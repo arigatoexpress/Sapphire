@@ -1,88 +1,103 @@
 {% extends "base.html" %}
 
 {% block content %}
-<!-- Command Deck Stats -->
+<!-- Trading Stats -->
 <div class="grid grid-4" style="margin-bottom: var(--space-xl);">
     <div class="stat-card">
-        <div class="stat-label">Signal Queue</div>
-        <div class="stat-value" id="signal-queue">--</div>
-        <div class="stat-change">Pending signals</div>
+        <div class="stat-label">Signals Today</div>
+        <div class="stat-value" id="signals-today">--</div>
+        <div class="stat-change">From pipeline</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">Workbench Status</div>
-        <div class="stat-value" id="workbench-status" style="color: var(--text);">--</div>
-        <div class="stat-change">Current state</div>
+        <div class="stat-label">Win Rate</div>
+        <div class="stat-value" id="win-rate" style="color: var(--success);">--%</div>
+        <div class="stat-change" id="win-loss">-- wins / -- losses</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">Proposals Today</div>
-        <div class="stat-value" id="proposals-today">--</div>
-        <div class="stat-change">AI analyzed</div>
+        <div class="stat-label">Total P&amp;L</div>
+        <div class="stat-value" id="total-pnl">$--</div>
+        <div class="stat-change">30-day cumulative</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">Success Rate</div>
-        <div class="stat-value" id="proposal-success">--%</div>
-        <div class="stat-change">Approved/Total</div>
+        <div class="stat-label">Pipeline</div>
+        <div class="stat-value" id="pipeline-status" style="color: var(--text);">--</div>
+        <div class="stat-change">Signal logger :18081</div>
     </div>
 </div>
 
-<!-- Command Deck Interface -->
+<!-- Recent Signals Table -->
 <div class="card" style="margin-bottom: var(--space-xl);">
     <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-terminal" style="margin-right: 8px; color: var(--success);"></i>Tactical Command Deck</h3>
-        <div style="display: flex; gap: var(--space-sm);">
-            <a href="https://sapphire-command-deck-267358751314.us-central1.run.app" target="_blank" class="btn btn-secondary" style="font-size: 0.8rem;">
-                <i class="fas fa-external-link-alt"></i> Full Screen
-            </a>
-        </div>
+        <h3 class="card-title">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px; color: var(--success); vertical-align: middle;"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
+            Today's Signals
+        </h3>
+        <button class="btn btn-secondary" onclick="refreshMetrics()" style="font-size: 0.8rem;">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle;"><polyline points="23,4 23,10 17,10"/><polyline points="1,20 1,14 7,14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+            Refresh
+        </button>
     </div>
-    <div class="card-body" style="padding: 0; height: 700px;">
-        <iframe 
-            src="https://sapphire-command-deck-267358751314.us-central1.run.app" 
-            style="width: 100%; height: 100%; border: none; border-radius: 0 0 12px 12px;"
-            title="Command Deck"
-        ></iframe>
+    <div class="card-body" style="padding: 0;">
+        <div id="signals-table">
+            <div class="loading" style="padding: var(--space-lg);">
+                <div class="spinner"></div> Loading signals...
+            </div>
+        </div>
     </div>
 </div>
 
-<!-- Signal Controls -->
+<!-- Signal Controls + Pipeline Status -->
 <div class="grid grid-2">
     <div class="card">
         <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-broadcast-tower" style="margin-right: 8px; color: var(--warning);"></i>Signal Controls</h3>
+            <h3 class="card-title">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px; color: var(--warning); vertical-align: middle;"><path d="M1 6l10.5 6L22 6"/><path d="M1 18l10.5-6L22 18"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+                Signal Controls
+            </h3>
         </div>
         <div class="card-body">
             <div style="display: flex; flex-direction: column; gap: var(--space-md);">
                 <button class="btn btn-primary" onclick="testSignal()">
-                    <i class="fas fa-paper-plane"></i> Send Test Signal
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle;"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>
+                    Send Test Signal
                 </button>
-                <button class="btn btn-secondary" onclick="pauseWorkbench()">
-                    <i class="fas fa-pause"></i> Pause Workbench
-                </button>
-                <button class="btn btn-secondary" onclick="resumeWorkbench()">
-                    <i class="fas fa-play"></i> Resume Workbench
-                </button>
-                <button class="btn btn-secondary" onclick="flushQueue()">
-                    <i class="fas fa-broom"></i> Flush Signal Queue
-                </button>
+                <a href="http://127.0.0.1:18081" target="_blank" class="btn btn-secondary">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle;"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15,3 21,3 21,9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    Signal Logger :18081
+                </a>
+                <a href="/signals" class="btn btn-secondary">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle;"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                    Signals Page
+                </a>
             </div>
         </div>
     </div>
-    
+
     <div class="card">
         <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-info-circle" style="margin-right: 8px; color: var(--info);"></i>Command Deck Info</h3>
+            <h3 class="card-title">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px; color: var(--info); vertical-align: middle;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                Pipeline Info
+            </h3>
         </div>
         <div class="card-body">
-            <div style="font-size: 0.9rem; line-height: 1.8;">
-                <p><strong>Version:</strong> 2.0</p>
-                <p><strong>Environment:</strong> Production</p>
-                <p><strong>Data Source:</strong> Firestore (Real-time)</p>
-                <p><strong>Last Updated:</strong> <span id="last-updated">--</span></p>
-                <hr style="border-color: var(--border); margin: var(--space-md) 0;">
-                <p style="color: var(--text-muted);">
-                    The Command Deck provides real-time visibility into the trading pipeline: 
-                    TradingView signals → Windows Webhook → AI Analysis → Trade Execution.
-                </p>
+            <div style="font-size: 0.9rem; line-height: 1.9;">
+                <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--border);">
+                    <span style="color: var(--text-muted);">Signal logger</span>
+                    <span id="logger-status">checking...</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--border);">
+                    <span style="color: var(--text-muted);">JSONL path</span>
+                    <code style="font-size: 0.78rem;">data/signals/YYYY-MM-DD.jsonl</code>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--border);">
+                    <span style="color: var(--text-muted);">Win rate source</span>
+                    <span>outcome-tagged signals</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 4px 0;">
+                    <span style="color: var(--text-muted);">Last refresh</span>
+                    <span id="last-refresh">--</span>
+                </div>
             </div>
         </div>
     </div>
@@ -91,51 +106,122 @@
 
 {% block extra_js %}
 <script>
-    async function fetchCommandDeckStats() {
+    const ROUTING_COLORS = {
+        'CONFIRMATION_REQUIRED': 'var(--amber)',
+        'NOTIFY':                'var(--primary)',
+        'LOG_ONLY':              'var(--text-muted)',
+        'BLOCKED':               'var(--danger)',
+    };
+
+    async function refreshMetrics() {
         try {
-            // Fetch from command deck API
-            const response = await fetch('/api/trading/metrics', { credentials: 'same-origin' });
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const data = await response.json();
-            
-            document.getElementById('proposals-today').textContent = data.trades?.today || 0;
-            document.getElementById('proposal-success').textContent = (data.trades?.success_rate || 0) + '%';
-            
-            const workbenchStatus = document.getElementById('workbench-status');
-            workbenchStatus.textContent = 'Active';
-            workbenchStatus.style.color = 'var(--success)';
-            
+            const r = await fetch('/api/trading/metrics', { credentials: 'same-origin' });
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const d = await r.json();
+
+            // Stats
+            document.getElementById('signals-today').textContent = d.signals_today ?? 0;
+
+            const wr = d.win_rate;
+            const wrEl = document.getElementById('win-rate');
+            if (wr !== null && wr !== undefined) {
+                wrEl.textContent = (wr * 100).toFixed(0) + '%';
+                wrEl.style.color = wr >= 0.5 ? 'var(--success)' : 'var(--danger)';
+            } else {
+                wrEl.textContent = 'N/A';
+                wrEl.style.color = 'var(--text-muted)';
+            }
+            document.getElementById('win-loss').textContent = `${d.wins ?? 0} wins / ${d.losses ?? 0} losses`;
+
+            const pnl = d.total_pnl_usd ?? 0;
+            const pnlEl = document.getElementById('total-pnl');
+            pnlEl.textContent = `$${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}`;
+            pnlEl.style.color = pnl >= 0 ? 'var(--success)' : 'var(--danger)';
+
+            const active = d.pipeline?.webhook_active;
+            const ps = document.getElementById('pipeline-status');
+            ps.textContent = active ? 'Active' : 'Offline';
+            ps.style.color = active ? 'var(--success)' : 'var(--danger)';
+
+            const loggerEl = document.getElementById('logger-status');
+            loggerEl.textContent = active ? '✓ Online' : '✗ Offline';
+            loggerEl.style.color = active ? 'var(--success)' : 'var(--danger)';
+
+            // Recent signals table
+            const signals = d.recent || [];
+            const table = document.getElementById('signals-table');
+            if (signals.length === 0) {
+                table.innerHTML = '<div class="empty-state" style="padding: var(--space-xl);"><p>No signals today yet.</p></div>';
+            } else {
+                table.innerHTML = `
+                    <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+                        <thead>
+                            <tr style="border-bottom:2px solid var(--border);text-align:left;">
+                                <th style="padding:10px 16px;color:var(--text-muted);font-weight:500;">ID</th>
+                                <th style="padding:10px 16px;color:var(--text-muted);font-weight:500;">Symbol</th>
+                                <th style="padding:10px 16px;color:var(--text-muted);font-weight:500;">Action</th>
+                                <th style="padding:10px 16px;color:var(--text-muted);font-weight:500;">Score</th>
+                                <th style="padding:10px 16px;color:var(--text-muted);font-weight:500;">Routing</th>
+                                <th style="padding:10px 16px;color:var(--text-muted);font-weight:500;">Outcome</th>
+                                <th style="padding:10px 16px;color:var(--text-muted);font-weight:500;">P&L</th>
+                                <th style="padding:10px 16px;color:var(--text-muted);font-weight:500;">Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${signals.map(s => {
+                                const outcomeColor = s.outcome === 'win' ? 'var(--success)'
+                                    : s.outcome === 'loss' ? 'var(--danger)'
+                                    : s.outcome === 'break_even' ? 'var(--text-muted)'
+                                    : 'var(--text-muted)';
+                                const pnlStr = s.pnl_usd !== null && s.pnl_usd !== undefined
+                                    ? `$${s.pnl_usd >= 0 ? '+' : ''}${s.pnl_usd.toFixed(2)}`
+                                    : '--';
+                                return `
+                                <tr style="border-bottom:1px solid var(--border);">
+                                    <td style="padding:10px 16px;font-family:monospace;color:var(--text-muted);">${s.id}</td>
+                                    <td style="padding:10px 16px;font-weight:600;">${s.symbol}</td>
+                                    <td style="padding:10px 16px;">${s.action}</td>
+                                    <td style="padding:10px 16px;">${s.score?.toFixed(1) ?? '--'}</td>
+                                    <td style="padding:10px 16px;"><span style="color:${ROUTING_COLORS[s.routing] || 'var(--text-muted)'};">${s.routing}</span></td>
+                                    <td style="padding:10px 16px;"><span style="color:${outcomeColor};">${s.outcome ?? 'open'}</span></td>
+                                    <td style="padding:10px 16px;color:${s.pnl_usd > 0 ? 'var(--success)' : s.pnl_usd < 0 ? 'var(--danger)' : 'inherit'};">${pnlStr}</td>
+                                    <td style="padding:10px 16px;color:var(--text-muted);">${s.ts}</td>
+                                </tr>`;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+
+            document.getElementById('last-refresh').textContent = new Date().toLocaleTimeString();
         } catch (e) {
-            console.error('Failed to fetch command deck stats:', e);
+            console.error('Failed to fetch trading metrics:', e);
         }
     }
-    
-    function testSignal() {
-        alert('Test signal feature coming soon!\n\nThis will send a test trading signal through the pipeline.');
-    }
-    
-    function pauseWorkbench() {
-        alert('Workbench paused!');
-    }
-    
-    function resumeWorkbench() {
-        alert('Workbench resumed!');
-    }
-    
-    function flushQueue() {
-        if (confirm('Are you sure you want to flush the signal queue?')) {
-            alert('Signal queue flushed!');
+
+    async function testSignal() {
+        try {
+            const r = await fetch('http://127.0.0.1:18081/api/signals', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    symbol: 'BTC', action: 'buy', price: 94000, confidence: 0.72, strategy: 'ManualTest'
+                }),
+            });
+            if (r.ok) {
+                alert('Test signal sent to pipeline!');
+                setTimeout(refreshMetrics, 1500);
+            } else {
+                alert(`Signal logger returned ${r.status}. Check :18081 is running.`);
+            }
+        } catch (e) {
+            alert(`Cannot reach signal logger: ${e.message}`);
         }
     }
-    
-    function updateTimestamp() {
-        const now = new Date();
-        document.getElementById('last-updated').textContent = now.toLocaleString();
-    }
-    
+
     document.addEventListener('DOMContentLoaded', () => {
-        fetchCommandDeckStats();
-        updateTimestamp();
+        refreshMetrics();
+        setInterval(refreshMetrics, 30000);
     });
 </script>
 {% endblock %}

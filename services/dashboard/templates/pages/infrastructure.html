@@ -1,194 +1,423 @@
 {% extends "base.html" %}
 
+{% block title %}Infrastructure{% endblock %}
+
+{% block extra_css %}
+.device-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    transition: border-color 0.2s;
+}
+
+.device-card:hover { border-color: rgba(59,130,246,0.3); }
+
+.device-header {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.device-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.device-body { padding: 16px; }
+
+.svc-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-size: 0.82rem;
+}
+
+.svc-row:last-child { border-bottom: none; }
+
+.svc-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-right: 8px;
+}
+
+.svc-dot.healthy { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.svc-dot.down    { background: var(--red);   box-shadow: 0 0 6px var(--red); }
+.svc-dot.unknown { background: var(--text-muted); }
+
+.flow-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.flow-icon {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.flow-arrow {
+    color: var(--text-muted);
+    font-size: 20px;
+    line-height: 1;
+    align-self: center;
+    padding: 0 8px;
+}
+
+@media (max-width: 700px) {
+    .flow-wrapper { flex-direction: column; }
+    .flow-arrow   { transform: rotate(90deg); }
+}
+{% endblock %}
+
 {% block content %}
-<!-- Infrastructure Overview -->
-<div class="grid grid-3" style="margin-bottom: var(--space-xl);">
+<!-- Summary KPIs -->
+<div class="grid grid-4" style="margin-bottom: var(--space-xl);">
     <div class="stat-card">
-        <div class="stat-label">Cloud Run Services</div>
-        <div class="stat-value" style="color: var(--primary);">10</div>
-        <div class="stat-change">GCP us-central1</div>
+        <div class="stat-label">Mac Services</div>
+        <div class="stat-value" id="mac-healthy" style="color:var(--green);">--</div>
+        <div class="stat-change" id="mac-total">of -- healthy</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">Raspberry Pi Nodes</div>
-        <div class="stat-value" style="color: var(--secondary);">2</div>
+        <div class="stat-label">Inference Tier</div>
+        <div class="stat-value" id="active-tier" style="color:var(--accent);">--</div>
+        <div class="stat-change" id="tier-latency">Checking…</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Windows GPU</div>
+        <div class="stat-value" id="gpu-status" style="color:var(--text-primary);">--</div>
+        <div class="stat-change">100.71.10.48 · RTX 5070 Ti</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Pi Cluster</div>
+        <div class="stat-value" id="pi-status" style="color:var(--text-primary);">--</div>
         <div class="stat-change">rari1 + rari2</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Windows Workstation</div>
-        <div class="stat-value" style="color: var(--accent);">1</div>
-        <div class="stat-change">Webhook + Trading</div>
     </div>
 </div>
 
-<!-- Architecture Diagram -->
-<div class="card" style="margin-bottom: var(--space-xl);">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-sitemap" style="margin-right: 8px; color: var(--primary);"></i>System Architecture</h3>
+<!-- Device Grid -->
+<div class="grid grid-2" style="margin-bottom: var(--space-xl);">
+
+    <!-- Mac Commander -->
+    <div class="device-card">
+        <div class="device-header">
+            <div class="device-title">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--accent)"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                Mac — Commander
+            </div>
+            <span class="badge badge-info">100.67.171.79</span>
+        </div>
+        <div class="device-body">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:12px;letter-spacing:.06em;">Local Services</div>
+            <div id="mac-services">
+                <div class="loading"><div class="spinner"></div>Loading…</div>
+            </div>
+        </div>
     </div>
-    <div class="card-body">
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-lg);">
-            <!-- Cloud Section -->
-            <div class="card" style="background: var(--bg-glass);">
-                <div class="card-header" style="border-bottom: 1px solid var(--border);">
-                    <h4 style="color: var(--primary);"><i class="fas fa-cloud"></i> Google Cloud Platform</h4>
+
+    <!-- Windows GPU -->
+    <div class="device-card">
+        <div class="device-header">
+            <div class="device-title">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--amber)"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                Windows Workstation
+            </div>
+            <span class="badge badge-info">100.71.10.48</span>
+        </div>
+        <div class="device-body">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:12px;letter-spacing:.06em;">GPU Inference + Webhook</div>
+            <div id="windows-services">
+                <div class="loading"><div class="spinner"></div>Loading…</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pi Cluster -->
+    <div class="device-card">
+        <div class="device-header">
+            <div class="device-title">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--green)"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+                Pi Cluster
+            </div>
+            <span class="badge badge-info">Tailscale</span>
+        </div>
+        <div class="device-body">
+            <div id="pi-services">
+                <div class="svc-row">
+                    <div style="display:flex;align-items:center;">
+                        <span class="svc-dot unknown"></span>
+                        <span style="color:var(--text-secondary);">rari1</span>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:0.75rem;color:var(--text-muted);">100.120.191.1</div>
+                        <div style="font-size:0.72rem;color:var(--amber);margin-top:2px;">SSH port 22 refused</div>
+                    </div>
                 </div>
-                <div class="card-body" style="font-size: 0.9rem;">
-                    <ul style="list-style: none; line-height: 2;">
-                        <li>☁️ <a href="https://sapphire-dashboard-267358751314.us-central1.run.app" target="_blank">sapphire-dashboard</a></li>
-                        <li>☁️ <a href="https://sapphire-command-deck-267358751314.us-central1.run.app" target="_blank">sapphire-command-deck</a></li>
-                        <li>☁️ <a href="https://sapphire-gateway-267358751314.us-central1.run.app" target="_blank">sapphire-gateway</a></li>
-                        <li>☁️ <a href="https://sapphire-log-viewer-267358751314.us-central1.run.app" target="_blank">sapphire-log-viewer</a></li>
-                        <li>☁️ <a href="https://sapphire-telegram-bot-267358751314.us-central1.run.app" target="_blank">sapphire-telegram-bot</a></li>
-                        <li>☁️ <a href="https://sapphire-health-dashboard-s77j6bxyra-uc.a.run.app" target="_blank">sapphire-health-dashboard</a></li>
-                        <li>☁️ <a href="https://agentic-pm-hub-267358751314.us-central1.run.app" target="_blank">agentic-pm-hub</a></li>
-                    </ul>
+                <div class="svc-row">
+                    <div style="display:flex;align-items:center;">
+                        <span class="svc-dot unknown"></span>
+                        <span style="color:var(--text-secondary);">rari2</span>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:0.75rem;color:var(--text-muted);">100.87.225.89 · 192.168.1.21</div>
+                        <div style="font-size:0.72rem;color:var(--red);margin-top:2px;">Offline — needs power cycle</div>
+                    </div>
+                </div>
+                <div style="margin-top:12px;padding:10px;background:rgba(240,136,62,0.06);border:1px solid rgba(240,136,62,0.2);border-radius:8px;font-size:0.75rem;color:var(--text-muted);">
+                    Pi tier is optional failover. System resilient without it per design.
                 </div>
             </div>
-            
-            <!-- Pi Cluster Section -->
-            <div class="card" style="background: var(--bg-glass);">
-                <div class="card-header" style="border-bottom: 1px solid var(--border);">
-                    <h4 style="color: var(--secondary);"><i class="fas fa-server"></i> Raspberry Pi Cluster</h4>
-                </div>
-                <div class="card-body" style="font-size: 0.9rem;">
-                    <div style="margin-bottom: var(--space-md);">
-                        <strong>rari1 (192.168.1.23)</strong>
-                        <ul style="list-style: none; padding-left: var(--space-md); line-height: 1.8; color: var(--text-muted);">
-                            <li>• Controller + Dashboard</li>
-                            <li>• Webhook Port 18890</li>
-                            <li>• Telegram Bot</li>
-                        </ul>
-                    </div>
-                    <div>
-                        <strong>rari2 (192.168.1.173)</strong>
-                        <ul style="list-style: none; padding-left: var(--space-md); line-height: 1.8; color: var(--text-muted);">
-                            <li>• Trading Engine (Lighter)</li>
-                            <li>• Trading API Port 18888</li>
-                            <li>• ProtonVPN (Switzerland)</li>
-                        </ul>
-                    </div>
-                </div>
+        </div>
+    </div>
+
+    <!-- Inference Proxy -->
+    <div class="device-card">
+        <div class="device-header">
+            <div class="device-title">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--accent)"><polyline points="16,3 21,3 21,8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21,16 21,21 16,21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>
+                Inference Proxy :11435
             </div>
-            
-            <!-- Windows Section -->
-            <div class="card" style="background: var(--bg-glass);">
-                <div class="card-header" style="border-bottom: 1px solid var(--border);">
-                    <h4 style="color: var(--accent);"><i class="fas fa-desktop"></i> Windows Workstation</h4>
-                </div>
-                <div class="card-body" style="font-size: 0.9rem;">
-                    <div style="margin-bottom: var(--space-md);">
-                        <strong>IP: 100.71.10.48</strong>
-                        <ul style="list-style: none; padding-left: var(--space-md); line-height: 1.8; color: var(--text-muted);">
-                            <li>• Webhook Receiver (Port 9090)</li>
-                            <li>• TradingView Integration</li>
-                            <li>• Firestore Logging</li>
-                            <li>• AI Trading Scripts</li>
-                        </ul>
-                    </div>
-                    <div style="padding: var(--space-md); background: var(--bg-dark); border-radius: 6px; font-size: 0.8rem;">
-                        <strong>Directories:</strong><br>
-                        D:/AsterAI<br>
-                        D:/tradingview-webhook<br>
-                        D:/SapphireAlpha
-                    </div>
-                </div>
+            <span class="badge badge-info">4-Tier Failover</span>
+        </div>
+        <div class="device-body">
+            <div id="inference-tiers">
+                <div class="loading"><div class="spinner"></div>Loading…</div>
             </div>
         </div>
     </div>
 </div>
 
 <!-- Data Flow -->
-<div class="card">
+<div class="card" style="margin-bottom: var(--space-xl);">
     <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-project-diagram" style="margin-right: 8px; color: var(--success);"></i>Data Flow</h3>
+        <h3 class="card-title">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;color:var(--green);vertical-align:middle"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            Trading Signal Flow
+        </h3>
     </div>
     <div class="card-body">
-        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-md); padding: var(--space-lg); background: var(--bg-glass); border-radius: 8px;">
-            <div style="text-align: center;">
-                <div style="width: 80px; height: 80px; background: linear-gradient(135deg, var(--primary), var(--secondary)); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-sm);">
-                    <i class="fas fa-chart-line" style="font-size: 1.5rem; color: white;"></i>
+        <div class="flow-wrapper" style="display:flex;align-items:center;justify-content:space-around;flex-wrap:wrap;gap:var(--space-md);padding:var(--space-md);background:rgba(0,0,0,0.2);border-radius:10px;">
+            <div class="flow-step">
+                <div class="flow-icon" style="background:linear-gradient(135deg,var(--accent),var(--accent-dim));">
+                    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="white" stroke-width="2"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
                 </div>
-                <strong>TradingView</strong>
-                <div style="font-size: 0.8rem; color: var(--text-muted);">Alerts</div>
+                <strong style="font-size:.82rem;">TradingView</strong>
+                <div style="font-size:.72rem;color:var(--text-muted);">Pine alerts</div>
             </div>
-            <i class="fas fa-arrow-right" style="font-size: 1.5rem; color: var(--text-muted);"></i>
-            <div style="text-align: center;">
-                <div style="width: 80px; height: 80px; background: linear-gradient(135deg, var(--accent), var(--warning)); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-sm);">
-                    <i class="fas fa-desktop" style="font-size: 1.5rem; color: white;"></i>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step">
+                <div class="flow-icon" style="background:linear-gradient(135deg,var(--amber),rgba(240,136,62,0.3));">
+                    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="white" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                 </div>
-                <strong>Windows</strong>
-                <div style="font-size: 0.8rem; color: var(--text-muted);">Webhook</div>
+                <strong style="font-size:.82rem;">Windows</strong>
+                <div style="font-size:.72rem;color:var(--text-muted);">Webhook :9090</div>
             </div>
-            <i class="fas fa-arrow-right" style="font-size: 1.5rem; color: var(--text-muted);"></i>
-            <div style="text-align: center;">
-                <div style="width: 80px; height: 80px; background: linear-gradient(135deg, var(--secondary), var(--primary)); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-sm);">
-                    <i class="fas fa-database" style="font-size: 1.5rem; color: white;"></i>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step">
+                <div class="flow-icon" style="background:linear-gradient(135deg,var(--green),rgba(34,197,94,0.3));">
+                    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="white" stroke-width="2"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
                 </div>
-                <strong>Firestore</strong>
-                <div style="font-size: 0.8rem; color: var(--text-muted);">Logs + Metrics</div>
+                <strong style="font-size:.82rem;">Signal Logger</strong>
+                <div style="font-size:.72rem;color:var(--text-muted);">Mac :18081</div>
             </div>
-            <i class="fas fa-arrow-right" style="font-size: 1.5rem; color: var(--text-muted);"></i>
-            <div style="text-align: center;">
-                <div style="width: 80px; height: 80px; background: linear-gradient(135deg, var(--success), var(--info)); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-sm);">
-                    <i class="fas fa-terminal" style="font-size: 1.5rem; color: white;"></i>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step">
+                <div class="flow-icon" style="background:linear-gradient(135deg,rgba(59,130,246,0.8),rgba(59,130,246,0.3));">
+                    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="white" stroke-width="2"><path d="M21.2 8.4c.5.38.8.97.8 1.6v10a2 2 0 01-2 2H4a2 2 0 01-2-2V10a2 2 0 012-2h3.8M16 4h2a2 2 0 012 2v2M8 4H6a2 2 0 00-2 2v2M12 4v8M8 12l4 4 4-4"/></svg>
                 </div>
-                <strong>Command Deck</strong>
-                <div style="font-size: 0.8rem; color: var(--text-muted);">Dashboard</div>
+                <strong style="font-size:.82rem;">Telegram</strong>
+                <div style="font-size:.72rem;color:var(--text-muted);">Hermes bot</div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Configuration Reference -->
-<div class="card" style="margin-top: var(--space-xl);">
+<!-- Config Table -->
+<div class="card">
     <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-cog" style="margin-right: 8px; color: var(--info);"></i>Configuration Reference</h3>
+        <h3 class="card-title">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;color:var(--text-secondary);vertical-align:middle"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+            Service Reference
+        </h3>
+        <span style="font-size:0.75rem;color:var(--text-muted)" id="svc-updated">--</span>
     </div>
-    <div class="card-body">
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Service</th>
-                        <th>URL / IP</th>
-                        <th>Purpose</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><i class="fas fa-globe" style="margin-right: 8px; color: var(--primary);"></i>sapphirealpha.xyz</td>
-                        <td>Custom Domain</td>
-                        <td>Main Dashboard</td>
-                        <td><span class="badge badge-success">Active</span></td>
-                    </tr>
-                    <tr>
-                        <td><i class="fas fa-cloud" style="margin-right: 8px; color: var(--primary);"></i>Gateway</td>
-                        <td>Cloud Run</td>
-                        <td>API Gateway</td>
-                        <td><span class="badge badge-success">Active</span></td>
-                    </tr>
-                    <tr>
-                        <td><i class="fas fa-server" style="margin-right: 8px; color: var(--secondary);"></i>rari1</td>
-                        <td>192.168.1.23</td>
-                        <td>Controller Node</td>
-                        <td><span class="badge badge-warning">Check</span></td>
-                    </tr>
-                    <tr>
-                        <td><i class="fas fa-server" style="margin-right: 8px; color: var(--secondary);"></i>rari2</td>
-                        <td>192.168.1.173</td>
-                        <td>Trading Engine</td>
-                        <td><span class="badge badge-success">Active</span></td>
-                    </tr>
-                    <tr>
-                        <td><i class="fas fa-desktop" style="margin-right: 8px; color: var(--accent);"></i>Windows</td>
-                        <td>100.71.10.48</td>
-                        <td>Webhook + Trading</td>
-                        <td><span class="badge badge-success">Active</span></td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+    <div class="card-body table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Service</th>
+                    <th>Endpoint</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="svc-table">
+                <tr><td colspan="4"><div class="loading"><div class="spinner"></div>Loading…</div></td></tr>
+            </tbody>
+        </table>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const MAC_SVC_META = {
+        'control-plane':   { label: 'Control Plane',   port: 8082,  role: 'PM hub, tasks, Kimi bridge' },
+        'dashboard':       { label: 'Dashboard',        port: 8080,  role: 'This UI (auth: sapphire)' },
+        'signal-logger':   { label: 'Signal Logger',    port: 18081, role: 'TradingView signal ingest' },
+        'openbb-api':      { label: 'OpenBB API',       port: 6900,  role: '32 financial data providers' },
+        'regional-intel':  { label: 'Regional Intel',   port: 8787,  role: 'Vote monitor + intel console' },
+        'inference-proxy': { label: 'Inference Proxy',  port: 11435, role: '4-tier GPU→Pi→Mac→Kimi failover' },
+        'redis':           { label: 'Redis',             port: 6379,  role: 'Cache + pub/sub' },
+    };
+
+    const TIER_META = [
+        { id: 't1',   label: 'T1 — Windows GPU',  host: '100.71.10.48', models: '27 models (RTX 5070 Ti)' },
+        { id: 't2a',  label: 'T2a — rari1 Pi',    host: '100.120.191.1', models: 'nemotron-mini, smollm2, qwen2.5' },
+        { id: 't2b',  label: 'T2b — rari2 Pi',    host: '100.87.225.89', models: '4 models (offline)' },
+        { id: 't3',   label: 'T3 — Mac Local',     host: '127.0.0.1',   models: '6 Ollama models' },
+        { id: 't4',   label: 'T4 — Kimi Cloud',    host: 'api.moonshot.cn', models: 'kimi-cloud (non-sensitive)' },
+    ];
+
+    async function loadInfrastructure() {
+        try {
+            const res = await fetch('/api/system', { credentials: 'same-origin' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+
+            renderMacServices(data.services || []);
+            renderWindowsStatus(data);
+            renderInferenceTiers(data.inference || {});
+            renderKPIs(data);
+            renderSvcTable(data.services || []);
+
+            document.getElementById('svc-updated').textContent =
+                'Updated ' + new Date().toLocaleTimeString();
+        } catch (e) {
+            console.error('Infrastructure load failed:', e);
+        }
+    }
+
+    function dot(healthy) {
+        const cls = healthy === true ? 'healthy' : healthy === false ? 'down' : 'unknown';
+        return `<span class="svc-dot ${cls}"></span>`;
+    }
+
+    function renderMacServices(services) {
+        const container = document.getElementById('mac-services');
+        if (!services.length) {
+            container.innerHTML = '<div class="empty-state"><p>No service data</p></div>';
+            return;
+        }
+        container.innerHTML = services.map(svc => {
+            const meta = MAC_SVC_META[svc.name] || { label: svc.name, port: svc.port, role: '' };
+            return `<div class="svc-row">
+                <div style="display:flex;align-items:center;">
+                    ${dot(svc.healthy)}
+                    <span style="color:var(--text-secondary);">${meta.label}</span>
+                </div>
+                <div style="text-align:right;">
+                    <span class="badge badge-${svc.healthy ? 'success' : 'danger'}" style="font-size:.68rem;">${svc.healthy ? 'online' : 'down'}</span>
+                    <div style="font-size:.72rem;color:var(--text-muted);margin-top:2px;">:${svc.port}</div>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function renderWindowsStatus(data) {
+        const cdp = data.cdp || {};
+        const container = document.getElementById('windows-services');
+        const gpu = cdp.connected;
+        container.innerHTML = `
+            <div class="svc-row">
+                <div style="display:flex;align-items:center;">${dot(true)}<span style="color:var(--text-secondary);">Ollama :11434</span></div>
+                <div style="text-align:right;"><span class="badge badge-success" style="font-size:.68rem;">27 models</span><div style="font-size:.72rem;color:var(--text-muted);margin-top:2px;">RTX 5070 Ti</div></div>
+            </div>
+            <div class="svc-row">
+                <div style="display:flex;align-items:center;">${dot(true)}<span style="color:var(--text-secondary);">Webhook :9090</span></div>
+                <div style="text-align:right;"><span class="badge badge-success" style="font-size:.68rem;">online</span><div style="font-size:.72rem;color:var(--text-muted);margin-top:2px;">TradingView ingest</div></div>
+            </div>
+            <div class="svc-row">
+                <div style="display:flex;align-items:center;">${dot(gpu)}<span style="color:var(--text-secondary);">TradingView CDP</span></div>
+                <div style="text-align:right;"><span class="badge badge-${gpu ? 'success' : 'danger'}" style="font-size:.68rem;">${gpu ? `${cdp.tv_tabs} TV tabs` : 'disconnected'}</span><div style="font-size:.72rem;color:var(--text-muted);margin-top:2px;">Port 9222</div></div>
+            </div>
+        `;
+    }
+
+    function renderInferenceTiers(inference) {
+        const tiers = inference.tiers || {};
+        const container = document.getElementById('inference-tiers');
+        container.innerHTML = TIER_META.map(t => {
+            const tier = tiers[t.id] || {};
+            const healthy = tier.healthy;
+            return `<div class="svc-row">
+                <div style="display:flex;align-items:center;">
+                    ${dot(healthy)}
+                    <div>
+                        <div style="color:var(--text-secondary);font-size:.82rem;">${t.label}</div>
+                        <div style="color:var(--text-muted);font-size:.72rem;">${t.host}</div>
+                    </div>
+                </div>
+                <div style="text-align:right;">
+                    <span class="badge badge-${healthy === true ? 'success' : healthy === false ? 'danger' : 'info'}" style="font-size:.68rem;">${healthy === true ? 'active' : healthy === false ? 'offline' : '?'}</span>
+                    <div style="font-size:.72rem;color:var(--text-muted);margin-top:2px;">${t.models}</div>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function renderKPIs(data) {
+        const svcs = data.services || [];
+        const healthy = svcs.filter(s => s.healthy).length;
+        const total   = svcs.length;
+        const tiers   = data.inference?.tiers || {};
+
+        document.getElementById('mac-healthy').textContent = healthy;
+        document.getElementById('mac-total').textContent   = `of ${total} healthy`;
+
+        const activeTier = tiers.t1?.healthy ? 'T1 GPU' : tiers.t2a?.healthy ? 'T2 Pi' : 'T3 Mac';
+        document.getElementById('active-tier').textContent = activeTier;
+        document.getElementById('tier-latency').textContent = tiers.t1?.healthy
+            ? '~0.4s RTX 5070 Ti' : 'Failover active';
+
+        const gpuOk = tiers.t1?.healthy;
+        document.getElementById('gpu-status').textContent = gpuOk ? 'Online' : 'Offline';
+        document.getElementById('gpu-status').style.color = gpuOk ? 'var(--green)' : 'var(--red)';
+
+        // Pi status from data (both known offline/SSH refused)
+        document.getElementById('pi-status').textContent = 'Degraded';
+        document.getElementById('pi-status').style.color = 'var(--amber)';
+    }
+
+    function renderSvcTable(services) {
+        if (!services.length) return;
+        document.getElementById('svc-table').innerHTML = services.map(svc => {
+            const meta = MAC_SVC_META[svc.name] || { label: svc.name, port: svc.port, role: svc.name };
+            return `<tr>
+                <td style="display:flex;align-items:center;gap:8px;">${dot(svc.healthy)}<span>${meta.label}</span></td>
+                <td><code style="font-size:.78rem;">127.0.0.1:${svc.port}</code></td>
+                <td style="color:var(--text-muted);font-size:.82rem;">${meta.role}</td>
+                <td><span class="badge badge-${svc.healthy ? 'success' : 'danger'}">${svc.healthy ? 'online' : 'down'}</span></td>
+            </tr>`;
+        }).join('');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadInfrastructure();
+        setInterval(loadInfrastructure, 30000);
+    });
+</script>
 {% endblock %}

@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 
-{% block page_subtitle %}Public trust policy, contract transparency, and privacy/security architecture including zero-knowledge attestation roadmap.{% endblock %}
+{% block title %}Settings & Policy{% endblock %}
+
+{% block page_subtitle %}Public trust policy, API contract status, and security architecture.{% endblock %}
 
 {% block extra_css %}
 .policy-hero {
@@ -14,8 +16,8 @@
     position: absolute;
     inset: 0;
     background:
-        radial-gradient(circle at 14% 18%, rgba(105, 212, 255, 0.2), transparent 44%),
-        radial-gradient(circle at 86% 14%, rgba(143, 125, 255, 0.18), transparent 36%);
+        radial-gradient(circle at 14% 18%, rgba(59,130,246,0.12), transparent 44%),
+        radial-gradient(circle at 86% 14%, rgba(34,197,94,0.08), transparent 36%);
     pointer-events: none;
 }
 
@@ -28,14 +30,16 @@
 }
 
 .policy-hero h2 {
-    font-size: 1.9rem;
-    line-height: 1.1;
+    font-size: 1.75rem;
+    line-height: 1.15;
     margin-bottom: var(--space-sm);
+    color: var(--text-primary);
 }
 
 .policy-hero p {
     color: var(--text-secondary);
     max-width: 66ch;
+    line-height: 1.6;
 }
 
 .policy-chip-row {
@@ -51,100 +55,116 @@
     gap: 6px;
     border-radius: 999px;
     border: 1px solid var(--border);
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(59,130,246,0.05);
     color: var(--text-secondary);
-    font-size: 0.8rem;
-    padding: 6px 12px;
+    font-size: 0.78rem;
+    padding: 5px 11px;
 }
 
-.policy-list {
-    display: grid;
-    gap: var(--space-sm);
-}
+.policy-list { display: grid; gap: var(--space-sm); }
 
 .policy-item {
     border: 1px solid var(--border);
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.04);
-    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.03);
+    padding: 10px 14px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.karpathy-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.karpathy-card {
+    border-radius: 8px;
+    padding: 12px 14px;
 }
 
 @media (max-width: 980px) {
-    .policy-hero-body {
-        grid-template-columns: 1fr;
-    }
-
-    .policy-hero h2 {
-        font-size: 1.6rem;
-    }
+    .policy-hero-body { grid-template-columns: 1fr; }
+    .policy-hero h2   { font-size: 1.4rem; }
+    .karpathy-grid    { grid-template-columns: 1fr; }
 }
 {% endblock %}
 
 {% block content %}
+<!-- Hero -->
 <div class="card policy-hero">
     <div class="card-body policy-hero-body">
         <div>
             <span class="policy-chip">Security Policy · Public Surface</span>
-            <h2>Transparent by Design, Protected by Boundaries</h2>
+            <h2>Transparent by Design,<br>Protected by Boundaries</h2>
             <p>
-                Sapphire's web platform is intentionally public and read-only. This page documents what data is exposed,
-                what is restricted, and how control boundaries are enforced.
+                Sapphire's dashboard is intentionally read-only. This page documents what data
+                is exposed, what is restricted, and how control boundaries are enforced.
             </p>
             <div class="policy-chip-row" id="policy-chip-row">
-                <span class="policy-chip"><i class="fas fa-lock"></i> Loading policy status...</span>
+                <span class="policy-chip">
+                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                    Checking policy status…
+                </span>
             </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:var(--space-sm);">
-            {% if mac_operator_app_url %}
-            <a class="btn btn-primary" href="{{ mac_operator_app_url }}">
-                <i class="fab fa-apple"></i> {{ mac_operator_app_label }}
+            <a class="btn btn-secondary" href="/sapphire-book">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
+                Sapphire Book
             </a>
-            {% endif %}
-            <a class="btn btn-secondary" href="/sapphire-book"><i class="fas fa-book-open"></i> Sapphire Book</a>
-            <a class="btn btn-secondary" href="/production-readiness"><i class="fas fa-shield-check"></i> Readiness</a>
+            <a class="btn btn-secondary" href="/production-readiness">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                Readiness Gates
+            </a>
         </div>
     </div>
 </div>
 
+<!-- KPI Row -->
 <div class="grid grid-4" style="margin-bottom: var(--space-xl);">
     <div class="stat-card">
-        <div class="stat-label">Public Access Mode</div>
-        <div class="stat-value" style="color: var(--warning);">Read-Only</div>
+        <div class="stat-label">Access Mode</div>
+        <div class="stat-value" style="color:var(--amber);">Read-Only</div>
         <div class="stat-change">No control endpoints</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">Contract Health</div>
+        <div class="stat-label">API Contracts</div>
         <div class="stat-value" id="policy-contract-health">--</div>
-        <div class="stat-change" id="policy-contract-note">Checking canonical APIs</div>
+        <div class="stat-change" id="policy-contract-note">Checking…</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">Readiness State</div>
+        <div class="stat-label">Readiness Gate</div>
         <div class="stat-value" id="policy-readiness">--</div>
-        <div class="stat-change" id="policy-readiness-note">Loading launch state</div>
+        <div class="stat-change" id="policy-readiness-note">Loading…</div>
     </div>
     <div class="stat-card">
         <div class="stat-label">Operator Surface</div>
-        <div class="stat-value">macOS</div>
-        <div class="stat-change">Privileged workflows only</div>
+        <div class="stat-value" style="color:var(--accent);">macOS</div>
+        <div class="stat-change">Privileged actions only</div>
     </div>
 </div>
 
+<!-- Contracts + Boundary Rules -->
 <div class="grid grid-2" style="margin-bottom: var(--space-xl);">
     <div class="card">
         <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-globe" style="margin-right: 8px; color: var(--primary);"></i>Public Contract Endpoints</h3>
+            <h3 class="card-title">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;color:var(--accent);vertical-align:middle"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+                API Contract Status
+            </h3>
         </div>
         <div class="card-body table-container">
             <table>
                 <thead>
                     <tr>
-                        <th>Contract</th>
+                        <th>Endpoint</th>
                         <th>Purpose</th>
                         <th>Status</th>
                     </tr>
                 </thead>
                 <tbody id="policy-contract-table">
-                    <tr><td colspan="3">Loading contract statuses...</td></tr>
+                    <tr><td colspan="3"><div class="loading"><div class="spinner"></div>Probing contracts…</div></td></tr>
                 </tbody>
             </table>
         </div>
@@ -152,153 +172,213 @@
 
     <div class="card">
         <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-shield-halved" style="margin-right: 8px; color: var(--accent);"></i>Security Boundary Rules</h3>
+            <h3 class="card-title">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;color:var(--green);vertical-align:middle"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                Security Boundary Rules
+            </h3>
         </div>
         <div class="card-body" id="policy-rules">
-            <div class="loading"><div class="spinner"></div>Loading policy rules...</div>
+            <div class="loading"><div class="spinner"></div>Loading rules…</div>
         </div>
     </div>
 </div>
 
+<!-- Attestation Stack -->
 <div class="card" style="margin-bottom: var(--space-xl);">
     <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-road" style="margin-right: 8px; color: var(--info);"></i>Sapphire Book Alignment</h3>
-    </div>
-    <div class="card-body" id="policy-book-alignment">
-        <div class="loading"><div class="spinner"></div>Loading alignment status...</div>
-    </div>
-</div>
-
-<div class="card" style="margin-bottom: var(--space-xl);">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-user-shield" style="margin-right: 8px; color: var(--secondary);"></i>Privacy & Attestation Stack</h3>
+        <h3 class="card-title">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;color:var(--text-secondary);vertical-align:middle"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Privacy & Attestation Stack
+        </h3>
     </div>
     <div class="card-body">
         <div class="policy-list">
-            <div class="policy-item" style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-sm);">
+            <div class="policy-item" style="display:flex;justify-content:space-between;align-items:center;">
                 <span>Scoped control tokens + signed ingress headers</span>
                 <span class="badge badge-success">active</span>
             </div>
-            <div class="policy-item" style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-sm);">
+            <div class="policy-item" style="display:flex;justify-content:space-between;align-items:center;">
                 <span>Secret Manager-backed credential handling</span>
                 <span class="badge badge-success">active</span>
             </div>
-            <div class="policy-item" style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-sm);">
-                <span>Sandbox-only external scraping controls</span>
+            <div class="policy-item" style="display:flex;justify-content:space-between;align-items:center;">
+                <span>Sensitivity gate blocks API keys/PII from reaching T4 Kimi cloud tier</span>
                 <span class="badge badge-success">active</span>
             </div>
-            <div class="policy-item" style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-sm);">
+            <div class="policy-item" style="display:flex;justify-content:space-between;align-items:center;">
                 <span>zkPass-style zero-knowledge operator attestations</span>
-                <span class="badge badge-warning">roadmap</span>
+                <span class="badge" style="background:rgba(240,136,62,0.15);color:var(--amber);border:1px solid rgba(240,136,62,0.3);">roadmap</span>
             </div>
-            <div class="policy-item" style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-sm);">
+            <div class="policy-item" style="display:flex;justify-content:space-between;align-items:center;">
                 <span>Privacy-preserving verification for partner workflows</span>
-                <span class="badge badge-warning">design</span>
+                <span class="badge" style="background:rgba(240,136,62,0.15);color:var(--amber);border:1px solid rgba(240,136,62,0.3);">design</span>
             </div>
         </div>
     </div>
 </div>
 
-<div class="card" style="border-color: rgba(255, 204, 102, 0.4); background: rgba(255, 204, 102, 0.07);">
+<!-- Karpathy Principles -->
+<div class="card" style="margin-bottom: var(--space-xl);">
     <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-triangle-exclamation" style="margin-right: 8px; color: var(--warning);"></i>Non-Negotiable Rule</h3>
+        <h3 class="card-title">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;color:var(--accent-bright);vertical-align:middle"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
+            Agent Workflow Discipline (Karpathy)
+        </h3>
     </div>
-    <div class="card-body" style="color: var(--text-secondary); line-height: 1.8;">
+    <div class="card-body">
+        <p style="color:var(--text-secondary);font-size:13px;margin-bottom:14px;line-height:1.6;">
+            All Claude Code tasks in this repo apply <strong style="color:var(--text-primary)">Andrej Karpathy's 4 coding discipline principles</strong>
+            defined in <code style="font-size:11px;background:rgba(255,255,255,0.05);padding:1px 6px;border-radius:3px;">CLAUDE.md</code>.
+        </p>
+        <div class="karpathy-grid">
+            <div class="karpathy-card" style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.18);">
+                <div style="font-size:11px;font-weight:700;color:var(--accent-bright);letter-spacing:.08em;margin-bottom:5px;">1. Think Before Coding</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Surface assumptions & ambiguities before implementing. Never pick silently.</div>
+            </div>
+            <div class="karpathy-card" style="background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.18);">
+                <div style="font-size:11px;font-weight:700;color:var(--green);letter-spacing:.08em;margin-bottom:5px;">2. Simplicity First</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Minimum code that solves the problem. No speculative features.</div>
+            </div>
+            <div class="karpathy-card" style="background:rgba(240,136,62,0.06);border:1px solid rgba(240,136,62,0.18);">
+                <div style="font-size:11px;font-weight:700;color:var(--amber);letter-spacing:.08em;margin-bottom:5px;">3. Surgical Changes</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Touch only what the request requires. Every changed line traces to the ask.</div>
+            </div>
+            <div class="karpathy-card" style="background:rgba(139,148,158,0.06);border:1px solid rgba(139,148,158,0.18);">
+                <div style="font-size:11px;font-weight:700;color:var(--text-secondary);letter-spacing:.08em;margin-bottom:5px;">4. Goal-Driven Execution</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Define verifiable success criteria before writing code.</div>
+            </div>
+        </div>
+        <div style="margin-top:12px;font-size:11px;color:var(--text-muted);">
+            Source: <code style="background:rgba(255,255,255,0.05);padding:1px 5px;border-radius:3px;">lib/core/src/sapphire_core/task_discipline.py</code>
+            · Hermes skill: <code style="background:rgba(255,255,255,0.05);padding:1px 5px;border-radius:3px;">/karpathy</code>
+        </div>
+    </div>
+</div>
+
+<!-- Non-negotiable rule -->
+<div class="card" style="border-color:rgba(240,136,62,0.3);background:rgba(240,136,62,0.04);">
+    <div class="card-header">
+        <h3 class="card-title">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;color:var(--amber);vertical-align:middle"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Non-Negotiable Rule
+        </h3>
+    </div>
+    <div class="card-body" style="color:var(--text-secondary);line-height:1.8;">
         No public UI action may trigger execution, dispatch, model reconfiguration, or infrastructure mutation.
+        All write operations are restricted to the macOS operator surface.
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+    // Real Sapphire API endpoints to probe
     const CONTRACT_ROWS = [
-        { name: '/api/platform/status', purpose: 'Live system health + service map' },
-        { name: '/api/platform/metrics', purpose: 'Aggregated metrics + market snapshot' },
-        { name: '/api/platform/logs', purpose: 'Operational event feed' },
-        { name: '/api/platform/intel-summary', purpose: 'AI market pulse and key movers' },
-        { name: '/api/platform/architecture-telemetry', purpose: 'Live topology and flow telemetry' },
-        { name: '/api/platform/organization', purpose: 'Organization and department model' },
-        { name: '/api/platform/projects', purpose: 'Portfolio snapshot' },
-        { name: '/api/platform/readiness', purpose: 'Launch gate status' },
+        { name: '/api/system',               purpose: 'System health + inference tier status' },
+        { name: '/api/health/summary',        purpose: 'Service health aggregation' },
+        { name: '/api/signals',               purpose: 'Trading signal pipeline' },
+        { name: '/api/trading/metrics',       purpose: 'P&L + performance metrics' },
+        { name: '/api/soc/threats',           purpose: 'Threat intelligence feed' },
+        { name: '/api/predictions/status',    purpose: 'Kronos ML forecast status' },
+        { name: '/api/production/readiness',  purpose: 'Launch gate readiness' },
+        { name: '/api/logs',                  purpose: 'System event log' },
     ];
 
     function statusBadge(ok) {
-        return `<span class="badge badge-${ok ? 'success' : 'warning'}">${ok ? 'healthy' : 'watch'}</span>`;
+        return ok
+            ? '<span class="badge badge-success">healthy</span>'
+            : '<span class="badge" style="background:rgba(240,136,62,0.15);color:var(--amber);border:1px solid rgba(240,136,62,0.3);">watch</span>';
     }
 
     async function refreshPolicyPage() {
         try {
             const [readiness, contracts] = await Promise.all([
-                window.platformApi.getReadiness(),
-                Promise.all(CONTRACT_ROWS.map(async (row) => {
+                fetch('/api/production/readiness', { credentials: 'same-origin' })
+                    .then(r => r.json()).catch(() => ({ overall_ok: false })),
+                Promise.all(CONTRACT_ROWS.map(async row => {
                     try {
-                        await window.platformApi.request(row.name);
-                        return { ...row, healthy: true };
+                        const r = await fetch(row.name, { credentials: 'same-origin' });
+                        return { ...row, healthy: r.ok };
                     } catch (_) {
                         return { ...row, healthy: false };
                     }
                 })),
             ]);
 
-            const healthyContracts = contracts.filter((row) => row.healthy).length;
-            const totalContracts = contracts.length;
-            const contractsOk = healthyContracts === totalContracts;
+            const healthyCount  = contracts.filter(r => r.healthy).length;
+            const totalCount    = contracts.length;
+            const allHealthy    = healthyCount === totalCount;
 
-            document.getElementById('policy-contract-health').textContent = `${healthyContracts}/${totalContracts}`;
-            document.getElementById('policy-contract-health').style.color = contractsOk ? 'var(--success)' : 'var(--warning)';
-            document.getElementById('policy-contract-note').textContent = contractsOk ? 'All canonical contracts healthy' : 'One or more contracts degraded';
+            // Contract health KPI
+            document.getElementById('policy-contract-health').textContent = `${healthyCount}/${totalCount}`;
+            document.getElementById('policy-contract-health').style.color =
+                allHealthy ? 'var(--green)' : 'var(--amber)';
+            document.getElementById('policy-contract-note').textContent =
+                allHealthy ? 'All contracts healthy' : 'One or more degraded';
 
-            document.getElementById('policy-readiness').textContent = readiness.overall_ok ? 'GREEN' : 'WATCH';
-            document.getElementById('policy-readiness').style.color = readiness.overall_ok ? 'var(--success)' : 'var(--warning)';
-            document.getElementById('policy-readiness-note').textContent = readiness.timestamp || '--';
+            // Readiness KPI
+            const rOk = !!readiness.overall_ok;
+            document.getElementById('policy-readiness').textContent = rOk ? 'GREEN' : 'WATCH';
+            document.getElementById('policy-readiness').style.color = rOk ? 'var(--green)' : 'var(--amber)';
+            document.getElementById('policy-readiness-note').textContent =
+                readiness.timestamp
+                    ? new Date(readiness.timestamp).toLocaleTimeString()
+                    : (rOk ? 'All gates pass' : 'Blockers present');
 
-            document.getElementById('policy-contract-table').innerHTML = contracts.map((row) => `
+            // Contracts table
+            document.getElementById('policy-contract-table').innerHTML = contracts.map(row => `
                 <tr>
-                    <td><code>${row.name}</code></td>
-                    <td>${row.purpose}</td>
+                    <td><code style="font-size:0.78rem;">${row.name}</code></td>
+                    <td style="color:var(--text-muted);font-size:0.82rem;">${row.purpose}</td>
                     <td>${statusBadge(row.healthy)}</td>
                 </tr>
             `).join('');
 
+            // Security boundary rules
+            const blockers = readiness.blockers || [];
             document.getElementById('policy-rules').innerHTML = `
                 <div class="policy-list">
-                    <div class="policy-item" style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-sm);">
-                        <span>Public web is read-only by policy</span>
+                    <div class="policy-item" style="display:flex;justify-content:space-between;align-items:center;">
+                        <span>Public dashboard is read-only by policy</span>
                         ${statusBadge(true)}
                     </div>
-                    <div class="policy-item" style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-sm);">
+                    <div class="policy-item" style="display:flex;justify-content:space-between;align-items:center;">
                         <span>Execution controls restricted to macOS operator app</span>
                         ${statusBadge(true)}
                     </div>
-                    <div class="policy-item" style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-sm);">
+                    <div class="policy-item" style="display:flex;justify-content:space-between;align-items:center;">
                         <span>Signal ingress redundancy gate monitored</span>
                         ${statusBadge(!!(readiness.gates?.D_signal_ingress?.ok))}
                     </div>
-                    <div class="policy-item" style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-sm);">
-                        <span>Production readiness must remain green for go-live claims</span>
-                        ${statusBadge(!!readiness.overall_ok)}
+                    <div class="policy-item" style="display:flex;justify-content:space-between;align-items:center;">
+                        <span>Production readiness green for go-live claims</span>
+                        ${statusBadge(rOk)}
+                    </div>
+                    <div class="policy-item" style="display:flex;justify-content:space-between;align-items:center;">
+                        <span>Open blockers: ${blockers.length ? blockers.slice(0,3).join(', ') : 'none'}</span>
+                        ${statusBadge(blockers.length === 0)}
                     </div>
                 </div>
             `;
 
-            const blockers = readiness.blockers || [];
-            document.getElementById('policy-book-alignment').innerHTML = `
-                <div class="policy-list">
-                    <div class="policy-item"><strong>Public Website:</strong> visibility + reporting only</div>
-                    <div class="policy-item"><strong>Sapphire Book/macOS:</strong> operator workflows + privileged actions</div>
-                    <div class="policy-item"><strong>Current blockers:</strong> ${blockers.length ? blockers.length : 'none'}</div>
-                    <div class="policy-item"><strong>Next milestone:</strong> continue consolidating feed intelligence into read-only business surfaces</div>
-                </div>
-            `;
-
+            // Chips
             document.getElementById('policy-chip-row').innerHTML = `
-                <span class="policy-chip"><i class="fas fa-lock"></i> public read-only enforced</span>
-                <span class="policy-chip"><i class="fas fa-shield-check"></i> readiness ${readiness.overall_ok ? 'green' : 'watch'}</span>
-                <span class="policy-chip"><i class="fas fa-link"></i> ${healthyContracts}/${totalContracts} contracts healthy</span>
+                <span class="policy-chip">
+                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                    public read-only enforced
+                </span>
+                <span class="policy-chip" style="color:${rOk ? 'var(--green)' : 'var(--amber)'}">
+                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    readiness ${rOk ? 'green' : 'watch'}
+                </span>
+                <span class="policy-chip" style="color:${allHealthy ? 'var(--green)' : 'var(--amber)'}">
+                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg>
+                    ${healthyCount}/${totalCount} contracts healthy
+                </span>
             `;
         } catch (error) {
             console.error('Failed to refresh policy page:', error);
-            document.getElementById('policy-contract-note').textContent = error.message || 'failed to load policy data';
+            document.getElementById('policy-contract-note').textContent = 'Failed to load policy data';
         }
     }
 

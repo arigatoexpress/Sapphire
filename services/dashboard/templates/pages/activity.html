@@ -1,179 +1,142 @@
 {% extends "base.html" %}
 
-{% block title %}Activity_Log{% endblock %}
+{% block title %}Activity Log{% endblock %}
 
 {% block extra_css %}
 .log-container {
-    border: 1px solid var(--border-dim);
-    background: rgba(0, 0, 0, 0.5);
-    font-family: var(--font-terminal);
-    font-size: 0.8rem;
-    max-height: 600px;
+    border: 1px solid var(--border);
+    background: rgba(0,0,0,0.4);
+    font-family: 'SF Mono', 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    max-height: 580px;
     overflow-y: auto;
+    border-radius: 0 0 12px 12px;
 }
 
 .log-line {
-    padding: var(--space-xs) var(--space-md);
-    border-bottom: 1px solid rgba(255, 176, 0, 0.03);
+    padding: 6px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
     display: flex;
-    gap: var(--space-md);
+    gap: 12px;
+    align-items: baseline;
+    transition: background 0.1s;
 }
 
 .log-line:hover {
-    background: rgba(255, 176, 0, 0.03);
+    background: rgba(59,130,246,0.04);
 }
 
 .log-timestamp {
     color: var(--text-muted);
-    min-width: 80px;
+    min-width: 76px;
     flex-shrink: 0;
+    font-size: 0.72rem;
 }
 
 .log-level {
-    min-width: 60px;
-    text-transform: uppercase;
-    font-size: 0.7rem;
-    padding: 1px 6px;
+    min-width: 52px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    padding: 1px 5px;
+    border-radius: 3px;
     text-align: center;
+    flex-shrink: 0;
 }
 
-.log-level.info {
-    color: var(--cyan);
-    background: rgba(0, 255, 255, 0.05);
-}
-
-.log-level.warn, .log-level.warning {
-    color: var(--amber);
-    background: rgba(255, 176, 0, 0.05);
-}
-
-.log-level.error {
-    color: var(--red);
-    background: rgba(255, 51, 51, 0.05);
-}
+.log-level.info    { color: var(--accent);    background: rgba(59,130,246,0.08); }
+.log-level.warning,
+.log-level.warn    { color: var(--amber);     background: rgba(240,136,62,0.08); }
+.log-level.error   { color: var(--red);       background: rgba(239,68,68,0.08); }
+.log-level.debug   { color: var(--text-muted); background: transparent; }
 
 .log-service {
-    color: var(--amber);
-    min-width: 100px;
+    color: var(--accent-bright);
+    min-width: 110px;
     flex-shrink: 0;
-    opacity: 0.7;
+    font-size: 0.72rem;
+    opacity: 0.8;
 }
 
 .log-message {
     color: var(--text-secondary);
     flex: 1;
     word-break: break-word;
-}
-
-.log-filters {
-    display: flex;
-    gap: var(--space-md);
-    margin-bottom: var(--space-lg);
-    flex-wrap: wrap;
-}
-
-.log-filter {
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
-}
-
-.log-filter label {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    text-transform: uppercase;
-}
-
-.log-filter select, .log-filter input {
-    background: rgba(10, 10, 10, 0.8);
-    border: 1px solid var(--border-dim);
-    color: var(--amber);
-    font-family: var(--font-terminal);
-    padding: var(--space-xs) var(--space-sm);
-    font-size: 0.8rem;
-}
-
-.log-stats {
-    display: flex;
-    gap: var(--space-lg);
-    margin-bottom: var(--space-lg);
-}
-
-.log-stat {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-}
-
-.log-stat span {
-    color: var(--amber);
-    font-family: var(--font-header);
-    font-size: 1.1rem;
+    line-height: 1.5;
 }
 {% endblock %}
 
 {% block content %}
-<div class="section-header">
-    <div class="section-title">Activity_Log</div>
-    <div class="section-subtitle">System events and operational telemetry</div>
-</div>
-
-<!-- Stats -->
-<div class="log-stats">
-    <div class="log-stat">Total Events: <span id="log-total">--</span></div>
-    <div class="log-stat">Warnings: <span id="log-warn" style="color: var(--amber);">--</span></div>
-    <div class="log-stat">Errors: <span id="log-error" style="color: var(--red);">--</span></div>
-</div>
-
-<!-- Filters -->
-<div class="panel">
-    <span class="panel-corner tl"></span>
-    <span class="panel-corner tr"></span>
-    <span class="panel-corner bl"></span>
-    <span class="panel-corner br"></span>
-    <div class="panel-header">
-        <div class="panel-title">Filters</div>
+<!-- Stats Bar -->
+<div class="grid grid-4" style="margin-bottom: var(--space-xl);">
+    <div class="stat-card">
+        <div class="stat-label">Total Events</div>
+        <div class="stat-value" id="log-total" style="color: var(--text-primary);">--</div>
+        <div class="stat-change">In current filter</div>
     </div>
-    <div class="panel-body">
-        <div class="log-filters">
-            <div class="log-filter">
-                <label>Level</label>
-                <select id="filter-level">
-                    <option value="">All</option>
-                    <option value="info">Info</option>
-                    <option value="warn">Warning</option>
-                    <option value="error">Error</option>
-                </select>
-            </div>
-            <div class="log-filter">
-                <label>Hours</label>
-                <select id="filter-hours">
-                    <option value="1">1h</option>
-                    <option value="6">6h</option>
-                    <option value="24" selected>24h</option>
-                    <option value="72">72h</option>
-                </select>
-            </div>
-            <div class="log-filter">
-                <label>Service</label>
-                <input type="text" id="filter-service" placeholder="Filter by service...">
-            </div>
+    <div class="stat-card">
+        <div class="stat-label">Info</div>
+        <div class="stat-value" id="log-info" style="color: var(--accent);">--</div>
+        <div class="stat-change">Operational events</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Warnings</div>
+        <div class="stat-value" id="log-warn" style="color: var(--amber);">--</div>
+        <div class="stat-change">Needs attention</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Errors</div>
+        <div class="stat-value" id="log-error" style="color: var(--red);">--</div>
+        <div class="stat-change">Failures</div>
+    </div>
+</div>
+
+<!-- Filters + Log Output -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;color:var(--accent);vertical-align:middle"><polyline points="4,17 10,11 4,5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+            System Event Log
+        </h3>
+        <div style="display:flex;align-items:center;gap:var(--space-md);">
+            <span style="font-size:0.75rem;color:var(--text-muted)" id="log-time">--</span>
+            <button class="btn btn-secondary" style="font-size:0.75rem;padding:4px 10px;" onclick="loadLogs()">Refresh</button>
         </div>
     </div>
-</div>
 
-<!-- Log Output -->
-<div class="panel">
-    <span class="panel-corner tl"></span>
-    <span class="panel-corner tr"></span>
-    <span class="panel-corner bl"></span>
-    <span class="panel-corner br"></span>
-    <div class="panel-header">
-        <div class="panel-title">System_Events</div>
-        <span class="timestamp" id="log-time">--</span>
+    <!-- Filter Bar -->
+    <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:var(--space-md);flex-wrap:wrap;align-items:center;background:rgba(0,0,0,0.15);">
+        <div style="display:flex;align-items:center;gap:8px;">
+            <label style="font-size:0.72rem;color:var(--text-muted);letter-spacing:.06em;">Level</label>
+            <select id="filter-level" style="background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);padding:4px 8px;border-radius:6px;font-size:0.78rem;">
+                <option value="">All</option>
+                <option value="info">Info</option>
+                <option value="warn">Warning</option>
+                <option value="error">Error</option>
+            </select>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+            <label style="font-size:0.72rem;color:var(--text-muted);letter-spacing:.06em;">Window</label>
+            <select id="filter-hours" style="background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);padding:4px 8px;border-radius:6px;font-size:0.78rem;">
+                <option value="1">1h</option>
+                <option value="6">6h</option>
+                <option value="24" selected>24h</option>
+                <option value="72">72h</option>
+                <option value="0">All</option>
+            </select>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:160px;">
+            <label style="font-size:0.72rem;color:var(--text-muted);letter-spacing:.06em;">Filter</label>
+            <input type="text" id="filter-service" placeholder="service or keyword…"
+                style="flex:1;background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);padding:4px 10px;border-radius:6px;font-size:0.78rem;">
+        </div>
     </div>
-    <div class="panel-body" style="padding: 0;">
-        <div class="log-container" id="log-container">
-            <div class="loading" style="padding: var(--space-lg);">Loading activity log...</div>
+
+    <!-- Log Output -->
+    <div class="log-container" id="log-container">
+        <div style="padding:40px;text-align:center;color:var(--text-muted);">
+            <div class="spinner" style="margin:0 auto 12px;"></div>
+            Loading activity log…
         </div>
     </div>
 </div>
@@ -184,75 +147,114 @@
     let currentLogs = [];
 
     async function loadLogs() {
-        const hours = document.getElementById('filter-hours').value;
-        const level = document.getElementById('filter-level').value;
-        const service = document.getElementById('filter-service').value;
-        
+        const hours   = parseInt(document.getElementById('filter-hours').value) || 0;
+        const level   = document.getElementById('filter-level').value.toLowerCase();
+        const keyword = document.getElementById('filter-service').value.toLowerCase();
+
         try {
-            const data = await window.platformApi.getLogs({ 
-                hours: parseInt(hours), 
-                limit: 100,
-                level: level,
-                service: service
-            });
-            
-            currentLogs = data.logs || [];
+            const res = await fetch('/api/logs', { credentials: 'same-origin' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const raw = await res.json();
+
+            // /api/logs returns a plain array [{time, level, message}]
+            let logs = Array.isArray(raw) ? raw : (raw.logs || []);
+
+            // Filter by time window
+            if (hours > 0) {
+                const cutoff = Date.now() - hours * 3600 * 1000;
+                logs = logs.filter(l => {
+                    const t = l.time || l.timestamp;
+                    return !t || new Date(t).getTime() > cutoff;
+                });
+            }
+
+            // Filter by level
+            if (level) {
+                logs = logs.filter(l =>
+                    (l.level || 'info').toLowerCase().startsWith(level)
+                );
+            }
+
+            // Filter by keyword
+            if (keyword) {
+                logs = logs.filter(l =>
+                    (l.service || '').toLowerCase().includes(keyword) ||
+                    (l.message || '').toLowerCase().includes(keyword)
+                );
+            }
+
+            currentLogs = logs;
             renderLogs();
             updateStats();
-            document.getElementById('log-time').textContent = new Date().toLocaleTimeString();
+            document.getElementById('log-time').textContent =
+                'Updated ' + new Date().toLocaleTimeString();
         } catch (e) {
-            document.getElementById('log-container').innerHTML = '<div class="empty-state">Unable to load logs</div>';
+            document.getElementById('log-container').innerHTML =
+                `<div class="empty-state" style="padding:40px;">
+                    <div class="empty-state-icon">⚠</div>
+                    <div class="empty-state-title">Failed to load logs</div>
+                    <div class="empty-state-desc">${e.message}</div>
+                </div>`;
         }
     }
 
     function renderLogs() {
         const container = document.getElementById('log-container');
-        
+
         if (!currentLogs.length) {
-            container.innerHTML = '<div class="empty-state">No events match current filters</div>';
+            container.innerHTML =
+                `<div class="empty-state" style="padding:40px;">
+                    <div class="empty-state-icon">📋</div>
+                    <div class="empty-state-title">No events match filters</div>
+                    <div class="empty-state-desc">Try widening the time window or clearing the keyword filter.</div>
+                </div>`;
             return;
         }
 
         container.innerHTML = currentLogs.map(log => {
-            const time = log.timestamp 
-                ? new Date(log.timestamp).toLocaleTimeString('en-US', { hour12: false })
+            const ts    = log.time || log.timestamp;
+            const time  = ts
+                ? new Date(ts).toLocaleTimeString('en-US', { hour12: false })
                 : '--:--:--';
             const level = (log.level || 'info').toLowerCase();
-            
-            return `
-                <div class="log-line">
-                    <span class="log-timestamp">[${time}]</span>
-                    <span class="log-level ${level}">${level}</span>
-                    <span class="log-service">${log.service || 'system'}</span>
-                    <span class="log-message">${log.message || ''}</span>
-                </div>
-            `;
+            const svc   = log.service || 'system';
+            const msg   = (log.message || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+            return `<div class="log-line">
+                <span class="log-timestamp">[${time}]</span>
+                <span class="log-level ${level}">${level}</span>
+                <span class="log-service">${svc}</span>
+                <span class="log-message">${msg}</span>
+            </div>`;
         }).join('');
+
+        // Auto-scroll to bottom
+        container.scrollTop = container.scrollHeight;
     }
 
     function updateStats() {
-        const warnCount = currentLogs.filter(l => ['warn', 'warning'].includes((l.level || '').toLowerCase())).length;
-        const errorCount = currentLogs.filter(l => (l.level || '').toLowerCase() === 'error').length;
-        
-        document.getElementById('log-total').textContent = currentLogs.length;
-        document.getElementById('log-warn').textContent = warnCount;
-        document.getElementById('log-error').textContent = errorCount;
-    }
+        const info  = currentLogs.filter(l => (l.level||'info').toLowerCase() === 'info').length;
+        const warn  = currentLogs.filter(l => ['warn','warning'].includes((l.level||'').toLowerCase())).length;
+        const error = currentLogs.filter(l => (l.level||'').toLowerCase() === 'error').length;
 
-    // Event listeners
-    document.getElementById('filter-level').addEventListener('change', loadLogs);
-    document.getElementById('filter-hours').addEventListener('change', loadLogs);
-    document.getElementById('filter-service').addEventListener('input', debounce(loadLogs, 500));
+        document.getElementById('log-total').textContent = currentLogs.length;
+        document.getElementById('log-info').textContent  = info;
+        document.getElementById('log-warn').textContent  = warn;
+        document.getElementById('log-error').textContent = error;
+    }
 
     function debounce(fn, ms) {
-        let timeout;
-        return function(...args) {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => fn.apply(this, args), ms);
-        };
+        let t;
+        return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
     }
 
-    loadLogs();
-    setInterval(loadLogs, 30000);
+    document.getElementById('filter-level').addEventListener('change', loadLogs);
+    document.getElementById('filter-hours').addEventListener('change', loadLogs);
+    document.getElementById('filter-service').addEventListener('input', debounce(loadLogs, 400));
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadLogs();
+        setInterval(loadLogs, 30000);
+    });
 </script>
 {% endblock %}

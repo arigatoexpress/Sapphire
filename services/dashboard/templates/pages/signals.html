@@ -1,0 +1,737 @@
+{% extends "base.html" %}
+
+{% block title %}Signals{% endblock %}
+
+{% block extra_css %}
+/* ── P&L Hero ─────────────────────────────────────────────────── */
+.pnl-hero {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    margin-bottom: 20px;
+}
+.pnl-cell {
+    background: var(--bg-card);
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: background var(--t-fast);
+}
+.pnl-cell:hover { background: var(--bg-card-hover); }
+.pnl-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+}
+.pnl-main .pnl-value {
+    font-size: 44px;
+    font-weight: 600;
+    line-height: 1.05;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+    color: var(--text-primary);
+}
+.pnl-main .pnl-value.positive { color: var(--green); }
+.pnl-main .pnl-value.negative { color: var(--red); }
+.pnl-cell .pnl-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.pnl-cell .pnl-sub.positive { color: var(--green); }
+.pnl-cell .pnl-sub.negative { color: var(--red); }
+.metric-line .pnl-value {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.1;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+}
+
+/* ── Routing bar ──────────────────────────────────────────────── */
+.routing-stack {
+    display: flex;
+    height: 6px;
+    border-radius: 3px;
+    overflow: hidden;
+    background: rgba(255,255,255,0.04);
+    margin: 10px 0 14px;
+}
+.routing-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.routing-leg-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+.routing-leg-row .swatch {
+    width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 8px;
+}
+.routing-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 500;
+    font-family: var(--font-mono);
+    letter-spacing: 0;
+    text-transform: none;
+}
+.routing-confirmation { background: var(--accent-dim);  color: var(--accent-bright); }
+.routing-notify       { background: var(--green-dim);   color: var(--green); }
+.routing-log_only     { background: rgba(255,255,255,0.04); color: var(--text-muted); }
+.routing-blocked      { background: var(--red-dim);     color: var(--red); }
+
+/* ── Actions ──────────────────────────────────────────────────── */
+.action-long  { color: var(--green);  font-weight: 500; }
+.action-short { color: var(--red);    font-weight: 500; }
+.action-close { color: var(--amber);  font-weight: 500; }
+
+/* ── Score bar ────────────────────────────────────────────────── */
+.score-bar-wrap { display: flex; align-items: center; gap: 8px; min-width: 100px; }
+.score-bar-val { font-family: var(--font-mono); font-size: 12px; min-width: 30px; color: var(--text-primary); }
+.score-bar-track { flex: 1; height: 3px; background: rgba(255,255,255,0.05); border-radius: 2px; overflow: hidden; }
+.score-bar-fill { height: 100%; border-radius: 2px; transition: width 400ms var(--ease); }
+
+/* ── Kernel list ──────────────────────────────────────────────── */
+.kernel-list { display: flex; flex-direction: column; }
+.kernel-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+}
+.kernel-row:last-child { border-bottom: none; }
+.kernel-key { color: var(--text-secondary); }
+.kernel-val { font-family: var(--font-mono); font-size: 12px; color: var(--text-primary); }
+
+/* ── Perf trend ───────────────────────────────────────────────── */
+.perf-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1fr;
+    gap: 0;
+    background: var(--border);
+    gap: 1px;
+}
+.perf-cell { background: var(--bg-card); padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; }
+.perf-cell-label { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+.perf-cell-value { font-family: var(--font-mono); font-size: 18px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.perf-cell-spark { line-height: 0; margin-top: 4px; }
+
+/* ── Empty state ──────────────────────────────────────────────── */
+.scanner-idle {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 48px 16px;
+    color: var(--text-muted);
+}
+.scanner-idle-title { font-size: 13px; color: var(--text-secondary); }
+.scanner-idle-sub { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
+{% endblock %}
+
+{% block content %}
+<!-- P&L Hero -->
+<div class="pnl-hero">
+    <div class="pnl-cell pnl-main">
+        <div class="pnl-label">Cumulative P&L</div>
+        <div class="pnl-value" id="hero-pnl">—</div>
+        <div class="pnl-sub" id="hero-pnl-sub">loading</div>
+    </div>
+    <div class="pnl-cell metric-line">
+        <div class="pnl-label">Win rate</div>
+        <div class="pnl-value" id="hero-winrate">—</div>
+        <div class="pnl-sub" id="hero-wr-sub">—</div>
+    </div>
+    <div class="pnl-cell metric-line">
+        <div class="pnl-label">Signals today</div>
+        <div class="pnl-value" id="hero-count">—</div>
+        <div class="pnl-sub" id="hero-count-sub">—</div>
+    </div>
+    <div class="pnl-cell metric-line">
+        <div class="pnl-label">Risk kernel</div>
+        <div class="pnl-value" id="hero-kernel">—</div>
+        <div class="pnl-sub" id="hero-kernel-sub">—</div>
+    </div>
+</div>
+
+<!-- Performance + Routing -->
+<div class="grid grid-2" style="margin-bottom: 20px">
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Performance trend</span>
+            <span id="perf-range-label" class="muted mono" style="font-size:11px">14-day</span>
+        </div>
+        <div class="card-body no-pad">
+            <div class="perf-grid">
+                <div class="perf-cell">
+                    <div class="perf-cell-label">Cumulative P&L</div>
+                    <div class="perf-cell-value" id="perf-pnl-value">—</div>
+                    <div class="perf-cell-spark" id="perf-pnl-spark"></div>
+                </div>
+                <div class="perf-cell">
+                    <div class="perf-cell-label">Win rate</div>
+                    <div class="perf-cell-value" id="perf-wr-value">—</div>
+                    <div class="perf-cell-spark" id="perf-wr-spark"></div>
+                </div>
+                <div class="perf-cell">
+                    <div class="perf-cell-label">Recent days</div>
+                    <div id="perf-daily-summary" style="margin-top:2px"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Routing</span>
+            <span id="routing-total-badge" class="muted mono" style="font-size:11px">—</span>
+        </div>
+        <div class="card-body" id="routing-body">
+            <div class="loading"><div class="spinner"></div>Loading…</div>
+        </div>
+    </div>
+</div>
+
+<!-- Kernel + Active -->
+<div class="grid grid-2" style="margin-bottom: 20px">
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Risk kernel</span>
+            <span id="kernel-gate-badge" class="pill">checking</span>
+        </div>
+        <div class="card-body" id="kernel-body">
+            <div class="loading"><div class="spinner"></div>Fetching kernel state…</div>
+        </div>
+    </div>
+
+    <div class="card" id="active-card" style="display:none">
+        <div class="card-header">
+            <span class="card-title">Active positions</span>
+            <span id="active-count-badge" class="pill accent">0</span>
+        </div>
+        <div class="card-body no-pad" id="active-body"></div>
+    </div>
+    <div class="card" id="active-empty-card">
+        <div class="card-header">
+            <span class="card-title">Active positions</span>
+            <span class="pill">0</span>
+        </div>
+        <div class="card-body">
+            <div class="empty-state illustrated">
+                <svg class="empty-illustration" viewBox="0 0 140 60" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M2 48 L22 38 L38 44 L56 28 L74 34 L92 20 L110 26 L138 14"
+                          stroke-dasharray="3 3" opacity="0.35"/>
+                    <path d="M2 48 L22 38 L38 44 L56 28 L74 34" stroke="var(--accent-bright)" opacity="0.45" stroke-width="1.3"/>
+                    <circle cx="56" cy="28" r="2.5" fill="var(--accent-bright)" opacity="0.7"/>
+                    <circle cx="74" cy="34" r="1.8" fill="currentColor" opacity="0.5"/>
+                    <circle cx="92" cy="20" r="1.4" fill="currentColor" opacity="0.35"/>
+                    <circle cx="110" cy="26" r="1.2" fill="currentColor" opacity="0.25"/>
+                    <circle cx="138" cy="14" r="1" fill="currentColor" opacity="0.2"/>
+                </svg>
+                <div class="empty-state-title">No active positions</div>
+                <div class="muted" style="font-size:12px">Scanner awaiting RSI / MACD / Bollinger triggers</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- History -->
+<div class="card">
+    <div class="card-header">
+        <span class="card-title">Signal history</span>
+        <div class="hstack" style="gap:8px">
+            <select id="filter-routing" class="btn small" style="padding-right:24px">
+                <option value="">All routes</option>
+                <option value="CONFIRMATION_REQUIRED">Confirmation</option>
+                <option value="NOTIFY">Notify</option>
+                <option value="LOG_ONLY">Log only</option>
+                <option value="BLOCKED">Blocked</option>
+            </select>
+            <button class="btn small" onclick="refreshSignals()">Refresh</button>
+        </div>
+    </div>
+    <div class="card-body no-pad" id="table-body">
+        <div class="loading"><div class="spinner"></div>Loading signals…</div>
+    </div>
+</div>
+
+<div class="card" style="margin-top: 20px;">
+    <div class="card-header">
+        <span class="card-title">Cross-asset correlation · 30d</span>
+        <span id="sig-corr-meta" style="font-size: 11px; color: var(--text-muted);">—</span>
+    </div>
+    <div class="card-body">
+        <div id="sig-corr-container" style="overflow-x: auto;">
+            <div class="loading"><div class="spinner"></div>Loading correlations…</div>
+        </div>
+        <div id="sig-corr-decorr" style="margin-top: 14px;"></div>
+    </div>
+</div>
+
+<style>
+.sig-corr-grid {
+    display: grid;
+    gap: 2px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-primary);
+}
+.sig-corr-cell {
+    padding: 9px 6px;
+    text-align: center;
+    border-radius: 4px;
+    min-width: 46px;
+    font-weight: 500;
+    transition: transform 120ms ease;
+}
+.sig-corr-cell:hover { transform: scale(1.08); z-index: 2; position: relative; }
+.sig-corr-header {
+    font-weight: 700; color: var(--text-muted);
+    background: transparent; letter-spacing: 0.04em;
+}
+.sig-corr-diag { background: var(--bg-elevated); color: var(--text-muted); }
+.sig-decorr {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 7px 11px; margin-bottom: 5px; border-radius: 5px;
+    border: 1px solid var(--border); background: var(--bg-elevated);
+    font-size: 12px;
+}
+.sig-decorr-severe { border-left: 3px solid var(--red); }
+.sig-decorr-moderate { border-left: 3px solid var(--amber); }
+.sig-decorr-mild { border-left: 3px solid var(--text-muted); }
+.sig-decorr-badge {
+    padding: 2px 7px; border-radius: 3px; font-size: 10px;
+    font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+}
+.sig-decorr-severe .sig-decorr-badge { background: rgba(239,68,68,0.18); color: var(--red); }
+.sig-decorr-moderate .sig-decorr-badge { background: rgba(245,158,11,0.18); color: var(--amber); }
+.sig-decorr-mild .sig-decorr-badge { background: rgba(148,163,184,0.18); color: var(--text-muted); }
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let _allSignals = [];
+
+async function fetchSignals() {
+    const r = await fetch('/api/signals', { credentials: 'same-origin' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+}
+
+function fmtUsd(n) {
+    if (n == null) return '—';
+    const sign = n >= 0 ? '+' : '-';
+    return sign + '$' + Math.abs(n).toFixed(2);
+}
+
+function renderHero(data) {
+    const stats = data.stats || {};
+    const kernel = data.kernel || {};
+    const signals = data.recent || [];
+
+    // P&L (from kernel day-start if available, else stats)
+    let pnl = null;
+    if (kernel.day_start_equity != null && kernel.last_equity != null) {
+        pnl = kernel.last_equity - kernel.day_start_equity;
+    } else if (stats.total_pnl_usd != null) {
+        pnl = stats.total_pnl_usd;
+    }
+
+    const pnlEl = document.getElementById('hero-pnl');
+    const pnlSub = document.getElementById('hero-pnl-sub');
+    if (pnl != null) {
+        pnlEl.textContent = fmtUsd(pnl);
+        pnlEl.className = 'pnl-value ' + (pnl >= 0 ? 'positive' : 'negative');
+        const wins = stats.wins ?? 0;
+        const losses = stats.losses ?? 0;
+        pnlSub.textContent = `${wins}W · ${losses}L`;
+        pnlSub.className = 'pnl-sub';
+    } else {
+        pnlEl.textContent = '$0.00';
+        pnlEl.className = 'pnl-value';
+        pnlSub.textContent = 'no closed trades';
+    }
+
+    // Win rate
+    const wr = stats.win_rate;
+    const wrEl = document.getElementById('hero-winrate');
+    const wrSub = document.getElementById('hero-wr-sub');
+    if (wr != null) {
+        wrEl.textContent = (wr * 100).toFixed(0) + '%';
+        const cls = wr >= 0.6 ? 'positive' : wr >= 0.45 ? '' : 'negative';
+        wrSub.textContent = wr >= 0.6 ? 'above target' : wr >= 0.45 ? 'at target' : 'below target';
+        wrSub.className = 'pnl-sub ' + cls;
+    } else {
+        wrEl.textContent = '—';
+        wrSub.textContent = 'no data';
+    }
+
+    // Signals today
+    const total = stats.total_signals ?? signals.length ?? 0;
+    document.getElementById('hero-count').textContent = total;
+    const confirmCount = signals.filter(s => s.routing === 'CONFIRMATION_REQUIRED').length;
+    document.getElementById('hero-count-sub').textContent = total > 0 ? `${confirmCount} awaiting confirmation` : 'scanner idle';
+
+    // Kernel
+    const blocked = kernel.blocked;
+    const kEl = document.getElementById('hero-kernel');
+    const kSub = document.getElementById('hero-kernel-sub');
+    const kGate = document.getElementById('kernel-gate-badge');
+    if (blocked === false) {
+        kEl.textContent = 'Open';
+        kEl.style.color = 'var(--green)';
+        kSub.textContent = 'ready to trade';
+        kSub.className = 'pnl-sub positive';
+        kGate.textContent = 'open';
+        kGate.className = 'pill green';
+    } else if (blocked === true) {
+        kEl.textContent = 'Closed';
+        kEl.style.color = 'var(--red)';
+        kSub.textContent = kernel.block_reason || 'blocked';
+        kSub.className = 'pnl-sub negative';
+        kGate.textContent = 'closed';
+        kGate.className = 'pill red';
+    } else {
+        kEl.textContent = '—';
+        kSub.textContent = 'unknown';
+        kSub.className = 'pnl-sub';
+        kGate.textContent = 'unknown';
+        kGate.className = 'pill';
+    }
+}
+
+function renderKernel(kernel) {
+    const canOpen = kernel?.blocked === false;
+    const cfg = kernel?.config || {};
+    const rows = [
+        ['Day P&L',         kernel?.day_start_equity != null && kernel?.last_equity != null
+                               ? fmtUsd(kernel.last_equity - kernel.day_start_equity) : '—'],
+        ['Max daily loss',  cfg.max_daily_loss_usd ? '$' + cfg.max_daily_loss_usd : (cfg.max_daily_loss_pct != null ? cfg.max_daily_loss_pct + '%' : '—')],
+        ['Max drawdown',    cfg.max_intraday_drawdown_pct != null ? cfg.max_intraday_drawdown_pct + '%' : '—'],
+        ['Consec. losses',  kernel?.consecutive_loss_events ?? '—'],
+        ['Consec. fails',   kernel?.consecutive_hard_fails ?? '—'],
+        ['Block reason',    kernel?.block_reason || (canOpen ? 'none' : '—')],
+    ];
+    document.getElementById('kernel-body').innerHTML = `
+        <div class="kernel-list">
+            ${rows.map(([k, v]) => `
+                <div class="kernel-row">
+                    <span class="kernel-key">${k}</span>
+                    <span class="kernel-val">${v}</span>
+                </div>`).join('')}
+        </div>`;
+}
+
+function renderRouting(stats, recent) {
+    const routing = {};
+    (recent || []).forEach(s => {
+        const r = s.routing || 'UNKNOWN';
+        routing[r] = (routing[r] || 0) + 1;
+    });
+    const total = (stats?.total_signals || Object.values(routing).reduce((a,b) => a+b, 0)) || 0;
+    document.getElementById('routing-total-badge').textContent = `${total} total`;
+
+    const ROUTES = [
+        { key: 'CONFIRMATION_REQUIRED', label: 'Confirmation', color: 'var(--accent)' },
+        { key: 'NOTIFY',                label: 'Notify',       color: 'var(--green)' },
+        { key: 'LOG_ONLY',              label: 'Log only',     color: 'var(--text-muted)' },
+        { key: 'BLOCKED',               label: 'Blocked',      color: 'var(--red)' },
+    ];
+
+    const routeTotal = Object.values(routing).reduce((a,b) => a+b, 0) || 1;
+    let bar = '<div class="routing-stack">';
+    ROUTES.forEach(r => {
+        const count = routing[r.key] || 0;
+        const pct = count / routeTotal * 100;
+        if (pct > 0) bar += `<div style="width:${pct}%;background:${r.color};"></div>`;
+    });
+    bar += '</div>';
+
+    let legend = '<div class="routing-legend">';
+    ROUTES.forEach(r => {
+        const count = routing[r.key] || 0;
+        const pct = routeTotal > 0 ? Math.round(count / routeTotal * 100) : 0;
+        legend += `<div class="routing-leg-row">
+            <span><span class="swatch" style="background:${r.color}"></span>${r.label}</span>
+            <span><span class="mono" style="color:var(--text-primary)">${count}</span> <span class="muted mono" style="margin-left:8px">${pct}%</span></span>
+        </div>`;
+    });
+    legend += '</div>';
+
+    document.getElementById('routing-body').innerHTML = bar + legend;
+}
+
+function renderActive(active) {
+    const card = document.getElementById('active-card');
+    const emptyCard = document.getElementById('active-empty-card');
+    if (!active || active.length === 0) {
+        card.style.display = 'none';
+        emptyCard.style.display = '';
+        return;
+    }
+    card.style.display = '';
+    emptyCard.style.display = 'none';
+    document.getElementById('active-count-badge').textContent = active.length;
+
+    const rows = active.map(s => {
+        const dir = (s.direction || s.action || '').toLowerCase();
+        const cls = dir.includes('long') || dir.includes('buy') ? 'action-long'
+                  : dir.includes('short') || dir.includes('sell') ? 'action-short' : 'action-close';
+        const actionText = (s.action || s.direction || '—');
+        const routeCls = `routing-${(s.routing || '').toLowerCase()}`;
+        const score = s.score != null ? parseFloat(s.score).toFixed(0) : '—';
+        const fill = (s.score || 0) >= 75 ? 'var(--green)' : (s.score || 0) >= 50 ? 'var(--amber)' : 'var(--text-muted)';
+        return `<tr>
+            <td class="mono faint" style="font-size:11px">${(s.timestamp || '').slice(11,16)}</td>
+            <td><strong style="color:var(--text-primary)">${s.symbol || '—'}</strong></td>
+            <td><span class="${cls}">${actionText}</span></td>
+            <td>
+                <div class="score-bar-wrap">
+                    <span class="score-bar-val">${score}</span>
+                    <div class="score-bar-track"><div class="score-bar-fill" style="width:${Math.min(s.score||0,100)}%;background:${fill}"></div></div>
+                </div>
+            </td>
+            <td><span class="routing-badge ${routeCls}">${(s.routing || '—').replace(/_/g,' ').toLowerCase()}</span></td>
+            <td class="num">${s.position_usd != null ? '$' + s.position_usd.toFixed(0) : '—'}</td>
+            <td class="num">${s.rr_ratio != null ? s.rr_ratio.toFixed(2) + 'x' : '—'}</td>
+        </tr>`;
+    }).join('');
+
+    document.getElementById('active-body').innerHTML = `
+        <table class="data-table">
+            <thead><tr>
+                <th>Time</th><th>Symbol</th><th>Action</th><th>Score</th>
+                <th>Routing</th><th class="num">Position</th><th class="num">R:R</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+        </table>`;
+}
+
+function renderTable(signals) {
+    _allSignals = signals || [];
+    applyFilter();
+}
+
+function applyFilter() {
+    const filter = document.getElementById('filter-routing').value;
+    const filtered = filter ? _allSignals.filter(s => (s.routing || '') === filter) : _allSignals;
+    if (filtered.length === 0) {
+        document.getElementById('table-body').innerHTML = `
+            <div class="empty-state illustrated">
+                <svg class="empty-illustration" viewBox="0 0 140 60" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M2 42 L22 36 L38 40 L56 28 L74 32 L92 22 L110 28 L138 18" stroke-dasharray="3 3" opacity="0.35"/>
+                    <path d="M2 42 L22 36 L38 40 L56 28" stroke="var(--accent-bright)" opacity="0.5" stroke-width="1.3"/>
+                    <circle cx="56" cy="28" r="2.2" fill="var(--accent-bright)" opacity="0.7"/>
+                    <circle cx="74" cy="32" r="1.6" fill="currentColor" opacity="0.45"/>
+                    <circle cx="92" cy="22" r="1.2" fill="currentColor" opacity="0.3"/>
+                    <circle cx="110" cy="28" r="1" fill="currentColor" opacity="0.2"/>
+                </svg>
+                <div class="empty-state-title">No signals${filter ? ' for this filter' : ' today'}</div>
+                <div class="muted" style="font-size:12px;">Scanner active · RSI · MACD · Bollinger</div>
+            </div>`;
+        return;
+    }
+
+    const rows = filtered.map(s => {
+        const dir = (s.direction || s.action || '').toLowerCase();
+        const cls = dir.includes('long') || dir.includes('buy') ? 'action-long'
+                  : dir.includes('short') || dir.includes('sell') ? 'action-short' : 'action-close';
+        const routeCls = `routing-${(s.routing || '').toLowerCase()}`;
+        const score = s.score != null ? parseFloat(s.score).toFixed(0) : '—';
+        const fill = (parseFloat(s.score)||0) >= 75 ? 'var(--green)' : (parseFloat(s.score)||0) >= 50 ? 'var(--amber)' : 'var(--text-muted)';
+        const ts = (s.timestamp || '').replace('T', ' ').slice(0,16);
+        return `<tr>
+            <td class="mono faint" style="font-size:11px">${ts}</td>
+            <td><strong style="color:var(--text-primary)">${s.symbol || '—'}</strong></td>
+            <td><span class="${cls}">${s.action || s.direction || '—'}</span></td>
+            <td>
+                <div class="score-bar-wrap">
+                    <span class="score-bar-val">${score}</span>
+                    <div class="score-bar-track"><div class="score-bar-fill" style="width:${Math.min(parseFloat(s.score)||0,100)}%;background:${fill}"></div></div>
+                </div>
+            </td>
+            <td><span class="routing-badge ${routeCls}">${(s.routing || '—').replace(/_/g,' ').toLowerCase()}</span></td>
+            <td class="num">${s.position_usd != null ? '$' + parseFloat(s.position_usd).toFixed(0) : '—'}</td>
+            <td class="num">${s.rr_ratio != null ? parseFloat(s.rr_ratio).toFixed(2) + 'x' : '—'}</td>
+            <td class="num">${s.confidence != null ? (parseFloat(s.confidence)*100).toFixed(0) + '%' : '—'}</td>
+        </tr>`;
+    }).join('');
+
+    document.getElementById('table-body').innerHTML = `
+        <table class="data-table">
+            <thead><tr>
+                <th>Timestamp</th><th>Symbol</th><th>Action</th><th style="min-width:120px">Score</th>
+                <th>Routing</th><th class="num">Position</th><th class="num">R:R</th><th class="num">Conf.</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+        </table>`;
+}
+
+function makeSpark(vals, color, w, h) {
+    w = w || 160; h = h || 32;
+    const data = vals.filter(v => v != null);
+    if (data.length < 2) return '<span class="muted" style="font-size:11px">no history</span>';
+    const min = Math.min(...data), max = Math.max(...data);
+    const range = max - min || 1;
+    const pts = data.map((v, i) => {
+        const x = (i / (data.length - 1)) * w;
+        const y = h - 2 - ((v - min) / range) * (h - 4);
+        return x.toFixed(1) + ',' + y.toFixed(1);
+    }).join(' ');
+    return `<svg width="${w}" height="${h}" style="overflow:visible">
+        <polyline points="${pts}" stroke="${color}" fill="none" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="round"/>
+    </svg>`;
+}
+
+async function fetchPerformance() {
+    try {
+        const r = await fetch('/api/signals/performance');
+        if (!r.ok) return;
+        const d = await r.json();
+
+        const pnl = d.cumulative_pnl || [];
+        const finalPnl = pnl.length ? pnl[pnl.length - 1] : null;
+        const pnlColor = finalPnl == null ? 'var(--text-muted)' : finalPnl >= 0 ? 'var(--green)' : 'var(--red)';
+        document.getElementById('perf-pnl-spark').innerHTML = makeSpark(pnl, pnlColor);
+        const ppv = document.getElementById('perf-pnl-value');
+        ppv.textContent = finalPnl != null ? fmtUsd(finalPnl) : '—';
+        ppv.style.color = pnlColor;
+
+        const wr = (d.win_rate_trend || []).filter(v => v != null);
+        const latestWr = wr.length ? wr[wr.length - 1] : null;
+        const wrColor = latestWr == null ? 'var(--text-muted)' : latestWr >= 0.6 ? 'var(--green)' : latestWr >= 0.45 ? 'var(--amber)' : 'var(--red)';
+        document.getElementById('perf-wr-spark').innerHTML = makeSpark(wr.map(v => v * 100), wrColor);
+        const pwv = document.getElementById('perf-wr-value');
+        pwv.textContent = latestWr != null ? (latestWr * 100).toFixed(0) + '%' : '—';
+        pwv.style.color = wrColor;
+
+        const daily = (d.daily || []).filter(day => day.signals > 0).slice(-5);
+        const totalSignals = (d.daily || []).reduce((a,b) => a + b.signals, 0);
+        document.getElementById('perf-range-label').textContent = `${d.daily?.length || 0}-day · ${totalSignals} signals`;
+        if (daily.length) {
+            document.getElementById('perf-daily-summary').innerHTML = daily.map(day => {
+                const pnlClr = day.pnl >= 0 ? 'var(--green)' : 'var(--red)';
+                const sign = day.pnl >= 0 ? '+' : '';
+                return `<div style="display:flex;justify-content:space-between;gap:8px;font-size:11px;font-family:var(--font-mono);margin-bottom:4px">
+                    <span class="faint">${day.date.slice(5)}</span>
+                    <span class="muted">${day.signals}</span>
+                    <span style="color:${pnlClr}">${sign}$${day.pnl.toFixed(1)}</span>
+                </div>`;
+            }).join('');
+        } else {
+            document.getElementById('perf-daily-summary').innerHTML = '<div class="muted" style="font-size:11px">no recent days</div>';
+        }
+    } catch(e) {}
+}
+
+async function refreshSignals() {
+    try {
+        const data = await fetchSignals();
+        renderHero(data);
+        renderKernel(data.kernel);
+        renderRouting(data.stats, data.recent);
+        renderActive(data.active);
+        renderTable(data.recent);
+        window.markRefresh && window.markRefresh();
+    } catch (e) {
+        document.getElementById('table-body').innerHTML =
+            `<div class="empty-state"><div class="empty-state-title" style="color:var(--red)">Fetch failed</div><div class="muted" style="font-size:12px;margin-top:6px">${e.message}</div></div>`;
+    }
+}
+
+function sigCorrColor(v) {
+    if (v === null || v === undefined || isNaN(v)) return '#1a1f2e';
+    const mag = Math.min(1, Math.abs(v));
+    if (v >= 0) {
+        const g = Math.round(40 + 170 * mag);
+        return `rgb(${Math.round(30 + 30*(1-mag))}, ${g}, ${Math.round(60 + 50*(1-mag))})`;
+    } else {
+        const r = Math.round(60 + 170 * mag);
+        return `rgb(${r}, ${Math.round(40 + 30*(1-mag))}, ${Math.round(60 + 50*(1-mag))})`;
+    }
+}
+
+function renderSigCorrelation(data) {
+    const matrix = data.matrix;
+    if (!matrix || !matrix.symbols) return;
+    const syms = matrix.symbols;
+    const n = syms.length;
+    const container = document.getElementById('sig-corr-container');
+    const cols = `56px repeat(${n}, 1fr)`;
+    let html = `<div class="sig-corr-grid" style="grid-template-columns: ${cols};">`;
+    html += `<div class="sig-corr-cell sig-corr-header"></div>`;
+    for (const s of syms) html += `<div class="sig-corr-cell sig-corr-header">${s}</div>`;
+    for (let i = 0; i < n; i++) {
+        html += `<div class="sig-corr-cell sig-corr-header" style="text-align: right; padding-right: 8px;">${syms[i]}</div>`;
+        for (let j = 0; j < n; j++) {
+            const v = matrix.matrix[i][j];
+            if (i === j) {
+                html += `<div class="sig-corr-cell sig-corr-diag">1.00</div>`;
+            } else {
+                const bg = sigCorrColor(v);
+                const fg = Math.abs(v) > 0.4 ? '#fff' : '#cbd5e1';
+                const display = (v >= 0 ? '+' : '') + v.toFixed(2);
+                html += `<div class="sig-corr-cell" style="background:${bg}; color:${fg};" title="${syms[i]} ↔ ${syms[j]}: ${display}">${display}</div>`;
+            }
+        }
+    }
+    html += '</div>';
+    container.innerHTML = html;
+    document.getElementById('sig-corr-meta').textContent =
+        `${matrix.window_days}d · ${matrix.sample_count} samples`;
+
+    const evts = data.decorrelation_events || [];
+    const ed = document.getElementById('sig-corr-decorr');
+    if (evts.length === 0) {
+        ed.innerHTML = '<div class="muted" style="font-size: 12px;">No decorrelation events detected.</div>';
+    } else {
+        ed.innerHTML = '<div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px;">Active decorrelations</div>' +
+            evts.map(e => `<div class="sig-decorr sig-decorr-${e.severity}"><span>${e.note}</span><span class="sig-decorr-badge">${e.severity}</span></div>`).join('');
+    }
+}
+
+async function refreshSigCorrelation() {
+    try {
+        const r = await fetch('/api/analytics/correlation', { credentials: 'same-origin' });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const d = await r.json();
+        if (d.matrix) renderSigCorrelation(d);
+    } catch (e) {
+        document.getElementById('sig-corr-container').innerHTML =
+            `<div class="muted" style="font-size: 12px;">Correlation fetch failed: ${e.message}</div>`;
+    }
+}
+
+document.getElementById('filter-routing').addEventListener('change', applyFilter);
+document.addEventListener('DOMContentLoaded', () => {
+    refreshSignals();
+    fetchPerformance();
+    refreshSigCorrelation();
+});
+setInterval(refreshSignals, 60000);
+setInterval(fetchPerformance, 300000);
+setInterval(refreshSigCorrelation, 5 * 60 * 1000);
+</script>
+{% endblock %}

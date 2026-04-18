@@ -1,303 +1,428 @@
 {% extends "base.html" %}
 
-{% block title %}Sapphire_Book{% endblock %}
+{% block title %}Sapphire Book{% endblock %}
 
 {% block extra_css %}
-.book-container {
-    max-width: 900px;
-    margin: 0 auto;
+.book-container { max-width: 860px; margin: 0 auto; }
+
+.book-hero {
+    position: relative;
+    overflow: hidden;
+    margin-bottom: var(--space-xl);
+    border-radius: var(--radius-lg);
+    padding: var(--space-xl);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    text-align: center;
 }
 
-.chapter-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-sm);
+.book-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 20% 40%, rgba(59,130,246,0.08), transparent 50%),
+        radial-gradient(circle at 80% 60%, rgba(34,197,94,0.06), transparent 50%);
+    pointer-events: none;
 }
+
+.book-title {
+    position: relative;
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    letter-spacing: .05em;
+    margin-bottom: 6px;
+}
+
+.book-subtitle {
+    position: relative;
+    font-size: .85rem;
+    color: var(--text-muted);
+    margin-bottom: var(--space-md);
+}
+
+.book-chips {
+    position: relative;
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.book-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(59,130,246,0.08);
+    border: 1px solid rgba(59,130,246,0.2);
+    border-radius: 999px;
+    font-size: .72rem;
+    color: var(--accent-bright);
+    padding: 4px 10px;
+}
+
+.chapter-list { display: flex; flex-direction: column; gap: 8px; }
 
 .chapter-item {
-    border: 1px solid var(--border-dim);
-    background: rgba(255, 176, 0, 0.02);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     overflow: hidden;
+    transition: border-color 0.2s;
 }
+
+.chapter-item:hover { border-color: rgba(59,130,246,0.25); }
 
 .chapter-header {
-    padding: var(--space-md) var(--space-lg);
+    padding: 14px 18px;
     display: flex;
-    justify-content: space-between;
     align-items: center;
     cursor: pointer;
-    transition: background 0.2s;
-}
-
-.chapter-header:hover {
-    background: rgba(255, 176, 0, 0.05);
+    gap: 12px;
+    user-select: none;
 }
 
 .chapter-number {
-    font-family: var(--font-header);
-    font-size: 0.8rem;
+    font-family: 'SF Mono', monospace;
+    font-size: .72rem;
     color: var(--text-muted);
-    margin-right: var(--space-md);
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 2px 7px;
+    flex-shrink: 0;
 }
 
 .chapter-title {
-    font-size: 0.9rem;
-    color: var(--amber);
+    font-size: .9rem;
+    font-weight: 600;
+    color: var(--text-primary);
     flex: 1;
 }
 
 .chapter-toggle {
     color: var(--text-muted);
-    font-size: 0.8rem;
+    font-size: .78rem;
+    transition: transform 0.2s;
 }
+
+.chapter-toggle.open { transform: rotate(90deg); }
 
 .chapter-content {
     max-height: 0;
     overflow: hidden;
-    transition: max-height 0.3s ease;
+    transition: max-height 0.35s ease;
 }
 
-.chapter-content.open {
-    max-height: 1000px;
-}
+.chapter-content.open { max-height: 1200px; }
 
 .chapter-body {
-    padding: 0 var(--space-lg) var(--space-lg);
-    font-size: 0.85rem;
+    padding: 4px 18px 18px;
+    font-size: .84rem;
     color: var(--text-secondary);
-    line-height: 1.7;
+    line-height: 1.75;
+    border-top: 1px solid var(--border);
 }
 
 .chapter-body h4 {
-    color: var(--amber);
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    margin: var(--space-md) 0 var(--space-sm);
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .09em;
+    color: var(--accent-bright);
+    margin: 16px 0 8px;
 }
 
-.chapter-body ul {
-    margin-left: var(--space-lg);
-    margin-bottom: var(--space-md);
+.chapter-body ul, .chapter-body ol {
+    margin-left: 20px;
+    margin-bottom: 12px;
 }
 
-.chapter-body li {
-    margin-bottom: var(--space-xs);
-}
+.chapter-body li { margin-bottom: 4px; }
 
 .chapter-body code {
-    background: rgba(255, 176, 0, 0.1);
-    padding: 2px 6px;
-    font-family: var(--font-terminal);
-    font-size: 0.8rem;
-    color: var(--amber);
+    background: rgba(59,130,246,0.1);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: 'SF Mono', monospace;
+    font-size: .79rem;
+    color: var(--accent-bright);
 }
 
-.book-meta {
-    text-align: center;
-    margin-bottom: var(--space-xl);
-    padding: var(--space-xl);
-    border: 1px solid var(--border-dim);
-    background: rgba(255, 176, 0, 0.02);
+.chapter-body strong { color: var(--text-primary); }
+
+.chapter-body p { margin-bottom: 10px; }
+
+.endpoint-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 12px;
+    font-size: .8rem;
+    margin-bottom: 12px;
 }
 
-.book-title {
-    font-family: var(--font-header);
-    font-size: 1.5rem;
-    color: var(--amber);
-    text-transform: uppercase;
-    letter-spacing: 0.15em;
-    margin-bottom: var(--space-sm);
-}
-
-.book-subtitle {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-}
-
-.book-version {
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    margin-top: var(--space-md);
-    padding-top: var(--space-md);
-    border-top: 1px solid var(--border-dim);
-}
+.ep-path { color: var(--accent-bright); font-family: 'SF Mono', monospace; }
+.ep-desc { color: var(--text-muted); }
 {% endblock %}
 
 {% block content %}
 <div class="book-container">
-    <div class="book-meta">
+
+    <!-- Hero -->
+    <div class="book-hero">
         <div class="book-title">The Sapphire Book</div>
-        <div class="book-subtitle">Operational Manual & System Documentation</div>
-        <div class="book-version">Version 2.0 | Classification: OPERATOR</div>
+        <div class="book-subtitle">Operational Manual &amp; System Documentation — v0.4.0</div>
+        <div class="book-chips" id="book-chips">
+            <span class="book-chip">v0.4.0 · production-grade</span>
+            <span class="book-chip" id="chip-health">Loading…</span>
+            <span class="book-chip">19 scheduled tasks</span>
+            <span class="book-chip">21 plugin tools</span>
+        </div>
     </div>
 
+    <!-- Chapters -->
     <div class="chapter-list">
+
+        <!-- 01 -->
         <div class="chapter-item">
             <div class="chapter-header" onclick="toggleChapter(this)">
                 <span class="chapter-number">01</span>
                 <span class="chapter-title">System Overview</span>
-                <span class="chapter-toggle">[+]</span>
+                <span class="chapter-toggle">›</span>
             </div>
             <div class="chapter-content">
                 <div class="chapter-body">
-                    <p>Sapphire is an autonomous trading and operations platform designed for 24/7 market participation with minimal human intervention. The system consists of:</p>
+                    <p>Sapphire is an autonomous trading + operations + intelligence platform designed for 24/7 market participation with minimal human intervention. It runs across a 4-device mesh: Mac commander, Windows GPU workstation, and two Raspberry Pi nodes.</p>
+                    <h4>Core Services (Mac :100.67.171.79)</h4>
                     <ul>
-                        <li><strong>Alpha Engine:</strong> Core signal generation and execution logic</li>
-                        <li><strong>Gateway:</strong> API routing and webhook ingress</li>
-                        <li><strong>PM Hub:</strong> Project management and operational governance</li>
-                        <li><strong>Edge Infrastructure:</strong> Raspberry Pi nodes for trade execution</li>
+                        <li><strong>Inference Proxy :11435</strong> — 4-tier failover: T1 Windows GPU → T2 Pi → T3 Mac CPU → T4 Kimi Cloud</li>
+                        <li><strong>Dashboard :8080</strong> — This UI (auth: <code>sapphire</code>)</li>
+                        <li><strong>Signal Logger :18081</strong> — TradingView webhook ingest → Telegram</li>
+                        <li><strong>Control Plane :8082</strong> — PM hub: projects, tasks, events</li>
+                        <li><strong>OpenBB API :6900</strong> — 32 financial data providers</li>
+                        <li><strong>Regional Intel :8787</strong> — Vote monitor + intelligence console</li>
+                        <li><strong>Hermes Bot</strong> — NousResearch Telegram agent (hermes3:8b)</li>
                     </ul>
-                    <p>All components communicate via encrypted channels with health monitoring and automatic failover.</p>
+                    <h4>Philosophy</h4>
+                    <ul>
+                        <li>PnL is king — Sortino/Calmar over Sharpe, 80%+ win rate target</li>
+                        <li>Mac is commander; system must work without Pi cluster</li>
+                        <li>Autonomous operation: 19 Claude scheduled tasks run 24/7</li>
+                        <li>All Karpathy coding discipline principles applied to every task</li>
+                    </ul>
                 </div>
             </div>
         </div>
 
+        <!-- 02 -->
         <div class="chapter-item">
             <div class="chapter-header" onclick="toggleChapter(this)">
                 <span class="chapter-number">02</span>
                 <span class="chapter-title">Architecture</span>
-                <span class="chapter-toggle">[+]</span>
+                <span class="chapter-toggle">›</span>
             </div>
             <div class="chapter-content">
                 <div class="chapter-body">
-                    <p>Sapphire uses a hub-and-spoke architecture with the Unified Frontend as the central coordination point:</p>
-                    <h4>Cloud Layer</h4>
+                    <p>Sapphire uses a 4-tier inference mesh with the Mac as commander and Windows GPU as primary inference engine.</p>
+                    <h4>Inference Tiers</h4>
                     <ul>
-                        <li>Google Cloud Run for stateless services</li>
-                        <li>Cloud Firestore for persistent data</li>
-                        <li>Cloud Scheduler for automated jobs</li>
+                        <li><strong>T1 Windows GPU</strong> (100.71.10.48) — RTX 5070 Ti, 27 Ollama models, ~0.4s latency</li>
+                        <li><strong>T2a rari1</strong> (100.120.191.1) — Pi, nemotron-mini + smollm2 + qwen2.5:0.5b</li>
+                        <li><strong>T2b rari2</strong> (100.87.225.89) — Pi, 4 models (offline — needs power cycle)</li>
+                        <li><strong>T3 Mac Local</strong> (127.0.0.1:11434) — 6 Ollama models, ~90s CPU fallback</li>
+                        <li><strong>T4 Kimi Cloud</strong> (api.moonshot.cn) — Non-sensitive tasks only, regex sensitivity gate</li>
                     </ul>
-                    <h4>Edge Layer</h4>
+                    <h4>Model Aliases</h4>
                     <ul>
-                        <li>RARI-1 & RARI-2: Trading execution nodes</li>
-                        <li>Windows Lab: TradingView integration</li>
-                        <li>Tailscale mesh for secure connectivity</li>
+                        <li><code>fast</code> / <code>quick</code> → nemotron-mini:4b (232 tok/s)</li>
+                        <li><code>balanced</code> → hermes3:8b (118 tok/s)</li>
+                        <li><code>code</code> → gemma4:latest (154 tok/s)</li>
+                        <li><code>reason</code> → deepseek-r1:14b (80 tok/s)</li>
+                        <li><code>deep</code> → qwen3:14b (81 tok/s)</li>
+                        <li><code>large</code> → qwen2.5:32b (2.7 tok/s)</li>
+                    </ul>
+                    <h4>Tailscale Mesh</h4>
+                    <ul>
+                        <li>Mac: 100.67.171.79 — Windows: 100.71.10.48 — rari1: 100.120.191.1 — rari2: 100.87.225.89</li>
                     </ul>
                 </div>
             </div>
         </div>
 
+        <!-- 03 -->
         <div class="chapter-item">
             <div class="chapter-header" onclick="toggleChapter(this)">
                 <span class="chapter-number">03</span>
                 <span class="chapter-title">Security Protocols</span>
-                <span class="chapter-toggle">[+]</span>
+                <span class="chapter-toggle">›</span>
             </div>
             <div class="chapter-content">
                 <div class="chapter-body">
-                    <p>Sapphire implements defense-in-depth with multiple security layers:</p>
+                    <p>Sapphire implements defense-in-depth with multiple security layers across all tiers.</p>
                     <h4>Access Control</h4>
                     <ul>
-                        <li>Basic Auth for API endpoints</li>
-                        <li>X-Sapphire-Token for internal jobs</li>
-                        <li>Read-only web interface - no mutations</li>
+                        <li>Basic Auth for dashboard (env: <code>AUTH_PASSWORD</code>)</li>
+                        <li>Read-only public web interface — no mutations via UI</li>
+                        <li>Sensitivity gate: regex blocks <code>api_key/password/jwt/SSN/CC</code> from T4 Kimi</li>
+                        <li>Scoped control tokens + signed ingress headers</li>
                     </ul>
                     <h4>Operational Safety</h4>
                     <ul>
-                        <li>Kill switch for emergency halt</li>
-                        <li>Owner approval gate for autonomy</li>
-                        <li>Failure pressure monitoring</li>
-                        <li>Automatic paper-trade fallback</li>
+                        <li>Kill switch for emergency halt (macOS operator app only)</li>
+                        <li>Paper-trade mode default — live trading requires explicit gate</li>
+                        <li>ATR-based SL/TP: 1.67:1 R:R, 10% max position size</li>
+                        <li>60s health cooldown + 30s background probe on inference proxy</li>
                     </ul>
                 </div>
             </div>
         </div>
 
+        <!-- 04 -->
         <div class="chapter-item">
             <div class="chapter-header" onclick="toggleChapter(this)">
                 <span class="chapter-number">04</span>
                 <span class="chapter-title">Trading Operations</span>
-                <span class="chapter-toggle">[+]</span>
+                <span class="chapter-toggle">›</span>
             </div>
             <div class="chapter-content">
                 <div class="chapter-body">
-                    <p>Trading follows a multi-stage pipeline from signal to execution:</p>
+                    <p>Trading follows a multi-stage pipeline from signal to execution with 58% overall accuracy (BTC 75%).</p>
+                    <h4>Pipeline</h4>
                     <ol>
-                        <li><strong>Signal Generation:</strong> Alpha Engine produces trading signals</li>
-                        <li><strong>Validation:</strong> Risk checks and sanity filters applied</li>
-                        <li><strong>Routing:</strong> Signal routed to appropriate execution venue</li>
-                        <li><strong>Execution:</strong> Edge node executes via exchange API</li>
-                        <li><strong>Confirmation:</strong> Trade logged and PnL tracked</li>
+                        <li><strong>Signal Generation</strong> — TradingView Pine alerts → Windows webhook :9090</li>
+                        <li><strong>Ingest</strong> — Signal logger (Mac :18081) normalizes + validates</li>
+                        <li><strong>Scoring</strong> — 6-factor TA: RSI/MACD/BB/MA/ATR/volume</li>
+                        <li><strong>Prediction</strong> — Kronos ML: 6-factor weighted scoring</li>
+                        <li><strong>Notification</strong> — Hermes bot → Telegram alert</li>
+                        <li><strong>Paper Trade</strong> — $100K paper portfolio, ATR stops, Sortino tracking</li>
                     </ol>
-                    <p>All stages are monitored with telemetry sent to Firestore for analysis.</p>
+                    <h4>Metrics</h4>
+                    <ul>
+                        <li>Prediction accuracy: 58% overall, BTC 75%</li>
+                        <li>R:R ratio: 1.67:1 (ATR-based)</li>
+                        <li>Position sizing: 10% max</li>
+                        <li>Target: Sortino/Calmar over Sharpe, 80%+ win rate</li>
+                    </ul>
                 </div>
             </div>
         </div>
 
+        <!-- 05 -->
         <div class="chapter-item">
             <div class="chapter-header" onclick="toggleChapter(this)">
                 <span class="chapter-number">05</span>
                 <span class="chapter-title">API Reference</span>
-                <span class="chapter-toggle">[+]</span>
+                <span class="chapter-toggle">›</span>
             </div>
             <div class="chapter-content">
                 <div class="chapter-body">
-                    <p>Key API endpoints for operators:</p>
-                    <h4>Status Endpoints</h4>
+                    <p>All endpoints require Basic Auth. Base URL: <code>http://localhost:8080</code> (or Tailscale IP).</p>
+                    <h4>System Endpoints</h4>
+                    <div class="endpoint-grid">
+                        <span class="ep-path">GET /api/system</span><span class="ep-desc">Inference health + 7 Mac service statuses + recent signals</span>
+                        <span class="ep-path">GET /api/health/summary</span><span class="ep-desc">Health by category (cloud/pi/windows/firestore)</span>
+                        <span class="ep-path">GET /api/logs</span><span class="ep-desc">Recent system events</span>
+                        <span class="ep-path">GET /health</span><span class="ep-desc">Dashboard liveness probe</span>
+                    </div>
+                    <h4>Trading Endpoints</h4>
+                    <div class="endpoint-grid">
+                        <span class="ep-path">GET /api/signals</span><span class="ep-desc">Signal pipeline: recent signals, stats, routing</span>
+                        <span class="ep-path">GET /api/trading/metrics</span><span class="ep-desc">P&amp;L, Sortino, drawdown, win rate</span>
+                        <span class="ep-path">GET /api/predictions/status</span><span class="ep-desc">Kronos ML model status</span>
+                        <span class="ep-path">POST /api/predictions/kronos</span><span class="ep-desc">Run TA prediction for a symbol</span>
+                    </div>
+                    <h4>Security / Intelligence</h4>
+                    <div class="endpoint-grid">
+                        <span class="ep-path">GET /api/soc/security</span><span class="ep-desc">SOC security overview</span>
+                        <span class="ep-path">GET /api/soc/threats</span><span class="ep-desc">CISA KEV + NVD + MITRE threat feed</span>
+                        <span class="ep-path">POST /api/soc/cyber-research</span><span class="ep-desc">AI cyber research query</span>
+                    </div>
+                    <h4>Readiness</h4>
+                    <div class="endpoint-grid">
+                        <span class="ep-path">GET /api/production/readiness</span><span class="ep-desc">Gate A/B/C status + blockers</span>
+                        <span class="ep-path">GET /api/agents</span><span class="ep-desc">Pi agent vitals (market-watchdog, health-monitor)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 06 -->
+        <div class="chapter-item">
+            <div class="chapter-header" onclick="toggleChapter(this)">
+                <span class="chapter-number">06</span>
+                <span class="chapter-title">Troubleshooting</span>
+                <span class="chapter-toggle">›</span>
+            </div>
+            <div class="chapter-content">
+                <div class="chapter-body">
+                    <h4>Service Issues</h4>
                     <ul>
-                        <li><code>/api/platform/status</code> - Full system status</li>
-                        <li><code>/api/platform/home-snapshot</code> - Aggregated status/metrics/logs snapshot</li>
-                        <li><code>/api/platform/readiness</code> - Readiness gates</li>
+                        <li><strong>Dashboard won't start</strong> — Requires <code>AUTH_PASSWORD</code> env var</li>
+                        <li><strong>Inference proxy offline</strong> — Check <code>com.sapphire.inference-proxy</code> LaunchAgent</li>
+                        <li><strong>GPU Ollama empty responses</strong> — Proxy uses native <code>/api/chat</code> not <code>/v1/</code>; check Windows reboot (Scheduled Task)</li>
+                        <li><strong>Predictions chart missing</strong> — Chart.js served from <code>/static/js/chart.min.js</code></li>
                     </ul>
-                    <h4>Data Endpoints</h4>
+                    <h4>Pi Cluster</h4>
                     <ul>
-                        <li><code>/api/platform/metrics</code> - Trading metrics</li>
-                        <li><code>/api/platform/logs</code> - Activity logs</li>
-                        <li><code>/api/platform/trades</code> - Trade history</li>
+                        <li><strong>rari1 SSH refused</strong> — Needs physical access to start sshd. Setup script: <code>infra/pi/rpc-server-setup.sh</code></li>
+                        <li><strong>rari2 offline</strong> — Needs power cycle. rari2 ProtonVPN (proton0) breaks internet if tunnel dies</li>
                     </ul>
-                    <h4>Management Endpoints</h4>
+                    <h4>LaunchAgent Quick Restart</h4>
                     <ul>
-                        <li><code>/api/platform/projects</code> - Program portfolio</li>
-                        <li><code>/api/platform/organization</code> - Org structure</li>
-                        <li><code>/api/platform/contracts</code> - API manifest</li>
+                        <li>Dashboard: <code>launchctl kickstart -k gui/$(id -u)/com.sapphire.dashboard</code></li>
+                        <li>Inference proxy: <code>launchctl kickstart -k gui/$(id -u)/com.sapphire.inference-proxy</code></li>
+                        <li>Signal logger: <code>launchctl kickstart -k gui/$(id -u)/com.sapphire.signal-logger</code></li>
+                    </ul>
+                    <h4>Mac Python</h4>
+                    <ul>
+                        <li>Use <code>/usr/local/bin/python3</code> for tests — brew 3.14 may be missing pytest</li>
+                        <li>Tests: <code>pytest tests/unit/ --tb=short -q</code> (1,088 tests)</li>
                     </ul>
                 </div>
             </div>
         </div>
 
-        <div class="chapter-item">
-            <div class="chapter-header" onclick="toggleChapter(this)">
-                <span class="chapter-number">06</span>
-                <span class="chapter-title">Troubleshooting</span>
-                <span class="chapter-toggle">[+]</span>
-            </div>
-            <div class="chapter-content">
-                <div class="chapter-body">
-                    <h4>Common Issues</h4>
-                    <p><strong>Service Degraded:</strong> Check /api/platform/status for unhealthy services. Restart via Cloud Console if needed.</p>
-                    <p><strong>Edge Node Offline:</strong> Verify Tailscale connection on the node. Check power and network.</p>
-                    <p><strong>Signal Not Executing:</strong> Verify dex_execution_stage is not 'paper' and kill_switch is not active.</p>
-                    <h4>Emergency Procedures</h4>
-                    <ul>
-                        <li>Activate kill switch via macOS Commander app</li>
-                        <li>Contact operator via Telegram bot</li>
-                        <li>Check Cloud Run logs in GCP Console</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+    </div><!-- /chapter-list -->
+</div><!-- /book-container -->
 {% endblock %}
 
 {% block extra_js %}
 <script>
     function toggleChapter(header) {
         const content = header.nextElementSibling;
-        const toggle = header.querySelector('.chapter-toggle');
-        
-        if (content.classList.contains('open')) {
-            content.classList.remove('open');
-            toggle.textContent = '[+]';
-        } else {
-            // Close all others
-            document.querySelectorAll('.chapter-content').forEach(c => c.classList.remove('open'));
-            document.querySelectorAll('.chapter-toggle').forEach(t => t.textContent = '[+]');
-            
+        const toggle  = header.querySelector('.chapter-toggle');
+        const isOpen  = content.classList.contains('open');
+
+        // Close all
+        document.querySelectorAll('.chapter-content').forEach(c => c.classList.remove('open'));
+        document.querySelectorAll('.chapter-toggle').forEach(t => {
+            t.classList.remove('open');
+            t.textContent = '›';
+        });
+
+        if (!isOpen) {
             content.classList.add('open');
-            toggle.textContent = '[-]';
+            toggle.classList.add('open');
+            toggle.textContent = '›';
         }
     }
+
+    // Live system status chip
+    async function loadChip() {
+        try {
+            const res = await fetch('/api/system', { credentials: 'same-origin' });
+            if (!res.ok) return;
+            const data = await res.json();
+            const h = data.healthy_count ?? (data.services || []).filter(s => s.healthy).length;
+            const t = data.total_count   ?? (data.services || []).length;
+            const chip = document.getElementById('chip-health');
+            chip.textContent = `${h}/${t} services healthy`;
+            chip.style.color = h === t ? 'var(--green)' : 'var(--amber)';
+            chip.style.borderColor = h === t ? 'rgba(34,197,94,0.3)' : 'rgba(240,136,62,0.3)';
+            chip.style.background  = h === t ? 'rgba(34,197,94,0.08)' : 'rgba(240,136,62,0.08)';
+        } catch(_) {}
+    }
+
+    document.addEventListener('DOMContentLoaded', loadChip);
 </script>
 {% endblock %}

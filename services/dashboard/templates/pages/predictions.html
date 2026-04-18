@@ -1,0 +1,710 @@
+{% extends "base.html" %}
+
+{% block title %}Predictions{% endblock %}
+
+{% block extra_css %}
+.pred-hero {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    gap: 20px;
+    padding: 18px 20px 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 12px;
+}
+.pred-hero h1 {
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+    margin: 0;
+}
+.pred-hero .sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+.pred-hero .model-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    padding: 3px 9px;
+    background: var(--bg-base);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+}
+.pred-hero .model-chip .dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--green);
+}
+.pred-hero .ctrls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.pill-btn {
+    padding: 6px 11px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.pill-btn:hover { background: rgba(255,255,255,0.02); color: var(--text-primary); }
+.pill-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+.primary-btn {
+    padding: 7px 14px;
+    border-radius: 4px;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    transition: opacity 0.15s;
+}
+.primary-btn:hover { opacity: 0.9; }
+
+.ctrl-bar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+.ctrl-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.ctrl-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+    margin-right: 3px;
+}
+.ctrl-group input[type=text] {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 5px 10px;
+    color: var(--text-primary);
+    font-size: 12px;
+    font-family: var(--font-mono);
+    width: 90px;
+}
+
+.kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+}
+.kpi-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+}
+.kpi-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+}
+.kpi-value {
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    line-height: 1.1;
+}
+.kpi-value.up   { color: var(--green); }
+.kpi-value.down { color: var(--red); }
+.kpi-value.neutral { color: var(--amber); }
+.kpi-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    font-family: var(--font-mono);
+}
+.kpi-sub.up { color: var(--green); }
+.kpi-sub.down { color: var(--red); }
+
+.pred-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+}
+.pred-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+}
+.pred-card-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.pred-card-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+}
+.pred-card-body { padding: 14px 16px; }
+
+.chart-wrap {
+    position: relative;
+    width: 100%;
+    height: 320px;
+    background: var(--bg-base);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.pred-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    font-family: var(--font-mono);
+}
+.pred-row:last-child { border-bottom: none; }
+.pred-ts    { color: var(--text-muted); min-width: 108px; font-size: 11px; }
+.pred-close { font-weight: 500; min-width: 78px; }
+.pred-close.up   { color: var(--green); }
+.pred-close.down { color: var(--red); }
+.pred-pct { min-width: 58px; font-size: 11px; }
+.pred-pct.up   { color: var(--green); }
+.pred-pct.down { color: var(--red); }
+.pred-hl { color: var(--text-muted); font-size: 10px; margin-left: auto; }
+
+.conf-display { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; }
+.conf-value {
+    font-size: 40px;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    color: var(--text-primary);
+    line-height: 1;
+    letter-spacing: -0.01em;
+    transition: color 0.3s;
+}
+.conf-label { font-size: 12px; color: var(--text-muted); }
+.conf-bar {
+    height: 4px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 2px;
+    overflow: hidden;
+}
+.conf-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.6s ease, background 0.3s;
+}
+.conf-detail {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 10px;
+    line-height: 1.5;
+}
+
+.ctx-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 20px;
+}
+.ctx-item { display: flex; flex-direction: column; gap: 3px; }
+.ctx-label {
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+.ctx-value {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+}
+
+.spinner-sm {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border: 2px solid rgba(59,130,246,0.2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+{% endblock %}
+
+{% block content %}
+
+<!-- Hero -->
+<div class="pred-hero">
+    <div>
+        <h1>Predictions</h1>
+        <div class="sub">
+            <span class="model-chip"><span class="dot"></span>Kronos-base · 102M</span>
+            &nbsp; Foundation model · OHLCV sequence forecasting · <span id="model-status" style="color:var(--text-muted);">checking model…</span>
+        </div>
+    </div>
+    <div class="ctrls">
+        <button onclick="loadPrediction()" class="primary-btn">Predict</button>
+    </div>
+</div>
+
+<!-- Controls -->
+<div class="ctrl-bar">
+    <div class="ctrl-group">
+        <span class="ctrl-label">Symbol</span>
+        <button class="pill-btn active" onclick="selectSymbol('BTC-USD', this)" id="btn-BTC-USD">BTC</button>
+        <button class="pill-btn" onclick="selectSymbol('ETH-USD', this)" id="btn-ETH-USD">ETH</button>
+        <button class="pill-btn" onclick="selectSymbol('SOL-USD', this)" id="btn-SOL-USD">SOL</button>
+        <button class="pill-btn" onclick="selectSymbol('SPY', this)" id="btn-SPY">SPY</button>
+        <button class="pill-btn" onclick="selectSymbol('TSLA', this)" id="btn-TSLA">TSLA</button>
+    </div>
+    <div class="ctrl-group">
+        <span class="ctrl-label">Custom</span>
+        <input id="custom-symbol" type="text" placeholder="AAPL" onkeydown="if(event.key==='Enter') selectSymbol(this.value.toUpperCase(), null)"/>
+    </div>
+    <div class="ctrl-group" style="margin-left:auto;">
+        <span class="ctrl-label">Horizon</span>
+        <button class="pill-btn" onclick="selectHorizon(12, this)">12h</button>
+        <button class="pill-btn active" onclick="selectHorizon(24, this)" id="h-24">24h</button>
+        <button class="pill-btn" onclick="selectHorizon(48, this)">48h</button>
+        <button class="pill-btn" onclick="selectHorizon(96, this)">4d</button>
+    </div>
+</div>
+
+<!-- KPI Row -->
+<div class="kpi-row" id="kpi-row">
+    <div class="kpi-card">
+        <div class="kpi-label">Symbol</div>
+        <div class="kpi-value" id="stat-symbol">—</div>
+        <div class="kpi-sub" id="stat-interval">—</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Current price</div>
+        <div class="kpi-value" id="stat-price">—</div>
+        <div class="kpi-sub">OpenBB / yfinance</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Direction</div>
+        <div class="kpi-value" id="stat-direction">—</div>
+        <div class="kpi-sub" id="stat-conf-text">—</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Target price</div>
+        <div class="kpi-value" id="stat-target">—</div>
+        <div class="kpi-sub" id="stat-change-pct">—</div>
+    </div>
+</div>
+
+<!-- Chart + Forecast table -->
+<div style="display:grid; grid-template-columns:1fr 340px; gap:12px; margin-bottom:12px;">
+
+    <div class="pred-card">
+        <div class="pred-card-head">
+            <div class="pred-card-title">Price forecast</div>
+            <div class="pred-card-meta" id="chart-status">historical + predicted</div>
+        </div>
+        <div class="pred-card-body" style="padding:14px 16px;">
+            <div id="chart-wrap" class="chart-wrap">
+                <canvas id="pred-chart"></canvas>
+                <div id="chart-loading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg-base);">
+                    <span style="color:var(--text-muted);font-size:12px;"><span class="spinner-sm"></span>Awaiting prediction</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="pred-card">
+        <div class="pred-card-head">
+            <div class="pred-card-title">Bar-by-bar forecast</div>
+            <div class="pred-card-meta" id="pred-count">—</div>
+        </div>
+        <div class="pred-card-body" style="padding:0 16px; overflow-y:auto; max-height:320px;">
+            <div id="pred-table">
+                <div style="padding:18px 0;text-align:center;color:var(--text-muted);font-size:12px;">Select symbol and predict</div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Confidence + Model Context -->
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+
+    <div class="pred-card">
+        <div class="pred-card-head">
+            <div class="pred-card-title">Confidence</div>
+            <div class="pred-card-meta" id="pred-updated">—</div>
+        </div>
+        <div class="pred-card-body">
+            <div class="conf-display">
+                <span id="conf-ring-pct" class="conf-value">—%</span>
+                <span class="conf-label">confidence</span>
+            </div>
+            <div class="conf-bar"><div id="conf-arc" class="conf-bar-fill"></div></div>
+            <div class="conf-detail" id="conf-detail">Derived from predicted price move magnitude.</div>
+        </div>
+    </div>
+
+    <div class="pred-card">
+        <div class="pred-card-head">
+            <div class="pred-card-title">Model context</div>
+            <div class="pred-card-meta">Kronos-base · 102M</div>
+        </div>
+        <div class="pred-card-body">
+            <div class="ctx-grid">
+                <div class="ctx-item">
+                    <span class="ctx-label">Lookback used</span>
+                    <span class="ctx-value" id="ctx-lookback">—</span>
+                </div>
+                <div class="ctx-item">
+                    <span class="ctx-label">Predict bars</span>
+                    <span class="ctx-value" id="ctx-predict">—</span>
+                </div>
+                <div class="ctx-item">
+                    <span class="ctx-label">Inference time</span>
+                    <span class="ctx-value" id="ctx-elapsed">—</span>
+                </div>
+                <div class="ctx-item">
+                    <span class="ctx-label">Data source</span>
+                    <span class="ctx-value" id="ctx-source" style="font-size:12px;color:var(--text-secondary);">OpenBB / yfinance</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/chart.min.js"></script>
+<script>
+let currentSymbol = 'BTC-USD';
+let currentHorizon = 24;
+let isLoading = false;
+
+function selectSymbol(sym, btn) {
+    currentSymbol = sym;
+    document.querySelectorAll('.pill-btn[id^="btn-"]').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    loadPrediction();
+}
+
+function selectHorizon(h, btn) {
+    currentHorizon = h;
+    document.querySelectorAll('.pill-btn').forEach(b => {
+        if (['12h','24h','48h','4d'].some(t => b.textContent.trim() === t)) b.classList.remove('active');
+    });
+    if (btn) btn.classList.add('active');
+}
+
+async function loadPrediction() {
+    if (isLoading) return;
+    isLoading = true;
+
+    const cl = document.getElementById('chart-loading');
+    cl.style.display = 'flex';
+    cl.innerHTML = '<span style="color:var(--text-muted);font-size:12px;"><span class="spinner-sm"></span>Running Kronos inference</span>';
+
+    const url = `/api/predictions/kronos?symbol=${encodeURIComponent(currentSymbol)}&predict=${currentHorizon}&interval=1h&lookback=200`;
+
+    try {
+        const r = await fetch(url);
+        const d = await r.json();
+        if (d.error) {
+            cl.innerHTML = `<span style="color:var(--red);font-size:12px;">${d.error}</span>`;
+            isLoading = false;
+            return;
+        }
+        renderPrediction(d);
+        cl.style.display = 'none';
+    } catch(e) {
+        cl.innerHTML = `<span style="color:var(--red);font-size:12px;">Fetch failed — ${e.message}</span>`;
+    }
+
+    isLoading = false;
+}
+
+function fmtPrice(v) {
+    if (v == null) return '—';
+    return v >= 1000
+        ? '$' + v.toLocaleString(undefined, {maximumFractionDigits:2})
+        : '$' + v.toFixed(v >= 10 ? 2 : 4);
+}
+
+function renderPrediction(d) {
+    document.getElementById('stat-symbol').textContent = d.symbol || '—';
+    document.getElementById('stat-interval').textContent = d.interval || '—';
+
+    const price = d.current_price;
+    document.getElementById('stat-price').textContent = fmtPrice(price);
+
+    const dir = (d.direction || 'neutral').toLowerCase();
+    const dirEl = document.getElementById('stat-direction');
+    const arrowMap = { 'go-long':'↑', 'bullish':'↑', 'bearish':'↓', 'go-short':'↓', 'neutral':'→' };
+    const arrow = arrowMap[dir] || '→';
+    const dirLabel = dir === 'go-long' ? 'Long' : dir === 'go-short' ? 'Short' : dir.charAt(0).toUpperCase() + dir.slice(1);
+    dirEl.innerHTML = `${arrow} ${dirLabel}`;
+    dirEl.className = 'kpi-value ' + (dir.includes('long') || dir === 'bullish' ? 'up' : dir.includes('short') || dir === 'bearish' ? 'down' : 'neutral');
+
+    const conf = d.confidence || 0;
+    document.getElementById('stat-conf-text').textContent = `${(conf*100).toFixed(0)}% confidence`;
+
+    const preds = d.predictions || [];
+    if (preds.length > 0) {
+        const lastClose = preds[preds.length-1].close || price;
+        const pctChange = ((lastClose - price) / price * 100);
+        const sign = pctChange >= 0 ? '+' : '';
+        document.getElementById('stat-target').textContent = fmtPrice(lastClose);
+        const chEl = document.getElementById('stat-change-pct');
+        chEl.textContent = `${sign}${pctChange.toFixed(2)}%`;
+        chEl.className = 'kpi-sub ' + (pctChange >= 0 ? 'up' : 'down');
+    }
+
+    const arcEl = document.getElementById('conf-arc');
+    const arcColor = conf > 0.7 ? 'var(--green)' : conf > 0.5 ? 'var(--accent)' : 'var(--amber)';
+    if (arcEl) { arcEl.style.width = (conf * 100).toFixed(1) + '%'; arcEl.style.background = arcColor; }
+    const ringPct = document.getElementById('conf-ring-pct');
+    if (ringPct) { ringPct.textContent = (conf*100).toFixed(0) + '%'; ringPct.style.color = arcColor; }
+
+    document.getElementById('pred-updated').textContent = new Date().toLocaleTimeString('en-US', {hour12:false});
+    document.getElementById('ctx-lookback').textContent = d.lookback_used || '—';
+    document.getElementById('ctx-predict').textContent = preds.length;
+    document.getElementById('ctx-elapsed').textContent = d.elapsed_s ? d.elapsed_s + 's' : '—';
+
+    renderChart(d.history || [], preds, price);
+    renderTable(preds, price);
+
+    document.getElementById('pred-count').textContent = `${preds.length} bars`;
+}
+
+function renderChart(history, predictions, currentPrice) {
+    const canvas = document.getElementById('pred-chart');
+    const wrap   = canvas.parentElement;
+    canvas.width  = wrap.offsetWidth  || 600;
+    canvas.height = wrap.offsetHeight || 300;
+
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    const pad = { top: 24, right: 20, bottom: 32, left: 70 };
+    const cw = W - pad.left - pad.right;
+    const ch = H - pad.top  - pad.bottom;
+
+    const allClose = [...history.map(b => b.close), ...predictions.map(b => b.close)];
+    if (allClose.length === 0) return;
+    const minV = Math.min(...allClose) * 0.9985;
+    const maxV = Math.max(...allClose) * 1.0015;
+    const total = allClose.length;
+
+    const xAt = i => pad.left + (i / Math.max(total - 1, 1)) * cw;
+    const yAt = v => pad.top + ch - ((v - minV) / (maxV - minV)) * ch;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Grid lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+        const y = pad.top + (ch / 4) * i;
+        ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + cw, y); ctx.stroke();
+    }
+
+    // Historical line
+    if (history.length) {
+        ctx.strokeStyle = 'rgba(161,161,170,0.55)';
+        ctx.lineWidth = 1.25;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        history.forEach((b, i) => {
+            i === 0 ? ctx.moveTo(xAt(i), yAt(b.close)) : ctx.lineTo(xAt(i), yAt(b.close));
+        });
+        ctx.stroke();
+    }
+
+    const hi = history.length - 1;
+    const bridgeX = xAt(hi);
+    const bridgeY = history.length ? yAt(history[hi].close) : yAt(currentPrice);
+
+    if (predictions.length) {
+        // Area
+        const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + ch);
+        grad.addColorStop(0, 'rgba(59,130,246,0.15)');
+        grad.addColorStop(1, 'rgba(59,130,246,0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(bridgeX, yAt(minV));
+        ctx.lineTo(bridgeX, bridgeY);
+        predictions.forEach((b, i) => ctx.lineTo(xAt(history.length + i), yAt(b.close)));
+        ctx.lineTo(xAt(total - 1), yAt(minV));
+        ctx.closePath();
+        ctx.fill();
+
+        // Forecast line
+        ctx.strokeStyle = '#3b82f6';
+        ctx.lineWidth = 1.75;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(bridgeX, bridgeY);
+        predictions.forEach((b, i) => ctx.lineTo(xAt(history.length + i), yAt(b.close)));
+        ctx.stroke();
+
+        // Divider
+        ctx.strokeStyle = 'rgba(59,130,246,0.3)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 4]);
+        ctx.beginPath(); ctx.moveTo(bridgeX, pad.top); ctx.lineTo(bridgeX, pad.top + ch); ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Forecast label
+        ctx.fillStyle = 'rgba(59,130,246,0.65)';
+        ctx.font = '9px ui-monospace, monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText('FORECAST', bridgeX + 4, pad.top + 10);
+    }
+
+    // Y labels
+    ctx.fillStyle = '#71717a';
+    ctx.font = '10px ui-monospace, monospace';
+    ctx.textAlign = 'right';
+    for (let i = 0; i <= 4; i++) {
+        const v = maxV - ((maxV - minV) / 4) * i;
+        const y = pad.top + (ch / 4) * i;
+        const label = v >= 1000 ? '$' + v.toLocaleString(undefined, {maximumFractionDigits: 0})
+                                : '$' + v.toFixed(2);
+        ctx.fillText(label, pad.left - 8, y + 4);
+    }
+
+    // X labels
+    ctx.fillStyle = '#52525b';
+    ctx.textAlign = 'center';
+    const step = Math.max(1, Math.floor(total / 7));
+    [...history, ...predictions].forEach((b, i) => {
+        if (i % step !== 0 && i !== total - 1) return;
+        const ts = b.timestamp ? new Date(b.timestamp) : null;
+        const label = ts ? (ts.getMonth()+1)+'/'+ts.getDate()+' '+String(ts.getHours()).padStart(2,'0')+'h'
+                        : (i < history.length ? 'T-'+(history.length-i) : 'T+'+(i-history.length+1));
+        ctx.fillText(label, xAt(i), H - 8);
+    });
+
+    // Legend
+    const ly = pad.top - 12;
+    ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(161,161,170,0.55)'; ctx.lineWidth = 1.25;
+    ctx.beginPath(); ctx.moveTo(pad.left, ly); ctx.lineTo(pad.left + 16, ly); ctx.stroke();
+    ctx.fillStyle = '#71717a'; ctx.font = '10px ui-sans-serif, system-ui'; ctx.textAlign = 'left';
+    ctx.fillText('Historical', pad.left + 20, ly + 3);
+
+    ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 1.75;
+    ctx.beginPath(); ctx.moveTo(pad.left + 90, ly); ctx.lineTo(pad.left + 106, ly); ctx.stroke();
+    ctx.fillText('Forecast', pad.left + 110, ly + 3);
+}
+
+function renderTable(predictions, currentPrice) {
+    const el = document.getElementById('pred-table');
+    if (!predictions.length) {
+        el.innerHTML = `
+          <div class="empty-state illustrated" style="padding:40px 16px 48px;text-align:center;">
+            <svg class="empty-illustration" viewBox="0 0 140 80" fill="none" stroke="currentColor" stroke-width="1.2" style="max-width:140px;color:var(--text-faint);opacity:0.8;margin:0 auto 14px;display:block;">
+              <path d="M6 60 L28 48 L48 54 L66 38" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="78" cy="32" r="1.6" fill="currentColor" stroke="none"/>
+              <circle cx="92" cy="26" r="1.4" fill="currentColor" stroke="none" opacity="0.75"/>
+              <circle cx="106" cy="22" r="1.2" fill="currentColor" stroke="none" opacity="0.55"/>
+              <circle cx="120" cy="20" r="1.0" fill="currentColor" stroke="none" opacity="0.35"/>
+              <circle cx="132" cy="18" r="0.8" fill="currentColor" stroke="none" opacity="0.2"/>
+              <line x1="6" y1="72" x2="134" y2="72" stroke-width="0.6" opacity="0.4"/>
+            </svg>
+            <div style="font-size:13px;color:var(--text-secondary);margin-bottom:4px;">No predictions yet</div>
+            <div style="font-size:11px;color:var(--text-muted);">Forecast engine is waiting for candle data</div>
+          </div>`;
+        return;
+    }
+
+    el.innerHTML = predictions.map((p, i) => {
+        const ts = p.timestamp ? new Date(p.timestamp).toLocaleString(undefined, {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}) : 'T+' + p.bar;
+        const close = p.close;
+        const ref = i === 0 ? currentPrice : (predictions[i-1].close || currentPrice);
+        const up = close >= ref;
+        const pct = ((close - currentPrice) / currentPrice * 100);
+        const sign = pct >= 0 ? '+' : '';
+
+        return `<div class="pred-row">
+            <span class="pred-ts">${ts}</span>
+            <span class="pred-close ${up ? 'up' : 'down'}">${close >= 1000 ? close.toLocaleString(undefined,{maximumFractionDigits:0}) : close.toFixed(close >= 10 ? 2 : 4)}</span>
+            <span class="pred-pct ${pct>=0 ? 'up' : 'down'}">${sign}${pct.toFixed(2)}%</span>
+            <span class="pred-hl">H ${p.high?.toFixed(2)||'—'} · L ${p.low?.toFixed(2)||'—'}</span>
+        </div>`;
+    }).join('');
+}
+
+async function checkModelStatus() {
+    try {
+        const r = await fetch('/api/predictions/status');
+        const d = await r.json();
+        const el = document.getElementById('model-status');
+        const predTable = document.getElementById('pred-table');
+        const noDataYet = predTable && predTable.innerHTML.includes('Select symbol');
+        if (d.error) {
+            el.innerHTML = '<span style="color:var(--red);">model check failed</span>';
+        } else if (d.has_todays_predictions) {
+            const syms = (d.cached_symbols || []).join(', ');
+            el.innerHTML = `<span style="color:var(--green);">cached</span> <span style="color:var(--text-muted);">· ${syms}</span>`;
+        } else if (d.kronos_root_exists) {
+            el.innerHTML = '<span style="color:var(--amber);">model ready · no predictions today</span>';
+            if (noDataYet) {
+                predTable.innerHTML = `<div style="padding:24px 0;text-align:center;">
+                    <div style="font-size:13px;color:var(--amber);margin-bottom:6px;">Awaiting first prediction</div>
+                    <div style="font-size:12px;color:var(--text-muted);line-height:1.6;">
+                        Runs automatically at 5:42 AM<br>
+                        <span style="color:var(--text-secondary);">Predict</span> to run on demand
+                    </div>
+                </div>`;
+            }
+        } else {
+            el.innerHTML = '<span style="color:var(--red);">Kronos not installed</span>';
+            if (noDataYet) {
+                predTable.innerHTML = `<div style="padding:20px 0;text-align:center;">
+                    <div style="font-size:13px;color:var(--red);margin-bottom:6px;">Model not found</div>
+                    <div style="font-size:12px;color:var(--text-muted);">Kronos not at expected path</div>
+                </div>`;
+            }
+        }
+    } catch(e) {
+        document.getElementById('model-status').innerHTML = '<span style="color:var(--text-muted);">status unavailable</span>';
+    }
+}
+
+checkModelStatus();
+loadPrediction();
+</script>
+{% endblock %}

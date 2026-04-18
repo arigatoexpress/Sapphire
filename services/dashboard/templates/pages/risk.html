@@ -1,0 +1,456 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .risk-hero {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        gap: 1px;
+        background: var(--border);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 20px;
+    }
+    .risk-cell {
+        background: var(--bg-card);
+        padding: 22px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        transition: background 150ms var(--ease);
+    }
+    .risk-cell:hover { background: var(--bg-card-hover); }
+    .risk-label {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+    }
+    .risk-value {
+        font-size: 36px;
+        font-weight: 600;
+        line-height: 1.05;
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.02em;
+        color: var(--text-primary);
+    }
+    .risk-value.positive { color: var(--green); }
+    .risk-value.negative { color: var(--red); }
+    .risk-value.neutral  { color: var(--text-primary); }
+    .risk-sub {
+        font-size: 12px;
+        color: var(--text-secondary);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 14px;
+        margin-bottom: 20px;
+    }
+    .metric-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 18px 20px;
+        transition: border-color 150ms;
+    }
+    .metric-card:hover { border-color: var(--accent); }
+    .metric-card .label {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 6px;
+    }
+    .metric-card .val {
+        font-size: 26px;
+        font-weight: 600;
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+        color: var(--text-primary);
+        line-height: 1.1;
+    }
+    .metric-card .sub {
+        font-size: 11px;
+        color: var(--text-secondary);
+        margin-top: 4px;
+    }
+    .val.positive { color: var(--green); }
+    .val.negative { color: var(--red); }
+
+    .panel {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 22px;
+        margin-bottom: 18px;
+    }
+    .panel-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 16px;
+    }
+    .panel-title {
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        color: var(--text-primary);
+    }
+    .panel-meta {
+        font-size: 11px;
+        color: var(--text-muted);
+    }
+
+    .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+    }
+
+    #equity-chart, #dd-chart {
+        width: 100%;
+        height: 240px;
+    }
+
+    .kelly-box {
+        background: linear-gradient(135deg, rgba(59,130,246,0.06) 0%, rgba(59,130,246,0.02) 100%);
+        border: 1px solid rgba(59,130,246,0.22);
+        border-radius: 10px;
+        padding: 22px 24px;
+    }
+    .kelly-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--border);
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
+    }
+    .kelly-row:last-child { border-bottom: none; padding-top: 14px; }
+    .kelly-row .k-label { color: var(--text-secondary); }
+    .kelly-row .k-val { color: var(--text-primary); font-family: var(--font-mono); font-weight: 500; }
+    .kelly-recommend {
+        font-size: 32px;
+        font-weight: 600;
+        color: var(--accent);
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+        margin: 6px 0;
+    }
+    .kelly-caption { font-size: 11px; color: var(--text-muted); }
+    .loading-msg {
+        color: var(--text-muted);
+        padding: 28px;
+        text-align: center;
+        font-size: 13px;
+    }
+</style>
+
+<div class="risk-page">
+    <div class="risk-hero">
+        <div class="risk-cell">
+            <div class="risk-label">Total PnL</div>
+            <div class="risk-value neutral" id="hero-pnl">—</div>
+            <div class="risk-sub" id="hero-pnl-sub">—</div>
+        </div>
+        <div class="risk-cell">
+            <div class="risk-label">Win rate</div>
+            <div class="risk-value neutral" id="hero-winrate">—</div>
+            <div class="risk-sub" id="hero-winrate-sub">— W/L</div>
+        </div>
+        <div class="risk-cell">
+            <div class="risk-label">Max drawdown</div>
+            <div class="risk-value neutral" id="hero-maxdd">—</div>
+            <div class="risk-sub" id="hero-maxdd-sub">—</div>
+        </div>
+        <div class="risk-cell">
+            <div class="risk-label">Sortino</div>
+            <div class="risk-value neutral" id="hero-sortino">—</div>
+            <div class="risk-sub" id="hero-sortino-sub">annualized</div>
+        </div>
+    </div>
+
+    <div class="metric-grid">
+        <div class="metric-card">
+            <div class="label">Sharpe</div>
+            <div class="val" id="m-sharpe">—</div>
+            <div class="sub">risk-adjusted return</div>
+        </div>
+        <div class="metric-card">
+            <div class="label">Calmar</div>
+            <div class="val" id="m-calmar">—</div>
+            <div class="sub">return / max DD</div>
+        </div>
+        <div class="metric-card">
+            <div class="label">Profit factor</div>
+            <div class="val" id="m-pf">—</div>
+            <div class="sub">Σwins / Σlosses</div>
+        </div>
+        <div class="metric-card">
+            <div class="label">Expectancy</div>
+            <div class="val" id="m-exp">—</div>
+            <div class="sub">per-trade avg</div>
+        </div>
+        <div class="metric-card">
+            <div class="label">Avg win</div>
+            <div class="val positive" id="m-avgwin">—</div>
+            <div class="sub" id="m-wins-sub">— trades</div>
+        </div>
+        <div class="metric-card">
+            <div class="label">Avg loss</div>
+            <div class="val negative" id="m-avgloss">—</div>
+            <div class="sub" id="m-losses-sub">— trades</div>
+        </div>
+        <div class="metric-card">
+            <div class="label">Drawdown dur.</div>
+            <div class="val" id="m-dd-dur">—</div>
+            <div class="sub">days in worst run</div>
+        </div>
+        <div class="metric-card">
+            <div class="label">Current DD</div>
+            <div class="val" id="m-cur-dd">—</div>
+            <div class="sub" id="m-bankroll-sub">—</div>
+        </div>
+    </div>
+
+    <div class="grid-2">
+        <div class="panel">
+            <div class="panel-head">
+                <span class="panel-title">Equity curve</span>
+                <span class="panel-meta" id="eq-meta">—</span>
+            </div>
+            <svg id="equity-chart" viewBox="0 0 800 240" preserveAspectRatio="none"></svg>
+        </div>
+        <div class="panel">
+            <div class="panel-head">
+                <span class="panel-title">Drawdown over time</span>
+                <span class="panel-meta" id="dd-meta">worst: —</span>
+            </div>
+            <svg id="dd-chart" viewBox="0 0 800 240" preserveAspectRatio="none"></svg>
+        </div>
+    </div>
+
+    <div class="grid-2">
+        <div class="panel kelly-box">
+            <div class="panel-head">
+                <span class="panel-title">Kelly sizing</span>
+                <span class="panel-meta">quarter-Kelly recommendation</span>
+            </div>
+            <div class="kelly-recommend" id="kelly-recommended">$—</div>
+            <div class="kelly-caption" id="kelly-caption">per trade — from current win rate &amp; R:R</div>
+            <div style="margin-top: 16px;">
+                <div class="kelly-row"><span class="k-label">Raw Kelly f*</span><span class="k-val" id="kelly-raw">—</span></div>
+                <div class="kelly-row"><span class="k-label">Quarter-Kelly</span><span class="k-val" id="kelly-quarter">—</span></div>
+                <div class="kelly-row"><span class="k-label">Bankroll</span><span class="k-val" id="kelly-bankroll">—</span></div>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="panel-head">
+                <span class="panel-title">Trade distribution</span>
+                <span class="panel-meta" id="dist-meta">—</span>
+            </div>
+            <div id="dist-view" style="padding: 8px 0;">
+                <div class="loading-msg">Loading…</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function fmtUSD(n) {
+    if (n === null || n === undefined || isNaN(n)) return '—';
+    const sign = n < 0 ? '-' : '';
+    const abs = Math.abs(n);
+    if (abs >= 1e6) return sign + '$' + (abs/1e6).toFixed(2) + 'M';
+    if (abs >= 1e3) return sign + '$' + (abs/1e3).toFixed(2) + 'k';
+    return sign + '$' + abs.toFixed(2);
+}
+function fmtPct(n, digits) {
+    if (n === null || n === undefined || isNaN(n)) return '—';
+    digits = digits === undefined ? 2 : digits;
+    return (n * 100).toFixed(digits) + '%';
+}
+function signedClass(n) {
+    if (n === null || n === undefined || isNaN(n)) return 'neutral';
+    return n > 0 ? 'positive' : (n < 0 ? 'negative' : 'neutral');
+}
+
+function drawEquity(curve, bankroll) {
+    const svg = document.getElementById('equity-chart');
+    svg.innerHTML = '';
+    if (!curve || curve.length < 1) {
+        svg.innerHTML = '<text x="400" y="120" text-anchor="middle" fill="#64748b" font-size="13">Awaiting closed trades</text>';
+        return;
+    }
+    const pts = [[0, bankroll], ...curve.map((p, i) => [i + 1, p.equity_usd])];
+    const xs = pts.map(p => p[0]);
+    const ys = pts.map(p => p[1]);
+    const minY = Math.min(...ys) * 0.995;
+    const maxY = Math.max(...ys) * 1.005;
+    const W = 800, H = 240, PAD = 24;
+    const xMin = Math.min(...xs), xMax = Math.max(...xs);
+    const scaleX = x => PAD + ((x - xMin) / Math.max(1, (xMax - xMin))) * (W - 2*PAD);
+    const scaleY = y => H - PAD - ((y - minY) / Math.max(1, (maxY - minY))) * (H - 2*PAD);
+
+    // bankroll baseline
+    const bly = scaleY(bankroll);
+    svg.insertAdjacentHTML('beforeend',
+        `<line x1="${PAD}" x2="${W-PAD}" y1="${bly}" y2="${bly}" stroke="#334155" stroke-dasharray="3,4" stroke-width="1"/>`);
+
+    // equity line
+    const poly = pts.map(p => `${scaleX(p[0])},${scaleY(p[1])}`).join(' ');
+    const lastY = pts[pts.length-1][1];
+    const color = lastY >= bankroll ? '#22c55e' : '#ef4444';
+    svg.insertAdjacentHTML('beforeend',
+        `<polyline points="${poly}" fill="none" stroke="${color}" stroke-width="2"/>`);
+    // area fill
+    svg.insertAdjacentHTML('beforeend',
+        `<polygon points="${PAD},${H-PAD} ${poly} ${W-PAD},${H-PAD}" fill="${color}" opacity="0.08"/>`);
+
+    // endpoints
+    svg.insertAdjacentHTML('beforeend',
+        `<circle cx="${scaleX(pts[pts.length-1][0])}" cy="${scaleY(lastY)}" r="3" fill="${color}"/>`);
+
+    document.getElementById('eq-meta').textContent =
+        `$${bankroll.toFixed(0)} → ${fmtUSD(lastY)}`;
+}
+
+function drawDrawdown(curve) {
+    const svg = document.getElementById('dd-chart');
+    svg.innerHTML = '';
+    if (!curve || curve.length < 1) {
+        svg.innerHTML = '<text x="400" y="120" text-anchor="middle" fill="#64748b" font-size="13">No trades</text>';
+        return;
+    }
+    const W = 800, H = 240, PAD = 24;
+    const pts = curve.map((p, i) => [i + 1, p.drawdown_pct]);
+    const minY = 0;
+    const maxY = Math.max(0.01, ...pts.map(p => p[1])) * 1.1;
+    const xMin = 0, xMax = Math.max(...pts.map(p => p[0]));
+    const scaleX = x => PAD + ((x - xMin) / Math.max(1, (xMax - xMin))) * (W - 2*PAD);
+    const scaleY = y => PAD + ((y - minY) / (maxY - minY)) * (H - 2*PAD);
+
+    const poly = pts.map(p => `${scaleX(p[0])},${scaleY(p[1])}`).join(' ');
+    svg.insertAdjacentHTML('beforeend',
+        `<polygon points="${PAD},${PAD} ${poly} ${W-PAD},${PAD}" fill="#ef4444" opacity="0.12"/>`);
+    svg.insertAdjacentHTML('beforeend',
+        `<polyline points="${poly}" fill="none" stroke="#ef4444" stroke-width="1.5"/>`);
+
+    const worst = Math.max(...pts.map(p => p[1]));
+    document.getElementById('dd-meta').textContent =
+        `worst: ${fmtPct(worst, 2)}`;
+}
+
+function renderDistribution(curve) {
+    const el = document.getElementById('dist-view');
+    if (!curve || curve.length === 0) {
+        el.innerHTML = '<div class="loading-msg">No closed trades yet.</div>';
+        return;
+    }
+    const wins = curve.filter(p => p.pnl_usd > 0);
+    const losses = curve.filter(p => p.pnl_usd < 0);
+    const bes = curve.filter(p => p.pnl_usd === 0);
+    const total = curve.length;
+    const winPct = (wins.length / total) * 100;
+    const lossPct = (losses.length / total) * 100;
+    const bePct = (bes.length / total) * 100;
+
+    el.innerHTML = `
+        <div style="margin-bottom: 14px;">
+            <div style="display: flex; height: 16px; border-radius: 4px; overflow: hidden;">
+                <div style="width:${winPct}%; background: var(--green);" title="${wins.length} wins"></div>
+                <div style="width:${bePct}%; background: var(--text-muted);" title="${bes.length} break-even"></div>
+                <div style="width:${lossPct}%; background: var(--red);" title="${losses.length} losses"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 12px; font-variant-numeric: tabular-nums;">
+                <span style="color: var(--green);">● ${wins.length} wins (${winPct.toFixed(0)}%)</span>
+                <span style="color: var(--text-muted);">● ${bes.length} BE</span>
+                <span style="color: var(--red);">● ${losses.length} losses (${lossPct.toFixed(0)}%)</span>
+            </div>
+        </div>
+        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.6;">
+            Biggest win:&nbsp; ${wins.length ? fmtUSD(Math.max(...wins.map(p=>p.pnl_usd))) : '—'}<br>
+            Biggest loss:&nbsp; ${losses.length ? fmtUSD(Math.min(...losses.map(p=>p.pnl_usd))) : '—'}
+        </div>
+    `;
+    document.getElementById('dist-meta').textContent = `${total} closed`;
+}
+
+async function refresh() {
+    try {
+        const r = await fetch('/api/risk/metrics');
+        const m = await r.json();
+        if (m.error) {
+            document.getElementById('eq-meta').textContent = 'error';
+            return;
+        }
+        // Hero
+        const pnlEl = document.getElementById('hero-pnl');
+        pnlEl.textContent = fmtUSD(m.total_pnl_usd);
+        pnlEl.className = 'risk-value ' + signedClass(m.total_pnl_usd);
+        document.getElementById('hero-pnl-sub').textContent =
+            `${m.total_trades} trades · bankroll $${m.bankroll.toFixed(0)}`;
+
+        const wr = m.win_rate !== null ? (m.win_rate * 100).toFixed(1) + '%' : '—';
+        document.getElementById('hero-winrate').textContent = wr;
+        document.getElementById('hero-winrate-sub').textContent = `${m.wins}W / ${m.losses}L`;
+
+        const mddEl = document.getElementById('hero-maxdd');
+        mddEl.textContent = fmtPct(m.max_drawdown_pct, 1);
+        mddEl.className = 'risk-value ' + (m.max_drawdown_pct > 0 ? 'negative' : 'neutral');
+        document.getElementById('hero-maxdd-sub').textContent =
+            `${fmtUSD(m.max_drawdown_usd)} · ${m.max_drawdown_duration_days}d`;
+
+        const sortEl = document.getElementById('hero-sortino');
+        sortEl.textContent = m.sortino !== null ? m.sortino.toFixed(2) : '—';
+        sortEl.className = 'risk-value ' + (m.sortino !== null ? signedClass(m.sortino) : 'neutral');
+
+        // Metric grid
+        document.getElementById('m-sharpe').textContent = m.sharpe !== null ? m.sharpe.toFixed(2) : '—';
+        document.getElementById('m-sharpe').className = 'val ' + signedClass(m.sharpe);
+        document.getElementById('m-calmar').textContent = m.calmar !== null ? m.calmar.toFixed(2) : '—';
+        document.getElementById('m-calmar').className = 'val ' + signedClass(m.calmar);
+        document.getElementById('m-pf').textContent =
+            m.profit_factor === null ? '—' : (m.profit_factor === Infinity || m.profit_factor > 100 ? '∞' : m.profit_factor.toFixed(2));
+        document.getElementById('m-exp').textContent = fmtUSD(m.expectancy);
+        document.getElementById('m-exp').className = 'val ' + signedClass(m.expectancy);
+        document.getElementById('m-avgwin').textContent = fmtUSD(m.avg_win);
+        document.getElementById('m-avgloss').textContent = '-' + fmtUSD(m.avg_loss);
+        document.getElementById('m-wins-sub').textContent = `${m.wins} wins`;
+        document.getElementById('m-losses-sub').textContent = `${m.losses} losses`;
+        document.getElementById('m-dd-dur').textContent = m.max_drawdown_duration_days + 'd';
+        document.getElementById('m-cur-dd').textContent = fmtPct(m.current_drawdown_pct, 2);
+        document.getElementById('m-cur-dd').className = 'val ' + (m.current_drawdown_pct > 0 ? 'negative' : 'neutral');
+        document.getElementById('m-bankroll-sub').textContent = 'of $' + m.bankroll.toFixed(0);
+
+        // Equity & drawdown charts
+        drawEquity(m.equity_curve, m.bankroll);
+        drawDrawdown(m.equity_curve);
+        renderDistribution(m.equity_curve);
+
+        // Kelly panel
+        document.getElementById('kelly-recommended').textContent = fmtUSD(m.recommended_size_usd);
+        document.getElementById('kelly-raw').textContent = (m.kelly_fraction * 100).toFixed(2) + '%';
+        document.getElementById('kelly-quarter').textContent = (m.kelly_quarter * 100).toFixed(2) + '%';
+        document.getElementById('kelly-bankroll').textContent = '$' + m.bankroll.toFixed(0);
+        if (m.total_trades < 10) {
+            document.getElementById('kelly-caption').textContent =
+                'using defaults — need 10+ closed trades for data-driven Kelly';
+        }
+
+    } catch (e) {
+        console.error('risk fetch failed', e);
+    }
+}
+
+refresh();
+setInterval(refresh, 60_000);
+</script>
+{% endblock %}

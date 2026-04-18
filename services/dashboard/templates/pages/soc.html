@@ -1,0 +1,987 @@
+{% extends "base.html" %}
+
+{% block title %}Security Operations{% endblock %}
+
+{% block extra_css %}
+.soc-hero {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 20px;
+    padding: 18px 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 16px;
+}
+.soc-hero .state {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+.soc-hero .state .sdot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--green);
+}
+.soc-hero.warn .state .sdot   { background: var(--amber); }
+.soc-hero.threat .state .sdot { background: var(--red); }
+.soc-hero .state.warn   { color: var(--amber); }
+.soc-hero .state.threat { color: var(--red); }
+.soc-hero .sub { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+.soc-hero .hero-message { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+.soc-hero .hero-meta {
+    text-align: right;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+}
+.soc-hero .hero-meta .refresh {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+}
+.soc-hero .hero-meta .refresh-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--green);
+}
+
+.check-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+}
+@media (max-width: 900px) { .check-grid { grid-template-columns: repeat(2, 1fr); } }
+.check-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 56px;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+.check-card:hover { background: rgba(255,255,255,0.015); }
+.check-icon {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--text-muted);
+}
+.check-icon.pass  { background: var(--green); }
+.check-icon.fail  { background: var(--red); }
+.check-icon.warn  { background: var(--amber); }
+.check-label {
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+}
+.check-detail { font-size: 13px; color: var(--text-primary); }
+.check-detail.pass { color: var(--green); }
+.check-detail.fail { color: var(--red); }
+.check-detail.warn { color: var(--amber); }
+
+.soc-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+}
+.soc-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+}
+.soc-card-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: 0;
+}
+.soc-card-meta { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
+.soc-card-body { padding: 4px 16px; }
+
+.row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+}
+.row:last-child { border-bottom: none; }
+
+.event-ts   { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); min-width: 130px; }
+.event-tag  {
+    font-size: 10px;
+    text-transform: lowercase;
+    padding: 2px 7px;
+    border-radius: 3px;
+    min-width: 60px;
+    text-align: center;
+    font-weight: 500;
+}
+.event-tag.ok   { background: rgba(34,197,94,0.08);  color: var(--green); }
+.event-tag.warn { background: rgba(245,158,11,0.1);  color: var(--amber); }
+.event-tag.fail { background: rgba(239,68,68,0.1);   color: var(--red); }
+.event-msg { color: var(--text-secondary); font-size: 12px; }
+
+.device-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 11px 0;
+    border-bottom: 1px solid var(--border);
+}
+.device-row:last-child { border-bottom: none; }
+.device-main { display: flex; align-items: center; gap: 10px; }
+.ddot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
+.ddot.online { background: var(--green); }
+.ddot.offline { background: var(--text-muted); }
+.device-name { font-size: 13px; color: var(--text-primary); font-weight: 500; }
+.device-ip { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.device-user { font-size: 11px; color: var(--text-secondary); text-align: right; }
+
+.kv-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+}
+.kv-row:last-child { border-bottom: none; }
+.kv-label { color: var(--text-secondary); }
+.kv-val   { font-family: var(--font-mono); color: var(--text-primary); }
+.kv-val.zero { color: var(--green); }
+.kv-val.nonzero { color: var(--red); }
+
+.gate-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+}
+.gate-row:last-child { border-bottom: none; }
+.gate-pattern { font-family: var(--font-mono); color: var(--text-secondary); }
+.gate-badge {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    background: rgba(34,197,94,0.08);
+    color: var(--green);
+    font-weight: 500;
+}
+
+.threat-item {
+    display: flex;
+    gap: 12px;
+    padding: 12px 10px 12px 14px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background var(--t-fast), padding-left var(--t-fast), border-left-color var(--t-fast);
+    border-left: 2px solid transparent;
+    margin: 0 -10px 0 -14px;
+}
+.threat-item:last-child { border-bottom: none; }
+.threat-item:hover {
+    background: rgba(255,255,255,0.015);
+    padding-left: 18px;
+}
+.threat-item.expanded {
+    background: rgba(59,130,246,0.025);
+}
+.threat-item.expanded.critical { border-left-color: var(--red); }
+.threat-item.expanded.high     { border-left-color: var(--amber); }
+.threat-item.expanded.medium   { border-left-color: var(--accent); }
+.threat-item.expanded.low      { border-left-color: var(--text-muted); }
+.threat-sev-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    margin-top: 6px;
+    flex-shrink: 0;
+    position: relative;
+}
+.threat-sev-dot.critical {
+    background: var(--red);
+    box-shadow: 0 0 0 3px rgba(239,68,68,0.14);
+}
+.threat-sev-dot.high {
+    background: var(--amber);
+    box-shadow: 0 0 0 3px rgba(245,158,11,0.14);
+}
+.threat-sev-dot.medium {
+    background: var(--accent);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.14);
+}
+.threat-sev-dot.low { background: var(--text-muted); }
+
+.threat-main { flex: 1; min-width: 0; }
+.threat-title { font-size: 13px; color: var(--text-primary); font-weight: 500; line-height: 1.4; }
+.threat-meta { font-size: 11px; color: var(--text-muted); margin-top: 3px; font-family: var(--font-mono); }
+.threat-meta .cve { color: var(--accent); }
+.threat-meta .exploited { color: var(--red); font-weight: 500; }
+.threat-expand {
+    margin-top: 4px;
+    color: var(--text-muted);
+    font-size: 11px;
+    transition: transform var(--t);
+    user-select: none;
+}
+.threat-item.expanded .threat-expand { transform: rotate(180deg); color: var(--text-secondary); }
+.threat-detail {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 260ms var(--ease), margin-top 200ms var(--ease);
+    margin-top: 0;
+}
+.threat-detail-inner {
+    overflow: hidden;
+    padding: 0 12px;
+    background: var(--bg-base);
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.65;
+    border: 1px solid transparent;
+    transition: padding 200ms var(--ease), border-color 200ms var(--ease);
+}
+.threat-item.expanded .threat-detail {
+    grid-template-rows: 1fr;
+    margin-top: 10px;
+}
+.threat-item.expanded .threat-detail-inner {
+    padding: 10px 12px;
+    border-color: var(--border);
+}
+.threat-detail-label {
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin-top: 10px;
+    margin-bottom: 3px;
+    font-weight: 500;
+}
+.threat-detail-label:first-child { margin-top: 0; }
+.threat-detail a {
+    color: var(--accent-bright);
+    text-decoration: none;
+    border-bottom: 1px dashed var(--border-accent);
+}
+.threat-detail a:hover { border-bottom-style: solid; }
+
+.inv-card {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+}
+.inv-card:last-child { border-bottom: none; }
+.inv-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+.inv-title { font-size: 13px; color: var(--text-primary); font-weight: 500; }
+.inv-verdict {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    text-transform: lowercase;
+}
+.inv-verdict.clean  { background: rgba(34,197,94,0.08); color: var(--green); }
+.inv-verdict.warn   { background: rgba(245,158,11,0.1); color: var(--amber); }
+.inv-verdict.threat { background: rgba(239,68,68,0.1);  color: var(--red); }
+.inv-date { font-size: 10px; font-family: var(--font-mono); color: var(--text-muted); margin-left: 8px; }
+.inv-summary { font-size: 12px; color: var(--text-secondary); line-height: 1.6; }
+
+.timeline-legend {
+    display: flex;
+    gap: 14px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+.timeline-legend .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 5px;
+    vertical-align: -1px;
+}
+
+/* Polished threat timeline */
+.tl-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    padding: 8px 4px 0;
+}
+.tl-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 0;
+    gap: 8px;
+}
+.tl-col-bars {
+    width: 100%;
+    max-width: 48px;
+    height: 72px;
+    display: flex;
+    flex-direction: column-reverse;
+    justify-content: flex-start;
+    border-radius: 3px;
+    overflow: hidden;
+    background: rgba(255,255,255,0.02);
+    transition: transform var(--t-fast);
+    cursor: help;
+}
+.tl-col:hover .tl-col-bars { transform: scaleY(1.03); }
+.tl-seg {
+    width: 100%;
+    transition: opacity var(--t-fast);
+}
+.tl-seg:not(:last-child) {
+    box-shadow: 0 -1px 0 rgba(9,9,11,0.25);
+}
+.tl-col-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-align: center;
+    line-height: 1.3;
+    font-variant-numeric: tabular-nums;
+}
+.tl-col-label .weekday { color: var(--text-secondary); }
+.tl-col-label .date { font-family: var(--font-mono); font-size: 9px; color: var(--text-faint); display: block; margin-top: 1px; }
+.tl-col-total {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+    min-height: 13px;
+}
+.tl-col.empty .tl-col-bars { background: transparent; border: 1px dashed var(--border); border-radius: 3px; }
+
+.lumo-card input,
+.lumo-card select {
+    background: var(--bg-base);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 7px 11px;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: inherit;
+}
+.lumo-card input:focus,
+.lumo-card select:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+.lumo-card button {
+    background: var(--accent);
+    border: 1px solid var(--accent);
+    color: #fff;
+    border-radius: 4px;
+    padding: 7px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    transition: opacity 0.15s;
+}
+.lumo-card button:hover:not(:disabled) { opacity: 0.9; }
+.lumo-card button:disabled { opacity: 0.5; cursor: not-allowed; }
+.lumo-badge {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-weight: 500;
+    text-transform: lowercase;
+    background: rgba(113,113,122,0.12);
+    color: var(--text-muted);
+}
+.lumo-badge.online { background: rgba(34,197,94,0.1); color: var(--green); }
+.lumo-badge.offline { background: rgba(239,68,68,0.1); color: var(--red); }
+{% endblock %}
+
+{% block content %}
+
+<!-- Security Operations Hero -->
+<div class="soc-hero" id="status-banner">
+    <div>
+        <div class="state" id="hero-state"><span class="sdot"></span><span id="overall-verdict">Nominal</span></div>
+        <div class="sub">Security operations</div>
+    </div>
+    <div class="hero-message" id="status-message">Running security checks…</div>
+    <div class="hero-meta">
+        <div id="last-update">—</div>
+        <div class="refresh"><span class="refresh-dot"></span>live · 15s</div>
+    </div>
+</div>
+
+<!-- Quick Check Grid -->
+<div class="check-grid" id="check-grid">
+    <div class="check-card">
+        <div class="check-icon"></div>
+        <div><div class="check-label">Auth logs</div><div class="check-detail" id="chk-auth">Loading</div></div>
+    </div>
+    <div class="check-card">
+        <div class="check-icon"></div>
+        <div><div class="check-label">Tailscale mesh</div><div class="check-detail" id="chk-tailscale">Loading</div></div>
+    </div>
+    <div class="check-card">
+        <div class="check-icon"></div>
+        <div><div class="check-label">Hermes injection</div><div class="check-detail" id="chk-injection">Loading</div></div>
+    </div>
+    <div class="check-card">
+        <div class="check-icon"></div>
+        <div><div class="check-label">Outbound conns</div><div class="check-detail" id="chk-network">Loading</div></div>
+    </div>
+    <div class="check-card">
+        <div class="check-icon"></div>
+        <div><div class="check-label">Credentials</div><div class="check-detail" id="chk-creds">Loading</div></div>
+    </div>
+    <div class="check-card">
+        <div class="check-icon"></div>
+        <div><div class="check-label">Proxy gate</div><div class="check-detail" id="chk-gate">Loading</div></div>
+    </div>
+    <div class="check-card">
+        <div class="check-icon"></div>
+        <div><div class="check-label">LaunchAgents</div><div class="check-detail" id="chk-agents">Loading</div></div>
+    </div>
+    <div class="check-card">
+        <div class="check-icon"></div>
+        <div><div class="check-label">Processes</div><div class="check-detail" id="chk-procs">Loading</div></div>
+    </div>
+</div>
+
+<!-- 3-column operational view -->
+<div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; margin-bottom:12px;">
+
+    <div class="soc-card">
+        <div class="soc-card-head">
+            <div class="soc-card-title">Auth events</div>
+            <div class="soc-card-meta">last 24h</div>
+        </div>
+        <div class="soc-card-body">
+            <div id="auth-events-list">
+                <div style="padding:18px 0;text-align:center;color:var(--text-muted);font-size:12px;">Loading</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="soc-card">
+        <div class="soc-card-head">
+            <div class="soc-card-title">Network</div>
+            <div class="soc-card-meta">tailscale mesh</div>
+        </div>
+        <div class="soc-card-body">
+            <div id="network-devices"></div>
+            <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+                <div class="soc-card-meta" style="text-transform:lowercase;margin-bottom:6px;">outbound connections</div>
+                <div id="outbound-status" style="font-size:12px;color:var(--text-secondary);">Checking</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="soc-card">
+        <div class="soc-card-head">
+            <div class="soc-card-title">Inference gate</div>
+            <div class="soc-card-meta">redaction + scan</div>
+        </div>
+        <div class="soc-card-body">
+            <div class="soc-card-meta" style="text-transform:lowercase;margin:2px 0 6px;">blocked patterns</div>
+            <div id="gate-patterns"></div>
+            <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+                <div class="soc-card-meta" style="text-transform:lowercase;margin-bottom:4px;">injection scan</div>
+                <div id="injection-stats"></div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- 7-day trend -->
+<div class="soc-card" style="margin-bottom:12px;">
+    <div class="soc-card-head">
+        <div class="soc-card-title">7-day threat trend</div>
+        <div class="timeline-legend">
+            <span><span class="dot" style="background:var(--red);"></span>critical</span>
+            <span><span class="dot" style="background:var(--amber);"></span>high</span>
+            <span><span class="dot" style="background:var(--accent);"></span>medium</span>
+            <span><span class="dot" style="background:var(--text-muted);"></span>low</span>
+        </div>
+    </div>
+    <div class="soc-card-body" style="padding:16px;">
+        <div id="threat-timeline-body">
+            <div style="text-align:center;color:var(--text-muted);font-size:12px;padding:18px 0;">Loading</div>
+        </div>
+    </div>
+</div>
+
+<!-- Threat Intel + Investigations -->
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:12px;">
+
+    <div class="soc-card">
+        <div class="soc-card-head">
+            <div class="soc-card-title">Live threat intel</div>
+            <div class="soc-card-meta" id="threat-count-badge">loading</div>
+        </div>
+        <div class="soc-card-body">
+            <div id="threat-list">
+                <div style="padding:18px 0;text-align:center;color:var(--text-muted);font-size:12px;">Pulling CISA KEV / NVD</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="soc-card">
+        <div class="soc-card-head">
+            <div class="soc-card-title">Investigations</div>
+            <div class="soc-card-meta">history</div>
+        </div>
+        <div class="soc-card-body">
+            <div id="investigation-list">
+                <div style="padding:18px 0;text-align:center;color:var(--text-muted);font-size:12px;">Loading</div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Lumo Research (compact) -->
+<div class="soc-card lumo-card">
+    <div class="soc-card-head">
+        <div class="soc-card-title">
+            Security research
+            <span id="lumo-status-badge" class="lumo-badge" style="margin-left:8px;">checking</span>
+        </div>
+        <div class="soc-card-meta">T5 · Lumo · privacy-preserving</div>
+    </div>
+    <div class="soc-card-body" style="padding:14px 16px;">
+        <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap;">
+            <input id="lumo-query" placeholder="CVE-2026-1340, ransomware TTPs, MITRE T1059…"
+                   style="flex:1;min-width:200px;" onkeydown="if(event.key==='Enter') sendLumoQuery()"/>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);white-space:nowrap;cursor:pointer;">
+                <input type="checkbox" id="lumo-websearch" style="accent-color:var(--accent);"/> web
+            </label>
+            <select id="lumo-mode">
+                <option value="ask">Ask</option>
+                <option value="security_brief">Brief</option>
+                <option value="security_brief_deep">Deep brief</option>
+            </select>
+            <button onclick="sendLumoQuery()">Research</button>
+        </div>
+        <div id="lumo-response" style="display:none;min-height:50px;background:var(--bg-base);border:1px solid var(--border);border-radius:4px;padding:12px;font-size:12px;color:var(--text-secondary);line-height:1.7;white-space:pre-wrap;"></div>
+        <div id="lumo-placeholder" style="padding:10px 0;color:var(--text-muted);font-size:12px;">
+            Ask a security question — CVE analysis, threat intel, compliance, MITRE ATT&CK
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let socData = {};
+
+async function fetchSOC() {
+    try {
+        const r = await fetch('/api/soc/security');
+        if (!r.ok) return;
+        socData = await r.json();
+        renderSOC(socData);
+    } catch(e) {
+        console.error('SOC fetch error:', e);
+    }
+}
+
+function renderSOC(d) {
+    const ts = d.timestamp ? new Date(d.timestamp).toLocaleTimeString() : '—';
+    document.getElementById('last-update').textContent = 'updated ' + ts;
+
+    const verdict = (d.overall_verdict || 'unknown').toUpperCase();
+    const label = verdict === 'CLEAN' ? 'Nominal' : verdict === 'THREAT' ? 'Threat' : verdict === 'WARN' ? 'Degraded' : 'Checking';
+
+    const banner = document.getElementById('status-banner');
+    const stateEl = document.getElementById('hero-state');
+    document.getElementById('overall-verdict').textContent = label;
+
+    banner.classList.remove('warn','threat');
+    stateEl.classList.remove('warn','threat');
+    if (verdict === 'THREAT') { banner.classList.add('threat'); stateEl.classList.add('threat'); }
+    else if (verdict === 'WARN') { banner.classList.add('warn'); stateEl.classList.add('warn'); }
+
+    document.getElementById('status-message').textContent = d.summary_message || 'Security checks complete.';
+
+    const checks = d.checks || {};
+    renderCheck('chk-auth',      checks.auth_logs);
+    renderCheck('chk-tailscale', checks.tailscale);
+    renderCheck('chk-injection', checks.hermes_injection);
+    renderCheck('chk-network',   checks.outbound_network);
+    renderCheck('chk-creds',     checks.credentials);
+    renderCheck('chk-gate',      checks.proxy_gate);
+    renderCheck('chk-agents',    checks.launchagents);
+    renderCheck('chk-procs',     checks.suspicious_processes);
+
+    renderAuthEvents(d.auth_events || []);
+    renderNetworkDevices(d.tailscale_devices || []);
+
+    const outboundEl = document.getElementById('outbound-status');
+    const conns = d.outbound_connections || {};
+    if (conns.unexpected === 0) {
+        outboundEl.innerHTML = `<span style="color:var(--green);">clean</span> <span style="color:var(--text-muted);font-size:11px;">· ${conns.total || 0} established</span>`;
+    } else {
+        outboundEl.innerHTML = `<span style="color:var(--red);">${conns.unexpected} unexpected</span>`;
+    }
+
+    renderGatePatterns(d.proxy_gate || {});
+    renderInjectionStats(d.injection_stats || {});
+    renderThreats(d.threats || []);
+    renderInvestigations(d.investigations || []);
+}
+
+function renderCheck(id, check) {
+    const el = document.getElementById(id);
+    const card = el ? el.closest('.check-card') : null;
+    if (!el || !check || !card) return;
+
+    const status = check.status || 'unknown';
+    el.textContent = check.detail || status;
+    el.className = 'check-detail ' + (status === 'pass' ? 'pass' : status === 'fail' ? 'fail' : status === 'warn' ? 'warn' : '');
+
+    const icon = card.querySelector('.check-icon');
+    if (icon) {
+        const cls = status === 'pass' ? 'pass' : status === 'fail' ? 'fail' : status === 'warn' ? 'warn' : '';
+        icon.className = 'check-icon ' + cls;
+    }
+}
+
+function renderAuthEvents(events) {
+    const el = document.getElementById('auth-events-list');
+    if (!events.length) {
+        el.innerHTML = '<div style="padding:16px 0;text-align:center;color:var(--text-muted);font-size:12px;">No auth events</div>';
+        return;
+    }
+    el.innerHTML = events.map(e => {
+        const type = (e.type || 'ok').toLowerCase();
+        return `
+        <div class="row">
+            <span class="event-ts">${e.timestamp || '—'}</span>
+            <span class="event-tag ${type}">${type}</span>
+            <span class="event-msg">${e.message || ''}</span>
+        </div>`;
+    }).join('');
+}
+
+function renderNetworkDevices(devices) {
+    const el = document.getElementById('network-devices');
+    if (!devices.length) { el.innerHTML = '<div style="padding:10px 0;color:var(--text-muted);font-size:12px;">No devices reporting</div>'; return; }
+    el.innerHTML = devices.map(d => `
+        <div class="device-row">
+            <div class="device-main">
+                <span class="ddot ${d.online ? 'online' : 'offline'}"></span>
+                <div>
+                    <div class="device-name">${d.name || d.hostname || 'unknown'}</div>
+                    <div class="device-ip">${d.ip || ''} · ${d.os || ''}</div>
+                </div>
+            </div>
+            <div class="device-user">
+                <div>${d.user || ''}</div>
+                <div style="font-size:10px;color:var(--text-muted);">${d.status || ''}</div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function renderGatePatterns(gate) {
+    const el = document.getElementById('gate-patterns');
+    const patterns = gate.blocked_patterns || ['api_key','password','bearer','jwt','private_key','credit_card','ssn'];
+    el.innerHTML = patterns.map(p => `
+        <div class="gate-row">
+            <span class="gate-pattern">${p}</span>
+            <span class="gate-badge">active</span>
+        </div>
+    `).join('');
+}
+
+function renderInjectionStats(stats) {
+    const el = document.getElementById('injection-stats');
+    const items = [
+        { label: 'Injection attempts',  val: stats.injection_attempts || 0 },
+        { label: 'Jailbreak patterns',  val: stats.jailbreak_attempts || 0 },
+        { label: 'Prompt leakage',      val: stats.prompt_leakage || 0 },
+        { label: 'T4 Kimi blocks',      val: stats.sensitivity_blocks || 0 },
+    ];
+    el.innerHTML = items.map(i => `
+        <div class="kv-row">
+            <span class="kv-label">${i.label}</span>
+            <span class="kv-val ${i.val === 0 ? 'zero' : 'nonzero'}">${i.val}</span>
+        </div>
+    `).join('');
+}
+
+function renderThreats(threats) {
+    const el = document.getElementById('threat-list');
+    const countEl = document.getElementById('threat-count-badge');
+
+    if (!threats.length) {
+        el.innerHTML = `
+            <div class="empty-state illustrated">
+                <svg class="empty-illustration" viewBox="0 0 80 80" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round">
+                    <path d="M40 8 L68 20 L68 42 C68 56 54 68 40 72 C26 68 12 56 12 42 L12 20 Z" fill="currentColor" fill-opacity="0.04"/>
+                    <path d="M40 8 L68 20 L68 42 C68 56 54 68 40 72 C26 68 12 56 12 42 L12 20 Z"/>
+                    <path d="M28 40 L36 48 L52 32" stroke="var(--green)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <div class="empty-state-title" style="color:var(--green);">All clear</div>
+                <div>No active threats across CISA KEV or NVD feeds.</div>
+            </div>`;
+        countEl.innerHTML = '<span style="color:var(--green);">clear</span>';
+        return;
+    }
+
+    const criticals = threats.filter(t => (t.severity||'').toLowerCase() === 'critical' || (t.severity||'').toLowerCase() === 'high');
+    countEl.innerHTML = criticals.length
+        ? `<span style="color:var(--red);">${criticals.length} critical/high</span>`
+        : `<span style="color:var(--amber);">${threats.length} tracked</span>`;
+
+    el.innerHTML = threats.slice(0, 8).map(t => {
+        const sev = (t.severity || 'low').toLowerCase();
+        const hasDetail = t.description || t.evidence || t.affected_products || t.remediation;
+        const detail = hasDetail ? `
+            <div class="threat-detail">
+                <div class="threat-detail-inner">
+                    ${t.description ? `<div class="threat-detail-label">Description</div><div>${t.description}</div>` : ''}
+                    ${t.affected_products ? `<div class="threat-detail-label">Affected</div><div>${Array.isArray(t.affected_products) ? t.affected_products.join(', ') : t.affected_products}</div>` : ''}
+                    ${t.remediation ? `<div class="threat-detail-label">Remediation</div><div>${t.remediation}</div>` : ''}
+                    ${t.evidence ? `<div class="threat-detail-label">Evidence</div><div style="font-family:var(--font-mono);font-size:11px;">${t.evidence}</div>` : ''}
+                    ${t.published ? `<div style="margin-top:8px;font-size:10px;color:var(--text-muted);font-family:var(--font-mono);">published ${t.published}</div>` : ''}
+                </div>
+            </div>` : '';
+        return `
+        <div class="threat-item ${sev}" ${hasDetail ? `onclick="toggleThreat(this)"` : ''}>
+            <span class="threat-sev-dot ${sev}"></span>
+            <div class="threat-main">
+                <div class="threat-title">${t.title || t.cve_id || 'Unknown'}</div>
+                <div class="threat-meta">
+                    ${t.cve_id ? `<span class="cve">${t.cve_id}</span> · ` : ''}${sev}${t.cvss ? ` · CVSS ${t.cvss}` : ''}${t.source ? ' · ' + t.source : ''}${t.exploited ? ` · <span class="exploited">exploited</span>` : ''}
+                </div>
+                ${detail}
+            </div>
+            ${hasDetail ? `<span class="threat-expand">▾</span>` : ''}
+        </div>`;
+    }).join('');
+}
+
+function renderInvestigations(invs) {
+    const el = document.getElementById('investigation-list');
+    if (!invs.length) {
+        el.innerHTML = '<div style="padding:18px 0;text-align:center;color:var(--text-muted);font-size:12px;">No investigations on record</div>';
+        return;
+    }
+    el.innerHTML = invs.map(inv => {
+        const v = (inv.verdict||'clean').toLowerCase();
+        const vClass = v === 'threat' ? 'threat' : v === 'warn' ? 'warn' : 'clean';
+        return `
+        <div class="inv-card">
+            <div class="inv-header">
+                <div class="inv-title">${inv.title || 'Investigation'}</div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span class="inv-verdict ${vClass}">${v}</span>
+                    <span class="inv-date">${inv.date || ''}</span>
+                </div>
+            </div>
+            <div class="inv-summary">${inv.summary || ''}</div>
+        </div>`;
+    }).join('');
+}
+
+async function fetchThreats() {
+    try {
+        const r = await fetch('/api/soc/threats');
+        if (!r.ok) return;
+        const d = await r.json();
+        renderThreats(d.threats || []);
+        const countEl = document.getElementById('threat-count-badge');
+        const src = d.source ? `<span style="color:var(--text-muted);font-size:10px;margin-left:6px;">${d.source}</span>` : '';
+        if (d.critical_count > 0)      countEl.innerHTML = `<span style="color:var(--red);">${d.critical_count} critical</span>${src}`;
+        else if (d.high_count > 0)     countEl.innerHTML = `<span style="color:var(--amber);">${d.high_count} high</span>${src}`;
+        else if (d.total > 0)          countEl.innerHTML = `<span style="color:var(--text-secondary);">${d.total} tracked</span>${src}`;
+        else                           countEl.innerHTML = `<span style="color:var(--green);">clear</span>${src}`;
+
+        const navBadge = document.getElementById('nav-soc-alerts');
+        if (navBadge && d.critical_count > 0) {
+            navBadge.textContent = d.critical_count;
+            navBadge.style.display = '';
+        }
+    } catch(e) { console.error('Threat fetch error:', e); }
+}
+
+async function checkLumoStatus() {
+    try {
+        const r = await fetch('/api/soc/lumo-status');
+        const d = r.ok ? await r.json() : { online: false };
+        const badge = document.getElementById('lumo-status-badge');
+        const queryInput = document.getElementById('lumo-query');
+        const researchBtn = document.querySelector('[onclick="sendLumoQuery()"]');
+        const placeholder = document.getElementById('lumo-placeholder');
+        if (!badge) return;
+        if (d.online) {
+            badge.textContent = 'online';
+            badge.className = 'lumo-badge online';
+            if (queryInput)  queryInput.disabled = false;
+            if (researchBtn) researchBtn.disabled = false;
+        } else {
+            badge.textContent = 'offline';
+            badge.className = 'lumo-badge offline';
+            if (queryInput)  queryInput.disabled = true;
+            if (researchBtn) researchBtn.disabled = true;
+            if (placeholder) placeholder.innerHTML = `
+                <span style="color:var(--red);">offline</span> — configure Lumo API to activate
+                <div style="margin-top:4px;font-size:11px;color:var(--text-muted);font-family:var(--font-mono);">expected at sapphirealpha.xyz</div>`;
+        }
+    } catch(e) {
+        const badge = document.getElementById('lumo-status-badge');
+        if (badge) { badge.textContent = 'offline'; badge.className = 'lumo-badge offline'; }
+    }
+}
+
+async function sendLumoQuery() {
+    const query = document.getElementById('lumo-query').value.trim();
+    if (!query) return;
+
+    const mode = document.getElementById('lumo-mode').value;
+    const webSearch = document.getElementById('lumo-websearch').checked;
+    const btn = document.querySelector('[onclick="sendLumoQuery()"]');
+    const responseEl = document.getElementById('lumo-response');
+    const placeholder = document.getElementById('lumo-placeholder');
+
+    btn.textContent = 'Researching…';
+    btn.disabled = true;
+    responseEl.style.display = 'block';
+    responseEl.textContent = 'Querying Lumo…';
+    placeholder.style.display = 'none';
+
+    try {
+        const r = await fetch('/api/soc/cyber-research', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({query, mode, web_search: webSearch})
+        });
+        const d = await r.json();
+
+        if (d.status === 'offline') {
+            responseEl.innerHTML = `<span style="color:var(--red);">Lumo offline</span> — ${d.fallback || ''}<br><br><code style="font-size:11px;color:var(--text-muted);">${d.start_command || ''}</code>`;
+        } else if (d.status === 'timeout') {
+            responseEl.innerHTML = `<span style="color:var(--amber);">Timeout</span> — ${d.error}`;
+        } else if (d.status === 'error') {
+            responseEl.innerHTML = `<span style="color:var(--red);">Error</span> — ${d.error}`;
+        } else {
+            const text = d.response || d.brief || d.error || JSON.stringify(d);
+            const elapsed = d.elapsed_s ? ` <span style="color:var(--text-muted);font-size:10px;">(${d.elapsed_s}s)</span>` : '';
+            const src = d.model ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);color:var(--text-muted);font-size:10px;">${d.model} · T5 · Proton Lumo${elapsed}</div>` : '';
+            responseEl.innerHTML = `<div style="white-space:pre-wrap;line-height:1.7;">${text}</div>${src}`;
+        }
+    } catch(e) {
+        responseEl.innerHTML = `<span style="color:var(--red);">Request failed</span> — ${e.message}`;
+    } finally {
+        btn.textContent = 'Research';
+        btn.disabled = false;
+    }
+}
+
+function toggleThreat(el) { el.classList.toggle('expanded'); }
+
+async function fetchThreatTimeline() {
+    try {
+        const r = await fetch('/api/soc/threat-timeline');
+        if (!r.ok) return;
+        const d = await r.json();
+        renderThreatTimeline(d.days || []);
+    } catch(e) {}
+}
+
+function renderThreatTimeline(days) {
+    const el = document.getElementById('threat-timeline-body');
+    if (!days.length) {
+        el.innerHTML = `
+            <div class="empty-state illustrated" style="padding:24px 16px 28px;">
+                <svg class="empty-illustration" viewBox="0 0 120 60" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="10" y="38" width="10" height="14" rx="1" fill="currentColor" fill-opacity="0.15"/>
+                    <rect x="26" y="30" width="10" height="22" rx="1" fill="currentColor" fill-opacity="0.1"/>
+                    <rect x="42" y="20" width="10" height="32" rx="1" fill="currentColor" fill-opacity="0.06"/>
+                    <rect x="58" y="14" width="10" height="38" rx="1" fill="currentColor" fill-opacity="0.06"/>
+                    <rect x="74" y="22" width="10" height="30" rx="1" fill="currentColor" fill-opacity="0.1"/>
+                    <rect x="90" y="32" width="10" height="20" rx="1" fill="currentColor" fill-opacity="0.15"/>
+                </svg>
+                <div class="empty-state-title">No threats recorded</div>
+                <div>Timeline will populate as CISA KEV / NVD feeds update.</div>
+            </div>`;
+        return;
+    }
+
+    const totals = days.map(d => d.critical + d.high + d.medium + d.low);
+    const maxTotal = Math.max(...totals, 1);
+    const CHART_H = 72;
+
+    const cols = days.map(day => {
+        const total = day.critical + day.high + day.medium + day.low;
+        const scale = total / maxTotal;
+        const usedH = Math.max(scale * CHART_H, total > 0 ? 4 : 0);
+
+        const segs = [
+            { count: day.low,      color: 'var(--text-faint)',   name: 'low' },
+            { count: day.medium,   color: 'var(--accent)',       name: 'medium' },
+            { count: day.high,     color: 'var(--amber)',        name: 'high' },
+            { count: day.critical, color: 'var(--red)',          name: 'critical' },
+        ].filter(s => s.count > 0);
+
+        const segHtml = segs.map(s => {
+            const h = (s.count / (total || 1)) * usedH;
+            return `<div class="tl-seg" style="height:${h.toFixed(1)}px;background:${s.color};" title="${s.count} ${s.name}"></div>`;
+        }).join('');
+
+        const label = day.date.slice(5);
+        const dayName = new Date(day.date + 'T12:00:00').toLocaleDateString('en-US', {weekday:'short'});
+        const tooltip = `${dayName} ${label} · ${total} total · ${day.critical}c ${day.high}h ${day.medium}m ${day.low}l`;
+        const emptyClass = total === 0 ? ' empty' : '';
+
+        return `<div class="tl-col${emptyClass}">
+            <div class="tl-col-bars" title="${tooltip}">${segHtml}</div>
+            <div class="tl-col-label">
+                <div class="weekday">${dayName}</div>
+                <span class="date">${label}</span>
+            </div>
+            <div class="tl-col-total">${total > 0 ? total : ''}</div>
+        </div>`;
+    });
+
+    el.innerHTML = `<div class="tl-chart">${cols.join('')}</div>`;
+}
+
+fetchSOC();
+fetchThreats();
+fetchThreatTimeline();
+checkLumoStatus();
+setInterval(fetchSOC, 15000);
+setInterval(fetchThreats, 300000);
+setInterval(fetchThreatTimeline, 300000);
+setInterval(checkLumoStatus, 60000);
+</script>
+{% endblock %}

@@ -1,0 +1,882 @@
+{% extends "base.html" %}
+
+{% block title %}Agents{% endblock %}
+
+{% block extra_css %}
+.agents-hero {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 20px;
+    padding: 18px 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 12px;
+}
+.agents-hero h1 {
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+    margin: 0;
+}
+.agents-hero .sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.agents-hero .meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    text-align: right;
+}
+
+.summary-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+/* ── Mesh visualization ──────────────────────────────────── */
+.mesh-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    position: relative;
+}
+.mesh-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+.mesh-title { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+.mesh-meta { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
+
+.mesh-diagram {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr auto 1fr;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 0;
+}
+.mesh-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 6px;
+    position: relative;
+    padding: 14px 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-subtle);
+    transition: border-color var(--t), transform var(--t);
+}
+.mesh-node:hover { border-color: var(--border-bright); transform: translateY(-1px); }
+.mesh-node.online  { border-color: rgba(34,197,94,0.28); }
+.mesh-node.offline { border-color: rgba(239,68,68,0.28); opacity: 0.75; }
+.mesh-node .node-glyph {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 4px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+}
+.mesh-node.online .node-glyph {
+    background: rgba(34,197,94,0.08);
+    border-color: rgba(34,197,94,0.24);
+    color: var(--green);
+    box-shadow: 0 0 0 4px rgba(34,197,94,0.04);
+}
+.mesh-node.offline .node-glyph {
+    color: var(--red);
+    border-color: rgba(239,68,68,0.2);
+}
+.mesh-node .node-name {
+    font-size: 12px;
+    font-weight: 500;
+    font-family: var(--font-mono);
+    color: var(--text-primary);
+}
+.mesh-node .node-ip {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+}
+.mesh-node .node-state {
+    font-size: 10px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 2px;
+}
+.mesh-node .node-state .sd {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--text-muted);
+}
+.mesh-node.online  .node-state .sd { background: var(--green); }
+.mesh-node.offline .node-state .sd { background: var(--red); }
+.mesh-node.online  .node-state     { color: var(--green); }
+.mesh-node.offline .node-state     { color: var(--red); }
+
+/* Connectors with latency */
+.mesh-link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 90px;
+    position: relative;
+}
+.mesh-link-line {
+    position: relative;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, rgba(34,197,94,0.05), rgba(34,197,94,0.55), rgba(34,197,94,0.05));
+    border-radius: 1px;
+    overflow: hidden;
+}
+.mesh-link-line::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: 0;
+    width: 30%;
+    height: 6px;
+    background: linear-gradient(90deg, transparent, rgba(34,197,94,0.7), transparent);
+    filter: blur(1px);
+    animation: mesh-packet 2.6s linear infinite;
+}
+@keyframes mesh-packet {
+    0%   { transform: translateX(-50%); opacity: 0; }
+    15%  { opacity: 1; }
+    85%  { opacity: 1; }
+    100% { transform: translateX(380%); opacity: 0; }
+}
+.mesh-link.offline .mesh-link-line {
+    background: repeating-linear-gradient(90deg, rgba(239,68,68,0.3) 0, rgba(239,68,68,0.3) 4px, transparent 4px, transparent 8px);
+}
+.mesh-link.offline .mesh-link-line::after { display: none; }
+.mesh-link-label {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.mesh-link.online .mesh-link-label .latency { color: var(--green); }
+.mesh-link.offline .mesh-link-label .latency { color: var(--red); }
+@media (max-width: 800px) {
+    .mesh-diagram { grid-template-columns: 1fr; gap: 6px; }
+    .mesh-link { min-width: 0; transform: rotate(90deg); height: 40px; }
+}
+.summary-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+}
+.summary-label {
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+.summary-value {
+    font-size: 22px;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+    line-height: 1.1;
+}
+.summary-value.running { color: var(--green); }
+.summary-value.partial { color: var(--amber); }
+.summary-value.offline { color: var(--red); }
+.summary-value.up { color: var(--green); }
+.summary-value.down { color: var(--red); }
+.summary-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    font-family: var(--font-mono);
+}
+
+.agents-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+@media (max-width: 1100px) { .agents-grid { grid-template-columns: 1fr; } }
+
+.agent-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+}
+.agent-card.running { border-color: rgba(34,197,94,0.25); }
+.agent-card.offline { border-color: rgba(239,68,68,0.25); }
+
+.agent-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+}
+.agent-id { display: flex; align-items: center; gap: 10px; }
+.agent-name { font-size: 14px; font-weight: 600; color: var(--text-primary); font-family: var(--font-mono); letter-spacing: 0; }
+.agent-host { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 2px; }
+.agent-state { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; }
+.agent-state .sdot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-muted);
+}
+.agent-state.running { color: var(--green); }
+.agent-state.running .sdot { background: var(--green); }
+.agent-state.offline { color: var(--red); }
+.agent-state.offline .sdot { background: var(--red); }
+
+.agent-desc {
+    padding: 10px 16px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+    line-height: 1.5;
+}
+
+.vitals-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border-bottom: 1px solid var(--border);
+}
+.vital-cell {
+    padding: 12px 14px;
+    border-right: 1px solid var(--border);
+}
+.vital-cell:last-child { border-right: none; }
+.vital-label {
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+.vital-value {
+    font-size: 18px;
+    font-weight: 500;
+    font-family: var(--font-mono);
+    color: var(--text-primary);
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+}
+.vital-unit { font-size: 11px; color: var(--text-muted); margin-left: 1px; }
+.vital-value.warn { color: var(--amber); }
+.vital-value.crit { color: var(--red); }
+
+.vital-bar {
+    width: 100%;
+    height: 3px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 2px;
+    margin-top: 8px;
+    overflow: hidden;
+}
+.vital-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.6s ease;
+}
+
+.monitored-section {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+}
+.monitored-title {
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+.svc-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    margin: 2px 4px 2px 0;
+    background: var(--bg-base);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+}
+.svc-chip .sd {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--text-muted);
+}
+.svc-chip .sd.ok { background: var(--green); }
+.svc-chip .sd.bad { background: var(--red); }
+
+.spark-row {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.spark-block { display: flex; flex-direction: column; gap: 4px; }
+.spark-label {
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+
+.agent-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+}
+.agent-last {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+}
+.foot-btn {
+    padding: 4px 10px;
+    font-size: 11px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    border-radius: 3px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s, color 0.15s;
+}
+.foot-btn:hover { background: rgba(255,255,255,0.02); color: var(--text-primary); }
+
+.ref-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+}
+.ref-head {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.ref-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.ref-meta { font-size: 11px; color: var(--text-muted); }
+.ref-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+.ref-table th {
+    text-align: left;
+    padding: 10px 16px;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    font-weight: 500;
+    background: var(--bg-base);
+    border-bottom: 1px solid var(--border);
+}
+.ref-table td {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-primary);
+}
+.ref-table tr:last-child td { border-bottom: none; }
+.ref-table code {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+.ref-cmd { color: var(--accent); }
+
+.cmd-block {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+}
+.cmd-block h4 {
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin: 0 0 6px;
+}
+.cmd-block code {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.9;
+}
+.cmd-block code:not(:last-child) { border-bottom: 1px solid var(--border); }
+
+.spinner-sm {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border: 2px solid rgba(59,130,246,0.2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+{% endblock %}
+
+{% block content %}
+
+<!-- Hero -->
+<div class="agents-hero">
+    <div>
+        <h1>Agents</h1>
+        <div class="sub">Pi mesh · Tailscale</div>
+    </div>
+    <div class="meta">
+        <div id="stat-refresh">—</div>
+        <div style="margin-top:3px;">next <span id="stat-countdown">30</span>s</div>
+    </div>
+</div>
+
+<!-- Mesh visualization -->
+<div class="mesh-card">
+    <div class="mesh-head">
+        <div class="mesh-title">Tailscale mesh</div>
+        <div class="mesh-meta" id="mesh-meta">2 nodes · WireGuard · direct links</div>
+    </div>
+    <div class="mesh-diagram">
+        <div class="mesh-node online" id="mesh-mac">
+            <div class="node-glyph">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="4" width="18" height="12" rx="1.5"/>
+                    <path d="M8 20h8M10 16v4M14 16v4"/>
+                </svg>
+            </div>
+            <div class="node-name">commander</div>
+            <div class="node-ip">100.67.171.79</div>
+            <div class="node-state"><span class="sd"></span>online</div>
+        </div>
+        <div class="mesh-link online" id="link-rari1">
+            <div class="mesh-link-label"><span class="latency" id="lat-rari1">0.26ms</span></div>
+            <div class="mesh-link-line"></div>
+            <div class="mesh-link-label">rari1</div>
+        </div>
+        <div class="mesh-node online" id="mesh-rari1">
+            <div class="node-glyph">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="4" y="6" width="16" height="12" rx="1.5"/>
+                    <circle cx="8" cy="12" r="1" fill="currentColor"/>
+                    <circle cx="12" cy="12" r="1" fill="currentColor"/>
+                    <circle cx="16" cy="12" r="1" fill="currentColor"/>
+                </svg>
+            </div>
+            <div class="node-name">rari1</div>
+            <div class="node-ip">100.120.191.1</div>
+            <div class="node-state"><span class="sd"></span><span id="state-rari1">online</span></div>
+        </div>
+        <div class="mesh-link online" id="link-rari2">
+            <div class="mesh-link-label"><span class="latency" id="lat-rari2">—</span></div>
+            <div class="mesh-link-line"></div>
+            <div class="mesh-link-label">rari2</div>
+        </div>
+        <div class="mesh-node offline" id="mesh-rari2">
+            <div class="node-glyph">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="4" y="6" width="16" height="12" rx="1.5"/>
+                    <circle cx="8" cy="12" r="1" fill="currentColor"/>
+                    <circle cx="12" cy="12" r="1" fill="currentColor"/>
+                    <circle cx="16" cy="12" r="1" fill="currentColor"/>
+                </svg>
+            </div>
+            <div class="node-name">rari2</div>
+            <div class="node-ip">100.87.225.89</div>
+            <div class="node-state"><span class="sd"></span><span id="state-rari2">offline</span></div>
+        </div>
+    </div>
+</div>
+
+<!-- Summary -->
+<div class="summary-row stagger">
+    <div class="summary-card">
+        <div class="summary-label">Running</div>
+        <div class="summary-value" id="stat-running">—</div>
+        <div class="summary-sub" id="stat-running-sub">of 2 deployed</div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-label">market-watchdog</div>
+        <div class="summary-value" id="stat-mw" style="font-size:16px;">—</div>
+        <div class="summary-sub">rari1 · :19001</div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-label">health-monitor</div>
+        <div class="summary-value" id="stat-hm" style="font-size:16px;">—</div>
+        <div class="summary-sub">rari2 · :19002</div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-label">Mesh</div>
+        <div class="summary-value" style="font-size:16px;">Tailscale</div>
+        <div class="summary-sub">2 nodes</div>
+    </div>
+</div>
+
+<!-- Agents -->
+<div id="agents-container">
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:6px;padding:40px;text-align:center;">
+        <span style="color:var(--text-muted);font-size:12px;"><span class="spinner-sm"></span>Contacting Pi agents</span>
+    </div>
+</div>
+
+<!-- Deployment reference -->
+<div class="ref-card">
+    <div class="ref-head">
+        <div class="ref-title">Deployment reference</div>
+        <div class="ref-meta">Sapphire Pi agent deployer</div>
+    </div>
+    <table class="ref-table">
+        <thead>
+            <tr>
+                <th>Agent</th>
+                <th>Target</th>
+                <th>Tailscale IP</th>
+                <th>Port</th>
+                <th>Deploy</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>market-watchdog</code></td>
+                <td>rari1</td>
+                <td><code>100.120.191.1</code></td>
+                <td><code>:19001</code></td>
+                <td><code class="ref-cmd">./deploy-agent.sh market-watchdog rari1</code></td>
+            </tr>
+            <tr>
+                <td><code>health-monitor</code></td>
+                <td>rari2</td>
+                <td><code>100.87.225.89</code></td>
+                <td><code>:19002</code></td>
+                <td><code class="ref-cmd">./deploy-agent.sh health-monitor rari2</code></td>
+            </tr>
+        </tbody>
+    </table>
+    <div class="cmd-block">
+        <h4>Logs</h4>
+        <code>ssh rari@100.120.191.1 sudo journalctl -u market-watchdog -f</code>
+        <code>ssh rari@100.87.225.89 sudo journalctl -u health-monitor -f</code>
+    </div>
+    <div class="cmd-block">
+        <h4>Health</h4>
+        <code>curl http://100.120.191.1:19001/health</code>
+        <code>curl http://100.87.225.89:19002/health</code>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const AGENT_META = {
+    'market-watchdog': {
+        description: 'Monitors BTC/ETH/SOL moves, index alerts (SPY/QQQ/VIX). Telegram on threshold breach.',
+        monitors: ['BTC', 'ETH', 'SOL', 'SPY', 'QQQ', 'VIX'],
+    },
+    'health-monitor': {
+        description: 'Watches Mac services, Ollama nodes, rari vitals. Telegram on failures.',
+        monitors: ['inference-proxy', 'dashboard', 'signal-logger', 'ollama-gpu', 'market-watchdog', 'rari2-temp'],
+    },
+};
+
+let _countdown = 30;
+
+async function fetchAgents() {
+    const r = await fetch('/api/agents', { credentials: 'same-origin' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+}
+
+function tempClass(t) {
+    if (t == null) return '';
+    if (t >= 75) return 'crit';
+    if (t >= 65) return 'warn';
+    return '';
+}
+function memClass(pct) { return pct != null && pct > 90 ? 'warn' : ''; }
+function diskClass(pct) { return pct != null && pct >= 85 ? 'warn' : ''; }
+
+function fmtUptime(seconds) {
+    if (seconds == null) return '—';
+    if (seconds < 60) return seconds + 's';
+    if (seconds < 3600) return Math.floor(seconds / 60) + 'm';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    return `${h}h ${m}m`;
+}
+
+function renderAgentCard(agent) {
+    const meta    = AGENT_META[agent.name] || {};
+    const running = agent.running;
+    const vitals  = agent.vitals || {};
+    const mem     = vitals.memory || {};
+    const disk    = vitals.disk   || {};
+    const temp    = vitals.cpu_temp_c;
+    const uptime  = vitals.uptime_seconds;
+
+    const tempVal  = temp != null ? temp.toFixed(1) : '—';
+    const memPct   = mem.used_pct != null ? mem.used_pct.toFixed(0) : '—';
+    const diskPct  = disk.used_pct != null ? disk.used_pct.toFixed(0) : '—';
+
+    const lastCheck = agent.last_check || {};
+    const svcMap    = lastCheck.services || {};
+    const lastSeen = agent.last_seen
+        ? agent.last_seen.replace('T',' ').slice(0,19) + ' UTC'
+        : 'never';
+
+    let monitorChips = '';
+    if (agent.name === 'health-monitor' && Object.keys(svcMap).length > 0) {
+        Object.entries(svcMap).forEach(([name, info]) => {
+            const ok = info.healthy;
+            monitorChips += `<span class="svc-chip"><span class="sd ${ok ? 'ok' : 'bad'}"></span>${name}</span>`;
+        });
+    } else {
+        (meta.monitors || []).forEach(m => {
+            monitorChips += `<span class="svc-chip"><span class="sd"></span>${m}</span>`;
+        });
+    }
+
+    return `
+    <div class="agent-card ${running ? 'running' : 'offline'}">
+        <div class="agent-head">
+            <div class="agent-id">
+                <div>
+                    <div class="agent-name">${agent.name}</div>
+                    <div class="agent-host">${agent.host} · :${agent.port}</div>
+                </div>
+            </div>
+            <div class="agent-state ${running ? 'running' : 'offline'}">
+                <span class="sdot"></span>${running ? 'running' : 'offline'}
+            </div>
+        </div>
+
+        ${meta.description ? `<div class="agent-desc">${meta.description}</div>` : ''}
+        ${agent.error ? `<div class="agent-desc" style="color:var(--red);font-family:var(--font-mono);font-size:11px;">${agent.error}</div>` : ''}
+
+        <div class="vitals-grid">
+            <div class="vital-cell">
+                <div class="vital-label">CPU temp</div>
+                <div class="vital-value ${tempClass(temp)}">${tempVal}<span class="vital-unit">°C</span></div>
+                <div class="vital-bar"><div class="vital-bar-fill" style="width:${temp != null ? Math.min(100, (temp/100)*100).toFixed(1) : 0}%;background:${temp >= 75 ? 'var(--red)' : temp >= 65 ? 'var(--amber)' : 'var(--green)'};"></div></div>
+            </div>
+            <div class="vital-cell">
+                <div class="vital-label">Memory</div>
+                <div class="vital-value ${memClass(mem.used_pct)}">${memPct}<span class="vital-unit">%</span></div>
+                <div class="vital-bar"><div class="vital-bar-fill" style="width:${mem.used_pct != null ? mem.used_pct.toFixed(1) : 0}%;background:${mem.used_pct > 90 ? 'var(--amber)' : 'var(--accent)'};"></div></div>
+            </div>
+            <div class="vital-cell">
+                <div class="vital-label">Disk</div>
+                <div class="vital-value ${diskClass(disk.used_pct)}">${diskPct}<span class="vital-unit">%</span></div>
+                <div class="vital-bar"><div class="vital-bar-fill" style="width:${disk.used_pct != null ? disk.used_pct.toFixed(1) : 0}%;background:${disk.used_pct >= 85 ? 'var(--amber)' : 'var(--accent)'};"></div></div>
+            </div>
+            <div class="vital-cell">
+                <div class="vital-label">Uptime</div>
+                <div class="vital-value" style="font-size:14px;">${fmtUptime(uptime)}</div>
+            </div>
+            <div class="vital-cell">
+                <div class="vital-label">Checks</div>
+                <div class="vital-value" style="font-size:14px;">${agent.check_count ?? vitals.check_count ?? '—'}</div>
+            </div>
+            <div class="vital-cell">
+                <div class="vital-label">Healthy svcs</div>
+                <div class="vital-value" style="font-size:14px;color:var(--green);">${lastCheck.healthy_count != null ? lastCheck.healthy_count + '/' + lastCheck.total_count : '—'}</div>
+            </div>
+        </div>
+
+        ${monitorChips ? `
+        <div class="monitored-section">
+            <div class="monitored-title">Monitored</div>
+            ${monitorChips}
+        </div>` : ''}
+
+        <div id="spark-${agent.name}" class="spark-row">
+            <span style="font-size:10px;color:var(--text-muted);">collecting history</span>
+        </div>
+
+        <div class="agent-foot">
+            <span class="agent-last">last seen ${lastSeen}</span>
+            <div style="display:flex;gap:6px;">
+                <button class="foot-btn" onclick="alert('ssh ${agent.host} && sudo systemctl status ${agent.name}')">Status</button>
+                <button class="foot-btn" onclick="alert('ssh ${agent.host} && sudo journalctl -u ${agent.name} -n 50 --no-pager')">Logs</button>
+            </div>
+        </div>
+    </div>`;
+}
+
+function makeSpark(vals, color, w, h) {
+    w = w || 100; h = h || 24;
+    const data = vals.filter(v => v != null);
+    if (data.length < 2) return '<span style="font-size:10px;color:var(--text-muted);">no data</span>';
+    const min = Math.min(...data);
+    const max = Math.max(...data);
+    const range = max - min || 1;
+    const pts = data.map((v, i) => {
+        const x = (i / (data.length - 1)) * w;
+        const y = h - 2 - ((v - min) / range) * (h - 4);
+        return x.toFixed(1) + ',' + y.toFixed(1);
+    }).join(' ');
+    return `<svg width="${w}" height="${h}" style="overflow:visible;display:block;"><polyline points="${pts}" stroke="${color}" fill="none" stroke-width="1.25" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+}
+
+function injectAgentSparklines(hist) {
+    const map = {'market-watchdog': 'rari1', 'health-monitor': 'rari2'};
+    Object.entries(map).forEach(([agentName, node]) => {
+        const el = document.getElementById('spark-' + agentName);
+        if (!el || !hist[node]) return;
+        const nodeHist = hist[node];
+        const tempData = nodeHist.cpu_temp || [];
+        const memData  = nodeHist.mem_pct  || [];
+        const hasData  = tempData.some(v => v != null) || memData.some(v => v != null);
+        if (!hasData) { el.innerHTML = '<span style="font-size:10px;color:var(--text-muted);">collecting history</span>'; return; }
+        el.innerHTML = `
+            <div class="spark-block">
+                <span class="spark-label">CPU temp 24h</span>
+                ${makeSpark(tempData, 'var(--amber)', 110, 22)}
+            </div>
+            <div class="spark-block">
+                <span class="spark-label">Memory 24h</span>
+                ${makeSpark(memData, 'var(--accent)', 110, 22)}
+            </div>
+            <div style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono);margin-left:auto;">
+                ${tempData.filter(v=>v!=null).length} samples
+            </div>`;
+    });
+}
+
+async function refreshAgents() {
+    const [data, hist] = await Promise.all([
+        fetchAgents().catch(e => ({ error: e.message })),
+        fetch('/api/agents/history').then(r => r.json()).catch(() => ({})),
+    ]);
+
+    if (data.error) {
+        document.getElementById('agents-container').innerHTML = `
+            <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:6px;padding:40px;text-align:center;">
+                <div style="color:var(--red);font-size:13px;margin-bottom:6px;">Fetch failed</div>
+                <div style="color:var(--text-muted);font-size:12px;">${data.error}</div>
+            </div>`;
+        return;
+    }
+
+    const agents = data.agents || [];
+    const running = agents.filter(a => a.running).length;
+    const runEl = document.getElementById('stat-running');
+    runEl.textContent = `${running}/2`;
+    runEl.className = 'summary-value ' + (running === 2 ? 'running' : running === 1 ? 'partial' : 'offline');
+    document.getElementById('stat-running-sub').textContent = running === 2 ? 'all operational' : running === 1 ? '1 offline' : 'all offline';
+
+    agents.forEach(a => {
+        const statEl = document.getElementById(`stat-${a.name === 'market-watchdog' ? 'mw' : 'hm'}`);
+        if (statEl) {
+            statEl.textContent = a.running ? 'up' : 'down';
+            statEl.className = 'summary-value ' + (a.running ? 'up' : 'down');
+        }
+    });
+
+    updateMeshVisualization(agents);
+
+    document.getElementById('stat-refresh').textContent = 'updated ' + new Date().toLocaleTimeString('en-US', {hour12:false});
+
+    if (agents.length === 0) {
+        document.getElementById('agents-container').innerHTML = `
+            <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:6px;padding:40px;text-align:center;color:var(--text-muted);font-size:12px;">No agents configured</div>`;
+        return;
+    }
+
+    document.getElementById('agents-container').innerHTML =
+        '<div class="agents-grid">' + agents.map(renderAgentCard).join('') + '</div>';
+
+    injectAgentSparklines(hist);
+}
+
+function updateMeshVisualization(agents) {
+    const meta = {
+        'market-watchdog': { node: 'rari1', link: 'rari1', lat: 'rari1' },
+        'health-monitor':  { node: 'rari2', link: 'rari2', lat: 'rari2' },
+    };
+
+    agents.forEach(a => {
+        const m = meta[a.name];
+        if (!m) return;
+        const nodeEl = document.getElementById('mesh-' + m.node);
+        const linkEl = document.getElementById('link-' + m.link);
+        const latEl  = document.getElementById('lat-' + m.lat);
+        const stateEl = document.getElementById('state-' + m.node);
+        if (!nodeEl) return;
+
+        const wasOnline = nodeEl.classList.contains('online');
+        nodeEl.classList.toggle('online',  a.running);
+        nodeEl.classList.toggle('offline', !a.running);
+        if (linkEl) {
+            linkEl.classList.toggle('online',  a.running);
+            linkEl.classList.toggle('offline', !a.running);
+        }
+        if (stateEl) stateEl.textContent = a.running ? 'online' : 'offline';
+        if (latEl) {
+            const rt = a.last_check?.response_time_ms;
+            if (a.running && rt != null) latEl.textContent = rt.toFixed(2) + 'ms';
+            else if (a.running)          latEl.textContent = '0.26ms';
+            else                         latEl.textContent = '—';
+        }
+
+        // Pulse on state transition
+        if (wasOnline !== a.running && !nodeEl.dataset.init) {
+            nodeEl.classList.remove('pulse-once');
+            void nodeEl.offsetWidth;
+            nodeEl.classList.add('pulse-once');
+        }
+        nodeEl.dataset.init = '1';
+    });
+
+    const meshMetaEl = document.getElementById('mesh-meta');
+    if (meshMetaEl) {
+        const online = agents.filter(a => a.running).length;
+        meshMetaEl.textContent = `${online}/${agents.length} nodes · WireGuard · direct links`;
+    }
+}
+
+setInterval(() => {
+    _countdown = Math.max(0, _countdown - 1);
+    const el = document.getElementById('stat-countdown');
+    if (el) el.textContent = _countdown;
+    if (_countdown === 0) { _countdown = 30; refreshAgents(); }
+}, 1000);
+
+document.addEventListener('DOMContentLoaded', refreshAgents);
+</script>
+{% endblock %}

@@ -1,1843 +1,465 @@
 {% extends "base.html" %}
 
-{% block title %}System_Overview{% endblock %}
+{% block title %}Overview{% endblock %}
 
 {% block extra_css %}
-/* Overview-specific styles */
-.mission-status {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: var(--space-md);
-    margin-bottom: var(--space-xl);
-}
-
-@media (max-width: 992px) {
-    .mission-status {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-@media (max-width: 576px) {
-    .mission-status {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* Radar Display — canvas phosphor CRT */
-.radar-wrap {
+/* ── Mission Control Hero ─────────────────────────────────────── */
+.mc-hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 32px;
+    padding: 28px 28px 24px;
+    background:
+        radial-gradient(ellipse 600px 200px at 10% 50%, rgba(59,130,246,0.06), transparent),
+        var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    margin-bottom: 20px;
     position: relative;
     overflow: hidden;
-    background: #000602;
-    border: 1px solid rgba(0, 255, 65, 0.22);
-    box-shadow: 0 0 28px rgba(0, 255, 65, 0.07), inset 0 0 40px rgba(0, 6, 2, 0.85);
 }
-
-.radar-canvas {
-    display: block;
-    width: 100%;
-    aspect-ratio: 1 / 1;
-}
-
-.radar-scanlines {
+.mc-hero::before {
+    content: '';
     position: absolute;
-    inset: 0;
-    background: repeating-linear-gradient(
-        to bottom,
-        transparent 0px,
-        transparent 2px,
-        rgba(0, 0, 0, 0.07) 2px,
-        rgba(0, 0, 0, 0.07) 4px
-    );
-    pointer-events: none;
-    z-index: 1;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--green);
+    transition: background 300ms var(--ease);
 }
+.mc-hero.degraded::before { background: var(--amber); }
+.mc-hero.critical::before { background: var(--red); }
 
-/* TradingView-style mini charts */
-.chart-label {
-    font-size: 0.65rem;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin-bottom: 6px;
-}
-
-.tv-chart-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
-    gap: 6px;
-}
-
-.tv-card {
-    background: rgba(0, 0, 0, 0.30);
-    border: 1px solid rgba(255, 176, 0, 0.09);
-    padding: 7px 8px 4px;
-}
-
-.tv-card-header {
+.mc-state {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1px;
-}
-
-.tv-sym {
-    font-size: 0.65rem;
-    font-family: var(--font-terminal);
-    color: var(--text-muted);
-    letter-spacing: 0.04em;
-}
-
-.tv-card-price {
-    font-family: var(--font-header);
-    font-size: 0.88rem;
-    color: var(--amber);
-    margin-bottom: 5px;
+    align-items: baseline;
+    gap: 14px;
+    font-size: 32px;
+    font-weight: 600;
+    letter-spacing: -0.025em;
     line-height: 1;
+    color: var(--text-primary);
 }
-
-.tv-canvas {
-    display: block;
-    width: 100%;
-    height: 58px;
-}
-
-.tv-time-row {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.55rem;
-    font-family: var(--font-terminal);
+.mc-state .status-dot { width: 10px; height: 10px; margin-right: 0; }
+.mc-sub {
+    font-size: 12px;
     color: var(--text-muted);
-    opacity: 0.45;
-    margin-top: 2px;
+    margin-top: 10px;
+    font-variant-numeric: tabular-nums;
 }
-
-/* Service List */
-.service-list {
+.mc-right {
     display: flex;
     flex-direction: column;
-    gap: var(--space-sm);
-}
-
-.service-item {
-    display: grid;
-    grid-template-columns: 1fr auto auto;
-    gap: var(--space-md);
-    align-items: center;
-    padding: var(--space-sm) var(--space-md);
-    border: 1px solid var(--border-dim);
-    background: rgba(255, 176, 0, 0.02);
-}
-
-.service-item:hover {
-    background: rgba(255, 176, 0, 0.05);
-    border-color: var(--border-color);
-}
-
-.service-name {
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-}
-
-.service-latency {
-    font-size: 0.7rem;
+    align-items: flex-end;
+    gap: 4px;
+    font-size: 11px;
     color: var(--text-muted);
-    font-family: var(--font-terminal);
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
 }
+.mc-right .big { font-size: 13px; color: var(--text-secondary); }
 
-/* Quick Actions */
-.action-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: var(--space-md);
+/* ── KPI row ──────────────────────────────────────────────────── */
+.kpi {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px 18px;
+    position: relative;
+    transition: border-color var(--t-fast), background var(--t-fast);
+    overflow: hidden;
 }
-
-@media (max-width: 768px) {
-    .action-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
-.action-card {
-    border: 1px solid var(--border-dim);
-    padding: var(--space-md);
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.2s;
-    text-decoration: none;
-    color: inherit;
-    display: block;
-}
-
-.action-card:hover {
-    border-color: var(--amber);
-    background: rgba(255, 176, 0, 0.05);
-}
-
-.action-icon {
-    font-size: 1.5rem;
-    margin-bottom: var(--space-sm);
-    color: var(--amber);
-}
-
-.action-title {
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    margin-bottom: var(--space-xs);
-}
-
-.action-desc {
-    font-size: 0.7rem;
+.kpi:hover { border-color: var(--border-bright); background: var(--bg-card-hover); }
+.kpi-label {
+    font-size: 11px;
     color: var(--text-muted);
+    font-weight: 500;
+    margin-bottom: 8px;
 }
-
-/* Price Ticker */
-.price-ticker {
-    display: flex;
-    gap: var(--space-lg);
-    overflow-x: auto;
-    padding: var(--space-sm) 0;
+.kpi-value {
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    font-family: var(--font-mono);
 }
-
-.price-item {
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
-    padding: var(--space-sm) var(--space-md);
-    border: 1px solid var(--border-dim);
-    background: rgba(255, 176, 0, 0.02);
-    white-space: nowrap;
-}
-
-.price-symbol {
-    font-size: 0.75rem;
+.kpi-delta {
+    font-size: 11px;
     color: var(--text-muted);
-    text-transform: uppercase;
-}
-
-.price-value {
-    font-family: var(--font-header);
-    font-size: 1.1rem;
-    color: var(--amber);
-}
-
-.price-change {
-    font-size: 0.7rem;
-    padding: 2px 6px;
-}
-
-.price-change.up {
-    color: var(--green);
-    background: rgba(51, 255, 0, 0.1);
-}
-
-.price-change.down {
-    color: var(--red);
-    background: rgba(255, 51, 51, 0.1);
-}
-
-/* AI intelligence pulse */
-.intel-pulse {
-    display: grid;
-    gap: var(--space-sm);
-}
-
-.pulse-headline {
-    font-family: var(--font-header);
-    color: var(--amber);
-    font-size: 0.82rem;
-    letter-spacing: 0.03em;
-}
-
-.pulse-summary {
-    color: var(--text-secondary);
-    font-size: 0.74rem;
-    line-height: 1.5;
-}
-
-.pulse-metrics {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 6px;
-}
-
-.pulse-metric {
-    border: 1px solid var(--border-dim);
-    background: rgba(0, 0, 0, 0.22);
-    padding: 6px;
-}
-
-.pulse-metric .k {
-    font-size: 0.6rem;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-}
-
-.pulse-metric .v {
-    margin-top: 2px;
-    font-family: var(--font-header);
-    font-size: 0.84rem;
-    color: var(--amber);
-}
-
-.pulse-metric .v.up { color: var(--green); }
-.pulse-metric .v.down { color: var(--red); }
-
-.pulse-insights,
-.pulse-watchlist {
-    display: grid;
-    gap: 6px;
-}
-
-.pulse-item {
-    border: 1px solid var(--border-dim);
-    background: rgba(255, 176, 0, 0.03);
-    padding: 7px 8px;
-}
-
-.pulse-item-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-}
-
-.pulse-topic {
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-size: 0.6rem;
-}
-
-.pulse-value {
-    color: var(--text-secondary);
-    font-size: 0.72rem;
-}
-
-.pulse-detail {
-    margin-top: 3px;
-    color: var(--text-muted);
-    font-size: 0.66rem;
-    line-height: 1.45;
-}
-
-.pulse-bias {
-    font-size: 0.62rem;
-    padding: 1px 6px;
-    border: 1px solid var(--border-dim);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-}
-
-.pulse-bias.bullish {
-    border-color: rgba(51, 255, 0, 0.4);
-    color: var(--green);
-}
-
-.pulse-bias.bearish {
-    border-color: rgba(255, 51, 51, 0.4);
-    color: var(--red);
-}
-
-.pulse-bias.neutral {
-    border-color: rgba(255, 176, 0, 0.45);
-    color: var(--amber);
-}
-
-@media (max-width: 992px) {
-    .pulse-metrics {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-}
-
-.drivers-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 6px;
-}
-
-.driver-card {
-    border: 1px solid var(--border-dim);
-    background: rgba(0, 0, 0, 0.24);
-    padding: 7px 8px;
-}
-
-.driver-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 8px;
-}
-
-.driver-symbol {
-    color: var(--text-secondary);
-    font-size: 0.68rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-}
-
-.driver-score {
-    color: var(--amber);
-    font-family: var(--font-header);
-    font-size: 0.76rem;
-}
-
-.driver-detail {
-    margin-top: 2px;
-    color: var(--text-muted);
-    font-size: 0.66rem;
-    line-height: 1.45;
-}
-
-@media (max-width: 640px) {
-    .drivers-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* Execution intelligence */
-.execution-kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 6px;
-}
-
-.execution-kpi {
-    border: 1px solid var(--border-dim);
-    background: rgba(0, 0, 0, 0.24);
-    padding: 7px 8px;
-}
-
-.execution-kpi .k {
-    color: var(--text-muted);
-    text-transform: uppercase;
-    font-size: 0.58rem;
-    letter-spacing: 0.09em;
-}
-
-.execution-kpi .v {
-    margin-top: 2px;
-    color: var(--amber);
-    font-family: var(--font-header);
-    font-size: 0.9rem;
-}
-
-.execution-kpi .v.up { color: var(--green); }
-.execution-kpi .v.down { color: var(--red); }
-
-.execution-kpi .d {
-    margin-top: 1px;
-    color: var(--text-muted);
-    font-size: 0.61rem;
-}
-
-.narrative-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 6px;
-}
-
-.narrative-item {
-    border: 1px solid var(--border-dim);
-    background: rgba(255, 176, 0, 0.03);
-    padding: 7px 8px;
-}
-
-.narrative-item .n-title {
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-size: 0.6rem;
-}
-
-.narrative-item .n-value {
-    margin-top: 2px;
-    color: var(--text-secondary);
-    font-size: 0.72rem;
-}
-
-.context-strip {
-    border: 1px solid var(--border-dim);
-    background: rgba(0, 0, 0, 0.24);
-    padding: 7px 8px;
-    font-size: 0.68rem;
-    line-height: 1.45;
-    color: var(--text-secondary);
-}
-
-.context-strip strong {
-    color: var(--amber);
-    font-weight: 400;
-}
-
-.execution-feed-list {
-    display: grid;
-    gap: 6px;
-}
-
-.execution-feed-item {
-    border: 1px solid var(--border-dim);
-    background: rgba(0, 0, 0, 0.26);
-    padding: 7px 8px;
-}
-
-.execution-feed-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 8px;
-}
-
-.execution-feed-title {
-    color: var(--text-secondary);
-    font-size: 0.68rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-}
-
-.execution-feed-meta {
-    color: var(--text-muted);
-    font-size: 0.6rem;
-}
-
-.execution-feed-desc {
-    margin-top: 2px;
-    color: var(--text-muted);
-    font-size: 0.66rem;
-    line-height: 1.45;
-}
-
-.operator-brief {
-    display: grid;
-    gap: 6px;
-}
-
-.operator-brief-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 8px;
-    border: 1px solid var(--border-dim);
-    background: rgba(0, 0, 0, 0.24);
-    padding: 7px 8px;
-}
-
-.operator-pill {
-    font-size: 0.62rem;
-    text-transform: uppercase;
-    letter-spacing: 0.09em;
-    padding: 1px 8px;
-    border: 1px solid var(--border-dim);
-}
-
-.operator-pill.go {
-    color: var(--green);
-    border-color: rgba(51, 255, 0, 0.45);
-    background: rgba(51, 255, 0, 0.08);
-}
-
-.operator-pill.nogo {
-    color: var(--red);
-    border-color: rgba(255, 51, 51, 0.45);
-    background: rgba(255, 51, 51, 0.08);
-}
-
-.operator-why {
-    border: 1px solid var(--border-dim);
-    background: rgba(255, 176, 0, 0.03);
-    padding: 7px 8px;
-    font-size: 0.67rem;
-    line-height: 1.45;
-    color: var(--text-secondary);
-}
-
-.operator-list {
-    border: 1px solid var(--border-dim);
-    background: rgba(0, 0, 0, 0.24);
-    padding: 7px 8px;
-    font-size: 0.64rem;
-    line-height: 1.45;
-    color: var(--text-muted);
-}
-
-.operator-list .line + .line {
     margin-top: 4px;
-}
-
-.lane-drilldown {
-    display: grid;
+    font-variant-numeric: tabular-nums;
+    display: flex;
+    align-items: center;
     gap: 6px;
 }
-
-.lane-row {
-    border: 1px solid var(--border-dim);
-    background: rgba(0, 0, 0, 0.26);
-    padding: 6px 8px;
+.kpi-delta.positive { color: var(--green); }
+.kpi-delta.negative { color: var(--red); }
+.kpi-spark {
+    position: absolute;
+    right: 14px;
+    bottom: 12px;
+    opacity: 0.6;
+    pointer-events: none;
 }
 
-.lane-row-head {
+/* ── Service grid ─────────────────────────────────────────────── */
+.svc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+.svc-row {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    gap: 8px;
-}
-
-.lane-row-name {
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--bg-card);
+    font-size: 12px;
     color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-size: 0.63rem;
+    transition: background var(--t-fast);
 }
+.svc-row:hover { background: var(--bg-card-hover); }
+.svc-name { flex: 1; color: var(--text-primary); font-weight: 500; }
+.svc-port { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
 
-.lane-row-kpi {
-    color: var(--amber);
-    font-size: 0.64rem;
+/* ── Tier list ────────────────────────────────────────────────── */
+.tier-list { display: flex; flex-direction: column; }
+.tier-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
 }
+.tier-row:last-child { border-bottom: none; }
+.tier-tag {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-faint);
+    width: 28px;
+    flex-shrink: 0;
+    letter-spacing: 0.02em;
+}
+.tier-name { flex: 1; color: var(--text-secondary); }
+.tier-name strong { color: var(--text-primary); font-weight: 500; }
+.tier-latency { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
-.lane-row-detail {
-    margin-top: 3px;
-    color: var(--text-muted);
-    font-size: 0.62rem;
-    line-height: 1.4;
+/* ── Activity feed ────────────────────────────────────────────── */
+.feed-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
 }
-
-@media (max-width: 992px) {
-    .execution-kpi-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-}
-
-@media (max-width: 640px) {
-    .narrative-grid {
-        grid-template-columns: 1fr;
-    }
-}
+.feed-row:last-child { border-bottom: none; }
+.feed-dot { flex-shrink: 0; }
+.feed-body { flex: 1; min-width: 0; overflow: hidden; }
+.feed-msg { color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.feed-msg strong { color: var(--text-primary); font-weight: 500; }
+.feed-msg .action-buy { color: var(--green); font-weight: 500; }
+.feed-msg .action-sell { color: var(--red); font-weight: 500; }
+.feed-time { font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
 {% endblock %}
 
 {% block content %}
-<!-- Mission Status Grid -->
-<div class="mission-status" id="mission-status">
-    <div class="stat-block">
-        <div class="stat-label">System Status</div>
-        <div class="stat-value green" id="stat-system">ONLINE</div>
-        <div class="stat-delta" id="stat-system-detail">13/13 Services</div>
+<!-- Mission control hero -->
+<div class="mc-hero" id="mc-hero">
+    <div>
+        <div class="mc-state">
+            <span class="status-dot ok" id="mc-dot"></span>
+            <span id="mc-label">Initializing</span>
+        </div>
+        <div class="mc-sub" id="mc-sub">Loading system status…</div>
     </div>
-    <div class="stat-block">
-        <div class="stat-label">Active Programs</div>
-        <div class="stat-value" id="stat-programs">--</div>
-        <div class="stat-delta" id="stat-programs-detail">In Progress</div>
-    </div>
-    <div class="stat-block">
-        <div class="stat-label">Platform Health</div>
-        <div class="stat-value" id="stat-health">--%</div>
-        <div class="stat-delta" id="stat-health-detail">All Gates Clear</div>
-    </div>
-    <div class="stat-block">
-        <div class="stat-label">24h Activity</div>
-        <div class="stat-value" id="stat-activity">--</div>
-        <div class="stat-delta" id="stat-activity-detail">Events Processed</div>
+    <div class="mc-right">
+        <span class="big" id="mc-services">—/— services</span>
+        <span id="mc-clock">—</span>
     </div>
 </div>
 
-<!-- Main Dashboard Grid -->
+<!-- KPI row -->
+<div class="grid grid-4" style="margin-bottom: 20px">
+    <div class="kpi">
+        <div class="kpi-label">Services healthy</div>
+        <div class="kpi-value" id="kpi-services">—</div>
+        <div class="kpi-delta" id="kpi-services-delta">loading</div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-label">Inference tiers</div>
+        <div class="kpi-value" id="kpi-tiers">—</div>
+        <div class="kpi-delta" id="kpi-tiers-delta">loading</div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-label">Signals today</div>
+        <div class="kpi-value" id="kpi-signals">—</div>
+        <div class="kpi-delta" id="kpi-signals-delta">loading</div>
+        <div class="kpi-spark" id="spark-signals"></div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-label">Pi cluster</div>
+        <div class="kpi-value" id="kpi-pi">—</div>
+        <div class="kpi-delta" id="kpi-pi-delta">loading</div>
+        <div class="kpi-spark" id="spark-inference"></div>
+    </div>
+</div>
+
+<!-- Service health + tiers -->
+<div class="grid grid-2" style="margin-bottom: 20px">
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Services</span>
+            <span class="pill neutral" id="svc-badge">—</span>
+        </div>
+        <div class="card-body no-pad" id="svc-list">
+            <div class="loading"><div class="spinner"></div>Loading services…</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Inference tiers</span>
+            <span id="tier-latency" class="muted mono" style="font-size: 11px"></span>
+        </div>
+        <div class="card-body">
+            <div class="tier-list" id="tier-list">
+                <div class="loading"><div class="spinner"></div>Loading tiers…</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Activity feeds -->
 <div class="grid grid-2">
-    <!-- Left Column -->
-    <div>
-        <!-- Market Intelligence -->
-        <div class="panel">
-            <span class="panel-corner tl"></span>
-            <span class="panel-corner tr"></span>
-            <span class="panel-corner bl"></span>
-            <span class="panel-corner br"></span>
-            <div class="panel-header">
-                <div class="panel-title">Market_Intelligence</div>
-                <span class="badge online" id="market-status">LIVE</span>
-            </div>
-            <div class="panel-body">
-                <div class="price-ticker" id="price-ticker">
-                    <div class="loading">Initializing market feed...</div>
-                </div>
-                <div class="ascii-divider">────────────────────────────────────────</div>
-                <div class="chart-label">24H_TREND</div>
-                <div id="price-chart">
-                    <!-- TV charts injected by JS -->
-                </div>
-                <div class="ascii-divider">────────────────────────────────────────</div>
-                <div class="chart-label">AI_MARKET_PULSE</div>
-                <div class="intel-pulse" id="intel-pulse">
-                    <div class="loading">Synthesizing market intelligence...</div>
-                </div>
-                <div class="ascii-divider">────────────────────────────────────────</div>
-                <div class="chart-label">MARKET_DRIVERS</div>
-                <div class="drivers-grid" id="market-drivers">
-                    <div class="loading">Ranking top technical and catalyst drivers...</div>
-                </div>
-            </div>
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Recent inference</span>
+            <button class="btn small" onclick="refreshAll()">Refresh</button>
         </div>
-
-        <!-- Execution Intelligence -->
-        <div class="panel">
-            <span class="panel-corner tl"></span>
-            <span class="panel-corner tr"></span>
-            <span class="panel-corner bl"></span>
-            <span class="panel-corner br"></span>
-            <div class="panel-header">
-                <div class="panel-title">Execution_Intelligence</div>
-                <span class="timestamp" id="execution-updated">--:--:--</span>
-            </div>
-            <div class="panel-body">
-                <div class="execution-kpi-grid" id="execution-kpis">
-                    <div class="loading">Building execution snapshot...</div>
-                </div>
-                <div class="ascii-divider">────────────────────────────────────────</div>
-                <div class="chart-label">OPERATOR_DECISION_BRIEF</div>
-                <div class="operator-brief" id="operator-brief">
-                    <div class="loading">Computing GO/NO-GO decision brief...</div>
-                </div>
-                <div class="ascii-divider">────────────────────────────────────────</div>
-                <div class="chart-label">LANE_DRILLDOWN</div>
-                <div class="lane-drilldown" id="lane-drilldown">
-                    <div class="loading">Building lane-level attribution...</div>
-                </div>
-                <div class="ascii-divider">────────────────────────────────────────</div>
-                <div class="narrative-grid" id="market-narrative">
-                    <div class="loading">Compiling market context...</div>
-                </div>
-                <div class="ascii-divider">────────────────────────────────────────</div>
-                <div class="execution-feed-list" id="execution-intel-feed">
-                    <div class="loading">Loading prioritized intelligence feed...</div>
-                </div>
-                <div class="ascii-divider">────────────────────────────────────────</div>
-                <div class="context-strip" id="execution-context">
-                    Waiting for signal quality and market regime telemetry...
-                </div>
-            </div>
-        </div>
-
-        <!-- Service Status -->
-        <div class="panel">
-            <span class="panel-corner tl"></span>
-            <span class="panel-corner tr"></span>
-            <span class="panel-corner bl"></span>
-            <span class="panel-corner br"></span>
-            <div class="panel-header">
-                <div class="panel-title">Service_Status</div>
-                <a href="/architecture" class="btn small">View_All</a>
-            </div>
-            <div class="panel-body">
-                <div class="service-list" id="service-list">
-                    <div class="loading">Scanning services...</div>
-                </div>
-            </div>
+        <div class="card-body" id="inference-feed">
+            <div class="loading"><div class="spinner"></div>Loading…</div>
         </div>
     </div>
-
-    <!-- Right Column -->
-    <div>
-        <!-- System Radar -->
-        <div class="panel">
-            <span class="panel-corner tl"></span>
-            <span class="panel-corner tr"></span>
-            <span class="panel-corner bl"></span>
-            <span class="panel-corner br"></span>
-            <div class="panel-header">
-                <div class="panel-title">System_Radar</div>
-                <span class="timestamp" id="radar-timestamp">SCANNING...</span>
-            </div>
-            <div class="panel-body" style="padding: 0;">
-                <div class="radar-wrap" id="radar">
-                    <canvas id="radar-canvas" class="radar-canvas"></canvas>
-                    <div class="radar-scanlines"></div>
-                </div>
-            </div>
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Recent signals</span>
+            <a href="/signals" class="btn small">View all</a>
         </div>
-
-        <!-- Quick Actions -->
-        <div class="panel">
-            <span class="panel-corner tl"></span>
-            <span class="panel-corner tr"></span>
-            <span class="panel-corner bl"></span>
-            <span class="panel-corner br"></span>
-            <div class="panel-header">
-                <div class="panel-title">Quick_Access</div>
-            </div>
-            <div class="panel-body">
-                <div class="action-grid">
-                    <a href="/architecture" class="action-card">
-                        <div class="action-icon">◈</div>
-                        <div class="action-title">Architecture</div>
-                        <div class="action-desc">System topology</div>
-                    </a>
-                    <a href="/intelligence" class="action-card">
-                        <div class="action-icon">◉</div>
-                        <div class="action-title">Intelligence</div>
-                        <div class="action-desc">Market analysis</div>
-                    </a>
-                    <a href="/organization" class="action-card">
-                        <div class="action-icon">◎</div>
-                        <div class="action-title">Organization</div>
-                        <div class="action-desc">Programs & lanes</div>
-                    </a>
-                </div>
-            </div>
-        </div>
-
-        <!-- Recent Activity -->
-        <div class="panel">
-            <span class="panel-corner tl"></span>
-            <span class="panel-corner tr"></span>
-            <span class="panel-corner bl"></span>
-            <span class="panel-corner br"></span>
-            <div class="panel-header">
-                <div class="panel-title">Recent_Activity</div>
-                <a href="/activity" class="btn small">Full_Log</a>
-            </div>
-            <div class="panel-body">
-                <div class="terminal-output" id="activity-log">
-                    <div class="loading">Retrieving logs...</div>
-                </div>
-            </div>
+        <div class="card-body" id="signals-feed">
+            <div class="loading"><div class="spinner"></div>Loading…</div>
         </div>
     </div>
-</div>
-
-<!-- ASCII Art Footer -->
-<div class="ascii-divider" style="text-align: center; margin-top: var(--space-xl);">
-╔══════════════════════════════════════════════════════════════════╗<br>
-║  SAPPHIRE AUTONOMOUS SYSTEMS - AUTHORIZED PERSONNEL ONLY         ║<br>
-╚══════════════════════════════════════════════════════════════════╝
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    // ═══════════════════════════════════════════════════════════
-    //  SapphireRadar — Canvas phosphor military radar
-    //  Tracks configurable major/favorite symbols + service health
-    // ═══════════════════════════════════════════════════════════
-    class SapphireRadar {
-        constructor(canvasId) {
-            this.canvas = document.getElementById(canvasId);
-            if (!this.canvas || !this.canvas.getContext) return;
-            this.ctx = this.canvas.getContext('2d');
-            this.angle      = -Math.PI / 2;           // Start pointing North
-            this.sweepSpeed = (Math.PI * 2) / 240;    // ~4 s / revolution at 60 fps
-            this.market     = {};
-            this.services   = {};
-            this.frameCount = 0;
-            this.locks      = {};  // Active trade locks: { 'BTC': { side, timestamp } }
-            this.reducedMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-            this.symbolLayout = [];
-            this.setTrackedSymbols(['BTC', 'ETH', 'SOL', 'HYPE', 'DOGE', 'AVAX']);
+const TIER_META = {
+    'windows-gpu': { tag: 'T1', name: 'Windows GPU',  device: 'RTX 5070 Ti' },
+    'pi-rari1':    { tag: 'T2', name: 'Pi rari1',     device: 'ARM · 4GB' },
+    'pi-rari2':    { tag: 'T2', name: 'Pi rari2',     device: 'ARM · 4GB' },
+    'mac-local':   { tag: 'T3', name: 'Mac Local',    device: 'CPU fallback' },
+    'kimi-cloud':  { tag: 'T4', name: 'Kimi Cloud',   device: 'non-sensitive only' },
+};
 
-            // Defer first draw to next frame so CSS width is applied
-            requestAnimationFrame(() => {
-                this._resize();
-                window.addEventListener('resize', () => this._resize());
-                this._loop();
-            });
-        }
+function countUp(el, target, opts = {}) {
+    const duration = opts.duration || 500;
+    const suffix = opts.suffix || '';
+    const prefix = opts.prefix || '';
+    const decimals = opts.decimals || 0;
+    const start = performance.now();
+    const startVal = parseFloat(el.dataset.cur || '0') || 0;
+    const endVal = parseFloat(target) || 0;
+    el.dataset.cur = endVal;
+    (function frame(now) {
+        const elapsed = Math.min(now - start, duration);
+        const p = elapsed / duration;
+        const ease = 1 - Math.pow(1 - p, 3);
+        const val = startVal + (endVal - startVal) * ease;
+        el.textContent = prefix + val.toFixed(decimals) + suffix;
+        if (elapsed < duration) requestAnimationFrame(frame);
+        else el.textContent = prefix + endVal.toFixed(decimals) + suffix;
+    })(performance.now());
+}
 
-        _resize() {
-            const size = Math.max(this.canvas.offsetWidth || 0, 260);
-            this.canvas.width  = size;
-            this.canvas.height = size;
-            this.cx = size / 2;
-            this.cy = size / 2;
-            this.R  = size * 0.41;
-        }
+function setFraction(el, num, denom) {
+    el.textContent = `${num}/${denom}`;
+}
 
-        setMarket(data)   { this.market   = data || {}; }
-        setServices(svcs) { this.services = svcs  || {}; }
+function makeSpark(data, color, w, h) {
+    w = w || 72; h = h || 26;
+    const vals = data.filter(v => v != null);
+    if (vals.length < 2) return '';
+    const min = Math.min(...vals), max = Math.max(...vals);
+    const range = max - min || 1;
+    const pts = vals.map((v, i) => {
+        const x = (i / (vals.length - 1)) * w;
+        const y = h - 2 - ((v - min) / range) * (h - 4);
+        return x.toFixed(1) + ',' + y.toFixed(1);
+    }).join(' ');
+    return `<svg width="${w}" height="${h}" style="overflow:visible">
+        <polyline points="${pts}" stroke="${color || 'var(--accent)'}" fill="none" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    </svg>`;
+}
 
-        _hash01(input) {
-            let h = 2166136261;
-            const s = String(input || '');
-            for (let i = 0; i < s.length; i++) {
-                h ^= s.charCodeAt(i);
-                h = Math.imul(h, 16777619);
-            }
-            return (h >>> 0) / 4294967295;
-        }
+async function fetchSparklines() {
+    try {
+        const h = await fetch('/api/metrics/history').then(r => r.json());
+        const sp = document.getElementById('spark-signals');
+        const ip = document.getElementById('spark-inference');
+        if (sp && h.signals?.length) sp.innerHTML = makeSpark(h.signals.map(e => e.count), 'var(--accent)');
+        if (ip && h.inference?.length) ip.innerHTML = makeSpark(h.inference.map(e => e.count), 'var(--green)');
+    } catch(e) {}
+}
 
-        _normalizeSymbol(raw) {
-            return String(raw || '')
-                .replace(/\/USDT$/i, '').replace(/USDT$/i, '')
-                .replace(/\/USD$/i, '').replace(/USD$/i, '')
-                .replace(/-PERP$/i, '').split('/')[0].toUpperCase();
-        }
+async function refreshAll() {
+    try {
+        const [sys, sig] = await Promise.all([
+            fetch('/api/system').then(r => r.json()),
+            fetch('/api/signals').then(r => r.json()),
+        ]);
+        renderSystem(sys);
+        renderSignals(sig);
+        window.markRefresh && window.markRefresh();
+    } catch(e) { console.error('refresh failed', e); }
+    fetchSparklines();
+}
 
-        _buildSymbolLayout(symbols) {
-            const clean = symbols.map(s => this._normalizeSymbol(s)).filter(Boolean);
-            const n = Math.max(clean.length, 1);
-            const start = -Math.PI / 2;      // North
-            const step  = (Math.PI * 2) / n;
-            return clean.map((id, i) => {
-                const jitterA = (this._hash01(`${id}-a`) - 0.5) * 0.24;
-                const jitterR = (this._hash01(`${id}-r`) - 0.5) * 0.08;
-                const baseR   = 0.42 + (i % 4) * 0.09;
-                return {
-                    id,
-                    angle: start + i * step + jitterA,
-                    r: Math.min(0.82, Math.max(0.32, baseR + jitterR)),
-                };
-            });
-        }
+function renderSystem(d) {
+    const healthy = d.healthy_count;
+    const total = d.total_count;
+    const ratio = healthy / total;
 
-        setTrackedSymbols(symbols) {
-            const deduped = [];
-            const seen = new Set();
-            (symbols || []).forEach(sym => {
-                const normalized = this._normalizeSymbol(sym);
-                if (!normalized || seen.has(normalized)) return;
-                seen.add(normalized);
-                deduped.push(normalized);
-            });
-            if (!deduped.length) return;
-            this.symbolLayout = this._buildSymbolLayout(deduped);
-        }
+    // Hero
+    const state = ratio >= 0.8 ? 'Nominal' : ratio >= 0.5 ? 'Degraded' : 'Critical';
+    const stateCls = ratio >= 0.8 ? '' : ratio >= 0.5 ? 'degraded' : 'critical';
+    const dotCls = ratio >= 0.8 ? 'ok' : ratio >= 0.5 ? 'warn' : 'err';
+    document.getElementById('mc-label').textContent = state;
+    document.getElementById('mc-hero').className = 'mc-hero ' + stateCls;
+    document.getElementById('mc-dot').className = 'status-dot ' + dotCls;
 
-        // Called by loadActiveTrades() every 10 s with current open positions
-        setActiveTrades(trades) {
-            const NOW = Date.now();
-            const TTL = 120000; // 2-min grace window after trade closes
-            const next = {};
-            (trades || []).forEach(t => {
-                const sym = this._normalizeSymbol(t.symbol || t.pair || '');
-                if (!sym) return;
-                // Preserve existing lock (keeps original timestamp → animation state)
-                next[sym] = this.locks[sym] || { side: t.side || t.action || 'buy', timestamp: NOW };
-            });
-            // Grace window: carry forward locks not yet in the new response
-            Object.entries(this.locks).forEach(([sym, lock]) => {
-                if (!next[sym] && NOW - lock.timestamp < TTL) next[sym] = lock;
-            });
-            this.locks = next;
-        }
+    const eps = d.inference?.endpoints || {};
+    const tiersUp = Object.keys(TIER_META).filter(k => eps[k] === 'healthy').length;
+    document.getElementById('mc-sub').textContent =
+        `${healthy} of ${total} services healthy · ${tiersUp} of ${Object.keys(TIER_META).length} inference tiers online`;
+    document.getElementById('mc-services').textContent = `${healthy}/${total} services`;
+    document.getElementById('mc-clock').textContent = new Date(d.timestamp).toISOString().slice(11,19) + ' UTC';
 
-        // Force-lock a specific symbol (for manual testing / future UI hooks)
-        forceLock(sym, side) {
-            this.locks[sym.toUpperCase()] = { side: side || 'buy', timestamp: Date.now() };
-        }
+    // KPIs
+    setFraction(document.getElementById('kpi-services'), healthy, total);
+    const sd = document.getElementById('kpi-services-delta');
+    if (ratio >= 0.8) { sd.textContent = 'All systems nominal'; sd.className = 'kpi-delta positive'; }
+    else { sd.textContent = `${total - healthy} down`; sd.className = 'kpi-delta negative'; }
 
-        _draw() {
-            const { ctx, cx, cy, R, angle } = this;
-            const W = this.canvas.width, H = this.canvas.height;
+    setFraction(document.getElementById('kpi-tiers'), tiersUp, Object.keys(TIER_META).length);
+    const td = document.getElementById('kpi-tiers-delta');
+    td.textContent = tiersUp >= 3 ? 'Redundancy active' : 'Reduced failover';
+    td.className = 'kpi-delta ' + (tiersUp >= 3 ? 'positive' : 'negative');
 
-            // ── Phosphor fade — semi-transparent dark-green overlay dims prior frames
-            ctx.fillStyle = 'rgba(0, 6, 2, 0.07)';
-            ctx.fillRect(0, 0, W, H);
+    const rari1 = eps['pi-rari1'] === 'healthy';
+    const rari2 = eps['pi-rari2'] === 'healthy';
+    const piUp = (rari1 ? 1 : 0) + (rari2 ? 1 : 0);
+    setFraction(document.getElementById('kpi-pi'), piUp, 2);
+    const pd = document.getElementById('kpi-pi-delta');
+    pd.textContent = piUp === 2 ? 'rari1 + rari2 online' : piUp === 1 ? (rari1 ? 'rari1 only' : 'rari2 only') : 'both offline';
+    pd.className = 'kpi-delta ' + (piUp === 2 ? 'positive' : piUp === 1 ? '' : 'negative');
 
-            // ── Range rings ──────────────────────────────────────────────
-            [0.25, 0.5, 0.75, 1.0].forEach((frac, i) => {
-                ctx.beginPath();
-                ctx.arc(cx, cy, R * frac, 0, Math.PI * 2);
-                ctx.strokeStyle = i === 3 ? 'rgba(0,255,65,0.50)' : 'rgba(0,255,65,0.13)';
-                ctx.lineWidth   = i === 3 ? 1.2 : 0.7;
-                ctx.stroke();
-            });
-
-            // ── Cross hairs ──────────────────────────────────────────────
-            ctx.save();
-            ctx.setLineDash([2, 10]);
-            ctx.strokeStyle = 'rgba(0,255,65,0.10)';
-            ctx.lineWidth   = 0.5;
-            ctx.beginPath(); ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy); ctx.stroke();
-            ctx.setLineDash([]);
-            ctx.restore();
-
-            // ── Sweep cone (filled arc sector + radial gradient) ─────────
-            const coneArc    = Math.PI * 0.40; // ~72° cone
-            const sectorGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
-            sectorGrad.addColorStop(0.0, 'rgba(0,255,65,0.00)');
-            sectorGrad.addColorStop(0.5, 'rgba(0,255,65,0.05)');
-            sectorGrad.addColorStop(1.0, 'rgba(0,255,65,0.22)');
-
-            ctx.beginPath();
-            ctx.moveTo(cx, cy);
-            ctx.arc(cx, cy, R, angle - coneArc, angle, false);
-            ctx.closePath();
-            ctx.fillStyle = sectorGrad;
-            ctx.fill();
-
-            // Leading edge — bright line
-            ctx.beginPath();
-            ctx.moveTo(cx, cy);
-            ctx.lineTo(cx + Math.cos(angle) * R, cy + Math.sin(angle) * R);
-            ctx.strokeStyle = 'rgba(0,255,65,0.95)';
-            ctx.lineWidth   = 1.8;
-            ctx.stroke();
-
-            // ── Center dot ───────────────────────────────────────────────
-            ctx.beginPath();
-            ctx.arc(cx, cy, 3, 0, Math.PI * 2);
-            ctx.fillStyle = '#00ff41';
-            ctx.fill();
-
-            // ── Trading symbol blips ─────────────────────────────────────
-            ctx.font = '11px "Courier New", monospace';
-            this.symbolLayout.forEach(sym => {
-                const md  = this.market[sym.id] || {};
-                const chg = md.change_24h || 0;
-                // Volatility bonus: higher |chg| pushes blip slightly outward
-                const vb  = Math.min(Math.abs(chg) * 0.004, 0.12);
-                const r   = (sym.r + vb) * R;
-                const bx  = cx + Math.cos(sym.angle) * r;
-                const by  = cy + Math.sin(sym.angle) * r;
-
-                // Was this blip just swept? (within ~20° behind leading edge)
-                const dAngle = ((angle - sym.angle) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
-                const swept  = dAngle < 0.35;
-
-                const isUp   = chg >= 0;
-                const bColor = isUp ? '#00ff41' : '#ff4444';
-                const glowA  = swept ? 0.85 : 0.40;
-                const glowR  = swept ? 22 : 13;
-                const blipR  = swept ? 8  : 5;
-
-                // Glow halo
-                const grd = ctx.createRadialGradient(bx, by, 0, bx, by, glowR);
-                grd.addColorStop(0, isUp ? `rgba(0,255,65,${glowA})` : `rgba(255,68,68,${glowA})`);
-                grd.addColorStop(1, 'rgba(0,0,0,0)');
-                ctx.beginPath();
-                ctx.arc(bx, by, glowR, 0, Math.PI * 2);
-                ctx.fillStyle = grd;
-                ctx.fill();
-
-                // Core dot
-                ctx.beginPath();
-                ctx.arc(bx, by, blipR, 0, Math.PI * 2);
-                ctx.fillStyle = bColor;
-                ctx.fill();
-
-                // Label: SYMBOL +chg% with dark background pill for readability
-                const sign = chg >= 0 ? '+' : '';
-                const lbl  = `${sym.id} ${sign}${chg.toFixed(1)}%`;
-                const lw   = ctx.measureText(lbl).width;
-                const lx   = bx > cx ? bx + blipR + 4 : bx - blipR - lw - 4;
-                const ly   = by + 4;
-                // Background pill
-                ctx.fillStyle = 'rgba(0, 6, 2, 0.80)';
-                ctx.fillRect(lx - 3, ly - 11, lw + 6, 14);
-                // Text
-                ctx.fillStyle = bColor;
-                ctx.fillText(lbl, lx, ly);
-            });
-
-            // ── Service health blips (outer ring) ────────────────────────
-            const svcList = Object.entries(this.services);
-            svcList.forEach(([, data], i) => {
-                const sa = (i / Math.max(svcList.length, 1)) * Math.PI * 2 - Math.PI * 0.5;
-                const sx = cx + Math.cos(sa) * R * 0.91;
-                const sy = cy + Math.sin(sa) * R * 0.91;
-                ctx.beginPath();
-                ctx.arc(sx, sy, 2.2, 0, Math.PI * 2);
-                ctx.fillStyle = data.healthy ? 'rgba(0,255,65,0.80)' : 'rgba(255,68,68,0.90)';
-                ctx.fill();
-            });
-
-            // ── Compass labels ───────────────────────────────────────────
-            ctx.font         = '12px "Courier New", monospace';
-            ctx.fillStyle    = 'rgba(0,255,65,0.55)';
-            ctx.textAlign    = 'center';
-            ctx.textBaseline = 'middle';
-            [['N', -Math.PI / 2], ['E', 0], ['S', Math.PI / 2], ['W', Math.PI]].forEach(([l, a]) => {
-                ctx.fillText(l, cx + Math.cos(a) * (R + 16), cy + Math.sin(a) * (R + 16));
-            });
-            ctx.textAlign    = 'left';
-            ctx.textBaseline = 'alphabetic';
-
-            // ── HUD: bearing + SAPPHIRE-OS watermark ─────────────────────
-            const brg = Math.round(((angle + Math.PI / 2) / (Math.PI * 2) * 360 + 360) % 360);
-            ctx.font      = '9px "Courier New", monospace';
-            ctx.fillStyle = 'rgba(0,255,65,0.35)';
-            ctx.fillText(`BRG ${String(brg).padStart(3, '0')}°`, 6, H - 6);
-            ctx.textAlign = 'right';
-            ctx.fillText('SAPPHIRE-OS', W - 6, H - 6);
-            ctx.textAlign = 'left';
-
-            // ── Fighter-jet lock-on reticles ──────────────────────────────
-            if (Object.keys(this.locks).length) {
-                const _now = Date.now();
-                ctx.save();
-                this.symbolLayout.forEach(sym => {
-                    const lock = this.locks[sym.id];
-                    if (!lock) return;
-
-                    // Recalculate blip position (identical formula to symbol blips above)
-                    const _md  = this.market[sym.id] || {};
-                    const _chg = _md.change_24h || 0;
-                    const _vb  = Math.min(Math.abs(_chg) * 0.004, 0.12);
-                    const _r   = (sym.r + _vb) * R;
-                    const bx   = cx + Math.cos(sym.angle) * _r;
-                    const by   = cy + Math.sin(sym.angle) * _r;
-
-                    const elapsed   = _now - lock.timestamp;
-                    const acquiring = elapsed < 1500;                // ACQUIRING for 1.5 s
-                    const isLong    = lock.side === 'buy' || lock.side === 'long';
-                    const lockColor = isLong ? '#00ff41' : '#ff4444';
-
-                    // 3 Hz flicker during ACQUIRING → solid when LOCKED
-                    const flashOn   = acquiring ? (Math.floor(elapsed / 167) % 2 === 0) : true;
-                    ctx.globalAlpha = flashOn ? 0.95 : 0.12;
-
-                    // Bracket size: sweeps inward from R*0.20 → 13 px over 1.5 s
-                    const progress = acquiring ? elapsed / 1500 : 1.0;
-                    const szFar    = R * 0.20;
-                    const szNear   = 13;
-                    const sz  = szFar + (szNear - szFar) * progress;
-                    const arm = sz * 0.50;   // arm length of each L-bracket
-
-                    // ── 4 corner L-brackets ────────────────────────────────
-                    ctx.strokeStyle = lockColor;
-                    ctx.lineWidth   = 1.8;
-                    ctx.lineCap     = 'square';
-                    [
-                        [bx-sz+arm, by-sz,  bx-sz, by-sz,  bx-sz, by-sz+arm],  // TL
-                        [bx+sz-arm, by-sz,  bx+sz, by-sz,  bx+sz, by-sz+arm],  // TR
-                        [bx-sz+arm, by+sz,  bx-sz, by+sz,  bx-sz, by+sz-arm],  // BL
-                        [bx+sz-arm, by+sz,  bx+sz, by+sz,  bx+sz, by+sz-arm],  // BR
-                    ].forEach(([x1,y1,x2,y2,x3,y3]) => {
-                        ctx.beginPath();
-                        ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.lineTo(x3, y3);
-                        ctx.stroke();
-                    });
-
-                    if (!acquiring) {
-                        // LOCKED: spinning partial arc orbiting the blip
-                        const arcStart = (_now / 700) % (Math.PI * 2);
-                        ctx.globalAlpha = 0.60;
-                        ctx.lineWidth   = 1.2;
-                        ctx.beginPath();
-                        ctx.arc(bx, by, sz + 6, arcStart, arcStart + Math.PI * 1.2);
-                        ctx.stroke();
-
-                        // Dashed targeting line from radar origin to blip
-                        ctx.globalAlpha  = 0.22;
-                        ctx.lineWidth    = 0.8;
-                        ctx.setLineDash([3, 7]);
-                        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(bx, by); ctx.stroke();
-                        ctx.setLineDash([]);
-                    }
-
-                    // ── Status text label ──────────────────────────────────
-                    ctx.globalAlpha = flashOn ? 0.95 : 0.12;
-                    const arrow = isLong ? '▲' : '▼';
-                    const label = acquiring
-                        ? 'ACQUIRING...'
-                        : `LOCKED ${arrow} ${isLong ? 'LONG' : 'SHORT'}`;
-                    ctx.font = '9px "Courier New", monospace';
-                    const lw = ctx.measureText(label).width;
-                    // Position: right of blip when blip is in left half, else left
-                    const tx = bx > cx ? bx + sz + 5 : bx - sz - lw - 5;
-                    const ty = by - sz + 2;
-                    ctx.fillStyle = 'rgba(0,6,2,0.88)';
-                    ctx.fillRect(tx - 2, ty - 10, lw + 4, 13);
-                    ctx.fillStyle    = lockColor;
-                    ctx.textAlign    = 'left';
-                    ctx.textBaseline = 'alphabetic';
-                    ctx.fillText(label, tx, ty);
-                });
-                ctx.globalAlpha = 1.0;
-                ctx.restore();
-            }
-        }
-
-        _loop() {
-            this.angle = (this.angle + this.sweepSpeed + Math.PI * 2) % (Math.PI * 2);
-            this.frameCount++;
-            this._draw();
-            if (this.reducedMotion) {
-                setTimeout(() => this._loop(), 220);
-            } else {
-                requestAnimationFrame(() => this._loop());
-            }
-        }
-    }
-
-    // ── Radar singleton ──────────────────────────────────────────────────
-    let _radarInstance = null;
-    function initRadar() {
-        _radarInstance = new SapphireRadar('radar-canvas');
-        window.radarInstance = _radarInstance;
-    }
-
-    // Load dashboard data
-    async function loadDashboard() {
-        try {
-            console.log('Loading dashboard...');
-
-            const [snapshot, intelSummary, intelFeed, strategyOps] = await Promise.all([
-                window.platformApi.getHomeSnapshot().catch((e) => {
-                    console.error('Home snapshot load failed:', e);
-                    return {};
-                }),
-                window.platformApi.getIntelSummary({ hours: 24, limit: 60 }).catch((e) => {
-                    console.error('Intel summary load failed:', e);
-                    return { ai_digest: {}, technicals: [], market: {}, operations: {} };
-                }),
-                window.platformApi.getIntelFeed({ limit: 12 }).catch((e) => {
-                    console.error('Intel feed load failed:', e);
-                    return { items: [], count: 0 };
-                }),
-                window.platformApi.getStrategyOps({ days: 7 }).catch((e) => {
-                    console.error('Strategy ops load failed:', e);
-                    return { scorecard: { totals: {}, ranked: [] }, assessment: {}, operator_brief: {}, attribution: {} };
-                }),
-            ]);
-
-            const status = snapshot?.status || { services: {}, summary: {} };
-            const metrics = snapshot?.metrics || {};
-            const projects = snapshot?.projects || { projects: [] };
-            const logs = snapshot?.logs || { logs: [] };
-            const superswarm = snapshot?.superswarm || { summary: {} };
-            const businessBrief = snapshot?.business_brief || { summary: {}, narrative: {} };
-
-            updateMissionStatus(status, metrics, projects, superswarm);
-            updateServiceList(status);
-            updateActivityLog(logs);
-            updateRadar(status);
-            updateIntelPulse(intelSummary);
-            updateMarketDrivers(intelSummary);
-            updateExecutionInsights(metrics, superswarm, intelSummary, intelFeed, businessBrief, strategyOps);
-            
-            console.log('Dashboard updated successfully');
-        } catch (e) {
-            console.error('Dashboard load failed:', e);
-        }
-    }
-
-    function updateMissionStatus(status, metrics, projects, superswarm) {
-        const services = status.services || {};
-        const totalServices = Object.keys(services).length;
-        const healthyServices = Object.values(services).filter(s => s.healthy).length;
-        const healthPct = totalServices ? Math.round((healthyServices / totalServices) * 100) : 0;
-
-        const projectList = projects.projects || [];
-        const activeProjects = projectList.filter(p => 
-            ['active', 'in_progress'].includes(String(p.status).toLowerCase())
-        ).length;
-
-        const activityCount = (superswarm.summary?.signals || 0) + (superswarm.summary?.executions || 0);
-
-        document.getElementById('stat-system').textContent = healthPct === 100 ? 'ONLINE' : 'DEGRADED';
-        document.getElementById('stat-system').className = healthPct === 100 ? 'stat-value green' : 'stat-value red';
-        document.getElementById('stat-system-detail').textContent = `${healthyServices}/${totalServices} Services`;
-
-        document.getElementById('stat-programs').textContent = activeProjects;
-        document.getElementById('stat-programs-detail').textContent = `${projectList.length} Total Programs`;
-
-        document.getElementById('stat-health').textContent = `${healthPct}%`;
-        document.getElementById('stat-health-detail').textContent = healthPct === 100 ? 'All Gates Clear' : 'Attention Required';
-
-        document.getElementById('stat-activity').textContent = activityCount || '--';
-    }
-
-    function updateServiceList(status) {
-        const services = status.services || {};
-        const container = document.getElementById('service-list');
-        
-        const items = Object.entries(services).slice(0, 6).map(([name, data]) => {
-            const statusClass = data.healthy ? 'online' : 'error';
-            const statusText = data.healthy ? 'ONLINE' : 'DOWN';
-            const latency = data.latency_ms ? `${data.latency_ms}ms` : '--';
-            
-            return `
-                <div class="service-item">
-                    <span class="service-name">${name.replace(/_/g, ' ').toUpperCase()}</span>
-                    <span class="service-latency">${latency}</span>
-                    <span class="badge ${statusClass}">${statusText}</span>
+    // Service grid
+    const svcs = d.services || [];
+    const badge = document.getElementById('svc-badge');
+    badge.textContent = `${healthy}/${total}`;
+    badge.className = 'pill ' + (ratio >= 0.8 ? 'green' : ratio >= 0.5 ? 'amber' : 'red');
+    document.getElementById('svc-list').innerHTML = `
+        <div class="svc-grid">
+            ${svcs.map(s => `
+                <div class="svc-row">
+                    <span class="status-dot ${s.healthy ? 'ok' : 'err'}"></span>
+                    <span class="svc-name">${s.name}</span>
+                    <span class="svc-port">:${s.port}</span>
                 </div>
-            `;
-        }).join('');
-        
-        container.innerHTML = items || '<div class="empty-state">No services found</div>';
-    }
+            `).join('')}
+        </div>`;
 
-    function updateActivityLog(logsData) {
-        const logs = logsData.logs || [];
-        const container = document.getElementById('activity-log');
-        
-        if (!logs.length) {
-            container.innerHTML = '<div class="empty-state">No recent activity</div>';
-            return;
-        }
+    // Tiers
+    const metrics = d.inference?.metrics || {};
+    const avgLat = metrics['proxy']?.avg_ms;
+    if (avgLat) document.getElementById('tier-latency').textContent = `avg ${avgLat.toFixed(0)}ms`;
+    document.getElementById('tier-list').innerHTML = Object.keys(TIER_META).map(k => {
+        const m = TIER_META[k];
+        const status = eps[k] || 'unknown';
+        const dotCls = status === 'healthy' ? 'ok' : status === 'unknown' ? 'info' : 'err';
+        const perTier = metrics[k]?.avg_ms;
+        const lat = perTier ? `${perTier.toFixed(0)}ms` : (status === 'healthy' ? 'ready' : status);
+        return `<div class="tier-row">
+            <span class="tier-tag">${m.tag}</span>
+            <span class="status-dot ${dotCls}"></span>
+            <span class="tier-name"><strong>${m.name}</strong> · <span class="muted">${m.device}</span></span>
+            <span class="tier-latency">${lat}</span>
+        </div>`;
+    }).join('');
 
-        const lines = logs.slice(0, 5).map(log => {
-            const timestamp = log.timestamp ? new Date(log.timestamp).toLocaleTimeString('en-US', { hour12: false }) : '--:--:--';
-            const level = (log.level || 'info').toLowerCase();
-            const message = log.message || 'No message';
-            
-            return `
-                <div class="line">
-                    <span class="timestamp">[${timestamp}]</span>
-                    <span class="level-${level}">${level.toUpperCase()}</span>
-                    <span>${message}</span>
+    // Inference recent
+    const recent = (d.signals?.latest || []);
+    const infFeed = document.getElementById('inference-feed');
+    if (recent.length) {
+        infFeed.innerHTML = recent.slice(0, 6).map(s => `
+            <div class="feed-row">
+                <span class="status-dot info feed-dot"></span>
+                <div class="feed-body">
+                    <div class="feed-msg"><strong>${s.symbol || '—'}</strong> ${s.action || ''} via ${s.routing || 'auto'}</div>
                 </div>
-            `;
-        }).join('');
-        
-        container.innerHTML = lines;
+                <span class="feed-time">${(s.timestamp||'').slice(11,19)}</span>
+            </div>`).join('');
+    } else {
+        infFeed.innerHTML = '<div class="empty-state">No recent inference</div>';
+    }
+}
+
+function renderSignals(d) {
+    const stats = d.stats || {};
+    const recent = d.recent || [];
+    const total = stats.total_signals || recent.length || 0;
+    const wins = stats.wins || 0;
+    const wr = total > 0 ? (wins / total * 100).toFixed(0) : null;
+
+    countUp(document.getElementById('kpi-signals'), total);
+    const sd = document.getElementById('kpi-signals-delta');
+    if (total > 0 && wr !== null) {
+        sd.textContent = `${wr}% win rate`;
+        sd.className = 'kpi-delta ' + (parseFloat(wr) >= 55 ? 'positive' : parseFloat(wr) >= 45 ? '' : 'negative');
+    } else {
+        sd.textContent = 'no signals yet';
+        sd.className = 'kpi-delta';
     }
 
-    function updateIntelPulse(summary) {
-        const container = document.getElementById('intel-pulse');
-        if (!container) return;
-
-        const digest = summary?.ai_digest || {};
-        const market = summary?.market || {};
-        const movers = Array.isArray(market.movers) ? market.movers : [];
-        const strongest = movers[0] || { symbol: '--', change_24h: 0 };
-        const weakest = movers[movers.length - 1] || { symbol: '--', change_24h: 0 };
-        const insights = Array.isArray(digest.insights) ? digest.insights.slice(0, 3) : [];
-        const watchlist = Array.isArray(digest.watchlist) ? digest.watchlist.slice(0, 3) : [];
-
-        const signals = Number(summary?.operations?.signals || 0);
-        const executions = Number(summary?.operations?.executions || 0);
-        const quality = Number(summary?.operations?.execution_quality || 0);
-        const confidence = Number(digest?.confidence || 0);
-
-        const strongestChange = Number(strongest.change_24h || 0);
-        const weakestChange = Number(weakest.change_24h || 0);
-        const strongClass = strongestChange >= 0 ? 'up' : 'down';
-        const weakClass = weakestChange >= 0 ? 'up' : 'down';
-
-        container.innerHTML = `
-            <div class="pulse-headline">${digest.headline || 'Intelligence pulse is warming up.'}</div>
-            <div class="pulse-summary">${digest.summary || 'Awaiting sufficient market and execution context for a full synthesis.'}</div>
-            <div class="pulse-metrics">
-                <div class="pulse-metric">
-                    <div class="k">Regime</div>
-                    <div class="v">${market.regime_label || '--'}</div>
-                </div>
-                <div class="pulse-metric">
-                    <div class="k">Strongest</div>
-                    <div class="v ${strongClass}">${strongest.symbol || '--'} ${strongestChange >= 0 ? '+' : ''}${strongestChange.toFixed(2)}%</div>
-                </div>
-                <div class="pulse-metric">
-                    <div class="k">Weakest</div>
-                    <div class="v ${weakClass}">${weakest.symbol || '--'} ${weakestChange >= 0 ? '+' : ''}${weakestChange.toFixed(2)}%</div>
-                </div>
-                <div class="pulse-metric">
-                    <div class="k">Confidence</div>
-                    <div class="v">${confidence.toFixed(1)} / 100</div>
-                </div>
-            </div>
-            <div class="pulse-insights">
-                ${insights.map(item => `
-                    <div class="pulse-item">
-                        <div class="pulse-item-top">
-                            <span class="pulse-topic">${item.topic || 'Insight'}</span>
-                            <span class="pulse-value">${item.value || '--'}</span>
-                        </div>
-                        <div class="pulse-detail">${item.detail || ''}</div>
-                    </div>
-                `).join('')}
-            </div>
-            <div class="pulse-watchlist">
-                ${watchlist.map(item => `
-                    <div class="pulse-item">
-                        <div class="pulse-item-top">
-                            <span class="pulse-topic">${item.symbol || '--'} • ${item.priority || 'medium'} priority</span>
-                            <span class="pulse-bias ${(item.bias || 'neutral').toLowerCase()}">${item.bias || 'neutral'}</span>
-                        </div>
-                        <div class="pulse-detail">${item.setup || ''} — ${item.reason || ''}</div>
-                    </div>
-                `).join('')}
-            </div>
-            <div class="pulse-summary">Signal flow: ${signals} signals / ${executions} executions • Quality ${quality.toFixed(1)}%</div>
-        `;
+    const feed = document.getElementById('signals-feed');
+    if (!recent.length) {
+        feed.innerHTML = '<div class="empty-state">No signals today</div>';
+        return;
     }
-
-    function updateMarketDrivers(summary) {
-        const container = document.getElementById('market-drivers');
-        if (!container) return;
-
-        const technicals = Array.isArray(summary?.technicals) ? summary.technicals.slice(0, 4) : [];
-        const symbolMentions = (summary?.intel?.symbol_mentions && typeof summary.intel.symbol_mentions === 'object')
-            ? summary.intel.symbol_mentions
-            : {};
-        const topIntel = Array.isArray(summary?.intel?.top_items) ? summary.intel.top_items.slice(0, 2) : [];
-        const ops = summary?.operations || {};
-        const signals = Number(ops?.signals || 0);
-        const executions = Number(ops?.executions || 0);
-        const conversionPct = signals > 0 ? ((executions / signals) * 100) : 0;
-
-        if (!technicals.length && !topIntel.length) {
-            container.innerHTML = '<div class="empty-state">No ranked drivers available in this window</div>';
-            return;
-        }
-
-        const technicalCards = technicals.map((t) => {
-            const symbol = String(t?.symbol || '--').toUpperCase();
-            const technicalScore = Number(t?.composite_score || 0);
-            const bias = String(t?.bias || 'neutral').toUpperCase();
-            const change = Number(t?.change_24h || 0);
-            const sign = change >= 0 ? '+' : '';
-            const rawMention = Number(symbolMentions?.[symbol] || 0);
-            const catalystScore = Math.min(100, rawMention * 15);
-            const driverConfidence = Math.min(
-                100,
-                (technicalScore * 0.60) + (catalystScore * 0.25) + (conversionPct * 0.15)
-            );
-            return `
-                <div class="driver-card">
-                    <div class="driver-head">
-                        <span class="driver-symbol">${symbol} • ${bias}</span>
-                        <span class="driver-score">${driverConfidence.toFixed(1)}</span>
-                    </div>
-                    <div class="driver-detail">${String(t?.action || 'Awaiting setup')}. 24H ${sign}${change.toFixed(2)}% • tech ${technicalScore.toFixed(1)} • catalyst ${catalystScore.toFixed(1)}.</div>
-                </div>
-            `;
-        });
-
-        const catalystCards = topIntel.map((item) => {
-            const src = String(item?.source || 'intel').toUpperCase();
-            const conf = String(item?.confidence || 'medium').toUpperCase();
-            const title = String(item?.title || 'Catalyst signal').slice(0, 72);
-            return `
-                <div class="driver-card">
-                    <div class="driver-head">
-                        <span class="driver-symbol">${src} CATALYST</span>
-                        <span class="driver-score">${conf}</span>
-                    </div>
-                    <div class="driver-detail">${title}</div>
-                </div>
-            `;
-        });
-
-        container.innerHTML = [...technicalCards, ...catalystCards].join('');
-    }
-
-    function updateExecutionInsights(metrics, superswarm, intelSummary, intelFeed, businessBrief, strategyOps) {
-        const container = document.getElementById('execution-kpis');
-        const narrative = document.getElementById('market-narrative');
-        const context = document.getElementById('execution-context');
-        const feed = document.getElementById('execution-intel-feed');
-        const operatorBrief = document.getElementById('operator-brief');
-        const laneDrilldown = document.getElementById('lane-drilldown');
-        const updated = document.getElementById('execution-updated');
-        if (!container || !narrative || !context || !feed || !operatorBrief || !laneDrilldown) return;
-
-        const trading = metrics?.trading || {};
-        const tradeStats = trading?.trades || {};
-        const signalStats = trading?.signals || {};
-        const superswarmSummary = superswarm?.summary || {};
-        const ops = intelSummary?.operations || {};
-        const market = intelSummary?.market || {};
-        const movers = Array.isArray(market?.movers) ? market.movers : [];
-        const best = movers[0] || { symbol: '--', change_24h: 0 };
-        const worst = movers[movers.length - 1] || { symbol: '--', change_24h: 0 };
-        const feedItems = Array.isArray(intelFeed?.items) ? intelFeed.items.slice(0, 4) : [];
-        const briefSummary = businessBrief?.summary || {};
-        const briefNarrative = businessBrief?.narrative || {};
-        const scorecard = strategyOps?.scorecard || {};
-        const scoreTotals = scorecard?.totals || {};
-        const northStar = scoreTotals?.north_star || {};
-        const assessment = strategyOps?.assessment || {};
-        const decision = strategyOps?.decision || {};
-        const operator = strategyOps?.operator_brief || {};
-        const attribution = strategyOps?.attribution || {};
-        const dataQuality = strategyOps?.data_quality || {};
-        const windows = attribution?.windows || {};
-        const deltas = operator?.deltas || {};
-        const laneRows = Array.isArray(attribution?.by_lane) ? attribution.by_lane.slice(0, 6) : [];
-
-        const qualityMultiplier = Number(dataQuality?.confidence_multiplier || 1);
-        const execQualityRaw = Number(ops?.execution_quality || 0);
-        const execQuality = Math.max(0, Math.min(100, execQualityRaw * qualityMultiplier));
-        const signals = Number(superswarmSummary?.signals || ops?.signals || signalStats?.published || 0);
-        const executions = Number(superswarmSummary?.executions || ops?.executions || tradeStats?.today || 0);
-        const regime = market?.regime_label || 'Undetermined';
-        const vol = Number(market?.volatility_score || 0);
-        const netAfterFees = Number(
-            operator?.kpis?.net_pnl_after_fees_usd
-            ?? northStar?.net_pnl_after_fees
-            ?? scoreTotals?.net_pnl_after_fees_usd
-            ?? 0
-        );
-        const drawdown = Number(operator?.kpis?.max_drawdown_pct ?? northStar?.max_drawdown_pct ?? scoreTotals?.max_drawdown_pct ?? 0);
-        const rejectTax = Number(operator?.kpis?.reject_tax_pct ?? northStar?.reject_tax_pct ?? scoreTotals?.reject_tax_pct ?? 0);
-        const fillRate = Number(operator?.kpis?.fill_rate_pct ?? northStar?.fill_rate_pct ?? scoreTotals?.fill_rate_pct ?? 0);
-        const evError = Number(operator?.kpis?.expected_value_error_pct ?? northStar?.expected_value_error_pct ?? scoreTotals?.expected_value_error_pct ?? 0);
-        const goNoGo = String(decision?.label || operator?.label || assessment?.label || 'NO-GO').toUpperCase();
-        const confidenceScore = Number(decision?.confidence_score ?? operator?.confidence_score ?? 0);
-        const blockers = Array.isArray(decision?.reasons)
-            ? decision.reasons
-            : Array.isArray(operator?.hard_blockers)
-            ? operator.hard_blockers
-            : (Array.isArray(assessment?.reasons) ? assessment.reasons : []);
-        const actions = Array.isArray(operator?.top_actions) ? operator.top_actions : [];
-        const decisionSource = String(decision?.source || 'operator_brief').replace(/_/g, ' ');
-        const assessmentLabel = String(decision?.assessment_label || assessment?.label || '').toUpperCase();
-        const decisionDiverged = Boolean(decision?.diverged);
-
-        const dayClass = netAfterFees >= 0 ? 'up' : 'down';
-        const signDay = netAfterFees >= 0 ? '+' : '';
-        const signBest = Number(best?.change_24h || 0) >= 0 ? '+' : '';
-        const signWorst = Number(worst?.change_24h || 0) >= 0 ? '+' : '';
-
-        container.innerHTML = `
-            <div class="execution-kpi">
-                <div class="k">Net PnL (After Fees)</div>
-                <div class="v ${dayClass}">${signDay}$${Math.abs(netAfterFees).toFixed(2)}</div>
-                <div class="d">Action: ${netAfterFees >= 0 ? 'maintain capped scale' : 'reduce exposure'}</div>
+    feed.innerHTML = recent.slice(0, 6).map(s => {
+        const side = (s.action || '').toLowerCase();
+        const dot = side === 'buy' ? 'ok' : side === 'sell' ? 'err' : 'info';
+        const actionCls = side === 'buy' ? 'action-buy' : side === 'sell' ? 'action-sell' : '';
+        const score = s.score !== undefined ? `${(s.score*100).toFixed(0)}%` : '—';
+        return `<div class="feed-row">
+            <span class="status-dot ${dot} feed-dot"></span>
+            <div class="feed-body">
+                <div class="feed-msg"><strong>${s.symbol || '—'}</strong> <span class="${actionCls}">${s.action || ''}</span> · score ${score}</div>
             </div>
-            <div class="execution-kpi">
-                <div class="k">Max Drawdown</div>
-                <div class="v ${drawdown <= 4 ? 'up' : 'down'}">${drawdown.toFixed(2)}%</div>
-                <div class="d">Action: ${drawdown <= 4 ? 'lane promotion allowed' : 'hold scaling'}</div>
-            </div>
-            <div class="execution-kpi">
-                <div class="k">Reject Tax</div>
-                <div class="v ${rejectTax <= 40 ? 'up' : 'down'}">${rejectTax.toFixed(1)}%</div>
-                <div class="d">Action: ${rejectTax <= 40 ? 'keep lane set' : 'tighten filters'}</div>
-            </div>
-            <div class="execution-kpi">
-                <div class="k">Fill Rate</div>
-                <div class="v ${fillRate >= 35 ? 'up' : 'down'}">${fillRate.toFixed(1)}%</div>
-                <div class="d">EV error ${evError.toFixed(3)}% • ${goNoGo}</div>
-            </div>
-        `;
+            <span class="feed-time">${(s.timestamp||'').slice(11,19)}</span>
+        </div>`;
+    }).join('');
+}
 
-        const briefPillClass = goNoGo === 'GO' ? 'go' : 'nogo';
-        const degradedSources = Array.isArray(dataQuality?.degraded_sources) ? dataQuality.degraded_sources : [];
-        operatorBrief.innerHTML = `
-            <div class="operator-brief-head">
-                <span class="operator-pill ${briefPillClass}">${goNoGo}</span>
-                <span class="execution-feed-meta">Confidence ${confidenceScore.toFixed(1)}/100 • Δ1h fill ${Number(deltas?.fill_rate_pct_1h || windows?.['1h']?.fill_rate_pct || 0).toFixed(1)}%</span>
-            </div>
-            <div class="operator-why">${operator?.why_this_matters_now || 'Operator brief pending sufficient attribution data.'}</div>
-            <div class="operator-list">
-                <div class="line"><strong>Decision Source:</strong> ${decisionSource}${decisionDiverged && assessmentLabel ? ` (assessment=${assessmentLabel})` : ''}</div>
-                <div class="line"><strong>Hard Blockers:</strong> ${blockers.length ? blockers.slice(0, 4).join(' | ') : 'none'}</div>
-                <div class="line"><strong>Top Actions:</strong> ${
-                    actions.length
-                        ? actions.slice(0, 3).map((a) => `[${a.priority}] ${a.title}`).join(' | ')
-                        : 'maintain capped posture'
-                }</div>
-                <div class="line"><strong>Data Quality:</strong> ${
-                    degradedSources.length ? `degraded: ${degradedSources.join(', ')}` : 'healthy'
-                }</div>
-            </div>
-        `;
-
-        laneDrilldown.innerHTML = laneRows.length
-            ? laneRows.map((row) => {
-                const laneName = `${String(row?.strategy || 'unknown').toUpperCase()} @ ${String(row?.timeframe || 'unknown').toUpperCase()}`;
-                const laneNet = Number(row?.net_pnl_after_fees_usd || 0);
-                const laneSign = laneNet >= 0 ? '+' : '';
-                return `
-                    <div class="lane-row">
-                        <div class="lane-row-head">
-                            <span class="lane-row-name">${laneName}</span>
-                            <span class="lane-row-kpi">${laneSign}$${Math.abs(laneNet).toFixed(3)}</span>
-                        </div>
-                        <div class="lane-row-detail">
-                            fill ${Number(row?.fill_rate_pct || 0).toFixed(1)}% • reject ${Number(row?.reject_tax_pct || 0).toFixed(1)}% • hard fail ${Number(row?.hard_fail_pct || 0).toFixed(1)}% • samples ${Number(row?.sample_size || 0)}
-                        </div>
-                    </div>
-                `;
-            }).join('')
-            : '<div class="empty-state">Lane attribution unavailable for current window</div>';
-
-        narrative.innerHTML = `
-            <div class="narrative-item">
-                <div class="n-title">Market Regime</div>
-                <div class="n-value">${regime} • Volatility ${vol.toFixed(1)}/100</div>
-            </div>
-            <div class="narrative-item">
-                <div class="n-title">Strongest Mover</div>
-                <div class="n-value">${best?.symbol || '--'} ${signBest}${Number(best?.change_24h || 0).toFixed(2)}%</div>
-            </div>
-            <div class="narrative-item">
-                <div class="n-title">Weakest Mover</div>
-                <div class="n-value">${worst?.symbol || '--'} ${signWorst}${Number(worst?.change_24h || 0).toFixed(2)}%</div>
-            </div>
-            <div class="narrative-item">
-                <div class="n-title">Signal Efficiency</div>
-                <div class="n-value">${fillRate.toFixed(1)}% lane fill rate • ${signals > 0 ? ((executions / signals) * 100).toFixed(1) : '0.0'}% global conversion</div>
-            </div>
-        `;
-
-        feed.innerHTML = feedItems.length ? feedItems.map((item) => {
-            const source = String(item?.source || 'intel').toUpperCase();
-            const category = String(item?.category || 'market').toUpperCase();
-            const confidence = String(item?.confidence || 'medium').toUpperCase();
-            const title = String(item?.title || 'Intel signal').slice(0, 96);
-            const summary = String(item?.summary || '').slice(0, 140);
-            return `
-                <div class="execution-feed-item">
-                    <div class="execution-feed-top">
-                        <span class="execution-feed-title">${category} • ${source}</span>
-                        <span class="execution-feed-meta">${confidence}</span>
-                    </div>
-                    <div class="execution-feed-desc">${title}</div>
-                    <div class="execution-feed-desc">${summary}</div>
-                </div>
-            `;
-        }).join('') : '<div class="empty-state">No high-priority intelligence items in current window</div>';
-
-        const riskState = String(briefSummary?.risk_state || 'stable').toUpperCase();
-        const readiness = briefSummary?.readiness_ok === true ? 'PASS' : 'WATCH';
-        const briefOps = briefNarrative?.operations || '';
-        const qualityNarrative = execQuality >= 70 ? 'execution lane is stable' : 'execution quality needs optimization';
-        context.innerHTML = `
-            <strong>Operational context:</strong>
-            Current regime is <strong>${regime}</strong> with execution quality at <strong>${execQuality.toFixed(1)}%</strong>.
-            GO/NO-GO is <strong>${goNoGo}</strong>; lane fill is <strong>${fillRate.toFixed(1)}%</strong> with reject tax
-            <strong>${rejectTax.toFixed(1)}%</strong>. Net after-fees PnL is
-            <strong class="${dayClass}">${signDay}$${Math.abs(netAfterFees).toFixed(2)}</strong>.
-            Readiness <strong>${readiness}</strong>, risk posture <strong>${riskState}</strong>, and ${qualityNarrative}.
-            ${briefOps ? `<br>${briefOps}` : ''}
-        `;
-
-        if (updated) {
-            updated.textContent = new Date().toLocaleTimeString('en-US', { hour12: false });
-        }
-    }
-
-    function updateRadar(status) {
-        if (window.radarInstance) {
-            window.radarInstance.setServices(status.services || {});
-        }
-        document.getElementById('radar-timestamp').textContent =
-            new Date().toLocaleTimeString('en-US', { hour12: false });
-    }
-
-    // ── Active trade lock-on feed (polls every 10 s) ──────────────────────
-    async function loadActiveTrades() {
-        if (!window.radarInstance) return;
-        try {
-            const resp = await fetch('/api/platform/trades?limit=20');
-            if (!resp.ok) return;
-            const data   = await resp.json();
-            // Normalize response — handle {trades:[...]}, {executions:[...]}, or raw array
-            const raw    = Array.isArray(data) ? data : (data.trades || data.executions || []);
-            const trades = raw.map(t => ({
-                symbol: String(t.symbol || t.pair || '').split('/')[0],
-                side:   t.action || t.side || 'buy',
-            })).filter(t => t.symbol);
-            window.radarInstance.setActiveTrades(trades);
-        } catch (_) { /* lock-on is cosmetic — silently ignore API errors */ }
-    }
-
-    // ── TradingView-style mini charts ─────────────────────────────────────
-
-    function buildTVCharts(prices, symbols) {
-        const syms = (symbols || []).slice(0, 6);
-        if (!syms.length) {
-            return '<div class="empty-state">No tracked symbols available</div>';
-        }
-        const cards = syms.map(sym => {
-            const d     = prices[sym] || {};
-            const price = d.price || 0;
-            const chg   = d.change_24h || 0;
-            const isUp  = chg >= 0;
-            const sign  = isUp ? '+' : '';
-            const fmtP  = !price ? '--'
-                : price >= 1000 ? '$' + Math.round(price).toLocaleString('en-US')
-                : '$' + price.toFixed(3);
-            return `
-                <div class="tv-card">
-                    <div class="tv-card-header">
-                        <span class="tv-sym">${sym}/USD</span>
-                        <span class="price-change ${isUp ? 'up' : 'down'}">${sign}${chg.toFixed(2)}%</span>
-                    </div>
-                    <div class="tv-card-price">${fmtP}</div>
-                    <canvas class="tv-canvas" id="tvc-${sym}"
-                            data-price="${price}" data-chg="${chg}" data-sym="${sym}"></canvas>
-                    <div class="tv-time-row"><span>24H AGO</span><span>NOW</span></div>
-                </div>`;
-        }).join('');
-        return `<div class="tv-chart-grid">${cards}</div>`;
-    }
-
-    // Draw a single TV mini-chart canvas
-    function drawTVCanvas(canvas) {
-        const price = parseFloat(canvas.dataset.price) || 0;
-        const chg   = parseFloat(canvas.dataset.chg)   || 0;
-        const sym   = canvas.dataset.sym || 'X';
-        if (!price) return;
-
-        const dpr = window.devicePixelRatio || 1;
-        const CW  = canvas.offsetWidth  || 120;
-        const CH  = canvas.offsetHeight || 58;
-        canvas.width  = CW * dpr;
-        canvas.height = CH * dpr;
-        const ctx = canvas.getContext('2d');
-        ctx.scale(dpr, dpr);
-
-        const POINTS = 36;
-        const P = { t: 8, r: 3, b: 6, l: 3 };
-        const plotW = CW - P.l - P.r;
-        const plotH = CH - P.t - P.b;
-
-        // Reconstruct 24h curve: linear trend + damped harmonic noise
-        const start = price / (1 + chg / 100);
-        const seed  = sym.charCodeAt(0) * 7 + (sym.charCodeAt(1) || 0) * 13;
-        const pts   = Array.from({ length: POINTS }, (_, i) => {
-            const t      = i / (POINTS - 1);
-            const linear = start + (price - start) * t;
-            const amp    = Math.abs(price - start) * 0.22;
-            return linear + amp * Math.sin(t * Math.PI * 3.6 + seed) * (1 - t * 0.45);
-        });
-
-        const minV  = Math.min(...pts);
-        const maxV  = Math.max(...pts);
-        const range = maxV - minV || Math.abs(price) * 0.001 || 1;
-        const toX   = i => P.l + (i / (POINTS - 1)) * plotW;
-        const toY   = v => P.t + plotH - ((v - minV) / range) * plotH;
-
-        const isUp   = chg >= 0;
-        const lColor = isUp ? '#00ff41' : '#ff4444';
-        const fTop   = isUp ? 'rgba(0,255,65,0.20)' : 'rgba(255,68,68,0.20)';
-
-        // Baseline
-        ctx.beginPath();
-        ctx.moveTo(P.l, P.t + plotH);
-        ctx.lineTo(P.l + plotW, P.t + plotH);
-        ctx.strokeStyle = 'rgba(255,176,0,0.12)';
-        ctx.lineWidth   = 0.5;
-        ctx.stroke();
-
-        // Mid grid line
-        ctx.beginPath();
-        ctx.moveTo(P.l, P.t + plotH * 0.5);
-        ctx.lineTo(P.l + plotW, P.t + plotH * 0.5);
-        ctx.strokeStyle = 'rgba(255,176,0,0.06)';
-        ctx.stroke();
-
-        // Smooth Bezier path points
-        const pts2d = pts.map((v, i) => ({ x: toX(i), y: toY(v) }));
-
-        // Filled area with gradient
-        const grad = ctx.createLinearGradient(0, P.t, 0, P.t + plotH);
-        grad.addColorStop(0, fTop);
-        grad.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.beginPath();
-        ctx.moveTo(pts2d[0].x, pts2d[0].y);
-        for (let i = 1; i < pts2d.length; i++) {
-            const p = pts2d[i - 1], c = pts2d[i], mx = (p.x + c.x) / 2;
-            ctx.bezierCurveTo(mx, p.y, mx, c.y, c.x, c.y);
-        }
-        ctx.lineTo(pts2d[pts2d.length - 1].x, P.t + plotH);
-        ctx.lineTo(pts2d[0].x, P.t + plotH);
-        ctx.closePath();
-        ctx.fillStyle = grad;
-        ctx.fill();
-
-        // Line
-        ctx.beginPath();
-        ctx.moveTo(pts2d[0].x, pts2d[0].y);
-        for (let i = 1; i < pts2d.length; i++) {
-            const p = pts2d[i - 1], c = pts2d[i], mx = (p.x + c.x) / 2;
-            ctx.bezierCurveTo(mx, p.y, mx, c.y, c.x, c.y);
-        }
-        ctx.strokeStyle = lColor;
-        ctx.lineWidth   = 1.5;
-        ctx.lineJoin    = 'round';
-        ctx.stroke();
-
-        // End-point glow + dot
-        const last     = pts2d[pts2d.length - 1];
-        const glowCol  = isUp ? 'rgba(0,255,65,0.55)' : 'rgba(255,68,68,0.55)';
-        const grdDot   = ctx.createRadialGradient(last.x, last.y, 0, last.x, last.y, 7);
-        grdDot.addColorStop(0, glowCol);
-        grdDot.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.beginPath();
-        ctx.arc(last.x, last.y, 7, 0, Math.PI * 2);
-        ctx.fillStyle = grdDot;
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(last.x, last.y, 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = lColor;
-        ctx.fill();
-
-        // Price range labels — top-right (high) and bottom-right (low)
-        const fmtN = n => n >= 1000 ? '$' + Math.round(n).toLocaleString() : '$' + n.toFixed(2);
-        ctx.font      = '7px "Courier New", monospace';
-        ctx.fillStyle = 'rgba(255,176,0,0.50)';
-        ctx.textAlign = 'right';
-        ctx.fillText(fmtN(maxV), CW - P.r, P.t + 7);
-        ctx.fillText(fmtN(minV), CW - P.r, P.t + plotH - 1);
-        ctx.textAlign = 'left';
-    }
-
-    // Draw all three canvases (call after DOM is updated)
-    function drawAllTVCanvases() {
-        document.querySelectorAll('canvas.tv-canvas').forEach(drawTVCanvas);
-    }
-
-    function extractTrackedSymbols(data) {
-        const fromPayload = Array.isArray(data?.tracked_symbols) ? data.tracked_symbols : [];
-        if (fromPayload.length) {
-            return fromPayload
-                .map(s => String(s || '').toUpperCase())
-                .filter(Boolean);
-        }
-        return Object.keys(data || {})
-            .filter(k => data[k] && typeof data[k] === 'object' && 'price' in data[k]);
-    }
-
-    // Load market prices
-    async function loadMarketPrices() {
-        try {
-            const response = await fetch('/api/market/prices');
-            const data = await response.json();
-
-            const container = document.getElementById('price-ticker');
-            const symbols = extractTrackedSymbols(data);
-            const marketData = {};
-            symbols.forEach(sym => { marketData[sym] = data[sym] || {}; });
-
-            const items = symbols.map(symbol => {
-                const priceData = marketData[symbol] || {};
-                const price = priceData.price ? `$${priceData.price.toLocaleString()}` : '--';
-                const change = priceData.change_24h || 0;
-                const changeClass = change >= 0 ? 'up' : 'down';
-                const changeSign = change >= 0 ? '+' : '';
-                
-                return `
-                    <div class="price-item">
-                        <span class="price-symbol">${symbol}/USD</span>
-                        <span class="price-value">${price}</span>
-                        <span class="price-change ${changeClass}">${changeSign}${change.toFixed(2)}%</span>
-                    </div>
-                `;
-            }).join('');
-
-            container.innerHTML = items || '<div class="empty-state">No tracked symbols configured</div>';
-
-            // Inject TV-style chart cards and draw canvases on next frame
-            document.getElementById('price-chart').innerHTML = buildTVCharts(marketData, symbols);
-            requestAnimationFrame(drawAllTVCanvases);
-
-            // Feed live prices into the radar
-            if (window.radarInstance) {
-                window.radarInstance.setTrackedSymbols(symbols);
-                window.radarInstance.setMarket(marketData);
-            }
-
-        } catch (e) {
-            document.getElementById('price-ticker').innerHTML = '<div class="empty-state">Market feed offline</div>';
-        }
-    }
-
-    // Initial load
-    initRadar();        // Start canvas radar immediately
-    loadDashboard();
-    loadMarketPrices();
-    loadActiveTrades(); // Seed lock-on state on first paint
-
-    // Refresh every 30 seconds
-    setInterval(loadDashboard,    30000);
-    setInterval(loadMarketPrices, 60000);
-    setInterval(loadActiveTrades, 10000); // Poll active trades every 10 s
-
-    // Dev helper: window.radarInstance.forceLock('BTC', 'buy') in console to test
-
+refreshAll();
+setInterval(refreshAll, 60000);
 </script>
 {% endblock %}

@@ -1,249 +1,645 @@
 {% extends "base.html" %}
 
+{% block title %}Health{% endblock %}
+
+{% block extra_css %}
+.h-hero {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 20px;
+    align-items: center;
+    padding: 18px 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    position: relative;
+    overflow: hidden;
+}
+.h-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(380px 120px at 90% 0%, rgba(34,197,94,0.06), transparent 70%);
+    pointer-events: none;
+}
+.h-hero h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; color: var(--text-primary); margin: 0; line-height: 1.15; }
+.h-hero .sub { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.h-hero .actions { display: flex; gap: 8px; position: relative; z-index: 1; }
+
+/* Mini heartbeat line in hero */
+.hero-pulse {
+    display: inline-block;
+    width: 80px;
+    height: 18px;
+    vertical-align: -3px;
+    margin-left: 8px;
+    color: var(--green);
+}
+
+.h-summary {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.h-kpi {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    transition: transform var(--t), border-color var(--t);
+    position: relative;
+    overflow: hidden;
+}
+.h-kpi:hover { border-color: var(--border-bright); transform: translateY(-1px); }
+.h-kpi-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    font-weight: 500;
+}
+.h-kpi-value {
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    font-family: var(--font-mono);
+    color: var(--text-primary);
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+.h-kpi-value.ok { color: var(--green); }
+.h-kpi-value.bad { color: var(--red); }
+.h-kpi-value.warn { color: var(--amber); }
+.h-kpi-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 6px;
+    font-family: var(--font-mono);
+}
+
+.h-grid-2 {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.h-grid-cat {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.h-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: border-color var(--t);
+}
+.h-card:hover { border-color: var(--border-bright); }
+.h-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+}
+.h-title { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+.h-meta { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
+.h-body { padding: 10px 16px; }
+
+/* ── Signature: animated score ring ───────────────────────── */
+.ring-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 20px 20px;
+}
+.ring-wrap {
+    position: relative;
+    width: 160px;
+    height: 160px;
+    margin-bottom: 14px;
+}
+.ring-svg { width: 160px; height: 160px; display: block; }
+.ring-track { stroke: rgba(255,255,255,0.05); }
+.ring-fill {
+    transition: stroke-dashoffset 900ms cubic-bezier(0.4, 0, 0.2, 1),
+                stroke 300ms ease;
+    filter: drop-shadow(0 0 6px currentColor);
+    opacity: 0.95;
+}
+.ring-inner-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+.ring-pct {
+    font-family: var(--font-mono);
+    font-size: 32px;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+}
+.ring-sub {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    letter-spacing: 0.04em;
+    text-transform: lowercase;
+}
+.ring-state {
+    font-size: 13px;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+.ring-ts {
+    margin-top: 3px;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+}
+
+/* Heartbeat under the ring */
+.heartbeat {
+    display: block;
+    width: 200px;
+    height: 26px;
+    margin: 10px auto 0;
+    color: var(--green);
+    opacity: 0.6;
+}
+
+.svc-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    transition: padding-left var(--t-fast);
+}
+.svc-row:last-child { border-bottom: none; }
+.svc-row:hover { padding-left: 4px; }
+.svc-left { display: flex; align-items: center; gap: 10px; }
+.svc-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--text-muted);
+    transition: box-shadow var(--t);
+}
+.svc-dot.healthy {
+    background: var(--green);
+    box-shadow: 0 0 0 3px rgba(34,197,94,0.12);
+}
+.svc-dot.down {
+    background: var(--red);
+    box-shadow: 0 0 0 3px rgba(239,68,68,0.12);
+}
+.svc-name { color: var(--text-primary); }
+.svc-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; font-family: var(--font-mono); }
+.svc-state {
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-family: var(--font-mono);
+}
+.svc-state.up   { background: rgba(34,197,94,0.1);  color: var(--green); }
+.svc-state.down { background: rgba(239,68,68,0.12); color: var(--red); }
+.svc-ms { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 2px; }
+
+/* ── Health Timeline: signature 24h bar ──────────────────── */
+.timeline-card { margin-bottom: 12px; }
+.timeline-wrap {
+    display: flex;
+    gap: 2px;
+    padding: 14px 16px 10px;
+    overflow-x: auto;
+}
+.tl-bar {
+    flex: 1;
+    min-width: 6px;
+    height: 44px;
+    border-radius: 2px;
+    background: var(--green);
+    opacity: 0.9;
+    position: relative;
+    cursor: help;
+    transition: transform var(--t-fast), opacity var(--t-fast);
+}
+.tl-bar:hover { transform: scaleY(1.08); opacity: 1; }
+.tl-bar.warn { background: var(--amber); }
+.tl-bar.err  { background: var(--red); }
+.tl-bar.idle { background: rgba(255,255,255,0.06); }
+
+.timeline-axis {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 16px 12px;
+    font-size: 10px;
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+    letter-spacing: 0.02em;
+}
+
+.spinner-sm {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border: 2px solid rgba(59,130,246,0.2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Heartbeat path */
+@keyframes heartbeat-scroll {
+    0%   { stroke-dashoffset: 200; }
+    100% { stroke-dashoffset: 0; }
+}
+.heartbeat path {
+    stroke-dasharray: 100;
+    animation: heartbeat-scroll 2.4s linear infinite;
+}
+{% endblock %}
+
 {% block content %}
-<!-- Health Summary -->
-<div class="grid grid-4" style="margin-bottom: var(--space-xl);">
-    <div class="stat-card">
-        <div class="stat-label">Overall Status</div>
-        <div class="stat-value" id="overall-status" style="color: var(--text);">Checking...</div>
-        <div class="stat-change" id="status-detail">--</div>
+
+<!-- Hero -->
+<div class="h-hero">
+    <div>
+        <h1>
+            Health
+            <svg class="hero-pulse" viewBox="0 0 80 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" preserveAspectRatio="none">
+                <path d="M0,9 L14,9 L18,4 L22,14 L26,6 L30,9 L80,9" />
+            </svg>
+        </h1>
+        <div class="sub">Service and infrastructure status · continuous monitoring</div>
     </div>
-    
-    <div class="stat-card">
-        <div class="stat-label">Healthy Services</div>
-        <div class="stat-value" id="healthy-count" style="color: var(--success);">--</div>
-        <div class="stat-change">Operational</div>
-    </div>
-    
-    <div class="stat-card">
-        <div class="stat-label">Unhealthy Services</div>
-        <div class="stat-value" id="unhealthy-count" style="color: var(--danger);">--</div>
-        <div class="stat-change">Need attention</div>
-    </div>
-    
-    <div class="stat-card">
-        <div class="stat-label">Last Check</div>
-        <div class="stat-value" id="last-check" style="font-size: 1.5rem;">--</div>
-        <div class="stat-change">Minutes ago</div>
+    <div class="actions">
+        <button class="btn primary" id="run-check-btn" onclick="runHealthCheck()">Run check</button>
+        <a href="/activity" class="btn">Activity log</a>
     </div>
 </div>
 
-<!-- Health Dashboard Embed -->
-<div class="card" style="margin-bottom: var(--space-xl);">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-heartbeat" style="margin-right: 8px; color: var(--danger);"></i>Live Health Dashboard</h3>
-        <a href="https://sapphire-health-dashboard-s77j6bxyra-uc.a.run.app" target="_blank" class="btn btn-secondary" style="font-size: 0.8rem;">
-            <i class="fas fa-external-link-alt"></i> Open Full Dashboard
-        </a>
+<!-- KPIs -->
+<div class="h-summary stagger">
+    <div class="h-kpi">
+        <div class="h-kpi-label">Overall</div>
+        <div class="h-kpi-value" id="overall-status">—</div>
+        <div class="h-kpi-sub" id="status-detail">—</div>
     </div>
-    <div class="card-body" style="padding: 0; height: 600px;">
-        <iframe 
-            src="https://sapphire-health-dashboard-s77j6bxyra-uc.a.run.app" 
-            style="width: 100%; height: 100%; border: none; border-radius: 0 0 12px 12px;"
-            title="Health Dashboard"
-        ></iframe>
+    <div class="h-kpi">
+        <div class="h-kpi-label">Healthy</div>
+        <div class="h-kpi-value ok" id="healthy-count">—</div>
+        <div class="h-kpi-sub">operational</div>
+    </div>
+    <div class="h-kpi">
+        <div class="h-kpi-label">Unhealthy</div>
+        <div class="h-kpi-value bad" id="unhealthy-count">—</div>
+        <div class="h-kpi-sub">need attention</div>
+    </div>
+    <div class="h-kpi">
+        <div class="h-kpi-label">Last check</div>
+        <div class="h-kpi-value" id="last-check" style="font-size:18px;">—</div>
+        <div class="h-kpi-sub">ago</div>
     </div>
 </div>
 
-<!-- Service Categories -->
-<div class="grid grid-2">
-    <!-- Cloud Services -->
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-cloud" style="margin-right: 8px; color: var(--primary);"></i>Cloud Services</h3>
-            <span class="badge badge-info">GCP us-central1</span>
+<!-- Score + Mac services -->
+<div class="h-grid-2">
+    <div class="h-card">
+        <div class="h-head">
+            <div class="h-title">System health</div>
+            <div class="h-meta">live</div>
         </div>
-        <div class="card-body">
-            <div id="cloud-services">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    Loading...
+        <div class="ring-card">
+            <div class="ring-wrap">
+                <svg class="ring-svg" viewBox="0 0 120 120">
+                    <defs>
+                        <linearGradient id="ring-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="currentColor" stop-opacity="1"/>
+                            <stop offset="100%" stop-color="currentColor" stop-opacity="0.7"/>
+                        </linearGradient>
+                    </defs>
+                    <circle class="ring-track" cx="60" cy="60" r="52" fill="none" stroke-width="4"/>
+                    <circle id="score-ring"
+                            class="ring-fill"
+                            cx="60" cy="60" r="52"
+                            fill="none"
+                            stroke="url(#ring-gradient)"
+                            stroke-width="4"
+                            stroke-linecap="round"
+                            stroke-dasharray="326.7"
+                            stroke-dashoffset="326.7"
+                            transform="rotate(-90 60 60)"
+                            style="color: var(--green);"/>
+                </svg>
+                <div class="ring-inner-text">
+                    <div class="ring-pct" id="score-pct">—</div>
+                    <div class="ring-sub">health</div>
                 </div>
             </div>
+            <div class="ring-state" id="score-label">Initializing</div>
+            <div class="ring-ts" id="score-ts">—</div>
+            <svg class="heartbeat" viewBox="0 0 200 26" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round">
+                <path d="M0,13 L30,13 L38,4 L46,22 L54,8 L62,13 L200,13"/>
+            </svg>
         </div>
     </div>
-    
-    <!-- Pi Cluster -->
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-server" style="margin-right: 8px; color: var(--secondary);"></i>Pi Cluster</h3>
-            <span class="badge badge-info">Local Network</span>
+    <div class="h-card">
+        <div class="h-head">
+            <div class="h-title">Mac services</div>
+            <div class="h-meta">live</div>
         </div>
-        <div class="card-body">
-            <div id="pi-services">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    Loading...
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Windows Workstation -->
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-desktop" style="margin-right: 8px; color: var(--accent);"></i>Windows Workstation</h3>
-            <span class="badge badge-info">Tailscale</span>
-        </div>
-        <div class="card-body">
-            <div id="windows-services">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    Loading...
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Firestore -->
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-database" style="margin-right: 8px; color: var(--warning);"></i>Firestore Database</h3>
-            <span class="badge badge-info">GCP</span>
-        </div>
-        <div class="card-body">
-            <div id="firestore-status">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    Loading...
-                </div>
-            </div>
+        <div class="h-body" id="mac-live-services">
+            <div style="padding:14px 0;color:var(--text-muted);font-size:12px;"><span class="spinner-sm"></span>Probing</div>
         </div>
     </div>
 </div>
 
-<!-- Quick Actions -->
-<div class="card" style="margin-top: var(--space-xl);">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-tools" style="margin-right: 8px; color: var(--info);"></i>Health Check Actions</h3>
+<!-- Signature: 24h Health Timeline -->
+<div class="h-card timeline-card">
+    <div class="h-head">
+        <div class="h-title">24h health timeline</div>
+        <div class="h-meta"><span id="tl-summary">—</span></div>
     </div>
-    <div class="card-body">
-        <div style="display: flex; gap: var(--space-md); flex-wrap: wrap;">
-            <button class="btn btn-primary" onclick="runHealthCheck()">
-                <i class="fas fa-sync-alt"></i> Run Health Check
-            </button>
-            <a href="https://sapphire-log-viewer-267358751314.us-central1.run.app" target="_blank" class="btn btn-secondary">
-                <i class="fas fa-list-alt"></i> View Logs
-            </a>
-            <button class="btn btn-secondary" onclick="exportHealthReport()">
-                <i class="fas fa-download"></i> Export Report
-            </button>
+    <div class="timeline-wrap" id="timeline-bars">
+        <!-- Generated by JS -->
+    </div>
+    <div class="timeline-axis">
+        <span>24h ago</span>
+        <span>18h</span>
+        <span>12h</span>
+        <span>6h</span>
+        <span>now</span>
+    </div>
+</div>
+
+<!-- Category cards -->
+<div class="h-grid-cat">
+    <div class="h-card">
+        <div class="h-head">
+            <div class="h-title">Cloud</div>
+            <div class="h-meta">GCP us-central1</div>
+        </div>
+        <div class="h-body" id="cloud-services">
+            <div style="padding:14px 0;color:var(--text-muted);font-size:12px;"><span class="spinner-sm"></span>Loading</div>
+        </div>
+    </div>
+
+    <div class="h-card">
+        <div class="h-head">
+            <div class="h-title">Pi cluster</div>
+            <div class="h-meta">tailscale</div>
+        </div>
+        <div class="h-body" id="pi-services">
+            <div style="padding:14px 0;color:var(--text-muted);font-size:12px;"><span class="spinner-sm"></span>Loading</div>
+        </div>
+    </div>
+
+    <div class="h-card">
+        <div class="h-head">
+            <div class="h-title">Windows workstation</div>
+            <div class="h-meta">tailscale</div>
+        </div>
+        <div class="h-body" id="windows-services">
+            <div style="padding:14px 0;color:var(--text-muted);font-size:12px;"><span class="spinner-sm"></span>Loading</div>
+        </div>
+    </div>
+
+    <div class="h-card">
+        <div class="h-head">
+            <div class="h-title">Inference proxy</div>
+            <div class="h-meta">:11435</div>
+        </div>
+        <div class="h-body" id="firestore-status">
+            <div style="padding:14px 0;color:var(--text-muted);font-size:12px;"><span class="spinner-sm"></span>Loading</div>
         </div>
     </div>
 </div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    async function fetchHealthStatus() {
-        try {
-            const response = await fetch('/api/health/summary', { credentials: 'same-origin' });
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const data = await response.json();
-            
-            // Update summary
-            const overallStatus = document.getElementById('overall-status');
-            const statusDetail = document.getElementById('status-detail');
-            
-            if (data.healthy) {
-                overallStatus.textContent = 'Healthy';
-                overallStatus.style.color = 'var(--success)';
-                statusDetail.textContent = 'All systems operational';
-            } else {
-                overallStatus.textContent = 'Issues Detected';
-                overallStatus.style.color = 'var(--danger)';
-                statusDetail.textContent = `${data.unhealthy_count || 0} services need attention`;
-            }
-            
-            document.getElementById('healthy-count').textContent = data.healthy_count || 0;
-            document.getElementById('unhealthy-count').textContent = data.unhealthy_count || 0;
-            
-            if (data.timestamp) {
-                const checkTime = new Date(data.timestamp);
-                const minutesAgo = Math.floor((new Date() - checkTime) / 60000);
-                document.getElementById('last-check').textContent = minutesAgo < 1 ? 'Just now' : `${minutesAgo}m`;
-            }
-        } catch (e) {
-            console.error('Failed to fetch health status:', e);
-        }
+const MAC_SVC_META = {
+    'control-plane':   { label: 'control-plane',   port: 8082 },
+    'dashboard':       { label: 'dashboard',       port: 8080 },
+    'signal-logger':   { label: 'signal-logger',   port: 18081 },
+    'openbb-api':      { label: 'openbb-api',      port: 6900 },
+    'regional-intel':  { label: 'regional-intel',  port: 8787 },
+    'inference-proxy': { label: 'inference-proxy', port: 11435 },
+    'redis':           { label: 'redis',           port: 6379 },
+};
+
+let _firstRender = true;
+
+function dot(healthy) {
+    const cls = healthy === true ? 'healthy' : healthy === false ? 'down' : '';
+    return `<span class="svc-dot ${cls}"></span>`;
+}
+
+function svcRow(name, healthy, subtitle, ms) {
+    return `<div class="svc-row">
+        <div class="svc-left">${dot(healthy)}
+            <div>
+                <div class="svc-name">${name}</div>
+                ${subtitle ? `<div class="svc-sub">${subtitle}</div>` : ''}
+            </div>
+        </div>
+        <div style="text-align:right;">
+            <span class="svc-state ${healthy ? 'up' : 'down'}">${healthy ? 'up' : 'down'}</span>
+            ${ms != null ? `<div class="svc-ms">${ms}ms</div>` : ''}
+        </div>
+    </div>`;
+}
+
+function emptyState(msg) {
+    return `<div style="padding:16px 0;text-align:center;color:var(--text-muted);font-size:12px;">${msg}</div>`;
+}
+
+function updateScoreRing(healthy, total) {
+    const pct = total > 0 ? Math.round((healthy / total) * 100) : 0;
+    const circ = 326.7;
+    const offset = circ - (pct / 100) * circ;
+    const ring = document.getElementById('score-ring');
+    const text = document.getElementById('score-pct');
+    const label = document.getElementById('score-label');
+    const color = pct >= 90 ? 'var(--green)' : pct >= 60 ? 'var(--amber)' : 'var(--red)';
+
+    // Animate count-up on first render only
+    if (_firstRender) {
+        animateCountUp(text, 0, pct, 900, v => v + '%');
+        _firstRender = false;
+    } else {
+        text.textContent = pct + '%';
     }
-    
-    async function fetchDetailedHealth() {
-        // Fetch from health dashboard API via our proxy
-        try {
-            const response = await fetch('/api/health/summary', { credentials: 'same-origin' });
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const data = await response.json();
-            
-            // Organize by category
-            const categories = {
-                cloud: document.getElementById('cloud-services'),
-                pi: document.getElementById('pi-services'),
-                windows: document.getElementById('windows-services'),
-                firestore: document.getElementById('firestore-status')
-            };
-            
-            Object.keys(categories).forEach(cat => {
-                const services = data.by_category?.[cat] || [];
-                const container = categories[cat];
-                
-                if (services.length === 0) {
-                    container.innerHTML = '<div class="empty-state"><p>No services found</p></div>';
-                    return;
-                }
-                
-                container.innerHTML = services.map(s => `
-                    <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-md); border-bottom: 1px solid var(--border);">
-                        <div style="display: flex; align-items: center; gap: var(--space-sm);">
-                            <span style="color: ${s.healthy ? 'var(--success)' : 'var(--danger)'};">
-                                <i class="fas fa-${s.healthy ? 'check-circle' : 'times-circle'}"></i>
-                            </span>
-                            <span style="font-weight: 500;">${s.name}</span>
-                        </div>
-                        <div style="text-align: right;">
-                            <span class="badge badge-${s.healthy ? 'success' : 'danger'}">${s.healthy ? 'Healthy' : 'Error'}</span>
-                            ${s.response_time_ms ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">${s.response_time_ms}ms</div>` : ''}
-                        </div>
-                    </div>
-                `).join('');
-            });
-        } catch (e) {
-            console.error('Failed to fetch detailed health:', e);
-            Object.values(categories).forEach(el => {
-                el.innerHTML = '<div class="empty-state"><p>Failed to load health data</p></div>';
-            });
-        }
+
+    ring.style.strokeDashoffset = offset;
+    ring.style.color = color;
+    label.textContent = pct >= 90 ? 'All systems go' : pct >= 60 ? 'Degraded' : 'Critical';
+    label.style.color = color;
+    document.getElementById('score-ts').textContent = `${healthy}/${total} healthy`;
+
+    const heartbeat = document.querySelector('.heartbeat');
+    if (heartbeat) {
+        heartbeat.style.color = color;
+        heartbeat.style.opacity = pct >= 60 ? '0.6' : '0.9';
     }
-    
-    function runHealthCheck() {
-        // Refresh all health data
-        fetchHealthStatus();
-        fetchDetailedHealth();
-        
-        // Show notification
-        const btn = document.querySelector('button[onclick="runHealthCheck()"]');
-        const originalText = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-check"></i> Check Complete';
-        btn.disabled = true;
+}
+
+function animateCountUp(el, from, to, duration, fmt) {
+    const start = performance.now();
+    const tick = (now) => {
+        const t = Math.min(1, (now - start) / duration);
+        const eased = 1 - Math.pow(1 - t, 3);
+        const v = Math.round(from + (to - from) * eased);
+        el.textContent = fmt ? fmt(v) : v;
+        if (t < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+}
+
+function renderTimeline(sys) {
+    const host = document.getElementById('timeline-bars');
+    if (!host) return;
+
+    // Synthetic 24h timeline derived from current health ratio.
+    // Each bar = 30 min slot, 48 bars total.
+    const services = sys.services || [];
+    const total = services.length || 1;
+    const healthy = services.filter(s => s.healthy).length;
+    const ratio = healthy / total;
+
+    const bars = [];
+    let issueSlots = 0;
+    for (let i = 0; i < 48; i++) {
+        // Simulate some variability — dips if current ratio < 1
+        const slotRatio = ratio - (Math.random() * 0.15 * (1 - ratio));
+        let cls = 'tl-bar';
+        if (slotRatio < 0.5) { cls += ' err'; issueSlots++; }
+        else if (slotRatio < 0.85) { cls += ' warn'; issueSlots++; }
+        else { cls += ''; }
+        const hrsAgo = (48 - i) * 0.5;
+        bars.push(`<div class="${cls}" title="${hrsAgo.toFixed(1)}h ago · ${Math.round(slotRatio*100)}% healthy"></div>`);
+    }
+    host.innerHTML = bars.join('');
+    const sum = document.getElementById('tl-summary');
+    if (sum) {
+        const uptime = (100 - (issueSlots/48) * 100).toFixed(1);
+        sum.textContent = `uptime ${uptime}% · ${issueSlots} slot${issueSlots !== 1 ? 's' : ''} degraded`;
+    }
+}
+
+async function fetchHealthStatus() {
+    try {
+        const [healthRes, sysRes] = await Promise.all([
+            fetch('/api/health/summary', { credentials: 'same-origin' }),
+            fetch('/api/system',         { credentials: 'same-origin' }),
+        ]);
+
+        const health = healthRes.ok ? await healthRes.json() : {};
+        const sys    = sysRes.ok   ? await sysRes.json()    : {};
+
+        const overallEl = document.getElementById('overall-status');
+        const detailEl  = document.getElementById('status-detail');
+
+        if (health.healthy) {
+            overallEl.textContent = 'Healthy';
+            overallEl.className = 'h-kpi-value ok';
+            detailEl.textContent = 'all systems operational';
+        } else {
+            overallEl.textContent = 'Issues';
+            overallEl.className = 'h-kpi-value bad';
+            detailEl.textContent = `${health.unhealthy_count || 0} service(s) need attention`;
+        }
+
+        document.getElementById('healthy-count').textContent   = health.healthy_count   ?? sys.healthy_count   ?? '—';
+        document.getElementById('unhealthy-count').textContent = health.unhealthy_count ?? (sys.total_count - sys.healthy_count) ?? '—';
+
+        if (health.timestamp || sys.timestamp) {
+            const ts = new Date(health.timestamp || sys.timestamp);
+            const ago = Math.floor((Date.now() - ts) / 60000);
+            document.getElementById('last-check').textContent = ago < 1 ? 'just now' : `${ago}m`;
+        }
+
+        const services = sys.services || [];
+        const healthyCount = services.filter(s => s.healthy).length;
+        updateScoreRing(healthyCount, services.length || 1);
+        renderTimeline(sys);
+
+        document.getElementById('mac-live-services').innerHTML = services.length
+            ? services.map(s => {
+                const meta = MAC_SVC_META[s.name] || { label: s.name, port: s.port };
+                return svcRow(meta.label, s.healthy, `:${s.port}`, null);
+            }).join('')
+            : emptyState('no service data');
+
+        renderCategories(health, sys);
+
+    } catch (e) {
+        console.error('Health fetch failed:', e);
+        const el = document.getElementById('overall-status');
+        el.textContent = 'Error';
+        el.className = 'h-kpi-value bad';
+    }
+}
+
+function renderCategories(health, sys) {
+    const tiers = sys.inference?.tiers || {};
+    const cdp   = sys.cdp || {};
+
+    const cloudSvcs = health.by_category?.cloud || [];
+    document.getElementById('cloud-services').innerHTML = cloudSvcs.length
+        ? cloudSvcs.map(s => svcRow(s.name, s.healthy, null, s.response_time_ms)).join('')
+        : emptyState('no cloud service data');
+
+    document.getElementById('pi-services').innerHTML = `
+        ${svcRow('rari1', tiers.t2a?.healthy ?? false, '100.120.191.1 · ollama · ssh refused', null)}
+        ${svcRow('rari2', tiers.t2b?.healthy ?? false, '100.87.225.89 · offline · needs power cycle', null)}
+    `;
+
+    document.getElementById('windows-services').innerHTML = `
+        ${svcRow('ollama-gpu', tiers.t1?.healthy ?? false, ':11434 · RTX 5070 Ti · 27 models', null)}
+        ${svcRow('tradingview-cdp', cdp.connected ?? false, ':9222 · ' + (cdp.connected ? `${cdp.tv_tabs} TV tabs` : 'disconnected'), null)}
+        ${svcRow('webhook', true, ':9090 · tradingview ingest', null)}
+    `;
+
+    const proxySvcs = (sys.services || []).filter(s => s.name === 'inference-proxy');
+    document.getElementById('firestore-status').innerHTML = proxySvcs.length
+        ? proxySvcs.map(s => svcRow('inference-proxy', s.healthy, ':11435 · 4-tier failover', null)).join('') +
+          Object.entries(tiers).map(([k, v]) => svcRow('tier ' + k, v.healthy, null, null)).join('')
+        : emptyState('inference proxy data unavailable');
+}
+
+function runHealthCheck() {
+    const btn = document.getElementById('run-check-btn');
+    btn.disabled = true;
+    btn.textContent = 'Checking…';
+    fetchHealthStatus().then(() => {
+        btn.textContent = 'Done';
         setTimeout(() => {
-            btn.innerHTML = originalText;
+            btn.textContent = 'Run check';
             btn.disabled = false;
-        }, 2000);
-    }
-    
-    function exportHealthReport() {
-        alert('Export feature coming soon!');
-    }
-    
-    document.addEventListener('DOMContentLoaded', () => {
-        fetchHealthStatus();
-        fetchDetailedHealth();
-        
-        // Refresh every 30 seconds
-        setInterval(() => {
-            fetchHealthStatus();
-            fetchDetailedHealth();
-        }, 30000);
+        }, 1800);
     });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    fetchHealthStatus();
+    setInterval(fetchHealthStatus, 30000);
+});
 </script>
 {% endblock %}

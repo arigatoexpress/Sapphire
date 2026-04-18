@@ -1,17 +1,156 @@
 {% extends 'base.html' %}
 
+{% block title %}Production Readiness{% endblock %}
+
+{% block extra_css %}
+.gate-pipeline {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    margin-bottom: var(--space-xl);
+    overflow-x: auto;
+}
+
+.gate-card {
+    flex: 1;
+    min-width: 160px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 0;
+    padding: 20px 16px;
+    position: relative;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    text-align: center;
+}
+
+.gate-card:first-child { border-radius: var(--radius-lg) 0 0 var(--radius-lg); }
+.gate-card:last-child  { border-radius: 0 var(--radius-lg) var(--radius-lg) 0; border-right: 1px solid var(--border); }
+
+.gate-card.pass {
+    border-color: rgba(34,197,94,0.4);
+    box-shadow: inset 0 0 30px rgba(34,197,94,0.05), 0 0 1px rgba(34,197,94,0.4);
+}
+
+.gate-card.fail {
+    border-color: rgba(239,68,68,0.4);
+    box-shadow: inset 0 0 30px rgba(239,68,68,0.05);
+}
+
+.gate-card.checking {
+    border-color: rgba(59,130,246,0.2);
+}
+
+.gate-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    flex-shrink: 0;
+    background: var(--bg-card);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 16px;
+}
+
+.gate-arrow.pass { color: var(--green); border-color: rgba(34,197,94,0.4); }
+
+.gate-label {
+    font-size: 0.65rem;
+    letter-spacing: .1em;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+.gate-name {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.gate-score {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 6px;
+}
+
+.gate-icon {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 10px;
+    font-size: 18px;
+}
+
+.gate-icon.pass    { background: rgba(34,197,94,0.15);   color: var(--green); }
+.gate-icon.fail    { background: rgba(239,68,68,0.12); color: var(--red); }
+.gate-icon.checking{ background: rgba(59,130,246,0.1);   color: var(--accent); }
+
+.check-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(0,0,0,0.15);
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+}
+{% endblock %}
+
 {% block content %}
-<div class="page-header">
+<!-- Page Header -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-xl);">
     <div>
-        <h1 class="page-title">Production Readiness</h1>
-        <p class="page-subtitle">Launch gates, blockers, and live environment confidence for final production go-live.</p>
+        <h1 style="font-size:1.4rem;font-weight:700;color:var(--text-primary);margin:0 0 4px;">Production Readiness</h1>
+        <p style="color:var(--text-muted);font-size:.85rem;margin:0;">Launch gates, blockers, and live environment confidence.</p>
     </div>
     <button class="btn btn-primary" onclick="refreshReadiness()">
-        <i class="fas fa-sync-alt"></i> Refresh
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><polyline points="23,4 23,10 17,10"/><polyline points="1,20 1,14 7,14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+        Refresh
     </button>
 </div>
 
-<div class="grid grid-cols-4" style="margin-bottom: var(--space-xl);">
+<!-- Gate Pipeline Visualization -->
+<div class="gate-pipeline" id="gate-pipeline">
+    <!-- Gate A -->
+    <div class="gate-card checking" id="gate-card-a">
+        <div class="gate-label">Gate A</div>
+        <div class="gate-icon checking" id="gate-icon-a">▶</div>
+        <div class="gate-name">Contracts</div>
+        <div class="gate-score" id="gate-score-a">Checking…</div>
+    </div>
+    <div class="gate-arrow" id="gate-arrow-ab">›</div>
+    <!-- Gate B -->
+    <div class="gate-card checking" id="gate-card-b">
+        <div class="gate-label">Gate B</div>
+        <div class="gate-icon checking" id="gate-icon-b">▶</div>
+        <div class="gate-name">Cloud</div>
+        <div class="gate-score" id="gate-score-b">Checking…</div>
+    </div>
+    <div class="gate-arrow" id="gate-arrow-bc">›</div>
+    <!-- Gate C -->
+    <div class="gate-card checking" id="gate-card-c">
+        <div class="gate-label">Gate C</div>
+        <div class="gate-icon checking" id="gate-icon-c">▶</div>
+        <div class="gate-name">Edge Fleet</div>
+        <div class="gate-score" id="gate-score-c">Checking…</div>
+    </div>
+    <div class="gate-arrow" id="gate-arrow-ready">›</div>
+    <!-- Final Status -->
+    <div class="gate-card checking" id="gate-card-ready" style="flex:0.6;min-width:120px;">
+        <div class="gate-label">Status</div>
+        <div class="gate-icon checking" id="gate-icon-ready">?</div>
+        <div class="gate-name" id="gate-ready-label">HOLD</div>
+        <div class="gate-score" id="gate-ready-ts">--</div>
+    </div>
+</div>
+
+<!-- KPI Row -->
+<div class="grid grid-4" style="margin-bottom: var(--space-xl);">
     <div class="stat-card">
         <div class="stat-label">Overall</div>
         <div class="stat-value" id="overall-status">--</div>
@@ -34,41 +173,57 @@
     </div>
 </div>
 
-<div class="grid grid-cols-2" style="margin-bottom: var(--space-xl);">
+<!-- Gate Detail + Blockers -->
+<div class="grid grid-2" style="margin-bottom: var(--space-xl);">
     <div class="card">
         <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-list-check" style="margin-right: 8px; color: var(--primary);"></i>Gate Status</h3>
+            <h3 class="card-title">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;color:var(--accent);vertical-align:middle"><polyline points="9,11 12,14 22,4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+                Gate Status
+            </h3>
         </div>
         <div class="card-body">
-            <div id="gates-list" style="display: grid; gap: var(--space-sm);"></div>
+            <div id="gates-list" style="display:grid;gap:8px;"></div>
         </div>
     </div>
 
     <div class="card">
         <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-triangle-exclamation" style="margin-right: 8px; color: var(--warning);"></i>Current Blockers</h3>
+            <h3 class="card-title">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;color:var(--amber);vertical-align:middle"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                Current Blockers
+            </h3>
         </div>
         <div class="card-body">
-            <div id="blockers-list" style="display: grid; gap: var(--space-sm);"></div>
+            <div id="blockers-list" style="display:grid;gap:8px;"></div>
         </div>
     </div>
 </div>
 
-<div class="card" style="margin-bottom: var(--space-xl);">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-network-wired" style="margin-right: 8px; color: var(--info);"></i>Cloud Service Matrix</h3>
+<!-- Cloud Matrix + Contracts -->
+<div class="grid grid-2">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;color:var(--accent);vertical-align:middle"><path d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z"/></svg>
+                Cloud Service Matrix
+            </h3>
+        </div>
+        <div class="card-body">
+            <div id="cloud-matrix" style="display:grid;gap:8px;"></div>
+        </div>
     </div>
-    <div class="card-body">
-        <div id="cloud-matrix" style="display: grid; gap: var(--space-sm);"></div>
-    </div>
-</div>
 
-<div class="card">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-clipboard-check" style="margin-right: 8px; color: var(--success);"></i>Contract Checks</h3>
-    </div>
-    <div class="card-body">
-        <div id="contract-matrix" style="display: grid; gap: var(--space-sm);"></div>
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;color:var(--green);vertical-align:middle"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>
+                Contract Checks
+            </h3>
+        </div>
+        <div class="card-body">
+            <div id="contract-matrix" style="display:grid;gap:8px;"></div>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -76,85 +231,130 @@
 {% block extra_js %}
 <script>
     function statusBadge(ok) {
-        return ok ? '<span class="badge badge-success">PASS</span>' : '<span class="badge badge-danger">FAIL</span>';
+        return ok
+            ? '<span class="badge badge-success">PASS</span>'
+            : '<span class="badge badge-danger">FAIL</span>';
     }
 
-    function setGate(el, metaEl, gate) {
-        const ok = gate && gate.ok;
-        document.getElementById(el).textContent = ok ? 'PASS' : 'FAIL';
-        document.getElementById(el).style.color = ok ? 'var(--success)' : 'var(--danger)';
+    function setGateKpi(el, metaEl, gate) {
+        const ok = gate?.ok;
+        document.getElementById(el).textContent     = ok ? 'PASS' : 'FAIL';
+        document.getElementById(el).style.color     = ok ? 'var(--green)' : 'var(--red)';
         document.getElementById(metaEl).textContent = gate ? `${gate.pass}/${gate.total}` : '--';
     }
 
+    function updateGateCard(id, gate) {
+        const ok = gate?.ok;
+        const cls = ok ? 'pass' : 'fail';
+        const card = document.getElementById(`gate-card-${id}`);
+        const icon = document.getElementById(`gate-icon-${id}`);
+        const score = document.getElementById(`gate-score-${id}`);
+        card.className = `gate-card ${cls}`;
+        icon.className = `gate-icon ${cls}`;
+        icon.textContent = ok ? '✓' : '✗';
+        score.textContent = gate ? `${gate.pass}/${gate.total} checks` : '--';
+    }
+
+    function updateArrow(id, pass) {
+        const arrow = document.getElementById(id);
+        arrow.className = `gate-arrow ${pass ? 'pass' : ''}`;
+    }
+
+    function checkRow(name, ok, sub) {
+        return `<div class="check-row">
+            <div>
+                <div>${name}</div>
+                ${sub ? `<div style="font-size:.75rem;color:var(--text-muted);margin-top:2px;">${sub}</div>` : ''}
+            </div>
+            ${statusBadge(ok)}
+        </div>`;
+    }
+
     async function refreshReadiness() {
-        const response = await fetch('/api/production/readiness', { credentials: 'same-origin' });
-        const payload = await response.json();
+        try {
+            const res = await fetch('/api/production/readiness', { credentials: 'same-origin' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const payload = await res.json();
 
-        const overall = document.getElementById('overall-status');
-        const overallMeta = document.getElementById('overall-meta');
-        overall.textContent = payload.overall_ok ? 'READY' : 'HOLD';
-        overall.style.color = payload.overall_ok ? 'var(--success)' : 'var(--warning)';
-        overallMeta.textContent = payload.timestamp;
+            // Overall
+            const overallOk = !!payload.overall_ok;
+            document.getElementById('overall-status').textContent = overallOk ? 'READY' : 'HOLD';
+            document.getElementById('overall-status').style.color = overallOk ? 'var(--green)' : 'var(--amber)';
+            document.getElementById('overall-meta').textContent   = payload.timestamp
+                ? new Date(payload.timestamp).toLocaleTimeString() : '--';
 
-        setGate('gate-a', 'gate-a-meta', payload.gates.A_contracts);
-        setGate('gate-b', 'gate-b-meta', payload.gates.B_cloud);
-        setGate('gate-c', 'gate-c-meta', payload.gates.C_edge);
+            // Gate KPIs
+            const gates = payload.gates || {};
+            setGateKpi('gate-a', 'gate-a-meta', gates.A_contracts);
+            setGateKpi('gate-b', 'gate-b-meta', gates.B_cloud);
+            setGateKpi('gate-c', 'gate-c-meta', gates.C_edge);
 
-        const gatesList = document.getElementById('gates-list');
-        gatesList.innerHTML = Object.entries(payload.gates).map(([name, gate]) => `
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-sm) var(--space-md);background:var(--bg-glass);border-radius:8px;">
-                <div>
-                    <div style="font-weight:600;">${name}</div>
-                    <div style="font-size:0.8rem;color:var(--text-muted);">${gate.pass}/${gate.total}</div>
-                </div>
-                ${statusBadge(gate.ok)}
-            </div>
-        `).join('');
+            // Gate pipeline cards
+            updateGateCard('a', gates.A_contracts);
+            updateGateCard('b', gates.B_cloud);
+            updateGateCard('c', gates.C_edge);
 
-        const blockers = document.getElementById('blockers-list');
-        if (!payload.blockers || payload.blockers.length === 0) {
-            blockers.innerHTML = '<div class="empty-state"><p>No blockers. System is ready for launch gates.</p></div>';
-        } else {
-            blockers.innerHTML = payload.blockers.map((b) => `
-                <div style="padding:var(--space-sm) var(--space-md);background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:8px;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;">
-                        <strong>${b.name}</strong>
-                        <span class="badge badge-danger">${b.gate}</span>
-                    </div>
-                    <div style="font-size:0.85rem;color:var(--text-secondary);margin-top:4px;">${b.error || 'unhealthy'}</div>
-                </div>
-            `).join('');
+            // Arrows light up if gate passed
+            updateArrow('gate-arrow-ab', gates.A_contracts?.ok);
+            updateArrow('gate-arrow-bc', gates.B_cloud?.ok);
+            updateArrow('gate-arrow-ready', gates.C_edge?.ok);
+
+            // Final ready card
+            const readyCard = document.getElementById('gate-card-ready');
+            const readyIcon = document.getElementById('gate-icon-ready');
+            const readyLabel = document.getElementById('gate-ready-label');
+            readyCard.className = `gate-card ${overallOk ? 'pass' : 'fail'}`;
+            readyIcon.className = `gate-icon ${overallOk ? 'pass' : 'fail'}`;
+            readyIcon.textContent = overallOk ? '🚀' : '⏸';
+            readyLabel.textContent = overallOk ? 'READY' : 'HOLD';
+            readyLabel.style.color = overallOk ? 'var(--green)' : 'var(--amber)';
+            document.getElementById('gate-ready-ts').textContent = overallOk
+                ? 'All gates pass' : `${payload.blockers?.length || 0} blockers`;
+
+            // Gates list
+            document.getElementById('gates-list').innerHTML =
+                Object.entries(gates).map(([name, gate]) => checkRow(name, gate?.ok, `${gate?.pass ?? 0}/${gate?.total ?? 0} checks`)).join('');
+
+            // Blockers
+            const blockersEl = document.getElementById('blockers-list');
+            if (!payload.blockers?.length) {
+                blockersEl.innerHTML = `<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:.83rem;">
+                    <div style="font-size:1.4rem;margin-bottom:8px;">✓</div>
+                    No blockers — all gates clear.
+                </div>`;
+            } else {
+                blockersEl.innerHTML = payload.blockers.map(b => `
+                    <div style="padding:10px 14px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.25);border-radius:8px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                            <strong style="font-size:.85rem;">${b.name}</strong>
+                            <span class="badge badge-danger" style="font-size:.68rem;">${b.gate}</span>
+                        </div>
+                        <div style="font-size:.78rem;color:var(--text-muted);">${b.error || 'unhealthy'}</div>
+                    </div>`).join('');
+            }
+
+            // Cloud matrix
+            document.getElementById('cloud-matrix').innerHTML =
+                Object.entries(payload.cloud?.services || {}).map(([name, svc]) =>
+                    checkRow(name, !!svc.healthy, `${svc.status || '?'} · ${svc.latency_ms != null ? svc.latency_ms + 'ms' : '--'}`)
+                ).join('');
+
+            // Contract matrix
+            document.getElementById('contract-matrix').innerHTML =
+                (payload.contract_checks || []).map(c =>
+                    checkRow(c.name, !!c.healthy, `${c.status || 'ok'} · ${c.latency_ms != null ? c.latency_ms + 'ms' : '--'}`)
+                ).join('');
+
+        } catch (err) {
+            document.getElementById('overall-status').textContent = 'ERROR';
+            document.getElementById('overall-status').style.color = 'var(--red)';
+            document.getElementById('overall-meta').textContent   = String(err);
         }
-
-        const cloud = document.getElementById('cloud-matrix');
-        cloud.innerHTML = Object.entries(payload.cloud.services || {}).map(([name, svc]) => `
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-sm) var(--space-md);background:var(--bg-glass);border-radius:8px;">
-                <div>
-                    <div style="font-weight:600;">${name}</div>
-                    <div style="font-size:0.8rem;color:var(--text-muted);">${svc.status} · ${svc.latency_ms || '--'} ms</div>
-                </div>
-                ${statusBadge(!!svc.healthy)}
-            </div>
-        `).join('');
-
-        const contracts = document.getElementById('contract-matrix');
-        contracts.innerHTML = (payload.contract_checks || []).map((c) => `
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-sm) var(--space-md);background:var(--bg-glass);border-radius:8px;">
-                <div>
-                    <div style="font-weight:600;">${c.name}</div>
-                    <div style="font-size:0.8rem;color:var(--text-muted);">${c.status || 'ok'} · ${c.latency_ms || '--'} ms</div>
-                </div>
-                ${statusBadge(!!c.healthy)}
-            </div>
-        `).join('');
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        refreshReadiness().catch((err) => {
-            document.getElementById('overall-status').textContent = 'ERROR';
-            document.getElementById('overall-status').style.color = 'var(--danger)';
-            document.getElementById('overall-meta').textContent = String(err);
-        });
+        refreshReadiness();
+        setInterval(refreshReadiness, 60000);
     });
 </script>
 {% endblock %}

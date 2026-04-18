@@ -1,0 +1,443 @@
+{% extends "base.html" %}
+
+{% block title %}Infrastructure{% endblock %}
+
+{% block extra_css %}
+/* System page uses new design tokens inherited from base.html */
+{% endblock %}
+
+{% block content %}
+<!-- Summary Stats -->
+<div class="grid grid-4" style="margin-bottom: var(--space-xl);">
+    <div class="stat-card">
+        <div class="stat-label">Services</div>
+        <div class="stat-value" id="svc-healthy" style="color: var(--text-muted);">--/--</div>
+        <div class="stat-change" id="svc-status">Loading...</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Inference Proxy</div>
+        <div class="stat-value" id="proxy-status" style="color: var(--text-muted);">--</div>
+        <div class="stat-change">localhost:11435</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Active Tier</div>
+        <div class="stat-value" id="active-tier" style="font-size: 1.2rem; color: var(--cyan);">--</div>
+        <div class="stat-change" id="active-tier-detail">--</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Last Refresh</div>
+        <div class="stat-value" id="last-refresh" style="font-size: 1.3rem; color: var(--text-secondary);">--</div>
+        <div class="stat-change"><span id="refresh-countdown">30</span>s next refresh</div>
+    </div>
+</div>
+
+<!-- Inference Tiers -->
+<div class="card" style="margin-bottom: var(--space-xl);">
+    <div class="card-header">
+        <span class="card-title">Inference mesh</span>
+        <span style="font-size: 0.75rem; color: var(--text-muted);">4-tier failover</span>
+    </div>
+    <div class="card-body">
+        <div id="tiers-container">
+            <div class="loading">Probing tiers...</div>
+        </div>
+    </div>
+</div>
+
+<!-- Two-column: Services + Metrics -->
+<div class="grid grid-2" style="margin-bottom: var(--space-xl);">
+    <!-- Service Status -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Mac services</span>
+            <span id="svc-badge" style="font-size: 0.75rem; color: var(--text-muted);">7 services</span>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            <div id="services-container">
+                <div class="loading">Checking services...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Inference Metrics -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Session metrics</span>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">requests / latency</span>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            <div id="metrics-container">
+                <div class="loading">Fetching metrics...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Pi Vitals -->
+<div class="card" style="margin-bottom: var(--space-xl);">
+    <div class="card-header">
+        <span class="card-title">Pi cluster vitals</span>
+        <span style="font-size: 0.75rem; color: var(--text-muted);">tailscale mesh</span>
+    </div>
+    <div class="card-body">
+        <div class="grid grid-2">
+            <div id="rari1-container">
+                <div class="loading">Checking rari1...</div>
+            </div>
+            <div id="rari2-container">
+                <div class="loading">Checking rari2...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CDP + Recent Signals row -->
+<div class="grid grid-2" style="margin-bottom: var(--space-xl);">
+
+    <!-- CDP / TradingView MCP -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">TradingView MCP</span>
+            <span id="cdp-badge" style="font-size:0.75rem; color: var(--text-muted);">CDP · :9222</span>
+        </div>
+        <div class="card-body" id="cdp-container">
+            <div class="loading">Checking CDP...</div>
+        </div>
+    </div>
+
+    <!-- Recent Signals -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Recent signals</span>
+            <a href="/signals" style="font-size:0.75rem; color: var(--accent-bright); text-decoration:none;">View all →</a>
+        </div>
+        <div class="card-body" style="padding:0;" id="signals-container">
+            <div class="loading">Loading signals...</div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Errors -->
+<div class="card">
+    <div class="card-header">
+        <span class="card-title">Recent errors</span>
+        <button class="btn small" onclick="refreshAll()">Refresh</button>
+    </div>
+    <div class="card-body">
+        <div id="errors-container" class="terminal-output">
+            <div class="loading">Scanning logs...</div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const TIERS = [
+    { key: 'windows-gpu', label: 'T1',  name: 'Windows GPU',  detail: '100.71.10.48:11434 · RTX 5070 Ti · 27 models', speed: '232' },
+    { key: 'pi-rari1',    label: 'T2a', name: 'Pi rari1',     detail: '100.120.191.1:11434 · ARM · 4 models',           speed: '~40' },
+    { key: 'pi-rari2',    label: 'T2b', name: 'Pi rari2',     detail: '100.87.225.89:11434 · ARM · 4 models',           speed: '~40' },
+    { key: 'mac-local',   label: 'T3',  name: 'Mac Local',    detail: '127.0.0.1:11434 · CPU inference · 6 models',     speed: '~12' },
+    { key: 'kimi-cloud',  label: 'T4',  name: 'Kimi Cloud',   detail: 'api.moonshot.cn · non-sensitive only',           speed: 'API' },
+];
+
+let countdown = 30;
+
+async function fetchSystem() {
+    const resp = await fetch('/api/system', { credentials: 'same-origin' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return resp.json();
+}
+
+function statusDot(healthy) {
+    const color = healthy ? 'var(--green)' : 'var(--red)';
+    const label = healthy ? 'online' : 'offline';
+    return `<span style="color:${color}; font-weight:700;">${label}</span>`;
+}
+
+function renderTiers(data) {
+    const endpoints = data.inference?.endpoints || {};
+    const tiers_info = data.inference?.tiers || {};
+
+    let html = '<div style="display:flex;flex-direction:column;gap:0;">';
+    let firstHealthy = null;
+
+    TIERS.forEach((t, idx) => {
+        const status = endpoints[t.key] || 'unknown';
+        const healthy = status === 'healthy';
+        if (healthy && !firstHealthy) firstHealthy = t;
+
+        const color   = healthy ? 'var(--green)' : status === 'unknown' ? 'var(--text-muted)' : 'var(--red)';
+        const bgColor = healthy ? 'rgba(34,197,94,0.04)' : 'transparent';
+        const pulse   = '';
+
+        html += `
+        <div style="display:flex;align-items:stretch;position:relative;">
+            <!-- Tier label column -->
+            <div style="width:52px;display:flex;flex-direction:column;align-items:center;padding:14px 0 0;flex-shrink:0;">
+                <div style="width:28px;height:28px;border-radius:50%;border:2px solid ${color};background:${bgColor};
+                            display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;
+                            color:${color};font-family:var(--font-mono);${pulse}">${t.label}</div>
+                ${idx < TIERS.length-1 ? `<div style="width:2px;flex:1;min-height:16px;background:linear-gradient(${color}44,rgba(48,54,61,0.4));margin-top:4px;"></div>` : ''}
+            </div>
+            <!-- Card -->
+            <div style="flex:1;border:1px solid ${healthy ? 'rgba(34,197,94,0.25)' : status==='unknown' ? 'var(--border)' : 'rgba(239,68,68,0.2)'};
+                        border-left:3px solid ${color};border-radius:6px;padding:10px 14px;margin:4px 0;
+                        background:${bgColor};${!healthy && status!=='unknown' ? 'box-shadow:0 0 0 1px rgba(239,68,68,0.08)inset;' : ''}">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;">
+                    <span style="font-size:13px;font-weight:600;color:var(--text-primary);">${t.name}</span>
+                    <span style="font-size:11px;font-weight:700;color:${color};letter-spacing:.05em;">${status.toUpperCase()}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                    <span style="font-size:11px;color:var(--text-muted);">${t.detail}</span>
+                    <span style="font-size:11px;font-family:var(--font-mono);color:var(--accent-bright);background:rgba(59,130,246,0.08);padding:1px 6px;border-radius:3px;">${t.speed} tok/s</span>
+                </div>
+            </div>
+        </div>`;
+    });
+
+    html += '</div>';
+    document.getElementById('tiers-container').innerHTML = html;
+
+    // Update summary
+    document.getElementById('proxy-status').textContent =
+        Object.values(endpoints).some(s => s === 'healthy') ? 'UP' : 'DOWN';
+    document.getElementById('proxy-status').style.color =
+        Object.values(endpoints).some(s => s === 'healthy') ? 'var(--green)' : 'var(--red)';
+    if (firstHealthy) {
+        document.getElementById('active-tier').textContent = firstHealthy.label.split('  ')[0].trim();
+        document.getElementById('active-tier-detail').textContent = firstHealthy.label.split('  ').slice(1).join(' ').trim();
+    }
+}
+
+function renderServices(data) {
+    const services = data.services || [];
+    const healthy = services.filter(s => s.healthy).length;
+    const total = services.length;
+
+    document.getElementById('svc-healthy').textContent = `${healthy}/${total}`;
+    document.getElementById('svc-status').textContent = healthy === total ? 'All operational' : `${total - healthy} down`;
+    document.getElementById('svc-healthy').style.color = healthy === total ? 'var(--green)' : 'var(--red)';
+
+    let html = '';
+    services.forEach(s => {
+        const color = s.healthy ? 'var(--green)' : 'var(--red)';
+        const border = s.healthy ? 'var(--border-dim)' : 'rgba(255,111,158,0.15)';
+        html += `
+        <div style="display:flex; align-items:center; justify-content:space-between;
+                    padding: var(--space-sm) var(--space-md); border-bottom: 1px solid ${border};">
+            <div style="display:flex; align-items:center; gap: var(--space-sm);">
+                <span style="color:${color};">${s.healthy ? '▶' : '✕'}</span>
+                <span style="font-size:0.82rem; color: var(--text-primary);">${s.name}</span>
+            </div>
+            <div style="text-align:right;">
+                <span style="font-size:0.72rem; color:${color};">${s.healthy ? 'UP' : 'DOWN'}</span>
+                <span style="font-size:0.68rem; color:var(--text-muted); margin-left:8px;">:${s.port}</span>
+            </div>
+        </div>`;
+    });
+
+    document.getElementById('services-container').innerHTML = html || '<div class="empty-state"><div class="empty-state-title">No services found</div></div>';
+}
+
+function renderMetrics(data) {
+    const metrics = data.inference?.metrics || {};
+    const TIER_KEYS = ['windows-gpu', 'pi-rari1', 'pi-rari2', 'mac-local', 'kimi-cloud'];
+    const TIER_LABELS = {
+        'windows-gpu': 'T1 GPU', 'pi-rari1': 'T2a rari1',
+        'pi-rari2': 'T2b rari2', 'mac-local': 'T3 Mac', 'kimi-cloud': 'T4 Kimi',
+    };
+
+    const active = TIER_KEYS.filter(k => (metrics[k]?.requests || 0) > 0);
+
+    if (active.length === 0) {
+        document.getElementById('metrics-container').innerHTML =
+            '<div class="empty-state" style="padding: var(--space-xl); text-align:center; color: var(--text-muted);">[ NO REQUESTS THIS SESSION ]</div>';
+        return;
+    }
+
+    let html = '';
+    active.forEach(k => {
+        const m = metrics[k] || {};
+        const reqs = m.requests || 0;
+        const ok = m.success || 0;
+        const avg = m.avg_ms || 0;
+        const rate = reqs ? Math.round((ok / reqs) * 100) : 0;
+        const color = rate >= 90 ? 'var(--green)' : rate >= 70 ? 'var(--amber)' : 'var(--red)';
+
+        html += `
+        <div style="padding: var(--space-sm) var(--space-md); border-bottom: 1px solid var(--border-dim);">
+            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                <span style="font-family:var(--font-header); font-size:0.82rem; color: var(--accent-bright);">${TIER_LABELS[k]}</span>
+                <span style="font-size:0.72rem; color:${color};">${rate}% ok</span>
+            </div>
+            <div style="display:flex; gap: var(--space-lg); font-size:0.72rem; color: var(--text-muted);">
+                <span>${reqs} req</span>
+                <span>${ok} success</span>
+                <span>avg ${avg}ms</span>
+            </div>
+        </div>`;
+    });
+
+    document.getElementById('metrics-container').innerHTML = html;
+}
+
+function renderPiVitals(data) {
+    const endpoints = data.inference?.endpoints || {};
+
+    function piCard(id, label, ip, models) {
+        const status = endpoints[id] || 'unknown';
+        const healthy = status === 'healthy';
+        const color = healthy ? 'var(--green)' : 'var(--red)';
+        return `
+        <div style="border: 1px solid ${healthy ? 'rgba(98,255,64,0.2)' : 'rgba(255,111,158,0.15)'};
+                    padding: var(--space-md);">
+            <div style="display:flex; align-items:center; gap: var(--space-sm); margin-bottom: var(--space-sm);">
+                <span style="color:${color}; font-size:1.2rem;">◈</span>
+                <span style="font-family:var(--font-header); color:${color};">${label}</span>
+                <span style="margin-left:auto; color:${color}; font-size:0.8rem;">${status.toUpperCase()}</span>
+            </div>
+            <div style="font-size:0.72rem; color:var(--text-muted); line-height:1.8;">
+                <div>IP  ${ip}</div>
+                <div>Models  ${models}</div>
+                <div>Port  :11434 · Ollama</div>
+            </div>
+        </div>`;
+    }
+
+    document.getElementById('rari1-container').innerHTML = piCard(
+        'pi-rari1', 'rari1', '100.120.191.1',
+        'nemotron-mini:4b / smollm2:1.7b / qwen2.5:0.5b'
+    );
+    document.getElementById('rari2-container').innerHTML = piCard(
+        'pi-rari2', 'rari2', '100.87.225.89',
+        'nemotron-mini:4b / smollm2:1.7b / qwen2.5:0.5b'
+    );
+}
+
+function renderErrors(data) {
+    const services = data.services || [];
+    const down = services.filter(s => !s.healthy);
+
+    if (down.length === 0) {
+        document.getElementById('errors-container').innerHTML =
+            '<div class="line" style="color: var(--green);">[ ALL SERVICES NOMINAL — NO ERRORS DETECTED ]</div>';
+        return;
+    }
+
+    const ts = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    let html = down.map(s => `
+        <div class="line">
+            <span class="timestamp">${ts}</span>
+            <span class="level-error">ERROR</span>
+            <span style="margin-left: 8px; color: var(--text-primary);">${s.name}:${s.port} — health check failed</span>
+        </div>`).join('');
+
+    document.getElementById('errors-container').innerHTML = html;
+}
+
+function updateRefreshTime() {
+    const now = new Date().toISOString().replace('T', ' ').slice(11, 19);
+    document.getElementById('last-refresh').textContent = now;
+}
+
+function renderCDP(data) {
+    const cdp = data.cdp || {};
+    const connected = cdp.connected;
+    const badge = document.getElementById('cdp-badge');
+    badge.textContent = connected ? `${cdp.tabs} tabs · ${cdp.tv_tabs} TV` : 'DISCONNECTED';
+    badge.style.color = connected ? 'var(--green)' : 'var(--red)';
+
+    if (connected) {
+        document.getElementById('cdp-container').innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span style="color:var(--green);font-size:1.3rem;">◆</span>
+                <div>
+                    <div style="font-size:13px;font-weight:600;color:var(--green);">CDP Connected</div>
+                    <div style="font-size:11px;color:var(--text-muted);">100.71.10.48:9222 · Chrome DevTools Protocol</div>
+                </div>
+            </div>
+            <div style="display:flex;gap:24px;font-size:12px;">
+                <div><span style="color:var(--text-muted);">Total tabs</span> <span style="font-family:var(--font-mono);color:var(--text-primary);margin-left:6px;">${cdp.tabs}</span></div>
+                <div><span style="color:var(--text-muted);">TradingView tabs</span> <span style="font-family:var(--font-mono);color:var(--accent-bright);margin-left:6px;">${cdp.tv_tabs}</span></div>
+            </div>
+            ${cdp.tv_tabs === 0 ? `<div style="font-size:11px;color:var(--amber);">⚠ No TradingView tabs open — Pine Script tools unavailable</div>` : ''}
+        </div>`;
+    } else {
+        document.getElementById('cdp-container').innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span style="color:var(--red);font-size:1.3rem;">◇</span>
+                <div>
+                    <div style="font-size:13px;font-weight:600;color:var(--red);">CDP Unreachable</div>
+                    <div style="font-size:11px;color:var(--text-muted);">100.71.10.48:9222</div>
+                </div>
+            </div>
+            ${cdp.error ? `<div style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono);">${cdp.error}</div>` : ''}
+            <div style="font-size:11px;color:var(--text-secondary);padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:4px;border:1px solid var(--border);">
+                Start TradingView Desktop on Windows with<br>
+                <code style="color:var(--accent-bright);">--remote-debugging-port=9222</code>
+            </div>
+        </div>`;
+    }
+}
+
+function renderRecentSignals(data) {
+    const signals = (data.signals?.latest || []);
+    if (signals.length === 0) {
+        document.getElementById('signals-container').innerHTML =
+            '<div style="padding:16px;font-size:12px;color:var(--text-muted);text-align:center;">No signals today</div>';
+        return;
+    }
+    const rows = signals.map(s => {
+        const dir = (s.direction || s.action || '').toLowerCase();
+        const color = dir.includes('long') || dir.includes('buy') ? 'var(--green)'
+                    : dir.includes('short') || dir.includes('sell') ? 'var(--red)' : 'var(--amber)';
+        const routing = (s.routing || '').replace(/_/g, ' ');
+        return `
+        <div style="display:flex;align-items:center;justify-content:space-between;
+                    padding:9px 14px;border-bottom:1px solid var(--border);">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span style="font-weight:700;color:${color};min-width:36px;">${s.symbol || '--'}</span>
+                <span style="font-size:11px;color:${color};">${(s.action || s.direction || '--').toUpperCase()}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:14px;">
+                <span style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono);">${s.score != null ? parseFloat(s.score).toFixed(0) : '--'}</span>
+                <span style="font-size:10px;color:var(--text-muted);">${routing}</span>
+                <span style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono);">${(s.timestamp||'').slice(11,16)}</span>
+            </div>
+        </div>`;
+    }).join('');
+    document.getElementById('signals-container').innerHTML = rows;
+}
+
+async function refreshAll() {
+    try {
+        const data = await fetchSystem();
+        renderTiers(data);
+        renderServices(data);
+        renderMetrics(data);
+        renderPiVitals(data);
+        renderErrors(data);
+        renderCDP(data);
+        renderRecentSignals(data);
+        updateRefreshTime();
+        countdown = 30;
+    } catch (e) {
+        console.error('System fetch failed:', e);
+        document.getElementById('proxy-status').textContent = 'ERR';
+        document.getElementById('proxy-status').style.color = 'var(--red)';
+    }
+}
+
+// Countdown ticker
+setInterval(() => {
+    countdown = Math.max(0, countdown - 1);
+    document.getElementById('refresh-countdown').textContent = countdown;
+    if (countdown === 0) refreshAll();
+}, 1000);
+
+document.addEventListener('DOMContentLoaded', refreshAll);
+</script>
+{% endblock %}
