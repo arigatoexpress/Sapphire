@@ -6,8 +6,8 @@ Autonomous trading + project management + intelligence system. Telegram-first, a
 
 ```bash
 # Test
-pytest tests/unit/ --tb=short -q           # 1,251 tests (use /usr/local/bin/python3 on Mac)
-pytest plugins/claw-sapphire/tests/ -q     # 13 plugin tests
+pytest tests/unit/ --tb=short -q           # 1,273 passing + 1 skipped (use /usr/local/bin/python3 on Mac)
+pytest plugins/claw-sapphire/tests/ -q     # 25 plugin tests (budget, router, state, technical_analysis)
 
 # Lint
 ruff check .                               # Uses pyproject.toml rules (E501 ignored)
@@ -57,7 +57,7 @@ python3 plugins/claw-sapphire/tools/budget.py < /dev/null
 | `data/benchmarks/kadima-labs/` | data | Kadima Labs AI benchmark (v1-v3, 70 charts, 30 JSON) |
 | `infra/` | infra | Cloudflare Tunnel, Pi systemd, Windows setup |
 
-## Infrastructure (2026-04-13)
+## Infrastructure (verified 2026-04-18)
 
 **Mac (100.67.171.79) — commander, all services:**
 - control-plane:8082, dashboard:8080, signal-logger:18081
@@ -67,13 +67,13 @@ python3 plugins/claw-sapphire/tools/budget.py < /dev/null
 - regional-intel:8787 (vote monitor + intelligence console)
 
 **Windows PC (100.71.10.48) — GPU + services:**
-- Ollama:11434 (27 models, RTX 5070 Ti 16GB VRAM, OLLAMA_HOST=0.0.0.0)
+- Ollama:11434 (28 models, RTX 5070 Ti 16GB VRAM, OLLAMA_HOST=0.0.0.0)
 - OLLAMA_MODELS=D:\OllamaModels set at Machine scope (required — SYSTEM service doesn't inherit user env)
 - webhook:9090, telemetry-dashboard:3001, OllamaServe (auto-start)
 - SSH: `ssh aribs@100.71.10.48`
 
-**Pi rari1 (100.120.191.1) — ONLINE** (Tailscale): Ollama:11434 responding (nemotron-mini, smollm2:1.7b, qwen2.5:0.5b). SSH port 22 refused — needs physical access to start sshd.
-**Pi rari2 (100.87.225.89) — OFFLINE**: needs power cycle.
+**Pi rari1 (100.120.191.1) — ONLINE** (Tailscale): Ollama:11434 serves nemotron-mini, smollm2:1.7b, qwen2.5:0.5b, gemma2:2b. SSH port 22 refused — needs physical access to start sshd. Proxy routing disabled by default (`PI_RARI1_ENABLED=0`); set to `1` after the Pi is stable.
+**Pi rari2 (100.87.225.89) — ONLINE** (as of 2026-04-18): Ollama:11434 serves nemotron-mini, gemma2:2b, smollm2:1.7b, qwen2.5:0.5b. Previously marked OFFLINE in the proxy — `inference-proxy/app.py:148` comment + CLAUDE.md were stale. `PI_RARI2_ENABLED=1` to route.
 
 ## Agent Workflow Discipline (Karpathy Principles)
 
@@ -113,42 +113,32 @@ Source: `andrej-karpathy-skills` — `~/Code/Sapphire/lib/core/src/sapphire_core
 | `~/Code/cyber-threat-bot` | arigatoexpress/cyber-threat-bot | Threat intel: CISA KEV, NVD, MITRE ATT&CK, revenue synthesis |
 | `~/Code/hermes-agent` | NousResearch/hermes-agent | Conversational AI framework (Telegram bot) |
 
-## Sapphire Plugin (v0.4.0 — 21 tools)
+## Sapphire Plugin (v0.3.0 — 30 tools on disk, 7 registered in plugin.json)
 
-`plugins/claw-sapphire/tools/` — all invoked via stdin JSON:
-- `dispatch` — multi-tier routing (T0 Nemotron → T3 Claude)
-- `verify` — post-fix lint + test verification
-- `budget` — real token tracking per tier
-- `state` — persistent factory memory (backoff on failed fixes)
-- `status` — mesh device + inference status
-- `notify` — Telegram alerts via NemotronRariBot (`python3 notify.py "msg" --priority p0`)
-- `market` — unified OpenBB + TradingView data
-- `threat_intel` — CISA KEV + NVD + MITRE ATT&CK (via ~/Code/cyber-threat-bot)
-- `starred_repos` — GitHub starred/trending repo synergy finder
-- `vote_monitor` — ve Vote escrow bridge (Blackhole, Supernova, Full Sail)
-- `health_check` — 20-point ecosystem health (services, repos, data, inference)
-- `watchdog` — smart Telegram alerts on failures/recoveries (deduped, tracks state)
-- `predict` — 6-factor TA predictions (RSI, MACD, BB, MA, ATR, volume). 58% accuracy.
-- `signal_generator` — autonomous TA scanner → signals + Telegram. Triggers on RSI/MACD/BB.
-- `paper_trader` — $100K paper portfolio, ATR stops, Sortino/drawdown metrics
-- `crypto_portfolio` — unified view (Cointracker + paper trader + live prices)
-- `research` — nightly trading research + prediction scoring
-- `digest` — intelligence digest
-- `backtest` — Pine Script backtesting
-- `qa_aware_factory` — QA-driven factory prioritization
-- `events` — system event logging
+`plugins/claw-sapphire/plugin.json` declares **7** as Claude Code tools: `sapphire_dispatch`, `sapphire_verify`, `sapphire_budget`, `sapphire_state`, `sapphire_status`, `sapphire_notify`, `sapphire_market`. The other 23 are standalone scripts invoked via stdin JSON (by hermes skills, scheduled tasks, other tools). plugin.json version reads 0.3.0; update to 0.4.0 when registering more.
 
-`plugins/claw-sapphire/lib/` — shared libraries:
+`plugins/claw-sapphire/tools/` — all 30 invoked via stdin JSON:
+- **Registered (7):** `dispatch`, `verify`, `budget`, `state`, `status`, `notify`, `market`
+- **Intel / analytics (9):** `threat_intel`, `starred_repos`, `vote_monitor`, `health_check`, `watchdog`, `digest`, `research`, `events`, `qa_aware_factory`
+- **Trading (9):** `predict` (6-factor TA, **verified 58% overall, BTC 75%, ETH 62%, SOL 38% on 24 scored predictions**), `predict_kronos` (Kronos-base forecasting; `kronos_predict.py` is a legacy duplicate), `signal_generator`, `paper_trader`, `crypto_portfolio`, `backtest`, `macro_data` (crashes without FRED key), `trading_brain`, `market_sentiment`
+- **Other (5):** `lumo` + `lumo_research` (Lumo-T5 cyber research), `tho_intel`, `lead_engine`, `kronos_predict` (legacy — prefer `predict_kronos`)
+
+**Orphan tools: `trading_brain`, `lead_engine`, `tho_intel`, `macro_data`, `lumo` (not imported by any service or scheduled task — invoke directly or wire them).**
+
+`plugins/claw-sapphire/lib/` — 10 shared modules (was "4 libs" in old CLAUDE.md):
 - `technical_analysis.py` — RSI, MACD, Bollinger, MA, ATR, volume (from OpenBB OHLCV)
 - `nemotron.py` — Ollama client with failover (proxy → GPU → Mac)
 - `quant_analysis.py` — S/R detection, correlation, trend strength
+- `router.py`, `runtime_policy.py`, `token_governor.py` — dispatch policy + budget
+- `sensitivity_classifier.py` — PII/secret regex (used by dispatch, not proxy)
+- `market_data.py`, `nvidia_agents.py` — shared market + NeMo helpers
 
 ## Inference Proxy (localhost:11435)
 
 4-tier failover (threaded server — concurrent requests safe). hermes-agent and all plugin tools talk to this.
 - **T1 Windows GPU** (100.71.10.48:11434): native `/api/chat` (NOT `/v1/` — returns empty on Windows). ~0.4s.
-- **T2 Pi rari1** (100.120.191.1:11434): nemotron-mini, smollm2, qwen2.5:0.5b. PI_OLLAMA_ENABLED=1.
-- **T2 Pi rari2** (100.87.225.89:11434): offline. PI_OLLAMA_ENABLED=1 (will activate when rari2 back online).
+- **T2 Pi rari1** (100.120.191.1:11434): nemotron-mini, smollm2, qwen2.5:0.5b, gemma2:2b. `PI_RARI1_ENABLED=1`. Currently failing all proxy probes (0/4 success in `/metrics`) despite responding to direct curl — routing config bug; investigate before relying on it.
+- **T2 Pi rari2** (100.87.225.89:11434): ONLINE as of 2026-04-18 (5 models). `PI_RARI2_ENABLED=1`. Proxy comment at `app.py:148` still says "rari2 is offline" — stale.
 - **T3 Mac local** (127.0.0.1:11434): `/v1/chat/completions` passthrough. ~90s (CPU inference).
 - **T4 Kimi Cloud** (api.moonshot.cn): non-sensitive only. `MOONSHOT_API_KEY` loaded from `~/.sapphire/secrets.env` (mode 0600, not in plist).
 - Model aliases: `fast`/`quick`→nemotron-mini:latest, `auto`/`balanced`→hermes3:8b, `deep`→qwen3:14b, `code`→gemma4:latest, `reason`→deepseek-r1:14b, `qwen-reason`→qwen3.5:9b, `cascade`/`moe`→nemotron-cascade-2, `large`→qwen2.5:32b, `kimi`→kimi-cloud
@@ -169,7 +159,7 @@ Prediction accuracy: 58% overall, BTC 75%
 hermes-agent (NousResearch) replaced custom bot. Installed at ~/.hermes/.
 - Config: ~/.hermes/config.yaml (model: hermes3:8b, provider: custom, base_url: proxy)
 - Env: ~/.hermes/.env (TELEGRAM_BOT_TOKEN, OPENAI_BASE_URL → proxy)
-- Skills: ~/.hermes/skills/sapphire/ (6 skills: threat-intel, trading, health, THO, repos, paper-trading)
+- Skills: ~/.hermes/skills/sapphire/ (14 skills: cyber-intel, inference-tier, kimi-delegate, macro-data, paper-trading, regional-intel, repo-discovery, system-health, system-ops, tho-operations, threat-intel, trading-analysis, trading-brain, trading-signals)
 - Gateway: ai.hermes.gateway LaunchAgent (always-on Telegram polling)
 - Restart: `~/.local/bin/hermes gateway restart`
 
@@ -195,9 +185,9 @@ Registries: `data/connectors.json`, `data/device_topology.json`
 - cyber-threat-bot: run with `PYTHONPATH=src python3 -m cyber_threat_bot ...` (editable install unreliable)
 - regional-intel-workbench venv has stale shebang paths — use `.venv/bin/python -m uvicorn` not `.venv/bin/uvicorn`
 
-## 19 Scheduled Tasks (Claude Code)
+## 20 Scheduled Tasks (Claude Code)
 
-All in ~/.claude/scheduled-tasks/. Run 24/7 when Claude Code is open.
+All in ~/.claude/scheduled-tasks/. Run 24/7 when Claude Code is open. Add `lead-generation` and `pull-gcp-secrets` to the list below; the 18 named tasks cover the rest.
 - morning-briefing (8 AM) — 6-section digest → Telegram
 - trading-research (5:42 AM) — TA predictions + scoring
 - market-pulse (8/12/4 M-F) — signal scan + paper trade stops + scoring
