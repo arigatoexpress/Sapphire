@@ -1,3 +1,10 @@
+"""Runtime policy for agent/executor membership and capability whitelisting.
+
+Loads the agent_runtime_policy.json (file or Firestore backend) that gates
+which agents may execute which command classes. Consumed by the orchestrator
+before any OpenClaw/NemoClaw dispatch; cached with a 5s TTL.
+"""
+
 from __future__ import annotations
 
 import json

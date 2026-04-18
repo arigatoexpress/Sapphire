@@ -62,6 +62,8 @@ class CircuitBreaker:
 
     @property
     def state(self) -> str:
+        # Lazy OPEN→HALF_OPEN transition on read: there is no background
+        # timer, so every access must check if the cooldown has elapsed.
         if self._state == self.OPEN:
             elapsed = time.monotonic() - self._last_failure_time
             if elapsed >= self.reset_timeout:
@@ -80,6 +82,9 @@ class CircuitBreaker:
     # ── Record outcomes ────────────────────────────────────────────────
 
     def record_success(self) -> None:
+        # Any success — including from the HALF_OPEN probe — resets the counter.
+        # A single passing call is treated as full recovery; we don't require N
+        # in a row because venue flakes rarely manifest as one-off successes.
         was_recovering = self._state != self.CLOSED
         self._failure_count = 0
         self._state = self.CLOSED
@@ -88,6 +93,9 @@ class CircuitBreaker:
             self._notify(self._on_close)
 
     def record_failure(self, error: Exception | None = None) -> None:
+        # Counter never decays — any success resets it to 0. This makes "fail_max
+        # consecutive failures" trip the breaker (one success in the middle of a
+        # failure streak would otherwise silently keep the venue live).
         self._failure_count += 1
         self._last_failure_time = time.monotonic()
         logger.warning(

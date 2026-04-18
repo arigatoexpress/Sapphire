@@ -1,3 +1,10 @@
+"""Inbound API gateway for hermes-agent and OpenClaw execution commands.
+
+Exposes unified health/readiness endpoints plus a POST /execute command buffer
+used by the alpha engine to accept high-priority directives from upstream
+agents. Replaces the earlier rudimentary health.py surface.
+"""
+
 import asyncio
 import inspect
 import logging

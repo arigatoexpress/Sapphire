@@ -1,8 +1,8 @@
-"""
-Telegram command handlers extracted from AlphaEngine._handle_control_command.
+"""Telegram ``/command`` dispatchers for the Sapphire Alpha engine.
 
-Each handler function receives the engine instance and the command parameters.
-Returns True if the action was handled, False otherwise.
+Handlers extracted from ``AlphaEngine._handle_control_command``. Each takes
+the engine instance plus command parameters and returns ``True`` when the
+action was handled, ``False`` to fall through to the next handler.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from src.main import AlphaEngine
 
 # Re-export agent identities for message routing.
-# Fallback keeps alpha-engine boot-safe if shared telegram module changes exports.
+# Fallback keeps the alpha service boot-safe if shared telegram module changes exports.
 try:
     from telegram_bot import EMERALD, OBSIDIAN, SAPPHIRE
 except Exception:

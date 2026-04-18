@@ -25,12 +25,30 @@ EVENTS_PATH = Path.home() / "Code" / "Sapphire" / "data" / "system_events.jsonl"
 # Add plugin lib to path for Telegram notifications
 sys.path.insert(0, str(Path.home() / "Code" / "Sapphire" / "plugins" / "claw-sapphire" / "lib"))
 
+# Signal pipeline (optional — graceful degradation if lib/core unavailable)
+sys.path.insert(0, str(Path.home() / "Code" / "Sapphire" / "services" / "alpha"))
+try:
+    from signal_pipeline import pipeline as _signal_pipeline
+    _PIPELINE_AVAILABLE = True
+except Exception:
+    _PIPELINE_AVAILABLE = False
+
 app = FastAPI(title="Sapphire Signal Logger", version="0.1.0")
+
+# Optional webhook secret for signal authentication (set WEBHOOK_SECRET env var)
+# TradingView sends the secret as a field in the JSON body: {"secret": "...", ...}
+_WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "mode": "signal_logger", "note": "Pis offline — logging only, no execution"}
+    paper_trading = os.environ.get("PAPER_TRADING", "0") == "1"
+    return {
+        "status": "ok",
+        "mode": "signal_logger",
+        "paper_trading": paper_trading,
+        "note": "Pis offline — logging only, no execution",
+    }
 
 
 @app.post("/api/signals")
@@ -41,6 +59,10 @@ async def receive_signal(request: Request):
         body = await request.json()
     except Exception:
         return JSONResponse({"error": "invalid JSON"}, status_code=400)
+
+    # Validate webhook secret if configured
+    if _WEBHOOK_SECRET and body.get("secret") != _WEBHOOK_SECRET:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
 
     signal = {
         "timestamp": datetime.now(UTC).isoformat(),
@@ -72,41 +94,58 @@ async def receive_signal(request: Request):
     with open(EVENTS_PATH, "a") as f:
         f.write(json.dumps(event) + "\n")
 
-    # Notify via Telegram
-    try:
-        from nemotron import generate, MODELS
+    # ── Signal Pipeline (scoring + routing + confirmation firewall) ─────────
+    pipeline_result = None
+    if _PIPELINE_AVAILABLE:
+        try:
+            pipeline_result = _signal_pipeline.process(signal)
+        except Exception:
+            pass
 
-        # Quick Nemotron analysis of the signal
-        analysis_prompt = f"Trading signal: {signal['action']} {signal['symbol']} at ${signal['price']} with confidence {signal['confidence']}. Strategy: {signal['strategy']}. Give a one-sentence assessment."
-        result = generate(analysis_prompt, model=MODELS["classify"], timeout=10)
-        ai_assessment = result.response if result.success else "Analysis unavailable"
-    except Exception:
-        ai_assessment = "Analysis unavailable"
+    # ── Telegram notification (pipeline handles it if available) ────────────
+    ai_assessment = "Analysis unavailable"
+    if not pipeline_result or not pipeline_result.telegram_sent:
+        # Fallback: quick Nemotron analysis + basic notification
+        try:
+            from nemotron import generate, MODELS
+            analysis_prompt = f"Trading signal: {signal['action']} {signal['symbol']} at ${signal['price']} with confidence {signal['confidence']}. Strategy: {signal['strategy']}. Give a one-sentence assessment."
+            result = generate(analysis_prompt, model=MODELS["classify"], timeout=10)
+            ai_assessment = result.response if result.success else "Analysis unavailable"
+        except Exception:
+            ai_assessment = "Analysis unavailable"
 
-    # Send Telegram notification
-    try:
-        sys.path.insert(0, str(Path.home() / "Code" / "Sapphire" / "plugins" / "claw-sapphire" / "tools"))
-        from notify import send_telegram_message
-        send_telegram_message(
-            f"📊 *Signal Received*\n\n"
-            f"{'🟢' if 'buy' in signal['action'].lower() else '🔴'} {signal['action']} {signal['symbol']}\n"
-            f"Price: ${signal['price']}\n"
-            f"Confidence: {signal['confidence']}\n"
-            f"Strategy: {signal['strategy']}\n\n"
-            f"🤖 {ai_assessment}\n\n"
-            f"⚠️ _Logged only — execution offline (Pis down)_",
-            priority="p1",
-        )
-    except Exception:
-        pass
+        try:
+            sys.path.insert(0, str(Path.home() / "Code" / "Sapphire" / "plugins" / "claw-sapphire" / "tools"))
+            from notify import send_telegram_message
+            send_telegram_message(
+                f"📊 *Signal Received*\n\n"
+                f"{'🟢' if 'buy' in signal['action'].lower() else '🔴'} {signal['action']} {signal['symbol']}\n"
+                f"Price: ${signal['price']}\n"
+                f"Confidence: {signal['confidence']}\n"
+                f"Strategy: {signal['strategy']}\n\n"
+                f"🤖 {ai_assessment}\n\n"
+                f"⚠️ _Logged only — execution offline (Pis down)_",
+                priority="p1",
+            )
+        except Exception:
+            pass
 
-    return {
+    response: dict = {
         "status": "logged",
         "signal_id": signal["signal_id"],
         "execution": "LOGGED_ONLY",
         "note": "Pis offline — signal captured but not executed",
         "ai_assessment": ai_assessment,
     }
+    if pipeline_result:
+        response["pipeline"] = {
+            "score": pipeline_result.scored.score,
+            "routing": pipeline_result.scored.routing,
+            "position_usd": pipeline_result.scored.position_usd,
+            "kernel_ok": pipeline_result.scored.kernel_ok,
+            "audit": pipeline_result.audit_path,
+        }
+    return response
 
 
 @app.get("/api/signals/recent")

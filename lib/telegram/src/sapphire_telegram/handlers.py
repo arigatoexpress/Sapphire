@@ -1,8 +1,8 @@
-"""
-Telegram command handlers extracted from AlphaEngine._handle_control_command.
+"""All /command handlers for the Telegram bot.
 
-Each handler function receives the engine instance and the command parameters.
-Returns True if the action was handled, False otherwise.
+Large single-file registry; a further split into topic modules is intended.
+Each handler receives the AlphaEngine instance and command parameters and
+returns True if the action was handled, False otherwise.
 """
 
 from __future__ import annotations

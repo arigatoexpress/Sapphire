@@ -1,3 +1,10 @@
+"""Master agent dispatcher for the control-plane hub.
+
+Wires together OpenClaw/NemoClaw dispatch, runtime policy, token governor,
+project board, news/digest, and alpha-stream scoring into the chat-driven
+orchestration loop consumed by services/control-plane (port 8082).
+"""
+
 from __future__ import annotations
 
 import asyncio

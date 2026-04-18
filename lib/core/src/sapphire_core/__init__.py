@@ -1,3 +1,6 @@
-"""Shared Libraries Package for Sapphire Microservices."""
+"""Sapphire core library: risk kernel, circuit breaker, cognitive mesh, pubsub.
 
-# This makes 'services.shared' importable
+Shared building blocks consumed by every service under services/ (alpha,
+aster, hyperliquid, control-plane, dashboard). Services import from here;
+they do not import from each other.
+"""

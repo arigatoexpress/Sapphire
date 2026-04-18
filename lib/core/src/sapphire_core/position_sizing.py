@@ -243,8 +243,9 @@ def compute_position_size(
     # Step 5 — Regime multiplier
     regime_mult = REGIME_MULTIPLIERS.get(inp.regime, 1.0)
 
-    # Step 6 — Stage multiplier
-    stage_mult = cfg.stage_multipliers.get(inp.execution_stage, 1.0)
+    # Step 6 — Stage multiplier. Default to 0.0 (paper) for unknown stages so a
+    # typo in the caller's config can never promote sizing to full_live.
+    stage_mult = cfg.stage_multipliers.get(inp.execution_stage, 0.0)
 
     # Combine
     adjusted_pct = base_pct * confidence_mult * vol_mult * dd_mult * regime_mult * stage_mult
@@ -295,10 +296,11 @@ def apply_stage_multiplier(
     Apply execution stage multiplier to a pre-computed quantity.
 
     Useful when you already have a position size and just need to
-    scale it for the current deployment stage.
+    scale it for the current deployment stage. Unknown stages map to 0.0
+    (paper) so a typo never promotes an order to full_live.
     """
     if multiplier_override is not None:
         mult = max(0.0, multiplier_override)
     else:
-        mult = cfg.stage_multipliers.get(stage, 1.0)
+        mult = cfg.stage_multipliers.get(stage, 0.0)
     return round(base_qty * mult, 6)

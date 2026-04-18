@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
-"""
-Sapphire Webhook Receiver — Windows PC
+"""Sapphire Webhook Receiver — Windows PC (port 9090).
 
-Receives TradingView alerts, enriches via local Ollama (gemma3:27b),
-then forwards to alpha-engine on rari1 (Tailscale) and alpha-engine
-on rari2 as secondary. No GCP Pub/Sub — fully on-prem.
+Receives TradingView alerts, validates HMAC, optionally enriches via local
+Ollama, then forwards to the Sapphire signal logger on Mac (Tailscale
+100.67.171.79:18081). Fully on-prem — no GCP Pub/Sub.
 
 Signal flow:
-  TradingView → POST /webhook/tradingview (this service, Windows PC, port 9090)
-                → Ollama enrichment (local, optional)
-                → POST http://100.120.191.1:18081/api/signals  ← rari1 alpha-engine (primary)
-                → POST http://100.87.225.89:18081/api/signals  ← rari2 alpha-engine (secondary)
+  TradingView → POST /webhook/tradingview (this service, Windows, :9090)
+                → HMAC validate + optional Ollama enrichment
+                → POST http://100.67.171.79:18081/api/signals  ← Mac signal logger
 """
 
 import asyncio
@@ -403,7 +401,7 @@ async def publish_signal(signal: dict) -> dict:
     On-prem signal routing over Tailscale. Targets (in priority order):
     1. Mac signal logger (primary — always-on, logs + AI assessment)
     2. rari2 api-gateway (secondary — if Pi is online)
-    3. rari1 alpha-engine (tertiary — if Pi is online)
+    3. rari1 api-gateway (tertiary — rari1 is offline per CLAUDE.md, kept for legacy)
     """
     targets = [
         ("mac-logger", f"{SIGNAL_LOGGER_MAC}/api/signals"),
@@ -658,7 +656,7 @@ async def receive_tradingview(request: Request, background_tasks: BackgroundTask
     # Step 2 — Build TradeSignal dict
     signal = build_trade_signal(alert)
 
-    # Step 3 — Route signal to alpha-engine over Tailscale
+    # Step 3 — Route signal to alpha service over Tailscale
     pub_result = await publish_signal(signal)
 
     write_system_log(

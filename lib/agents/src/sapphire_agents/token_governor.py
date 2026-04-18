@@ -1,3 +1,10 @@
+"""Per-tier token budget enforcement for agent dispatch.
+
+Tracks daily and per-cycle token spend against configured limits and throttles
+agent calls once the maintenance_threshold is reached. Persists counters to
+JSON on disk so budgets survive orchestrator restarts.
+"""
+
 from __future__ import annotations
 
 import json

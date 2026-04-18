@@ -311,6 +311,10 @@ class RiskManager:
 
     def _get_regime_multiplier(self, regime: MarketRegime) -> float:
         """Get position size multiplier based on market regime."""
+        # Multipliers stack with Kelly — not additive adjustments. A 0.7 in high-vol
+        # combined with fractional Kelly can take an 8% bet down to ~2.8%.
+        # Bear-trend deliberately asymmetric (0.8) vs bull (1.1): drawdowns hurt
+        # capital compounding more than missed upside (Kelly penalizes variance).
         multipliers = {
             MarketRegime.LOW_VOLATILITY: 1.2,    # Increase in low vol
             MarketRegime.HIGH_VOLATILITY: 0.7,   # Decrease in high vol
