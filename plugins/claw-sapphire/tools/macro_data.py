@@ -26,11 +26,31 @@ SECRETS_DIR = Path.home() / ".config" / "sapphire-secrets"
 FRED_KEY_PATH = SECRETS_DIR / "fred_api_key"
 
 
+_NO_KEY_MSG = (
+    "No FRED API key. Save to ~/.config/sapphire-secrets/fred_api_key "
+    "(get one free at https://fred.stlouisfed.org/docs/api/api_key.html)."
+)
+
+
 def _get_fred():
-    from fredapi import Fred
-    key = FRED_KEY_PATH.read_text().strip() if FRED_KEY_PATH.exists() else None
+    """Return a Fred client, or None if the key is missing/unreadable.
+
+    Returning None (instead of raising) lets every action degrade to an empty
+    payload with an ``error`` field, which keeps scheduled tasks and dashboards
+    from crashing when the key isn't provisioned on a given host.
+    """
+    try:
+        from fredapi import Fred  # type: ignore
+    except ImportError:
+        return None
+    if not FRED_KEY_PATH.exists():
+        return None
+    try:
+        key = FRED_KEY_PATH.read_text().strip()
+    except OSError:
+        return None
     if not key:
-        raise RuntimeError("No FRED API key. Save to ~/.config/sapphire-secrets/fred_api_key")
+        return None
     return Fred(api_key=key)
 
 
@@ -38,6 +58,8 @@ def _latest(series_id: str, fred=None) -> dict:
     """Get latest value + metadata for a FRED series."""
     if fred is None:
         fred = _get_fred()
+    if fred is None:
+        return {"id": series_id, "value": None, "error": _NO_KEY_MSG}
     try:
         s = fred.get_series(series_id)
         s = s.dropna()
@@ -55,6 +77,8 @@ def _latest(series_id: str, fred=None) -> dict:
 def action_dashboard() -> dict:
     """Key macro indicators at a glance."""
     fred = _get_fred()
+    if fred is None:
+        return {"success": False, "indicators": {}, "source": "FRED", "error": _NO_KEY_MSG}
 
     indicators = {
         "GDP (Billions)": "GDP",
@@ -82,6 +106,8 @@ def action_dashboard() -> dict:
 def action_rates() -> dict:
     """Interest rates overview."""
     fred = _get_fred()
+    if fred is None:
+        return {"success": False, "rates": {}, "error": _NO_KEY_MSG}
     rates = {}
     for label, sid in [
         ("Fed Funds", "FEDFUNDS"), ("3M Treasury", "DTB3"), ("2Y Treasury", "DGS2"),
@@ -96,6 +122,8 @@ def action_rates() -> dict:
 def action_housing() -> dict:
     """Housing market data (relevant to THO)."""
     fred = _get_fred()
+    if fred is None:
+        return {"success": False, "housing": {}, "error": _NO_KEY_MSG}
     metrics = {}
     for label, sid in [
         ("Housing Starts (K)", "HOUST"), ("Building Permits (K)", "PERMIT"),
@@ -111,6 +139,8 @@ def action_housing() -> dict:
 def action_series(series_id: str, periods: int = 12) -> dict:
     """Fetch any FRED series."""
     fred = _get_fred()
+    if fred is None:
+        return {"success": False, "series": series_id, "error": _NO_KEY_MSG}
     try:
         s = fred.get_series(series_id).dropna().tail(periods)
         info = fred.get_series_info(series_id)
