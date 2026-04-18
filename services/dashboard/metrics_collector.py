@@ -4,6 +4,7 @@ Background daemon that snapshots system metrics every 5 minutes.
 Feeds /api/metrics/history and /api/agents/history sparkline endpoints.
 """
 
+import contextlib
 import json
 import threading
 import time
@@ -24,10 +25,8 @@ def _read_jsonl(path):
         return []
     entries = []
     for line in path.read_text().strip().splitlines():
-        try:
+        with contextlib.suppress(json.JSONDecodeError):
             entries.append(json.loads(line))
-        except json.JSONDecodeError:
-            pass
     return entries
 
 
@@ -152,16 +151,12 @@ def start_collector():
     """Launch the background snapshot thread. Safe to call multiple times."""
     def run():
         # Take an immediate snapshot so history isn't empty on first load
-        try:
+        with contextlib.suppress(Exception):
             _snapshot()
-        except Exception:
-            pass
         while True:
             time.sleep(INTERVAL)
-            try:
+            with contextlib.suppress(Exception):
                 _snapshot()
-            except Exception:
-                pass
 
     t = threading.Thread(target=run, daemon=True, name='metrics-collector')
     t.start()

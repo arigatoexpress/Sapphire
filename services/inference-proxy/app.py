@@ -631,7 +631,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
         if self.path == "/metrics":
             with _metrics_lock:
                 snapshot = {k: dict(v) for k, v in _metrics.items()}
-            for tier, m in snapshot.items():
+            for _tier, m in snapshot.items():
                 n = m["requests"]
                 m["avg_ms"] = round(m["total_ms"] / n) if n > 0 else 0
                 m["success_rate"] = f"{100*m['success']//n}%" if n > 0 else "n/a"

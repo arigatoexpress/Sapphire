@@ -419,7 +419,7 @@ class TestMediaManager:
     def test_latest_resolve(self, manager_module):
         mgr = manager_module.MediaManager()
         mgr.mode = "owner_approval"
-        r1 = mgr.request_publish(topic="a", title="A", body="a", targets=["twitter"])
+        mgr.request_publish(topic="a", title="A", body="a", targets=["twitter"])
         r2 = mgr.request_publish(topic="b", title="B", body="b", targets=["twitter"])
         resolved = mgr._resolve_id("latest")
         assert resolved == r2["request_id"]

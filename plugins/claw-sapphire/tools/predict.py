@@ -16,6 +16,7 @@ Usage:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import sys
@@ -133,10 +134,7 @@ def action_predict() -> dict:
 
         # ─── Confidence: based on how strong the consensus is ───
         total_score = bull_score + bear_score
-        if total_score > 0:
-            dominance = max(bull_score, bear_score) / total_score
-        else:
-            dominance = 0.5
+        dominance = max(bull_score, bear_score) / total_score if total_score > 0 else 0.5
         conf = round(min(0.90, 0.40 + dominance * 0.4 + abs(net) * 0.05), 2)
 
         # ─── Target: entry ± 0.5 ATR (conservative) ───
@@ -227,10 +225,8 @@ def _atomic_write_lines(path: Path, lines: list[str]) -> None:
             os.fsync(f.fileno())
         os.replace(tmp, path)
     except Exception:
-        try:
+        with contextlib.suppress(OSError):
             os.unlink(tmp)
-        except OSError:
-            pass
         raise
 
 

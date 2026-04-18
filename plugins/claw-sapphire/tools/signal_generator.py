@@ -19,6 +19,7 @@ Usage:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import subprocess
 import sys
@@ -35,11 +36,9 @@ NOTIFY_TOOL = SAPPHIRE_DIR / "plugins" / "claw-sapphire" / "tools" / "notify.py"
 
 def _notify(msg: str, priority: str = "p1"):
     """Send Telegram notification."""
-    try:
+    with contextlib.suppress(Exception):
         subprocess.run(["python3", str(NOTIFY_TOOL), msg, "--priority", priority],
                       capture_output=True, timeout=15)
-    except Exception:
-        pass
 
 
 def _log_signal(signal: dict):

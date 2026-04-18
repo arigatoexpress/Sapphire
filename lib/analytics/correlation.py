@@ -30,6 +30,7 @@ CACHE_TTL_SECS = 6 * 3600
 
 # Event bus — optional, degrades silently if unavailable
 import sys as _sys
+
 _EVT_PATH = Path(__file__).resolve().parents[2] / "lib" / "core"
 if str(_EVT_PATH) not in _sys.path:
     _sys.path.insert(0, str(_EVT_PATH))

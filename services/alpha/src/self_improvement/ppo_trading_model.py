@@ -361,10 +361,7 @@ class PPOMemory:
         last_gae = 0
 
         for t in reversed(range(len(rewards))):
-            if t == len(rewards) - 1:
-                next_value = 0
-            else:
-                next_value = values[t + 1]
+            next_value = 0 if t == len(rewards) - 1 else values[t + 1]
 
             delta = rewards[t] + gamma * next_value * (1 - dones[t]) - values[t]
             advantages[t] = last_gae = delta + gamma * gae_lambda * (1 - dones[t]) * last_gae
@@ -544,7 +541,7 @@ class PPOMostProfitableTrader:
 
         self.memory.clear()
 
-        for step in range(self.config.max_steps_per_episode):
+        for _step in range(self.config.max_steps_per_episode):
             # Get action
             with torch.no_grad():
                 state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.config.device)

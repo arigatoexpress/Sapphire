@@ -153,7 +153,7 @@ class AlphaStrategyEngine:
             value = float(raw)
         except (TypeError, ValueError):
             return fallback
-        if not value == value:  # NaN guard
+        if value != value:  # NaN guard
             return fallback
         return max(0.0, min(1.0, value))
 

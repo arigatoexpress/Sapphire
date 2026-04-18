@@ -18,7 +18,7 @@ import os
 import statistics
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 import google.generativeai as genai
@@ -105,7 +105,7 @@ class MarketSnapshot:
 # ============ REGIME AUTO-DETECTION ============
 
 
-class MarketRegime(str, Enum):
+class MarketRegime(StrEnum):
     """Market regime classifications."""
 
     TRENDING_UP = "trending_up"
@@ -131,7 +131,6 @@ def auto_detect_regime(
     indicators = snapshot.get_regime_indicators()
 
     # Default confidence
-    confidence = 0.5
 
     # High volatility regime
     if indicators["high_volatility"]:

@@ -320,7 +320,7 @@ def test_get_top_topics_filter_by_category(forum):
     _create_topic(forum, title="Strategy topic", body="A strategy body content", category="strategy")
     trade_topics = forum.get_top_topics(limit=10, category="trade_idea")
     # Should only return trade_idea topics
-    for t in trade_topics:
+    for _t in trade_topics:
         pass  # We just verify it doesn't crash — category not in summary
     assert isinstance(trade_topics, list)
 

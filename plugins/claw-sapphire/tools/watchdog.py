@@ -12,6 +12,7 @@ Usage:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import subprocess
 import sys
@@ -38,13 +39,11 @@ def _run_health_check() -> dict:
 
 def _send_alert(message: str, priority: str = "p0"):
     """Send a Telegram alert."""
-    try:
+    with contextlib.suppress(Exception):
         subprocess.run(
             ["python3", str(NOTIFY_TOOL), message, "--priority", priority],
             capture_output=True, timeout=15,
         )
-    except Exception:
-        pass
 
 
 def _load_previous_state() -> dict:

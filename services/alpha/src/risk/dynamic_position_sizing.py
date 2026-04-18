@@ -261,7 +261,7 @@ class RiskManager:
         returns_data = []
         volatilities = []
 
-        for symbol, position in positions.items():
+        for symbol, _position in positions.items():
             if symbol in market_data:
                 price_history = market_data[symbol].get('close', [])
                 if len(price_history) >= 30:
@@ -380,7 +380,7 @@ class RiskManager:
 
         # Find appropriate scaling factor
         scaling_factor = 1.0
-        for level, multiplier in zip(self.config.drawdown_levels, self.config.drawdown_multipliers):
+        for level, multiplier in zip(self.config.drawdown_levels, self.config.drawdown_multipliers, strict=False):
             if current_dd >= level:
                 scaling_factor = multiplier
             else:
@@ -496,7 +496,7 @@ class DynamicPositionSizer:
 
         scaling_factor = 1.0
 
-        for level, multiplier in zip(self.config.conviction_levels, self.config.conviction_multipliers):
+        for level, multiplier in zip(self.config.conviction_levels, self.config.conviction_multipliers, strict=False):
             if confidence >= level:
                 scaling_factor = multiplier
 

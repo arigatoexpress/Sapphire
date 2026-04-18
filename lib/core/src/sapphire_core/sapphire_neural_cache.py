@@ -216,7 +216,6 @@ class PacketBuffer:
     def get_wire_format(self) -> bytes:
         """Get the complete wire format with header."""
         # Header: [magic(2)] [version(1)] [count(2)] [checksum(4)]
-        magic = b"SP"  # "SP" for Sapphire Protocol
         version = 1
         count = self.packet_count
 

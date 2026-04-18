@@ -74,9 +74,9 @@ def _load_predictor(verbose: bool = False) -> Any:
         return _predictor
 
     except ImportError as e:
-        raise RuntimeError(f"Kronos model code not found at {KRONOS_ROOT}: {e}")
+        raise RuntimeError(f"Kronos model code not found at {KRONOS_ROOT}: {e}") from e
     except Exception as e:
-        raise RuntimeError(f"Failed to load Kronos model: {e}")
+        raise RuntimeError(f"Failed to load Kronos model: {e}") from e
 
 
 # ── Data fetching ─────────────────────────────────────────────────────────────
@@ -291,7 +291,7 @@ def action_predict(
 
     # Build predictions list
     predictions = []
-    for i, (ts, row) in enumerate(zip(y_timestamp, pred_df.itertuples())):
+    for i, (ts, row) in enumerate(zip(y_timestamp, pred_df.itertuples(), strict=False)):
         entry: dict = {
             "bar": i + 1,
             "timestamp": str(ts),

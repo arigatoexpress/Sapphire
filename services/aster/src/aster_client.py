@@ -16,6 +16,7 @@ All trading logic uses only verified, documented API capabilities.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
 import hmac
 import json
@@ -348,10 +349,8 @@ class AsterClient:
                     retry_after = backoff_factor * (2**attempt)
                     # Respect server header if present
                     if "Retry-After" in response.headers:
-                        try:
+                        with contextlib.suppress(ValueError):
                             retry_after = float(response.headers["Retry-After"])
-                        except ValueError:
-                            pass
 
                     print(
                         f"⚠️ Rate limit hit (429). Retrying in {retry_after}s... (Attempt {attempt + 1}/{retries})"
@@ -373,10 +372,8 @@ class AsterClient:
                 # Silence expected noise logs for invalid symbols/delivering symbols during scanning/restart
                 if response.status_code != 429:
                     error_data = {}
-                    try:
+                    with contextlib.suppress(BaseException):
                         error_data = exc.response.json()
-                    except:
-                        pass
 
                     error_code = error_data.get("code")
                     if error_code not in [-1121, -4108]:
@@ -1277,7 +1274,7 @@ async def test_api_connection():
                 print(f"   ✅ Open orders: {len(open_orders)}")
 
                 print("\n9. Testing account balance...")
-                balance = await auth_client.get_account_balance()
+                await auth_client.get_account_balance()
                 print("   ✅ Account balance retrieved")
 
                 print("\n10. Testing leverage brackets...")
@@ -1291,7 +1288,7 @@ async def test_api_connection():
                 print(f"   ✅ ADL quantile: {len(adl)}")
 
                 print("\n12. Testing commission rates...")
-                commission = await auth_client.get_commission_rate("BTCUSDT")
+                await auth_client.get_commission_rate("BTCUSDT")
                 print("   ✅ Commission rates retrieved")
 
                 await auth_client.close()
@@ -1504,10 +1501,8 @@ class UserStream:
         if self._keepalive_task:
             self._keepalive_task.cancel()
         if self.listen_key:
-            try:
+            with contextlib.suppress(BaseException):
                 await self.client.delete_listen_key()
-            except:
-                pass
 
     async def _keepalive_loop(self):
         """Extend listen key every 50 minutes."""

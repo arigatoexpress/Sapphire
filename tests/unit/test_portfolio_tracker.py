@@ -191,7 +191,7 @@ def test_fill_provided_pnl_used():
 
 def test_closed_trades_ring_buffer():
     tracker = PortfolioTracker(max_closed_trades=5)
-    for i in range(10):
+    for _i in range(10):
         tracker.process_fill(_fill(side="BUY", qty=1.0, price=100.0))
         tracker.process_fill(_fill(side="SELL", qty=1.0, price=110.0))
     assert len(tracker.closed_trades) == 5

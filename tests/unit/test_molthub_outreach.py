@@ -257,7 +257,7 @@ def test_record_dispatch(outreach):
 def test_record_dispatch_history_capped(outreach):
     outreach.MAX_OUTREACH_HISTORY = 5
     post = outreach.compose_outreach(template="general_invite")
-    for i in range(10):
+    for _i in range(10):
         outreach.record_dispatch(post, {"ok": True, "mode": "test"})
     assert len(outreach._history) == 5
 

@@ -10,6 +10,7 @@ Usage:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import sys
@@ -97,10 +98,8 @@ async def receive_signal(request: Request):
     # ── Signal Pipeline (scoring + routing + confirmation firewall) ─────────
     pipeline_result = None
     if _PIPELINE_AVAILABLE:
-        try:
+        with contextlib.suppress(Exception):
             pipeline_result = _signal_pipeline.process(signal)
-        except Exception:
-            pass
 
     # ── Telegram notification (pipeline handles it if available) ────────────
     ai_assessment = "Analysis unavailable"
@@ -157,10 +156,8 @@ async def recent_signals():
     lines = SIGNALS_PATH.read_text().strip().splitlines()[-20:]
     signals = []
     for line in lines:
-        try:
+        with contextlib.suppress(json.JSONDecodeError):
             signals.append(json.loads(line))
-        except json.JSONDecodeError:
-            pass
 
     return {"signals": list(reversed(signals)), "count": len(signals)}
 

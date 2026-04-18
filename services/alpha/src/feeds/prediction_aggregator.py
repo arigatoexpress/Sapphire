@@ -248,7 +248,7 @@ class PredictionAggregator:
 
         opportunities: list[ArbitrageOpportunity] = []
 
-        for name_key, signals in groups.items():
+        for _name_key, signals in groups.items():
             if len(signals) < 2:
                 continue
 

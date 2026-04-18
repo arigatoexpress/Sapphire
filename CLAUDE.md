@@ -50,7 +50,7 @@ python3 -m lib.content publish                                # promote draft �
        /api/events/stream       (weekly report gen)          (priority-tagged)
 ```
 
-Event bus: Redis Streams primary → SQLite local-bus fallback (survives Redis outage, rehydrates on reconnect).
+Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl`, survives Redis outage).
 
 ## Module Map
 
@@ -85,7 +85,7 @@ Event bus: Redis Streams primary → SQLite local-bus fallback (survives Redis o
 `lib/core/event_bus.py` — central nervous system.
 
 - **Redis Streams** primary transport when `REDIS_URL` is set (XADD/XREAD with consumer groups).
-- **SQLite local bus** fallback (`data/event_bus.sqlite`) — survives Redis outage, buffers events, rehydrates.
+- **JSONL fallback** (`data/events/bus.jsonl`) — append-only file, survives Redis outage, always-on local record.
 - Publishers: `signal_pipeline`, `correlation`, `threat_intel`, `chain/intelligence` (failures never break the producer).
 - Subscribers: dashboard SSE (`/api/events/stream?types=signal.*,threat.*`), content engine, Telegram dispatcher.
 - **Replay**: `GET /api/events/replay?type=signal.generated&limit=100` replays historical events.
@@ -272,7 +272,7 @@ Registries: `data/connectors.json`, `data/device_topology.json`.
 - macOS `python3` may resolve to brew 3.14 (no pytest) — use `/usr/local/bin/python3`.
 - GPU Ollama needs `OLLAMA_HOST=0.0.0.0` after Windows reboot.
 - Windows Ollama `/v1/` returns empty — proxy uses native `/api/chat`.
-- Event bus silently degrades to SQLite if Redis is down — check `tail -f data/event_bus.sqlite-wal` if you expect Redis events.
+- Event bus silently degrades to JSONL if Redis is down — check `tail -f data/events/bus.jsonl` if you expect Redis events.
 - x402 is gated by `X402_ENABLED=1`; without a recipient addr, requests pass through unpaywalled.
 - Position sizing unknown-stage = 0 (paper). If an order is unexpectedly zero-sized, check `execution_stage` for typos.
 - Prediction scoring is timeframe-aware — a 24h forecast written at 12:00 won't score until 12:00 next day.

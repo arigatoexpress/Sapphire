@@ -47,7 +47,7 @@ class TestCircuitBreakerStates:
         _open_breaker(cb)
         try:
             cb.check()
-            assert False, "Should have raised CircuitBreakerOpen"
+            raise AssertionError("Should have raised CircuitBreakerOpen")
         except CircuitBreakerOpen:
             pass
 

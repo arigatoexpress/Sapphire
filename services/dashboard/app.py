@@ -57,6 +57,7 @@ if not AUTH_PASSWORD:
     raise RuntimeError("AUTH_PASSWORD environment variable must be set")
 
 # x402 payment gate — optional, disabled unless X402_ENABLED=1
+import contextlib
 import sys as _sys  # noqa: E402
 
 _LIB_PAYMENTS = Path.home() / "Code" / "Sapphire"
@@ -564,7 +565,7 @@ def api_events_stream():
     q: _queue.Queue = _queue.Queue(maxsize=500)
 
     def _on_event(ev):
-        try:
+        with contextlib.suppress(_queue.Full):
             q.put_nowait({
                 'id': ev.id,
                 'type': ev.type,
@@ -572,8 +573,6 @@ def api_events_stream():
                 'source': ev.source,
                 'data': ev.data,
             })
-        except _queue.Full:
-            pass
 
     subscription = bus.subscribe(patterns, _on_event)
 
@@ -666,7 +665,7 @@ def api_events_stream():
     q: _queue.Queue = _queue.Queue(maxsize=500)
 
     def _on_event(ev):
-        try:
+        with contextlib.suppress(_queue.Full):
             q.put_nowait({
                 'id': ev.id,
                 'type': ev.type,
@@ -674,8 +673,6 @@ def api_events_stream():
                 'source': ev.source,
                 'data': ev.data,
             })
-        except _queue.Full:
-            pass
 
     subscription = bus.subscribe(patterns, _on_event)
 
@@ -874,10 +871,8 @@ def api_signals():
             f = signals_dir / f'{today}.jsonl'
             if f.exists():
                 for line in f.read_text().strip().splitlines()[-20:]:
-                    try:
+                    with contextlib.suppress(Exception):
                         recent.append(json.loads(line))
-                    except Exception:
-                        pass
                 recent.reverse()
 
         return {
@@ -905,7 +900,7 @@ def api_agents():
     def fetch():
         agents = []
 
-        for agent_name, pi_ip, pi_port, log_path in [
+        for agent_name, pi_ip, pi_port, _log_path in [
             ('market-watchdog', '100.120.191.1', 19001,
              '/home/rari/sapphire/logs/market-watchdog.log'),
             ('health-monitor',  '100.87.225.89', 19002,
@@ -1143,10 +1138,8 @@ def api_trading_metrics():
         signals_today = []
         if f.exists():
             for line in f.read_text().strip().splitlines():
-                try:
+                with contextlib.suppress(Exception):
                     signals_today.append(_json.loads(line))
-                except Exception:
-                    pass
 
         total = len(signals_today)
 
@@ -1314,7 +1307,7 @@ def api_risk_backtest():
       latest=1                  return the last saved run instead of recomputing
     """
     try:
-        from lib.analytics.backtest import Backtester, BacktestConfig, DEFAULT_SYMBOLS
+        from lib.analytics.backtest import DEFAULT_SYMBOLS, BacktestConfig, Backtester
         if request.args.get('latest') == '1':
             for cand in (r / 'data' / 'backtests' / 'latest.json' for r in _DASHBOARD_ROOTS):
                 if cand.exists():
@@ -1383,21 +1376,21 @@ def api_soc_security():
                 ['last', '-10'],
                 capture_output=True, text=True, timeout=5
             )
-            lines = [l for l in result.stdout.splitlines()
-                     if l.strip() and 'wtmp' not in l and 'reboot' not in l]
+            lines = [ln for ln in result.stdout.splitlines()
+                     if ln.strip() and 'wtmp' not in ln and 'reboot' not in ln]
             known_users = {'aribs', 'rari'}
-            unknown = [l for l in lines if not any(u in l for u in known_users)]
+            unknown = [ln for ln in lines if not any(u in ln for u in known_users)]
             if unknown:
                 checks['auth_logs'] = {'status': 'warn', 'detail': f'{len(unknown)} unknown session(s)'}
-                for l in unknown[:3]:
+                for ln in unknown[:3]:
                     auth_events.append({'timestamp': datetime.now().isoformat()[:19],
-                                        'type': 'warn', 'message': l.strip()[:80]})
+                                        'type': 'warn', 'message': ln.strip()[:80]})
             else:
                 checks['auth_logs'] = {'status': 'pass', 'detail': f'{len(lines)} sessions, all known'}
-                for l in lines[:5]:
-                    parts = l.split()
+                for ln in lines[:5]:
+                    parts = ln.split()
                     auth_events.append({'timestamp': ' '.join(parts[4:8]) if len(parts) > 7 else '--',
-                                        'type': 'ok', 'message': l.strip()[:80]})
+                                        'type': 'ok', 'message': ln.strip()[:80]})
         except Exception:
             checks['auth_logs'] = {'status': 'warn', 'detail': 'Could not read auth logs'}
 
@@ -1408,7 +1401,7 @@ def api_soc_security():
                 capture_output=True, text=True, timeout=8
             )
             known_ips = {'100.67.171.79', '100.71.10.48', '100.120.191.1', '100.87.225.89'}
-            lines = [l for l in result.stdout.splitlines() if l.strip() and not l.startswith('#')]
+            lines = [ln for ln in result.stdout.splitlines() if ln.strip() and not ln.startswith('#')]
             unknown_devices = []
             for line in lines:
                 parts = line.split()
@@ -1456,12 +1449,12 @@ def api_soc_security():
                 ['lsof', '-i', '-P', '-n'],
                 capture_output=True, text=True, timeout=8
             )
-            established = [l for l in result.stdout.splitlines() if 'ESTABLISHED' in l]
+            established = [ln for ln in result.stdout.splitlines() if 'ESTABLISHED' in ln]
             # Filter known/expected IPs
             known_prefixes = ('100.', '127.', '17.', '34.', '35.', '52.', '54.',
                               '104.', '140.', '142.', '192.168.', '10.')
-            unexpected = [l for l in established
-                          if not any(p in l for p in known_prefixes)]
+            unexpected = [ln for ln in established
+                          if not any(p in ln for p in known_prefixes)]
             outbound = {'total': len(established), 'unexpected': len(unexpected)}
             if unexpected:
                 checks['outbound_network'] = {'status': 'warn', 'detail': f'{len(unexpected)} unexpected'}
