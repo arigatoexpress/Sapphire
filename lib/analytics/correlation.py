@@ -14,7 +14,7 @@ import json
 import logging
 import time
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -115,7 +115,7 @@ def _fetch_prices(symbols: dict[str, str], days: int = 180) -> pd.DataFrame:
     if not need_refresh and cached is not None:
         return cached[list(symbols.keys())].copy()
 
-    end = datetime.now(timezone.utc)
+    end = datetime.now(UTC)
     start = end - timedelta(days=days + 10)
 
     frames: dict[str, pd.Series] = {}
@@ -210,7 +210,7 @@ class CorrelationEngine:
                     out_row.append(float(x))
             matrix.append(out_row)
         return CorrelationMatrix(
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             window_days=window_days,
             symbols=syms,
             matrix=matrix,
@@ -287,7 +287,7 @@ class CorrelationEngine:
                     ts = e.get("unix_ts")
                     if not (state in regime_days and ts):
                         continue
-                    day = datetime.fromtimestamp(ts, tz=timezone.utc).date().isoformat()
+                    day = datetime.fromtimestamp(ts, tz=UTC).date().isoformat()
                     regime_days[state].add(day)
         except OSError:
             return None, None
@@ -309,7 +309,7 @@ class CorrelationEngine:
             corr = subset.corr(method="pearson").round(3)
             syms = list(corr.columns)
             return CorrelationMatrix(
-                timestamp=datetime.now(timezone.utc).isoformat(),
+                timestamp=datetime.now(UTC).isoformat(),
                 window_days=len(subset),
                 symbols=syms,
                 matrix=[[float(x) if not (isinstance(x, float) and np.isnan(x)) else 0.0 for x in row] for row in corr.values.tolist()],
@@ -327,7 +327,7 @@ class CorrelationEngine:
         events = self.detect_decorrelations(matrix)
         on, off = self.regime_adjusted_matrices()
         report = CorrelationReport(
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             matrix=matrix,
             decorrelation_events=events,
             risk_on_matrix=on,

@@ -325,7 +325,6 @@ def analyze_all() -> dict[str, TechnicalProfile]:
 
 
 if __name__ == "__main__":
-    from dataclasses import asdict
     profiles = analyze_all()
     for sym, p in profiles.items():
         print(f"\n{'='*50}")

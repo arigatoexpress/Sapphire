@@ -20,8 +20,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
-import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 SAPPHIRE_DIR = Path.home() / "Code" / "Sapphire"
@@ -116,7 +115,7 @@ def _get_paper_track_record() -> dict:
 
 def action_decide(symbol: str = "BTC") -> dict:
     """Produce a unified GO/WAIT/EXIT decision for a symbol."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     votes = []  # (direction, weight, source, detail)
 
     # ─── Source 1: Technical Analysis ───
@@ -218,7 +217,7 @@ def action_dashboard() -> dict:
     results = {}
     for symbol in ["BTC", "ETH", "SOL"]:
         results[symbol] = action_decide(symbol)
-    return {"success": True, "decisions": results, "timestamp": datetime.now(timezone.utc).isoformat()}
+    return {"success": True, "decisions": results, "timestamp": datetime.now(UTC).isoformat()}
 
 
 def main():

@@ -29,17 +29,17 @@ Endpoints:
 """
 
 import json
+import logging
 import os
+import re
 import sys
 import threading
 import time
-import urllib.request
 import urllib.error
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from socketserver import ThreadingMixIn
-import logging
-import re
+import urllib.request
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from socketserver import ThreadingMixIn
 
 # Task classifier for auto-routing (no LLM required — keyword matching)
 try:

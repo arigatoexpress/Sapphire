@@ -222,13 +222,13 @@ def generate_report() -> dict:
     stars = json.loads(STARS_FILE.read_text()) if STARS_FILE.exists() else []
 
     lines = [
-        f"# Starred Repos Synergy Report",
-        f"",
+        "# Starred Repos Synergy Report",
+        "",
         f"Generated: {datetime.now().isoformat()}",
         f"Total starred: {len(stars)} | With synergies: {len(synergies)}",
-        f"",
-        f"## High-Value Synergies",
-        f"",
+        "",
+        "## High-Value Synergies",
+        "",
     ]
 
     for i, s in enumerate(synergies[:15], 1):
@@ -355,7 +355,7 @@ def discover_trending() -> dict:
     trend_report_path = DATA_DIR / f"trending_report_{datetime.now().strftime('%Y%m%d')}.md"
     lines = [
         "# Trending GitHub Repos — Synergy Analysis",
-        f"",
+        "",
         f"Generated: {datetime.now().isoformat()}",
         f"Searched {len(domains_to_search)} domains, found {len(all_trending)} repos, {len(synergies)} with synergies",
         "",

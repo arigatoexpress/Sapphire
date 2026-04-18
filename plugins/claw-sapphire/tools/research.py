@@ -298,7 +298,7 @@ def generate_briefing(profiles: dict[str, TechnicalProfile], predictions: list[d
     if history["scored"] > 0:
         lines.append(f"*Lifetime:* {history['correct']}/{history['scored']} ({history['accuracy']}%)")
 
-    lines.append(f"\n_Math: RSI/MACD/BB/MA calculated from OHLCV. LLM: narrative only._")
+    lines.append("\n_Math: RSI/MACD/BB/MA calculated from OHLCV. LLM: narrative only._")
 
     return "\n".join(lines)
 

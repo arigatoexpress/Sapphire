@@ -20,7 +20,6 @@ import json
 import subprocess
 import sys
 import urllib.request
-from datetime import datetime, timezone
 from pathlib import Path
 
 SAPPHIRE_DIR = Path.home() / "Code" / "Sapphire"
@@ -57,7 +56,6 @@ def action_market() -> dict:
     # THO customer stats
     tho_stats = {}
     try:
-        import os
         token_resp = urllib.request.urlopen(urllib.request.Request(
             "https://project-go-forward-691674245427.us-central1.run.app/api/admin/verify",
             data=json.dumps({"pin": "4832"}).encode(),

@@ -38,9 +38,9 @@ INTEL_DIR.mkdir(parents=True, exist_ok=True)
 def _import_ctb():
     """Import cyber-threat-bot modules. Returns None tuple if not installed."""
     try:
-        from cyber_threat_bot import sources, render, briefs, scoring
+        from cyber_threat_bot import briefs, render, scoring, sources
         return sources, render, briefs, scoring
-    except ImportError as e:
+    except ImportError:
         return None, None, None, None
 
 

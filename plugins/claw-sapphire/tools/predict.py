@@ -19,8 +19,7 @@ from __future__ import annotations
 import json
 import sys
 import urllib.request
-from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
@@ -50,7 +49,7 @@ def action_predict() -> dict:
 
     profiles = analyze_all()
     predictions = []
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     for sym, profile in profiles.items():
         if profile is None:

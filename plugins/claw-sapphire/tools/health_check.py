@@ -12,10 +12,9 @@ Usage:
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 SAPPHIRE_DIR = Path.home() / "Code" / "Sapphire"
@@ -23,8 +22,8 @@ SAPPHIRE_DIR = Path.home() / "Code" / "Sapphire"
 
 def _check_url(url: str, timeout: int = 5) -> tuple[bool, str]:
     """Check if a URL is reachable."""
-    import urllib.request
     import urllib.error
+    import urllib.request
     try:
         req = urllib.request.Request(url, headers={"Accept": "application/json"})
         with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -111,7 +110,7 @@ def check_repos() -> dict:
             last_commit = r2.stdout.strip()
 
             status = "green" if dirty == 0 else "yellow"
-            detail = f"clean" if dirty == 0 else f"{dirty} uncommitted files"
+            detail = "clean" if dirty == 0 else f"{dirty} uncommitted files"
             detail += f" | last: {last_commit[:60]}"
 
             results[name] = {"status": status, "detail": detail}

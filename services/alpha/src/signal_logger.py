@@ -74,7 +74,7 @@ async def receive_signal(request: Request):
 
     # Notify via Telegram
     try:
-        from nemotron import generate, MODELS
+        from nemotron import MODELS, generate
 
         # Quick Nemotron analysis of the signal
         analysis_prompt = f"Trading signal: {signal['action']} {signal['symbol']} at ${signal['price']} with confidence {signal['confidence']}. Strategy: {signal['strategy']}. Give a one-sentence assessment."

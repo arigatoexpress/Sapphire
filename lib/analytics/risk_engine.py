@@ -17,7 +17,7 @@ import json
 import logging
 import math
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -206,11 +206,11 @@ class RiskEngine:
         def _ts_key(t: Trade) -> datetime:
             raw = t.timestamp or ""
             if not raw:
-                return datetime.min.replace(tzinfo=timezone.utc)
+                return datetime.min.replace(tzinfo=UTC)
             try:
                 return datetime.fromisoformat(raw.replace("Z", "+00:00"))
             except ValueError:
-                return datetime.min.replace(tzinfo=timezone.utc)
+                return datetime.min.replace(tzinfo=UTC)
 
         trades.sort(key=_ts_key)
         return trades
@@ -363,7 +363,7 @@ class RiskEngine:
             recommended_size_usd=recommended,
             equity_curve=equity_curve,
             bankroll=self.bankroll,
-            computed_at=datetime.now(timezone.utc).isoformat(),
+            computed_at=datetime.now(UTC).isoformat(),
             source_files=1 + (len(list(SIGNALS_DIR.glob("*.jsonl"))) if SIGNALS_DIR.exists() else 0),
         )
 

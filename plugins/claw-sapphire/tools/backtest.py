@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import json
 import subprocess
-import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -125,7 +124,7 @@ def run_backtest(
                 print(f"    Net profit: {metrics.get('netProfit', 'n/a')}")
                 print(f"    Max DD: {metrics.get('maxDrawdown', 'n/a')}")
             else:
-                print(f"    No strategy results (may need strategy on chart)")
+                print("    No strategy results (may need strategy on chart)")
 
             results.append(result)
 

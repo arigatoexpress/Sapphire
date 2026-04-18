@@ -9,7 +9,7 @@ import logging
 import os
 import secrets
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from functools import wraps
 from pathlib import Path
 
@@ -376,9 +376,9 @@ def api_signals():
         except Exception:
             # Fallback: read JSONL directly
             import json
-            from datetime import datetime as _dt, timezone as _tz
+            from datetime import datetime as _dt
             signals_dir = _root / 'data' / 'signals'
-            today = _dt.now(_tz.utc).strftime('%Y-%m-%d')
+            today = _dt.now(UTC).strftime('%Y-%m-%d')
             f = signals_dir / f'{today}.jsonl'
             if f.exists():
                 for line in f.read_text().strip().splitlines()[-20:]:
@@ -634,9 +634,9 @@ def command_deck_page():
 @requires_auth
 def api_trading_metrics():
     """Trading pipeline metrics — signal counts, success rates from signal logger"""
-    from pathlib import Path as _Path
-    from datetime import datetime as _dt, timezone as _tz
     import json as _json
+    from datetime import datetime as _dt
+    from pathlib import Path as _Path
 
     def fetch():
         import sys as _sys
@@ -644,7 +644,7 @@ def api_trading_metrics():
         if str(_alpha) not in _sys.path:
             _sys.path.insert(0, str(_alpha))
 
-        today = _dt.now(_tz.utc).strftime('%Y-%m-%d')
+        today = _dt.now(UTC).strftime('%Y-%m-%d')
         signals_dir = _Path.home() / 'Code' / 'Sapphire' / 'data' / 'signals'
         f = signals_dir / f'{today}.jsonl'
 
@@ -800,8 +800,8 @@ def api_correlation():
 @requires_auth
 def api_soc_security():
     """SOC security status — auth events, network, inference gate, threat intel, investigations"""
-    import subprocess
     import re
+    import subprocess
 
     def fetch():
         checks = {}
@@ -834,8 +834,8 @@ def api_soc_security():
                     parts = l.split()
                     auth_events.append({'timestamp': ' '.join(parts[4:8]) if len(parts) > 7 else '--',
                                         'type': 'ok', 'message': l.strip()[:80]})
-        except Exception as e:
-            checks['auth_logs'] = {'status': 'warn', 'detail': f'Could not read auth logs'}
+        except Exception:
+            checks['auth_logs'] = {'status': 'warn', 'detail': 'Could not read auth logs'}
 
         # ── Tailscale devices ────────────────────────────────────────
         try:
@@ -1024,7 +1024,7 @@ def api_soc_security():
                     'title': trigger[:80] or f'Investigation {inv_date}',
                     'date': inv_date,
                     'verdict': verdict,
-                    'summary': f'10-point security sweep. Verdict: System clean. No unauthorized access detected.',
+                    'summary': '10-point security sweep. Verdict: System clean. No unauthorized access detected.',
                     'file': inv_file.name,
                 })
         except Exception:
@@ -1072,9 +1072,8 @@ def api_soc_threats():
     """Live threat feed from cyber-threat-bot — CISA KEV, NVD, MITRE ATT&CK.
     Reads saved reports first (fast), falls back to live fetch if stale (>4h).
     """
-    import sys as _sys
     import re as _re
-    from datetime import timezone as _tz
+    import sys as _sys
 
     CTB_SRC = Path.home() / 'Code' / 'cyber-threat-bot' / 'src'
     THREAT_CACHE = 240  # 4 hours — live fetch is slow (NVD rate limits)
@@ -1092,7 +1091,6 @@ def api_soc_threats():
             latest = saved_reports[0]
             try:
                 # Check freshness — use file if <4h old
-                import os as _os
                 age_hours = (time.time() - latest.stat().st_mtime) / 3600
                 content = latest.read_text(errors='ignore')
 
@@ -1171,7 +1169,8 @@ def api_soc_threats():
             _sys.path.insert(0, str(CTB_SRC))
 
         try:
-            from cyber_threat_bot import sources as _src, scoring as _sc
+            from cyber_threat_bot import scoring as _sc
+            from cyber_threat_bot import sources as _src
 
             records = _src.collect_latest_records(days=3, per_source=5)
             records.sort(key=lambda r: _sc.record_priority(r), reverse=True)
@@ -1252,7 +1251,6 @@ def api_kronos_prediction():
     Query params: symbol (default BTC-USD), lookback (default 200), predict (default 24), interval (default 1h)
     """
     import subprocess as _sp
-    import sys as _sys
 
     symbol = request.args.get('symbol', 'BTC-USD')
     lookback = int(request.args.get('lookback', 200))

@@ -12,7 +12,6 @@ from __future__ import annotations
 import json
 import os
 import subprocess
-import sys
 import time
 import urllib.request
 from dataclasses import dataclass
@@ -190,7 +189,7 @@ def _kimi_http(task: str, repo: str | None = None) -> ExecutionResult | None:
                 total_tokens=usage.get("total_tokens", 0),
                 success=bool(content),
             )
-        except Exception as e:
+        except Exception:
             pass  # Fall through to OpenRouter
 
     # Method 2: OpenRouter (fallback, has OPENROUTER_API_KEY for hermes)

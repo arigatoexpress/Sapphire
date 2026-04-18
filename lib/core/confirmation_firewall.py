@@ -31,10 +31,9 @@ import logging
 import re
 import time
 import uuid
-from datetime import date, datetime
+from datetime import date
 from enum import Enum
 from pathlib import Path
-from typing import Optional
 
 log = logging.getLogger(__name__)
 
@@ -140,7 +139,7 @@ def _get_redis():
     import os
     if os.environ.get("SAPPHIRE_NO_REDIS"):
         return None
-    if SAPPHIRE_STATE != Path.home() / ".sapphire":
+    if Path.home() / ".sapphire" != SAPPHIRE_STATE:
         return None  # test / non-standard context — use file fallback
     try:
         import redis
@@ -293,7 +292,7 @@ def _write_pending(code: str, action: str, risk: ActionRisk, details: str) -> Pa
     return path
 
 
-def _poll_pending(code: str) -> Optional[str]:
+def _poll_pending(code: str) -> str | None:
     """Return status ('approved' or 'denied') or None if still pending/expired."""
     path = PENDING_DIR / f"{code}.json"
     if not path.exists():
@@ -386,7 +385,7 @@ def _send_confirmation_request(code: str, action: str, risk: ActionRisk,
             print(f"Amount:  ${amount:.2f}")
         print(f"Code:    {code}")
         print(f"Expires: {CONFIRMATION_TIMEOUT}s")
-        print(f"Approve: write 'approved' to pending confirmation file (check logs for path)")
+        print("Approve: write 'approved' to pending confirmation file (check logs for path)")
         print(f"{'='*60}\n")
         log.info("Pending confirmation file: %s/%s.json", PENDING_DIR, code)
         return False
@@ -399,7 +398,7 @@ def _send_confirmation_request(code: str, action: str, risk: ActionRisk,
     }.get(risk, "⚠️")
 
     amount_line = f"\n💵 Amount: ${amount:.2f}" if amount > 0 else ""
-    delay_line  = f"\n⏱ 30-second delay enforced after approval" if risk == ActionRisk.DESTRUCTIVE else ""
+    delay_line  = "\n⏱ 30-second delay enforced after approval" if risk == ActionRisk.DESTRUCTIVE else ""
 
     text = (
         f"{risk_emoji} *ACTION REQUIRES CONFIRMATION*\n"

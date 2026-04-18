@@ -27,7 +27,7 @@ import json
 import math
 import sys
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 SAPPHIRE_DIR = Path.home() / "Code" / "Sapphire"
@@ -48,7 +48,7 @@ def _load_portfolio() -> dict:
         "initial_capital": INITIAL_CAPITAL,
         "positions": [],  # Open positions
         "history": [],  # Closed trades
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -122,7 +122,7 @@ def action_execute(symbol: str, side: str, price: float, atr: float = None,
         "atr": atr,
         "edge": edge,
         "confidence": confidence,
-        "opened_at": datetime.now(timezone.utc).isoformat(),
+        "opened_at": datetime.now(UTC).isoformat(),
     }
 
     pf["positions"].append(position)
@@ -190,7 +190,7 @@ def action_check_stops() -> dict:
                 if current <= trail_level:
                     pnl = (current - entry) * pos["qty"]
                     trade = {**pos, "exit_price": current, "pnl": round(pnl, 2),
-                             "exit_reason": "trailing_stop", "closed_at": datetime.now(timezone.utc).isoformat()}
+                             "exit_reason": "trailing_stop", "closed_at": datetime.now(UTC).isoformat()}
                     pf["history"].append(trade)
                     pf["capital"] += pnl
                     closed.append(trade)
@@ -200,7 +200,7 @@ def action_check_stops() -> dict:
                 if current >= trail_level:
                     pnl = (entry - current) * pos["qty"]
                     trade = {**pos, "exit_price": current, "pnl": round(pnl, 2),
-                             "exit_reason": "trailing_stop", "closed_at": datetime.now(timezone.utc).isoformat()}
+                             "exit_reason": "trailing_stop", "closed_at": datetime.now(UTC).isoformat()}
                     pf["history"].append(trade)
                     pf["capital"] += pnl
                     closed.append(trade)
@@ -215,7 +215,7 @@ def action_check_stops() -> dict:
             pnl = (exit_price - entry) * pos["qty"] if is_long else (entry - exit_price) * pos["qty"]
             trade = {**pos, "exit_price": exit_price, "pnl": round(pnl, 2),
                      "exit_reason": "stop_loss" if hit_stop else "take_profit",
-                     "closed_at": datetime.now(timezone.utc).isoformat()}
+                     "closed_at": datetime.now(UTC).isoformat()}
             pf["history"].append(trade)
             pf["capital"] += pnl
             closed.append(trade)
@@ -280,7 +280,7 @@ def action_close(symbol: str) -> dict:
                 pnl = (pos["entry_price"] - current) * pos["qty"]
 
             trade = {**pos, "exit_price": current, "pnl": round(pnl, 2),
-                     "exit_reason": "manual", "closed_at": datetime.now(timezone.utc).isoformat()}
+                     "exit_reason": "manual", "closed_at": datetime.now(UTC).isoformat()}
             pf["history"].append(trade)
             pf["capital"] += pnl
             pf["positions"].pop(i)

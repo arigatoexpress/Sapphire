@@ -1122,7 +1122,8 @@ async def health():
 @app.get("/api/ecosystem-health")
 async def ecosystem_health():
     """Run the full 20-point ecosystem health check and return JSON."""
-    import subprocess, json as _json
+    import json as _json
+    import subprocess
     tool_path = Path.home() / "Code" / "Sapphire" / "plugins" / "claw-sapphire" / "tools" / "health_check.py"
     try:
         r = subprocess.run(

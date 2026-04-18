@@ -44,8 +44,8 @@ DEFAULT_BALANCES = {
 
 def _call_api(endpoint: str, params: dict = None) -> dict | None:
     """Call the ve vote monitor API."""
-    import urllib.request
     import urllib.parse
+    import urllib.request
 
     url = f"{VE_API_BASE}{endpoint}"
     if params:

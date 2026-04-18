@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
-from technical_analysis import _sma, _ema, _rsi, _bollinger
+from technical_analysis import _bollinger, _ema, _rsi, _sma
 
 
 def test_sma_basic():

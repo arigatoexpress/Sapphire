@@ -20,8 +20,6 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Union
-
 
 # ─── Pattern groups ───────────────────────────────────────────────────────────
 
@@ -119,7 +117,7 @@ def classify(text: str) -> SensitivityResult:
     return SensitivityResult(safe=True)
 
 
-def is_sensitive(text_or_messages: Union[str, list]) -> SensitivityResult:
+def is_sensitive(text_or_messages: str | list) -> SensitivityResult:
     """Classify a string or a list of OpenAI-format messages.
 
     Args:
