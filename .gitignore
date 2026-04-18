@@ -41,6 +41,8 @@ Thumbs.db
 *.log
 memory/
 output/
+data/backtests/
+data/decisions/
 
 # Build
 *.so

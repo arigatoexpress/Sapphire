@@ -85,6 +85,8 @@ class BacktestResult:
     avg_loss: float
     avg_score: float
     trades: list[Trade] = field(default_factory=list)
+    equity_curve: list[tuple[str, float]] = field(default_factory=list)  # [(date, equity)]
+    benchmark_curve: list[tuple[str, float]] = field(default_factory=list)  # buy-and-hold
 
 
 def _load_ohlcv(symbol: str, days: int):
@@ -467,6 +469,14 @@ class Backtester:
         m = _metrics(curve, trades, self.cfg.initial_capital)
         final = curve[-1] if curve else self.cfg.initial_capital
         total_ret = ((final - self.cfg.initial_capital) / self.cfg.initial_capital) * 100
+
+        # Buy-and-hold benchmark for the same window, scaled to initial capital.
+        benchmark_curve: list[tuple[str, float]] = []
+        if bars:
+            start_px = bars[0]["close"] or 1.0
+            for b in bars:
+                benchmark_curve.append((b["date"], self.cfg.initial_capital * (b["close"] / start_px)))
+        equity_pairs = [(b["date"], v) for b, v in zip(bars, curve, strict=False)]
         return BacktestResult(
             symbol=symbol,
             regime_enhancement=with_regime,
@@ -484,6 +494,8 @@ class Backtester:
             avg_loss=m["avg_loss"],
             avg_score=m["avg_score"],
             trades=trades,
+            equity_curve=equity_pairs,
+            benchmark_curve=benchmark_curve,
         )
 
     def run_comparison(self, symbols: list[str] | None = None) -> dict[str, Any]:

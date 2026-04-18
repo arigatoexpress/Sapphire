@@ -8,10 +8,26 @@ import json
 import logging
 import os
 import secrets
+import sys
 import time
 from datetime import UTC, datetime
 from functools import wraps
 from pathlib import Path
+
+# Make the Sapphire lib/ discoverable regardless of whether this dashboard runs
+# from the main repo or a git worktree. Done once at import time so namespace
+# packages resolve consistently across requests.
+_DASHBOARD_ROOTS = (
+    Path(__file__).resolve().parents[2],          # current checkout (worktree or main)
+    Path.home() / 'Code' / 'Sapphire',            # canonical main repo
+)
+# Insert in reverse so the current-checkout path ends up at index 0 (highest
+# priority). Without this, a worktree dashboard resolves `lib.*` against the
+# main repo and misses modules only present in the worktree.
+for _r in reversed(_DASHBOARD_ROOTS):
+    _rs = str(_r)
+    if _rs not in sys.path:
+        sys.path.insert(0, _rs)
 
 log = logging.getLogger("dashboard")
 
@@ -769,6 +785,31 @@ def api_risk_metrics():
         return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
 
 
+@app.route('/analytics')
+@requires_auth
+def analytics_page():
+    """Performance analytics: equity curve, rolling Sharpe, regime breakdown."""
+    return render_template('pages/analytics.html', current_page='analytics',
+                           page_title='Performance Analytics')
+
+
+@app.route('/api/analytics/performance')
+@requires_auth
+def api_analytics_performance():
+    """Equity/benchmark/rolling-Sharpe/regime/monthly report from latest backtest."""
+    try:
+        from lib.analytics.performance import build_performance_report
+        primary = request.args.get('symbol', 'BTC-USD')
+        window = int(request.args.get('window', 30))
+        candidates = [r / 'data' / 'backtests' / 'latest.json' for r in _DASHBOARD_ROOTS]
+        path = next((c for c in candidates if c.exists()), candidates[0])
+        report = build_performance_report(path, primary_symbol=primary, rolling_window=window)
+        return jsonify(report)
+    except Exception as e:
+        log.exception("analytics performance failed")
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+
+
 @app.route('/api/risk/backtest')
 @requires_auth
 def api_risk_backtest():
@@ -779,17 +820,12 @@ def api_risk_backtest():
       days=90                   lookback period
       latest=1                  return the last saved run instead of recomputing
     """
-    import sys as _sys
-    from pathlib import Path as _Path
-    _root = _Path.home() / 'Code' / 'Sapphire'
-    if str(_root) not in _sys.path:
-        _sys.path.insert(0, str(_root))
     try:
         from lib.analytics.backtest import Backtester, BacktestConfig, DEFAULT_SYMBOLS
         if request.args.get('latest') == '1':
-            latest = _root / 'data' / 'backtests' / 'latest.json'
-            if latest.exists():
-                return jsonify(json.loads(latest.read_text()))
+            for cand in (r / 'data' / 'backtests' / 'latest.json' for r in _DASHBOARD_ROOTS):
+                if cand.exists():
+                    return jsonify(json.loads(cand.read_text()))
             return jsonify({"error": "no cached backtest"}), 404
         syms_arg = request.args.get('symbols')
         symbols = tuple(s.strip() for s in syms_arg.split(',') if s.strip()) if syms_arg else DEFAULT_SYMBOLS

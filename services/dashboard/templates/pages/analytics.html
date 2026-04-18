@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<div class="grid grid-4" style="margin-bottom: var(--space-xl);">
+    <div class="stat-card">
+        <div class="stat-label">Primary Symbol</div>
+        <div class="stat-value" id="a-primary">—</div>
+        <div class="stat-change" id="a-generated">Loading…</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Total Return (WITH regime)</div>
+        <div class="stat-value" id="a-return-on" style="color: var(--success);">—</div>
+        <div class="stat-change" id="a-return-delta">vs without: —</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Sharpe (WITH regime)</div>
+        <div class="stat-value" id="a-sharpe-on">—</div>
+        <div class="stat-change" id="a-sharpe-off">without: —</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Max Drawdown</div>
+        <div class="stat-value" id="a-maxdd" style="color: var(--danger);">—</div>
+        <div class="stat-change" id="a-winrate">Win rate: —</div>
+    </div>
+</div>
+
+<!-- Equity curve with BTC benchmark -->
+<div class="card" style="margin-bottom: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-chart-line" style="margin-right: 8px; color: var(--primary);"></i>Equity Curve vs BTC Buy-and-Hold</h3>
+        <span class="badge badge-info" id="a-symbol-badge">—</span>
+    </div>
+    <div class="card-body" style="height: 380px;"><canvas id="equity-chart"></canvas></div>
+</div>
+
+<div class="grid grid-2">
+    <!-- Rolling Sharpe -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-wave-square"></i>&nbsp;30-day Rolling Sharpe</h3>
+        </div>
+        <div class="card-body" style="height: 300px;"><canvas id="sharpe-chart"></canvas></div>
+    </div>
+
+    <!-- Signal quality scatter -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-bullseye"></i>&nbsp;Signal Quality (confidence vs outcome)</h3>
+        </div>
+        <div class="card-body" style="height: 300px;"><canvas id="quality-chart"></canvas></div>
+    </div>
+
+    <!-- Regime breakdown -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-layer-group"></i>&nbsp;Performance by Regime</h3>
+        </div>
+        <div class="card-body">
+            <table class="data-table">
+                <thead><tr><th>Regime</th><th>Trades</th><th>Win Rate</th><th>Avg PnL %</th><th>Total $</th></tr></thead>
+                <tbody id="regime-tbody"><tr><td colspan="5" class="loading">Loading…</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Monthly returns heatmap -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-calendar"></i>&nbsp;Monthly Returns</h3>
+        </div>
+        <div class="card-body">
+            <div id="monthly-heatmap" class="loading">Loading…</div>
+        </div>
+    </div>
+</div>
+
+<!-- WITH vs WITHOUT comparison table -->
+<div class="card" style="margin-top: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-balance-scale"></i>&nbsp;Regime Enhancement Lift</h3>
+    </div>
+    <div class="card-body">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th rowspan="2">Symbol</th>
+                    <th colspan="2">Return %</th>
+                    <th colspan="2">Sharpe</th>
+                    <th colspan="2">Max DD %</th>
+                    <th colspan="2">Win Rate</th>
+                    <th colspan="2">Trades</th>
+                </tr>
+                <tr>
+                    <th>off</th><th>on</th>
+                    <th>off</th><th>on</th>
+                    <th>off</th><th>on</th>
+                    <th>off</th><th>on</th>
+                    <th>off</th><th>on</th>
+                </tr>
+            </thead>
+            <tbody id="summary-tbody"><tr><td colspan="11" class="loading">Loading…</td></tr></tbody>
+        </table>
+    </div>
+</div>
+
+<style>
+  .data-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .data-table th, .data-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--border, #333); }
+  .data-table th { font-weight: 600; color: var(--muted, #888); }
+  .heatmap-row { display: grid; grid-template-columns: 60px repeat(12, 1fr); gap: 2px; margin-bottom: 2px; }
+  .heatmap-cell { padding: 6px; text-align: center; border-radius: 3px; font-size: 0.75rem; }
+  .heatmap-label { font-weight: 600; padding: 6px; }
+</style>
+
+<script>
+(async function analyticsBootstrap() {
+  const TEXT = getComputedStyle(document.body).getPropertyValue('--text').trim() || '#ccc';
+  const MUTED = '#666';
+  Chart.defaults.color = TEXT;
+  Chart.defaults.borderColor = 'rgba(255,255,255,0.08)';
+
+  function fmt(n, d) { d = (d == null) ? 2 : d; return (n == null || !isFinite(n)) ? '—' : Number(n).toFixed(d); }
+  function pctColor(v) {
+    if (v == null || !isFinite(v) || v === 0) return '#222';
+    const clamped = Math.max(-10, Math.min(10, v));
+    if (clamped >= 0) return `rgba(34, 197, 94, ${0.15 + (clamped / 10) * 0.65})`;
+    return `rgba(239, 68, 68, ${0.15 + (Math.abs(clamped) / 10) * 0.65})`;
+  }
+
+  let resp;
+  try {
+    resp = await fetch('/api/analytics/performance').then(r => r.json());
+  } catch (e) {
+    document.getElementById('a-generated').textContent = 'fetch failed: ' + e.message;
+    return;
+  }
+  if (resp.error) {
+    document.getElementById('a-generated').textContent = resp.error;
+    return;
+  }
+
+  document.getElementById('a-primary').textContent = resp.primary_symbol || '—';
+  document.getElementById('a-symbol-badge').textContent = resp.primary_symbol || '—';
+  document.getElementById('a-generated').textContent = (resp.generated_at || '').replace('T', ' ').slice(0, 19);
+
+  const primaryRow = (resp.summary || []).find(r => r.symbol === resp.primary_symbol);
+  if (primaryRow) {
+    const on = primaryRow.with_regime || {}, off = primaryRow.without_regime || {};
+    document.getElementById('a-return-on').textContent = fmt(on.total_return_pct) + '%';
+    document.getElementById('a-return-delta').textContent = 'vs without: ' + fmt(off.total_return_pct) + '%';
+    document.getElementById('a-sharpe-on').textContent = fmt(on.sharpe);
+    document.getElementById('a-sharpe-off').textContent = 'without: ' + fmt(off.sharpe);
+    document.getElementById('a-maxdd').textContent = fmt(on.max_drawdown_pct) + '%';
+    document.getElementById('a-winrate').textContent = 'Win rate: ' + fmt((on.win_rate || 0) * 100, 1) + '%';
+  }
+
+  // Equity curve
+  const eqLabels = (resp.equity_curve || []).map(p => p.date);
+  const eqValues = (resp.equity_curve || []).map(p => p.value);
+  const eqOff = (resp.equity_curve_off || []).map(p => p.value);
+  const benchValues = (resp.benchmark_curve || []).map(p => p.value);
+  new Chart(document.getElementById('equity-chart'), {
+    type: 'line',
+    data: {
+      labels: eqLabels,
+      datasets: [
+        { label: 'WITH regime', data: eqValues, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.15)', tension: 0.1, pointRadius: 0, fill: false },
+        { label: 'WITHOUT regime', data: eqOff, borderColor: '#f59e0b', tension: 0.1, pointRadius: 0, fill: false, borderDash: [4, 4] },
+        { label: 'Buy & hold', data: benchValues, borderColor: '#60a5fa', tension: 0.1, pointRadius: 0, fill: false, borderDash: [2, 2] },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } },
+      scales: { x: { ticks: { maxTicksLimit: 10, color: MUTED } }, y: { ticks: { color: MUTED } } }
+    }
+  });
+
+  // Rolling Sharpe
+  const rs = resp.rolling_sharpe || [];
+  new Chart(document.getElementById('sharpe-chart'), {
+    type: 'line',
+    data: {
+      labels: rs.map(p => p.date),
+      datasets: [{ label: '30d Sharpe', data: rs.map(p => p.sharpe), borderColor: '#a855f7', backgroundColor: 'rgba(168,85,247,0.1)', tension: 0.2, pointRadius: 0, fill: true }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { ticks: { maxTicksLimit: 8, color: MUTED } }, y: { ticks: { color: MUTED } } }
+    }
+  });
+
+  // Signal quality scatter
+  const regimeColors = {
+    TREND_UP:   '#22c55e',
+    TREND_DOWN: '#ef4444',
+    RANGE:      '#94a3b8',
+    VOLATILE:   '#f59e0b',
+    UNKNOWN:    '#6b7280',
+    RISK_ON:    '#22c55e',
+    RISK_OFF:   '#ef4444',
+  };
+  const byRegime = {};
+  for (const p of (resp.signal_quality || [])) {
+    const key = p.regime || 'UNKNOWN';
+    (byRegime[key] = byRegime[key] || []).push({ x: p.confidence, y: p.pnl_pct });
+  }
+  new Chart(document.getElementById('quality-chart'), {
+    type: 'scatter',
+    data: {
+      datasets: Object.entries(byRegime).map(([regime, pts]) => ({
+        label: regime, data: pts,
+        backgroundColor: regimeColors[regime] || '#888', pointRadius: 4,
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } },
+      scales: {
+        x: { title: { display: true, text: 'Confidence' }, min: 0, max: 1, ticks: { color: MUTED } },
+        y: { title: { display: true, text: 'PnL %' }, ticks: { color: MUTED } }
+      }
+    }
+  });
+
+  // Regime breakdown table
+  const tb = document.getElementById('regime-tbody');
+  tb.innerHTML = '';
+  for (const r of (resp.regime_breakdown || [])) {
+    tb.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td><strong style="color:${regimeColors[r.regime] || '#aaa'}">${r.regime}</strong></td>
+        <td>${r.trade_count}</td>
+        <td>${fmt(r.win_rate * 100, 1)}%</td>
+        <td>${fmt(r.avg_pnl_pct, 2)}%</td>
+        <td style="color:${r.total_pnl >= 0 ? '#22c55e' : '#ef4444'}">$${fmt(r.total_pnl)}</td>
+      </tr>`);
+  }
+  if (!resp.regime_breakdown || !resp.regime_breakdown.length) {
+    tb.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">No trades in backtest window</td></tr>';
+  }
+
+  // Monthly heatmap
+  const hm = document.getElementById('monthly-heatmap');
+  hm.classList.remove('loading');
+  hm.innerHTML = '';
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  // header row
+  let header = '<div class="heatmap-row"><div class="heatmap-label"></div>';
+  for (const m of MONTHS) header += `<div class="heatmap-label" style="color:var(--muted);text-align:center;font-size:0.7rem">${m}</div>`;
+  header += '</div>';
+  hm.insertAdjacentHTML('beforeend', header);
+  const entries = Object.entries(resp.monthly_returns || {});
+  if (!entries.length) {
+    hm.insertAdjacentHTML('beforeend', '<div style="color:var(--muted);padding:12px">No monthly data</div>');
+  }
+  for (const [year, months] of entries) {
+    let row = `<div class="heatmap-row"><div class="heatmap-label">${year}</div>`;
+    for (const v of months) {
+      const val = Number(v || 0);
+      row += `<div class="heatmap-cell" style="background:${pctColor(val)};color:${Math.abs(val)>3?'#fff':'#ccc'}" title="${fmt(val,2)}%">${val === 0 ? '' : fmt(val, 1)}</div>`;
+    }
+    row += '</div>';
+    hm.insertAdjacentHTML('beforeend', row);
+  }
+
+  // Summary table
+  const sb = document.getElementById('summary-tbody');
+  sb.innerHTML = '';
+  for (const row of (resp.summary || [])) {
+    const on = row.with_regime || {}, off = row.without_regime || {};
+    const wrPct = v => (v == null ? '—' : fmt(v * 100, 1) + '%');
+    sb.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td><strong>${row.symbol}</strong></td>
+        <td>${fmt(off.total_return_pct)}%</td><td>${fmt(on.total_return_pct)}%</td>
+        <td>${fmt(off.sharpe)}</td><td>${fmt(on.sharpe)}</td>
+        <td>${fmt(off.max_drawdown_pct)}%</td><td>${fmt(on.max_drawdown_pct)}%</td>
+        <td>${wrPct(off.win_rate)}</td><td>${wrPct(on.win_rate)}</td>
+        <td>${off.trade_count ?? '—'}</td><td>${on.trade_count ?? '—'}</td>
+      </tr>`);
+  }
+})();
+</script>
+{% endblock %}
