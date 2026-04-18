@@ -1,8 +1,8 @@
 # Sapphire OS — System Upgrade Plan
 ## Multi-Tier Inference: Windows GPU + Mac Local + Kimi Cloud + Pi (future)
 
-**Date:** 2026-04-10  
-**Status:** Phase 1-3 Complete — awaiting API key to activate Kimi Cloud  
+**Date:** 2026-04-10 (updated 2026-04-14)  
+**Status:** Phase 1-4 Complete — Pi tier live (rari1 + rari2), Kimi Cloud pending API key renewal  
 **Author:** Architecture audit → implementation
 
 ---
@@ -42,10 +42,11 @@ sapphire_dispatch tool
 ```
 hermes-agent (Telegram bot)
     └── inference-proxy:11435
-            ├── T1: Windows GPU Ollama:11434    ← primary (native /api/chat)
-            ├── T2: Mac Local Ollama:11434       ← fallback 1 (/v1/ compat)
-            ├── T3: Kimi Cloud API               ← fallback 2 (Moonshot/OpenRouter)
-            └── T4: Pi Ollama (optional, stub)   ← future: re-activate when Pi back
+            ├── T1: Windows GPU Ollama:11434    ← primary (native /api/chat) ~0.4s
+            ├── T2: Pi rari1 (100.120.191.1)    ← fallback 1, nemotron-mini:latest, 90s timeout
+            │   Pi rari2 (100.87.225.89)        ← fallback 1b, nemotron-mini:latest, 90s timeout
+            ├── T3: Mac Local Ollama:11434       ← fallback 2 (/v1/ compat, CPU ~90s)
+            └── T4: Kimi Cloud API               ← fallback 3 (Moonshot — needs API key renewal)
 
 sapphire_dispatch (plugin router)
     ├── T0: Nemotron GPU (free, via inference-proxy)
@@ -77,7 +78,7 @@ Files to create:
 
 **Auth strategy:** Use OpenRouter as primary (key likely already set for hermes) with Moonshot direct as secondary.
 
-### Phase 2: inference-proxy upgrade ✅ → In Progress
+### Phase 2: inference-proxy upgrade ✅ Complete
 **Goal:** Add Kimi Cloud as 3rd tier fallback so hermes-agent never goes dark.
 
 Changes to `services/inference-proxy/app.py`:
@@ -116,23 +117,32 @@ OPENROUTER_API_KEY=<already set for hermes>     # via OpenRouter
 
 ---
 
-## 4. Pi Future-Proofing
+## 4. Pi Tier — Active Production (2026-04-14)
 
-Pis (rari1/rari2) are decommissioned (WiFi incompatible). When re-activated:
+Both Pis are live inference nodes on the Tailscale mesh:
+
+| Node | IP | Status | Models | Agent |
+|------|-----|--------|--------|-------|
+| rari1 | 100.120.191.1 | ✅ ONLINE | nemotron-mini:latest, smollm2:1.7b, qwen2.5:0.5b | market-watchdog :19001 |
+| rari2 | 100.87.225.89 | ✅ ONLINE | nemotron-mini:latest, nemotron-mini:4b, gemma2:2b, qwen2.5:0.5b, smollm2:1.7b | health-monitor :19002 |
 
 ```python
-# inference-proxy stub (disabled by default)
-PI_OLLAMA = "http://100.100.1.10:11434"  # TBD: Pi Tailscale IP
-PI_ENABLED = os.getenv("PI_ENABLED", "false").lower() == "true"
+# inference-proxy — Pi T2 tier (both enabled)
+PI_RARI1 = "http://100.120.191.1:11434"
+PI_RARI2 = "http://100.87.225.89:11434"
+PI_DEFAULT_MODEL = "nemotron-mini:latest"
+PI_TIMEOUT = 90  # seconds (cold load ~72s on ARM)
 ```
 
-Activation checklist (when Pis get ethernet):
-1. Flash Pi OS (64-bit, Bookworm)
-2. Configure static IP on ethernet interface
-3. Install Ollama: `curl -fsSL https://ollama.com/install.sh | sh`
-4. Pull small models: `ollama pull nemotron-mini:4b phi3:3b`
-5. Set `PI_ENABLED=true` in inference-proxy LaunchAgent plist
-6. Update `data/device_topology.json` with Pi entries
+LaunchAgent plist (com.sapphire.inference-proxy):
+- `PI_RARI1_ENABLED=1` ✅
+- `PI_RARI2_ENABLED=1` ✅
+
+Notes:
+- Cold model load on ARM takes ~72s (`load_duration=67.4s`). 90s timeout is sufficient.
+- rari1 SSH port 22 refused — needs physical access to start sshd. Manage via Tailscale HTTP API only.
+- rari2 local: 192.168.1.21, user: rari. ProtonVPN (proton0) breaks internet if tunnel dies.
+- Health-monitor agent on rari2 checks 127.0.0.1-bound services as "down" — expected (security posture).
 
 ---
 
@@ -170,7 +180,7 @@ All changes are additive — existing Windows GPU → Mac Local path unchanged.
 | Permanent API key auth | `inference-proxy/app.py:_call_kimi_cloud` | ✅ Done |
 | Sensitivity classifier | `inference-proxy/app.py:_is_sensitive` | ✅ Existing |
 | router.py T1 HTTP API | `plugins/claw-sapphire/lib/router.py:_kimi_http` | ✅ Done |
-| Pi tier stub | `inference-proxy/app.py` (PI_RARI1/PI_RARI2) | ✅ Existing |
+| Pi tier T2 (rari1 + rari2) | `inference-proxy/app.py` (PI_RARI1/PI_RARI2) | ✅ Active — nemotron-mini:latest, 90s timeout |
 
 ## 8. Activation Steps
 

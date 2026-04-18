@@ -6,7 +6,7 @@ Autonomous trading + project management + intelligence system. Telegram-first, a
 
 ```bash
 # Test
-pytest tests/unit/ --tb=short -q           # 1,088 tests (use /usr/local/bin/python3 on Mac)
+pytest tests/unit/ --tb=short -q           # 1,251 tests (use /usr/local/bin/python3 on Mac)
 pytest plugins/claw-sapphire/tests/ -q     # 13 plugin tests
 
 # Lint
@@ -57,25 +57,41 @@ python3 plugins/claw-sapphire/tools/budget.py < /dev/null
 | `data/benchmarks/kadima-labs/` | data | Kadima Labs AI benchmark (v1-v3, 70 charts, 30 JSON) |
 | `infra/` | infra | Cloudflare Tunnel, Pi systemd, Windows setup |
 
-## Infrastructure (Pi-less since 2026-04-03)
+## Infrastructure (2026-04-13)
 
 **Mac (100.67.171.79) — commander, all services:**
 - control-plane:8082, dashboard:8080, signal-logger:18081
-- inference-proxy:11435 (multi-model failover: GPU→Mac + tier routing)
+- inference-proxy:11435 (4-tier failover: GPU→Pi→Mac→Kimi, threaded, /metrics endpoint)
 - hermes-agent gateway (ai.hermes.gateway LaunchAgent, Telegram bot)
-- OpenBB:6900, Redis:6379, Ollama:11434 (5 models)
+- OpenBB:6900, Redis:6379, Ollama:11434 (6 models)
 - regional-intel:8787 (vote monitor + intelligence console)
 
 **Windows PC (100.71.10.48) — GPU + services:**
-- Ollama:11434 (26 models, RTX 5070 Ti 16GB VRAM, OLLAMA_HOST=0.0.0.0)
-- webhook:9090 (SapphireWebhook — TradingView → Mac signal logger)
-- telemetry-dashboard:3001 (SapphireDashboard — React + WebSocket real-time viz)
-- OllamaServe (auto-start on login)
-- All repos mirrored to E:\Sapphire\Code\ (SSH key: sapphire-windows)
-- SSH: `ssh aribs@100.71.10.48` (ed25519 key on GitHub)
+- Ollama:11434 (27 models, RTX 5070 Ti 16GB VRAM, OLLAMA_HOST=0.0.0.0)
+- OLLAMA_MODELS=D:\OllamaModels set at Machine scope (required — SYSTEM service doesn't inherit user env)
+- webhook:9090, telemetry-dashboard:3001, OllamaServe (auto-start)
+- SSH: `ssh aribs@100.71.10.48`
 
-**Pi rari2 (100.87.225.89) — ONLINE** (ethernet, 3.8GB RAM): signal-logger:18081 active. Ollama pending install (run `~/Code/Sapphire/infra/pi/setup-ollama.sh`, then set `PI_OLLAMA_ENABLED=1`).
-**Pi rari1 (100.120.191.1) — OFFLINE** (WiFi incompatible).
+**Pi rari1 (100.120.191.1) — ONLINE** (Tailscale): Ollama:11434 responding (nemotron-mini, smollm2:1.7b, qwen2.5:0.5b). SSH port 22 refused — needs physical access to start sshd.
+**Pi rari2 (100.87.225.89) — OFFLINE**: needs power cycle.
+
+## Agent Workflow Discipline (Karpathy Principles)
+
+These apply to every coding task in this repo. They bias toward caution over speed — use judgment for trivial tasks.
+
+**1. Think Before Coding** — State assumptions explicitly. If multiple interpretations exist, surface them before implementing. If unclear, stop and ask. Never hide confusion.
+
+**2. Simplicity First** — Minimum code that solves the problem. No speculative features, no abstractions for single-use code, no unasked-for "flexibility". If 200 lines could be 50, rewrite it.
+
+**3. Surgical Changes** — Touch only what the request requires. Don't refactor adjacent code, don't "improve" formatting, don't delete pre-existing dead code unless asked. Every changed line must trace directly to the request.
+
+**4. Goal-Driven Execution** — Transform tasks into verifiable success criteria before starting. For multi-step tasks, state a brief plan with verification steps:
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+```
+
+Source: `andrej-karpathy-skills` — `~/Code/Sapphire/lib/core/src/sapphire_core/task_discipline.py`
 
 ## Code Style
 
@@ -129,15 +145,17 @@ python3 plugins/claw-sapphire/tools/budget.py < /dev/null
 
 ## Inference Proxy (localhost:11435)
 
-4-tier failover. hermes-agent and all plugin tools talk to this.
-- **T1 Windows GPU** (100.71.10.48:11434): native `/api/chat` (NOT `/v1/` — returns empty on Windows)
-- **T2 Pi rari2** (100.87.225.89:11434): lightweight models only (≤4B). Enable with `PI_OLLAMA_ENABLED=1`
-- **T3 Mac local** (127.0.0.1:11434): uses `/v1/chat/completions` passthrough
-- **T4 Kimi Cloud** (api.moonshot.cn): non-sensitive queries only — set `MOONSHOT_API_KEY`. NEVER route credentials, PnL, customer data, or system internals to Kimi.
-- Model tiers: `fast`→nemotron-mini, `balanced`→hermes3:8b, `deep`→qwen3:14b, `code`→qwen2.5-coder:14b, `reason`→deepseek-r1:14b, `large`→qwen2.5:32b, `kimi`→kimi-cloud
-- GPU-only models (>8B params): Windows only, 503 if down
-- Sensitivity gate: regex classifier blocks private data from reaching T4
-- Health: 60s cooldown per failed endpoint
+4-tier failover (threaded server — concurrent requests safe). hermes-agent and all plugin tools talk to this.
+- **T1 Windows GPU** (100.71.10.48:11434): native `/api/chat` (NOT `/v1/` — returns empty on Windows). ~0.4s.
+- **T2 Pi rari1** (100.120.191.1:11434): nemotron-mini, smollm2, qwen2.5:0.5b. PI_OLLAMA_ENABLED=1.
+- **T2 Pi rari2** (100.87.225.89:11434): offline. PI_OLLAMA_ENABLED=1 (will activate when rari2 back online).
+- **T3 Mac local** (127.0.0.1:11434): `/v1/chat/completions` passthrough. ~90s (CPU inference).
+- **T4 Kimi Cloud** (api.moonshot.cn): non-sensitive only. `MOONSHOT_API_KEY` loaded from `~/.sapphire/secrets.env` (mode 0600, not in plist).
+- Model aliases: `fast`/`quick`→nemotron-mini:latest, `auto`/`balanced`→hermes3:8b, `deep`→qwen3:14b, `code`→gemma4:latest, `reason`→deepseek-r1:14b, `qwen-reason`→qwen3.5:9b, `cascade`/`moe`→nemotron-cascade-2, `large`→qwen2.5:32b, `kimi`→kimi-cloud
+- GPU-only models (>8B params): Windows only, 503 if GPU down
+- Sensitivity gate: regex blocks api_key/password/jwt/SSN/CC from T4
+- Health: 60s cooldown, background 30s probe, `/metrics` endpoint
+- Endpoints: `/health`, `/metrics`, `/v1/chat/completions`, `/v1/models`
 
 ## Trading Pipeline
 
