@@ -243,8 +243,8 @@ def compute_position_size(
     # Step 5 — Regime multiplier
     regime_mult = REGIME_MULTIPLIERS.get(inp.regime, 1.0)
 
-    # Step 6 — Stage multiplier. Default to 0.0 (paper) for unknown stages so a
-    # typo in the caller's config can never promote sizing to full_live.
+    # Step 6 — Stage multiplier. Default to 0.0 (paper) for unknown stages so
+    # a typo in the caller's config can never promote sizing to full_live.
     stage_mult = cfg.stage_multipliers.get(inp.execution_stage, 0.0)
 
     # Combine

@@ -102,34 +102,6 @@ def publish(report: Report, platforms: list[str] | None = None) -> dict:
     draft_path = DRAFTS_ROOT / f"{stamp}_{report.kind}.json"
     draft_path.write_text(json.dumps(manifest, indent=2, default=str))
     manifest["manifest_path"] = str(draft_path.relative_to(REPO_ROOT))
-
-    # Publish to the event bus so dashboards and downstream automations
-    # can react (e.g. alert on a draft that failed quality gates). Never
-    # raises — content should still land on disk even if the bus is down.
-    try:
-        from lib.core.event_bus import get_bus
-        passed = sum(
-            1 for r in renderings.values()
-            if (r.get("quality") or {}).get("passed")
-        )
-        failed = sum(
-            1 for r in renderings.values()
-            if (r.get("quality") or {}).get("passed") is False
-        )
-        get_bus().publish(
-            "content.generated",
-            {
-                "kind": report.kind,
-                "platforms": list(renderings.keys()),
-                "quality_passed": passed,
-                "quality_failed": failed,
-                "manifest_path": manifest["manifest_path"],
-            },
-            source="content.publisher",
-        )
-    except Exception:
-        pass
-
     return manifest
 
 

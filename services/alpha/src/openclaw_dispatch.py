@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 try:
     import aiohttp
-except ImportError:  # pragma: no cover — aiohttp is always installed in alpha-engine
+except ImportError:  # pragma: no cover — aiohttp is always installed in the alpha service
     aiohttp = None  # type: ignore[assignment]
 
 # Default Cloud Run gateway URL; falls back to localhost for local dev.

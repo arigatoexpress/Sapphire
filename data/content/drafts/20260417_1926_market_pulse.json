@@ -1,0 +1,141 @@
+{
+  "report": {
+    "kind": "market_pulse",
+    "title": "Market Pulse \u2014 2026-04-18",
+    "generated_at": "2026-04-18T01:26:56+00:00",
+    "facts": {
+      "forecasts": [
+        {
+          "timestamp": "2026-04-11T23:39:01.251432+00:00",
+          "symbol": "BTC",
+          "direction": "neutral",
+          "confidence": 0.76,
+          "target_price": 73143.73,
+          "entry_price": 73143.73,
+          "timeframe": "24h",
+          "rsi": 78.1,
+          "macd_cross": "none",
+          "ma_trend": "bullish",
+          "bb_position": "upper_half",
+          "volume_signal": "normal",
+          "volatility": "normal",
+          "signals_bullish": 4,
+          "signals_bearish": 1,
+          "net_signal": "bullish",
+          "reasoning": "neutral (net=+1.5): MA\u2191 RSI78\u2193. Bull=2.5 Bear=1.0. RSI 78, MA bullish, BB upper_half.",
+          "actual_price": 73149,
+          "correct": true
+        },
+        {
+          "timestamp": "2026-04-11T23:39:01.251432+00:00",
+          "symbol": "ETH",
+          "direction": "neutral",
+          "confidence": 0.65,
+          "target_price": 2289.07,
+          "entry_price": 2289.07,
+          "timeframe": "24h",
+          "rsi": 74.9,
+          "macd_cross": "none",
+          "ma_trend": "bullish",
+          "bb_position": "above_upper",
+          "volume_signal": "normal",
+          "volatility": "normal",
+          "signals_bullish": 4,
+          "signals_bearish": 2,
+          "net_signal": "bullish",
+          "reasoning": "neutral (net=+0.5): MA\u2191 RSI75\u2193 BB>high. Bull=2.5 Bear=2.0. RSI 75, MA bullish, BB above_upper.",
+          "actual_price": 2288.83,
+          "correct": true
+        },
+        {
+          "timestamp": "2026-04-11T23:39:01.251432+00:00",
+          "symbol": "SOL",
+          "direction": "bearish",
+          "confidence": 0.83,
+          "target_price": 83.19,
+          "entry_price": 85.04,
+          "timeframe": "24h",
+          "rsi": 56.9,
+          "macd_cross": "none",
+          "ma_trend": "bearish",
+          "bb_position": "upper_half",
+          "volume_signal": "high",
+          "volatility": "normal",
+          "signals_bullish": 4,
+          "signals_bearish": 1,
+          "net_signal": "bullish",
+          "reasoning": "bearish (net=-2.0): MA\u2193 RSI57 Vol\u2191. Bull=0.5 Bear=2.5. RSI 57, MA bearish, BB upper_half.",
+          "actual_price": 85.06,
+          "correct": false
+        }
+      ],
+      "accuracy": 0.583,
+      "portfolio": {
+        "capital": 100000.0,
+        "initial_capital": 100000.0,
+        "pnl_pct": 0.0,
+        "open_positions": 2,
+        "symbols": [
+          "BTCUSDT",
+          "ETHUSDT"
+        ],
+        "positions": [
+          {
+            "symbol": "BTCUSDT",
+            "side": "BUY",
+            "entry_price": 72391,
+            "qty": 0.1381387189015209,
+            "size_usd": 10000.0,
+            "stop_loss": 68993.5,
+            "take_profit": 78053.5,
+            "atr": 2265,
+            "confidence": 0.85,
+            "opened_at": "2026-04-09T21:51:42.676305+00:00",
+            "peak_price": 73133,
+            "trailing_active": true
+          },
+          {
+            "symbol": "ETHUSDT",
+            "side": "BUY",
+            "entry_price": 2220,
+            "qty": 4.504504504504505,
+            "size_usd": 10000.0,
+            "stop_loss": 2080.5,
+            "take_profit": 2452.5,
+            "atr": 93,
+            "confidence": 0.85,
+            "opened_at": "2026-04-09T21:51:42.719936+00:00",
+            "peak_price": 2288.66,
+            "trailing_active": true
+          }
+        ]
+      }
+    },
+    "body": "Market pulse: BTC neutral \u2192 $73143.73; ETH neutral \u2192 $2289.07; SOL bearish \u2192 $83.19. Model accuracy 58.3%, paper book at +0.00%.",
+    "sources": [
+      "data/trading_predictions.jsonl",
+      "data/paper_portfolio.json"
+    ],
+    "tags": [
+      "crypto",
+      "pulse",
+      "daily"
+    ]
+  },
+  "renderings": {
+    "x": {
+      "path": "data/content/ready/x/20260417_1926_market_pulse.jsonl",
+      "quality": {
+        "passed": false,
+        "banned_hits": [],
+        "number_count": 5,
+        "word_count": 21,
+        "avg_sentence_words": 10.5,
+        "reasons": [
+          "too_short (21<30 words)"
+        ]
+      }
+    }
+  },
+  "published_at": "2026-04-17T19:26:56"
+}

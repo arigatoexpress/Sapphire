@@ -29,11 +29,15 @@ PUBSUB_EMULATOR_HOST = os.getenv("PUBSUB_EMULATOR_HOST")
 PROJECT_ID = os.getenv("GCP_PROJECT_ID", "sapphire-479610")
 SUBSCRIPTION_ACK_DEADLINE_SECONDS = max(
     10,
+    # Clamped to GCP's valid range [10, 600]. Below 10s, slow handlers trigger
+    # redelivery storms; above 600s is rejected by the API.
     min(int(os.getenv("PUBSUB_SUB_ACK_DEADLINE_SECONDS", "60")), 600),
 )
 PUBLISH_RESULT_TIMEOUT_SECONDS = max(
     5.0, float(os.getenv("PUBSUB_PUBLISH_RESULT_TIMEOUT_SECONDS", "20"))
 )
+# These topics emit at tick rate (10+ Hz). Blocking on publish ack would
+# stall the trading loop; losing one message is cheaper than missing a fill.
 FIRE_AND_FORGET_TOPICS = {"position-updates", "balance-updates"}
 
 

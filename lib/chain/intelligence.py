@@ -1,642 +1,560 @@
-"""ChainIntelligence aggregator — synthesizes on-chain data into a market regime.
+"""Chain + macro regime classifier with shift alerting.
 
-The `get_regime()` method is the crown jewel: it combines BTC dominance,
-funding extremes, TVL direction, and stablecoin supply deltas into a single
-RISK_ON / RISK_OFF / TRANSITION call with a numeric confidence.
+Pulls live sentiment (alternative.me Fear & Greed), perpetual funding
+(Binance USDT-perp premium index), BTC dominance + 24h delta (CoinGecko),
+and DXY/VIX closes (yfinance) to classify the market into one of
+{RISK_ON, RISK_OFF, NEUTRAL}. Persists every snapshot to
+`data/chain/history.jsonl`, and when the classification changes vs the
+last persisted state it:
 
-Historical state is persisted to `data/chain/history.jsonl` so 24h/7d deltas
-are meaningful across process restarts.
+  * emits a Telegram p0 alert
+  * publishes a `risk-alerts` Pub/Sub message (best-effort)
+
+The module degrades gracefully — any single data source failing returns
+None for that field rather than crashing the snapshot. Classification
+uses a scoring scheme so it works with partial inputs.
 """
 
 from __future__ import annotations
 
 import json
-import statistics
-import threading
-import time
+import logging
+import os
+import subprocess
+import sys
+import urllib.error
+import urllib.request
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
+from enum import Enum
 from pathlib import Path
 
-from .sources import (
-    CoinGeckoClient,
-    DefiLlamaClient,
-    HyperliquidClient,
-    SourceError,
-)
+log = logging.getLogger(__name__)
 
-DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "chain"
+ROOT = Path(__file__).resolve().parents[2]
+DATA_DIR = ROOT / "data" / "chain"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 HISTORY_FILE = DATA_DIR / "history.jsonl"
+LAST_STATE_FILE = DATA_DIR / "last_state.json"
 
-# Funding thresholds (per 8h on Hyperliquid — equivalent to ~0.15%/day at extreme)
-FUNDING_EXTREME_POS = 0.00050   # 0.05%/8h → crowded longs
-FUNDING_EXTREME_NEG = -0.00050  # 0.05%/8h → crowded shorts
-FUNDING_ELEVATED = 0.00020
+NOTIFY_TOOL = ROOT / "plugins" / "claw-sapphire" / "tools" / "notify.py"
 
-MAJOR_PERPS = ["BTC", "ETH", "SOL", "AVAX", "LINK", "DOGE", "ARB", "OP", "SUI", "APT"]
-
-
-# ---------------------------------------------------------------------------
-# Dataclasses
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class MarketOverview:
-    timestamp: str
-    total_market_cap_usd: float
-    total_volume_24h_usd: float
-    btc_dominance: float
-    eth_dominance: float
-    market_cap_change_24h_pct: float
-    btc_price_usd: float
-    eth_price_usd: float
-    stablecoin_total_usd: float
-    stablecoin_24h_change_pct: float | None
-
-
-@dataclass
-class PerpFunding:
-    coin: str
-    mark_price: float
-    funding_rate_8h: float
-    funding_annualized_pct: float  # APR-equivalent (×3×365)
-    open_interest_usd: float
-    day_volume_usd: float
-    extreme_flag: str  # "", "crowded_long", "crowded_short", "elevated_long", "elevated_short"
-
-
-@dataclass
-class FundingSnapshot:
-    timestamp: str
-    perps: list[PerpFunding]
-    extreme_count: int
-    avg_funding_pct: float  # mean across majors
-    majors_skew: str  # "long", "short", "neutral"
-
-
-@dataclass
-class OISnapshot:
-    timestamp: str
-    total_oi_usd: float
-    delta_24h_pct: float | None  # None on cold start
-    top_gainers: list[tuple[str, float]]  # [(coin, pct_change), ...]
-    top_losers: list[tuple[str, float]]
-
-
-@dataclass
-class TVLTrend:
-    timestamp: str
-    total_tvl_usd: float
-    tvl_7d_ago_usd: float | None
-    delta_7d_pct: float | None
-    top_chains: list[tuple[str, float]]  # [(chain, tvl), ...] top 10
-    direction: str  # "rising", "falling", "flat"
-
-
-@dataclass
-class StablecoinFlows:
-    timestamp: str
-    total_usd: float
-    tether_usd: float
-    usdc_usd: float
-    delta_24h_usd: float | None
-    delta_7d_usd: float | None
-    flow_direction: str  # "inflow" (minting), "outflow" (burning), "neutral"
-
-
-@dataclass
-class MarketRegime:
-    timestamp: str
-    state: str  # "RISK_ON", "RISK_OFF", "TRANSITION"
-    confidence: float  # 0.0 – 1.0
-    score: float  # -1.0 (max risk-off) to +1.0 (max risk-on)
-    signals: dict[str, float] = field(default_factory=dict)
-    reasoning: list[str] = field(default_factory=list)
+HTTP_TIMEOUT = 10.0
+REQUEST_HEADERS = {"User-Agent": "SapphireOS/1.0 (chain-intelligence)"}
 
 
 # ---------------------------------------------------------------------------
-# History persistence
+# Types
 # ---------------------------------------------------------------------------
 
 
-_history_lock = threading.Lock()
+class Regime(str, Enum):  # noqa: UP042 — str base is load-bearing for JSON round-trip
+    RISK_ON = "RISK_ON"
+    RISK_OFF = "RISK_OFF"
+    NEUTRAL = "NEUTRAL"
 
 
-def _append_history(snapshot: dict) -> None:
-    with _history_lock, HISTORY_FILE.open("a") as f:
-        f.write(json.dumps(snapshot) + "\n")
+@dataclass
+class RegimeClassification:
+    regime: Regime
+    score: float  # -1 (max risk-off) .. +1 (max risk-on)
+    reasons: list[str] = field(default_factory=list)
+    inputs_ok: int = 0
+    inputs_total: int = 0
 
 
-def _read_history(kind: str, max_age_secs: float) -> list[dict]:
-    """Load history entries of a given kind newer than `max_age_secs`."""
-    if not HISTORY_FILE.exists():
-        return []
-    cutoff = time.time() - max_age_secs
-    out: list[dict] = []
-    with _history_lock, HISTORY_FILE.open() as f:
-        for line in f:
+@dataclass
+class ChainSnapshot:
+    timestamp: str
+    unix_ts: int
+    fear_greed: int | None
+    fear_greed_label: str | None
+    btc_dominance: float | None
+    btc_dominance_24h_change: float | None
+    total_mcap_usd: float | None
+    total_mcap_24h_change_pct: float | None
+    btc_funding_rate_pct: float | None  # 8h funding, percent
+    eth_funding_rate_pct: float | None
+    dxy: float | None
+    dxy_1d_change_pct: float | None
+    vix: float | None
+    vix_1d_change_pct: float | None
+    classification: RegimeClassification
+
+
+@dataclass
+class RegimeShiftEvent:
+    from_regime: Regime
+    to_regime: Regime
+    from_score: float
+    to_score: float
+    timestamp: str
+    reasons: list[str]
+
+
+# ---------------------------------------------------------------------------
+# HTTP helpers (no external deps — uses urllib)
+# ---------------------------------------------------------------------------
+
+
+def _http_json(url: str, timeout: float = HTTP_TIMEOUT) -> dict | list | None:
+    try:
+        req = urllib.request.Request(url, headers=REQUEST_HEADERS)
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            raw = r.read(4 * 1024 * 1024)
+        return json.loads(raw)
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
+        log.debug("chain: fetch failed %s (%s)", url, exc)
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Data sources
+# ---------------------------------------------------------------------------
+
+
+def _fetch_fear_greed() -> tuple[int | None, str | None]:
+    """alternative.me Fear & Greed Index (0-100)."""
+    data = _http_json("https://api.alternative.me/fng/?limit=1")
+    if not isinstance(data, dict):
+        return None, None
+    items = data.get("data", [])
+    if not items:
+        return None, None
+    try:
+        value = int(items[0]["value"])
+        label = str(items[0].get("value_classification", ""))
+        return value, label
+    except (KeyError, ValueError, TypeError):
+        return None, None
+
+
+def _fetch_coingecko_global() -> dict | None:
+    data = _http_json("https://api.coingecko.com/api/v3/global")
+    if not isinstance(data, dict):
+        return None
+    return data.get("data") if isinstance(data.get("data"), dict) else None
+
+
+def _fetch_binance_funding(symbol: str) -> float | None:
+    """Binance premium index (8h funding rate). Returns percent."""
+    data = _http_json(
+        f"https://fapi.binance.com/fapi/v1/premiumIndex?symbol={symbol}",
+        timeout=6.0,
+    )
+    if not isinstance(data, dict):
+        return None
+    raw = data.get("lastFundingRate")
+    if raw is None:
+        return None
+    try:
+        return float(raw) * 100.0
+    except (TypeError, ValueError):
+        return None
+
+
+def _fetch_yf_close(ticker: str) -> tuple[float | None, float | None]:
+    """Last close and 1d % change via yfinance. Returns (close, pct_change)."""
+    try:
+        import yfinance as yf  # type: ignore
+    except ImportError:
+        return None, None
+    try:
+        data = yf.download(
+            ticker,
+            period="5d",
+            interval="1d",
+            progress=False,
+            auto_adjust=True,
+            threads=False,
+        )
+        if data is None or data.empty or "Close" not in data.columns:
+            return None, None
+        closes = data["Close"].dropna()
+        if len(closes) < 2:
+            last = float(closes.iloc[-1]) if len(closes) else None
+            return last, None
+        last = float(closes.iloc[-1])
+        prev = float(closes.iloc[-2])
+        if prev == 0:
+            return last, None
+        pct = (last - prev) / prev * 100.0
+        return last, pct
+    except Exception as exc:  # noqa: BLE001 — yfinance raises a menagerie
+        log.debug("chain: yfinance failed for %s: %s", ticker, exc)
+        return None, None
+
+
+# ---------------------------------------------------------------------------
+# Classification
+# ---------------------------------------------------------------------------
+
+
+def _score_fear_greed(v: int | None) -> tuple[float, str] | None:
+    if v is None:
+        return None
+    # Map 0-100 to -1..+1 (extreme fear -> risk-off, extreme greed -> risk-on)
+    score = (v - 50) / 50.0
+    label = "extreme fear" if v < 20 else "fear" if v < 40 else "neutral" if v < 60 else "greed" if v < 80 else "extreme greed"
+    return score, f"Fear&Greed={v} ({label})"
+
+
+def _score_funding(btc: float | None, eth: float | None) -> tuple[float, str] | None:
+    if btc is None and eth is None:
+        return None
+    parts = []
+    if btc is not None:
+        parts.append(btc)
+    if eth is not None:
+        parts.append(eth)
+    avg = sum(parts) / len(parts)
+    # >0.02% per 8h is elevated; map ±0.05% to ±1
+    score = max(-1.0, min(1.0, avg / 0.05))
+    tag = f"funding avg={avg:.3f}%"
+    return score, tag
+
+
+def _score_dominance(delta_24h: float | None) -> tuple[float, str] | None:
+    if delta_24h is None:
+        return None
+    # Rising BTC dominance = flight to safety = risk-off (alts bleeding).
+    score = max(-1.0, min(1.0, -delta_24h / 1.5))
+    return score, f"BTC dom 24h={delta_24h:+.2f}%"
+
+
+def _score_mcap_change(pct: float | None) -> tuple[float, str] | None:
+    if pct is None:
+        return None
+    score = max(-1.0, min(1.0, pct / 3.0))
+    return score, f"total mcap 24h={pct:+.2f}%"
+
+
+def _score_dxy(delta_1d: float | None) -> tuple[float, str] | None:
+    if delta_1d is None:
+        return None
+    # Dollar up = risk-off for crypto
+    score = max(-1.0, min(1.0, -delta_1d / 0.7))
+    return score, f"DXY 1d={delta_1d:+.2f}%"
+
+
+def _score_vix(vix: float | None) -> tuple[float, str] | None:
+    if vix is None:
+        return None
+    # VIX 15 = benign, 25 = stressed
+    score = max(-1.0, min(1.0, (20.0 - vix) / 10.0))
+    return score, f"VIX={vix:.1f}"
+
+
+def classify(snapshot_inputs: dict) -> RegimeClassification:
+    components: list[tuple[float, str]] = []
+    scorers = [
+        (_score_fear_greed, snapshot_inputs.get("fear_greed")),
+        (_score_funding, (snapshot_inputs.get("btc_funding_rate_pct"),
+                          snapshot_inputs.get("eth_funding_rate_pct"))),
+        (_score_dominance, snapshot_inputs.get("btc_dominance_24h_change")),
+        (_score_mcap_change, snapshot_inputs.get("total_mcap_24h_change_pct")),
+        (_score_dxy, snapshot_inputs.get("dxy_1d_change_pct")),
+        (_score_vix, snapshot_inputs.get("vix")),
+    ]
+    inputs_total = len(scorers)
+    inputs_ok = 0
+
+    for fn, arg in scorers:
+        result = fn(*arg) if isinstance(arg, tuple) else fn(arg)  # type: ignore[arg-type]
+        if result is None:
+            continue
+        inputs_ok += 1
+        components.append(result)
+
+    if inputs_ok == 0:
+        return RegimeClassification(
+            regime=Regime.NEUTRAL, score=0.0, reasons=["no inputs available"],
+            inputs_ok=0, inputs_total=inputs_total,
+        )
+
+    score = sum(s for s, _ in components) / len(components)
+    reasons = [tag for _, tag in components]
+    if score >= 0.25:
+        regime = Regime.RISK_ON
+    elif score <= -0.25:
+        regime = Regime.RISK_OFF
+    else:
+        regime = Regime.NEUTRAL
+    return RegimeClassification(
+        regime=regime, score=round(score, 3), reasons=reasons,
+        inputs_ok=inputs_ok, inputs_total=inputs_total,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Persistence
+# ---------------------------------------------------------------------------
+
+
+def _read_last_state() -> dict | None:
+    if not LAST_STATE_FILE.exists():
+        return None
+    try:
+        return json.loads(LAST_STATE_FILE.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _write_last_state(snapshot: ChainSnapshot) -> None:
+    try:
+        LAST_STATE_FILE.write_text(json.dumps({
+            "timestamp": snapshot.timestamp,
+            "unix_ts": snapshot.unix_ts,
+            "regime": snapshot.classification.regime.value,
+            "score": snapshot.classification.score,
+        }))
+    except OSError as exc:
+        log.warning("chain: could not write last_state: %s", exc)
+
+
+def _append_history(snapshot: ChainSnapshot) -> None:
+    entry = {
+        "kind": "regime",
+        "timestamp": snapshot.timestamp,
+        "unix_ts": snapshot.unix_ts,
+        "state": snapshot.classification.regime.value,
+        "score": snapshot.classification.score,
+        "reasons": snapshot.classification.reasons,
+        "inputs_ok": snapshot.classification.inputs_ok,
+        "inputs_total": snapshot.classification.inputs_total,
+        "data": {
+            "fear_greed": snapshot.fear_greed,
+            "btc_dominance": snapshot.btc_dominance,
+            "btc_dominance_24h_change": snapshot.btc_dominance_24h_change,
+            "total_mcap_24h_change_pct": snapshot.total_mcap_24h_change_pct,
+            "btc_funding_rate_pct": snapshot.btc_funding_rate_pct,
+            "eth_funding_rate_pct": snapshot.eth_funding_rate_pct,
+            "dxy": snapshot.dxy,
+            "dxy_1d_change_pct": snapshot.dxy_1d_change_pct,
+            "vix": snapshot.vix,
+        },
+    }
+    try:
+        with HISTORY_FILE.open("a") as f:
+            f.write(json.dumps(entry) + "\n")
+    except OSError as exc:
+        log.warning("chain: could not append history: %s", exc)
+
+
+# ---------------------------------------------------------------------------
+# Alerting
+# ---------------------------------------------------------------------------
+
+
+def _send_telegram(msg: str, priority: str = "p0") -> None:
+    try:
+        subprocess.run(
+            [sys.executable, str(NOTIFY_TOOL), msg, "--priority", priority],
+            capture_output=True,
+            timeout=15,
+            check=False,
+        )
+    except (subprocess.SubprocessError, OSError) as exc:
+        log.warning("chain: telegram notify failed: %s", exc)
+
+
+def _publish_pubsub(topic: str, payload: dict) -> None:
+    """Best-effort Pub/Sub publish. Skipped entirely if disabled via env.
+
+    Set SAPPHIRE_PUBSUB=0 to skip. Otherwise attempts lib/core PubSub client.
+    """
+    if os.getenv("SAPPHIRE_PUBSUB", "1") == "0":
+        return
+    try:
+        core_src = ROOT / "lib" / "core" / "src"
+        if str(core_src) not in sys.path:
+            sys.path.insert(0, str(core_src))
+        from sapphire_core.pubsub.client import get_pubsub_client  # type: ignore
+
+        client = get_pubsub_client()
+        # Reuse the running loop if one exists; otherwise, do nothing —
+        # blocking here would stall a sync caller (dashboard, CLI tools).
+        import asyncio
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        if loop is None:
+            # Fire synchronously on a short-lived loop; tolerate failure.
             try:
-                e = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if e.get("kind") != kind:
-                continue
-            ts = e.get("unix_ts")
-            if ts is None or ts < cutoff:
-                continue
-            out.append(e)
-    return out
+                asyncio.run(client.publish(topic, payload))
+            except Exception as exc:  # noqa: BLE001
+                log.debug("chain: sync pubsub publish failed: %s", exc)
+        else:
+            loop.create_task(client.publish(topic, payload))
+    except Exception as exc:  # noqa: BLE001
+        log.debug("chain: pubsub client unavailable: %s", exc)
 
 
 # ---------------------------------------------------------------------------
-# ChainIntelligence
+# Public API
 # ---------------------------------------------------------------------------
 
 
 class ChainIntelligence:
-    """Aggregator that turns raw on-chain data into decision-grade signals."""
+    """Snapshot builder + regime shift alerter.
 
-    def __init__(
-        self,
-        llama: DefiLlamaClient | None = None,
-        hyperliquid: HyperliquidClient | None = None,
-        coingecko: CoinGeckoClient | None = None,
-    ):
-        self.llama = llama or DefiLlamaClient()
-        self.hyperliquid = hyperliquid or HyperliquidClient()
-        self.coingecko = coingecko or CoinGeckoClient()
+    Instantiate and call `.snapshot()` — every call fetches fresh data (no
+    internal cache; callers should cache if needed — the dashboard already
+    uses a 10s cache around this endpoint).
+    """
 
-    # ------------------------------------------------------------------
-    # Primitive collectors
-    # ------------------------------------------------------------------
-
-    def get_market_overview(self) -> MarketOverview:
-        gm = self.coingecko.global_market()
-        prices = self.llama.prices(["coingecko:bitcoin", "coingecko:ethereum"])
-        btc = float(prices.get("coingecko:bitcoin", {}).get("price", 0.0))
-        eth = float(prices.get("coingecko:ethereum", {}).get("price", 0.0))
-        sc = self.llama.stablecoins()
-
-        # Look up 24h-ago stablecoin supply from history
-        prev = _read_history("stablecoins", 30 * 3600)
-        prev_total = None
-        if prev:
-            # Find closest to 24h ago
-            target = time.time() - 24 * 3600
-            closest = min(prev, key=lambda e: abs(e.get("unix_ts", 0) - target))
-            if abs(closest.get("unix_ts", 0) - target) < 6 * 3600:
-                prev_total = closest.get("total_usd")
-
-        delta_pct = None
-        if prev_total and prev_total > 0:
-            delta_pct = (sc.total_usd - prev_total) / prev_total * 100.0
-
+    def snapshot(self, *, alert_on_shift: bool = True) -> dict:
         now = datetime.now(UTC)
-        overview = MarketOverview(
-            timestamp=now.isoformat(),
-            total_market_cap_usd=gm.total_market_cap_usd,
-            total_volume_24h_usd=gm.total_volume_24h_usd,
-            btc_dominance=gm.btc_dominance,
-            eth_dominance=gm.eth_dominance,
-            market_cap_change_24h_pct=gm.market_cap_change_pct_24h,
-            btc_price_usd=btc,
-            eth_price_usd=eth,
-            stablecoin_total_usd=sc.total_usd,
-            stablecoin_24h_change_pct=delta_pct,
-        )
-        _append_history({
-            "kind": "stablecoins",
-            "unix_ts": now.timestamp(),
-            "total_usd": sc.total_usd,
-            "tether_usd": sc.tether_usd,
-            "usdc_usd": sc.usdc_usd,
-        })
-        _append_history({
-            "kind": "market_overview",
-            "unix_ts": now.timestamp(),
-            "btc_dominance": gm.btc_dominance,
-            "total_mcap": gm.total_market_cap_usd,
-            "btc": btc,
-            "eth": eth,
-        })
-        return overview
+        fg_value, fg_label = _fetch_fear_greed()
 
-    def get_funding_rates(self) -> FundingSnapshot:
-        ctxs = self.hyperliquid.meta_and_asset_ctxs()
-        by_coin = {c.coin: c for c in ctxs}
-        perps: list[PerpFunding] = []
-        for coin in MAJOR_PERPS:
-            c = by_coin.get(coin)
-            if not c:
-                continue
-            flag = ""
-            if c.funding_rate >= FUNDING_EXTREME_POS:
-                flag = "crowded_long"
-            elif c.funding_rate <= FUNDING_EXTREME_NEG:
-                flag = "crowded_short"
-            elif c.funding_rate >= FUNDING_ELEVATED:
-                flag = "elevated_long"
-            elif c.funding_rate <= -FUNDING_ELEVATED:
-                flag = "elevated_short"
-            perps.append(
-                PerpFunding(
-                    coin=c.coin,
-                    mark_price=c.mark_px,
-                    funding_rate_8h=c.funding_rate,
-                    funding_annualized_pct=c.funding_rate * 3 * 365 * 100,
-                    open_interest_usd=c.open_interest * c.mark_px,
-                    day_volume_usd=c.day_volume,
-                    extreme_flag=flag,
-                )
+        gl = _fetch_coingecko_global() or {}
+        btc_dominance = None
+        btc_dominance_24h_change = None
+        total_mcap_usd = None
+        total_mcap_24h_change_pct = None
+        try:
+            mcp = gl.get("market_cap_percentage") or {}
+            btc_dominance = float(mcp.get("btc")) if mcp.get("btc") is not None else None
+            # CoinGecko doesn't return dominance delta directly — derive from
+            # total mcap 24h change vs BTC price change if both present.
+            total_mcap_usd = float((gl.get("total_market_cap") or {}).get("usd")) if (gl.get("total_market_cap") or {}).get("usd") else None
+            total_mcap_24h_change_pct = (
+                float(gl.get("market_cap_change_percentage_24h_usd"))
+                if gl.get("market_cap_change_percentage_24h_usd") is not None
+                else None
             )
-        extreme_count = sum(1 for p in perps if p.extreme_flag.startswith("crowded"))
-        avg = statistics.mean(p.funding_rate_8h for p in perps) if perps else 0.0
-        if avg > FUNDING_ELEVATED:
-            skew = "long"
-        elif avg < -FUNDING_ELEVATED:
-            skew = "short"
-        else:
-            skew = "neutral"
-        now = datetime.now(UTC)
-        _append_history({
-            "kind": "funding",
-            "unix_ts": now.timestamp(),
-            "avg_funding": avg,
-            "extreme_count": extreme_count,
-            "perps": {p.coin: p.funding_rate_8h for p in perps},
-        })
-        return FundingSnapshot(
+        except (TypeError, ValueError):
+            pass
+
+        # BTC dominance delta: compare to last persisted snapshot
+        last = _read_last_state() or {}
+        if btc_dominance is not None and isinstance(last.get("btc_dominance"), (int, float)):
+            btc_dominance_24h_change = btc_dominance - float(last["btc_dominance"])
+
+        btc_funding = _fetch_binance_funding("BTCUSDT")
+        eth_funding = _fetch_binance_funding("ETHUSDT")
+
+        dxy, dxy_chg = _fetch_yf_close("DX-Y.NYB")
+        vix, _vix_chg = _fetch_yf_close("^VIX")
+
+        inputs = {
+            "fear_greed": fg_value,
+            "btc_funding_rate_pct": btc_funding,
+            "eth_funding_rate_pct": eth_funding,
+            "btc_dominance_24h_change": btc_dominance_24h_change,
+            "total_mcap_24h_change_pct": total_mcap_24h_change_pct,
+            "dxy_1d_change_pct": dxy_chg,
+            "vix": vix,
+        }
+        classification = classify(inputs)
+
+        snap = ChainSnapshot(
             timestamp=now.isoformat(),
-            perps=perps,
-            extreme_count=extreme_count,
-            avg_funding_pct=avg * 100,
-            majors_skew=skew,
+            unix_ts=int(now.timestamp()),
+            fear_greed=fg_value,
+            fear_greed_label=fg_label,
+            btc_dominance=round(btc_dominance, 3) if btc_dominance is not None else None,
+            btc_dominance_24h_change=round(btc_dominance_24h_change, 3) if btc_dominance_24h_change is not None else None,
+            total_mcap_usd=total_mcap_usd,
+            total_mcap_24h_change_pct=round(total_mcap_24h_change_pct, 2) if total_mcap_24h_change_pct is not None else None,
+            btc_funding_rate_pct=round(btc_funding, 4) if btc_funding is not None else None,
+            eth_funding_rate_pct=round(eth_funding, 4) if eth_funding is not None else None,
+            dxy=round(dxy, 3) if dxy is not None else None,
+            dxy_1d_change_pct=round(dxy_chg, 3) if dxy_chg is not None else None,
+            vix=round(vix, 2) if vix is not None else None,
+            vix_1d_change_pct=None,
+            classification=classification,
         )
 
-    def get_open_interest_delta(self, hours: int = 24) -> OISnapshot:
-        ctxs = self.hyperliquid.meta_and_asset_ctxs()
-        by_coin = {c.coin: c for c in ctxs}
-        majors = [by_coin[c] for c in MAJOR_PERPS if c in by_coin]
-        total_oi_usd = sum(c.open_interest * c.mark_px for c in majors)
+        _append_history(snap)
 
-        now = datetime.now(UTC)
-        # Record current OI in history
-        _append_history({
-            "kind": "open_interest",
-            "unix_ts": now.timestamp(),
-            "total_usd": total_oi_usd,
-            "per_coin": {c.coin: c.open_interest * c.mark_px for c in majors},
-        })
+        prev_regime = None
+        prev_score = None
+        if last.get("regime"):
+            try:
+                prev_regime = Regime(last["regime"])
+                prev_score = float(last.get("score", 0.0))
+            except (ValueError, TypeError):
+                prev_regime = None
 
-        # Retrieve historical OI
-        window = hours * 3600
-        hist = _read_history("open_interest", window + 6 * 3600)
-        prev_total: float | None = None
-        prev_per_coin: dict[str, float] = {}
-        if hist:
-            target = now.timestamp() - window
-            hist_filtered = [e for e in hist if e.get("unix_ts", 0) < now.timestamp() - 1800]
-            if hist_filtered:
-                closest = min(hist_filtered, key=lambda e: abs(e.get("unix_ts", 0) - target))
-                if abs(closest.get("unix_ts", 0) - target) < hours * 3600 * 0.5:
-                    prev_total = closest.get("total_usd")
-                    prev_per_coin = closest.get("per_coin") or {}
-
-        delta_pct = None
-        if prev_total and prev_total > 0:
-            delta_pct = (total_oi_usd - prev_total) / prev_total * 100.0
-
-        gainers: list[tuple[str, float]] = []
-        losers: list[tuple[str, float]] = []
-        if prev_per_coin:
-            for c in majors:
-                curr = c.open_interest * c.mark_px
-                prev = prev_per_coin.get(c.coin)
-                if prev and prev > 0:
-                    pct = (curr - prev) / prev * 100
-                    if pct > 0:
-                        gainers.append((c.coin, pct))
-                    elif pct < 0:
-                        losers.append((c.coin, pct))
-            gainers.sort(key=lambda x: -x[1])
-            losers.sort(key=lambda x: x[1])
-
-        return OISnapshot(
-            timestamp=now.isoformat(),
-            total_oi_usd=total_oi_usd,
-            delta_24h_pct=delta_pct,
-            top_gainers=gainers[:5],
-            top_losers=losers[:5],
-        )
-
-    def get_defi_tvl_trend(self, days: int = 7) -> TVLTrend:
-        chains = self.llama.chains()
-        total_tvl = sum(c.tvl for c in chains)
-        top = sorted(chains, key=lambda c: -c.tvl)[:10]
-
-        # Pull historical TVL
-        history = self.llama.chart_tvl()
-        prev_tvl: float | None = None
-        if history:
-            target_ts = int(time.time()) - days * 86400
-            # history is sorted ascending by date
-            closest = min(history, key=lambda p: abs(p[0] - target_ts))
-            if abs(closest[0] - target_ts) < 2 * 86400:
-                prev_tvl = closest[1]
-
-        delta_pct = None
-        direction = "flat"
-        if prev_tvl and prev_tvl > 0:
-            delta_pct = (total_tvl - prev_tvl) / prev_tvl * 100.0
-            if delta_pct > 1.5:
-                direction = "rising"
-            elif delta_pct < -1.5:
-                direction = "falling"
-
-        now = datetime.now(UTC)
-        return TVLTrend(
-            timestamp=now.isoformat(),
-            total_tvl_usd=total_tvl,
-            tvl_7d_ago_usd=prev_tvl,
-            delta_7d_pct=delta_pct,
-            top_chains=[(c.name, c.tvl) for c in top],
-            direction=direction,
-        )
-
-    def get_stablecoin_flows(self) -> StablecoinFlows:
-        sc = self.llama.stablecoins()
-        now = datetime.now(UTC)
-
-        hist = _read_history("stablecoins", 8 * 86400)
-        delta_24h: float | None = None
-        delta_7d: float | None = None
-        if hist:
-            t24 = now.timestamp() - 86400
-            t7 = now.timestamp() - 7 * 86400
-            h24 = min(hist, key=lambda e: abs(e.get("unix_ts", 0) - t24))
-            h7 = min(hist, key=lambda e: abs(e.get("unix_ts", 0) - t7))
-            if abs(h24.get("unix_ts", 0) - t24) < 6 * 3600:
-                delta_24h = sc.total_usd - float(h24.get("total_usd") or 0)
-            if abs(h7.get("unix_ts", 0) - t7) < 36 * 3600:
-                delta_7d = sc.total_usd - float(h7.get("total_usd") or 0)
-
-        # Classify on 24h
-        flow = "neutral"
-        if delta_24h is not None:
-            pct = delta_24h / sc.total_usd * 100 if sc.total_usd else 0
-            if pct > 0.3:
-                flow = "inflow"
-            elif pct < -0.3:
-                flow = "outflow"
-
-        return StablecoinFlows(
-            timestamp=now.isoformat(),
-            total_usd=sc.total_usd,
-            tether_usd=sc.tether_usd,
-            usdc_usd=sc.usdc_usd,
-            delta_24h_usd=delta_24h,
-            delta_7d_usd=delta_7d,
-            flow_direction=flow,
-        )
-
-    # ------------------------------------------------------------------
-    # Regime synthesizer (the crown jewel)
-    # ------------------------------------------------------------------
-
-    def get_regime(self) -> MarketRegime:
-        """Synthesize a market regime from all inputs.
-
-        Each input contributes a sub-score in [-1, +1]. The final score is
-        a weighted average; >0.2 = RISK_ON, <-0.2 = RISK_OFF, else TRANSITION.
-        Confidence is derived from the magnitude of the score and the
-        agreement between inputs.
-        """
-        now = datetime.now(UTC)
-        signals: dict[str, float] = {}
-        reasoning: list[str] = []
-        weights: dict[str, float] = {}
-        failures: list[str] = []
-
-        # ── BTC dominance direction ──
-        try:
-            overview = self.get_market_overview()
-            dom = overview.btc_dominance
-            mcap_change = overview.market_cap_change_24h_pct
-            # Rising dominance + falling total mcap = risk-off (flight to BTC)
-            dom_score = 0.0
-            if mcap_change > 1.5:
-                dom_score += 0.3
-                reasoning.append(f"Total mcap +{mcap_change:.1f}% 24h → risk-on")
-            elif mcap_change < -1.5:
-                dom_score -= 0.3
-                reasoning.append(f"Total mcap {mcap_change:.1f}% 24h → risk-off")
-            if dom > 58:
-                dom_score -= 0.2
-                reasoning.append(f"BTC.D {dom:.1f}% elevated (alt weakness)")
-            elif dom < 50:
-                dom_score += 0.2
-                reasoning.append(f"BTC.D {dom:.1f}% low (alt strength)")
-            signals["market"] = max(-1.0, min(1.0, dom_score))
-            weights["market"] = 0.25
-        except SourceError as e:
-            failures.append(f"market_overview: {e}")
-
-        # ── Funding rates ──
-        try:
-            funding = self.get_funding_rates()
-            avg = funding.avg_funding_pct / 100
-            # Moderately positive funding = healthy; extreme = crowded = inversion risk
-            f_score = 0.0
-            if avg > FUNDING_EXTREME_POS:
-                f_score -= 0.4  # Crowded long = contrarian bearish
-                reasoning.append(f"Funding extreme long ({avg*100*3*365:.1f}% APR) → overheated")
-            elif avg > FUNDING_ELEVATED:
-                f_score += 0.2  # Healthy long bias
-                reasoning.append(f"Funding healthy long ({avg*100*3*365:.1f}% APR)")
-            elif avg < FUNDING_EXTREME_NEG:
-                f_score += 0.4  # Crowded short = contrarian bullish
-                reasoning.append("Funding extreme short → squeeze potential")
-            elif avg < -FUNDING_ELEVATED:
-                f_score -= 0.2
-                reasoning.append(f"Funding bearish ({avg*100*3*365:.1f}% APR)")
-            else:
-                reasoning.append(f"Funding neutral ({avg*100*3*365:+.1f}% APR)")
-            signals["funding"] = max(-1.0, min(1.0, f_score))
-            weights["funding"] = 0.25
-        except SourceError as e:
-            failures.append(f"funding: {e}")
-
-        # ── Open interest ──
-        try:
-            oi = self.get_open_interest_delta()
-            oi_score = 0.0
-            if oi.delta_24h_pct is not None:
-                if oi.delta_24h_pct > 3:
-                    oi_score += 0.3
-                    reasoning.append(f"OI +{oi.delta_24h_pct:.1f}% 24h — fresh longs")
-                elif oi.delta_24h_pct < -3:
-                    oi_score -= 0.3
-                    reasoning.append(f"OI {oi.delta_24h_pct:.1f}% 24h — deleveraging")
-            signals["oi"] = max(-1.0, min(1.0, oi_score))
-            weights["oi"] = 0.15
-        except SourceError as e:
-            failures.append(f"oi: {e}")
-
-        # ── DeFi TVL ──
-        try:
-            tvl = self.get_defi_tvl_trend(days=7)
-            t_score = 0.0
-            if tvl.delta_7d_pct is not None:
-                if tvl.direction == "rising":
-                    t_score = min(0.5, tvl.delta_7d_pct / 10)
-                    reasoning.append(f"TVL +{tvl.delta_7d_pct:.1f}% 7d → DeFi expanding")
-                elif tvl.direction == "falling":
-                    t_score = max(-0.5, tvl.delta_7d_pct / 10)
-                    reasoning.append(f"TVL {tvl.delta_7d_pct:.1f}% 7d → DeFi contracting")
-            signals["tvl"] = max(-1.0, min(1.0, t_score))
-            weights["tvl"] = 0.15
-        except SourceError as e:
-            failures.append(f"tvl: {e}")
-
-        # ── Stablecoin flows ──
-        try:
-            sc = self.get_stablecoin_flows()
-            s_score = 0.0
-            if sc.delta_7d_usd is not None:
-                if sc.flow_direction == "inflow":
-                    s_score = 0.3
-                    reasoning.append(f"Stablecoins +${sc.delta_7d_usd/1e9:+.1f}B 7d → fiat entering")
-                elif sc.flow_direction == "outflow":
-                    s_score = -0.3
-                    reasoning.append(f"Stablecoins ${sc.delta_7d_usd/1e9:+.1f}B 7d → fiat exiting")
-            signals["stablecoins"] = max(-1.0, min(1.0, s_score))
-            weights["stablecoins"] = 0.20
-        except SourceError as e:
-            failures.append(f"stablecoins: {e}")
-
-        # ── Weighted score ──
-        if not signals:
-            return MarketRegime(
-                timestamp=now.isoformat(),
-                state="TRANSITION",
-                confidence=0.0,
-                score=0.0,
-                signals={},
-                reasoning=["All data sources failed"] + failures,
+        shift: RegimeShiftEvent | None = None
+        if prev_regime is not None and prev_regime != classification.regime:
+            shift = RegimeShiftEvent(
+                from_regime=prev_regime,
+                to_regime=classification.regime,
+                from_score=prev_score if prev_score is not None else 0.0,
+                to_score=classification.score,
+                timestamp=snap.timestamp,
+                reasons=classification.reasons,
             )
-        total_weight = sum(weights[k] for k in signals)
-        score = sum(signals[k] * weights[k] for k in signals) / total_weight
+            if alert_on_shift:
+                self._handle_shift(shift, snap)
 
-        if score >= 0.2:
-            state = "RISK_ON"
-        elif score <= -0.2:
-            state = "RISK_OFF"
-        else:
-            state = "TRANSITION"
+        # Persist last_state AFTER dispatching the shift so a crash mid-alert
+        # results in the shift being re-detected on next run rather than lost.
+        # Also stash btc_dominance so the next call can compute delta.
+        try:
+            payload = {
+                "timestamp": snap.timestamp,
+                "unix_ts": snap.unix_ts,
+                "regime": classification.regime.value,
+                "score": classification.score,
+                "btc_dominance": btc_dominance,
+            }
+            LAST_STATE_FILE.write_text(json.dumps(payload))
+        except OSError as exc:
+            log.warning("chain: could not write last_state: %s", exc)
 
-        # Confidence: magnitude × agreement (how many signals agree with final call)
-        if score > 0:
-            agreement = sum(1 for v in signals.values() if v > 0) / len(signals)
-        elif score < 0:
-            agreement = sum(1 for v in signals.values() if v < 0) / len(signals)
-        else:
-            agreement = 0.5
-        confidence = min(1.0, abs(score) * agreement * 2)
+        result = asdict(snap)
+        if shift:
+            result["regime_shift"] = {
+                "from": shift.from_regime.value,
+                "to": shift.to_regime.value,
+                "from_score": shift.from_score,
+                "to_score": shift.to_score,
+                "reasons": shift.reasons,
+            }
+        return result
 
-        if failures:
-            reasoning.extend(f"⚠ {f}" for f in failures)
-
-        # Persist regime row so correlation.regime_adjusted_matrices can
-        # bucket historical returns by RISK_ON / RISK_OFF days.
-        _append_history({
-            "kind": "regime",
-            "unix_ts": now.timestamp(),
-            "state": state,
-            "score": round(score, 3),
-            "confidence": round(confidence, 3),
-        })
-
-        return MarketRegime(
-            timestamp=now.isoformat(),
-            state=state,
-            confidence=round(confidence, 3),
-            score=round(score, 3),
-            signals={k: round(v, 3) for k, v in signals.items()},
-            reasoning=reasoning,
+    def _handle_shift(self, shift: RegimeShiftEvent, snap: ChainSnapshot) -> None:
+        arrow = "→"
+        msg = (
+            f"*Regime shift*: {shift.from_regime.value} {arrow} {shift.to_regime.value}\n"
+            f"Score: {shift.from_score:+.2f} {arrow} {shift.to_score:+.2f}\n"
+            f"\n"
+            + "\n".join(f"• {r}" for r in shift.reasons[:6])
         )
-
-    # ------------------------------------------------------------------
-    # Unified dict for API
-    # ------------------------------------------------------------------
-
-    def snapshot(self) -> dict:
-        """Unified dict of every metric — used by /api/chain/overview."""
-        out: dict = {"generated_at": datetime.now(UTC).isoformat()}
-        try:
-            out["overview"] = asdict(self.get_market_overview())
-        except SourceError as e:
-            out["overview_error"] = str(e)
-        try:
-            out["funding"] = asdict(self.get_funding_rates())
-        except SourceError as e:
-            out["funding_error"] = str(e)
-        try:
-            out["open_interest"] = asdict(self.get_open_interest_delta())
-        except SourceError as e:
-            out["open_interest_error"] = str(e)
-        try:
-            out["tvl"] = asdict(self.get_defi_tvl_trend())
-        except SourceError as e:
-            out["tvl_error"] = str(e)
-        try:
-            out["stablecoins"] = asdict(self.get_stablecoin_flows())
-        except SourceError as e:
-            out["stablecoins_error"] = str(e)
-        try:
-            out["regime"] = asdict(self.get_regime())
-        except SourceError as e:
-            out["regime_error"] = str(e)
-        return out
+        _send_telegram(msg, priority="p0")
+        _publish_pubsub("risk-alerts", {
+            "kind": "regime_shift",
+            "from": shift.from_regime.value,
+            "to": shift.to_regime.value,
+            "from_score": shift.from_score,
+            "to_score": shift.to_score,
+            "timestamp": shift.timestamp,
+            "reasons": shift.reasons,
+            "snapshot": {
+                "fear_greed": snap.fear_greed,
+                "btc_funding_rate_pct": snap.btc_funding_rate_pct,
+                "vix": snap.vix,
+                "dxy_1d_change_pct": snap.dxy_1d_change_pct,
+                "btc_dominance_24h_change": snap.btc_dominance_24h_change,
+            },
+        })
+        log.warning(
+            "chain: regime shift %s -> %s (score %+.2f -> %+.2f)",
+            shift.from_regime.value, shift.to_regime.value,
+            shift.from_score, shift.to_score,
+        )
 
 
 # ---------------------------------------------------------------------------
-# CLI smoke test
+# CLI
 # ---------------------------------------------------------------------------
 
-
-if __name__ == "__main__":
-    ci = ChainIntelligence()
-
-    print("=== Market Overview ===")
-    ov = ci.get_market_overview()
-    print(f"BTC.D: {ov.btc_dominance:.2f}% | total mcap: ${ov.total_market_cap_usd:,.0f} | 24h: {ov.market_cap_change_24h_pct:+.2f}%")
-    print(f"Stablecoins: ${ov.stablecoin_total_usd:,.0f}")
-
-    print("\n=== Funding ===")
-    f = ci.get_funding_rates()
-    print(f"Avg: {f.avg_funding_pct:+.4f}% per 8h | skew: {f.majors_skew} | extremes: {f.extreme_count}")
-    for p in f.perps[:5]:
-        print(f"  {p.coin:6} {p.funding_rate_8h*100:+.4f}%/8h  OI=${p.open_interest_usd/1e6:.1f}M  flag={p.extreme_flag}")
-
-    print("\n=== Open Interest ===")
-    oi = ci.get_open_interest_delta()
-    print(f"Total OI: ${oi.total_oi_usd/1e9:.2f}B | 24h: {oi.delta_24h_pct}")
-
-    print("\n=== TVL ===")
-    tvl = ci.get_defi_tvl_trend()
-    print(f"Total: ${tvl.total_tvl_usd/1e9:.1f}B | 7d: {tvl.delta_7d_pct}  direction={tvl.direction}")
-    for name, v in tvl.top_chains[:5]:
-        print(f"  {name:12} ${v/1e9:.1f}B")
-
-    print("\n=== Stablecoin Flows ===")
-    sc = ci.get_stablecoin_flows()
-    print(f"Total: ${sc.total_usd/1e9:.1f}B | 24h: {sc.delta_24h_usd} | 7d: {sc.delta_7d_usd} | flow={sc.flow_direction}")
-
-    print("\n=== REGIME ===")
-    r = ci.get_regime()
-    print(f"STATE: {r.state} (score={r.score:+.3f}, conf={r.confidence:.2f})")
-    print(f"Signals: {r.signals}")
-    for reason in r.reasoning:
-        print(f"  • {reason}")
+if __name__ == "__main__":  # pragma: no cover
+    logging.basicConfig(level=logging.INFO)
+    snap = ChainIntelligence().snapshot()
+    print(json.dumps(snap, indent=2, default=str))

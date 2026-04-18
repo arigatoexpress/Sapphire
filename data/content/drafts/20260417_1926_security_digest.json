@@ -1,0 +1,94 @@
+{
+  "report": {
+    "kind": "security_digest",
+    "title": "Sapphire Security Digest \u2014 2026-04-18",
+    "generated_at": "2026-04-18T01:26:56+00:00",
+    "facts": {
+      "top_cves": [
+        {
+          "title": "Ivanti Endpoint Manager Mobile (EPMM): Ivanti Endpoint Manager Mobile (EPMM) Code Injection Vulnerability",
+          "cve": "CVE-2026-1340",
+          "priority_score": 14.13,
+          "cvss": 9.8,
+          "exploited": true
+        },
+        {
+          "title": "Fortinet FortiClient EMS: Fortinet FortiClient EMS Improper Access Control Vulnerability",
+          "cve": "CVE-2026-35616",
+          "priority_score": 11.97,
+          "cvss": 9.8,
+          "exploited": true
+        },
+        {
+          "title": "Craft CMS Craft CMS: Craft CMS Code Injection Vulnerability",
+          "cve": "CVE-2025-32432",
+          "priority_score": 11.5,
+          "cvss": 10.0,
+          "exploited": true
+        },
+        {
+          "title": "Google Dawn: Google Dawn Use-After-Free Vulnerability",
+          "cve": "CVE-2026-5281",
+          "priority_score": 11.37,
+          "cvss": 8.8,
+          "exploited": true
+        },
+        {
+          "title": "F5 BIG-IP: F5 BIG-IP Stack-Based Buffer Overflow Vulnerability",
+          "cve": "CVE-2025-53521",
+          "priority_score": 11.15,
+          "cvss": 9.3,
+          "exploited": true
+        }
+      ],
+      "count": 5,
+      "exploited_in_wild": 5,
+      "avg_cvss": 9.54
+    },
+    "body": "## Top Priority CVEs This Cycle\n\n5 prioritized items. 5 exploited in the wild. Average CVSS 9.54.\n\n- **CVE-2026-1340** \u2014 Ivanti Endpoint Manager Mobile (EPMM): Ivanti Endpoint Manager Mobile (EPMM) Code Injection Vulnerability (priority 14.13 \u00b7 CVSS 9.8 \u00b7 KEV)\n- **CVE-2026-35616** \u2014 Fortinet FortiClient EMS: Fortinet FortiClient EMS Improper Access Control Vulnerability (priority 11.97 \u00b7 CVSS 9.8 \u00b7 KEV)\n- **CVE-2025-32432** \u2014 Craft CMS Craft CMS: Craft CMS Code Injection Vulnerability (priority 11.50 \u00b7 CVSS 10.0 \u00b7 KEV)\n- **CVE-2026-5281** \u2014 Google Dawn: Google Dawn Use-After-Free Vulnerability (priority 11.37 \u00b7 CVSS 8.8 \u00b7 KEV)\n- **CVE-2025-53521** \u2014 F5 BIG-IP: F5 BIG-IP Stack-Based Buffer Overflow Vulnerability (priority 11.15 \u00b7 CVSS 9.3 \u00b7 KEV)",
+    "sources": [
+      "/Users/aribs/Code/Sapphire/.claude/worktrees/quizzical-mclaren-8cabc7/data/threat_intel/latest_20260409_0118.md"
+    ],
+    "tags": [
+      "security",
+      "cve",
+      "threat-intel"
+    ]
+  },
+  "renderings": {
+    "linkedin": {
+      "path": "data/content/ready/linkedin/20260417_1926_security_digest.md",
+      "quality": {
+        "passed": true,
+        "banned_hits": [],
+        "number_count": 10,
+        "word_count": 62,
+        "avg_sentence_words": 20.67,
+        "reasons": []
+      }
+    },
+    "substack": {
+      "path": "data/content/ready/substack/20260417_1926_security_digest.md",
+      "quality": {
+        "passed": true,
+        "banned_hits": [],
+        "number_count": 34,
+        "word_count": 127,
+        "avg_sentence_words": 31.75,
+        "reasons": []
+      }
+    },
+    "x": {
+      "path": "data/content/ready/x/20260417_1926_security_digest.jsonl",
+      "quality": {
+        "passed": true,
+        "banned_hits": [],
+        "number_count": 32,
+        "word_count": 98,
+        "avg_sentence_words": 14.0,
+        "reasons": []
+      }
+    }
+  },
+  "published_at": "2026-04-17T19:26:56"
+}

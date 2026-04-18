@@ -91,6 +91,14 @@ try:
 except ImportError:
     _ENHANCER_AVAILABLE = False
 
+# Event bus — central nervous system. Degrades to JSONL fallback if Redis down.
+try:
+    from event_bus import get_bus as _get_event_bus
+    _EVENT_BUS = _get_event_bus(source="signal_pipeline")
+except Exception as e:  # pragma: no cover — import guard
+    log.warning("event_bus unavailable: %s", e)
+    _EVENT_BUS = None
+
 # ─── Constants ────────────────────────────────────────────────────────────────
 
 SIGNALS_DIR   = _ROOT / "data" / "signals"
@@ -287,6 +295,26 @@ class SignalPipeline:
             log.warning("close for %s but no open position in _active", scored.symbol)
 
         elapsed_ms = int((time.time() - t0) * 1000)
+
+        # Event bus — publish signal.generated for any live entry that passed
+        # the kernel gate. Close actions are handled in _close_position via
+        # signal.closed.
+        if _EVENT_BUS is not None and is_live_entry:
+            try:
+                _EVENT_BUS.publish("signal.generated", {
+                    "pipeline_id": scored.pipeline_id,
+                    "symbol": scored.symbol,
+                    "action": scored.action,
+                    "direction": scored.direction,
+                    "strategy": scored.strategy,
+                    "price": scored.price,
+                    "confidence": scored.confidence,
+                    "routing": scored.routing,
+                    "position_usd": scored.position_usd,
+                })
+            except Exception as e:
+                log.warning("event bus publish failed: %s", e)
+
         return ProcessedSignal(
             scored=scored,
             telegram_sent=telegram_sent,
@@ -330,6 +358,20 @@ class SignalPipeline:
             "-> closed %s | entry=%.4f exit=%.4f pnl=%.2f USD (%s)",
             open_signal.symbol, entry, close_price, pnl_usd, outcome,
         )
+
+        if _EVENT_BUS is not None:
+            try:
+                _EVENT_BUS.publish("signal.closed", {
+                    "pipeline_id": open_signal.pipeline_id,
+                    "symbol": open_signal.symbol,
+                    "direction": open_signal.direction,
+                    "entry_price": entry,
+                    "close_price": close_price,
+                    "pnl_usd": pnl_usd,
+                    "outcome": outcome,
+                })
+            except Exception as e:
+                log.warning("event bus publish failed: %s", e)
 
         def _do_update() -> None:
             try:
@@ -684,15 +726,20 @@ class SignalPipeline:
             sizing_reason = "kernel_blocked"
 
         # ── Composite Score ───────────────────────────────────────────────────
-        # Scale: confidence(40) + kernel_ok(25) + rr_factor(20) + position_factor(15)
+        # Weighted 40/25/20/15 — confidence dominates because it reflects the
+        # strategy's own self-assessment; kernel is binary (gate, not gradient)
+        # so it caps at 25; R:R and size are quality-of-setup modifiers.
         # Clamp confidence_pts to [0, 40] — bad-input confidence > 1.0 must not
         # overflow the composite; < 0 must not subtract from other factors.
         conf_pts  = min(40.0, max(0.0, confidence * 40))
         kern_pts  = 25 if kernel_ok else 0
         # Missing R:R should score LOWER than a valid 1:1 (7 pts), not higher.
         # Prior default of 10 rewarded ignorance — lower it below any real R:R.
+        # The 7x multiplier means R:R=2.85 saturates at 20 (matches our target setup).
         rr_pts    = min(20, rr_ratio * 7) if rr_ratio > 0 else 5
-        pos_pts   = min(15, (position_pct / 0.10) * 15)  # scales to max position
+        # Scales linearly to max position (10% of balance = full 15 pts); Kelly
+        # below the cap produces a proportional haircut on the composite.
+        pos_pts   = min(15, (position_pct / 0.10) * 15)
         score     = round(conf_pts + kern_pts + rr_pts + pos_pts, 1)
 
         # ── Routing Decision ──────────────────────────────────────────────────

@@ -1,33 +1,22 @@
-"""Sapphire on-chain intelligence module.
+"""On-chain + macro intelligence.
 
-Provides adapters for free on-chain data sources (DeFiLlama, Hyperliquid,
-CoinGecko) and an aggregator that synthesizes them into a single market regime.
+Provides ChainIntelligence — a unified snapshot of crypto + macro state used
+to classify market regime (RISK_ON / RISK_OFF / NEUTRAL) and drive alerts
+when the regime changes.
 """
 
-from .intelligence import (
+from lib.chain.intelligence import (
     ChainIntelligence,
-    FundingSnapshot,
-    MarketOverview,
-    MarketRegime,
-    OISnapshot,
-    StablecoinFlows,
-    TVLTrend,
-)
-from .sources import (
-    CoinGeckoClient,
-    DefiLlamaClient,
-    HyperliquidClient,
+    ChainSnapshot,
+    Regime,
+    RegimeClassification,
+    RegimeShiftEvent,
 )
 
 __all__ = [
-    "DefiLlamaClient",
-    "HyperliquidClient",
-    "CoinGeckoClient",
     "ChainIntelligence",
-    "MarketOverview",
-    "FundingSnapshot",
-    "OISnapshot",
-    "TVLTrend",
-    "StablecoinFlows",
-    "MarketRegime",
+    "ChainSnapshot",
+    "Regime",
+    "RegimeClassification",
+    "RegimeShiftEvent",
 ]
