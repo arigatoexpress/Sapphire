@@ -1333,6 +1333,7 @@ class AlphaEngine:
             for sym in preferred:
                 info = venue_data.get(sym, {})
                 price = info.get("price", 0.0)
+                info.get("status", "offline")
                 if price > 0:
                     age = info.get("age_seconds")
                     age_text = f"{age}s" if age is not None else "?"
@@ -1934,6 +1935,7 @@ class AlphaEngine:
         active_text = ", ".join(active) if active else "none"
         paused_text = ", ".join(paused) if paused else "none"
         failure_pressure = int(context.get("total_failure_pressure", 0))
+        int(context.get("pending_autonomy_sessions", 0))
         dex_stage = str(context.get("dex_execution_stage", "paper"))
         dex_live = "ON" if bool(context.get("dex_live_dispatch", False)) else "OFF"
         key = str(session_key or "").strip() or "n/a"
@@ -3337,9 +3339,7 @@ class AlphaEngine:
                                 if int(severity_value) >= int(error_threshold)
                                 else "medium"
                             )
-                        except (TypeError, ValueError):
-                            priority = "medium"
-                        await self.telegram.send_as(SAPPHIRE, msg, priority=priority)
+                        await self.telegram.send_as(SAPPHIRE, msg)
                         logger.warning(msg)
                     else:
                         # Log but don't spam Telegram

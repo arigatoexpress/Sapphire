@@ -63,7 +63,7 @@ except ImportError:
     _SIZING_AVAILABLE = False
 
 try:
-    from confirmation_firewall import ActionRisk, ConfirmationFirewall  # noqa: F401
+    from confirmation_firewall import ConfirmationFirewall
     _FIREWALL_AVAILABLE = True
 except ImportError:
     _FIREWALL_AVAILABLE = False

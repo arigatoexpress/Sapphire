@@ -19,10 +19,7 @@ except ImportError:
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    import aiohttp
+from typing import Any
 
 from loguru import logger
 

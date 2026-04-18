@@ -188,7 +188,10 @@ def check_inference() -> dict:
 
 
 def main():
-    sys.stdin.read()  # consume stdin (params not used)
+    raw = sys.stdin.read().strip()
+    params = json.loads(raw) if raw else {}
+    params.get("verbose", False)
+
     services = check_services()
     repos = check_repos()
     data = check_data_freshness()

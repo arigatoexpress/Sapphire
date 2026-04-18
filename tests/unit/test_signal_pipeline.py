@@ -357,3 +357,66 @@ class TestSignalStats:
         with patch.object(Path, "read_text", side_effect=OSError("file removed")):
             stats = pl.signal_stats()
         assert isinstance(stats, dict)
+
+
+# ─── Decision Engine Wiring ────────────────────────────────────────────────────
+
+class TestDecisionEngineWiring:
+    """Verify the decision engine gate in _score works correctly."""
+
+    _RAW = {
+        "symbol": "BTC", "action": "buy", "price": 50000.0,
+        "confidence": 0.70, "strategy": "test",
+    }
+
+    def test_decision_engine_block_overrides_routing(self, pipeline, monkeypatch):
+        pl, _ = pipeline
+        from unittest.mock import MagicMock
+        import signal_pipeline as sp  # type: ignore
+        fake_dec = MagicMock()
+        fake_dec.verdict = "BLOCK"
+        fake_dec.adjusted_confidence = 0.10
+        fake_dec.reasons = ["extreme_funding"]
+        fake_engine = MagicMock()
+        fake_engine.evaluate.return_value = fake_dec
+        monkeypatch.setattr(sp, "_DECISION_ENGINE_AVAILABLE", True)
+        monkeypatch.setattr(sp, "_DECISION_ENGINE", fake_engine)
+        result = pl.process(self._RAW)
+        assert result.scored.routing == "BLOCKED"
+        assert any("decision_engine" in n for n in result.scored.notes)
+
+    def test_decision_engine_reduce_adjusts_confidence(self, pipeline, monkeypatch):
+        pl, _ = pipeline
+        from unittest.mock import MagicMock
+        import signal_pipeline as sp  # type: ignore
+        fake_dec = MagicMock()
+        fake_dec.verdict = "REDUCE"
+        fake_dec.adjusted_confidence = 0.45  # below MEDIUM_CONF → LOG_ONLY
+        fake_dec.reasons = ["bear_regime"]
+        fake_engine = MagicMock()
+        fake_engine.evaluate.return_value = fake_dec
+        monkeypatch.setattr(sp, "_DECISION_ENGINE_AVAILABLE", True)
+        monkeypatch.setattr(sp, "_DECISION_ENGINE", fake_engine)
+        result = pl.process(self._RAW)
+        assert result.scored.confidence < 0.70
+        assert result.scored.routing != "BLOCKED"
+
+    def test_decision_engine_error_is_caught(self, pipeline, monkeypatch):
+        pl, _ = pipeline
+        from unittest.mock import MagicMock
+        import signal_pipeline as sp  # type: ignore
+        fake_engine = MagicMock()
+        fake_engine.evaluate.side_effect = RuntimeError("chain data unavailable")
+        monkeypatch.setattr(sp, "_DECISION_ENGINE_AVAILABLE", True)
+        monkeypatch.setattr(sp, "_DECISION_ENGINE", fake_engine)
+        result = pl.process(self._RAW)
+        assert any("decision_engine_error" in n for n in result.scored.notes)
+        assert result.scored.routing != "BLOCKED"
+
+    def test_decision_engine_unavailable_does_not_block(self, pipeline, monkeypatch):
+        pl, _ = pipeline
+        import signal_pipeline as sp  # type: ignore
+        monkeypatch.setattr(sp, "_DECISION_ENGINE_AVAILABLE", False)
+        monkeypatch.setattr(sp, "_DECISION_ENGINE", None)
+        result = pl.process(self._RAW)
+        assert result.scored.routing in {"NOTIFY", "CONFIRMATION_REQUIRED", "LOG_ONLY"}

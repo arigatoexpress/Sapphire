@@ -863,6 +863,7 @@ def _build_architecture_overview_payload(*, refresh: bool = False) -> dict[str, 
     logbook = _build_frontend_logbook_payload(event_limit=24)
     control = _build_control_plane_payload(task_limit=20, event_limit=20)
     overview = control.get("overview") if isinstance(control.get("overview"), dict) else {}
+    ops_status.get("summary") if isinstance(ops_status.get("summary"), dict) else {}
     agents = control.get("agents") if isinstance(control.get("agents"), list) else []
     topology_nodes = []
     topology_links = []
@@ -936,6 +937,7 @@ def _build_architecture_overview_payload(*, refresh: bool = False) -> dict[str, 
 
 def _build_secops_payload(*, refresh: bool = False, event_limit: int = 80) -> dict[str, Any]:
     ops_status = _build_ops_status_payload(refresh=refresh)
+    _build_architecture_overview_payload(refresh=refresh)
     logbook = _build_frontend_logbook_payload(event_limit=event_limit)
     summary = ops_status.get("summary") if isinstance(ops_status.get("summary"), dict) else {}
     primary = ((ops_status.get("executor_readiness") or {}).get("primary_executor") or {}) if isinstance(ops_status.get("executor_readiness"), dict) else {}
