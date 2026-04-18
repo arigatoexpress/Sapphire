@@ -1,268 +1,271 @@
-"""Unit tests for lib.analytics.backtest — deterministic synthetic OHLCV.
-
-Module loading notes:
-- `services/alpha/signal_pipeline.py` (loaded indirectly by other tests in
-  the suite) inserts the *main* Sapphire repo's lib/ and plugins/ trees
-  into sys.path[0]. That shadows both `lib.analytics.backtest` (wrong
-  package) and a plain `backtest` import (wrong file — the plugin tool).
-- So load our module explicitly via importlib and expose it as `bt`.
-"""
-
+"""Unit tests — lib.analytics.backtest."""
 from __future__ import annotations
 
-import importlib.util
 import math
 import sys
 from pathlib import Path
 
 import pytest
 
-_BACKTEST_PATH = Path(__file__).resolve().parents[2] / "lib" / "analytics" / "backtest.py"
-_spec = importlib.util.spec_from_file_location("sapphire_backtest", _BACKTEST_PATH)
-bt = importlib.util.module_from_spec(_spec)
-assert _spec.loader is not None
-# Register in sys.modules *before* exec so @dataclass lookups on cls.__module__
-# find this module rather than getting None. Using a unique name avoids the
-# `backtest` collision with plugins/claw-sapphire/tools/backtest.py.
-sys.modules[_spec.name] = bt
-_spec.loader.exec_module(bt)
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-# Names re-exported for clarity in tests
-Bar = bt.Bar
-Decision = bt.Decision
-Backtester = bt.Backtester
-backtest_symbol = bt.backtest_symbol
-_rsi = bt._rsi
-load_yfinance_ohlcv = bt.load_yfinance_ohlcv
+from lib.analytics.backtest import (
+    BacktestConfig,
+    Backtester,
+    Trade,
+    _apply_enhancement,
+    _atr,
+    _classify_regime,
+    _generate_signals,
+    _metrics,
+    _score_signal,
+    _simulate,
+    _sma,
+)
 
 
-# ---------------------------------------------------------------------------
-# Helpers — deterministic synthetic bar series (no yfinance network)
-# ---------------------------------------------------------------------------
-
-
-def _bars_uptrend(n: int = 100, start: float = 100.0, step: float = 1.0):
-    """Monotone uptrend — 1% daily gain. Good for buy_and_hold sanity."""
-
+def _synthetic_bars(n: int = 120, start: float = 100.0, trend: float = 0.5) -> list[dict]:
+    """Deterministic uptrending bars with ±1% noise — no network."""
     bars = []
-    px = start
+    price = start
     for i in range(n):
-        o = px
-        c = o + step
-        bars.append(Bar(
-            date=f"2026-01-{(i % 28) + 1:02d}" if i < 28
-                 else f"2026-{((i // 28) % 12) + 1:02d}-{(i % 28) + 1:02d}",
-            open=o, high=max(o, c) + 0.1, low=min(o, c) - 0.1, close=c, volume=1_000,
-        ))
-        px = c
-    # Recompute sequential dates with a simple epoch offset for stability.
-    from datetime import date, timedelta
-    base = date(2026, 1, 1)
-    for i, b in enumerate(bars):
-        b.date = (base + timedelta(days=i)).isoformat()
+        price += trend + (0.5 if i % 3 == 0 else -0.3)
+        high = price * 1.01
+        low = price * 0.99
+        bars.append({
+            "date": f"2026-01-{(i % 28) + 1:02d}",
+            "open": price * 0.999,
+            "high": high,
+            "low":  low,
+            "close": price,
+            "volume": 1_000_000,
+        })
     return bars
 
 
-def _bars_oscillation(n: int = 100, center: float = 100.0, amplitude: float = 10.0):
-    """Sine-wave oscillation — triggers RSI mean-reversion regularly."""
-    from datetime import date, timedelta
+class TestSMA:
+    def test_sma_basic(self):
+        out = _sma([1, 2, 3, 4, 5], 3)
+        assert out[:2] == [None, None]
+        assert out[2] == pytest.approx(2.0)
+        assert out[3] == pytest.approx(3.0)
+        assert out[4] == pytest.approx(4.0)
 
-    bars = []
-    base = date(2026, 1, 1)
-    for i in range(n):
-        # Period ≈ 15 days → enough swings for RSI<30 and RSI>70.
-        v = math.sin(2 * math.pi * i / 15) * amplitude + center
-        prev_v = math.sin(2 * math.pi * (i - 1) / 15) * amplitude + center if i > 0 else v
-        o = prev_v
-        c = v
-        bars.append(Bar(
-            date=(base + timedelta(days=i)).isoformat(),
-            open=o, high=max(o, c) + 0.5, low=min(o, c) - 0.5, close=c, volume=1_000,
-        ))
-    return bars
+    def test_sma_insufficient_data(self):
+        assert _sma([1, 2], 5) == [None, None]
+
+    def test_sma_window_zero(self):
+        # Guard: window <= 0 returns all Nones without raising.
+        assert _sma([1, 2, 3], 0) == [None, None, None]
 
 
-# ---------------------------------------------------------------------------
-# Loader
-# ---------------------------------------------------------------------------
+class TestATR:
+    def test_atr_produces_positive_values(self):
+        bars = _synthetic_bars(40)
+        atr = _atr(bars, 14)
+        assert atr[:13] == [None] * 13
+        assert atr[13] is not None
+        assert atr[13] > 0
+        for v in atr[14:]:
+            assert v > 0
 
 
-def test_load_yfinance_ohlcv_returns_list():
-    """Loader returns an empty list when yfinance fails — never raises."""
+class TestRegimeClassifier:
+    def test_trend_up_detection(self):
+        # Strong monotonic uptrend → TREND_UP
+        closes = [100 + i for i in range(60)]
+        regime, score = _classify_regime(closes, 59)
+        assert regime == "TREND_UP"
+        assert score > 0
 
-    # Use an invalid ticker so we don't depend on network reach.
-    result = bt.load_yfinance_ohlcv("__NOT_A_REAL_TICKER_XYZ__", days=5)
-    assert isinstance(result, list)
+    def test_trend_down_detection(self):
+        closes = [200 - i for i in range(60)]
+        regime, score = _classify_regime(closes, 59)
+        assert regime == "TREND_DOWN"
+        assert score < 0
 
+    def test_range_for_flat_series(self):
+        closes = [100.0] * 60
+        regime, _ = _classify_regime(closes, 59)
+        assert regime == "RANGE"
 
-# ---------------------------------------------------------------------------
-# Backtester — walk-forward mechanics
-# ---------------------------------------------------------------------------
-
-
-def test_backtester_empty_bars_returns_empty_report():
-
-    r = Backtester()._empty_report("BTC-USD", "rsi", [])
-    assert r.total_trades == 0
-    assert r.win_rate is None
-    assert r.sharpe is None
-    assert r.max_drawdown_pct == 0.0
-
-
-def test_backtester_rejects_unknown_strategy():
-
-    bars = _bars_uptrend(30)
-    with pytest.raises(ValueError, match="unknown strategy"):
-        Backtester().run(bars, "not_a_real_strategy")
+    def test_unknown_when_insufficient_history(self):
+        regime, score = _classify_regime([100] * 20, 19)
+        assert regime == "UNKNOWN"
+        assert score == 0.0
 
 
-def test_buy_and_hold_on_uptrend_is_profitable():
-    """Buy-and-hold on a pure uptrend must end positive and close at end_of_data."""
+class TestEnhancement:
+    def test_aligned_boosts_confidence(self):
+        adj, flags = _apply_enhancement("long", 0.50, "TREND_UP", 0.5)
+        assert adj > 0.50
+        assert any("aligned" in f for f in flags)
 
-    bars = _bars_uptrend(50, start=100.0, step=1.0)
-    r = Backtester(bankroll=10_000.0, fee_bps=0.0).run(bars, "buy_and_hold", symbol="TEST")
+    def test_opposed_cuts_confidence(self):
+        adj, flags = _apply_enhancement("short", 0.60, "TREND_UP", 0.5)
+        assert adj < 0.60
+        assert any("opposed" in f for f in flags)
 
-    assert r.total_trades == 1
-    assert r.trades[0]["exit_reason"] == "end_of_data"
-    assert r.total_pnl_usd > 0
-    # Synthetic returns roughly 1%/day — over 50 bars, equity should grow >30%.
-    assert r.total_return_pct > 0.3
+    def test_volatile_reduces_confidence(self):
+        adj, flags = _apply_enhancement("long", 0.70, "VOLATILE", 0.0)
+        assert adj < 0.70
+        assert flags == ["regime_volatile"]
 
+    def test_range_is_neutral(self):
+        adj, flags = _apply_enhancement("long", 0.60, "RANGE", 0.0)
+        assert adj == 0.60
+        assert flags == []
 
-def test_fees_reduce_pnl():
-    """Round-trip fees lower total PnL — two runs with different fee_bps."""
-
-    bars = _bars_uptrend(50)
-    r_zero = Backtester(fee_bps=0.0).run(bars, "buy_and_hold")
-    r_fees = Backtester(fee_bps=20.0).run(bars, "buy_and_hold")
-    assert r_fees.total_pnl_usd < r_zero.total_pnl_usd
-
-
-def test_stop_loss_exits_before_end_of_data():
-    """Long with a 2% stop must exit on a sharp drawdown — not end_of_data."""
-
-    def always_long(bars):
-        # Tight stop so it triggers on the synthetic flash crash.
-        if len(bars) < 1:
-            return None
-        return Decision(direction="long", size=1.0, stop_pct=0.02, take_pct=None)
-
-    # Build bars: 3 flat, then a gap-down
-    bars = [
-        Bar(date="2026-01-01", open=100, high=100.5, low=99.5, close=100, volume=100),
-        Bar(date="2026-01-02", open=100, high=100.5, low=99.5, close=100, volume=100),
-        Bar(date="2026-01-03", open=100, high=100.5, low=99.5, close=100, volume=100),
-        Bar(date="2026-01-04", open=100, high=100.5, low=90, close=95, volume=100),  # crash
-        Bar(date="2026-01-05", open=95, high=96, low=94, close=95, volume=100),
-    ]
-    r = Backtester(bankroll=10_000.0, fee_bps=0.0).run(bars, always_long)
-    assert r.total_trades >= 1
-    # First trade stopped out on the crash bar
-    first = r.trades[0]
-    assert first["exit_reason"] == "stop"
-    assert first["outcome"] == "loss"
+    def test_confidence_clamped(self):
+        adj, _ = _apply_enhancement("long", 0.95, "TREND_UP", 1.0)
+        assert 0.0 <= adj <= 1.0
 
 
-def test_signal_reverse_closes_old_opens_new():
-    """When strategy flips direction, engine closes and opens a new position."""
+class TestScoring:
+    def test_score_mirrors_pipeline_formula(self):
+        # confidence .75 × 40 + 25 (kernel) + 1.67×7 rr + 15 pos = 30 + 25 + 11.69 + 15 ≈ 81.7
+        score = _score_signal(0.75, 1.67, 0.10, kernel_ok=True)
+        assert 80.0 <= score <= 82.5
 
-    # Flip at bar 3: long for first 3 bars, then short.
-    call_count = [0]
+    def test_kernel_blocked_reduces_score(self):
+        ok = _score_signal(0.75, 1.67, 0.10, kernel_ok=True)
+        blocked = _score_signal(0.75, 1.67, 0.10, kernel_ok=False)
+        assert blocked == ok - 25
 
-    def flipper(bars):
-        call_count[0] += 1
-        if len(bars) < 1:
-            return None
-        return Decision(direction="long" if len(bars) <= 3 else "short", size=1.0)
-
-    bars = [
-        Bar(date=f"2026-01-{i:02d}", open=100 + i, high=100 + i + 0.5,
-            low=100 + i - 0.5, close=100 + i, volume=100)
-        for i in range(1, 8)
-    ]
-    r = Backtester(fee_bps=0.0).run(bars, flipper)
-    # Should have ≥2 trades: one long (closed on reverse), one short (closed at EoD).
-    assert r.total_trades >= 2
-    reasons = [t["exit_reason"] for t in r.trades]
-    assert "signal_reverse" in reasons
+    def test_score_in_range(self):
+        # Out-of-range confidence must not produce > 100 composite.
+        assert _score_signal(2.0, 5.0, 0.5) <= 100
+        assert _score_signal(-1.0, 0.0, 0.0) >= 0
 
 
-def test_metrics_sharpe_sortino_computed_with_enough_trades():
-    """With >=2 trades and non-zero variance, Sharpe/Sortino must be non-None floats."""
-
-    bars = _bars_oscillation(80, center=100.0, amplitude=8.0)
-    r = Backtester(fee_bps=0.0).run(bars, "rsi", symbol="OSC")
-
-    # The oscillator generates enough RSI crossings to produce trades.
-    if r.total_trades >= 2:
-        # Sharpe/Sortino are floats (may be None if all returns identical — unlikely).
-        assert r.sharpe is None or isinstance(r.sharpe, float)
-        assert r.sortino is None or isinstance(r.sortino, float)
+class TestSignalGeneration:
+    def test_signals_have_required_fields(self):
+        bars = _synthetic_bars(120)
+        cfg = BacktestConfig(sma_fast=5, sma_slow=20)
+        signals = _generate_signals(bars, cfg)
+        for s in signals:
+            assert {"idx", "date", "price", "direction", "confidence", "atr"} <= s.keys()
+            assert s["direction"] in {"long", "short"}
+            assert 0.0 <= s["confidence"] <= 1.0
 
 
-def test_win_rate_and_profit_factor_with_mixed_trades():
-    """Directly construct a sequence with known W/L outcomes and verify metrics."""
+class TestSimulation:
+    def test_simulate_returns_trades_and_curve(self):
+        bars = _synthetic_bars(150)
+        cfg = BacktestConfig(sma_fast=5, sma_slow=20)
+        signals = _generate_signals(bars, cfg)
+        for s in signals:
+            s["symbol"] = "SYN"
+        trades, curve = _simulate(bars, signals, cfg, with_regime=False)
+        assert len(curve) == len(bars)
+        # Equity curve is monotone between trades — never NaN
+        for v in curve:
+            assert math.isfinite(v)
+            assert v > 0
+        # All closed trades have valid fields
+        for t in trades:
+            assert isinstance(t, Trade)
+            assert t.exit_reason in {"tp", "sl", "cross", "eod"}
+            assert t.bars_held >= 0
 
-    # Strategy that always goes long with stop/take so every bar decides.
-    def always_long(bars):
-        if len(bars) < 1:
-            return None
-        return Decision(direction="long", size=1.0, stop_pct=0.05, take_pct=0.05)
-
-    # Design: first trip hits take (win), second hits stop (loss)
-    bars = [
-        Bar(date="2026-01-01", open=100, high=100.5, low=99.5, close=100, volume=100),
-        Bar(date="2026-01-02", open=100, high=106, low=99.5, close=105.5, volume=100),  # hits +5% take
-        Bar(date="2026-01-03", open=105, high=106, low=104, close=105, volume=100),
-        Bar(date="2026-01-04", open=105, high=106, low=99, close=100, volume=100),  # hits -5% stop on entry 105
-        Bar(date="2026-01-05", open=100, high=101, low=99, close=100, volume=100),
-    ]
-    r = Backtester(fee_bps=0.0).run(bars, always_long)
-    assert r.total_trades >= 2
-    # At least one win and one loss in outcomes list
-    outcomes = [t["outcome"] for t in r.trades]
-    assert "win" in outcomes
-    assert "loss" in outcomes
-    assert r.win_rate is not None
-    # Profit factor defined when there's ≥1 loss
-    assert r.profit_factor is not None
-
-
-def test_drawdown_is_nonneg_and_tracks_equity_curve():
-
-    bars = _bars_oscillation(60)
-    r = Backtester(fee_bps=0.0).run(bars, "rsi", symbol="OSC")
-    assert r.max_drawdown_pct >= 0
-    # Every equity-curve point has a drawdown_pct field
-    for p in r.equity_curve:
-        assert "drawdown_pct" in p
-        assert p["drawdown_pct"] >= 0
+    def test_regime_changes_trade_count(self):
+        """WITH-regime filtering can skip low-confidence entries → trade count ≠ without."""
+        bars = _synthetic_bars(150, trend=-0.3)  # downtrend
+        cfg = BacktestConfig(sma_fast=5, sma_slow=20, medium_conf_threshold=0.4)
+        signals = _generate_signals(bars, cfg)
+        for s in signals:
+            s["symbol"] = "SYN"
+        t_off, _ = _simulate(bars, signals, cfg, with_regime=False)
+        t_on, _  = _simulate(bars, signals, cfg, with_regime=True)
+        # Same signal input; regime filter may reduce entries.
+        assert len(t_on) <= len(t_off)
 
 
-def test_backtest_symbol_convenience_with_unreachable_symbol():
-    """Convenience entry point returns an empty report on load failure."""
+class TestMetrics:
+    def test_metrics_empty_trades(self):
+        m = _metrics([100_000, 100_000], [], 100_000)
+        assert m["win_rate"] == 0.0
+        assert m["profit_factor"] == 0.0
+        assert m["max_drawdown"] == 0.0
 
-    r = backtest_symbol("__ABSOLUTELY_NOT_A_SYMBOL_ZZZ__", strategy="rsi", days=5)
-    assert r.total_trades == 0
-    assert r.bars == 0
+    def test_metrics_winning_sequence(self):
+        curve = [100_000, 101_000, 102_000, 103_000]
+        trades = [
+            Trade("X", "long", "d1", 100, "d2", 110, 10.0, 10.0, 1, 80, 0.7, "TREND_UP", "tp"),
+            Trade("X", "long", "d3", 100, "d4", 105,  5.0,  5.0, 1, 70, 0.6, "TREND_UP", "tp"),
+        ]
+        m = _metrics(curve, trades, 100_000)
+        assert m["win_rate"] == 1.0
+        assert m["profit_factor"] == 999.0  # no losses → infinity sentinel
+        assert m["sharpe"] > 0
+
+    def test_drawdown_from_decline(self):
+        curve = [100_000, 110_000, 90_000]
+        m = _metrics(curve, [], 100_000)
+        # peak 110k → trough 90k = ~18.18% drawdown
+        assert 0.17 < m["max_drawdown"] < 0.19
 
 
-# ---------------------------------------------------------------------------
-# Indicator correctness (sanity)
-# ---------------------------------------------------------------------------
+class TestBacktester:
+    def test_run_symbol_synthetic_via_monkeypatch(self, monkeypatch):
+        """End-to-end run with a stubbed loader — no network."""
+        bars = _synthetic_bars(120)
+
+        def fake_load(symbol, days):
+            return bars
+
+        monkeypatch.setattr("lib.analytics.backtest._load_ohlcv", fake_load)
+        cfg = BacktestConfig(symbols=("SYN",), period_days=90, sma_fast=5, sma_slow=20)
+        bt = Backtester(cfg)
+        result = bt.run_symbol("SYN", with_regime=False)
+        assert result.symbol == "SYN"
+        assert result.bar_count == 120
+        assert result.trade_count >= 0
+        assert math.isfinite(result.sharpe)
+        assert math.isfinite(result.sortino)
+        assert 0 <= result.win_rate <= 1
+        assert result.max_drawdown_pct >= 0
+
+    def test_run_comparison_produces_delta(self, monkeypatch):
+        bars = _synthetic_bars(150)
+
+        def fake_load(symbol, days):
+            return bars
+
+        monkeypatch.setattr("lib.analytics.backtest._load_ohlcv", fake_load)
+        cfg = BacktestConfig(symbols=("SYN",), period_days=90, sma_fast=5, sma_slow=20)
+        bt = Backtester(cfg)
+        results = bt.run_comparison(["SYN"])
+        assert "with_regime" in results and "without_regime" in results
+        assert "delta" in results
+        assert "SYN" in results["delta"]
+        d = results["delta"]["SYN"]
+        assert "sharpe" in d and "total_return_pct" in d
+
+    def test_save_writes_files(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            "lib.analytics.backtest._load_ohlcv",
+            lambda *_args, **_kw: _synthetic_bars(120),
+        )
+        cfg = BacktestConfig(symbols=("SYN",), period_days=90, output_dir=tmp_path)
+        bt = Backtester(cfg)
+        results = bt.run_comparison(["SYN"])
+        path = bt.save(results)
+        assert path.exists()
+        assert (tmp_path / "latest.json").exists()
 
 
-def test_rsi_extremes():
+class TestErrors:
+    def test_load_raises_when_yfinance_returns_empty(self, monkeypatch):
+        import lib.analytics.backtest as bt_mod
 
-    # All-up series → RSI should be 100.
-    up = [100 + i for i in range(30)]
-    assert _rsi(up) == 100.0
+        class _EmptyYF:
+            @staticmethod
+            def download(*_args, **_kwargs):
+                class _DF:
+                    empty = True
+                return _DF()
 
-    # All-down → RSI very low (close to 0 but may not be exactly 0 in pure decline).
-    down = [100 - i for i in range(30)]
-    r = _rsi(down)
-    assert r is not None and r < 20.0
-
-
-def test_rsi_returns_none_when_too_few_bars():
-    assert _rsi([100, 101]) is None
+        monkeypatch.setitem(sys.modules, "yfinance", _EmptyYF)
+        with pytest.raises(RuntimeError, match="no data"):
+            bt_mod._load_ohlcv("FAKE", 90)

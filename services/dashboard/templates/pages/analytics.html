@@ -1,604 +1,287 @@
 {% extends "base.html" %}
 
-{% block extra_css %}
-<style>
-    .analytics-hero {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 1px;
-        background: var(--border);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        overflow: hidden;
-        margin-bottom: 20px;
-    }
-    .hero-cell {
-        background: var(--bg-card);
-        padding: 18px 22px;
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-    }
-    .hero-label {
-        font-size: 10px;
-        font-weight: 500;
-        color: var(--text-muted);
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-    }
-    .hero-value {
-        font-size: 28px;
-        font-weight: 600;
-        font-family: var(--font-mono);
-        font-variant-numeric: tabular-nums;
-        letter-spacing: -0.02em;
-        color: var(--text-primary);
-        line-height: 1.1;
-    }
-    .hero-value.positive { color: var(--green); }
-    .hero-value.negative { color: var(--red); }
-    .hero-sub {
-        font-size: 11px;
-        color: var(--text-secondary);
-        font-variant-numeric: tabular-nums;
-    }
-
-    .card {
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        padding: 18px 20px;
-        margin-bottom: 16px;
-    }
-    .card h3 {
-        font-size: 13px;
-        font-weight: 500;
-        color: var(--text-secondary);
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        margin: 0 0 14px 0;
-    }
-    .card .card-sub {
-        font-size: 11px;
-        color: var(--text-muted);
-        margin-top: -8px;
-        margin-bottom: 14px;
-    }
-
-    .chart-wrap {
-        position: relative;
-        height: 340px;
-    }
-    .chart-wrap.short { height: 240px; }
-
-    .grid-2 {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 16px;
-    }
-    @media (max-width: 900px) {
-        .grid-2 { grid-template-columns: 1fr; }
-    }
-
-    .regime-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-        gap: 12px;
-    }
-    .regime-cell {
-        padding: 14px 16px;
-        background: var(--bg-subtle);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-    }
-    .regime-name {
-        font-size: 11px;
-        color: var(--text-muted);
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        margin-bottom: 6px;
-    }
-    .regime-win {
-        font-size: 22px;
-        font-weight: 600;
-        font-family: var(--font-mono);
-        line-height: 1.1;
-    }
-    .regime-win.positive { color: var(--green); }
-    .regime-win.negative { color: var(--red); }
-    .regime-win.neutral { color: var(--text-secondary); }
-    .regime-sub {
-        font-size: 11px;
-        color: var(--text-secondary);
-        margin-top: 4px;
-        font-variant-numeric: tabular-nums;
-    }
-
-    table.trades {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 12px;
-        font-variant-numeric: tabular-nums;
-    }
-    table.trades th, table.trades td {
-        padding: 8px 10px;
-        border-bottom: 1px solid var(--border);
-        text-align: right;
-    }
-    table.trades th {
-        font-size: 10px;
-        font-weight: 500;
-        color: var(--text-muted);
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        text-align: right;
-    }
-    table.trades th.l, table.trades td.l { text-align: left; }
-    table.trades td.pos { color: var(--green); }
-    table.trades td.neg { color: var(--red); }
-
-    .heatmap {
-        display: grid;
-        grid-auto-flow: column;
-        grid-template-rows: auto repeat(12, 26px);
-        gap: 3px;
-    }
-    .heatmap .h-head {
-        font-size: 10px;
-        color: var(--text-muted);
-        text-align: center;
-        padding: 4px 0;
-        font-variant-numeric: tabular-nums;
-    }
-    .heatmap .h-row-label {
-        font-size: 9px;
-        color: var(--text-muted);
-        padding: 4px 6px 0 0;
-        text-align: right;
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-    }
-    .heatmap .h-cell {
-        border-radius: 3px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 9px;
-        font-family: var(--font-mono);
-        color: var(--text-primary);
-        background: var(--bg-subtle);
-        border: 1px solid var(--border);
-        min-width: 40px;
-    }
-    .heatmap .h-cell.empty { opacity: 0.3; }
-
-    .empty-state {
-        text-align: center;
-        padding: 40px 20px;
-        color: var(--text-muted);
-        font-size: 12px;
-    }
-
-    .last-updated {
-        font-size: 11px;
-        color: var(--text-muted);
-        text-align: right;
-        margin: 10px 0 0;
-    }
-</style>
-{% endblock %}
-
 {% block content %}
-<div class="analytics-hero" id="hero">
-    <div class="hero-cell">
-        <span class="hero-label">Total Return</span>
-        <span class="hero-value neutral" id="kpi-return">—</span>
-        <span class="hero-sub" id="kpi-return-sub">vs $100k initial</span>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<div class="grid grid-4" style="margin-bottom: var(--space-xl);">
+    <div class="stat-card">
+        <div class="stat-label">Primary Symbol</div>
+        <div class="stat-value" id="a-primary">—</div>
+        <div class="stat-change" id="a-generated">Loading…</div>
     </div>
-    <div class="hero-cell">
-        <span class="hero-label">Alpha vs BTC</span>
-        <span class="hero-value neutral" id="kpi-alpha">—</span>
-        <span class="hero-sub" id="kpi-alpha-sub">strategy − buy&amp;hold</span>
+    <div class="stat-card">
+        <div class="stat-label">Total Return (WITH regime)</div>
+        <div class="stat-value" id="a-return-on" style="color: var(--success);">—</div>
+        <div class="stat-change" id="a-return-delta">vs without: —</div>
     </div>
-    <div class="hero-cell">
-        <span class="hero-label">Win Rate</span>
-        <span class="hero-value neutral" id="kpi-winrate">—</span>
-        <span class="hero-sub" id="kpi-winrate-sub">— trades</span>
+    <div class="stat-card">
+        <div class="stat-label">Sharpe (WITH regime)</div>
+        <div class="stat-value" id="a-sharpe-on">—</div>
+        <div class="stat-change" id="a-sharpe-off">without: —</div>
     </div>
-    <div class="hero-cell">
-        <span class="hero-label">Realized PnL</span>
-        <span class="hero-value neutral" id="kpi-pnl">—</span>
-        <span class="hero-sub" id="kpi-pnl-sub">—</span>
+    <div class="stat-card">
+        <div class="stat-label">Max Drawdown</div>
+        <div class="stat-value" id="a-maxdd" style="color: var(--danger);">—</div>
+        <div class="stat-change" id="a-winrate">Win rate: —</div>
     </div>
 </div>
 
-<div class="card">
-    <h3>Equity Curve vs BTC Buy &amp; Hold</h3>
-    <div class="card-sub">Paper portfolio ($100k) compared to holding BTC from first trade.</div>
-    <div class="chart-wrap"><canvas id="equity-chart"></canvas></div>
+<!-- Equity curve with BTC benchmark -->
+<div class="card" style="margin-bottom: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-chart-line" style="margin-right: 8px; color: var(--primary);"></i>Equity Curve vs BTC Buy-and-Hold</h3>
+        <span class="badge badge-info" id="a-symbol-badge">—</span>
+    </div>
+    <div class="card-body" style="height: 380px;"><canvas id="equity-chart"></canvas></div>
 </div>
 
-<div class="grid-2">
+<div class="grid grid-2">
+    <!-- Rolling Sharpe -->
     <div class="card">
-        <h3>Rolling 30-Day Sharpe</h3>
-        <div class="card-sub">Annualised, computed on daily PnL.</div>
-        <div class="chart-wrap short"><canvas id="sharpe-chart"></canvas></div>
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-wave-square"></i>&nbsp;30-day Rolling Sharpe</h3>
+        </div>
+        <div class="card-body" style="height: 300px;"><canvas id="sharpe-chart"></canvas></div>
     </div>
+
+    <!-- Signal quality scatter -->
     <div class="card">
-        <h3>Signal Quality</h3>
-        <div class="card-sub">Confidence at entry vs realised PnL % — winners (green) vs losers (red).</div>
-        <div class="chart-wrap short"><canvas id="scatter-chart"></canvas></div>
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-bullseye"></i>&nbsp;Signal Quality (confidence vs outcome)</h3>
+        </div>
+        <div class="card-body" style="height: 300px;"><canvas id="quality-chart"></canvas></div>
+    </div>
+
+    <!-- Regime breakdown -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-layer-group"></i>&nbsp;Performance by Regime</h3>
+        </div>
+        <div class="card-body">
+            <table class="data-table">
+                <thead><tr><th>Regime</th><th>Trades</th><th>Win Rate</th><th>Avg PnL %</th><th>Total $</th></tr></thead>
+                <tbody id="regime-tbody"><tr><td colspan="5" class="loading">Loading…</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Monthly returns heatmap -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-calendar"></i>&nbsp;Monthly Returns</h3>
+        </div>
+        <div class="card-body">
+            <div id="monthly-heatmap" class="loading">Loading…</div>
+        </div>
     </div>
 </div>
 
-<div class="card">
-    <h3>Regime Performance</h3>
-    <div class="card-sub">Win rate and PnL grouped by market regime at signal time.</div>
-    <div class="regime-grid" id="regime-grid">
-        <div class="empty-state">Loading…</div>
+<!-- WITH vs WITHOUT comparison table -->
+<div class="card" style="margin-top: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-balance-scale"></i>&nbsp;Regime Enhancement Lift</h3>
     </div>
-</div>
-
-<div class="grid-2">
-    <div class="card">
-        <h3>Best Trades</h3>
-        <table class="trades" id="best-table">
-            <thead><tr>
-                <th class="l">Symbol</th><th class="l">Side</th>
-                <th>PnL $</th><th>PnL %</th><th>Conf</th><th class="l">Closed</th>
-            </tr></thead>
-            <tbody><tr><td colspan="6" class="empty-state">—</td></tr></tbody>
+    <div class="card-body">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th rowspan="2">Symbol</th>
+                    <th colspan="2">Return %</th>
+                    <th colspan="2">Sharpe</th>
+                    <th colspan="2">Max DD %</th>
+                    <th colspan="2">Win Rate</th>
+                    <th colspan="2">Trades</th>
+                </tr>
+                <tr>
+                    <th>off</th><th>on</th>
+                    <th>off</th><th>on</th>
+                    <th>off</th><th>on</th>
+                    <th>off</th><th>on</th>
+                    <th>off</th><th>on</th>
+                </tr>
+            </thead>
+            <tbody id="summary-tbody"><tr><td colspan="11" class="loading">Loading…</td></tr></tbody>
         </table>
     </div>
-    <div class="card">
-        <h3>Worst Trades</h3>
-        <table class="trades" id="worst-table">
-            <thead><tr>
-                <th class="l">Symbol</th><th class="l">Side</th>
-                <th>PnL $</th><th>PnL %</th><th>Conf</th><th class="l">Closed</th>
-            </tr></thead>
-            <tbody><tr><td colspan="6" class="empty-state">—</td></tr></tbody>
-        </table>
-    </div>
 </div>
 
-<div class="card">
-    <h3>Monthly Returns</h3>
-    <div class="card-sub">PnL % per month — colour intensity scaled to best month.</div>
-    <div id="heatmap-wrap"><div class="empty-state">Loading…</div></div>
-</div>
+<style>
+  .data-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .data-table th, .data-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--border, #333); }
+  .data-table th { font-weight: 600; color: var(--muted, #888); }
+  .heatmap-row { display: grid; grid-template-columns: 60px repeat(12, 1fr); gap: 2px; margin-bottom: 2px; }
+  .heatmap-cell { padding: 6px; text-align: center; border-radius: 3px; font-size: 0.75rem; }
+  .heatmap-label { font-weight: 600; padding: 6px; }
+</style>
 
-<p class="last-updated" id="last-updated">—</p>
-{% endblock %}
-
-{% block extra_js %}
-<script src="/static/js/chart.min.js"></script>
 <script>
-let charts = {};
+(async function analyticsBootstrap() {
+  const TEXT = getComputedStyle(document.body).getPropertyValue('--text').trim() || '#ccc';
+  const MUTED = '#666';
+  Chart.defaults.color = TEXT;
+  Chart.defaults.borderColor = 'rgba(255,255,255,0.08)';
 
-function fmtUSD(n, digits) {
-    if (n == null || isNaN(n)) return '—';
-    digits = digits == null ? 2 : digits;
-    const sign = n < 0 ? '-' : '';
-    return sign + '$' + Math.abs(n).toLocaleString(undefined, {minimumFractionDigits: digits, maximumFractionDigits: digits});
-}
-function fmtPct(n, digits) {
-    if (n == null || isNaN(n)) return '—';
-    digits = digits == null ? 2 : digits;
-    const sign = n > 0 ? '+' : '';
-    return sign + n.toFixed(digits) + '%';
-}
-function signClass(n) {
-    if (n == null || isNaN(n) || n === 0) return 'neutral';
-    return n > 0 ? 'positive' : 'negative';
-}
-function fmtDate(s) {
-    if (!s) return '—';
-    const d = new Date(s);
-    if (isNaN(d.getTime())) return '—';
-    return d.toISOString().slice(0, 10);
-}
+  function fmt(n, d) { d = (d == null) ? 2 : d; return (n == null || !isFinite(n)) ? '—' : Number(n).toFixed(d); }
+  function pctColor(v) {
+    if (v == null || !isFinite(v) || v === 0) return '#222';
+    const clamped = Math.max(-10, Math.min(10, v));
+    if (clamped >= 0) return `rgba(34, 197, 94, ${0.15 + (clamped / 10) * 0.65})`;
+    return `rgba(239, 68, 68, ${0.15 + (Math.abs(clamped) / 10) * 0.65})`;
+  }
 
-function renderHero(summary) {
-    const r = summary.return_pct;
-    const a = summary.alpha_pct;
-    const wr = summary.win_rate;
-    const pnl = summary.total_pnl_usd;
+  let resp;
+  try {
+    resp = await fetch('/api/analytics/performance').then(r => r.json());
+  } catch (e) {
+    document.getElementById('a-generated').textContent = 'fetch failed: ' + e.message;
+    return;
+  }
+  if (resp.error) {
+    document.getElementById('a-generated').textContent = resp.error;
+    return;
+  }
 
-    const setValue = (id, text, sign) => {
-        const el = document.getElementById(id);
-        el.textContent = text;
-        el.className = 'hero-value ' + sign;
-    };
-    setValue('kpi-return', fmtPct(r), signClass(r));
-    setValue('kpi-alpha', fmtPct(a), signClass(a));
-    setValue('kpi-winrate', wr != null ? (wr * 100).toFixed(1) + '%' : '—', 'neutral');
-    setValue('kpi-pnl', fmtUSD(pnl), signClass(pnl));
+  document.getElementById('a-primary').textContent = resp.primary_symbol || '—';
+  document.getElementById('a-symbol-badge').textContent = resp.primary_symbol || '—';
+  document.getElementById('a-generated').textContent = (resp.generated_at || '').replace('T', ' ').slice(0, 19);
 
-    document.getElementById('kpi-return-sub').textContent =
-        'equity ' + fmtUSD(summary.final_equity_usd);
-    document.getElementById('kpi-alpha-sub').textContent =
-        'BTC ' + fmtPct(summary.btc_return_pct);
-    document.getElementById('kpi-winrate-sub').textContent =
-        (summary.total_trades || 0) + ' trades · ' + (summary.wins || 0) + 'W / ' + (summary.losses || 0) + 'L';
-    document.getElementById('kpi-pnl-sub').textContent =
-        pnl >= 0 ? 'net positive' : 'net negative';
-}
+  const primaryRow = (resp.summary || []).find(r => r.symbol === resp.primary_symbol);
+  if (primaryRow) {
+    const on = primaryRow.with_regime || {}, off = primaryRow.without_regime || {};
+    document.getElementById('a-return-on').textContent = fmt(on.total_return_pct) + '%';
+    document.getElementById('a-return-delta').textContent = 'vs without: ' + fmt(off.total_return_pct) + '%';
+    document.getElementById('a-sharpe-on').textContent = fmt(on.sharpe);
+    document.getElementById('a-sharpe-off').textContent = 'without: ' + fmt(off.sharpe);
+    document.getElementById('a-maxdd').textContent = fmt(on.max_drawdown_pct) + '%';
+    document.getElementById('a-winrate').textContent = 'Win rate: ' + fmt((on.win_rate || 0) * 100, 1) + '%';
+  }
 
-function renderEquity(equityCurve, btcBenchmark) {
-    const ctx = document.getElementById('equity-chart').getContext('2d');
-    if (charts.equity) charts.equity.destroy();
-
-    const eqPoints = equityCurve.filter(p => p.t);
-    const btcPoints = btcBenchmark.filter(p => p.t);
-
-    if (eqPoints.length === 0 && btcPoints.length === 0) {
-        ctx.canvas.parentElement.innerHTML =
-            '<div class="empty-state">No closed trades yet — equity curve will appear after positions close.</div>';
-        return;
+  // Equity curve
+  const eqLabels = (resp.equity_curve || []).map(p => p.date);
+  const eqValues = (resp.equity_curve || []).map(p => p.value);
+  const eqOff = (resp.equity_curve_off || []).map(p => p.value);
+  const benchValues = (resp.benchmark_curve || []).map(p => p.value);
+  new Chart(document.getElementById('equity-chart'), {
+    type: 'line',
+    data: {
+      labels: eqLabels,
+      datasets: [
+        { label: 'WITH regime', data: eqValues, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.15)', tension: 0.1, pointRadius: 0, fill: false },
+        { label: 'WITHOUT regime', data: eqOff, borderColor: '#f59e0b', tension: 0.1, pointRadius: 0, fill: false, borderDash: [4, 4] },
+        { label: 'Buy & hold', data: benchValues, borderColor: '#60a5fa', tension: 0.1, pointRadius: 0, fill: false, borderDash: [2, 2] },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } },
+      scales: { x: { ticks: { maxTicksLimit: 10, color: MUTED } }, y: { ticks: { color: MUTED } } }
     }
+  });
 
-    // Merge timestamps from both series so the category axis covers everything
-    const allTs = [...new Set([...eqPoints.map(p => p.t), ...btcPoints.map(p => p.t)])]
-        .sort((a, b) => new Date(a) - new Date(b));
-    const labels = allTs.map(fmtDate);
-
-    const align = (pts) => {
-        const map = new Map(pts.map(p => [p.t, p.equity]));
-        return allTs.map(t => (map.has(t) ? map.get(t) : null));
-    };
-
-    charts.equity = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels,
-            datasets: [
-                {
-                    label: 'Strategy',
-                    data: align(eqPoints),
-                    borderColor: '#3b82f6',
-                    backgroundColor: 'rgba(59,130,246,0.08)',
-                    borderWidth: 2,
-                    pointRadius: 1,
-                    tension: 0.15,
-                    fill: true,
-                    spanGaps: true,
-                },
-                {
-                    label: 'BTC Buy & Hold',
-                    data: align(btcPoints),
-                    borderColor: '#a1a1aa',
-                    borderWidth: 1.5,
-                    borderDash: [5, 3],
-                    pointRadius: 0,
-                    tension: 0.1,
-                    fill: false,
-                    spanGaps: true,
-                },
-            ],
-        },
-        options: sharedChartOpts({yTicks: v => '$' + (v / 1000).toFixed(0) + 'k'}),
-    });
-}
-
-function renderSharpe(series) {
-    const ctx = document.getElementById('sharpe-chart').getContext('2d');
-    if (charts.sharpe) charts.sharpe.destroy();
-    if (!series || series.length === 0) {
-        ctx.canvas.parentElement.innerHTML =
-            '<div class="empty-state">Need 30 days of trade data to compute rolling Sharpe.</div>';
-        return;
+  // Rolling Sharpe
+  const rs = resp.rolling_sharpe || [];
+  new Chart(document.getElementById('sharpe-chart'), {
+    type: 'line',
+    data: {
+      labels: rs.map(p => p.date),
+      datasets: [{ label: '30d Sharpe', data: rs.map(p => p.sharpe), borderColor: '#a855f7', backgroundColor: 'rgba(168,85,247,0.1)', tension: 0.2, pointRadius: 0, fill: true }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { ticks: { maxTicksLimit: 8, color: MUTED } }, y: { ticks: { color: MUTED } } }
     }
-    charts.sharpe = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: series.map(p => p.t),
-            datasets: [{
-                label: 'Sharpe (30d)',
-                data: series.map(p => p.sharpe),
-                borderColor: '#22c55e',
-                backgroundColor: 'rgba(34,197,94,0.08)',
-                borderWidth: 2,
-                pointRadius: 0,
-                tension: 0.2,
-                fill: true,
-            }],
-        },
-        options: sharedChartOpts({yTicks: v => v.toFixed(2)}),
-    });
-}
+  });
 
-function renderScatter(points) {
-    const ctx = document.getElementById('scatter-chart').getContext('2d');
-    if (charts.scatter) charts.scatter.destroy();
-    if (!points || points.length === 0) {
-        ctx.canvas.parentElement.innerHTML =
-            '<div class="empty-state">No scored signals with outcomes yet.</div>';
-        return;
+  // Signal quality scatter
+  const regimeColors = {
+    TREND_UP:   '#22c55e',
+    TREND_DOWN: '#ef4444',
+    RANGE:      '#94a3b8',
+    VOLATILE:   '#f59e0b',
+    UNKNOWN:    '#6b7280',
+    RISK_ON:    '#22c55e',
+    RISK_OFF:   '#ef4444',
+  };
+  const byRegime = {};
+  for (const p of (resp.signal_quality || [])) {
+    const key = p.regime || 'UNKNOWN';
+    (byRegime[key] = byRegime[key] || []).push({ x: p.confidence, y: p.pnl_pct });
+  }
+  new Chart(document.getElementById('quality-chart'), {
+    type: 'scatter',
+    data: {
+      datasets: Object.entries(byRegime).map(([regime, pts]) => ({
+        label: regime, data: pts,
+        backgroundColor: regimeColors[regime] || '#888', pointRadius: 4,
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } },
+      scales: {
+        x: { title: { display: true, text: 'Confidence' }, min: 0, max: 1, ticks: { color: MUTED } },
+        y: { title: { display: true, text: 'PnL %' }, ticks: { color: MUTED } }
+      }
     }
-    const wins = points.filter(p => p.outcome === 'win').map(p => ({x: p.confidence, y: p.pnl_pct, meta: p}));
-    const losses = points.filter(p => p.outcome === 'loss').map(p => ({x: p.confidence, y: p.pnl_pct, meta: p}));
-    const be = points.filter(p => p.outcome === 'break_even').map(p => ({x: p.confidence, y: p.pnl_pct, meta: p}));
+  });
 
-    charts.scatter = new Chart(ctx, {
-        type: 'scatter',
-        data: {
-            datasets: [
-                {label: 'Wins',    data: wins,   backgroundColor: 'rgba(34,197,94,0.65)', pointRadius: 4},
-                {label: 'Losses',  data: losses, backgroundColor: 'rgba(239,68,68,0.65)', pointRadius: 4},
-                {label: 'Flat',    data: be,     backgroundColor: 'rgba(161,161,170,0.65)', pointRadius: 3},
-            ],
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {labels: {color: '#a1a1aa', font: {size: 11}}},
-                tooltip: {
-                    callbacks: {
-                        label: (ctx) => {
-                            const m = ctx.raw.meta || {};
-                            return [
-                                `${m.symbol} — ${m.outcome}`,
-                                `conf ${(m.confidence*100).toFixed(0)}%`,
-                                `pnl ${m.pnl_pct > 0 ? '+' : ''}${m.pnl_pct.toFixed(2)}% ($${m.pnl_usd})`,
-                            ];
-                        },
-                    },
-                },
-            },
-            scales: {
-                x: {
-                    title: {display: true, text: 'Confidence at entry', color: '#71717a'},
-                    min: 0, max: 1,
-                    ticks: {color: '#71717a', callback: v => (v*100).toFixed(0) + '%'},
-                    grid: {color: 'rgba(255,255,255,0.04)'},
-                },
-                y: {
-                    title: {display: true, text: 'Realized PnL %', color: '#71717a'},
-                    ticks: {color: '#71717a', callback: v => v.toFixed(1) + '%'},
-                    grid: {color: 'rgba(255,255,255,0.04)'},
-                },
-            },
-        },
-    });
-}
+  // Regime breakdown table
+  const tb = document.getElementById('regime-tbody');
+  tb.innerHTML = '';
+  for (const r of (resp.regime_breakdown || [])) {
+    tb.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td><strong style="color:${regimeColors[r.regime] || '#aaa'}">${r.regime}</strong></td>
+        <td>${r.trade_count}</td>
+        <td>${fmt(r.win_rate * 100, 1)}%</td>
+        <td>${fmt(r.avg_pnl_pct, 2)}%</td>
+        <td style="color:${r.total_pnl >= 0 ? '#22c55e' : '#ef4444'}">$${fmt(r.total_pnl)}</td>
+      </tr>`);
+  }
+  if (!resp.regime_breakdown || !resp.regime_breakdown.length) {
+    tb.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">No trades in backtest window</td></tr>';
+  }
 
-function renderRegime(regime) {
-    const wrap = document.getElementById('regime-grid');
-    wrap.innerHTML = '';
-    const order = ['RISK_ON', 'TRANSITION', 'RISK_OFF', 'UNKNOWN'];
-    let anyData = false;
-    order.forEach(r => {
-        const d = regime[r] || {};
-        if (d.trades > 0) anyData = true;
-        const wr = d.win_rate;
-        const sign = d.pnl_usd > 0 ? 'positive' : (d.pnl_usd < 0 ? 'negative' : 'neutral');
-        wrap.insertAdjacentHTML('beforeend', `
-            <div class="regime-cell">
-                <div class="regime-name">${r.replace('_', ' ')}</div>
-                <div class="regime-win ${sign}">${wr != null ? (wr*100).toFixed(1) + '%' : '—'}</div>
-                <div class="regime-sub">${d.trades || 0} trades · ${fmtUSD(d.pnl_usd || 0)}</div>
-            </div>
-        `);
-    });
-    if (!anyData) {
-        wrap.innerHTML = '<div class="empty-state">No regime-tagged trades yet.</div>';
+  // Monthly heatmap
+  const hm = document.getElementById('monthly-heatmap');
+  hm.classList.remove('loading');
+  hm.innerHTML = '';
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  // header row
+  let header = '<div class="heatmap-row"><div class="heatmap-label"></div>';
+  for (const m of MONTHS) header += `<div class="heatmap-label" style="color:var(--muted);text-align:center;font-size:0.7rem">${m}</div>`;
+  header += '</div>';
+  hm.insertAdjacentHTML('beforeend', header);
+  const entries = Object.entries(resp.monthly_returns || {});
+  if (!entries.length) {
+    hm.insertAdjacentHTML('beforeend', '<div style="color:var(--muted);padding:12px">No monthly data</div>');
+  }
+  for (const [year, months] of entries) {
+    let row = `<div class="heatmap-row"><div class="heatmap-label">${year}</div>`;
+    for (const v of months) {
+      const val = Number(v || 0);
+      row += `<div class="heatmap-cell" style="background:${pctColor(val)};color:${Math.abs(val)>3?'#fff':'#ccc'}" title="${fmt(val,2)}%">${val === 0 ? '' : fmt(val, 1)}</div>`;
     }
-}
+    row += '</div>';
+    hm.insertAdjacentHTML('beforeend', row);
+  }
 
-function renderTradesTable(tableId, trades) {
-    const tbody = document.querySelector(`#${tableId} tbody`);
-    if (!trades || trades.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No trades.</td></tr>';
-        return;
-    }
-    tbody.innerHTML = trades.map(t => `
-        <tr>
-            <td class="l">${t.symbol}</td>
-            <td class="l">${t.side}</td>
-            <td class="${t.pnl_usd >= 0 ? 'pos' : 'neg'}">${fmtUSD(t.pnl_usd)}</td>
-            <td class="${t.pnl_pct >= 0 ? 'pos' : 'neg'}">${fmtPct(t.pnl_pct, 2)}</td>
-            <td>${(t.confidence * 100).toFixed(0)}%</td>
-            <td class="l">${fmtDate(t.closed_at)}</td>
-        </tr>
-    `).join('');
-}
-
-function renderHeatmap(monthly) {
-    const wrap = document.getElementById('heatmap-wrap');
-    if (!monthly || monthly.length === 0) {
-        wrap.innerHTML = '<div class="empty-state">No closed trades yet.</div>';
-        return;
-    }
-    // Collect unique years + all months 1..12
-    const years = [...new Set(monthly.map(m => m.year))].sort();
-    const byKey = {};
-    monthly.forEach(m => { byKey[`${m.year}-${m.month}`] = m; });
-
-    const maxAbs = monthly.reduce((a, m) => Math.max(a, Math.abs(m.pct || 0)), 0) || 1;
-
-    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    let html = '<div class="heatmap" style="grid-template-columns: auto repeat(' + years.length + ', 1fr);">';
-
-    // Header row: empty + year labels
-    html += '<div class="h-head"></div>';
-    years.forEach(y => { html += `<div class="h-head">${y}</div>`; });
-
-    // 12 rows for months
-    for (let mo = 1; mo <= 12; mo++) {
-        html += `<div class="h-row-label">${monthNames[mo-1]}</div>`;
-        years.forEach(y => {
-            const m = byKey[`${y}-${mo}`];
-            if (!m) {
-                html += '<div class="h-cell empty">·</div>';
-            } else {
-                const pct = m.pct;
-                const alpha = Math.min(1, Math.abs(pct) / maxAbs);
-                const color = pct >= 0
-                    ? `rgba(34,197,94,${0.15 + 0.7 * alpha})`
-                    : `rgba(239,68,68,${0.15 + 0.7 * alpha})`;
-                html += `<div class="h-cell" style="background:${color};" title="${m.trades} trades, ${fmtUSD(m.pnl)}">${fmtPct(pct, 1)}</div>`;
-            }
-        });
-    }
-    html += '</div>';
-    wrap.innerHTML = html;
-}
-
-function sharedChartOpts({yTicks}) {
-    return {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {labels: {color: '#a1a1aa', font: {size: 11}}},
-            tooltip: {mode: 'index', intersect: false},
-        },
-        scales: {
-            x: {
-                type: 'category',
-                ticks: {
-                    color: '#71717a',
-                    maxRotation: 0,
-                    autoSkip: true,
-                    maxTicksLimit: 10,
-                    callback: function(v, i) {
-                        const label = this.getLabelForValue(v);
-                        return fmtDate(label);
-                    },
-                },
-                grid: {color: 'rgba(255,255,255,0.04)'},
-            },
-            y: {
-                ticks: {color: '#71717a', callback: yTicks || (v => v)},
-                grid: {color: 'rgba(255,255,255,0.04)'},
-            },
-        },
-    };
-}
-
-async function load() {
-    try {
-        const r = await fetch('/api/analytics');
-        const d = await r.json();
-        renderHero(d.summary || {});
-        renderEquity(d.equity_curve || [], d.btc_benchmark || []);
-        renderSharpe(d.rolling_sharpe || []);
-        renderScatter(d.scatter || []);
-        renderRegime(d.regime_perf || {});
-        renderTradesTable('best-table', d.best_trades || []);
-        renderTradesTable('worst-table', d.worst_trades || []);
-        renderHeatmap(d.monthly_returns || []);
-        const ts = d.generated_at ? new Date(d.generated_at).toLocaleString() : '—';
-        document.getElementById('last-updated').textContent = 'Updated ' + ts;
-    } catch (e) {
-        console.error('analytics load failed', e);
-        document.getElementById('last-updated').textContent = 'Load error — ' + e.message;
-    }
-}
-
-load();
-setInterval(load, 60000);
+  // Summary table
+  const sb = document.getElementById('summary-tbody');
+  sb.innerHTML = '';
+  for (const row of (resp.summary || [])) {
+    const on = row.with_regime || {}, off = row.without_regime || {};
+    const wrPct = v => (v == null ? '—' : fmt(v * 100, 1) + '%');
+    sb.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td><strong>${row.symbol}</strong></td>
+        <td>${fmt(off.total_return_pct)}%</td><td>${fmt(on.total_return_pct)}%</td>
+        <td>${fmt(off.sharpe)}</td><td>${fmt(on.sharpe)}</td>
+        <td>${fmt(off.max_drawdown_pct)}%</td><td>${fmt(on.max_drawdown_pct)}%</td>
+        <td>${wrPct(off.win_rate)}</td><td>${wrPct(on.win_rate)}</td>
+        <td>${off.trade_count ?? '—'}</td><td>${on.trade_count ?? '—'}</td>
+      </tr>`);
+  }
+})();
 </script>
 {% endblock %}

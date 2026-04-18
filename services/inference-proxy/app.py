@@ -139,7 +139,7 @@ PI_MODELS = {
     "nemotron-mini:4b", "nemotron-mini", "nemotron-mini:latest",
     "gemma2:2b", "qwen2.5:0.5b", "smollm2:1.7b",
 }
-PI_DEFAULT_MODEL  = "nemotron-mini:latest"  # fallback when requested model not in PI_MODELS
+PI_DEFAULT_MODEL  = "qwen2.5:0.5b"  # fastest Pi model (~20s cold load); nemotron-mini times out
 MAC_FALLBACK_MODEL = "hermes3:8b"       # model known to be on Mac Ollama
 
 # Mac models (models confirmed available locally)
@@ -258,6 +258,7 @@ def _call_native_ollama(base_url: str, model: str, messages: list,
         "model": model,
         "messages": messages,
         "stream": False,
+        "keep_alive": -1,  # keep model loaded in VRAM between requests
         "options": {"temperature": temperature, "num_predict": max_tokens},
     }).encode()
     req = urllib.request.Request(
@@ -715,7 +716,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
         if _is_healthy("windows-gpu"):
             tried.append("windows-gpu")
         resp = _try_ollama_native("windows-gpu", WINDOWS_GPU, model,
-                                  messages, max_tokens, temperature, timeout=15)
+                                  messages, max_tokens, temperature, timeout=90)
         if resp:
             self._respond(200, resp, tier="windows-gpu")
             return
@@ -739,7 +740,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
             if PI_RARI1_ENABLED and _is_healthy("pi-rari1"):
                 tried.append("pi-rari1")
                 resp = _try_ollama_native("pi-rari1", PI_RARI1, pi_model,
-                                          messages, max_tokens, temperature, timeout=90)
+                                          messages, max_tokens, temperature, timeout=30)
                 if resp:
                     resp["model"] = f"{resp['model']} (pi-rari1)"
                     self._respond(200, resp, tier="pi-rari1")
@@ -748,7 +749,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
             if PI_RARI2_ENABLED and _is_healthy("pi-rari2"):
                 tried.append("pi-rari2")
                 resp = _try_ollama_native("pi-rari2", PI_RARI2, pi_model,
-                                          messages, max_tokens, temperature, timeout=90)
+                                          messages, max_tokens, temperature, timeout=30)
                 if resp:
                     resp["model"] = f"{resp['model']} (pi-rari2)"
                     self._respond(200, resp, tier="pi-rari2")

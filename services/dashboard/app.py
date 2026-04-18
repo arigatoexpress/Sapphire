@@ -8,12 +8,28 @@ import json
 import logging
 import os
 import secrets
+import sys
 import time
 from datetime import UTC, datetime
 from functools import wraps
 
 UTC = UTC
 from pathlib import Path
+
+# Make the Sapphire lib/ discoverable regardless of whether this dashboard runs
+# from the main repo or a git worktree. Done once at import time so namespace
+# packages resolve consistently across requests.
+_DASHBOARD_ROOTS = (
+    Path(__file__).resolve().parents[2],          # current checkout (worktree or main)
+    Path.home() / 'Code' / 'Sapphire',            # canonical main repo
+)
+# Insert in reverse so the current-checkout path ends up at index 0 (highest
+# priority). Without this, a worktree dashboard resolves `lib.*` against the
+# main repo and misses modules only present in the worktree.
+for _r in reversed(_DASHBOARD_ROOTS):
+    _rs = str(_r)
+    if _rs not in sys.path:
+        sys.path.insert(0, _rs)
 
 log = logging.getLogger("dashboard")
 
@@ -751,9 +767,8 @@ def api_signals():
             # Fallback: read JSONL directly
             import json
             from datetime import datetime as _dt
-            from datetime import timezone as _tz
             signals_dir = _root / 'data' / 'signals'
-            today = _dt.now(_tz.utc).strftime('%Y-%m-%d')
+            today = _dt.now(UTC).strftime('%Y-%m-%d')
             f = signals_dir / f'{today}.jsonl'
             if f.exists():
                 for line in f.read_text().strip().splitlines()[-20:]:
@@ -1011,7 +1026,6 @@ def api_trading_metrics():
     """Trading pipeline metrics — signal counts, success rates from signal logger"""
     import json as _json
     from datetime import datetime as _dt
-    from datetime import timezone as _tz
     from pathlib import Path as _Path
 
     def fetch():
@@ -1020,7 +1034,7 @@ def api_trading_metrics():
         if str(_alpha) not in _sys.path:
             _sys.path.insert(0, str(_alpha))
 
-        today = _dt.now(_tz.utc).strftime('%Y-%m-%d')
+        today = _dt.now(UTC).strftime('%Y-%m-%d')
         signals_dir = _Path.home() / 'Code' / 'Sapphire' / 'data' / 'signals'
         f = signals_dir / f'{today}.jsonl'
 
@@ -1167,6 +1181,61 @@ def api_risk_metrics():
         return jsonify(asdict(m))
     except Exception as e:
         log.exception("risk metrics failed")
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+
+
+@app.route('/analytics')
+@requires_auth
+def analytics_page():
+    """Performance analytics: equity curve, rolling Sharpe, regime breakdown."""
+    return render_template('pages/analytics.html', current_page='analytics',
+                           page_title='Performance Analytics')
+
+
+@app.route('/api/analytics/performance')
+@requires_auth
+def api_analytics_performance():
+    """Equity/benchmark/rolling-Sharpe/regime/monthly report from latest backtest."""
+    try:
+        from lib.analytics.performance import build_performance_report
+        primary = request.args.get('symbol', 'BTC-USD')
+        window = int(request.args.get('window', 30))
+        candidates = [r / 'data' / 'backtests' / 'latest.json' for r in _DASHBOARD_ROOTS]
+        path = next((c for c in candidates if c.exists()), candidates[0])
+        report = build_performance_report(path, primary_symbol=primary, rolling_window=window)
+        return jsonify(report)
+    except Exception as e:
+        log.exception("analytics performance failed")
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+
+
+@app.route('/api/risk/backtest')
+@requires_auth
+def api_risk_backtest():
+    """Backtest SMA-crossover signals against 90d OHLCV.
+
+    Query params:
+      symbols=BTC-USD,ETH-USD   comma list (default: BTC/ETH/SOL/SPY)
+      days=90                   lookback period
+      latest=1                  return the last saved run instead of recomputing
+    """
+    try:
+        from lib.analytics.backtest import Backtester, BacktestConfig, DEFAULT_SYMBOLS
+        if request.args.get('latest') == '1':
+            for cand in (r / 'data' / 'backtests' / 'latest.json' for r in _DASHBOARD_ROOTS):
+                if cand.exists():
+                    return jsonify(json.loads(cand.read_text()))
+            return jsonify({"error": "no cached backtest"}), 404
+        syms_arg = request.args.get('symbols')
+        symbols = tuple(s.strip() for s in syms_arg.split(',') if s.strip()) if syms_arg else DEFAULT_SYMBOLS
+        days = int(request.args.get('days', 90))
+        cfg = BacktestConfig(symbols=symbols, period_days=days)
+        bt = Backtester(cfg)
+        results = bt.run_comparison()
+        bt.save(results)
+        return jsonify(results)
+    except Exception as e:
+        log.exception("backtest failed")
         return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
 
 

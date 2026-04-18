@@ -3,8 +3,8 @@
 Uses Nemotron (free, 196 t/s) to classify tasks, then routes to cheapest tier.
 Keyword fallback if Nemotron is unavailable.
 
-T1 (Kimi) uses kimi_client HTTP API — no CLI subprocess, no hourly auth expiry.
-Priority: MOONSHOT_API_KEY → OPENROUTER_API_KEY → unavailable
+T1 (Kimi) uses HTTP API directly — no CLI subprocess, no hourly auth expiry.
+Priority: MOONSHOT_API_KEY → OPENROUTER_API_KEY → kimi CLI binary (legacy fallback)
 """
 
 from __future__ import annotations
@@ -12,13 +12,10 @@ from __future__ import annotations
 import json
 import os
 import subprocess
-import sys
+import time
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-
-# kimi_client — permanent API key HTTP client (no auth expiry)
-sys.path.insert(0, str(Path.home() / "Code" / "kimi-tools"))
-from kimi_client import complete as kimi_complete  # noqa: E402
 
 # Import nemotron client — handle both plugin context and direct execution
 try:
@@ -26,7 +23,15 @@ try:
 except ImportError:
     from nemotron import MODELS, generate
 
+KIMI_BIN = Path.home() / ".local" / "bin" / "kimi"
 CLAW_BIN = Path.home() / ".local" / "bin" / "claw"
+
+# ─── Kimi Cloud HTTP config ──────────────────────────────────────────────────
+MOONSHOT_API_KEY = os.getenv("MOONSHOT_API_KEY", "")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+MOONSHOT_BASE = "https://api.moonshot.cn/v1"
+OPENROUTER_BASE = "https://openrouter.ai/api/v1"
+KIMI_HTTP_TIMEOUT = 120  # seconds
 
 CLASSIFY_PROMPT = """Classify this software development task into ONE tier.
 
@@ -139,23 +144,113 @@ def execute_t0(task: str, repo: str | None = None) -> ExecutionResult:
     )
 
 
-def execute_t1(task: str, repo: str | None = None) -> ExecutionResult:
-    """Execute via Kimi Cloud (permanent API key, no auth expiry)."""
+def _kimi_http(task: str, repo: str | None = None) -> ExecutionResult | None:
+    """Call Kimi Cloud via HTTP API (no CLI, no auth expiry).
+
+    Tries MOONSHOT_API_KEY first, then OPENROUTER_API_KEY.
+    Returns None if neither key is available.
+    """
     system = "You are a senior software engineer. Be concise, precise, and complete."
     if repo:
         system += f" Working in the {repo} repository."
 
-    result = kimi_complete(task, model="balanced", system=system, max_tokens=4096)
-    return ExecutionResult(
-        tier="t1",
-        agent=f"kimi/{result.provider}/{result.model}",
-        output=result.content if result.success else "",
-        prompt_tokens=result.prompt_tokens,
-        eval_tokens=result.eval_tokens,
-        total_tokens=result.total_tokens,
-        success=result.success,
-        error=result.error,
-    )
+    messages = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": task},
+    ]
+
+    def _post(base: str, model: str, api_key: str, extra_headers: dict | None = None) -> dict:
+        payload = json.dumps({
+            "model": model,
+            "messages": messages,
+            "max_tokens": 4096,
+            "temperature": 0.2,
+        }).encode()
+        headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
+        if extra_headers:
+            headers.update(extra_headers)
+        req = urllib.request.Request(f"{base}/chat/completions", data=payload, headers=headers)
+        with urllib.request.urlopen(req, timeout=KIMI_HTTP_TIMEOUT) as resp:
+            return json.loads(resp.read())
+
+    # Method 1: Moonshot direct (preferred, no markup)
+    if MOONSHOT_API_KEY:
+        try:
+            t0 = time.time()
+            resp = _post(MOONSHOT_BASE, "moonshot-v1-32k", MOONSHOT_API_KEY)
+            content = resp["choices"][0]["message"]["content"]
+            usage = resp.get("usage", {})
+            latency = int((time.time() - t0) * 1000)
+            return ExecutionResult(
+                tier="t1", agent=f"kimi/moonshot-direct ({latency}ms)",
+                output=content,
+                prompt_tokens=usage.get("prompt_tokens", 0),
+                eval_tokens=usage.get("completion_tokens", 0),
+                total_tokens=usage.get("total_tokens", 0),
+                success=bool(content),
+            )
+        except Exception:
+            pass  # Fall through to OpenRouter
+
+    # Method 2: OpenRouter (fallback, has OPENROUTER_API_KEY for hermes)
+    if OPENROUTER_API_KEY:
+        try:
+            t0 = time.time()
+            resp = _post(
+                OPENROUTER_BASE, "moonshotai/kimi-k2.5", OPENROUTER_API_KEY,
+                extra_headers={"HTTP-Referer": "https://sapphire.kadima.io", "X-Title": "Sapphire OS"},
+            )
+            content = resp["choices"][0]["message"]["content"]
+            usage = resp.get("usage", {})
+            latency = int((time.time() - t0) * 1000)
+            return ExecutionResult(
+                tier="t1", agent=f"kimi/openrouter ({latency}ms)",
+                output=content,
+                prompt_tokens=usage.get("prompt_tokens", 0),
+                eval_tokens=usage.get("completion_tokens", 0),
+                total_tokens=usage.get("total_tokens", 0),
+                success=bool(content),
+            )
+        except Exception:
+            pass
+
+    return None  # No API keys configured
+
+
+def execute_t1(task: str, repo: str | None = None) -> ExecutionResult:
+    """Execute via Kimi (HTTP API preferred, CLI binary as legacy fallback)."""
+    # Try HTTP API first (no auth expiry, real token counts)
+    result = _kimi_http(task, repo)
+    if result is not None:
+        return result
+
+    # Legacy fallback: Kimi CLI binary (requires `kimi login` every ~1h)
+    if not KIMI_BIN.exists():
+        return ExecutionResult("t1", "kimi", "", 0, 0, 0, False,
+                               "Kimi unavailable: no API keys (MOONSHOT_API_KEY/OPENROUTER_API_KEY) and CLI binary not found")
+
+    cwd = str(Path.home() / "Code" / repo) if repo else str(Path.home() / "Code" / "Sapphire")
+    env = {**os.environ, "PATH": f"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:{os.environ.get('PATH', '')}"}
+
+    try:
+        proc = subprocess.run(
+            [str(KIMI_BIN), "--print", "--prompt", task, "--work-dir", cwd],
+            capture_output=True, text=True, timeout=180, env=env,
+        )
+        output = proc.stdout.strip()
+        prompt_tokens, eval_tokens = _parse_kimi_tokens(output)
+        return ExecutionResult(
+            tier="t1", agent="kimi/cli-legacy",
+            output=output,
+            prompt_tokens=prompt_tokens,
+            eval_tokens=eval_tokens,
+            total_tokens=prompt_tokens + eval_tokens,
+            success=proc.returncode == 0 and "error" not in output.lower()[:100],
+        )
+    except subprocess.TimeoutExpired:
+        return ExecutionResult("t1", "kimi", "", 0, 0, 0, False, "Timed out")
+    except Exception as e:
+        return ExecutionResult("t1", "kimi", "", 0, 0, 0, False, str(e))
 
 
 def execute_t3(task: str, repo: str | None = None) -> ExecutionResult:
@@ -186,6 +281,33 @@ def execute_t3(task: str, repo: str | None = None) -> ExecutionResult:
         )
     except subprocess.TimeoutExpired:
         return ExecutionResult("t3", "claw", "", 0, 0, 0, False, "Timed out")
+
+
+def _parse_kimi_tokens(output: str) -> tuple[int, int]:
+    """Extract real token counts from Kimi CLI output."""
+    prompt_tokens = 0
+    eval_tokens = 0
+    for line in output.splitlines():
+        if "input_other=" in line or "input_cache" in line:
+            # Parse TokenUsage(...) blocks
+            for part in line.split(","):
+                part = part.strip()
+                if "input_other=" in part:
+                    try:
+                        prompt_tokens += int(part.split("=")[1])
+                    except (ValueError, IndexError):
+                        pass
+                elif "output=" in part and "input" not in part:
+                    try:
+                        eval_tokens += int(part.split("=")[1])
+                    except (ValueError, IndexError):
+                        pass
+                elif "input_cache_read=" in part:
+                    try:
+                        prompt_tokens += int(part.split("=")[1])
+                    except (ValueError, IndexError):
+                        pass
+    return prompt_tokens, eval_tokens
 
 
 # Tier execution chain — cheapest first with fallbacks

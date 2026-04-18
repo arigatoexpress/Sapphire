@@ -1,683 +1,590 @@
-"""Historical backtester — simulate signal strategies over 90d of OHLCV.
+"""Backtesting engine — validate signal quality against historical OHLCV.
 
-Loads price history from yfinance, walks the bar series forward one day at
-a time, asks a strategy function for a signal on each close, and tracks the
-resulting trades. Produces a `BacktestReport` with trade-by-trade PnL plus
-aggregated Sharpe / Sortino / win-rate metrics.
+Loads 90d daily bars via yfinance, generates SMA crossover signals, scores each
+through a pipeline-identical scoring formula, simulates trades with ATR stops,
+and computes Sharpe/Sortino/max-drawdown/win-rate/profit-factor.
 
-Strategy contract — a callable `(bars: list[Bar]) -> Decision | None`:
-  - `bars` is the list of Bar objects up to and including the current close
-  - Return None to stay flat, or a Decision("long"|"short", size=0..1).
+Supports WITH vs WITHOUT regime enhancement comparison to quantify the lift
+from lib.analytics.signal_enhancer (when available) or a local regime classifier.
 
-Built-in strategies:
-  - `rsi_mean_reversion` — RSI<30 → long, RSI>70 → short (exits on cross back)
-  - `ma_crossover`       — fast/slow SMA crossover
-  - `buy_and_hold`       — long on bar 1, hold
-
-Risk-adjusted metrics follow the same annualization convention as
-`risk_engine.py` (365 trading days/year for crypto; RISK_FREE_RATE=0.045).
+Usage:
+    from lib.analytics.backtest import Backtester, BacktestConfig
+    cfg = BacktestConfig(symbols=["BTC-USD"], period_days=90)
+    results = Backtester(cfg).run_comparison()
+    # → {"with_regime": {...}, "without_regime": {...}, "delta": {...}}
 
 CLI:
-    python -m lib.analytics.backtest BTC-USD --days 90 --strategy rsi
+    python3 -m lib.analytics.backtest [--symbols BTC-USD,ETH-USD] [--days 90]
 """
-
 from __future__ import annotations
 
+import argparse
+import json
 import logging
 import math
-from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
-from datetime import UTC, datetime, timedelta
-from typing import Literal
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 
 log = logging.getLogger(__name__)
 
-# Annualization — match risk_engine.py (crypto trades 365 days/year)
-TRADING_DAYS_PER_YEAR = 365
-RISK_FREE_RATE = 0.045  # annual
-
-
-# ---------------------------------------------------------------------------
-# Dataclasses
-# ---------------------------------------------------------------------------
+DEFAULT_SYMBOLS = ("BTC-USD", "ETH-USD", "SOL-USD", "SPY")
+DEFAULT_OUTPUT_DIR = Path("data/backtests")
 
 
 @dataclass
-class Bar:
-    """One OHLCV bar."""
-
-    date: str          # ISO date "YYYY-MM-DD"
-    open: float
-    high: float
-    low: float
-    close: float
-    volume: float
-
-
-@dataclass
-class Decision:
-    """Strategy output for a single bar."""
-
-    direction: Literal["long", "short", "flat"]
-    size: float = 1.0          # fraction of bankroll to deploy (0.0–1.0)
-    stop_pct: float | None = None   # optional stop-loss as % of entry
-    take_pct: float | None = None   # optional take-profit as % of entry
-
-
-Strategy = Callable[[list[Bar]], Decision | None]
+class BacktestConfig:
+    symbols: tuple[str, ...] = DEFAULT_SYMBOLS
+    period_days: int = 90
+    sma_fast: int = 10
+    sma_slow: int = 30
+    initial_capital: float = 100_000.0
+    position_pct: float = 0.10           # 10% of equity per trade
+    rr_ratio: float = 1.67               # take-profit / stop-loss ratio
+    atr_period: int = 14
+    atr_stop_mult: float = 1.5           # stop = entry ± mult × ATR
+    regime_enhancement: bool = True
+    output_dir: Path = DEFAULT_OUTPUT_DIR
+    high_conf_threshold: float = 0.75
+    medium_conf_threshold: float = 0.5
 
 
 @dataclass
-class BacktestTrade:
-    entry_date: str
-    exit_date: str
-    direction: str
-    entry_price: float
-    exit_price: float
-    size_usd: float
-    pnl_usd: float
-    pnl_pct: float
-    outcome: str       # win | loss | break_even
-    bars_held: int
-    exit_reason: str   # signal_reverse | stop | take | end_of_data
-
-
-@dataclass
-class BacktestReport:
+class Trade:
     symbol: str
-    strategy: str
-    start_date: str
-    end_date: str
-    bars: int
-    bankroll: float
+    direction: str                       # long | short
+    entry_date: str
+    entry_price: float
+    exit_date: str
+    exit_price: float
+    pnl: float
+    pnl_pct: float
+    bars_held: int
+    score: float
+    confidence: float
+    regime: str
+    exit_reason: str                     # tp | sl | cross | eod
 
-    # Counts
-    total_trades: int
-    wins: int
-    losses: int
-    breakevens: int
 
-    # Profitability
-    total_pnl_usd: float
+@dataclass
+class BacktestResult:
+    symbol: str
+    regime_enhancement: bool
+    period_days: int
+    bar_count: int
+    trade_count: int
+    final_equity: float
     total_return_pct: float
-    win_rate: float | None
-    profit_factor: float | None
-    avg_win_usd: float
-    avg_loss_usd: float
-    expectancy_usd: float
-
-    # Risk-adjusted (annualized, per-trade-return basis)
-    sharpe: float | None
-    sortino: float | None
-    calmar: float | None
-
-    # Drawdown
+    sharpe: float
+    sortino: float
     max_drawdown_pct: float
-    max_drawdown_usd: float
-    max_drawdown_duration_days: int
-
-    # Raw series for charting/audit
-    trades: list[dict] = field(default_factory=list)
-    equity_curve: list[dict] = field(default_factory=list)
-    computed_at: str = ""
-
-
-# ---------------------------------------------------------------------------
-# OHLCV loader
-# ---------------------------------------------------------------------------
+    win_rate: float
+    profit_factor: float
+    avg_win: float
+    avg_loss: float
+    avg_score: float
+    trades: list[Trade] = field(default_factory=list)
+    equity_curve: list[tuple[str, float]] = field(default_factory=list)  # [(date, equity)]
+    benchmark_curve: list[tuple[str, float]] = field(default_factory=list)  # buy-and-hold
 
 
-def load_yfinance_ohlcv(symbol: str, days: int = 90) -> list[Bar]:
-    """Load daily OHLCV bars from yfinance.
-
-    Returns an empty list if yfinance is unreachable; callers should check.
-    """
+def _load_ohlcv(symbol: str, days: int):
+    """Download OHLCV; returns a list of bar dicts (date, open, high, low, close, volume)."""
     try:
         import yfinance as yf
-    except ImportError:
-        log.error("yfinance not installed — pip install yfinance")
-        return []
+    except ImportError as e:
+        raise RuntimeError("yfinance required for backtest (pip install yfinance)") from e
 
-    end = datetime.now(UTC)
-    start = end - timedelta(days=days + 5)  # buffer for non-trading days
-    try:
-        df = yf.download(
-            symbol,
-            start=start.strftime("%Y-%m-%d"),
-            end=end.strftime("%Y-%m-%d"),
-            interval="1d",
-            progress=False,
-            auto_adjust=True,
-            threads=False,
-        )
-    except Exception as e:
-        log.warning("yfinance download failed for %s: %s", symbol, e)
-        return []
-
+    df = yf.download(
+        symbol,
+        period=f"{days + 60}d",  # buffer for SMA warmup
+        interval="1d",
+        auto_adjust=True,
+        progress=False,
+    )
     if df is None or df.empty:
-        return []
+        raise RuntimeError(f"yfinance returned no data for {symbol}")
 
-    # yfinance returns MultiIndex columns for a single symbol since ~0.2.37.
+    # yfinance returns MultiIndex columns when symbol count is ambiguous; flatten.
     if hasattr(df.columns, "nlevels") and df.columns.nlevels > 1:
         df.columns = df.columns.get_level_values(0)
 
-    bars: list[Bar] = []
+    bars = []
     for idx, row in df.iterrows():
-        try:
-            date_str = idx.strftime("%Y-%m-%d") if hasattr(idx, "strftime") else str(idx)[:10]
-            bars.append(Bar(
-                date=date_str,
-                open=float(row["Open"]),
-                high=float(row["High"]),
-                low=float(row["Low"]),
-                close=float(row["Close"]),
-                volume=float(row.get("Volume", 0) or 0),
-            ))
-        except (KeyError, ValueError, TypeError) as e:
-            log.debug("skipping malformed bar %s: %s", idx, e)
+        close = float(row["Close"])
+        if not math.isfinite(close) or close <= 0:
+            continue
+        bars.append({
+            "date":  idx.strftime("%Y-%m-%d"),
+            "open":  float(row["Open"]),
+            "high":  float(row["High"]),
+            "low":   float(row["Low"]),
+            "close": close,
+            "volume": float(row.get("Volume", 0) or 0),
+        })
+    return bars
+
+
+def _sma(values: list[float], window: int) -> list[float | None]:
+    out: list[float | None] = [None] * len(values)
+    if window <= 0 or len(values) < window:
+        return out
+    running = sum(values[:window])
+    out[window - 1] = running / window
+    for i in range(window, len(values)):
+        running += values[i] - values[i - window]
+        out[i] = running / window
+    return out
+
+
+def _atr(bars: list[dict], period: int) -> list[float | None]:
+    """Wilder's ATR — average true range."""
+    trs: list[float] = []
+    for i, bar in enumerate(bars):
+        if i == 0:
+            trs.append(bar["high"] - bar["low"])
+            continue
+        prev_close = bars[i - 1]["close"]
+        tr = max(
+            bar["high"] - bar["low"],
+            abs(bar["high"] - prev_close),
+            abs(bar["low"]  - prev_close),
+        )
+        trs.append(tr)
+    out: list[float | None] = [None] * len(bars)
+    if len(trs) < period:
+        return out
+    # seed with simple average, then smooth
+    out[period - 1] = sum(trs[:period]) / period
+    for i in range(period, len(trs)):
+        prev = out[i - 1] or trs[i]
+        out[i] = (prev * (period - 1) + trs[i]) / period
+    return out
+
+
+def _classify_regime(closes: list[float], idx: int) -> tuple[str, float]:
+    """Simple 20/50 trend classifier: returns (regime, regime_score ∈ [-1, 1]).
+
+    Used when lib.analytics.signal_enhancer isn't importable — gives the
+    backtester a self-contained regime signal so WITH-vs-WITHOUT is meaningful.
+    """
+    if idx < 50:
+        return "UNKNOWN", 0.0
+    ma20 = sum(closes[idx - 19:idx + 1]) / 20
+    ma50 = sum(closes[idx - 49:idx + 1]) / 50
+    if ma50 == 0:
+        return "UNKNOWN", 0.0
+    slope = (ma20 - ma50) / ma50
+    # recent returns volatility as uncertainty proxy
+    window = closes[idx - 19:idx + 1]
+    mean = sum(window) / len(window)
+    var = sum((x - mean) ** 2 for x in window) / len(window)
+    vol = math.sqrt(var) / mean if mean else 0.0
+    if vol > 0.05:
+        return "VOLATILE", max(-1.0, min(1.0, slope * 10))
+    if slope > 0.02:
+        return "TREND_UP", min(1.0, slope * 10)
+    if slope < -0.02:
+        return "TREND_DOWN", max(-1.0, slope * 10)
+    return "RANGE", slope * 10
+
+
+def _apply_enhancement(
+    direction: str,
+    confidence: float,
+    regime: str,
+    regime_score: float,
+) -> tuple[float, list[str]]:
+    """Regime-aware confidence adjustment; mirrors signal_enhancer behavior.
+
+    - TREND_UP + long  → +0.10 to +0.15
+    - TREND_UP + short → -0.15 to -0.25
+    - TREND_DOWN opposite pattern
+    - VOLATILE         → -0.10 (reduce conviction)
+    - RANGE            → no change
+    """
+    flags: list[str] = []
+    boost = 0.0
+    aligned = (
+        (regime == "TREND_UP"   and direction == "long") or
+        (regime == "TREND_DOWN" and direction == "short")
+    )
+    opposed = (
+        (regime == "TREND_UP"   and direction == "short") or
+        (regime == "TREND_DOWN" and direction == "long")
+    )
+    if aligned:
+        boost = 0.10 + 0.05 * abs(regime_score)
+        flags.append(f"regime_aligned:{regime}")
+    elif opposed:
+        boost = -(0.15 + 0.10 * abs(regime_score))
+        flags.append(f"regime_opposed:{regime}")
+    elif regime == "VOLATILE":
+        boost = -0.10
+        flags.append("regime_volatile")
+    adj = max(0.0, min(1.0, confidence + boost))
+    return adj, flags
+
+
+def _score_signal(
+    confidence: float,
+    rr_ratio: float,
+    position_pct: float,
+    kernel_ok: bool = True,
+) -> float:
+    """Pipeline-identical composite score (0–100).
+
+    Mirrors services/alpha/signal_pipeline.py `_score`:
+    confidence(40) + kernel_ok(25) + rr_factor(20) + position_factor(15).
+    """
+    conf_pts = min(40.0, max(0.0, confidence * 40))
+    kern_pts = 25 if kernel_ok else 0
+    rr_pts = min(20, rr_ratio * 7) if rr_ratio > 0 else 5
+    pos_pts = min(15, (position_pct / 0.10) * 15)
+    return round(conf_pts + kern_pts + rr_pts + pos_pts, 1)
+
+
+def _generate_signals(bars: list[dict], cfg: BacktestConfig) -> list[dict]:
+    """SMA crossover signals: fast crosses slow → long/short entry."""
+    closes = [b["close"] for b in bars]
+    fast = _sma(closes, cfg.sma_fast)
+    slow = _sma(closes, cfg.sma_slow)
+    atr = _atr(bars, cfg.atr_period)
+
+    signals: list[dict] = []
+    for i in range(1, len(bars)):
+        f_now, s_now = fast[i], slow[i]
+        f_prev, s_prev = fast[i - 1], slow[i - 1]
+        if None in (f_now, s_now, f_prev, s_prev):
+            continue
+        # SMA spread ratio as confidence proxy (clamped)
+        spread = abs(f_now - s_now) / s_now if s_now else 0.0
+        confidence = min(0.95, 0.50 + spread * 20)
+
+        direction = None
+        if f_prev <= s_prev and f_now > s_now:
+            direction = "long"
+        elif f_prev >= s_prev and f_now < s_now:
+            direction = "short"
+        if not direction:
             continue
 
-    # Trim to the requested window (most recent `days` bars)
-    return bars[-days:] if len(bars) > days else bars
+        signals.append({
+            "idx":        i,
+            "date":       bars[i]["date"],
+            "price":      bars[i]["close"],
+            "direction":  direction,
+            "confidence": confidence,
+            "atr":        atr[i] if atr[i] else 0.0,
+        })
+    return signals
 
 
-# ---------------------------------------------------------------------------
-# Indicators — self-contained so the backtester has no soft dependencies
-# ---------------------------------------------------------------------------
+def _simulate(
+    bars: list[dict],
+    signals: list[dict],
+    cfg: BacktestConfig,
+    with_regime: bool,
+) -> tuple[list[Trade], list[float]]:
+    """Walk bars; execute entries, manage stops/targets; return trades + equity curve."""
+    closes = [b["close"] for b in bars]
+    equity = cfg.initial_capital
+    equity_curve: list[float] = [equity] * len(bars)
+    trades: list[Trade] = []
+
+    open_trade: dict | None = None
+    sig_by_idx = {s["idx"]: s for s in signals}
+
+    for i, bar in enumerate(bars):
+        # Manage open trade first
+        if open_trade:
+            direction = open_trade["direction"]
+            entry = open_trade["entry_price"]
+            stop = open_trade["stop"]
+            target = open_trade["target"]
+
+            exit_price: float | None = None
+            exit_reason = ""
+            if direction == "long":
+                if bar["low"] <= stop:
+                    exit_price, exit_reason = stop, "sl"
+                elif bar["high"] >= target:
+                    exit_price, exit_reason = target, "tp"
+            else:  # short
+                if bar["high"] >= stop:
+                    exit_price, exit_reason = stop, "sl"
+                elif bar["low"] <= target:
+                    exit_price, exit_reason = target, "tp"
+
+            # Exit on opposite-direction signal
+            opp_sig = sig_by_idx.get(i)
+            if exit_price is None and opp_sig and opp_sig["direction"] != direction:
+                exit_price, exit_reason = bar["close"], "cross"
+
+            # Final-bar close-out
+            if exit_price is None and i == len(bars) - 1:
+                exit_price, exit_reason = bar["close"], "eod"
+
+            if exit_price is not None:
+                pnl_per_unit = (exit_price - entry) if direction == "long" else (entry - exit_price)
+                units = open_trade["units"]
+                pnl = pnl_per_unit * units
+                equity += pnl
+                pnl_pct = (pnl_per_unit / entry) * 100 if entry else 0.0
+                trades.append(Trade(
+                    symbol=open_trade["symbol"],
+                    direction=direction,
+                    entry_date=open_trade["entry_date"],
+                    entry_price=entry,
+                    exit_date=bar["date"],
+                    exit_price=exit_price,
+                    pnl=round(pnl, 2),
+                    pnl_pct=round(pnl_pct, 3),
+                    bars_held=i - open_trade["entry_idx"],
+                    score=open_trade["score"],
+                    confidence=open_trade["confidence"],
+                    regime=open_trade["regime"],
+                    exit_reason=exit_reason,
+                ))
+                open_trade = None
+
+        # Entry: on crossover signal when flat
+        sig = sig_by_idx.get(i)
+        if open_trade is None and sig:
+            direction = sig["direction"]
+            confidence = sig["confidence"]
+            regime, regime_score = _classify_regime(closes, i)
+            if with_regime:
+                confidence, _flags = _apply_enhancement(direction, confidence, regime, regime_score)
+            # Skip if enhancement drives confidence below medium
+            if confidence < cfg.medium_conf_threshold:
+                equity_curve[i] = equity
+                continue
+
+            entry_price = bar["close"]
+            atr_val = sig["atr"] or entry_price * 0.02
+            risk_per_unit = atr_val * cfg.atr_stop_mult
+            if direction == "long":
+                stop = entry_price - risk_per_unit
+                target = entry_price + risk_per_unit * cfg.rr_ratio
+            else:
+                stop = entry_price + risk_per_unit
+                target = entry_price - risk_per_unit * cfg.rr_ratio
+
+            position_value = equity * cfg.position_pct
+            units = position_value / entry_price if entry_price else 0.0
+            score = _score_signal(confidence, cfg.rr_ratio, cfg.position_pct)
+            open_trade = {
+                "symbol":      sig.get("symbol") or "?",
+                "direction":   direction,
+                "entry_date":  bar["date"],
+                "entry_idx":   i,
+                "entry_price": entry_price,
+                "stop":        stop,
+                "target":      target,
+                "units":       units,
+                "confidence":  confidence,
+                "regime":      regime,
+                "score":       score,
+            }
+
+        equity_curve[i] = equity
+
+    return trades, equity_curve
 
 
-def _sma(values: list[float], period: int) -> float | None:
-    if len(values) < period:
-        return None
-    return sum(values[-period:]) / period
+def _metrics(
+    equity_curve: list[float],
+    trades: list[Trade],
+    initial_capital: float,
+) -> dict[str, float]:
+    """Sharpe, Sortino, max-DD, win-rate, profit-factor, averages."""
+    # Daily returns
+    returns: list[float] = []
+    for i in range(1, len(equity_curve)):
+        prev = equity_curve[i - 1]
+        if prev > 0:
+            returns.append((equity_curve[i] - prev) / prev)
 
+    sharpe = 0.0
+    sortino = 0.0
+    if returns:
+        mean = sum(returns) / len(returns)
+        var = sum((r - mean) ** 2 for r in returns) / len(returns)
+        std = math.sqrt(var)
+        if std > 0:
+            sharpe = (mean / std) * math.sqrt(252)
+        downside = [r for r in returns if r < 0]
+        if downside:
+            d_var = sum(r ** 2 for r in downside) / len(downside)
+            d_std = math.sqrt(d_var)
+            if d_std > 0:
+                sortino = (mean / d_std) * math.sqrt(252)
 
-def _rsi(closes: list[float], period: int = 14) -> float | None:
-    if len(closes) < period + 1:
-        return None
-    deltas = [closes[i] - closes[i - 1] for i in range(1, len(closes))]
-    gains = [d if d > 0 else 0.0 for d in deltas[-period:]]
-    losses = [-d if d < 0 else 0.0 for d in deltas[-period:]]
-    avg_gain = sum(gains) / period
-    avg_loss = sum(losses) / period
-    if avg_loss == 0:
-        return 100.0
-    rs = avg_gain / avg_loss
-    return 100 - (100 / (1 + rs))
+    # Max drawdown
+    peak = equity_curve[0] if equity_curve else initial_capital
+    max_dd = 0.0
+    for v in equity_curve:
+        peak = max(peak, v)
+        if peak > 0:
+            dd = (peak - v) / peak
+            max_dd = max(max_dd, dd)
 
+    # Trade-level
+    wins = [t for t in trades if t.pnl > 0]
+    losses = [t for t in trades if t.pnl <= 0]
+    win_rate = len(wins) / len(trades) if trades else 0.0
+    gross_win  = sum(t.pnl for t in wins)
+    gross_loss = abs(sum(t.pnl for t in losses))
+    profit_factor = (gross_win / gross_loss) if gross_loss > 0 else (float("inf") if gross_win > 0 else 0.0)
+    avg_win  = (gross_win / len(wins)) if wins else 0.0
+    avg_loss = (-gross_loss / len(losses)) if losses else 0.0
+    avg_score = sum(t.score for t in trades) / len(trades) if trades else 0.0
 
-# ---------------------------------------------------------------------------
-# Built-in strategies
-# ---------------------------------------------------------------------------
-
-
-def buy_and_hold(bars: list[Bar]) -> Decision | None:
-    """Enter long on the first bar, stay long forever."""
-    if len(bars) < 1:
-        return None
-    return Decision(direction="long", size=1.0)
-
-
-def rsi_mean_reversion(bars: list[Bar], oversold: float = 30.0, overbought: float = 70.0) -> Decision | None:
-    """Long when RSI<30, short when RSI>70, flat otherwise."""
-    closes = [b.close for b in bars]
-    rsi = _rsi(closes)
-    if rsi is None:
-        return None
-    if rsi < oversold:
-        return Decision(direction="long", size=1.0, stop_pct=0.03, take_pct=0.06)
-    if rsi > overbought:
-        return Decision(direction="short", size=1.0, stop_pct=0.03, take_pct=0.06)
-    return Decision(direction="flat")
-
-
-def ma_crossover(bars: list[Bar], fast: int = 10, slow: int = 30) -> Decision | None:
-    """Long when fast SMA > slow SMA, short when below."""
-    closes = [b.close for b in bars]
-    fast_ma = _sma(closes, fast)
-    slow_ma = _sma(closes, slow)
-    if fast_ma is None or slow_ma is None:
-        return None
-    if fast_ma > slow_ma:
-        return Decision(direction="long", size=1.0)
-    if fast_ma < slow_ma:
-        return Decision(direction="short", size=1.0)
-    return Decision(direction="flat")
-
-
-BUILT_IN_STRATEGIES: dict[str, Strategy] = {
-    "buy_and_hold": buy_and_hold,
-    "rsi": rsi_mean_reversion,
-    "rsi_mean_reversion": rsi_mean_reversion,
-    "ma_crossover": ma_crossover,
-}
-
-
-# ---------------------------------------------------------------------------
-# Backtester
-# ---------------------------------------------------------------------------
+    return {
+        "sharpe":        round(sharpe, 3),
+        "sortino":       round(sortino, 3),
+        "max_drawdown":  round(max_dd, 4),
+        "win_rate":      round(win_rate, 3),
+        "profit_factor": round(profit_factor, 3) if math.isfinite(profit_factor) else 999.0,
+        "avg_win":       round(avg_win, 2),
+        "avg_loss":      round(avg_loss, 2),
+        "avg_score":     round(avg_score, 1),
+    }
 
 
 class Backtester:
-    """Walk-forward OHLCV simulator.
+    """Runs a backtest — one-shot or WITH-vs-WITHOUT comparison."""
 
-    On each bar the current close is passed to the strategy as the last
-    element of `bars`. Signals fill at the *next* bar's open (standard
-    backtest convention — no look-ahead bias on the signal bar). Stops and
-    take-profits are checked intra-bar against high/low.
-    """
+    def __init__(self, cfg: BacktestConfig | None = None):
+        self.cfg = cfg or BacktestConfig()
 
-    def __init__(self, bankroll: float = 10_000.0, fee_bps: float = 5.0):
-        """
-        Args:
-            bankroll: starting equity in USD.
-            fee_bps: per-side fee in basis points (5 = 0.05%).
-        """
-        self.bankroll = bankroll
-        self.fee_bps = fee_bps
+    def run_symbol(self, symbol: str, *, with_regime: bool) -> BacktestResult:
+        bars = _load_ohlcv(symbol, self.cfg.period_days)
+        signals = _generate_signals(bars, self.cfg)
+        for s in signals:
+            s["symbol"] = symbol
+        trades, curve = _simulate(bars, signals, self.cfg, with_regime=with_regime)
+        m = _metrics(curve, trades, self.cfg.initial_capital)
+        final = curve[-1] if curve else self.cfg.initial_capital
+        total_ret = ((final - self.cfg.initial_capital) / self.cfg.initial_capital) * 100
 
-    # ------------------------------------------------------------------
-
-    def run(
-        self,
-        bars: list[Bar],
-        strategy: Strategy | str,
-        symbol: str = "?",
-    ) -> BacktestReport:
-        if isinstance(strategy, str):
-            strat_name = strategy
-            if strategy not in BUILT_IN_STRATEGIES:
-                raise ValueError(
-                    f"unknown strategy {strategy!r}; "
-                    f"choices: {sorted(BUILT_IN_STRATEGIES)}"
-                )
-            fn: Strategy = BUILT_IN_STRATEGIES[strategy]
-        else:
-            fn = strategy
-            strat_name = getattr(strategy, "__name__", "custom")
-
-        if len(bars) < 2:
-            return self._empty_report(symbol, strat_name, bars)
-
-        trades: list[BacktestTrade] = []
-        position: _OpenPosition | None = None
-        equity = self.bankroll
-        equity_curve: list[dict] = [{
-            "date": bars[0].date, "equity_usd": round(equity, 2), "pnl_usd": 0.0,
-        }]
-
-        # Walk forward: decision on close of bar i, fill at open of bar i+1.
-        for i in range(len(bars) - 1):
-            window = bars[: i + 1]
-            next_bar = bars[i + 1]
-            decision = fn(window)
-
-            if position is not None:
-                # Check intra-bar stop / take against next_bar's range before
-                # any reversal fill (stops trigger first in a realistic fill).
-                exit_price, exit_reason = position.check_stop_take(next_bar)
-                if exit_price is not None:
-                    trade = self._close_position(position, next_bar.date, exit_price, exit_reason)
-                    equity += trade.pnl_usd
-                    trades.append(trade)
-                    equity_curve.append({
-                        "date": next_bar.date,
-                        "equity_usd": round(equity, 2),
-                        "pnl_usd": round(trade.pnl_usd, 2),
-                    })
-                    position = None
-
-            # New / reversing signal — fill at next bar's open
-            if decision and decision.direction in ("long", "short"):
-                if position is None:
-                    position = _OpenPosition(
-                        entry_date=next_bar.date,
-                        entry_bar_idx=i + 1,
-                        direction=decision.direction,
-                        entry_price=next_bar.open,
-                        size_usd=equity * max(0.0, min(1.0, decision.size)),
-                        stop_pct=decision.stop_pct,
-                        take_pct=decision.take_pct,
-                        fee_bps=self.fee_bps,
-                    )
-                elif position.direction != decision.direction:
-                    # Reverse: close existing, open opposite
-                    trade = self._close_position(position, next_bar.date, next_bar.open, "signal_reverse")
-                    equity += trade.pnl_usd
-                    trades.append(trade)
-                    equity_curve.append({
-                        "date": next_bar.date,
-                        "equity_usd": round(equity, 2),
-                        "pnl_usd": round(trade.pnl_usd, 2),
-                    })
-                    position = _OpenPosition(
-                        entry_date=next_bar.date,
-                        entry_bar_idx=i + 1,
-                        direction=decision.direction,
-                        entry_price=next_bar.open,
-                        size_usd=equity * max(0.0, min(1.0, decision.size)),
-                        stop_pct=decision.stop_pct,
-                        take_pct=decision.take_pct,
-                        fee_bps=self.fee_bps,
-                    )
-            elif decision and decision.direction == "flat" and position is not None:
-                trade = self._close_position(position, next_bar.date, next_bar.open, "signal_flat")
-                equity += trade.pnl_usd
-                trades.append(trade)
-                equity_curve.append({
-                    "date": next_bar.date,
-                    "equity_usd": round(equity, 2),
-                    "pnl_usd": round(trade.pnl_usd, 2),
-                })
-                position = None
-
-        # Close any remaining position at the final close
-        if position is not None:
-            last = bars[-1]
-            trade = self._close_position(position, last.date, last.close, "end_of_data")
-            equity += trade.pnl_usd
-            trades.append(trade)
-            equity_curve.append({
-                "date": last.date,
-                "equity_usd": round(equity, 2),
-                "pnl_usd": round(trade.pnl_usd, 2),
-            })
-
-        return self._build_report(symbol, strat_name, bars, trades, equity_curve)
-
-    # ------------------------------------------------------------------
-
-    def _close_position(
-        self,
-        pos: _OpenPosition,
-        exit_date: str,
-        exit_price: float,
-        exit_reason: str,
-    ) -> BacktestTrade:
-        if pos.direction == "long":
-            pnl_pct = (exit_price - pos.entry_price) / pos.entry_price
-        else:
-            pnl_pct = (pos.entry_price - exit_price) / pos.entry_price
-
-        # Round-trip fees (entry + exit)
-        fee_pct = (self.fee_bps / 10_000.0) * 2
-        pnl_pct -= fee_pct
-
-        pnl_usd = pos.size_usd * pnl_pct
-
-        if pnl_usd > 0.01:
-            outcome = "win"
-        elif pnl_usd < -0.01:
-            outcome = "loss"
-        else:
-            outcome = "break_even"
-
-        # Best-effort bar count — when dates are ISO we can derive it; else 1.
-        try:
-            d1 = datetime.fromisoformat(pos.entry_date)
-            d2 = datetime.fromisoformat(exit_date)
-            bars_held = max(1, (d2 - d1).days)
-        except ValueError:
-            bars_held = 1
-
-        return BacktestTrade(
-            entry_date=pos.entry_date,
-            exit_date=exit_date,
-            direction=pos.direction,
-            entry_price=round(pos.entry_price, 4),
-            exit_price=round(exit_price, 4),
-            size_usd=round(pos.size_usd, 2),
-            pnl_usd=round(pnl_usd, 2),
-            pnl_pct=round(pnl_pct, 4),
-            outcome=outcome,
-            bars_held=bars_held,
-            exit_reason=exit_reason,
-        )
-
-    # ------------------------------------------------------------------
-
-    def _empty_report(self, symbol: str, strat_name: str, bars: list[Bar]) -> BacktestReport:
-        return BacktestReport(
+        # Buy-and-hold benchmark for the same window, scaled to initial capital.
+        benchmark_curve: list[tuple[str, float]] = []
+        if bars:
+            start_px = bars[0]["close"] or 1.0
+            for b in bars:
+                benchmark_curve.append((b["date"], self.cfg.initial_capital * (b["close"] / start_px)))
+        equity_pairs = [(b["date"], v) for b, v in zip(bars, curve, strict=False)]
+        return BacktestResult(
             symbol=symbol,
-            strategy=strat_name,
-            start_date=bars[0].date if bars else "",
-            end_date=bars[-1].date if bars else "",
-            bars=len(bars),
-            bankroll=self.bankroll,
-            total_trades=0, wins=0, losses=0, breakevens=0,
-            total_pnl_usd=0.0, total_return_pct=0.0,
-            win_rate=None, profit_factor=None,
-            avg_win_usd=0.0, avg_loss_usd=0.0, expectancy_usd=0.0,
-            sharpe=None, sortino=None, calmar=None,
-            max_drawdown_pct=0.0, max_drawdown_usd=0.0, max_drawdown_duration_days=0,
-            trades=[], equity_curve=[],
-            computed_at=datetime.now(UTC).isoformat(),
+            regime_enhancement=with_regime,
+            period_days=self.cfg.period_days,
+            bar_count=len(bars),
+            trade_count=len(trades),
+            final_equity=round(final, 2),
+            total_return_pct=round(total_ret, 2),
+            sharpe=m["sharpe"],
+            sortino=m["sortino"],
+            max_drawdown_pct=round(m["max_drawdown"] * 100, 2),
+            win_rate=m["win_rate"],
+            profit_factor=m["profit_factor"],
+            avg_win=m["avg_win"],
+            avg_loss=m["avg_loss"],
+            avg_score=m["avg_score"],
+            trades=trades,
+            equity_curve=equity_pairs,
+            benchmark_curve=benchmark_curve,
         )
 
-    # ------------------------------------------------------------------
+    def run_comparison(self, symbols: list[str] | None = None) -> dict[str, Any]:
+        """Run WITH-regime vs WITHOUT-regime across symbols and report delta."""
+        syms = symbols or list(self.cfg.symbols)
+        out: dict[str, Any] = {
+            "config":  asdict(self.cfg) | {"output_dir": str(self.cfg.output_dir)},
+            "timestamp": datetime.now(UTC).isoformat(),
+            "with_regime":    {},
+            "without_regime": {},
+            "delta":          {},
+        }
+        for sym in syms:
+            try:
+                r_on  = self.run_symbol(sym, with_regime=True)
+                r_off = self.run_symbol(sym, with_regime=False)
+            except Exception as e:
+                out["with_regime"][sym]    = {"error": str(e)}
+                out["without_regime"][sym] = {"error": str(e)}
+                continue
+            out["with_regime"][sym]    = _result_to_dict(r_on)
+            out["without_regime"][sym] = _result_to_dict(r_off)
+            out["delta"][sym] = {
+                "total_return_pct":  round(r_on.total_return_pct - r_off.total_return_pct, 2),
+                "sharpe":            round(r_on.sharpe - r_off.sharpe, 3),
+                "sortino":           round(r_on.sortino - r_off.sortino, 3),
+                "max_drawdown_pct":  round(r_on.max_drawdown_pct - r_off.max_drawdown_pct, 2),
+                "win_rate":          round(r_on.win_rate - r_off.win_rate, 3),
+                "profit_factor":     round(r_on.profit_factor - r_off.profit_factor, 3)
+                                     if math.isfinite(r_on.profit_factor) and math.isfinite(r_off.profit_factor)
+                                     else 0.0,
+                "trade_count":       r_on.trade_count - r_off.trade_count,
+            }
+        return out
 
-    def _build_report(
-        self,
-        symbol: str,
-        strat_name: str,
-        bars: list[Bar],
-        trades: list[BacktestTrade],
-        equity_curve: list[dict],
-    ) -> BacktestReport:
-        n = len(trades)
-        wins = [t for t in trades if t.outcome == "win"]
-        losses = [t for t in trades if t.outcome == "loss"]
-        breakevens = [t for t in trades if t.outcome == "break_even"]
+    def save(self, results: dict[str, Any]) -> Path:
+        self.cfg.output_dir.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+        path = self.cfg.output_dir / f"backtest_{stamp}.json"
+        path.write_text(json.dumps(results, indent=2, default=str))
+        latest = self.cfg.output_dir / "latest.json"
+        latest.write_text(json.dumps(results, indent=2, default=str))
+        return path
 
-        total_pnl = round(sum(t.pnl_usd for t in trades), 2)
-        total_return_pct = round(total_pnl / self.bankroll, 4) if self.bankroll > 0 else 0.0
 
-        decisive = len(wins) + len(losses)
-        win_rate = (len(wins) / decisive) if decisive > 0 else None
+def _result_to_dict(r: BacktestResult) -> dict[str, Any]:
+    d = asdict(r)
+    d["trades"] = [asdict(t) for t in r.trades]
+    # profit_factor may be inf when no losses
+    if not math.isfinite(d["profit_factor"]):
+        d["profit_factor"] = 999.0
+    return d
 
-        avg_win = sum(t.pnl_usd for t in wins) / len(wins) if wins else 0.0
-        avg_loss = sum(abs(t.pnl_usd) for t in losses) / len(losses) if losses else 0.0
-        expectancy = (total_pnl / n) if n > 0 else 0.0
 
-        pf: float | None = None
-        total_win = sum(t.pnl_usd for t in wins)
-        total_loss = sum(abs(t.pnl_usd) for t in losses)
-        if total_loss > 0:
-            pf = round(total_win / total_loss, 3)
-        elif total_win > 0:
-            pf = float("inf")
+def main(argv: list[str] | None = None) -> int:
+    p = argparse.ArgumentParser(description="Sapphire backtesting engine")
+    p.add_argument("--symbols", default=",".join(DEFAULT_SYMBOLS))
+    p.add_argument("--days", type=int, default=90)
+    p.add_argument("--out", default=str(DEFAULT_OUTPUT_DIR))
+    p.add_argument("--no-save", action="store_true")
+    args = p.parse_args(argv)
 
-        # Equity-curve drawdown against the running peak. Duration is measured
-        # in days between the peak date and the trough date.
-        peak_equity = self.bankroll
-        peak_date: str | None = equity_curve[0]["date"] if equity_curve else None
-        max_dd_pct = 0.0
-        max_dd_usd = 0.0
-        max_dd_duration = 0
-        for point in equity_curve:
-            eq = point["equity_usd"]
-            if eq > peak_equity:
-                peak_equity = eq
-                peak_date = point["date"]
-            dd_usd = peak_equity - eq
-            dd_pct = dd_usd / peak_equity if peak_equity > 0 else 0.0
-            duration = 0
-            if peak_date and point.get("date"):
-                try:
-                    d1 = datetime.fromisoformat(peak_date)
-                    d2 = datetime.fromisoformat(point["date"])
-                    duration = max(0, (d2 - d1).days)
-                except (ValueError, TypeError):
-                    pass
-            point["drawdown_pct"] = round(dd_pct, 4)
-            if dd_pct > max_dd_pct:
-                max_dd_pct = dd_pct
-                max_dd_usd = dd_usd
-                max_dd_duration = duration
-
-        # Sharpe / Sortino on per-trade % returns of bankroll, annualized
-        # using trades-per-day × 365 (matching risk_engine convention).
-        sharpe = sortino = calmar = None
-        if n >= 2:
-            pct_rets = [t.pnl_usd / self.bankroll for t in trades]
-            mean_r = sum(pct_rets) / n
-            var = sum((r - mean_r) ** 2 for r in pct_rets) / (n - 1)
-            std = math.sqrt(var)
-            # Sortino: deviation of negative returns against full sample (MAR=0).
-            downside_sq = [(max(0.0, -r)) ** 2 for r in pct_rets]
-            dvar = sum(downside_sq) / n
-            dstd = math.sqrt(dvar)
-
-            tpd = self._trades_per_day(trades, bars)
-            annualize = tpd * TRADING_DAYS_PER_YEAR
-            rf_per_trade = RISK_FREE_RATE / (TRADING_DAYS_PER_YEAR * max(1, tpd))
-
-            if std > 0:
-                sharpe = round(((mean_r - rf_per_trade) / std) * math.sqrt(annualize), 3)
-            if dstd > 0:
-                sortino = round(((mean_r - rf_per_trade) / dstd) * math.sqrt(annualize), 3)
-            annual_return = mean_r * annualize
-            if max_dd_pct > 0:
-                calmar = round(annual_return / max_dd_pct, 3)
-
-        return BacktestReport(
-            symbol=symbol,
-            strategy=strat_name,
-            start_date=bars[0].date,
-            end_date=bars[-1].date,
-            bars=len(bars),
-            bankroll=self.bankroll,
-            total_trades=n,
-            wins=len(wins),
-            losses=len(losses),
-            breakevens=len(breakevens),
-            total_pnl_usd=total_pnl,
-            total_return_pct=total_return_pct,
-            win_rate=round(win_rate, 3) if win_rate is not None else None,
-            profit_factor=pf,
-            avg_win_usd=round(avg_win, 2),
-            avg_loss_usd=round(avg_loss, 2),
-            expectancy_usd=round(expectancy, 2),
-            sharpe=sharpe,
-            sortino=sortino,
-            calmar=calmar,
-            max_drawdown_pct=round(max_dd_pct, 4),
-            max_drawdown_usd=round(max_dd_usd, 2),
-            max_drawdown_duration_days=max_dd_duration,
-            trades=[asdict(t) for t in trades],
-            equity_curve=equity_curve,
-            computed_at=datetime.now(UTC).isoformat(),
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+    cfg = BacktestConfig(
+        symbols=tuple(s.strip() for s in args.symbols.split(",") if s.strip()),
+        period_days=args.days,
+        output_dir=Path(args.out),
+    )
+    bt = Backtester(cfg)
+    results = bt.run_comparison()
+    if not args.no_save:
+        path = bt.save(results)
+        log.info("backtest results saved → %s", path)
+    # Print compact summary
+    for sym in cfg.symbols:
+        d = results["delta"].get(sym, {})
+        on = results["with_regime"].get(sym, {})
+        off = results["without_regime"].get(sym, {})
+        if "error" in on:
+            print(f"{sym}: ERROR {on['error']}")
+            continue
+        print(
+            f"{sym}: return {off.get('total_return_pct', 0):+.2f}% → {on.get('total_return_pct', 0):+.2f}% "
+            f"(Δ{d.get('total_return_pct', 0):+.2f}pp) · "
+            f"Sharpe {off.get('sharpe', 0):.2f}→{on.get('sharpe', 0):.2f} · "
+            f"trades {off.get('trade_count', 0)}→{on.get('trade_count', 0)}"
         )
-
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _trades_per_day(trades: list[BacktestTrade], bars: list[Bar]) -> int:
-        """Estimate trading frequency from the backtest window."""
-        if not trades or not bars:
-            return 1
-        try:
-            first = datetime.fromisoformat(bars[0].date)
-            last = datetime.fromisoformat(bars[-1].date)
-            days = max(1, (last - first).days)
-            return max(1, round(len(trades) / days))
-        except ValueError:
-            return 1
-
-
-# ---------------------------------------------------------------------------
-# Open-position helper
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class _OpenPosition:
-    entry_date: str
-    entry_bar_idx: int
-    direction: str          # long | short
-    entry_price: float
-    size_usd: float
-    stop_pct: float | None
-    take_pct: float | None
-    fee_bps: float
-
-    def check_stop_take(self, bar: Bar) -> tuple[float | None, str]:
-        """Return (exit_price, reason) if the bar's range triggers stop/take, else (None, '').
-
-        For longs: stop below entry·(1-stop_pct), take above entry·(1+take_pct).
-        For shorts: stop above entry·(1+stop_pct), take below entry·(1-take_pct).
-        If both levels are touched intra-bar, assume stop fills first (conservative).
-        """
-        if self.direction == "long":
-            stop_level = self.entry_price * (1 - self.stop_pct) if self.stop_pct else None
-            take_level = self.entry_price * (1 + self.take_pct) if self.take_pct else None
-            if stop_level is not None and bar.low <= stop_level:
-                return stop_level, "stop"
-            if take_level is not None and bar.high >= take_level:
-                return take_level, "take"
-        else:  # short
-            stop_level = self.entry_price * (1 + self.stop_pct) if self.stop_pct else None
-            take_level = self.entry_price * (1 - self.take_pct) if self.take_pct else None
-            if stop_level is not None and bar.high >= stop_level:
-                return stop_level, "stop"
-            if take_level is not None and bar.low <= take_level:
-                return take_level, "take"
-        return None, ""
-
-
-# ---------------------------------------------------------------------------
-# Convenience entry point
-# ---------------------------------------------------------------------------
-
-
-def backtest_symbol(
-    symbol: str,
-    strategy: Strategy | str = "rsi",
-    days: int = 90,
-    bankroll: float = 10_000.0,
-    fee_bps: float = 5.0,
-) -> BacktestReport:
-    """One-shot helper: fetch yfinance → run backtest → return report."""
-    bars = load_yfinance_ohlcv(symbol, days=days)
-    if not bars:
-        return Backtester(bankroll=bankroll, fee_bps=fee_bps)._empty_report(
-            symbol,
-            strategy if isinstance(strategy, str) else getattr(strategy, "__name__", "custom"),
-            [],
-        )
-    return Backtester(bankroll=bankroll, fee_bps=fee_bps).run(bars, strategy, symbol=symbol)
-
-
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
+    return 0
 
 
 if __name__ == "__main__":
-    import argparse
-
-    p = argparse.ArgumentParser(description="Sapphire backtester")
-    p.add_argument("symbol", help="yfinance symbol, e.g. BTC-USD, ETH-USD, SPY")
-    p.add_argument("--days", type=int, default=90)
-    p.add_argument("--strategy", default="rsi", choices=sorted(BUILT_IN_STRATEGIES))
-    p.add_argument("--bankroll", type=float, default=10_000.0)
-    p.add_argument("--fees", type=float, default=5.0, help="per-side fee in bps")
-    args = p.parse_args()
-
-    r = backtest_symbol(
-        args.symbol,
-        strategy=args.strategy,
-        days=args.days,
-        bankroll=args.bankroll,
-        fee_bps=args.fees,
-    )
-    print(f"=== {r.symbol} · {r.strategy} · {r.start_date} → {r.end_date} ({r.bars} bars) ===")
-    print(f"Trades:       {r.total_trades} ({r.wins}W / {r.losses}L / {r.breakevens}BE)")
-    print(f"Win rate:     {r.win_rate}")
-    print(f"Total PnL:    ${r.total_pnl_usd:+,.2f}  ({r.total_return_pct:+.2%})")
-    print(f"Profit factor:{r.profit_factor}")
-    print(f"Expectancy:   ${r.expectancy_usd:+.2f}/trade")
-    print(f"Sharpe:       {r.sharpe}")
-    print(f"Sortino:      {r.sortino}")
-    print(f"Calmar:       {r.calmar}")
-    print(f"Max DD:       {r.max_drawdown_pct:.2%} (-${r.max_drawdown_usd:,.2f}, {r.max_drawdown_duration_days}d)")
+    raise SystemExit(main())
