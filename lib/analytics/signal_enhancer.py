@@ -157,6 +157,14 @@ class SignalEnhancer:
             except Exception as e:
                 log.debug("sentiment unavailable: %s", e)
 
+            # Market intelligence (stablecoins, econ calendar, liquidation, order flow)
+            try:
+                from lib.intel.market_intelligence import load_latest_snapshot
+                state["market_intel"] = load_latest_snapshot() or {}
+            except Exception as e:
+                log.debug("market intelligence unavailable: %s", e)
+                state["market_intel"] = {}
+
             # Kronos predictions (latest per-symbol direction + confidence)
             try:
                 import json
@@ -277,6 +285,45 @@ class SignalEnhancer:
                     reasons.append(
                         f"Kronos forecasts {kronos_dir} (conf {kronos_conf:.0%}) against short"
                     )
+
+        # --- Market intelligence factors ------------------------------------
+        intel = state.get("market_intel") or {}
+
+        # Stablecoin macro flow: large burn → capital leaving → penalise longs
+        sc_signal = intel.get("stablecoin_signal")
+        if sc_signal == "burn_large" and direction == "long":
+            adjusted *= 0.93
+            flags.append("stablecoin_outflow")
+            reasons.append("large stablecoin burn — macro capital outflow")
+        elif sc_signal == "mint_large" and direction == "short":
+            adjusted *= 0.93
+            flags.append("stablecoin_inflow")
+            reasons.append("large stablecoin mint — macro capital inflow")
+
+        # Pre-event risk: high-impact macro event (FOMC/CPI) within 24h
+        pre_event_h = intel.get("pre_event_hours")
+        if pre_event_h is not None and pre_event_h <= 24:
+            ev_title = intel.get("next_event_title", "high-impact event")
+            flags.append("pre_event_risk")
+            reasons.append(f"{ev_title} in {pre_event_h:.0f}h — elevated volatility risk")
+
+        # Liquidation cascade proximity
+        liq_coins: list = intel.get("liq_cascade_coins") or []
+        liq_dirs: dict = intel.get("liq_directions") or {}
+        if symbol in liq_coins:
+            liq_dir = liq_dirs.get(symbol)
+            if liq_dir == "long" and direction == "long":
+                flags.append("cascade_risk")
+                reasons.append(f"{symbol} approaching long liquidation cascade zone")
+            elif liq_dir == "short" and direction == "short":
+                flags.append("cascade_risk")
+                reasons.append(f"{symbol} approaching short liquidation cascade zone")
+
+        # Funding velocity: extreme one-sided positioning (velocity-based, non-duplicate)
+        of_sigs: dict = intel.get("order_flow_signals") or {}
+        if of_sigs.get(symbol) == "extreme_positioning" and "crowded_entry" not in flags:
+            flags.append("extreme_positioning")
+            reasons.append(f"{symbol} funding velocity shows extreme one-sided positioning")
 
         # Clamp
         adjusted = max(self.MIN_CONFIDENCE, min(self.MAX_CONFIDENCE, adjusted))

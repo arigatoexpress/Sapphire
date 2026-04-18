@@ -76,6 +76,11 @@ crypto:
     coingecko_id: "solana"
     alert_threshold_pct: 10.0  # Alert on >10% 24h move (higher vol)
 
+  - symbol: "zcash"
+    ticker: "ZEC"
+    coingecko_id: "zcash"
+    alert_threshold_pct: 8.0   # Alert on >8% 24h move (mid cap privacy coin)
+
   - symbol: "avalanche-2"
     ticker: "AVAX"
     coingecko_id: "avalanche-2"
@@ -85,6 +90,44 @@ crypto:
     ticker: "HYPE"
     coingecko_id: "hyperliquid"
     alert_threshold_pct: 12.0
+
+# ── Commodity Alerts ─────────────────────────────────────────────────────────
+# Source: yfinance via OpenBB (ETF proxies for tradable instruments)
+commodities:
+  - symbol: "SLV"
+    name: "Silver (ETF)"
+    source: "yahoo"
+    alert_threshold_pct: 3.0   # Alert on >3% daily move (silver more volatile)
+    direction: both
+
+  - symbol: "USO"
+    name: "Oil/WTI Crude (ETF)"
+    source: "yahoo"
+    alert_threshold_pct: 3.0   # Alert on >3% daily move
+    direction: both
+
+  - symbol: "URA"
+    name: "Uranium (ETF)"
+    source: "yahoo"
+    alert_threshold_pct: 5.0   # Alert on >5% daily move (illiquid, wide swings)
+    direction: both
+
+  - symbol: "COPX"
+    name: "Copper Miners (ETF)"
+    source: "yahoo"
+    alert_threshold_pct: 3.0   # Alert on >3% daily move
+    direction: both
+
+# ── Macro Rate Alerts ────────────────────────────────────────────────────────
+# TNX is a yield expressed in %, so threshold is in basis points (bps)
+macro_rates:
+  - symbol: "TNX"
+    name: "10-Year Treasury Yield"
+    source: "yahoo"
+    ticker_yahoo: "^TNX"
+    alert_threshold_bps: 5.0   # Alert on >5bps single-day move (e.g., 4.30 → 4.35)
+    direction: both
+    note: "Price * 10 = yield in bps. Each 0.01 point = 1 basis point."
 
 # ── Funding Rate Alerts ─────────────────────────────────────────────────────
 # Source: Hyperliquid public API (no key required)
@@ -97,7 +140,9 @@ funding_rates:
     - "BTC"
     - "ETH"
     - "SOL"
+    - "ZEC"
     - "AVAX"
+    - "HYPE"
   alert_threshold_high: 0.001    # >0.1% per 8h = extremely bullish/crowded longs
   alert_threshold_low: -0.001    # <-0.1% per 8h = extremely bearish/crowded shorts
   # These are per-8h rates (Hyperliquid standard). Convert to hourly: /8

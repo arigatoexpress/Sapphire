@@ -1286,14 +1286,6 @@ def api_risk_metrics():
         return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
 
 
-@app.route('/analytics')
-@requires_auth
-def analytics_page():
-    """Performance analytics: equity curve, rolling Sharpe, regime breakdown."""
-    return render_template('pages/analytics.html', current_page='analytics',
-                           page_title='Performance Analytics')
-
-
 @app.route('/api/analytics/performance')
 @requires_auth
 def api_analytics_performance():

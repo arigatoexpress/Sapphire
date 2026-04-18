@@ -29,7 +29,16 @@ from typing import Any
 
 log = logging.getLogger(__name__)
 
-DEFAULT_SYMBOLS = ("BTC-USD", "ETH-USD", "SOL-USD", "SPY")
+DEFAULT_SYMBOLS = (
+    # Crypto
+    "BTC-USD", "ETH-USD", "SOL-USD", "ZEC-USD",
+    # Equities
+    "SPY", "QQQ",
+    # Commodities
+    "GLD", "SLV", "USO", "URA", "COPX",
+    # Macro
+    "DX-Y.NYB", "^VIX", "^TNX",
+)
 DEFAULT_OUTPUT_DIR = Path("data/backtests")
 
 

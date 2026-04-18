@@ -1,15 +1,16 @@
 """Morning Telegram brief — 7 AM CT via LaunchAgent.
 
-Synthesizes seven intelligence streams into one Markdown-formatted
+Synthesizes eight intelligence streams into one Markdown-formatted
 Telegram message:
 
   1. Market regime (from lib.chain.ChainIntelligence)
-  2. Correlations & decorrelation events (from lib.analytics.CorrelationEngine)
-  3. Fear & Greed composite (from lib.analytics.sentiment)
-  4. Portfolio risk metrics (from lib.analytics.RiskEngine)
-  5. Kronos predictions (from data/intelligence/YYYY-MM-DD/predictions.json)
-  6. Threat intel count (from data/intelligence/YYYY-MM-DD/threats.json)
-  7. System health (services up/down)
+  2. Market intelligence (from lib.intel.market_intelligence — stablecoins, econ calendar, political, liquidation, order flow)
+  3. Correlations & decorrelation events (from lib.analytics.CorrelationEngine)
+  4. Fear & Greed composite (from lib.analytics.sentiment)
+  5. Portfolio risk metrics (from lib.analytics.RiskEngine)
+  6. Kronos predictions (from data/intelligence/YYYY-MM-DD/predictions.json)
+  7. Threat intel count (from data/intelligence/YYYY-MM-DD/threats.json)
+  8. System health (services up/down)
 
 Also persists a markdown copy to data/intelligence/YYYY-MM-DD/daily_brief.md
 so the morning brief is always accessible in the ops log, and publishes a
@@ -400,6 +401,79 @@ def _section_kronos() -> dict:
     return {"status": "ok", "text": "\n".join(lines)}
 
 
+def _section_market_intel() -> dict:
+    """Market intelligence: stablecoins, econ calendar, political signals, liquidation, order flow."""
+    snap_path = ROOT / "data" / "intelligence" / "latest" / "market_intel.json"
+    if not snap_path.exists():
+        return {"status": "missing", "text": "  Market intel not yet collected (run market_intelligence.py)."}
+    try:
+        data = json.loads(snap_path.read_text())
+    except (OSError, json.JSONDecodeError) as e:
+        return {"status": "error", "text": f"  Market intel parse error: {e}"}
+
+    lines: list[str] = []
+
+    # Stablecoins
+    stable = data.get("stablecoins") or {}
+    if stable:
+        signal = stable.get("signal", "neutral")
+        total = stable.get("total_usd") or 0.0
+        delta = stable.get("delta_24h_usd")
+        sig_emoji = {
+            "mint_large": "🟢↑", "mint_moderate": "🟡↑",
+            "burn_large": "🔴↓", "burn_moderate": "🟡↓",
+        }.get(signal, "⚪")
+        line = f"{sig_emoji} Stablecoins `${total/1e9:.2f}B`"
+        if delta is not None:
+            line += f"  (Δ24h {'+' if delta >= 0 else ''}{_fmt_usd(delta)})"
+        lines.append(f"  {line}")
+
+    # Economic calendar — upcoming High impact
+    cal = data.get("econ_calendar") or {}
+    upcoming = cal.get("upcoming_high") or []
+    fomc_days = cal.get("next_fomc_days")
+    if upcoming:
+        ev = upcoming[0]
+        d = ev.get("days_until", "?")
+        day_str = "today" if d == 0 else f"in {d}d"
+        lines.append(f"  📅 `{ev.get('title', '?')}` {day_str}")
+        extras = [e.get("title", "?")[:22] for e in upcoming[1:3]]
+        if extras:
+            lines.append(f"     + {' · '.join(extras)}")
+    elif fomc_days is not None:
+        lines.append(f"  📅 FOMC in `{fomc_days}d`")
+
+    # Political signals
+    pol = data.get("political") or {}
+    high_rel = pol.get("high_relevance_count", 0)
+    crypto_flag = pol.get("crypto_flag", False)
+    if crypto_flag or high_rel:
+        emoji = "🚨" if crypto_flag else "⚠️"
+        label = " — crypto-direct" if crypto_flag else ""
+        lines.append(f"  {emoji} Political: `{high_rel}` high-relevance signal(s){label}")
+        for s in (pol.get("signals") or [])[:2]:
+            src = s.get("source", "?").upper()
+            title = s.get("title", "")[:52]
+            lines.append(f"    • [{src}] {title}")
+
+    # Liquidation cascade alerts
+    liq = data.get("liquidation") or {}
+    alerts = liq.get("alerts") or []
+    if alerts:
+        lines.append(f"  ⚠️ Liq cascade zone: {', '.join(alerts[:5])}")
+
+    # Order flow / funding velocity
+    of = data.get("order_flow") or {}
+    crowding = of.get("crowding_alerts") or []
+    if crowding:
+        lines.append(f"  📊 Extreme positioning: {', '.join(crowding[:5])}")
+
+    if not lines:
+        lines.append("  All market-intel feeds nominal.")
+
+    return {"status": "ok", "text": "\n".join(lines)}
+
+
 # ---------------------------------------------------------------------------
 # Compose + send
 # ---------------------------------------------------------------------------
@@ -420,6 +494,7 @@ def build_brief() -> str:
         chain_snap = None
 
     regime = _section_regime()
+    market_intel = _section_market_intel()
     corr = _section_correlation()
     sent = _section_sentiment(chain_snapshot=chain_snap)
     port = _section_portfolio()
@@ -432,6 +507,9 @@ def build_brief() -> str:
         "",
         "*Market Regime*",
         regime.get("text") or f"  ({regime.get('status', 'unknown')})",
+        "",
+        "*Market Intelligence*",
+        market_intel.get("text") or f"  ({market_intel.get('status', 'unknown')})",
         "",
         "*Correlations*",
         corr.get("text") or f"  ({corr.get('status', 'unknown')})",

@@ -39,16 +39,27 @@ try:
 except Exception:
     _EVENT_BUS = None
 
-# Symbol universe
+# Symbol universe — full watchlist across crypto, equities, commodities, macro
+# Note: HYPE and PENGU are not available on yfinance; they are covered by watchdog.yaml
 DEFAULT_SYMBOLS = {
+    # Crypto
     "BTC":  "BTC-USD",
     "ETH":  "ETH-USD",
     "SOL":  "SOL-USD",
+    "ZEC":  "ZEC-USD",
+    # Equities
     "SPY":  "SPY",
     "QQQ":  "QQQ",
-    "DXY":  "DX-Y.NYB",
+    # Commodities
     "GLD":  "GLD",
+    "SLV":  "SLV",
+    "USO":  "USO",
+    "URA":  "URA",
+    "COPX": "COPX",
+    # Macro
+    "DXY":  "DX-Y.NYB",
     "VIX":  "^VIX",
+    "TNX":  "^TNX",
 }
 
 

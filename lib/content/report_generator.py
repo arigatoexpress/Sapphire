@@ -30,6 +30,44 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = REPO_ROOT / "data"
 
+# Commodity + macro tickers for weekly brief context
+_MACRO_TICKERS: dict[str, tuple[str, str]] = {
+    "GLD":      ("Gold (GLD)",      "commodity"),
+    "SLV":      ("Silver (SLV)",    "commodity"),
+    "USO":      ("Oil (USO)",       "commodity"),
+    "URA":      ("Uranium (URA)",   "commodity"),
+    "COPX":     ("Copper (COPX)",   "commodity"),
+    "DX-Y.NYB": ("DXY",             "macro"),
+    "^VIX":     ("VIX",             "macro"),
+    "^TNX":     ("10Y Yield",       "macro"),
+}
+
+
+def _fetch_macro_context() -> dict[str, Any]:
+    """Fetch 5-day returns for commodity and macro tickers via yfinance."""
+    try:
+        import yfinance as yf  # optional — brief still renders without it
+        tickers = list(_MACRO_TICKERS.keys())
+        raw = yf.download(tickers, period="6d", interval="1d", progress=False, auto_adjust=True)
+        closes = raw["Close"] if "Close" in raw.columns else raw
+        result: dict[str, dict] = {}
+        for ticker, (name, category) in _MACRO_TICKERS.items():
+            if ticker not in closes.columns:
+                continue
+            col = closes[ticker].dropna()
+            if len(col) < 2:
+                continue
+            pct = float((col.iloc[-1] - col.iloc[0]) / col.iloc[0] * 100)
+            result[ticker] = {
+                "name": name,
+                "category": category,
+                "price": round(float(col.iloc[-1]), 4),
+                "pct_5d": round(pct, 2),
+            }
+        return result
+    except Exception:
+        return {}
+
 
 # ---------- models ----------
 
@@ -229,6 +267,7 @@ def generate_weekly_crypto_brief() -> Report:
     forecasts = latest_forecasts(preds, n_per_symbol=1)
     port = portfolio_snapshot(pf)
     sig = signal_pipeline_stats(sigs)
+    macro = _fetch_macro_context()
 
     sources = [
         _rel(DATA_DIR / "trading_predictions.jsonl"),
@@ -243,6 +282,7 @@ def generate_weekly_crypto_brief() -> Report:
         "latest_forecasts": forecasts,
         "portfolio": port,
         "signal_pipeline": sig,
+        "macro_context": macro,
     }
 
     body = _render_crypto_brief(facts)
