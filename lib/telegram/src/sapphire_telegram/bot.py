@@ -84,10 +84,6 @@ class TelegramPlatformBot:
             self._session = aiohttp.ClientSession()
         return self._session
 
-    async def close(self):
-        if self._session and not self._session.closed:
-            await self._session.close()
-
     async def start(self):
         """Start the flush loop and listener."""
         self.running = True
@@ -106,38 +102,9 @@ class TelegramPlatformBot:
         if not self.message_buffer:
             return
 
-        # Combine messages
         batch_text = "📋 **Activity Digest**\n" + "\n".join(self.message_buffer)
         self.message_buffer.clear()
-
-        # Send as single update (force send)
         await self._dispatch_message(batch_text, NotificationPriority.LOW)
-
-    async def send_message(
-        self, text: str, priority: NotificationPriority = NotificationPriority.MEDIUM, **kwargs
-    ):
-        if not self.bot_token or not self.chat_id:
-            logger.warning("Telegram configuration missing")
-            return
-
-        priority_prefix = {
-            NotificationPriority.LOW: "📝",
-            NotificationPriority.MEDIUM: "📢",
-            NotificationPriority.HIGH: "🚨",
-            NotificationPriority.CRITICAL: "🚨🚨",
-        }.get(priority, "📢")
-
-        full_message = f"{priority_prefix} {text}"
-
-        # Batch LOW/MEDIUM messages
-        if priority in (NotificationPriority.LOW, NotificationPriority.MEDIUM):
-            self.message_buffer.append(full_message)
-            if len(self.message_buffer) >= 10:  # Flush if buffer gets big
-                await self._flush_buffer()
-            return
-
-        # Send HIGH/CRITICAL immediately
-        await self._dispatch_message(full_message, priority)
 
     async def _dispatch_message(self, text: str, priority: NotificationPriority):
         """Internal method to actually post to Telegram."""
@@ -162,77 +129,6 @@ class TelegramPlatformBot:
         except Exception as e:
             logger.error(f"❌ Telegram Post Failed: {e}")
 
-    async def start_listener(self):
-        """Starts a long-polling loop to listen for interactive commands."""
-        if not self.bot_token:
-            logger.error("Cannot start Telegram listener without token")
-            return
-
-        logger.info("📡 Telegram Command Listener Started")
-        self.running = True
-
-        while self.running:
-            try:
-                url = f"{self.base_url}/getUpdates"
-                params = {"offset": self.last_update_id + 1, "timeout": 30}
-
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(url, params=params, timeout=35) as resp:
-                        if resp.status == 200:
-                            data = await resp.json()
-                            if data.get("ok"):
-                                for update in data.get("result", []):
-                                    self.last_update_id = update["update_id"]
-                                    await self._process_update(update)
-                        elif resp.status == 409:
-                            # Use randomized jitter
-                            import random
-
-                            jitter = random.uniform(5, 30)
-                            logger.warning(f"Telegram conflict, retrying in {jitter:.1f}s...")
-                            await asyncio.sleep(jitter)
-                        else:
-                            logger.error(f"Telegram listener error: {resp.status}")
-                            await asyncio.sleep(10)
-            except Exception as e:
-                logger.error(f"Telegram listener crashed: {e}")
-                await asyncio.sleep(10)
-
-    async def _process_update(self, update: dict[str, Any]):
-        message = update.get("message", {})
-        text = message.get("text", "")
-        chat_id = str(message.get("chat", {}).get("id", ""))
-
-        if self.chat_id and chat_id != self.chat_id:
-            return
-
-        cmd_match = re.search(r"@(\w+)\s+(buy|sell|close)\s+([\d.]+)\s+(\w+)", text.lower())
-
-        if cmd_match:
-            platform = cmd_match.group(1)
-            action = cmd_match.group(2).upper()
-            quantity = float(cmd_match.group(3))
-            symbol = cmd_match.group(4).upper()
-
-            platforms = (
-                ["aster", "lighter"]
-                if platform == "all"
-                else [platform]
-            )
-
-            await self.send_message(
-                f"⚡ **MANUAL OVERRIDE**\n"
-                f"🎯 `{platform.upper()}`: `{action} {quantity} {symbol}`",
-                priority=NotificationPriority.HIGH,
-            )
-
-            if self.command_callback:
-                for p in platforms:
-                    try:
-                        await self.command_callback(p, symbol, action, quantity)
-                    except Exception as e:
-                        await self.send_message(f"❌ Error dispatching to {p}: {e}")
-
     async def close(self):
         if self._session and not self._session.closed:
             await self._session.close()
@@ -242,6 +138,9 @@ class TelegramPlatformBot:
     ):
         if not self.bot_token or not self.chat_id:
             logger.warning("Telegram configuration missing")
+            return
+        if not text or not text.strip():
+            logger.warning("send_message called with empty text — suppressed")
             return
 
         priority_prefix = {

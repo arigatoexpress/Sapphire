@@ -67,6 +67,8 @@ def tg_api(method: str, data: dict | None = None) -> dict:
 
 def send_message(text: str, chat_id: str = CHAT_ID) -> dict:
     """Send Telegram message, splitting if needed."""
+    if not text or not text.strip():
+        return {"ok": False, "error": "empty_message"}
     if len(text) > 4000:
         text = text[:4000] + "\n\n_(truncated)_"
     return tg_api("sendMessage", {
@@ -220,16 +222,16 @@ def handle_command(cmd: str, args: str, chat_id: str) -> str:
         send_message("🧠 Thinking...", chat_id)
         from lib.nemotron import MODELS, generate
         result = generate(args, model=MODELS["classify"], timeout=30)
-        if result.success:
+        if result.success and result.response:
             return f"{result.response}\n\n_({result.endpoint} • {result.model} • {result.eval_tokens} tokens • {result.tokens_per_second} t/s)_"
-        return f"❌ {result.error}"
+        return f"❌ {result.error or 'Nemotron returned empty response — model may be loading'}"
     elif cmd == "/think" and args:
         send_message("🧠 Deep thinking with nemotron-cascade-2...", chat_id)
         from lib.nemotron import MODELS, generate
         result = generate(args, model=MODELS["analyze"], timeout=120, max_tokens=1024)
-        if result.success:
+        if result.success and result.response:
             return f"{result.response}\n\n_({result.endpoint} • {result.model} • {result.eval_tokens} tokens • {result.tokens_per_second} t/s)_"
-        return f"❌ {result.error}"
+        return f"❌ {result.error or 'Nemotron returned empty response — model may be loading'}"
     elif cmd == "/escalate" and args:
         send_message("🔴 Escalating to Claude...", chat_id)
         return run_tool_direct("dispatch.py", {"task": args.strip(), "tier": "t3"})

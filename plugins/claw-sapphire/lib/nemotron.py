@@ -78,8 +78,11 @@ def generate(
             eval_duration = result.get("eval_duration", 1) / 1e9  # ns → s
             tps = eval_tokens / eval_duration if eval_duration > 0 else 0
 
+            response_text = result.get("response", "").strip()
+            if not response_text:
+                continue  # empty body — treat as endpoint failure, try next
             return InferenceResult(
-                response=result.get("response", ""),
+                response=response_text,
                 endpoint=ep_name,
                 model=model,
                 prompt_tokens=prompt_tokens,
