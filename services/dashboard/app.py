@@ -2126,29 +2126,132 @@ def intel_page():
 @app.route('/api/portfolio')
 @requires_auth
 def api_portfolio():
-    """Portfolio holdings — stub for Robinhood integration."""
-    return jsonify({'holdings': [], 'total_value': 0, 'note': 'Robinhood integration pending'})
+    """Live Robinhood portfolio snapshot."""
+    try:
+        from lib.portfolio.robinhood import RobinhoodReader
+        reader = RobinhoodReader()
+        snapshot = reader.get_snapshot()
+        return jsonify(snapshot)
+    except Exception as e:
+        log.warning("portfolio API error: %s", e)
+        return jsonify({
+            'source': 'unavailable',
+            'error': str(e),
+            'holdings': [],
+            'total_value': 0,
+            'day_pnl': 0,
+            'day_pnl_pct': 0,
+            'total_return': 0,
+            'total_return_pct': 0,
+            'cash': 0,
+            'buying_power': 0,
+            'sectors': [],
+            'asset_classes': [],
+        }), 200
 
 
 @app.route('/api/factors')
 @requires_auth
 def api_factors():
-    """Cross-sectional factor exposures — stub."""
-    return jsonify({'factors': [], 'note': 'Factor pipeline pending'})
+    """Cross-sectional factor scores (CoinGecko, 1h cache)."""
+    try:
+        from lib.analytics.factors import CrossSectionalFactors, to_dict as factors_to_dict
+        report = CrossSectionalFactors().compute()
+        return jsonify(factors_to_dict(report))
+    except Exception as e:
+        log.warning("factors API error: %s", e)
+        return jsonify({'error': str(e), 'assets': [], 'ranked_assets': [],
+                        'factor_names': [], 'strongest': None, 'weakest': None,
+                        'dispersion': 0, 'asset_count': 0}), 200
 
 
 @app.route('/api/cascade')
 @requires_auth
 def api_cascade():
-    """Liquidation cascade risk — stub."""
-    return jsonify({'risk_score': 0, 'clusters': [], 'note': 'Cascade analysis pending'})
+    """Live liquidation cascade risk via Hyperliquid OI + funding data."""
+    try:
+        from lib.analytics.liquidation import CascadeDetector, to_dict as cascade_to_dict
+        report = CascadeDetector().assess_all(['BTC', 'ETH', 'SOL', 'LINK', 'ARB', 'AVAX'])
+        return jsonify(cascade_to_dict(report))
+    except Exception as e:
+        log.warning("cascade API error: %s", e)
+        return jsonify({'error': str(e), 'risk_score': 0, 'risk_label': 'UNAVAILABLE',
+                        'assets': [], 'total_oi_usd': 0, 'avg_funding_8h': 0}), 200
 
 
 @app.route('/api/intel')
 @requires_auth
 def api_intel():
-    """Regional intel feed — stub for Palantir Foundry merge."""
-    return jsonify({'items': [], 'sources': [], 'note': 'Foundry integration pending'})
+    """Regional intel feed — proxies regional-intel-workbench if reachable, else local snapshot."""
+    # Try local intelligence snapshots
+    items = []
+    sources = []
+
+    # Load recent threat intel as intel feed items
+    intel_dir = Path.home() / 'Code' / 'Sapphire' / 'data' / 'intelligence'
+    try:
+        import datetime as _dt
+        today = _dt.date.today().isoformat()
+        for day_dir in sorted(intel_dir.glob('*/threats.json'), reverse=True)[:3]:
+            try:
+                threats = json.loads(day_dir.read_text()).get('threats') or []
+                for t in threats[:5]:
+                    items.append({
+                        'id': t.get('canonical_id') or t.get('id', ''),
+                        'title': t.get('title', ''),
+                        'region': 'GLOBAL',
+                        'severity': 'high' if (t.get('score') or 0) >= 8 else 'medium',
+                        'source': t.get('source', 'threat-intel'),
+                        'timestamp': t.get('published') or day_dir.parent.name,
+                        'tags': t.get('tags') or [],
+                        'exploited': t.get('exploited', False),
+                    })
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    # Try regional-intel-workbench API (port 8787)
+    workbench_status = 'offline'
+    try:
+        import urllib.request as _ureq
+        with _ureq.urlopen('http://127.0.0.1:8787/api/intel/recent?limit=10', timeout=3) as r:
+            wb_data = json.loads(r.read())
+            for item in (wb_data.get('items') or []):
+                items.append({**item, 'source': 'regional-workbench'})
+            workbench_status = 'online'
+    except Exception:
+        pass
+
+    sources = [
+        {'name': 'CISA KEV', 'status': 'active' if items else 'unknown'},
+        {'name': 'NVD', 'status': 'active' if items else 'unknown'},
+        {'name': 'Regional Workbench', 'status': workbench_status},
+        {'name': 'Palantir Foundry', 'status': 'pending'},
+    ]
+
+    return jsonify({
+        'items': items[:20],
+        'sources': sources,
+        'item_count': len(items),
+        'last_updated': time.time(),
+    })
+
+
+@app.route('/api/performance')
+@requires_auth
+def api_performance():
+    """Live performance tracker stats from data/performance/signals.jsonl."""
+    try:
+        from lib.analytics.performance_tracker import PerformanceTracker
+        pt = PerformanceTracker()
+        stats = pt.get_all_stats()
+        alerts = pt.get_decay_alerts()
+        return jsonify({**stats, 'decay_alerts': alerts, 'last_updated': time.time()})
+    except Exception as e:
+        log.warning("performance tracker API error: %s", e)
+        return jsonify({'error': str(e), 'total_signals': 0, 'scored_signals': 0,
+                        'win_rate': None, 'decay_alerts': []}), 200
 
 
 @app.route('/api/content/drafts')
