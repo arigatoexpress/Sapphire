@@ -69,12 +69,22 @@ data/system_events.jsonl
 data/trading_predictions.jsonl
 data/trading_signals.jsonl
 data/starred_repos/trending_report_*.md
+data/starred_repos/starred.json
+data/starred_repos/synergies.json
+data/starred_repos/synergy_report.md
+data/starred_repos/trending.json
 data/leads/pipeline_*.json
+data/market_pulse/
+data/performance/
+data/threat_intel/
+results/
+qwen*.json
 services/control-plane/app/data/system_events.jsonl
 
 # Local-only state
 .claude/launch.json
 .claude/worktrees/
+.claire/
 
 # Large benchmark/archived content — tracked separately if needed
 archived/
