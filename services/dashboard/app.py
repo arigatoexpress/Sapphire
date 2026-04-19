@@ -2183,6 +2183,43 @@ def api_strategy_performance():
         }), 200
 
 
+@app.route('/api/backtest-results')
+@requires_auth
+def api_backtest_results():
+    """Summary + leaderboard over the latest strategy backtest sweep.
+
+    Query params:
+      metric: sortino | sharpe | calmar | total_return_pct | win_rate | profit_factor
+      limit:  top-N (default 10)
+      include_minimal: "1" to include strategies with <5 trades (default false)
+    """
+    try:
+        from lib.analytics.backtest_results import summary, leaderboard
+        metric = request.args.get('metric', 'sortino')
+        try:
+            limit = int(request.args.get('limit', '10'))
+        except ValueError:
+            limit = 10
+        include_minimal = request.args.get('include_minimal') == '1'
+        summary_payload = summary()
+        try:
+            lb = leaderboard(metric=metric, limit=limit, include_minimal_trades=include_minimal)
+        except ValueError as ve:
+            lb = {'error': str(ve), 'rows': [], 'metric': metric}
+        return jsonify({
+            'summary': summary_payload,
+            'leaderboard': lb,
+            'last_updated': time.time(),
+        })
+    except Exception as e:
+        log.warning("backtest results API error: %s", e)
+        return jsonify({
+            'error': str(e),
+            'summary': {'have_results': False, 'best_per_symbol': [], 'total_backtests': 0},
+            'leaderboard': {'rows': [], 'metric': 'sortino'},
+        }), 200
+
+
 @app.route('/api/performance-timeseries')
 @requires_auth
 def api_performance_timeseries():

@@ -407,6 +407,48 @@
     </div>
 </div>
 
+<!-- Backtest leaderboard (projected performance from historical sweep) -->
+<div class="perf-section">
+    <div class="perf-section-title">Backtest Leaderboard &mdash; Projected Performance</div>
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom: 10px; flex-wrap: wrap;">
+        <span style="color:#b8e8b0; font-size:0.75rem; letter-spacing:0.06em; text-transform:uppercase;">Rank by</span>
+        <select id="backtestMetric" style="background:rgba(11,11,26,0.9); color:#d4f2cc; border:1px solid var(--border-color); padding:4px 8px; font-family: var(--font-terminal); font-size: 0.8rem;">
+            <option value="sortino" selected>Sortino</option>
+            <option value="sharpe">Sharpe</option>
+            <option value="calmar">Calmar</option>
+            <option value="total_return_pct">Total Return</option>
+            <option value="win_rate">Win Rate</option>
+            <option value="profit_factor">Profit Factor</option>
+        </select>
+        <span id="backtestMeta" style="color:#9fd89c; font-size:0.72rem; margin-left:auto;">&mdash;</span>
+    </div>
+    <div class="panel" style="padding: 0; margin-bottom: 0;">
+        <div class="table-scroll">
+            <table class="strat-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Strategy</th>
+                        <th>Symbol</th>
+                        <th>Params</th>
+                        <th>Sortino</th>
+                        <th>Sharpe</th>
+                        <th>Calmar</th>
+                        <th>Return</th>
+                        <th>Win Rate</th>
+                        <th>Profit Factor</th>
+                        <th>Max DD</th>
+                        <th>Trades</th>
+                    </tr>
+                </thead>
+                <tbody id="backtestLeaderboardBody">
+                    <tr><td colspan="12" style="text-align:center; padding:24px; color: #9fd89c;">Loading backtest sweep…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 <!-- Equity curve -->
 <div class="perf-section">
     <div class="perf-section-title">Equity Curve &mdash; 90 Days</div>
@@ -756,6 +798,63 @@
         body.innerHTML = html;
     }
 
+    /* ── Render backtest leaderboard from /api/backtest-results ── */
+    function renderBacktestLeaderboard(payload) {
+        var body = document.getElementById('backtestLeaderboardBody');
+        var meta = document.getElementById('backtestMeta');
+        if (!body) return;
+        var lb = (payload || {}).leaderboard || {};
+        var summary = (payload || {}).summary || {};
+        var rows = lb.rows || [];
+
+        if (meta) {
+            if (!summary.have_results) {
+                meta.textContent = 'no backtest artifacts on disk';
+            } else {
+                var computed = summary.computed_at ? new Date(summary.computed_at) : null;
+                var age = summary.age_hours != null ? (summary.age_hours >= 24 ? (summary.age_hours / 24).toFixed(1) + 'd ago' : summary.age_hours.toFixed(1) + 'h ago') : '';
+                meta.textContent = summary.total_backtests + ' backtests · ' + (lb.filtered_rows != null ? lb.filtered_rows : 0) + ' ≥5 trades · ' + age;
+            }
+        }
+
+        if (!rows.length) {
+            body.innerHTML = '<tr><td colspan="12" style="text-align:center; padding:24px; color: #9fd89c;">' + (summary.note || 'No results for this metric') + '</td></tr>';
+            return;
+        }
+
+        var html = '';
+        rows.forEach(function (r, i) {
+            var params = r.params || {};
+            var paramStr = Object.keys(params).map(function (k) { return k + '=' + params[k]; }).join(', ');
+            var retPct = r.total_return_pct != null ? (r.total_return_pct * 100) : null;
+            var ddPct = r.max_drawdown_pct != null ? (r.max_drawdown_pct * 100) : null;
+            html += '<tr>'
+                + '<td style="color:#6a8e67;">' + (i + 1) + '</td>'
+                + '<td class="strat-name">' + (r.strategy_cls || '?') + '</td>'
+                + '<td>' + (r.symbol || '?') + '</td>'
+                + '<td style="font-size:0.72rem; color:#9fd89c;">' + paramStr + '</td>'
+                + '<td class="' + (r.sortino != null && r.sortino > 0 ? 'val-pos' : '') + '">' + fmtFloat(r.sortino, 2) + '</td>'
+                + '<td class="' + (r.sharpe != null && r.sharpe > 1 ? 'val-pos' : '') + '">' + fmtFloat(r.sharpe, 2) + '</td>'
+                + '<td class="' + (r.calmar != null && r.calmar > 1 ? 'val-pos' : '') + '">' + fmtFloat(r.calmar, 2) + '</td>'
+                + '<td class="' + (retPct != null && retPct > 0 ? 'val-pos' : retPct != null && retPct < 0 ? 'val-neg' : '') + '">' + (retPct != null ? (retPct > 0 ? '+' : '') + retPct.toFixed(2) + '%' : '—') + '</td>'
+                + '<td class="' + (r.win_rate != null && r.win_rate >= 0.5 ? 'val-pos' : r.win_rate != null ? 'val-neg' : '') + '">' + fmtPct(r.win_rate) + '</td>'
+                + '<td class="' + (typeof r.profit_factor === 'number' && r.profit_factor > 1 ? 'val-pos' : r.profit_factor === 'inf' ? 'val-pos' : 'val-neg') + '">' + fmtFloat(r.profit_factor, 2) + '</td>'
+                + '<td class="val-neg">' + (ddPct != null ? '−' + Math.abs(ddPct).toFixed(2) + '%' : '—') + '</td>'
+                + '<td>' + (r.total_trades != null ? r.total_trades : '—') + '</td>'
+                + '</tr>';
+        });
+        body.innerHTML = html;
+    }
+
+    function fetchBacktestResults(metric) {
+        fetch('/api/backtest-results?metric=' + encodeURIComponent(metric || 'sortino') + '&limit=10', {credentials: 'same-origin'})
+            .then(function (r) { return r.json(); })
+            .then(renderBacktestLeaderboard)
+            .catch(function (err) {
+                console.warn('backtest-results fetch failed', err);
+            });
+    }
+
     /* ── Render hero stats ── */
     function renderHero(overall) {
         var pnl = overall.total_pnl_usd;
@@ -814,10 +913,23 @@
                 console.warn('performance-timeseries fetch failed', err);
             });
 
+        var metricSel = document.getElementById('backtestMetric');
+        fetchBacktestResults(metricSel ? metricSel.value : 'sortino');
+
         var now = new Date().toISOString().replace('T', ' ').slice(0, 19);
         var el = document.getElementById('lastUpdate');
         if (el) el.textContent = 'LAST UPDATE: ' + now;
     }
+
+    /* ── Backtest metric selector ── */
+    (function () {
+        var sel = document.getElementById('backtestMetric');
+        if (sel) {
+            sel.addEventListener('change', function () {
+                fetchBacktestResults(sel.value);
+            });
+        }
+    })();
 
     /* ── Init (render placeholders first, then fetch) ── */
     renderEquityCurve();
