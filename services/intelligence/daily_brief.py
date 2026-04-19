@@ -474,6 +474,80 @@ def _section_market_intel() -> dict:
     return {"status": "ok", "text": "\n".join(lines)}
 
 
+def _section_cascade() -> dict:
+    """Liquidation cascade risk across major perps."""
+    try:
+        from lib.analytics.liquidation import get_detector
+        det = get_detector()
+        results = det.assess_all(coins=["BTC", "ETH", "SOL", "AVAX", "LINK", "ARB"])
+    except Exception as e:
+        log.warning("cascade detector unavailable: %s", e)
+        return {"status": "unavailable", "text": f"  (cascade risk unavailable: {e})"}
+
+    if not results:
+        return {"status": "ok", "text": "  No cascade data available."}
+
+    level_emoji = {"low": "🟢", "moderate": "🟡", "elevated": "🟠", "critical": "🚨"}
+    lines: list[str] = []
+    critical = [r for r in results if r.level == "critical"]
+    elevated = [r for r in results if r.level == "elevated"]
+
+    if critical:
+        lines.append(f"🚨 *CASCADE CRITICAL:* {', '.join(r.coin for r in critical)}")
+    elif elevated:
+        lines.append(f"🟠 *Cascade elevated:* {', '.join(r.coin for r in elevated)}")
+    else:
+        lines.append("🟢 Cascade risk: low across majors")
+
+    # Show top 3 by score
+    for r in results[:3]:
+        em = level_emoji.get(r.level, "•")
+        rec = r.recommendation.get("action", "")
+        lines.append(f"  {em} {r.coin}: score `{r.score:.2f}` ({r.level}) — {rec}")
+        if r.reasons:
+            lines.append(f"    ↳ {r.reasons[0]}")
+
+    max_score = results[0].score if results else 0.0
+    return {
+        "status": "ok",
+        "max_score": max_score,
+        "critical_count": len(critical),
+        "text": "\n".join(lines),
+    }
+
+
+def _section_robinhood() -> dict:
+    """Robinhood Crypto portfolio snapshot (if credentials configured)."""
+    try:
+        from lib.portfolio.robinhood import get_reader
+        reader = get_reader()
+        if not reader.is_configured():
+            return {"status": "disabled", "text": "  Robinhood: not configured (set ROBINHOOD_API_KEY)."}
+        snap = reader.get_daily_snapshot()
+    except Exception as e:
+        log.warning("robinhood reader unavailable: %s", e)
+        return {"status": "unavailable", "text": f"  Robinhood unavailable: {e}"}
+
+    if not snap:
+        return {"status": "empty", "text": "  Robinhood: no snapshot returned."}
+
+    pnl = snap.get("unrealized_pnl_usd", 0.0)
+    pnl_pct = snap.get("unrealized_pnl_pct", 0.0)
+    pnl_emoji = "🟢" if pnl >= 0 else "🔴"
+    lines = [
+        f"{pnl_emoji} *Robinhood Crypto:* ${snap.get('portfolio_value_usd', 0):,.2f}  "
+        f"({snap.get('position_count', 0)} positions)"
+    ]
+    lines.append(f"  Unrealised P&L: {_fmt_usd(pnl)}  ({pnl_pct*100:+.2f}%)")
+    for pos in snap.get("positions", [])[:4]:
+        em = "↑" if pos["unrealized_pnl_usd"] >= 0 else "↓"
+        lines.append(
+            f"  {em} {pos['asset']:6}  {_fmt_usd(pos['market_value_usd'])}  "
+            f"P&L {pos['unrealized_pnl_pct']*100:+.1f}%"
+        )
+    return {"status": "ok", "portfolio_value": snap.get("portfolio_value_usd"), "text": "\n".join(lines)}
+
+
 # ---------------------------------------------------------------------------
 # Compose + send
 # ---------------------------------------------------------------------------
@@ -498,6 +572,8 @@ def build_brief() -> str:
     corr = _section_correlation()
     sent = _section_sentiment(chain_snapshot=chain_snap)
     port = _section_portfolio()
+    cascade = _section_cascade()
+    robinhood = _section_robinhood()
     kron = _section_kronos()
     threats = _section_threats()
     health = _section_health()
@@ -511,14 +587,20 @@ def build_brief() -> str:
         "*Market Intelligence*",
         market_intel.get("text") or f"  ({market_intel.get('status', 'unknown')})",
         "",
+        "*Cascade Risk*",
+        cascade.get("text") or f"  ({cascade.get('status', 'unknown')})",
+        "",
         "*Correlations*",
         corr.get("text") or f"  ({corr.get('status', 'unknown')})",
         "",
         "*Sentiment*",
         sent.get("text") or f"  ({sent.get('status', 'unknown')})",
         "",
-        "*Portfolio*",
+        "*Portfolio (paper)*",
         port.get("text") or f"  ({port.get('status', 'unknown')})",
+        "",
+        "*Robinhood Crypto*",
+        robinhood.get("text") or f"  ({robinhood.get('status', 'unknown')})",
         "",
         "*Kronos predictions*",
         kron.get("text"),
