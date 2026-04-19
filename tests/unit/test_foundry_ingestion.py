@@ -240,6 +240,79 @@ class TestTransformServiceHealth:
     def test_empty(self, tmp_path):
         assert transform_service_health(tmp_path) == []
 
+    def test_real_schema_service_name_field(self, tmp_path):
+        """Real data/health/*.ndjson uses `service_name` (not `service`)."""
+        health_dir = tmp_path / "data" / "health"
+        health_dir.mkdir(parents=True)
+        (health_dir / "2026-04-19.ndjson").write_text(
+            json.dumps({
+                "service_name": "ollama_windows",
+                "ip": "100.71.10.48",
+                "status": "healthy",
+                "response_ms": 412,
+                "timestamp": "2026-04-19T10:00:00Z",
+            }) + "\n"
+        )
+        objs = transform_service_health(tmp_path)
+        assert len(objs) >= 1
+        match = [o for o in objs if o["service"] == "ollama_windows"]
+        assert match, f"expected ollama_windows entry, got {objs}"
+        assert match[0]["status"] == "healthy"
+        assert match[0]["latency_ms"] == 412
+
+    def test_heartbeat_jsonl_services_dict(self, tmp_path):
+        """heartbeat.jsonl stores services as a nested dict per line."""
+        health_dir = tmp_path / "data" / "health"
+        health_dir.mkdir(parents=True)
+        (health_dir / "heartbeat.jsonl").write_text(
+            json.dumps({
+                "timestamp": "2026-04-19T10:00:00Z",
+                "services": {
+                    "dashboard": {"status": "healthy", "latency_ms": 12},
+                    "proxy": {"status": "degraded", "latency_ms": 900},
+                },
+            }) + "\n"
+        )
+        objs = transform_service_health(tmp_path)
+        names = sorted(o["service"] for o in objs)
+        assert "dashboard" in names and "proxy" in names
+        dash = next(o for o in objs if o["service"] == "dashboard")
+        assert dash["status"] == "healthy"
+        assert dash["latency_ms"] == 12
+
+    def test_non_dict_row_does_not_crash(self, tmp_path):
+        """A stray string line must not break the whole transform."""
+        health_dir = tmp_path / "data" / "health"
+        health_dir.mkdir(parents=True)
+        (health_dir / "2026-04-19.ndjson").write_text(
+            '"just a string"\n'
+            + json.dumps({"service_name": "dashboard", "status": "healthy"}) + "\n"
+        )
+        objs = transform_service_health(tmp_path)
+        # Should have captured the valid dict row, skipped the string
+        assert any(o["service"] == "dashboard" for o in objs)
+
+    def test_topology_handles_string_services(self, tmp_path):
+        """device_topology services may be strings OR dicts OR junk."""
+        (tmp_path / "data").mkdir(parents=True)
+        (tmp_path / "data" / "device_topology.json").write_text(json.dumps({
+            "devices": [
+                {
+                    "name": "mac",
+                    "services": [
+                        "dashboard",                         # string
+                        {"name": "proxy", "port": 11435},    # dict
+                        42,                                  # junk, must be skipped
+                    ],
+                },
+            ]
+        }))
+        objs = transform_service_health(tmp_path)
+        names = [o["service"] for o in objs]
+        assert "dashboard" in names
+        assert "proxy" in names
+        assert 42 not in names
+
 
 # ---------------------------------------------------------------------------
 # ThreatIntel transform

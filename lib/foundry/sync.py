@@ -45,7 +45,7 @@ _HISTORY_FILE = "data/foundry_sync_history.jsonl"
 _SOURCE_PATTERNS: dict[str, list[str]] = {
     "PaperTrade": ["data/signals/*.jsonl", "data/paper_portfolio.json"],
     "Alert": ["data/system_events.jsonl", "data/security/*.json"],
-    "ServiceHealth": ["data/health/*.ndjson"],
+    "ServiceHealth": ["data/health/*.ndjson", "data/health/heartbeat.jsonl"],
     "ThreatIntel": [
         "data/intelligence/*/threats.json",
         "data/threat_intel/*.md",
@@ -73,12 +73,20 @@ def _repo_root() -> Path:
 
 @dataclass
 class SyncState:
-    """Tracks file modification times and content hashes between syncs."""
+    """Tracks file modification times and content hashes between syncs.
+
+    ``first_success_at`` and ``last_auth_warning_at`` are used to rate-limit
+    Telegram alerts: a sync that has never succeeded once should not page the
+    user every 15 minutes about misconfiguration, and auth errors should warn
+    at most once per day until resolved.
+    """
 
     files: dict[str, dict[str, Any]] = field(default_factory=dict)
     last_sync: str | None = None
     last_status: str = "never"
     sync_count: int = 0
+    first_success_at: str | None = None
+    last_auth_warning_at: str | None = None
 
     def save(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -87,6 +95,8 @@ class SyncState:
             "last_sync": self.last_sync,
             "last_status": self.last_status,
             "sync_count": self.sync_count,
+            "first_success_at": self.first_success_at,
+            "last_auth_warning_at": self.last_auth_warning_at,
         }, indent=2, default=str))
 
     @classmethod
@@ -100,6 +110,8 @@ class SyncState:
                 last_sync=data.get("last_sync"),
                 last_status=data.get("last_status", "unknown"),
                 sync_count=data.get("sync_count", 0),
+                first_success_at=data.get("first_success_at"),
+                last_auth_warning_at=data.get("last_auth_warning_at"),
             )
         except Exception:
             return cls()
@@ -274,7 +286,7 @@ def run_sync(
     2. Transform changed data into Foundry objects
     3. Upload to Foundry (unless dry_run)
     4. Update state file
-    5. Alert on failure
+    5. Alert only on real upload failures after a prior successful connection
     """
     root = root or _repo_root()
     state_path = root / _STATE_FILE
@@ -308,62 +320,130 @@ def run_sync(
         if fn is None:
             continue
         try:
-            if obj_type == "ServiceHealth":
-                objects_by_type[obj_type] = fn(root)
-            else:
-                objects_by_type[obj_type] = fn(root)
+            objects_by_type[obj_type] = fn(root)
         except Exception as exc:
             log.exception("Transform %s failed", obj_type)
             result.errors.append(f"Transform {obj_type}: {exc}")
 
     # 3. Upload
+    config_missing = False
+    auth_failed = False
+    uploaded_anything = False
     if not dry_run:
-        try:
-            from lib.foundry.client import FoundryClient, FoundryError
+        from lib.foundry.client import (
+            FoundryAuthError,
+            FoundryClient,
+            FoundryConfigError,
+            FoundryError,
+        )
 
+        try:
             client = FoundryClient.from_env()
+        except FoundryConfigError as exc:
+            # No URL or credentials yet. This is expected before the user has
+            # provisioned Foundry — log once and bail without paging Telegram.
+            config_missing = True
+            log.info("Foundry not configured, skipping sync: %s", exc)
+            client = None
+        except FoundryError as exc:
+            log.error("Foundry client init failed: %s", exc)
+            result.errors.append(f"Client init: {exc}")
+            client = None
+
+        if client is not None:
             for obj_type, objects in objects_by_type.items():
                 if not objects:
                     continue
                 try:
                     client.upsert_objects(obj_type, objects)
                     result.uploaded_types[obj_type] = len(objects)
+                    uploaded_anything = True
                     log.info("Uploaded %d %s objects", len(objects), obj_type)
+                except FoundryAuthError as exc:
+                    auth_failed = True
+                    result.errors.append(f"Upload {obj_type}: {exc}")
+                    log.error("Upload %s auth failed: %s", obj_type, exc)
+                    break  # Don't hammer failing auth on every object type.
                 except FoundryError as exc:
                     log.error("Upload %s failed: %s", obj_type, exc)
                     result.errors.append(f"Upload {obj_type}: {exc}")
-        except Exception as exc:
-            log.error("Foundry client init failed: %s", exc)
-            result.errors.append(f"Client init: {exc}")
     else:
         for obj_type, objects in objects_by_type.items():
             result.uploaded_types[obj_type] = len(objects)
             log.info("[DRY RUN] Would upload %d %s objects", len(objects), obj_type)
 
     # 4. Update state
-    result.ok = len(result.errors) == 0
+    if config_missing:
+        # Treat an unconfigured stack as a successful no-op skip — we did what
+        # we could, and we don't want the sync to exit non-zero and trigger
+        # LaunchAgent restart backoff.
+        result.skipped = True
+        result.ok = True
+    else:
+        result.ok = len(result.errors) == 0
     result.duration_s = time.monotonic() - t0
 
     state.files = current_files
     state.last_sync = now
-    state.last_status = "ok" if result.ok else "error"
+    if config_missing:
+        state.last_status = "not_configured"
+    elif result.ok:
+        state.last_status = "ok"
+    else:
+        state.last_status = "error"
     state.sync_count += 1
+    if uploaded_anything and not state.first_success_at:
+        state.first_success_at = now
     state.save(state_path)
 
     # 5. History
     _append_history(root, result.to_dict())
 
-    # 6. Alert on failure
-    if not result.ok:
-        msg = (
-            f"⚠️ *Foundry Sync Failed*\n"
-            f"Time: {now}\n"
-            f"Errors: {len(result.errors)}\n"
-            f"{''.join(f'• {e}' + chr(10) for e in result.errors[:5])}"
-        )
-        _send_telegram_alert(msg)
+    # 6. Alert on failure — but only when it's a real data-sync problem.
+    #    * Missing config: no alert, user hasn't finished provisioning.
+    #    * Auth failure before first success: warn at most once per 24h.
+    #    * Other upload errors after a prior success: page as before.
+    if not result.ok and not config_missing and result.errors:
+        first_success = state.first_success_at
+        auth_warn_fresh = _auth_warning_fresh(state.last_auth_warning_at, now)
+        if auth_failed and not first_success:
+            if not auth_warn_fresh:
+                log.warning(
+                    "Foundry auth failing and sync has never connected — "
+                    "check token/URL. (Telegram alert suppressed until first "
+                    "successful sync.)"
+                )
+                state.last_auth_warning_at = now
+                state.save(state_path)
+            # Suppress Telegram to avoid a 15-min spam loop on bad creds.
+        elif first_success:
+            msg = (
+                f"⚠️ *Foundry Sync Failed*\n"
+                f"Time: {now}\n"
+                f"Errors: {len(result.errors)}\n"
+                f"{''.join(f'• {e}' + chr(10) for e in result.errors[:5])}"
+            )
+            _send_telegram_alert(msg)
+        else:
+            # Transform or misc error before first success — log but don't page.
+            log.warning(
+                "Foundry sync errors before first successful connection: %s",
+                result.errors[:3],
+            )
 
     return result
+
+
+def _auth_warning_fresh(last_iso: str | None, now_iso: str) -> bool:
+    """Return True if the last auth warning was emitted within the last 24h."""
+    if not last_iso:
+        return False
+    try:
+        last = datetime.fromisoformat(last_iso)
+        now = datetime.fromisoformat(now_iso)
+    except ValueError:
+        return False
+    return (now - last).total_seconds() < 24 * 3600
 
 
 # ---------------------------------------------------------------------------

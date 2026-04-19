@@ -5,12 +5,14 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
+from unittest import mock
 
 import pytest
 
 from lib.foundry.sync import (
     SyncResult,
     SyncState,
+    _auth_warning_fresh,
     _file_hash,
     _scan_sources,
     detect_changes,
@@ -18,6 +20,21 @@ from lib.foundry.sync import (
     load_sync_history,
     run_sync,
 )
+
+
+@pytest.fixture(autouse=True)
+def _isolate_secrets(tmp_path_factory, monkeypatch):
+    """Point SAPPHIRE_SECRETS_DIR at an empty tmp dir so run_sync tests
+    don't pick up the developer's real foundry_url/foundry_token files."""
+    empty = tmp_path_factory.mktemp("empty-secrets")
+    monkeypatch.setenv("SAPPHIRE_SECRETS_DIR", str(empty))
+    for v in (
+        "PALANTIR_FOUNDRY_URL", "FOUNDRY_URL",
+        "PALANTIR_FOUNDRY_TOKEN", "FOUNDRY_TOKEN", "FOUNDRY_API_TOKEN",
+        "PALANTIR_FOUNDRY_CLIENT_ID", "FOUNDRY_CLIENT_ID",
+        "PALANTIR_FOUNDRY_CLIENT_SECRET", "FOUNDRY_CLIENT_SECRET",
+    ):
+        monkeypatch.delenv(v, raising=False)
 
 
 # ---------------------------------------------------------------------------
@@ -275,3 +292,111 @@ class TestGetSyncStatus:
         assert status["last_status"] == "ok"
         assert status["sync_count"] == 1
         assert status["tracked_files"] >= 0
+
+
+# ---------------------------------------------------------------------------
+# Graceful degradation — no Telegram spam when Foundry isn't configured
+# ---------------------------------------------------------------------------
+
+
+class TestRunSyncGracefulDegradation:
+    def test_config_missing_exits_ok_and_skipped(self, tmp_path):
+        """With no URL configured, run_sync must exit cleanly and not page."""
+        # Create at least one changed source so we hit the upload path
+        signals_dir = tmp_path / "data" / "signals"
+        signals_dir.mkdir(parents=True)
+        (signals_dir / "2026-04-19.jsonl").write_text(
+            json.dumps({"pipeline_id": "t1", "symbol": "BTC"}) + "\n"
+        )
+
+        with mock.patch("lib.foundry.sync._send_telegram_alert") as tg:
+            result = run_sync(tmp_path, dry_run=False, force=True)
+
+        assert tg.call_count == 0, "Telegram must not fire on config_missing"
+        assert result.ok is True
+        assert result.skipped is True
+
+        state_path = tmp_path / "data" / "foundry_sync_state.json"
+        state = json.loads(state_path.read_text())
+        assert state["last_status"] == "not_configured"
+
+    def test_auth_failure_before_first_success_does_not_telegram(
+        self, tmp_path, monkeypatch
+    ):
+        """Auth error with no prior success → warn once, no Telegram spam."""
+        monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
+        monkeypatch.setenv("PALANTIR_FOUNDRY_TOKEN", "bad-tok")
+
+        signals_dir = tmp_path / "data" / "signals"
+        signals_dir.mkdir(parents=True)
+        (signals_dir / "2026-04-19.jsonl").write_text(
+            json.dumps({"pipeline_id": "t1", "symbol": "BTC"}) + "\n"
+        )
+
+        from lib.foundry.client import FoundryAuthError
+
+        with mock.patch(
+            "lib.foundry.client.FoundryClient.upsert_objects",
+            side_effect=FoundryAuthError("401 unauthorized"),
+        ), mock.patch("lib.foundry.sync._send_telegram_alert") as tg:
+            result = run_sync(tmp_path, dry_run=False, force=True)
+
+        assert tg.call_count == 0, "must not page on first-time auth failure"
+        assert result.ok is False
+        state_path = tmp_path / "data" / "foundry_sync_state.json"
+        state = json.loads(state_path.read_text())
+        assert state["first_success_at"] is None
+        assert state["last_auth_warning_at"] is not None
+
+    def test_alert_fires_after_first_success_then_failure(
+        self, tmp_path, monkeypatch
+    ):
+        """Real upload failure after prior success → Telegram alert fires."""
+        monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
+        monkeypatch.setenv("PALANTIR_FOUNDRY_TOKEN", "ok-tok")
+
+        # Pre-seed state with a prior successful sync
+        state_path = tmp_path / "data" / "foundry_sync_state.json"
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        state_path.write_text(json.dumps({
+            "files": {},
+            "last_sync": "2026-04-18T00:00:00+00:00",
+            "last_status": "ok",
+            "sync_count": 3,
+            "first_success_at": "2026-04-18T00:00:00+00:00",
+            "last_auth_warning_at": None,
+        }))
+
+        signals_dir = tmp_path / "data" / "signals"
+        signals_dir.mkdir(parents=True)
+        (signals_dir / "2026-04-19.jsonl").write_text(
+            json.dumps({"pipeline_id": "t1", "symbol": "BTC"}) + "\n"
+        )
+
+        from lib.foundry.client import FoundryAPIError
+
+        with mock.patch(
+            "lib.foundry.client.FoundryClient.upsert_objects",
+            side_effect=FoundryAPIError("500 Internal", status=500),
+        ), mock.patch("lib.foundry.sync._send_telegram_alert") as tg:
+            result = run_sync(tmp_path, dry_run=False, force=True)
+
+        assert result.ok is False
+        assert tg.call_count == 1, "page once after post-success failure"
+
+
+class TestAuthWarningFresh:
+    def test_none(self):
+        assert _auth_warning_fresh(None, "2026-04-19T00:00:00+00:00") is False
+
+    def test_within_24h(self):
+        assert _auth_warning_fresh(
+            "2026-04-19T00:00:00+00:00",
+            "2026-04-19T10:00:00+00:00",
+        ) is True
+
+    def test_beyond_24h(self):
+        assert _auth_warning_fresh(
+            "2026-04-17T00:00:00+00:00",
+            "2026-04-19T00:00:00+00:00",
+        ) is False

@@ -3,7 +3,14 @@
 Wraps Foundry REST APIs for dataset operations, ontology object sync, and
 health checks.  Supports token-based and OAuth client-credentials auth.
 
-Environment variables (checked in order):
+Configuration resolution order:
+  1. Environment variables (PALANTIR_FOUNDRY_*, FOUNDRY_*)
+  2. Files in ``$SAPPHIRE_SECRETS_DIR`` (default ``~/.config/sapphire-secrets``):
+     - ``foundry_url`` — Foundry stack URL
+     - ``foundry_token`` — bearer token
+     - ``foundry_client_id`` / ``foundry_client_secret`` — OAuth
+
+Env variables:
   PALANTIR_FOUNDRY_URL / FOUNDRY_URL          — Foundry stack URL
   PALANTIR_FOUNDRY_TOKEN / FOUNDRY_TOKEN      — bearer token (simplest)
   PALANTIR_FOUNDRY_CLIENT_ID + _SECRET        — OAuth client-credentials
@@ -19,6 +26,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 log = logging.getLogger("foundry.client")
@@ -32,6 +40,13 @@ _TOKEN_ENVS = ("PALANTIR_FOUNDRY_TOKEN", "FOUNDRY_TOKEN", "FOUNDRY_API_TOKEN")
 _CLIENT_ID_ENVS = ("PALANTIR_FOUNDRY_CLIENT_ID", "FOUNDRY_CLIENT_ID")
 _CLIENT_SECRET_ENVS = ("PALANTIR_FOUNDRY_CLIENT_SECRET", "FOUNDRY_CLIENT_SECRET")
 
+_DEFAULT_SECRETS_DIR = Path.home() / ".config" / "sapphire-secrets"
+
+
+def _secrets_dir() -> Path:
+    override = os.getenv("SAPPHIRE_SECRETS_DIR")
+    return Path(override) if override else _DEFAULT_SECRETS_DIR
+
 
 def _first_env(*names: str) -> str | None:
     for n in names:
@@ -39,6 +54,40 @@ def _first_env(*names: str) -> str | None:
         if v:
             return v
     return None
+
+
+def _read_secret_file(name: str) -> str | None:
+    """Read a single-value secret file from the sapphire-secrets dir.
+
+    Returns the stripped contents, or None if the file doesn't exist or can't
+    be read. Never raises — missing files are a normal fallback path.
+    """
+    path = _secrets_dir() / name
+    try:
+        if path.is_file():
+            return path.read_text().strip() or None
+    except OSError as exc:
+        log.warning("Failed to read secret %s: %s", path, exc)
+    return None
+
+
+def _resolve_url() -> str | None:
+    return _first_env(*_URL_ENVS) or _read_secret_file("foundry_url")
+
+
+def _resolve_token() -> str | None:
+    return _first_env(*_TOKEN_ENVS) or _read_secret_file("foundry_token")
+
+
+def _resolve_client_id() -> str | None:
+    return _first_env(*_CLIENT_ID_ENVS) or _read_secret_file("foundry_client_id")
+
+
+def _resolve_client_secret() -> str | None:
+    return (
+        _first_env(*_CLIENT_SECRET_ENVS)
+        or _read_secret_file("foundry_client_secret")
+    )
 
 
 @dataclass
@@ -56,20 +105,22 @@ class FoundryAuth:
 
     @classmethod
     def from_env(cls) -> "FoundryAuth":
-        """Build auth from environment variables."""
-        url = _first_env(*_URL_ENVS)
+        """Build auth from environment variables, falling back to secrets dir."""
+        url = _resolve_url()
         if not url:
             raise FoundryConfigError(
-                "No Foundry URL configured.  Set PALANTIR_FOUNDRY_URL or FOUNDRY_URL."
+                "No Foundry URL configured.  Set PALANTIR_FOUNDRY_URL, "
+                f"FOUNDRY_URL, or write {_secrets_dir() / 'foundry_url'}."
             )
         url = url.rstrip("/")
-        token = _first_env(*_TOKEN_ENVS)
-        client_id = _first_env(*_CLIENT_ID_ENVS)
-        client_secret = _first_env(*_CLIENT_SECRET_ENVS)
+        token = _resolve_token()
+        client_id = _resolve_client_id()
+        client_secret = _resolve_client_secret()
         if not token and not (client_id and client_secret):
             raise FoundryConfigError(
                 "No Foundry credentials configured.  "
-                "Set PALANTIR_FOUNDRY_TOKEN or both CLIENT_ID + CLIENT_SECRET."
+                "Set PALANTIR_FOUNDRY_TOKEN or both CLIENT_ID + CLIENT_SECRET, "
+                f"or write {_secrets_dir() / 'foundry_token'}."
             )
         return cls(
             base_url=url,

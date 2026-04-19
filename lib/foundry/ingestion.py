@@ -226,30 +226,94 @@ def transform_alerts(
 def transform_service_health(
     root: Path | None = None,
 ) -> list[dict[str, Any]]:
-    """Read health data and build ServiceHealth ontology objects."""
+    """Read health data and build ServiceHealth ontology objects.
+
+    Handles two on-disk shapes written by services/heartbeat/heartbeat.py and
+    the health probe pipeline:
+
+    * Per-service probes in ``data/health/*.ndjson`` — one row per service per
+      tick: ``{"service_name": "...", "status": "...", "response_ms": ...}``.
+    * Aggregate heartbeat in ``data/health/heartbeat.jsonl`` — one row per tick
+      with ``{"services": {"svc": "up"|"down"}, "timestamp": "..."}``. Each
+      service in the dict becomes its own ServiceHealth object.
+    """
     root = root or _repo_root()
     objects: list[dict[str, Any]] = []
 
-    # data/health/*.ndjson
     health_dir = root / "data" / "health"
     if health_dir.is_dir():
+        # Per-service probe rows — current heartbeat writer uses `service_name`,
+        # older rows may use `service`/`name`.
         for fpath in sorted(health_dir.glob("*.ndjson"), reverse=True)[:5]:
             for row in _load_jsonl(fpath, max_lines=500):
-                svc = row.get("service") or row.get("name") or fpath.stem
-                svc_id = _deterministic_id(svc, row.get("timestamp", ""))
+                if not isinstance(row, dict):
+                    continue
+                svc = (
+                    row.get("service_name")
+                    or row.get("service")
+                    or row.get("name")
+                    or fpath.stem
+                )
+                ts = row.get("timestamp")
+                svc_id = _deterministic_id(svc, ts or "")
                 objects.append({
                     "id": svc_id,
                     "service": svc,
                     "status": row.get("status", "unknown"),
-                    "latency_ms": row.get("latency_ms") or row.get("latency"),
+                    "latency_ms": row.get("response_ms")
+                        or row.get("latency_ms")
+                        or row.get("latency"),
                     "uptime_pct": row.get("uptime_pct"),
                     "error_count": row.get("error_count", 0),
-                    "last_check": _iso(row.get("timestamp")),
+                    "last_check": _iso(ts),
                     "host": row.get("host") or row.get("endpoint"),
                     "tier": row.get("tier"),
-                    "notes": row.get("notes", ""),
+                    "notes": row.get("notes") or row.get("error") or "",
                     "_sapphire_source": str(fpath.relative_to(root)),
                 })
+
+        # Aggregate heartbeat file — fan out the services dict into per-service
+        # objects. The .jsonl extension means it is not matched by the glob above.
+        heartbeat_path = health_dir / "heartbeat.jsonl"
+        if heartbeat_path.is_file():
+            for row in _load_jsonl(heartbeat_path, max_lines=500):
+                if not isinstance(row, dict):
+                    continue
+                ts = row.get("timestamp")
+                services_field = row.get("services")
+                if isinstance(services_field, dict):
+                    for svc_name, svc_val in services_field.items():
+                        # Service value is either a plain status string ("up",
+                        # "healthy") or a nested probe dict with status +
+                        # latency + etc.
+                        if isinstance(svc_val, dict):
+                            status_str = svc_val.get("status", "unknown")
+                            latency = (
+                                svc_val.get("latency_ms")
+                                or svc_val.get("response_ms")
+                                or svc_val.get("latency")
+                            )
+                            notes = svc_val.get("notes") or svc_val.get("error") or "heartbeat"
+                        elif isinstance(svc_val, str):
+                            status_str = svc_val
+                            latency = None
+                            notes = "heartbeat"
+                        else:
+                            continue
+                        svc_id = _deterministic_id(svc_name, ts or "", "heartbeat")
+                        objects.append({
+                            "id": svc_id,
+                            "service": svc_name,
+                            "status": status_str,
+                            "latency_ms": latency,
+                            "uptime_pct": None,
+                            "error_count": 0,
+                            "last_check": _iso(ts),
+                            "host": None,
+                            "tier": None,
+                            "notes": notes,
+                            "_sapphire_source": str(heartbeat_path.relative_to(root)),
+                        })
 
     # Fallback: build from known services in infrastructure topology
     topology_path = root / "data" / "device_topology.json"
@@ -258,12 +322,19 @@ def transform_service_health(
     if isinstance(devices, dict):
         device_items = devices.items()
     else:
-        device_items = ((d.get("name", ""), d) for d in devices if isinstance(d, dict))
+        device_items = (
+            (d.get("name", ""), d) for d in devices if isinstance(d, dict)
+        )
     for device_name, device in device_items:
         if not isinstance(device, dict):
             continue
         for svc in device.get("services") or []:
-            svc_name = svc if isinstance(svc, str) else svc.get("name", "")
+            if isinstance(svc, str):
+                svc_name = svc
+            elif isinstance(svc, dict):
+                svc_name = svc.get("name", "")
+            else:
+                continue
             if not svc_name:
                 continue
             svc_id = _deterministic_id(device_name, svc_name, "topology")

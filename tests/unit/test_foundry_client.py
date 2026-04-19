@@ -18,6 +18,13 @@ from lib.foundry.client import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _isolate_secrets(tmp_path, monkeypatch):
+    """Point SAPPHIRE_SECRETS_DIR at an empty tmp dir so tests don't read the
+    real ~/.config/sapphire-secrets/ files on the developer machine."""
+    monkeypatch.setenv("SAPPHIRE_SECRETS_DIR", str(tmp_path))
+
+
 # ---------------------------------------------------------------------------
 # FoundryAuth
 # ---------------------------------------------------------------------------
@@ -143,6 +150,35 @@ class TestFoundryClientDatasets:
 # ---------------------------------------------------------------------------
 # Exception hierarchy
 # ---------------------------------------------------------------------------
+
+
+class TestSecretsDirFallback:
+    def test_url_resolved_from_secrets_file(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("PALANTIR_FOUNDRY_URL", raising=False)
+        monkeypatch.delenv("FOUNDRY_URL", raising=False)
+        monkeypatch.setenv("SAPPHIRE_SECRETS_DIR", str(tmp_path))
+        (tmp_path / "foundry_url").write_text("https://kadima.example.com\n")
+        (tmp_path / "foundry_token").write_text("secret-tok\n")
+        auth = FoundryAuth.from_env()
+        assert auth.base_url == "https://kadima.example.com"
+        assert auth.token == "secret-tok"
+
+    def test_env_takes_precedence_over_file(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("SAPPHIRE_SECRETS_DIR", str(tmp_path))
+        (tmp_path / "foundry_url").write_text("https://file.example.com")
+        (tmp_path / "foundry_token").write_text("file-tok")
+        monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://env.example.com")
+        monkeypatch.setenv("PALANTIR_FOUNDRY_TOKEN", "env-tok")
+        auth = FoundryAuth.from_env()
+        assert auth.base_url == "https://env.example.com"
+        assert auth.token == "env-tok"
+
+    def test_missing_files_raises_config_error(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("PALANTIR_FOUNDRY_URL", raising=False)
+        monkeypatch.delenv("FOUNDRY_URL", raising=False)
+        monkeypatch.setenv("SAPPHIRE_SECRETS_DIR", str(tmp_path))
+        with pytest.raises(FoundryConfigError, match="No Foundry URL"):
+            FoundryAuth.from_env()
 
 
 class TestExceptions:
