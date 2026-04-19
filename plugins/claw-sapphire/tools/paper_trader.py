@@ -58,21 +58,69 @@ INITIAL_CAPITAL = 100_000.0  # $100K paper money
 POSITION_SIZE_PCT = 0.10  # 10% of capital per trade
 STOP_LOSS_ATR_MULT = 1.5  # Stop at 1.5x ATR below entry
 TAKE_PROFIT_ATR_MULT = 2.5  # TP at 2.5x ATR above entry (1.67:1 R:R)
+FEE_RATE_PER_LEG = 0.004  # 0.40% per side to model retail friction
+ROUND_TRIP_FEE_RATE = FEE_RATE_PER_LEG * 2
+
+
+def _round_money(value: float) -> float:
+    return round(float(value), 2)
+
+
+def _normalize_position(pos: dict) -> dict:
+    qty = float(pos.get("qty", 0.0) or 0.0)
+    entry_price = float(pos.get("entry_price", 0.0) or 0.0)
+    original_qty = float(pos.get("original_qty", qty) or qty)
+
+    pos["qty"] = qty
+    pos["original_qty"] = original_qty
+    pos["size_usd"] = _round_money(entry_price * qty)
+    pos["original_size_usd"] = _round_money(
+        float(pos.get("original_size_usd", entry_price * original_qty) or 0.0)
+    )
+
+    estimated_entry_fee = float(
+        pos.get(
+            "estimated_entry_fee_usd",
+            pos["original_size_usd"] * FEE_RATE_PER_LEG,
+        )
+        or 0.0
+    )
+    remaining_entry_fee = float(
+        pos.get("remaining_entry_fee_usd", estimated_entry_fee) or 0.0
+    )
+
+    pos["estimated_entry_fee_usd"] = _round_money(estimated_entry_fee)
+    pos["remaining_entry_fee_usd"] = _round_money(
+        max(0.0, min(estimated_entry_fee, remaining_entry_fee))
+    )
+    pos["realized_pnl_usd"] = _round_money(float(pos.get("realized_pnl_usd", 0.0) or 0.0))
+    return pos
+
+
+def _normalize_portfolio(pf: dict) -> dict:
+    pf.setdefault("capital", INITIAL_CAPITAL)
+    pf.setdefault("initial_capital", pf["capital"])
+    pf.setdefault("positions", [])
+    pf.setdefault("history", [])
+    pf.setdefault("created_at", datetime.now(UTC).isoformat())
+    pf["positions"] = [_normalize_position(pos) for pos in pf.get("positions", [])]
+    return pf
 
 
 def _load_portfolio() -> dict:
     if PORTFOLIO_FILE.exists():
-        return json.loads(PORTFOLIO_FILE.read_text())
-    return {
+        return _normalize_portfolio(json.loads(PORTFOLIO_FILE.read_text()))
+    return _normalize_portfolio({
         "capital": INITIAL_CAPITAL,
         "initial_capital": INITIAL_CAPITAL,
         "positions": [],  # Open positions
         "history": [],  # Closed trades
         "created_at": datetime.now(UTC).isoformat(),
-    }
+    })
 
 
 def _save_portfolio(pf: dict):
+    _normalize_portfolio(pf)
     PORTFOLIO_FILE.parent.mkdir(parents=True, exist_ok=True)
     PORTFOLIO_FILE.write_text(json.dumps(pf, indent=2, default=str))
 
@@ -101,10 +149,93 @@ def _get_price(symbol: str) -> float | None:
         return None
 
 
+def _gross_pnl(pos: dict, exit_price: float, qty: float | None = None) -> float:
+    close_qty = pos["qty"] if qty is None else qty
+    if pos["side"] == "BUY":
+        return (exit_price - pos["entry_price"]) * close_qty
+    return (pos["entry_price"] - exit_price) * close_qty
+
+
+def _exit_fee(exit_price: float, qty: float) -> float:
+    return _round_money(exit_price * qty * FEE_RATE_PER_LEG)
+
+
+def _allocate_entry_fee(pos: dict, qty: float) -> float:
+    open_qty = float(pos.get("qty", 0.0) or 0.0)
+    remaining_entry_fee = float(pos.get("remaining_entry_fee_usd", 0.0) or 0.0)
+    if open_qty <= 0 or remaining_entry_fee <= 0:
+        return 0.0
+    if qty >= open_qty - 1e-12:
+        return _round_money(remaining_entry_fee)
+    return _round_money(remaining_entry_fee * (qty / open_qty))
+
+
+def _net_unrealized_pnl(pos: dict, current_price: float) -> tuple[float, float, float]:
+    gross = _round_money(_gross_pnl(pos, current_price))
+    close_fee = _exit_fee(current_price, pos["qty"])
+    net = _round_money(gross - pos.get("remaining_entry_fee_usd", 0.0) - close_fee)
+    return gross, close_fee, net
+
+
+def _close_position_slice(
+    pf: dict,
+    pos: dict,
+    exit_price: float,
+    reason: str,
+    qty: float | None = None,
+) -> tuple[dict, bool, float]:
+    _normalize_position(pos)
+    open_qty = float(pos["qty"])
+    if open_qty <= 0:
+        raise ValueError("cannot close an empty position")
+
+    close_qty = open_qty if qty is None else min(float(qty), open_qty)
+    snapshot = dict(pos)
+    gross_pnl = _round_money(_gross_pnl(snapshot, exit_price, close_qty))
+    entry_fee = _allocate_entry_fee(snapshot, close_qty)
+    exit_fee = _exit_fee(exit_price, close_qty)
+    net_pnl = _round_money(gross_pnl - entry_fee - exit_fee)
+
+    remaining_qty = 0.0 if close_qty >= open_qty - 1e-12 else round(open_qty - close_qty, 12)
+    remaining_entry_fee = (
+        0.0
+        if remaining_qty == 0.0
+        else _round_money(snapshot["remaining_entry_fee_usd"] - entry_fee)
+    )
+
+    pos["qty"] = remaining_qty
+    pos["size_usd"] = _round_money(pos["entry_price"] * remaining_qty)
+    pos["remaining_entry_fee_usd"] = remaining_entry_fee
+    pos["realized_pnl_usd"] = _round_money(pos.get("realized_pnl_usd", 0.0) + net_pnl)
+
+    trade = {
+        **snapshot,
+        "qty": close_qty,
+        "size_usd": _round_money(snapshot["entry_price"] * close_qty),
+        "exit_price": exit_price,
+        "gross_pnl": gross_pnl,
+        "entry_fee_usd": entry_fee,
+        "exit_fee_usd": exit_fee,
+        "fees_usd": _round_money(entry_fee + exit_fee),
+        "pnl": net_pnl,
+        "exit_reason": reason,
+        "closed_at": datetime.now(UTC).isoformat(),
+        "remaining_qty": remaining_qty,
+        "cumulative_pnl_usd": pos["realized_pnl_usd"],
+        "partial_exit": remaining_qty > 0,
+    }
+    pf["history"].append(trade)
+    pf["capital"] = _round_money(float(pf.get("capital", 0.0) or 0.0) + net_pnl)
+    return trade, remaining_qty == 0.0, pos["realized_pnl_usd"]
+
+
 def action_execute(symbol: str, side: str, price: float, atr: float = None,
                     confidence: float = 0.5, kelly_size_pct: float = None, edge: float = None,
                     pipeline_id: str = "") -> dict:
     """Execute a paper trade with optional Half-Kelly sizing from signal generator."""
+    if price <= 0:
+        return {"error": "Price must be > 0"}
+
     pf = _load_portfolio()
 
     # Check for existing position in same symbol
@@ -124,6 +255,7 @@ def action_execute(symbol: str, side: str, price: float, atr: float = None,
 
     size_usd = pf["capital"] * size_pct
     qty = size_usd / price
+    entry_fee = _round_money(size_usd * FEE_RATE_PER_LEG)
 
     # ATR-based stops (default to 3% of price if no ATR)
     if atr is None:
@@ -143,6 +275,7 @@ def action_execute(symbol: str, side: str, price: float, atr: float = None,
         "qty": qty,
         "original_qty": qty,
         "size_usd": size_usd,
+        "original_size_usd": size_usd,
         "stop_loss": round(stop_loss, 2),
         "take_profit": round(take_profit, 2),
         "partial_tp": round(price + atr * 1.0 if side.upper() == "BUY" else price - atr * 1.0, 2),  # Partial at 1 ATR
@@ -153,6 +286,9 @@ def action_execute(symbol: str, side: str, price: float, atr: float = None,
         "edge": edge,
         "confidence": confidence,
         "pipeline_id": pipeline_id,   # links back to signal_pipeline audit JSONL
+        "estimated_entry_fee_usd": entry_fee,
+        "remaining_entry_fee_usd": entry_fee,
+        "realized_pnl_usd": 0.0,
         "opened_at": datetime.now(UTC).isoformat(),
     }
 
@@ -163,6 +299,8 @@ def action_execute(symbol: str, side: str, price: float, atr: float = None,
         "success": True,
         "trade": f"{side.upper()} {qty:.6f} {symbol} @ ${price:,.2f}",
         "size": f"${size_usd:,.0f}",
+        "entry_fee": f"${entry_fee:,.2f}",
+        "estimated_round_trip_friction": f"${size_usd * ROUND_TRIP_FEE_RATE:,.2f}",
         "stop_loss": f"${stop_loss:,.2f}",
         "take_profit": f"${take_profit:,.2f}",
         "risk_reward": f"1:{TAKE_PROFIT_ATR_MULT/STOP_LOSS_ATR_MULT:.1f}",
@@ -177,6 +315,7 @@ def action_check_stops() -> dict:
 
     remaining = []
     for pos in pf["positions"]:
+        _normalize_position(pos)
         current = _get_price(pos["symbol"])
         if current is None:
             remaining.append(pos)
@@ -198,12 +337,12 @@ def action_check_stops() -> dict:
             hit_partial = (current >= partial_tp) if is_long else (current <= partial_tp)
             if hit_partial:
                 half_qty = pos["qty"] * 0.5
-                partial_pnl = (current - entry) * half_qty if is_long else (entry - current) * half_qty
-                pos["qty"] -= half_qty
+                trade, _closed_final, _total_trade_pnl = _close_position_slice(
+                    pf, pos, current, "partial_50pct", qty=half_qty
+                )
                 pos["partial_taken"] = True
-                pf["capital"] += partial_pnl
                 partial_exits.append({
-                    "symbol": pos["symbol"], "pnl": round(partial_pnl, 2),
+                    "symbol": pos["symbol"], "pnl": round(trade["pnl"], 2),
                     "reason": "partial_50pct", "remaining_qty": pos["qty"]
                 })
 
@@ -219,23 +358,19 @@ def action_check_stops() -> dict:
             if is_long:
                 trail_level = peak * (1 - TRAILING_DISTANCE_BPS / 10000)
                 if current <= trail_level:
-                    pnl = (current - entry) * pos["qty"]
-                    trade = {**pos, "exit_price": current, "pnl": round(pnl, 2),
-                             "exit_reason": "trailing_stop", "closed_at": datetime.now(UTC).isoformat()}
-                    pf["history"].append(trade)
-                    pf["capital"] += pnl
-                    _record_outcome(pos.get("pipeline_id", ""), pnl, current)
+                    trade, _finalized, total_trade_pnl = _close_position_slice(
+                        pf, pos, current, "trailing_stop"
+                    )
+                    _record_outcome(pos.get("pipeline_id", ""), total_trade_pnl, current)
                     closed.append(trade)
                     continue
             else:
                 trail_level = peak * (1 + TRAILING_DISTANCE_BPS / 10000)
                 if current >= trail_level:
-                    pnl = (entry - current) * pos["qty"]
-                    trade = {**pos, "exit_price": current, "pnl": round(pnl, 2),
-                             "exit_reason": "trailing_stop", "closed_at": datetime.now(UTC).isoformat()}
-                    pf["history"].append(trade)
-                    pf["capital"] += pnl
-                    _record_outcome(pos.get("pipeline_id", ""), pnl, current)
+                    trade, _finalized, total_trade_pnl = _close_position_slice(
+                        pf, pos, current, "trailing_stop"
+                    )
+                    _record_outcome(pos.get("pipeline_id", ""), total_trade_pnl, current)
                     closed.append(trade)
                     continue
 
@@ -245,13 +380,13 @@ def action_check_stops() -> dict:
 
         if hit_stop or hit_tp:
             exit_price = current  # Use actual price, not the level
-            pnl = (exit_price - entry) * pos["qty"] if is_long else (entry - exit_price) * pos["qty"]
-            trade = {**pos, "exit_price": exit_price, "pnl": round(pnl, 2),
-                     "exit_reason": "stop_loss" if hit_stop else "take_profit",
-                     "closed_at": datetime.now(UTC).isoformat()}
-            pf["history"].append(trade)
-            pf["capital"] += pnl
-            _record_outcome(pos.get("pipeline_id", ""), pnl, exit_price)
+            trade, _finalized, total_trade_pnl = _close_position_slice(
+                pf,
+                pos,
+                exit_price,
+                "stop_loss" if hit_stop else "take_profit",
+            )
+            _record_outcome(pos.get("pipeline_id", ""), total_trade_pnl, exit_price)
             closed.append(trade)
         else:
             remaining.append(pos)
@@ -275,16 +410,19 @@ def action_positions() -> dict:
     """Show open positions with unrealized PnL."""
     pf = _load_portfolio()
     positions = []
+    unrealized_total = 0.0
 
     for pos in pf["positions"]:
+        _normalize_position(pos)
         current = _get_price(pos["symbol"])
         if current:
-            if pos["side"] == "BUY":
-                unrealized = (current - pos["entry_price"]) * pos["qty"]
-            else:
-                unrealized = (pos["entry_price"] - current) * pos["qty"]
+            gross_unrealized, close_fee, unrealized = _net_unrealized_pnl(pos, current)
+            fees_if_closed = _round_money(pos["remaining_entry_fee_usd"] + close_fee)
         else:
+            gross_unrealized = 0
             unrealized = 0
+            fees_if_closed = _round_money(pos.get("remaining_entry_fee_usd", 0.0))
+        unrealized_total += unrealized
 
         positions.append({
             "symbol": pos["symbol"],
@@ -292,11 +430,19 @@ def action_positions() -> dict:
             "entry": f"${pos['entry_price']:,.2f}",
             "current": f"${current:,.2f}" if current else "?",
             "unrealized_pnl": f"${unrealized:+,.2f}",
+            "gross_unrealized_pnl": f"${gross_unrealized:+,.2f}",
+            "fees_if_closed_now": f"${fees_if_closed:,.2f}",
             "stop": f"${pos['stop_loss']:,.2f}",
             "tp": f"${pos['take_profit']:,.2f}",
         })
 
-    return {"capital": f"${pf['capital']:,.2f}", "open_positions": len(positions), "positions": positions}
+    liquidation_value = _round_money(pf["capital"] + unrealized_total)
+    return {
+        "capital": f"${pf['capital']:,.2f}",
+        "estimated_liquidation_value": f"${liquidation_value:,.2f}",
+        "open_positions": len(positions),
+        "positions": positions,
+    }
 
 
 def action_close(symbol: str) -> dict:
@@ -308,19 +454,19 @@ def action_close(symbol: str) -> dict:
 
     for i, pos in enumerate(pf["positions"]):
         if pos["symbol"] == symbol:
-            if pos["side"] == "BUY":
-                pnl = (current - pos["entry_price"]) * pos["qty"]
-            else:
-                pnl = (pos["entry_price"] - current) * pos["qty"]
-
-            trade = {**pos, "exit_price": current, "pnl": round(pnl, 2),
-                     "exit_reason": "manual", "closed_at": datetime.now(UTC).isoformat()}
-            pf["history"].append(trade)
-            pf["capital"] += pnl
-            pf["positions"].pop(i)
+            trade, finalized, total_trade_pnl = _close_position_slice(
+                pf, pos, current, "manual"
+            )
+            if finalized:
+                pf["positions"].pop(i)
             _save_portfolio(pf)
-            _record_outcome(pos.get("pipeline_id", ""), pnl, current)
-            return {"success": True, "pnl": f"${pnl:+,.2f}", "capital": f"${pf['capital']:,.2f}"}
+            _record_outcome(pos.get("pipeline_id", ""), total_trade_pnl, current)
+            return {
+                "success": True,
+                "pnl": f"${trade['pnl']:+,.2f}",
+                "fees": f"${trade['fees_usd']:,.2f}",
+                "capital": f"${pf['capital']:,.2f}",
+            }
 
     return {"error": f"No open position in {symbol}"}
 
@@ -342,6 +488,7 @@ def action_metrics() -> dict:
     losses = [t for t in history if t["pnl"] <= 0]
     total_pnl = sum(t["pnl"] for t in history)
     pnls = [t["pnl"] for t in history]
+    total_fees = sum(t.get("fees_usd", 0.0) for t in history)
     avg_win = sum(t["pnl"] for t in wins) / len(wins) if wins else 0
     avg_loss = sum(t["pnl"] for t in losses) / len(losses) if losses else 0
 
@@ -370,6 +517,7 @@ def action_metrics() -> dict:
         "losses": len(losses),
         "win_rate": f"{len(wins)/len(history)*100:.0f}%",
         "total_pnl": f"${total_pnl:+,.2f}",
+        "total_fees": f"${total_fees:,.2f}",
         "avg_win": f"${avg_win:+,.2f}",
         "avg_loss": f"${avg_loss:+,.2f}",
         "capital": f"${pf['capital']:,.2f}",
