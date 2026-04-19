@@ -2158,6 +2158,31 @@ def api_performance():
                         'win_rate': None, 'decay_alerts': []}), 200
 
 
+@app.route('/api/strategy-performance')
+@requires_auth
+def api_strategy_performance():
+    """Unified strategy performance: overall + by-strategy + by-timeframe + cross.
+
+    Reads every closed trade from data/signals/*.jsonl, data/performance/signals.jsonl,
+    and data/paper_portfolio.json history, normalizes, and groups by strategy and
+    hold-duration bucket (1h/4h/1d/7d/30d/all).
+    """
+    try:
+        from lib.analytics.strategy_performance import report
+        payload = report()
+        payload['last_updated'] = time.time()
+        return jsonify(payload)
+    except Exception as e:
+        log.warning("strategy performance API error: %s", e)
+        return jsonify({
+            'error': str(e),
+            'overall': {'trades': 0, 'win_rate': None, 'total_pnl_usd': 0.0},
+            'by_strategy': {}, 'by_timeframe': {},
+            'by_strategy_timeframe': {}, 'by_symbol': {},
+            'trade_count': 0, 'strategies': [], 'timeframes': [],
+        }), 200
+
+
 @app.route('/api/content/drafts')
 @requires_auth
 def api_content_drafts():

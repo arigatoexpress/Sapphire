@@ -1,7 +1,8 @@
 {
-  "capital": 100000.0,
+  "capital": 100637.59,
   "initial_capital": 100000.0,
-  "positions": [
+  "positions": [],
+  "history": [
     {
       "symbol": "BTCUSDT",
       "side": "BUY",
@@ -14,7 +15,23 @@
       "confidence": 0.85,
       "opened_at": "2026-04-09T21:51:42.676305+00:00",
       "peak_price": 75537,
-      "trailing_active": true
+      "trailing_active": true,
+      "original_qty": 0.1381387189015209,
+      "original_size_usd": 10000.0,
+      "estimated_entry_fee_usd": 40.0,
+      "remaining_entry_fee_usd": 40.0,
+      "realized_pnl_usd": 0.0,
+      "exit_price": 75130,
+      "gross_pnl": 378.36,
+      "entry_fee_usd": 40.0,
+      "exit_fee_usd": 41.51,
+      "fees_usd": 81.51,
+      "pnl": 296.85,
+      "exit_reason": "trailing_stop",
+      "closed_at": "2026-04-19T08:34:24.858865+00:00",
+      "remaining_qty": 0.0,
+      "cumulative_pnl_usd": 296.85,
+      "partial_exit": false
     },
     {
       "symbol": "ETHUSDT",
@@ -28,9 +45,24 @@
       "confidence": 0.85,
       "opened_at": "2026-04-09T21:51:42.719936+00:00",
       "peak_price": 2332.87,
-      "trailing_active": true
+      "trailing_active": true,
+      "original_qty": 4.504504504504505,
+      "original_size_usd": 10000.0,
+      "estimated_entry_fee_usd": 40.0,
+      "remaining_entry_fee_usd": 40.0,
+      "realized_pnl_usd": 0.0,
+      "exit_price": 2313.78,
+      "gross_pnl": 422.43,
+      "entry_fee_usd": 40.0,
+      "exit_fee_usd": 41.69,
+      "fees_usd": 81.69,
+      "pnl": 340.74,
+      "exit_reason": "trailing_stop",
+      "closed_at": "2026-04-19T08:34:24.955107+00:00",
+      "remaining_qty": 0.0,
+      "cumulative_pnl_usd": 340.74,
+      "partial_exit": false
     }
   ],
-  "history": [],
   "created_at": "2026-04-09T21:51:42.676165+00:00"
 }

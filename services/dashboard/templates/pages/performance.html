@@ -282,31 +282,31 @@
     <span class="auto-badge">AUTO-REFRESH 60s</span>
 </div>
 
-<!-- Hero stats -->
+<!-- Hero stats (wired to /api/strategy-performance) -->
 <div class="perf-hero">
     <div class="perf-cell">
         <span class="perf-label">Total P&amp;L</span>
-        <span class="perf-value positive" id="heroPnl">+$12,847</span>
-        <span class="perf-sub">+12.85% since inception</span>
+        <span class="perf-value" id="heroPnl">—</span>
+        <span class="perf-sub" id="heroPnlSub">no closed trades yet</span>
     </div>
     <div class="perf-cell">
         <span class="perf-label">Win Rate</span>
-        <span class="perf-value amber" id="heroWinRate">78.4%</span>
-        <span class="perf-sub">218 / 278 trades</span>
+        <span class="perf-value" id="heroWinRate">—</span>
+        <span class="perf-sub" id="heroWinRateSub">0 / 0 trades</span>
     </div>
     <div class="perf-cell">
-        <span class="perf-label">Sharpe Ratio</span>
-        <span class="perf-value positive" id="heroSharpe">1.82</span>
-        <span class="perf-sub">annualized, rf = 5.3%</span>
+        <span class="perf-label">Profit Factor</span>
+        <span class="perf-value" id="heroPf">—</span>
+        <span class="perf-sub" id="heroPfSub">gross wins / gross losses</span>
     </div>
     <div class="perf-cell">
         <span class="perf-label">Sortino Ratio</span>
-        <span class="perf-value positive" id="heroSortino">2.41</span>
-        <span class="perf-sub">downside-only vol</span>
+        <span class="perf-value" id="heroSortino">—</span>
+        <span class="perf-sub" id="heroSortinoSub">downside-only vol</span>
     </div>
 </div>
 
-<!-- Strategy comparison -->
+<!-- Strategy comparison (wired) -->
 <div class="perf-section">
     <div class="perf-section-title">Strategy Comparison</div>
     <div class="panel" style="padding: 0; margin-bottom: 0;">
@@ -317,70 +317,49 @@
                         <th>Strategy</th>
                         <th>Trades</th>
                         <th>Win Rate</th>
-                        <th>Avg Win</th>
-                        <th>Avg Loss</th>
+                        <th>Total P&amp;L</th>
+                        <th>Avg P&amp;L</th>
+                        <th>Best</th>
+                        <th>Worst</th>
                         <th>Profit Factor</th>
-                        <th>Max DD</th>
-                        <th>Calmar</th>
-                        <th>Status</th>
+                        <th>Portfolio ROI</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="strategyTableBody">
+                    <tr><td colspan="9" style="text-align:center; padding:24px; color: var(--text-muted);">Loading strategy data…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Strategy × Timeframe breakdown -->
+<div class="perf-section">
+    <div class="perf-section-title">Strategy &times; Timeframe &mdash; Hold Duration Buckets</div>
+    <div class="panel" style="padding: 0; margin-bottom: 0;">
+        <div class="table-scroll">
+            <table class="strat-table" id="strategyTimeframeTable">
+                <thead>
                     <tr>
-                        <td class="strat-name">Ultra v3 Momentum</td>
-                        <td>94</td>
-                        <td class="val-pos">82.1%</td>
-                        <td class="val-pos">+$287</td>
-                        <td class="val-neg">-$162</td>
-                        <td class="val-pos">2.84</td>
-                        <td class="val-neg">-4.2%</td>
-                        <td class="val-pos">3.06</td>
-                        <td><span class="strat-status live">Live</span></td>
+                        <th rowspan="2">Strategy</th>
+                        <th colspan="2" style="text-align:center;">&lt; 1h</th>
+                        <th colspan="2" style="text-align:center;">&lt; 4h</th>
+                        <th colspan="2" style="text-align:center;">&lt; 1d</th>
+                        <th colspan="2" style="text-align:center;">&lt; 7d</th>
+                        <th colspan="2" style="text-align:center;">&lt; 30d</th>
+                        <th colspan="2" style="text-align:center;">all</th>
                     </tr>
                     <tr>
-                        <td class="strat-name">Mean Revert BTC</td>
-                        <td>63</td>
-                        <td class="val-pos">76.2%</td>
-                        <td class="val-pos">+$412</td>
-                        <td class="val-neg">-$238</td>
-                        <td class="val-pos">2.21</td>
-                        <td class="val-neg">-6.1%</td>
-                        <td class="val-pos">2.54</td>
-                        <td><span class="strat-status live">Live</span></td>
+                        <th>N</th><th>WR</th>
+                        <th>N</th><th>WR</th>
+                        <th>N</th><th>WR</th>
+                        <th>N</th><th>WR</th>
+                        <th>N</th><th>WR</th>
+                        <th>N</th><th>WR</th>
                     </tr>
-                    <tr>
-                        <td class="strat-name">Breakout SOL</td>
-                        <td>51</td>
-                        <td>68.6%</td>
-                        <td class="val-pos">+$524</td>
-                        <td class="val-neg">-$347</td>
-                        <td class="val-pos">1.63</td>
-                        <td class="val-neg">-9.8%</td>
-                        <td>1.12</td>
-                        <td><span class="strat-status paper">Paper</span></td>
-                    </tr>
-                    <tr>
-                        <td class="strat-name">Correlation Pairs</td>
-                        <td>42</td>
-                        <td class="val-pos">81.0%</td>
-                        <td class="val-pos">+$198</td>
-                        <td class="val-neg">-$124</td>
-                        <td class="val-pos">2.58</td>
-                        <td class="val-neg">-3.4%</td>
-                        <td class="val-pos">3.82</td>
-                        <td><span class="strat-status live">Live</span></td>
-                    </tr>
-                    <tr>
-                        <td class="strat-name">Funding Arb</td>
-                        <td>28</td>
-                        <td class="val-pos">85.7%</td>
-                        <td class="val-pos">+$93</td>
-                        <td class="val-neg">-$71</td>
-                        <td class="val-pos">3.14</td>
-                        <td class="val-neg">-1.8%</td>
-                        <td class="val-pos">5.61</td>
-                        <td><span class="strat-status paused">Paused</span></td>
-                    </tr>
+                </thead>
+                <tbody id="strategyTimeframeBody">
+                    <tr><td colspan="13" style="text-align:center; padding:24px; color: var(--text-muted);">Loading timeframe data…</td></tr>
                 </tbody>
             </table>
         </div>
@@ -630,9 +609,138 @@
         body.innerHTML = html;
     }
 
-    /* ── Refresh stub ── */
+    /* ── Formatters ── */
+    function fmtUsd(v) {
+        if (v == null) return '—';
+        var sign = v > 0 ? '+' : (v < 0 ? '−' : '');
+        var abs = Math.abs(v);
+        var str = abs >= 1000 ? abs.toLocaleString(undefined, {maximumFractionDigits: 0}) : abs.toFixed(2);
+        return sign + '$' + str;
+    }
+    function fmtPct(v) {
+        if (v == null) return '—';
+        return (v * 100).toFixed(1) + '%';
+    }
+    function fmtPctRaw(v) {
+        if (v == null) return '—';
+        var sign = v > 0 ? '+' : '';
+        return sign + v.toFixed(2) + '%';
+    }
+    function fmtFloat(v, d) {
+        if (v == null) return '—';
+        if (v === 'inf') return '∞';
+        return Number(v).toFixed(d == null ? 2 : d);
+    }
+    function pnlClass(v) {
+        if (v == null) return '';
+        return v > 0 ? 'val-pos positive' : v < 0 ? 'val-neg negative' : '';
+    }
+
+    /* ── Render strategy table from /api/strategy-performance ── */
+    function renderStrategyTable(byStrategy) {
+        var body = document.getElementById('strategyTableBody');
+        if (!body) return;
+        var names = Object.keys(byStrategy || {});
+        if (!names.length) {
+            body.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:24px; color: var(--text-muted);">No closed trades yet — tracking starts on first signal close.</td></tr>';
+            return;
+        }
+        names.sort(function (a, b) {
+            return (byStrategy[b].total_pnl_usd || 0) - (byStrategy[a].total_pnl_usd || 0);
+        });
+        var html = '';
+        names.forEach(function (name) {
+            var s = byStrategy[name];
+            html += '<tr>'
+                + '<td class="strat-name">' + name + '</td>'
+                + '<td>' + s.trades + '</td>'
+                + '<td class="' + (s.win_rate != null && s.win_rate >= 0.5 ? 'val-pos' : 'val-neg') + '">' + fmtPct(s.win_rate) + '</td>'
+                + '<td class="' + pnlClass(s.total_pnl_usd) + '">' + fmtUsd(s.total_pnl_usd) + '</td>'
+                + '<td class="' + pnlClass(s.avg_pnl_usd) + '">' + fmtUsd(s.avg_pnl_usd) + '</td>'
+                + '<td class="val-pos">' + fmtUsd(s.best) + '</td>'
+                + '<td class="val-neg">' + fmtUsd(s.worst) + '</td>'
+                + '<td class="' + (typeof s.profit_factor === 'number' && s.profit_factor >= 1 ? 'val-pos' : s.profit_factor === 'inf' ? 'val-pos' : 'val-neg') + '">' + fmtFloat(s.profit_factor) + '</td>'
+                + '<td class="' + pnlClass(s.portfolio_roi_pct) + '">' + fmtPctRaw(s.portfolio_roi_pct) + '</td>'
+                + '</tr>';
+        });
+        body.innerHTML = html;
+    }
+
+    /* ── Render strategy × timeframe matrix ── */
+    function renderStrategyTimeframeTable(byStrategyTimeframe, timeframes) {
+        var body = document.getElementById('strategyTimeframeBody');
+        if (!body) return;
+        var buckets = timeframes || ['1h', '4h', '1d', '7d', '30d', 'all'];
+        var strategies = Object.keys(byStrategyTimeframe || {});
+        if (!strategies.length) {
+            body.innerHTML = '<tr><td colspan="13" style="text-align:center; padding:24px; color: var(--text-muted);">No closed trades yet.</td></tr>';
+            return;
+        }
+        strategies.sort();
+        var html = '';
+        strategies.forEach(function (name) {
+            var byTf = byStrategyTimeframe[name] || {};
+            html += '<tr><td class="strat-name">' + name + '</td>';
+            buckets.forEach(function (tf) {
+                var s = byTf[tf];
+                if (!s || !s.trades) {
+                    html += '<td style="color: var(--text-muted);">—</td><td style="color: var(--text-muted);">—</td>';
+                } else {
+                    var wrCls = s.win_rate != null && s.win_rate >= 0.5 ? 'val-pos' : 'val-neg';
+                    html += '<td>' + s.trades + '</td>'
+                        + '<td class="' + wrCls + '">' + fmtPct(s.win_rate) + '</td>';
+                }
+            });
+            html += '</tr>';
+        });
+        body.innerHTML = html;
+    }
+
+    /* ── Render hero stats ── */
+    function renderHero(overall) {
+        var pnl = overall.total_pnl_usd;
+        var pnlEl = document.getElementById('heroPnl');
+        if (pnlEl) {
+            pnlEl.textContent = fmtUsd(pnl);
+            pnlEl.className = 'perf-value ' + pnlClass(pnl);
+        }
+        var pnlSub = document.getElementById('heroPnlSub');
+        if (pnlSub) pnlSub.textContent = (overall.portfolio_roi_pct != null ? fmtPctRaw(overall.portfolio_roi_pct) + ' portfolio ROI' : 'awaiting trades');
+
+        var wrEl = document.getElementById('heroWinRate');
+        if (wrEl) {
+            wrEl.textContent = fmtPct(overall.win_rate);
+            wrEl.className = 'perf-value ' + (overall.win_rate != null && overall.win_rate >= 0.5 ? 'positive' : overall.win_rate != null ? 'negative' : '');
+        }
+        var wrSub = document.getElementById('heroWinRateSub');
+        if (wrSub) wrSub.textContent = (overall.wins || 0) + ' / ' + ((overall.wins || 0) + (overall.losses || 0)) + ' scored trades';
+
+        var pfEl = document.getElementById('heroPf');
+        if (pfEl) {
+            pfEl.textContent = fmtFloat(overall.profit_factor);
+            var pfOk = overall.profit_factor === 'inf' || (typeof overall.profit_factor === 'number' && overall.profit_factor >= 1);
+            pfEl.className = 'perf-value ' + (pfOk ? 'positive' : overall.profit_factor != null ? 'negative' : '');
+        }
+
+        var sortEl = document.getElementById('heroSortino');
+        if (sortEl) {
+            sortEl.textContent = fmtFloat(overall.sortino, 2);
+            sortEl.className = 'perf-value ' + (overall.sortino != null && overall.sortino > 0 ? 'positive' : overall.sortino != null ? 'negative' : '');
+        }
+    }
+
+    /* ── Main refresh — pulls /api/strategy-performance ── */
     function refreshPerformance() {
-        /* Future: fetch /api/performance and update hero stats + table rows */
+        fetch('/api/strategy-performance', {credentials: 'same-origin'})
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data && data.overall) renderHero(data.overall);
+                renderStrategyTable(data.by_strategy || {});
+                renderStrategyTimeframeTable(data.by_strategy_timeframe || {}, data.timeframes);
+            })
+            .catch(function (err) {
+                console.warn('strategy-performance fetch failed', err);
+            });
         var now = new Date().toISOString().replace('T', ' ').slice(0, 19);
         var el = document.getElementById('lastUpdate');
         if (el) el.textContent = 'LAST UPDATE: ' + now;
