@@ -2183,6 +2183,24 @@ def api_strategy_performance():
         }), 200
 
 
+@app.route('/api/forecast')
+@requires_auth
+def api_forecast():
+    """Combined Kronos + TA-scanner forecast per symbol with consensus + edge score."""
+    try:
+        from lib.analytics.forecast import forecast
+        payload = forecast()
+        payload['last_updated'] = time.time()
+        return jsonify(payload)
+    except Exception as e:
+        log.warning("forecast API error: %s", e)
+        return jsonify({
+            'error': str(e),
+            'rows': [], 'symbols': [],
+            'kronos_stamp': None, 'kronos_source': None,
+        }), 200
+
+
 @app.route('/api/backtest-results')
 @requires_auth
 def api_backtest_results():

@@ -407,6 +407,38 @@
     </div>
 </div>
 
+<!-- Forecast (live Kronos + TA consensus) -->
+<div class="perf-section">
+    <div class="perf-section-title">Live Forecast &mdash; Kronos + TA Consensus</div>
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom: 10px;">
+        <span id="forecastMeta" style="color:#9fd89c; font-size:0.72rem;">&mdash;</span>
+    </div>
+    <div class="panel" style="padding: 0; margin-bottom: 0;">
+        <div class="table-scroll">
+            <table class="strat-table">
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th>Edge</th>
+                        <th>Consensus</th>
+                        <th>Kronos</th>
+                        <th>K. Conf</th>
+                        <th>Proj Δ</th>
+                        <th>Target Range</th>
+                        <th>TA</th>
+                        <th>TA Conf</th>
+                        <th>TA Target</th>
+                        <th>TF</th>
+                    </tr>
+                </thead>
+                <tbody id="forecastBody">
+                    <tr><td colspan="11" style="text-align:center; padding:24px; color: #9fd89c;">Loading forecast…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 <!-- Backtest leaderboard (projected performance from historical sweep) -->
 <div class="perf-section">
     <div class="perf-section-title">Backtest Leaderboard &mdash; Projected Performance</div>
@@ -798,6 +830,76 @@
         body.innerHTML = html;
     }
 
+    /* ── Render forecast table from /api/forecast ── */
+    function renderForecast(payload) {
+        var body = document.getElementById('forecastBody');
+        var meta = document.getElementById('forecastMeta');
+        if (!body) return;
+
+        var rows = (payload || {}).rows || [];
+        if (meta) {
+            var stamp = (payload || {}).kronos_stamp;
+            meta.textContent = stamp
+                ? ('Kronos generated ' + new Date(stamp).toLocaleString() + ' · ' + rows.length + ' symbols')
+                : (rows.length + ' symbols (no Kronos data)');
+        }
+        if (!rows.length) {
+            body.innerHTML = '<tr><td colspan="11" style="text-align:center; padding:24px; color: #9fd89c;">Awaiting forecast data…</td></tr>';
+            return;
+        }
+
+        var consensusClass = {
+            AGREE_BULL:  'val-pos', AGREE_BEAR: 'val-neg',
+            CONTRADICT:  'val-neg', PARTIAL:    '',
+            KRONOS_ONLY: '',        TA_ONLY:    '',
+            NEITHER:     '',
+        };
+        var consensusIcon = {
+            AGREE_BULL: '⬆⬆', AGREE_BEAR: '⬇⬇',
+            CONTRADICT: '⚠',  PARTIAL: '~',
+            KRONOS_ONLY: 'K', TA_ONLY: 'T', NEITHER: '—',
+        };
+
+        function _dirClass(d) {
+            if (!d) return '';
+            d = String(d).toLowerCase();
+            if (d === 'bullish' || d === 'long' || d === 'up' || d === 'buy') return 'val-pos';
+            if (d === 'bearish' || d === 'short' || d === 'down' || d === 'sell') return 'val-neg';
+            return '';
+        }
+        function _money(v) {
+            if (v == null) return '—';
+            return '$' + Number(v).toLocaleString(undefined, {maximumFractionDigits: 2});
+        }
+
+        var html = '';
+        rows.forEach(function (r) {
+            var k = r.kronos || {};
+            var t = r.ta || {};
+            var edgeCls = r.edge_score > 0.1 ? 'val-pos' : r.edge_score < -0.1 ? 'val-neg' : '';
+            var edgeSign = r.edge_score > 0 ? '+' : '';
+            var projChg = k.projected_change_pct;
+            var range = (k.target_low != null && k.target_high != null)
+                ? (_money(k.target_low) + ' — ' + _money(k.target_high))
+                : '—';
+
+            html += '<tr>'
+                + '<td class="strat-name">' + r.symbol + '</td>'
+                + '<td class="' + edgeCls + '">' + edgeSign + (r.edge_score * 100).toFixed(1) + '</td>'
+                + '<td class="' + (consensusClass[r.consensus] || '') + '">' + (consensusIcon[r.consensus] || r.consensus) + ' ' + r.consensus + '</td>'
+                + '<td class="' + _dirClass(k.direction) + '">' + (k.direction || '—') + '</td>'
+                + '<td>' + (k.confidence != null ? (k.confidence * 100).toFixed(1) + '%' : '—') + '</td>'
+                + '<td class="' + (projChg > 0 ? 'val-pos' : projChg < 0 ? 'val-neg' : '') + '">' + (projChg != null ? (projChg > 0 ? '+' : '') + projChg.toFixed(2) + '%' : '—') + '</td>'
+                + '<td style="font-size:0.72rem;">' + range + '</td>'
+                + '<td class="' + _dirClass(t.direction) + '">' + (t.direction || '—') + '</td>'
+                + '<td>' + (t.confidence != null ? (t.confidence * 100).toFixed(1) + '%' : '—') + '</td>'
+                + '<td>' + _money(t.target_price) + '</td>'
+                + '<td style="color:#9fd89c;">' + (t.timeframe || '—') + '</td>'
+                + '</tr>';
+        });
+        body.innerHTML = html;
+    }
+
     /* ── Render backtest leaderboard from /api/backtest-results ── */
     function renderBacktestLeaderboard(payload) {
         var body = document.getElementById('backtestLeaderboardBody');
@@ -915,6 +1017,13 @@
 
         var metricSel = document.getElementById('backtestMetric');
         fetchBacktestResults(metricSel ? metricSel.value : 'sortino');
+
+        fetch('/api/forecast', {credentials: 'same-origin'})
+            .then(function (r) { return r.json(); })
+            .then(renderForecast)
+            .catch(function (err) {
+                console.warn('forecast fetch failed', err);
+            });
 
         var now = new Date().toISOString().replace('T', ' ').slice(0, 19);
         var el = document.getElementById('lastUpdate');
