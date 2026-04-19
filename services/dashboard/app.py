@@ -2271,6 +2271,125 @@ def api_content_drafts():
         return jsonify({"count": 0, "drafts": [], "error": str(e)}), 500
 
 
+# ── Security Intelligence Platform (Phase 1) ─────────────────────────────
+
+
+@app.route('/security')
+@requires_auth
+def security_page():
+    """Security intelligence dashboard — dependency, model, and network panels."""
+    return render_template(
+        'pages/security.html', current_page='security', page_title='Security Intel'
+    )
+
+
+@app.route('/api/security/dependencies')
+@requires_auth
+def api_security_dependencies():
+    """Dependency scan — CVEs, outdated packages, SBOM."""
+    try:
+        from lib.security.dependency_scanner import DependencyScanner
+        scanner = DependencyScanner(check_outdated=False, check_vulns=False)
+        result = scanner.scan_quick()
+        return jsonify(result.to_dict())
+    except Exception as e:
+        log.warning("security dependency scan failed: %s", e)
+        return jsonify({'error': str(e), 'total_packages': 0, 'score': 0}), 200
+
+
+@app.route('/api/security/dependencies/full')
+@requires_auth
+def api_security_dependencies_full():
+    """Full dependency scan with CVE + outdated checks (slow — network calls)."""
+    try:
+        from lib.security.dependency_scanner import DependencyScanner
+        scanner = DependencyScanner(check_outdated=True, check_vulns=True)
+        result = scanner.scan()
+        return jsonify(result.to_dict())
+    except Exception as e:
+        log.warning("security full dependency scan failed: %s", e)
+        return jsonify({'error': str(e), 'total_packages': 0, 'score': 0}), 200
+
+
+@app.route('/api/security/models')
+@requires_auth
+def api_security_models():
+    """Model integrity scan — SHA-256 verification + template backdoor detection."""
+    try:
+        from lib.security.model_monitor import ModelMonitor
+        monitor = ModelMonitor(verify_sha256=False)
+        result = monitor.scan()
+        return jsonify(result.to_dict())
+    except Exception as e:
+        log.warning("security model scan failed: %s", e)
+        return jsonify({'error': str(e), 'total_models': 0, 'score': 0}), 200
+
+
+@app.route('/api/security/network')
+@requires_auth
+def api_security_network():
+    """Network topology scan — Tailscale nodes, ports, trust zones."""
+    try:
+        from lib.security.network_mapper import NetworkMapper
+        mapper = NetworkMapper(probe_ports=True, probe_timeout=1.5)
+        result = mapper.scan()
+        return jsonify(result.to_dict())
+    except Exception as e:
+        log.warning("security network scan failed: %s", e)
+        return jsonify({'error': str(e), 'total_nodes': 0, 'score': 0}), 200
+
+
+@app.route('/api/security/score')
+@requires_auth
+def api_security_score():
+    """Aggregate security score across all three modules."""
+    scores = {}
+    try:
+        from lib.security.dependency_scanner import DependencyScanner
+        dep_result = DependencyScanner(check_outdated=False, check_vulns=False).scan_quick()
+        scores['dependencies'] = {
+            'score': dep_result.score,
+            'total_packages': dep_result.total_packages,
+            'unsigned': dep_result.unsigned_count,
+        }
+    except Exception as e:
+        scores['dependencies'] = {'score': 0, 'error': str(e)}
+
+    try:
+        from lib.security.model_monitor import ModelMonitor
+        model_result = ModelMonitor(verify_sha256=False).scan()
+        scores['models'] = {
+            'score': model_result.score,
+            'total_models': model_result.total_models,
+            'alerts': len(model_result.template_alerts),
+        }
+    except Exception as e:
+        scores['models'] = {'score': 0, 'error': str(e)}
+
+    try:
+        from lib.security.network_mapper import NetworkMapper
+        net_result = NetworkMapper(probe_ports=False).scan_quick()
+        scores['network'] = {
+            'score': net_result.score,
+            'total_nodes': net_result.total_nodes,
+            'online': net_result.online_nodes,
+        }
+    except Exception as e:
+        scores['network'] = {'score': 0, 'error': str(e)}
+
+    # Weighted aggregate: deps 35%, models 35%, network 30%
+    dep_s = scores.get('dependencies', {}).get('score', 0) or 0
+    mod_s = scores.get('models', {}).get('score', 0) or 0
+    net_s = scores.get('network', {}).get('score', 0) or 0
+    aggregate = round(dep_s * 0.35 + mod_s * 0.35 + net_s * 0.30, 1)
+
+    return jsonify({
+        'aggregate_score': aggregate,
+        'modules': scores,
+        'timestamp': datetime.now(UTC).isoformat(),
+    })
+
+
 if __name__ == '__main__':
     # Start background metrics collector (snapshots every 5 min)
     try:

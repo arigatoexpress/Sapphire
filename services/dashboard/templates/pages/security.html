@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+
+{% block title %}Security Intelligence{% endblock %}
+
+{% block extra_css %}
+.sec-hero {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 20px;
+    padding: 18px 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 16px;
+}
+.sec-hero .state {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 24px;
+    font-weight: 600;
+}
+.sec-hero .sdot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--green);
+}
+.sec-hero.warn .sdot   { background: var(--amber); }
+.sec-hero.threat .sdot { background: var(--red); }
+.sec-hero .sub { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+.sec-hero .hero-message { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+.sec-hero .hero-meta {
+    text-align: right;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+}
+
+.sec-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+}
+@media (max-width: 960px) { .sec-grid { grid-template-columns: 1fr; } }
+
+.sec-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    min-height: 200px;
+}
+.sec-panel h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.sec-panel h3 .badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 400;
+}
+.badge-ok { background: rgba(154,255,120,0.15); color: var(--green); }
+.badge-warn { background: rgba(255,180,0,0.15); color: var(--amber); }
+.badge-crit { background: rgba(255,111,158,0.15); color: var(--red); }
+
+.score-ring {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 700;
+    border: 3px solid var(--green);
+    margin: 0 auto 12px;
+}
+.score-ring.warn { border-color: var(--amber); color: var(--amber); }
+.score-ring.crit { border-color: var(--red); color: var(--red); }
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    font-size: 12px;
+    border-bottom: 1px solid var(--border-dim);
+}
+.stat-row:last-child { border-bottom: none; }
+.stat-label { color: var(--text-muted); }
+.stat-value { color: var(--text-primary); font-family: var(--font-mono); }
+
+.vuln-list, .alert-list, .node-list {
+    max-height: 260px;
+    overflow-y: auto;
+    font-size: 12px;
+}
+.vuln-item, .alert-item, .node-item {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border-dim);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+.vuln-item:last-child, .alert-item:last-child, .node-item:last-child { border-bottom: none; }
+
+.sev-critical { color: var(--red); font-weight: 600; }
+.sev-high     { color: #ff9966; font-weight: 600; }
+.sev-medium   { color: var(--amber); }
+.sev-low      { color: var(--text-muted); }
+
+.zone-tag {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.zone-core      { background: rgba(154,255,120,0.15); color: var(--green); }
+.zone-trusted   { background: rgba(105,214,255,0.15); color: var(--cyan); }
+.zone-dmz       { background: rgba(255,180,0,0.15); color: var(--amber); }
+.zone-untrusted { background: rgba(255,111,158,0.15); color: var(--red); }
+
+.loading { color: var(--text-muted); font-style: italic; font-size: 12px; }
+.full-scan-btn {
+    margin-top: 8px;
+    padding: 4px 12px;
+    font-size: 11px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: var(--font-terminal);
+}
+.full-scan-btn:hover { border-color: var(--amber); color: var(--amber); }
+{% endblock %}
+
+{% block content %}
+<!-- Hero -->
+<div class="sec-hero" id="sec-hero">
+    <div>
+        <div class="state"><span class="sdot"></span> <span id="hero-state">SCANNING</span></div>
+        <div class="sub">Security Intelligence Platform v1</div>
+    </div>
+    <div class="hero-message" id="hero-msg">Initializing security scans…</div>
+    <div class="hero-meta">
+        <div>Aggregate Score</div>
+        <div style="font-size:28px;font-weight:700;" id="hero-score">—</div>
+    </div>
+</div>
+
+<!-- Three Panels -->
+<div class="sec-grid">
+
+    <!-- Dependencies Panel -->
+    <div class="sec-panel" id="dep-panel">
+        <h3>Dependencies <span class="badge" id="dep-badge">scanning</span></h3>
+        <div class="score-ring" id="dep-score">—</div>
+        <div id="dep-stats"><div class="loading">Scanning packages…</div></div>
+        <div class="vuln-list" id="dep-vulns"></div>
+    </div>
+
+    <!-- Models Panel -->
+    <div class="sec-panel" id="model-panel">
+        <h3>Model Integrity <span class="badge" id="model-badge">scanning</span></h3>
+        <div class="score-ring" id="model-score">—</div>
+        <div id="model-stats"><div class="loading">Scanning Ollama models…</div></div>
+        <div class="alert-list" id="model-alerts"></div>
+    </div>
+
+    <!-- Network Panel -->
+    <div class="sec-panel" id="net-panel">
+        <h3>Network Topology <span class="badge" id="net-badge">scanning</span></h3>
+        <div class="score-ring" id="net-score">—</div>
+        <div id="net-stats"><div class="loading">Mapping network…</div></div>
+        <div class="node-list" id="net-nodes"></div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    function scoreClass(s) { return s >= 80 ? '' : s >= 50 ? 'warn' : 'crit'; }
+    function badgeClass(s) { return s >= 80 ? 'badge-ok' : s >= 50 ? 'badge-warn' : 'badge-crit'; }
+    function badgeText(s) { return s >= 80 ? 'healthy' : s >= 50 ? 'warning' : 'critical'; }
+    function sevClass(s) { return 'sev-' + (s || 'low'); }
+    function zoneClass(z) { return 'zone-' + (z || 'untrusted'); }
+
+    // ── Dependencies ──
+    fetch('/api/security/dependencies')
+        .then(r => r.json())
+        .then(d => {
+            const s = d.score || 0;
+            document.getElementById('dep-score').textContent = s;
+            document.getElementById('dep-score').className = 'score-ring ' + scoreClass(s);
+            const b = document.getElementById('dep-badge');
+            b.textContent = badgeText(s); b.className = 'badge ' + badgeClass(s);
+            document.getElementById('dep-stats').innerHTML =
+                '<div class="stat-row"><span class="stat-label">Total packages</span><span class="stat-value">' + d.total_packages + '</span></div>' +
+                '<div class="stat-row"><span class="stat-label">Vulnerable</span><span class="stat-value ' + (d.vulnerable_count ? 'sev-critical' : '') + '">' + (d.vulnerable_count || 0) + '</span></div>' +
+                '<div class="stat-row"><span class="stat-label">Outdated</span><span class="stat-value">' + (d.outdated_count || 0) + '</span></div>' +
+                '<div class="stat-row"><span class="stat-label">No metadata</span><span class="stat-value">' + (d.unsigned_count || 0) + '</span></div>';
+            // Vulns
+            var vh = '';
+            (d.vulnerabilities || []).slice(0, 15).forEach(function(v) {
+                vh += '<div class="vuln-item"><span>' + v.id + ' — ' + v.package + '</span><span class="' + sevClass(v.severity) + '">' + v.severity + '</span></div>';
+            });
+            document.getElementById('dep-vulns').innerHTML = vh;
+        })
+        .catch(function() { document.getElementById('dep-stats').innerHTML = '<div class="loading">Scan unavailable</div>'; });
+
+    // ── Models ──
+    fetch('/api/security/models')
+        .then(r => r.json())
+        .then(d => {
+            const s = d.score || 0;
+            document.getElementById('model-score').textContent = s;
+            document.getElementById('model-score').className = 'score-ring ' + scoreClass(s);
+            const b = document.getElementById('model-badge');
+            b.textContent = badgeText(s); b.className = 'badge ' + badgeClass(s);
+            document.getElementById('model-stats').innerHTML =
+                '<div class="stat-row"><span class="stat-label">Total models</span><span class="stat-value">' + d.total_models + '</span></div>' +
+                '<div class="stat-row"><span class="stat-label">Verified</span><span class="stat-value">' + (d.verified_count || 0) + '</span></div>' +
+                '<div class="stat-row"><span class="stat-label">Failed</span><span class="stat-value ' + (d.failed_count ? 'sev-critical' : '') + '">' + (d.failed_count || 0) + '</span></div>' +
+                '<div class="stat-row"><span class="stat-label">Template alerts</span><span class="stat-value">' + (d.template_alerts || []).length + '</span></div>';
+            // Alerts
+            var ah = '';
+            (d.template_alerts || []).slice(0, 10).forEach(function(a) {
+                ah += '<div class="alert-item"><span>' + a.pattern_name + '</span><span class="' + sevClass(a.severity) + '">' + a.severity + '</span></div>';
+            });
+            document.getElementById('model-alerts').innerHTML = ah;
+        })
+        .catch(function() { document.getElementById('model-stats').innerHTML = '<div class="loading">Scan unavailable</div>'; });
+
+    // ── Network ──
+    fetch('/api/security/network')
+        .then(r => r.json())
+        .then(d => {
+            const s = d.score || 0;
+            document.getElementById('net-score').textContent = s;
+            document.getElementById('net-score').className = 'score-ring ' + scoreClass(s);
+            const b = document.getElementById('net-badge');
+            b.textContent = badgeText(s); b.className = 'badge ' + badgeClass(s);
+            document.getElementById('net-stats').innerHTML =
+                '<div class="stat-row"><span class="stat-label">Nodes</span><span class="stat-value">' + d.total_nodes + '</span></div>' +
+                '<div class="stat-row"><span class="stat-label">Online</span><span class="stat-value">' + (d.online_nodes || 0) + '</span></div>' +
+                '<div class="stat-row"><span class="stat-label">Open ports</span><span class="stat-value">' + (d.total_open_ports || 0) + '</span></div>' +
+                '<div class="stat-row"><span class="stat-label">Unauth ports</span><span class="stat-value ' + (d.unauthenticated_ports ? 'sev-high' : '') + '">' + (d.unauthenticated_ports || 0) + '</span></div>';
+            // Nodes
+            var nh = '';
+            (d.nodes || []).forEach(function(n) {
+                var open = (n.ports || []).filter(function(p){ return p.status === 'open'; }).length;
+                nh += '<div class="node-item"><span>' + n.hostname + ' <span class="zone-tag ' + zoneClass(n.trust_zone) + '">' + n.trust_zone + '</span></span><span class="stat-value">' + (n.online ? '●' : '○') + ' ' + open + ' ports</span></div>';
+            });
+            document.getElementById('net-nodes').innerHTML = nh;
+        })
+        .catch(function() { document.getElementById('net-stats').innerHTML = '<div class="loading">Scan unavailable</div>'; });
+
+    // ── Aggregate Score ──
+    fetch('/api/security/score')
+        .then(r => r.json())
+        .then(d => {
+            const s = d.aggregate_score || 0;
+            document.getElementById('hero-score').textContent = s;
+            const hero = document.getElementById('sec-hero');
+            const state = document.getElementById('hero-state');
+            const msg = document.getElementById('hero-msg');
+            if (s >= 80) {
+                state.textContent = 'SECURE';
+                msg.textContent = 'All security modules reporting nominal. Score: ' + s + '/100.';
+            } else if (s >= 50) {
+                hero.classList.add('warn');
+                state.textContent = 'ADVISORY';
+                msg.textContent = 'Some security findings require attention. Score: ' + s + '/100.';
+            } else {
+                hero.classList.add('threat');
+                state.textContent = 'ALERT';
+                msg.textContent = 'Critical security issues detected. Immediate review required. Score: ' + s + '/100.';
+            }
+        })
+        .catch(function() {
+            document.getElementById('hero-state').textContent = 'OFFLINE';
+            document.getElementById('hero-msg').textContent = 'Security scan modules unavailable.';
+        });
+})();
+</script>
+{% endblock %}
