@@ -483,6 +483,34 @@
     </div>
 </div>
 
+<!-- Per-symbol breakdown -->
+<div class="perf-section">
+    <div class="perf-section-title">Per-Symbol Performance</div>
+    <div class="panel" style="padding: 0; margin-bottom: 0;">
+        <div class="table-scroll">
+            <table class="strat-table">
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th>Trades</th>
+                        <th>Win Rate</th>
+                        <th>Total P&amp;L</th>
+                        <th>Avg P&amp;L</th>
+                        <th>Expectancy</th>
+                        <th>Profit Factor</th>
+                        <th>Sharpe</th>
+                        <th>Sortino</th>
+                        <th>Portfolio ROI</th>
+                    </tr>
+                </thead>
+                <tbody id="symbolTableBody">
+                    <tr><td colspan="10" style="text-align:center; padding:24px; color: var(--text-muted);">Loading…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 <!-- Equity curve -->
 <div class="perf-section">
     <div class="perf-section-title">Equity Curve &mdash; 90 Days</div>
@@ -813,6 +841,39 @@
         body.innerHTML = html;
     }
 
+    /* ── Render per-symbol table ── */
+    function renderSymbolTable(bySymbol) {
+        var body = document.getElementById('symbolTableBody');
+        if (!body) return;
+        var syms = Object.keys(bySymbol || {});
+        if (!syms.length) {
+            body.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:24px; color: var(--text-muted);">No closed trades per symbol yet.</td></tr>';
+            return;
+        }
+        syms.sort(function (a, b) {
+            return (bySymbol[b].total_pnl_usd || 0) - (bySymbol[a].total_pnl_usd || 0);
+        });
+        var html = '';
+        syms.forEach(function (sym) {
+            var s = bySymbol[sym];
+            var pfCls = (typeof s.profit_factor === 'number' && s.profit_factor >= 1)
+                ? 'val-pos' : (s.profit_factor === 'inf' ? 'val-pos' : 'val-neg');
+            html += '<tr>'
+                + '<td class="strat-name">' + sym + '</td>'
+                + '<td>' + s.trades + '</td>'
+                + '<td class="' + (s.win_rate != null && s.win_rate >= 0.5 ? 'val-pos' : 'val-neg') + '">' + fmtPct(s.win_rate) + '</td>'
+                + '<td class="' + pnlClass(s.total_pnl_usd) + '">' + fmtUsd(s.total_pnl_usd) + '</td>'
+                + '<td class="' + pnlClass(s.avg_pnl_usd) + '">' + fmtUsd(s.avg_pnl_usd) + '</td>'
+                + '<td class="' + pnlClass(s.expectancy_usd) + '">' + fmtUsd(s.expectancy_usd) + '</td>'
+                + '<td class="' + pfCls + '">' + fmtFloat(s.profit_factor) + '</td>'
+                + '<td class="' + (s.sharpe != null && s.sharpe > 0 ? 'val-pos' : s.sharpe != null ? 'val-neg' : '') + '">' + fmtFloat(s.sharpe, 2) + '</td>'
+                + '<td class="' + (s.sortino != null && s.sortino > 0 ? 'val-pos' : s.sortino != null ? 'val-neg' : '') + '">' + fmtFloat(s.sortino, 2) + '</td>'
+                + '<td class="' + pnlClass(s.portfolio_roi_pct) + '">' + fmtPctRaw(s.portfolio_roi_pct) + '</td>'
+                + '</tr>';
+        });
+        body.innerHTML = html;
+    }
+
     /* ── Render strategy × timeframe matrix ── */
     function renderStrategyTimeframeTable(byStrategyTimeframe, timeframes) {
         var body = document.getElementById('strategyTimeframeBody');
@@ -1010,6 +1071,7 @@
             .then(function (data) {
                 if (data && data.overall) renderHero(data.overall);
                 renderStrategyTable(data.by_strategy || {});
+                renderSymbolTable(data.by_symbol || {});
                 renderStrategyTimeframeTable(data.by_strategy_timeframe || {}, data.timeframes);
             })
             .catch(function (err) {
