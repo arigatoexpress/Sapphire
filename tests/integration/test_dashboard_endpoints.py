@@ -138,3 +138,65 @@ def test_logs_filter_by_level_and_service(app_client, tmp_path, monkeypatch):
                    headers={"Authorization": _AUTH})
     body = r.get_json()
     assert all("signal" in e["type"] for e in body["logs"])
+
+
+def test_foundry_readiness_reports_data_ready(app_client, tmp_path, monkeypatch):
+    _, client = app_client
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+    data_dir = tmp_path / "Code" / "Sapphire" / "data"
+    (data_dir / "health").mkdir(parents=True)
+    (data_dir / "metrics").mkdir(parents=True)
+    (data_dir / "intelligence" / "2026-04-19").mkdir(parents=True)
+    (data_dir / "system_events.jsonl").write_text('{"type":"test"}\n')
+    (data_dir / "health" / "2026-04-19.ndjson").write_text('{"service":"dashboard"}\n')
+    (data_dir / "metrics" / "2026-04-19.ndjson").write_text('{"metric":"latency"}\n')
+    (data_dir / "trading_predictions.jsonl").write_text('{"symbol":"BTC"}\n')
+    (data_dir / "intelligence" / "2026-04-19" / "predictions.json").write_text(
+        json.dumps({"predictions": {"BTC-USD": {"direction": "bullish"}}})
+    )
+
+    r = client.get("/api/foundry/readiness", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["status"] == "partial"
+    assert body["badge"] == "DATA READY"
+    assert body["auth_mode"] == "not-configured"
+    assert body["totals"]["files"] >= 4
+    groups = {group["id"]: group for group in body["dataset_groups"]}
+    assert groups["system-events"]["files"] == 1
+    assert groups["ops-telemetry"]["files"] >= 2
+    assert groups["market-forecasts"]["files"] >= 2
+
+
+def test_intel_sources_include_foundry_readiness(app_client, tmp_path, monkeypatch):
+    _, client = app_client
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+    data_dir = tmp_path / "Code" / "Sapphire" / "data"
+    intel_day = data_dir / "intelligence" / "2026-04-19"
+    intel_day.mkdir(parents=True)
+    (data_dir / "system_events.jsonl").write_text('{"type":"test"}\n')
+    (intel_day / "threats.json").write_text(
+        json.dumps(
+            {
+                "threats": [
+                    {
+                        "id": "threat-1",
+                        "title": "APT test cluster",
+                        "score": 9,
+                        "published": "2026-04-19T02:00:00Z",
+                        "source": "unit-test",
+                    }
+                ]
+            }
+        )
+    )
+
+    r = client.get("/api/intel", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["items"][0]["title"] == "APT test cluster"
+    sources = {source["name"]: source for source in body["sources"]}
+    assert sources["Threat snapshots"]["status"] == "active"
+    assert sources["Threat snapshots"]["items"] == 1
+    assert sources["Palantir Foundry"]["status"] == "partial"
+    assert sources["Palantir Foundry"]["items"] >= 1

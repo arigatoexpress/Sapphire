@@ -44,6 +44,17 @@ def _run_tool(tool_name: str, params: dict) -> dict:
         return {"error": str(e)[:100]}
 
 
+def _canonical_market_symbol(symbol: str) -> str:
+    """Map short crypto tickers to the canonical symbols used by predict_kronos."""
+    cleaned = (symbol or "").strip().upper()
+    aliases = {
+        "BTC": "BTC-USD",
+        "ETH": "ETH-USD",
+        "SOL": "SOL-USD",
+    }
+    return aliases.get(cleaned, cleaned if "-" in cleaned else f"{cleaned}-USD")
+
+
 def _get_macro_sentiment() -> dict:
     """Get macro environment sentiment from FRED data."""
     macro = _run_tool("macro_data", {"action": "dashboard"})
@@ -141,11 +152,18 @@ def action_decide(symbol: str = "BTC") -> dict:
         votes.append(("neutral", 0.15, "Ensemble", "no consensus"))
 
     # ─── Source 3: Kronos Foundation Model ───
-    kronos = _run_tool("kronos_predict", {"action": "forecast", "symbol": symbol, "horizon": 24})
-    if kronos.get("success"):
-        k_dir = kronos["direction"]
-        k_conf = min(abs(kronos.get("change_pct", 0)) / 5, 1.0)  # Normalize to 0-1
-        votes.append((k_dir, 0.25 * k_conf, "Kronos", f"{kronos['change_pct']:+.1f}% predicted"))
+    kronos = _run_tool(
+        "predict_kronos",
+        {"action": "predict", "symbol": _canonical_market_symbol(symbol), "predict_bars": 24, "interval": "1h"},
+    )
+    if "error" not in kronos:
+        k_dir = kronos.get("direction", "neutral")
+        current_price = float(kronos.get("current_price", 0) or 0)
+        predictions = kronos.get("predictions", [])
+        predicted_close = float(predictions[-1]["close"]) if predictions else current_price
+        change_pct = ((predicted_close - current_price) / current_price * 100) if current_price else 0.0
+        k_conf = min(abs(change_pct) / 5, 1.0)  # Normalize to 0-1
+        votes.append((k_dir, 0.25 * k_conf, "Kronos", f"{change_pct:+.1f}% predicted"))
     else:
         votes.append(("neutral", 0.05, "Kronos", kronos.get("error", "unavailable")[:50]))
 
@@ -193,7 +211,7 @@ def action_decide(symbol: str = "BTC") -> dict:
 
     confidence = round(max(0.1, min(0.95, confidence)), 2)
 
-    return {
+    result = {
         "symbol": symbol,
         "decision": decision,
         "direction": direction,
@@ -210,6 +228,16 @@ def action_decide(symbol: str = "BTC") -> dict:
         },
         "track_record": track,
     }
+
+    # Persist decision for accuracy tracking
+    try:
+        sys.path.insert(0, str(SAPPHIRE_DIR))
+        from lib.analytics.brain_accuracy import record_decision
+        record_decision(result)
+    except Exception as e:
+        sys.stderr.write(f"brain_accuracy record failed: {e}\n")
+
+    return result
 
 
 def action_dashboard() -> dict:

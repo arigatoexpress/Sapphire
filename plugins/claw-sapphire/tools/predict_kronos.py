@@ -32,11 +32,6 @@ try:
 except ImportError:
     pd = None  # type: ignore[assignment]
 
-try:
-    import pandas as pd
-except ImportError:
-    pd = None  # type: ignore[assignment]
-
 # ── Paths ─────────────────────────────────────────────────────────────────────
 KRONOS_ROOT = Path.home() / "Code" / "Kronos"
 KRONOS_MODELS = KRONOS_ROOT / ".models"
@@ -95,10 +90,12 @@ def _load_predictor(verbose: bool = False) -> Any:
 # ── Data fetching ─────────────────────────────────────────────────────────────
 
 def _fetch_openbb(symbol: str, interval: str, bars: int):
-    """Try to fetch OHLCV from OpenBB REST API."""
+    """Try to fetch OHLCV from OpenBB REST API using stdlib only."""
     try:
+        import urllib.parse
+        import urllib.request
+
         import pandas as pd
-        import requests
 
         # Determine date range
         interval_minutes = {
@@ -115,9 +112,9 @@ def _fetch_openbb(symbol: str, interval: str, bars: int):
         # Try crypto endpoint first
         is_crypto = any(c in symbol.upper() for c in ["-USD", "USDT", "BTC", "ETH", "SOL"])
         if is_crypto:
-            url = f"{OPENBB_URL}/api/v1/crypto/price/historical"
+            base_url = f"{OPENBB_URL}/api/v1/crypto/price/historical"
         else:
-            url = f"{OPENBB_URL}/api/v1/equity/price/historical"
+            base_url = f"{OPENBB_URL}/api/v1/equity/price/historical"
 
         params = {
             "symbol": symbol,
@@ -127,11 +124,11 @@ def _fetch_openbb(symbol: str, interval: str, bars: int):
             "interval": interval,
         }
 
-        resp = requests.get(url, params=params, timeout=10)
-        if resp.status_code != 200:
-            return None
-
-        data = resp.json()
+        full_url = f"{base_url}?{urllib.parse.urlencode(params)}"
+        with urllib.request.urlopen(full_url, timeout=10) as resp:
+            if resp.status != 200:
+                return None
+            data = json.loads(resp.read())
         results = data.get("results", [])
         if not results:
             return None

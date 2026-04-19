@@ -102,17 +102,19 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 **Pi rari1 (100.120.191.1) — ONLINE** (Tailscale): Ollama:11434 serves nemotron-mini, smollm2:1.7b, qwen2.5:0.5b, gemma2:2b. SSH port 22 refused — needs physical access to start sshd. Proxy routing disabled by default (`PI_RARI1_ENABLED=0`); set to `1` after the Pi is stable.
 **Pi rari2 (100.87.225.89) — ONLINE** (as of 2026-04-18): Ollama:11434 serves nemotron-mini, gemma2:2b, smollm2:1.7b, qwen2.5:0.5b. Previously marked OFFLINE in the proxy — `inference-proxy/app.py:148` comment + CLAUDE.md were stale. `PI_RARI2_ENABLED=1` to route.
 
-## Sapphire Plugin (27 tools)
+## Sapphire Plugin (32 tool scripts on disk, 12 registered)
 
-`plugins/claw-sapphire/tools/` — all invoked via stdin JSON:
+`plugins/claw-sapphire/` contains 12 Claude Code tools registered in `plugin.json` plus companion stdin-JSON scripts under `plugins/claw-sapphire/tools/`.
 
 **Infra / ops**: `dispatch`, `verify`, `budget`, `state`, `status`, `notify`, `health_check`, `watchdog`, `events`
 
-**Market / trading**: `market`, `predict`, `kronos_predict`, `signal_generator`, `paper_trader`, `backtest`, `crypto_portfolio`, `trading_brain`, `market_sentiment`, `macro_data`
+**Market / trading**: `market`, `predict`, `predict_kronos`, `signal_generator`, `paper_trader`, `backtest`, `crypto_portfolio`, `trading_brain`, `market_sentiment`, `macro_data`
 
 **Intelligence**: `threat_intel`, `starred_repos`, `vote_monitor`, `tho_intel`, `research`, `digest`, `qa_aware_factory`
 
 **Outreach**: `lead_engine`
+
+**Legacy compatibility alias**: `kronos_predict` delegates to `predict_kronos`
 
 `plugins/claw-sapphire/lib/` — shared libraries:
 - `technical_analysis.py` — RSI, MACD, Bollinger, MA, ATR, volume
@@ -142,17 +144,17 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `~/Code/hermes-agent` | NousResearch/hermes-agent | Conversational framework (Telegram bot) |
 | `~/Code/kimi-tools` | local | Kimi Cloud HTTP client |
 
-## Sapphire Plugin (v0.3.0 — 30 tools on disk, 7 registered in plugin.json)
+## Sapphire Plugin (v0.6.0 — 32 tools on disk, 12 registered in plugin.json)
 
-`plugins/claw-sapphire/plugin.json` declares **7** as Claude Code tools: `sapphire_dispatch`, `sapphire_verify`, `sapphire_budget`, `sapphire_state`, `sapphire_status`, `sapphire_notify`, `sapphire_market`. The other 23 are standalone scripts invoked via stdin JSON (by hermes skills, scheduled tasks, other tools). plugin.json version reads 0.3.0; update to 0.4.0 when registering more.
+`plugins/claw-sapphire/plugin.json` declares **12** as Claude Code tools: `sapphire_dispatch`, `sapphire_verify`, `sapphire_budget`, `sapphire_state`, `sapphire_status`, `sapphire_notify`, `sapphire_health_check`, `sapphire_market`, `sapphire_predict_kronos`, `sapphire_threat_intel`, `sapphire_lumo_research`, `sapphire_starred_repos`. The other 20 are standalone scripts invoked via stdin JSON (by hermes skills, scheduled tasks, dashboards, or other tools).
 
-`plugins/claw-sapphire/tools/` — all 30 invoked via stdin JSON:
-- **Registered (7):** `dispatch`, `verify`, `budget`, `state`, `status`, `notify`, `market`
-- **Intel / analytics (9):** `threat_intel`, `starred_repos`, `vote_monitor`, `health_check`, `watchdog`, `digest`, `research`, `events`, `qa_aware_factory`
-- **Trading (9):** `predict` (6-factor TA, **verified 58% overall, BTC 75%, ETH 62%, SOL 38% on 24 scored predictions**), `predict_kronos` (Kronos-base forecasting; `kronos_predict.py` is a legacy duplicate), `signal_generator`, `paper_trader`, `crypto_portfolio`, `backtest`, `macro_data` (crashes without FRED key), `trading_brain`, `market_sentiment`
-- **Other (5):** `lumo` + `lumo_research` (Lumo-T5 cyber research), `tho_intel`, `lead_engine`, `kronos_predict` (legacy — prefer `predict_kronos`)
+`plugins/claw-sapphire/tools/` — all 32 invoked via stdin JSON:
+- **Registered (12):** `dispatch`, `verify`, `budget`, `state`, `status`, `notify`, `health_check`, `market`, `predict_kronos`, `threat_intel`, `lumo_research`, `starred_repos`
+- **Intel / analytics (6):** `vote_monitor`, `watchdog`, `digest`, `research`, `events`, `qa_aware_factory`
+- **Trading (8):** `predict` (6-factor TA, **verified 58% overall, BTC 75%, ETH 62%, SOL 38% on 24 scored predictions**), `signal_generator`, `paper_trader`, `crypto_portfolio`, `backtest`, `macro_data` (graceful error when FRED key is missing), `trading_brain`, `market_sentiment`
+- **Other (5 + 1 legacy alias):** `lead_engine`, `lead_enrich`, `lumo`, `tho_intel`, `solana_wallet`, `kronos_predict` (legacy wrapper — prefer `predict_kronos`)
 
-**Orphan tools: `trading_brain`, `lead_engine`, `tho_intel`, `macro_data`, `lumo` (not imported by any service or scheduled task — invoke directly or wire them).**
+**Repo-local orphan entrypoints: `trading_brain`, `tho_intel`, `lumo`. `lead_engine` and `macro_data` still have in-repo tool-graph callers.**
 
 `plugins/claw-sapphire/lib/` — 10 shared modules (was "4 libs" in old CLAUDE.md):
 - `technical_analysis.py` — RSI, MACD, Bollinger, MA, ATR, volume (from OpenBB OHLCV)

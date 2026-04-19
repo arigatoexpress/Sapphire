@@ -695,6 +695,14 @@ def build_brief() -> str:
 
     rec = _section_recommendation(regime, sent, cascade)
 
+    # Trading Brain accuracy
+    brain_text = ""
+    try:
+        from lib.analytics.brain_accuracy import brief_summary
+        brain_text = brief_summary()
+    except Exception as e:
+        brain_text = f"  (brain accuracy unavailable: {e})"
+
     def _t(section: dict, name: str) -> str:
         return section.get("text") or f"  ({section.get('status', name + ' unavailable')})"
 
@@ -721,6 +729,9 @@ def build_brief() -> str:
         "",
         "*Robinhood Crypto*",
         _t(robinhood, "robinhood"),
+        "",
+        "*Trading Brain*",
+        brain_text,
         "",
         "*Kronos predictions*",
         kron.get("text") or "  Kronos predictions not yet generated.",

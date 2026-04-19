@@ -229,7 +229,7 @@ Tailscale mesh connects everything. Cloudflare Tunnel exposes `webhook.sapphirea
 2. **services/inference-proxy/app.py** — the best-documented large file; read if you need to understand the LLM routing.
 3. **lib/core/src/sapphire_core/risk_kernel.py + circuit_breaker.py** — trading safety invariants.
 4. **services/alpha/src/main.py** — trading engine orchestrator (150KB — use grep to navigate).
-5. **plugins/claw-sapphire/plugin.json** — tool registry; every tool is one file under `tools/`.
+5. **plugins/claw-sapphire/plugin.json** — registry for the 12 Claude Code tools; companion stdin-JSON scripts also live under `plugins/claw-sapphire/tools/`.
 6. **docs/routines-manifest.md** (if present in main repo, currently uncommitted) — schedule reference.
 
 ## 8. Out-of-scope references

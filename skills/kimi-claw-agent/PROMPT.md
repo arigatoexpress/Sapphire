@@ -23,10 +23,10 @@ Sapphire OS is an autonomous AI operations platform spanning:
 | `hermes-agent` | NousResearch conversational AI framework (Telegram bot) |
 | `Kronos` | Financial candlestick foundation model (AAAI 2026) |
 
-## Plugin Tools (26)
+## Plugin Tools (32 scripts on disk, 7 registered)
 
 Located at `plugins/claw-sapphire/tools/`:
-- **Trading**: `signal_generator` (6-factor ensemble), `predict` (TA-grounded), `paper_trader` (Half-Kelly + trailing stops), `trading_brain` (unified 5-source decisions), `kronos_predict` (foundation model), `market` (OpenBB + TradingView), `backtest` (Pine Script)
+- **Trading**: `signal_generator` (6-factor ensemble), `predict` (TA-grounded), `paper_trader` (Half-Kelly + trailing stops), `trading_brain` (unified 5-source decisions), `predict_kronos` (canonical foundation-model forecast; `kronos_predict` is a legacy alias), `market` (OpenBB + TradingView), `backtest` (Pine Script)
 - **Intelligence**: `threat_intel` (CISA/NVD/MITRE), `lead_engine` (AI SDR from Regional Intel), `macro_data` (FRED — free Bloomberg), `starred_repos` (GitHub synergy finder), `vote_monitor` (DeFi vote escrow)
 - **Operations**: `health_check` (20-point), `watchdog` (Telegram alerts), `notify` (Telegram), `dispatch` (multi-tier routing), `verify` (lint+test), `budget` (token tracking)
 - **Other**: `crypto_portfolio`, `digest`, `events`, `state`, `status`, `qa_aware_factory`

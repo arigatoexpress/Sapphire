@@ -1,7 +1,7 @@
 {
   "name": "sapphire",
-  "version": "0.3.0",
-  "description": "Sapphire OS — multi-agent dispatch, token governance, verification, factory automation",
+  "version": "0.6.0",
+  "description": "Sapphire OS — multi-agent dispatch, token governance, verification, health monitoring, forecasting, and cyber research",
   "defaultEnabled": true,
   "permissions": ["read", "write", "execute"],
 
@@ -58,10 +58,66 @@
       "requiredPermission": "read-only"
     },
     {
+      "name": "sapphire_health_check",
+      "description": "Run Sapphire's unified health check across services, repos, data freshness, and inference endpoints. Supports brief and full profiles.",
+      "command": "python3",
+      "args": ["plugins/claw-sapphire/tools/health_check.py"],
+      "requiredPermission": "read-only"
+    },
+    {
       "name": "sapphire_market",
       "description": "Unified market data — equity quotes, crypto OHLCV, FRED macro, news via OpenBB (32 providers) + TradingView live chart data, Pine Script CI. Actions: quote, crypto, historical, fred, news, snapshot, tv_quote, tv_ohlcv, tv_levels, tv_strategy, pine_ci.",
       "command": "python3",
       "args": ["plugins/claw-sapphire/tools/market.py"],
+      "requiredPermission": "read-only"
+    },
+    {
+      "name": "sapphire_predict_kronos",
+      "description": "Kronos foundation-model forecasting for candles and market direction. Actions: predict, batch, status. Successful predict/batch calls also refresh `data/intelligence/YYYY-MM-DD/predictions.json`.",
+      "command": "python3",
+      "args": ["plugins/claw-sapphire/tools/predict_kronos.py"],
+      "requiredPermission": "workspace-write"
+    },
+    {
+      "name": "sapphire_threat_intel",
+      "description": "Threat intelligence via cyber-threat-bot. Actions: latest, brief, offers, scan. Persists markdown outputs under `data/threat_intel/` and may emit threat.detected events.",
+      "command": "python3",
+      "args": ["plugins/claw-sapphire/tools/threat_intel.py"],
+      "requiredPermission": "workspace-write"
+    },
+    {
+      "name": "sapphire_lumo_research",
+      "description": "Security-focused research through the local Proton Lumo bridge. Actions: ask, security_brief, status. Redacts common secret patterns before sending prompts.",
+      "command": "python3",
+      "args": ["plugins/claw-sapphire/tools/lumo_research.py"],
+      "requiredPermission": "read-only"
+    },
+    {
+      "name": "sapphire_starred_repos",
+      "description": "GitHub starred-repo sync and synergy analysis. Actions: sync, analyze, report, trending. Persists outputs under `data/starred_repos/`.",
+      "command": "python3",
+      "args": ["plugins/claw-sapphire/tools/starred_repos.py"],
+      "requiredPermission": "workspace-write"
+    },
+    {
+      "name": "sapphire_macro_data",
+      "description": "FRED macro-economic indicators: GDP, CPI, unemployment, rates, housing. Actions: dashboard, rates, housing, series. Feeds trading_brain macro sentiment. Graceful fallback if FRED API key missing.",
+      "command": "python3",
+      "args": ["plugins/claw-sapphire/tools/macro_data.py"],
+      "requiredPermission": "read-only"
+    },
+    {
+      "name": "sapphire_lead_engine",
+      "description": "AI-powered outbound lead generation. Analyze websites to extract ICP, discover matching businesses from Regional Intel data, generate personalized outreach. Actions: analyze, discover, outreach, pipeline.",
+      "command": "python3",
+      "args": ["plugins/claw-sapphire/tools/lead_engine.py"],
+      "requiredPermission": "workspace-write"
+    },
+    {
+      "name": "sapphire_trading_brain",
+      "description": "Unified trading decision engine combining TA, ensemble signals, Kronos, macro, and paper track record. Produces GO/LEAN/WAIT decisions with confidence. Actions: decide, dashboard. Decisions logged for accuracy tracking.",
+      "command": "python3",
+      "args": ["plugins/claw-sapphire/tools/trading_brain.py"],
       "requiredPermission": "read-only"
     }
   ]

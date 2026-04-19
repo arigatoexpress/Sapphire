@@ -21,7 +21,12 @@ from __future__ import annotations
 import json
 import logging
 from collections import defaultdict
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+try:
+    from datetime import UTC
+except ImportError:
+    UTC = timezone.utc
 from pathlib import Path
 from typing import Any
 

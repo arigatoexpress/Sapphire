@@ -30,19 +30,19 @@
 
 | Issue | Impact | Fix |
 |-------|--------|-----|
-| Orphan modules (zero non-test imports): `lib/core/confirmation_firewall.py`, plugin tools `trading_brain`, `lead_engine`, `tho_intel`, `macro_data`, `lumo` | Tools run only if explicitly invoked — not automatic | Wire from signal_pipeline / dashboard, or delete |
+| The old orphan-tool claim is too broad: `trading_brain`, `tho_intel`, and `lumo` are still repo-local orphan entrypoints, but `lead_engine` and `macro_data` are active inside the standalone tool graph | Overstates deletion candidates and hides real registration choices | See `docs/tool-surface-audit-2026-04-19.md`; wire, archive, or register only with explicit product intent |
 | `data/market_pulse/` and `data/threat_intel/` frozen at 2026-04-08 | health_check flags RED; tasks run but don't persist | SKILL.md hardened 2026-04-18 to always write a file in STEP 1 |
 | Proxy log shows intermittent "No route to host" to Pi + Windows | Inference falls back to slow Mac (90s+ per call) | Tailscale reachability jitter — investigate routes |
 | Dashboard has `app_backup.py`, `app_with_auth.py` stale variants | Confusion + accidental edits | **Deleted 2026-04-18** |
-| `plugins/.../tools/kronos_predict.py` legacy dup of `predict_kronos.py` | Confusion | **Deleted 2026-04-18** |
+| `plugins/.../tools/kronos_predict.py` legacy alias next to `predict_kronos.py` | Confusion | Keep as a thin compatibility wrapper or fully retire it after callers migrate |
 | Pre-existing audit docs contradict each other | Readers can't tell which is current | This doc replaces them all |
-| plugin.json version `0.3.0` but CLAUDE.md said `0.4.0` | Version drift | Bump plugin.json to 0.4.0 when registering remaining tools |
+| plugin registration count and docs drift when tools are promoted without manifest checks | Confusion about the real plugin surface | Keep `plugin.json`, core docs, and manifest tests in sync |
 
 ## Plugin tool reality
 
-- **30 scripts on disk** in `plugins/claw-sapphire/tools/` (was "21" in old CLAUDE.md — undercount)
-- **7 registered** in `plugin.json` as Claude Code tools: dispatch, verify, budget, state, status, notify, market
-- **23 orphans** — standalone scripts invoked by hermes skills, scheduled tasks, or each other via stdin JSON
+- **32 scripts on disk** in `plugins/claw-sapphire/tools/` (was "21" in old CLAUDE.md — undercount)
+- **12 registered** in `plugin.json` as Claude Code tools: dispatch, verify, budget, state, status, notify, health_check, market, predict_kronos, threat_intel, lumo_research, starred_repos
+- **20 companion scripts** — standalone tools invoked by hermes skills, scheduled tasks, dashboards, or each other via stdin JSON
 - **10 libs** in `plugins/claw-sapphire/lib/` (was "4" — undercount)
 - macro_data.py: **fixed 2026-04-18** to return graceful `{success: false, error: ...}` instead of raising when FRED key missing
 
@@ -61,14 +61,17 @@
 
 ## Fixes applied in this audit pass (2026-04-18)
 
-1. Deleted `services/dashboard/app_backup.py`, `app_with_auth.py`, `plugins/claw-sapphire/tools/kronos_predict.py`
-2. Updated `CLAUDE.md` counts: tests 1,251→1,273, plugin tests 13→25, tools 21→30, libs 4→10, scheduled tasks 19→20, Windows models 27→28, hermes skills 6→14. Pi rari2 flipped ONLINE.
+1. Deleted `services/dashboard/app_backup.py`, `app_with_auth.py`
+2. Updated `CLAUDE.md` counts: tests 1,251→1,273, plugin tests 13→25, tools 21→32, libs 4→10, scheduled tasks 19→20, Windows models 27→28, hermes skills 6→14. Pi rari2 flipped ONLINE.
 3. Added graceful FRED-key-missing fallback to all 4 actions in `plugins/claw-sapphire/tools/macro_data.py`
 4. Hardened `market-pulse` and `threat-intel-sweep` scheduled task SKILL.md files to always write a timestamped file in STEP 1, so health_check stops flagging them RED
+5. Follow-on on 2026-04-19: promoted `health_check` and `predict_kronos` into `plugin.json`, bumped the plugin to `0.4.0`, and added a manifest test to keep registrations + paths intentional
+6. Follow-on on 2026-04-19: promoted `threat_intel` and `lumo_research` into `plugin.json`, bumped the plugin to `0.5.0`, and added focused offline/summarization tests for both tools
+7. Follow-on on 2026-04-19: promoted `starred_repos` into `plugin.json`, bumped the plugin to `0.6.0`, and added focused tests for repo classification and `gh` failure handling
 
 ## Still TODO (not done)
 
 1. Re-verify opus-audit C2 (body cap) and C5 (TLS) findings
-2. Wire or delete the 5 orphan modules (confirmation_firewall, trading_brain, lead_engine, tho_intel, lumo)
-3. Bump `plugins/claw-sapphire/plugin.json` version to 0.4.0 if/when more tools get registered
+2. Decide whether to wire or retire `confirmation_firewall`, `trading_brain`, `tho_intel`, and `lumo`; keep `lead_engine` and `macro_data` unless the standalone tool graph is redesigned (see `docs/tool-surface-audit-2026-04-19.md`)
+3. Revisit whether any remaining companions truly deserve plugin-surface promotion, or whether the surface should now stabilize at 12 registered tools
 4. Investigate intermittent Tailscale route failures in proxy log

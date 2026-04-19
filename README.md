@@ -220,17 +220,18 @@ Scheduled weekly via `com.sapphire.content-engine` LaunchAgent. Also invocable: 
 
 ---
 
-## Sapphire Plugin (claw-code, 32 tools)
+## Sapphire Plugin (claw-code, 32 tool scripts on disk)
 
-`plugins/claw-sapphire/` — all tools invoked via stdin JSON.
+`plugins/claw-sapphire/` contains:
 
-**Registered in Claude Code (7):** `dispatch` · `verify` · `budget` · `state` · `status` · `notify` · `market`
+- **12 registered Claude Code tools** in `plugin.json`: `dispatch` · `verify` · `budget` · `state` · `status` · `notify` · `health_check` · `market` · `predict_kronos` · `threat_intel` · `lumo_research` · `starred_repos`
+- **20 companion CLI scripts** under `plugins/claw-sapphire/tools/` that are invoked via stdin JSON by hermes skills, scheduled tasks, dashboards, or other tools
 
-**Intel / analytics (9):** `threat_intel` · `starred_repos` · `vote_monitor` · `health_check` · `watchdog` · `digest` · `research` · `events` · `qa_aware_factory`
+**Intel / analytics (6):** `vote_monitor` · `watchdog` · `digest` · `research` · `events` · `qa_aware_factory`
 
-**Trading (9):** `predict` · `predict_kronos` · `signal_generator` · `paper_trader` · `crypto_portfolio` · `backtest` · `market_sentiment` · `trading_brain` · `macro_data`
+**Trading (8):** `predict` · `signal_generator` · `paper_trader` · `crypto_portfolio` · `backtest` · `market_sentiment` · `trading_brain` · `macro_data`
 
-**Other (7):** `lead_engine` · `lead_enrich` · `lumo` · `lumo_research` · `tho_intel` · `solana_wallet` · `kronos_predict` (legacy)
+**Other (5 + 1 legacy alias):** `lead_engine` · `lead_enrich` · `lumo` · `tho_intel` · `solana_wallet` · `kronos_predict` (legacy wrapper over `predict_kronos`)
 
 **Shared libs (10):** `technical_analysis` · `nemotron` · `quant_analysis` · `router` · `runtime_policy` · `token_governor` · `sensitivity_classifier` · `market_data` · `nvidia_agents` · `budget` (module)
 

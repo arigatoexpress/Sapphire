@@ -10,7 +10,12 @@ import os
 import secrets
 import sys
 import time
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+try:
+    from datetime import UTC
+except ImportError:
+    UTC = timezone.utc
 from functools import wraps
 from pathlib import Path
 
@@ -2389,6 +2394,25 @@ def api_performance_timeseries():
             'equity_curve': [], 'drawdown_series': [],
             'max_drawdown': {'pct': 0.0, 'ts': None, 'equity_usd': 100000.0},
             'monthly_returns': [], 'trade_count': 0,
+        }), 200
+
+
+@app.route('/api/brain-accuracy')
+@requires_auth
+def api_brain_accuracy():
+    """Trading Brain decision accuracy — GO/LEAN/WAIT scoring over 24h windows."""
+    try:
+        from lib.analytics.brain_accuracy import report as brain_report
+        payload = brain_report()
+        payload['last_updated'] = time.time()
+        return jsonify(payload)
+    except Exception as e:
+        log.warning("brain accuracy API error: %s", e)
+        return jsonify({
+            'error': str(e),
+            'total_decisions': 0, 'scored': 0, 'pending': 0,
+            'overall_accuracy': None,
+            'by_symbol': {}, 'by_decision': {}, 'recent': [],
         }), 200
 
 
