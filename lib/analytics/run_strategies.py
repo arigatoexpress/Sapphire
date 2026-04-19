@@ -26,7 +26,10 @@ _ROOT = Path(__file__).resolve().parents[2]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from lib.analytics.backtest import load_yfinance_ohlcv
+# fetch_ohlcv returns Bar dataclass instances; backtest.load_yfinance_ohlcv
+# returns list[dict] with a 'date' key — strategies.py expects Bar instances
+# so we use the engine loader for parity.
+from lib.analytics.backtest_engine import fetch_ohlcv as load_yfinance_ohlcv
 from lib.analytics.strategies import (
     ALL_STRATEGIES,
     COMPOSITE_THRESHOLDS,

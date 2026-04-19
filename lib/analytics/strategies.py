@@ -221,7 +221,7 @@ class RegimeAwareRSI(Strategy):
 
         if rsi < threshold:
             return Decision(direction="long", size=0.5,
-                            stop_pct=p.sl_pct, take_pct=p.tp_pct)
+                            stop_pct=p.sl_pct, tp_pct=p.tp_pct)
         if rsi > 70.0:
             return Decision(direction="flat")
         return None
@@ -258,11 +258,11 @@ class FundingRateContrarian(Strategy):
         if mom_3d > p.funding_high:
             # High simulated funding → crowded long → contrarian short
             return Decision(direction="short", size=0.4,
-                            stop_pct=p.sl_pct, take_pct=p.tp_pct)
+                            stop_pct=p.sl_pct, tp_pct=p.tp_pct)
         if mom_3d < p.funding_low:
             # Negative funding → crowded short → contrarian long
             return Decision(direction="long", size=0.4,
-                            stop_pct=p.sl_pct, take_pct=p.tp_pct)
+                            stop_pct=p.sl_pct, tp_pct=p.tp_pct)
         return None
 
 
@@ -308,7 +308,7 @@ class CorrelationBreakout(Strategy):
             if rsi < 45.0:
                 # Decoupled + oversold → high-quality long setup
                 return Decision(direction="long", size=0.6,
-                                stop_pct=p.sl_pct, take_pct=p.tp_pct)
+                                stop_pct=p.sl_pct, tp_pct=p.tp_pct)
             if rsi > 65.0:
                 return Decision(direction="flat")
         return None
@@ -357,7 +357,7 @@ class MultiTFMomentum(Strategy):
 
         if bull:
             return Decision(direction="long", size=0.5,
-                            stop_pct=p.sl_pct, take_pct=p.tp_pct)
+                            stop_pct=p.sl_pct, tp_pct=p.tp_pct)
         if bear:
             return Decision(direction="flat")
         return None
@@ -471,7 +471,7 @@ class SapphireComposite(Strategy):
             direction="long",
             size=self._kelly_size(),
             stop_pct=p.sl_pct,
-            take_pct=p.tp_pct,
+            tp_pct=p.tp_pct,
         )
 
 
@@ -493,31 +493,86 @@ ALL_STRATEGIES: list[type[Strategy]] = [
 # ---------------------------------------------------------------------------
 
 class BacktestEngine:
-    """Drives Strategy instances through the existing Backtester.
+    """Drives Strategy instances through the backtest_engine runner.
 
     Handles date-aligned aux data so strategies can reference BTC / SPY
     bars at the correct historical window index.
+
+    Adapts Strategy.on_bar (returning Decision) to backtest_engine.run_backtest
+    (expecting a signal_fn that returns a raw dict). The old backtest.py
+    Backtester API was replaced with a regime-comparison runner that doesn't
+    accept arbitrary strategy functions, so we wrap run_backtest here.
     """
 
     def __init__(self, bankroll: float = 10_000.0, fee_bps: float = 5.0) -> None:
         self.bankroll = bankroll
-        self.fee_bps = fee_bps
+        self.fee_bps = fee_bps  # kept for API compat; run_backtest applies no fees
 
     def run(
         self,
-        bars: list[Bar],
+        bars,
         strategy: Strategy,
         symbol: str = "?",
-        aux_data: dict[str, list[Bar]] | None = None,
-    ) -> BacktestReport:
+        aux_data: dict | None = None,
+    ):
+        """Run strategy against bars. Returns an object exposing the same
+        fields as the old BacktestReport (sortino, sharpe, win_rate,
+        profit_factor, max_drawdown_pct, calmar, total_return_pct,
+        total_trades).
+        """
+        from lib.analytics.backtest_engine import run_backtest
+
         aligned = self._align_aux(bars, aux_data or {})
 
-        def fn(window: list[Bar]) -> Decision | None:
-            n = len(window)
-            return strategy.on_bar(window, {k: v[:n] for k, v in aligned.items()})
+        def sig_fn(sym, window, i):
+            # window is backtest_engine's bars list up to index i
+            slice_window = window[: i + 1]
+            aux_at_i = {k: v[: i + 1] for k, v in aligned.items()}
+            # Strategy.on_bar was written against backtest.py's Bar (same
+            # shape: .ts / .open / .close / etc.) — backtest_engine.Bar is
+            # structurally compatible.
+            decision = strategy.on_bar(slice_window, aux_at_i)
+            if decision is None or getattr(decision, "direction", "flat") == "flat":
+                return None
+            price = window[i].close
+            direction = decision.direction
+            action = "buy" if direction == "long" else "sell" if direction == "short" else "close"
+            out = {
+                "symbol": sym,
+                "action": action,
+                "price": price,
+                "confidence": 0.5,
+                "strategy": strategy.name,
+            }
+            # Translate Decision stop/tp percents into absolute levels
+            if getattr(decision, "stop_pct", 0.0):
+                out["stop_loss"] = price * (1 - decision.stop_pct) if direction == "long" else price * (1 + decision.stop_pct)
+            if getattr(decision, "tp_pct", 0.0):
+                out["take_profit"] = price * (1 + decision.tp_pct) if direction == "long" else price * (1 - decision.tp_pct)
+            return out
 
-        fn.__name__ = strategy.name
-        return Backtester(self.bankroll, self.fee_bps).run(bars, fn, symbol=symbol)
+        result = run_backtest(
+            symbol=symbol,
+            bars=bars,
+            signal_fn=sig_fn,
+            initial_capital=self.bankroll,
+        )
+
+        # Project BacktestResult onto the fields strategies.py downstream code reads.
+        # SweepResult consumes: sortino, sharpe, total_return_pct, win_rate,
+        # profit_factor, max_drawdown_pct, calmar, total_trades, plus .report.
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            sortino=result.sortino,
+            sharpe=result.sharpe,
+            total_return_pct=result.total_return_pct,
+            win_rate=result.win_rate,
+            profit_factor=result.profit_factor,
+            max_drawdown_pct=result.max_drawdown_pct,
+            calmar=result.calmar,
+            total_trades=len(result.trades),
+            report=result.to_dict(),
+        )
 
     @staticmethod
     def _align_aux(
@@ -593,8 +648,20 @@ class SweepResult:
             "calmar":           self.calmar,
             "total_trades":     self.total_trades,
         }
-        if include_report:
-            d["report"] = asdict(self.report)
+        if include_report and self.report is not None:
+            # .report may be a dataclass (old BacktestReport), a dict
+            # (BacktestResult.to_dict()), or a SimpleNamespace wrapper from
+            # BacktestEngine.run exposing .report as the dict payload.
+            r = self.report
+            if isinstance(r, dict):
+                d["report"] = r
+            elif hasattr(r, "report") and isinstance(r.report, dict):
+                d["report"] = r.report
+            else:
+                try:
+                    d["report"] = asdict(r)
+                except TypeError:
+                    d["report"] = vars(r) if hasattr(r, "__dict__") else {}
         return d
 
 
