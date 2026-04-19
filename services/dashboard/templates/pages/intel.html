@@ -181,45 +181,81 @@
     border-radius: 50%;
 }
 
-.foundry-field {
+.foundry-status.ready .foundry-status-dot {
+    background: var(--green);
+    box-shadow: var(--glow-green);
+}
+
+.foundry-status.partial .foundry-status-dot {
+    background: var(--amber);
+    box-shadow: var(--glow-amber);
+}
+
+.foundry-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-sm);
     margin-bottom: var(--space-md);
 }
 
-.foundry-field label {
-    display: block;
-    font-size: 0.7rem;
+.foundry-stat {
+    border: 1px solid var(--border-dim);
+    background: rgba(11, 11, 26, 0.45);
+    padding: var(--space-sm) var(--space-md);
+}
+
+.foundry-stat-label {
+    font-size: 0.66rem;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    margin-bottom: var(--space-xs);
+    margin-bottom: 4px;
 }
 
-.foundry-field input {
-    width: 100%;
-    background: rgba(11, 11, 26, 0.6);
-    border: 1px solid var(--border-dim);
-    color: var(--text-muted);
-    font-family: var(--font-terminal);
+.foundry-stat-value {
     font-size: 0.78rem;
-    padding: var(--space-sm) var(--space-md);
-    cursor: not-allowed;
+    color: var(--text-primary);
+    line-height: 1.45;
 }
 
-.btn-foundry {
-    display: inline-flex;
-    align-items: center;
+.foundry-candidates {
+    display: flex;
+    flex-direction: column;
     gap: var(--space-sm);
-    padding: var(--space-sm) var(--space-lg);
-    background: rgba(98, 255, 64, 0.04);
-    border: 1px solid var(--border-dim);
-    color: var(--text-muted);
-    font-family: var(--font-terminal);
-    font-size: 0.78rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    cursor: not-allowed;
-    opacity: 0.55;
     margin-bottom: var(--space-md);
+}
+
+.foundry-candidate {
+    border: 1px solid var(--border-dim);
+    background: rgba(11, 11, 26, 0.45);
+    padding: var(--space-sm) var(--space-md);
+}
+
+.foundry-candidate-header {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-sm);
+    align-items: baseline;
+    margin-bottom: 4px;
+}
+
+.foundry-candidate-title {
+    font-size: 0.78rem;
+    color: var(--amber);
+    font-family: var(--font-terminal);
+}
+
+.foundry-candidate-count {
+    font-size: 0.66rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.foundry-candidate-meta {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    line-height: 1.5;
 }
 
 .foundry-note {
@@ -287,10 +323,20 @@
 
 .source-status.active::before   { background: var(--green); box-shadow: var(--glow-green); }
 .source-status.active           { color: var(--green); }
+.source-status.online::before   { background: var(--green); box-shadow: var(--glow-green); }
+.source-status.online           { color: var(--green); }
+.source-status.ready::before    { background: var(--green); box-shadow: var(--glow-green); }
+.source-status.ready            { color: var(--green); }
 .source-status.pending::before  { background: var(--amber); box-shadow: var(--glow-amber); }
 .source-status.pending          { color: var(--amber); }
+.source-status.partial::before  { background: var(--amber); box-shadow: var(--glow-amber); }
+.source-status.partial          { color: var(--amber); }
 .source-status.planned::before  { background: var(--text-muted); }
 .source-status.planned          { color: var(--text-muted); }
+.source-status.unknown::before  { background: var(--text-muted); }
+.source-status.unknown          { color: var(--text-muted); }
+.source-status.offline::before  { background: var(--red); box-shadow: 0 0 8px rgba(255, 111, 158, 0.35); }
+.source-status.offline          { color: var(--red); }
 {% endblock %}
 
 {% block content %}
@@ -342,26 +388,70 @@
     <div class="panel">
         <div class="panel-header">
             <span class="panel-title">Palantir Foundry Integration</span>
-            <span class="badge offline">PLANNED</span>
+            <span class="badge warning" id="foundry-badge">DATA READY</span>
         </div>
         <div class="panel-body">
             <div class="foundry-logo">PALANTIR FOUNDRY</div>
-            <div class="foundry-status">
+            <div class="foundry-status partial" id="foundry-status-row">
                 <span class="foundry-status-dot"></span>
-                <span style="color: var(--text-muted);">NOT CONNECTED</span>
+                <span id="foundry-status-label" style="color: var(--text-muted);">Loading readiness…</span>
             </div>
-            <div class="foundry-field">
-                <label>API Endpoint</label>
-                <input type="text" value="https://foundry.palantir.com/api/v2" disabled>
+            <div class="foundry-grid">
+                <div class="foundry-stat">
+                    <div class="foundry-stat-label">Connection</div>
+                    <div class="foundry-stat-value" id="foundry-connection-mode">Checking repo signals…</div>
+                </div>
+                <div class="foundry-stat">
+                    <div class="foundry-stat-label">First App</div>
+                    <div class="foundry-stat-value" id="foundry-first-app">Sapphire Mission Control</div>
+                </div>
+                <div class="foundry-stat">
+                    <div class="foundry-stat-label">Bridge</div>
+                    <div class="foundry-stat-value" id="foundry-transport-hint">Dataset sync first, live pull second.</div>
+                </div>
+                <div class="foundry-stat">
+                    <div class="foundry-stat-label">Artifacts Ready</div>
+                    <div class="foundry-stat-value" id="foundry-artifact-count">--</div>
+                </div>
             </div>
-            <button class="btn-foundry" disabled>
-                Connect Foundry
-            </button>
+            <div class="foundry-candidates" id="foundry-candidates">
+                <div class="foundry-candidate">
+                    <div class="foundry-candidate-header">
+                        <span class="foundry-candidate-title">Loading first-wave datasets…</span>
+                        <span class="foundry-candidate-count">--</span>
+                    </div>
+                    <div class="foundry-candidate-meta">Inspecting local Sapphire artifacts and safe Foundry config signals.</div>
+                </div>
+            </div>
             <div class="foundry-note">
-                Future integration point for Palantir Foundry ontology-based analysis.
-                When connected, this panel will surface entity graphs, object timelines,
-                and action recommendations derived from the Foundry ontology layer.
-                Requires a valid Foundry API token and workspace enrollment.
+                <span id="foundry-next-step">Preparing a repo-grounded readiness summary for Sapphire's Foundry bridge.</span>
+            </div>
+
+            <!-- ── Sync Status Sub-panel ── -->
+            <div style="margin-top: var(--space-md); border-top: 1px solid var(--border-dim); padding-top: var(--space-md);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
+                    <span style="font-size: 0.78rem; color: var(--amber); font-family: var(--font-terminal);">SYNC ENGINE</span>
+                    <span class="badge" id="sync-status-badge" style="font-size: 0.62rem;">--</span>
+                </div>
+                <div class="foundry-grid">
+                    <div class="foundry-stat">
+                        <div class="foundry-stat-label">Last Sync</div>
+                        <div class="foundry-stat-value" id="sync-last-time">--</div>
+                    </div>
+                    <div class="foundry-stat">
+                        <div class="foundry-stat-label">Sync Count</div>
+                        <div class="foundry-stat-value" id="sync-count">--</div>
+                    </div>
+                    <div class="foundry-stat">
+                        <div class="foundry-stat-label">Tracked Files</div>
+                        <div class="foundry-stat-value" id="sync-tracked-files">--</div>
+                    </div>
+                    <div class="foundry-stat">
+                        <div class="foundry-stat-label">Recent Errors</div>
+                        <div class="foundry-stat-value" id="sync-recent-errors">--</div>
+                    </div>
+                </div>
+                <div id="sync-history" style="margin-top: var(--space-sm);"></div>
             </div>
         </div>
     </div>
@@ -458,41 +548,9 @@
                     <th>Items</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="sources-body">
                 <tr>
-                    <td style="color:var(--amber);">CISA Advisories</td>
-                    <td>Vulnerability / CVE</td>
-                    <td><span class="source-status active">Active</span></td>
-                    <td>2026-04-18 06:32 UTC</td>
-                    <td>1,247</td>
-                </tr>
-                <tr>
-                    <td style="color:var(--amber);">NVD / CVE Feed</td>
-                    <td>Vulnerability</td>
-                    <td><span class="source-status active">Active</span></td>
-                    <td>2026-04-18 06:30 UTC</td>
-                    <td>3,812</td>
-                </tr>
-                <tr>
-                    <td style="color:var(--amber);">OSINT Aggregator</td>
-                    <td>Open-Source Intel</td>
-                    <td><span class="source-status active">Active</span></td>
-                    <td>2026-04-18 06:28 UTC</td>
-                    <td>894</td>
-                </tr>
-                <tr>
-                    <td style="color:var(--amber);">Regional Workbench</td>
-                    <td>Geopolitical / Cyber</td>
-                    <td><span class="source-status pending">Pending</span></td>
-                    <td>2026-04-18 05:15 UTC</td>
-                    <td>412</td>
-                </tr>
-                <tr>
-                    <td style="color:var(--text-muted);">Palantir Foundry</td>
-                    <td>Ontology / Graph</td>
-                    <td><span class="source-status planned">Planned</span></td>
-                    <td>--</td>
-                    <td>--</td>
+                    <td colspan="5" style="color:var(--text-muted);">Loading live source status…</td>
                 </tr>
             </tbody>
         </table>
@@ -579,27 +637,177 @@
         }
     ];
 
-    /* ── Render Feed ── */
+    function escapeHtml(value) {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function normalizeStatus(status) {
+        return String(status || 'unknown').toLowerCase().replace(/[^a-z-]/g, '') || 'unknown';
+    }
+
+    function statusLabel(status) {
+        var normalized = normalizeStatus(status);
+        if (normalized === 'ready') return 'CONNECTED';
+        if (normalized === 'partial') return 'DATA READY';
+        return normalized.replace(/-/g, ' ').toUpperCase();
+    }
+
+    function badgeClass(status) {
+        var normalized = normalizeStatus(status);
+        if (normalized === 'ready' || normalized === 'active' || normalized === 'online') return 'online';
+        if (normalized === 'partial' || normalized === 'pending') return 'warning';
+        if (normalized === 'offline') return 'error';
+        return 'offline';
+    }
+
+    function formatTimestamp(value) {
+        if (!value) return '--';
+        if (typeof value === 'number') {
+            var millis = value < 1000000000000 ? value * 1000 : value;
+            return new Date(millis).toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' UTC');
+        }
+        var text = String(value);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text + ' UTC';
+        if (text.indexOf('T') !== -1) return text.replace('T', ' ').replace(/\.\d+/, '').replace(/\+00:00$/, ' UTC');
+        return text;
+    }
+
     function renderFeed(items) {
         var feed = document.getElementById('intel-feed');
         feed.innerHTML = '';
         items.forEach(function(item) {
+            var region = String(item.region || 'GLOBAL').toUpperCase();
+            var severity = String(item.severity || 'medium').toLowerCase();
             var el = document.createElement('div');
             el.className = 'intel-item';
             el.innerHTML =
                 '<div class="intel-item-header">' +
                     '<div class="intel-item-meta">' +
-                        '<span class="region-tag ' + item.region.toLowerCase() + '">' + item.region + '</span>' +
-                        '<span class="severity-badge ' + item.severity + '">' + item.severity.toUpperCase() + '</span>' +
+                        '<span class="region-tag ' + escapeHtml(region.toLowerCase()) + '">' + escapeHtml(region) + '</span>' +
+                        '<span class="severity-badge ' + escapeHtml(severity) + '">' + escapeHtml(severity.toUpperCase()) + '</span>' +
                     '</div>' +
                 '</div>' +
-                '<div class="intel-item-title">' + item.title + '</div>' +
+                '<div class="intel-item-title">' + escapeHtml(item.title || '(no title)') + '</div>' +
                 '<div class="intel-item-footer">' +
-                    '<span>' + item.timestamp + '</span>' +
-                    '<span>' + item.source + '</span>' +
+                    '<span>' + escapeHtml(item.timestamp || '--') + '</span>' +
+                    '<span>' + escapeHtml(item.source || 'unknown') + '</span>' +
                 '</div>';
             feed.appendChild(el);
         });
+    }
+
+    function renderSources(sources) {
+        var body = document.getElementById('sources-body');
+        var countEl = document.getElementById('source-count');
+        if (!body) return;
+        var rows = sources || [];
+        countEl.textContent = rows.length + ' SOURCES';
+        body.innerHTML = '';
+        if (!rows.length) {
+            body.innerHTML = '<tr><td colspan="5" style="color:var(--text-muted);">No live sources detected.</td></tr>';
+            return;
+        }
+        rows.forEach(function(source) {
+            var status = normalizeStatus(source.status);
+            var row = document.createElement('tr');
+            row.innerHTML =
+                '<td style="color:var(--amber);">' + escapeHtml(source.name || 'Unknown') + '</td>' +
+                '<td>' + escapeHtml(source.type || '--') + '</td>' +
+                '<td><span class="source-status ' + escapeHtml(status) + '">' + escapeHtml(statusLabel(status)) + '</span></td>' +
+                '<td>' + escapeHtml(formatTimestamp(source.last_pull)) + '</td>' +
+                '<td>' + escapeHtml(source.items == null ? '--' : source.items) + '</td>';
+            body.appendChild(row);
+        });
+    }
+
+    function renderFoundry(data) {
+        var status = normalizeStatus(data && data.status);
+        var badge = document.getElementById('foundry-badge');
+        var statusRow = document.getElementById('foundry-status-row');
+        var statusLabelEl = document.getElementById('foundry-status-label');
+        var connectionMode = document.getElementById('foundry-connection-mode');
+        var firstApp = document.getElementById('foundry-first-app');
+        var transportHint = document.getElementById('foundry-transport-hint');
+        var artifactCount = document.getElementById('foundry-artifact-count');
+        var nextStep = document.getElementById('foundry-next-step');
+        var candidates = document.getElementById('foundry-candidates');
+        var groups = (data && data.dataset_groups) || [];
+
+        badge.className = 'badge ' + badgeClass(status);
+        badge.textContent = statusLabel(status);
+        statusRow.className = 'foundry-status ' + status;
+        statusLabelEl.textContent = (data && data.connection_label) || 'Foundry readiness unavailable.';
+        connectionMode.textContent = ((data && data.auth_mode) || 'unknown').replace(/-/g, ' ');
+        firstApp.textContent = (data && data.recommended_first_app) || 'Sapphire Mission Control';
+        transportHint.textContent = (data && data.transport_hint) || 'Dataset sync first.';
+        artifactCount.textContent = ((data && data.totals && data.totals.files) || 0) + ' files across ' +
+            (((data && data.totals && data.totals.groups) || 0)) + ' groups';
+        nextStep.textContent = (data && data.next_step) || 'Define the first Sapphire ingestion contract.';
+
+        candidates.innerHTML = '';
+        groups.slice(0, 4).forEach(function(group) {
+            var item = document.createElement('div');
+            item.className = 'foundry-candidate';
+            item.innerHTML =
+                '<div class="foundry-candidate-header">' +
+                    '<span class="foundry-candidate-title">' + escapeHtml(group.label || group.id || 'Dataset group') + '</span>' +
+                    '<span class="foundry-candidate-count">' + escapeHtml(group.files || 0) + ' files</span>' +
+                '</div>' +
+                '<div class="foundry-candidate-meta">' +
+                    'Transport: ' + escapeHtml(group.transport || '--') + '<br>' +
+                    'Ontology: ' + escapeHtml((group.ontology || []).join(', ') || '--') + '<br>' +
+                    'Latest: ' + escapeHtml(group.latest_path || '--') +
+                '</div>';
+            candidates.appendChild(item);
+        });
+
+        if (!groups.length) {
+            candidates.innerHTML =
+                '<div class="foundry-candidate">' +
+                    '<div class="foundry-candidate-header">' +
+                        '<span class="foundry-candidate-title">No mapped artifact groups yet</span>' +
+                        '<span class="foundry-candidate-count">0 files</span>' +
+                    '</div>' +
+                    '<div class="foundry-candidate-meta">Add a first Sapphire dataset contract before building the Ontology layer.</div>' +
+                '</div>';
+        }
+    }
+
+    function updateHero(items, sources, payloadUpdatedAt) {
+        var heroSources = document.getElementById('hero-sources');
+        var heroThreat = document.getElementById('hero-threat');
+        var heroThreatNote = document.getElementById('hero-threat-note');
+        var onlineCount = (sources || []).filter(function(source) {
+            var status = normalizeStatus(source.status);
+            return status === 'active' || status === 'online' || status === 'ready';
+        }).length;
+        heroSources.textContent = String(onlineCount || 0);
+
+        var severityRank = { info: 0, low: 1, medium: 2, high: 3, critical: 4 };
+        var top = (items || []).reduce(function(best, item) {
+            if (!best) return item;
+            return (severityRank[item.severity] || 0) > (severityRank[best.severity] || 0) ? item : best;
+        }, null);
+        var label = top ? String(top.severity || 'medium').toUpperCase() : 'MEDIUM';
+        heroThreat.textContent =
+            label === 'CRITICAL' ? 'CRIT' :
+            label === 'MEDIUM' ? 'MED' :
+            label;
+        heroThreat.className = 'hero-value ' + (
+            label === 'CRITICAL' ? 'threat-crit' :
+            label === 'HIGH' ? 'threat-high' :
+            label === 'LOW' ? 'threat-low' :
+            'threat-med'
+        );
+        heroThreatNote.textContent = top ? (top.title || 'latest threat snapshot loaded') : 'latest threat snapshot loaded';
+
+        var syncEl = document.getElementById('hero-sync');
+        if (payloadUpdatedAt) syncEl.textContent = formatTimestamp(payloadUpdatedAt);
     }
 
     /* ── Map /api/intel payload shape into the feed renderer's shape ── */
@@ -619,32 +827,56 @@
         };
     }
 
-    /* ── Refresh Intel — pulls /api/intel (threat intel + regional workbench) ── */
-    function refreshIntel() {
-        var now = new Date();
-        var ts = now.getUTCFullYear() + '-' +
-                 String(now.getUTCMonth() + 1).padStart(2, '0') + '-' +
-                 String(now.getUTCDate()).padStart(2, '0') + ' ' +
-                 String(now.getUTCHours()).padStart(2, '0') + ':' +
-                 String(now.getUTCMinutes()).padStart(2, '0') + ':' +
-                 String(now.getUTCSeconds()).padStart(2, '0');
-        document.getElementById('hero-sync').textContent = ts;
-
-        fetch('/api/intel', { credentials: 'same-origin' })
+    function refreshFoundry() {
+        return fetch('/api/foundry/readiness', { credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
             .then(function (data) {
-                var items = (data && data.items) || [];
-                if (!items.length) {
-                    // Fallback to seeded mock if the API returned nothing
-                    renderFeed(INTEL_ITEMS);
-                    return;
-                }
-                renderFeed(items.map(_adaptApiItem));
+                renderFoundry(data || {});
+                return data || {};
             })
             .catch(function (err) {
-                console.warn('intel fetch failed, showing seed items', err);
-                renderFeed(INTEL_ITEMS);
+                console.warn('foundry readiness fetch failed', err);
+                renderFoundry({
+                    status: 'unknown',
+                    connection_label: 'Foundry readiness unavailable.',
+                    auth_mode: 'unknown',
+                    recommended_first_app: 'Sapphire Mission Control',
+                    transport_hint: 'Dataset sync first.',
+                    totals: { files: 0, groups: 0 },
+                    dataset_groups: [],
+                    next_step: 'Inspect the dashboard API or repo-level Foundry configuration.'
+                });
+                return {};
             });
+    }
+
+    /* ── Refresh Intel — pulls /api/intel (threat intel + regional workbench) ── */
+    function refreshIntel() {
+        Promise.all([
+            fetch('/api/intel', { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .catch(function () { return null; }),
+            refreshFoundry()
+        ]).then(function (results) {
+            var data = results[0];
+            var items = data && data.items ? data.items : [];
+            var sources = data && data.sources ? data.sources : [];
+            if (!items.length) {
+                renderFeed(INTEL_ITEMS);
+            } else {
+                renderFeed(items.map(_adaptApiItem));
+            }
+            renderSources(sources);
+            updateHero(items.length ? items.map(_adaptApiItem) : INTEL_ITEMS, sources, data && data.last_updated);
+            if (data && data.foundry && (!results[1] || !results[1].status)) {
+                renderFoundry(data.foundry);
+            }
+        }).catch(function (err) {
+            console.warn('intel fetch failed, showing seed items', err);
+            renderFeed(INTEL_ITEMS);
+            renderSources([]);
+            updateHero(INTEL_ITEMS, [], Date.now());
+        });
     }
 
     /* ── Countdown ── */
@@ -670,10 +902,74 @@
         });
     }
 
+    /* ── Sync Status ── */
+    function renderSyncStatus(data) {
+        var badge = document.getElementById('sync-status-badge');
+        var lastTime = document.getElementById('sync-last-time');
+        var count = document.getElementById('sync-count');
+        var tracked = document.getElementById('sync-tracked-files');
+        var errors = document.getElementById('sync-recent-errors');
+        var historyEl = document.getElementById('sync-history');
+
+        if (!data) {
+            badge.textContent = 'UNAVAILABLE';
+            badge.className = 'badge';
+            return;
+        }
+
+        var st = (data.last_status || 'never').toLowerCase();
+        if (st === 'ok') {
+            badge.textContent = 'SYNCING';
+            badge.className = 'badge success';
+        } else if (st === 'error') {
+            badge.textContent = 'ERROR';
+            badge.className = 'badge danger';
+        } else {
+            badge.textContent = 'PENDING';
+            badge.className = 'badge warning';
+        }
+
+        lastTime.textContent = data.last_sync ? formatTimestamp(data.last_sync) : 'Never';
+        count.textContent = data.sync_count || 0;
+        tracked.textContent = data.tracked_files || 0;
+        errors.textContent = data.recent_errors || 0;
+        errors.style.color = (data.recent_errors > 0) ? 'var(--red)' : 'var(--green)';
+
+        /* Recent history mini-log */
+        var history = (data.recent_history || []).slice(-3).reverse();
+        if (history.length && historyEl) {
+            historyEl.innerHTML = history.map(function(h) {
+                var icon = h.ok ? '✓' : '✗';
+                var color = h.ok ? 'var(--green)' : 'var(--red)';
+                var types = Object.keys(h.uploaded_types || {}).join(', ') || 'none';
+                var ts = h.timestamp ? formatTimestamp(h.timestamp) : '--';
+                return '<div style="font-size:0.68rem;color:var(--text-muted);line-height:1.6;">' +
+                    '<span style="color:' + color + ';">' + icon + '</span> ' +
+                    ts + ' — ' + types +
+                    (h.dry_run ? ' (dry run)' : '') +
+                    (h.skipped ? ' (no changes)' : '') +
+                '</div>';
+            }).join('');
+        }
+    }
+
+    function refreshSyncStatus() {
+        return fetch('/api/foundry/sync-status', { credentials: 'same-origin' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) { renderSyncStatus(data); return data; })
+            .catch(function(err) {
+                console.warn('sync status fetch failed', err);
+                renderSyncStatus(null);
+                return null;
+            });
+    }
+
     /* ── Init ── */
     refreshIntel();
+    refreshSyncStatus();
     setInterval(tickCountdown, 1000);
     setInterval(animateThreatDots, 3000);
+    setInterval(refreshSyncStatus, 60000);
 
 })();
 </script>

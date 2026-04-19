@@ -2025,6 +2025,62 @@ def intel_page():
     return render_template('pages/intel.html', current_page='intel', page_title='Intel')
 
 
+@app.route('/api/foundry/readiness')
+@requires_auth
+def api_foundry_readiness():
+    """Repo-grounded Foundry readiness: safe config checks + local artifact map."""
+    try:
+        from lib.foundry.readiness import build_foundry_readiness
+
+        payload = build_foundry_readiness()
+        payload['last_updated'] = time.time()
+        return jsonify(payload)
+    except Exception as e:
+        log.warning("foundry readiness API error: %s", e)
+        return jsonify({
+            'status': 'unknown',
+            'badge': 'UNAVAILABLE',
+            'auth_mode': 'unknown',
+            'connection_label': 'Foundry readiness inspection failed.',
+            'connector_registered': False,
+            'configured_envs': {},
+            'recommended_first_app': 'Sapphire Mission Control',
+            'transport_hint': 'Dataset sync first.',
+            'dataset_groups': [],
+            'totals': {'groups': 0, 'files': 0},
+            'latest_materialization': None,
+            'next_step': 'Inspect the repo-level Foundry configuration and retry.',
+            'error': str(e),
+            'last_updated': time.time(),
+        }), 200
+
+
+@app.route('/api/foundry/sync-status')
+@requires_auth
+def api_foundry_sync_status():
+    """Foundry sync engine status — last sync, history, tracked files."""
+    try:
+        from lib.foundry.sync import get_sync_status
+
+        payload = get_sync_status()
+        payload['last_updated'] = time.time()
+        return jsonify(payload)
+    except Exception as e:
+        log.warning("foundry sync-status API error: %s", e)
+        return jsonify({
+            'last_sync': None,
+            'last_status': 'unavailable',
+            'sync_count': 0,
+            'tracked_files': 0,
+            'recent_history': [],
+            'recent_errors': 0,
+            'interval_seconds': 900,
+            'source_types': [],
+            'error': str(e),
+            'last_updated': time.time(),
+        }), 200
+
+
 @app.route('/api/portfolio')
 @requires_auth
 def api_portfolio():
@@ -2089,24 +2145,27 @@ def api_intel():
     """Regional intel feed — proxies regional-intel-workbench if reachable, else local snapshot."""
     # Try local intelligence snapshots
     items = []
-    sources = []
+    local_item_count = 0
+    local_latest = None
 
     # Load recent threat intel as intel feed items
     intel_dir = Path.home() / 'Code' / 'Sapphire' / 'data' / 'intelligence'
     try:
-        import datetime as _dt
-        today = _dt.date.today().isoformat()
         for day_dir in sorted(intel_dir.glob('*/threats.json'), reverse=True)[:3]:
             try:
                 threats = json.loads(day_dir.read_text()).get('threats') or []
                 for t in threats[:5]:
+                    local_item_count += 1
+                    stamp = t.get('published') or day_dir.parent.name
+                    if local_latest is None or str(stamp) > str(local_latest):
+                        local_latest = stamp
                     items.append({
                         'id': t.get('canonical_id') or t.get('id', ''),
                         'title': t.get('title', ''),
                         'region': 'GLOBAL',
                         'severity': 'high' if (t.get('score') or 0) >= 8 else 'medium',
                         'source': t.get('source', 'threat-intel'),
-                        'timestamp': t.get('published') or day_dir.parent.name,
+                        'timestamp': stamp,
                         'tags': t.get('tags') or [],
                         'exploited': t.get('exploited', False),
                     })
@@ -2117,27 +2176,55 @@ def api_intel():
 
     # Try regional-intel-workbench API (port 8787)
     workbench_status = 'offline'
+    workbench_items = 0
     try:
         import urllib.request as _ureq
         with _ureq.urlopen('http://127.0.0.1:8787/api/intel/recent?limit=10', timeout=3) as r:
             wb_data = json.loads(r.read())
+            workbench_items = len(wb_data.get('items') or [])
             for item in (wb_data.get('items') or []):
                 items.append({**item, 'source': 'regional-workbench'})
             workbench_status = 'online'
     except Exception:
         pass
 
+    foundry = {}
+    try:
+        from lib.foundry.readiness import build_foundry_readiness
+
+        foundry = build_foundry_readiness()
+    except Exception as e:
+        log.warning("intel API failed to summarize Foundry readiness: %s", e)
+
     sources = [
-        {'name': 'CISA KEV', 'status': 'active' if items else 'unknown'},
-        {'name': 'NVD', 'status': 'active' if items else 'unknown'},
-        {'name': 'Regional Workbench', 'status': workbench_status},
-        {'name': 'Palantir Foundry', 'status': 'pending'},
+        {
+            'name': 'Threat snapshots',
+            'type': 'Threat / CVE',
+            'status': 'active' if local_item_count else 'unknown',
+            'last_pull': local_latest,
+            'items': local_item_count,
+        },
+        {
+            'name': 'Regional Workbench',
+            'type': 'Geopolitical / Cyber',
+            'status': workbench_status,
+            'last_pull': time.time() if workbench_status == 'online' else None,
+            'items': workbench_items,
+        },
+        {
+            'name': 'Palantir Foundry',
+            'type': 'Ontology / Graph',
+            'status': foundry.get('status', 'planned'),
+            'last_pull': foundry.get('latest_materialization'),
+            'items': ((foundry.get('totals') or {}).get('files') or 0),
+        },
     ]
 
     return jsonify({
         'items': items[:20],
         'sources': sources,
         'item_count': len(items),
+        'foundry': foundry,
         'last_updated': time.time(),
     })
 
