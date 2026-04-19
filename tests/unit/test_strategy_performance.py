@@ -106,6 +106,38 @@ class TestStatsComputation:
         assert s["profit_factor"] == 0.0
 
 
+class TestSharpe:
+    def test_needs_multiple_points(self):
+        assert sp._sharpe([1.0]) is None
+        assert sp._sharpe([]) is None
+
+    def test_zero_std(self):
+        # Constant returns have no dispersion — Sharpe undefined
+        assert sp._sharpe([1.0, 1.0, 1.0]) is None
+
+    def test_positive_sharpe(self):
+        s = sp._sharpe([1.0, 2.0, 3.0])
+        assert s is not None
+        assert s > 0
+
+    def test_negative_sharpe(self):
+        s = sp._sharpe([-1.0, -2.0, -3.0])
+        assert s is not None
+        assert s < 0
+
+
+class TestExpectancy:
+    def test_in_stats_output(self):
+        trades = [
+            sp._normalize("S", "BTC", "long", "win", 200, 50000, 51000, 1000, 0.7, "R", None, None, "t"),
+            sp._normalize("S", "BTC", "long", "loss", -100, 50000, 49500, 1000, 0.7, "R", None, None, "t"),
+        ]
+        s = sp._stats_for(trades)
+        # WR=0.5, avg_win=200, avg_loss=-100 → E = 0.5*200 + 0.5*-100 = 50
+        assert s["expectancy_usd"] == 50.0
+        assert s["avg_hold_hours"] is None  # no duration set
+
+
 class TestSortino:
     def test_needs_multiple_downside(self):
         assert sp._sortino([100, 200]) is None  # no downside

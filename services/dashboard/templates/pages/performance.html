@@ -360,14 +360,16 @@
                         <th>Win Rate</th>
                         <th>Total P&amp;L</th>
                         <th>Avg P&amp;L</th>
-                        <th>Best</th>
-                        <th>Worst</th>
+                        <th>Expectancy</th>
                         <th>Profit Factor</th>
+                        <th>Sharpe</th>
+                        <th>Sortino</th>
+                        <th>Avg Hold</th>
                         <th>Portfolio ROI</th>
                     </tr>
                 </thead>
                 <tbody id="strategyTableBody">
-                    <tr><td colspan="9" style="text-align:center; padding:24px; color: var(--text-muted);">Loading strategy data…</td></tr>
+                    <tr><td colspan="11" style="text-align:center; padding:24px; color: var(--text-muted);">Loading strategy data…</td></tr>
                 </tbody>
             </table>
         </div>
@@ -776,24 +778,35 @@
         if (!body) return;
         var names = Object.keys(byStrategy || {});
         if (!names.length) {
-            body.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:24px; color: var(--text-muted);">No closed trades yet — tracking starts on first signal close.</td></tr>';
+            body.innerHTML = '<tr><td colspan="11" style="text-align:center; padding:24px; color: var(--text-muted);">No closed trades yet — tracking starts on first signal close.</td></tr>';
             return;
         }
         names.sort(function (a, b) {
             return (byStrategy[b].total_pnl_usd || 0) - (byStrategy[a].total_pnl_usd || 0);
         });
+        function _holdStr(h) {
+            if (h == null) return '—';
+            if (h < 1) return Math.round(h * 60) + 'm';
+            if (h < 24) return h.toFixed(1) + 'h';
+            return (h / 24).toFixed(1) + 'd';
+        }
         var html = '';
         names.forEach(function (name) {
             var s = byStrategy[name];
+            var pfCls = (typeof s.profit_factor === 'number' && s.profit_factor >= 1)
+                ? 'val-pos'
+                : (s.profit_factor === 'inf' ? 'val-pos' : 'val-neg');
             html += '<tr>'
                 + '<td class="strat-name">' + name + '</td>'
                 + '<td>' + s.trades + '</td>'
                 + '<td class="' + (s.win_rate != null && s.win_rate >= 0.5 ? 'val-pos' : 'val-neg') + '">' + fmtPct(s.win_rate) + '</td>'
                 + '<td class="' + pnlClass(s.total_pnl_usd) + '">' + fmtUsd(s.total_pnl_usd) + '</td>'
                 + '<td class="' + pnlClass(s.avg_pnl_usd) + '">' + fmtUsd(s.avg_pnl_usd) + '</td>'
-                + '<td class="val-pos">' + fmtUsd(s.best) + '</td>'
-                + '<td class="val-neg">' + fmtUsd(s.worst) + '</td>'
-                + '<td class="' + (typeof s.profit_factor === 'number' && s.profit_factor >= 1 ? 'val-pos' : s.profit_factor === 'inf' ? 'val-pos' : 'val-neg') + '">' + fmtFloat(s.profit_factor) + '</td>'
+                + '<td class="' + pnlClass(s.expectancy_usd) + '">' + fmtUsd(s.expectancy_usd) + '</td>'
+                + '<td class="' + pfCls + '">' + fmtFloat(s.profit_factor) + '</td>'
+                + '<td class="' + (s.sharpe != null && s.sharpe > 0 ? 'val-pos' : s.sharpe != null ? 'val-neg' : '') + '">' + fmtFloat(s.sharpe, 2) + '</td>'
+                + '<td class="' + (s.sortino != null && s.sortino > 0 ? 'val-pos' : s.sortino != null ? 'val-neg' : '') + '">' + fmtFloat(s.sortino, 2) + '</td>'
+                + '<td style="color:#9fd89c;">' + _holdStr(s.avg_hold_hours) + '</td>'
                 + '<td class="' + pnlClass(s.portfolio_roi_pct) + '">' + fmtPctRaw(s.portfolio_roi_pct) + '</td>'
                 + '</tr>';
         });

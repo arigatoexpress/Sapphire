@@ -237,15 +237,35 @@ def _sortino(pnls: list[float]) -> float | None:
     return mean_r / dn_std
 
 
+def _sharpe(values: list[float]) -> float | None:
+    """Sharpe-like ratio on a series of per-trade returns (not annualized
+    — trade durations vary, so we report the dimensionless mean/stdev ratio).
+    """
+    if len(values) < 2:
+        return None
+    sd = stdev(values)
+    if sd == 0:
+        return None
+    return (sum(values) / len(values)) / sd
+
+
+def _avg_hold_hours(trades: list[dict[str, Any]]) -> float | None:
+    durations = [t["duration_h"] for t in trades if t.get("duration_h") is not None]
+    if not durations:
+        return None
+    return sum(durations) / len(durations)
+
+
 def _stats_for(trades: list[dict[str, Any]]) -> dict[str, Any]:
     if not trades:
         return {
             "trades": 0, "wins": 0, "losses": 0, "win_rate": None,
             "total_pnl_usd": 0.0, "avg_pnl_usd": None,
             "best": None, "worst": None,
-            "profit_factor": None, "sortino": None,
+            "profit_factor": None, "sortino": None, "sharpe": None,
             "avg_roi_pct": None, "total_position_usd": 0.0,
-            "portfolio_roi_pct": None,
+            "portfolio_roi_pct": None, "avg_hold_hours": None,
+            "expectancy_usd": None,
         }
     wins = [t for t in trades if t["outcome"] == "win"]
     losses = [t for t in trades if t["outcome"] == "loss"]
@@ -263,6 +283,16 @@ def _stats_for(trades: list[dict[str, Any]]) -> dict[str, Any]:
         pf_val = None
     pnls = [t["pnl_usd"] for t in trades]
     rois = [t["roi_pct"] for t in trades if t["position_usd"]]
+    avg_win = (win_pnl / len(wins)) if wins else 0.0
+    avg_loss = (loss_pnl / len(losses)) if losses else 0.0  # loss_pnl is negative already
+    # Expectancy: E[trade PnL] under observed win rate
+    if win_rate is not None:
+        expectancy = win_rate * avg_win + (1 - win_rate) * avg_loss
+    else:
+        expectancy = None
+    hold_avg = _avg_hold_hours(trades)
+    sortino = _sortino(pnls)
+    sharpe = _sharpe(rois) if rois else None
     return {
         "trades": len(trades),
         "wins": len(wins),
@@ -273,10 +303,13 @@ def _stats_for(trades: list[dict[str, Any]]) -> dict[str, Any]:
         "best": round(max(pnls), 2),
         "worst": round(min(pnls), 2),
         "profit_factor": (round(pf_val, 2) if isinstance(pf_val, float) else pf_val),
-        "sortino": round(_sortino(pnls), 3) if _sortino(pnls) is not None else None,
+        "sortino": round(sortino, 3) if sortino is not None else None,
+        "sharpe": round(sharpe, 3) if sharpe is not None else None,
         "avg_roi_pct": round(sum(rois) / len(rois), 3) if rois else None,
         "total_position_usd": round(total_position, 2),
         "portfolio_roi_pct": round(total_pnl / total_position * 100, 3) if total_position else None,
+        "avg_hold_hours": round(hold_avg, 2) if hold_avg is not None else None,
+        "expectancy_usd": round(expectancy, 2) if expectancy is not None else None,
     }
 
 
