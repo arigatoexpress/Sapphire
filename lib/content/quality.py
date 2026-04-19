@@ -282,9 +282,7 @@ def coherence(text: str) -> float:
         if _has_evidence(sent) or lower.startswith(_TRANSITION_PREFIXES):
             supported += 1
         if idx > 0:
-            if tokens & prev_tokens:
-                linked_pairs += 1
-            elif lower.startswith(_TRANSITION_PREFIXES):
+            if tokens & prev_tokens or lower.startswith(_TRANSITION_PREFIXES):
                 linked_pairs += 1
         prev_tokens = tokens
 

@@ -230,7 +230,7 @@ def _fetch_prices(symbols: dict[str, str], days: int = 180) -> pd.DataFrame:
         except Exception:
             pass
         if stale_cached is not None:
-            available = [s for s in symbols.keys() if s in stale_cached.columns]
+            available = [s for s in symbols if s in stale_cached.columns]
             if available:
                 log.warning(
                     "live refresh failed; using stale correlation cache (%0.1fh old)",

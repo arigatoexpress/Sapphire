@@ -25,8 +25,8 @@ from __future__ import annotations
 import logging
 import math
 import sys
-import time
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any

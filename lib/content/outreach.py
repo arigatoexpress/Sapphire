@@ -16,11 +16,11 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Literal
 
+from . import report_generator as rg
 from .performance_policy import (
     has_public_accuracy_track_record,
     small_sample_accuracy_notice,
 )
-from . import report_generator as rg
 
 AngleKind = Literal["crypto_perf", "agent_infra", "security"]
 

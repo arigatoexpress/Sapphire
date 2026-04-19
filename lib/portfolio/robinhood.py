@@ -94,7 +94,7 @@ def _sign_request(
     """Return auth headers for a Robinhood API request."""
     timestamp = str(int(time.time()))
     method = method.upper()
-    message = f"{api_key}{timestamp}{path}{method}{body}".encode("utf-8")
+    message = f"{api_key}{timestamp}{path}{method}{body}".encode()
 
     try:
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey

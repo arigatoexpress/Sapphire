@@ -20,7 +20,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-
 DEFAULT_REPO = Path.home() / "Code" / "Sapphire"
 DEFAULT_PROJECTS_ROOT = Path.home() / ".claude" / "projects"
 

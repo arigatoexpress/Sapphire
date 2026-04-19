@@ -7,7 +7,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from lib.content import outreach, report_generator as rg  # type: ignore
+from lib.content import outreach  # type: ignore
+from lib.content import report_generator as rg
 from lib.content.performance_policy import (  # type: ignore
     MIN_PUBLIC_ACCURACY_SAMPLE,
     has_public_accuracy_track_record,
