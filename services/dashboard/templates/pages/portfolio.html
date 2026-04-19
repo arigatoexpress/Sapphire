@@ -547,16 +547,23 @@ function animateValue(elementId, targetValue, prefix, suffix, duration) {
 
 /* ── Main refresh function ── */
 function refreshPortfolio() {
-    // In production this would fetch from /api/portfolio
-    // For now, use mock data
-    /*
     fetch('/api/portfolio')
         .then(function(r) { return r.json(); })
-        .then(function(data) { renderAll(data); })
-        .catch(function(e) { console.error('portfolio fetch failed', e); });
-    */
-    var data = getMockData();
-    renderAll(data);
+        .then(function(data) {
+            if (data.source === 'unavailable' || !data.holdings || data.holdings.length === 0) {
+                // Fall back to mock so page is never blank
+                renderAll(getMockData());
+                var ts = new Date().toLocaleTimeString('en-US', { hour12: false });
+                document.getElementById('last-refresh').textContent =
+                    'MOCK DATA — Robinhood unavailable (' + (data.error || 'no data') + ')';
+            } else {
+                renderAll(data);
+            }
+        })
+        .catch(function(e) {
+            console.error('portfolio fetch failed', e);
+            renderAll(getMockData());
+        });
 }
 
 function renderAll(data) {

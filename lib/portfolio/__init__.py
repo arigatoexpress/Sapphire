@@ -1,9 +1,4 @@
-"""Sapphire portfolio integrations: read-only connectors to external brokers."""
+"""Sapphire portfolio integrations."""
+from .robinhood import RobinhoodReader
 
-__all__: list[str] = []
-
-try:
-    from .robinhood import RobinhoodReader
-    __all__ += ["RobinhoodReader"]
-except ImportError:
-    pass
+__all__ = ["RobinhoodReader"]

@@ -294,6 +294,25 @@ class SignalPipeline:
             and scored.routing != "BLOCKED"
             and scored.position_usd > 0
         )
+
+        # Record signal in performance tracker (lazy import — never blocks tests)
+        if is_live_entry:
+            try:
+                from lib.analytics.performance_tracker import PerformanceTracker
+                PerformanceTracker().record_signal({
+                    "signal_id": scored.pipeline_id,
+                    "symbol": scored.symbol,
+                    "direction": scored.direction,
+                    "confidence": scored.confidence,
+                    "regime": scored.regime,
+                    "entry_price": scored.price,
+                    "tp_price": scored.take_profit or None,
+                    "sl_price": scored.stop_loss or None,
+                    "source": scored.source,
+                    "enhancer_flags": scored.enhancer_flags,
+                })
+            except Exception as _e:
+                log.debug("performance tracker record_signal failed: %s", _e)
         with self._active_lock:
             prior_open = self._active.pop(scored.symbol, None)
             if is_live_entry:
@@ -393,6 +412,18 @@ class SignalPipeline:
                     "Failed to write outcome for pipeline_id=%s: %s",
                     open_signal.pipeline_id, e,
                 )
+            try:
+                from lib.analytics.performance_tracker import PerformanceTracker
+                entry_px = open_signal.price
+                pnl_pct = (close_price - entry_px) / entry_px if entry_px else None
+                PerformanceTracker().record_outcome(
+                    open_signal.pipeline_id,
+                    outcome="win" if pnl_usd > 0 else ("loss" if pnl_usd < 0 else "timeout"),
+                    exit_price=close_price,
+                    pnl_pct=pnl_pct,
+                )
+            except Exception as _e:
+                log.debug("performance tracker record_outcome failed: %s", _e)
 
         threading.Thread(target=_do_update, daemon=True, name="signal-outcome-writer").start()
 
