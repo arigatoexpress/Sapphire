@@ -50,6 +50,36 @@
       "owner": "Codex",
       "notes": "Implemented sync engine, next-actions artifacts, and /api/projects/sync endpoint.",
       "updated_at": "2026-03-24T22:53:00.893769+00:00"
+    },
+    {
+      "id": "card-invoice-pack",
+      "title": "Promote invoice recon execution pack into Sapphire",
+      "project": "Invoice Recon MVP",
+      "status": "done",
+      "priority": "high",
+      "owner": "Codex",
+      "notes": "Canonical docs now live under docs/invoice-recon-mvp and the initiative is tracked by the control plane.",
+      "updated_at": "2026-04-19T07:34:59Z"
+    },
+    {
+      "id": "card-invoice-architecture",
+      "title": "Lock canonical invoice model and posting state machine",
+      "project": "Invoice Recon MVP",
+      "status": "backlog",
+      "priority": "high",
+      "owner": "Codex",
+      "notes": "Define entity boundaries, extraction-to-review contract, idempotent posting semantics, and reconciliation states.",
+      "updated_at": "2026-04-19T07:34:59Z"
+    },
+    {
+      "id": "card-invoice-prd",
+      "title": "Compress research into founder-ready PRD and pilot package",
+      "project": "Invoice Recon MVP",
+      "status": "backlog",
+      "priority": "high",
+      "owner": "Claude",
+      "notes": "Turn the thesis into a concise PRD, pricing narrative, buyer objections, and pilot success scorecard.",
+      "updated_at": "2026-04-19T07:34:59Z"
     }
   ]
 }

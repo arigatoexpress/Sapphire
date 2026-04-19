@@ -249,6 +249,36 @@ def _default_board_cards() -> list[dict[str, Any]]:
             "notes": "Implemented sync engine, next-actions artifacts, and /api/projects/sync endpoint.",
             "updated_at": stamp,
         },
+        {
+            "id": "card-invoice-pack",
+            "title": "Promote invoice recon execution pack into Sapphire",
+            "project": "Invoice Recon MVP",
+            "status": "done",
+            "priority": "high",
+            "owner": "Codex",
+            "notes": "Canonical docs now live under docs/invoice-recon-mvp and the initiative is tracked by the control plane.",
+            "updated_at": stamp,
+        },
+        {
+            "id": "card-invoice-architecture",
+            "title": "Lock canonical invoice model and posting state machine",
+            "project": "Invoice Recon MVP",
+            "status": "backlog",
+            "priority": "high",
+            "owner": "Codex",
+            "notes": "Define entity boundaries, extraction-to-review contract, idempotent posting semantics, and reconciliation states.",
+            "updated_at": stamp,
+        },
+        {
+            "id": "card-invoice-prd",
+            "title": "Compress research into founder-ready PRD and pilot package",
+            "project": "Invoice Recon MVP",
+            "status": "backlog",
+            "priority": "high",
+            "owner": "Claude",
+            "notes": "Turn the thesis into a concise PRD, pricing narrative, buyer objections, and pilot success scorecard.",
+            "updated_at": stamp,
+        },
     ]
 
 
@@ -312,6 +342,21 @@ def _default_tracked_projects() -> dict[str, Any]:
                 ],
                 "github_required": False,
                 "notes": "Local Codex workspace repo. Contains operator tooling, memory, and exploratory automation tied into the PM loop.",
+            },
+            {
+                "id": "invoice-recon-mvp",
+                "name": "Invoice Recon MVP",
+                "slug": "invoice-recon-mvp",
+                "canonical_local_path": "/Users/aribs/Code/Sapphire/docs/invoice-recon-mvp",
+                "local_paths": [
+                    "/Users/aribs/Code/Sapphire/docs/invoice-recon-mvp",
+                    "/Users/aribs/Documents/Organized/Codex Projects/docs/invoice-recon-mvp",
+                ],
+                "github_urls": [
+                    "https://github.com/arigatoexpress/Sapphire",
+                ],
+                "github_required": False,
+                "notes": "Mid-market AP automation and payment reconciliation initiative. Sapphire holds the canonical execution pack; the Codex workspace remains a scratchpad during consolidation.",
             },
             {
                 "id": "cointracker",
