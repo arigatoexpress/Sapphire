@@ -13,7 +13,7 @@
       "atr": 2265,
       "confidence": 0.85,
       "opened_at": "2026-04-09T21:51:42.676305+00:00",
-      "peak_price": 73133,
+      "peak_price": 75537,
       "trailing_active": true
     },
     {
@@ -27,7 +27,7 @@
       "atr": 93,
       "confidence": 0.85,
       "opened_at": "2026-04-09T21:51:42.719936+00:00",
-      "peak_price": 2288.66,
+      "peak_price": 2332.87,
       "trailing_active": true
     }
   ],
