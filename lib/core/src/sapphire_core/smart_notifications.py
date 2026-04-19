@@ -10,8 +10,9 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass
 
-from error_classifier import ErrorCategory, ErrorSeverity
 from loguru import logger
+
+from lib.core.src.sapphire_core.error_classifier import ErrorCategory, ErrorSeverity
 
 
 @dataclass

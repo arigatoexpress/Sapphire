@@ -139,6 +139,18 @@ def _latest_pulse_file() -> Path | None:
     return files[-1] if files else None
 
 
+def _persist_market_pulse(body: str, sources: list[str]) -> None:
+    out_dir = DATA_DIR / "market_pulse"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = out_dir / f"pulse_{datetime.now(UTC).strftime('%Y%m%d')}.md"
+    footer = "\n".join(f"- `{src}`" for src in sources) if sources else "(none)"
+    text = f"{body}\n\n## Sources\n\n{footer}\n"
+    try:
+        path.write_text(text)
+    except OSError:
+        pass
+
+
 # ---------- fact extractors ----------
 
 def prediction_stats(preds: list[dict]) -> dict[str, Any]:
@@ -402,6 +414,7 @@ def generate_market_pulse_tweet() -> Report:
         _rel(DATA_DIR / "paper_portfolio.json"),
     ]
     body = _render_market_pulse(facts)
+    _persist_market_pulse(body, sources)
 
     return Report(
         kind="market_pulse",
@@ -548,9 +561,24 @@ def _render_market_pulse(f: dict[str, Any]) -> str:
         sym = fc.get("symbol", "?")
         d = fc.get("direction", "?")
         tp = fc.get("target_price")
-        parts.append(f"{sym} {d} → ${tp}")
+        conf = fc.get("confidence", 0)
+        tf = fc.get("timeframe", "24h")
+        parts.append(
+            f"{sym} forecast {d} toward ${tp} "
+            f"({conf:.0%} confidence, {tf} horizon)"
+        )
+    forecast_text = (
+        "; ".join(parts) if parts else "no live forecasts available today"
+    )
+    port = f["portfolio"]
+    holdings = port.get("open_positions", 0)
+    book_val = port.get("total_value", 0)
     return (
-        f"Market pulse: {'; '.join(parts) if parts else 'no live forecasts'}. "
-        f"Model accuracy {_fmt_pct(f['accuracy'])}, "
-        f"paper book at {f['portfolio']['pnl_pct']:+.2f}%."
+        f"Sapphire market pulse: {forecast_text}. "
+        f"Prediction model running at {_fmt_pct(f['accuracy'])} accuracy "
+        f"across scored signals. "
+        f"Paper portfolio at {port['pnl_pct']:+.2f}% overall "
+        f"with {holdings} open positions "
+        f"and ${book_val:,.0f} total book value. "
+        f"Signals generated from RSI, MACD, Bollinger, and moving average crossovers."
     )

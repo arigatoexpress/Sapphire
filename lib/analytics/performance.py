@@ -160,7 +160,7 @@ def _rolling_sharpe(trades: list[dict], bankroll: float, window: int = ROLLING_W
         mean = sum(rets) / len(rets)
         var = sum((r - mean) ** 2 for r in rets) / (len(rets) - 1)
         std = math.sqrt(var)
-        if std <= 0:
+        if std < 1e-12:
             continue
         sharpe = (mean / std) * math.sqrt(TRADING_DAYS)
         out.append({

@@ -58,9 +58,9 @@ class Platform(IntEnum):
     """Compact platform encoding."""
 
     ASTER = 0
-    ASTER = 1
+    HYPERLIQUID = 1
     LIGHTER = 2
-    ASTER = 3
+    ROBINHOOD = 3
 
 
 # Symbol to 2-byte index mapping (extensible)

@@ -29,6 +29,32 @@ from typing import Any
 
 log = logging.getLogger(__name__)
 
+
+# ---------------------------------------------------------------------------
+# Types shared with strategies.py and backtest_engine.py
+# ---------------------------------------------------------------------------
+
+@dataclass
+class Bar:
+    """Single OHLCV bar."""
+    ts: datetime
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float
+
+
+@dataclass
+class Decision:
+    """Signal from a strategy — direction + optional sizing / metadata."""
+    direction: str  # "long" | "short" | "flat"
+    size: float = 1.0
+    stop_pct: float = 0.0
+    tp_pct: float = 0.0
+    reason: str = ""
+
+
 DEFAULT_SYMBOLS = (
     # Crypto
     "BTC-USD", "ETH-USD", "SOL-USD", "ZEC-USD",
@@ -593,6 +619,14 @@ def main(argv: list[str] | None = None) -> int:
             f"trades {off.get('trade_count', 0)}→{on.get('trade_count', 0)}"
         )
     return 0
+
+
+# ---------------------------------------------------------------------------
+# Public aliases expected by strategies.py and run_strategies.py
+# ---------------------------------------------------------------------------
+
+BacktestReport = BacktestResult
+load_yfinance_ohlcv = _load_ohlcv
 
 
 if __name__ == "__main__":

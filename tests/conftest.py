@@ -2,10 +2,26 @@
 
 Many tests use old import paths (from src.X, from shared.X, from risk_kernel).
 This conftest adds the necessary directories to sys.path so they resolve.
+
+Also provides Python 3.10 compatibility shims for datetime.UTC and enum.StrEnum
+(both introduced in 3.11). The production target is 3.11+, but this lets tests
+run on 3.10 environments (CI images, sandboxes) without source changes.
 """
 
+import datetime
+import enum
 import sys
 from pathlib import Path
+
+# --- Python 3.10 compat shims (safe no-ops on 3.11+) -------------------------
+if not hasattr(datetime, "UTC"):
+    datetime.UTC = datetime.timezone.utc  # noqa: UP017
+
+if not hasattr(enum, "StrEnum"):
+    class _StrEnum(str, enum.Enum):  # noqa: UP042
+        """Minimal StrEnum backport for Python <3.11."""
+
+    enum.StrEnum = _StrEnum  # type: ignore[attr-defined]
 
 REPO_ROOT = Path(__file__).parent.parent
 
