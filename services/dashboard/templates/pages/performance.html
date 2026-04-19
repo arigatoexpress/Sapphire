@@ -441,6 +441,29 @@
     </div>
 </div>
 
+<!-- Prediction accuracy (TA scanner historical forecast quality) -->
+<div class="perf-section">
+    <div class="perf-section-title">Prediction Accuracy &mdash; TA Scanner Historical</div>
+    <div class="panel" style="padding: 0; margin-bottom: 0;">
+        <div class="table-scroll">
+            <table class="strat-table">
+                <thead>
+                    <tr>
+                        <th>Scope</th>
+                        <th>Total</th>
+                        <th>Scored</th>
+                        <th>Correct</th>
+                        <th>Accuracy</th>
+                    </tr>
+                </thead>
+                <tbody id="predictionAccuracyBody">
+                    <tr><td colspan="5" style="text-align:center; padding:24px; color: var(--text-muted);">Loading…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 <!-- Backtest leaderboard (projected performance from historical sweep) -->
 <div class="perf-section">
     <div class="perf-section-title">Backtest Leaderboard &mdash; Projected Performance</div>
@@ -904,6 +927,50 @@
         body.innerHTML = html;
     }
 
+    /* ── Render prediction accuracy from /api/prediction-accuracy ── */
+    function renderPredictionAccuracy(data) {
+        var body = document.getElementById('predictionAccuracyBody');
+        if (!body) return;
+        if (!data || data.total === 0) {
+            body.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:24px; color: var(--text-muted);">No predictions logged yet.</td></tr>';
+            return;
+        }
+        function _accCls(a) {
+            if (a == null) return '';
+            return a >= 0.6 ? 'val-pos' : a >= 0.4 ? '' : 'val-neg';
+        }
+        var html = '<tr>'
+            + '<td class="strat-name">OVERALL</td>'
+            + '<td>' + data.total + '</td>'
+            + '<td>' + data.scored + '</td>'
+            + '<td>' + data.correct + '</td>'
+            + '<td class="' + _accCls(data.accuracy) + '">' + fmtPct(data.accuracy) + '</td>'
+            + '</tr>';
+        var symbols = Object.keys(data.by_symbol || {}).sort();
+        symbols.forEach(function (sym) {
+            var s = data.by_symbol[sym];
+            html += '<tr>'
+                + '<td style="padding-left:20px;color:var(--cyan);">↳ ' + sym + '</td>'
+                + '<td>' + s.total + '</td>'
+                + '<td>' + s.scored + '</td>'
+                + '<td>' + s.correct + '</td>'
+                + '<td class="' + _accCls(s.accuracy) + '">' + fmtPct(s.accuracy) + '</td>'
+                + '</tr>';
+        });
+        var directions = Object.keys(data.by_direction || {}).sort();
+        directions.forEach(function (d) {
+            var s = data.by_direction[d];
+            html += '<tr>'
+                + '<td style="padding-left:20px;color:#9fd89c;">direction: ' + d + '</td>'
+                + '<td>' + s.total + '</td>'
+                + '<td>' + s.scored + '</td>'
+                + '<td>' + s.correct + '</td>'
+                + '<td class="' + _accCls(s.accuracy) + '">' + fmtPct(s.accuracy) + '</td>'
+                + '</tr>';
+        });
+        body.innerHTML = html;
+    }
+
     /* ── Render forecast table from /api/forecast ── */
     function renderForecast(payload) {
         var body = document.getElementById('forecastBody');
@@ -1098,6 +1165,13 @@
             .then(renderForecast)
             .catch(function (err) {
                 console.warn('forecast fetch failed', err);
+            });
+
+        fetch('/api/prediction-accuracy', {credentials: 'same-origin'})
+            .then(function (r) { return r.json(); })
+            .then(renderPredictionAccuracy)
+            .catch(function (err) {
+                console.warn('prediction-accuracy fetch failed', err);
             });
 
         var now = new Date().toISOString().replace('T', ' ').slice(0, 19);

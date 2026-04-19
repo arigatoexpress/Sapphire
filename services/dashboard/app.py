@@ -2183,6 +2183,21 @@ def api_strategy_performance():
         }), 200
 
 
+@app.route('/api/prediction-accuracy')
+@requires_auth
+def api_prediction_accuracy():
+    """TA-scanner prediction accuracy from data/trading_predictions.jsonl."""
+    try:
+        from lib.analytics.prediction_accuracy import report
+        return jsonify({**report(), 'last_updated': time.time()})
+    except Exception as e:
+        log.warning("prediction accuracy API error: %s", e)
+        return jsonify({
+            'error': str(e), 'total': 0, 'scored': 0, 'correct': 0,
+            'accuracy': None, 'by_symbol': {}, 'by_direction': {}, 'recent': [],
+        }), 200
+
+
 @app.route('/api/forecast')
 @requires_auth
 def api_forecast():
