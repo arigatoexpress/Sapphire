@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import importlib.util
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "tools"))
-import lumo_research as lr
+TOOLS = Path(__file__).parent.parent / "tools"
+sys.path.insert(0, str(TOOLS))
+sys.path.insert(0, str(TOOLS.parent / "lib"))
+
+_spec = importlib.util.spec_from_file_location("lumo_research", TOOLS / "internal" / "lumo_research.py")
+lr = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(lr)
 
 
 def test_action_ask_offline_returns_fallback(monkeypatch):

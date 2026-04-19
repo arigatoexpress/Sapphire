@@ -1,0 +1,375 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .rh-hero {
+        background: linear-gradient(135deg, var(--bg-card) 0%, rgba(99,102,241,0.05) 100%);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 24px 28px;
+        margin-bottom: 24px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }
+    .rh-chain-badge {
+        flex-shrink: 0;
+        padding: 14px 20px;
+        border-radius: 10px;
+        border: 1px solid rgba(99,102,241,0.4);
+        background: rgba(99,102,241,0.08);
+        text-align: center;
+        min-width: 160px;
+    }
+    .rh-chain-badge .chain-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: #818cf8;
+        letter-spacing: 0.04em;
+    }
+    .rh-chain-badge .chain-id {
+        font-size: 11px;
+        font-family: var(--font-mono);
+        color: var(--text-muted);
+        margin-top: 4px;
+    }
+    .rh-status-dot {
+        width: 8px; height: 8px;
+        border-radius: 50%;
+        background: var(--text-muted);
+        display: inline-block;
+        margin-right: 6px;
+        transition: background 300ms;
+    }
+    .rh-status-dot.connected { background: var(--green); box-shadow: 0 0 6px rgba(34,197,94,0.5); }
+    .rh-status-dot.error { background: var(--red); }
+    .rh-hero-meta { flex: 1; }
+    .rh-hero-meta h2 { margin: 0 0 6px; font-size: 18px; font-weight: 600; }
+    .rh-hero-meta p { margin: 0; font-size: 12px; color: var(--text-secondary); line-height: 1.6; }
+    .rh-hero-meta p a { color: #818cf8; text-decoration: none; }
+    .rh-hero-meta p a:hover { text-decoration: underline; }
+
+    .rh-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    @media (max-width: 900px) { .rh-grid { grid-template-columns: 1fr; } }
+
+    .rh-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 20px;
+    }
+    .rh-card-title {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        margin-bottom: 14px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .rh-stat-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 7px 0;
+        border-bottom: 1px solid var(--border);
+        font-size: 12px;
+    }
+    .rh-stat-row:last-child { border-bottom: none; }
+    .rh-stat-label { color: var(--text-secondary); }
+    .rh-stat-value { font-family: var(--font-mono); color: var(--text-primary); }
+    .rh-stat-value.addr { font-size: 10px; color: #818cf8; }
+    .rh-stat-value.addr a { color: inherit; text-decoration: none; }
+    .rh-stat-value.addr a:hover { text-decoration: underline; }
+    .rh-stat-value.loading { color: var(--text-muted); font-style: italic; }
+
+    .signal-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .signal-table th {
+        text-align: left;
+        color: var(--text-muted);
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 6px 10px;
+        border-bottom: 1px solid var(--border);
+    }
+    .signal-table td {
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--border);
+        font-family: var(--font-mono);
+        vertical-align: middle;
+    }
+    .signal-table tr:last-child td { border-bottom: none; }
+    .signal-table tr:hover td { background: rgba(255,255,255,0.02); }
+    .dir-long { color: var(--green); }
+    .dir-short { color: var(--red); }
+    .dir-neutral { color: var(--text-muted); }
+
+    .confidence-bar {
+        height: 4px;
+        background: var(--bg-elevated);
+        border-radius: 2px;
+        overflow: hidden;
+        width: 60px;
+        display: inline-block;
+        vertical-align: middle;
+        margin-left: 6px;
+    }
+    .confidence-fill {
+        height: 100%;
+        background: #818cf8;
+        border-radius: 2px;
+    }
+
+    .rh-empty { text-align: center; padding: 40px; color: var(--text-muted); font-size: 13px; }
+    .rh-empty code { display: block; margin-top: 8px; font-size: 11px; color: var(--text-muted); }
+
+    .rh-buildathon {
+        background: linear-gradient(135deg, rgba(99,102,241,0.06) 0%, rgba(168,85,247,0.06) 100%);
+        border: 1px solid rgba(99,102,241,0.25);
+        border-radius: 10px;
+        padding: 16px 20px;
+        margin-bottom: 24px;
+        font-size: 12px;
+        color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+    .rh-buildathon .badge {
+        flex-shrink: 0;
+        background: rgba(99,102,241,0.15);
+        border: 1px solid rgba(99,102,241,0.4);
+        color: #818cf8;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        padding: 4px 10px;
+        border-radius: 20px;
+        text-transform: uppercase;
+    }
+    .rh-refresh-btn {
+        background: rgba(99,102,241,0.12);
+        border: 1px solid rgba(99,102,241,0.3);
+        color: #818cf8;
+        font-size: 11px;
+        padding: 5px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-family: var(--font-mono);
+        transition: background 200ms;
+    }
+    .rh-refresh-btn:hover { background: rgba(99,102,241,0.22); }
+</style>
+
+<!-- Buildathon banner -->
+<div class="rh-buildathon">
+    <span class="badge">London Buildathon</span>
+    <span>Robinhood Chain testnet deployment — Arbitrum Orbit, Chain ID 46630. Target: June 25–28 2026.</span>
+</div>
+
+<!-- Hero: connection status -->
+<div class="rh-hero">
+    <div class="rh-chain-badge">
+        <div class="chain-name">ROBINHOOD CHAIN</div>
+        <div class="chain-id">chain id 46630</div>
+        <div style="margin-top:10px; font-size:11px;">
+            <span class="rh-status-dot" id="conn-dot"></span>
+            <span id="conn-label" style="color:var(--text-muted);">checking…</span>
+        </div>
+    </div>
+    <div class="rh-hero-meta">
+        <h2>Testnet Infrastructure</h2>
+        <p>
+            RPC: <a href="https://rpc.testnet.chain.robinhood.com" target="_blank">rpc.testnet.chain.robinhood.com</a> ·
+            Explorer: <a href="https://explorer.testnet.chain.robinhood.com" target="_blank">explorer.testnet.chain.robinhood.com</a><br>
+            Contracts: SapphireSignalVerifier · SapphirePaymentGate ·
+            Tooling: Foundry / Hardhat / Arbitrum Stylus
+        </p>
+    </div>
+    <button class="rh-refresh-btn" onclick="loadAll()">↺ refresh</button>
+</div>
+
+<!-- Stats grid -->
+<div class="rh-grid">
+    <!-- Chain status card -->
+    <div class="rh-card">
+        <div class="rh-card-title">Chain Status</div>
+        <div class="rh-stat-row">
+            <span class="rh-stat-label">Block number</span>
+            <span class="rh-stat-value" id="stat-block">—</span>
+        </div>
+        <div class="rh-stat-row">
+            <span class="rh-stat-label">Gas price</span>
+            <span class="rh-stat-value" id="stat-gas">—</span>
+        </div>
+        <div class="rh-stat-row">
+            <span class="rh-stat-label">On-chain signals</span>
+            <span class="rh-stat-value" id="stat-sigcount">—</span>
+        </div>
+        <div class="rh-stat-row">
+            <span class="rh-stat-label">SapphireSignalVerifier</span>
+            <span class="rh-stat-value addr" id="stat-verifier">—</span>
+        </div>
+        <div class="rh-stat-row">
+            <span class="rh-stat-label">SapphirePaymentGate</span>
+            <span class="rh-stat-value addr" id="stat-payment">—</span>
+        </div>
+    </div>
+
+    <!-- Payment gate card -->
+    <div class="rh-card">
+        <div class="rh-card-title">Payment Gate</div>
+        <div class="rh-stat-row">
+            <span class="rh-stat-label">Price per signal</span>
+            <span class="rh-stat-value" id="pay-per-signal">—</span>
+        </div>
+        <div class="rh-stat-row">
+            <span class="rh-stat-label">Monthly subscription</span>
+            <span class="rh-stat-value" id="pay-monthly">—</span>
+        </div>
+        <div class="rh-stat-row">
+            <span class="rh-stat-label">Payment contract</span>
+            <span class="rh-stat-value addr" id="pay-addr">—</span>
+        </div>
+        <div class="rh-stat-row">
+            <span class="rh-stat-label">Deploy script</span>
+            <span class="rh-stat-value" style="font-size:10px; color:var(--text-secondary);">scripts/deploy_robinhood_chain.py</span>
+        </div>
+        <div class="rh-stat-row">
+            <span class="rh-stat-label">Foundry config</span>
+            <span class="rh-stat-value" style="font-size:10px; color:var(--text-secondary);">foundry.toml</span>
+        </div>
+    </div>
+</div>
+
+<!-- On-chain signals table -->
+<div class="rh-card" style="margin-bottom:24px;">
+    <div class="rh-card-title" style="justify-content:space-between;">
+        <span>Recent On-Chain Signals</span>
+        <span id="signals-meta" style="font-size:10px; color:var(--text-muted); font-weight:400;"></span>
+    </div>
+    <div id="signals-container">
+        <div class="rh-empty">
+            Loading signals…
+            <code>SapphireSignalVerifier.getLatestSignals(10)</code>
+        </div>
+    </div>
+</div>
+
+<script>
+const EXPLORER = 'https://explorer.testnet.chain.robinhood.com';
+
+function shortAddr(addr) {
+    if (!addr || addr.length < 10) return addr || '—';
+    return addr.slice(0, 6) + '…' + addr.slice(-4);
+}
+
+function addrLink(addr) {
+    if (!addr) return '—';
+    return `<a href="${EXPLORER}/address/${addr}" target="_blank" title="${addr}">${shortAddr(addr)}</a>`;
+}
+
+async function loadStatus() {
+    try {
+        const r = await fetch('/api/chain/robinhood/status');
+        const d = await r.json();
+        const dot = document.getElementById('conn-dot');
+        const label = document.getElementById('conn-label');
+
+        if (d.connected) {
+            dot.className = 'rh-status-dot connected';
+            label.textContent = 'connected';
+            label.style.color = 'var(--green)';
+        } else {
+            dot.className = 'rh-status-dot error';
+            label.textContent = d.error || 'disconnected';
+            label.style.color = 'var(--red)';
+        }
+
+        document.getElementById('stat-block').textContent = d.block_number != null ? d.block_number.toLocaleString() : '—';
+        document.getElementById('stat-gas').textContent = d.gas_price_gwei != null ? d.gas_price_gwei.toFixed(4) + ' gwei' : '—';
+        document.getElementById('stat-sigcount').textContent = d.signal_count != null ? d.signal_count : (d.connected ? '0' : '—');
+        document.getElementById('stat-verifier').innerHTML = addrLink(d.signal_verifier_address);
+        document.getElementById('stat-payment').innerHTML = addrLink(d.payment_gate_address);
+    } catch (e) {
+        document.getElementById('conn-label').textContent = 'fetch error';
+    }
+}
+
+async function loadPayment() {
+    try {
+        const r = await fetch('/api/chain/robinhood/payment');
+        const d = await r.json();
+        if (d.error) {
+            document.getElementById('pay-per-signal').textContent = '—';
+            document.getElementById('pay-monthly').textContent = '—';
+            document.getElementById('pay-addr').textContent = 'not deployed';
+            return;
+        }
+        document.getElementById('pay-per-signal').textContent = d.price_per_signal_eth != null
+            ? d.price_per_signal_eth + ' ETH' : '—';
+        document.getElementById('pay-monthly').textContent = d.monthly_subscription_eth != null
+            ? d.monthly_subscription_eth + ' ETH / 30d' : '—';
+        document.getElementById('pay-addr').innerHTML = addrLink(d.payment_gate_address);
+    } catch (e) {}
+}
+
+async function loadSignals() {
+    const container = document.getElementById('signals-container');
+    const meta = document.getElementById('signals-meta');
+    try {
+        const r = await fetch('/api/chain/robinhood/signals?count=10');
+        const d = await r.json();
+
+        if (d.error || !d.signals || d.signals.length === 0) {
+            container.innerHTML = `<div class="rh-empty">
+                No on-chain signals yet — deploy contracts and publish your first signal.
+                <code>python3 scripts/deploy_robinhood_chain.py</code>
+            </div>`;
+            meta.textContent = '';
+            return;
+        }
+
+        meta.textContent = `${d.count} signal${d.count !== 1 ? 's' : ''}`;
+        const rows = d.signals.map(s => {
+            const dirClass = s.direction === 'long' ? 'dir-long' : s.direction === 'short' ? 'dir-short' : 'dir-neutral';
+            const pct = (s.confidence_bps / 100).toFixed(1);
+            const ts = new Date(s.timestamp * 1000).toISOString().replace('T', ' ').slice(0, 16);
+            const stratShort = s.strategy_id.slice(0, 8) + '…';
+            return `<tr>
+                <td>${s.id}</td>
+                <td>${s.symbol}</td>
+                <td class="${dirClass}">${s.direction.toUpperCase()}</td>
+                <td>
+                    ${pct}%
+                    <span class="confidence-bar"><span class="confidence-fill" style="width:${pct}%"></span></span>
+                </td>
+                <td style="color:var(--text-muted); font-size:10px;" title="${s.strategy_id}">${stratShort}</td>
+                <td style="color:var(--text-muted); font-size:10px;">${ts}</td>
+            </tr>`;
+        }).join('');
+
+        container.innerHTML = `<table class="signal-table">
+            <thead><tr>
+                <th>#</th><th>Symbol</th><th>Direction</th>
+                <th>Confidence</th><th>Strategy</th><th>Time (UTC)</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+        </table>`;
+    } catch (e) {
+        container.innerHTML = `<div class="rh-empty">Failed to load signals: ${e.message}</div>`;
+    }
+}
+
+function loadAll() {
+    loadStatus();
+    loadPayment();
+    loadSignals();
+}
+
+loadAll();
+setInterval(loadStatus, 30000);
+</script>
+{% endblock %}

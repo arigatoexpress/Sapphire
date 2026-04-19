@@ -1,0 +1,53 @@
+# Sapphire Agent Manifest
+#
+# The LEAN subset of the tool registry that the LLM (Claude Code, hermes-agent)
+# sees in its tool-selection context. Kept intentionally small: Kimi research
+# on tool-boundary architecture found that LLM tool-selection accuracy drops
+# from 74% → 49% as the manifest grows past ~8 tools.
+#
+# Inclusion criteria (all three must hold):
+#   1. Frequently used  — cold tools waste manifest budget.
+#   2. Requires LLM judgment to invoke  — if a scheduler or human always
+#      picks the action, the tool belongs in `internal`, not here.
+#   3. Clear, non-overlapping purpose  — overlapping tools cause confusion.
+#
+# Every entry here MUST also appear in infra/tool-registry.yaml with
+# status=registered and agent_facing=true. Validated in CI by
+# scripts/validate_tool_registry.py.
+
+version: 1
+
+# Agent-visible tool set (5 entries — lean by design).
+tools:
+  - name: sapphire_market
+    rationale: >
+      High-frequency, many parameter shapes (equity/crypto/macro/news), and
+      routing between OpenBB and TradingView requires LLM judgment based on
+      user intent.
+
+  - name: sapphire_dispatch
+    rationale: >
+      Dev-task routing — LLM classifies task complexity to pick the cheapest
+      capable tier. Core of the cost-optimization layer.
+
+  - name: sapphire_notify
+    rationale: >
+      Priority (p0/p1/p2) and message framing require judgment. Called often
+      in long-running tasks to surface findings to the user.
+
+  - name: sapphire_verify
+    rationale: >
+      Post-edit verification loop. LLM decides when the repo is at a state
+      worth verifying.
+
+  - name: sapphire_state
+    rationale: >
+      Factory memory — the LLM reads it to avoid re-attempting failed fixes
+      and writes it to record new known-issues/backoff timers.
+
+# Explicitly NOT in the manifest — here to document the pruning decision.
+excluded:
+  - name: sapphire_budget
+    reason: Ops query; a scheduled task or human checks budgets, not the LLM.
+  - name: sapphire_status
+    reason: Ops query; resolved via health_check or dashboard, not LLM tool call.

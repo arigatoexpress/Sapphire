@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import importlib.util
 import sys
 from pathlib import Path
 from types import SimpleNamespace
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "tools"))
-import threat_intel as ti
+TOOLS = Path(__file__).parent.parent / "tools"
+sys.path.insert(0, str(TOOLS))
+sys.path.insert(0, str(TOOLS.parent / "lib"))
+
+_spec = importlib.util.spec_from_file_location("threat_intel", TOOLS / "internal" / "threat_intel.py")
+ti = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(ti)
 
 
 def test_action_scan_handles_missing_dependency(monkeypatch):

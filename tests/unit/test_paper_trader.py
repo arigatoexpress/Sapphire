@@ -1,4 +1,4 @@
-"""Unit tests for plugins/claw-sapphire/tools/paper_trader.py."""
+"""Unit tests for plugins/claw-sapphire/tools/internal/paper_trader.py."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-TOOL = ROOT / "plugins" / "claw-sapphire" / "tools" / "paper_trader.py"
+TOOL = ROOT / "plugins" / "claw-sapphire" / "tools" / "internal" / "paper_trader.py"
 
 
 @pytest.fixture

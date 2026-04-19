@@ -835,6 +835,131 @@
             background: var(--amber);
         }
 
+        /* Nav groups */
+        .nav-sep {
+            width: 1px;
+            background: var(--border-dim);
+            margin: 4px var(--space-xs);
+            align-self: stretch;
+            flex-shrink: 0;
+        }
+        .nav-group-label {
+            font-size: 0.55rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.18em;
+            padding: 0 var(--space-xs);
+            align-self: center;
+            flex-shrink: 0;
+            opacity: 0.55;
+        }
+        /* Card component (used by newer pages) */
+        .card {
+            border: 1px solid var(--border-color);
+            background: rgba(11, 11, 26, 0.82);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: var(--space-lg);
+            position: relative;
+        }
+        .card-header {
+            padding: var(--space-md) var(--space-lg);
+            border-bottom: 1px solid var(--border-dim);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(98, 255, 64, 0.03);
+        }
+        .card-title {
+            font-family: var(--font-header);
+            font-size: 1rem;
+            color: var(--amber);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-weight: 400;
+        }
+        .card-body {
+            padding: var(--space-lg);
+        }
+        .card-body.no-pad { padding: 0; }
+        /* Stat card */
+        .stat-card {
+            border: 1px solid var(--border-dim);
+            background: rgba(98, 255, 64, 0.02);
+            border-radius: 8px;
+            padding: var(--space-md);
+            position: relative;
+        }
+        .stat-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: var(--space-xs);
+        }
+        .stat-value {
+            font-family: var(--font-header);
+            font-size: 1.8rem;
+            color: var(--amber);
+            line-height: 1.1;
+        }
+        .stat-change {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        /* Status dot */
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            flex-shrink: 0;
+        }
+        .status-dot.ok { background: var(--green); box-shadow: var(--glow-green); }
+        .status-dot.warn { background: var(--amber); box-shadow: var(--glow-amber); }
+        .status-dot.err { background: var(--red); }
+        .status-dot.info { background: var(--cyan); }
+        /* Pill badges */
+        .pill {
+            font-size: 0.68rem;
+            padding: 2px 8px;
+            border-radius: 12px;
+            border: 1px solid var(--border-dim);
+            color: var(--text-muted);
+        }
+        .pill.green { border-color: var(--green); color: var(--green); background: rgba(154,255,120,0.1); }
+        .pill.amber { border-color: var(--amber); color: var(--amber); background: rgba(98,255,64,0.1); }
+        .pill.red { border-color: var(--red); color: var(--red); background: rgba(255,111,158,0.1); }
+        .pill.neutral { border-color: var(--border-dim); }
+        /* CSS vars used by newer pages */
+        :root {
+            --accent: #60a5fa;
+            --success: var(--green);
+            --danger: var(--red);
+            --font-mono: var(--font-terminal);
+            --bg-card: rgba(11, 11, 26, 0.82);
+            --bg-card-hover: rgba(11, 11, 26, 0.95);
+            --border: var(--border-color);
+            --border-bright: var(--amber);
+            --radius: 8px;
+            --radius-lg: 10px;
+            --t-fast: 150ms;
+            --ease: ease-in-out;
+            --text-faint: var(--text-muted);
+            --muted: var(--text-muted);
+            --mono: var(--font-terminal);
+        }
+        /* Spinner */
+        .spinner {
+            width: 12px; height: 12px;
+            border: 2px solid var(--border-dim);
+            border-top-color: var(--amber);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            flex-shrink: 0;
+        }
+
         {% block extra_css %}{% endblock %}
     </style>
 </head>
@@ -875,6 +1000,11 @@
                 <span class="nav-group-label">Intel</span>
                 <a href="/intelligence" class="nav-item {% if current_page == 'intelligence' %}active{% endif %}">Intelligence</a>
                 <a href="/intel" class="nav-item {% if current_page == 'intel' %}active{% endif %}">Regional</a>
+            </div>
+            <div class="nav-group">
+                <span class="nav-group-label">Chain</span>
+                <a href="/chain" class="nav-item {% if current_page == 'chain' %}active{% endif %}">Regime</a>
+                <a href="/chain/robinhood" class="nav-item {% if current_page == 'robinhood_chain' %}active{% endif %}">Robinhood</a>
             </div>
             <div class="nav-group">
                 <span class="nav-group-label">Ops</span>

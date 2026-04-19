@@ -315,6 +315,30 @@
         </div>
     </div>
 </div>
+
+<!-- Quick nav cards -->
+<div style="margin-top:20px;">
+    <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.18em;margin-bottom:12px;">Quick Access</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">
+        {% for href, label, desc in [
+            ('/portfolio',   'Portfolio',    'Holdings & P&L'),
+            ('/performance', 'Performance',  'Strategy tracker'),
+            ('/factors',     'Factors',      'Factor heatmap'),
+            ('/cascade',     'Cascade',      'Liquidation risk'),
+            ('/intel',       'Intel Hub',    'Regional + threats'),
+            ('/chain',       'Chain',        'On-chain data'),
+            ('/analytics',   'Analytics',    'Equity curve'),
+            ('/soc',         'SOC',          'Security ops'),
+            ('/content',     'Content',      'Pipeline status'),
+            ('/predictions', 'Predictions',  'Kronos forecasts'),
+        ] %}
+        <a href="{{ href }}" style="border:1px solid var(--border-dim);border-radius:6px;padding:10px 12px;text-decoration:none;background:rgba(98,255,64,0.02);transition:border-color 0.2s,background 0.2s;" onmouseover="this.style.borderColor='var(--amber)';this.style.background='rgba(98,255,64,0.06)'" onmouseout="this.style.borderColor='var(--border-dim)';this.style.background='rgba(98,255,64,0.02)'">
+            <div style="font-family:var(--font-header);font-size:0.85rem;color:var(--amber);letter-spacing:0.05em;margin-bottom:3px;">{{ label }}</div>
+            <div style="font-size:0.63rem;color:var(--text-muted);">{{ desc }}</div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -519,5 +543,103 @@ function renderSignals(d) {
 
 refreshAll();
 setInterval(refreshAll, 60000);
+
+// ── Sapphire summary cards ────────────────────────────────────────────────────
+async function loadSummaryCards() {
+    // Portfolio equity
+    try {
+        const p = await fetch('/api/portfolio/summary').then(r => r.json());
+        const eq = p.equity || 100000;
+        const pnl = p.total_pnl_usd || 0;
+        document.getElementById('kpi-equity').textContent = '$' + Math.round(eq).toLocaleString();
+        const ed = document.getElementById('kpi-equity-delta');
+        ed.textContent = (pnl >= 0 ? '+' : '') + '$' + pnl.toFixed(2) + ' P&L · ' + ((p.win_rate||0)*100).toFixed(0) + '% win';
+        ed.className = 'kpi-delta ' + (pnl >= 0 ? 'positive' : 'negative');
+    } catch(e) { document.getElementById('kpi-equity').textContent = '—'; document.getElementById('kpi-equity-delta').textContent = 'unavailable'; }
+
+    // Regime + VPIN from chain overview
+    try {
+        const c = await fetch('/api/chain/overview').then(r => r.json());
+        const regime = (c.regime || c.market_regime || '—').toUpperCase();
+        document.getElementById('kpi-regime').textContent = regime;
+        document.getElementById('kpi-regime-delta').textContent = c.regime_confidence ? 'conf ' + (c.regime_confidence*100).toFixed(0) + '%' : 'on-chain signal';
+
+        const vpin = c.vpin !== undefined ? parseFloat(c.vpin) : null;
+        if (vpin !== null) {
+            document.getElementById('kpi-vpin').textContent = vpin.toFixed(3);
+            const vd = document.getElementById('kpi-vpin-delta');
+            vd.textContent = vpin > 0.7 ? 'HIGH — toxic flow' : vpin > 0.4 ? 'ELEVATED' : 'normal';
+            vd.className = 'kpi-delta ' + (vpin > 0.7 ? 'negative' : vpin > 0.4 ? '' : 'positive');
+        }
+    } catch(e) {
+        document.getElementById('kpi-regime').textContent = '—';
+        document.getElementById('kpi-regime-delta').textContent = 'chain offline';
+        document.getElementById('kpi-vpin').textContent = '—';
+        document.getElementById('kpi-vpin-delta').textContent = 'unavailable';
+    }
+
+    // Cascade risk
+    try {
+        const ca = await fetch('/api/cascade/risk').then(r => r.json());
+        const coins = ca.coins || [];
+        if (coins.length) {
+            const top = coins.sort((a,b) => b.risk_score - a.risk_score)[0];
+            document.getElementById('kpi-cascade').textContent = Math.round(top.risk_score);
+            const cd = document.getElementById('kpi-cascade-delta');
+            cd.textContent = top.symbol + ' — ' + (top.risk_score >= 75 ? 'CRITICAL' : top.risk_score >= 50 ? 'HIGH' : top.risk_score >= 25 ? 'ELEVATED' : 'LOW');
+            cd.className = 'kpi-delta ' + (top.risk_score >= 75 ? 'negative' : top.risk_score >= 50 ? '' : 'positive');
+        } else {
+            document.getElementById('kpi-cascade').textContent = '—';
+            document.getElementById('kpi-cascade-delta').textContent = ca.status || 'no data';
+        }
+    } catch(e) { document.getElementById('kpi-cascade').textContent = '—'; document.getElementById('kpi-cascade-delta').textContent = 'unavailable'; }
+
+    // Strategy performance
+    try {
+        const perf = await fetch('/api/performance/strategies').then(r => r.json());
+        const rb = perf.regime_breakdown || {};
+        const regimes = Object.entries(rb);
+        if (regimes.length) {
+            regimes.sort((a,b) => (b[1].win_rate||0) - (a[1].win_rate||0));
+            const best = regimes[0];
+            const worst = regimes[regimes.length - 1];
+            document.getElementById('kpi-perf-best').textContent = best[0];
+            document.getElementById('kpi-perf-best-delta').textContent = ((best[1].win_rate||0)*100).toFixed(0) + '% win rate';
+            document.getElementById('kpi-perf-worst').textContent = worst[0];
+            const wd = document.getElementById('kpi-perf-worst-delta');
+            wd.textContent = ((worst[1].win_rate||0)*100).toFixed(0) + '% win rate';
+            wd.className = 'kpi-delta ' + ((worst[1].win_rate||0) < 0.4 ? 'negative' : '');
+        } else {
+            document.getElementById('kpi-perf-best').textContent = '—';
+            document.getElementById('kpi-perf-best-delta').textContent = 'no backtest data';
+            document.getElementById('kpi-perf-worst').textContent = '—';
+            document.getElementById('kpi-perf-worst-delta').textContent = 'run backtest';
+        }
+    } catch(e) {
+        document.getElementById('kpi-perf-best').textContent = '—';
+        document.getElementById('kpi-perf-worst').textContent = '—';
+    }
+
+    // Content drafts
+    try {
+        const ct = await fetch('/api/content/drafts').then(r => r.json());
+        document.getElementById('kpi-content').textContent = ct.count || 0;
+        document.getElementById('kpi-content-delta').textContent = (ct.count||0) > 0 ? 'drafts ready to publish' : 'no drafts — run content engine';
+        document.getElementById('kpi-content-delta').className = 'kpi-delta ' + ((ct.count||0) > 0 ? 'positive' : '');
+    } catch(e) { document.getElementById('kpi-content').textContent = '—'; document.getElementById('kpi-content-delta').textContent = 'unavailable'; }
+
+    // System health
+    try {
+        const h = await fetch('/api/health/summary').then(r => r.json());
+        const total = (h.healthy_count||0) + (h.unhealthy_count||0);
+        document.getElementById('kpi-health').textContent = (h.healthy_count||0) + '/' + total;
+        const hd = document.getElementById('kpi-health-delta');
+        hd.textContent = h.healthy ? 'all services nominal' : (h.unhealthy_count||0) + ' down';
+        hd.className = 'kpi-delta ' + (h.healthy ? 'positive' : 'negative');
+    } catch(e) { document.getElementById('kpi-health').textContent = '—'; document.getElementById('kpi-health-delta').textContent = 'unavailable'; }
+}
+
+loadSummaryCards();
+setInterval(loadSummaryCards, 120000);
 </script>
 {% endblock %}

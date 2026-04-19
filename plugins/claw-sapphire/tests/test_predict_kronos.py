@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+import importlib.util
 import io
 import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "tools"))
-import predict_kronos as pk
+TOOLS = Path(__file__).parent.parent / "tools"
+sys.path.insert(0, str(TOOLS))
+sys.path.insert(0, str(TOOLS.parent / "lib"))
+
+_spec = importlib.util.spec_from_file_location("predict_kronos", TOOLS / "internal" / "predict_kronos.py")
+pk = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(pk)
 
 
 class _FakeResponse:

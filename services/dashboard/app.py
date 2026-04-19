@@ -1102,6 +1102,107 @@ def soc_page():
                            page_title='Security Operations Center')
 
 
+@app.route('/security/overview')
+@requires_auth
+def security_overview_page():
+    """Security intelligence: dependency scanner, model integrity, network surface."""
+    return render_template('pages/security.html', current_page='security',
+                           page_title='Security Overview')
+
+
+@app.route('/api/security/dependencies')
+@requires_auth
+def api_security_dependencies():
+    """Dependency scan: installed packages, CVEs, outdated versions."""
+    def fetch():
+        try:
+            from lib.security.dependency_scanner import DependencyScanner
+            scanner = DependencyScanner()
+            packages = scanner.scan_python()
+            risk = scanner.get_risk_score()
+            return {
+                'packages': packages,
+                'total_packages': risk['total_packages'],
+                'outdated': risk['outdated'],
+                'cve_count': risk['cve_count'],
+                'high_risk': risk['high_risk'],
+                'scanned_at': risk['scanned_at'],
+            }
+        except Exception as exc:
+            log.warning("dependency scan failed: %s", exc)
+            return {'packages': {}, 'total_packages': 0, 'outdated': 0,
+                    'cve_count': 0, 'high_risk': 0, 'error': str(exc)}
+
+    return jsonify(get_cached('security_deps', fetch))
+
+
+@app.route('/api/security/models')
+@requires_auth
+def api_security_models():
+    """Ollama model integrity: blob hash verification and template risk scan."""
+    def fetch():
+        try:
+            from lib.security.model_monitor import ModelIntegrityMonitor
+            monitor = ModelIntegrityMonitor()
+            models = monitor.verify_all_models()
+            templates = monitor.scan_templates()
+            import time as _time
+            return {
+                'models': models,
+                'templates': templates,
+                'total': len(models),
+                'ok_count': sum(1 for m in models.values() if m.get('status') == 'ok'),
+                'checked_at': __import__('datetime').datetime.now(
+                    __import__('datetime').timezone.utc).isoformat(),
+            }
+        except Exception as exc:
+            log.warning("model integrity check failed: %s", exc)
+            return {'models': {}, 'templates': {}, 'total': 0, 'ok_count': 0, 'error': str(exc)}
+
+    return jsonify(get_cached('security_models', fetch))
+
+
+@app.route('/api/security/network')
+@requires_auth
+def api_security_network():
+    """Network topology: Tailscale nodes, listening ports, attack surface scores."""
+    def fetch():
+        try:
+            from lib.security.network_mapper import NetworkMapper
+            mapper = NetworkMapper()
+            topology = mapper.get_topology()
+            attack_surface = mapper.get_attack_surface()
+            return {
+                'topology': topology,
+                'attack_surface': attack_surface,
+                'peer_count': topology.get('peer_count', 0),
+                'node_count': len(topology.get('nodes', [])),
+            }
+        except Exception as exc:
+            log.warning("network topology scan failed: %s", exc)
+            return {'topology': {}, 'attack_surface': {}, 'peer_count': 0,
+                    'node_count': 0, 'error': str(exc)}
+
+    return jsonify(get_cached('security_network', fetch))
+
+
+@app.route('/api/security/score')
+@requires_auth
+def api_security_score():
+    """Aggregate risk score (0–100) across dependency, model, and network dimensions."""
+    def fetch():
+        try:
+            from lib.security.dependency_scanner import DependencyScanner
+            risk = DependencyScanner().get_risk_score()
+            return risk
+        except Exception as exc:
+            log.warning("security score calculation failed: %s", exc)
+            return {'risk_score': 0, 'total_packages': 0, 'outdated': 0,
+                    'cve_count': 0, 'high_risk': 0, 'error': str(exc)}
+
+    return jsonify(get_cached('security_score', fetch))
+
+
 @app.route('/chain')
 @requires_auth
 def chain_page():
@@ -1125,6 +1226,65 @@ def api_chain_overview():
         return jsonify(ci.snapshot())
     except Exception as e:
         log.exception("chain overview failed")
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+
+
+@app.route('/chain/robinhood')
+@requires_auth
+def robinhood_chain_page():
+    """Robinhood Chain testnet: contract status, on-chain signals, payment gate."""
+    return render_template('pages/robinhood_chain.html', current_page='robinhood_chain',
+                           page_title='Robinhood Chain')
+
+
+@app.route('/api/chain/robinhood/status')
+@requires_auth
+def api_robinhood_chain_status():
+    """Chain health: block number, gas price, contract addresses."""
+    try:
+        from lib.chain.robinhood_chain import RobinhoodChainClient
+        client = RobinhoodChainClient()
+        status = client.get_chain_status()
+        return jsonify({
+            "connected": status.connected,
+            "chain_id": status.chain_id,
+            "block_number": status.block_number,
+            "gas_price_gwei": status.gas_price_gwei,
+            "signal_verifier_address": status.signal_verifier_address,
+            "payment_gate_address": status.payment_gate_address,
+            "signal_count": status.signal_count,
+            "error": status.error,
+        })
+    except Exception as e:
+        log.exception("robinhood chain status failed")
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+
+
+@app.route('/api/chain/robinhood/signals')
+@requires_auth
+def api_robinhood_chain_signals():
+    """Recent on-chain signals from SapphireSignalVerifier."""
+    count = min(int(request.args.get("count", 10)), 50)
+    try:
+        from lib.chain.robinhood_chain import RobinhoodChainClient
+        client = RobinhoodChainClient()
+        signals = client.get_signal_history(count)
+        return jsonify({"signals": signals, "count": len(signals)})
+    except Exception as e:
+        log.exception("robinhood chain signals failed")
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+
+
+@app.route('/api/chain/robinhood/payment')
+@requires_auth
+def api_robinhood_payment_stats():
+    """Payment gate pricing and stats."""
+    try:
+        from lib.chain.robinhood_chain import RobinhoodChainClient
+        client = RobinhoodChainClient()
+        return jsonify(client.get_payment_gate_stats())
+    except Exception as e:
+        log.exception("robinhood payment stats failed")
         return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
 
 
@@ -2367,6 +2527,124 @@ def api_backtest_results():
             'summary': {'have_results': False, 'best_per_symbol': [], 'total_backtests': 0},
             'leaderboard': {'rows': [], 'metric': 'sortino'},
         }), 200
+
+
+@app.route('/api/trading-brain')
+@requires_auth
+def api_trading_brain():
+    """Unified trading decision engine — aggregates TA, ensemble signals, Kronos, macro, and track record.
+
+    5-minute in-process cache (each call invokes 5 sub-tools per symbol).
+    Query params:
+      symbol — decide for a single symbol only; omit for dashboard (BTC + ETH + SOL)
+    """
+    import subprocess as _sp
+
+    symbol = request.args.get('symbol', '').strip().upper()
+    cache_key = f'trading_brain_{symbol or "dashboard"}'
+    BRAIN_CACHE = 300
+
+    now = time.time()
+    if cache_key in _cache and now - _cache_time.get(cache_key, 0) < BRAIN_CACHE:
+        return jsonify(_cache[cache_key])
+
+    tool_path = Path.home() / 'Code' / 'Sapphire' / 'plugins' / 'claw-sapphire' / 'tools' / 'trading_brain.py'
+    lib_path = Path.home() / 'Code' / 'Sapphire' / 'plugins' / 'claw-sapphire' / 'lib'
+    inp = json.dumps({'action': 'decide', 'symbol': symbol} if symbol else {'action': 'dashboard'})
+    env = {**__import__('os').environ, 'PYTHONPATH': str(lib_path)}
+
+    try:
+        result = _sp.run(
+            ['python3', str(tool_path)],
+            input=inp, capture_output=True, text=True, timeout=150, env=env,
+        )
+        if result.returncode != 0:
+            log.warning("trading_brain failed (rc=%s): %s", result.returncode, (result.stderr or "")[-500:])
+            return jsonify({'error': 'trading_brain process failed', 'decisions': {}}), 200
+        data = json.loads(result.stdout)
+        _cache[cache_key] = data
+        _cache_time[cache_key] = now
+        return jsonify(data)
+    except _sp.TimeoutExpired:
+        return jsonify({'error': 'trading_brain timed out (150s)', 'decisions': {}}), 200
+    except json.JSONDecodeError as e:
+        log.warning("trading_brain returned invalid JSON: %s", e)
+        return jsonify({'error': 'Invalid JSON from trading_brain', 'decisions': {}}), 200
+    except Exception as e:
+        log.warning("trading_brain endpoint error: %s", e)
+        return jsonify({'error': str(e), 'decisions': {}}), 200
+
+
+@app.route('/api/tho/market-intel')
+@requires_auth
+def api_tho_market_intel():
+    """THO housing market intelligence — FRED rates + Houston permits + THO customer analytics.
+
+    10-minute cache (housing data changes slowly).
+    Query params:
+      action — market (default) | buyers | report
+    """
+    import subprocess as _sp
+
+    action = request.args.get('action', 'market')
+    if action not in ('market', 'buyers', 'report'):
+        return jsonify({'error': f'Unknown action {action!r}. Valid: market, buyers, report'}), 400
+
+    cache_key = f'tho_market_intel_{action}'
+    THO_CACHE = 600
+
+    now = time.time()
+    if cache_key in _cache and now - _cache_time.get(cache_key, 0) < THO_CACHE:
+        return jsonify(_cache[cache_key])
+
+    tool_path = Path.home() / 'Code' / 'Sapphire' / 'plugins' / 'claw-sapphire' / 'tools' / 'tho_intel.py'
+
+    try:
+        result = _sp.run(
+            ['python3', str(tool_path)],
+            input=json.dumps({'action': action}), capture_output=True, text=True, timeout=60,
+        )
+        if result.stdout.strip():
+            data = json.loads(result.stdout)
+            _cache[cache_key] = data
+            _cache_time[cache_key] = now
+            return jsonify(data)
+        log.warning("tho_intel returned no stdout; stderr=%s", (result.stderr or "")[-500:])
+        return jsonify({'error': 'no output from tho_intel', 'success': False}), 200
+    except _sp.TimeoutExpired:
+        return jsonify({'error': 'tho_intel timed out (60s)', 'success': False}), 200
+    except Exception as e:
+        log.warning("tho market intel error: %s", e)
+        return jsonify({'error': str(e), 'success': False}), 200
+
+
+@app.route('/api/lumo/latest-pack')
+@requires_auth
+def api_lumo_latest_pack():
+    """Latest Lumo strategy research pack from data/lumo/.
+
+    Returns the most recently generated pack as markdown. To refresh:
+      echo '{"action":"pack"}' | python3 ~/Code/Sapphire/plugins/claw-sapphire/tools/lumo.py
+    """
+    lumo_dir = Path.home() / 'Code' / 'Sapphire' / 'data' / 'lumo'
+    packs = sorted(lumo_dir.glob('lumo_pack_*.md'), reverse=True) if lumo_dir.exists() else []
+    if not packs:
+        return jsonify({
+            'available': False,
+            'pack_count': 0,
+            'hint': "echo '{\"action\":\"pack\"}' | python3 ~/Code/Sapphire/plugins/claw-sapphire/tools/lumo.py",
+        }), 200
+    latest = packs[0]
+    try:
+        return jsonify({
+            'available': True,
+            'path': str(latest),
+            'generated': latest.stem.replace('lumo_pack_', ''),
+            'content': latest.read_text(),
+            'pack_count': len(packs),
+        })
+    except Exception as e:
+        return jsonify({'available': False, 'error': str(e)}), 200
 
 
 @app.route('/api/performance-timeseries')

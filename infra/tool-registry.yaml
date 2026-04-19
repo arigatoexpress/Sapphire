@@ -1,0 +1,290 @@
+# Sapphire Tool Registry
+#
+# Source of truth for every invocable tool in the repo. Validated by
+# scripts/validate_tool_registry.py (run in CI).
+#
+# Status values:
+#   registered  → agent-facing, listed in plugins/claw-sapphire/plugin.json
+#   internal    → invoked programmatically (scheduled tasks, hermes skills,
+#                 services); not exposed to the LLM tool manifest
+#   deprecated  → in sunset window; a thin wrapper in tools/_deprecated/
+#                 emits a DeprecationWarning on invocation
+#   retired     → removed from disk (listed here as a historical record)
+#
+# agent-manifest.yaml must be a strict subset of entries with status=registered
+# whose `agent_facing: true`. Keep the manifest lean — research shows LLM
+# tool-selection accuracy drops from 74% to 49% as manifest size grows.
+
+version: 1
+
+tools:
+  # ── registered / agent-facing ─────────────────────────────────────────────
+  - name: sapphire_dispatch
+    path: plugins/claw-sapphire/tools/dispatch.py
+    status: registered
+    agent_facing: true
+    owner: sapphire
+    consumers: [scheduled-tasks.factory-client-delivery, hermes-agent.kimi-delegate]
+    description: Route a dev task to the cheapest capable inference tier (T0 Nemotron / T1 Kimi / T3 Claude). Classifies complexity, checks budget, executes.
+
+  - name: sapphire_verify
+    path: plugins/claw-sapphire/tools/verify.py
+    status: registered
+    agent_facing: true
+    owner: sapphire
+    consumers: [hermes-agent.system-ops, claude-code.manual]
+    description: Run ruff + pytest on a repo. Returns pass/fail and safe-to-commit status. Use after code changes.
+
+  - name: sapphire_budget
+    path: plugins/claw-sapphire/tools/budget.py
+    status: registered
+    agent_facing: false
+    owner: sapphire
+    consumers: [scheduled-tasks.factory-repo-fixer, hermes-agent.inference-tier]
+    description: Show token usage per tier (T0/T1/T3) with budget bars and call counts.
+
+  - name: sapphire_state
+    path: plugins/claw-sapphire/tools/state.py
+    status: registered
+    agent_facing: true
+    owner: sapphire
+    consumers: [scheduled-tasks.factory-repo-fixer]
+    description: Read/write persistent factory state — known issues, fix attempts, backoff timers. Prevents re-attempting failed fixes.
+
+  - name: sapphire_status
+    path: plugins/claw-sapphire/tools/status.py
+    status: registered
+    agent_facing: false
+    owner: sapphire
+    consumers: [hermes-agent.system-health]
+    description: Query Sapphire mesh status — Tailscale devices, Ollama models on GPU and local.
+
+  - name: sapphire_notify
+    path: plugins/claw-sapphire/tools/notify.py
+    status: registered
+    agent_facing: true
+    owner: sapphire
+    consumers:
+      - scheduled-tasks.sapphire-morning-briefing
+      - scheduled-tasks.sapphire-ci-monitor
+      - scheduled-tasks.factory-test-guardian
+      - scheduled-tasks.trading-research
+      - hermes-agent.system-ops
+    description: Send a Telegram notification via NemotronRariBot (p0 urgent / p1 normal / p2 low).
+
+  - name: sapphire_market
+    path: plugins/claw-sapphire/tools/market.py
+    status: registered
+    agent_facing: true
+    owner: sapphire
+    consumers: [hermes-agent.trading-analysis, hermes-agent.macro-data]
+    description: "Unified market data — equity quotes, crypto OHLCV, FRED macro, news via OpenBB + TradingView live chart data + Pine CI. Actions: quote, crypto, historical, fred, news, snapshot, tv_quote, tv_ohlcv, tv_levels, tv_strategy, pine_ci."
+
+  # ── internal / programmatically invoked ──────────────────────────────────
+  # Trading & signals
+  - name: predict
+    path: plugins/claw-sapphire/tools/internal/predict.py
+    status: internal
+    owner: sapphire
+    consumers:
+      - scheduled-tasks.sapphire-morning-briefing
+      - scheduled-tasks.trading-research
+    description: 6-factor TA predictions (RSI, MACD, Bollinger, MA, ATR, volume). Scored nightly. 58% overall / 75% BTC win rate.
+
+  - name: predict_kronos
+    path: plugins/claw-sapphire/tools/internal/predict_kronos.py
+    status: internal
+    owner: sapphire
+    consumers: [scheduled-tasks.trading-research]
+    description: Kronos-base OHLCV forecasting. Preferred replacement for legacy kronos_predict.
+
+  - name: signal_generator
+    path: plugins/claw-sapphire/tools/internal/signal_generator.py
+    status: internal
+    owner: sapphire
+    consumers:
+      - scheduled-tasks.sapphire-morning-briefing
+      - scheduled-tasks.market-pulse
+    description: Autonomous RSI/MACD/BB/MA scanner → generates signals for paper trader.
+
+  - name: paper_trader
+    path: plugins/claw-sapphire/tools/internal/paper_trader.py
+    status: internal
+    owner: sapphire
+    consumers:
+      - scheduled-tasks.sapphire-morning-briefing
+      - scheduled-tasks.market-pulse
+      - hermes-agent.paper-trading
+    description: $100K paper portfolio — ATR-based SL/TP (1.67:1 R:R), 10% sizing, round-trip friction.
+
+  - name: crypto_portfolio
+    path: plugins/claw-sapphire/tools/internal/crypto_portfolio.py
+    status: internal
+    owner: sapphire
+    consumers: [hermes-agent.trading-analysis]
+    description: Read-only crypto portfolio snapshot across exchanges.
+
+  - name: backtest
+    path: plugins/claw-sapphire/tools/internal/backtest.py
+    status: internal
+    owner: sapphire
+    consumers: [hermes-agent.trading-analysis, scheduled-tasks.backtest-sweep]
+    description: Strategy backtester — Sortino/Calmar/Sharpe, fee-aware.
+
+  - name: trading_brain
+    path: plugins/claw-sapphire/tools/internal/trading_brain.py
+    status: internal
+    owner: sapphire
+    consumers:
+      - scheduled-tasks.sapphire-morning-briefing
+      - hermes-agent.trading-brain
+    description: Multi-source decision engine — TA + ensemble + Kronos + macro consensus for BTC/ETH/SOL.
+
+  - name: market_sentiment
+    path: plugins/claw-sapphire/tools/internal/market_sentiment.py
+    status: internal
+    owner: sapphire
+    consumers: [scheduled-tasks.sapphire-morning-briefing]
+    description: Fear & Greed + social sentiment composite.
+
+  - name: macro_data
+    path: plugins/claw-sapphire/tools/internal/macro_data.py
+    status: internal
+    owner: sapphire
+    consumers:
+      - scheduled-tasks.sapphire-morning-briefing
+      - hermes-agent.macro-data
+    description: FRED macro dashboard (CPI, unemployment, rates, housing). Graceful fallback when FRED_API_KEY unset.
+
+  # Intelligence & ops
+  - name: threat_intel
+    path: plugins/claw-sapphire/tools/internal/threat_intel.py
+    status: internal
+    owner: sapphire
+    consumers:
+      - scheduled-tasks.threat-intel-sweep
+      - scheduled-tasks.sapphire-morning-briefing
+      - hermes-agent.threat-intel
+      - tests.integration.test_ecosystem
+    description: CISA KEV / NVD / MITRE ATT&CK threat feed aggregation.
+
+  - name: starred_repos
+    path: plugins/claw-sapphire/tools/internal/starred_repos.py
+    status: internal
+    owner: sapphire
+    consumers:
+      - scheduled-tasks.github-discovery
+      - scheduled-tasks.sapphire-morning-briefing
+      - hermes-agent.repo-discovery
+    description: GitHub starred-repo sync + trending project discovery.
+
+  - name: vote_monitor
+    path: plugins/claw-sapphire/tools/internal/vote_monitor.py
+    status: internal
+    owner: sapphire
+    consumers: [scheduled-tasks.vote-monitor-collector]
+    description: DeFi vote-escrow pool snapshots (Blackhole/Supernova/FullSail) + strategy recs.
+
+  - name: health_check
+    path: plugins/claw-sapphire/tools/internal/health_check.py
+    status: internal
+    owner: sapphire
+    consumers:
+      - scheduled-tasks.sapphire-self-improvement
+      - hermes-agent.system-health
+    description: Full-mesh health probe — services, Ollama tiers, disk, Redis.
+
+  - name: watchdog
+    path: plugins/claw-sapphire/tools/internal/watchdog.py
+    status: internal
+    owner: sapphire
+    consumers:
+      - scheduled-tasks.tho-production-healthcheck
+      - scheduled-tasks.sapphire-morning-briefing
+    description: Service state-transition watchdog → Telegram on up/down changes.
+
+  - name: research
+    path: plugins/claw-sapphire/tools/internal/research.py
+    status: internal
+    owner: sapphire
+    consumers:
+      - scheduled-tasks.trading-research
+      - scheduled-tasks.sapphire-weekly-review
+    description: Prediction scoring + per-symbol accuracy history.
+
+  - name: digest
+    path: plugins/claw-sapphire/tools/internal/digest.py
+    status: internal
+    owner: sapphire
+    consumers: [scheduled-tasks.evening-digest]
+    description: Daily digest composer — merges signals, trades, threats into a single report.
+
+  - name: events
+    path: plugins/claw-sapphire/tools/internal/events.py
+    status: internal
+    owner: sapphire
+    consumers: [services.dashboard]
+    description: Event-bus read helper — recent events by tag.
+
+  - name: qa_aware_factory
+    path: plugins/claw-sapphire/tools/internal/qa_aware_factory.py
+    status: internal
+    owner: sapphire
+    consumers:
+      - scheduled-tasks.factory-repo-fixer
+      - scheduled-tasks.sapphire-weekly-review
+    description: Factory self-awareness — what files it edits, what tests it runs, what metrics it tracks.
+
+  # Outreach & specialized
+  - name: lead_engine
+    path: plugins/claw-sapphire/tools/internal/lead_engine.py
+    status: internal
+    owner: sapphire
+    consumers: [scheduled-tasks.lead-generation]
+    description: Autonomous outreach lead generation + prioritization.
+
+  - name: lead_enrich
+    path: plugins/claw-sapphire/tools/internal/lead_enrich.py
+    status: internal
+    owner: sapphire
+    consumers: [scheduled-tasks.lead-generation, tests.unit.test_lead_enrich]
+    description: Lead enrichment — intent classification, domain/email inference, tier scoring.
+
+  - name: tho_intel
+    path: plugins/claw-sapphire/tools/internal/tho_intel.py
+    status: internal
+    owner: sapphire
+    consumers: [scheduled-tasks.sapphire-morning-briefing, hermes-agent.tho-operations]
+    description: THO (housing) intelligence report generator.
+
+  - name: lumo
+    path: plugins/claw-sapphire/tools/internal/lumo.py
+    status: internal
+    owner: sapphire
+    consumers: [hermes-agent.cyber-intel]
+    description: Lumo-T5 cyber research workflow (chat mode).
+
+  - name: lumo_research
+    path: plugins/claw-sapphire/tools/internal/lumo_research.py
+    status: internal
+    owner: sapphire
+    consumers: [hermes-agent.cyber-intel]
+    description: Lumo-T5 structured research — briefs, CVE deep-dive, summaries.
+
+  - name: solana_wallet
+    path: plugins/claw-sapphire/tools/internal/solana_wallet.py
+    status: internal
+    owner: sapphire
+    consumers: []
+    description: Solana wallet helper — balance, SPL token lookups. (Thin wrapper over lib.trading.solana_wallet.)
+
+  # ── deprecated / sunset window ───────────────────────────────────────────
+  - name: kronos_predict
+    path: plugins/claw-sapphire/tools/_deprecated/kronos_predict.py
+    shim: plugins/claw-sapphire/tools/kronos_predict.py
+    status: deprecated
+    owner: sapphire
+    replacement: predict_kronos
+    remove_in: v0.5.0
+    consumers: []
+    description: Legacy Kronos forecaster — duplicate of predict_kronos. Use predict_kronos instead.

@@ -106,13 +106,24 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 
 `plugins/claw-sapphire/` contains 12 Claude Code tools registered in `plugin.json` plus companion stdin-JSON scripts under `plugins/claw-sapphire/tools/`.
 
-**Infra / ops**: `dispatch`, `verify`, `budget`, `state`, `status`, `notify`, `health_check`, `watchdog`, `events`
+```
+plugins/claw-sapphire/tools/
+├── <name>.py               registered  (7, agent-facing; listed in plugin.json)
+├── internal/<name>.py      internal    (24, invoked by scheduled tasks / hermes / services)
+└── _deprecated/<name>.py   deprecated  (1, in sunset window)
+```
 
 **Market / trading**: `market`, `predict`, `predict_kronos`, `signal_generator`, `paper_trader`, `backtest`, `crypto_portfolio`, `trading_brain`, `market_sentiment`, `macro_data`
 
-**Intelligence**: `threat_intel`, `starred_repos`, `vote_monitor`, `tho_intel`, `research`, `digest`, `qa_aware_factory`
+**Agent manifest** (`infra/agent-manifest.yaml`) — the lean 5-tool subset the LLM actually sees: `sapphire_market`, `sapphire_dispatch`, `sapphire_notify`, `sapphire_verify`, `sapphire_state`. `sapphire_budget` and `sapphire_status` are excluded (ops queries, no LLM judgment needed) but still registered and callable.
 
-**Outreach**: `lead_engine`
+**Invariants (CI-enforced):**
+1. Every `.py` under `tools/` (excluding `__init__.py`) is listed in the registry.
+2. Every registered tool's file exists and parses.
+3. Every deprecated entry has a shim that calls `warnings.warn(..., DeprecationWarning)`.
+4. `agent-manifest.yaml` is a strict subset of registry entries with `status: registered` and `agent_facing: true`.
+
+Run `python3 scripts/validate_tool_registry.py` locally; CI calls it in `sapphire-ci-monitor`.
 
 **Legacy compatibility alias**: `kronos_predict` delegates to `predict_kronos`
 

@@ -254,12 +254,19 @@ def transform_service_health(
     # Fallback: build from known services in infrastructure topology
     topology_path = root / "data" / "device_topology.json"
     topo = _load_json(topology_path)
-    for device in topo.get("devices") or []:
+    devices = topo.get("devices") or {}
+    if isinstance(devices, dict):
+        device_items = devices.items()
+    else:
+        device_items = ((d.get("name", ""), d) for d in devices if isinstance(d, dict))
+    for device_name, device in device_items:
+        if not isinstance(device, dict):
+            continue
         for svc in device.get("services") or []:
             svc_name = svc if isinstance(svc, str) else svc.get("name", "")
             if not svc_name:
                 continue
-            svc_id = _deterministic_id(device.get("name", ""), svc_name, "topology")
+            svc_id = _deterministic_id(device_name, svc_name, "topology")
             # Only add if no health data exists for this service
             if not any(o["service"] == svc_name for o in objects):
                 objects.append({
@@ -270,9 +277,9 @@ def transform_service_health(
                     "uptime_pct": None,
                     "error_count": 0,
                     "last_check": None,
-                    "host": device.get("ip") or device.get("name"),
+                    "host": device.get("tailscaleIp") or device.get("ip") or device_name,
                     "tier": None,
-                    "notes": f"From topology ({device.get('name', 'unknown')})",
+                    "notes": f"From topology ({device_name})",
                     "_sapphire_source": "data/device_topology.json",
                 })
 
