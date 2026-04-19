@@ -521,21 +521,32 @@ class BacktestEngine:
 
     @staticmethod
     def _align_aux(
-        main_bars: list[Bar],
-        aux: dict[str, list[Bar]],
-    ) -> dict[str, list[Bar]]:
-        """Forward-fill each aux series to match main_bars by date."""
-        result: dict[str, list[Bar]] = {}
+        main_bars,
+        aux: dict,
+    ) -> dict:
+        """Forward-fill each aux series to match main_bars.
+
+        _load_ohlcv in backtest.py returns list[dict] with 'date' string keys,
+        not Bar instances. This helper handles both cases so strategies work
+        whether the caller passes Bar dataclasses or raw yfinance dicts.
+        """
+        def _key(bar):
+            if isinstance(bar, dict):
+                return bar.get("date") or bar.get("ts")
+            return getattr(bar, "ts", None) or getattr(bar, "date", None)
+
+        result: dict = {}
         for key, aux_bars in aux.items():
             if not aux_bars:
                 result[key] = []
                 continue
-            by_date = {b.date: b for b in aux_bars}
-            aligned: list[Bar] = []
-            last: Bar = aux_bars[0]
+            by_key = {_key(b): b for b in aux_bars}
+            aligned = []
+            last = aux_bars[0]
             for mb in main_bars:
-                if mb.date in by_date:
-                    last = by_date[mb.date]
+                k = _key(mb)
+                if k in by_key:
+                    last = by_key[k]
                 aligned.append(last)
             result[key] = aligned
         return result
