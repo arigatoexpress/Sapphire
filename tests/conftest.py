@@ -11,6 +11,7 @@ run on 3.10 environments (CI images, sandboxes) without source changes.
 import datetime
 import enum
 import sys
+import tempfile
 from pathlib import Path
 
 # --- Python 3.10 compat shims (safe no-ops on 3.11+) -------------------------
@@ -24,6 +25,17 @@ if not hasattr(enum, "StrEnum"):
     enum.StrEnum = _StrEnum  # type: ignore[attr-defined]
 
 REPO_ROOT = Path(__file__).parent.parent
+
+# Redirect PerformanceTracker writes to a tmp dir during tests.
+# Without this, signal_pipeline.py:302 writes fixture signals into
+# data/performance/signals.jsonl, polluting the production performance log
+# that the dashboard and analytics pipelines read.
+_TEST_PERF_DIR = Path(tempfile.gettempdir()) / "sapphire-test-performance"
+_TEST_PERF_DIR.mkdir(exist_ok=True)
+sys.path.insert(0, str(REPO_ROOT))  # so lib.analytics resolves
+import lib.analytics.performance_tracker as _pt_module  # noqa: E402
+_pt_module.DATA_DIR = _TEST_PERF_DIR
+_pt_module.SIGNALS_FILE = _TEST_PERF_DIR / "signals.jsonl"
 
 # Add paths that tests expect to import from
 sys.path.insert(0, str(REPO_ROOT / "lib" / "core" / "src"))  # for: from sapphire_core.X
