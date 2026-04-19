@@ -2183,6 +2183,30 @@ def api_strategy_performance():
         }), 200
 
 
+@app.route('/api/convergence-watchlist')
+@requires_auth
+def api_convergence_watchlist():
+    """Convergence thesis watchlist — equities curated from Kimi P1 research
+    (Solar / Drone / Space / AI convergence). Static JSON file under
+    world_knowledge/research/kimi-p1-sun-drone/. Read-only; for live prices,
+    cross-reference with the TA scanner or OpenBB quote API.
+    """
+    try:
+        watchlist_path = (
+            Path(__file__).resolve().parents[2]
+            / "world_knowledge" / "research" / "kimi-p1-sun-drone"
+            / "convergence_watchlist.json"
+        )
+        if not watchlist_path.exists():
+            return jsonify({'error': 'watchlist not found', 'tiers': {}}), 200
+        data = json.loads(watchlist_path.read_text())
+        data['source_file'] = str(watchlist_path.relative_to(watchlist_path.parents[4]))
+        return jsonify(data)
+    except Exception as e:
+        log.warning("convergence watchlist API error: %s", e)
+        return jsonify({'error': str(e), 'tiers': {}}), 200
+
+
 @app.route('/api/prediction-accuracy')
 @requires_auth
 def api_prediction_accuracy():
