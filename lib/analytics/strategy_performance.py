@@ -286,10 +286,10 @@ def _stats_for(trades: list[dict[str, Any]]) -> dict[str, Any]:
     avg_win = (win_pnl / len(wins)) if wins else 0.0
     avg_loss = (loss_pnl / len(losses)) if losses else 0.0  # loss_pnl is negative already
     # Expectancy: E[trade PnL] under observed win rate
-    if win_rate is not None:
-        expectancy = win_rate * avg_win + (1 - win_rate) * avg_loss
-    else:
-        expectancy = None
+    expectancy = (
+        win_rate * avg_win + (1 - win_rate) * avg_loss
+        if win_rate is not None else None
+    )
     hold_avg = _avg_hold_hours(trades)
     sortino = _sortino(pnls)
     sharpe = _sharpe(rois) if rois else None
