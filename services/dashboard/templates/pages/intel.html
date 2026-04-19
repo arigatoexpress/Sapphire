@@ -602,10 +602,25 @@
         });
     }
 
-    /* ── Refresh Intel (stub) ── */
+    /* ── Map /api/intel payload shape into the feed renderer's shape ── */
+    function _adaptApiItem(raw) {
+        var severity = String(raw.severity || 'medium').toLowerCase();
+        var region = String(raw.region || 'GLOBAL').toUpperCase();
+        var source = raw.source || 'threat-intel';
+        var ts = raw.timestamp || '';
+        // If timestamp looks like a date-only string, append UTC suffix for display
+        if (ts && !/\d{2}:\d{2}/.test(ts)) ts = ts + ' UTC';
+        return {
+            region: region,
+            severity: severity,
+            title: raw.title || '(no title)',
+            timestamp: ts,
+            source: source,
+        };
+    }
+
+    /* ── Refresh Intel — pulls /api/intel (threat intel + regional workbench) ── */
     function refreshIntel() {
-        /* In production this would fetch from /api/intel or event bus.
-           For now, re-render mock data and update the sync timestamp. */
         var now = new Date();
         var ts = now.getUTCFullYear() + '-' +
                  String(now.getUTCMonth() + 1).padStart(2, '0') + '-' +
@@ -613,9 +628,23 @@
                  String(now.getUTCHours()).padStart(2, '0') + ':' +
                  String(now.getUTCMinutes()).padStart(2, '0') + ':' +
                  String(now.getUTCSeconds()).padStart(2, '0');
-
         document.getElementById('hero-sync').textContent = ts;
-        renderFeed(INTEL_ITEMS);
+
+        fetch('/api/intel', { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                var items = (data && data.items) || [];
+                if (!items.length) {
+                    // Fallback to seeded mock if the API returned nothing
+                    renderFeed(INTEL_ITEMS);
+                    return;
+                }
+                renderFeed(items.map(_adaptApiItem));
+            })
+            .catch(function (err) {
+                console.warn('intel fetch failed, showing seed items', err);
+                renderFeed(INTEL_ITEMS);
+            });
     }
 
     /* ── Countdown ── */
