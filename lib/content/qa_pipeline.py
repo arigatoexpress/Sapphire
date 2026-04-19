@@ -36,6 +36,12 @@ _KIND_OVERRIDES: dict[str, dict[str, Any]] = {
 }
 
 
+def _qa_text(report: Report) -> str:
+    if not report.sources:
+        return report.body
+    return report.body + "\n\nSources: " + " ".join(report.sources)
+
+
 @dataclass
 class QAResult:
     passed: bool
@@ -56,7 +62,8 @@ class QAResult:
 
 def run_qa(report: Report) -> QAResult:
     """Run the quality gate on *report* and return a structured result."""
-    result = _q.check(report.body)
+    qa_text = _qa_text(report)
+    result = _q.check(qa_text, facts=report.facts)
 
     # Apply per-kind overrides: re-filter reasons that the override relaxes
     overrides = _KIND_OVERRIDES.get(report.kind, {})
@@ -64,7 +71,7 @@ def run_qa(report: Report) -> QAResult:
 
     if "min_numbers" in overrides:
         min_n = overrides["min_numbers"]
-        reasons = [r for r in reasons if not r.startswith("data_density_low") or _q.count_numbers(report.body) < min_n]
+        reasons = [r for r in reasons if not r.startswith("data_density_low") or _q.count_numbers(qa_text) < min_n]
 
     if "min_originality_score" in overrides:
         floor = overrides["min_originality_score"]

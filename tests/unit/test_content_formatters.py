@@ -212,6 +212,23 @@ class TestFormatLinkedIn:
         result = format_linkedin(_crypto_report())
         assert SHORT_DISCLAIMER in result
 
+    def test_small_sample_crypto_omits_numeric_accuracy_claims(self):
+        result = format_linkedin(_crypto_report(facts={
+            "predictions": {
+                "total": 24,
+                "hits": 14,
+                "accuracy": 14 / 24,
+                "by_symbol": {
+                    "BTC": {"hits": 8, "total": 12, "accuracy": 8 / 12},
+                    "ETH": {"hits": 6, "total": 12, "accuracy": 6 / 12},
+                },
+            },
+        }))
+        assert "58.3%" not in result
+        assert "14/24" not in result
+        assert "8/12" not in result
+        assert "100-call threshold" in result
+
 
 # ── format_substack ────────────────────────────────────────────────────────────
 
@@ -305,3 +322,21 @@ class TestFormatXThread:
         result = format_x_thread(_unknown_report())
         assert isinstance(result, list)
         assert len(result) >= 1
+
+    def test_small_sample_crypto_thread_omits_numeric_accuracy_claims(self):
+        result = format_x_thread(_crypto_report(facts={
+            "predictions": {
+                "total": 24,
+                "hits": 14,
+                "accuracy": 14 / 24,
+                "by_symbol": {
+                    "BTC": {"hits": 8, "total": 12, "accuracy": 8 / 12},
+                    "ETH": {"hits": 6, "total": 12, "accuracy": 6 / 12},
+                },
+            },
+        }))
+        joined = "\n".join(result)
+        assert "58.3%" not in joined
+        assert "14/24" not in joined
+        assert "8/12" not in joined
+        assert "100 scored forecasts" in joined

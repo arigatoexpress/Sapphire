@@ -39,7 +39,7 @@ def _stamp() -> str:
 def _write_linkedin(report: Report, stamp: str) -> tuple[Path, quality.QualityReport]:
     text = formatters.format_linkedin(report)
     # LinkedIn posts are bullet-point format — relax coherence threshold
-    q = quality.check(text, min_coherence=0.2)
+    q = quality.check(text, min_coherence=0.2, facts=report.facts)
     path = READY_ROOT / "linkedin" / f"{stamp}_{report.kind}.md"
     path.write_text(text)
     return path, q
@@ -47,7 +47,7 @@ def _write_linkedin(report: Report, stamp: str) -> tuple[Path, quality.QualityRe
 
 def _write_substack(report: Report, stamp: str) -> tuple[Path, quality.QualityReport]:
     text = formatters.format_substack(report)
-    q = quality.check(text)
+    q = quality.check(text, facts=report.facts)
     path = READY_ROOT / "substack" / f"{stamp}_{report.kind}.md"
     path.write_text(text)
     return path, q
@@ -56,7 +56,7 @@ def _write_substack(report: Report, stamp: str) -> tuple[Path, quality.QualityRe
 def _write_x(report: Report, stamp: str) -> tuple[Path, quality.QualityReport]:
     thread = formatters.format_x_thread(report)
     combined = "\n\n".join(thread)
-    q = quality.check(combined)
+    q = quality.check(combined, facts=report.facts)
     path = READY_ROOT / "x" / f"{stamp}_{report.kind}.jsonl"
     with path.open("w") as f:
         for i, tweet in enumerate(thread):

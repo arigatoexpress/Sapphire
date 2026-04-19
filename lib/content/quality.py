@@ -14,6 +14,8 @@ institutional research checks that do not require external model calls:
 4. Unsupported conclusions: flag conclusion language without nearby proof.
 5. Argument coherence: reward linked, evidence-backed sentence flow.
 6. Originality: penalize cliche-heavy or repetitive phrasing.
+7. Small-sample performance claims: block public accuracy boasts before the
+   prediction sample is large enough to support them.
 
 The goal is still not literary beauty; it is truthful, specific,
 traceable, and decision-useful writing.
@@ -23,6 +25,8 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+
+from .performance_policy import has_public_accuracy_track_record, prediction_sample_size
 
 BANNED_PHRASES: tuple[str, ...] = (
     "in today's rapidly evolving",
@@ -59,6 +63,13 @@ _PATH_CITATION_RE = re.compile(
 )
 _URL_CITATION_RE = re.compile(r"https?://[^\s)]+")
 _TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9_-]*")
+_PERFORMANCE_CLAIM_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"\b\d+(?:\.\d+)?%\s+accuracy\b", re.IGNORECASE),
+    re.compile(r"\baccuracy\b[^.\n]{0,40}\b\d+(?:\.\d+)?%", re.IGNORECASE),
+    re.compile(r"\b\d+\s*/\s*\d+\s+correct\b", re.IGNORECASE),
+    re.compile(r"\b[A-Z]{2,10}\s+\d+\s*/\s*\d+\b"),
+    re.compile(r"\b[A-Z]{2,10}:\s*\d+\s*/\s*\d+\s*(?:\(\d+(?:\.\d+)?%\))?"),
+)
 
 _EVIDENCE_MARKERS: tuple[str, ...] = (
     "according to",
@@ -153,6 +164,7 @@ class QualityReport:
     originality_score: float = 0.0
     unsupported_claims: list[str] = field(default_factory=list)
     overreach_hits: list[str] = field(default_factory=list)
+    performance_claim_violations: list[str] = field(default_factory=list)
     reasons: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -170,6 +182,7 @@ class QualityReport:
             "originality_score": self.originality_score,
             "unsupported_claims": self.unsupported_claims,
             "overreach_hits": self.overreach_hits,
+            "performance_claim_violations": self.performance_claim_violations,
             "reasons": self.reasons,
         }
 
@@ -319,7 +332,25 @@ def citation_quality(text: str) -> float:
     return round(min(1.0, raw_score / max(1.0, len(sents) / 3)), 3)
 
 
-def check(text: str, min_coherence: float = MIN_ARGUMENT_COHERENCE) -> QualityReport:
+def find_small_sample_performance_claims(
+    text: str, facts: dict[str, object] | None = None
+) -> list[str]:
+    if facts is None or has_public_accuracy_track_record(facts):
+        return []
+    if prediction_sample_size(facts) <= 0:
+        return []
+    return [
+        sent
+        for sent in _sentences(text)
+        if any(pattern.search(sent) for pattern in _PERFORMANCE_CLAIM_PATTERNS)
+    ]
+
+
+def check(
+    text: str,
+    min_coherence: float = MIN_ARGUMENT_COHERENCE,
+    facts: dict[str, object] | None = None,
+) -> QualityReport:
     """Run all checks and return a structured report."""
     hits = count_banned(text)
     nums = count_numbers(text)
@@ -330,6 +361,7 @@ def check(text: str, min_coherence: float = MIN_ARGUMENT_COHERENCE) -> QualityRe
     coherence_score = coherence(text)
     originality_score = originality(text)
     citation_score = citation_quality(text)
+    performance_claim_violations = find_small_sample_performance_claims(text, facts)
 
     reasons: list[str] = []
     if len(hits) > MAX_BANNED:
@@ -367,6 +399,10 @@ def check(text: str, min_coherence: float = MIN_ARGUMENT_COHERENCE) -> QualityRe
         reasons.append(f"unsupported_conclusions ({len(unsupported)})")
     if overreach:
         reasons.append(f"logical_overreach ({len(overreach)})")
+    if performance_claim_violations:
+        reasons.append(
+            f"performance_claim_sample_too_small ({len(performance_claim_violations)})"
+        )
 
     return QualityReport(
         passed=not reasons,
@@ -382,5 +418,6 @@ def check(text: str, min_coherence: float = MIN_ARGUMENT_COHERENCE) -> QualityRe
         originality_score=originality_score,
         unsupported_claims=unsupported,
         overreach_hits=overreach,
+        performance_claim_violations=performance_claim_violations,
         reasons=reasons,
     )

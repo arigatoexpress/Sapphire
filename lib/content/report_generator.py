@@ -27,6 +27,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from .performance_policy import (
+    has_public_accuracy_track_record,
+    small_sample_accuracy_notice,
+)
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = REPO_ROOT / "data"
 
@@ -406,6 +411,7 @@ def generate_market_pulse_tweet() -> Report:
 
     facts = {
         "forecasts": forecasts,
+        "predictions": stats,
         "accuracy": stats["accuracy"],
         "portfolio": port,
     }
@@ -442,15 +448,28 @@ def _render_crypto_brief(f: dict[str, Any]) -> str:
     lines = []
     lines.append("## Where the Predictions Stand")
     lines.append("")
-    lines.append(
-        f"Across {preds['total']} scored forecasts, the 6-factor TA model hit "
-        f"{preds['hits']} ({_fmt_pct(preds['accuracy'])}). Per symbol:"
-    )
-    for sym, v in preds["by_symbol"].items():
+    if has_public_accuracy_track_record(preds):
         lines.append(
-            f"- {sym}: {v['hits']}/{v['total']} correct "
-            f"({_fmt_pct(v['accuracy'])})"
+            f"Across {preds['total']} scored forecasts, the 6-factor TA model hit "
+            f"{preds['hits']} ({_fmt_pct(preds['accuracy'])}). Per symbol:"
         )
+        for sym, v in preds["by_symbol"].items():
+            lines.append(
+                f"- {sym}: {v['hits']}/{v['total']} correct "
+                f"({_fmt_pct(v['accuracy'])})"
+            )
+    else:
+        lines.append(
+            small_sample_accuracy_notice(
+                preds, subject="The 6-factor TA model"
+            )
+        )
+        if preds["by_symbol"]:
+            lines.append(
+                "Coverage is live across "
+                + ", ".join(sorted(preds["by_symbol"]))
+                + ". Per-symbol hit-rate tables stay internal until the public sample clears 100 scored forecasts."
+            )
     lines.append("")
 
     if forecasts:
@@ -556,6 +575,7 @@ def _render_security(f: dict[str, Any]) -> str:
 
 
 def _render_market_pulse(f: dict[str, Any]) -> str:
+    preds = f.get("predictions", {})
     parts = []
     for fc in f["forecasts"]:
         sym = fc.get("symbol", "?")
@@ -573,10 +593,21 @@ def _render_market_pulse(f: dict[str, Any]) -> str:
     port = f["portfolio"]
     holdings = port.get("open_positions", 0)
     book_val = port.get("total_value", 0)
+    if has_public_accuracy_track_record(preds):
+        performance_line = (
+            f"Prediction model running at {_fmt_pct(preds.get('accuracy', 0.0))} accuracy "
+            f"across {preds.get('total', 0)} scored signals. "
+        )
+    else:
+        performance_line = (
+            small_sample_accuracy_notice(
+                preds, subject="The prediction model"
+            )
+            + " "
+        )
     return (
         f"Sapphire market pulse: {forecast_text}. "
-        f"Prediction model running at {_fmt_pct(f['accuracy'])} accuracy "
-        f"across scored signals. "
+        f"{performance_line}"
         f"Paper portfolio at {port['pnl_pct']:+.2f}% overall "
         f"with {holdings} open positions "
         f"and ${book_val:,.0f} total book value. "

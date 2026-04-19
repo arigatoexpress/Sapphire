@@ -13,6 +13,10 @@ Formatters do not invent facts; they only draw from `report.facts` and
 
 from __future__ import annotations
 
+from .performance_policy import (
+    has_public_accuracy_track_record,
+    small_sample_accuracy_notice,
+)
 from .report_generator import Report
 
 LINKEDIN_LIMIT = 1300
@@ -51,13 +55,23 @@ def _linkedin_crypto(r: Report) -> str:
     preds = f["predictions"]
     port = f["portfolio"]
     sig = f["signal_pipeline"]
-    hook = (
-        f"{preds['total']} scored predictions later, Sapphire's 6-factor TA "
-        f"model is at {preds['accuracy'] * 100:.1f}% accuracy."
-    )
-    symbol_line = " · ".join(
-        f"{s} {v['hits']}/{v['total']}" for s, v in preds["by_symbol"].items()
-    )
+    if has_public_accuracy_track_record(preds):
+        hook = (
+            f"{preds['total']} scored predictions later, Sapphire's 6-factor TA "
+            f"model is at {preds['accuracy'] * 100:.1f}% accuracy."
+        )
+        symbol_line = " · ".join(
+            f"{s} {v['hits']}/{v['total']}" for s, v in preds["by_symbol"].items()
+        )
+    else:
+        hook = small_sample_accuracy_notice(
+            preds, subject="Sapphire's 6-factor TA model"
+        )
+        tracked = ", ".join(sorted(preds["by_symbol"])) if preds["by_symbol"] else "live markets"
+        symbol_line = (
+            f"Coverage is live across {tracked}. "
+            "Per-symbol hit-rate tables stay internal until the public sample clears 100 scored forecasts."
+        )
     book = (
         f"Paper book: ${port['capital']:,.0f} on a $100K start "
         f"({port['pnl_pct']:+.2f}%), {port['open_positions']} open."
@@ -177,14 +191,27 @@ def _x_crypto_parts(r: Report) -> list[str]:
     f = r.facts
     preds = f["predictions"]
     port = f["portfolio"]
-    parts = [
-        "Sapphire weekly crypto brief — thread.",
-        f"Predictions: {preds['hits']}/{preds['total']} correct "
-        f"({preds['accuracy'] * 100:.1f}% accuracy).",
-    ]
-    for sym, v in preds["by_symbol"].items():
-        acc = v["accuracy"] * 100
-        parts.append(f"{sym}: {v['hits']}/{v['total']} ({acc:.1f}%).")
+    parts = ["Sapphire weekly crypto brief — thread."]
+    if has_public_accuracy_track_record(preds):
+        parts.append(
+            f"Predictions: {preds['hits']}/{preds['total']} correct "
+            f"({preds['accuracy'] * 100:.1f}% accuracy)."
+        )
+        for sym, v in preds["by_symbol"].items():
+            acc = v["accuracy"] * 100
+            parts.append(f"{sym}: {v['hits']}/{v['total']} ({acc:.1f}%).")
+    else:
+        parts.append(
+            small_sample_accuracy_notice(
+                preds, subject="The 6-factor TA model"
+            )
+        )
+        if preds["by_symbol"]:
+            parts.append(
+                "Coverage live across "
+                + ", ".join(sorted(preds["by_symbol"]))
+                + ". Per-symbol accuracy tables stay internal until the public sample clears 100 scored forecasts."
+            )
     parts.append(
         f"Paper book: ${port['capital']:,.0f} "
         f"({port['pnl_pct']:+.2f}% vs $100K), "

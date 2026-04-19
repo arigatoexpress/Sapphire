@@ -29,6 +29,7 @@ from lib.content.quality import (  # type: ignore
     evidence_metrics,
     extract_citations,
     find_overreach,
+    find_small_sample_performance_claims,
     find_unsupported_claims,
     originality,
     readability,
@@ -271,6 +272,7 @@ class TestCheck:
             "originality_score",
             "unsupported_claims",
             "overreach_hits",
+            "performance_claim_violations",
             "reasons",
         }
 
@@ -282,6 +284,13 @@ class TestCheck:
     def test_to_dict_passed_is_bool(self):
         d = check(_good_text()).to_dict()
         assert isinstance(d["passed"], bool)
+
+    def test_fails_on_small_sample_accuracy_claim(self):
+        text = "The model is at 58.3% accuracy across 14/24 scored forecasts."
+        report = check(text, facts={"predictions": {"total": 24}})
+        assert report.passed is False
+        assert report.performance_claim_violations == [text]
+        assert any("performance_claim_sample_too_small" in r for r in report.reasons)
 
 
 class TestResearchSignals:
@@ -320,3 +329,17 @@ class TestResearchSignals:
         )
         score = citation_quality(text)
         assert score >= MIN_CITATION_QUALITY
+
+    def test_find_small_sample_performance_claims(self):
+        text = (
+            "Track record note.\n"
+            "Predictions: 14/24 correct (58.3% accuracy).\n"
+            "BTC 8/12"
+        )
+        violations = find_small_sample_performance_claims(
+            text, {"predictions": {"total": 24}}
+        )
+        assert violations == [
+            "Predictions: 14/24 correct (58.3% accuracy)",
+            "BTC 8/12",
+        ]

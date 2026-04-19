@@ -16,6 +16,10 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Literal
 
+from .performance_policy import (
+    has_public_accuracy_track_record,
+    small_sample_accuracy_notice,
+)
 from . import report_generator as rg
 
 AngleKind = Literal["crypto_perf", "agent_infra", "security"]
@@ -69,13 +73,24 @@ def _crypto_angle() -> tuple[str, list[str]]:
     report = rg.generate_weekly_crypto_brief()
     preds = report.facts["predictions"]
     port = report.facts["portfolio"]
-    line = (
-        f"Sapphire's 6-factor TA model is at "
-        f"{preds['accuracy'] * 100:.1f}% across {preds['total']} scored forecasts; "
-        f"BTC track is {preds['by_symbol'].get('BTC', {}).get('accuracy', 0) * 100:.0f}%. "
-        f"Paper book at {port['pnl_pct']:+.2f}% on $100K, "
-        f"{port['open_positions']} open."
-    )
+    if has_public_accuracy_track_record(preds):
+        line = (
+            f"Sapphire's 6-factor TA model is at "
+            f"{preds['accuracy'] * 100:.1f}% across {preds['total']} scored forecasts; "
+            f"BTC track is {preds['by_symbol'].get('BTC', {}).get('accuracy', 0) * 100:.0f}%. "
+            f"Paper book at {port['pnl_pct']:+.2f}% on $100K, "
+            f"{port['open_positions']} open."
+        )
+    else:
+        tracked = ", ".join(sorted(preds["by_symbol"])) if preds["by_symbol"] else "our live markets"
+        line = (
+            small_sample_accuracy_notice(
+                preds, subject="Sapphire's 6-factor TA model"
+            )
+            + f" Coverage is live across {tracked}. "
+            f"Paper book at {port['pnl_pct']:+.2f}% on $100K, "
+            f"{port['open_positions']} open."
+        )
     return line, report.sources
 
 
