@@ -372,6 +372,7 @@ class TestDecisionEngineWiring:
     def test_decision_engine_block_overrides_routing(self, pipeline, monkeypatch):
         pl, _ = pipeline
         from unittest.mock import MagicMock
+
         import signal_pipeline as sp  # type: ignore
         fake_dec = MagicMock()
         fake_dec.verdict = "BLOCK"
@@ -388,6 +389,7 @@ class TestDecisionEngineWiring:
     def test_decision_engine_reduce_adjusts_confidence(self, pipeline, monkeypatch):
         pl, _ = pipeline
         from unittest.mock import MagicMock
+
         import signal_pipeline as sp  # type: ignore
         fake_dec = MagicMock()
         fake_dec.verdict = "REDUCE"
@@ -404,6 +406,7 @@ class TestDecisionEngineWiring:
     def test_decision_engine_error_is_caught(self, pipeline, monkeypatch):
         pl, _ = pipeline
         from unittest.mock import MagicMock
+
         import signal_pipeline as sp  # type: ignore
         fake_engine = MagicMock()
         fake_engine.evaluate.side_effect = RuntimeError("chain data unavailable")

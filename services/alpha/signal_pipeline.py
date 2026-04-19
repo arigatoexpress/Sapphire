@@ -95,7 +95,7 @@ except ImportError:
 # Decision engine — world-state-aware confidence gate (regime/funding/fear-greed).
 try:
     from lib.core.decision_engine import DecisionEngine as _DecisionEngine
-    _DECISION_ENGINE: "_DecisionEngine | None" = _DecisionEngine()
+    _DECISION_ENGINE: _DecisionEngine | None = _DecisionEngine()
     _DECISION_ENGINE_AVAILABLE = True
 except Exception:
     _DECISION_ENGINE = None

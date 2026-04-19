@@ -16,8 +16,6 @@ from lib.content.quality import (  # type: ignore
     MAX_AVG_SENTENCE_WORDS,
     MAX_BANNED,
     MIN_NUMBERS,
-    MIN_WORDS,
-    QualityReport,
     check,
     count_banned,
     count_numbers,

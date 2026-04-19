@@ -7,8 +7,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import pytest
-
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from lib.content.formatters import (  # type: ignore
@@ -21,7 +19,6 @@ from lib.content.formatters import (  # type: ignore
     format_x_thread,
 )
 from lib.content.report_generator import Report  # type: ignore
-
 
 # ── Fixtures ───────────────────────────────────────────────────────────────────
 

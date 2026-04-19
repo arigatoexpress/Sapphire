@@ -17,8 +17,6 @@ import signal
 import sys
 import tempfile
 import time
-
-import requests
 from collections import defaultdict, deque
 from collections.abc import Callable
 from datetime import UTC, datetime

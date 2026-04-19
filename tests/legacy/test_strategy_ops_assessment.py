@@ -1,4 +1,5 @@
 import pytest
+
 pytest.skip("Legacy test — depends on removed module", allow_module_level=True)
 pytestmark = pytest.mark.skip(reason="Legacy test — depends on removed module")
 import importlib.util

@@ -5,7 +5,6 @@ Run: /usr/local/bin/python3 -m pytest tests/unit/test_confirmation_firewall.py -
 from __future__ import annotations
 
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -15,12 +14,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import lib.core.confirmation_firewall as fw_module  # type: ignore
 from lib.core.confirmation_firewall import (  # type: ignore
+    DAILY_AUTO_LIMIT,
     ActionRisk,
-    classify_action,
     _load_daily_spend,
     _record_spend,
     _try_consume_daily_budget,
-    DAILY_AUTO_LIMIT,
+    classify_action,
 )
 
 

@@ -57,7 +57,6 @@ if not AUTH_PASSWORD:
     raise RuntimeError("AUTH_PASSWORD environment variable must be set")
 
 # x402 payment gate — optional, disabled unless X402_ENABLED=1
-import contextlib
 import sys as _sys  # noqa: E402
 
 _LIB_PAYMENTS = Path.home() / "Code" / "Sapphire"
@@ -537,7 +536,6 @@ def api_logs():
 
 def _event_bus():
     """Import event bus lazily — dashboard should start even if lib/core missing."""
-    import sys as _sys
     _p = Path.home() / "Code" / "Sapphire" / "lib" / "core"
     if str(_p) not in _sys.path:
         _sys.path.insert(0, str(_p))
@@ -637,7 +635,6 @@ def api_events_replay():
 
 def _event_bus():
     """Import event bus lazily — dashboard should start even if lib/core missing."""
-    import sys as _sys
     _p = Path.home() / "Code" / "Sapphire" / "lib" / "core"
     if str(_p) not in _sys.path:
         _sys.path.insert(0, str(_p))
@@ -1126,7 +1123,6 @@ def api_trading_metrics():
     from pathlib import Path as _Path
 
     def fetch():
-        import sys as _sys
         _alpha = _Path.home() / 'Code' / 'Sapphire' / 'services' / 'alpha'
         if str(_alpha) not in _sys.path:
             _sys.path.insert(0, str(_alpha))
@@ -1212,7 +1208,6 @@ def chain_page():
 @x402_require(0.01, description="On-chain intelligence snapshot")
 def api_chain_overview():
     """Unified on-chain snapshot — regime, funding, OI, TVL, stablecoins."""
-    import sys as _sys
     from pathlib import Path as _Path
     _root = _Path.home() / 'Code' / 'Sapphire'
     if str(_root) not in _sys.path:
@@ -1248,7 +1243,6 @@ def analytics_page():
 def api_analytics():
     """Full analytics report from signal + paper trading data."""
     def fetch():
-        import sys as _sys
         from pathlib import Path as _Path
         repo_root = _Path(__file__).resolve().parents[2]
         if str(repo_root) not in _sys.path:
@@ -1262,7 +1256,6 @@ def api_analytics():
 @x402_require(0.02, description="Portfolio risk analytics")
 def api_risk_metrics():
     """Portfolio metrics computed from paper_trading + signal audit logs."""
-    import sys as _sys
     from dataclasses import asdict
     from pathlib import Path as _Path
     _root = _Path.home() / 'Code' / 'Sapphire'
@@ -1330,7 +1323,6 @@ def api_risk_backtest():
 @requires_auth
 def api_correlation():
     """30-day rolling correlation matrix across crypto + equities + macro."""
-    import sys as _sys
     from dataclasses import asdict
     from pathlib import Path as _Path
     _root = _Path.home() / 'Code' / 'Sapphire'
@@ -1630,7 +1622,6 @@ def api_soc_threats():
     Reads saved reports first (fast), falls back to live fetch if stale (>4h).
     """
     import re as _re
-    import sys as _sys
 
     CTB_SRC = Path.home() / 'Code' / 'cyber-threat-bot' / 'src'
     THREAT_CACHE = 240  # 4 hours — live fetch is slow (NVD rate limits)
