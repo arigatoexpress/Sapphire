@@ -26,10 +26,11 @@ from __future__ import annotations
 import json
 import logging
 from collections import defaultdict
+from collections.abc import Iterable
 from datetime import datetime, timedelta
 from pathlib import Path
 from statistics import stdev
-from typing import Any, Iterable
+from typing import Any
 
 log = logging.getLogger(__name__)
 
