@@ -60,7 +60,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `lib/payments/` | library | **x402 HTTP 402 micropayment middleware** (Flask + raw-socket gates, EVM signatures) |
 | `lib/chain/` | library | **On-chain intelligence**: regime, funding, OI, TVL, stablecoin supply, whale flow |
 | `lib/content/` | library | **Content engine**: weekly report generator, outreach, quality gate, publisher (Substack/X/LinkedIn/Typefully) |
-| `lib/analytics/` | library | CPCV, regime GMM, VPIN, backtest engine, risk engine, liquidation, correlation |
+| `lib/analytics/` | library | CPCV, regime GMM, VPIN, backtest engine, risk engine, liquidation, correlation, **strategy_performance** (× timeframe aggregator), **backtest_results** (sweep reader), **forecast** (Kronos+TA consensus) |
 | `lib/agents/` | library | OpenClaw/NemoClaw dispatch, orchestrator, runtime policy, token governor |
 | `lib/telegram/` | library | Telegram bot framework + handlers |
 | `lib/intel/` | library | Lead enrichment, threat feed aggregation |
@@ -196,6 +196,19 @@ hermes-agent (NousResearch) replaced custom bot. Installed at ~/.hermes/.
 
 JSONL at `data/system_events.jsonl`. Tags: `project:` `agent:` `priority:` `type:` `service:` `device:`
 Registries: `data/connectors.json`, `data/device_topology.json`
+
+## Performance Analytics (2026-04-19)
+
+`/performance` dashboard page is fully wired to real trade data via four endpoints:
+
+- `GET /api/strategy-performance` — `lib.analytics.strategy_performance.report()`. Unified trade stream (data/signals/\*.jsonl + data/performance/signals.jsonl + data/paper_portfolio.json history, deduplicated by key). Returns overall / by_strategy / by_timeframe / by_strategy_timeframe / by_symbol. Timeframe buckets by hold duration: 1h, 4h, 1d, 7d, 30d, all. Per-bucket metrics: trades, win_rate, total_pnl_usd, avg_pnl_usd, best/worst, profit_factor, sortino, avg_roi_pct, portfolio_roi_pct.
+- `GET /api/performance-timeseries` — `lib.analytics.strategy_performance.timeseries()`. Equity curve (cumulative P&L per closed trade, anchored to paper_portfolio.json initial_capital), drawdown series (running peak), monthly returns (year/month grid). Powers the SVG charts + monthly grid.
+- `GET /api/backtest-results?metric={sortino|sharpe|calmar|total_return_pct|win_rate|profit_factor}&limit=10` — `lib.analytics.backtest_results.summary()` + `leaderboard()`. Reads latest strategy_sweep_\*.json / best_per_symbol_\*.json artifacts under `data/backtests/strategies/`, sanitizes `Infinity`/`NaN` (strict-JSON-safe), filters rows with <5 trades by default.
+- `GET /api/forecast` — `lib.analytics.forecast.forecast()`. Reconciles Kronos OHLCV projections (`data/intelligence/<date>/predictions.json`) with TA-scanner predictions (`data/trading_predictions.jsonl`, <36h old), aliases BTC-USD↔BTC etc. Emits `consensus` (AGREE_BULL|AGREE_BEAR|CONTRADICT|PARTIAL|KRONOS_ONLY|TA_ONLY|NEITHER) and `edge_score` (blended EV in [-1,+1]).
+
+The performance.html template was previously hardcoded demo data (fake "Ultra v3 Momentum" strategies, fake $12,847 P&L). All panels now fetch the above endpoints on load + every 60s.
+
+Tests at `tests/unit/test_strategy_performance.py`, `test_backtest_results.py`, `test_forecast.py` (57 tests). To regenerate a backtest sweep: `python3 -m lib.analytics.run_strategies --days 90` — note: currently blocked by a signature-drift bug in `Backtester.__init__` where `strategies.py` passes `fee_bps` that `backtest.py` no longer accepts. The Apr-18 artifacts remain valid for the leaderboard until that is refactored.
 
 ## Gotchas
 
