@@ -34,6 +34,7 @@ _TEST_PERF_DIR = Path(tempfile.gettempdir()) / "sapphire-test-performance"
 _TEST_PERF_DIR.mkdir(exist_ok=True)
 sys.path.insert(0, str(REPO_ROOT))  # so lib.analytics resolves
 import lib.analytics.performance_tracker as _pt_module  # noqa: E402
+
 _pt_module.DATA_DIR = _TEST_PERF_DIR
 _pt_module.SIGNALS_FILE = _TEST_PERF_DIR / "signals.jsonl"
 
