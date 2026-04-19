@@ -225,6 +225,17 @@ class CrossSectionalFactors:
             else:
                 raw_factors[sym]["Liquidity"] = None
 
+        # Validate fetch coverage before computing z-scores
+        fetched_ok = [sym for sym in symbols if any(v is not None for v in raw_factors.get(sym, {}).values())]
+        if len(fetched_ok) < len(symbols):
+            missing = sorted(set(symbols) - set(fetched_ok))
+            log.warning(
+                "factors: %d/%d assets have data (missing: %s) — z-scores will use 0.0 fill",
+                len(fetched_ok), len(symbols), ", ".join(missing),
+            )
+        else:
+            log.info("factors: all %d assets fetched from CoinGecko", len(symbols))
+
         # Cross-sectional z-scores per factor
         factor_z: dict[str, dict[str, float]] = {}
         for fn in FACTOR_NAMES:

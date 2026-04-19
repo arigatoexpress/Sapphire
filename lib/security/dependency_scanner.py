@@ -12,6 +12,7 @@ from __future__ import annotations
 import importlib.metadata
 import json
 import logging
+import time
 import urllib.error
 import urllib.request
 from dataclasses import asdict, dataclass, field
@@ -147,17 +148,25 @@ class DependencyScanner:
             "version": version,
             "package": {"name": package, "ecosystem": "PyPI"},
         }).encode()
-        req = urllib.request.Request(
-            self.OSV_API,
-            data=payload,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=self.REQUEST_TIMEOUT) as resp:
-                data = json.loads(resp.read())
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
-            log.debug("OSV query failed for %s: %s", package, exc)
+        data: dict | None = None
+        for attempt in range(3):
+            req = urllib.request.Request(
+                self.OSV_API,
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=self.REQUEST_TIMEOUT) as resp:
+                    data = json.loads(resp.read())
+                break
+            except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+                if attempt < 2:
+                    time.sleep(2 ** attempt)
+                else:
+                    log.debug("OSV query failed for %s after 3 attempts: %s", package, exc)
+                    return []
+        if data is None:
             return []
 
         vulns: list[Vulnerability] = []
@@ -201,16 +210,21 @@ class DependencyScanner:
     def _check_pypi_latest(self, pkg: PackageInfo) -> None:
         """Check PyPI for the latest version of a package."""
         url = self.PYPI_API.format(pkg.name)
-        try:
-            req = urllib.request.Request(url, method="GET")
-            with urllib.request.urlopen(req, timeout=self.REQUEST_TIMEOUT) as resp:
-                data = json.loads(resp.read())
-            latest = data.get("info", {}).get("version", "")
-            if latest:
-                pkg.latest_version = latest
-                pkg.is_outdated = latest != pkg.version
-        except Exception:
-            pass
+        for attempt in range(3):
+            try:
+                req = urllib.request.Request(url, method="GET")
+                with urllib.request.urlopen(req, timeout=self.REQUEST_TIMEOUT) as resp:
+                    data = json.loads(resp.read())
+                latest = data.get("info", {}).get("version", "")
+                if latest:
+                    pkg.latest_version = latest
+                    pkg.is_outdated = latest != pkg.version
+                return
+            except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
+                if attempt < 2:
+                    time.sleep(2 ** attempt)
+            except Exception:
+                return
 
     def _generate_sbom(self, packages: list[PackageInfo]) -> dict[str, Any]:
         """Generate a CycloneDX 1.5 BOM in JSON format."""

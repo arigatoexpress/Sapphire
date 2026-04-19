@@ -131,27 +131,47 @@ def _request(
     body: dict[str, Any] | None = None,
     timeout: int = 15,
 ) -> Any:
-    """Authenticated Robinhood API request."""
-    body_text = json.dumps(body, separators=(",", ":")) if body is not None else ""
-    headers = _sign_request(api_key, private_bytes, method, path, body_text)
-    req = urllib.request.Request(
-        _BASE + path,
-        data=body_text.encode("utf-8") if body_text else None,
-        headers=headers,
-        method=method.upper(),
-    )
-    try:
-        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=timeout) as response:
-            return json.loads(response.read())
-    except urllib.error.HTTPError as exc:
-        body_text = exc.read().decode(errors="replace")[:300]
-        raise RuntimeError(
-            f"Robinhood {method.upper()} {path} -> HTTP {exc.code}: {body_text}"
-        ) from exc
-    except Exception as exc:
-        raise RuntimeError(
-            f"Robinhood {method.upper()} {path} -> {type(exc).__name__}: {exc}"
-        ) from exc
+    """Authenticated Robinhood API request with retry on 5xx / network errors."""
+    body_json = json.dumps(body, separators=(",", ":")) if body is not None else ""
+    last_exc: RuntimeError | None = None
+    for attempt in range(3):
+        # Re-sign each attempt — timestamp is part of the signature message.
+        headers = _sign_request(api_key, private_bytes, method, path, body_json)
+        req = urllib.request.Request(
+            _BASE + path,
+            data=body_json.encode("utf-8") if body_json else None,
+            headers=headers,
+            method=method.upper(),
+        )
+        try:
+            with urllib.request.urlopen(req, context=_SSL_CTX, timeout=timeout) as response:
+                return json.loads(response.read())
+        except urllib.error.HTTPError as exc:
+            err_body = exc.read().decode(errors="replace")[:300]
+            if exc.code >= 500 and attempt < 2:
+                last_exc = RuntimeError(
+                    f"Robinhood {method.upper()} {path} -> HTTP {exc.code}: {err_body}"
+                )
+                time.sleep(2 ** attempt)
+                continue
+            raise RuntimeError(
+                f"Robinhood {method.upper()} {path} -> HTTP {exc.code}: {err_body}"
+            ) from exc
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            if attempt < 2:
+                last_exc = RuntimeError(
+                    f"Robinhood {method.upper()} {path} -> {type(exc).__name__}: {exc}"
+                )
+                time.sleep(2 ** attempt)
+                continue
+            raise RuntimeError(
+                f"Robinhood {method.upper()} {path} -> {type(exc).__name__}: {exc}"
+            ) from exc
+        except Exception as exc:
+            raise RuntimeError(
+                f"Robinhood {method.upper()} {path} -> {type(exc).__name__}: {exc}"
+            ) from exc
+    raise last_exc or RuntimeError(f"Robinhood {method.upper()} {path} -> failed after 3 attempts")
 
 
 class RobinhoodReader:
@@ -411,6 +431,8 @@ class RobinhoodReader:
             key=lambda row: row.get("market_value") if row.get("market_value") is not None else -1.0,
             reverse=True,
         )
+        total_val = sum(h.get("market_value") or 0.0 for h in live_rows)
+        log.info("robinhood: %d holdings, total value $%,.2f", len(live_rows), total_val)
         return live_rows
 
     def get_portfolio_value(self) -> dict[str, Any]:

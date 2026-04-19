@@ -66,6 +66,74 @@ def _fmt_pct(n: float | None, digits: int = 1) -> str:
     return f"{n*100:+.{digits}f}%"
 
 
+def _regime_narrative(state: str, score: float, confidence: float, snap: dict) -> str:
+    """Build a professional 2-3 sentence regime narrative from chain snapshot."""
+    fg = snap.get("fear_greed")
+    btc_d = snap.get("btc_dominance")
+    btc_d_chg = snap.get("btc_dominance_24h_change")
+    dxy = snap.get("dxy")
+    vix = snap.get("vix")
+    btc_f = snap.get("btc_funding_rate_pct")
+    eth_f = snap.get("eth_funding_rate_pct")
+    mcap_chg = snap.get("total_mcap_24h_change_pct")
+
+    sentences: list[str] = []
+
+    # Sentence 1: F&G + total mcap context
+    if fg is not None:
+        fg_label = (
+            "extreme fear" if fg < 20 else "fear" if fg < 40 else
+            "neutral" if fg < 60 else "greed" if fg < 80 else "extreme greed"
+        )
+        s1 = f"F&G {fg} ({fg_label})"
+        if mcap_chg is not None:
+            if mcap_chg > 1.5:
+                s1 += f", total mcap +{mcap_chg:.1f}% — capital flowing in"
+            elif mcap_chg < -1.5:
+                s1 += f", total mcap {mcap_chg:.1f}% — capital leaving"
+        sentences.append(s1 + ".")
+
+    # Sentence 2: BTC dominance + funding
+    mid: list[str] = []
+    if btc_d is not None:
+        d_str = f"BTC.D {btc_d:.1f}%"
+        if btc_d_chg is not None:
+            arrow = "↑" if btc_d_chg > 0.05 else "↓" if btc_d_chg < -0.05 else "→"
+            d_str += f" {arrow}{abs(btc_d_chg):.2f}%"
+        mid.append(d_str)
+
+    if btc_f is not None:
+        if abs(btc_f) < 0.005:
+            f_tag = "flat"
+        elif btc_f > 0.04:
+            f_tag = "longs crowded"
+        elif btc_f < -0.04:
+            f_tag = "shorts crowded"
+        else:
+            f_tag = "normal"
+        eth_part = f" / ETH {eth_f:+.3f}%" if eth_f is not None else ""
+        mid.append(f"funding {btc_f:+.3f}%{eth_part} ({f_tag})")
+
+    if mid:
+        sentences.append("  ".join(mid) + ".")
+
+    # Sentence 3: Macro (DXY + VIX)
+    macro: list[str] = []
+    if dxy is not None:
+        macro.append(f"DXY {dxy:.1f}")
+    if vix is not None:
+        vix_tag = " ⚠️" if vix > 25 else " (elevated)" if vix > 18 else ""
+        macro.append(f"VIX {vix:.1f}{vix_tag}")
+    if macro:
+        macro_str = " · ".join(macro)
+        if dxy is not None and vix is not None and (dxy > 101 or vix > 20):
+            sentences.append(f"{macro_str} — macro headwinds.")
+        elif macro:
+            sentences.append(f"{macro_str}.")
+
+    return "\n".join(f"  {s}" for s in sentences) if sentences else "  No signal data."
+
+
 def _section_regime(chain_snapshot: dict | None = None) -> dict:
     """Market regime section from on-chain intelligence."""
     try:
@@ -78,7 +146,6 @@ def _section_regime(chain_snapshot: dict | None = None) -> dict:
         log.warning("chain intelligence unavailable: %s", e)
         return {"status": "unavailable", "error": str(e)}
 
-    # ChainIntelligence.snapshot() returns a flat dict — extract fields directly.
     clf = snap.get("classification") or {}
     raw_regime = clf.get("regime")
     state = raw_regime.value if hasattr(raw_regime, "value") else str(raw_regime or "UNKNOWN")
@@ -88,37 +155,15 @@ def _section_regime(chain_snapshot: dict | None = None) -> dict:
     confidence = inputs_ok / inputs_total
 
     emoji = {"RISK_ON": "🟢", "RISK_OFF": "🔴"}.get(state, "🟡" if state == "NEUTRAL" else "⚪")
-    lines = [
-        f"{emoji} *Regime:* `{state}`  "
-        f"score {score:+.2f} · "
-        f"conf {confidence:.0%}"
-    ]
-
-    for r in (clf.get("reasons") or [])[:3]:
-        lines.append(f"  • {r}")
-
-    # Headline numbers not already in reasoning bullets
-    btc_d = snap.get("btc_dominance")
-    dxy = snap.get("dxy")
-    vix = snap.get("vix")
-    if btc_d is not None:
-        lines.append(f"  BTC.D {btc_d:.1f}%")
-    if dxy is not None:
-        lines.append(f"  DXY {dxy:.2f}  VIX {vix:.1f}" if vix is not None
-                     else f"  DXY {dxy:.2f}")
-
-    # Funding rates (if available — Binance geo-restricted for US)
-    btc_f = snap.get("btc_funding_rate_pct")
-    eth_f = snap.get("eth_funding_rate_pct")
-    if btc_f is not None:
-        lines.append(f"  BTC funding {btc_f:+.4f}%  ETH {eth_f:+.4f}%" if eth_f is not None
-                     else f"  BTC funding {btc_f:+.4f}%")
+    header = f"{emoji} *{state}*  score {score:+.2f} · {inputs_ok}/{inputs_total} signals"
+    narrative = _regime_narrative(state, score, confidence, snap)
 
     return {
         "status": "ok",
         "state": state,
         "score": score,
-        "text": "\n".join(lines),
+        "sentiment_score": snap.get("fear_greed"),
+        "text": header + "\n" + narrative,
     }
 
 
@@ -490,20 +535,26 @@ def _section_cascade() -> dict:
     level_emoji = {"LOW": "🟢", "MODERATE": "🟡", "HIGH": "🟠", "CRITICAL": "🚨"}
     lines: list[str] = []
     label = report.risk_label
-    em = level_emoji.get(label, "•")
 
-    if label == "CRITICAL":
-        critical = [a.coin for a in report.assets if a.risk_label == "CRITICAL"]
-        lines.append(f"🚨 *CASCADE CRITICAL:* {', '.join(critical)}")
+    if label == "LOW":
+        lines.append("🟢 No cascade risk detected across majors.")
+    elif label == "MODERATE":
+        moderate = [a.coin for a in report.assets if a.risk_label != "LOW"]
+        lines.append(f"🟡 Moderate cascade risk: {', '.join(moderate) if moderate else 'elevated broadly'}")
+        for a in [x for x in report.assets if x.risk_label == "MODERATE"][:2]:
+            lines.append(f"  🟡 {a.coin}: score `{a.risk_score:.1f}` — {a.detail}")
     elif label == "HIGH":
         high = [a.coin for a in report.assets if a.risk_label == "HIGH"]
         lines.append(f"🟠 *Cascade HIGH:* {', '.join(high)}")
-    else:
-        lines.append(f"{em} Cascade risk: {label.lower()} across majors")
-
-    for a in report.assets[:3]:
-        asset_em = level_emoji.get(a.risk_label, "•")
-        lines.append(f"  {asset_em} {a.coin}: score `{a.risk_score:.1f}` ({a.risk_label}) — {a.detail}")
+        for a in [x for x in report.assets if x.risk_label in {"HIGH", "CRITICAL"}][:3]:
+            asset_em = level_emoji.get(a.risk_label, "•")
+            lines.append(f"  {asset_em} {a.coin}: score `{a.risk_score:.1f}` — {a.detail}")
+    else:  # CRITICAL
+        critical = [a.coin for a in report.assets if a.risk_label == "CRITICAL"]
+        lines.append(f"🚨 *CASCADE CRITICAL:* {', '.join(critical)}")
+        for a in report.assets[:3]:
+            asset_em = level_emoji.get(a.risk_label, "•")
+            lines.append(f"  {asset_em} {a.coin}: score `{a.risk_score:.1f}` — {a.detail}")
 
     return {
         "status": "ok",
@@ -542,15 +593,29 @@ def _section_robinhood() -> dict:
     if pnl_available and pnl_pct is not None:
         lines.append(f"  Unrealised P&L: {_fmt_usd(pnl)}  ({pnl_pct*100:+.2f}%)")
     else:
-        lines.append("  Unrealised P&L: unavailable (cost basis still reconstructing from order history)")
-    for pos in snap.get("positions", [])[:4]:
+        lines.append("  Unrealised P&L: unavailable (reconstructing cost basis)")
+
+    positions = snap.get("positions", [])
+    positions_with_pnl = [p for p in positions if p.get("unrealized_pnl_pct") is not None]
+    if len(positions_with_pnl) >= 2:
+        top_g = max(positions_with_pnl, key=lambda p: p["unrealized_pnl_pct"])
+        top_l = min(positions_with_pnl, key=lambda p: p["unrealized_pnl_pct"])
+        lines.append(
+            f"  ↑ Best: *{top_g['asset']}* {top_g['unrealized_pnl_pct']*100:+.1f}%"
+            f"   ↓ Worst: *{top_l['asset']}* {top_l['unrealized_pnl_pct']*100:+.1f}%"
+        )
+    elif len(positions_with_pnl) == 1:
+        p = positions_with_pnl[0]
+        lines.append(f"  ↑ *{p['asset']}* {p['unrealized_pnl_pct']*100:+.1f}%")
+
+    for pos in positions[:3]:
         pos_pnl = pos.get("unrealized_pnl_usd")
         pos_pct = pos.get("unrealized_pnl_pct")
         if pos_pnl is not None and pos_pct is not None:
             em = "↑" if pos_pnl >= 0 else "↓"
             lines.append(
                 f"  {em} {pos['asset']:6}  {_fmt_usd(pos.get('market_value_usd'))}  "
-                f"P&L {pos_pct*100:+.1f}%"
+                f"({pos_pct*100:+.1f}%)"
             )
         else:
             lines.append(
@@ -558,6 +623,41 @@ def _section_robinhood() -> dict:
                 f"@ {_fmt_usd(pos.get('current_price_usd'))}"
             )
     return {"status": "ok", "portfolio_value": snap.get("portfolio_value_usd"), "text": "\n".join(lines)}
+
+
+def _section_recommendation(
+    regime: dict,
+    sentiment: dict,
+    cascade: dict,
+) -> str:
+    """Generate a 1-2 sentence actionable daily recommendation."""
+    state = regime.get("state", "NEUTRAL")
+    sent_score = sentiment.get("score") or 50
+    cascade_score = cascade.get("max_score") or 0.0
+
+    if state == "RISK_OFF" or cascade_score > 70:
+        stance = "defensive"
+        action = "Reduce exposure and prioritize capital preservation"
+    elif state == "RISK_ON" and sent_score > 60:
+        stance = "bullish"
+        action = "Lean long on BTC/ETH with defined stops — momentum confirmed"
+    elif state == "RISK_ON" and sent_score < 40:
+        stance = "cautiously bullish"
+        action = "Regime bullish but sentiment fearful — good R/R for selective longs"
+    elif sent_score < 25:
+        stance = "contrarian"
+        action = "Extreme fear with neutral regime — potential mean-reversion entry"
+    elif sent_score > 80:
+        stance = "cautious"
+        action = "Extreme greed — reduce sizes and tighten stops"
+    else:
+        stance = "neutral"
+        action = "Mixed signals — hold positions, avoid new entries until clearer setup"
+
+    if cascade_score > 50:
+        action += ". Cascade risk elevated — avoid excessive leverage"
+
+    return f"  📌 *Today ({stance}):* {action}."
 
 
 # ---------------------------------------------------------------------------
@@ -593,38 +693,46 @@ def build_brief() -> str:
     threats = _section_threats()
     health = _section_health()
 
+    rec = _section_recommendation(regime, sent, cascade)
+
+    def _t(section: dict, name: str) -> str:
+        return section.get("text") or f"  ({section.get('status', name + ' unavailable')})"
+
     parts = [
         header,
         "",
         "*Market Regime*",
-        regime.get("text") or f"  ({regime.get('status', 'unknown')})",
+        _t(regime, "regime"),
         "",
         "*Market Intelligence*",
-        market_intel.get("text") or f"  ({market_intel.get('status', 'unknown')})",
+        _t(market_intel, "market-intel"),
         "",
         "*Cascade Risk*",
-        cascade.get("text") or f"  ({cascade.get('status', 'unknown')})",
+        _t(cascade, "cascade"),
         "",
         "*Correlations*",
-        corr.get("text") or f"  ({corr.get('status', 'unknown')})",
+        _t(corr, "correlation"),
         "",
         "*Sentiment*",
-        sent.get("text") or f"  ({sent.get('status', 'unknown')})",
+        _t(sent, "sentiment"),
         "",
         "*Portfolio (paper)*",
-        port.get("text") or f"  ({port.get('status', 'unknown')})",
+        _t(port, "portfolio"),
         "",
         "*Robinhood Crypto*",
-        robinhood.get("text") or f"  ({robinhood.get('status', 'unknown')})",
+        _t(robinhood, "robinhood"),
         "",
         "*Kronos predictions*",
-        kron.get("text"),
+        kron.get("text") or "  Kronos predictions not yet generated.",
         "",
         "*Threat intel*",
-        threats.get("text") or f"  ({threats.get('status', 'unknown')})",
+        _t(threats, "threats"),
         "",
         "*System health*",
-        health.get("text") or f"  ({health.get('status', 'unknown')})",
+        _t(health, "health"),
+        "",
+        "*Daily Recommendation*",
+        rec,
     ]
     return "\n".join(parts)
 

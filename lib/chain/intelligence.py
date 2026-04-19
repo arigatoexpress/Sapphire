@@ -23,6 +23,7 @@ import os
 import ssl
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 from dataclasses import asdict, dataclass, field
@@ -103,14 +104,19 @@ class RegimeShiftEvent:
 
 
 def _http_json(url: str, timeout: float = HTTP_TIMEOUT) -> dict | list | None:
-    try:
-        req = urllib.request.Request(url, headers=REQUEST_HEADERS)
-        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=timeout) as r:
-            raw = r.read(4 * 1024 * 1024)
-        return json.loads(raw)
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
-        log.debug("chain: fetch failed %s (%s)", url, exc)
-        return None
+    last_exc: Exception | None = None
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(url, headers=REQUEST_HEADERS)
+            with urllib.request.urlopen(req, context=_SSL_CTX, timeout=timeout) as r:
+                raw = r.read(4 * 1024 * 1024)
+            return json.loads(raw)
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
+            last_exc = exc
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+    log.debug("chain: fetch failed %s (%s)", url, last_exc)
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -457,6 +463,17 @@ class ChainIntelligence:
             "vix": vix,
         }
         classification = classify(inputs)
+        log.info(
+            "chain: F&G=%s BTC.D=%s%% VIX=%s DXY=%s → %s (score %+.2f, %d/%d signals)",
+            fg_value,
+            f"{btc_dominance:.1f}" if btc_dominance is not None else "—",
+            f"{vix:.1f}" if vix is not None else "—",
+            f"{dxy:.2f}" if dxy is not None else "—",
+            classification.regime.value,
+            classification.score,
+            classification.inputs_ok,
+            classification.inputs_total,
+        )
 
         snap = ChainSnapshot(
             timestamp=now.isoformat(),

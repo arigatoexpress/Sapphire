@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import logging
 import ssl
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -78,9 +79,17 @@ def _fetch_raw(asset: str) -> dict[str, Any]:
         f"?assets={asset.lower()}&metrics={_METRICS}"
         f"&start_time={start}&end_time={end}&page_size=3"
     )
-    req = urllib.request.Request(url, headers={"User-Agent": "Sapphire/1.0"})
-    with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as resp:
-        return json.loads(resp.read())
+    last_exc: Exception | None = None
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Sapphire/1.0"})
+            with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as resp:
+                return json.loads(resp.read())
+        except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+            last_exc = exc
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+    raise last_exc or OSError(f"fetch failed for {asset}")
 
 
 def get_snapshot(asset: str) -> CoinMetricsSnapshot:
@@ -110,6 +119,13 @@ def get_snapshot(asset: str) -> CoinMetricsSnapshot:
             raw=latest,
         )
         cache.write_text(json.dumps(snap.to_dict()))
+        log.info(
+            "coinmetrics: %s price=$%s active_addr=%s tx=%s",
+            asset,
+            f"{snap.price_usd:,.0f}" if snap.price_usd else "—",
+            f"{snap.active_addresses:,}" if snap.active_addresses else "—",
+            f"{snap.tx_count:,}" if snap.tx_count else "—",
+        )
         return snap
     except Exception as exc:
         log.warning("coinmetrics fetch failed for %s: %s", asset, exc)

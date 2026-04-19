@@ -31,6 +31,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
 
 SAPPHIRE_DIR = Path.home() / "Code" / "Sapphire"
 SIGNALS_FILE = SAPPHIRE_DIR / "data" / "trading_signals.jsonl"
+PERFORMANCE_FILE = SAPPHIRE_DIR / "data" / "performance" / "signals.jsonl"
 NOTIFY_TOOL = SAPPHIRE_DIR / "plugins" / "claw-sapphire" / "tools" / "notify.py"
 
 
@@ -45,6 +46,21 @@ def _log_signal(signal: dict):
     """Append signal to trading_signals.jsonl."""
     with open(SIGNALS_FILE, "a") as f:
         f.write(json.dumps(signal) + "\n")
+
+
+def _log_performance(signal: dict):
+    """Append performance-schema record to data/performance/signals.jsonl."""
+    PERFORMANCE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    record = {
+        "strategy": "SapphireComposite",
+        "symbol": signal.get("symbol", ""),
+        "direction": signal.get("direction", ""),
+        "confidence": signal.get("confidence", 0.0),
+        "entry_price": signal.get("price", 0.0),
+        "timestamp": signal.get("timestamp", ""),
+    }
+    with open(PERFORMANCE_FILE, "a") as f:
+        f.write(json.dumps(record) + "\n")
 
 
 def scan_for_signals(symbols: list[str] = None) -> dict:
@@ -169,6 +185,7 @@ def scan_for_signals(symbols: list[str] = None) -> dict:
             "timestamp": now.isoformat(),
             "symbol": f"{sym}USDT",
             "action": action,
+            "direction": "long" if action == "BUY" else "short",
             "strategy": "multi_factor_ensemble",
             "price": profile.price,
             "confidence": confidence,
@@ -196,6 +213,7 @@ def scan_for_signals(symbols: list[str] = None) -> dict:
         }
 
         _log_signal(signal)
+        _log_performance(signal)
         signals_generated.append({
             "symbol": f"{sym}USDT",
             "action": action,
