@@ -215,6 +215,16 @@ class CascadeDetector:
         )
 
 
+_detector: CascadeDetector | None = None
+
+
+def get_detector() -> CascadeDetector:
+    global _detector
+    if _detector is None:
+        _detector = CascadeDetector()
+    return _detector
+
+
 def to_dict(report: CascadeReport) -> dict:
     """Serialize CascadeReport to JSON-safe dict for dashboard API."""
     return {

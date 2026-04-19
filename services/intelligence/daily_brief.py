@@ -479,39 +479,36 @@ def _section_cascade() -> dict:
     try:
         from lib.analytics.liquidation import get_detector
         det = get_detector()
-        results = det.assess_all(coins=["BTC", "ETH", "SOL", "AVAX", "LINK", "ARB"])
+        report = det.assess_all(coins=["BTC", "ETH", "SOL", "AVAX", "LINK", "ARB"])
     except Exception as e:
         log.warning("cascade detector unavailable: %s", e)
         return {"status": "unavailable", "text": f"  (cascade risk unavailable: {e})"}
 
-    if not results:
+    if not report.assets:
         return {"status": "ok", "text": "  No cascade data available."}
 
-    level_emoji = {"low": "🟢", "moderate": "🟡", "elevated": "🟠", "critical": "🚨"}
+    level_emoji = {"LOW": "🟢", "MODERATE": "🟡", "HIGH": "🟠", "CRITICAL": "🚨"}
     lines: list[str] = []
-    critical = [r for r in results if r.level == "critical"]
-    elevated = [r for r in results if r.level == "elevated"]
+    label = report.risk_label
+    em = level_emoji.get(label, "•")
 
-    if critical:
-        lines.append(f"🚨 *CASCADE CRITICAL:* {', '.join(r.coin for r in critical)}")
-    elif elevated:
-        lines.append(f"🟠 *Cascade elevated:* {', '.join(r.coin for r in elevated)}")
+    if label == "CRITICAL":
+        critical = [a.coin for a in report.assets if a.risk_label == "CRITICAL"]
+        lines.append(f"🚨 *CASCADE CRITICAL:* {', '.join(critical)}")
+    elif label == "HIGH":
+        high = [a.coin for a in report.assets if a.risk_label == "HIGH"]
+        lines.append(f"🟠 *Cascade HIGH:* {', '.join(high)}")
     else:
-        lines.append("🟢 Cascade risk: low across majors")
+        lines.append(f"{em} Cascade risk: {label.lower()} across majors")
 
-    # Show top 3 by score
-    for r in results[:3]:
-        em = level_emoji.get(r.level, "•")
-        rec = r.recommendation.get("action", "")
-        lines.append(f"  {em} {r.coin}: score `{r.score:.2f}` ({r.level}) — {rec}")
-        if r.reasons:
-            lines.append(f"    ↳ {r.reasons[0]}")
+    for a in report.assets[:3]:
+        asset_em = level_emoji.get(a.risk_label, "•")
+        lines.append(f"  {asset_em} {a.coin}: score `{a.risk_score:.1f}` ({a.risk_label}) — {a.detail}")
 
-    max_score = results[0].score if results else 0.0
     return {
         "status": "ok",
-        "max_score": max_score,
-        "critical_count": len(critical),
+        "max_score": report.risk_score,
+        "critical_count": sum(1 for a in report.assets if a.risk_label == "CRITICAL"),
         "text": "\n".join(lines),
     }
 
