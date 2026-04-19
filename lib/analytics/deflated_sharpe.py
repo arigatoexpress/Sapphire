@@ -70,7 +70,7 @@ def deflated_sharpe_ratio(
         n_obs: Number of observations used to compute each Sharpe.
         threshold: Probability threshold to declare DSR "passed".
     """
-    if not sharpe_list:
+    if len(sharpe_list) == 0:
         raise ValueError("sharpe_list must not be empty")
 
     sr = selected_sharpe if selected_sharpe is not None else max(sharpe_list)

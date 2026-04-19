@@ -15,10 +15,22 @@ from lib.content.quality import (  # type: ignore
     BANNED_PHRASES,
     MAX_AVG_SENTENCE_WORDS,
     MAX_BANNED,
+    MIN_ARGUMENT_COHERENCE,
+    MIN_CITATION_QUALITY,
+    MIN_EVIDENCE_COVERAGE,
+    MIN_EVIDENCE_DENSITY,
+    MIN_ORIGINALITY_SCORE,
     MIN_NUMBERS,
     check,
+    citation_quality,
+    coherence,
     count_banned,
     count_numbers,
+    evidence_metrics,
+    extract_citations,
+    find_overreach,
+    find_unsupported_claims,
+    originality,
     readability,
 )
 
@@ -98,6 +110,32 @@ class TestCountNumbers:
         assert count_numbers(text) >= MIN_NUMBERS
 
 
+# ── citations / evidence ─────────────────────────────────────────────────────
+
+class TestCitationExtraction:
+    def test_extracts_repo_paths(self):
+        text = "Sources: data/content/ready/linkedin/post.md and docs/runbook.md"
+        refs = extract_citations(text)
+        assert "data/content/ready/linkedin/post.md" in refs
+        assert "docs/runbook.md" in refs
+
+    def test_extracts_urls(self):
+        refs = extract_citations("See https://example.com/report for details.")
+        assert refs == ["https://example.com/report"]
+
+
+class TestEvidenceMetrics:
+    def test_evidence_metrics_reward_numbers_and_sources(self):
+        text = (
+            "BTC rose 5% to $65,000. Sources: data/market_pulse/pulse_20260418.md "
+            "and https://example.com/chart."
+        )
+        citation_count, _, density, coverage = evidence_metrics(text)
+        assert citation_count == 2
+        assert density >= MIN_EVIDENCE_DENSITY
+        assert coverage >= MIN_EVIDENCE_COVERAGE
+
+
 # ── readability ───────────────────────────────────────────────────────────────
 
 class TestReadability:
@@ -159,6 +197,15 @@ class TestCheck:
         assert report.passed is False
         assert any("too_short" in r for r in report.reasons)
 
+    def test_evidence_dense_short_form_can_pass_length_gate(self):
+        text = (
+            "BTC +5.2% to $65,000, ETH +4.1%, SOL +3.3%, OI +$120M, "
+            "funding 0.03%, book flat at 10% gross, turnover low, "
+            "regime neutral, and risk unchanged."
+        )
+        report = check(text)
+        assert not any("too_short" in r for r in report.reasons)
+
     def test_fails_on_runaway_sentences(self):
         # One sentence of 40 words with 3 numbers embedded — avg will be ~40 > 35
         words = ["word"] * 13 + ["$1"] + ["word"] * 13 + ["4.2%"] + ["word"] * 12 + ["3"]
@@ -176,20 +223,100 @@ class TestCheck:
         report = check(_good_text())
         assert isinstance(report.banned_hits, list)
         assert isinstance(report.number_count, int)
+        assert isinstance(report.citation_count, int)
         assert isinstance(report.word_count, int)
         assert isinstance(report.avg_sentence_words, float)
+        assert isinstance(report.evidence_density, float)
+        assert isinstance(report.evidence_coverage, float)
+        assert isinstance(report.citation_quality, float)
+        assert isinstance(report.coherence_score, float)
+        assert isinstance(report.originality_score, float)
+        assert isinstance(report.unsupported_claims, list)
+        assert isinstance(report.overreach_hits, list)
 
     def test_multiple_failures_reported(self):
         report = check("short text with game-changer robust seamless")
         assert len(report.reasons) >= 2
 
-    def test_to_dict_keys(self):
+    def test_fails_on_unsupported_conclusion(self):
+        text = (
+            "This is a game-changer for the market. "
+            "Therefore this proves the strategy will always work forever."
+        )
+        report = check(text)
+        assert report.passed is False
+        assert any("unsupported_conclusions" in r for r in report.reasons)
+
+    def test_fails_on_low_citation_quality_for_long_form(self):
+        sentence = "BTC rose 5% and ETH gained 4% while SOL added 3% on the session."
+        text = " ".join([sentence] * 6)
+        report = check(text)
+        assert report.word_count >= 80
+        assert report.citation_quality < MIN_CITATION_QUALITY
+        assert any("citation_quality_low" in r for r in report.reasons)
+
+    def test_to_dict_includes_research_grade_metrics(self):
         d = check(_good_text()).to_dict()
         assert set(d.keys()) == {
-            "passed", "banned_hits", "number_count",
-            "word_count", "avg_sentence_words", "reasons",
+            "passed",
+            "banned_hits",
+            "number_count",
+            "citation_count",
+            "word_count",
+            "avg_sentence_words",
+            "evidence_density",
+            "evidence_coverage",
+            "citation_quality",
+            "coherence_score",
+            "originality_score",
+            "unsupported_claims",
+            "overreach_hits",
+            "reasons",
         }
+
+    def test_to_dict_keys(self):
+        d = check(_good_text()).to_dict()
+        assert "passed" in d
+        assert "reasons" in d
 
     def test_to_dict_passed_is_bool(self):
         d = check(_good_text()).to_dict()
         assert isinstance(d["passed"], bool)
+
+
+class TestResearchSignals:
+    def test_find_unsupported_claims(self):
+        text = (
+            "Markets are exciting today. "
+            "Clearly this means the thesis is correct."
+        )
+        claims = find_unsupported_claims(text)
+        assert claims == ["Clearly this means the thesis is correct."]
+
+    def test_find_overreach(self):
+        text = "This strategy always wins and nobody loses."
+        hits = find_overreach(text)
+        assert hits == [text]
+
+    def test_coherence_rewards_evidence_backed_flow(self):
+        text = (
+            "BTC rose 5% to $65,000. "
+            "This move lifted ETH by 3.2%. "
+            "Therefore the book stayed at 10% gross exposure."
+        )
+        score = coherence(text)
+        assert score >= MIN_ARGUMENT_COHERENCE
+
+    def test_originality_penalizes_repetition(self):
+        text = "Edge matters. Edge matters. Edge matters. Edge matters."
+        score = originality(text)
+        assert score < MIN_ORIGINALITY_SCORE
+
+    def test_citation_quality_rewards_specific_refs(self):
+        text = (
+            "BTC rose 5% to $65,000. "
+            "Sources: data/market_pulse/pulse_20260418.md "
+            "https://example.com/report"
+        )
+        score = citation_quality(text)
+        assert score >= MIN_CITATION_QUALITY

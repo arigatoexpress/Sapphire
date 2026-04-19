@@ -80,3 +80,6 @@ services/control-plane/app/data/system_events.jsonl
 archived/
 benchmarks/
 world_knowledge/
+
+# SOPS age keys (NEVER commit)
+**/keys.txt

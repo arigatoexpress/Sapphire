@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import ssl
 import subprocess
 import sys
 import urllib.error
@@ -28,6 +29,10 @@ from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
+
+import certifi
+
+_SSL_CTX = ssl.create_default_context(cafile=certifi.where())
 
 log = logging.getLogger(__name__)
 
@@ -100,7 +105,7 @@ class RegimeShiftEvent:
 def _http_json(url: str, timeout: float = HTTP_TIMEOUT) -> dict | list | None:
     try:
         req = urllib.request.Request(url, headers=REQUEST_HEADERS)
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=timeout) as r:
             raw = r.read(4 * 1024 * 1024)
         return json.loads(raw)
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
@@ -171,6 +176,9 @@ def _fetch_yf_close(ticker: str) -> tuple[float | None, float | None]:
         if data is None or data.empty or "Close" not in data.columns:
             return None, None
         closes = data["Close"].dropna()
+        # yfinance ≥0.2.x returns MultiIndex columns for single-ticker downloads
+        if hasattr(closes, "squeeze"):
+            closes = closes.squeeze()
         if len(closes) < 2:
             last = float(closes.iloc[-1]) if len(closes) else None
             return last, None

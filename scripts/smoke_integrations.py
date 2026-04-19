@@ -196,6 +196,16 @@ def probe_resend() -> ProbeResult:
         if verified:
             return ProbeResult("resend", PASS, f"verified: {', '.join(verified)}")
         return ProbeResult("resend", PASS, f"authed; {len(domains)} domain(s), none verified yet")
+    # 401 with name="restricted_api_key" means the key is VALID but scoped
+    # to Sending access (least privilege — exactly what we recommend). The
+    # key still works for the email-send path; we just can't enumerate
+    # domains from it. Treat as PASS with a clear note.
+    if status == 401 and isinstance(body, dict) and body.get("name") == "restricted_api_key":
+        return ProbeResult(
+            "resend",
+            PASS,
+            "authed (sending-scoped key — verify domains in the Resend dashboard)",
+        )
     if status == 401:
         return ProbeResult("resend", FAIL, "HTTP 401 — bad RESEND_API_KEY")
     return ProbeResult("resend", FAIL, f"HTTP {status}: {str(body)[:120]}")

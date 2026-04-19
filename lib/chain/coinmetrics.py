@@ -1,8 +1,11 @@
 """CoinMetrics on-chain data provider (community API — no key required).
 
-Fetches NVT ratio, realized cap, SOPR, and active addresses from the
-CoinMetrics community endpoint for BTC/ETH/SOL.  Results are cached in
-`data/chain/coinmetrics/` for 6 hours to avoid hammering the public API.
+Fetches price, supply, active addresses, transaction count, and hash rate
+from the CoinMetrics community endpoint for BTC/ETH/SOL.  Results are cached
+in `data/chain/coinmetrics/` for 6 hours.
+
+Community tier metrics (verified 2026-04-18): PriceUSD, SplyCur, AdrActCnt,
+TxCnt, HashRate.  NVTAdj / CapRealUSD / SoprFree are paid-tier only.
 
 API docs: https://docs.coinmetrics.io/api/v4
 """
@@ -11,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import ssl
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -18,34 +22,39 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import certifi
+
+_SSL_CTX = ssl.create_default_context(cafile=certifi.where())
 log = logging.getLogger(__name__)
 
 _CACHE_DIR = Path(__file__).resolve().parents[2] / "data" / "chain" / "coinmetrics"
 _CACHE_TTL_HOURS = 6
 _BASE_URL = "https://community-api.coinmetrics.io/v4"
 
-# Community API metrics available without a key
-_METRICS = "NVTAdj,CapRealUSD,SoprFree,AdrActCnt"
+# Free community-tier metrics (403 on NVTAdj / CapRealUSD / SoprFree)
+_METRICS = "PriceUSD,SplyCur,AdrActCnt,TxCnt,HashRate"
 
 
 @dataclass
 class CoinMetricsSnapshot:
     asset: str
     timestamp: str
-    nvt: float | None = None
-    realized_cap_usd: float | None = None
-    sopr: float | None = None
+    price_usd: float | None = None
+    supply: float | None = None
     active_addresses: int | None = None
+    tx_count: int | None = None
+    hash_rate: float | None = None
     raw: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "asset": self.asset,
             "timestamp": self.timestamp,
-            "nvt": self.nvt,
-            "realized_cap_usd": self.realized_cap_usd,
-            "sopr": self.sopr,
+            "price_usd": self.price_usd,
+            "supply": self.supply,
             "active_addresses": self.active_addresses,
+            "tx_count": self.tx_count,
+            "hash_rate": self.hash_rate,
         }
 
 
@@ -66,10 +75,11 @@ def _fetch_raw(asset: str) -> dict[str, Any]:
     start = (datetime.now(UTC) - timedelta(days=2)).strftime("%Y-%m-%d")
     url = (
         f"{_BASE_URL}/timeseries/asset-metrics"
-        f"?assets={asset.lower()}&metrics={_METRICS}&start_time={start}&end_time={end}&limit=3"
+        f"?assets={asset.lower()}&metrics={_METRICS}"
+        f"&start_time={start}&end_time={end}&page_size=3"
     )
     req = urllib.request.Request(url, headers={"User-Agent": "Sapphire/1.0"})
-    with urllib.request.urlopen(req, timeout=10) as resp:
+    with urllib.request.urlopen(req, context=_SSL_CTX, timeout=10) as resp:
         return json.loads(resp.read())
 
 
@@ -92,10 +102,11 @@ def get_snapshot(asset: str) -> CoinMetricsSnapshot:
         snap = CoinMetricsSnapshot(
             asset=asset,
             timestamp=latest.get("time", datetime.now(UTC).isoformat()),
-            nvt=_float(latest.get("NVTAdj")),
-            realized_cap_usd=_float(latest.get("CapRealUSD")),
-            sopr=_float(latest.get("SoprFree")),
+            price_usd=_float(latest.get("PriceUSD")),
+            supply=_float(latest.get("SplyCur")),
             active_addresses=_int(latest.get("AdrActCnt")),
+            tx_count=_int(latest.get("TxCnt")),
+            hash_rate=_float(latest.get("HashRate")),
             raw=latest,
         )
         cache.write_text(json.dumps(snap.to_dict()))

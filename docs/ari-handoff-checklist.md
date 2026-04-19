@@ -64,9 +64,12 @@ Recommended **publication settings** once you're in: turn on *Hide subscriber co
 
 1. **Sign up** with `aristotlespec@gmail.com`.
 2. **Domains → Add Domain** → `kadima.digital`. Region: `us-east-1` (closest to GCP us-central1).
-3. Resend will show 3 DNS records (MX, SPF/TXT, one DKIM CNAME). Add them in whichever provider hosts `kadima.digital` DNS.
-4. Repeat for `texashomeoutlet.com`.
-5. Click **Verify** — verification usually lands in 5-30 minutes, occasionally up to 24h if the DNS provider is slow.
+3. Resend will show 3 DNS records (MX, SPF/TXT, one DKIM CNAME). **Kadima DNS lives at Namecheap** (`dns{1,2}.registrar-servers.com` — confirmed via `dig NS kadima.digital`). Paste them there:
+   - **URL:** https://ap.www.namecheap.com/Domains/DomainControlPanel/kadima.digital/advancedns
+   - For each Resend record, click **ADD NEW RECORD**, pick the type (MX / TXT / CNAME), set **Host** to the subdomain Resend gives you (e.g. `send` for the MX and SPF, `resend._domainkey` for DKIM — paste only the label, Namecheap appends `.kadima.digital` automatically), and paste **Value** as shown. For MX set Priority to `10`. TTL = `Automatic`.
+   - Hit the green check to save each row. Namecheap propagates in 10–30 min typically.
+4. Repeat for `texashomeoutlet.com` — check `dig NS texashomeoutlet.com` first; if different provider, paste there instead.
+5. Click **Verify** in Resend — verification usually lands in 5-30 minutes, occasionally up to 24h if the DNS provider is slow.
 6. **API Keys → Create API Key**
    - **Name:** `sapphire-content-prod`
    - **Permission:** `Sending access` (not full access — least privilege)
@@ -433,7 +436,7 @@ Every key that lives in `.env.integrations` stays on disk at `chmod 600` — not
 ---
 
 *Open questions I can't answer without you:*
-- Kadima DNS provider (Cloudflare? Namecheap? Google Domains?) — determines *where* you paste the Resend DNS records.
+- ~~Kadima DNS provider~~ — resolved: Namecheap (`dns{1,2}.registrar-servers.com`). Section 2 has the exact paste instructions now.
 - LinkedIn profile prior roles — for the About section.
 - sapphire-alpha → A / B / C.
 - Budget for X credits beyond the initial $10.

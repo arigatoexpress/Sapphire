@@ -11,6 +11,7 @@ Usage:
 
 from __future__ import annotations
 
+import concurrent.futures
 import json
 import subprocess
 import sys
@@ -52,7 +53,7 @@ def _check_process(name: str) -> bool:
         return False
 
 
-def check_services() -> dict:
+def check_services(profile: str = "full") -> dict:
     """Check all running services."""
     services = {
         "control-plane:8082": ("http://127.0.0.1:8082/health", "com.sapphire.control-plane"),
@@ -63,9 +64,11 @@ def check_services() -> dict:
         "regional-intel:8787": ("http://127.0.0.1:8787/", "com.sapphire.regional-intel"),
         "tho-cloud-run": ("https://project-go-forward-691674245427.us-central1.run.app/health", None),  # 10s for cold start
     }
+    if profile == "brief":
+        services.pop("tho-cloud-run", None)
+        services.pop("openbb:6900", None)
 
-    results = {}
-    for name, (url, agent) in services.items():
+    def _check(name: str, url: str | None, agent: str | None) -> tuple[str, dict]:
         status = "unknown"
         detail = ""
 
@@ -83,8 +86,17 @@ def check_services() -> dict:
                 status = "green"
                 detail = "LaunchAgent loaded"
 
-        results[name] = {"status": status, "detail": detail}
+        return name, {"status": status, "detail": detail}
 
+    results = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(6, len(services) or 1)) as pool:
+        futures = [
+            pool.submit(_check, name, url, agent)
+            for name, (url, agent) in services.items()
+        ]
+        for future in concurrent.futures.as_completed(futures):
+            name, payload = future.result()
+            results[name] = payload
     return results
 
 
@@ -99,11 +111,9 @@ def check_repos() -> dict:
         "claw-code": Path.home() / "Code" / "claw-code",
     }
 
-    results = {}
-    for name, path in repos.items():
+    def _check_repo(name: str, path: Path) -> tuple[str, dict]:
         if not path.exists():
-            results[name] = {"status": "red", "detail": "Directory not found"}
-            continue
+            return name, {"status": "red", "detail": "Directory not found"}
         try:
             # Check for uncommitted changes
             r = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True,
@@ -119,10 +129,16 @@ def check_repos() -> dict:
             detail = "clean" if dirty == 0 else f"{dirty} uncommitted files"
             detail += f" | last: {last_commit[:60]}"
 
-            results[name] = {"status": status, "detail": detail}
+            return name, {"status": status, "detail": detail}
         except Exception as e:
-            results[name] = {"status": "red", "detail": str(e)[:100]}
+            return name, {"status": "red", "detail": str(e)[:100]}
 
+    results = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(6, len(repos) or 1)) as pool:
+        futures = [pool.submit(_check_repo, name, path) for name, path in repos.items()]
+        for future in concurrent.futures.as_completed(futures):
+            name, payload = future.result()
+            results[name] = payload
     return results
 
 
@@ -172,13 +188,16 @@ def check_data_freshness() -> dict:
     return results
 
 
-def check_inference() -> dict:
+def check_inference(profile: str = "full") -> dict:
     """Check inference endpoints."""
     results = {}
 
     # Mac Ollama
     ok, msg = _check_url("http://127.0.0.1:11434/api/tags", timeout=3)
     results["mac_ollama"] = {"status": "green" if ok else "red", "detail": msg}
+
+    if profile == "brief":
+        return results
 
     # Windows GPU Ollama
     ok, msg = _check_url("http://100.71.10.48:11434/api/tags", timeout=3)
@@ -190,16 +209,22 @@ def check_inference() -> dict:
 def main():
     raw = sys.stdin.read().strip()
     params = json.loads(raw) if raw else {}
-    params.get("verbose", False)
+    profile = params.get("profile", "full")
+    verbose = params.get("verbose", False)
 
-    services = check_services()
-    repos = check_repos()
-    data = check_data_freshness()
-    inference = check_inference()
+    sections: dict[str, dict] = {
+        "services": check_services(profile=profile),
+        "data_freshness": check_data_freshness(),
+    }
+    if profile != "brief":
+        sections["repos"] = check_repos()
+        sections["inference"] = check_inference(profile=profile)
+    else:
+        sections["inference"] = check_inference(profile=profile)
 
     # Aggregate status
     all_statuses = []
-    for section in [services, repos, data, inference]:
+    for section in sections.values():
         for item in section.values():
             all_statuses.append(item["status"])
 
@@ -217,12 +242,12 @@ def main():
     result = {
         "overall": overall,
         "summary": f"{green} green, {yellow} yellow, {red} red out of {len(all_statuses)} checks",
+        "profile": profile,
         "timestamp": datetime.now().isoformat(),
-        "services": services,
-        "repos": repos,
-        "data_freshness": data,
-        "inference": inference,
+        **sections,
     }
+    if verbose:
+        result["checked_sections"] = list(sections.keys())
 
     print(json.dumps(result, indent=2, default=str))
 

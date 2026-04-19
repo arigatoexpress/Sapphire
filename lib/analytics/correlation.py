@@ -13,6 +13,9 @@ from __future__ import annotations
 import json
 import logging
 import time
+import urllib.parse
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -27,6 +30,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 CACHE_FILE = DATA_DIR / "price_cache.parquet"
 HISTORY_FILE = DATA_DIR / "correlation_history.jsonl"
 CACHE_TTL_SECS = 6 * 3600
+OPENBB_BASE = "http://127.0.0.1:6900/api/v1"
 
 # Event bus — optional, degrades silently if unavailable
 import sys as _sys
@@ -101,12 +105,12 @@ class CorrelationReport:
 # ---------------------------------------------------------------------------
 
 
-def _load_cache() -> pd.DataFrame | None:
+def _load_cache(*, allow_stale: bool = False) -> pd.DataFrame | None:
     if not CACHE_FILE.exists():
         return None
     try:
         age = time.time() - CACHE_FILE.stat().st_mtime
-        if age > CACHE_TTL_SECS:
+        if age > CACHE_TTL_SECS and not allow_stale:
             return None
         df = pd.read_parquet(CACHE_FILE)
         return df
@@ -122,11 +126,61 @@ def _save_cache(df: pd.DataFrame) -> None:
         pass
 
 
+def _fetch_prices_openbb(symbols: dict[str, str], days: int = 180) -> pd.DataFrame:
+    """Fallback historical fetcher via the local OpenBB service."""
+    start = (datetime.now(UTC) - timedelta(days=days + 10)).strftime("%Y-%m-%d")
+    frames: dict[str, pd.Series] = {}
+
+    def _fetch_one(label: str, ticker: str) -> tuple[str, pd.Series | None]:
+        if ticker.endswith("-USD"):
+            path = "/crypto/price/historical"
+            symbol = ticker.replace("-", "")
+        else:
+            path = "/equity/price/historical"
+            symbol = ticker
+
+        params = urllib.parse.urlencode(
+            {"symbol": symbol, "provider": "yfinance", "start_date": start}
+        )
+        url = f"{OPENBB_BASE}{path}?{params}"
+        try:
+            with urllib.request.urlopen(url, timeout=4) as response:
+                payload = json.loads(response.read())
+        except Exception:
+            return label, None
+
+        rows = payload.get("results") or []
+        if not rows:
+            return label, None
+        data = pd.DataFrame(rows)
+        if "date" not in data.columns or "close" not in data.columns:
+            return label, None
+        return label, pd.Series(
+            data["close"].astype(float).values,
+            index=pd.to_datetime(data["date"]),
+            name=label,
+        )
+
+    with ThreadPoolExecutor(max_workers=min(8, len(symbols) or 1)) as pool:
+        futures = [pool.submit(_fetch_one, label, ticker) for label, ticker in symbols.items()]
+        for future in as_completed(futures):
+            label, series = future.result()
+            if series is not None:
+                frames[label] = series
+
+    if not frames:
+        raise RuntimeError("No price data could be fetched from OpenBB")
+
+    df = pd.concat(frames.values(), axis=1)
+    df.columns = list(frames.keys())
+    df.index = pd.to_datetime(df.index).tz_localize(None)
+    return df.sort_index().ffill().dropna(how="all")
+
+
 def _fetch_prices(symbols: dict[str, str], days: int = 180) -> pd.DataFrame:
     """Fetch daily adjusted closes for all symbols. Returns DF indexed by date."""
-    import yfinance as yf
-
     cached = _load_cache()
+    stale_cached = _load_cache(allow_stale=True)
     need_refresh = False
     if cached is None:
         need_refresh = True
@@ -138,33 +192,52 @@ def _fetch_prices(symbols: dict[str, str], days: int = 180) -> pd.DataFrame:
     if not need_refresh and cached is not None:
         return cached[list(symbols.keys())].copy()
 
-    end = datetime.now(UTC)
-    start = end - timedelta(days=days + 10)
-
     frames: dict[str, pd.Series] = {}
-    for label, ticker in symbols.items():
-        try:
-            data = yf.download(
-                ticker,
-                start=start.strftime("%Y-%m-%d"),
-                end=end.strftime("%Y-%m-%d"),
-                progress=False,
-                auto_adjust=True,
-                threads=True,
-            )
-            if data is None or data.empty:
+    try:
+        import yfinance as yf
+    except Exception:
+        yf = None
+
+    if yf is not None:
+        end = datetime.now(UTC)
+        start = end - timedelta(days=days + 10)
+        for label, ticker in symbols.items():
+            try:
+                data = yf.download(
+                    ticker,
+                    start=start.strftime("%Y-%m-%d"),
+                    end=end.strftime("%Y-%m-%d"),
+                    progress=False,
+                    auto_adjust=True,
+                    threads=True,
+                )
+                if data is None or data.empty:
+                    continue
+                col = "Close" if "Close" in data.columns else data.columns[0]
+                series = data[col]
+                if isinstance(series, pd.DataFrame):
+                    series = series.iloc[:, 0]
+                series.name = label
+                frames[label] = series
+            except Exception:
                 continue
-            col = "Close" if "Close" in data.columns else data.columns[0]
-            series = data[col]
-            if isinstance(series, pd.DataFrame):
-                series = series.iloc[:, 0]
-            series.name = label
-            frames[label] = series
-        except Exception:
-            continue
 
     if not frames:
-        raise RuntimeError("No price data could be fetched from yfinance")
+        try:
+            df = _fetch_prices_openbb(symbols, days=days)
+            _save_cache(df)
+            return df
+        except Exception:
+            pass
+        if stale_cached is not None:
+            available = [s for s in symbols.keys() if s in stale_cached.columns]
+            if available:
+                log.warning(
+                    "live refresh failed; using stale correlation cache (%0.1fh old)",
+                    (time.time() - CACHE_FILE.stat().st_mtime) / 3600,
+                )
+                return stale_cached[available].copy()
+        raise RuntimeError("No price data could be fetched from yfinance or OpenBB")
 
     df = pd.concat(frames.values(), axis=1)
     df.columns = list(frames.keys())

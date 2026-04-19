@@ -38,7 +38,8 @@ def _stamp() -> str:
 
 def _write_linkedin(report: Report, stamp: str) -> tuple[Path, quality.QualityReport]:
     text = formatters.format_linkedin(report)
-    q = quality.check(text)
+    # LinkedIn posts are bullet-point format — relax coherence threshold
+    q = quality.check(text, min_coherence=0.2)
     path = READY_ROOT / "linkedin" / f"{stamp}_{report.kind}.md"
     path.write_text(text)
     return path, q

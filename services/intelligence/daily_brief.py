@@ -66,65 +66,58 @@ def _fmt_pct(n: float | None, digits: int = 1) -> str:
     return f"{n*100:+.{digits}f}%"
 
 
-def _section_regime() -> dict:
+def _section_regime(chain_snapshot: dict | None = None) -> dict:
     """Market regime section from on-chain intelligence."""
     try:
-        from lib.chain import ChainIntelligence
-        ci = ChainIntelligence()
-        snap = ci.snapshot()
+        if chain_snapshot is None:
+            from lib.chain import ChainIntelligence
+
+            chain_snapshot = ChainIntelligence().snapshot()
+        snap = chain_snapshot
     except Exception as e:
         log.warning("chain intelligence unavailable: %s", e)
         return {"status": "unavailable", "error": str(e)}
 
-    regime = snap.get("regime") or {}
-    overview = snap.get("overview") or {}
-    stable = snap.get("stablecoins") or {}
-    funding_snap = snap.get("funding") or {}
+    # ChainIntelligence.snapshot() returns a flat dict — extract fields directly.
+    clf = snap.get("classification") or {}
+    raw_regime = clf.get("regime")
+    state = raw_regime.value if hasattr(raw_regime, "value") else str(raw_regime or "UNKNOWN")
+    score = clf.get("score", 0.0) or 0.0
+    inputs_ok = clf.get("inputs_ok", 0)
+    inputs_total = clf.get("inputs_total", 1) or 1
+    confidence = inputs_ok / inputs_total
 
-    # Top extreme funding perps
-    perps = funding_snap.get("perps") or []
-    extremes = [p for p in perps if p.get("extreme_flag") in
-                {"crowded_long", "crowded_short", "elevated_long", "elevated_short"}]
-    extremes.sort(key=lambda p: abs(p.get("funding_rate_8h", 0.0)), reverse=True)
+    emoji = {"RISK_ON": "🟢", "RISK_OFF": "🔴"}.get(state, "🟡" if state == "NEUTRAL" else "⚪")
+    lines = [
+        f"{emoji} *Regime:* `{state}`  "
+        f"score {score:+.2f} · "
+        f"conf {confidence:.0%}"
+    ]
 
-    lines = []
-    state = regime.get("state", "UNKNOWN")
-    emoji = {"RISK_ON": "🟢", "RISK_OFF": "🔴", "TRANSITION": "🟡"}.get(state, "⚪")
-    lines.append(f"{emoji} *Regime:* `{state}`  "
-                 f"score {regime.get('score', 0):+.2f} · "
-                 f"conf {regime.get('confidence', 0):.0%}")
-
-    for r in regime.get("reasoning", [])[:3]:
+    for r in (clf.get("reasons") or [])[:3]:
         lines.append(f"  • {r}")
 
-    # Headline numbers
-    btc_price = overview.get("btc_price_usd")
-    btc_d = overview.get("btc_dominance")
-    m24 = overview.get("market_cap_change_24h_pct")
-    if btc_price:
-        lines.append(f"  BTC ${btc_price:,.0f}  (dom {btc_d:.1f}%)" if btc_d
-                     else f"  BTC ${btc_price:,.0f}")
-    if m24 is not None:
-        lines.append(f"  Total mcap 24h: {m24:+.2f}%")
+    # Headline numbers not already in reasoning bullets
+    btc_d = snap.get("btc_dominance")
+    dxy = snap.get("dxy")
+    vix = snap.get("vix")
+    if btc_d is not None:
+        lines.append(f"  BTC.D {btc_d:.1f}%")
+    if dxy is not None:
+        lines.append(f"  DXY {dxy:.2f}  VIX {vix:.1f}" if vix is not None
+                     else f"  DXY {dxy:.2f}")
 
-    # Funding extremes (max 2)
-    for p in extremes[:2]:
-        coin = p.get("coin", "?")
-        rate = p.get("funding_rate_8h", 0.0) * 100
-        flag = p.get("extreme_flag", "")
-        lines.append(f"  ⚠️ {coin} funding {rate:+.3f}%  ({flag})")
-
-    # Stablecoin flow
-    flow = stable.get("flow_direction")
-    d24 = stable.get("delta_24h_usd")
-    if flow in {"inflow", "outflow"} and d24 is not None:
-        arrow = "↑" if flow == "inflow" else "↓"
-        lines.append(f"  Stablecoins 24h: {arrow} {_fmt_usd(abs(d24))} ({flow})")
+    # Funding rates (if available — Binance geo-restricted for US)
+    btc_f = snap.get("btc_funding_rate_pct")
+    eth_f = snap.get("eth_funding_rate_pct")
+    if btc_f is not None:
+        lines.append(f"  BTC funding {btc_f:+.4f}%  ETH {eth_f:+.4f}%" if eth_f is not None
+                     else f"  BTC funding {btc_f:+.4f}%")
 
     return {
         "status": "ok",
         "state": state,
-        "score": regime.get("score", 0.0),
+        "score": score,
         "text": "\n".join(lines),
     }
 
@@ -169,6 +162,7 @@ def _section_correlation() -> dict:
     return {
         "status": "ok",
         "events": len(events),
+        "correlation_events": [{"severity": e.severity} for e in events],
         "text": "\n".join(lines),
     }
 
@@ -205,11 +199,17 @@ def _section_portfolio() -> dict:
     }
 
 
-def _section_sentiment(chain_snapshot: dict | None = None) -> dict:
+def _section_sentiment(
+    chain_snapshot: dict | None = None,
+    correlation_events: list[dict] | None = None,
+) -> dict:
     """Fear & Greed composite — publishes sentiment.update to the event bus."""
     try:
         from lib.analytics.sentiment import compute_sentiment
-        s = compute_sentiment(chain_snapshot=chain_snapshot)
+        s = compute_sentiment(
+            chain_snapshot=chain_snapshot,
+            correlation_events=correlation_events,
+        )
     except Exception as e:
         log.warning("sentiment unavailable: %s", e)
         return {"status": "unavailable", "text": f"  (sentiment unavailable: {e})"}
@@ -308,10 +308,10 @@ def _section_health() -> dict:
         import subprocess
         r = subprocess.run(
             ["/usr/local/bin/python3", str(health_tool)],
-            input="{}",
+            input=json.dumps({"profile": "brief"}),
             capture_output=True,
             text=True,
-            timeout=20,
+            timeout=10,
         )
         if r.returncode != 0:
             return {"status": "error", "text": f"  Health check exit {r.returncode}: {r.stderr[:80]}"}
@@ -528,20 +528,35 @@ def _section_robinhood() -> dict:
     if not snap:
         return {"status": "empty", "text": "  Robinhood: no snapshot returned."}
 
-    pnl = snap.get("unrealized_pnl_usd", 0.0)
-    pnl_pct = snap.get("unrealized_pnl_pct", 0.0)
-    pnl_emoji = "🟢" if pnl >= 0 else "🔴"
+    pnl = snap.get("unrealized_pnl_usd")
+    pnl_pct = snap.get("unrealized_pnl_pct")
+    pnl_available = bool(snap.get("pnl_available"))
+    pnl_emoji = "🟢" if (pnl or 0.0) >= 0 else "🔴"
     lines = [
         f"{pnl_emoji} *Robinhood Crypto:* ${snap.get('portfolio_value_usd', 0):,.2f}  "
         f"({snap.get('position_count', 0)} positions)"
     ]
-    lines.append(f"  Unrealised P&L: {_fmt_usd(pnl)}  ({pnl_pct*100:+.2f}%)")
+    lines.append(
+        f"  Holdings: {_fmt_usd(snap.get('holdings_value_usd'))} · Cash: {_fmt_usd(snap.get('cash_usd'))}"
+    )
+    if pnl_available and pnl_pct is not None:
+        lines.append(f"  Unrealised P&L: {_fmt_usd(pnl)}  ({pnl_pct*100:+.2f}%)")
+    else:
+        lines.append("  Unrealised P&L: unavailable (cost basis still reconstructing from order history)")
     for pos in snap.get("positions", [])[:4]:
-        em = "↑" if pos["unrealized_pnl_usd"] >= 0 else "↓"
-        lines.append(
-            f"  {em} {pos['asset']:6}  {_fmt_usd(pos['market_value_usd'])}  "
-            f"P&L {pos['unrealized_pnl_pct']*100:+.1f}%"
-        )
+        pos_pnl = pos.get("unrealized_pnl_usd")
+        pos_pct = pos.get("unrealized_pnl_pct")
+        if pos_pnl is not None and pos_pct is not None:
+            em = "↑" if pos_pnl >= 0 else "↓"
+            lines.append(
+                f"  {em} {pos['asset']:6}  {_fmt_usd(pos.get('market_value_usd'))}  "
+                f"P&L {pos_pct*100:+.1f}%"
+            )
+        else:
+            lines.append(
+                f"  • {pos['asset']:6}  {_fmt_usd(pos.get('market_value_usd'))}  "
+                f"@ {_fmt_usd(pos.get('current_price_usd'))}"
+            )
     return {"status": "ok", "portfolio_value": snap.get("portfolio_value_usd"), "text": "\n".join(lines)}
 
 
@@ -564,10 +579,13 @@ def build_brief() -> str:
     except Exception:
         chain_snap = None
 
-    regime = _section_regime()
+    regime = _section_regime(chain_snapshot=chain_snap)
     market_intel = _section_market_intel()
     corr = _section_correlation()
-    sent = _section_sentiment(chain_snapshot=chain_snap)
+    sent = _section_sentiment(
+        chain_snapshot=chain_snap,
+        correlation_events=corr.get("correlation_events"),
+    )
     port = _section_portfolio()
     cascade = _section_cascade()
     robinhood = _section_robinhood()

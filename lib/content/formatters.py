@@ -17,6 +17,8 @@ from .report_generator import Report
 
 LINKEDIN_LIMIT = 1300
 X_TWEET_LIMIT = 270  # leave headroom under the hard 280
+SHORT_DISCLAIMER = "Informational only. Not investment advice."
+MARKDOWN_DISCLAIMER = "_For informational and educational purposes only. Not investment advice._"
 
 
 # ---------- LinkedIn ----------
@@ -29,6 +31,19 @@ def _shorten_to(text: str, limit: int) -> str:
     if len(cut) < limit * 0.6:
         cut = text[: limit - 1]
     return cut.rstrip() + "…"
+
+
+def _append_tail(text: str, tail: str, limit: int) -> str:
+    """Append a fixed tail while guaranteeing it survives truncation."""
+    if not tail:
+        return _shorten_to(text, limit)
+    joiner = "\n\n"
+    if len(text) + len(joiner) + len(tail) <= limit:
+        return text + joiner + tail
+    budget = max(0, limit - len(joiner) - len(tail))
+    if budget == 0:
+        return tail[:limit]
+    return _shorten_to(text, budget) + joiner + tail
 
 
 def _linkedin_crypto(r: Report) -> str:
@@ -54,7 +69,7 @@ def _linkedin_crypto(r: Report) -> str:
     tail = "Data sources: " + ", ".join(r.sources)
     tags = " ".join(f"#{t}" for t in r.tags if t.isascii())
     body = "\n\n".join([hook, symbol_line, book, pipe, tail, tags])
-    return _shorten_to(body, LINKEDIN_LIMIT)
+    return _append_tail(body, SHORT_DISCLAIMER, LINKEDIN_LIMIT)
 
 
 def _linkedin_ai(r: Report) -> str:
@@ -79,8 +94,10 @@ def _linkedin_ai(r: Report) -> str:
     proj = f"{f['tracked_projects']} active projects in the ledger."
     tail = "Source: " + ", ".join(r.sources)
     tags = " ".join(f"#{t}" for t in r.tags if t.isascii())
-    return _shorten_to(
-        "\n\n".join([hook, lead, mesh, proj, tail, tags]), LINKEDIN_LIMIT
+    return _append_tail(
+        "\n\n".join([hook, lead, mesh, proj, tail, tags]),
+        SHORT_DISCLAIMER,
+        LINKEDIN_LIMIT,
     )
 
 
@@ -97,8 +114,10 @@ def _linkedin_security(r: Report) -> str:
         tops.append(f"• {item['cve']}{kev} — {item['title']}")
     tail = "Source: " + ", ".join(r.sources)
     tags = " ".join(f"#{t}" for t in r.tags if t.isascii())
-    return _shorten_to(
-        "\n\n".join([hook, "\n".join(tops), tail, tags]), LINKEDIN_LIMIT
+    return _append_tail(
+        "\n\n".join([hook, "\n".join(tops), tail, tags]),
+        SHORT_DISCLAIMER,
+        LINKEDIN_LIMIT,
     )
 
 
@@ -109,7 +128,7 @@ def format_linkedin(r: Report) -> str:
         return _linkedin_ai(r)
     if r.kind == "security_digest":
         return _linkedin_security(r)
-    return _shorten_to(r.body, LINKEDIN_LIMIT)
+    return _append_tail(r.body, SHORT_DISCLAIMER, LINKEDIN_LIMIT)
 
 
 # ---------- Substack ----------
@@ -119,7 +138,10 @@ def format_substack(r: Report) -> str:
     header = f"# {r.title}\n\n_Generated {r.generated_at}_\n"
     body = r.body
     sources = "\n".join(f"- `{s}`" for s in r.sources) if r.sources else "(none)"
-    footer = f"\n\n---\n\n## Data Sources\n\n{sources}\n"
+    footer = (
+        f"\n\n---\n\n## Data Sources\n\n{sources}\n"
+        f"\n## Disclaimer\n\n{MARKDOWN_DISCLAIMER}\n"
+    )
     return "\n".join([header, body, footer])
 
 
@@ -225,4 +247,5 @@ def format_x_thread(r: Report) -> list[str]:
         return [single]
     else:
         parts = [r.title, r.body]
+    parts.append(SHORT_DISCLAIMER)
     return _split_tweets(parts)

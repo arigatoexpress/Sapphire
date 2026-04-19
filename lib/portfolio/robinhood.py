@@ -1,17 +1,24 @@
-"""Robinhood Trading API client — portfolio + holdings.
+"""Robinhood Crypto Trading API client — portfolio + holdings.
 
-Authentication: ED25519-signed requests (Robinhood Credentials API, 2024+).
-Credentials loaded from ~/.config/sapphire-secrets/:
-  - robinhood_api_key               (e.g. rh-api-{uuid})
-  - robinhood_ed25519_private.b64   (base64-encoded 32-byte ED25519 seed)
+Uses Robinhood's current crypto trading API and authentication contract:
 
-Endpoints used:
-  GET /api/v1/portfolios/   → portfolio value, equity
-  GET /api/v1/positions/?nonzero=true  → open positions
-  GET /api/v1/accounts/     → account info (cash, buying power)
+  - Base URL: ``https://trading.robinhood.com``
+  - Read endpoints:
+      ``/api/v2/crypto/trading/accounts/``
+      ``/api/v2/crypto/trading/holdings/``
+      ``/api/v2/crypto/marketdata/best_bid_ask/``
+      ``/api/v2/crypto/trading/orders/``
+  - Signature message:
+      ``{api_key}{timestamp}{path}{method}{body}``
 
-All calls degrade gracefully — if the API is unavailable this returns
-a stub dict with a `source: "unavailable"` key so callers can detect it.
+Credentials are loaded from ``~/.config/sapphire-secrets/``:
+  - ``robinhood_api_key``
+  - ``robinhood_ed25519_private.b64`` (base64-encoded 32-byte Ed25519 seed)
+
+The API does not expose cost basis directly in holdings, so this module
+reconstructs a weighted-average cost basis from filled order history when
+possible. If order history is incomplete, the reader still returns current
+holdings and valuation data, but unrealized P&L may be unavailable.
 """
 
 from __future__ import annotations
@@ -19,11 +26,17 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import ssl
 import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+
+import certifi
+
+_SSL_CTX = ssl.create_default_context(cafile=certifi.where())
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -35,301 +48,510 @@ log = logging.getLogger(__name__)
 
 _SECRETS = Path.home() / ".config" / "sapphire-secrets"
 _BASE = "https://trading.robinhood.com"
+_DEFAULT_ORDER_LOOKBACK_DAYS = 365 * 5
 
-# Instrument symbol cache to avoid repeated calls
-_INSTRUMENT_CACHE: dict[str, str] = {}
+
+def _as_float(value: Any) -> float | None:
+    try:
+        if value is None or value == "":
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _load_credentials() -> tuple[str, bytes]:
-    """Load API key + ED25519 private key bytes from secrets dir."""
+    """Load API key + Ed25519 private key bytes from the secrets dir."""
     api_key = (_SECRETS / "robinhood_api_key").read_text().strip()
     private_b64 = (_SECRETS / "robinhood_ed25519_private.b64").read_text().strip()
     private_bytes = base64.b64decode(private_b64)
     return api_key, private_bytes
 
 
-def _sign_request(api_key: str, private_bytes: bytes, path: str, body: str = "") -> dict[str, str]:
-    """Return auth headers for a Robinhood API request.
+def _encode_query(params: dict[str, Any] | None = None) -> str:
+    if not params:
+        return ""
+    items: list[tuple[str, str]] = []
+    for key, value in params.items():
+        if value is None:
+            continue
+        if isinstance(value, (list, tuple)):
+            items.extend((key, str(v)) for v in value if v is not None)
+        else:
+            items.append((key, str(value)))
+    if not items:
+        return ""
+    return "?" + urllib.parse.urlencode(items, doseq=True)
 
-    Message format: {api_key}{timestamp}{path}{body}
-    """
+
+def _sign_request(
+    api_key: str,
+    private_bytes: bytes,
+    method: str,
+    path: str,
+    body: str = "",
+) -> dict[str, str]:
+    """Return auth headers for a Robinhood API request."""
     timestamp = str(int(time.time()))
-    message = f"{api_key}{timestamp}{path}{body}".encode()
+    method = method.upper()
+    message = f"{api_key}{timestamp}{path}{method}{body}".encode("utf-8")
 
     try:
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
         private_key = Ed25519PrivateKey.from_private_bytes(private_bytes)
         signature = private_key.sign(message)
-        sig_b64 = base64.b64encode(signature).decode()
+        sig_b64 = base64.b64encode(signature).decode("utf-8")
     except ImportError:
-        # PyNaCl fallback
         try:
             import nacl.signing
+
             signing_key = nacl.signing.SigningKey(private_bytes)
             signed = signing_key.sign(message)
-            sig_b64 = base64.b64encode(signed.signature).decode()
-        except ImportError:
+            sig_b64 = base64.b64encode(signed.signature).decode("utf-8")
+        except ImportError as exc:
             raise RuntimeError(
-                "No ED25519 signing library available. "
-                "Install 'cryptography' or 'PyNaCl': pip install cryptography"
-            )
+                "No Ed25519 signing library available. Install 'cryptography' or 'PyNaCl'."
+            ) from exc
 
     return {
         "x-api-key": api_key,
-        "x-timestamp": timestamp,
         "x-signature": sig_b64,
-        "Content-Type": "application/json",
+        "x-timestamp": timestamp,
         "Accept": "application/json",
+        "Content-Type": "application/json",
     }
 
 
-def _get(path: str, api_key: str, private_bytes: bytes, timeout: int = 15) -> Any:
-    """Authenticated GET request to Robinhood API."""
-    headers = _sign_request(api_key, private_bytes, path)
-    url = _BASE + path
-    req = urllib.request.Request(url, headers=headers)
+def _request(
+    method: str,
+    path: str,
+    api_key: str,
+    private_bytes: bytes,
+    body: dict[str, Any] | None = None,
+    timeout: int = 15,
+) -> Any:
+    """Authenticated Robinhood API request."""
+    body_text = json.dumps(body, separators=(",", ":")) if body is not None else ""
+    headers = _sign_request(api_key, private_bytes, method, path, body_text)
+    req = urllib.request.Request(
+        _BASE + path,
+        data=body_text.encode("utf-8") if body_text else None,
+        headers=headers,
+        method=method.upper(),
+    )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            return json.loads(r.read())
-    except urllib.error.HTTPError as e:
-        body = e.read().decode(errors="replace")[:200]
-        raise RuntimeError(f"Robinhood GET {path} → HTTP {e.code}: {body}") from e
-    except Exception as e:
-        raise RuntimeError(f"Robinhood GET {path} → {type(e).__name__}: {e}") from e
+        with urllib.request.urlopen(req, context=_SSL_CTX, timeout=timeout) as response:
+            return json.loads(response.read())
+    except urllib.error.HTTPError as exc:
+        body_text = exc.read().decode(errors="replace")[:300]
+        raise RuntimeError(
+            f"Robinhood {method.upper()} {path} -> HTTP {exc.code}: {body_text}"
+        ) from exc
+    except Exception as exc:
+        raise RuntimeError(
+            f"Robinhood {method.upper()} {path} -> {type(exc).__name__}: {exc}"
+        ) from exc
 
 
 class RobinhoodReader:
-    """Read-only Robinhood portfolio data."""
+    """Read-only Robinhood crypto portfolio data."""
 
     def __init__(self):
         try:
             self._api_key, self._private_bytes = _load_credentials()
             self._available = True
-        except (FileNotFoundError, KeyError, ValueError) as e:
-            log.warning("Robinhood credentials unavailable: %s", e)
+        except (FileNotFoundError, ValueError) as exc:
+            log.warning("Robinhood credentials unavailable: %s", exc)
             self._api_key = ""
             self._private_bytes = b""
             self._available = False
+        self._account_cache: dict[str, Any] | None = None
+        self._cost_basis_cache: dict[str, dict[str, float]] | None = None
 
     def is_configured(self) -> bool:
         """True if credentials are loaded and non-empty."""
         return self._available and bool(self._api_key)
 
-    def _get(self, path: str) -> Any:
-        return _get(path, self._api_key, self._private_bytes)
+    def _request_json(
+        self,
+        method: str,
+        path: str,
+        body: dict[str, Any] | None = None,
+        timeout: int = 15,
+    ) -> Any:
+        return _request(method, path, self._api_key, self._private_bytes, body=body, timeout=timeout)
 
-    def get_portfolio_value(self) -> dict:
-        """Return equity, cash, and return metrics."""
-        if not self._available:
-            return {"source": "unavailable", "error": "credentials not loaded"}
-        try:
-            portfolios = self._get("/api/v1/portfolios/")
-            results = portfolios.get("results") or []
-            if not results:
-                return {"source": "unavailable", "error": "no portfolio found"}
-            p = results[0]
-            equity = float(p.get("equity") or p.get("extended_hours_equity") or 0)
-            prev_equity = float(p.get("equity_previous_close") or equity)
-            day_pnl = equity - prev_equity
-            day_pnl_pct = (day_pnl / prev_equity * 100.0) if prev_equity else 0.0
-            adj_prev = float(p.get("adjusted_equity_previous_close") or prev_equity)
-            total_return = equity - adj_prev
-            total_return_pct = (total_return / adj_prev * 100.0) if adj_prev else 0.0
-            return {
-                "source": "robinhood",
-                "equity": equity,
-                "day_pnl": day_pnl,
-                "day_pnl_pct": day_pnl_pct,
-                "total_return": total_return,
-                "total_return_pct": total_return_pct,
-            }
-        except Exception as e:
-            log.warning("get_portfolio_value failed: %s", e)
-            return {"source": "unavailable", "error": str(e)}
-
-    def get_account(self) -> dict:
-        """Return cash, buying power from account endpoint."""
-        if not self._available:
-            return {"source": "unavailable", "error": "credentials not loaded"}
-        try:
-            accounts = self._get("/api/v1/accounts/")
-            results = accounts.get("results") or []
-            if not results:
-                return {"source": "unavailable", "error": "no account found"}
-            a = results[0]
-            cash = float(a.get("cash") or a.get("portfolio_cash") or 0)
-            buying_power = float(a.get("buying_power") or cash)
-            return {
-                "source": "robinhood",
-                "cash": cash,
-                "buying_power": buying_power,
-                "account_number": a.get("account_number", ""),
-            }
-        except Exception as e:
-            log.warning("get_account failed: %s", e)
-            return {"source": "unavailable", "error": str(e)}
-
-    def get_holdings(self) -> list[dict]:
-        """Return list of non-zero positions with current price data."""
+    def _get_results(self, base_path: str, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         if not self._available:
             return []
+
+        path = f"{base_path}{_encode_query(params)}"
+        results: list[dict[str, Any]] = []
+        seen_paths: set[str] = set()
+
+        while path and path not in seen_paths:
+            seen_paths.add(path)
+            payload = self._request_json("GET", path)
+            page_results = payload.get("results") if isinstance(payload, dict) else None
+            if isinstance(page_results, list):
+                results.extend(r for r in page_results if isinstance(r, dict))
+            next_url = payload.get("next") if isinstance(payload, dict) else None
+            if next_url:
+                path = next_url.replace(_BASE, "")
+            else:
+                break
+        return results
+
+    def _get_account_record(self) -> dict[str, Any] | None:
+        if self._account_cache is not None:
+            return self._account_cache
+        if not self._available:
+            return None
         try:
-            # Positions
-            positions_data = self._get("/api/v1/positions/?nonzero=true")
-            positions = positions_data.get("results") or []
-            if not positions:
-                return []
+            accounts = self._get_results("/api/v2/crypto/trading/accounts/")
+            if not accounts:
+                return None
+            tradable = [a for a in accounts if a.get("is_api_tradable") is True]
+            self._account_cache = tradable[0] if tradable else accounts[0]
+            return self._account_cache
+        except Exception as exc:
+            log.warning("get_accounts failed: %s", exc)
+            return None
 
-            # Collect instrument URLs to resolve symbols
-            instrument_urls = list({p.get("instrument") for p in positions if p.get("instrument")})
-            symbol_map = self._resolve_symbols(instrument_urls)
+    def _get_account_number(self) -> str | None:
+        account = self._get_account_record()
+        if not account:
+            return None
+        account_number = account.get("account_number")
+        return str(account_number) if account_number else None
 
-            holdings = []
-            total_equity = sum(
-                float(p.get("quantity", 0)) * float(p.get("average_buy_price", 0))
-                for p in positions
+    def _get_best_bid_ask(self, symbols: list[str]) -> dict[str, float]:
+        if not symbols:
+            return {}
+        try:
+            results = self._get_results(
+                "/api/v2/crypto/marketdata/best_bid_ask/",
+                params={"symbol": symbols},
             )
-            total_equity = total_equity or 1.0  # avoid division by zero
+        except Exception as exc:
+            log.warning("get_best_bid_ask failed: %s", exc)
+            return {}
 
-            for p in positions:
-                qty = float(p.get("quantity") or 0)
-                avg_cost = float(p.get("average_buy_price") or 0)
-                if qty == 0:
-                    continue
+        prices: dict[str, float] = {}
+        for item in results:
+            symbol = str(item.get("symbol") or "").upper()
+            bid = _as_float(item.get("bid"))
+            ask = _as_float(item.get("ask"))
+            price = None
+            if bid is not None and ask is not None:
+                price = (bid + ask) / 2.0
+            elif bid is not None:
+                price = bid
+            elif ask is not None:
+                price = ask
+            if symbol and price is not None:
+                prices[symbol] = price
+        return prices
 
-                instrument_url = p.get("instrument", "")
-                sym = symbol_map.get(instrument_url, "UNKNOWN")
+    def _reconstruct_cost_basis(self, account_number: str) -> dict[str, dict[str, float]]:
+        if self._cost_basis_cache is not None:
+            return self._cost_basis_cache
 
-                # Current price via quote endpoint
-                current_price, day_chg_pct = self._fetch_quote(sym)
-                if current_price is None:
-                    current_price = avg_cost
-                    day_chg_pct = 0.0
+        created_at_start = (
+            datetime.now(UTC) - timedelta(days=_DEFAULT_ORDER_LOOKBACK_DAYS)
+        ).strftime("%Y-%m-%dT%H:%M:%SZ")
+        try:
+            orders = self._get_results(
+                "/api/v2/crypto/trading/orders/",
+                params={
+                    "account_number": account_number,
+                    "created_at_start": created_at_start,
+                },
+            )
+        except Exception as exc:
+            log.warning("get_orders failed: %s", exc)
+            self._cost_basis_cache = {}
+            return self._cost_basis_cache
 
-                total_return = (current_price - avg_cost) * qty
-                market_value = current_price * qty
-                weight = market_value / total_equity * 100.0
+        positions: dict[str, dict[str, float]] = {}
+        orders.sort(key=lambda order: str(order.get("created_at") or ""))
 
-                holdings.append({
-                    "symbol": sym,
-                    "name": sym,  # Robinhood API gives name via instrument detail
-                    "qty": qty,
-                    "avg_cost": avg_cost,
-                    "price": current_price,
-                    "day_chg_pct": day_chg_pct,
-                    "total_return": total_return,
-                    "weight": weight,
-                })
+        for order in orders:
+            state = str(order.get("state") or "").lower()
+            if state not in {"filled", "partially_filled"}:
+                continue
 
-            return holdings
-        except Exception as e:
-            log.warning("get_holdings failed: %s", e)
+            symbol = str(order.get("symbol") or "")
+            asset_code = symbol.split("-", 1)[0].upper() if "-" in symbol else ""
+            if not asset_code:
+                continue
+
+            quantity = _as_float(order.get("filled_asset_quantity")) or 0.0
+            average_price = _as_float(order.get("average_price"))
+            side = str(order.get("side") or "").lower()
+            if quantity <= 0 or average_price is None or side not in {"buy", "sell"}:
+                continue
+
+            pos = positions.setdefault(asset_code, {"qty": 0.0, "cost": 0.0})
+            if side == "buy":
+                pos["qty"] += quantity
+                pos["cost"] += quantity * average_price
+                continue
+
+            current_qty = pos["qty"]
+            if current_qty <= 0:
+                pos["qty"] = 0.0
+                pos["cost"] = 0.0
+                continue
+
+            avg_cost = pos["cost"] / current_qty if current_qty else 0.0
+            quantity_to_remove = min(current_qty, quantity)
+            pos["qty"] = max(0.0, current_qty - quantity)
+            pos["cost"] = max(0.0, pos["cost"] - quantity_to_remove * avg_cost)
+
+        self._cost_basis_cache = {
+            asset: {
+                "qty": round(pos["qty"], 12),
+                "avg_cost": (pos["cost"] / pos["qty"]) if pos["qty"] > 0 else 0.0,
+            }
+            for asset, pos in positions.items()
+        }
+        return self._cost_basis_cache
+
+    def get_account(self) -> dict[str, Any]:
+        """Return the default crypto account's buying power and status."""
+        if not self._available:
+            return {"source": "unavailable", "error": "credentials not loaded"}
+        try:
+            account = self._get_account_record()
+            if not account:
+                return {"source": "unavailable", "error": "no crypto account found"}
+            buying_power = _as_float(account.get("buying_power")) or 0.0
+            return {
+                "source": "robinhood",
+                "account_number": account.get("account_number", ""),
+                "status": account.get("status", ""),
+                "account_type": account.get("account_type", ""),
+                "buying_power": buying_power,
+                "buying_power_currency": account.get("buying_power_currency", "USD"),
+                "is_api_tradable": bool(account.get("is_api_tradable")),
+                "fee_ratio": _as_float((account.get("fee_tier_status") or {}).get("fee_ratio")),
+            }
+        except Exception as exc:
+            log.warning("get_account failed: %s", exc)
+            return {"source": "unavailable", "error": str(exc)}
+
+    def get_holdings(self) -> list[dict[str, Any]]:
+        """Return Robinhood crypto holdings with live prices and cost basis if available."""
+        if not self._available:
             return []
 
-    def _resolve_symbols(self, instrument_urls: list[str]) -> dict[str, str]:
-        """Batch-resolve instrument URLs to ticker symbols."""
-        result: dict[str, str] = {}
-        for url in instrument_urls:
-            if url in _INSTRUMENT_CACHE:
-                result[url] = _INSTRUMENT_CACHE[url]
-                continue
-            try:
-                req = urllib.request.Request(
-                    url,
-                    headers={"Accept": "application/json"},
-                )
-                with urllib.request.urlopen(req, timeout=10) as r:
-                    data = json.loads(r.read())
-                sym = data.get("symbol", "UNKNOWN")
-                _INSTRUMENT_CACHE[url] = sym
-                result[url] = sym
-            except Exception:
-                result[url] = "UNKNOWN"
-        return result
+        account_number = self._get_account_number()
+        if not account_number:
+            return []
 
-    def _fetch_quote(self, symbol: str) -> tuple[float | None, float]:
-        """Fetch current price + day change % for a symbol."""
         try:
-            data = self._get(f"/api/v1/quotes/{symbol}/")
-            price = float(data.get("last_trade_price") or data.get("bid_price") or 0)
-            prev_close = float(data.get("previous_close") or price)
-            day_chg = ((price - prev_close) / prev_close * 100.0) if prev_close else 0.0
-            return price, day_chg
-        except Exception:
-            return None, 0.0
+            raw_holdings = self._get_results(
+                "/api/v2/crypto/trading/holdings/",
+                params={"account_number": account_number},
+            )
+        except Exception as exc:
+            log.warning("get_holdings failed: %s", exc)
+            return []
 
-    def get_snapshot(self) -> dict:
+        live_rows: list[dict[str, Any]] = []
+        symbols: list[str] = []
+        for row in raw_holdings:
+            asset_code = str(row.get("asset_code") or "").upper()
+            quantity = _as_float(row.get("total_quantity")) or 0.0
+            if not asset_code or quantity <= 0:
+                continue
+            symbol = f"{asset_code}-USD"
+            symbols.append(symbol)
+            live_rows.append({
+                "asset_code": asset_code,
+                "symbol": asset_code,
+                "trading_pair": symbol,
+                "qty": quantity,
+                "available_qty": _as_float(row.get("quantity_available_for_trading")) or quantity,
+                "account_number": row.get("account_number", ""),
+            })
+
+        if not live_rows:
+            return []
+
+        prices = self._get_best_bid_ask(symbols)
+        cost_basis = self._reconstruct_cost_basis(account_number)
+
+        total_market_value = 0.0
+        for row in live_rows:
+            price = prices.get(row["trading_pair"])
+            avg_cost = cost_basis.get(row["asset_code"], {}).get("avg_cost")
+            market_value = price * row["qty"] if price is not None else None
+            total_return = (
+                (price - avg_cost) * row["qty"]
+                if price is not None and avg_cost not in {None, 0.0}
+                else None
+            )
+            row["price"] = price
+            row["avg_cost"] = avg_cost if avg_cost not in {None, 0.0} else None
+            row["market_value"] = market_value
+            row["total_return"] = total_return
+            if market_value is not None:
+                total_market_value += market_value
+
+        for row in live_rows:
+            if row.get("market_value") is None or total_market_value <= 0:
+                row["weight"] = None
+            else:
+                row["weight"] = row["market_value"] / total_market_value * 100.0
+
+        live_rows.sort(
+            key=lambda row: row.get("market_value") if row.get("market_value") is not None else -1.0,
+            reverse=True,
+        )
+        return live_rows
+
+    def get_portfolio_value(self) -> dict[str, Any]:
+        """Return current crypto account value from holdings + buying power."""
+        if not self._available:
+            return {"source": "unavailable", "error": "credentials not loaded"}
+
+        account = self.get_account()
+        if account.get("source") != "robinhood":
+            return account
+
+        holdings = self.get_holdings()
+        holdings_value = sum(h.get("market_value") or 0.0 for h in holdings)
+        buying_power = account.get("buying_power", 0.0) or 0.0
+        equity = holdings_value + buying_power
+
+        pnl_rows = [h["total_return"] for h in holdings if h.get("total_return") is not None]
+        cost_basis_total = sum(
+            (h.get("avg_cost") or 0.0) * (h.get("qty") or 0.0)
+            for h in holdings
+            if h.get("avg_cost") is not None
+        )
+        total_return = sum(pnl_rows) if pnl_rows else None
+        total_return_pct = (
+            (total_return / cost_basis_total * 100.0)
+            if total_return is not None and cost_basis_total > 0
+            else None
+        )
+
+        return {
+            "source": "robinhood",
+            "equity": equity,
+            "cash": buying_power,
+            "buying_power": buying_power,
+            "holdings_value": holdings_value,
+            "day_pnl": None,
+            "day_pnl_pct": None,
+            "total_return": total_return,
+            "total_return_pct": total_return_pct,
+            "position_count": len(holdings),
+        }
+
+    def get_snapshot(self) -> dict[str, Any]:
         """Full portfolio snapshot matching dashboard template data shape."""
         pv = self.get_portfolio_value()
-        acc = self.get_account()
+        account = self.get_account()
         holdings = self.get_holdings()
 
-        # Build sector + asset class summaries from holdings
-        # (Robinhood API has instrument types we can use for this)
-        equity_val = pv.get("equity", 0.0)
-        cash = acc.get("cash", 0.0)
-        total_val = equity_val + cash
+        total_val = pv.get("equity", 0.0) or 0.0
+        holdings_value = pv.get("holdings_value", 0.0) or 0.0
+        cash = account.get("buying_power", 0.0) or 0.0
 
-        # Simple sector allocation (all stocks for now — crypto separate)
-        sectors = [{"name": "Equities", "pct": (equity_val / total_val * 100) if total_val else 0}]
+        sectors = []
+        if holdings_value:
+            sectors.append({"name": "Crypto", "pct": (holdings_value / total_val * 100) if total_val else 0})
         if cash:
             sectors.append({"name": "Cash & Equivalents", "pct": (cash / total_val * 100) if total_val else 0})
 
-        asset_classes = [
-            {"name": "Stocks", "pct": (equity_val / total_val * 100) if total_val else 0, "color": "#62ff40"},
-            {"name": "Cash", "pct": (cash / total_val * 100) if total_val else 0, "color": "#6a8e67"},
-        ]
+        asset_classes = []
+        if holdings_value:
+            asset_classes.append(
+                {"name": "Crypto", "pct": (holdings_value / total_val * 100) if total_val else 0, "color": "#62ff40"}
+            )
+        if cash:
+            asset_classes.append(
+                {"name": "Cash", "pct": (cash / total_val * 100) if total_val else 0, "color": "#6a8e67"}
+            )
 
         is_live = pv.get("source") == "robinhood"
         return {
             "source": "robinhood" if is_live else "unavailable",
             "total_value": total_val,
-            "day_pnl": pv.get("day_pnl", 0.0),
-            "day_pnl_pct": pv.get("day_pnl_pct", 0.0),
-            "total_return": pv.get("total_return", 0.0),
-            "total_return_pct": pv.get("total_return_pct", 0.0),
+            "day_pnl": pv.get("day_pnl"),
+            "day_pnl_pct": pv.get("day_pnl_pct"),
+            "total_return": pv.get("total_return"),
+            "total_return_pct": pv.get("total_return_pct"),
             "cash": cash,
-            "buying_power": acc.get("buying_power", cash),
+            "buying_power": cash,
             "holdings": holdings,
             "sectors": sectors,
             "asset_classes": asset_classes,
             "last_updated": time.time(),
-            "error": pv.get("error") or acc.get("error"),
+            "error": pv.get("error") or account.get("error"),
         }
 
-    def get_daily_snapshot(self) -> dict:
-        """Snapshot shaped for the morning brief (unrealized P&L focus)."""
+    def get_daily_snapshot(self) -> dict[str, Any]:
+        """Snapshot shaped for the morning brief."""
         if not self._available:
             return {}
         try:
             holdings = self.get_holdings()
-            pv = self.get_portfolio_value()
-            if pv.get("source") != "robinhood":
+            portfolio = self.get_portfolio_value()
+            if portfolio.get("source") != "robinhood":
                 return {}
-            total_pnl_usd = sum(h.get("total_return", 0.0) for h in holdings)
-            total_cost = sum(h.get("qty", 0) * h.get("avg_cost", 0) for h in holdings) or 1.0
-            pnl_pct = total_pnl_usd / total_cost
-            positions = [
-                {
-                    "asset": h["symbol"],
-                    "market_value_usd": h["qty"] * h["price"],
-                    "unrealized_pnl_usd": h["total_return"],
-                    "unrealized_pnl_pct": h["total_return"] / (h["qty"] * h["avg_cost"]) if h["avg_cost"] else 0,
+
+            pnl_rows = [h["total_return"] for h in holdings if h.get("total_return") is not None]
+            cost_basis_total = sum(
+                (h.get("avg_cost") or 0.0) * (h.get("qty") or 0.0)
+                for h in holdings
+                if h.get("avg_cost") is not None
+            )
+            total_pnl_usd = sum(pnl_rows) if pnl_rows else None
+            pnl_pct = (
+                (total_pnl_usd / cost_basis_total)
+                if total_pnl_usd is not None and cost_basis_total > 0
+                else None
+            )
+
+            positions = []
+            for holding in holdings:
+                market_value = holding.get("market_value")
+                position = {
+                    "asset": holding["symbol"],
+                    "market_value_usd": market_value,
+                    "current_price_usd": holding.get("price"),
+                    "unrealized_pnl_usd": holding.get("total_return"),
+                    "unrealized_pnl_pct": (
+                        (holding["total_return"] / ((holding.get("avg_cost") or 0.0) * holding["qty"]))
+                        if holding.get("total_return") is not None
+                        and holding.get("avg_cost") not in {None, 0.0}
+                        and holding["qty"] > 0
+                        else None
+                    ),
                 }
-                for h in sorted(holdings, key=lambda x: abs(x.get("total_return", 0)), reverse=True)
-            ]
+                positions.append(position)
+
             return {
-                "portfolio_value_usd": pv.get("equity", 0.0),
+                "portfolio_value_usd": portfolio.get("equity", 0.0),
+                "cash_usd": portfolio.get("cash", 0.0),
+                "holdings_value_usd": portfolio.get("holdings_value", 0.0),
                 "unrealized_pnl_usd": total_pnl_usd,
                 "unrealized_pnl_pct": pnl_pct,
+                "pnl_available": total_pnl_usd is not None,
                 "position_count": len(holdings),
                 "positions": positions,
             }
-        except Exception as e:
-            log.warning("get_daily_snapshot failed: %s", e)
+        except Exception as exc:
+            log.warning("get_daily_snapshot failed: %s", exc)
             return {}
 
 
 def get_reader() -> RobinhoodReader:
-    """Factory function — returns a RobinhoodReader (credentials loaded from secrets dir)."""
+    """Factory function — returns a RobinhoodReader."""
     return RobinhoodReader()

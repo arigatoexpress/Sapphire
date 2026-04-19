@@ -11,6 +11,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from lib.content.formatters import (  # type: ignore
     LINKEDIN_LIMIT,
+    MARKDOWN_DISCLAIMER,
+    SHORT_DISCLAIMER,
     X_TWEET_LIMIT,
     _shorten_to,
     _split_tweets,
@@ -206,6 +208,10 @@ class TestFormatLinkedIn:
         result = format_linkedin(_crypto_report())
         assert "#crypto" in result or "#trading" in result or "#AI" in result
 
+    def test_linkedin_includes_disclaimer(self):
+        result = format_linkedin(_crypto_report())
+        assert SHORT_DISCLAIMER in result
+
 
 # ── format_substack ────────────────────────────────────────────────────────────
 
@@ -230,6 +236,11 @@ class TestFormatSubstack:
         result = format_substack(_crypto_report())
         assert "Data Sources" in result
         assert "data/trading_predictions.jsonl" in result
+
+    def test_contains_disclaimer_section(self):
+        result = format_substack(_crypto_report())
+        assert "Disclaimer" in result
+        assert MARKDOWN_DISCLAIMER in result
 
     def test_empty_sources_renders_none(self):
         r = _crypto_report()
@@ -257,6 +268,10 @@ class TestFormatXThread:
     def test_security_thread_returns_list(self):
         result = format_x_thread(_security_report())
         assert isinstance(result, list)
+
+    def test_thread_includes_disclaimer(self):
+        result = format_x_thread(_crypto_report())
+        assert any(SHORT_DISCLAIMER in tweet for tweet in result)
 
     def test_market_pulse_single_tweet(self):
         r = Report(
