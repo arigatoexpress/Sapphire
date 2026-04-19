@@ -1,0 +1,234 @@
+// Sapphire mesh Tailscale ACL policy
+// Owner: aristotlespec@
+// Last updated: 2026-04-18
+//
+// Nodes:
+//   macbook-pro-8    100.67.171.79  — Mac commander (all services)
+//   desktop-hfck6u9  100.71.10.48   — Windows GPU node
+//   rari1            100.120.191.1  — Raspberry Pi 1
+//   rari2            100.87.225.89  — Raspberry Pi 2
+//
+// Trust model:
+//   - Mac can reach all nodes on all Sapphire service ports
+//   - Pis and Windows only accept inbound on Ollama (11434) and SSH (22)
+//   - All 4 nodes can reach each other freely (mesh for service-to-service calls)
+//   - No inbound from external Tailscale nodes beyond what is explicitly allowed
+{
+  // -------------------------------------------------------------------------
+  // Groups: logical node sets for readable rules
+  // -------------------------------------------------------------------------
+  "groups": {
+    // Commander node — runs control-plane, dashboard, signal-logger, proxy, etc.
+    "group:commander": ["aristotlespec@"],
+
+    // GPU inference node (Windows)
+    "group:gpu-node": ["aristotlespec@"],
+
+    // Raspberry Pi inference nodes
+    "group:pi-nodes": ["aristotlespec@"],
+
+    // All Sapphire mesh nodes
+    "group:sapphire-mesh": ["aristotlespec@"]
+  },
+
+  // -------------------------------------------------------------------------
+  // Hosts: named aliases for each node IP
+  // -------------------------------------------------------------------------
+  "hosts": {
+    "macbook-pro-8":   "100.67.171.79",
+    "desktop-hfck6u9": "100.71.10.48",
+    "rari1":           "100.120.191.1",
+    "rari2":           "100.87.225.89",
+
+    // Convenience group CIDRs (individual hosts referenced by IP above)
+    "sapphire-mesh-cidr": "100.64.0.0/10"
+  },
+
+  // -------------------------------------------------------------------------
+  // ACL rules
+  //
+  // Evaluation order: first match wins (Tailscale uses deny-by-default,
+  // these rules ADD access on top of the implicit deny).
+  //
+  // Port legend:
+  //   22    — SSH
+  //   6379  — Redis
+  //   6900  — OpenBB
+  //   8080  — Dashboard (Flask)
+  //   8082  — Control-plane (FastAPI)
+  //   9090  — TradingView webhook receiver (Windows)
+  //   11434 — Ollama (local inference)
+  //   11435 — Inference-proxy (4-tier failover)
+  //   18081 — Signal logger
+  // -------------------------------------------------------------------------
+  "acls": [
+    // ------------------------------------------------------------------
+    // Rule 1: Mac commander → all nodes, all Sapphire service ports
+    // The Mac orchestrates every other node, so it needs full reach.
+    // ------------------------------------------------------------------
+    {
+      "action": "accept",
+      "src":    ["macbook-pro-8"],
+      "dst": [
+        "macbook-pro-8:*",
+        "desktop-hfck6u9:22,11434,11435,6379,6900,8080,8082,9090,18081",
+        "rari1:22,11434",
+        "rari2:22,11434"
+      ]
+    },
+
+    // ------------------------------------------------------------------
+    // Rule 2: Full mesh between all 4 nodes on core service ports
+    // Covers service-to-service calls (e.g. inference-proxy → GPU Ollama,
+    // pipeline → Redis, dashboard → control-plane, etc.)
+    // ------------------------------------------------------------------
+    {
+      "action": "accept",
+      "src": [
+        "macbook-pro-8",
+        "desktop-hfck6u9",
+        "rari1",
+        "rari2"
+      ],
+      "dst": [
+        // Mac services — reachable by all mesh nodes
+        "macbook-pro-8:22,6379,6900,8080,8082,11434,11435,18081",
+
+        // Windows GPU — Ollama + SSH + inference-proxy only inbound
+        "desktop-hfck6u9:22,11434",
+
+        // Pi nodes — Ollama + SSH only inbound
+        "rari1:22,11434",
+        "rari2:22,11434"
+      ]
+    },
+
+    // ------------------------------------------------------------------
+    // Rule 3: Windows GPU webhook port — Mac only
+    // Webhook receiver on :9090 should only accept from the Mac
+    // commander (TradingView signals are relayed via Mac).
+    // ------------------------------------------------------------------
+    {
+      "action": "accept",
+      "src":    ["macbook-pro-8"],
+      "dst":    ["desktop-hfck6u9:9090"]
+    },
+
+    // ------------------------------------------------------------------
+    // Rule 4: Deny all other inbound from external Tailscale nodes
+    // (Tailscale is deny-by-default, so this is implicit, but stated
+    // explicitly here for clarity and audit purposes.)
+    //
+    // No wildcard "accept" rules exist above that would admit external
+    // nodes — only the named IPs in rules 1-3 are permitted.
+    // ------------------------------------------------------------------
+
+    // Note: Tailscale's implicit deny covers everything not matched above.
+    // No explicit deny rule is needed in Tailscale ACL JSON syntax.
+  ],
+
+  // -------------------------------------------------------------------------
+  // SSH access rules
+  // Controls who can SSH into which nodes via Tailscale SSH (tssh).
+  // These are separate from the port-22 ACL rules above which cover
+  // regular SSH. Tailscale SSH uses the SSH subsystem and enforces
+  // these rules at the Tailscale layer.
+  // -------------------------------------------------------------------------
+  "ssh": [
+    // Mac commander can SSH into all other nodes
+    {
+      "action": "accept",
+      "src":    ["macbook-pro-8"],
+      "dst":    ["desktop-hfck6u9", "rari1", "rari2"],
+      "users":  ["aribs", "pi"]
+    },
+
+    // All mesh nodes can SSH back to the Mac (for reverse tunnels, callbacks)
+    {
+      "action": "accept",
+      "src":    ["desktop-hfck6u9", "rari1", "rari2"],
+      "dst":    ["macbook-pro-8"],
+      "users":  ["aribs"]
+    },
+
+    // Owner can SSH into any node from any device on the tailnet
+    {
+      "action": "accept",
+      "src":    ["autogroup:owner"],
+      "dst":    ["autogroup:self"],
+      "users":  ["aribs", "pi", "autogroup:nonroot"]
+    }
+  ],
+
+  // -------------------------------------------------------------------------
+  // Auto-approvers
+  // Automatically approve subnet route advertisements and exit nodes
+  // from trusted mesh nodes without manual admin approval.
+  // -------------------------------------------------------------------------
+  "autoApprovers": {
+    // Mac commander may advertise subnet routes (e.g. local LAN segments)
+    "routes": {
+      "100.67.171.79/32":  ["aristotlespec@"],
+      "100.71.10.48/32":   ["aristotlespec@"],
+      "100.120.191.1/32":  ["aristotlespec@"],
+      "100.87.225.89/32":  ["aristotlespec@"]
+    },
+
+    // Allow the Mac to act as an exit node if configured
+    "exitNode": ["aristotlespec@"]
+  },
+
+  // -------------------------------------------------------------------------
+  // Node attributes (tag-based policy hooks for future use)
+  // Tags allow attribute-based rules decoupled from specific IPs.
+  // -------------------------------------------------------------------------
+  "tagOwners": {
+    "tag:sapphire-commander": ["aristotlespec@"],
+    "tag:sapphire-gpu":       ["aristotlespec@"],
+    "tag:sapphire-pi":        ["aristotlespec@"],
+    "tag:sapphire-mesh":      ["aristotlespec@"]
+  },
+
+  // -------------------------------------------------------------------------
+  // Tests
+  // Tailscale ACL tests — validated by `tailscale policy check`.
+  // Run: tailscale policy check infra/tailscale-acl.json
+  // -------------------------------------------------------------------------
+  "tests": [
+    // Mac can reach Windows Ollama
+    {
+      "src":    "macbook-pro-8",
+      "accept": ["desktop-hfck6u9:11434"]
+    },
+    // Mac can reach Pi Ollama
+    {
+      "src":    "macbook-pro-8",
+      "accept": ["rari1:11434", "rari2:11434"]
+    },
+    // Mac can reach its own services
+    {
+      "src":    "macbook-pro-8",
+      "accept": ["macbook-pro-8:8080", "macbook-pro-8:8082", "macbook-pro-8:11435"]
+    },
+    // Windows can reach Mac inference-proxy (for model failover)
+    {
+      "src":    "desktop-hfck6u9",
+      "accept": ["macbook-pro-8:11435"]
+    },
+    // Pi can reach Mac inference-proxy
+    {
+      "src":    "rari1",
+      "accept": ["macbook-pro-8:11435"]
+    },
+    // Windows should NOT expose dashboard to Pis
+    {
+      "src":  "rari1",
+      "deny": ["desktop-hfck6u9:8080"]
+    },
+    // Pis should NOT expose Redis to Windows
+    {
+      "src":  "desktop-hfck6u9",
+      "deny": ["rari1:6379"]
+    }
+  ]
+}

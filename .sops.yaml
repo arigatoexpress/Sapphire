@@ -1,0 +1,9 @@
+# SOPS config for Sapphire
+# Encrypts all files under infra/sops/ with age
+creation_rules:
+  - path_regex: infra/sops/.*\.enc\..*
+    age: >-
+      age1uwdct9h7pl5jt66gkjshzwwfcqay4dhrccddp3pmerv35jfzdqdq269cer
+  - path_regex: \.env\.enc$
+    age: >-
+      age1uwdct9h7pl5jt66gkjshzwwfcqay4dhrccddp3pmerv35jfzdqdq269cer
