@@ -46,9 +46,9 @@
       "hash": "d35a9da39fb2f0fb"
     },
     "data/health/2026-04-19.ndjson": {
-      "mtime": 1776632320.8366039,
-      "size": 604738,
-      "hash": "d9070c629c725ff1"
+      "mtime": 1776633898.2414567,
+      "size": 624875,
+      "hash": "5fff8741a5a299ca"
     },
     "data/intelligence/2026-04-19/threats.json": {
       "mtime": 1776624105.5631855,
@@ -111,7 +111,7 @@
       "hash": "f881db3d17b5b940"
     }
   },
-  "last_sync": "2026-04-19T21:03:36.776148+00:00",
-  "last_status": "error",
-  "sync_count": 1
+  "last_sync": "2026-04-19T21:25:32.802058+00:00",
+  "last_status": "ok",
+  "sync_count": 3
 }

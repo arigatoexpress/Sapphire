@@ -432,7 +432,7 @@ class RobinhoodReader:
             reverse=True,
         )
         total_val = sum(h.get("market_value") or 0.0 for h in live_rows)
-        log.info("robinhood: %d holdings, total value $%,.2f", len(live_rows), total_val)
+        log.info("robinhood: %d holdings, total value $%s", len(live_rows), f"{total_val:,.2f}")
         return live_rows
 
     def get_portfolio_value(self) -> dict[str, Any]:
