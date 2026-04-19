@@ -1,0 +1,654 @@
+{% extends "base.html" %}
+
+{% block title %}Performance{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ── Hero stats grid ── */
+    .perf-hero {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        gap: 1px;
+        background: var(--border-color);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 24px;
+    }
+    .perf-cell {
+        background: rgba(11, 11, 26, 0.9);
+        padding: 22px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        transition: background 150ms ease;
+    }
+    .perf-cell:hover { background: rgba(18, 18, 36, 0.95); }
+    .perf-label {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+    }
+    .perf-value {
+        font-size: 36px;
+        font-weight: 600;
+        line-height: 1.05;
+        font-family: var(--font-terminal);
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.02em;
+        color: var(--text-primary);
+    }
+    .perf-value.positive { color: var(--green); text-shadow: var(--glow-green); }
+    .perf-value.negative { color: var(--red); }
+    .perf-value.amber    { color: var(--amber); text-shadow: var(--glow-amber); }
+    .perf-sub {
+        font-size: 12px;
+        color: var(--text-secondary);
+        font-variant-numeric: tabular-nums;
+    }
+
+    @media (max-width: 900px) {
+        .perf-hero { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 500px) {
+        .perf-hero { grid-template-columns: 1fr; }
+    }
+
+    /* ── Section title ── */
+    .perf-section {
+        margin-bottom: 24px;
+    }
+    .perf-section-title {
+        font-family: var(--font-header);
+        font-size: 1.1rem;
+        color: var(--amber);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 14px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--border-dim);
+    }
+    .perf-section-title::before { content: '[ '; color: var(--text-muted); }
+    .perf-section-title::after  { content: ' ]'; color: var(--text-muted); }
+
+    /* ── Strategy comparison table ── */
+    .strat-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.8rem;
+        margin-bottom: 8px;
+    }
+    .strat-table th {
+        text-align: left;
+        padding: 10px 12px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.7rem;
+        font-weight: 400;
+        border-bottom: 1px solid var(--border-color);
+        white-space: nowrap;
+    }
+    .strat-table td {
+        padding: 10px 12px;
+        border-bottom: 1px solid rgba(98, 255, 64, 0.05);
+        color: var(--text-secondary);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+    .strat-table tr:hover td {
+        background: rgba(98, 255, 64, 0.05);
+        color: var(--text-primary);
+    }
+    .strat-table .strat-name {
+        color: var(--cyan);
+        font-weight: 500;
+    }
+    .strat-table .val-pos { color: var(--green); }
+    .strat-table .val-neg { color: var(--red); }
+
+    .strat-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 2px 8px;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border: 1px solid;
+        border-radius: 2px;
+    }
+    .strat-status.live   { border-color: var(--green); color: var(--green); background: rgba(51, 255, 0, 0.08); }
+    .strat-status.paper  { border-color: var(--amber); color: var(--amber); background: rgba(98, 255, 64, 0.08); }
+    .strat-status.paused { border-color: var(--text-muted); color: var(--text-muted); }
+    .strat-status::before {
+        content: '';
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+    }
+
+    /* ── Equity curve SVG ── */
+    .equity-container {
+        position: relative;
+        width: 100%;
+        height: 220px;
+        border: 1px solid var(--border-dim);
+        border-radius: 8px;
+        background: rgba(11, 11, 26, 0.6);
+        overflow: hidden;
+    }
+    .equity-container svg {
+        width: 100%;
+        height: 100%;
+    }
+    .equity-grid-line {
+        stroke: var(--border-dim);
+        stroke-width: 0.5;
+    }
+    .equity-line {
+        fill: none;
+        stroke: var(--green);
+        stroke-width: 2;
+        filter: drop-shadow(0 0 4px rgba(154, 255, 120, 0.4));
+    }
+    .equity-area {
+        fill: url(#equityGradient);
+    }
+    .equity-label {
+        font-family: var(--font-terminal);
+        font-size: 10px;
+        fill: var(--text-muted);
+    }
+    .equity-marker {
+        fill: var(--green);
+        filter: drop-shadow(0 0 3px rgba(154, 255, 120, 0.5));
+    }
+
+    /* ── Monthly returns grid ── */
+    .monthly-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.75rem;
+        text-align: center;
+    }
+    .monthly-table th {
+        padding: 8px 6px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: 0.68rem;
+        font-weight: 400;
+        border-bottom: 1px solid var(--border-dim);
+    }
+    .monthly-table td {
+        padding: 8px 6px;
+        border-bottom: 1px solid rgba(98, 255, 64, 0.04);
+        font-variant-numeric: tabular-nums;
+        color: var(--text-secondary);
+    }
+    .monthly-table td.mp { color: var(--green); background: rgba(154, 255, 120, 0.06); }
+    .monthly-table td.mn { color: var(--red); background: rgba(255, 111, 158, 0.06); }
+    .monthly-table td.mz { color: var(--text-muted); }
+    .monthly-table .year-label {
+        text-align: left;
+        color: var(--amber);
+        font-weight: 500;
+        letter-spacing: 0.04em;
+    }
+    .monthly-table .ytd-col { border-left: 1px solid var(--border-dim); font-weight: 500; }
+
+    /* ── Drawdown SVG ── */
+    .dd-container {
+        position: relative;
+        width: 100%;
+        height: 140px;
+        border: 1px solid var(--border-dim);
+        border-radius: 8px;
+        background: rgba(11, 11, 26, 0.6);
+        overflow: hidden;
+    }
+    .dd-container svg { width: 100%; height: 100%; }
+    .dd-area {
+        fill: rgba(255, 111, 158, 0.15);
+        stroke: var(--red);
+        stroke-width: 1.5;
+    }
+    .dd-zero {
+        stroke: var(--border-color);
+        stroke-width: 0.5;
+        stroke-dasharray: 4 4;
+    }
+    .dd-label {
+        font-family: var(--font-terminal);
+        font-size: 10px;
+        fill: var(--text-muted);
+    }
+    .dd-marker-line {
+        stroke: var(--red);
+        stroke-width: 0.5;
+        stroke-dasharray: 2 2;
+        opacity: 0.6;
+    }
+    .dd-marker-text {
+        font-family: var(--font-terminal);
+        font-size: 9px;
+        fill: var(--red);
+    }
+
+    /* ── Refresh indicator ── */
+    .refresh-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+    .refresh-bar .last-update { letter-spacing: 0.04em; }
+    .refresh-bar .auto-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 2px 10px;
+        border: 1px solid var(--border-dim);
+        border-radius: 3px;
+    }
+    .refresh-bar .auto-badge::before {
+        content: '';
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--green);
+        box-shadow: var(--glow-green);
+        animation: pulse 2s ease-in-out infinite;
+    }
+
+    /* ── Table overflow ── */
+    .table-scroll {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Refresh bar -->
+<div class="refresh-bar">
+    <span class="last-update" id="lastUpdate">LAST UPDATE: --:--:--</span>
+    <span class="auto-badge">AUTO-REFRESH 60s</span>
+</div>
+
+<!-- Hero stats -->
+<div class="perf-hero">
+    <div class="perf-cell">
+        <span class="perf-label">Total P&amp;L</span>
+        <span class="perf-value positive" id="heroPnl">+$12,847</span>
+        <span class="perf-sub">+12.85% since inception</span>
+    </div>
+    <div class="perf-cell">
+        <span class="perf-label">Win Rate</span>
+        <span class="perf-value amber" id="heroWinRate">78.4%</span>
+        <span class="perf-sub">218 / 278 trades</span>
+    </div>
+    <div class="perf-cell">
+        <span class="perf-label">Sharpe Ratio</span>
+        <span class="perf-value positive" id="heroSharpe">1.82</span>
+        <span class="perf-sub">annualized, rf = 5.3%</span>
+    </div>
+    <div class="perf-cell">
+        <span class="perf-label">Sortino Ratio</span>
+        <span class="perf-value positive" id="heroSortino">2.41</span>
+        <span class="perf-sub">downside-only vol</span>
+    </div>
+</div>
+
+<!-- Strategy comparison -->
+<div class="perf-section">
+    <div class="perf-section-title">Strategy Comparison</div>
+    <div class="panel" style="padding: 0; margin-bottom: 0;">
+        <div class="table-scroll">
+            <table class="strat-table">
+                <thead>
+                    <tr>
+                        <th>Strategy</th>
+                        <th>Trades</th>
+                        <th>Win Rate</th>
+                        <th>Avg Win</th>
+                        <th>Avg Loss</th>
+                        <th>Profit Factor</th>
+                        <th>Max DD</th>
+                        <th>Calmar</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="strat-name">Ultra v3 Momentum</td>
+                        <td>94</td>
+                        <td class="val-pos">82.1%</td>
+                        <td class="val-pos">+$287</td>
+                        <td class="val-neg">-$162</td>
+                        <td class="val-pos">2.84</td>
+                        <td class="val-neg">-4.2%</td>
+                        <td class="val-pos">3.06</td>
+                        <td><span class="strat-status live">Live</span></td>
+                    </tr>
+                    <tr>
+                        <td class="strat-name">Mean Revert BTC</td>
+                        <td>63</td>
+                        <td class="val-pos">76.2%</td>
+                        <td class="val-pos">+$412</td>
+                        <td class="val-neg">-$238</td>
+                        <td class="val-pos">2.21</td>
+                        <td class="val-neg">-6.1%</td>
+                        <td class="val-pos">2.54</td>
+                        <td><span class="strat-status live">Live</span></td>
+                    </tr>
+                    <tr>
+                        <td class="strat-name">Breakout SOL</td>
+                        <td>51</td>
+                        <td>68.6%</td>
+                        <td class="val-pos">+$524</td>
+                        <td class="val-neg">-$347</td>
+                        <td class="val-pos">1.63</td>
+                        <td class="val-neg">-9.8%</td>
+                        <td>1.12</td>
+                        <td><span class="strat-status paper">Paper</span></td>
+                    </tr>
+                    <tr>
+                        <td class="strat-name">Correlation Pairs</td>
+                        <td>42</td>
+                        <td class="val-pos">81.0%</td>
+                        <td class="val-pos">+$198</td>
+                        <td class="val-neg">-$124</td>
+                        <td class="val-pos">2.58</td>
+                        <td class="val-neg">-3.4%</td>
+                        <td class="val-pos">3.82</td>
+                        <td><span class="strat-status live">Live</span></td>
+                    </tr>
+                    <tr>
+                        <td class="strat-name">Funding Arb</td>
+                        <td>28</td>
+                        <td class="val-pos">85.7%</td>
+                        <td class="val-pos">+$93</td>
+                        <td class="val-neg">-$71</td>
+                        <td class="val-pos">3.14</td>
+                        <td class="val-neg">-1.8%</td>
+                        <td class="val-pos">5.61</td>
+                        <td><span class="strat-status paused">Paused</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Equity curve -->
+<div class="perf-section">
+    <div class="perf-section-title">Equity Curve &mdash; 90 Days</div>
+    <div class="equity-container">
+        <svg id="equitySvg" viewBox="0 0 900 220" preserveAspectRatio="none"></svg>
+    </div>
+</div>
+
+<!-- Monthly returns -->
+<div class="perf-section">
+    <div class="perf-section-title">Monthly Returns</div>
+    <div class="panel" style="padding: 0; margin-bottom: 0;">
+        <div class="table-scroll">
+            <table class="monthly-table" id="monthlyTable">
+                <thead>
+                    <tr>
+                        <th>Year</th>
+                        <th>Jan</th><th>Feb</th><th>Mar</th><th>Apr</th>
+                        <th>May</th><th>Jun</th><th>Jul</th><th>Aug</th>
+                        <th>Sep</th><th>Oct</th><th>Nov</th><th>Dec</th>
+                        <th class="ytd-col">YTD</th>
+                    </tr>
+                </thead>
+                <tbody id="monthlyBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Drawdown timeline -->
+<div class="perf-section">
+    <div class="perf-section-title">Drawdown Timeline</div>
+    <div class="dd-container">
+        <svg id="ddSvg" viewBox="0 0 900 140" preserveAspectRatio="none"></svg>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    'use strict';
+
+    /* ── Seed-able pseudo-random ── */
+    function seededRandom(seed) {
+        let s = seed;
+        return function () {
+            s = (s * 16807 + 0) % 2147483647;
+            return (s - 1) / 2147483646;
+        };
+    }
+
+    /* ── Generate mock equity curve (90 days) ── */
+    function generateEquityData(days) {
+        var rng = seededRandom(42);
+        var data = [100000];
+        for (var i = 1; i <= days; i++) {
+            var drift = 0.0012;
+            var vol = 0.015;
+            var shock = (rng() - 0.5) * 2 * vol;
+            // Inject drawdown periods
+            if (i >= 22 && i <= 30) drift = -0.004;
+            if (i >= 55 && i <= 62) drift = -0.003;
+            if (i >= 78 && i <= 82) drift = -0.002;
+            var prev = data[data.length - 1];
+            data.push(Math.max(prev * (1 + drift + shock), prev * 0.95));
+        }
+        return data;
+    }
+
+    var equityData = generateEquityData(90);
+
+    /* ── Render equity curve SVG ── */
+    function renderEquityCurve() {
+        var svg = document.getElementById('equitySvg');
+        if (!svg) return;
+
+        var w = 900, h = 220;
+        var padL = 60, padR = 10, padT = 15, padB = 25;
+        var chartW = w - padL - padR;
+        var chartH = h - padT - padB;
+        var n = equityData.length;
+        var minV = Math.min.apply(null, equityData);
+        var maxV = Math.max.apply(null, equityData);
+        var range = maxV - minV || 1;
+
+        function x(i) { return padL + (i / (n - 1)) * chartW; }
+        function y(v) { return padT + (1 - (v - minV) / range) * chartH; }
+
+        var parts = [];
+
+        // Gradient def
+        parts.push('<defs>');
+        parts.push('<linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">');
+        parts.push('<stop offset="0%" stop-color="rgba(154,255,120,0.25)"/>');
+        parts.push('<stop offset="100%" stop-color="rgba(154,255,120,0)"/>');
+        parts.push('</linearGradient>');
+        parts.push('</defs>');
+
+        // Horizontal grid lines (5)
+        for (var g = 0; g <= 4; g++) {
+            var gy = padT + (g / 4) * chartH;
+            var gv = maxV - (g / 4) * range;
+            parts.push('<line x1="' + padL + '" y1="' + gy + '" x2="' + (w - padR) + '" y2="' + gy + '" class="equity-grid-line"/>');
+            parts.push('<text x="' + (padL - 6) + '" y="' + (gy + 3) + '" text-anchor="end" class="equity-label">$' + (gv / 1000).toFixed(1) + 'k</text>');
+        }
+
+        // X-axis labels
+        var dayLabels = [0, 15, 30, 45, 60, 75, 90];
+        for (var d = 0; d < dayLabels.length; d++) {
+            var dx = x(dayLabels[d]);
+            parts.push('<text x="' + dx + '" y="' + (h - 4) + '" text-anchor="middle" class="equity-label">D' + dayLabels[d] + '</text>');
+        }
+
+        // Area
+        var areaPath = 'M' + x(0) + ',' + y(equityData[0]);
+        for (var i = 1; i < n; i++) {
+            areaPath += 'L' + x(i) + ',' + y(equityData[i]);
+        }
+        areaPath += 'L' + x(n - 1) + ',' + (padT + chartH) + 'L' + x(0) + ',' + (padT + chartH) + 'Z';
+        parts.push('<path d="' + areaPath + '" class="equity-area"/>');
+
+        // Line
+        var linePath = 'M' + x(0) + ',' + y(equityData[0]);
+        for (var i = 1; i < n; i++) {
+            linePath += 'L' + x(i) + ',' + y(equityData[i]);
+        }
+        parts.push('<path d="' + linePath + '" class="equity-line"/>');
+
+        // End marker
+        parts.push('<circle cx="' + x(n - 1) + '" cy="' + y(equityData[n - 1]) + '" r="4" class="equity-marker"/>');
+
+        // Start / end value labels
+        parts.push('<text x="' + (x(0) + 4) + '" y="' + (y(equityData[0]) - 6) + '" class="equity-label" fill="var(--text-secondary)">$' + (equityData[0] / 1000).toFixed(1) + 'k</text>');
+        parts.push('<text x="' + (x(n - 1) - 4) + '" y="' + (y(equityData[n - 1]) - 6) + '" text-anchor="end" class="equity-label" fill="var(--green)">$' + (equityData[n - 1] / 1000).toFixed(1) + 'k</text>');
+
+        svg.innerHTML = parts.join('');
+    }
+
+    /* ── Drawdown series from equity data ── */
+    function computeDrawdown(eq) {
+        var peak = eq[0];
+        var dd = [];
+        for (var i = 0; i < eq.length; i++) {
+            if (eq[i] > peak) peak = eq[i];
+            dd.push((eq[i] - peak) / peak);
+        }
+        return dd;
+    }
+
+    function renderDrawdown() {
+        var svg = document.getElementById('ddSvg');
+        if (!svg) return;
+
+        var dd = computeDrawdown(equityData);
+        var w = 900, h = 140;
+        var padL = 60, padR = 10, padT = 10, padB = 25;
+        var chartW = w - padL - padR;
+        var chartH = h - padT - padB;
+        var n = dd.length;
+        var minDD = Math.min.apply(null, dd);
+        if (minDD >= 0) minDD = -0.01;
+
+        function x(i) { return padL + (i / (n - 1)) * chartW; }
+        function y(v) { return padT + (-v / (-minDD)) * chartH; }
+
+        var parts = [];
+
+        // Zero line
+        parts.push('<line x1="' + padL + '" y1="' + padT + '" x2="' + (w - padR) + '" y2="' + padT + '" class="dd-zero"/>');
+
+        // Y-axis labels
+        var ddSteps = [0, minDD * 0.25, minDD * 0.5, minDD * 0.75, minDD];
+        for (var s = 0; s < ddSteps.length; s++) {
+            var sy = y(ddSteps[s]);
+            parts.push('<text x="' + (padL - 6) + '" y="' + (sy + 3) + '" text-anchor="end" class="dd-label">' + (ddSteps[s] * 100).toFixed(1) + '%</text>');
+        }
+
+        // X-axis labels
+        var dayLabels = [0, 15, 30, 45, 60, 75, 90];
+        for (var d = 0; d < dayLabels.length; d++) {
+            var dx = x(dayLabels[d]);
+            parts.push('<text x="' + dx + '" y="' + (h - 4) + '" text-anchor="middle" class="dd-label">D' + dayLabels[d] + '</text>');
+        }
+
+        // Area
+        var areaPath = 'M' + x(0) + ',' + padT;
+        for (var i = 0; i < n; i++) {
+            areaPath += 'L' + x(i) + ',' + y(dd[i]);
+        }
+        areaPath += 'L' + x(n - 1) + ',' + padT + 'Z';
+        parts.push('<path d="' + areaPath + '" class="dd-area"/>');
+
+        // Max drawdown marker
+        var maxIdx = 0;
+        for (var i = 1; i < n; i++) {
+            if (dd[i] < dd[maxIdx]) maxIdx = i;
+        }
+        var mxY = y(dd[maxIdx]);
+        parts.push('<line x1="' + x(maxIdx) + '" y1="' + padT + '" x2="' + x(maxIdx) + '" y2="' + mxY + '" class="dd-marker-line"/>');
+        parts.push('<text x="' + (x(maxIdx) + 4) + '" y="' + (mxY - 4) + '" class="dd-marker-text">Max DD: ' + (dd[maxIdx] * 100).toFixed(2) + '%</text>');
+
+        svg.innerHTML = parts.join('');
+    }
+
+    /* ── Monthly returns table ── */
+    function renderMonthlyReturns() {
+        var rng = seededRandom(77);
+        var years = {
+            2025: [ 2.1, -0.4, 3.2, 1.8, -1.1, 0.6, 2.9, -0.8, 1.4, 3.1, -0.3, 1.7 ],
+            2026: [ 1.9, 2.4, -0.6, 1.2, null, null, null, null, null, null, null, null ]
+        };
+
+        var body = document.getElementById('monthlyBody');
+        if (!body) return;
+        var html = '';
+
+        for (var yr in years) {
+            var row = years[yr];
+            var ytd = 0;
+            var count = 0;
+            html += '<tr><td class="year-label">' + yr + '</td>';
+            for (var m = 0; m < 12; m++) {
+                var v = row[m];
+                if (v === null) {
+                    html += '<td class="mz">&mdash;</td>';
+                } else {
+                    ytd += v;
+                    count++;
+                    var cls = v > 0 ? 'mp' : v < 0 ? 'mn' : 'mz';
+                    var sign = v > 0 ? '+' : '';
+                    html += '<td class="' + cls + '">' + sign + v.toFixed(1) + '%</td>';
+                }
+            }
+            var ytdCls = ytd > 0 ? 'mp' : ytd < 0 ? 'mn' : 'mz';
+            var ytdSign = ytd > 0 ? '+' : '';
+            html += '<td class="ytd-col ' + ytdCls + '">' + ytdSign + ytd.toFixed(1) + '%</td>';
+            html += '</tr>';
+        }
+
+        body.innerHTML = html;
+    }
+
+    /* ── Refresh stub ── */
+    function refreshPerformance() {
+        /* Future: fetch /api/performance and update hero stats + table rows */
+        var now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+        var el = document.getElementById('lastUpdate');
+        if (el) el.textContent = 'LAST UPDATE: ' + now;
+    }
+
+    /* ── Init ── */
+    renderEquityCurve();
+    renderDrawdown();
+    renderMonthlyReturns();
+    refreshPerformance();
+
+    /* ── Auto-refresh every 60s ── */
+    setInterval(function () {
+        refreshPerformance();
+    }, 60000);
+
+})();
+</script>
+{% endblock %}

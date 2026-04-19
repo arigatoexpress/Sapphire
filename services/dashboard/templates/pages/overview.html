@@ -104,6 +104,36 @@
     pointer-events: none;
 }
 
+/* ── Quick-nav cards ──────────────────────────────────────────── */
+.qnav-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 18px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    transition: border-color var(--t-fast), background var(--t-fast), transform 80ms ease;
+    cursor: pointer;
+}
+.qnav-card:hover {
+    border-color: var(--amber);
+    background: var(--bg-card-hover);
+    transform: translateY(-1px);
+}
+.qnav-icon { font-size: 22px; }
+.qnav-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: 0.02em;
+}
+.qnav-desc {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
 /* ── Service grid ─────────────────────────────────────────────── */
 .svc-grid {
     display: grid;
@@ -209,6 +239,34 @@
         <div class="kpi-delta" id="kpi-pi-delta">loading</div>
         <div class="kpi-spark" id="spark-inference"></div>
     </div>
+</div>
+
+<!-- Quick-nav cards -->
+<div class="grid grid-3" style="margin-bottom: 20px">
+    <a href="/portfolio" class="qnav-card" style="text-decoration:none">
+        <div class="qnav-icon">📊</div>
+        <div class="qnav-text"><div class="qnav-title">Portfolio</div><div class="qnav-desc">Robinhood holdings &amp; allocation</div></div>
+    </a>
+    <a href="/performance" class="qnav-card" style="text-decoration:none">
+        <div class="qnav-icon">📈</div>
+        <div class="qnav-text"><div class="qnav-title">Performance</div><div class="qnav-desc">Strategy P&amp;L &amp; equity curves</div></div>
+    </a>
+    <a href="/factors" class="qnav-card" style="text-decoration:none">
+        <div class="qnav-icon">🔬</div>
+        <div class="qnav-text"><div class="qnav-title">Factors</div><div class="qnav-desc">Cross-sectional heatmap</div></div>
+    </a>
+    <a href="/cascade" class="qnav-card" style="text-decoration:none">
+        <div class="qnav-icon">⚡</div>
+        <div class="qnav-text"><div class="qnav-title">Cascade</div><div class="qnav-desc">Liquidation risk analysis</div></div>
+    </a>
+    <a href="/intel" class="qnav-card" style="text-decoration:none">
+        <div class="qnav-icon">🛰️</div>
+        <div class="qnav-text"><div class="qnav-title">Intel</div><div class="qnav-desc">Regional + Foundry intel</div></div>
+    </a>
+    <a href="/content" class="qnav-card" style="text-decoration:none">
+        <div class="qnav-icon">📝</div>
+        <div class="qnav-text"><div class="qnav-title">Content</div><div class="qnav-desc">Pipeline &amp; publishing status</div></div>
+    </a>
 </div>
 
 <!-- Service health + tiers -->

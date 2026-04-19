@@ -2087,10 +2087,68 @@ def api_signals_performance():
     })
 
 
+@app.route('/portfolio')
+@requires_auth
+def portfolio_page():
+    return render_template('pages/portfolio.html', current_page='portfolio', page_title='Portfolio')
+
+
+@app.route('/factors')
+@requires_auth
+def factors_page():
+    return render_template('pages/factors.html', current_page='factors', page_title='Factors')
+
+
+@app.route('/performance')
+@requires_auth
+def performance_page():
+    return render_template('pages/performance.html', current_page='performance', page_title='Performance')
+
+
 @app.route('/content')
 @requires_auth
 def content_page():
     return render_template('pages/content.html', current_page='content', page_title='Content_Engine')
+
+
+@app.route('/cascade')
+@requires_auth
+def cascade_page():
+    return render_template('pages/cascade.html', current_page='cascade', page_title='Cascade')
+
+
+@app.route('/intel')
+@requires_auth
+def intel_page():
+    return render_template('pages/intel.html', current_page='intel', page_title='Intel')
+
+
+@app.route('/api/portfolio')
+@requires_auth
+def api_portfolio():
+    """Portfolio holdings — stub for Robinhood integration."""
+    return jsonify({'holdings': [], 'total_value': 0, 'note': 'Robinhood integration pending'})
+
+
+@app.route('/api/factors')
+@requires_auth
+def api_factors():
+    """Cross-sectional factor exposures — stub."""
+    return jsonify({'factors': [], 'note': 'Factor pipeline pending'})
+
+
+@app.route('/api/cascade')
+@requires_auth
+def api_cascade():
+    """Liquidation cascade risk — stub."""
+    return jsonify({'risk_score': 0, 'clusters': [], 'note': 'Cascade analysis pending'})
+
+
+@app.route('/api/intel')
+@requires_auth
+def api_intel():
+    """Regional intel feed — stub for Palantir Foundry merge."""
+    return jsonify({'items': [], 'sources': [], 'note': 'Foundry integration pending'})
 
 
 @app.route('/api/content/drafts')

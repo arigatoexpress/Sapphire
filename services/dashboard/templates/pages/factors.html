@@ -1,0 +1,619 @@
+{% extends "base.html" %}
+
+{% block title %}Factors{% endblock %}
+
+{% block extra_css %}
+    /* ---- Summary Row ---- */
+    .factor-summary {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1px;
+        background: var(--border-color);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: var(--space-lg);
+    }
+
+    .summary-cell {
+        background: rgba(11, 11, 26, 0.82);
+        padding: 22px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        transition: background 150ms ease;
+    }
+
+    .summary-cell:hover {
+        background: rgba(98, 255, 64, 0.04);
+    }
+
+    .summary-label {
+        font-size: 0.65rem;
+        font-weight: 400;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+    }
+
+    .summary-value {
+        font-family: var(--font-header);
+        font-size: 2rem;
+        line-height: 1.05;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.02em;
+        color: var(--amber);
+        text-shadow: var(--glow-amber);
+    }
+
+    .summary-value.green { color: var(--green); text-shadow: var(--glow-green); }
+    .summary-value.red   { color: var(--red); text-shadow: 0 0 10px rgba(255, 111, 158, 0.4); }
+    .summary-value.cyan  { color: var(--cyan); text-shadow: 0 0 10px rgba(105, 214, 255, 0.3); }
+
+    .summary-sub {
+        font-size: 0.7rem;
+        color: var(--text-secondary);
+    }
+
+    /* ---- Heatmap Panel ---- */
+    .heatmap-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .heatmap-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.8rem;
+        min-width: 720px;
+    }
+
+    .heatmap-table th {
+        text-align: center;
+        padding: var(--space-sm) var(--space-md);
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.65rem;
+        font-weight: 400;
+        border-bottom: 1px solid var(--border-dim);
+        position: sticky;
+        top: 0;
+        background: rgba(11, 11, 26, 0.95);
+        z-index: 2;
+    }
+
+    .heatmap-table th:first-child {
+        text-align: left;
+        min-width: 80px;
+    }
+
+    .heatmap-table td {
+        text-align: center;
+        padding: 0;
+        border-bottom: 1px solid rgba(98, 255, 64, 0.04);
+    }
+
+    .heatmap-table td:first-child {
+        text-align: left;
+        padding: var(--space-sm) var(--space-md);
+        color: var(--amber);
+        font-family: var(--font-terminal);
+        font-size: 0.8rem;
+        letter-spacing: 0.04em;
+        white-space: nowrap;
+        border-right: 1px solid var(--border-dim);
+    }
+
+    .heatmap-cell {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 48px;
+        font-family: var(--font-terminal);
+        font-size: 0.75rem;
+        font-variant-numeric: tabular-nums;
+        transition: all 180ms ease;
+        cursor: default;
+        position: relative;
+    }
+
+    .heatmap-cell:hover {
+        transform: scale(1.08);
+        z-index: 5;
+        box-shadow: 0 0 12px rgba(98, 255, 64, 0.2);
+    }
+
+    .heatmap-table tr:hover td:first-child {
+        text-shadow: var(--glow-amber);
+    }
+
+    /* ---- Factor Performance Panel ---- */
+    .perf-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: var(--space-md);
+    }
+
+    .perf-card {
+        border: 1px solid var(--border-dim);
+        border-radius: 8px;
+        padding: var(--space-md);
+        background: rgba(98, 255, 64, 0.015);
+        transition: border-color 180ms ease, background 180ms ease;
+    }
+
+    .perf-card:hover {
+        border-color: var(--border-color);
+        background: rgba(98, 255, 64, 0.04);
+    }
+
+    .perf-name {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: var(--space-sm);
+    }
+
+    .perf-bars {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .perf-row {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+    }
+
+    .perf-period {
+        font-size: 0.6rem;
+        color: var(--text-muted);
+        width: 28px;
+        flex-shrink: 0;
+        text-align: right;
+    }
+
+    .perf-bar-track {
+        flex: 1;
+        height: 6px;
+        background: rgba(98, 255, 64, 0.06);
+        border-radius: 3px;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .perf-bar-fill {
+        position: absolute;
+        top: 0;
+        height: 100%;
+        border-radius: 3px;
+        transition: width 400ms ease;
+    }
+
+    .perf-bar-fill.positive {
+        left: 50%;
+        background: linear-gradient(90deg, var(--green-dim), var(--green));
+        box-shadow: 0 0 4px var(--green-glow);
+    }
+
+    .perf-bar-fill.negative {
+        right: 50%;
+        background: linear-gradient(270deg, var(--red-dim), var(--red));
+        box-shadow: 0 0 4px rgba(255, 111, 158, 0.3);
+    }
+
+    .perf-bar-track::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 0;
+        bottom: 0;
+        width: 1px;
+        background: var(--border-color);
+        opacity: 0.4;
+    }
+
+    .perf-pct {
+        font-size: 0.65rem;
+        font-family: var(--font-terminal);
+        font-variant-numeric: tabular-nums;
+        width: 42px;
+        flex-shrink: 0;
+        text-align: right;
+    }
+
+    .perf-pct.positive { color: var(--green); }
+    .perf-pct.negative { color: var(--red); }
+
+    /* ---- Correlation Matrix ---- */
+    .corr-wrapper {
+        overflow-x: auto;
+    }
+
+    .corr-table {
+        border-collapse: collapse;
+        font-size: 0.7rem;
+        min-width: 500px;
+    }
+
+    .corr-table th {
+        padding: 6px 10px;
+        color: var(--text-muted);
+        font-weight: 400;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: 0.6rem;
+        border-bottom: 1px solid var(--border-dim);
+    }
+
+    .corr-table th:first-child {
+        text-align: left;
+    }
+
+    .corr-table td {
+        text-align: center;
+        padding: 0;
+    }
+
+    .corr-table td:first-child {
+        text-align: left;
+        padding: 4px 10px;
+        color: var(--text-secondary);
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+
+    .corr-cell {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 32px;
+        font-family: var(--font-terminal);
+        font-size: 0.65rem;
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* ---- Two Column Layout ---- */
+    .factors-lower {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: var(--space-lg);
+        margin-top: 0;
+    }
+
+    @media (max-width: 1100px) {
+        .factors-lower {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 900px) {
+        .factor-summary {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    @media (max-width: 600px) {
+        .factor-summary {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* ---- Refresh indicator ---- */
+    .refresh-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: var(--space-md);
+    }
+
+    .refresh-bar .section-title {
+        margin: 0;
+    }
+
+    .last-update {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        letter-spacing: 0.04em;
+    }
+
+    .last-update span {
+        color: var(--cyan);
+    }
+{% endblock %}
+
+{% block content %}
+<div class="refresh-bar">
+    <div class="section-title">Cross-Sectional Factor Heatmap</div>
+    <div class="last-update">REFRESH <span id="countdown">120</span>s // LAST <span id="last-update-ts">--:--:--</span></div>
+</div>
+
+<!-- Summary Row -->
+<div class="factor-summary" id="summary-row">
+    <div class="summary-cell">
+        <div class="summary-label">Factors Tracked</div>
+        <div class="summary-value cyan" id="sum-count">8</div>
+        <div class="summary-sub">cross-sectional</div>
+    </div>
+    <div class="summary-cell">
+        <div class="summary-label">Strongest Today</div>
+        <div class="summary-value green" id="sum-strongest">--</div>
+        <div class="summary-sub" id="sum-strongest-val">--</div>
+    </div>
+    <div class="summary-cell">
+        <div class="summary-label">Weakest Today</div>
+        <div class="summary-value red" id="sum-weakest">--</div>
+        <div class="summary-sub" id="sum-weakest-val">--</div>
+    </div>
+    <div class="summary-cell">
+        <div class="summary-label">Factor Dispersion</div>
+        <div class="summary-value" id="sum-dispersion">--</div>
+        <div class="summary-sub">cross-factor spread</div>
+    </div>
+</div>
+
+<!-- Factor Exposure Heatmap -->
+<div class="panel">
+    <div class="panel-header">
+        <div class="panel-title">Factor Exposures</div>
+        <div class="badge online">LIVE</div>
+    </div>
+    <div class="panel-body">
+        <div class="heatmap-wrapper">
+            <table class="heatmap-table" id="heatmap-grid">
+                <thead id="heatmap-head"></thead>
+                <tbody id="heatmap-body"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Lower: Performance + Correlation -->
+<div class="factors-lower">
+    <!-- Factor Performance -->
+    <div class="panel">
+        <div class="panel-header">
+            <div class="panel-title">Factor Performance</div>
+            <span style="font-size:0.65rem;color:var(--text-muted);">trailing returns</span>
+        </div>
+        <div class="panel-body">
+            <div class="perf-grid" id="perf-grid"></div>
+        </div>
+    </div>
+
+    <!-- Correlation Matrix -->
+    <div class="panel">
+        <div class="panel-header">
+            <div class="panel-title">Factor Correlations</div>
+        </div>
+        <div class="panel-body">
+            <div class="corr-wrapper">
+                <table class="corr-table" id="corr-table">
+                    <thead id="corr-head"></thead>
+                    <tbody id="corr-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    'use strict';
+
+    /* ---- Constants ---- */
+    var ASSETS   = ['BTC', 'ETH', 'SOL', 'AAPL', 'NVDA', 'MSFT', 'GOOGL', 'AMD'];
+    var FACTORS  = ['Momentum', 'Value', 'Volatility', 'Quality', 'Size', 'Liquidity', 'Carry', 'Mean-Revert'];
+    var PERIODS  = ['7d', '30d', '90d'];
+    var REFRESH_INTERVAL = 120; // seconds
+
+    /* ---- Color helpers ---- */
+    function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+    function heatColor(val) {
+        // val in [-1, 1].  green for positive, red for negative, dim for near-zero
+        var v = clamp(val, -1, 1);
+        var abs = Math.abs(v);
+        if (abs < 0.05) return 'rgba(98,255,64,0.04)';
+        if (v > 0) {
+            var alpha = 0.08 + abs * 0.42;
+            return 'rgba(154,255,120,' + alpha.toFixed(3) + ')';
+        }
+        var alphaR = 0.08 + abs * 0.42;
+        return 'rgba(255,111,158,' + alphaR.toFixed(3) + ')';
+    }
+
+    function heatTextColor(val) {
+        var abs = Math.abs(val);
+        if (abs < 0.15) return 'var(--text-muted)';
+        return val > 0 ? 'var(--green)' : 'var(--red)';
+    }
+
+    function corrColor(val) {
+        var v = clamp(val, -1, 1);
+        var abs = Math.abs(v);
+        if (abs < 0.1) return 'rgba(98,255,64,0.03)';
+        if (v > 0) return 'rgba(105,214,255,' + (0.06 + abs * 0.35).toFixed(3) + ')';
+        return 'rgba(255,111,158,' + (0.06 + abs * 0.35).toFixed(3) + ')';
+    }
+
+    /* ---- Mock data generators ---- */
+    function randBetween(lo, hi) { return lo + Math.random() * (hi - lo); }
+
+    function generateExposures() {
+        var data = {};
+        ASSETS.forEach(function (a) {
+            data[a] = {};
+            FACTORS.forEach(function (f) {
+                data[a][f] = parseFloat(randBetween(-0.9, 0.9).toFixed(2));
+            });
+        });
+        return data;
+    }
+
+    function generatePerformance() {
+        var data = {};
+        FACTORS.forEach(function (f) {
+            data[f] = {};
+            PERIODS.forEach(function (p) {
+                data[f][p] = parseFloat(randBetween(-12, 18).toFixed(1));
+            });
+        });
+        return data;
+    }
+
+    function generateCorrelations() {
+        var m = {};
+        FACTORS.forEach(function (a) {
+            m[a] = {};
+            FACTORS.forEach(function (b) {
+                if (a === b) { m[a][b] = 1.0; return; }
+                if (m[b] && m[b][a] !== undefined) { m[a][b] = m[b][a]; return; }
+                m[a][b] = parseFloat(randBetween(-0.6, 0.6).toFixed(2));
+            });
+        });
+        return m;
+    }
+
+    /* ---- Render: Heatmap ---- */
+    function renderHeatmap(exposures) {
+        var head = document.getElementById('heatmap-head');
+        var body = document.getElementById('heatmap-body');
+        var headRow = '<tr><th>Asset</th>';
+        FACTORS.forEach(function (f) { headRow += '<th>' + f + '</th>'; });
+        headRow += '</tr>';
+        head.innerHTML = headRow;
+
+        var rows = '';
+        ASSETS.forEach(function (a) {
+            rows += '<tr><td>' + a + '</td>';
+            FACTORS.forEach(function (f) {
+                var v = exposures[a][f];
+                var bg = heatColor(v);
+                var fg = heatTextColor(v);
+                rows += '<td><div class="heatmap-cell" style="background:' + bg + ';color:' + fg + ';" title="' + a + ' / ' + f + ': ' + v.toFixed(2) + '">' + v.toFixed(2) + '</div></td>';
+            });
+            rows += '</tr>';
+        });
+        body.innerHTML = rows;
+    }
+
+    /* ---- Render: Summary ---- */
+    function renderSummary(exposures) {
+        // Per-factor average exposure across all assets
+        var factorAvg = {};
+        FACTORS.forEach(function (f) {
+            var sum = 0;
+            ASSETS.forEach(function (a) { sum += exposures[a][f]; });
+            factorAvg[f] = sum / ASSETS.length;
+        });
+
+        var best = null, worst = null;
+        FACTORS.forEach(function (f) {
+            if (!best || factorAvg[f] > factorAvg[best]) best = f;
+            if (!worst || factorAvg[f] < factorAvg[worst]) worst = f;
+        });
+
+        document.getElementById('sum-count').textContent = FACTORS.length;
+        document.getElementById('sum-strongest').textContent = best;
+        document.getElementById('sum-strongest-val').textContent = 'avg ' + factorAvg[best].toFixed(3);
+        document.getElementById('sum-weakest').textContent = worst;
+        document.getElementById('sum-weakest-val').textContent = 'avg ' + factorAvg[worst].toFixed(3);
+
+        // Dispersion: stdev of factor averages
+        var mean = 0;
+        FACTORS.forEach(function (f) { mean += factorAvg[f]; });
+        mean /= FACTORS.length;
+        var variance = 0;
+        FACTORS.forEach(function (f) { variance += Math.pow(factorAvg[f] - mean, 2); });
+        var stdev = Math.sqrt(variance / FACTORS.length);
+        document.getElementById('sum-dispersion').textContent = stdev.toFixed(3);
+    }
+
+    /* ---- Render: Performance ---- */
+    function renderPerformance(perf) {
+        var grid = document.getElementById('perf-grid');
+        var html = '';
+        FACTORS.forEach(function (f) {
+            html += '<div class="perf-card"><div class="perf-name">' + f + '</div><div class="perf-bars">';
+            PERIODS.forEach(function (p) {
+                var v = perf[f][p];
+                var cls = v >= 0 ? 'positive' : 'negative';
+                var widthPct = Math.min(Math.abs(v) / 20 * 50, 50);
+                html += '<div class="perf-row">';
+                html += '<div class="perf-period">' + p + '</div>';
+                html += '<div class="perf-bar-track"><div class="perf-bar-fill ' + cls + '" style="width:' + widthPct.toFixed(1) + '%;"></div></div>';
+                html += '<div class="perf-pct ' + cls + '">' + (v >= 0 ? '+' : '') + v.toFixed(1) + '%</div>';
+                html += '</div>';
+            });
+            html += '</div></div>';
+        });
+        grid.innerHTML = html;
+    }
+
+    /* ---- Render: Correlation ---- */
+    function renderCorrelations(corr) {
+        var head = document.getElementById('corr-head');
+        var body = document.getElementById('corr-body');
+        // Use short labels
+        var short = FACTORS.map(function (f) { return f.slice(0, 4).toUpperCase(); });
+
+        var headRow = '<tr><th></th>';
+        short.forEach(function (s) { headRow += '<th>' + s + '</th>'; });
+        headRow += '</tr>';
+        head.innerHTML = headRow;
+
+        var rows = '';
+        FACTORS.forEach(function (a, i) {
+            rows += '<tr><td>' + short[i] + '</td>';
+            FACTORS.forEach(function (b) {
+                var v = corr[a][b];
+                var bg = a === b ? 'rgba(105,214,255,0.12)' : corrColor(v);
+                var fg = a === b ? 'var(--cyan)' : (Math.abs(v) < 0.15 ? 'var(--text-muted)' : (v > 0 ? 'var(--cyan)' : 'var(--red)'));
+                rows += '<td><div class="corr-cell" style="background:' + bg + ';color:' + fg + ';" title="' + a + ' x ' + b + ': ' + v.toFixed(2) + '">' + v.toFixed(2) + '</div></td>';
+            });
+            rows += '</tr>';
+        });
+        body.innerHTML = rows;
+    }
+
+    /* ---- Refresh orchestrator ---- */
+    function refreshFactors() {
+        var exposures = generateExposures();
+        var perf      = generatePerformance();
+        var corr      = generateCorrelations();
+
+        renderHeatmap(exposures);
+        renderSummary(exposures);
+        renderPerformance(perf);
+        renderCorrelations(corr);
+
+        var now = new Date();
+        document.getElementById('last-update-ts').textContent = now.toTimeString().slice(0, 8);
+    }
+
+    /* ---- Countdown timer ---- */
+    var remaining = REFRESH_INTERVAL;
+    function tick() {
+        remaining--;
+        if (remaining <= 0) {
+            refreshFactors();
+            remaining = REFRESH_INTERVAL;
+        }
+        document.getElementById('countdown').textContent = remaining;
+    }
+
+    /* ---- Init ---- */
+    refreshFactors();
+    setInterval(tick, 1000);
+})();
+</script>
+{% endblock %}

@@ -289,6 +289,30 @@
             animation: blink 1s step-end infinite;
         }
 
+        .nav-group {
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+            position: relative;
+        }
+        .nav-group + .nav-group::before {
+            content: '│';
+            color: var(--border-color);
+            font-size: 0.85rem;
+            margin: 0 2px;
+            opacity: 0.5;
+        }
+        .nav-group-label {
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            padding: 2px 6px;
+            opacity: 0.5;
+            white-space: nowrap;
+            align-self: center;
+        }
+
         /* Main Content */
         .terminal-main {
             flex: 1;
@@ -768,7 +792,23 @@
             .terminal-nav.open {
                 display: flex;
             }
-            
+
+            .nav-group {
+                flex-direction: column;
+                gap: 0;
+            }
+            .nav-group + .nav-group::before {
+                content: '';
+                display: block;
+                border-top: 1px solid var(--border-dim);
+                margin: var(--space-sm) 0;
+            }
+            .nav-group-label {
+                padding: var(--space-xs) var(--space-md);
+                font-size: 0.65rem;
+                opacity: 0.7;
+            }
+
             .nav-item {
                 padding: var(--space-md);
                 font-size: 1rem;
@@ -818,14 +858,30 @@
 
         <!-- Navigation -->
         <nav class="terminal-nav" id="terminal-nav">
-            <a href="/" class="nav-item {% if current_page == 'overview' %}active{% endif %}">Overview</a>
-            <a href="/architecture" class="nav-item {% if current_page in ['architecture', 'platform'] %}active{% endif %}">Operations</a>
-            <a href="/intelligence" class="nav-item {% if current_page == 'intelligence' %}active{% endif %}">Intelligence</a>
-            <a href="/organization" class="nav-item {% if current_page == 'organization' %}active{% endif %}">Organization</a>
-            <a href="/activity" class="nav-item {% if current_page == 'activity' %}active{% endif %}">Activity</a>
-            <a href="/analytics" class="nav-item {% if current_page == 'analytics' %}active{% endif %}">Analytics</a>
-            <a href="/sapphire-book" class="nav-item {% if current_page == 'sapphire-book' %}active{% endif %}">Sapphire_Book</a>
-            <a href="/content" class="nav-item {% if current_page == 'content' %}active{% endif %}">Content</a>
+            <div class="nav-group">
+                <a href="/" class="nav-item {% if current_page == 'overview' %}active{% endif %}">Overview</a>
+                <a href="/architecture" class="nav-item {% if current_page in ['architecture', 'platform'] %}active{% endif %}">Operations</a>
+                <a href="/activity" class="nav-item {% if current_page == 'activity' %}active{% endif %}">Activity</a>
+            </div>
+            <div class="nav-group">
+                <span class="nav-group-label">Trading</span>
+                <a href="/portfolio" class="nav-item {% if current_page == 'portfolio' %}active{% endif %}">Portfolio</a>
+                <a href="/performance" class="nav-item {% if current_page == 'performance' %}active{% endif %}">Performance</a>
+                <a href="/factors" class="nav-item {% if current_page == 'factors' %}active{% endif %}">Factors</a>
+                <a href="/cascade" class="nav-item {% if current_page == 'cascade' %}active{% endif %}">Cascade</a>
+                <a href="/analytics" class="nav-item {% if current_page == 'analytics' %}active{% endif %}">Analytics</a>
+            </div>
+            <div class="nav-group">
+                <span class="nav-group-label">Intel</span>
+                <a href="/intelligence" class="nav-item {% if current_page == 'intelligence' %}active{% endif %}">Intelligence</a>
+                <a href="/intel" class="nav-item {% if current_page == 'intel' %}active{% endif %}">Regional</a>
+            </div>
+            <div class="nav-group">
+                <span class="nav-group-label">Ops</span>
+                <a href="/content" class="nav-item {% if current_page == 'content' %}active{% endif %}">Content</a>
+                <a href="/organization" class="nav-item {% if current_page == 'organization' %}active{% endif %}">Org</a>
+                <a href="/sapphire-book" class="nav-item {% if current_page == 'sapphire-book' %}active{% endif %}">Book</a>
+            </div>
         </nav>
 
         <!-- Main Content -->

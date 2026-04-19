@@ -1,0 +1,783 @@
+{% extends "base.html" %}
+
+{% block title %}Cascade{% endblock %}
+
+{% block extra_css %}
+    .cascade-hero-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: var(--space-lg);
+        margin-bottom: var(--space-xl);
+    }
+
+    @media (max-width: 1200px) {
+        .cascade-hero-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 768px) {
+        .cascade-hero-grid { grid-template-columns: 1fr; }
+    }
+
+    .hero-cell {
+        border: 1px solid var(--border-dim);
+        padding: var(--space-lg);
+        background: rgba(98, 255, 64, 0.02);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .hero-cell::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 3px;
+        height: 100%;
+        opacity: 0.7;
+    }
+
+    .hero-cell.green::before { background: var(--green); }
+    .hero-cell.amber::before { background: var(--amber); }
+    .hero-cell.cyan::before { background: var(--cyan); }
+    .hero-cell.red::before { background: var(--red); }
+
+    .hero-label {
+        font-size: 0.65rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        margin-bottom: var(--space-sm);
+    }
+
+    .hero-value {
+        font-family: var(--font-header);
+        font-size: 2.2rem;
+        line-height: 1;
+        margin-bottom: var(--space-xs);
+    }
+
+    .hero-value.green { color: var(--green); text-shadow: var(--glow-green); }
+    .hero-value.amber { color: var(--amber); text-shadow: var(--glow-amber); }
+    .hero-value.cyan { color: var(--cyan); text-shadow: 0 0 8px rgba(105, 214, 255, 0.35); }
+    .hero-value.red { color: var(--red); text-shadow: 0 0 8px rgba(255, 111, 158, 0.4); }
+
+    .hero-sub {
+        font-size: 0.72rem;
+        color: var(--text-secondary);
+    }
+
+    /* Heatmap */
+    .heatmap-container {
+        overflow-x: auto;
+    }
+
+    .heatmap-wrapper {
+        display: flex;
+        gap: 0;
+        min-width: 700px;
+    }
+
+    .heatmap-y-axis {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding-right: var(--space-sm);
+        min-width: 72px;
+        text-align: right;
+    }
+
+    .heatmap-y-label {
+        font-size: 0.65rem;
+        color: var(--text-muted);
+        font-family: var(--font-terminal);
+        line-height: 1;
+        height: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+    }
+
+    .heatmap-grid-area {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .heatmap-row {
+        display: flex;
+        gap: 2px;
+        height: 22px;
+    }
+
+    .heatmap-cell {
+        flex: 1;
+        min-width: 18px;
+        border-radius: 2px;
+        cursor: crosshair;
+        transition: outline 0.15s;
+        position: relative;
+    }
+
+    .heatmap-cell:hover {
+        outline: 1px solid var(--amber);
+        z-index: 2;
+    }
+
+    .heatmap-cell[data-tooltip]:hover::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        bottom: 110%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(7, 7, 17, 0.95);
+        border: 1px solid var(--border-color);
+        padding: 3px 8px;
+        font-size: 0.6rem;
+        color: var(--text-primary);
+        white-space: nowrap;
+        z-index: 10;
+        pointer-events: none;
+    }
+
+    .heatmap-x-axis {
+        display: flex;
+        gap: 2px;
+        padding-left: 80px;
+        padding-top: var(--space-xs);
+    }
+
+    .heatmap-x-label {
+        flex: 1;
+        min-width: 18px;
+        font-size: 0.6rem;
+        color: var(--text-muted);
+        text-align: center;
+    }
+
+    .heatmap-legend {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        margin-top: var(--space-md);
+        font-size: 0.65rem;
+        color: var(--text-muted);
+    }
+
+    .legend-bar {
+        width: 120px;
+        height: 8px;
+        border-radius: 2px;
+        background: linear-gradient(90deg,
+            rgba(7, 7, 17, 0.9),
+            rgba(255, 111, 158, 0.3),
+            rgba(255, 111, 158, 0.6),
+            rgba(255, 60, 60, 0.85),
+            #ff3c3c
+        );
+        border: 1px solid var(--border-dim);
+    }
+
+    /* Position Health */
+    .health-good { color: var(--green); }
+    .health-warn { color: var(--amber); }
+    .health-danger { color: var(--red); }
+
+    .health-bar-track {
+        width: 60px;
+        height: 4px;
+        background: rgba(98, 255, 64, 0.08);
+        display: inline-block;
+        vertical-align: middle;
+        margin-left: var(--space-sm);
+        position: relative;
+    }
+
+    .health-bar-fill {
+        height: 100%;
+        position: absolute;
+        left: 0;
+        top: 0;
+    }
+
+    /* Cascade Chain */
+    .cascade-chain {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        position: relative;
+    }
+
+    .cascade-stage {
+        display: flex;
+        align-items: center;
+        gap: var(--space-md);
+        padding: var(--space-md) var(--space-lg);
+        border: 1px solid var(--border-dim);
+        background: rgba(11, 11, 26, 0.7);
+        position: relative;
+    }
+
+    .cascade-stage:not(:last-child) {
+        border-bottom: none;
+    }
+
+    .cascade-stage:first-child {
+        border-radius: 6px 6px 0 0;
+    }
+
+    .cascade-stage:last-child {
+        border-radius: 0 0 6px 6px;
+    }
+
+    .cascade-arrow {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: var(--space-xs) 0;
+        color: var(--red);
+        font-size: 0.75rem;
+        position: relative;
+    }
+
+    .cascade-arrow::before {
+        content: '';
+        position: absolute;
+        left: 32px;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: linear-gradient(180deg, var(--red-dim), var(--red));
+        opacity: 0.5;
+    }
+
+    .stage-icon {
+        width: 36px;
+        height: 36px;
+        border: 1px solid var(--border-dim);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.85rem;
+        flex-shrink: 0;
+        background: rgba(98, 255, 64, 0.03);
+    }
+
+    .stage-info {
+        flex: 1;
+    }
+
+    .stage-title {
+        font-size: 0.8rem;
+        color: var(--text-primary);
+        margin-bottom: 2px;
+    }
+
+    .stage-detail {
+        font-size: 0.68rem;
+        color: var(--text-muted);
+    }
+
+    .stage-impact {
+        text-align: right;
+        min-width: 90px;
+        flex-shrink: 0;
+    }
+
+    .stage-impact-value {
+        font-family: var(--font-header);
+        font-size: 1.1rem;
+    }
+
+    .stage-impact-label {
+        font-size: 0.6rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+    }
+
+    .severity-1 .stage-icon { border-color: var(--amber); color: var(--amber); }
+    .severity-2 .stage-icon { border-color: #ff9944; color: #ff9944; }
+    .severity-3 .stage-icon { border-color: var(--red); color: var(--red); }
+    .severity-4 .stage-icon { border-color: #ff2222; color: #ff2222; background: rgba(255, 34, 34, 0.08); }
+
+    .severity-1 .stage-impact-value { color: var(--amber); }
+    .severity-2 .stage-impact-value { color: #ff9944; }
+    .severity-3 .stage-impact-value { color: var(--red); }
+    .severity-4 .stage-impact-value { color: #ff2222; text-shadow: 0 0 8px rgba(255, 34, 34, 0.5); }
+
+    /* Funding SVG */
+    .funding-chart-container {
+        padding: var(--space-sm) 0;
+    }
+
+    .funding-chart-container svg {
+        width: 100%;
+        height: auto;
+    }
+
+    .funding-zero-line {
+        stroke: var(--border-dim);
+        stroke-dasharray: 4 3;
+    }
+
+    .funding-line {
+        fill: none;
+        stroke: var(--cyan);
+        stroke-width: 1.5;
+    }
+
+    .funding-area {
+        fill: url(#fundingGrad);
+    }
+
+    .funding-dot {
+        fill: var(--cyan);
+    }
+
+    .funding-label {
+        font-size: 9px;
+        fill: var(--text-muted);
+        font-family: var(--font-terminal);
+    }
+
+    .cascade-refresh-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: var(--space-lg);
+    }
+
+    .refresh-timer {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+    }
+
+    .cascade-two-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--space-lg);
+    }
+
+    @media (max-width: 1024px) {
+        .cascade-two-col { grid-template-columns: 1fr; }
+    }
+{% endblock %}
+
+{% block content %}
+<!-- Refresh Bar -->
+<div class="cascade-refresh-bar">
+    <div class="section-header" style="margin-bottom:0; padding-bottom:0; border-bottom:none;">
+        <div class="section-title">Liquidation Cascade Analysis</div>
+        <div class="section-subtitle">BTC perpetual market structure / cascade risk monitor</div>
+    </div>
+    <div style="display:flex; align-items:center; gap:var(--space-md);">
+        <span class="refresh-timer" id="refresh-timer">Next refresh: 30s</span>
+        <button class="btn small" onclick="refreshCascade()">REFRESH</button>
+    </div>
+</div>
+
+<!-- Hero Row -->
+<div class="cascade-hero-grid">
+    <div class="hero-cell amber">
+        <div class="hero-label">Cascade Risk Score</div>
+        <div class="hero-value amber" id="cascade-risk-score">72</div>
+        <div class="hero-sub">ELEVATED -- monitor closely</div>
+    </div>
+    <div class="hero-cell cyan">
+        <div class="hero-label">Total Open Interest</div>
+        <div class="hero-value cyan" id="total-oi">$2.4B</div>
+        <div class="hero-sub">+3.1% (24h) across major venues</div>
+    </div>
+    <div class="hero-cell green">
+        <div class="hero-label">Funding Rate (8h)</div>
+        <div class="hero-value green" id="funding-rate">0.0124%</div>
+        <div class="hero-sub">Annualized: 16.1% -- longs paying</div>
+    </div>
+    <div class="hero-cell red">
+        <div class="hero-label">Liquidation Proximity</div>
+        <div class="hero-value red" id="liq-proximity">2.8%</div>
+        <div class="hero-sub">$1.2B cluster at $64,200</div>
+    </div>
+</div>
+
+<!-- Liquidation Heatmap -->
+<div class="panel">
+    <div class="panel-header">
+        <span class="panel-title">Liquidation Heatmap -- BTC/USD</span>
+        <span style="font-size:0.7rem; color:var(--text-muted);">Price x Time | Density = liquidation volume</span>
+    </div>
+    <div class="panel-body">
+        <div class="heatmap-container">
+            <div class="heatmap-wrapper">
+                <div class="heatmap-y-axis" id="heatmap-y-axis"></div>
+                <div class="heatmap-grid-area" id="heatmap-grid"></div>
+            </div>
+            <div class="heatmap-x-axis" id="heatmap-x-axis"></div>
+        </div>
+        <div class="heatmap-legend">
+            <span>Low</span>
+            <div class="legend-bar"></div>
+            <span>High</span>
+            <span style="margin-left:var(--space-md);">Liquidation density (notional volume)</span>
+        </div>
+    </div>
+</div>
+
+<!-- Two-Column: Position Health + Cascade Chain -->
+<div class="cascade-two-col">
+
+    <!-- Position Health Panel -->
+    <div class="panel">
+        <div class="panel-header">
+            <span class="panel-title">Position Health</span>
+            <span class="badge warning">3 OPEN</span>
+        </div>
+        <div class="panel-body" style="padding:0;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Position</th>
+                        <th>Entry</th>
+                        <th>Liq Price</th>
+                        <th>Dist %</th>
+                        <th>Margin</th>
+                        <th>Health</th>
+                    </tr>
+                </thead>
+                <tbody id="position-health-tbody">
+                    <tr>
+                        <td style="color:var(--amber);">BTC-PERP</td>
+                        <td>$65,420</td>
+                        <td style="color:var(--red);">$58,200</td>
+                        <td>11.0%</td>
+                        <td>42.3%</td>
+                        <td>
+                            <span class="health-good">SAFE</span>
+                            <span class="health-bar-track">
+                                <span class="health-bar-fill" style="width:85%; background:var(--green);"></span>
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="color:var(--amber);">ETH-PERP</td>
+                        <td>$3,380</td>
+                        <td style="color:var(--red);">$3,020</td>
+                        <td>10.7%</td>
+                        <td>38.1%</td>
+                        <td>
+                            <span class="health-good">SAFE</span>
+                            <span class="health-bar-track">
+                                <span class="health-bar-fill" style="width:78%; background:var(--green);"></span>
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="color:var(--amber);">SOL-PERP</td>
+                        <td>$142.60</td>
+                        <td style="color:var(--red);">$128.80</td>
+                        <td>9.7%</td>
+                        <td>31.5%</td>
+                        <td>
+                            <span class="health-warn">WATCH</span>
+                            <span class="health-bar-track">
+                                <span class="health-bar-fill" style="width:55%; background:var(--amber);"></span>
+                            </span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Cascade Chain Visualization -->
+    <div class="panel">
+        <div class="panel-header">
+            <span class="panel-title">Cascade Chain -- Scenario</span>
+            <span style="font-size:0.68rem; color:var(--text-muted);">If BTC drops to $64,200</span>
+        </div>
+        <div class="panel-body">
+            <div class="cascade-chain">
+                <div class="cascade-stage severity-1">
+                    <div class="stage-icon">1</div>
+                    <div class="stage-info">
+                        <div class="stage-title">Initial Price Drop to $64,200</div>
+                        <div class="stage-detail">Spot sell pressure triggers perp liquidations at high-leverage cluster</div>
+                    </div>
+                    <div class="stage-impact">
+                        <div class="stage-impact-value">$340M</div>
+                        <div class="stage-impact-label">Liq Volume</div>
+                    </div>
+                </div>
+
+                <div class="cascade-arrow">
+                    <span style="position:relative; z-index:1; background:var(--bg-screen); padding:0 var(--space-sm);">
+                        forced sells push price lower
+                    </span>
+                </div>
+
+                <div class="cascade-stage severity-2">
+                    <div class="stage-icon">2</div>
+                    <div class="stage-info">
+                        <div class="stage-title">Cascade to $63,100</div>
+                        <div class="stage-detail">10x-25x leveraged longs liquidated; funding flips negative</div>
+                    </div>
+                    <div class="stage-impact">
+                        <div class="stage-impact-value">$520M</div>
+                        <div class="stage-impact-label">Cumulative</div>
+                    </div>
+                </div>
+
+                <div class="cascade-arrow">
+                    <span style="position:relative; z-index:1; background:var(--bg-screen); padding:0 var(--space-sm);">
+                        margin calls + stop-loss triggers
+                    </span>
+                </div>
+
+                <div class="cascade-stage severity-3">
+                    <div class="stage-icon">3</div>
+                    <div class="stage-info">
+                        <div class="stage-title">Deep Cascade to $61,500</div>
+                        <div class="stage-detail">Cross-exchange contagion; ETH/SOL perps dragged down 4-6%</div>
+                    </div>
+                    <div class="stage-impact">
+                        <div class="stage-impact-value">$1.1B</div>
+                        <div class="stage-impact-label">Cumulative</div>
+                    </div>
+                </div>
+
+                <div class="cascade-arrow">
+                    <span style="position:relative; z-index:1; background:var(--bg-screen); padding:0 var(--space-sm);">
+                        insurance fund depleted; socialized loss
+                    </span>
+                </div>
+
+                <div class="cascade-stage severity-4">
+                    <div class="stage-icon">4</div>
+                    <div class="stage-info">
+                        <div class="stage-title">Systemic Cascade to $59,800</div>
+                        <div class="stage-detail">ADL (auto-deleverage) triggers; market halts possible on smaller venues</div>
+                    </div>
+                    <div class="stage-impact">
+                        <div class="stage-impact-value">$1.8B</div>
+                        <div class="stage-impact-label">Total Wiped</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Funding Rate History -->
+<div class="panel" style="margin-top:var(--space-lg);">
+    <div class="panel-header">
+        <span class="panel-title">Funding Rate History -- 7d</span>
+        <span style="font-size:0.68rem; color:var(--text-muted);">8h intervals | BTC perpetual</span>
+    </div>
+    <div class="panel-body">
+        <div class="funding-chart-container" id="funding-chart-container">
+            <!-- SVG injected by JS -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    'use strict';
+
+    // =============================
+    // Liquidation Heatmap
+    // =============================
+    const HEATMAP_ROWS = 16;
+    const HEATMAP_COLS = 24;
+    const PRICE_HIGH = 68000;
+    const PRICE_LOW = 59000;
+
+    function generateHeatmapData() {
+        var data = [];
+        for (var r = 0; r < HEATMAP_ROWS; r++) {
+            var row = [];
+            for (var c = 0; c < HEATMAP_COLS; c++) {
+                var base = Math.random() * 0.15;
+                // Cluster near $64,200 (row ~6) and $61,500 (row ~11)
+                var priceLevel = PRICE_HIGH - (r / (HEATMAP_ROWS - 1)) * (PRICE_HIGH - PRICE_LOW);
+                if (Math.abs(priceLevel - 64200) < 500) {
+                    base += 0.4 + Math.random() * 0.5;
+                    if (c > 14 && c < 22) base += 0.2;
+                }
+                if (Math.abs(priceLevel - 61500) < 400) {
+                    base += 0.25 + Math.random() * 0.35;
+                }
+                if (Math.abs(priceLevel - 66500) < 300) {
+                    base += 0.1 + Math.random() * 0.15;
+                }
+                row.push(Math.min(1, base));
+            }
+            data.push(row);
+        }
+        return data;
+    }
+
+    function heatColor(t) {
+        // 0 = dark bg, 1 = bright red
+        t = Math.max(0, Math.min(1, t));
+        if (t < 0.05) return 'rgba(7, 7, 17, 0.9)';
+        var r = Math.round(40 + t * 215);
+        var g = Math.round(15 + (1 - t) * 30);
+        var b = Math.round(30 + (1 - t) * 20);
+        var a = 0.25 + t * 0.75;
+        return 'rgba(' + r + ',' + g + ',' + b + ',' + a.toFixed(2) + ')';
+    }
+
+    function renderHeatmap() {
+        var data = generateHeatmapData();
+        var yAxis = document.getElementById('heatmap-y-axis');
+        var grid = document.getElementById('heatmap-grid');
+        var xAxis = document.getElementById('heatmap-x-axis');
+        yAxis.innerHTML = '';
+        grid.innerHTML = '';
+        xAxis.innerHTML = '';
+
+        for (var r = 0; r < HEATMAP_ROWS; r++) {
+            var price = PRICE_HIGH - (r / (HEATMAP_ROWS - 1)) * (PRICE_HIGH - PRICE_LOW);
+            var lbl = document.createElement('div');
+            lbl.className = 'heatmap-y-label';
+            lbl.textContent = '$' + Math.round(price).toLocaleString();
+            yAxis.appendChild(lbl);
+
+            var rowEl = document.createElement('div');
+            rowEl.className = 'heatmap-row';
+            for (var c = 0; c < HEATMAP_COLS; c++) {
+                var cell = document.createElement('div');
+                cell.className = 'heatmap-cell';
+                var v = data[r][c];
+                cell.style.background = heatColor(v);
+                var vol = (v * 180).toFixed(0);
+                cell.setAttribute('data-tooltip', '$' + Math.round(price).toLocaleString() + ' | ' + vol + 'M liq');
+                rowEl.appendChild(cell);
+            }
+            grid.appendChild(rowEl);
+        }
+
+        // X axis: hours ago
+        for (var c = 0; c < HEATMAP_COLS; c++) {
+            var xl = document.createElement('div');
+            xl.className = 'heatmap-x-label';
+            var h = HEATMAP_COLS - 1 - c;
+            xl.textContent = h === 0 ? 'now' : (h % 4 === 0 ? h + 'h' : '');
+            xAxis.appendChild(xl);
+        }
+    }
+
+    // =============================
+    // Funding Rate SVG Chart
+    // =============================
+    function renderFundingChart() {
+        var container = document.getElementById('funding-chart-container');
+        // 21 data points: 7 days x 3 (8h intervals)
+        var rates = [
+            0.0100, 0.0085, 0.0110, 0.0090, 0.0072, 0.0065, 0.0050,
+            0.0040, 0.0058, 0.0080, 0.0095, 0.0110, 0.0130, 0.0105,
+            0.0088, 0.0070, -0.0010, 0.0025, 0.0080, 0.0110, 0.0124
+        ];
+        var days = ['Apr 11', 'Apr 12', 'Apr 13', 'Apr 14', 'Apr 15', 'Apr 16', 'Apr 17', 'Apr 18'];
+
+        var W = 700, H = 140;
+        var padL = 52, padR = 16, padT = 16, padB = 28;
+        var plotW = W - padL - padR;
+        var plotH = H - padT - padB;
+        var maxR = 0.015, minR = -0.003;
+        var rangeR = maxR - minR;
+
+        function x(i) { return padL + (i / (rates.length - 1)) * plotW; }
+        function y(v) { return padT + (1 - (v - minR) / rangeR) * plotH; }
+
+        var pathD = '';
+        var areaD = 'M' + x(0) + ',' + y(0);
+        for (var i = 0; i < rates.length; i++) {
+            var px = x(i), py = y(rates[i]);
+            if (i === 0) { pathD = 'M' + px + ',' + py; }
+            else { pathD += ' L' + px + ',' + py; }
+            areaD += ' L' + px + ',' + py;
+        }
+        areaD += ' L' + x(rates.length - 1) + ',' + (padT + plotH) + ' L' + x(0) + ',' + (padT + plotH) + ' Z';
+
+        var zeroY = y(0);
+        var dots = '';
+        for (var i = 0; i < rates.length; i++) {
+            if (i % 3 === 0 || i === rates.length - 1) {
+                dots += '<circle cx="' + x(i) + '" cy="' + y(rates[i]) + '" r="3" class="funding-dot"/>';
+            }
+        }
+
+        var xLabels = '';
+        for (var d = 0; d < days.length; d++) {
+            var idx = d * 3;
+            if (idx < rates.length) {
+                xLabels += '<text x="' + x(idx) + '" y="' + (H - 4) + '" class="funding-label" text-anchor="middle">' + days[d] + '</text>';
+            }
+        }
+
+        var yLabels = '';
+        var yTicks = [-0.002, 0, 0.005, 0.010, 0.015];
+        for (var t = 0; t < yTicks.length; t++) {
+            var ty = y(yTicks[t]);
+            yLabels += '<text x="' + (padL - 6) + '" y="' + (ty + 3) + '" class="funding-label" text-anchor="end">' + (yTicks[t] * 100).toFixed(3) + '%</text>';
+        }
+
+        var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">'
+            + '<defs><linearGradient id="fundingGrad" x1="0" y1="0" x2="0" y2="1">'
+            + '<stop offset="0%" stop-color="rgba(105,214,255,0.18)"/>'
+            + '<stop offset="100%" stop-color="rgba(105,214,255,0.01)"/>'
+            + '</linearGradient></defs>'
+            + '<line x1="' + padL + '" y1="' + zeroY + '" x2="' + (W - padR) + '" y2="' + zeroY + '" class="funding-zero-line"/>'
+            + '<path d="' + areaD + '" class="funding-area"/>'
+            + '<path d="' + pathD + '" class="funding-line"/>'
+            + dots
+            + xLabels
+            + yLabels
+            + '</svg>';
+
+        container.innerHTML = svg;
+    }
+
+    // =============================
+    // Auto-refresh
+    // =============================
+    var refreshCountdown = 30;
+    var refreshInterval;
+
+    function refreshCascade() {
+        // Stub: in production, fetch from /api/cascade endpoint
+        renderHeatmap();
+        renderFundingChart();
+        refreshCountdown = 30;
+        document.getElementById('refresh-timer').textContent = 'Refreshed';
+        setTimeout(function() {
+            document.getElementById('refresh-timer').textContent = 'Next refresh: 30s';
+        }, 1500);
+    }
+
+    function startRefreshTimer() {
+        refreshInterval = setInterval(function() {
+            refreshCountdown--;
+            if (refreshCountdown <= 0) {
+                refreshCascade();
+            } else {
+                document.getElementById('refresh-timer').textContent = 'Next refresh: ' + refreshCountdown + 's';
+            }
+        }, 1000);
+    }
+
+    // Expose globally for button
+    window.refreshCascade = refreshCascade;
+
+    // Init
+    renderHeatmap();
+    renderFundingChart();
+    startRefreshTimer();
+})();
+</script>
+{% endblock %}

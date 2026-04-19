@@ -1,0 +1,651 @@
+{% extends "base.html" %}
+
+{% block title %}Intel{% endblock %}
+
+{% block extra_css %}
+/* ── Hero Stats Row ── */
+.intel-hero {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-md);
+    margin-bottom: var(--space-xl);
+}
+
+@media (max-width: 900px) {
+    .intel-hero { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 520px) {
+    .intel-hero { grid-template-columns: 1fr; }
+}
+
+.hero-cell {
+    border: 1px solid var(--border-dim);
+    background: rgba(98, 255, 64, 0.02);
+    padding: var(--space-md) var(--space-lg);
+    position: relative;
+}
+
+.hero-cell::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px; height: 100%;
+    background: var(--amber);
+    opacity: 0.5;
+}
+
+.hero-label {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: var(--space-xs);
+}
+
+.hero-value {
+    font-family: var(--font-header);
+    font-size: 1.8rem;
+    color: var(--amber);
+    text-shadow: var(--glow-amber);
+    line-height: 1;
+}
+
+.hero-value.threat-low    { color: var(--green); text-shadow: var(--glow-green); }
+.hero-value.threat-med    { color: var(--amber); text-shadow: var(--glow-amber); }
+.hero-value.threat-high   { color: #ff9f43; text-shadow: 0 0 10px rgba(255, 159, 67, 0.4); }
+.hero-value.threat-crit   { color: var(--red); text-shadow: 0 0 10px rgba(255, 111, 158, 0.5); }
+
+.hero-sub {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: var(--space-xs);
+}
+
+/* ── Two-Column Layout ── */
+.intel-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-lg);
+    margin-bottom: var(--space-xl);
+}
+
+@media (max-width: 900px) {
+    .intel-columns { grid-template-columns: 1fr; }
+}
+
+/* ── Intel Feed ── */
+.intel-feed {
+    max-height: 520px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    padding-right: var(--space-xs);
+}
+
+.intel-item {
+    border: 1px solid var(--border-dim);
+    background: rgba(11, 11, 26, 0.6);
+    padding: var(--space-md);
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+}
+
+.intel-item:hover {
+    border-color: var(--border-color);
+    background: rgba(98, 255, 64, 0.04);
+}
+
+.intel-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-xs);
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+}
+
+.intel-item-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.region-tag {
+    font-size: 0.62rem;
+    padding: 2px 6px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-family: var(--font-terminal);
+    border: 1px solid;
+}
+
+.region-tag.apac     { color: var(--cyan); border-color: var(--cyan-dim); background: rgba(105, 214, 255, 0.08); }
+.region-tag.emea     { color: var(--amber); border-color: var(--amber-dim); background: rgba(98, 255, 64, 0.06); }
+.region-tag.americas { color: var(--green); border-color: var(--green-dim); background: rgba(154, 255, 120, 0.06); }
+.region-tag.global   { color: var(--red); border-color: var(--red-dim); background: rgba(255, 111, 158, 0.08); }
+
+.severity-badge {
+    font-size: 0.6rem;
+    padding: 1px 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border: 1px solid;
+}
+
+.severity-badge.info     { color: var(--text-muted); border-color: var(--border-dim); }
+.severity-badge.low      { color: var(--cyan); border-color: var(--cyan-dim); }
+.severity-badge.medium   { color: var(--amber); border-color: var(--amber-dim); }
+.severity-badge.high     { color: #ff9f43; border-color: rgba(255, 159, 67, 0.4); }
+.severity-badge.critical { color: var(--red); border-color: var(--red-dim); background: rgba(255, 111, 158, 0.1); }
+
+.intel-item-title {
+    font-size: 0.84rem;
+    color: var(--text-primary);
+    font-weight: 400;
+    line-height: 1.35;
+    margin-bottom: var(--space-xs);
+}
+
+.intel-item-footer {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+}
+
+/* ── Palantir Foundry Panel ── */
+.foundry-logo {
+    font-family: var(--font-header);
+    font-size: 1.6rem;
+    letter-spacing: 0.2em;
+    color: var(--text-muted);
+    text-align: center;
+    padding: var(--space-lg) 0 var(--space-md);
+    border: 1px dashed var(--border-dim);
+    margin-bottom: var(--space-md);
+    opacity: 0.6;
+}
+
+.foundry-status {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-md);
+    font-size: 0.8rem;
+}
+
+.foundry-status-dot {
+    width: 8px; height: 8px;
+    background: var(--text-muted);
+    border-radius: 50%;
+}
+
+.foundry-field {
+    margin-bottom: var(--space-md);
+}
+
+.foundry-field label {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: var(--space-xs);
+}
+
+.foundry-field input {
+    width: 100%;
+    background: rgba(11, 11, 26, 0.6);
+    border: 1px solid var(--border-dim);
+    color: var(--text-muted);
+    font-family: var(--font-terminal);
+    font-size: 0.78rem;
+    padding: var(--space-sm) var(--space-md);
+    cursor: not-allowed;
+}
+
+.btn-foundry {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-lg);
+    background: rgba(98, 255, 64, 0.04);
+    border: 1px solid var(--border-dim);
+    color: var(--text-muted);
+    font-family: var(--font-terminal);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    cursor: not-allowed;
+    opacity: 0.55;
+    margin-bottom: var(--space-md);
+}
+
+.foundry-note {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+    border-top: 1px solid var(--border-dim);
+    padding-top: var(--space-md);
+}
+
+/* ── Threat Map ── */
+.threat-map-container {
+    position: relative;
+    width: 100%;
+    margin-bottom: var(--space-xl);
+}
+
+.threat-map-svg {
+    width: 100%;
+    height: auto;
+}
+
+.threat-dot {
+    animation: threatPulse 2.5s ease-in-out infinite;
+}
+
+.threat-dot:nth-child(2n) { animation-delay: 0.5s; }
+.threat-dot:nth-child(3n) { animation-delay: 1.2s; }
+.threat-dot:nth-child(5n) { animation-delay: 1.8s; }
+
+@keyframes threatPulse {
+    0%, 100% { opacity: 0.7; r: 4; }
+    50% { opacity: 1; r: 6; }
+}
+
+.threat-dot-ring {
+    fill: none;
+    stroke-width: 1;
+    animation: threatRing 2.5s ease-out infinite;
+}
+
+.threat-dot-ring:nth-child(2n) { animation-delay: 0.5s; }
+.threat-dot-ring:nth-child(3n) { animation-delay: 1.2s; }
+
+@keyframes threatRing {
+    0% { r: 4; opacity: 0.6; stroke-width: 1.5; }
+    100% { r: 14; opacity: 0; stroke-width: 0.5; }
+}
+
+/* ── Data Sources Table ── */
+.source-status {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.source-status::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+}
+
+.source-status.active::before   { background: var(--green); box-shadow: var(--glow-green); }
+.source-status.active           { color: var(--green); }
+.source-status.pending::before  { background: var(--amber); box-shadow: var(--glow-amber); }
+.source-status.pending          { color: var(--amber); }
+.source-status.planned::before  { background: var(--text-muted); }
+.source-status.planned          { color: var(--text-muted); }
+{% endblock %}
+
+{% block content %}
+<div class="section-header">
+    <div class="section-title">Regional Intelligence & Foundry Integration</div>
+    <div class="section-subtitle">Aggregated geopolitical, cyber, and chain intelligence // Auto-refresh 120s</div>
+</div>
+
+<!-- ── Hero Stats ── -->
+<div class="intel-hero">
+    <div class="hero-cell">
+        <div class="hero-label">Active Intel Sources</div>
+        <div class="hero-value" id="hero-sources">7</div>
+        <div class="hero-sub">feeds online</div>
+    </div>
+    <div class="hero-cell">
+        <div class="hero-label">Threat Level</div>
+        <div class="hero-value threat-med" id="hero-threat">MED</div>
+        <div class="hero-sub" id="hero-threat-note">elevated cyber activity in APAC</div>
+    </div>
+    <div class="hero-cell">
+        <div class="hero-label">Regions Monitored</div>
+        <div class="hero-value" id="hero-regions">4</div>
+        <div class="hero-sub">APAC / EMEA / AMERICAS / GLOBAL</div>
+    </div>
+    <div class="hero-cell">
+        <div class="hero-label">Last Sync</div>
+        <div class="hero-value small" id="hero-sync">--:--:--</div>
+        <div class="hero-sub">next refresh in <span id="hero-countdown">120</span>s</div>
+    </div>
+</div>
+
+<!-- ── Two-Column: Feed + Foundry ── -->
+<div class="intel-columns">
+    <!-- Regional Intel Feed -->
+    <div class="panel">
+        <div class="panel-header">
+            <span class="panel-title">Regional Intelligence Feed</span>
+            <span class="badge online">LIVE</span>
+        </div>
+        <div class="panel-body">
+            <div class="intel-feed" id="intel-feed">
+                <!-- populated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Palantir Foundry -->
+    <div class="panel">
+        <div class="panel-header">
+            <span class="panel-title">Palantir Foundry Integration</span>
+            <span class="badge offline">PLANNED</span>
+        </div>
+        <div class="panel-body">
+            <div class="foundry-logo">PALANTIR FOUNDRY</div>
+            <div class="foundry-status">
+                <span class="foundry-status-dot"></span>
+                <span style="color: var(--text-muted);">NOT CONNECTED</span>
+            </div>
+            <div class="foundry-field">
+                <label>API Endpoint</label>
+                <input type="text" value="https://foundry.palantir.com/api/v2" disabled>
+            </div>
+            <button class="btn-foundry" disabled>
+                Connect Foundry
+            </button>
+            <div class="foundry-note">
+                Future integration point for Palantir Foundry ontology-based analysis.
+                When connected, this panel will surface entity graphs, object timelines,
+                and action recommendations derived from the Foundry ontology layer.
+                Requires a valid Foundry API token and workspace enrollment.
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Threat Map ── -->
+<div class="panel">
+    <div class="panel-header">
+        <span class="panel-title">Global Threat Density</span>
+        <span style="font-size:0.7rem; color:var(--text-muted);">CONCEPT VIEW</span>
+    </div>
+    <div class="panel-body">
+        <div class="threat-map-container">
+            <svg class="threat-map-svg" viewBox="0 0 800 400" xmlns="http://www.w3.org/2000/svg">
+                <!-- simplified continent outlines -->
+                <!-- North America -->
+                <path d="M120,80 L160,60 L200,65 L220,80 L230,110 L220,140 L200,160 L180,170 L160,180 L140,175 L120,160 L105,140 L100,120 L110,95 Z"
+                      fill="none" stroke="var(--border-dim)" stroke-width="1" opacity="0.5"/>
+                <!-- Central America -->
+                <path d="M160,180 L170,200 L165,220 L160,230 L155,225 L150,210 L155,195 Z"
+                      fill="none" stroke="var(--border-dim)" stroke-width="1" opacity="0.5"/>
+                <!-- South America -->
+                <path d="M180,230 L200,225 L220,240 L230,270 L225,310 L210,340 L190,350 L175,335 L170,300 L165,270 L170,245 Z"
+                      fill="none" stroke="var(--border-dim)" stroke-width="1" opacity="0.5"/>
+                <!-- Europe -->
+                <path d="M370,70 L400,60 L430,65 L440,80 L435,100 L420,110 L400,115 L385,120 L370,110 L365,90 Z"
+                      fill="none" stroke="var(--border-dim)" stroke-width="1" opacity="0.5"/>
+                <!-- Africa -->
+                <path d="M380,140 L410,130 L440,140 L450,170 L445,210 L430,260 L410,280 L390,275 L375,250 L370,210 L375,170 Z"
+                      fill="none" stroke="var(--border-dim)" stroke-width="1" opacity="0.5"/>
+                <!-- Asia -->
+                <path d="M460,55 L520,50 L580,55 L640,65 L680,80 L690,100 L680,130 L650,140 L600,145 L560,140 L520,130 L490,120 L470,100 L460,80 Z"
+                      fill="none" stroke="var(--border-dim)" stroke-width="1" opacity="0.5"/>
+                <!-- India subcontinent -->
+                <path d="M540,140 L560,145 L570,170 L560,200 L540,210 L530,195 L525,170 L530,150 Z"
+                      fill="none" stroke="var(--border-dim)" stroke-width="1" opacity="0.5"/>
+                <!-- Southeast Asia / Indonesia -->
+                <path d="M600,160 L630,155 L660,165 L680,175 L700,190 L690,200 L660,195 L630,190 L610,180 Z"
+                      fill="none" stroke="var(--border-dim)" stroke-width="1" opacity="0.5"/>
+                <!-- Australia -->
+                <path d="M640,280 L680,270 L720,280 L730,310 L720,340 L690,345 L660,335 L645,310 Z"
+                      fill="none" stroke="var(--border-dim)" stroke-width="1" opacity="0.5"/>
+
+                <!-- Threat dots -->
+                <g id="threat-dots">
+                    <!-- East Asia (high) -->
+                    <circle class="threat-dot-ring" cx="640" cy="90" r="4" stroke="var(--red)"/>
+                    <circle class="threat-dot" cx="640" cy="90" r="4" fill="var(--red)" opacity="0.8"/>
+                    <!-- Southeast Asia (medium) -->
+                    <circle class="threat-dot-ring" cx="650" cy="175" r="4" stroke="var(--amber)"/>
+                    <circle class="threat-dot" cx="650" cy="175" r="4" fill="var(--amber)" opacity="0.8"/>
+                    <!-- Eastern Europe (high) -->
+                    <circle class="threat-dot-ring" cx="430" cy="80" r="4" stroke="var(--red)"/>
+                    <circle class="threat-dot" cx="430" cy="80" r="4" fill="var(--red)" opacity="0.7"/>
+                    <!-- Middle East (medium) -->
+                    <circle class="threat-dot-ring" cx="470" cy="130" r="4" stroke="#ff9f43"/>
+                    <circle class="threat-dot" cx="470" cy="130" r="4" fill="#ff9f43" opacity="0.8"/>
+                    <!-- West Africa (low) -->
+                    <circle class="threat-dot-ring" cx="380" cy="190" r="4" stroke="var(--cyan)"/>
+                    <circle class="threat-dot" cx="380" cy="190" r="4" fill="var(--cyan)" opacity="0.6"/>
+                    <!-- US East Coast (medium) -->
+                    <circle class="threat-dot-ring" cx="200" cy="110" r="4" stroke="var(--amber)"/>
+                    <circle class="threat-dot" cx="200" cy="110" r="4" fill="var(--amber)" opacity="0.7"/>
+                    <!-- South America (low) -->
+                    <circle class="threat-dot-ring" cx="200" cy="290" r="4" stroke="var(--cyan)"/>
+                    <circle class="threat-dot" cx="200" cy="290" r="4" fill="var(--cyan)" opacity="0.5"/>
+                    <!-- India (medium) -->
+                    <circle class="threat-dot-ring" cx="545" cy="170" r="4" stroke="var(--amber)"/>
+                    <circle class="threat-dot" cx="545" cy="170" r="4" fill="var(--amber)" opacity="0.7"/>
+                </g>
+
+                <!-- grid lines for map feel -->
+                <line x1="0" y1="200" x2="800" y2="200" stroke="var(--border-dim)" stroke-width="0.3" stroke-dasharray="4,8" opacity="0.3"/>
+                <line x1="400" y1="0" x2="400" y2="400" stroke="var(--border-dim)" stroke-width="0.3" stroke-dasharray="4,8" opacity="0.3"/>
+            </svg>
+        </div>
+    </div>
+</div>
+
+<!-- ── Data Sources ── -->
+<div class="panel">
+    <div class="panel-header">
+        <span class="panel-title">Intel Data Sources</span>
+        <span style="font-size:0.7rem; color:var(--text-muted);" id="source-count">5 SOURCES</span>
+    </div>
+    <div class="panel-body">
+        <table class="data-table" id="sources-table">
+            <thead>
+                <tr>
+                    <th>Source</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th>Last Pull</th>
+                    <th>Items</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="color:var(--amber);">CISA Advisories</td>
+                    <td>Vulnerability / CVE</td>
+                    <td><span class="source-status active">Active</span></td>
+                    <td>2026-04-18 06:32 UTC</td>
+                    <td>1,247</td>
+                </tr>
+                <tr>
+                    <td style="color:var(--amber);">NVD / CVE Feed</td>
+                    <td>Vulnerability</td>
+                    <td><span class="source-status active">Active</span></td>
+                    <td>2026-04-18 06:30 UTC</td>
+                    <td>3,812</td>
+                </tr>
+                <tr>
+                    <td style="color:var(--amber);">OSINT Aggregator</td>
+                    <td>Open-Source Intel</td>
+                    <td><span class="source-status active">Active</span></td>
+                    <td>2026-04-18 06:28 UTC</td>
+                    <td>894</td>
+                </tr>
+                <tr>
+                    <td style="color:var(--amber);">Regional Workbench</td>
+                    <td>Geopolitical / Cyber</td>
+                    <td><span class="source-status pending">Pending</span></td>
+                    <td>2026-04-18 05:15 UTC</td>
+                    <td>412</td>
+                </tr>
+                <tr>
+                    <td style="color:var(--text-muted);">Palantir Foundry</td>
+                    <td>Ontology / Graph</td>
+                    <td><span class="source-status planned">Planned</span></td>
+                    <td>--</td>
+                    <td>--</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    'use strict';
+
+    /* ── Mock Intel Data ── */
+    var INTEL_ITEMS = [
+        {
+            region: 'APAC',
+            severity: 'critical',
+            title: 'APT41 infrastructure observed rotating C2 domains targeting TSMC supply chain',
+            timestamp: '2026-04-18 06:12 UTC',
+            source: 'CISA / Mandiant'
+        },
+        {
+            region: 'EMEA',
+            severity: 'high',
+            title: 'Pro-Russian hacktivist collective claims DDoS campaign against Baltic energy grid operators',
+            timestamp: '2026-04-18 05:48 UTC',
+            source: 'OSINT Aggregator'
+        },
+        {
+            region: 'AMERICAS',
+            severity: 'medium',
+            title: 'CISA issues ICS advisory for Schneider Electric Modicon PLCs (CVE-2026-2841)',
+            timestamp: '2026-04-18 05:30 UTC',
+            source: 'CISA ICS-CERT'
+        },
+        {
+            region: 'GLOBAL',
+            severity: 'high',
+            title: 'Zero-day in Palo Alto PAN-OS GlobalProtect actively exploited in the wild (CVE-2026-3119)',
+            timestamp: '2026-04-18 05:15 UTC',
+            source: 'NVD / Volexity'
+        },
+        {
+            region: 'APAC',
+            severity: 'medium',
+            title: 'South China Sea cable maintenance window — potential SIGINT collection risk Apr 19-22',
+            timestamp: '2026-04-18 04:50 UTC',
+            source: 'Regional Workbench'
+        },
+        {
+            region: 'EMEA',
+            severity: 'low',
+            title: 'EU NIS2 compliance deadline enforcement begins for essential-entity registrants',
+            timestamp: '2026-04-18 04:30 UTC',
+            source: 'ENISA'
+        },
+        {
+            region: 'AMERICAS',
+            severity: 'medium',
+            title: 'Brazilian ANPD opens investigation into large-scale fintech data broker incident',
+            timestamp: '2026-04-18 04:05 UTC',
+            source: 'OSINT Aggregator'
+        },
+        {
+            region: 'GLOBAL',
+            severity: 'critical',
+            title: 'Ransomware-as-a-Service group "BlackNova" leaks 2.4 TB from healthcare consortium',
+            timestamp: '2026-04-18 03:42 UTC',
+            source: 'Dark-web monitoring'
+        },
+        {
+            region: 'APAC',
+            severity: 'info',
+            title: 'Japan NISC releases updated critical-infrastructure cybersecurity framework v4.1',
+            timestamp: '2026-04-18 03:10 UTC',
+            source: 'NISC Japan'
+        },
+        {
+            region: 'EMEA',
+            severity: 'high',
+            title: 'Sandworm-linked wiper malware variant detected in Ukrainian power-distribution SCADA',
+            timestamp: '2026-04-18 02:55 UTC',
+            source: 'CERT-UA / ESET'
+        }
+    ];
+
+    /* ── Render Feed ── */
+    function renderFeed(items) {
+        var feed = document.getElementById('intel-feed');
+        feed.innerHTML = '';
+        items.forEach(function(item) {
+            var el = document.createElement('div');
+            el.className = 'intel-item';
+            el.innerHTML =
+                '<div class="intel-item-header">' +
+                    '<div class="intel-item-meta">' +
+                        '<span class="region-tag ' + item.region.toLowerCase() + '">' + item.region + '</span>' +
+                        '<span class="severity-badge ' + item.severity + '">' + item.severity.toUpperCase() + '</span>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="intel-item-title">' + item.title + '</div>' +
+                '<div class="intel-item-footer">' +
+                    '<span>' + item.timestamp + '</span>' +
+                    '<span>' + item.source + '</span>' +
+                '</div>';
+            feed.appendChild(el);
+        });
+    }
+
+    /* ── Refresh Intel (stub) ── */
+    function refreshIntel() {
+        /* In production this would fetch from /api/intel or event bus.
+           For now, re-render mock data and update the sync timestamp. */
+        var now = new Date();
+        var ts = now.getUTCFullYear() + '-' +
+                 String(now.getUTCMonth() + 1).padStart(2, '0') + '-' +
+                 String(now.getUTCDate()).padStart(2, '0') + ' ' +
+                 String(now.getUTCHours()).padStart(2, '0') + ':' +
+                 String(now.getUTCMinutes()).padStart(2, '0') + ':' +
+                 String(now.getUTCSeconds()).padStart(2, '0');
+
+        document.getElementById('hero-sync').textContent = ts;
+        renderFeed(INTEL_ITEMS);
+    }
+
+    /* ── Countdown ── */
+    var countdown = 120;
+    function tickCountdown() {
+        countdown--;
+        if (countdown <= 0) {
+            countdown = 120;
+            refreshIntel();
+        }
+        var el = document.getElementById('hero-countdown');
+        if (el) el.textContent = countdown;
+    }
+
+    /* ── Animate Threat Dots ── */
+    function animateThreatDots() {
+        var dots = document.querySelectorAll('.threat-dot');
+        dots.forEach(function(dot) {
+            /* slight random jitter on opacity for liveliness */
+            var base = parseFloat(dot.getAttribute('opacity')) || 0.7;
+            var jitter = base + (Math.random() * 0.3 - 0.15);
+            dot.style.opacity = Math.max(0.3, Math.min(1, jitter));
+        });
+    }
+
+    /* ── Init ── */
+    refreshIntel();
+    setInterval(tickCountdown, 1000);
+    setInterval(animateThreatDots, 3000);
+
+})();
+</script>
+{% endblock %}

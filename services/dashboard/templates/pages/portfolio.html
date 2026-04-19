@@ -1,0 +1,588 @@
+{% extends "base.html" %}
+
+{% block title %}Portfolio{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ── Hero summary grid ── */
+    .portfolio-hero {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        gap: 1px;
+        background: var(--border-color);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 20px;
+    }
+    .portfolio-cell {
+        background: rgba(11, 11, 26, 0.9);
+        padding: 22px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        transition: background 150ms ease;
+    }
+    .portfolio-cell:hover { background: rgba(18, 18, 36, 0.95); }
+    .portfolio-label {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+    }
+    .portfolio-value {
+        font-size: 36px;
+        font-weight: 600;
+        line-height: 1.05;
+        font-family: var(--font-terminal);
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.02em;
+        color: var(--text-primary);
+    }
+    .portfolio-value.positive { color: var(--green); }
+    .portfolio-value.negative { color: var(--red); }
+    .portfolio-value.neutral  { color: var(--text-primary); }
+    .portfolio-sub {
+        font-size: 12px;
+        color: var(--text-secondary);
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* ── Panel containers ── */
+    .panel {
+        background: rgba(11, 11, 26, 0.9);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 22px;
+        margin-bottom: 18px;
+    }
+    .panel-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 16px;
+    }
+    .panel-title {
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        color: var(--text-primary);
+    }
+    .panel-meta {
+        font-size: 11px;
+        color: var(--text-muted);
+    }
+
+    /* ── Holdings table ── */
+    .holdings-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-variant-numeric: tabular-nums;
+    }
+    .holdings-table thead th {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--border-color);
+        text-align: right;
+        white-space: nowrap;
+    }
+    .holdings-table thead th:first-child,
+    .holdings-table thead th:nth-child(2) {
+        text-align: left;
+    }
+    .holdings-table tbody tr {
+        border-bottom: 1px solid var(--border-dim);
+        transition: background 120ms ease;
+    }
+    .holdings-table tbody tr:hover {
+        background: rgba(98, 255, 64, 0.04);
+    }
+    .holdings-table tbody tr:last-child {
+        border-bottom: none;
+    }
+    .holdings-table tbody td {
+        padding: 12px 12px;
+        font-size: 13px;
+        color: var(--text-primary);
+        text-align: right;
+        font-family: var(--font-terminal);
+    }
+    .holdings-table tbody td:first-child {
+        text-align: left;
+        font-weight: 600;
+        color: var(--amber);
+        letter-spacing: 0.04em;
+    }
+    .holdings-table tbody td:nth-child(2) {
+        text-align: left;
+        color: var(--text-secondary);
+        font-weight: 400;
+    }
+    .holdings-table .positive { color: var(--green); }
+    .holdings-table .negative { color: var(--red); }
+
+    /* ── Grid layouts ── */
+    .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+    }
+
+    /* ── Sector / allocation bars ── */
+    .sector-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border-dim);
+        font-size: 13px;
+    }
+    .sector-row:last-child { border-bottom: none; }
+    .sector-name {
+        width: 130px;
+        flex-shrink: 0;
+        color: var(--text-secondary);
+        letter-spacing: 0.02em;
+    }
+    .sector-bar-wrap {
+        flex: 1;
+        height: 14px;
+        background: rgba(98, 255, 64, 0.06);
+        border-radius: 3px;
+        overflow: hidden;
+    }
+    .sector-bar {
+        height: 100%;
+        background: var(--amber);
+        border-radius: 3px;
+        transition: width 600ms ease;
+        box-shadow: 0 0 6px var(--amber-glow);
+    }
+    .sector-pct {
+        width: 50px;
+        text-align: right;
+        font-family: var(--font-terminal);
+        font-variant-numeric: tabular-nums;
+        color: var(--text-primary);
+    }
+
+    /* ── Asset class ring placeholder ── */
+    .asset-ring {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 16px 0;
+    }
+    .asset-ring svg { max-width: 200px; }
+    .asset-legend {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-left: 28px;
+    }
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--text-secondary);
+    }
+    .legend-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+        flex-shrink: 0;
+    }
+    .legend-val {
+        margin-left: auto;
+        font-family: var(--font-terminal);
+        font-variant-numeric: tabular-nums;
+        color: var(--text-primary);
+    }
+
+    /* ── Refresh indicator ── */
+    .refresh-bar {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 14px;
+        font-size: 11px;
+        color: var(--text-muted);
+        letter-spacing: 0.04em;
+    }
+    .refresh-dot {
+        width: 6px;
+        height: 6px;
+        background: var(--green);
+        box-shadow: var(--glow-green);
+        animation: pulse 2s ease-in-out infinite;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 900px) {
+        .portfolio-hero { grid-template-columns: 1fr 1fr; }
+        .grid-2 { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 520px) {
+        .portfolio-hero { grid-template-columns: 1fr; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="portfolio-page">
+
+    <!-- Refresh indicator -->
+    <div class="refresh-bar">
+        <div class="refresh-dot"></div>
+        <span id="last-refresh">LIVE — updating every 60s</span>
+    </div>
+
+    <!-- Hero summary -->
+    <div class="portfolio-hero">
+        <div class="portfolio-cell">
+            <div class="portfolio-label">Portfolio Value</div>
+            <div class="portfolio-value neutral" id="hero-total">$---,---</div>
+            <div class="portfolio-sub" id="hero-total-sub">8 holdings</div>
+        </div>
+        <div class="portfolio-cell">
+            <div class="portfolio-label">Day P&amp;L</div>
+            <div class="portfolio-value neutral" id="hero-day-pnl">$---</div>
+            <div class="portfolio-sub" id="hero-day-pct">---%</div>
+        </div>
+        <div class="portfolio-cell">
+            <div class="portfolio-label">Total Return</div>
+            <div class="portfolio-value neutral" id="hero-total-return">$---</div>
+            <div class="portfolio-sub" id="hero-total-return-pct">---%</div>
+        </div>
+        <div class="portfolio-cell">
+            <div class="portfolio-label">Cash Balance</div>
+            <div class="portfolio-value neutral" id="hero-cash">$---</div>
+            <div class="portfolio-sub" id="hero-buying-power">buying power</div>
+        </div>
+    </div>
+
+    <!-- Holdings table -->
+    <div class="panel">
+        <div class="panel-head">
+            <span class="panel-title">Holdings</span>
+            <span class="panel-meta" id="holdings-meta">8 positions</span>
+        </div>
+        <table class="holdings-table">
+            <thead>
+                <tr>
+                    <th>Symbol</th>
+                    <th>Name</th>
+                    <th>Qty</th>
+                    <th>Avg Cost</th>
+                    <th>Current</th>
+                    <th>Day Chg %</th>
+                    <th>Total Return</th>
+                    <th>Weight %</th>
+                </tr>
+            </thead>
+            <tbody id="holdings-body">
+                <!-- populated by JS -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Sector allocation + Asset class -->
+    <div class="grid-2">
+        <div class="panel">
+            <div class="panel-head">
+                <span class="panel-title">Sector Allocation</span>
+                <span class="panel-meta">by market value</span>
+            </div>
+            <div id="sector-view">
+                <!-- populated by JS -->
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-head">
+                <span class="panel-title">Asset Class Breakdown</span>
+                <span class="panel-meta">stocks / crypto / options</span>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: center; padding: 10px 0;">
+                <div class="asset-ring">
+                    <svg viewBox="0 0 200 200" width="180" height="180" id="asset-ring-svg">
+                        <!-- drawn by JS -->
+                    </svg>
+                </div>
+                <div class="asset-legend" id="asset-legend">
+                    <!-- populated by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* ── Formatting helpers ── */
+function fmtUSD(n) {
+    if (n === null || n === undefined || isNaN(n)) return '$---';
+    var sign = n < 0 ? '-' : '';
+    var abs = Math.abs(n);
+    if (abs >= 1e6) return sign + '$' + (abs / 1e6).toFixed(2) + 'M';
+    if (abs >= 1e3) return sign + '$' + Number(abs.toFixed(2)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return sign + '$' + abs.toFixed(2);
+}
+function fmtPct(n) {
+    if (n === null || n === undefined || isNaN(n)) return '---%';
+    return (n >= 0 ? '+' : '') + n.toFixed(2) + '%';
+}
+function signedClass(n) {
+    if (n === null || n === undefined || isNaN(n)) return 'neutral';
+    return n > 0 ? 'positive' : (n < 0 ? 'negative' : 'neutral');
+}
+
+/* ── Mock portfolio data ── */
+function getMockData() {
+    return {
+        total_value: 284739.52,
+        day_pnl: 1832.47,
+        day_pnl_pct: 0.65,
+        total_return: 47293.18,
+        total_return_pct: 19.93,
+        cash: 12450.00,
+        buying_power: 24900.00,
+        holdings: [
+            { symbol: 'AAPL',  name: 'Apple Inc.',           qty: 150, avg_cost: 178.32, price: 198.76, day_chg_pct: 1.24,  total_return: 3066.00,  weight: 10.47 },
+            { symbol: 'NVDA',  name: 'NVIDIA Corporation',   qty: 85,  avg_cost: 475.60, price: 892.44, day_chg_pct: 2.18,  total_return: 35431.40, weight: 26.65 },
+            { symbol: 'MSFT',  name: 'Microsoft Corp.',      qty: 60,  avg_cost: 342.15, price: 428.90, day_chg_pct: 0.34,  total_return: 5205.00,  weight: 9.04  },
+            { symbol: 'GOOGL', name: 'Alphabet Inc.',        qty: 120, avg_cost: 138.90, price: 176.52, day_chg_pct: -0.42, total_return: 4514.40,  weight: 7.44  },
+            { symbol: 'AMZN',  name: 'Amazon.com Inc.',      qty: 95,  avg_cost: 168.44, price: 192.38, day_chg_pct: 0.87,  total_return: 2274.30,  weight: 6.42  },
+            { symbol: 'META',  name: 'Meta Platforms Inc.',   qty: 45,  avg_cost: 352.78, price: 512.64, day_chg_pct: -1.15, total_return: 7193.70,  weight: 8.10  },
+            { symbol: 'TSLA',  name: 'Tesla Inc.',           qty: 70,  avg_cost: 242.50, price: 178.92, day_chg_pct: -2.34, total_return: -4450.60, weight: 4.40  },
+            { symbol: 'AMD',   name: 'Advanced Micro Devices', qty: 110, avg_cost: 145.20, price: 162.88, day_chg_pct: 1.56, total_return: 1944.80,  weight: 6.29  }
+        ],
+        sectors: [
+            { name: 'Technology',        pct: 74.39 },
+            { name: 'Consumer Cyclical',  pct: 10.82 },
+            { name: 'Communication',      pct: 7.44  },
+            { name: 'Cash & Equivalents', pct: 4.37  },
+            { name: 'Other',              pct: 2.98  }
+        ],
+        asset_classes: [
+            { name: 'Stocks',  pct: 91.2, color: '#62ff40' },
+            { name: 'Crypto',  pct: 4.5,  color: '#69d6ff' },
+            { name: 'Options', pct: 0.0,  color: '#ff6f9e' },
+            { name: 'Cash',    pct: 4.3,  color: '#6a8e67' }
+        ]
+    };
+}
+
+/* ── Render functions ── */
+function renderHero(data) {
+    var el;
+
+    el = document.getElementById('hero-total');
+    el.textContent = fmtUSD(data.total_value);
+    el.className = 'portfolio-value neutral';
+    document.getElementById('hero-total-sub').textContent = data.holdings.length + ' holdings';
+
+    el = document.getElementById('hero-day-pnl');
+    el.textContent = (data.day_pnl >= 0 ? '+' : '') + fmtUSD(data.day_pnl);
+    el.className = 'portfolio-value ' + signedClass(data.day_pnl);
+    var dayPctEl = document.getElementById('hero-day-pct');
+    dayPctEl.textContent = fmtPct(data.day_pnl_pct);
+    dayPctEl.style.color = data.day_pnl >= 0 ? 'var(--green)' : 'var(--red)';
+
+    el = document.getElementById('hero-total-return');
+    el.textContent = (data.total_return >= 0 ? '+' : '') + fmtUSD(data.total_return);
+    el.className = 'portfolio-value ' + signedClass(data.total_return);
+    var trPctEl = document.getElementById('hero-total-return-pct');
+    trPctEl.textContent = fmtPct(data.total_return_pct);
+    trPctEl.style.color = data.total_return >= 0 ? 'var(--green)' : 'var(--red)';
+
+    el = document.getElementById('hero-cash');
+    el.textContent = fmtUSD(data.cash);
+    el.className = 'portfolio-value neutral';
+    document.getElementById('hero-buying-power').textContent = fmtUSD(data.buying_power) + ' buying power';
+}
+
+function renderHoldings(holdings) {
+    var tbody = document.getElementById('holdings-body');
+    tbody.innerHTML = '';
+    holdings.forEach(function(h) {
+        var dayClass = signedClass(h.day_chg_pct);
+        var retClass = signedClass(h.total_return);
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+            '<td>' + h.symbol + '</td>' +
+            '<td>' + h.name + '</td>' +
+            '<td>' + h.qty + '</td>' +
+            '<td>' + fmtUSD(h.avg_cost) + '</td>' +
+            '<td>' + fmtUSD(h.price) + '</td>' +
+            '<td class="' + dayClass + '">' + fmtPct(h.day_chg_pct) + '</td>' +
+            '<td class="' + retClass + '">' + fmtUSD(h.total_return) + '</td>' +
+            '<td>' + h.weight.toFixed(1) + '%</td>';
+        tbody.appendChild(tr);
+    });
+    document.getElementById('holdings-meta').textContent = holdings.length + ' positions';
+}
+
+function renderSectors(sectors) {
+    var wrap = document.getElementById('sector-view');
+    wrap.innerHTML = '';
+    sectors.forEach(function(s) {
+        var row = document.createElement('div');
+        row.className = 'sector-row';
+        row.innerHTML =
+            '<div class="sector-name">' + s.name + '</div>' +
+            '<div class="sector-bar-wrap"><div class="sector-bar" style="width: 0%;"></div></div>' +
+            '<div class="sector-pct">' + s.pct.toFixed(1) + '%</div>';
+        wrap.appendChild(row);
+        // Animate bar after append
+        requestAnimationFrame(function() {
+            row.querySelector('.sector-bar').style.width = s.pct + '%';
+        });
+    });
+}
+
+function renderAssetRing(classes) {
+    var svg = document.getElementById('asset-ring-svg');
+    svg.innerHTML = '';
+    var cx = 100, cy = 100, r = 80, innerR = 50;
+    var cumulative = 0;
+
+    classes.forEach(function(cls) {
+        if (cls.pct <= 0) return;
+        var startAngle = (cumulative / 100) * 2 * Math.PI - Math.PI / 2;
+        cumulative += cls.pct;
+        var endAngle = (cumulative / 100) * 2 * Math.PI - Math.PI / 2;
+
+        var x1 = cx + r * Math.cos(startAngle);
+        var y1 = cy + r * Math.sin(startAngle);
+        var x2 = cx + r * Math.cos(endAngle);
+        var y2 = cy + r * Math.sin(endAngle);
+        var ix1 = cx + innerR * Math.cos(endAngle);
+        var iy1 = cy + innerR * Math.sin(endAngle);
+        var ix2 = cx + innerR * Math.cos(startAngle);
+        var iy2 = cy + innerR * Math.sin(startAngle);
+
+        var largeArc = cls.pct > 50 ? 1 : 0;
+        var d = [
+            'M', x1, y1,
+            'A', r, r, 0, largeArc, 1, x2, y2,
+            'L', ix1, iy1,
+            'A', innerR, innerR, 0, largeArc, 0, ix2, iy2,
+            'Z'
+        ].join(' ');
+
+        var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', d);
+        path.setAttribute('fill', cls.color);
+        path.setAttribute('opacity', '0.85');
+        path.setAttribute('stroke', '#070711');
+        path.setAttribute('stroke-width', '2');
+        svg.appendChild(path);
+    });
+
+    // Center text
+    var text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', cx);
+    text.setAttribute('y', cy + 4);
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('fill', '#c9ffbe');
+    text.setAttribute('font-size', '13');
+    text.setAttribute('font-family', 'Share Tech Mono, monospace');
+    text.textContent = 'ALLOC';
+    svg.appendChild(text);
+
+    // Legend
+    var legend = document.getElementById('asset-legend');
+    legend.innerHTML = '';
+    classes.forEach(function(cls) {
+        var item = document.createElement('div');
+        item.className = 'legend-item';
+        item.innerHTML =
+            '<span class="legend-dot" style="background:' + cls.color + ';"></span>' +
+            '<span>' + cls.name + '</span>' +
+            '<span class="legend-val">' + cls.pct.toFixed(1) + '%</span>';
+        legend.appendChild(item);
+    });
+}
+
+/* ── Animate numbers on load ── */
+function animateValue(elementId, targetValue, prefix, suffix, duration) {
+    var el = document.getElementById(elementId);
+    if (!el) return;
+    var start = 0;
+    var startTime = null;
+    prefix = prefix || '';
+    suffix = suffix || '';
+    duration = duration || 800;
+
+    function step(timestamp) {
+        if (!startTime) startTime = timestamp;
+        var progress = Math.min((timestamp - startTime) / duration, 1);
+        // ease-out cubic
+        var eased = 1 - Math.pow(1 - progress, 3);
+        var current = start + (targetValue - start) * eased;
+        if (Math.abs(targetValue) >= 1000) {
+            el.textContent = prefix + Number(current.toFixed(2)).toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }) + suffix;
+        } else {
+            el.textContent = prefix + current.toFixed(2) + suffix;
+        }
+        if (progress < 1) {
+            requestAnimationFrame(step);
+        }
+    }
+    requestAnimationFrame(step);
+}
+
+/* ── Main refresh function ── */
+function refreshPortfolio() {
+    // In production this would fetch from /api/portfolio
+    // For now, use mock data
+    /*
+    fetch('/api/portfolio')
+        .then(function(r) { return r.json(); })
+        .then(function(data) { renderAll(data); })
+        .catch(function(e) { console.error('portfolio fetch failed', e); });
+    */
+    var data = getMockData();
+    renderAll(data);
+}
+
+function renderAll(data) {
+    renderHero(data);
+    renderHoldings(data.holdings);
+    renderSectors(data.sectors);
+    renderAssetRing(data.asset_classes);
+
+    // Update timestamp
+    var now = new Date();
+    var ts = now.toLocaleTimeString('en-US', { hour12: false });
+    document.getElementById('last-refresh').textContent = 'LIVE — last refresh ' + ts;
+}
+
+/* ── Animate hero values on first load ── */
+function animateOnLoad() {
+    var data = getMockData();
+    animateValue('hero-total', data.total_value, '$', '', 900);
+    animateValue('hero-day-pnl', data.day_pnl, '+$', '', 700);
+    animateValue('hero-total-return', data.total_return, '+$', '', 800);
+    animateValue('hero-cash', data.cash, '$', '', 600);
+}
+
+/* ── Init ── */
+refreshPortfolio();
+animateOnLoad();
+setInterval(refreshPortfolio, 60000);
+</script>
+{% endblock %}
