@@ -1,81 +1,81 @@
 # Ari — when you get back
 
-Single punch list of everything still gated on your click/tap. Ordered by time-to-value.
+Single punch list of everything still gated on your click/tap. Ordered by time-to-value. Current as of 2026-04-18 evening.
 
 ---
 
-## Priority queue
+## Status of the 8 integrations
+
+| # | Integration | Status |
+|---|-------------|--------|
+| 1 | Cloudflare API token | ✅ **DONE** — token verified + saved to `.env.integrations`, account id `75d6d9fd102b3f4f56a10a5a24005d68` |
+| 2 | Resend API key | ✅ **DONE** — sending-scoped key saved; smoke probe recognises it as PASS |
+| 3 | Resend domain verification (`kadima.digital`) | ⏳ Gated on DNS paste at Namecheap — [`docs/resend-dns-paste-guide.md`](./resend-dns-paste-guide.md) has the exact values |
+| 4 | Substack publisher agreement + first post | ⏳ Gated on you (ToS + paste) |
+| 5 | X API budget + token regen | ⏳ Gated on you (dev console + budget decision) |
+| 6 | LinkedIn org page + dev app | 🟡 **DEFERRED 7 days** — org creation hit LinkedIn's page-creation rate limit (anti-spam, ~2-3 pages/week). Earliest retry: **~April 25, 2026**. |
+| 7 | On-chain providers (6) | ⏳ Optional — signups when you get to them |
+| 8 | GCP / sapphire-alpha reconciliation | ⏳ Pick A/B/C — playbook ready at [`docs/sapphire-alpha-abc-playbook.md`](./sapphire-alpha-abc-playbook.md) |
+
+---
+
+## Priority queue — what to do next
 
 | # | Task | Minutes | Why it's gated on you |
 |---|------|---------|------------------------|
-| 1 | **Finish Cloudflare token creation** (tab already open, form pre-filled) | 1 | Token value shown once — you copy, not me. Creating credentials is an explicit-permission action. |
-| 2 | **Sign up for Resend + paste DNS at Namecheap + create API key** | 10 + DNS wait | Account creation + ToS acceptance. Namecheap Advanced DNS panel: https://ap.www.namecheap.com/Domains/DomainControlPanel/kadima.digital/advancedns |
-| 3 | **LinkedIn dev app creation in Brave** | 5 | Chrome-here isn't signed in, Brave has your session. ToS acceptance + scope grant. |
-| 4 | **X API — decide budget** | 2 (decision) | Post-tier-abolition, X is pay-per-use. Tell me your per-month ceiling and I'll set rate limits in the publisher. |
-| 5 | **Publisher agreement on Substack** | 2 | The "can publish" gate on Substack I walked you to; legal agreement. |
-| 6 | **Paste first Substack post** | 10 | Draft waiting at `docs/first-substack-post.md`. Paste into the editor already pulled up in your browser, review, ship. |
-| 7 | **sapphire-alpha — pick A/B/C** | 30 sec | I flagged 3 options for the stale Cloud Run service. Option B (retarget to tho-ai-agent project) is my recommendation — just confirm. |
-| 8 | **Run `scripts/go_live.sh`** | 2 | Once the env vars from #1, #2, #3 are pasted into `.env.integrations`. The script chains chmod → load env → smoke → dry-run → live setenv → LaunchAgent load with confirmation gates. |
+| 1 | **Paste Resend DNS at Namecheap** for `kadima.digital` (3 records) | 5 + DNS wait | Requires your Namecheap session. Guide: [`docs/resend-dns-paste-guide.md`](./resend-dns-paste-guide.md). Then click **Verify Domain** in Resend. |
+| 2 | **Substack publisher agreement** | 2 | Legal agreement — click-through at the checkbox I walked you to. |
+| 3 | **Paste first Substack post** | 10 | Draft at [`docs/first-substack-post.md`](./first-substack-post.md). Paste into the editor, review, ship. |
+| 4 | **X — decide budget + regenerate tokens with write scope** | 5 | Pay-per-use post-tier-abolition. Tell me the per-month ceiling and I'll set publisher rate limits. When tokens are in hand, run [`scripts/finish_x_setup.sh`](../scripts/finish_x_setup.sh) — prompts you for the 5 values, writes them to `.env.integrations` in place, re-runs the smoke probe. |
+| 5 | **sapphire-alpha — pick A/B/C** | 30 sec | One-line decision. Full playbook with exact commands: [`docs/sapphire-alpha-abc-playbook.md`](./sapphire-alpha-abc-playbook.md). Recommendation: **B** (retarget to `tho-ai-agent`). |
+| 6 | **Run `scripts/go_live.sh`** | 2 | Once Resend DNS verifies + Substack agreement signed. Chains chmod → load env → smoke → dry-run → live setenv → LaunchAgent load with confirmation gates at the two irreversible steps. |
+| 7 | **LinkedIn page + dev app** (when cooldown lifts ~April 25) | 15 | Try the org page again after 7 days. When token is in hand, run [`scripts/finish_linkedin_setup.sh`](../scripts/finish_linkedin_setup.sh) — prompts for the token, auto-extracts your author URN via `/v2/userinfo`, writes both vars. |
 
-Total: ~30 minutes active time plus DNS propagation wait. Kadima DNS provider was Namecheap (resolved via `dig NS kadima.digital`), so the old "tell me where" question is gone.
+Total active time without LinkedIn: ~25 minutes + DNS propagation wait. LinkedIn adds ~15 minutes once the cooldown lifts.
 
 ---
 
-## Exact paste strings (have these ready)
+## Exact paste strings (what still needs filling)
 
-### Cloudflare
+### Resend DNS records — ready to go
 
-Once you click Create Token and copy the value:
+See [`docs/resend-dns-paste-guide.md`](./resend-dns-paste-guide.md) for the Namecheap-specific paste tables. Two of the three values are deterministic (Amazon SES `us-east-1`); only the DKIM hash comes from the Resend dashboard.
 
-```
-CLOUDFLARE_API_TOKEN=<paste-the-token>
-CLOUDFLARE_ACCOUNT_ID=75d6d9fd102b3f4f56a10a5a24005d68
-```
+### X (when you regenerate tokens with Read+Write scope)
 
-### Resend (fill in as you go)
-
-```
-RESEND_API_KEY=re_xxxxxxxxxxxx
-RESEND_FROM_EMAIL=weekly@kadima.digital
-RESEND_THO_DOMAIN=texashomeoutlet.com
-RESEND_THO_FROM=hello@texashomeoutlet.com
-```
-
-### LinkedIn (after you create the app)
-
-```
-LINKEDIN_ACCESS_TOKEN=<60-day-token>
-LINKEDIN_AUTHOR_URN=urn:li:person:<your-id>
-```
-
-### X (after you create credits account + regenerate tokens for write scope)
+The `.env.integrations` already has placeholder lines for these — the finish-setup script will fill them:
 
 ```
 X_API_KEY=
 X_API_SECRET=
 X_ACCESS_TOKEN=
 X_ACCESS_SECRET=
-X_BEARER_TOKEN=
+X_BEARER_TOKEN=    # optional
 ```
+
+Then: `scripts/finish_x_setup.sh` (hidden-input prompts, verifies bearer, writes in place, reloads launchd, re-runs smoke probe).
+
+### LinkedIn (deferred 7 days, but here when you get there)
+
+```
+LINKEDIN_ACCESS_TOKEN=<60-day-token>
+LINKEDIN_AUTHOR_URN=urn:li:person:<your-id>  # auto-filled by finish_linkedin_setup.sh
+```
+
+Then: `scripts/finish_linkedin_setup.sh`.
 
 ### Substack — leave blank
 
-```
-# Substack has no public post-by-email for standard accounts.
-# Content engine will drop drafts in data/content/ready/; paste manually.
-SUBSTACK_POST_EMAIL=
-```
+Standard Substack has no post-by-email for programmatic publishing. Content engine drops drafts in `data/content/ready/`; you paste them manually. No env var needed.
 
 ---
 
-## Final flip sequence — just run one script
-
-All 8 of the commands below are now wrapped in `scripts/go_live.sh` with confirmation gates at the irreversible steps (flipping `SAPPHIRE_PUBLISH_LIVE=1` and the first live publish).
+## Final flip sequence — one script
 
 ```bash
 cd ~/Code/Sapphire
 scripts/go_live.sh              # full sequence, stops for yes/no before going live
-scripts/go_live.sh --dry-only   # stop after the dry-run preview (safe to run anytime)
+scripts/go_live.sh --dry-only   # stop after the dry-run preview (safe any time)
 scripts/go_live.sh --rollback   # flip LIVE=0 and unload the 6:15 AM LaunchAgent
 ```
 
@@ -93,36 +93,46 @@ If step 3 or 4 fails, the script aborts before touching anything live. If you ba
 
 ---
 
-## What I did while you were away
+## What I did while you were away (2026-04-18 session)
 
-- Renamed Substack publication: "ari's Substack" → **Agent Dev** with the tagline *"Field notes from building Sapphire — autonomous trading, on-chain intelligence, and agent-mesh telemetry."* Saved and live.
-- Pre-filled the Cloudflare token creation form with the right name (`sapphire-tunnel-monitor`) and scopes (Account.Cloudflare Tunnel.Read + Zone.Read). You click through the last two screens.
-- Confirmed Substack has no public post-by-email feature for standard accounts — updated `lib/content/publishers/substack.py` consumers and the handoff docs so we don't chase that anymore. Content pipeline stays manual-paste for Substack.
-- Drafted the inaugural Substack post at `docs/first-substack-post.md` (~400 words, Agent Dev framing).
-- Ran `smoke_integrations.py` baseline: 13 probes, 0 FAIL, 13 SKIP (all waiting on creds). No spurious errors — test scaffold is clean.
-- Audited `com.sapphire.content-publisher.plist` — dry-run by default, 6:15 AM CT, logs to `~/Library/Logs/sapphire/`.
-- Cleaned up `.env.integrations.example`: corrected Substack comments, inlined your Cloudflare account ID + exact scope names.
-- Resolved the Kadima DNS provider mystery: `dig NS kadima.digital` → `dns{1,2}.registrar-servers.com` = **Namecheap**. Updated the handoff doc with the exact Namecheap Advanced DNS steps and host-name conventions for the Resend records.
-- Wrote `scripts/go_live.sh` — one script chains all 8 flip-live commands with yes/no gates at the irreversible ones. Run `go_live.sh --dry-only` first to confirm everything previews cleanly, then `go_live.sh` for the full live flip. `--rollback` undoes it.
-- Re-ran the smoke test baseline: still clean (13 probes, 0 FAIL, 13 SKIP, gcloud SKIP is expected when not running under your user).
+**Verified live:**
+- Cloudflare token you created: active, 0 tunnels, 0 zones (matches — Namecheap is DNS authoritative). Saved to `.env.integrations`.
+- Resend API key: verified as sending-scoped (least-privilege, correct). Patched `probe_resend()` to recognise `restricted_api_key` 401 as PASS with a clear status note.
+
+**Wrote:**
+- [`docs/resend-dns-paste-guide.md`](./resend-dns-paste-guide.md) — Namecheap-specific paste tables for all 3 Resend records + dig verification commands. Two values pre-filled because SES is deterministic; only DKIM is unique.
+- [`docs/sapphire-alpha-abc-playbook.md`](./sapphire-alpha-abc-playbook.md) — three one-command paths (delete, retarget to `tho-ai-agent`, enable billing on `sapphire-479610`). Each is ~5 lines of copy-pastable gcloud.
+- [`scripts/go_live.sh`](../scripts/go_live.sh) — one-shot flip-live sequence with `--dry-only` and `--rollback` modes.
+- [`scripts/finish_linkedin_setup.sh`](../scripts/finish_linkedin_setup.sh) — prompts for LinkedIn token, verifies via `/v2/userinfo`, extracts author URN, writes `.env.integrations` in place, reloads launchd, re-runs smoke probe.
+- [`scripts/finish_x_setup.sh`](../scripts/finish_x_setup.sh) — same pattern for the OAuth 1.0a quartet + optional bearer.
+- Five Kadima logo variants at [`docs/brand/`](./brand/): lemniscate-based marks (recursive, quadrilemniscate, 3-level fractal, golden-ratio concentric, lobe-ripples) + PNG renders at 64/300/800 + Gemini prompt variants + brand README. Primary mark: **kadima-mark-e-lobe-ripples.svg** (closest to the Gemini Variant C aesthetic you liked).
+
+**Resolved / documented:**
+- Kadima DNS provider = Namecheap (`dig NS kadima.digital` → `dns{1,2}.registrar-servers.com`).
+- LinkedIn org page creation hit LinkedIn's 7-day rate limit — deferred, parked a retry reminder for ~April 25.
+- Smoke baseline: 2 PASS (Cloudflare, Resend), remaining SKIP — all waiting on credentials, no spurious reds.
 
 ---
 
 ## Open decisions I punted to you
 
-1. ~~**Kadima DNS provider**~~ — resolved: Namecheap. Advanced DNS panel is linked in row #2 of the priority queue above.
-2. **X budget ceiling** (pay-per-use consumption).
-3. **sapphire-alpha Cloud Run service** — retarget to `tho-ai-agent` (B), delete (A), or retire entirely (C). Recommendation: B.
-4. **LinkedIn scope** — personal (`w_member_social`) or Kadima Digital company page (`w_organization_social`). I'd do personal first, add company once you have 5+ posts that would have gone there.
+1. **X budget ceiling** (pay-per-use consumption model). Pick a per-month ceiling so I can set publisher rate limits.
+2. **sapphire-alpha Cloud Run service** — pick A/B/C per the playbook. Recommendation: **B** (retarget to `tho-ai-agent`).
+3. **LinkedIn scope** — personal (`w_member_social`) or Kadima Digital company page (`w_organization_social`). I'd do personal first after the cooldown, add company once you have 5+ posts that would have gone there.
 
 ---
 
-## Files you'll want to look at
+## Files you'll want
 
-- [docs/ari-handoff-checklist.md](./ari-handoff-checklist.md) — per-integration walk-through (§1-§8)
+- [docs/resend-dns-paste-guide.md](./resend-dns-paste-guide.md) — **new** — Namecheap paste steps
+- [docs/sapphire-alpha-abc-playbook.md](./sapphire-alpha-abc-playbook.md) — **new** — A/B/C gcloud commands
+- [docs/ari-handoff-checklist.md](./ari-handoff-checklist.md) — per-integration walk-through
 - [docs/integrations-status-2026-04-18.md](./integrations-status-2026-04-18.md) — set-up / partial / blocked matrix
 - [docs/first-substack-post.md](./first-substack-post.md) — inaugural post draft
+- [docs/brand/](./brand/) — 5 logo variants + prompt file + README
 - [.env.integrations.example](../.env.integrations.example) — paste-ready template with comments
-- [scripts/smoke_integrations.py](../scripts/smoke_integrations.py) — baseline check, exits 0 if all configured-probes pass
+- [scripts/smoke_integrations.py](../scripts/smoke_integrations.py) — baseline check
 - [scripts/load_integrations_env.sh](../scripts/load_integrations_env.sh) — env → launchd bridge
-- [scripts/go_live.sh](../scripts/go_live.sh) — one-shot flip-live sequence with safety gates and `--rollback`
+- [scripts/go_live.sh](../scripts/go_live.sh) — one-shot flip-live with safety gates
+- [scripts/finish_linkedin_setup.sh](../scripts/finish_linkedin_setup.sh) — **new** — post-token helper
+- [scripts/finish_x_setup.sh](../scripts/finish_x_setup.sh) — **new** — post-token helper

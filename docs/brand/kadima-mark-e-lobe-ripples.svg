@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-130 -70 260 140" width="800" height="431" role="img" aria-labelledby="title desc">
+  <title id="title">Kadima — Lobe Ripples</title>
+  <desc id="desc">An infinity envelope with three concentric ellipses inside each lobe — ripples that trace the lobe's interior curvature. Closer in spirit to the Gemini "Variant C" render but rendered as precise geometry.</desc>
+
+  <!-- Outer lemniscate envelope -->
+  <path d="M 0,0
+           C -40,-55 -110,-55 -110,0
+           C -110,55 -40,55 0,0
+           C 40,-55 110,-55 110,0
+           C 110,55 40,55 0,0 Z"
+        fill="none" stroke="#0A2540" stroke-width="8"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Left lobe — centered at (-55, 0) where the left lobe's visual centroid is.
+       Three concentric ellipses, elongated horizontally to follow the lobe shape.
+       rx : ry approximately matches the lobe aspect ratio (~1.8:1). -->
+  <g stroke="#0A2540" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="-55" cy="0" rx="38" ry="21" stroke-width="4.2"/>
+    <ellipse cx="-55" cy="0" rx="25" ry="14" stroke-width="3.2"/>
+    <ellipse cx="-55" cy="0" rx="13" ry="7.5" stroke-width="2.4"/>
+  </g>
+
+  <!-- Right lobe — mirror at (+55, 0) -->
+  <g stroke="#0A2540" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="55" cy="0" rx="38" ry="21" stroke-width="4.2"/>
+    <ellipse cx="55" cy="0" rx="25" ry="14" stroke-width="3.2"/>
+    <ellipse cx="55" cy="0" rx="13" ry="7.5" stroke-width="2.4"/>
+  </g>
+</svg>

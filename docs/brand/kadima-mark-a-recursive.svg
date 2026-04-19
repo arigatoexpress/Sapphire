@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-150 -150 300 300" width="600" height="600" role="img" aria-labelledby="title desc">
+  <title id="title">Kadima — Recursive Infinity Mark</title>
+  <desc id="desc">A lemniscate (infinity symbol) containing a smaller orthogonal lemniscate at its crossover, forming a self-referential fractal mark.</desc>
+  <!-- Background (transparent by default; set fill="#ffffff" to enforce white) -->
+  <!-- Primary lemniscate: Bernoulli-style figure eight, 220 wide x 110 tall -->
+  <path d="M 0,0
+           C -40,-55 -110,-55 -110,0
+           C -110,55 -40,55 0,0
+           C 40,-55 110,-55 110,0
+           C 110,55 40,55 0,0 Z"
+        fill="none" stroke="#0A2540" stroke-width="9"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Secondary lemniscate: rotated 90°, scaled 0.42, centered at crossover -->
+  <g transform="rotate(90) scale(0.42)">
+    <path d="M 0,0
+             C -40,-55 -110,-55 -110,0
+             C -110,55 -40,55 0,0
+             C 40,-55 110,-55 110,0
+             C 110,55 40,55 0,0 Z"
+          fill="none" stroke="#0A2540" stroke-width="14"
+          stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

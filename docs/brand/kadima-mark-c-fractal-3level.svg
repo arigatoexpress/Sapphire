@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-150 -150 300 300" width="600" height="600" role="img" aria-labelledby="title desc">
+  <title id="title">Kadima — Fractal Infinity, Three Levels</title>
+  <desc id="desc">A lemniscate containing smaller lemniscates at the crossover, recursing three levels deep. Each recursion rotates 90° from its parent, creating a fractal self-similar mark.</desc>
+  <!-- Level 1: primary lemniscate, 220 x 110 -->
+  <path d="M 0,0
+           C -40,-55 -110,-55 -110,0
+           C -110,55 -40,55 0,0
+           C 40,-55 110,-55 110,0
+           C 110,55 40,55 0,0 Z"
+        fill="none" stroke="#0A2540" stroke-width="9"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Level 2: rotated 90°, scaled 0.42 -->
+  <g transform="rotate(90) scale(0.42)">
+    <path d="M 0,0
+             C -40,-55 -110,-55 -110,0
+             C -110,55 -40,55 0,0
+             C 40,-55 110,-55 110,0
+             C 110,55 40,55 0,0 Z"
+          fill="none" stroke="#0A2540" stroke-width="18"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Level 3: rotated 90° again (back to horizontal), scaled 0.42 again -->
+    <g transform="rotate(90) scale(0.42)">
+      <path d="M 0,0
+               C -40,-55 -110,-55 -110,0
+               C -110,55 -40,55 0,0
+               C 40,-55 110,-55 110,0
+               C 110,55 40,55 0,0 Z"
+            fill="none" stroke="#0A2540" stroke-width="36"
+            stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-150 -150 300 300" width="600" height="600" role="img" aria-labelledby="title desc">
+  <title id="title">Kadima — Quadrilemniscate Mark</title>
+  <desc id="desc">Two interlocking lemniscates rotated 90° from each other, forming a four-lobed rosette with self-referential fractal symmetry.</desc>
+  <!-- Horizontal lemniscate -->
+  <path d="M 0,0
+           C -40,-55 -110,-55 -110,0
+           C -110,55 -40,55 0,0
+           C 40,-55 110,-55 110,0
+           C 110,55 40,55 0,0 Z"
+        fill="none" stroke="#0A2540" stroke-width="8"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Vertical lemniscate (same shape, rotated 90°) -->
+  <g transform="rotate(90)">
+    <path d="M 0,0
+             C -40,-55 -110,-55 -110,0
+             C -110,55 -40,55 0,0
+             C 40,-55 110,-55 110,0
+             C 110,55 40,55 0,0 Z"
+          fill="none" stroke="#0A2540" stroke-width="8"
+          stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

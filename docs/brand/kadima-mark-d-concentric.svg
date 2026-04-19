@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-130 -70 260 140" width="800" height="431" role="img" aria-labelledby="title desc">
+  <title id="title">Kadima — Concentric Lemniscates</title>
+  <desc id="desc">Four nested lemniscates at golden-ratio scales (1, 1/φ, 1/φ², 1/φ³) sharing center and orientation. Self-similar under scaling — a clean mathematical fractal of the infinity symbol.</desc>
+  <defs>
+    <path id="lem" d="M 0,0
+                     C -40,-55 -110,-55 -110,0
+                     C -110,55 -40,55 0,0
+                     C 40,-55 110,-55 110,0
+                     C 110,55 40,55 0,0 Z"/>
+  </defs>
+  <!-- Scale 1.000 — outermost -->
+  <use href="#lem" fill="none" stroke="#0A2540" stroke-width="8"
+       stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Scale 0.618 (1/φ) -->
+  <use href="#lem" fill="none" stroke="#0A2540" stroke-width="5.5"
+       stroke-linecap="round" stroke-linejoin="round"
+       transform="scale(0.618)"/>
+  <!-- Scale 0.382 (1/φ²) -->
+  <use href="#lem" fill="none" stroke="#0A2540" stroke-width="3.8"
+       stroke-linecap="round" stroke-linejoin="round"
+       transform="scale(0.382)"/>
+  <!-- Scale 0.236 (1/φ³) — innermost -->
+  <use href="#lem" fill="none" stroke="#0A2540" stroke-width="2.6"
+       stroke-linecap="round" stroke-linejoin="round"
+       transform="scale(0.236)"/>
+</svg>
