@@ -289,7 +289,8 @@ def transform_regime(files: list[Path]) -> Iterator[dict]:
             log.warning("regime read failed %s: %s", fp, e)
             continue
         ts = _parse_ts(snap.get("timestamp") or snap.get("generated_at"))
-        regime = snap.get("regime") or {}
+        _raw_regime = snap.get("regime") or {}
+        regime = _raw_regime if isinstance(_raw_regime, dict) else {}
         overview = snap.get("overview") or {}
         funding = snap.get("funding") or {}
         oi = snap.get("open_interest") or {}
