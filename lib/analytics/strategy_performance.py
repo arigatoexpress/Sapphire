@@ -350,6 +350,129 @@ def report(trades: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     }
 
 
+_DEFAULT_INITIAL_CAPITAL = 100_000.0
+
+
+def _initial_capital() -> float:
+    """Read initial_capital from paper_portfolio.json if available."""
+    if not PAPER_PORTFOLIO.exists():
+        return _DEFAULT_INITIAL_CAPITAL
+    try:
+        d = json.loads(PAPER_PORTFOLIO.read_text())
+    except (OSError, json.JSONDecodeError):
+        return _DEFAULT_INITIAL_CAPITAL
+    return float(d.get("initial_capital") or _DEFAULT_INITIAL_CAPITAL)
+
+
+def timeseries(
+    trades: list[dict[str, Any]] | None = None,
+    initial_capital: float | None = None,
+) -> dict[str, Any]:
+    """Compute equity curve, drawdown series, and monthly returns from closed trades.
+
+    Returns:
+      {
+        initial_capital, final_equity, total_pnl_usd, total_return_pct,
+        equity_curve: [{ts, equity_usd, pnl_usd}],
+        drawdown_series: [{ts, dd_pct, equity_usd}],
+        max_drawdown: {pct, ts, equity_usd},
+        monthly_returns: [{year, month, pnl_usd, return_pct, trades}],
+        trade_count: int,
+      }
+
+    All series are sorted by closed_at ASC. Trades missing closed_at are skipped.
+    """
+    if trades is None:
+        trades = load_all_trades()
+    capital = initial_capital if initial_capital is not None else _initial_capital()
+
+    closed = []
+    for t in trades:
+        ts = _parse_iso(t.get("closed_at"))
+        if ts is None:
+            continue
+        closed.append((ts, t))
+    closed.sort(key=lambda x: x[0])
+
+    if not closed:
+        return {
+            "initial_capital": capital,
+            "final_equity": capital,
+            "total_pnl_usd": 0.0,
+            "total_return_pct": 0.0,
+            "equity_curve": [],
+            "drawdown_series": [],
+            "max_drawdown": {"pct": 0.0, "ts": None, "equity_usd": capital},
+            "monthly_returns": [],
+            "trade_count": 0,
+        }
+
+    equity_curve: list[dict[str, Any]] = []
+    drawdown_series: list[dict[str, Any]] = []
+    running = capital
+    peak = capital
+    max_dd = {"pct": 0.0, "ts": None, "equity_usd": capital}
+
+    for ts, t in closed:
+        running += t["pnl_usd"]
+        if running > peak:
+            peak = running
+        dd_pct = (running - peak) / peak if peak > 0 else 0.0
+        ts_iso = ts.isoformat()
+        equity_curve.append({
+            "ts": ts_iso,
+            "equity_usd": round(running, 2),
+            "pnl_usd": round(t["pnl_usd"], 2),
+        })
+        drawdown_series.append({
+            "ts": ts_iso,
+            "dd_pct": round(dd_pct, 6),
+            "equity_usd": round(running, 2),
+        })
+        if dd_pct < max_dd["pct"]:
+            max_dd = {"pct": round(dd_pct, 6), "ts": ts_iso, "equity_usd": round(running, 2)}
+
+    monthly_bucket: dict[tuple[int, int], dict[str, Any]] = defaultdict(
+        lambda: {"pnl_usd": 0.0, "trades": 0, "equity_at_start": capital}
+    )
+    # Track equity at the start of each month (for return %)
+    running_before = capital
+    current_key: tuple[int, int] | None = None
+    for ts, t in closed:
+        key = (ts.year, ts.month)
+        if key != current_key:
+            monthly_bucket[key]["equity_at_start"] = running_before
+            current_key = key
+        monthly_bucket[key]["pnl_usd"] += t["pnl_usd"]
+        monthly_bucket[key]["trades"] += 1
+        running_before += t["pnl_usd"]
+
+    monthly_returns = []
+    for (year, month), v in sorted(monthly_bucket.items()):
+        start_eq = v["equity_at_start"]
+        ret_pct = (v["pnl_usd"] / start_eq * 100) if start_eq > 0 else 0.0
+        monthly_returns.append({
+            "year": year,
+            "month": month,
+            "pnl_usd": round(v["pnl_usd"], 2),
+            "return_pct": round(ret_pct, 3),
+            "trades": v["trades"],
+        })
+
+    total_pnl = running - capital
+    return {
+        "initial_capital": capital,
+        "final_equity": round(running, 2),
+        "total_pnl_usd": round(total_pnl, 2),
+        "total_return_pct": round(total_pnl / capital * 100, 3) if capital else 0.0,
+        "equity_curve": equity_curve,
+        "drawdown_series": drawdown_series,
+        "max_drawdown": max_dd,
+        "monthly_returns": monthly_returns,
+        "trade_count": len(closed),
+    }
+
+
 if __name__ == "__main__":
     import sys
     json.dump(report(), sys.stdout, indent=2, default=str)

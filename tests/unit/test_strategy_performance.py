@@ -208,6 +208,76 @@ class TestReport:
         assert r["trade_count"] == 1
 
 
+class TestTimeseries:
+    def test_empty_when_no_trades(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(sp, "SIGNALS_DIR", tmp_path / "signals")
+        monkeypatch.setattr(sp, "PERF_SIGNALS", tmp_path / "perf.jsonl")
+        monkeypatch.setattr(sp, "PAPER_PORTFOLIO", tmp_path / "portfolio.json")
+        ts = sp.timeseries()
+        assert ts["trade_count"] == 0
+        assert ts["equity_curve"] == []
+        assert ts["drawdown_series"] == []
+        assert ts["monthly_returns"] == []
+
+    def test_equity_curve_monotonic_wins(self, tmp_path, monkeypatch):
+        sigs = tmp_path / "signals"
+        sigs.mkdir()
+        _write_jsonl(sigs / "d.jsonl", [
+            _trade(pnl=100, opened="2026-04-01T00:00:00+00:00", closed="2026-04-01T01:00:00+00:00"),
+            _trade(pnl=200, opened="2026-04-02T00:00:00+00:00", closed="2026-04-02T01:00:00+00:00", symbol="ETH"),
+            _trade(pnl=50, opened="2026-04-03T00:00:00+00:00", closed="2026-04-03T01:00:00+00:00", symbol="SOL"),
+        ])
+        monkeypatch.setattr(sp, "SIGNALS_DIR", sigs)
+        monkeypatch.setattr(sp, "PERF_SIGNALS", tmp_path / "np.jsonl")
+        monkeypatch.setattr(sp, "PAPER_PORTFOLIO", tmp_path / "np.json")
+        ts = sp.timeseries(initial_capital=100000)
+        assert ts["trade_count"] == 3
+        assert len(ts["equity_curve"]) == 3
+        assert ts["equity_curve"][0]["equity_usd"] == 100100.0
+        assert ts["equity_curve"][1]["equity_usd"] == 100300.0
+        assert ts["equity_curve"][2]["equity_usd"] == 100350.0
+        assert ts["max_drawdown"]["pct"] == 0.0
+        assert ts["total_pnl_usd"] == 350.0
+        assert ts["total_return_pct"] == pytest.approx(0.35, rel=0.01)
+
+    def test_drawdown_tracked(self, tmp_path, monkeypatch):
+        sigs = tmp_path / "signals"
+        sigs.mkdir()
+        _write_jsonl(sigs / "d.jsonl", [
+            _trade(pnl=1000, outcome="win",
+                   opened="2026-04-01T00:00:00+00:00", closed="2026-04-01T01:00:00+00:00"),
+            _trade(pnl=-500, outcome="loss", symbol="ETH",
+                   opened="2026-04-02T00:00:00+00:00", closed="2026-04-02T01:00:00+00:00"),
+        ])
+        monkeypatch.setattr(sp, "SIGNALS_DIR", sigs)
+        monkeypatch.setattr(sp, "PERF_SIGNALS", tmp_path / "np.jsonl")
+        monkeypatch.setattr(sp, "PAPER_PORTFOLIO", tmp_path / "np.json")
+        ts = sp.timeseries(initial_capital=100000)
+        # peak = 101000 (after win), then -500 → dd = -500/101000 ≈ -0.00495
+        assert ts["max_drawdown"]["pct"] < 0
+        assert ts["max_drawdown"]["pct"] == pytest.approx(-500/101000, rel=0.01)
+
+    def test_monthly_bucketing(self, tmp_path, monkeypatch):
+        sigs = tmp_path / "signals"
+        sigs.mkdir()
+        _write_jsonl(sigs / "d.jsonl", [
+            _trade(pnl=100, opened="2026-03-15T00:00:00+00:00", closed="2026-03-15T01:00:00+00:00"),
+            _trade(pnl=200, opened="2026-04-02T00:00:00+00:00", closed="2026-04-02T01:00:00+00:00", symbol="ETH"),
+            _trade(pnl=-50, opened="2026-04-10T00:00:00+00:00", closed="2026-04-10T01:00:00+00:00", symbol="SOL"),
+        ])
+        monkeypatch.setattr(sp, "SIGNALS_DIR", sigs)
+        monkeypatch.setattr(sp, "PERF_SIGNALS", tmp_path / "np.jsonl")
+        monkeypatch.setattr(sp, "PAPER_PORTFOLIO", tmp_path / "np.json")
+        ts = sp.timeseries(initial_capital=100000)
+        months = {(m["year"], m["month"]): m for m in ts["monthly_returns"]}
+        assert (2026, 3) in months
+        assert (2026, 4) in months
+        assert months[(2026, 3)]["pnl_usd"] == 100.0
+        assert months[(2026, 3)]["trades"] == 1
+        assert months[(2026, 4)]["pnl_usd"] == 150.0  # 200 - 50
+        assert months[(2026, 4)]["trades"] == 2
+
+
 class TestPaperPortfolioSource:
     def test_reads_portfolio_history(self, tmp_path, monkeypatch):
         pf = tmp_path / "portfolio.json"

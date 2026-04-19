@@ -2183,6 +2183,34 @@ def api_strategy_performance():
         }), 200
 
 
+@app.route('/api/performance-timeseries')
+@requires_auth
+def api_performance_timeseries():
+    """Equity curve + drawdown + monthly returns over all closed trades.
+
+    Reads the unified trade stream from lib.analytics.strategy_performance and
+    emits ordered time-series suitable for the /performance SVG charts and
+    monthly-returns grid.
+    """
+    try:
+        from lib.analytics.strategy_performance import timeseries
+        payload = timeseries()
+        payload['last_updated'] = time.time()
+        return jsonify(payload)
+    except Exception as e:
+        log.warning("performance timeseries API error: %s", e)
+        return jsonify({
+            'error': str(e),
+            'initial_capital': 100000.0,
+            'final_equity': 100000.0,
+            'total_pnl_usd': 0.0,
+            'total_return_pct': 0.0,
+            'equity_curve': [], 'drawdown_series': [],
+            'max_drawdown': {'pct': 0.0, 'ts': None, 'equity_usd': 100000.0},
+            'monthly_returns': [], 'trade_count': 0,
+        }), 200
+
+
 @app.route('/api/content/drafts')
 @requires_auth
 def api_content_drafts():

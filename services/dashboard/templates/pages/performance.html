@@ -272,6 +272,47 @@
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
     }
+
+    /* ── Readability overrides (contrast lift on top of Fallout theme) ── */
+    .strat-table th {
+        color: #b8e8b0;                 /* was var(--text-muted) #6a8e67 — too dim on #070711 */
+        font-size: 0.72rem;
+        font-weight: 500;
+    }
+    .strat-table td {
+        color: #d4f2cc;                 /* up from #9fd89c for higher AAA contrast */
+    }
+    .strat-table tbody tr:nth-child(odd) td {
+        background: rgba(98, 255, 64, 0.025);
+    }
+    .strat-table tbody tr:hover td {
+        background: rgba(98, 255, 64, 0.09);
+        color: #e8ffde;
+    }
+    .strat-table .placeholder-dash {
+        color: #5a7858;
+    }
+    .monthly-table th { color: #b8e8b0; font-weight: 500; }
+    .monthly-table td.mz { color: #8db089; }
+    .perf-cell .perf-label { color: #a8d6a2; }     /* clearer labels */
+    .perf-sub { color: #9fd89c; }                   /* was --text-secondary */
+
+    /* Strategy × timeframe matrix: tighter cells, stronger column rhythm */
+    #strategyTimeframeTable th {
+        padding: 8px 10px;
+        font-size: 0.66rem;
+    }
+    #strategyTimeframeTable td {
+        padding: 8px 10px;
+        text-align: center;
+    }
+    #strategyTimeframeTable td:first-child {
+        text-align: left;
+        color: var(--cyan);
+    }
+    #strategyTimeframeTable thead tr:first-child th:not(:first-child) {
+        border-left: 1px solid var(--border-dim);
+    }
 </style>
 {% endblock %}
 
@@ -409,45 +450,37 @@
 (function () {
     'use strict';
 
-    /* ── Seed-able pseudo-random ── */
-    function seededRandom(seed) {
-        let s = seed;
-        return function () {
-            s = (s * 16807 + 0) % 2147483647;
-            return (s - 1) / 2147483646;
-        };
+    /* Current time-series payload from /api/performance-timeseries. Populated on refresh. */
+    var performanceTS = { equity_curve: [], drawdown_series: [], monthly_returns: [], max_drawdown: { pct: 0, ts: null }, initial_capital: 100000 };
+
+    function _emptyState(svg, msg) {
+        if (!svg) return;
+        svg.innerHTML = '<text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" style="fill: #9fd89c; font-family: var(--font-terminal); font-size: 12px;">' + msg + '</text>';
     }
 
-    /* ── Generate mock equity curve (90 days) ── */
-    function generateEquityData(days) {
-        var rng = seededRandom(42);
-        var data = [100000];
-        for (var i = 1; i <= days; i++) {
-            var drift = 0.0012;
-            var vol = 0.015;
-            var shock = (rng() - 0.5) * 2 * vol;
-            // Inject drawdown periods
-            if (i >= 22 && i <= 30) drift = -0.004;
-            if (i >= 55 && i <= 62) drift = -0.003;
-            if (i >= 78 && i <= 82) drift = -0.002;
-            var prev = data[data.length - 1];
-            data.push(Math.max(prev * (1 + drift + shock), prev * 0.95));
-        }
-        return data;
-    }
-
-    var equityData = generateEquityData(90);
-
-    /* ── Render equity curve SVG ── */
+    /* ── Render equity curve SVG from real trade stream ── */
     function renderEquityCurve() {
         var svg = document.getElementById('equitySvg');
         if (!svg) return;
+
+        var curve = performanceTS.equity_curve || [];
+        var init = performanceTS.initial_capital || 100000;
+
+        if (curve.length < 2) {
+            _emptyState(svg, curve.length === 0 ? 'Awaiting first closed trade…' : 'Need ≥2 trades to draw curve');
+            return;
+        }
 
         var w = 900, h = 220;
         var padL = 60, padR = 10, padT = 15, padB = 25;
         var chartW = w - padL - padR;
         var chartH = h - padT - padB;
+
+        /* equityData = [init, equity_after_trade1, equity_after_trade2, ...] */
+        var equityData = [init];
+        for (var k = 0; k < curve.length; k++) equityData.push(curve[k].equity_usd);
         var n = equityData.length;
+
         var minV = Math.min.apply(null, equityData);
         var maxV = Math.max.apply(null, equityData);
         var range = maxV - minV || 1;
@@ -474,10 +507,20 @@
         }
 
         // X-axis labels
-        var dayLabels = [0, 15, 30, 45, 60, 75, 90];
-        for (var d = 0; d < dayLabels.length; d++) {
-            var dx = x(dayLabels[d]);
-            parts.push('<text x="' + dx + '" y="' + (h - 4) + '" text-anchor="middle" class="equity-label">D' + dayLabels[d] + '</text>');
+        // X-axis labels — trade index, with date at first + last
+        var curveDates = performanceTS.equity_curve || [];
+        function _shortDate(iso) {
+            if (!iso) return '';
+            var dt = new Date(iso);
+            if (isNaN(dt)) return '';
+            return (dt.getMonth() + 1) + '/' + dt.getDate();
+        }
+        var tickPositions = [0, Math.floor((n - 1) / 2), n - 1];
+        for (var d = 0; d < tickPositions.length; d++) {
+            var ti = tickPositions[d];
+            var dx = x(ti);
+            var label = ti === 0 ? 'Start' : (curveDates[ti - 1] ? _shortDate(curveDates[ti - 1].ts) : 'T' + ti);
+            parts.push('<text x="' + dx + '" y="' + (h - 4) + '" text-anchor="middle" class="equity-label">' + label + '</text>');
         }
 
         // Area
@@ -495,32 +538,32 @@
         }
         parts.push('<path d="' + linePath + '" class="equity-line"/>');
 
-        // End marker
-        parts.push('<circle cx="' + x(n - 1) + '" cy="' + y(equityData[n - 1]) + '" r="4" class="equity-marker"/>');
+        // Per-trade markers
+        for (var m = 1; m < n; m++) {
+            parts.push('<circle cx="' + x(m) + '" cy="' + y(equityData[m]) + '" r="2.5" class="equity-marker"/>');
+        }
 
         // Start / end value labels
-        parts.push('<text x="' + (x(0) + 4) + '" y="' + (y(equityData[0]) - 6) + '" class="equity-label" fill="var(--text-secondary)">$' + (equityData[0] / 1000).toFixed(1) + 'k</text>');
-        parts.push('<text x="' + (x(n - 1) - 4) + '" y="' + (y(equityData[n - 1]) - 6) + '" text-anchor="end" class="equity-label" fill="var(--green)">$' + (equityData[n - 1] / 1000).toFixed(1) + 'k</text>');
+        parts.push('<text x="' + (x(0) + 4) + '" y="' + (y(equityData[0]) - 6) + '" class="equity-label" fill="#b8e8b0">$' + (equityData[0] / 1000).toFixed(2) + 'k</text>');
+        var endColor = equityData[n - 1] >= equityData[0] ? '#9aff78' : '#ff6f9e';
+        parts.push('<text x="' + (x(n - 1) - 4) + '" y="' + (y(equityData[n - 1]) - 6) + '" text-anchor="end" class="equity-label" fill="' + endColor + '">$' + (equityData[n - 1] / 1000).toFixed(2) + 'k</text>');
 
         svg.innerHTML = parts.join('');
-    }
-
-    /* ── Drawdown series from equity data ── */
-    function computeDrawdown(eq) {
-        var peak = eq[0];
-        var dd = [];
-        for (var i = 0; i < eq.length; i++) {
-            if (eq[i] > peak) peak = eq[i];
-            dd.push((eq[i] - peak) / peak);
-        }
-        return dd;
     }
 
     function renderDrawdown() {
         var svg = document.getElementById('ddSvg');
         if (!svg) return;
 
-        var dd = computeDrawdown(equityData);
+        var series = performanceTS.drawdown_series || [];
+        if (series.length < 2) {
+            _emptyState(svg, series.length === 0 ? 'Awaiting first closed trade…' : 'Need ≥2 trades to draw drawdown');
+            return;
+        }
+
+        /* dd[] matches equity indices: [0 at start, then one per trade close] */
+        var dd = [0];
+        for (var k = 0; k < series.length; k++) dd.push(series[k].dd_pct);
         var w = 900, h = 140;
         var padL = 60, padR = 10, padT = 10, padB = 25;
         var chartW = w - padL - padR;
@@ -544,11 +587,20 @@
             parts.push('<text x="' + (padL - 6) + '" y="' + (sy + 3) + '" text-anchor="end" class="dd-label">' + (ddSteps[s] * 100).toFixed(1) + '%</text>');
         }
 
-        // X-axis labels
-        var dayLabels = [0, 15, 30, 45, 60, 75, 90];
-        for (var d = 0; d < dayLabels.length; d++) {
-            var dx = x(dayLabels[d]);
-            parts.push('<text x="' + dx + '" y="' + (h - 4) + '" text-anchor="middle" class="dd-label">D' + dayLabels[d] + '</text>');
+        // X-axis labels — dated from series
+        var ddDates = performanceTS.drawdown_series || [];
+        function _shortDd(iso) {
+            if (!iso) return '';
+            var dt = new Date(iso);
+            if (isNaN(dt)) return '';
+            return (dt.getMonth() + 1) + '/' + dt.getDate();
+        }
+        var ddTicks = [0, Math.floor((n - 1) / 2), n - 1];
+        for (var d = 0; d < ddTicks.length; d++) {
+            var ti = ddTicks[d];
+            var dx = x(ti);
+            var label = ti === 0 ? 'Start' : (ddDates[ti - 1] ? _shortDd(ddDates[ti - 1].ts) : 'T' + ti);
+            parts.push('<text x="' + dx + '" y="' + (h - 4) + '" text-anchor="middle" class="dd-label">' + label + '</text>');
         }
 
         // Area
@@ -571,40 +623,48 @@
         svg.innerHTML = parts.join('');
     }
 
-    /* ── Monthly returns table ── */
+    /* ── Monthly returns table (built from real monthly_returns array) ── */
     function renderMonthlyReturns() {
-        var rng = seededRandom(77);
-        var years = {
-            2025: [ 2.1, -0.4, 3.2, 1.8, -1.1, 0.6, 2.9, -0.8, 1.4, 3.1, -0.3, 1.7 ],
-            2026: [ 1.9, 2.4, -0.6, 1.2, null, null, null, null, null, null, null, null ]
-        };
-
         var body = document.getElementById('monthlyBody');
         if (!body) return;
-        var html = '';
+        var rows = performanceTS.monthly_returns || [];
 
-        for (var yr in years) {
-            var row = years[yr];
+        if (!rows.length) {
+            body.innerHTML = '<tr><td colspan="14" style="text-align:center; padding:24px; color: #9fd89c;">No closed trades yet — monthly view populates as months accumulate.</td></tr>';
+            return;
+        }
+
+        /* Group by year */
+        var byYear = {};
+        rows.forEach(function (r) {
+            if (!byYear[r.year]) byYear[r.year] = {};
+            byYear[r.year][r.month] = r;
+        });
+
+        var years = Object.keys(byYear).map(Number).sort();
+        var html = '';
+        years.forEach(function (yr) {
+            var months = byYear[yr];
             var ytd = 0;
-            var count = 0;
             html += '<tr><td class="year-label">' + yr + '</td>';
-            for (var m = 0; m < 12; m++) {
-                var v = row[m];
-                if (v === null) {
+            for (var m = 1; m <= 12; m++) {
+                var entry = months[m];
+                if (!entry) {
                     html += '<td class="mz">&mdash;</td>';
                 } else {
+                    var v = entry.return_pct;
                     ytd += v;
-                    count++;
                     var cls = v > 0 ? 'mp' : v < 0 ? 'mn' : 'mz';
                     var sign = v > 0 ? '+' : '';
-                    html += '<td class="' + cls + '">' + sign + v.toFixed(1) + '%</td>';
+                    var tip = entry.trades + ' trades, ' + (v > 0 ? '+' : '') + '$' + Math.round(entry.pnl_usd);
+                    html += '<td class="' + cls + '" title="' + tip + '">' + sign + v.toFixed(2) + '%</td>';
                 }
             }
             var ytdCls = ytd > 0 ? 'mp' : ytd < 0 ? 'mn' : 'mz';
             var ytdSign = ytd > 0 ? '+' : '';
-            html += '<td class="ytd-col ' + ytdCls + '">' + ytdSign + ytd.toFixed(1) + '%</td>';
+            html += '<td class="ytd-col ' + ytdCls + '">' + ytdSign + ytd.toFixed(2) + '%</td>';
             html += '</tr>';
-        }
+        });
 
         body.innerHTML = html;
     }
@@ -729,7 +789,7 @@
         }
     }
 
-    /* ── Main refresh — pulls /api/strategy-performance ── */
+    /* ── Main refresh — pulls /api/strategy-performance + /api/performance-timeseries ── */
     function refreshPerformance() {
         fetch('/api/strategy-performance', {credentials: 'same-origin'})
             .then(function (r) { return r.json(); })
@@ -741,12 +801,25 @@
             .catch(function (err) {
                 console.warn('strategy-performance fetch failed', err);
             });
+
+        fetch('/api/performance-timeseries', {credentials: 'same-origin'})
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                performanceTS = data || performanceTS;
+                renderEquityCurve();
+                renderDrawdown();
+                renderMonthlyReturns();
+            })
+            .catch(function (err) {
+                console.warn('performance-timeseries fetch failed', err);
+            });
+
         var now = new Date().toISOString().replace('T', ' ').slice(0, 19);
         var el = document.getElementById('lastUpdate');
         if (el) el.textContent = 'LAST UPDATE: ' + now;
     }
 
-    /* ── Init ── */
+    /* ── Init (render placeholders first, then fetch) ── */
     renderEquityCurve();
     renderDrawdown();
     renderMonthlyReturns();
