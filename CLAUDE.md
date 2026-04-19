@@ -6,7 +6,7 @@ Autonomous trading + intelligence + content ops. Telegram-first, agent-driven, e
 
 ```bash
 # Test
-pytest tests/unit/ --tb=short -q           # 1,273 passing + 1 skipped (use /usr/local/bin/python3 on Mac)
+pytest tests/unit/ --tb=short -q           # 1,606 passing + 1 skipped (use /usr/local/bin/python3 on Mac)
 pytest plugins/claw-sapphire/tests/ -q     # 25 plugin tests (budget, router, state, technical_analysis)
 
 # Lint
@@ -59,21 +59,25 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `lib/core/` | library | Risk kernel, circuit breaker, position sizing, models, logging, pubsub, **event_bus** |
 | `lib/payments/` | library | **x402 HTTP 402 micropayment middleware** (Flask + raw-socket gates, EVM signatures) |
 | `lib/chain/` | library | **On-chain intelligence**: regime, funding, OI, TVL, stablecoin supply, whale flow |
-| `lib/content/` | library | **Content engine**: weekly report generator, outreach, quality gate, publisher |
-| `lib/analytics/` | library | Correlation engine, risk/exposure analytics |
+| `lib/content/` | library | **Content engine**: weekly report generator, outreach, quality gate, publisher (Substack/X/LinkedIn/Typefully) |
+| `lib/analytics/` | library | CPCV, regime GMM, VPIN, backtest engine, risk engine, liquidation, correlation |
 | `lib/agents/` | library | OpenClaw/NemoClaw dispatch, orchestrator, runtime policy, token governor |
 | `lib/telegram/` | library | Telegram bot framework + handlers |
+| `lib/intel/` | library | Lead enrichment, threat feed aggregation |
+| `lib/portfolio/` | library | Robinhood integration, portfolio state |
+| `lib/trading/` | library | Strategy runtime, signal enhancer, self-optimizer |
 | `services/alpha/` | service | Trading engine + signal logger [Mac:18081] |
 | `services/aster/` | service | Aster DEX bot — Solana perps (paused) |
 | `services/hyperliquid/` | service | Hyperliquid L1 bot (stub) |
 | `services/dashboard/` | service | Flask dashboard [Mac:8080, auth:sapphire] — SSE event stream, content page, metrics |
 | `services/control-plane/` | service | PM hub: projects, tasks, events, Kimi bridge [Mac:8082] |
 | `services/inference-proxy/` | service | 4-tier LLM failover [Mac:11435] + **x402 gate** |
-| `services/pipeline/` | service | GCP sync stub — syncs events → GCS/BigQuery (`gcp_sync.py` only, not a daemon) |
+| `services/pipeline/` | service | GCP sync — syncs events → GCS/BigQuery (hourly watermark; `gcp_sync.py` only, not a daemon) |
+| `services/intelligence/` | service | Daily brief generator, chain refresh |
 | `services/scout-sandbox/` | service | External-collaborator least-privilege sandbox |
 | `services/webhook/` | service | TradingView webhook receiver [Windows:9090] |
 | `services/telegram-bot/` | service | Legacy bot (replaced by hermes-agent gateway) |
-| `plugins/claw-sapphire/` | plugin | Claw-code plugin: 27 tools + lib + 25 tests |
+| `plugins/claw-sapphire/` | plugin | Claw-code plugin: 32 tools + 10 libs + 25 tests |
 | `pine/` | pine | TradingView strategies (v1-v3 Ultra, 80%+ win rate target) |
 | `skills/` | skills | Agent-executable capabilities |
 | `data/content/` | data | Content engine drafts + ready/ queue |
