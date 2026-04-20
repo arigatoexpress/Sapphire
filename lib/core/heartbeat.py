@@ -27,7 +27,7 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -37,21 +37,22 @@ if str(ROOT) not in sys.path:
 
 log = logging.getLogger(__name__)
 
-CHECK_INTERVAL = 60        # seconds between full sweeps
-FAIL_THRESHOLD = 3         # consecutive failures → FAILED
-DEGRADE_THRESHOLD = 1      # consecutive failures → DEGRADED
-ESCALATE_INTERVAL = 600    # re-alert for sustained FAILED every 10min
-RECOVER_CYCLES = 2         # healthy cycles needed to leave RECOVERING
+CHECK_INTERVAL = 60  # seconds between full sweeps
+FAIL_THRESHOLD = 3  # consecutive failures → FAILED
+DEGRADE_THRESHOLD = 1  # consecutive failures → DEGRADED
+ESCALATE_INTERVAL = 600  # re-alert for sustained FAILED every 10min
+RECOVER_CYCLES = 2  # healthy cycles needed to leave RECOVERING
 
 
 # ---------------------------------------------------------------------------
 # State machine
 # ---------------------------------------------------------------------------
 
-class ComponentState(str, Enum):
-    HEALTHY    = "healthy"
-    DEGRADED   = "degraded"
-    FAILED     = "failed"
+
+class ComponentState(StrEnum):
+    HEALTHY = "healthy"
+    DEGRADED = "degraded"
+    FAILED = "failed"
     RECOVERING = "recovering"
 
 
@@ -71,6 +72,7 @@ class ComponentStatus:
 # ---------------------------------------------------------------------------
 # Check primitives
 # ---------------------------------------------------------------------------
+
 
 def _tcp_ok(host: str, port: int, timeout: float = 3.0) -> tuple[bool, str]:
     try:
@@ -100,7 +102,9 @@ def _launchctl_status(label: str) -> tuple[bool, str]:
     try:
         result = subprocess.run(
             ["launchctl", "list", label],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode != 0:
             return False, f"not listed ({result.stderr.strip()[:80]})"
@@ -116,32 +120,33 @@ def _launchctl_status(label: str) -> tuple[bool, str]:
 # Component definitions
 # ---------------------------------------------------------------------------
 
+
 def _build_components() -> list[ComponentStatus]:
     comps: list[ComponentStatus] = []
 
     # HTTP services
     http_checks = [
-        ("control-plane",    "http://127.0.0.1:8082/health"),
-        ("dashboard",        "http://127.0.0.1:8080/health"),
-        ("inference-proxy",  "http://127.0.0.1:11435/health"),
-        ("signal-logger",    "http://127.0.0.1:18081/health"),
-        ("openbb",           "http://127.0.0.1:6900/api/v1/equity/price/quote?symbol=AAPL&provider=yfinance"),
-        ("ollama-mac",       "http://127.0.0.1:11434/api/version"),
+        ("control-plane", "http://127.0.0.1:8082/health"),
+        ("dashboard", "http://127.0.0.1:8080/health"),
+        ("inference-proxy", "http://127.0.0.1:11435/health"),
+        ("signal-logger", "http://127.0.0.1:18081/health"),
+        ("openbb", "http://127.0.0.1:6900/api/v1/equity/price/quote?symbol=AAPL&provider=yfinance"),
+        ("ollama-mac", "http://127.0.0.1:11434/api/version"),
     ]
     for name, url in http_checks:
         comps.append(ComponentStatus(name=name))
 
     # TCP-only
     tcp_checks = [
-        ("redis",   "127.0.0.1", 6379),
+        ("redis", "127.0.0.1", 6379),
     ]
     for name, host, port in tcp_checks:
         comps.append(ComponentStatus(name=name))
 
     # LaunchAgent-backed (self-healable)
     la_checks = [
-        ("hermes-gateway",  "ai.hermes.gateway"),
-        ("content-engine",  "com.sapphire.content-engine"),
+        ("hermes-gateway", "ai.hermes.gateway"),
+        ("content-engine", "com.sapphire.content-engine"),
     ]
     for name, label in la_checks:
         comps.append(ComponentStatus(name=name, launchctl_label=label))
@@ -179,6 +184,7 @@ def _check_fn(comp: ComponentStatus) -> tuple[bool, str]:
 # Self-heal
 # ---------------------------------------------------------------------------
 
+
 def _attempt_heal(comp: ComponentStatus) -> bool:
     """Attempt to restart a LaunchAgent. Returns True if kickstart succeeded."""
     if not comp.launchctl_label:
@@ -188,13 +194,17 @@ def _attempt_heal(comp: ComponentStatus) -> bool:
         uid = os.getuid()
         result = subprocess.run(
             ["launchctl", "kickstart", "-k", f"gui/{uid}/{label}"],
-            capture_output=True, text=True, timeout=15,
+            capture_output=True,
+            text=True,
+            timeout=15,
         )
         success = result.returncode == 0
         if success:
             log.info("heartbeat: self-heal kickstart %s succeeded", label)
         else:
-            log.warning("heartbeat: self-heal kickstart %s failed: %s", label, result.stderr.strip()[:120])
+            log.warning(
+                "heartbeat: self-heal kickstart %s failed: %s", label, result.stderr.strip()[:120]
+            )
         comp.restart_attempts += 1
         return success
     except Exception as exc:
@@ -207,6 +217,7 @@ def _attempt_heal(comp: ComponentStatus) -> bool:
 # Alerting
 # ---------------------------------------------------------------------------
 
+
 def _send_telegram(msg: str) -> None:
     notify_tool = ROOT / "plugins" / "claw-sapphire" / "tools" / "notify.py"
     if not notify_tool.exists():
@@ -215,7 +226,9 @@ def _send_telegram(msg: str) -> None:
     try:
         subprocess.run(
             [sys.executable, str(notify_tool), msg, "--priority", "p1"],
-            capture_output=True, timeout=15, check=False,
+            capture_output=True,
+            timeout=15,
+            check=False,
         )
     except Exception as exc:
         log.debug("heartbeat: telegram notify failed: %s", exc)
@@ -224,6 +237,7 @@ def _send_telegram(msg: str) -> None:
 def _publish_event(payload: dict) -> None:
     try:
         from lib.core.event_bus import get_bus
+
         get_bus().publish("service.health", payload, source="heartbeat")
     except Exception as exc:
         log.debug("heartbeat: event bus publish failed: %s", exc)
@@ -232,6 +246,7 @@ def _publish_event(payload: dict) -> None:
 # ---------------------------------------------------------------------------
 # Monitor core
 # ---------------------------------------------------------------------------
+
 
 class HeartbeatMonitor:
     """60-second sweep monitor with state machine, self-heal, and escalation."""
@@ -250,7 +265,11 @@ class HeartbeatMonitor:
         self._stop.clear()
         self._thread = threading.Thread(target=self._loop, name="sapphire-heartbeat", daemon=True)
         self._thread.start()
-        log.info("heartbeat: monitor started (interval=%ds, %d components)", self.interval, len(self._components))
+        log.info(
+            "heartbeat: monitor started (interval=%ds, %d components)",
+            self.interval,
+            len(self._components),
+        )
 
     def stop(self) -> None:
         self._stop.set()
@@ -312,18 +331,28 @@ class HeartbeatMonitor:
 
         if comp.state == ComponentState.FAILED:
             now = time.time()
-            if prev_state != ComponentState.FAILED or (now - comp.last_alerted) >= ESCALATE_INTERVAL:
+            if (
+                prev_state != ComponentState.FAILED
+                or (now - comp.last_alerted) >= ESCALATE_INTERVAL
+            ):
                 comp.last_alerted = now
                 self._handle_failure(comp)
 
         if comp.state == ComponentState.HEALTHY and prev_state in {
-            ComponentState.DEGRADED, ComponentState.FAILED, ComponentState.RECOVERING
+            ComponentState.DEGRADED,
+            ComponentState.FAILED,
+            ComponentState.RECOVERING,
         }:
             log.info("heartbeat: %s → HEALTHY", comp.name)
             _publish_event({"component": comp.name, "state": "healthy"})
 
     def _handle_failure(self, comp: ComponentStatus) -> None:
-        log.error("heartbeat: %s FAILED (%d× consecutive): %s", comp.name, comp.consecutive_failures, comp.last_error)
+        log.error(
+            "heartbeat: %s FAILED (%d× consecutive): %s",
+            comp.name,
+            comp.consecutive_failures,
+            comp.last_error,
+        )
 
         heal_note = ""
         if comp.launchctl_label and not self.dry_run:
@@ -335,13 +364,15 @@ class HeartbeatMonitor:
             else:
                 heal_note = " — self-heal failed"
 
-        _publish_event({
-            "component": comp.name,
-            "state": "failed",
-            "error": comp.last_error,
-            "consecutive_failures": comp.consecutive_failures,
-            "restart_attempts": comp.restart_attempts,
-        })
+        _publish_event(
+            {
+                "component": comp.name,
+                "state": "failed",
+                "error": comp.last_error,
+                "consecutive_failures": comp.consecutive_failures,
+                "restart_attempts": comp.restart_attempts,
+            }
+        )
 
         if not self.dry_run:
             msg = (
@@ -365,21 +396,27 @@ class HeartbeatMonitor:
         elif counts["degraded"] or counts["recovering"]:
             overall = "degraded"
 
-        _publish_event({
-            "summary": True,
-            "overall": overall,
-            "counts": counts,
-            "failing": failing,
-        })
+        _publish_event(
+            {
+                "summary": True,
+                "overall": overall,
+                "counts": counts,
+                "failing": failing,
+            }
+        )
 
         if counts["failed"] or counts["degraded"]:
             log.warning(
                 "heartbeat: sweep done — %d healthy, %d degraded, %d failed, %d recovering",
-                counts["healthy"], counts["degraded"], counts["failed"], counts["recovering"],
+                counts["healthy"],
+                counts["degraded"],
+                counts["failed"],
+                counts["recovering"],
             )
         else:
             log.info(
-                "heartbeat: all %d components healthy", counts["healthy"] + counts["recovering"],
+                "heartbeat: all %d components healthy",
+                counts["healthy"] + counts["recovering"],
             )
 
 
@@ -387,12 +424,18 @@ class HeartbeatMonitor:
 # CLI entry point
 # ---------------------------------------------------------------------------
 
+
 def main() -> int:
     import argparse
+
     parser = argparse.ArgumentParser(description="Sapphire heartbeat monitor")
-    parser.add_argument("--interval", type=int, default=CHECK_INTERVAL, help="Sweep interval in seconds")
+    parser.add_argument(
+        "--interval", type=int, default=CHECK_INTERVAL, help="Sweep interval in seconds"
+    )
     parser.add_argument("--once", action="store_true", help="Run one sweep and exit")
-    parser.add_argument("--dry-run", action="store_true", help="Check only — no Telegram, no restarts")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Check only — no Telegram, no restarts"
+    )
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -405,7 +448,9 @@ def main() -> int:
     if args.once:
         results = monitor.run_once()
         print(json.dumps(results, indent=2))
-        failing = [name for name, r in results.items() if r["state"] not in {"healthy", "recovering"}]
+        failing = [
+            name for name, r in results.items() if r["state"] not in {"healthy", "recovering"}
+        ]
         return 1 if failing else 0
 
     monitor.start()

@@ -10,6 +10,7 @@ surface derived from:
 The goal is to keep the PM surface accurate for the current on-prem runtime
 instead of replaying the older Cloud Run / Firestore topology.
 """
+
 from __future__ import annotations
 
 import hmac
@@ -187,7 +188,8 @@ def _event_timeline_row(event: dict[str, Any]) -> dict[str, Any]:
         "severity": str(event.get("severity") or "info"),
         "log_kind": _event_log_kind(event),
         "agent_id": _tag_value(event.get("tags"), "agent") or str(event.get("actor") or ""),
-        "project_id": str(event.get("project_id") or "") or _tag_value(event.get("tags"), "project"),
+        "project_id": str(event.get("project_id") or "")
+        or _tag_value(event.get("tags"), "project"),
         "channel": str(event.get("source") or "control-plane"),
         "status": str(event.get("status") or payload.get("status") or ""),
     }
@@ -212,9 +214,15 @@ def _normalized_agent_host(agent: dict[str, Any]) -> dict[str, Any]:
     return {
         "host_id": inferred_host_id or "unknown",
         "host_class": inferred_host_class or "unknown",
-        "node_role": str(host.get("node_role") or metadata.get("node_role") or labels.get("role") or "executor").strip(),
-        "hostname": str(host.get("hostname") or metadata.get("hostname") or inferred_host_id or "unknown").strip(),
-        "workspace_root": str(host.get("workspace_root") or metadata.get("workspace_root") or "").strip(),
+        "node_role": str(
+            host.get("node_role") or metadata.get("node_role") or labels.get("role") or "executor"
+        ).strip(),
+        "hostname": str(
+            host.get("hostname") or metadata.get("hostname") or inferred_host_id or "unknown"
+        ).strip(),
+        "workspace_root": str(
+            host.get("workspace_root") or metadata.get("workspace_root") or ""
+        ).strip(),
     }
 
 
@@ -225,7 +233,9 @@ def _agent_memberships(agent: dict[str, Any]) -> set[str]:
         value = str(labels.get(key) or "").strip().lower()
         if value:
             memberships.add(value)
-    for capability in agent.get("capabilities") if isinstance(agent.get("capabilities"), list) else []:
+    for capability in (
+        agent.get("capabilities") if isinstance(agent.get("capabilities"), list) else []
+    ):
         text = str(capability or "").strip().lower()
         if text.startswith("membership:"):
             memberships.add(text.split(":", 1)[1].strip())
@@ -252,15 +262,23 @@ def _normalized_task(task: dict[str, Any]) -> dict[str, Any]:
     payload = task.get("payload") if isinstance(task.get("payload"), dict) else {}
     contract = payload.get("contract") if isinstance(payload.get("contract"), dict) else {}
     normalized = dict(task)
-    normalized["routing"] = payload.get("routing") if isinstance(payload.get("routing"), dict) else {}
+    normalized["routing"] = (
+        payload.get("routing") if isinstance(payload.get("routing"), dict) else {}
+    )
     normalized["progress"] = str(payload.get("progress") or "").strip()
-    normalized["display_title"] = str(contract.get("objective") or task.get("title") or task.get("task_id") or "").strip()
+    normalized["display_title"] = str(
+        contract.get("objective") or task.get("title") or task.get("task_id") or ""
+    ).strip()
     return normalized
 
 
 def _primary_executor(agents: list[dict[str, Any]], policy: dict[str, Any]) -> dict[str, Any]:
-    allowed_agents = {str(item).strip().lower() for item in policy.get("allowed_executor_agent_ids", [])}
-    allowed_memberships = {str(item).strip().lower() for item in policy.get("allowed_executor_membership_ids", [])}
+    allowed_agents = {
+        str(item).strip().lower() for item in policy.get("allowed_executor_agent_ids", [])
+    }
+    allowed_memberships = {
+        str(item).strip().lower() for item in policy.get("allowed_executor_membership_ids", [])
+    }
 
     candidates: list[dict[str, Any]] = []
     for agent in agents:
@@ -294,24 +312,40 @@ def _primary_executor(agents: list[dict[str, Any]], policy: dict[str, Any]) -> d
     return selected
 
 
-def _queue_routability(tasks: list[dict[str, Any]], executors: list[dict[str, Any]]) -> dict[str, Any]:
+def _queue_routability(
+    tasks: list[dict[str, Any]], executors: list[dict[str, Any]]
+) -> dict[str, Any]:
     blocker_breakdown: Counter[str] = Counter()
     routable_count = 0
     online_executors = [agent for agent in executors if bool(agent.get("online"))]
     for task in tasks:
         routing = task.get("routing") if isinstance(task.get("routing"), dict) else {}
-        required_membership = str(
-            routing.get("required_membership_id") or routing.get("recommended_membership_id") or ""
-        ).strip().lower()
-        required_caps = {
-            str(cap).strip().lower()
-            for cap in task.get("required_capabilities")
-            if isinstance(task.get("required_capabilities"), list)
-            for cap in task.get("required_capabilities", [])
-        } if False else {
-            str(cap).strip().lower()
-            for cap in (task.get("required_capabilities") if isinstance(task.get("required_capabilities"), list) else [])
-        }
+        required_membership = (
+            str(
+                routing.get("required_membership_id")
+                or routing.get("recommended_membership_id")
+                or ""
+            )
+            .strip()
+            .lower()
+        )
+        required_caps = (
+            {
+                str(cap).strip().lower()
+                for cap in task.get("required_capabilities")
+                if isinstance(task.get("required_capabilities"), list)
+                for cap in task.get("required_capabilities", [])
+            }
+            if False
+            else {
+                str(cap).strip().lower()
+                for cap in (
+                    task.get("required_capabilities")
+                    if isinstance(task.get("required_capabilities"), list)
+                    else []
+                )
+            }
+        )
         if not online_executors:
             blocker_breakdown["no_online_executors"] += 1
             continue
@@ -326,7 +360,9 @@ def _queue_routability(tasks: list[dict[str, Any]], executors: list[dict[str, An
                 continue
             agent_caps = {
                 str(cap).strip().lower()
-                for cap in (agent.get("capabilities") if isinstance(agent.get("capabilities"), list) else [])
+                for cap in (
+                    agent.get("capabilities") if isinstance(agent.get("capabilities"), list) else []
+                )
             }
             if required_caps and not required_caps.issubset(agent_caps):
                 capability_denied = True
@@ -365,7 +401,10 @@ def _queue_routability(tasks: list[dict[str, Any]], executors: list[dict[str, An
         "summary": {
             "queued_count": queued_count,
             "routable_count": routable_count,
-            "blocker_breakdown": [{"reason": reason, "count": count} for reason, count in blocker_breakdown.most_common()],
+            "blocker_breakdown": [
+                {"reason": reason, "count": count}
+                for reason, count in blocker_breakdown.most_common()
+            ],
         },
         "recommendations": recommendations,
     }
@@ -375,7 +414,9 @@ def _build_control_plane_payload(*, task_limit: int = 12, event_limit: int = 20)
     store = _control_store()
     overview = store.overview()
     agents = store.list_agents(include_disabled=True)
-    tasks = [_normalized_task(task) for task in store.list_tasks(status=None, limit=max(20, task_limit))]
+    tasks = [
+        _normalized_task(task) for task in store.list_tasks(status=None, limit=max(20, task_limit))
+    ]
     events = store.list_events(limit=max(20, event_limit))
     return {
         "generated_at": _utc_iso_now(),
@@ -387,7 +428,9 @@ def _build_control_plane_payload(*, task_limit: int = 12, event_limit: int = 20)
 
 
 def _build_frontend_logbook_payload(*, event_limit: int = 40) -> dict[str, Any]:
-    timeline = [_event_timeline_row(event) for event in recent_events(limit=max(20, min(event_limit, 200)))]
+    timeline = [
+        _event_timeline_row(event) for event in recent_events(limit=max(20, min(event_limit, 200)))
+    ]
     communication_ledgers: dict[str, list[dict[str, Any]]] = {
         "decision": [],
         "handoff": [],
@@ -416,7 +459,11 @@ def _build_frontend_logbook_payload(*, event_limit: int = 40) -> dict[str, Any]:
     horizons = roadmap.get("horizons") if isinstance(roadmap.get("horizons"), dict) else {}
     control = _build_control_plane_payload(task_limit=12, event_limit=20)
     overview = control.get("overview") if isinstance(control.get("overview"), dict) else {}
-    tasks = overview.get("kpi_tasks") if isinstance(overview.get("kpi_tasks"), dict) else overview.get("tasks", {})
+    tasks = (
+        overview.get("kpi_tasks")
+        if isinstance(overview.get("kpi_tasks"), dict)
+        else overview.get("tasks", {})
+    )
     policy = _normalized_executor_policy()
 
     return {
@@ -427,13 +474,21 @@ def _build_frontend_logbook_payload(*, event_limit: int = 40) -> dict[str, Any]:
             "policy_lock_applied": bool(policy.get("effective_policy_lock_applied")),
             "policy_drift_detected": False,
             "timeline_count": len(timeline),
-            "task_event_count": sum(1 for row in timeline if str(row.get("event_type") or "").startswith("task_")),
-            "system_event_count": sum(1 for row in timeline if not str(row.get("event_type") or "").startswith("task_")),
+            "task_event_count": sum(
+                1 for row in timeline if str(row.get("event_type") or "").startswith("task_")
+            ),
+            "system_event_count": sum(
+                1 for row in timeline if not str(row.get("event_type") or "").startswith("task_")
+            ),
             "tasks_queued": int(tasks.get("queued", 0)),
             "tasks_leased": int(tasks.get("leased", 0)),
             "tasks_failed": int(tasks.get("failed", 0)),
-            "roadmap_now_count": len(horizons.get("now", [])) if isinstance(horizons.get("now"), list) else 0,
-            "roadmap_next_count": len(horizons.get("next", [])) if isinstance(horizons.get("next"), list) else 0,
+            "roadmap_now_count": len(horizons.get("now", []))
+            if isinstance(horizons.get("now"), list)
+            else 0,
+            "roadmap_next_count": len(horizons.get("next", []))
+            if isinstance(horizons.get("next"), list)
+            else 0,
         },
         "communication_views": {
             "categories": categories,
@@ -466,8 +521,14 @@ def _build_ops_status_payload(*, refresh: bool = False) -> dict[str, Any]:
     agents = control.get("agents") if isinstance(control.get("agents"), list) else []
     policy = _normalized_executor_policy()
     primary = _primary_executor(agents, policy)
-    executors = [agent for agent in agents if str(agent.get("status") or "").strip().lower() != "disabled"]
-    queued_tasks = [task for task in control.get("tasks", []) if str(task.get("status") or "").lower() == "queued"]
+    executors = [
+        agent for agent in agents if str(agent.get("status") or "").strip().lower() != "disabled"
+    ]
+    queued_tasks = [
+        task
+        for task in control.get("tasks", [])
+        if str(task.get("status") or "").lower() == "queued"
+    ]
     queue = _queue_routability(queued_tasks, executors)
     queue_summary = queue.get("summary") if isinstance(queue.get("summary"), dict) else {}
     top_blocker = str((queue_summary.get("blocker_breakdown") or [{}])[0].get("reason") or "none")
@@ -477,21 +538,37 @@ def _build_ops_status_payload(*, refresh: bool = False) -> dict[str, Any]:
     attestation = {
         "executor_count": len(executors),
         "online_executor_count": len(online_executors),
-        "all_online_have_host_attestation": all(bool(_normalized_agent_host(agent).get("host_id")) for agent in online_executors),
-        "primary_executor_pi_hosted": bool(primary and str((primary.get("host") or {}).get("host_id") or "").startswith("rari")),
+        "all_online_have_host_attestation": all(
+            bool(_normalized_agent_host(agent).get("host_id")) for agent in online_executors
+        ),
+        "primary_executor_pi_hosted": bool(
+            primary and str((primary.get("host") or {}).get("host_id") or "").startswith("rari")
+        ),
     }
 
     recommendations: list[str] = []
     if not online_executors:
-        recommendations.append("No online executors are registered in the local control-plane store.")
+        recommendations.append(
+            "No online executors are registered in the local control-plane store."
+        )
     if queued_tasks and int(queue_summary.get("routable_count", 0)) == 0:
-        recommendations.append(f"Queued work is stalled by {top_blocker}; restore agent heartbeats or routing policy.")
+        recommendations.append(
+            f"Queued work is stalled by {top_blocker}; restore agent heartbeats or routing policy."
+        )
     if not tool_summary.get("gh"):
-        recommendations.append("GitHub CLI is unavailable on this host; repo telemetry and auth checks are degraded.")
+        recommendations.append(
+            "GitHub CLI is unavailable on this host; repo telemetry and auth checks are degraded."
+        )
     if not tool_summary.get("node"):
-        recommendations.append("Node.js is unavailable on this host; browser/automation helper flows may degrade.")
+        recommendations.append(
+            "Node.js is unavailable on this host; browser/automation helper flows may degrade."
+        )
 
-    tasks = overview.get("kpi_tasks") if isinstance(overview.get("kpi_tasks"), dict) else overview.get("tasks", {})
+    tasks = (
+        overview.get("kpi_tasks")
+        if isinstance(overview.get("kpi_tasks"), dict)
+        else overview.get("tasks", {})
+    )
     payload = {
         "generated_at": _utc_iso_now(),
         "service_revision": _service_revision(),
@@ -502,7 +579,8 @@ def _build_ops_status_payload(*, refresh: bool = False) -> dict[str, Any]:
             "tasks_queued": int(tasks.get("queued", 0)),
             "tasks_leased": int(tasks.get("leased", 0)),
             "tasks_failed": int(tasks.get("failed", 0)),
-            "queue_stall_detected": bool(queued_tasks) and int(queue_summary.get("routable_count", 0)) == 0,
+            "queue_stall_detected": bool(queued_tasks)
+            and int(queue_summary.get("routable_count", 0)) == 0,
             "queue_top_blocker_reason": top_blocker,
             "agents_executor_online": int(overview.get("agents_executor_online", 0)),
             "agents_executor_total": int(overview.get("agents_executor_total", 0)),
@@ -558,7 +636,9 @@ def _build_frontend_overview_payload() -> dict[str, Any]:
             "source": str(row.get("channel") or "control-plane"),
             "alpha_score": _signal_score(row),
             "bias": "Operational",
-            "confidence": "high" if str(row.get("severity") or "") in {"info", "warning"} else "guarded",
+            "confidence": "high"
+            if str(row.get("severity") or "") in {"info", "warning"}
+            else "guarded",
             "assets": [project] if (project := str(row.get("project_id") or "").strip()) else [],
             "url": "",
             "published_at": str(row.get("created_at") or ""),
@@ -566,7 +646,11 @@ def _build_frontend_overview_payload() -> dict[str, Any]:
         for row in timeline[:6]
     ]
     monitor_healthy = not bool((ops_status.get("summary") or {}).get("queue_stall_detected"))
-    tasks = overview.get("kpi_tasks") if isinstance(overview.get("kpi_tasks"), dict) else overview.get("tasks", {})
+    tasks = (
+        overview.get("kpi_tasks")
+        if isinstance(overview.get("kpi_tasks"), dict)
+        else overview.get("tasks", {})
+    )
 
     return {
         "status": "ok" if overview.get("slo", {}).get("status", "ok") == "ok" else "degraded",
@@ -577,7 +661,9 @@ def _build_frontend_overview_payload() -> dict[str, Any]:
         "service_name": _service_name(),
         "service_revision": _service_revision(),
         "heartbeat_interval_minutes": settings.heartbeat_interval_minutes,
-        "allowlist_enabled": bool(settings.allowed_telegram_user_ids or settings.allowed_telegram_chat_ids),
+        "allowlist_enabled": bool(
+            settings.allowed_telegram_user_ids or settings.allowed_telegram_chat_ids
+        ),
         "public_prompting_enabled": False,
         "alpha_stream": {"items": alpha_items},
         "signals": alpha_items,
@@ -662,8 +748,12 @@ def _group_workspaces(tracked_projects: list[dict[str, Any]]) -> list[dict[str, 
             for project in tracked_projects
             if str(project.get("canonical_local_path") or "").startswith(root)
         ]
-        healthy_count = len([project for project in projects if str(project.get("health") or "") == "healthy"])
-        status = "healthy" if healthy_count == len(projects) else ("attention" if projects else "idle")
+        healthy_count = len(
+            [project for project in projects if str(project.get("health") or "") == "healthy"]
+        )
+        status = (
+            "healthy" if healthy_count == len(projects) else ("attention" if projects else "idle")
+        )
         rows.append(
             {
                 "name": definition["name"],
@@ -760,43 +850,72 @@ def _build_trading_operations_payload(primary_executor: dict[str, Any]) -> dict[
 
 def _build_org_overview_payload(*, refresh: bool = False) -> dict[str, Any]:
     projects = get_projects_overview(force_refresh=refresh)
-    tracked_projects = projects.get("tracked_projects") if isinstance(projects.get("tracked_projects"), list) else []
+    tracked_projects = (
+        projects.get("tracked_projects")
+        if isinstance(projects.get("tracked_projects"), list)
+        else []
+    )
     workspaces = _group_workspaces(tracked_projects)
     ops_status = _build_ops_status_payload(refresh=refresh)
     ops_summary = ops_status.get("summary") if isinstance(ops_status.get("summary"), dict) else {}
-    primary_executor = (ops_status.get("executor_readiness") or {}).get("primary_executor") if isinstance(ops_status.get("executor_readiness"), dict) else {}
+    primary_executor = (
+        (ops_status.get("executor_readiness") or {}).get("primary_executor")
+        if isinstance(ops_status.get("executor_readiness"), dict)
+        else {}
+    )
     policy = _normalized_executor_policy()
     runtime_exists = any(
-        str(project.get("id") or "") == "kimi-openclaw-runtime" and bool(project.get("canonical_exists"))
+        str(project.get("id") or "") == "kimi-openclaw-runtime"
+        and bool(project.get("canonical_exists"))
         for project in tracked_projects
     )
     source_of_truth_repo = next(
-        (str(project.get("canonical_local_path") or "") for project in tracked_projects if str(project.get("id") or "") == "sapphire-platform"),
+        (
+            str(project.get("canonical_local_path") or "")
+            for project in tracked_projects
+            if str(project.get("id") or "") == "sapphire-platform"
+        ),
         "/Users/aribs/Code/Sapphire",
     )
 
     blockers: list[str] = []
     summary = projects.get("summary") if isinstance(projects.get("summary"), dict) else {}
     if int(summary.get("tracked_missing_local_count", 0)) > 0:
-        blockers.append(f"{int(summary.get('tracked_missing_local_count', 0))} tracked project(s) point at missing local paths.")
+        blockers.append(
+            f"{int(summary.get('tracked_missing_local_count', 0))} tracked project(s) point at missing local paths."
+        )
     if bool(ops_summary.get("queue_stall_detected")):
         blockers.append(f"Queued work is stalled by {ops_summary.get('queue_top_blocker_reason')}.")
     if not (ops_status.get("executor_readiness") or {}).get("primary_executor"):
         if runtime_exists:
-            blockers.append("Kimi/OpenClaw runtime is present locally, but no executor heartbeat is registering into the control plane.")
+            blockers.append(
+                "Kimi/OpenClaw runtime is present locally, but no executor heartbeat is registering into the control plane."
+            )
         else:
-            blockers.append("No primary local executor is currently registered in the control plane.")
+            blockers.append(
+                "No primary local executor is currently registered in the control plane."
+            )
 
     recommendations: list[str] = []
     if int(summary.get("local_dirty_repo_count", 0)) > 0:
-        recommendations.append("Reduce dirty-repo drift so the PM board reflects clean, actionable execution state.")
+        recommendations.append(
+            "Reduce dirty-repo drift so the PM board reflects clean, actionable execution state."
+        )
     if runtime_exists and not primary_executor:
-        recommendations.append("Reconnect local runtime heartbeat/agent registration so PM tasks can route into the Pi or workstation executor pool.")
+        recommendations.append(
+            "Reconnect local runtime heartbeat/agent registration so PM tasks can route into the Pi or workstation executor pool."
+        )
     if not policy.get("effective_policy_lock_applied"):
-        recommendations.append("Keep executor policy open while reconnecting runtime heartbeats, then lock allowed executors once the local fleet is stable.")
-    recommendations.append("Treat GCP as an optional bridge only; keep the PM core, task state, and repo inventory local-first.")
+        recommendations.append(
+            "Keep executor policy open while reconnecting runtime heartbeats, then lock allowed executors once the local fleet is stable."
+        )
+    recommendations.append(
+        "Treat GCP as an optional bridge only; keep the PM core, task state, and repo inventory local-first."
+    )
     if not blockers:
-        recommendations.append("No structural blockers detected; continue wiring live sources into the local PM hub.")
+        recommendations.append(
+            "No structural blockers detected; continue wiring live sources into the local PM hub."
+        )
 
     return {
         "generated_at": _utc_iso_now(),
@@ -824,7 +943,18 @@ def _build_org_overview_payload(*, refresh: bool = False) -> dict[str, Any]:
         },
         "projects_summary": projects.get("summary", {}),
         "workspaces": workspaces,
-        "control_plane": {"overview": (ops_status.get("summary") or {}) | {"agents_executor_online": (ops_status.get("summary") or {}).get("agents_executor_online", 0), "agents_executor_total": (ops_status.get("summary") or {}).get("agents_executor_total", 0)}, "payload": _build_control_plane_payload()},
+        "control_plane": {
+            "overview": (ops_status.get("summary") or {})
+            | {
+                "agents_executor_online": (ops_status.get("summary") or {}).get(
+                    "agents_executor_online", 0
+                ),
+                "agents_executor_total": (ops_status.get("summary") or {}).get(
+                    "agents_executor_total", 0
+                ),
+            },
+            "payload": _build_control_plane_payload(),
+        },
         "trading_operations": _build_trading_operations_payload(primary_executor or {}),
         "executor_policy": policy,
         "blockers": blockers,
@@ -842,14 +972,18 @@ def _build_project_charts(tracked_projects: list[dict[str, Any]]) -> list[dict[s
                 children = [child for child in sorted(path.iterdir()) if child.is_dir()][:3]
             except OSError:
                 children = []
-            top_components = [{"name": child.name, "files": len(list(child.glob("*")))} for child in children]
+            top_components = [
+                {"name": child.name, "files": len(list(child.glob("*")))} for child in children
+            ]
         charts.append(
             {
                 "id": row.get("id"),
                 "name": row.get("name"),
                 "health": row.get("health"),
                 "canonical_local_path": str(row.get("canonical_local_path") or ""),
-                "stack_signals": ["python", "fastapi", "local-state"] if "sapphire" in str(row.get("slug") or "") else ["repo"],
+                "stack_signals": ["python", "fastapi", "local-state"]
+                if "sapphire" in str(row.get("slug") or "")
+                else ["repo"],
                 "scanned_files": len(top_components),
                 "top_components": top_components,
                 "mermaid": f'flowchart LR\n  ROOT["{str(row.get("name") or row.get("id") or "Project")}"] --> LOCAL["{path.name or "local"}"]\n  LOCAL --> HEALTH["health: {str(row.get("health") or "unknown")}"]',
@@ -863,18 +997,41 @@ def _build_architecture_overview_payload(*, refresh: bool = False) -> dict[str, 
     logbook = _build_frontend_logbook_payload(event_limit=24)
     control = _build_control_plane_payload(task_limit=20, event_limit=20)
     overview = control.get("overview") if isinstance(control.get("overview"), dict) else {}
-    ops_status.get("summary") if isinstance(ops_status.get("summary"), dict) else {}
     agents = control.get("agents") if isinstance(control.get("agents"), list) else []
     topology_nodes = []
     topology_links = []
     for node_id, label, subtitle, status in [
         ("mac", "Operator Workstation", "Codex workspace", "stable"),
         ("control", "Control Plane", f"{_service_name()} ({_runtime_mode()})", "stable"),
-        ("rari1", "rari1", "Pi / local execution", "stable" if any("rari1" in str(_normalized_agent_host(agent).get("host_id") or "") and agent.get("online") for agent in agents) else "guarded"),
-        ("rari2", "rari2", "Pi / local research", "stable" if any("rari2" in str(_normalized_agent_host(agent).get("host_id") or "") and agent.get("online") for agent in agents) else "guarded"),
+        (
+            "rari1",
+            "rari1",
+            "Pi / local execution",
+            "stable"
+            if any(
+                "rari1" in str(_normalized_agent_host(agent).get("host_id") or "")
+                and agent.get("online")
+                for agent in agents
+            )
+            else "guarded",
+        ),
+        (
+            "rari2",
+            "rari2",
+            "Pi / local research",
+            "stable"
+            if any(
+                "rari2" in str(_normalized_agent_host(agent).get("host_id") or "")
+                and agent.get("online")
+                for agent in agents
+            )
+            else "guarded",
+        ),
         ("telegram", "Telegram", "Operator channel", "stable"),
     ]:
-        topology_nodes.append({"id": node_id, "label": label, "subtitle": subtitle, "status": status})
+        topology_nodes.append(
+            {"id": node_id, "label": label, "subtitle": subtitle, "status": status}
+        )
     topology_links.extend(
         [
             {"from": "telegram", "to": "control", "label": "commands"},
@@ -884,7 +1041,7 @@ def _build_architecture_overview_payload(*, refresh: bool = False) -> dict[str, 
         ]
     )
     mermaid = (
-        'flowchart LR\n'
+        "flowchart LR\n"
         '  MAC["Mac / Codex Workspace"] --> HUB["Sapphire Control Plane\\nlocal-first"]\n'
         '  TG["Telegram Operator"] --> HUB\n'
         '  HUB --> R1["rari1\\nexecution rail"]\n'
@@ -892,7 +1049,11 @@ def _build_architecture_overview_payload(*, refresh: bool = False) -> dict[str, 
         '  HUB --> REPOS["/Users/aribs/Code\\nSapphire + client repos"]\n'
         '  HUB --> STATE["SQLite + JSONL state"]'
     )
-    project_charts = _build_project_charts(projects.get("tracked_projects") if isinstance(projects.get("tracked_projects"), list) else [])
+    project_charts = _build_project_charts(
+        projects.get("tracked_projects")
+        if isinstance(projects.get("tracked_projects"), list)
+        else []
+    )
     return {
         "generated_at": _utc_iso_now(),
         "service_name": _service_name(),
@@ -915,15 +1076,24 @@ def _build_architecture_overview_payload(*, refresh: bool = False) -> dict[str, 
             "agents_executor_online": int(overview.get("agents_executor_online", 0)),
             "agents_registered": int(overview.get("agents_registered", 0)),
             "agents_disabled": int(overview.get("agents_disabled", 0)),
-            "tasks_queued": int((overview.get("kpi_tasks") or overview.get("tasks") or {}).get("queued", 0)),
-            "tasks_leased": int((overview.get("kpi_tasks") or overview.get("tasks") or {}).get("leased", 0)),
-            "tasks_failed": int((overview.get("kpi_tasks") or overview.get("tasks") or {}).get("failed", 0)),
-            "tasks_blocked_review": int((overview.get("kpi_tasks") or overview.get("tasks") or {}).get("blocked_review", 0)),
+            "tasks_queued": int(
+                (overview.get("kpi_tasks") or overview.get("tasks") or {}).get("queued", 0)
+            ),
+            "tasks_leased": int(
+                (overview.get("kpi_tasks") or overview.get("tasks") or {}).get("leased", 0)
+            ),
+            "tasks_failed": int(
+                (overview.get("kpi_tasks") or overview.get("tasks") or {}).get("failed", 0)
+            ),
+            "tasks_blocked_review": int(
+                (overview.get("kpi_tasks") or overview.get("tasks") or {}).get("blocked_review", 0)
+            ),
             "pi_nodes_reachable": len(
                 {
                     _normalized_agent_host(agent).get("host_id")
                     for agent in agents
-                    if bool(agent.get("online")) and str(_normalized_agent_host(agent).get("host_id") or "").startswith("rari")
+                    if bool(agent.get("online"))
+                    and str(_normalized_agent_host(agent).get("host_id") or "").startswith("rari")
                 }
             ),
             "pi_nodes_total": 2,
@@ -940,13 +1110,21 @@ def _build_secops_payload(*, refresh: bool = False, event_limit: int = 80) -> di
     _build_architecture_overview_payload(refresh=refresh)
     logbook = _build_frontend_logbook_payload(event_limit=event_limit)
     summary = ops_status.get("summary") if isinstance(ops_status.get("summary"), dict) else {}
-    primary = ((ops_status.get("executor_readiness") or {}).get("primary_executor") or {}) if isinstance(ops_status.get("executor_readiness"), dict) else {}
+    primary = (
+        ((ops_status.get("executor_readiness") or {}).get("primary_executor") or {})
+        if isinstance(ops_status.get("executor_readiness"), dict)
+        else {}
+    )
     risk_points = 0
     if summary.get("queue_stall_detected"):
         risk_points += 3
     if summary.get("policy_drift_detected"):
         risk_points += 2
-    tools = ((ops_status.get("executor_readiness") or {}).get("tool_summary") or {}) if isinstance(ops_status.get("executor_readiness"), dict) else {}
+    tools = (
+        ((ops_status.get("executor_readiness") or {}).get("tool_summary") or {})
+        if isinstance(ops_status.get("executor_readiness"), dict)
+        else {}
+    )
     if not tools.get("gh"):
         risk_points += 1
     risk_band = "stable" if risk_points == 0 else "guarded" if risk_points <= 2 else "elevated"
@@ -969,12 +1147,37 @@ def _build_secops_payload(*, refresh: bool = False, event_limit: int = 80) -> di
             "event_mix": logbook.get("event_mix", {}),
             "topology": {
                 "nodes": [
-                    {"id": node.get("id"), "label": node.get("label"), "subtitle": node.get("subtitle"), "status": node.get("status")}
+                    {
+                        "id": node.get("id"),
+                        "label": node.get("label"),
+                        "subtitle": node.get("subtitle"),
+                        "status": node.get("status"),
+                    }
                     for node in [
-                        {"id": "control", "label": "Control Plane", "subtitle": _runtime_mode(), "status": "stable"},
-                        {"id": "telegram", "label": "Telegram", "subtitle": "operator channel", "status": "stable"},
-                        {"id": "rari1", "label": "rari1", "subtitle": "edge executor", "status": "guarded"},
-                        {"id": "rari2", "label": "rari2", "subtitle": "edge executor", "status": "guarded"},
+                        {
+                            "id": "control",
+                            "label": "Control Plane",
+                            "subtitle": _runtime_mode(),
+                            "status": "stable",
+                        },
+                        {
+                            "id": "telegram",
+                            "label": "Telegram",
+                            "subtitle": "operator channel",
+                            "status": "stable",
+                        },
+                        {
+                            "id": "rari1",
+                            "label": "rari1",
+                            "subtitle": "edge executor",
+                            "status": "guarded",
+                        },
+                        {
+                            "id": "rari2",
+                            "label": "rari2",
+                            "subtitle": "edge executor",
+                            "status": "guarded",
+                        },
                     ]
                 ],
                 "links": [
@@ -1017,8 +1220,13 @@ def _build_secops_payload(*, refresh: bool = False, event_limit: int = 80) -> di
             "command_channel": "telegram",
         },
         "security_posture": {
-            "privacy_first": {"public_prompting_enabled": False, "browser_token_storage": "operator-local-only"},
-            "auth_boundaries": {"telegram_webhook_secret_configured": bool(get_settings().telegram_webhook_secret)},
+            "privacy_first": {
+                "public_prompting_enabled": False,
+                "browser_token_storage": "operator-local-only",
+            },
+            "auth_boundaries": {
+                "telegram_webhook_secret_configured": bool(get_settings().telegram_webhook_secret)
+            },
             "hardening_signals": {"openclaw_embedded_secret_key_count": 0},
             "recommended_actions": [
                 "Keep control tokens off public surfaces and use operator-only pages for mutations.",
@@ -1132,11 +1340,23 @@ async def ecosystem_health():
     """Run the full 20-point ecosystem health check and return JSON."""
     import json as _json
     import subprocess
-    tool_path = Path.home() / "Code" / "Sapphire" / "plugins" / "claw-sapphire" / "tools" / "health_check.py"
+
+    tool_path = (
+        Path.home()
+        / "Code"
+        / "Sapphire"
+        / "plugins"
+        / "claw-sapphire"
+        / "tools"
+        / "health_check.py"
+    )
     try:
         r = subprocess.run(
             [shutil.which("python3") or "python3", str(tool_path)],
-            input="{}", capture_output=True, text=True, timeout=30,
+            input="{}",
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         return _json.loads(r.stdout) if r.stdout else {"error": "No output"}
     except Exception as exc:
@@ -1218,7 +1438,11 @@ async def frontend_secops(refresh: bool = False, event_limit: int = 80):
 @app.get("/api/router/overview")
 async def router_overview(refresh: bool = False):
     ops_status = _build_ops_status_payload(refresh=refresh)
-    primary = ((ops_status.get("executor_readiness") or {}).get("primary_executor") or {}) if isinstance(ops_status.get("executor_readiness"), dict) else {}
+    primary = (
+        ((ops_status.get("executor_readiness") or {}).get("primary_executor") or {})
+        if isinstance(ops_status.get("executor_readiness"), dict)
+        else {}
+    )
     memberships = []
     primary_memberships = sorted(_agent_memberships(primary)) if primary else []
     if primary_memberships:
@@ -1249,9 +1473,15 @@ async def router_overview(refresh: bool = False):
     return {
         "generated_at": _utc_iso_now(),
         "summary": {
-            "membership_ready_count": len([row for row in memberships if row.get("health") == "ready"]),
-            "membership_unavailable_count": len([row for row in memberships if row.get("health") == "unavailable"]),
-            "membership_quota_unknown_count": len([row for row in memberships if row.get("quota", {}).get("remaining") is None]),
+            "membership_ready_count": len(
+                [row for row in memberships if row.get("health") == "ready"]
+            ),
+            "membership_unavailable_count": len(
+                [row for row in memberships if row.get("health") == "unavailable"]
+            ),
+            "membership_quota_unknown_count": len(
+                [row for row in memberships if row.get("quota", {}).get("remaining") is None]
+            ),
             "filesystem_status": "local-only",
         },
         "memberships": memberships,
@@ -1268,7 +1498,9 @@ async def router_overview(refresh: bool = False):
                 {
                     "name": "Telegram",
                     "provider": "telegram",
-                    "auth_status": "configured" if bool(get_settings().telegram_bot_token) else "missing",
+                    "auth_status": "configured"
+                    if bool(get_settings().telegram_bot_token)
+                    else "missing",
                     "auth_detail": "Bot token presence only; commands remain off-page.",
                     "portal_url": "https://t.me",
                     "cli_login_command": "export TELEGRAM_BOT_TOKEN=...",
@@ -1315,12 +1547,18 @@ async def control_create_task(
     task = _control_store().create_task(
         title=str(body.get("title") or ""),
         payload=payload,
-        required_capabilities=body.get("required_capabilities") if isinstance(body.get("required_capabilities"), list) else None,
+        required_capabilities=body.get("required_capabilities")
+        if isinstance(body.get("required_capabilities"), list)
+        else None,
         priority=int(body.get("priority") or 100),
         max_attempts=int(body.get("max_attempts") or 3),
         created_by=str(body.get("created_by") or "control-plane"),
     )
-    return {"status": "ok", "task": _normalized_task(task), "routing": _normalized_task(task).get("routing", {})}
+    return {
+        "status": "ok",
+        "task": _normalized_task(task),
+        "routing": _normalized_task(task).get("routing", {}),
+    }
 
 
 @app.patch("/api/control/tasks/{task_id}")
@@ -1335,8 +1573,12 @@ async def control_update_task(
         task_id=task_id,
         updated_by=str(body.get("updated_by") or "control-plane"),
         title=body.get("title"),
-        payload_merge=body.get("payload_merge") if isinstance(body.get("payload_merge"), dict) else None,
-        required_capabilities=body.get("required_capabilities") if isinstance(body.get("required_capabilities"), list) else None,
+        payload_merge=body.get("payload_merge")
+        if isinstance(body.get("payload_merge"), dict)
+        else None,
+        required_capabilities=body.get("required_capabilities")
+        if isinstance(body.get("required_capabilities"), list)
+        else None,
         priority=body.get("priority"),
         note=str(body.get("note") or ""),
     )
@@ -1352,7 +1594,9 @@ async def control_lease_tasks(
     body = _safe_json_body(await request.json())
     leased = _control_store().lease_tasks(
         agent_id=str(body.get("agent_id") or ""),
-        capabilities=body.get("capabilities") if isinstance(body.get("capabilities"), list) else None,
+        capabilities=body.get("capabilities")
+        if isinstance(body.get("capabilities"), list)
+        else None,
         lease_seconds=int(body.get("lease_seconds") or 300),
         limit=int(body.get("limit") or 1),
     )
@@ -1401,7 +1645,15 @@ async def zkpass_verify(request: Request, x_control_token: str = Header(default=
     proof = body.get("proof")
     settings = get_settings()
     valid = bool(proof) and not settings.zkpass_enabled
-    errors = [] if valid else (["zkpass disabled or no proof supplied"] if not settings.zkpass_enabled else ["verification not implemented"])
+    errors = (
+        []
+        if valid
+        else (
+            ["zkpass disabled or no proof supplied"]
+            if not settings.zkpass_enabled
+            else ["verification not implemented"]
+        )
+    )
     return {
         "status": "ok",
         "verification": {
@@ -1422,7 +1674,9 @@ async def kimi_pm(request: Request, x_control_token: str = Header(default="")):
 
     action = str(body.pop("action", "")).strip()
     if not action:
-        raise HTTPException(status_code=400, detail=f"action required. valid: {sorted(ALL_ACTIONS)}")
+        raise HTTPException(
+            status_code=400, detail=f"action required. valid: {sorted(ALL_ACTIONS)}"
+        )
 
     result = dispatch(action, body, token=x_control_token)
     status_code = 200 if result.get("status") != "error" else 400

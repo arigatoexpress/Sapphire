@@ -84,10 +84,7 @@ def _resolve_client_id() -> str | None:
 
 
 def _resolve_client_secret() -> str | None:
-    return (
-        _first_env(*_CLIENT_SECRET_ENVS)
-        or _read_secret_file("foundry_client_secret")
-    )
+    return _first_env(*_CLIENT_SECRET_ENVS) or _read_secret_file("foundry_client_secret")
 
 
 @dataclass
@@ -104,7 +101,7 @@ class FoundryAuth:
     # -- public ---------------------------------------------------------------
 
     @classmethod
-    def from_env(cls) -> "FoundryAuth":
+    def from_env(cls) -> FoundryAuth:
         """Build auth from environment variables, falling back to secrets dir."""
         url = _resolve_url()
         if not url:
@@ -145,11 +142,13 @@ class FoundryAuth:
 
     def _refresh_oauth(self) -> str:
         url = f"{self.base_url}/multipass/api/oauth2/token"
-        body = urllib.parse.urlencode({
-            "grant_type": "client_credentials",
-            "client_id": self.client_id or "",
-            "client_secret": self.client_secret or "",
-        }).encode()
+        body = urllib.parse.urlencode(
+            {
+                "grant_type": "client_credentials",
+                "client_id": self.client_id or "",
+                "client_secret": self.client_secret or "",
+            }
+        ).encode()
         req = urllib.request.Request(
             url,
             data=body,
@@ -214,7 +213,7 @@ class FoundryClient:
         self.timeout = timeout
 
     @classmethod
-    def from_env(cls, **kwargs: Any) -> "FoundryClient":
+    def from_env(cls, **kwargs: Any) -> FoundryClient:
         return cls(FoundryAuth.from_env(), **kwargs)
 
     # -- low-level HTTP -------------------------------------------------------
@@ -275,7 +274,7 @@ class FoundryClient:
     def health(self) -> dict[str, Any]:
         """Check Foundry stack health.  Returns ``{"ok": True/False, ...}``."""
         try:
-            resp = self._get("/api/v2/datasets", params={"pageSize": "1"})
+            self._get("/api/v2/datasets", params={"pageSize": "1"})
             return {"ok": True, "auth_mode": self.auth.auth_mode, "datasets_accessible": True}
         except FoundryAPIError as exc:
             return {
