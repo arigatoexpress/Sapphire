@@ -51,12 +51,17 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-test.txt
       - name: pytest (unit)
+        # PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 is set at the job level to avoid
+        # loading stray plugins. pytest-asyncio must then be loaded explicitly
+        # via -p, otherwise pytest 9.x fails async tests (8.x silently skipped
+        # them, which hid the gap until the pytest bump in #78).
         run: |
           pytest tests/unit/ \
             --tb=short -q \
             --maxfail=25 \
             --durations=20 \
-            -p no:cacheprovider
+            -p no:cacheprovider \
+            -p pytest_asyncio.plugin
 
   plugin-test:
     name: plugin tests
