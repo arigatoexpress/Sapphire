@@ -14,7 +14,7 @@ pytest-cov==6.0.0
 
 # web / http
 aiohttp==3.11.11
-fastapi==0.115.6
+fastapi==0.136.0
 flask==3.1.0
 httpx==0.28.1
 requests==2.32.3
