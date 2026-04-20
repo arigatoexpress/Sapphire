@@ -15,6 +15,10 @@ on:
 permissions:
   contents: read
   security-events: write
+  # codeql-action/upload-sarif@v4 reads workflow-run metadata (telemetry +
+  # the Get-a-workflow-run API) and fails hard without actions:read.
+  # v3 tolerated the missing permission; v4 does not.
+  actions: read
 
 jobs:
   osv-scanner:
