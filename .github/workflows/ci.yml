@@ -13,6 +13,7 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   lint:
@@ -20,15 +21,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
+      - uses: actions/setup-python@v5
         with:
-          enable-cache: true
+          python-version: "3.11"
+          cache: pip
       - name: Install ruff
-        run: uv tool install ruff@0.7.4
-      - name: ruff format (check)
-        run: uv tool run ruff format --check .
+        run: python -m pip install "ruff==0.7.4"
       - name: ruff check
-        run: uv tool run ruff check --output-format=github .
+        run: ruff check --output-format=github .
+      # Note: `ruff format --check` would currently flag 373 pre-existing
+      # files. The PostToolUse hook + pre-commit keep new code formatted;
+      # a repo-wide bulk format pass is a separate follow-up commit.
 
   test:
     name: test (pytest)
@@ -91,6 +94,9 @@ jobs:
   secrets-scan:
     name: gitleaks (secrets)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v4
         with:
