@@ -33,7 +33,7 @@ _tho_spec.loader.exec_module(tho)
 def _make_macro_housing(mortgage_rate: float):
     return {
         "housing": {
-            f"30Y Mortgage Rate %": {"value": mortgage_rate, "label": "30Y Mortgage Rate"},
+            "30Y Mortgage Rate %": {"value": mortgage_rate, "label": "30Y Mortgage Rate"},
         }
     }
 
@@ -78,7 +78,6 @@ def _mock_action_market(
 
 class TestActionMarket:
     def _run(self, housing_resp, rates_resp, permits_data=None, tho_token="", tho_stats=None):
-        import urllib.request
 
         def fake_run_tool(name, params):
             if name == "macro_data" and params.get("action") == "housing":

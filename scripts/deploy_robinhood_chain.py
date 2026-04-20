@@ -160,8 +160,8 @@ def main() -> None:
         return
 
     try:
-        from web3 import Web3  # type: ignore[import]
         from eth_account import Account  # type: ignore[import]
+        from web3 import Web3  # type: ignore[import]
     except ImportError:
         log.error("web3 not installed. Run: pip install web3")
         sys.exit(1)

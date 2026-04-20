@@ -3,7 +3,7 @@
     "PreToolUse": [
       {
         "matcher": "Edit|Write",
-        "command": "bash -c 'FILE=\"${CLAUDE_TOOL_INPUT_FILE_PATH:-}\"; [[ -z \"$FILE\" ]] && exit 0; [[ \"$FILE\" == *trading_signals* || \"$FILE\" == *migrated_customers* || \"$FILE\" == *.env || \"$FILE\" == *secrets* || \"$FILE\" == *secret_* ]] && echo \"BLOCKED: $FILE is a protected data file\" && exit 2; exit 0'"
+        "command": "bash -c 'FILE=\"${CLAUDE_TOOL_INPUT_FILE_PATH:-}\"; [[ -z \"$FILE\" ]] && exit 0; [[ \"$FILE\" == *trading_signals* || \"$FILE\" == *migrated_customers* || \"$FILE\" == *.env || \"$FILE\" == *secrets* || \"$FILE\" == *secret_* || \"$FILE\" == */keys.txt || \"$FILE\" == *sapphire-secrets* ]] && echo \"BLOCKED: $FILE is a protected data/secret file\" && exit 2; exit 0'"
       }
     ],
     "PostToolUse": [
@@ -25,11 +25,25 @@
       "Bash(pytest:*)",
       "Bash(python3 -m pytest:*)",
       "Bash(/usr/local/bin/python3 -m pytest:*)",
+      "Bash(/usr/local/bin/python3 -m py_compile:*)",
+      "Bash(/usr/local/bin/python3 -m json.tool:*)",
+      "Bash(make:*)",
+      "Bash(pre-commit run:*)",
+      "Bash(pre-commit install:*)",
+      "Bash(gh pr:*)",
+      "Bash(gh run:*)",
+      "Bash(gh workflow:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh api:*)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)",
       "Bash(git branch:*)",
       "Bash(git fetch:*)",
+      "Bash(git show:*)",
+      "Bash(git ls-files:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git for-each-ref:*)",
       "Bash(tv:*)",
       "Bash(tailscale status:*)",
       "Bash(tailscale ping:*)",
@@ -37,10 +51,16 @@
       "Bash(curl http://127.0.0.1:*)",
       "Bash(curl -s http://localhost:*)",
       "Bash(curl -s http://127.0.0.1:*)",
+      "Bash(curl -fsS -m * http://127.0.0.1:*)",
+      "Bash(curl -fsS -m * http://localhost:*)",
       "Bash(redis-cli ping:*)",
+      "Bash(redis-cli info:*)",
       "Bash(claw:*)",
       "Bash(ssh workbench:*)",
-      "Bash(source ~/.zshenv:*)"
+      "Bash(source ~/.zshenv:*)",
+      "Bash(bash scripts/ops/doctor.sh:*)",
+      "Bash(launchctl list:*)",
+      "Bash(launchctl print:*)"
     ]
   }
 }

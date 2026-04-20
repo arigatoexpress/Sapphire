@@ -14,7 +14,6 @@ from lib.analytics.brain_accuracy import (
     GO_THRESHOLD,
     LEAN_THRESHOLD,
     WAIT_BAND,
-    _load_decisions,
     brief_summary,
     record_decision,
     report,

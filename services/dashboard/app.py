@@ -10,12 +10,7 @@ import os
 import secrets
 import sys
 import time
-from datetime import datetime, timezone
-
-try:
-    from datetime import UTC
-except ImportError:
-    UTC = timezone.utc
+from datetime import UTC, datetime
 from functools import wraps
 from pathlib import Path
 
@@ -2410,7 +2405,7 @@ def api_backtest_results():
       include_minimal: "1" to include strategies with <5 trades (default false)
     """
     try:
-        from lib.analytics.backtest_results import summary, leaderboard
+        from lib.analytics.backtest_results import leaderboard, summary
         metric = request.args.get('metric', 'sortino')
         try:
             limit = int(request.args.get('limit', '10'))

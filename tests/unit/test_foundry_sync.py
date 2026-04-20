@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import json
-import time
-from pathlib import Path
 from unittest import mock
 
 import pytest
@@ -14,7 +12,6 @@ from lib.foundry.sync import (
     SyncState,
     _auth_warning_fresh,
     _file_hash,
-    _scan_sources,
     detect_changes,
     get_sync_status,
     load_sync_history,

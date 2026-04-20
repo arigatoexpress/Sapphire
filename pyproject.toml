@@ -4,6 +4,17 @@ version = "0.1.0"
 description = "Sapphire OS — autonomous trading + PM + intelligence system"
 requires-python = ">=3.11"
 
+[project.optional-dependencies]
+# `pip install -e '.[dev]'` sets up the lint + test toolchain.
+dev = [
+    "ruff>=0.7.4",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5.0",
+    "pre-commit>=3.8",
+    "bandit[toml]>=1.7.10",
+]
+
 # uv workspace: each member manages its own deps
 [tool.uv.workspace]
 members = [
@@ -22,10 +33,39 @@ members = [
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+extend-exclude = [
+    "legacy_code",
+    "archived",
+    "results",
+    "data",
+    "world_knowledge",
+    "benchmarks",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
-ignore = ["E501", "B008"]
+ignore = [
+    "E501",   # line length — format handles what it can; long strings/URLs stay
+    "B008",   # default arg function calls (fastapi/pydantic idiom)
+    "E402",   # late imports — pattern used by conftest sys.path shims
+    "SIM117", # nested with — often more readable as-is
+    "SIM108", # ternary — case-by-case judgment call
+    "B904",   # raise-from — aspirational, not blocking
+    # Pre-existing stylistic — track-only, not CI-blocking. Revisit and tighten
+    # once backlog is cleared; new code is kept clean by the post-edit hook.
+    "E701",   # multiple-statements-on-one-line (colon)
+    "E722",   # bare except — pervasive in legacy resilience paths
+    "E741",   # ambiguous var name `l`
+    "SIM102", # nested if — judgment
+    "SIM105", # try/except/pass → contextlib.suppress — stylistic
+    "B007",   # unused loop var — rename to `_var` incrementally
+    "F811",   # redefinition — three known telegram_bot/executor cases
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B", "SIM", "UP"]
+"plugins/claw-sapphire/tests/**" = ["B", "SIM", "UP"]
+"scripts/**" = ["E402"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -34,3 +74,18 @@ indent-style = "space"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+# Quieter output by default; CI opts in to --durations.
+addopts = "-ra --strict-markers"
+markers = [
+    "slow: tests that take >1s — excluded by default (-m 'not slow')",
+    "integration: hits live services / network",
+    "gpu: requires the Windows GPU tier",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:aiohttp.*",
+    "ignore::DeprecationWarning:websockets.*",
+]
+
+[tool.bandit]
+exclude_dirs = ["tests", "legacy_code", "archived", "results", ".venv"]
+skips = ["B101", "B601"]  # assert_used, shell=True in controlled scripts

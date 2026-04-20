@@ -4,10 +4,8 @@ All web3 / network calls are fully mocked — no real RPC connection required.
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import sys
-import types
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -290,7 +288,7 @@ class TestDeploymentsLoading:
 # ---------------------------------------------------------------------------
 
 def test_constants():
-    from lib.chain.robinhood_chain import CHAIN_ID, TESTNET_RPC, TESTNET_WSS, EXPLORER_URL
+    from lib.chain.robinhood_chain import CHAIN_ID, EXPLORER_URL, TESTNET_RPC, TESTNET_WSS
     assert CHAIN_ID == 46630
     assert "testnet.chain.robinhood.com" in TESTNET_RPC
     assert "testnet.chain.robinhood.com" in TESTNET_WSS
