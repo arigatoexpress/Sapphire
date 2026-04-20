@@ -18,7 +18,7 @@ fastapi==0.115.6
 flask==3.1.0
 httpx==0.28.1
 requests==2.32.3
-websockets==14.1
+websockets>=13.0,<15
 
 # data / validation
 pydantic==2.10.4
@@ -45,7 +45,7 @@ google-generativeai==0.8.4
 firebase-admin==6.6.0
 
 # crypto / chain
-web3==7.6.1
-eth-account==0.13.5
+web3>=7.0,<8
+eth-account>=0.13,<1
 cryptography==44.0.0
 certifi==2024.12.14
