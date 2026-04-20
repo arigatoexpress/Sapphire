@@ -421,6 +421,7 @@ def _section_kronos() -> dict:
 
     lines = []
     predictions = data.get("predictions") or data
+    preds_list: list[dict] = []
 
     def _summarize(entry: dict, fallback_sym: str = "?") -> str:
         sym = entry.get("symbol", fallback_sym)
@@ -434,16 +435,18 @@ def _section_kronos() -> dict:
         for p in predictions[:4]:
             if isinstance(p, dict):
                 lines.append(_summarize(p))
+                preds_list.append(p)
     elif isinstance(predictions, dict):
         for sym, val in list(predictions.items())[:4]:
             if isinstance(val, dict):
                 lines.append(_summarize(val, fallback_sym=sym))
+                preds_list.append({**val, "symbol": val.get("symbol", sym)})
             else:
                 lines.append(f"  {sym}: {str(val)[:80]}")
 
     if not lines:
         lines.append("  (empty predictions)")
-    return {"status": "ok", "text": "\n".join(lines)}
+    return {"status": "ok", "text": "\n".join(lines), "predictions": preds_list}
 
 
 def _section_market_intel() -> dict:
@@ -629,8 +632,10 @@ def _section_recommendation(
     regime: dict,
     sentiment: dict,
     cascade: dict,
+    kronos: dict | None = None,
+    threats: dict | None = None,
 ) -> str:
-    """Generate a 1-2 sentence actionable daily recommendation."""
+    """Generate an actionable daily recommendation, enriched with Kronos + threats."""
     state = regime.get("state", "NEUTRAL")
     sent_score = sentiment.get("score") or 50
     cascade_score = cascade.get("max_score") or 0.0
@@ -657,7 +662,35 @@ def _section_recommendation(
     if cascade_score > 50:
         action += ". Cascade risk elevated — avoid excessive leverage"
 
-    return f"  📌 *Today ({stance}):* {action}."
+    lines = [f"  📌 *Today ({stance}):* {action}."]
+
+    # Kronos high-conviction call (≥70% confidence) adds actionable colour.
+    if isinstance(kronos, dict):
+        preds = kronos.get("predictions") or []
+        if isinstance(preds, list):
+            strong = [
+                p for p in preds
+                if isinstance(p, dict)
+                and (p.get("confidence") or 0) >= 0.70
+                and p.get("direction") in {"bullish", "bearish"}
+            ]
+            strong.sort(key=lambda p: p.get("confidence") or 0, reverse=True)
+            if strong:
+                top = strong[0]
+                sym = top.get("symbol", "?").replace("-USD", "")
+                direction = top.get("direction", "?")
+                conf = top.get("confidence") or 0
+                lines.append(
+                    f"  🧭 Kronos: *{sym}* {direction} at `{conf:.0%}` — align bias accordingly."
+                )
+
+    # KEV-exploited CVEs: surface immediate security context.
+    if isinstance(threats, dict) and threats.get("kev", 0) > 0:
+        lines.append(
+            f"  🛡️ `{threats['kev']}` KEV-exploited CVEs active — patch infra before EOD."
+        )
+
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -693,7 +726,7 @@ def build_brief() -> str:
     threats = _section_threats()
     health = _section_health()
 
-    rec = _section_recommendation(regime, sent, cascade)
+    rec = _section_recommendation(regime, sent, cascade, kronos=kron, threats=threats)
 
     # Trading Brain accuracy
     brain_text = ""

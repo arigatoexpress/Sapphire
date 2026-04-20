@@ -50,6 +50,10 @@ def _check_http(url: str, timeout: int = 5) -> bool:
     try:
         with urllib.request.urlopen(url, timeout=timeout) as r:
             return r.status < 500
+    except urllib.error.HTTPError as e:
+        # 4xx means the service is up and responding — 401/403/404 etc.
+        # are not outages, just auth/routing responses.
+        return e.code < 500
     except Exception:
         return False
 
