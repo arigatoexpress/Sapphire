@@ -12,9 +12,12 @@ help:  ## Show this help
 
 # ---------- setup ----------
 
-.PHONY: install install-hooks
+.PHONY: install install-hooks install-test
 install:  ## Install dev tooling (ruff, pytest, pre-commit)
 	$(PY) -m pip install -e '.[dev]'
+
+install-test:  ## Install the pinned CI test dep set (matches requirements-test.txt)
+	$(PY) -m pip install -r requirements-test.txt
 
 install-hooks:  ## Install pre-commit + commit-msg hooks
 	pre-commit install

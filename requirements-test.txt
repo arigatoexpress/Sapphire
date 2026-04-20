@@ -1,0 +1,51 @@
+# Pinned dep set for CI `make test` and `make test-plugin`.
+#
+# Scope: everything the unit test suite imports, pinned tightly enough that
+# pip doesn't walk the universe trying to resolve. Pins mirror
+# services/alpha/requirements.txt where they overlap.
+#
+# This is NOT a runtime lockfile — services each own their own requirements.
+# Update this when a new test ModuleNotFoundError lands in CI.
+
+# test runner
+pytest==8.3.4
+pytest-asyncio==0.24.0
+pytest-cov==6.0.0
+
+# web / http
+aiohttp==3.11.11
+fastapi==0.115.6
+flask==3.1.0
+httpx==0.28.1
+requests==2.32.3
+websockets==14.1
+
+# data / validation
+pydantic==2.10.4
+python-dateutil==2.9.0
+orjson==3.10.13
+pyyaml==6.0.2
+redis==5.2.1
+
+# scientific
+numpy==2.2.1
+pandas==2.2.3
+scipy==1.15.0
+scikit-learn==1.6.0
+
+# logging / config
+loguru==0.7.3
+python-dotenv==1.0.1
+
+# google / firebase — pinned tightly; without these pip resolution explodes
+google-cloud-firestore==2.19.0
+google-cloud-pubsub==2.27.1
+google-cloud-storage==2.19.0
+google-generativeai==0.8.4
+firebase-admin==6.6.0
+
+# crypto / chain
+web3==7.6.1
+eth-account==0.13.5
+cryptography==44.0.0
+certifi==2024.12.14
