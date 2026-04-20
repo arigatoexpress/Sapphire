@@ -82,6 +82,7 @@ markers = [
     "slow: tests that take >1s — excluded by default (-m 'not slow')",
     "integration: hits live services / network",
     "gpu: requires the Windows GPU tier",
+    "asyncio: pytest-asyncio marker — kept registered so --strict-markers doesn't reject it",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning:aiohttp.*",
