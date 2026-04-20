@@ -17,6 +17,7 @@ Usage:
 from __future__ import annotations
 
 import json
+import os
 import ssl
 import subprocess
 import sys
@@ -25,6 +26,27 @@ from pathlib import Path
 
 SAPPHIRE_DIR = Path.home() / "Code" / "Sapphire"
 TOOLS_DIR = SAPPHIRE_DIR / "plugins" / "claw-sapphire" / "tools"
+SECRETS_DIR = Path(os.getenv("SAPPHIRE_SECRETS_DIR", str(Path.home() / ".config" / "sapphire-secrets")))
+
+THO_BASE_URL = os.getenv("THO_BASE_URL", "https://project-go-forward-691674245427.us-central1.run.app")
+REGIONAL_INTEL_URL = os.getenv("REGIONAL_INTEL_URL", "http://127.0.0.1:8787")
+
+
+def _load_tho_pin() -> str | None:
+    """THO admin PIN from env var or ~/.config/sapphire-secrets/tho_admin_pin.
+
+    Returns None if neither is configured; callers must degrade gracefully.
+    """
+    pin = os.getenv("THO_ADMIN_PIN")
+    if pin:
+        return pin.strip() or None
+    path = SECRETS_DIR / "tho_admin_pin"
+    try:
+        if path.is_file():
+            return path.read_text().strip() or None
+    except OSError:
+        pass
+    return None
 
 
 def _run_tool(name: str, params: dict) -> dict:
@@ -47,35 +69,37 @@ def action_market() -> dict:
     # Regional Intel permits
     permits = []
     try:
-        url = "http://127.0.0.1:8787/api/intel/snapshot?region=houston_tx"
+        url = f"{REGIONAL_INTEL_URL}/api/intel/snapshot?region=houston_tx"
         with urllib.request.urlopen(url, timeout=5) as r:
             data = json.loads(r.read())
         permits = data.get("permits", [])
     except Exception:
         pass
 
-    # THO customer stats
+    # THO customer stats — requires admin PIN from env/secrets
     tho_stats = {}
-    try:
-        import certifi
-        ctx = ssl.create_default_context(cafile=certifi.where())
-    except ImportError:
-        ctx = ssl.create_default_context()
-    try:
-        token_resp = urllib.request.urlopen(urllib.request.Request(
-            "https://project-go-forward-691674245427.us-central1.run.app/api/admin/verify",
-            data=json.dumps({"pin": "4832"}).encode(),
-            headers={"Content-Type": "application/json"},
-        ), timeout=10, context=ctx)
-        token = json.loads(token_resp.read()).get("token", "")
-        if token:
-            stats_resp = urllib.request.urlopen(urllib.request.Request(
-                "https://project-go-forward-691674245427.us-central1.run.app/api/analytics/customers",
-                headers={"X-Admin-Token": token},
+    pin = _load_tho_pin()
+    if pin:
+        try:
+            import certifi
+            ctx = ssl.create_default_context(cafile=certifi.where())
+        except ImportError:
+            ctx = ssl.create_default_context()
+        try:
+            token_resp = urllib.request.urlopen(urllib.request.Request(
+                f"{THO_BASE_URL}/api/admin/verify",
+                data=json.dumps({"pin": pin}).encode(),
+                headers={"Content-Type": "application/json"},
             ), timeout=10, context=ctx)
-            tho_stats = json.loads(stats_resp.read())
-    except Exception:
-        pass
+            token = json.loads(token_resp.read()).get("token", "")
+            if token:
+                stats_resp = urllib.request.urlopen(urllib.request.Request(
+                    f"{THO_BASE_URL}/api/analytics/customers",
+                    headers={"X-Admin-Token": token},
+                ), timeout=10, context=ctx)
+                tho_stats = json.loads(stats_resp.read())
+        except Exception:
+            pass
 
     # Analyze
     mortgage_rate = None

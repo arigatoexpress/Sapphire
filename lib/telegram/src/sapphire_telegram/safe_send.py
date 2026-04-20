@@ -230,6 +230,7 @@ def _send_one(
     text: str,
     parse_mode: str | None,
     retries: int = 3,
+    reply_markup: dict | None = None,
 ) -> dict:
     """Send one chunk with retries, Markdown→plaintext fallback, 429 honoring."""
     url = f"https://api.telegram.org/bot{token}/sendMessage"
@@ -240,6 +241,8 @@ def _send_one(
     }
     if parse_mode:
         payload["parse_mode"] = parse_mode
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
 
     last_resp: dict = {}
     for attempt in range(retries):
@@ -276,6 +279,7 @@ def send(
     chat_id: str | None = None,
     prefix: bool = True,
     banner: str | None = "*Sapphire OS*",
+    reply_markup: dict | None = None,
 ) -> dict:
     """Send a Telegram message with robust error handling.
 
@@ -315,6 +319,13 @@ def send(
             head_parts.append(safe_markdown(banner) if pm else banner)
         head = " ".join(head_parts)
         text = f"{head}\n\n{text}" if text else head
+
+    # Inline keyboard can't span chunks — if set, truncate to one chunk to keep button attached.
+    if reply_markup:
+        if len(text) > _CHUNK_LIMIT:
+            text = text[: _CHUNK_LIMIT - 20] + "\n… [truncated]"
+        r = _send_one(token, target, text, pm, reply_markup=reply_markup)
+        return {"ok": r.get("ok", False), "chunks": 1, "results": [r]}
 
     # Photo: send as single message with caption (truncated if necessary)
     if photo:

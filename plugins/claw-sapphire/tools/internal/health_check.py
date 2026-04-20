@@ -13,12 +13,28 @@ from __future__ import annotations
 
 import concurrent.futures
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
 
 SAPPHIRE_DIR = Path.home() / "Code" / "Sapphire"
+SECRETS_DIR = Path(os.getenv("SAPPHIRE_SECRETS_DIR", str(Path.home() / ".config" / "sapphire-secrets")))
+THO_BASE_URL = os.getenv("THO_BASE_URL", "https://project-go-forward-691674245427.us-central1.run.app")
+
+
+def _load_tho_pin() -> str | None:
+    pin = os.getenv("THO_ADMIN_PIN")
+    if pin:
+        return pin.strip() or None
+    path = SECRETS_DIR / "tho_admin_pin"
+    try:
+        if path.is_file():
+            return path.read_text().strip() or None
+    except OSError:
+        pass
+    return None
 
 
 def _check_url(url: str, timeout: int = 5) -> tuple[bool, str]:
@@ -42,6 +58,95 @@ def _check_url(url: str, timeout: int = 5) -> tuple[bool, str]:
         return False, f"HTTP {e.code}: {e.reason}"
     except Exception as e:
         return False, str(e)[:100]
+
+
+def check_tho_deep(timeout: int = 15) -> dict:
+    """Deep THO probe: JWT auth round-trip + Firestore read + templates (GCS-backed).
+
+    A green `/health` means the process is up; this verifies the business path
+    still works (auth → DB → document pipeline). Requires THO_ADMIN_PIN; if
+    absent, returns a single skipped entry rather than a red.
+    """
+    import ssl
+    import urllib.error
+    import urllib.request
+
+    pin = _load_tho_pin()
+    if not pin:
+        return {
+            "tho-deep:auth": {
+                "status": "yellow",
+                "detail": "THO_ADMIN_PIN not set — deep probe skipped (surface /health unaffected)",
+            }
+        }
+
+    try:
+        import certifi
+        ctx = ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        ctx = ssl.create_default_context()
+
+    results: dict[str, dict] = {}
+
+    # 1) JWT auth round-trip
+    token = ""
+    try:
+        req = urllib.request.Request(
+            f"{THO_BASE_URL}/api/admin/verify",
+            data=json.dumps({"pin": pin}).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+            body = json.loads(resp.read())
+        token = (body or {}).get("token", "")
+        if len(token) > 20:
+            results["tho-deep:auth"] = {"status": "green", "detail": f"JWT issued ({len(token)} chars)"}
+        else:
+            results["tho-deep:auth"] = {"status": "red", "detail": "verify returned no token"}
+    except urllib.error.HTTPError as e:
+        results["tho-deep:auth"] = {"status": "red", "detail": f"HTTP {e.code}: {e.reason}"}
+    except Exception as e:
+        results["tho-deep:auth"] = {"status": "red", "detail": str(e)[:100]}
+
+    if not token:
+        # Skip Firestore/GCS probes if auth failed
+        results["tho-deep:firestore"] = {"status": "red", "detail": "skipped (no auth token)"}
+        results["tho-deep:templates"] = {"status": "red", "detail": "skipped (no auth token)"}
+        return results
+
+    headers = {"X-Admin-Token": token}
+
+    # 2) Firestore read (customers count — cheap, doesn't write)
+    try:
+        req = urllib.request.Request(f"{THO_BASE_URL}/api/customers/count", headers=headers)
+        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+            body = json.loads(resp.read())
+        total = (body or {}).get("total", 0)
+        if total > 0:
+            results["tho-deep:firestore"] = {"status": "green", "detail": f"{total:,} customers readable"}
+        else:
+            results["tho-deep:firestore"] = {"status": "yellow", "detail": "reachable but count=0"}
+    except urllib.error.HTTPError as e:
+        results["tho-deep:firestore"] = {"status": "red", "detail": f"HTTP {e.code}: {e.reason}"}
+    except Exception as e:
+        results["tho-deep:firestore"] = {"status": "red", "detail": str(e)[:100]}
+
+    # 3) Templates list (document pipeline — backed by GCS)
+    try:
+        req = urllib.request.Request(f"{THO_BASE_URL}/api/documents/templates", headers=headers)
+        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+            body = json.loads(resp.read())
+        templates = (body or {}).get("templates", [])
+        if len(templates) >= 1:
+            results["tho-deep:templates"] = {"status": "green", "detail": f"{len(templates)} templates listed"}
+        else:
+            results["tho-deep:templates"] = {"status": "yellow", "detail": "reachable but empty"}
+    except urllib.error.HTTPError as e:
+        results["tho-deep:templates"] = {"status": "red", "detail": f"HTTP {e.code}: {e.reason}"}
+    except Exception as e:
+        results["tho-deep:templates"] = {"status": "red", "detail": str(e)[:100]}
+
+    return results
 
 
 def _check_process(name: str) -> bool:
@@ -219,6 +324,9 @@ def main():
     if profile != "brief":
         sections["repos"] = check_repos()
         sections["inference"] = check_inference(profile=profile)
+        # Deep THO probe only in full profile — hits Cloud Run 3x per run.
+        # Skips itself gracefully if THO_ADMIN_PIN is not configured.
+        sections["tho_deep"] = check_tho_deep()
     else:
         sections["inference"] = check_inference(profile=profile)
 

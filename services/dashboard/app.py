@@ -2211,6 +2211,32 @@ def api_cascade():
                         'assets': [], 'total_oi_usd': 0, 'avg_funding_8h': 0}), 200
 
 
+def _attach_geo(item: dict) -> dict:
+    """Augment an intel item with ``latitude``/``longitude`` when resolvable.
+
+    Precedence: explicit fields, then region-tag centroid lookup from
+    ``lib.intel.lead_enricher.REGION_CENTROIDS``. Never mutates on failure.
+    """
+    try:
+        lat = item.get('latitude')
+        lng = item.get('longitude')
+        if lat is not None and lng is not None:
+            item['latitude'] = float(lat)
+            item['longitude'] = float(lng)
+            item.setdefault('geo_source', 'explicit')
+            return item
+        from lib.intel.lead_enricher import REGION_CENTROIDS
+        region = str(item.get('region') or '').lower().strip()
+        if region and region in REGION_CENTROIDS:
+            rlat, rlng = REGION_CENTROIDS[region]
+            item['latitude'] = rlat
+            item['longitude'] = rlng
+            item['geo_source'] = 'region_centroid'
+    except Exception:
+        pass
+    return item
+
+
 @app.route('/api/intel')
 @requires_auth
 def api_intel():
@@ -2291,6 +2317,9 @@ def api_intel():
             'items': ((foundry.get('totals') or {}).get('files') or 0),
         },
     ]
+
+    # Attach geo coords so the /intel Leaflet map can plot each item
+    items = [_attach_geo(dict(it)) for it in items]
 
     return jsonify({
         'items': items[:20],

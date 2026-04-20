@@ -22,7 +22,17 @@ from pathlib import Path
 
 SAPPHIRE_DIR = Path.home() / "Code" / "Sapphire"
 CTB_DIR = Path.home() / "Code" / "cyber-threat-bot"
-THO_BASE = "https://project-go-forward-691674245427.us-central1.run.app"
+THO_BASE = os.getenv("THO_BASE_URL", "https://project-go-forward-691674245427.us-central1.run.app")
+
+
+def _load_tho_pin() -> str:
+    pin = os.getenv("THO_ADMIN_PIN")
+    if pin:
+        return pin.strip()
+    path = Path(os.getenv("SAPPHIRE_SECRETS_DIR", str(Path.home() / ".config" / "sapphire-secrets"))) / "tho_admin_pin"
+    if path.is_file():
+        return path.read_text().strip()
+    return ""
 
 passed = 0
 failed = 0
@@ -88,9 +98,14 @@ def main():
     status, body = http_get(f"{THO_BASE}/health")
     check("Health endpoint", status == 200 and body and body.get("status") == "ok", f"HTTP {status}")
 
-    status, body = http_post(f"{THO_BASE}/api/admin/verify", {"pin": "4832"})
-    token = body.get("token", "") if body else ""
-    check("Admin auth (JWT)", status == 200 and len(token) > 20, f"HTTP {status}")
+    pin = _load_tho_pin()
+    if not pin:
+        skip("Admin auth (JWT)", "THO_ADMIN_PIN not set — skipping authenticated checks")
+        token = ""
+    else:
+        status, body = http_post(f"{THO_BASE}/api/admin/verify", {"pin": pin})
+        token = body.get("token", "") if body else ""
+        check("Admin auth (JWT)", status == 200 and len(token) > 20, f"HTTP {status}")
 
     if token:
         headers = {"X-Admin-Token": token}

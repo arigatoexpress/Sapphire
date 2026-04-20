@@ -218,3 +218,60 @@ class TestActionBuyers:
     def test_market_sentiment_present(self):
         result = self._run_buyers(7.5)
         assert result["market_sentiment"]  # non-empty string
+
+
+class TestPinLoader:
+    """PIN must come from env or secrets dir — never hardcoded."""
+
+    def test_env_var_wins(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("THO_ADMIN_PIN", "env-pin")
+        monkeypatch.setenv("SAPPHIRE_SECRETS_DIR", str(tmp_path))
+        (tmp_path / "tho_admin_pin").write_text("file-pin")
+        monkeypatch.setattr(tho, "SECRETS_DIR", tmp_path)
+        assert tho._load_tho_pin() == "env-pin"
+
+    def test_secrets_file_fallback(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("THO_ADMIN_PIN", raising=False)
+        (tmp_path / "tho_admin_pin").write_text("  file-pin  \n")
+        monkeypatch.setattr(tho, "SECRETS_DIR", tmp_path)
+        assert tho._load_tho_pin() == "file-pin"
+
+    def test_none_when_neither_set(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("THO_ADMIN_PIN", raising=False)
+        monkeypatch.setattr(tho, "SECRETS_DIR", tmp_path)
+        assert tho._load_tho_pin() is None
+
+    def test_empty_env_falls_back(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("THO_ADMIN_PIN", "")
+        (tmp_path / "tho_admin_pin").write_text("file-pin")
+        monkeypatch.setattr(tho, "SECRETS_DIR", tmp_path)
+        assert tho._load_tho_pin() == "file-pin"
+
+    def test_market_skips_tho_api_when_no_pin(self, monkeypatch):
+        """action_market must not call Cloud Run when PIN missing."""
+        monkeypatch.setattr(tho, "_load_tho_pin", lambda: None)
+        monkeypatch.setattr(tho, "_run_tool", lambda name, params: {})
+
+        call_log = []
+
+        def fake_urlopen(*args, **kwargs):
+            req = args[0] if args else kwargs.get("req")
+            url = req.full_url if hasattr(req, "full_url") else str(req)
+            call_log.append(url)
+            raise Exception("should not be called for THO")
+
+        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            result = tho.action_market()
+
+        assert result["success"] is True
+        assert all("project-go-forward" not in u for u in call_log), f"THO was called: {call_log}"
+        assert result["tho"]["customers"] == 0
+
+
+class TestNoHardcodedSecrets:
+    """Guard against regressions that bake the PIN back into source."""
+
+    def test_pin_not_in_tho_intel(self):
+        src = (INTERNAL / "tho_intel.py").read_text()
+        assert '"4832"' not in src, "Hardcoded PIN must not appear in source"
+        assert "'4832'" not in src
