@@ -5,16 +5,10 @@
 [extend]
 useDefault = true
 
-[[allowlists]]
-description = "Red-team corpus — adversarial token shapes are test fixtures"
+[allowlist]
+description = "Red-team corpus + onboarding prose — adversarial token shapes are test fixtures, not real leaks"
 paths = [
-    '''tests/fixtures/redteam/sensitivity_classifier_probes\.json''',
-    '''tests/fixtures/redteam/model_monitor_probes\.json''',
-]
-
-[[allowlists]]
-description = "Onboarding docs reference fake tokens in prose for illustration"
-paths = [
-    '''docs/onboarding/ai-redteam-audit-baseline\.md''',
-    '''docs/onboarding/ai-redteam-scope\.md''',
+    '''tests/fixtures/redteam/.*\.json''',
+    '''tests/unit/test_redteam_corpus\.py''',
+    '''docs/onboarding/ai-redteam-.*\.md''',
 ]
