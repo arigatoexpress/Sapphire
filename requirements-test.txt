@@ -38,7 +38,7 @@ loguru==0.7.3
 python-dotenv==1.0.1
 
 # google / firebase — pinned tightly; without these pip resolution explodes
-google-cloud-firestore==2.19.0
+google-cloud-firestore==2.27.0
 google-cloud-pubsub==2.27.1
 google-cloud-storage==2.19.0
 google-generativeai==0.8.4
