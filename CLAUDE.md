@@ -6,7 +6,7 @@ Autonomous trading + intelligence + content ops. Telegram-first, agent-driven, e
 
 ```bash
 # Test
-pytest tests/unit/ --tb=short -q           # 1,919 passing (use /usr/local/bin/python3 on Mac)
+pytest tests/unit/ --tb=short -q           # 1,932 passing (use /usr/local/bin/python3 on Mac)
 pytest plugins/claw-sapphire/tests/ -q     # 35 plugin tests (budget, router, state, technical_analysis, trading_brain)
 
 # Lint
@@ -32,7 +32,26 @@ echo '{"all": true}' | python3 plugins/claw-sapphire/tools/verify.py
 # Content engine
 python3 -m lib.content generate                               # render weekly report from events+signals
 python3 -m lib.content publish                                # promote draft → ready/
+
+# Makefile shortcuts (see `make help`)
+make test          # core unit tests
+make test-all      # core + plugin
+make lint          # ruff check
+make fix           # ruff --fix + format
+make doctor        # scripts/ops/doctor.sh — environment health check
+make registry      # validate infra/tool-registry.yaml invariants
+make ci            # mirror GitHub Actions CI locally
 ```
+
+## Dev Environment
+
+- **Lint + format:** `ruff` only (see `[tool.ruff]` in `pyproject.toml`). Black/isort/flake8 were retired 2026-04-19. Pre-existing stylistic rules (E701, E722, E741, SIM102/105, B007, F811) are *track-only ignores* — new code is kept clean by the PostToolUse hook in `.claude/settings.json`.
+- **Pre-commit:** `ruff + ruff-format + gitleaks + bandit + stdlib hooks`. Install with `make install-hooks`.
+- **CI:** `.github/workflows/ci.yml` runs ruff + pytest (core + plugin) + `validate_tool_registry.py` + gitleaks on every push and PR. `security.yml` runs osv-scanner, trivy-fs, and bandit daily.
+- **Dependabot:** pip + github-actions weekly (`.github/dependabot.yml`). Ruff and pytest grouped.
+- **CODEOWNERS:** review-gated paths: `.github/`, `lib/security/`, `lib/core/kill_switch.py`, `contracts/`, `services/webhook/`, trading critical path.
+- **PR/issue templates:** `.github/pull_request_template.md`, `.github/ISSUE_TEMPLATE/{bug,feature}.md`.
+- **Agent hooks:** `.claude/settings.json` blocks edits to `*secrets*`, `*.env`, `*trading_signals*`, `*migrated_customers*`; auto-runs `ruff format --fix` and `pytest tests/test_<basename>.py` after every Edit/Write.
 
 ## Architecture at a Glance
 
@@ -54,7 +73,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 
 ## Module Map
 
-**Key counts (verified 2026-04-19):** 1,954 passing tests (1,919 core + 35 plugin) · 31 dashboard pages · 7 quant strategies · 10 LaunchAgents · 21 scheduled tasks · 2 smart contracts.
+**Key counts (verified 2026-04-19):** 1,967 passing tests (1,932 core + 35 plugin) · 31 dashboard pages · 7 quant strategies · 10 LaunchAgents · 21 scheduled tasks · 2 smart contracts.
 
 | Path | Type | Description |
 |------|------|-------------|

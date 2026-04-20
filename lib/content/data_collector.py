@@ -14,12 +14,7 @@ import contextlib
 import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
-
-try:
-    from datetime import UTC
-except ImportError:
-    UTC = timezone.utc
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 

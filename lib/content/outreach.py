@@ -13,12 +13,7 @@ contact anyone — it only produces draft text.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-
-try:
-    from datetime import UTC
-except ImportError:
-    UTC = timezone.utc
+from datetime import UTC, datetime
 from typing import Literal
 
 from . import report_generator as rg

@@ -1,0 +1,101 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  lint:
+    name: lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install ruff
+        run: python -m pip install "ruff==0.7.4"
+      - name: ruff check
+        run: ruff check --output-format=github .
+      # Note: `ruff format --check` would currently flag 373 pre-existing
+      # files. The PostToolUse hook + pre-commit keep new code formatted;
+      # a repo-wide bulk format pass is a separate follow-up commit.
+
+  test:
+    name: test (pytest)
+    runs-on: ubuntu-latest
+    needs: lint
+    env:
+      AUTH_PASSWORD: ci-placeholder
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install test deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-test.txt
+      - name: pytest (unit)
+        run: |
+          pytest tests/unit/ \
+            --tb=short -q \
+            --maxfail=25 \
+            --durations=20 \
+            -p no:cacheprovider
+
+  plugin-test:
+    name: plugin tests
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-test.txt
+      - name: pytest (claw-sapphire)
+        run: pytest plugins/claw-sapphire/tests/ -q
+
+  tool-registry:
+    name: tool registry invariants
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install pyyaml
+      - run: python scripts/validate_tool_registry.py
+
+  secrets-scan:
+    name: gitleaks (secrets)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

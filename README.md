@@ -2,7 +2,9 @@
 
 > Self-sovereign AI operations platform for quantitative trading, intelligence, and content.
 
-![Tests](https://img.shields.io/badge/tests-1954%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1967%20passing-brightgreen)
+![CI](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml/badge.svg?branch=main)
+![Security](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml/badge.svg?branch=main)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![License](https://img.shields.io/badge/license-proprietary-lightgrey)
 
@@ -49,7 +51,7 @@ graph TD
 
 | Metric | Value |
 |--------|-------|
-| Passing unit + plugin tests | **1,954** (1,919 core + 35 plugin) |
+| Passing unit + plugin tests | **1,967** (1,932 core + 35 plugin) |
 | Dashboard pages | **31** |
 | Quant strategies (`lib/analytics/strategies.py`) | **7** |
 | Pine Script strategies | **5** |

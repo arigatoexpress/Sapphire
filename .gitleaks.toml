@@ -1,0 +1,14 @@
+# Gitleaks config — extends the default ruleset and allowlists the
+# red-team adversarial corpus where fake-but-realistic token shapes
+# are a deliberate test input, not a leaked secret.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Red-team corpus + onboarding prose — adversarial token shapes are test fixtures, not real leaks"
+paths = [
+    '''tests/fixtures/redteam/.*\.json''',
+    '''tests/unit/test_redteam_corpus\.py''',
+    '''docs/onboarding/ai-redteam-.*\.md''',
+]

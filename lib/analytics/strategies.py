@@ -32,7 +32,6 @@ from pathlib import Path
 from typing import Any
 
 from .backtest import (
-    Backtester,
     BacktestReport,
     Bar,
     Decision,

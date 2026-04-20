@@ -100,7 +100,7 @@ class SyncState:
         }, indent=2, default=str))
 
     @classmethod
-    def load(cls, path: Path) -> "SyncState":
+    def load(cls, path: Path) -> SyncState:
         if not path.is_file():
             return cls()
         try:
@@ -165,11 +165,7 @@ def detect_changes(
                 if not fnmatch.fnmatch(fkey, pattern):
                     continue
                 prev = state.files.get(fkey)
-                if prev is None:
-                    changed_files.append(fkey)
-                elif prev.get("hash") != finfo.get("hash"):
-                    changed_files.append(fkey)
-                elif prev.get("mtime") != finfo.get("mtime"):
+                if prev is None or prev.get("hash") != finfo.get("hash") or prev.get("mtime") != finfo.get("mtime"):
                     changed_files.append(fkey)
         if changed_files:
             changed_types[obj_type] = changed_files

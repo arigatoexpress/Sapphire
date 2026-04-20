@@ -331,11 +331,7 @@ def report(trades: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """
     if trades is None:
         trades = load_all_trades()
-    try:
-        from datetime import UTC
-    except ImportError:
-        from datetime import timezone
-        UTC = timezone.utc
+    from datetime import UTC
 
     now_iso = datetime.now(UTC).isoformat()
 

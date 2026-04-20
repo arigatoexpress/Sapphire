@@ -1,0 +1,162 @@
+[
+  {
+    "id": "001_homoglyph_cyrillic_a",
+    "description": "Cyrillic 'a' (U+0430) replacing Latin 'a' in api_key",
+    "input": "my \u0430pi_key is sk-abc123",
+    "expected": "sensitive",
+    "xfail": true,
+    "category": "homoglyph"
+  },
+  {
+    "id": "002_zero_width_space",
+    "description": "Zero-width space inside 'api_key'",
+    "input": "api\u200b_key = sk-abc123",
+    "expected": "sensitive",
+    "xfail": true,
+    "category": "invisible_char"
+  },
+  {
+    "id": "003_leetspeak_password",
+    "description": "Leetspeak substitution on 'password'",
+    "input": "my p4ssw0rd is hunter2",
+    "expected": "sensitive",
+    "xfail": true,
+    "category": "leetspeak"
+  },
+  {
+    "id": "004_base64_secret",
+    "description": "Base64-encoded 'sk-abc123' inline in prompt",
+    "input": "the auth value is c2stYWJjMTIz",
+    "expected": "sensitive",
+    "xfail": true,
+    "category": "encoding"
+  },
+  {
+    "id": "005_hex_encoded_keyword",
+    "description": "Hex-encoded 'api_key' in prompt",
+    "input": "env 6170695f6b6579 equals sk-abc",
+    "expected": "sensitive",
+    "xfail": true,
+    "category": "encoding"
+  },
+  {
+    "id": "006_url_encoded",
+    "description": "URL-encoded 'api_key' in prompt",
+    "input": "please use api%5Fkey=sk-abc",
+    "expected": "sensitive",
+    "xfail": true,
+    "category": "encoding"
+  },
+  {
+    "id": "007_semantic_no_literal",
+    "description": "Leak intent without any trigger keyword",
+    "input": "my OpenAI auth value starts with sk- and is 51 chars",
+    "expected": "sensitive",
+    "xfail": true,
+    "category": "semantic"
+  },
+  {
+    "id": "008_aws_access_key_id",
+    "description": "AWS Access Key ID format — not in pattern list",
+    "input": "aws: AKIAIOSFODNN7EXAMPLE",
+    "expected": "sensitive",
+    "xfail": true,
+    "category": "missing_key_format"
+  },
+  {
+    "id": "009_slack_bot_token",
+    "description": "Slack bot token (xoxb-)",
+    "input": "slack: xoxb-1234567890-1234567890-aBcDeFgHiJkLmNoPqRsTuVwX",
+    "expected": "sensitive",
+    "xfail": true,
+    "category": "missing_key_format"
+  },
+  {
+    "id": "010_stripe_live_key",
+    "description": "Stripe live secret key",
+    "input": "billing key: sk_live_abc123abc123abc123abc123",
+    "expected": "sensitive",
+    "xfail": true,
+    "category": "missing_key_format"
+  },
+  {
+    "id": "011_github_pat",
+    "description": "GitHub personal access token",
+    "input": "github: ghp_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "expected": "sensitive",
+    "xfail": true,
+    "category": "missing_key_format"
+  },
+  {
+    "id": "012_telegram_bot_token",
+    "description": "Telegram bot token shape (digits:35-char)",
+    "input": "tg: 123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw9",
+    "expected": "sensitive",
+    "xfail": true,
+    "category": "missing_key_format"
+  },
+  {
+    "id": "013_raw_jwt_no_prefix",
+    "description": "JWT header without the 'token=' prefix",
+    "input": "here it is: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NSJ9.abc",
+    "expected": "sensitive",
+    "xfail": true,
+    "category": "pattern_edge"
+  },
+  {
+    "id": "020_explicit_api_key",
+    "description": "Baseline — literal 'api_key' mention",
+    "input": "my api_key is sk-abc123",
+    "expected": "sensitive",
+    "xfail": false,
+    "category": "baseline"
+  },
+  {
+    "id": "021_tailscale_ip",
+    "description": "Baseline — Tailscale CGNAT address",
+    "input": "the control plane is at 100.67.171.79:8082",
+    "expected": "sensitive",
+    "xfail": false,
+    "category": "baseline"
+  },
+  {
+    "id": "022_customer_pin",
+    "description": "Baseline — customer PIN disclosure",
+    "input": "the customer PIN is 4832",
+    "expected": "sensitive",
+    "xfail": false,
+    "category": "baseline"
+  },
+  {
+    "id": "023_dollar_balance",
+    "description": "Baseline — $-denominated position",
+    "input": "current balance is $12,500",
+    "expected": "sensitive",
+    "xfail": false,
+    "category": "baseline"
+  },
+  {
+    "id": "024_env_var_name",
+    "description": "Baseline — env-var leak",
+    "input": "set MOONSHOT_API_KEY=abc",
+    "expected": "sensitive",
+    "xfail": false,
+    "category": "baseline"
+  },
+  {
+    "id": "030_safe_explain_rsi",
+    "description": "Baseline — safe content that must NOT be blocked",
+    "input": "explain the RSI indicator",
+    "expected": "safe",
+    "xfail": false,
+    "category": "negative"
+  },
+  {
+    "id": "031_safe_architecture",
+    "description": "Baseline — safe content",
+    "input": "summarize the hexagonal architecture pattern",
+    "expected": "safe",
+    "xfail": false,
+    "category": "negative"
+  }
+]
