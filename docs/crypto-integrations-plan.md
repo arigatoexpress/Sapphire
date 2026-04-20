@@ -1,13 +1,14 @@
 # Crypto / Privacy / Payments Integration Plan
 
-Four complementary technologies that, together, make Sapphire OS *private* and *paid*:
+Five complementary technologies that, together, make Sapphire OS *private*, *paid*, and *verifiable*:
 
 | # | Tech | Purpose | Status |
 |---|------|---------|--------|
 | 1 | **x402 (Coinbase)** | HTTP 402 micropayments in USDC on Base | **Implemented** — `lib/payments/x402_middleware.py` |
-| 2 | **Zama Concrete ML (FHE)** | Privacy-preserving cloud inference | Designed |
-| 3 | **Ika 2PC-MPC** | Decentralized wallet signing for trading | Designed |
-| 4 | **Aztec Noir** | Private on-chain strategy execution | Designed |
+| 2 | **Robinhood Chain (Arbitrum Orbit)** | On-chain signal anchoring + payment gate | **Implemented** — `lib/chain/robinhood_chain.py`, `contracts/` |
+| 3 | **Zama Concrete ML (FHE)** | Privacy-preserving cloud inference | Designed |
+| 4 | **Ika 2PC-MPC** | Decentralized wallet signing for trading | Designed |
+| 5 | **Aztec Noir** | Private on-chain strategy execution | Designed |
 
 All four plug into the existing event bus (`lib/core/event_bus.py`) so they become observable in the dashboard overview and auditable in the NIST compliance view.
 
@@ -326,6 +327,49 @@ Publishes:
 | **Q2 2026** | Zama FHE classifier | Biggest trust moat for THO customers. No on-chain risk. |
 | **Q3 2026** | Ika 2PC-MPC | Required before any non-paper live trading at size. |
 | **Q4 2026+** | Aztec Noir | Only meaningful if (a) on-chain trading is live and (b) MEV loss > privacy cost. |
+
+## 2a. Robinhood Chain — **IMPLEMENTED** (2026-04-19)
+
+Robinhood Chain is an Arbitrum Orbit L3 (chain ID **46630**). Sapphire uses it as an append-only, operator-controlled registry for trading signals and a rail for micropayments.
+
+### Architecture
+
+```
+┌─ Sapphire signal pipeline ─┐        ┌─ Robinhood Chain testnet ─┐
+│  strategy → risk kernel    │──web3─>│  SapphireSignalVerifier   │
+│  publishSignal(...)        │        │   signals[id] = Signal{}  │
+└────────────┬───────────────┘        │  SapphirePaymentGate      │
+             │                        │   pay(endpoint, amount)   │
+             ▼                        └─────────────┬─────────────┘
+        event_bus                                   │
+  chain.signal.{published,                          ▼
+     verified}                                 on-chain event
+  chain.payment.{received,                     log → sapphire sync
+     settled}
+```
+
+### What's Built
+
+- **`contracts/SapphireSignalVerifier.sol`** — operator-controlled signal registry. `publishSignal(strategyId, symbol, direction, confidence, proofHash)` writes into `mapping(uint256 => Signal)`. The `proofHash` field is reserved for future verifiable-computation integration (Aztec / Succinct / EZKL).
+- **`contracts/SapphirePaymentGate.sol`** — on-chain micropayment gate: `pay(endpoint, amount)`. Paid endpoints gate off-chain responses against the most recent payment event.
+- **`lib/chain/robinhood_chain.py`** — Python client: `RobinhoodChainClient.publish_signal(strategy, symbol, direction, confidence)`, `get_chain_status()`, address resolution from `data/chain/deployments.json`. Graceful fallback when `web3` is not installed.
+- **`scripts/deploy_robinhood_chain.py`** — deploy both contracts, record addresses.
+- Dashboard page: **`/robinhood_chain`** — shows latest N signals, per-strategy publish rate, pending gas.
+
+### Env
+
+| Variable | Purpose |
+|----------|---------|
+| `ROBINHOOD_CHAIN_RPC` | RPC endpoint (default Arbitrum Orbit testnet) |
+| `ROBINHOOD_CHAIN_OPERATOR_KEY` | Operator private key (signing) |
+| `ROBINHOOD_CHAIN_ENABLED` | Master switch — off = `publish_signal` is a no-op |
+
+### Why it matters for Sapphire
+- **Auditability**: an independent third party can verify that the signals a Sapphire customer received are the same signals committed on-chain — no retro-editing.
+- **Proof-of-work for strategies**: once ZK proofs are wired into `proofHash`, a consumer can verify that a claimed backtest actually ran against the claimed data.
+- **Composability**: other agents can pay `SapphirePaymentGate` to unlock premium endpoints without trusting Sapphire's billing system.
+
+---
 
 ## Event Bus is the Common Fabric
 

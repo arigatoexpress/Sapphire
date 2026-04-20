@@ -1,12 +1,12 @@
 # Sapphire OS
 
-> Autonomous trading · intelligence · content operations
+> Self-sovereign AI operations platform for quantitative trading, intelligence, and content.
 
-![Tests](https://img.shields.io/badge/tests-1606%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1954%20passing-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![License](https://img.shields.io/badge/license-proprietary-lightgrey)
 
-Sapphire is a self-managed operating system for capital allocation and intelligence. It runs continuously across an on-prem cluster (Mac M4 Pro + RTX 5070 Ti Windows + 2 Raspberry Pis) with GCP as the data lake. Human governance is a Telegram heartbeat. Everything else is automated.
+Sapphire is a continuously-running operating system for capital allocation and research. It runs on a four-node on-prem cluster (Mac M4 Pro commander, RTX 5070 Ti Windows GPU, two Raspberry Pis), uses GCP only as a data lake, and is governed through a Telegram heartbeat. Every signal, inference call, publication, and trade is observable on the event bus, auditable in the dashboard, and (where applicable) anchored on-chain.
 
 > `Net PnL = (edge × trades × capital efficiency) − (fees + slippage + infra + tail losses)`
 
@@ -16,355 +16,305 @@ Sapphire is a self-managed operating system for capital allocation and intellige
 
 ```mermaid
 graph TD
-    TG[Telegram] --> HG[hermes gateway\n ai.hermes.gateway]
-    HG --> IP[Inference Proxy :11435\n 4-tier LLM failover]
+    TG[Telegram operator] --> HG[hermes gateway]
+    HG --> IP[Inference Proxy :11435<br/>4-tier LLM failover]
 
-    IP --> GPU[Windows GPU\n RTX 5070 Ti\n 100.71.10.48:11434]
-    IP --> PI[Pi cluster\n rari1 + rari2\n Tailscale]
-    IP --> MAC[Mac Ollama\n 127.0.0.1:11434]
-    IP --> KC[Kimi Cloud\n api.moonshot.cn]
+    IP --> GPU[Windows GPU<br/>RTX 5070 Ti<br/>Tier 1]
+    IP --> PIS[Pi cluster<br/>rari1 + rari2<br/>Tier 2]
+    IP --> MAC[Mac Ollama<br/>Tier 3]
+    IP --> KC[Kimi Cloud<br/>Tier 4]
 
-    TV[TradingView] --> WH[Webhook :9090\n Windows]
-    WH --> SL[Signal Logger :18081\n Mac]
-    SL --> RD[(Redis Streams\n pub/sub)]
-    RD --> RK[Risk Kernel\n circuit breaker\n position sizing]
-    RK --> EX[Execution\n paper + live]
+    TV[TradingView] --> WH[Webhook :9090<br/>Windows]
+    WH --> SL[Signal Logger :18081<br/>Mac]
+    SL --> RK[Risk kernel<br/>circuit breaker<br/>position sizing]
+    RK --> PT[Paper + live execution]
+    RK --> RH[Robinhood Crypto<br/>live portfolio]
+    RK --> RC[Robinhood Chain<br/>on-chain signals]
 
-    EB[Event Bus\n Redis → JSONL] --> DS[Dashboard :8080\n 20+ pages SSE]
-    EB --> CE[Content Engine\n weekly report]
-    EB --> TA[Telegram alerts\n priority-tagged]
+    EB[(Event Bus<br/>Redis → JSONL)] --> DSH[Dashboard :8080<br/>31 pages SSE]
+    EB --> CE[Content engine<br/>weekly publish]
+    EB --> TA[Telegram alerts]
+    EB --> FS[Foundry sync<br/>ontology objects]
 
-    GS[gcp_sync.py\n hourly] --> BQ[(BigQuery\n sapphire.*)]
-    GS --> GCS[(GCS\n sapphire-data-lake)]
+    GS[gcp_sync.py] --> BQ[(BigQuery<br/>sapphire.*)]
+    FS --> PF[(Palantir Foundry<br/>PaperTrade, Signal,<br/>ChainMetric, ThreatAlert)]
 
-    CP[Control Plane :8082\n projects · tasks · events] --> DS
-    OB[OpenBB :6900\n market data REST] --> RK
-```
-
-```
-Hardware topology
-─────────────────
-Mac M4 Pro (100.67.171.79) ── commander, all LaunchAgents
-  inference-proxy :11435 · signal-logger :18081 · dashboard :8080
-  control-plane :8082 · hermes gateway (Telegram) · OpenBB :6900 · Redis :6379
-
-Windows (100.71.10.48) ─── GPU node
-  Ollama :11434 (28 models, RTX 5070 Ti 16 GB)
-  TradingView webhook :9090 · telemetry-dashboard :3001
-
-Pi rari1 (100.120.191.1) ── T2 inference (Tailscale)
-Pi rari2 (100.87.225.89) ── T2 inference (Tailscale)
-  Each: nemotron-mini · gemma2:2b · smollm2:1.7b · qwen2.5:0.5b
-
-GCP ─── data lake
-  BigQuery: tho-ai-agent.sapphire.{signals,predictions,market_regime,threats,…}
-  GCS: sapphire-data-lake/raw/<source>/YYYY-MM-DD/
+    SEC[Security platform<br/>deps · models · network<br/>heartbeat · kill switches] --> EB
+    CP[Control Plane :8082] --> DSH
 ```
 
 ---
 
-## Module Reference
+## Key Metrics
 
-| Path | Type | Description |
-|------|------|-------------|
-| `lib/core/` | library | Risk kernel, circuit breaker, position sizing, event bus, pubsub, logging, models |
-| `lib/agents/` | library | OpenClaw/NemoClaw dispatch, orchestrator, runtime policy, token governor |
-| `lib/analytics/` | library | Correlation, CPCV, regime detection, VPIN, backtest engine, risk engine, liquidation |
-| `lib/chain/` | library | On-chain intelligence: regime, funding, OI, TVL, stablecoin supply, whale flow |
-| `lib/content/` | library | Weekly report generator, publishers (Substack/X/LinkedIn/Typefully), quality gate |
-| `lib/intel/` | library | Lead enrichment, threat feed aggregation |
-| `lib/payments/` | library | x402 HTTP 402 micropayment middleware (Flask + raw-socket gates, EVM signatures) |
-| `lib/portfolio/` | library | Robinhood integration, portfolio state |
-| `lib/telegram/` | library | Telegram bot framework, command handlers |
-| `lib/trading/` | library | Strategy runtime, signal enhancer, self-optimizer |
-| `services/alpha/` | service | Trading engine + signal logger [Mac :18081] |
-| `services/aster/` | service | Aster DEX bot — Solana perps (paused) |
-| `services/control-plane/` | service | PM hub: projects, tasks, events, Kimi bridge [Mac :8082] |
-| `services/dashboard/` | service | Flask dashboard [Mac :8080] — SSE stream, 20+ pages, basic-auth |
-| `services/hyperliquid/` | service | Hyperliquid L1 bot (stub) |
-| `services/inference-proxy/` | service | 4-tier LLM failover [Mac :11435] + x402 gate |
-| `services/intelligence/` | service | Daily brief generator, chain refresh |
-| `services/pipeline/` | service | GCP sync: events → GCS/BigQuery (hourly watermark) |
-| `services/scout-sandbox/` | service | External-collaborator least-privilege sandbox |
-| `services/webhook/` | service | TradingView webhook receiver [Windows :9090] |
-| `plugins/claw-sapphire/` | plugin | 32 tools + 10 libs + 2 hooks for claw-code runtime |
-| `pine/` | Pine Script | 5 TradingView strategies (v1–v3 Ultra, multi-symbol screener) |
-| `skills/` | skills | 11 Claude Code skill directories |
-| `data/` | state | Runtime JSONL streams, paper portfolio, registries |
-| `infra/launchagents/` | infra | 20 macOS LaunchAgent plists |
-| `docs/` | docs | Architecture overview, setup guides, security audit |
+| Metric | Value |
+|--------|-------|
+| Passing unit + plugin tests | **1,954** (1,919 core + 35 plugin) |
+| Dashboard pages | **31** |
+| Quant strategies (`lib/analytics/strategies.py`) | **7** |
+| Pine Script strategies | **5** |
+| Plugin tool scripts | **32** (16 registered, 24 internal, 1 deprecated) |
+| LaunchAgents (Mac) | **10** plists |
+| Claude Code scheduled tasks | **21** |
+| Smart contracts (`contracts/`) | **2** Solidity |
+| Data providers wired | **13** |
+| Inference tiers | **4** (GPU · Pi · Mac · Kimi Cloud) |
+| Content publishers | **4** (Substack · X · LinkedIn · Typefully) |
 
 ---
 
-## Trading Strategies
+## Trading System
 
-Five Pine Script strategies in `pine/`, targeting 80%+ win rate:
+### Seven Quant Strategies (`lib/analytics/strategies.py`)
 
-| Strategy | File | Description |
-|----------|------|-------------|
-| Pair Trading v1 | `PairTrading_AI_System_v1.pine` | Baseline Z-score mean reversion |
-| Pair Trading v2 | `PairTrading_AI_System_v2_Strategy.pine` | v1 + neural network signal overlay |
-| Pair Trading v3 Ultra | `PairTrading_AI_System_v3_Ultra.pine` | Kalman filtering, regime detection, Kelly position sizing |
-| Multi-Symbol Screener | `PairTrading_MultiSymbol_Screener.pine` | Scans ETH/BTC, SOL/BTC, ZEC/BTC, HYPE/USDT simultaneously |
-| Sapphire Mac | `Sapphire_Strategy_Mac.pine` | Mac-optimized execution variant |
+| Strategy | Core idea |
+|----------|-----------|
+| `RegimeAwareRSI` | RSI reversion gated by GMM regime classification |
+| `FundingRateContrarian` | Fades extreme perps funding skew (`lib/chain/` data) |
+| `CorrelationBreakout` | Enters on cross-asset correlation breaks |
+| `MultiTFMomentum` | Multi-timeframe momentum confirmation |
+| `SapphireComposite` | Ensemble of the above, regime-weighted |
+| `Strategy` (base) | Abstract runtime shared by all above |
+| `StrategyParams` | Typed parameter registry |
 
-**Live signal pipeline:** TradingView → Windows webhook (:9090) → Mac signal-logger (:18081) → Redis → risk kernel → paper/live execution.
+### Rigor
+- **CPCV** — combinatorial purged cross-validation (`lib/analytics/cpcv.py`)
+- **Regime detection** — GMM over volatility + trend (`lib/analytics/regime.py`)
+- **VPIN** — volume-synchronized probability of informed trading
+- **Deflated Sharpe / Sortino / Calmar** — `risk_engine.py`, `deflated_sharpe.py`
+- **Walk-forward backtests** — `backtest_engine.py`, artifacts under `data/backtests/`
 
-**Prediction engine** (`plugins/claw-sapphire/tools/predict.py`): 6-factor TA (RSI, MACD, Bollinger Bands, MA, ATR, volume) + Kronos ML. Scored nightly against realized prices.
+### Pipeline
+`TradingView Pine → Windows webhook :9090 → Mac signal-logger :18081 → Redis → risk kernel → paper + Robinhood execution`.
+Paper portfolio: $100K notional, ATR-based SL/TP (1.67 : 1 R : R), 10% position sizing, runs alongside live.
 
-| Asset | Accuracy (24 scored predictions) |
-|-------|----------------------------------|
-| BTC   | 75% |
-| ETH   | 62% |
-| SOL   | 38% |
-| Overall | 58% |
-
-**Paper portfolio:** $100K notional, ATR-based stop-loss/take-profit (1.67:1 R:R), 10% position sizing. Runs in parallel with live signals.
-
----
-
-## Analytics Engine
-
-`lib/analytics/` implements a professional quant stack:
-
-| Module | Description |
-|--------|-------------|
-| `cpcv.py` | Combinatorial Purged Cross-Validation — prevents backtest overfitting |
-| `regime.py` | GMM-based market regime detection (BULL / BEAR / TRANSITION / NEUTRAL) |
-| `vpin.py` | Volume-Synchronized Probability of Informed Trading — order flow toxicity |
-| `backtest_engine.py` | Full vectorized backtest with walk-forward windows |
-| `risk_engine.py` | Kelly-informed sizing, Sortino/Calmar, deflated Sharpe, max drawdown |
-| `correlation.py` | Rolling cross-asset correlation, broken-correlation alerts |
-| `liquidation.py` | Liquidation cascade risk estimation |
-| `performance.py` | PnL attribution, factor decomposition |
-| `indicators.py` | RSI, MACD, Bollinger Bands, ATR, MA — also used by plugin tools |
-| `sentiment.py` | Fear/greed aggregation from multiple feeds |
-
-**On-chain regime** (`lib/chain/intelligence.py`): aggregates funding rates, open interest, TVL, stablecoin supply, and whale flow into a single regime score. Snapshots written to `data/chain/` every 15 minutes and synced to BigQuery.
+### Prediction accuracy (24 scored predictions)
+| Asset | Accuracy |
+|-------|----------|
+| BTC | **75%** |
+| ETH | 62% |
+| SOL | 38% |
+| Overall | **58%** |
 
 ---
 
 ## Data Sources
 
-| Provider | Library | Data |
-|----------|---------|------|
-| DeFiLlama | REST | TVL, protocol metrics |
-| CoinGlass | `lib/chain/coinglass.py` | Options, liquidations, OI |
-| CoinMetrics | REST | On-chain fundamentals |
-| Dune Analytics | `lib/chain/dune.py` | Custom SQL queries |
-| Whale Alert | `lib/chain/whale_alert.py` | Large transaction tracking |
-| Santiment | `lib/chain/santiment.py` | Social + on-chain intelligence |
-| CoinAPI | `lib/chain/coinapi.py` | OHLCV + reference data |
-| BGGeometrics | `lib/chain/bgeometrics.py` | On-chain metrics |
-| OpenBB | REST (:6900) | Equity, crypto OHLCV — use REST, SDK is broken |
-| CoinGecko | REST | Market caps, price feeds |
-| Hyperliquid | WebSocket | L1 perp order book |
-| FRED | REST | Macro indicators (requires API key) |
-| CISA / NVD | REST | Vulnerability intelligence (threat-intel-sweep) |
-| GitHub | REST | Starred repo sync, trending discovery |
+| Provider | Module | Auth | Data |
+|----------|--------|------|------|
+| CoinMetrics | `lib/chain/coinmetrics.py` | API key | On-chain fundamentals |
+| DeFiLlama | `lib/chain/sources.py` | none | TVL, protocol metrics |
+| Hyperliquid | `lib/chain/sources.py` | none | L1 perps order book |
+| CoinGecko | `lib/chain/sources.py` | none | Market caps, prices |
+| CoinGlass | `lib/chain/providers/coinglass.py` | API key | Options, liquidations, OI |
+| Dune Analytics | `lib/chain/providers/dune.py` | API key | Custom SQL queries |
+| Whale Alert | `lib/chain/providers/whale_alert.py` | API key | Large transactions |
+| Santiment | `lib/chain/providers/santiment.py` | API key | Social + on-chain |
+| CoinAPI | `lib/chain/providers/coinapi.py` | API key | OHLCV + reference |
+| BGGeometrics | `lib/chain/providers/bgeometrics.py` | API key | On-chain metrics |
+| OpenBB | REST `:6900` | none | Equity + crypto OHLCV |
+| Robinhood Crypto | `lib/portfolio/robinhood.py` | **Ed25519 keypair** | Portfolio, holdings, orders |
+| FRED | REST | API key | Macro indicators |
+| CISA / NVD | REST | none | Vulnerability intel |
 
 ---
 
-## Inference Proxy
+## Security Platform
 
-`services/inference-proxy/app.py` — 4-tier failover with OpenAI-compatible output across all tiers.
+A full second-class-citizen security stack — not an afterthought.
 
-| Tier | Host | Models | Notes |
-|------|------|--------|-------|
-| T1 — Windows GPU | 100.71.10.48:11434 | hermes3:8b, gemma4, deepseek-r1:14b, qwen3:14b, qwen2.5:32b | Uses native `/api/chat` (not `/v1/`) |
-| T2 — Pi cluster | rari1/rari2:11434 | nemotron-mini, qwen2.5:0.5b, gemma2:2b, smollm2:1.7b | Lightweight only |
-| T3 — Mac Ollama | 127.0.0.1:11434 | Any model | ~90 s CPU inference, last resort |
-| T4 — Kimi Cloud | api.moonshot.cn | kimi-cloud | Non-sensitive only; sensitivity classifier gates |
+| Module | Role |
+|--------|------|
+| `lib/security/dependency_scanner.py` | CVE lookup via OSV.dev, outdated-package detection, **CycloneDX 1.5 SBOM** emission |
+| `lib/security/model_monitor.py` | SHA-256 verification of Ollama model blobs against manifest digests; Jinja2 template backdoor detection |
+| `lib/security/network_mapper.py` | Tailscale topology enumeration, port probes, trust-zone classification, attack-surface scoring |
+| `lib/core/heartbeat.py` | 60 s per-component state machine (HEALTHY → DEGRADED → FAILED → RECOVERING) with Telegram escalation + self-heal |
+| `lib/core/security_monitor.py` | Runtime anomaly detection, event-bus publish on suspicious activity |
+| `lib/core/security_kill_switch.py` | Per-service kill switch, fails-closed at policy violation |
+| `lib/core/kill_switch.py` | Global trading kill switch (circuit breaker) |
+| `lib/core/confirmation_firewall.py` | Two-phase-commit gate on any action that mutates capital or external state |
+| `lib/core/decision_engine.py` | Ranks + explains every autonomous decision before it executes |
+| `plugins/claw-sapphire/lib/sensitivity_classifier.py` | Regex block on PII/secrets before egress to Kimi Cloud |
+| `services/security_pipeline/` | Scheduled full-system scan, ships findings to SOC page |
 
-**Model aliases:** `fast`/`quick` → nemotron-mini · `auto` → hermes3:8b · `deep` → qwen3:14b · `code` → gemma4 · `reason` → deepseek-r1:14b · `large` → qwen2.5:32b · `kimi` → kimi-cloud
+Perimeter: **Tailscale mesh-only**. No open ingress ports. Secrets live in **GCP Secret Manager** or `~/.sapphire/secrets.env` (mode 0600, never in plists).
 
-**GPU benchmarks (RTX 5070 Ti, 2026-04-14):**
-
-| Model | Tokens/s | VRAM |
-|-------|----------|------|
-| nemotron-mini (4B) | 232 | 2.7 GB |
-| hermes3 (8B) | 118 | 4.7 GB |
-| gemma4 | 154 | 9.0 GB |
-| deepseek-r1 (14B) | 80 | 9.0 GB |
-| qwen3.5 (9B) | 107 | 6.6 GB |
-| qwen3 (14B) | 81 | 9.3 GB |
-| qwen2.5 (32B) | 2.7 | 19.9 GB |
-| nemotron-cascade-2 (MoE) | 16 | 22.6 GB |
-
-**Endpoints:** `/v1/chat/completions` · `/v1/models` · `/health` · `/metrics`
-
----
-
-## Hermes Agent (Telegram Bot)
-
-hermes-agent (NousResearch) — always-on Telegram gateway. Installed at `~/.hermes/`.
-
-- Model: hermes3:8b via inference-proxy
-- 14 skills in `~/.hermes/skills/sapphire/`: cyber-intel, inference-tier, kimi-delegate, macro-data, paper-trading, regional-intel, repo-discovery, system-health, system-ops, tho-operations, threat-intel, trading-analysis, trading-brain, trading-signals
-- Restart: `~/.local/bin/hermes gateway restart`
+See [`docs/opus-audit-2026-04-17.md`](docs/opus-audit-2026-04-17.md) for the hardening audit and [`docs/nist-alignment.md`](docs/nist-alignment.md) for the NIST CSF control map.
 
 ---
 
 ## Content Engine
 
-`lib/content/` — 6-stage automated research-to-publish pipeline:
+`lib/content/` — a 14-module research-to-publish pipeline with an institutional-grade quality gate.
 
-1. **Signal collection** — event bus aggregation from all services
-2. **Report generation** (`report_generator.py`) — weekly synthesis from signals + chain data
-3. **Quality gate** (`quality.py`) — automated review before promotion
-4. **Formatting** (`formatters.py`) — platform-specific rendering
-5. **Publishing** (`auto_publish.py`) — promotes drafts from `data/content/` to `ready/`
-6. **Multi-platform push** — Substack, X, LinkedIn, Typefully
+| Stage | Module |
+|-------|--------|
+| Signal collection | `data_collector.py` (event-bus aggregation) |
+| Thesis generation | `thesis_engine.py` |
+| Draft rendering | `draft_generator.py`, `report_generator.py` |
+| Visualization | `visualizations.py` |
+| Quality gate | `quality.py` — seven-check institutional rubric |
+| Performance policy | `performance_policy.py` — blocks accuracy boasts before sample size supports them |
+| QA pipeline | `qa_pipeline.py` |
+| Formatting | `formatters.py` — platform-specific rendering |
+| Approval | `approval.py` — Telegram-based human sign-off |
+| Publishing | `publisher.py`, `auto_publish.py` + publishers: `substack`, `x`, `linkedin`, `typefully` |
+| Scheduling | `scheduler.py` — Mon weekly brief · Wed AI intel · Fri security digest · daily market pulse |
+| Outreach | `outreach.py` — lead engine integration |
 
-Scheduled weekly via `com.sapphire.content-engine` LaunchAgent. Also invocable: `python3 -m lib.content generate`.
+Runs weekly via `com.sapphire.content-engine` LaunchAgent. CLI: `python3 -m lib.content generate` / `publish`.
 
----
-
-## Sapphire Plugin (claw-code, 32 tool scripts on disk)
-
-`plugins/claw-sapphire/` contains:
-
-- **12 registered Claude Code tools** in `plugin.json`: `dispatch` · `verify` · `budget` · `state` · `status` · `notify` · `health_check` · `market` · `predict_kronos` · `threat_intel` · `lumo_research` · `starred_repos`
-- **20 companion CLI scripts** under `plugins/claw-sapphire/tools/` that are invoked via stdin JSON by hermes skills, scheduled tasks, dashboards, or other tools
-
-**Intel / analytics (6):** `vote_monitor` · `watchdog` · `digest` · `research` · `events` · `qa_aware_factory`
-
-**Trading (8):** `predict` · `signal_generator` · `paper_trader` · `crypto_portfolio` · `backtest` · `market_sentiment` · `trading_brain` · `macro_data`
-
-**Other (5 + 1 legacy alias):** `lead_engine` · `lead_enrich` · `lumo` · `tho_intel` · `solana_wallet` · `kronos_predict` (legacy wrapper over `predict_kronos`)
-
-**Shared libs (10):** `technical_analysis` · `nemotron` · `quant_analysis` · `router` · `runtime_policy` · `token_governor` · `sensitivity_classifier` · `market_data` · `nvidia_agents` · `budget` (module)
+**Quality rubric (`quality.py`):** evidence density, evidence coverage, citation quality, unsupported-conclusion detection, argument coherence, originality, small-sample performance-claim block.
 
 ---
 
-## Dashboard
+## Integrations
 
-`services/dashboard/` — Flask, basic-auth, SSE event stream, 10 s cached fetchers.
+### Robinhood Crypto API — live portfolio
+`lib/portfolio/robinhood.py`. Ed25519-signed REST requests against `trading.robinhood.com`. Reads accounts, holdings, best bid/ask, and order history; reconstructs weighted-average cost basis from filled orders. Credentials in `~/.config/sapphire-secrets/`.
 
-**Pages (20+):**
+### Robinhood Chain (Arbitrum Orbit, chain ID 46630) — on-chain signal anchoring
+`lib/chain/robinhood_chain.py` + `contracts/`:
+- **`SapphireSignalVerifier.sol`** — on-chain signal registry: `publishSignal(strategyId, symbol, direction, confidence, proofHash)`, with operator-controlled verification.
+- **`SapphirePaymentGate.sol`** — micropayment gate for paid inference / data calls.
 
-| Page | Route | Description |
-|------|-------|-------------|
-| Overview | `/` | System status + live metrics |
-| Architecture | `/architecture` | Live system topology |
-| Intelligence | `/intelligence` | Chain analysis + AI summaries |
-| Signals | `/signals` | Trading signal feed |
-| Predictions | `/predictions` | Kronos ML forecast history |
-| Analytics | `/analytics` | Correlation, performance charts |
-| Chain | `/chain` | On-chain overview (funding, OI, TVL) |
-| Risk | `/risk` | Risk dashboard + backtest |
-| SOC | `/soc` | Security Operations Center |
-| Agents | `/agents` | AI agent status + history |
-| Content | `/content` | Draft management |
-| Infrastructure | `/infrastructure` | Service health matrix |
-| Metrics | `/metrics` | Inference proxy counters |
-| Benchmarks | `/benchmarks` | Kadima Labs AI benchmark |
-| Command Deck | `/command-deck` | Direct service control |
-| Control | `/control` | Control plane bridge |
-| Health Status | `/health-status` | Per-service health monitor |
-| System | `/system` | System resource usage |
-| Organization | `/organization` | Team/project view |
-| Sapphire Book | `/sapphire-book` | Trading journal |
-| Production | `/production-readiness` | Pre-flight checklist |
-| Logs | `/logs` | Structured log viewer |
+Deployment script: `scripts/deploy_robinhood_chain.py`. Deployed addresses in `data/chain/deployments.json`. Dashboard page: `/robinhood_chain`.
 
----
+### Palantir Foundry
+`lib/foundry/` + `services/foundry_sync/`:
+- `client.py` — SDK wrapper, bearer-token + OAuth client-credentials auth.
+- `ingestion.py` — transforms local JSONL/data → Foundry ontology objects.
+- `readiness.py` — repo-grounded readiness audit.
+- `sync.py` — 15-min delta-aware scheduled sync, Telegram alerts on drift.
 
-## Security
+Ontology objects: `PaperTrade`, `Signal`, `ChainMetric`, `ThreatAlert`, plus scheduled syncs for strategy performance + regime snapshots. Schema: [`docs/foundry-ontology-schema.md`](docs/foundry-ontology-schema.md). Strategy: [`docs/foundry-strategy-2026-04-19.md`](docs/foundry-strategy-2026-04-19.md).
 
-Sapphire is private-by-default. Key controls:
+### TradingView CDP
+Chrome DevTools Protocol-driven TradingView Desktop. `tv` CLI (`tv status`, `tv quote`, `tv pine compile`, `tv stream all`). Setup: [`docs/tradingview-cdp-setup.md`](docs/tradingview-cdp-setup.md).
 
-| Control | Implementation |
-|---------|----------------|
-| Network perimeter | Tailscale mesh — all inter-node traffic; no open ports to internet |
-| Auth | Basic-auth on dashboard; `CONTROL_PLANE_TOKEN` on control-plane (fails closed at 503) |
-| Secrets | GCP Secret Manager (prod); `~/.sapphire/secrets.env` (mode 0600, never in plists) |
-| Sensitivity classifier | `sensitivity_classifier.py` — regex blocks api_key/password/JWT/SSN/CC from reaching Kimi Cloud |
-| x402 paywall | HTTP 402 gate on inference-proxy; EVM signature verification (`lib/payments/`) |
-| Kill switches | Per-service `ENABLED=0` env var; circuit breaker in `lib/core/` |
-| Audit trail | All events to `data/system_events.jsonl`; BigQuery for long-term retention |
-| Prompt injection | `sensitivity_classifier` + hermes handler guards; `docs/prompt-injection-analysis-2026-04-15.md` |
-| Dependency scanning | `dependency-security-scan` scheduled task (Wednesday 4 AM) |
-| NIST alignment | `docs/nist-alignment.md` — full CSF control map |
+### GCP BigQuery + GCS
+`services/pipeline/gcp_sync.py`. Hourly watermarked sync of event bus → `sapphire-data-lake/raw/<source>/YYYY-MM-DD/` + `tho-ai-agent.sapphire.{signals,predictions,market_regime,threats,…}`. Schema doc: [`docs/gcp-data-engineering.md`](docs/gcp-data-engineering.md).
 
-See [`docs/opus-audit-2026-04-17.md`](docs/opus-audit-2026-04-17.md) for the full security audit.
+### Other satellite integrations
+x402 (Coinbase HTTP 402 micropayments), Hermes Agent (NousResearch, Telegram), Kimi Cloud fallback, Claw Code Rust runtime (plugin host).
 
 ---
 
-## Scheduled Routines (20 tasks)
+## Dashboard (31 pages)
 
-All in `~/.claude/scheduled-tasks/`. Run continuously when Claude Code is open.
+`services/dashboard/` — Flask + SSE, basic-auth protected, 10 s cached fetchers.
 
-| Task | Schedule | Description |
-|------|----------|-------------|
-| morning-briefing | 8:00 AM | 6-section digest → Telegram |
-| trading-research | 5:42 AM | TA predictions + scoring |
-| market-pulse | 8/12/4 PM M-F | Signal scan + paper trade stops |
-| threat-intel-sweep | 6:30 AM + 2 PM | CISA/NVD vulnerability feed |
-| github-discovery | 7:00 AM | Star sync + trending repos |
-| tho-production-healthcheck | every 2h | Watchdog |
-| tho-test-writer | 11 AM + 11 PM | Coverage growth |
-| creative-experimenter | 2:00 AM | Nightly R&D |
-| factory-test-guardian | 3 AM + 3 PM | All test suites |
-| factory-repo-fixer | every 6h | Auto-fix lint |
-| code-quality-sweep | 1:00 PM | Dead code, imports |
-| evening-digest | 6:00 PM | Daily summary → Telegram |
-| self-improvement | 8:53 PM | Priority recalibration |
-| sapphire-ci-monitor | every 3h | Lint + unit tests |
-| factory-client-delivery | 10 AM M-F | THO production output |
-| vote-monitor-collector | every 4h | DeFi pool snapshots |
-| dependency-security-scan | Wed 4 AM | Vuln + secret scan |
-| sapphire-weekly-review | Sun 9 AM | Architecture audit |
-| lead-generation | daily | Autonomous outreach |
-| pull-gcp-secrets | on-demand | GCP secret sync |
+| Category | Pages |
+|----------|-------|
+| **Command** | overview · command_deck · control · system · settings · platform |
+| **Trading** | signals · predictions · portfolio · performance · sapphire_book · risk |
+| **Intelligence** | intel · intelligence · chain · cascade · factors · agents |
+| **Content & ops** | content · organization · activity · logs |
+| **Security** | soc · security · health · infrastructure · production_readiness |
+| **Architecture** | architecture · analytics |
+| **Integrations** | robinhood_chain · admin_domains |
+
+SSE event stream at `/api/events/stream`. Performance endpoints wired to real trade data: `/api/strategy-performance`, `/api/performance-timeseries`, `/api/backtest-results`, `/api/forecast`.
 
 ---
 
-## Revenue Pipelines
+## Tool Architecture
 
-| Pipeline | Status | Description |
-|----------|--------|-------------|
-| Trading | Active (paper) | Autonomous signal generation; live execution pending live API keys |
-| THO (The Honest Operator) | Active | Client PM deliverables via control-plane; Cloud Run deployment |
-| Elite Net | Active | Outreach + lead engine (`lead_engine.py`, `lead_enrich.py`) |
-| x402 Inference | Implemented | HTTP 402 paywall on inference-proxy; EVM payment verification |
-| Content / Substack | Active | Weekly automated report → multi-platform publish |
+`plugins/claw-sapphire/` — claw-code plugin host.
+
+```
+tools/
+├── <name>.py              registered (8, agent-facing; in plugin.json)
+├── internal/<name>.py     internal   (24, invoked by scheduled tasks / hermes / services)
+└── _deprecated/<name>.py  deprecated (1, in sunset window)
+```
+
+**Registered (agent-facing, 15 tools + 1 namespace):** `dispatch`, `verify`, `budget`, `state`, `status`, `notify`, `health_check`, `market`, `predict_kronos`, `threat_intel`, `lumo_research`, `starred_repos`, `macro_data`, `lead_engine`, `trading_brain`.
+
+**Agent manifest** (`infra/agent-manifest.yaml`) — the lean 5-tool subset the LLM actually sees: `sapphire_market`, `sapphire_dispatch`, `sapphire_notify`, `sapphire_verify`, `sapphire_state`.
+
+**Registry invariants (CI-enforced by `scripts/validate_tool_registry.py`):**
+1. Every `.py` under `tools/` is in the registry (`infra/tool-registry.yaml`).
+2. Every registered tool file exists and parses.
+3. Every deprecated entry has a `warnings.warn(..., DeprecationWarning)` shim.
+4. `agent-manifest.yaml` is a strict subset of registered + `agent_facing: true`.
+
+**Shared libraries (10):** `technical_analysis`, `nemotron`, `quant_analysis`, `router`, `runtime_policy`, `token_governor`, `sensitivity_classifier`, `market_data`, `nvidia_agents`, `budget`.
+
+---
+
+## Smart Contracts
+
+`contracts/` — deployed to Robinhood Chain testnet (Arbitrum Orbit, chain ID 46630).
+
+| Contract | Purpose |
+|----------|---------|
+| `SapphireSignalVerifier.sol` | On-chain trading signal registry with operator-controlled verification and ZK-proof hash field for future verifiable computation |
+| `SapphirePaymentGate.sol` | Micropayment gate for paid inference / data endpoints |
+
+Deployment: `scripts/deploy_robinhood_chain.py`. Foundry config: `foundry.toml`. Addresses tracked in `data/chain/deployments.json`.
+
+---
+
+## Hardware Topology
+
+| Node | Role | Specs |
+|------|------|-------|
+| Mac M4 Pro (`100.67.171.79`) | Commander — all LaunchAgents, dashboard, signal logger, inference proxy, hermes gateway, OpenBB, Redis | M4 Pro, 48 GB unified RAM |
+| Windows GPU (`100.71.10.48`) | T1 inference + TradingView webhook + telemetry | RTX 5070 Ti 16 GB, Ollama with 28 models |
+| Pi `rari1` (`100.120.191.1`) | T2 inference | nemotron-mini, qwen2.5:0.5b, gemma2:2b, smollm2:1.7b |
+| Pi `rari2` (`100.87.225.89`) | T2 inference | Same roster as rari1 |
+
+**Mesh:** Tailscale — all inter-node traffic; ACL at `infra/tailscale-acl.json`. **SSH:** `ssh aribs@100.71.10.48` (Windows), direct access to Pis for ops.
+
+### Inference Proxy (`services/inference-proxy/`)
+
+| Tier | Host | Latency | Notes |
+|------|------|---------|-------|
+| T1 Windows GPU | `100.71.10.48:11434` | ~0.4 s | Native `/api/chat` (Windows Ollama `/v1/` returns empty) |
+| T2 Pi cluster | rari1 + rari2:`11434` | ~2–5 s | Lightweight models only; sensitivity-safe |
+| T3 Mac Ollama | `127.0.0.1:11434` | ~90 s | CPU inference fallback |
+| T4 Kimi Cloud | `api.moonshot.cn` | varies | Non-sensitive only — sensitivity classifier gates |
+
+**Model aliases:** `fast`/`quick` → nemotron-mini · `auto`/`balanced` → hermes3:8b · `deep` → qwen3:14b · `code` → gemma4 · `reason` → deepseek-r1:14b · `qwen-reason` → qwen3.5:9b · `cascade`/`moe` → nemotron-cascade-2 · `large` → qwen2.5:32b · `kimi` → kimi-cloud.
+
+**Endpoints:** `/v1/chat/completions` · `/v1/models` · `/health` · `/metrics` · x402-gated (optional).
 
 ---
 
 ## Quick Start
 
 ```bash
-# Requirements: Python 3.11+, ruff, Redis, Ollama, Node 18+
+# Requirements: Python 3.11+, Redis, Ollama, ruff
 
-# 1. Clone and install deps
+# 1. Install
 pip install -r services/alpha/requirements.txt
 pip install -r services/dashboard/requirements.txt
 
-# 2. Set secrets
+# 2. Secrets
 cp env.example .env
-cp .env.integrations.example .env.integrations  # content + chain keys
+cp .env.integrations.example .env.integrations
 export AUTH_PASSWORD=sapphire
-export TELEGRAM_BOT_TOKEN=<from @BotFather>
-export MOONSHOT_API_KEY=<optional, Kimi Cloud fallback>
+export TELEGRAM_BOT_TOKEN=<@BotFather>
+export SAPPHIRE_CONTROL_API_TOKEN=<random-hex>
 
-# 3. Start core services (or use LaunchAgents on Mac)
-python3 services/inference-proxy/app.py &                    # :11435
-cd services/alpha && python3 -m uvicorn src.signal_logger:app --port 18081 &
-cd services/dashboard && python3 app.py &                    # :8080
-cd services/control-plane && uvicorn app.main:app --port 8082 &
+# 3. Core services (or let the LaunchAgents in infra/launchagents/ run them)
+python3 services/inference-proxy/app.py &                          # :11435
+(cd services/alpha && python3 -m uvicorn src.signal_logger:app --port 18081) &
+(cd services/dashboard && python3 app.py) &                        # :8080
+(cd services/control-plane && uvicorn app.main:app --port 8082) &
 
-# 4. Health check
+# 4. Health
 curl -s http://127.0.0.1:11435/health | python3 -m json.tool
 curl -s http://127.0.0.1:18081/health
 
-# 5. Run plugin tools (all read stdin JSON)
+# 5. Plugin tools (all read stdin JSON)
 echo '{"action":"quote","symbol":"BTC/USDT"}' | python3 plugins/claw-sapphire/tools/market.py
-echo '{"action":"predict"}'                   | python3 plugins/claw-sapphire/tools/predict.py
+echo '{"action":"predict"}'                    | python3 plugins/claw-sapphire/tools/internal/predict.py
 
-# 6. Content engine
-python3 -m lib.content generate   # render weekly report
-python3 -m lib.content publish    # promote draft → ready/
+# 6. Content
+python3 -m lib.content generate
+python3 -m lib.content publish
 ```
 
 ---
@@ -372,18 +322,21 @@ python3 -m lib.content publish    # promote draft → ready/
 ## Testing
 
 ```bash
-# Unit tests (1606 passing, 1 skipped)
+# Unit tests — 1,919 passing
 /usr/local/bin/python3 -m pytest tests/unit/ --tb=short -q
 
-# Plugin tests (25 tests: budget, router, state, technical_analysis)
+# Plugin tests — 35 passing
 /usr/local/bin/python3 -m pytest plugins/claw-sapphire/tests/ -q
 
 # Lint
-ruff check .          # E501 ignored; see pyproject.toml
-ruff check --fix .    # auto-fix safe issues
+ruff check .
+ruff check --fix .
+
+# Tool registry invariant
+python3 scripts/validate_tool_registry.py
 ```
 
-> **Mac gotcha:** `python3` may resolve to Homebrew 3.14 which lacks pytest. Always use `/usr/local/bin/python3`.
+> **Mac gotcha:** `python3` may resolve to Homebrew 3.14 (no pytest). Use `/usr/local/bin/python3`.
 
 ---
 
@@ -394,40 +347,56 @@ ruff check --fix .    # auto-fix safe issues
 | `TELEGRAM_BOT_TOKEN` | Yes | Bot token from @BotFather |
 | `TELEGRAM_CHAT_ID` | Yes | Target chat/channel ID |
 | `AUTH_PASSWORD` | Yes | Dashboard basic-auth password |
-| `SAPPHIRE_CONTROL_API_TOKEN` | Yes | Control-plane token (fails closed at 503 if unset) |
-| `MOONSHOT_API_KEY` | No | Kimi Cloud fallback (stored in `~/.sapphire/secrets.env`) |
+| `SAPPHIRE_CONTROL_API_TOKEN` | Yes | Control-plane token (fails-closed 503 if unset) |
+| `MOONSHOT_API_KEY` | No | Kimi Cloud fallback (in `~/.sapphire/secrets.env`) |
 | `ANTHROPIC_API_KEY` | No | Claude API access |
 | `GEMINI_API_KEY` | No | Gemini integration |
 | `VIRUSTOTAL_API_KEY` | No | Threat analysis |
-| `GOOGLE_APPLICATION_CREDENTIALS` | No | GCP sync (points to ADC JSON) |
-| `GOOGLE_CLOUD_PROJECT` | No | GCP project ID (default: `tho-ai-agent`) |
-| `OPENCLAW_GATEWAY_URL` | No | OpenClaw agent gateway |
-| `ENABLED_VENUES` | No | Active trading venues (e.g. `ASTER;LIGHTER`) |
-| `X402_ENABLED` | No | Enable x402 paywall on inference-proxy |
-| `PI_RARI1_ENABLED` | No | Route inference requests to Pi rari1 |
-| `PI_RARI2_ENABLED` | No | Route inference requests to Pi rari2 |
+| `GOOGLE_APPLICATION_CREDENTIALS` | No | GCP sync ADC JSON |
+| `GOOGLE_CLOUD_PROJECT` | No | GCP project (default `tho-ai-agent`) |
+| `PALANTIR_FOUNDRY_URL` | No | Foundry stack URL |
+| `PALANTIR_FOUNDRY_TOKEN` | No | Foundry bearer token |
+| `X402_ENABLED` | No | Enable x402 paywall on inference proxy |
+| `PI_RARI1_ENABLED` / `PI_RARI2_ENABLED` | No | Route inference to Pi nodes |
+| `ROBINHOOD_CHAIN_RPC` | No | Robinhood Chain RPC endpoint |
 
-Content publishing and chain provider keys live in `.env.integrations` (see `.env.integrations.example`).
+Content + chain provider keys live in `.env.integrations`. Production secrets in GCP Secret Manager. **Never commit real values.**
 
-Production secrets are managed in GCP Secret Manager. Never commit real values.
+---
+
+## Revenue Pipelines
+
+| Pipeline | Status | Description |
+|----------|--------|-------------|
+| Trading — paper | Active | Autonomous signal generation with full risk stack |
+| Trading — Robinhood Crypto | Wired | Live account read; execution behind confirmation firewall |
+| THO client delivery | Active | PM deliverables via control-plane → Cloud Run |
+| Elite Net outreach | Active | Lead engine, enrichment, autonomous daily outreach |
+| x402 inference | Implemented | HTTP 402 micropayment gate on inference proxy |
+| Content | Active | Weekly automated report → Substack + X + LinkedIn + Typefully |
+| Buildathon (London) | Pitch-ready | Foundry ontology + Robinhood Chain showcase |
 
 ---
 
 ## Research
 
-The `docs/` directory contains 200K+ words of cross-validated research and planning:
+The `docs/` directory is 400K+ words of cross-validated architecture, audit, and planning work.
 
-| Document | Description |
-|----------|-------------|
+| Document | Purpose |
+|----------|---------|
 | [`docs/architecture-overview.md`](docs/architecture-overview.md) | Full module wiring, request lifecycles, data flows |
 | [`docs/opus-audit-2026-04-17.md`](docs/opus-audit-2026-04-17.md) | Security audit — source of current hardening |
-| [`docs/crypto-integrations-plan.md`](docs/crypto-integrations-plan.md) | x402 + on-chain integration roadmap |
 | [`docs/nist-alignment.md`](docs/nist-alignment.md) | NIST CSF control map |
+| [`docs/crypto-integrations-plan.md`](docs/crypto-integrations-plan.md) | x402, Zama FHE, Ika MPC, Aztec Noir, Robinhood Chain |
+| [`docs/foundry-strategy-2026-04-19.md`](docs/foundry-strategy-2026-04-19.md) | Palantir Foundry value thesis + integration plan |
+| [`docs/foundry-ontology-schema.md`](docs/foundry-ontology-schema.md) | Foundry object-type schema (PaperTrade, Signal, ChainMetric, ThreatAlert) |
+| [`docs/palantir-foundry-strategy-2026-04-19.md`](docs/palantir-foundry-strategy-2026-04-19.md) | Partnership-facing Foundry strategy |
 | [`docs/gcp-data-engineering.md`](docs/gcp-data-engineering.md) | Data lake design, BigQuery schema |
 | [`docs/kronos-integration-plan.md`](docs/kronos-integration-plan.md) | Kronos ML forecasting architecture |
+| [`docs/tradingview-cdp-setup.md`](docs/tradingview-cdp-setup.md) | TradingView CDP setup |
 | [`docs/QUICK_START_GUIDE.md`](docs/QUICK_START_GUIDE.md) | First-run setup |
 | [`docs/LOGGING.md`](docs/LOGGING.md) | Event + audit log schema |
-| [`docs/setup/`](docs/setup/) | Windows node bringup, Pi networking, Cloudflare DNS |
+| [`docs/setup/`](docs/setup/) | Windows bringup, Pi Ethernet bridge, Cloudflare DNS |
 
 ---
 
@@ -435,18 +404,16 @@ The `docs/` directory contains 200K+ words of cross-validated research and plann
 
 | Repo | Role |
 |------|------|
-| `instructkr/claw-code` | Rust agent runtime (orchestrates all plugins) |
+| `instructkr/claw-code` | Rust agent runtime (plugin host) |
 | `arigatoexpress/Project-Go-Forward` | THO client PM |
 | `arigatoexpress/regional-intel-workbench` | Regional intelligence platform |
 | `arigatoexpress/tradingview-mcp` | TradingView MCP server |
 | `arigatoexpress/crypto-tax-tracker` | Crypto tax engine |
 | `arigatoexpress/cyber-threat-bot` | Threat intel feeds |
-| `NousResearch/hermes-agent` | Conversational framework (Telegram bot) |
+| `NousResearch/hermes-agent` | Telegram conversational gateway |
 
 ---
 
 ## License
 
-Proprietary — see [`LICENSE`](LICENSE).
-
-All research, strategies, and implementations are private. Do not distribute.
+Proprietary — see [`LICENSE`](LICENSE). All research, strategies, and implementations are private. Do not distribute.
