@@ -49,12 +49,18 @@ jobs:
       - name: Install test deps
         run: |
           python -m pip install --upgrade pip
-          # Minimal runtime + test deps. Services have their own envs; this
-          # runs the fast in-process unit suite only.
+          # Union of deps the unit suite imports. Keep alphabetical; add
+          # here when a new test `ModuleNotFoundError`s in CI.
           python -m pip install \
+            aiohttp fastapi flask httpx requests websockets \
             pytest pytest-asyncio pytest-cov \
-            pydantic requests aiohttp fastapi flask httpx \
-            python-dateutil numpy pandas scikit-learn
+            pydantic python-dateutil orjson pyyaml redis \
+            numpy pandas scipy scikit-learn \
+            loguru python-dotenv \
+            google-cloud-firestore google-cloud-pubsub google-cloud-storage \
+            firebase-admin \
+            web3 eth-account \
+            cryptography certifi
       - name: pytest (unit)
         run: |
           pytest tests/unit/ \
@@ -76,7 +82,10 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pytest pytest-asyncio requests pyyaml
+          python -m pip install \
+            pytest pytest-asyncio \
+            requests pyyaml pydantic httpx \
+            pandas numpy
       - name: pytest (claw-sapphire)
         run: pytest plugins/claw-sapphire/tests/ -q
 
