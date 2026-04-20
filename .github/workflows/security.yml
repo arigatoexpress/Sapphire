@@ -38,6 +38,13 @@ jobs:
           osv-scanner --recursive --skip-git --format=sarif --output=osv.sarif ./ || true
       - uses: github/codeql-action/upload-sarif@v4
         if: always()
+        # Soft-fail until Code Scanning is enabled in repo Settings →
+        # Code security → Code scanning. Without that repo-level toggle,
+        # SARIF upload errors with "Code scanning is not enabled for this
+        # repository", which would mask actual scanner findings in the
+        # daily cron. The SARIF file is still generated and retained as
+        # a step artifact for manual inspection.
+        continue-on-error: true
         with:
           sarif_file: osv.sarif
           category: osv-scanner
@@ -57,6 +64,13 @@ jobs:
           ignore-unfixed: true
       - uses: github/codeql-action/upload-sarif@v4
         if: always()
+        # Soft-fail until Code Scanning is enabled in repo Settings →
+        # Code security → Code scanning. Without that repo-level toggle,
+        # SARIF upload errors with "Code scanning is not enabled for this
+        # repository", which would mask actual scanner findings in the
+        # daily cron. The SARIF file is still generated and retained as
+        # a step artifact for manual inspection.
+        continue-on-error: true
         with:
           sarif_file: trivy-fs.sarif
           category: trivy-fs
