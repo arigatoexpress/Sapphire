@@ -1,0 +1,30 @@
+# Default owner — Ari reviews everything
+* @arigatoexpress
+
+# CI / dev environment — require explicit review
+/.github/ @arigatoexpress
+/.pre-commit-config.yaml @arigatoexpress
+/pyproject.toml @arigatoexpress
+/Makefile @arigatoexpress
+/scripts/ops/ @arigatoexpress
+
+# Security-sensitive paths
+/lib/security/ @arigatoexpress
+/lib/core/kill_switch.py @arigatoexpress
+/lib/core/confirmation_firewall.py @arigatoexpress
+/lib/core/security_monitor.py @arigatoexpress
+/services/webhook/ @arigatoexpress
+/contracts/ @arigatoexpress
+/.git-secrets-patterns @arigatoexpress
+
+# Trading / execution critical path
+/lib/analytics/strategies.py @arigatoexpress
+/lib/analytics/risk_engine.py @arigatoexpress
+/lib/portfolio/robinhood.py @arigatoexpress
+/lib/trading/ @arigatoexpress
+/services/alpha/ @arigatoexpress
+
+# Authoritative docs
+/CLAUDE.md @arigatoexpress
+/README.md @arigatoexpress
+/docs/architecture-overview.md @arigatoexpress

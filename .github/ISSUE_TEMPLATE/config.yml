@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Sapphire OS docs
+    url: https://github.com/arigatoexpress/Sapphire/tree/main/docs
+    about: Architecture, setup, and runbooks live in /docs.
+  - name: CLAUDE.md
+    url: https://github.com/arigatoexpress/Sapphire/blob/main/CLAUDE.md
+    about: Project memory / map for agents and new collaborators.

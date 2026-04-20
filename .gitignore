@@ -87,6 +87,7 @@ services/control-plane/app/data/system_events.jsonl
 # Local-only state
 .claude/launch.json
 .claude/worktrees/
+.claude/scheduled_tasks.lock
 .claire/
 
 # Large benchmark/archived content — tracked separately if needed
