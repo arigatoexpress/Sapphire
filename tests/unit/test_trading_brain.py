@@ -15,7 +15,7 @@ from unittest.mock import patch
 import pytest
 
 # ── path setup ────────────────────────────────────────────────────────────────
-SAPPHIRE = Path.home() / "Code" / "Sapphire"
+SAPPHIRE = Path(__file__).resolve().parents[2]
 TOOLS = SAPPHIRE / "plugins" / "claw-sapphire" / "tools"
 LIB = SAPPHIRE / "plugins" / "claw-sapphire" / "lib"
 INTERNAL = TOOLS / "internal"

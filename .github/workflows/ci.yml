@@ -58,6 +58,7 @@ jobs:
             numpy pandas scipy scikit-learn \
             loguru python-dotenv \
             google-cloud-firestore google-cloud-pubsub google-cloud-storage \
+            google-generativeai \
             firebase-admin \
             web3 eth-account \
             cryptography certifi
