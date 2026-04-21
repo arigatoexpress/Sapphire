@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.sapphire.correlation-refresh</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/python3</string>
+        <string>-m</string>
+        <string>services.pipeline.correlation_refresh</string>
+    </array>
+
+    <!-- Hourly at minute :17 (offset from gcp-sync :05 to avoid burst) -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Minute</key>
+        <integer>17</integer>
+    </dict>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/aribs/Code/Sapphire</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>/Users/aribs</string>
+        <key>PYTHONPATH</key>
+        <string>/Users/aribs/Code/Sapphire</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/aribs/Library/Logs/sapphire/correlation-refresh.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/aribs/Library/Logs/sapphire/correlation-refresh.err</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>ThrottleInterval</key>
+    <integer>600</integer>
+</dict>
+</plist>
