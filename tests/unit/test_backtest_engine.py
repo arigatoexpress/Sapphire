@@ -158,8 +158,9 @@ def test_win_rate_is_fraction_not_percent() -> None:
     # stored it as a percent (0–100), causing format_table to print 5000.0%.
     # Force two wins out of four trades via a strategy that takes profit twice
     # and stops out twice.
+    from datetime import UTC, datetime, timedelta
+
     from lib.analytics.backtest_engine import Bar, run_backtest
-    from datetime import datetime, timedelta, UTC
 
     base = datetime(2026, 1, 1, tzinfo=UTC)
     bars: list[Bar] = []
