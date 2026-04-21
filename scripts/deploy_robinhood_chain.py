@@ -192,13 +192,25 @@ def _preflight() -> int:
     else:
         log.info("[ OK ] RPC %s (chain_id %d, block %d)", RPC_URL, chain_id, w3.eth.block_number)
 
-    # 3. Deploy key present
+    # 3. Deploy key present + parseable
     try:
         private_key = _load_private_key()
     except RuntimeError as exc:
         log.error("[FAIL] %s", exc)
         return 1 if status == 0 else status
-    account = Account.from_key(private_key)
+    try:
+        account = Account.from_key(private_key)
+    except Exception as exc:
+        # Account.from_key raises binascii.Error / ValueError /
+        # eth_keys.exceptions.ValidationError for non-hex, wrong length, or
+        # out-of-curve-range keys. Report uniformly and exit cleanly rather
+        # than letting the traceback escape.
+        log.error(
+            "[FAIL] deploy key could not be parsed (%s: %s). "
+            "Expected a 32-byte hex private key in $ROBINHOOD_DEPLOY_KEY or %s.",
+            type(exc).__name__, exc, SECRETS_FILE,
+        )
+        return 1
     log.info("[ OK ] deploy key loaded: %s", account.address)
 
     # 4. Balance sufficient

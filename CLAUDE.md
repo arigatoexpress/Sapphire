@@ -73,7 +73,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 
 ## Module Map
 
-**Key counts (tests verified 2026-04-19; LaunchAgents updated 2026-04-20):** 1,967 passing tests (1,932 core + 35 plugin) · 31 dashboard pages · 7 quant strategies · 11 LaunchAgents · 21 scheduled tasks · 2 smart contracts.
+**Key counts (verified 2026-04-21):** 2,001 passing tests (1,966 core + 35 plugin) · 31 dashboard pages · 7 quant strategies · 21 LaunchAgents (up from 11 after the 2026-04-21 audit folded in 10 previously-un-versioned production plists; see `docs/launchagents-audit-2026-04-21.md`) · 21 scheduled tasks · 2 smart contracts.
 
 | Path | Type | Description |
 |------|------|-------------|
@@ -111,7 +111,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `data/content/` | data | Content engine drafts + ready/ queue. |
 | `data/chain/` | data | Deployed contract addresses (`deployments.json`), chain snapshots. |
 | `data/benchmarks/kadima-labs/` | data | Kadima Labs AI benchmark (v1–v3). |
-| `infra/launchagents/` | infra | 11 macOS LaunchAgent plists (alpha-agent, content-engine, content-publisher, morning-brief, backtest-weekly, foundry-sync, heartbeat, market-intel, security-pipeline, self-optimization, tradingview-cdp) plus 1 disabled template. |
+| `infra/launchagents/` | infra | 21 macOS LaunchAgent plists (11 pre-existing + 10 folded in by the 2026-04-21 audit: chain-refresh, control-plane, correlation-refresh, daily-brief, gcp-sync, logrotate, openbb-api, signal-logger, telemetry-collector, threat-refresh) plus 1 disabled template. |
 | `infra/agent-manifest.yaml` | infra | Lean 5-tool subset the LLM sees. |
 | `infra/tool-registry.yaml` | infra | Full plugin tool registry (CI-enforced by `scripts/validate_tool_registry.py`). |
 | `infra/tailscale-acl.json` | infra | Tailscale mesh ACL. |

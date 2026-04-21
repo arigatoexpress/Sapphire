@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.sapphire.signal-logger</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/python3</string>
+        <string>-m</string>
+        <string>uvicorn</string>
+        <string>src.signal_logger:app</string>
+        <string>--host</string>
+        <string>0.0.0.0</string>
+        <string>--port</string>
+        <string>18081</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/aribs/Code/Sapphire/services/alpha</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/aribs/autonomy-status/logs/signal_logger.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/aribs/autonomy-status/logs/signal_logger.err</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>PAPER_TRADING</key>
+        <string>1</string>
+    </dict>
+</dict>
+</plist>

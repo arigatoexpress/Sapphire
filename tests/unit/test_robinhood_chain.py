@@ -444,3 +444,32 @@ class TestPreflightCheck:
              patch("web3.Web3.HTTPProvider", return_value=MagicMock()):
             rc = mod._preflight()
         assert rc == 1
+
+    @pytest.mark.parametrize(
+        "bad_key",
+        [
+            "not-a-real-key",              # non-hex
+            "0x" + "zz" * 32,              # hex-length but non-hex digits
+            "",                             # empty (but non-None, so _load_private_key accepts it)
+            "0xdeadbeef",                  # well-formed hex but wrong length
+        ],
+    )
+    def test_fails_cleanly_on_malformed_key(self, tmp_path, monkeypatch, bad_key):
+        """Codex review r3115206707: malformed key must not crash with traceback."""
+        mod = _load_deploy_module()
+        # Route key through SECRETS_FILE so _load_private_key returns a non-empty
+        # but invalid string even when the key is "" (env-var path would skip).
+        secrets = tmp_path / "robinhood_deploy_key"
+        secrets.write_text(bad_key or "placeholder-will-be-overridden")
+        monkeypatch.delenv("ROBINHOOD_DEPLOY_KEY", raising=False)
+        monkeypatch.setenv("ROBINHOOD_DEPLOY_KEY", bad_key or " ")  # whitespace keeps _load_private_key path simple
+        monkeypatch.setattr(mod, "SECRETS_FILE", secrets)
+        monkeypatch.setattr(mod, "DEPLOYMENTS_FILE", tmp_path / "deployments.json")
+
+        w3 = self._mock_w3()
+        with patch("web3.Web3", return_value=w3), \
+             patch("web3.Web3.HTTPProvider", return_value=MagicMock()):
+            rc = mod._preflight()
+        # Either the loader rejected an empty key (return 1) or Account.from_key
+        # raised and we caught it (return 1). Both land on a clean non-zero exit.
+        assert rc == 1

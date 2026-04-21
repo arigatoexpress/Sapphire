@@ -381,6 +381,155 @@ class TestRunSyncGracefulDegradation:
         assert result.ok is False
         assert tg.call_count == 1, "page once after post-success failure"
 
+    def test_404_before_first_success_demotes_to_not_configured(
+        self, tmp_path, monkeypatch, caplog
+    ):
+        """A 404 on upsert-action before any success means the ontology isn't
+        provisioned yet. Downgrade to INFO, route to the not_configured state,
+        and don't Telegram-alert. This keeps foundry-sync-err.log clean while
+        the user finishes setup, but preserves ERROR for real 4xx/5xx failures.
+        """
+        monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
+        monkeypatch.setenv("PALANTIR_FOUNDRY_TOKEN", "ok-tok")
+
+        signals_dir = tmp_path / "data" / "signals"
+        signals_dir.mkdir(parents=True)
+        (signals_dir / "2026-04-19.jsonl").write_text(
+            json.dumps({"pipeline_id": "t1", "symbol": "BTC"}) + "\n"
+        )
+
+        from lib.foundry.client import FoundryAPIError
+
+        with mock.patch(
+            "lib.foundry.client.FoundryClient.upsert_objects",
+            side_effect=FoundryAPIError(
+                "Foundry API POST /api/v2/ontologies/ontology/actions/sapphire-upsert/apply → 404",
+                status=404,
+            ),
+        ), mock.patch("lib.foundry.sync._send_telegram_alert") as tg, caplog.at_level(
+            "INFO"
+        ):
+            result = run_sync(tmp_path, dry_run=False, force=True)
+
+        assert tg.call_count == 0, "ontology-not-ready must not Telegram"
+        assert result.skipped is True, "should route to not_configured path"
+        assert result.ok is True
+        state_path = tmp_path / "data" / "foundry_sync_state.json"
+        state = json.loads(state_path.read_text())
+        assert state["last_status"] == "not_configured"
+        # Confirm the INFO line fired and no ERROR for the same 404
+        info_msgs = [r.getMessage() for r in caplog.records if r.levelname == "INFO"]
+        error_msgs = [r.getMessage() for r in caplog.records if r.levelname == "ERROR"]
+        assert any("skipped" in m and "404" in m for m in info_msgs), (
+            f"expected INFO log like 'Upload ... skipped (... 404) ...', got {info_msgs!r}"
+        )
+        assert not any("404" in m for m in error_msgs), (
+            "404 must be INFO, not ERROR, while ontology is unprovisioned"
+        )
+
+    def test_404_mixed_with_non_404_failure_does_not_demote(
+        self, tmp_path, monkeypatch, caplog
+    ):
+        """Codex review #106 P1 follow-up (r3117240955): if the batch mixes a
+        pre-success 404 with any other failure (e.g. 500), the run is a real
+        failure and must alert — not be silently demoted to not_configured.
+        """
+        monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
+        monkeypatch.setenv("PALANTIR_FOUNDRY_TOKEN", "ok-tok")
+
+        signals_dir = tmp_path / "data" / "signals"
+        signals_dir.mkdir(parents=True)
+        (signals_dir / "2026-04-19.jsonl").write_text(
+            json.dumps({"pipeline_id": "t1", "symbol": "BTC"}) + "\n"
+        )
+
+        from lib.foundry.client import FoundryAPIError
+
+        # First upload returns 404, second returns 500
+        side_effects = [
+            FoundryAPIError("not deployed → 404", status=404),
+            FoundryAPIError("server exploded → 500", status=500),
+        ]
+        with mock.patch.dict(
+            "lib.foundry.ingestion.ALL_TRANSFORMS",
+            {"TypeA": lambda r: [{"id": "a1"}], "TypeB": lambda r: [{"id": "b1"}]},
+            clear=True,
+        ), mock.patch(
+            "lib.foundry.client.FoundryClient.upsert_objects",
+            side_effect=side_effects,
+        ), mock.patch(
+            "lib.foundry.sync._send_telegram_alert"
+        ), caplog.at_level("INFO"):
+            result = run_sync(tmp_path, dry_run=False, force=True)
+
+        # The mixed-error case must NOT be demoted to not_configured —
+        # the 500 is a real failure that deserves visibility.
+        assert result.skipped is False, (
+            "mixed 404+500 must not silently demote to skipped/not_configured"
+        )
+        assert result.ok is False
+        state_path = tmp_path / "data" / "foundry_sync_state.json"
+        state = json.loads(state_path.read_text())
+        assert state["last_status"] == "error"
+        # The 500 ERROR log must be present.
+        error_msgs = [r.getMessage() for r in caplog.records if r.levelname == "ERROR"]
+        assert any("500" in m for m in error_msgs), (
+            f"expected an ERROR log for the 500; got {error_msgs!r}"
+        )
+
+    def test_404_after_first_success_pages_as_regression(
+        self, tmp_path, monkeypatch, caplog
+    ):
+        """Codex review #106 P1: once the sync has ever succeeded, a 404 is
+        a regression (action deleted / renamed / perms revoked), not a fresh
+        setup gap. Must page + stay at ERROR, not be silently demoted to
+        not_configured.
+        """
+        monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
+        monkeypatch.setenv("PALANTIR_FOUNDRY_TOKEN", "ok-tok")
+
+        # Pre-seed state as if we've synced successfully before
+        state_path = tmp_path / "data" / "foundry_sync_state.json"
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        state_path.write_text(json.dumps({
+            "files": {},
+            "last_sync": "2026-04-18T00:00:00+00:00",
+            "last_status": "ok",
+            "sync_count": 3,
+            "first_success_at": "2026-04-18T00:00:00+00:00",
+            "last_auth_warning_at": None,
+        }))
+
+        signals_dir = tmp_path / "data" / "signals"
+        signals_dir.mkdir(parents=True)
+        (signals_dir / "2026-04-19.jsonl").write_text(
+            json.dumps({"pipeline_id": "t1", "symbol": "BTC"}) + "\n"
+        )
+
+        from lib.foundry.client import FoundryAPIError
+
+        with mock.patch(
+            "lib.foundry.client.FoundryClient.upsert_objects",
+            side_effect=FoundryAPIError(
+                "Foundry API POST /api/v2/ontologies/ontology/actions/sapphire-upsert/apply → 404",
+                status=404,
+            ),
+        ), mock.patch("lib.foundry.sync._send_telegram_alert") as tg, caplog.at_level(
+            "INFO"
+        ):
+            result = run_sync(tmp_path, dry_run=False, force=True)
+
+        assert result.ok is False, "post-success 404 must report failure, not ok=True"
+        assert result.skipped is False, "must not demote to skipped/not_configured"
+        assert tg.call_count == 1, "post-success 404 must Telegram (regression)"
+        state = json.loads(state_path.read_text())
+        assert state["last_status"] == "error", "status must reflect the regression"
+        # ERROR path, not INFO
+        error_msgs = [r.getMessage() for r in caplog.records if r.levelname == "ERROR"]
+        assert any("404" in m for m in error_msgs), (
+            f"expected ERROR carrying 404 once first_success_at is set; got ERRORs={error_msgs!r}"
+        )
+
 
 class TestAuthWarningFresh:
     def test_none(self):

@@ -334,6 +334,7 @@ def run_sync(
     uploaded_anything = False
     if not dry_run:
         from lib.foundry.client import (
+            FoundryAPIError,
             FoundryAuthError,
             FoundryClient,
             FoundryConfigError,
@@ -354,6 +355,21 @@ def run_sync(
             client = None
 
         if client is not None:
+            # A 404 on the upsert action means the ontology/action pair hasn't
+            # been deployed on Foundry yet — it's a setup step, not a runtime
+            # failure. Downgrade the log level so the error file doesn't fill
+            # with one identical ERROR line per 15-min cycle while Ari is still
+            # provisioning the ontology.
+            #
+            # IMPORTANT (codex review #106): only demote 404s while the sync
+            # has *never* succeeded. Once `state.first_success_at` is set, the
+            # ontology has existed before, so a fresh 404 is a real regression
+            # (action deleted / renamed / permissions revoked) and must stay at
+            # ERROR + Telegram-alerting. Otherwise a broken prod ontology
+            # silently looks like "skipped, no problem here".
+            never_succeeded = state.first_success_at is None
+            saw_404 = False
+            saw_non_404_failure = False  # includes auth, non-404 API, generic FoundryError
             for obj_type, objects in objects_by_type.items():
                 if not objects:
                     continue
@@ -364,12 +380,38 @@ def run_sync(
                     log.info("Uploaded %d %s objects", len(objects), obj_type)
                 except FoundryAuthError as exc:
                     auth_failed = True
+                    saw_non_404_failure = True
                     result.errors.append(f"Upload {obj_type}: {exc}")
                     log.error("Upload %s auth failed: %s", obj_type, exc)
                     break  # Don't hammer failing auth on every object type.
+                except FoundryAPIError as exc:
+                    result.errors.append(f"Upload {obj_type}: {exc}")
+                    if exc.status == 404 and not uploaded_anything and never_succeeded:
+                        saw_404 = True
+                        log.info(
+                            "Upload %s skipped (ontology action not deployed; "
+                            "HTTP 404) — finish Foundry ontology provisioning to enable",
+                            obj_type,
+                        )
+                    else:
+                        saw_non_404_failure = True
+                        log.error("Upload %s failed: %s", obj_type, exc)
                 except FoundryError as exc:
+                    saw_non_404_failure = True
                     log.error("Upload %s failed: %s", obj_type, exc)
                     result.errors.append(f"Upload {obj_type}: {exc}")
+            # Only demote to not_configured when EVERY failure was a pre-first-
+            # success 404. If the batch mixed a 404 with any other failure
+            # (500, timeout, auth, etc.), the run is a genuine error and must
+            # alert through the standard path — not be silently swallowed.
+            # (codex review #106 P1 follow-up: r3117240955)
+            if (
+                saw_404
+                and not saw_non_404_failure
+                and not uploaded_anything
+                and never_succeeded
+            ):
+                config_missing = True
     else:
         for obj_type, objects in objects_by_type.items():
             result.uploaded_types[obj_type] = len(objects)
