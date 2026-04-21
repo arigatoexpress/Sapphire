@@ -194,7 +194,7 @@ def _trade_metrics(
         "sharpe": sharpe_ratio(returns),
         "sortino": sortino_ratio(returns),
         "max_drawdown_pct": max_drawdown_pct(equity),
-        "win_rate": len(wins) / len(trades) * 100,
+        "win_rate": len(wins) / len(trades),
         "profit_factor": (total_wins / total_losses) if total_losses > 0 else 999.0,
         "n_trades": float(len(trades)),
     }
@@ -310,7 +310,7 @@ def run_cpcv_backtest(
             sharpe=round(m["sharpe"], 3),
             sortino=round(m["sortino"], 3),
             max_drawdown_pct=round(m["max_drawdown_pct"], 3),
-            win_rate=round(m["win_rate"], 2),
+            win_rate=round(m["win_rate"], 4),
             profit_factor=round(min(m["profit_factor"], 999.0), 3),
         ))
 
@@ -340,7 +340,7 @@ def run_cpcv_backtest(
         std_sortino=round(statistics.pstdev(sortinos) if len(sortinos) > 1 else 0.0, 3),
         min_sortino=round(min(sortinos), 3),
         mean_max_drawdown=round(statistics.fmean(dds), 3),
-        mean_win_rate=round(statistics.fmean(wrs), 2),
+        mean_win_rate=round(statistics.fmean(wrs), 4),
         mean_profit_factor=round(min(statistics.fmean(pfs), 999.0), 3),
         sharpe_cv=sharpe_cv,
     )

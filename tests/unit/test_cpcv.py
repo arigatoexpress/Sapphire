@@ -115,8 +115,30 @@ def test_trade_metrics_single_win() -> None:
     result = run_backtest("X", bars=bars, signal_fn=always_buy)
     if result.trades:
         m = _trade_metrics(result.trades)
-        assert 0.0 <= m["win_rate"] <= 100.0
+        assert 0.0 <= m["win_rate"] <= 1.0
         assert m["n_trades"] == float(len(result.trades))
+
+
+def test_trade_metrics_win_rate_is_fraction() -> None:
+    """Regression: win_rate must be a fraction in [0, 1], not a percent.
+
+    Aligns with backtest.py, backtest_engine.py, strategy_performance.py,
+    risk_engine.py — all fractions post-PR #102.
+    """
+    from lib.analytics.backtest_engine import Trade
+
+    def _t(pnl: float) -> Trade:
+        return Trade(
+            symbol="X", direction="long",
+            entry_ts="2026-01-01", entry_price=100.0,
+            exit_ts="2026-01-02", exit_price=100.0 + pnl / 10.0,
+            size_usd=1000.0, pnl_usd=pnl, pnl_pct=pnl / 10.0,
+            hold_bars=1, exit_reason="take_profit" if pnl > 0 else "stop_loss",
+        )
+
+    m = _trade_metrics([_t(100.0), _t(-100.0)])
+    assert m["win_rate"] == 0.5
+    assert f"{m['win_rate']:.1%}" == "50.0%"
 
 
 # ── run_cpcv_backtest ──────────────────────────────────────────────────────────
