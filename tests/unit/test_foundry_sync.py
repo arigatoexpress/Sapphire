@@ -427,6 +427,59 @@ class TestRunSyncGracefulDegradation:
             "404 must be INFO, not ERROR, while ontology is unprovisioned"
         )
 
+    def test_404_after_first_success_pages_as_regression(
+        self, tmp_path, monkeypatch, caplog
+    ):
+        """Codex review #106 P1: once the sync has ever succeeded, a 404 is
+        a regression (action deleted / renamed / perms revoked), not a fresh
+        setup gap. Must page + stay at ERROR, not be silently demoted to
+        not_configured.
+        """
+        monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
+        monkeypatch.setenv("PALANTIR_FOUNDRY_TOKEN", "ok-tok")
+
+        # Pre-seed state as if we've synced successfully before
+        state_path = tmp_path / "data" / "foundry_sync_state.json"
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        state_path.write_text(json.dumps({
+            "files": {},
+            "last_sync": "2026-04-18T00:00:00+00:00",
+            "last_status": "ok",
+            "sync_count": 3,
+            "first_success_at": "2026-04-18T00:00:00+00:00",
+            "last_auth_warning_at": None,
+        }))
+
+        signals_dir = tmp_path / "data" / "signals"
+        signals_dir.mkdir(parents=True)
+        (signals_dir / "2026-04-19.jsonl").write_text(
+            json.dumps({"pipeline_id": "t1", "symbol": "BTC"}) + "\n"
+        )
+
+        from lib.foundry.client import FoundryAPIError
+
+        with mock.patch(
+            "lib.foundry.client.FoundryClient.upsert_objects",
+            side_effect=FoundryAPIError(
+                "Foundry API POST /api/v2/ontologies/ontology/actions/sapphire-upsert/apply → 404",
+                status=404,
+            ),
+        ), mock.patch("lib.foundry.sync._send_telegram_alert") as tg, caplog.at_level(
+            "INFO"
+        ):
+            result = run_sync(tmp_path, dry_run=False, force=True)
+
+        assert result.ok is False, "post-success 404 must report failure, not ok=True"
+        assert result.skipped is False, "must not demote to skipped/not_configured"
+        assert tg.call_count == 1, "post-success 404 must Telegram (regression)"
+        state = json.loads(state_path.read_text())
+        assert state["last_status"] == "error", "status must reflect the regression"
+        # ERROR path, not INFO
+        error_msgs = [r.getMessage() for r in caplog.records if r.levelname == "ERROR"]
+        assert any("404" in m for m in error_msgs), (
+            f"expected ERROR carrying 404 once first_success_at is set; got ERRORs={error_msgs!r}"
+        )
+
 
 class TestAuthWarningFresh:
     def test_none(self):

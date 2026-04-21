@@ -28,7 +28,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-mkdir -p "$TARGET_DIR" "$LOG_DIR" "$AUTONOMY_LOG_DIR"
+# Only touch the filesystem outside of dry-run. Creating the LaunchAgents
+# directory or log dirs under a pure read-only inspection would violate the
+# "no writes" contract and surprise CI/ops callers.
+if [[ "$DRY_RUN" -eq 0 ]]; then
+  mkdir -p "$TARGET_DIR" "$LOG_DIR" "$AUTONOMY_LOG_DIR"
+fi
 
 uid=$(id -u)
 installed=0

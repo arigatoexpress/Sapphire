@@ -359,7 +359,15 @@ def run_sync(
             # been deployed on Foundry yet — it's a setup step, not a runtime
             # failure. Downgrade the log level so the error file doesn't fill
             # with one identical ERROR line per 15-min cycle while Ari is still
-            # provisioning the ontology. Other 4xx/5xx codes stay at ERROR.
+            # provisioning the ontology.
+            #
+            # IMPORTANT (codex review #106): only demote 404s while the sync
+            # has *never* succeeded. Once `state.first_success_at` is set, the
+            # ontology has existed before, so a fresh 404 is a real regression
+            # (action deleted / renamed / permissions revoked) and must stay at
+            # ERROR + Telegram-alerting. Otherwise a broken prod ontology
+            # silently looks like "skipped, no problem here".
+            never_succeeded = state.first_success_at is None
             ontology_not_ready = False
             for obj_type, objects in objects_by_type.items():
                 if not objects:
@@ -376,7 +384,7 @@ def run_sync(
                     break  # Don't hammer failing auth on every object type.
                 except FoundryAPIError as exc:
                     result.errors.append(f"Upload {obj_type}: {exc}")
-                    if exc.status == 404 and not uploaded_anything:
+                    if exc.status == 404 and not uploaded_anything and never_succeeded:
                         ontology_not_ready = True
                         log.info(
                             "Upload %s skipped (ontology action not deployed; "
@@ -388,9 +396,11 @@ def run_sync(
                 except FoundryError as exc:
                     log.error("Upload %s failed: %s", obj_type, exc)
                     result.errors.append(f"Upload {obj_type}: {exc}")
-            if ontology_not_ready and not uploaded_anything:
+            if ontology_not_ready and not uploaded_anything and never_succeeded:
                 # Whole batch was blocked by the same setup gap — demote to
-                # the "not configured" path so alerting stays quiet.
+                # the "not configured" path so alerting stays quiet. This
+                # guard doesn't fire post-first-success, so regressions after
+                # a prior successful sync still page via the standard path.
                 config_missing = True
     else:
         for obj_type, objects in objects_by_type.items():
