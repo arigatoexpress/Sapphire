@@ -437,7 +437,7 @@ def _finalize(
     total_wins = sum(t.pnl_usd for t in wins)
     total_losses = abs(sum(t.pnl_usd for t in losses))
     profit_factor = (total_wins / total_losses) if total_losses > 0 else float("inf") if total_wins > 0 else 0.0
-    win_rate = (len(wins) / len(trades) * 100) if trades else 0.0
+    win_rate = (len(wins) / len(trades)) if trades else 0.0
     avg_win = (total_wins / len(wins)) if wins else 0.0
     avg_loss = (-total_losses / len(losses)) if losses else 0.0
     avg_trade = sum(t.pnl_usd for t in trades) / len(trades) if trades else 0.0
@@ -458,7 +458,7 @@ def _finalize(
         sortino=round(sortino, 3),
         max_drawdown_pct=round(max_dd, 3),
         calmar=round(calmar, 3),
-        win_rate=round(win_rate, 2),
+        win_rate=round(win_rate, 4),
         profit_factor=round(profit_factor, 3) if math.isfinite(profit_factor) else 999.0,
         avg_trade_pnl=round(avg_trade, 2),
         avg_win=round(avg_win, 2),
