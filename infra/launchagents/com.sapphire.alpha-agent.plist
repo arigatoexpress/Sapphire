@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.sapphire.alpha-agent</string>
+
+    <key>Program</key>
+    <string>/usr/local/bin/python3</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/python3</string>
+        <string>-m</string>
+        <string>lib.agents.runner</string>
+        <string>--agent</string>
+        <string>alpha</string>
+        <string>--interval</string>
+        <string>300</string>
+    </array>
+
+    <!-- Paper-only evaluator; no live order dispatch -->
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>ThrottleInterval</key>
+    <integer>60</integer>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/aribs/Code/Sapphire</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>/Users/aribs</string>
+        <key>PYTHONPATH</key>
+        <string>/Users/aribs/Code/Sapphire</string>
+        <key>PYTHONUNBUFFERED</key>
+        <string>1</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/aribs/Library/Logs/sapphire/alpha-agent.out</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/aribs/Library/Logs/sapphire/alpha-agent.err</string>
+</dict>
+</plist>

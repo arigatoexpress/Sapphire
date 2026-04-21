@@ -153,7 +153,7 @@ def format_summary(rows: list[dict], actions: list[dict]) -> str:
 def send_summary(summary: str, priority: str = "p2") -> dict:
     """Send via safe_send. Returns API result dict."""
     try:
-        from sapphire_telegram.safe_send import send
+        from lib.telegram.src.sapphire_telegram.safe_send import send
         return send(summary, priority=priority, prefix=True, banner=None)
     except ImportError as e:
         log.warning("safe_send unavailable: %s", e)

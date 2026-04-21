@@ -212,10 +212,7 @@ def load_sync_history(root: Path | None = None, *, limit: int = 50) -> list[dict
 def _send_telegram_alert(message: str) -> None:
     """Best-effort Telegram notification on sync failure."""
     try:
-        # Reuse Sapphire's existing telegram helper if available.
-        # sapphire_telegram is a top-level package (lib/telegram/src is on
-        # sys.path; see tests/conftest.py:44).
-        from sapphire_telegram.safe_send import send
+        from lib.telegram.src.sapphire_telegram.safe_send import send
         send(message, priority="high")
         return
     except Exception:
