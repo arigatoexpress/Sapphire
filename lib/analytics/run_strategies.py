@@ -126,7 +126,7 @@ def run(days: int = 90, bankroll: float = 10_000.0) -> list[SweepResult]:
     bars_map = _load_all_bars(fetch_syms, days)
 
     # Filter to symbols that actually loaded
-    active_symbols = [s for s in SYMBOLS if len(bars_map.get(s, [])) >= 25]
+    active_symbols = [s for s in SYMBOLS if bars_map.get(s)]
     if not active_symbols:
         log.error("No symbols loaded — check yfinance connectivity")
         return []
@@ -168,7 +168,7 @@ def run(days: int = 90, bankroll: float = 10_000.0) -> list[SweepResult]:
         strat = SapphireComposite(params)
         for sym in active_symbols:
             bars = bars_map.get(sym, [])
-            if len(bars) < 25:
+            if not bars:
                 continue
             report = engine.run(bars, strat, sym, aux_map.get(sym, {}))
             all_results.append(SweepResult(

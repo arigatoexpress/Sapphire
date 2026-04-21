@@ -685,7 +685,7 @@ def sweep_params(
 
         for sym in symbols:
             bars = bars_map.get(sym, [])
-            if len(bars) < 25:
+            if not bars:
                 continue
             report = engine.run(bars, strat, sym, aux_map.get(sym, {}))
             results.append(SweepResult(

@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block title %}Autonomous Agents{% endblock %}
+
+{% block extra_css %}
+<style>
+    .perf-hero {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1px;
+        background: var(--border-color);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 24px;
+    }
+    .perf-cell {
+        background: rgba(11, 11, 26, 0.9);
+        padding: 22px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        transition: background 150ms ease;
+    }
+    .perf-cell:hover { background: rgba(18, 18, 36, 0.95); }
+    .perf-label {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+    }
+    .perf-value {
+        font-size: 36px;
+        font-weight: 600;
+        line-height: 1.05;
+        font-family: var(--font-terminal);
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.02em;
+        color: var(--text-primary);
+    }
+    .perf-value.amber {
+        color: var(--amber);
+        text-shadow: var(--glow-amber);
+    }
+    .perf-sub {
+        font-size: 12px;
+        color: var(--text-secondary);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .perf-section {
+        margin-bottom: 24px;
+    }
+    .perf-section-title {
+        font-family: var(--font-header);
+        font-size: 1.1rem;
+        color: var(--amber);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 14px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--border-dim);
+    }
+    .perf-section-title::before { content: '[ '; color: var(--text-muted); }
+    .perf-section-title::after  { content: ' ]'; color: var(--text-muted); }
+
+    .strat-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.8rem;
+    }
+    .strat-table th {
+        text-align: left;
+        padding: 10px 12px;
+        color: #b8e8b0;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.7rem;
+        font-weight: 500;
+        border-bottom: 1px solid var(--border-color);
+        white-space: nowrap;
+    }
+    .strat-table td {
+        padding: 10px 12px;
+        border-bottom: 1px solid rgba(98, 255, 64, 0.05);
+        color: #d4f2cc;
+        font-variant-numeric: tabular-nums;
+        vertical-align: top;
+    }
+    .strat-table tbody tr:nth-child(odd) td {
+        background: rgba(98, 255, 64, 0.025);
+    }
+    .strat-table tbody tr:hover td {
+        background: rgba(98, 255, 64, 0.09);
+        color: #e8ffde;
+    }
+    .table-scroll {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .event-type {
+        color: var(--cyan);
+        font-weight: 500;
+    }
+    .empty-state {
+        padding: 24px;
+        color: var(--text-muted);
+        text-align: center;
+    }
+
+    @media (max-width: 900px) {
+        .perf-hero { grid-template-columns: 1fr; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="perf-hero">
+    <div class="perf-cell">
+        <span class="perf-label">Last Cycle Timestamp</span>
+        <span class="perf-value amber">{{ last_cycle_timestamp or "—" }}</span>
+        <span class="perf-sub">Most recent `agent.cycle.completed` event on the bus.</span>
+    </div>
+    <div class="perf-cell">
+        <span class="perf-label">Cycle Count</span>
+        <span class="perf-value">{{ cycle_count }}</span>
+        <span class="perf-sub">Highest observed per-agent cycle counter from heartbeat files.</span>
+    </div>
+</div>
+
+<div class="perf-section">
+    <div class="perf-section-title">Agent Heartbeats</div>
+    <div class="panel" style="padding: 0; margin-bottom: 0;">
+        {% if heartbeats %}
+        <div class="table-scroll">
+            <table class="strat-table">
+                <thead>
+                    <tr>
+                        <th>Agent</th>
+                        <th>Heartbeat Age</th>
+                        <th>Cycle Count</th>
+                        <th>Last Cycle</th>
+                        <th>File Updated</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for heartbeat in heartbeats %}
+                    <tr>
+                        <td class="event-type">{{ heartbeat.name }}</td>
+                        <td>
+                            {% if heartbeat.age_sec is not none %}
+                            {{ heartbeat.age_sec }}s
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                        <td>{{ heartbeat.cycle_count }}</td>
+                        <td>{{ heartbeat.last_cycle_completed_at or "—" }}</td>
+                        <td>{{ heartbeat.updated_at or "—" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">No heartbeat files found in `data/agents/` yet.</div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="perf-section">
+    <div class="perf-section-title">Recent Agent Events</div>
+    <div class="panel" style="padding: 0; margin-bottom: 0;">
+        {% if events %}
+        <div class="table-scroll">
+            <table class="strat-table">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Event</th>
+                        <th>Agent</th>
+                        <th>Payload</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for event in events %}
+                    <tr>
+                        <td>{{ event.ts or "—" }}</td>
+                        <td class="event-type">{{ event.type }}</td>
+                        <td>{{ event.data.agent or event.agent }}</td>
+                        <td><code style="white-space: pre-wrap; word-break: break-word;">{{ event.data | tojson }}</code></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">No `agent.*` events have been written to `data/events/bus.jsonl` yet.</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -56,7 +56,8 @@ def _write_substack(report: Report, stamp: str) -> tuple[Path, quality.QualityRe
 def _write_x(report: Report, stamp: str) -> tuple[Path, quality.QualityReport]:
     thread = formatters.format_x_thread(report)
     combined = "\n\n".join(thread)
-    q = quality.check(combined, facts=report.facts)
+    # Tweets are short-form — relax coherence threshold like LinkedIn
+    q = quality.check(combined, min_coherence=0.2, facts=report.facts)
     path = READY_ROOT / "x" / f"{stamp}_{report.kind}.jsonl"
     with path.open("w") as f:
         for i, tweet in enumerate(thread):
