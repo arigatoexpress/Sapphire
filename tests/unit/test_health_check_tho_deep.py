@@ -14,7 +14,10 @@ import urllib.error
 from pathlib import Path
 from unittest.mock import patch
 
-SAPPHIRE = Path.home() / "Code" / "Sapphire"
+# Resolve repo root from this file's path so the test works in any checkout
+# location (local, worktrees, GitHub Actions runners at /home/runner/work/...).
+# Tests are at <repo>/tests/unit/, so parents[2] == <repo>.
+SAPPHIRE = Path(__file__).resolve().parents[2]
 INTERNAL = SAPPHIRE / "plugins" / "claw-sapphire" / "tools" / "internal"
 
 _spec = importlib.util.spec_from_file_location("health_check_internal", INTERNAL / "health_check.py")

@@ -15,14 +15,9 @@ from __future__ import annotations
 import json
 import logging
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-
-try:
-    from datetime import UTC
-except ImportError:
-    UTC = timezone.utc  # type: ignore[assignment]
 
 log = logging.getLogger(__name__)
 
