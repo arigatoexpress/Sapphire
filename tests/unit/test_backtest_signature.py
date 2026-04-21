@@ -58,3 +58,22 @@ def test_run_strategies_days_7_still_writes_artifact(tmp_path, monkeypatch):
 
     assert best
     assert any(out_dir.glob("strategy_sweep_*.json"))
+
+
+def test_backtest_engine_run_normalizes_percent_to_fraction():
+    """SweepResult fields must be fractions (0-1), not percents (0-100).
+
+    backtest_engine emits win_rate/total_return_pct/max_drawdown_pct as percents
+    (e.g., 50.0 for 50%). The /performance dashboard and format_table both assume
+    fractions — the BacktestEngine.run bridge divides by 100 so the contract holds.
+    """
+    from lib.analytics.strategies import BacktestEngine, RegimeAwareRSI
+
+    bars = _synthetic_bars("SYN", 120)
+    result = BacktestEngine(bankroll=10_000.0).run(bars, RegimeAwareRSI(), "SYN")
+
+    for field_name in ("win_rate", "total_return_pct", "max_drawdown_pct"):
+        v = getattr(result, field_name)
+        assert v is None or -1.5 <= v <= 1.5, (
+            f"{field_name}={v!r} is outside fraction range; percent-scale leak suspected"
+        )
