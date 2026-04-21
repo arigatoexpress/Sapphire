@@ -352,7 +352,7 @@ def _section_health() -> dict:
     try:
         import subprocess
         r = subprocess.run(
-            ["/usr/local/bin/python3", str(health_tool)],
+            [sys.executable, str(health_tool)],
             input=json.dumps({"profile": "brief"}),
             capture_output=True,
             text=True,
