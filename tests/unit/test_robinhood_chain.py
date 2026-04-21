@@ -354,3 +354,93 @@ class TestDeployScript:
         content = foundry_toml.read_text()
         assert "46630" in content
         assert "robinhood_testnet" in content
+
+
+# ---------------------------------------------------------------------------
+# deploy script — --check preflight
+# ---------------------------------------------------------------------------
+
+def _load_deploy_module():
+    """Load scripts/deploy_robinhood_chain.py without running main()."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "deploy_robinhood_chain",
+        ROOT / "scripts" / "deploy_robinhood_chain.py",
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+class TestPreflightCheck:
+    """_preflight() is the read-only readiness gate for deploy."""
+
+    def _mock_w3(self, *, connected=True, chain_id=46630, balance_wei=int(0.05 * 1e18), block=42):
+        w3 = MagicMock()
+        w3.is_connected.return_value = connected
+        w3.eth.chain_id = chain_id
+        w3.eth.block_number = block
+        w3.eth.get_balance.return_value = balance_wei
+        w3.from_wei.side_effect = lambda v, unit: v / 1e18 if unit == "ether" else v / 1e9
+        return w3
+
+    def test_passes_when_all_prereqs_met(self, tmp_path, monkeypatch):
+        mod = _load_deploy_module()
+        fake_key = "0x" + "ab" * 32
+        monkeypatch.setenv("ROBINHOOD_DEPLOY_KEY", fake_key)
+        monkeypatch.setattr(mod, "DEPLOYMENTS_FILE", tmp_path / "deployments.json")
+
+        w3 = self._mock_w3()
+        with patch.object(mod, "Web3" if hasattr(mod, "Web3") else "web3", create=True), \
+             patch("web3.Web3", return_value=w3), \
+             patch("web3.Web3.HTTPProvider", return_value=MagicMock()):
+            rc = mod._preflight()
+        assert rc == 0
+
+    def test_fails_when_no_key(self, tmp_path, monkeypatch):
+        mod = _load_deploy_module()
+        monkeypatch.delenv("ROBINHOOD_DEPLOY_KEY", raising=False)
+        monkeypatch.setattr(mod, "SECRETS_FILE", tmp_path / "missing_key")
+        monkeypatch.setattr(mod, "DEPLOYMENTS_FILE", tmp_path / "deployments.json")
+
+        w3 = self._mock_w3()
+        with patch("web3.Web3", return_value=w3), \
+             patch("web3.Web3.HTTPProvider", return_value=MagicMock()):
+            rc = mod._preflight()
+        assert rc == 1
+
+    def test_fails_on_chain_id_mismatch(self, tmp_path, monkeypatch):
+        mod = _load_deploy_module()
+        fake_key = "0x" + "ab" * 32
+        monkeypatch.setenv("ROBINHOOD_DEPLOY_KEY", fake_key)
+        monkeypatch.setattr(mod, "DEPLOYMENTS_FILE", tmp_path / "deployments.json")
+
+        w3 = self._mock_w3(chain_id=1)  # wrong chain
+        with patch("web3.Web3", return_value=w3), \
+             patch("web3.Web3.HTTPProvider", return_value=MagicMock()):
+            rc = mod._preflight()
+        assert rc == 1
+
+    def test_fails_on_insufficient_balance(self, tmp_path, monkeypatch):
+        mod = _load_deploy_module()
+        fake_key = "0x" + "ab" * 32
+        monkeypatch.setenv("ROBINHOOD_DEPLOY_KEY", fake_key)
+        monkeypatch.setattr(mod, "DEPLOYMENTS_FILE", tmp_path / "deployments.json")
+
+        w3 = self._mock_w3(balance_wei=int(0.001 * 1e18))  # below 0.01 floor
+        with patch("web3.Web3", return_value=w3), \
+             patch("web3.Web3.HTTPProvider", return_value=MagicMock()):
+            rc = mod._preflight()
+        assert rc == 1
+
+    def test_fails_when_rpc_unreachable(self, tmp_path, monkeypatch):
+        mod = _load_deploy_module()
+        fake_key = "0x" + "ab" * 32
+        monkeypatch.setenv("ROBINHOOD_DEPLOY_KEY", fake_key)
+        monkeypatch.setattr(mod, "DEPLOYMENTS_FILE", tmp_path / "deployments.json")
+
+        w3 = self._mock_w3(connected=False)
+        with patch("web3.Web3", return_value=w3), \
+             patch("web3.Web3.HTTPProvider", return_value=MagicMock()):
+            rc = mod._preflight()
+        assert rc == 1

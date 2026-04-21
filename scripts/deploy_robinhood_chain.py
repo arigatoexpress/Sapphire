@@ -9,7 +9,14 @@ Private key lookup order:
 Deployed addresses are written to data/chain/deployments.json.
 
 Usage:
-    python3 scripts/deploy_robinhood_chain.py [--dry-run] [--verify]
+    python3 scripts/deploy_robinhood_chain.py [--check | --dry-run | --verify]
+
+Modes:
+    --check     Read-only preflight: RPC reachable, chain ID matches,
+                deploy key present, deployer balance sufficient. No compile,
+                no deploy. Safe to run anywhere.
+    --dry-run   Compile contracts only (requires py-solc-x). No deploy.
+    (default)   Full deploy: compile + broadcast + save deployment record.
 """
 from __future__ import annotations
 
@@ -146,11 +153,90 @@ def _save_deployments(addresses: dict[str, str], tx_hashes: dict[str, str]) -> N
     log.info("Deployments saved → %s", DEPLOYMENTS_FILE)
 
 
+MIN_DEPLOY_BALANCE_ETH = 0.01  # rough floor for two simple deploys + buffer
+
+
+def _preflight() -> int:
+    """Read-only readiness check. Returns 0 on success, non-zero on failure."""
+    try:
+        from eth_account import Account  # type: ignore[import]
+        from web3 import Web3  # type: ignore[import]
+    except ImportError:
+        log.error("[FAIL] web3 / eth-account not installed")
+        log.error("       fix: pip install -r requirements-test.txt")
+        return 1
+
+    status = 0
+
+    # 1. Contract sources present
+    missing_sources = [n for n in CONTRACTS if not (CONTRACTS_DIR / f"{n}.sol").exists()]
+    if missing_sources:
+        log.error("[FAIL] contract sources missing: %s", missing_sources)
+        status = 1
+    else:
+        log.info("[ OK ] contract sources present: %s", ", ".join(CONTRACTS))
+
+    # 2. RPC reachable + chain ID
+    w3 = Web3(Web3.HTTPProvider(RPC_URL, request_kwargs={"timeout": 10}))
+    if not w3.is_connected():
+        log.error("[FAIL] RPC unreachable: %s", RPC_URL)
+        return 1 if status == 0 else status
+    try:
+        chain_id = w3.eth.chain_id
+    except Exception as exc:
+        log.error("[FAIL] RPC reachable but chain_id call failed: %s", exc)
+        return 1
+    if chain_id != CHAIN_ID:
+        log.error("[FAIL] chain_id mismatch: got %s, expected %s", chain_id, CHAIN_ID)
+        status = 1
+    else:
+        log.info("[ OK ] RPC %s (chain_id %d, block %d)", RPC_URL, chain_id, w3.eth.block_number)
+
+    # 3. Deploy key present
+    try:
+        private_key = _load_private_key()
+    except RuntimeError as exc:
+        log.error("[FAIL] %s", exc)
+        return 1 if status == 0 else status
+    account = Account.from_key(private_key)
+    log.info("[ OK ] deploy key loaded: %s", account.address)
+
+    # 4. Balance sufficient
+    balance_wei = w3.eth.get_balance(account.address)
+    balance_eth = float(w3.from_wei(balance_wei, "ether"))
+    if balance_eth < MIN_DEPLOY_BALANCE_ETH:
+        log.error(
+            "[FAIL] deployer balance %.6f ETH < %.4f ETH minimum — fund via testnet faucet",
+            balance_eth, MIN_DEPLOY_BALANCE_ETH,
+        )
+        status = 1
+    else:
+        log.info("[ OK ] deployer balance: %.6f ETH (min %.4f)", balance_eth, MIN_DEPLOY_BALANCE_ETH)
+
+    # 5. Existing deployment?
+    if DEPLOYMENTS_FILE.exists():
+        try:
+            existing = json.loads(DEPLOYMENTS_FILE.read_text())
+            net = existing.get("robinhood_testnet", {}).get("contracts", {})
+            if net:
+                log.info("[NOTE] prior deployment on record (will be overwritten):")
+                for name, info in net.items():
+                    log.info("         %s → %s", name, info.get("address"))
+        except Exception:
+            pass
+
+    return status
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--check", action="store_true", help="Read-only preflight; no compile, no deploy")
     parser.add_argument("--dry-run", action="store_true", help="Compile only, skip deployment")
     parser.add_argument("--verify", action="store_true", help="Attempt block explorer verification")
     args = parser.parse_args()
+
+    if args.check:
+        sys.exit(_preflight())
 
     compiled = _compile_contracts()
     if args.dry_run:
