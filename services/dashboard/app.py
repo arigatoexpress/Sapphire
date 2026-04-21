@@ -13,6 +13,7 @@ import time
 from datetime import UTC, datetime
 from functools import wraps
 from pathlib import Path
+from typing import Any
 
 # Make the Sapphire lib/ discoverable regardless of whether this dashboard runs
 # from the main repo or a git worktree. Done once at import time so namespace
@@ -42,6 +43,9 @@ from flask import Flask, Response, jsonify, render_template, request, send_file,
 # — only for authenticated users.
 app = Flask(__name__, static_folder=None)
 _STATIC_DIR = Path(__file__).parent / "static"
+_DASHBOARD_REPO_ROOT = Path(__file__).resolve().parents[2]
+_AGENT_EVENTS_FILE = _DASHBOARD_REPO_ROOT / "data" / "events" / "bus.jsonl"
+_AGENT_HEARTBEAT_DIR = _DASHBOARD_REPO_ROOT / "data" / "agents"
 
 # Configuration
 # Pi-less mode: services run on Mac (localhost) and rari2 (Tailscale)
@@ -2072,6 +2076,117 @@ def factors_page():
 @requires_auth
 def performance_page():
     return render_template('pages/performance.html', current_page='performance', page_title='Performance')
+
+
+def _parse_agent_timestamp(value: str | None) -> datetime | None:
+    """Parse an ISO timestamp string into an aware UTC datetime."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(UTC)
+    except ValueError:
+        return None
+
+
+def _load_agent_events(limit: int = 20) -> list[dict[str, Any]]:
+    """Load the most recent agent events from the event bus JSONL fallback."""
+    if not _AGENT_EVENTS_FILE.exists():
+        return []
+
+    events: list[dict[str, Any]] = []
+    try:
+        lines = _AGENT_EVENTS_FILE.read_text().splitlines()
+    except OSError:
+        return events
+
+    for raw_line in reversed(lines):
+        line = raw_line.strip()
+        if not line:
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        event_type = str(record.get("type") or "")
+        if not event_type.startswith("agent."):
+            continue
+        data = record.get("data") or {}
+        if not isinstance(data, dict):
+            data = {"value": data}
+        events.append(
+            {
+                "type": event_type,
+                "ts": record.get("ts"),
+                "agent": data.get("agent") or record.get("source") or "unknown",
+                "data": data,
+            }
+        )
+        if len(events) >= limit:
+            break
+    return events
+
+
+def _load_agent_heartbeats() -> list[dict[str, Any]]:
+    """Load per-agent heartbeat files from disk."""
+    heartbeats: list[dict[str, Any]] = []
+    now = datetime.now(UTC)
+    if not _AGENT_HEARTBEAT_DIR.exists():
+        return heartbeats
+
+    for path in sorted(_AGENT_HEARTBEAT_DIR.glob("*.heartbeat")):
+        try:
+            payload = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        updated_at = _parse_agent_timestamp(payload.get("updated_at"))
+        heartbeats.append(
+            {
+                "name": payload.get("agent") or path.stem,
+                "cycle_count": int(payload.get("cycle_count") or 0),
+                "last_cycle_completed_at": payload.get("last_cycle_completed_at"),
+                "updated_at": payload.get("updated_at"),
+                "age_sec": (
+                    max(0, int((now - updated_at).total_seconds()))
+                    if updated_at is not None
+                    else None
+                ),
+            }
+        )
+    return heartbeats
+
+
+def _load_agents_autonomous_context() -> dict[str, Any]:
+    """Build the server-side context for the autonomous agents dashboard."""
+    events = _load_agent_events()
+    heartbeats = _load_agent_heartbeats()
+    last_cycle_event = next(
+        (event for event in events if event["type"] == "agent.cycle.completed"),
+        None,
+    )
+    cycle_count = 0
+    if heartbeats:
+        cycle_count = max(heartbeat["cycle_count"] for heartbeat in heartbeats)
+    if cycle_count == 0 and last_cycle_event is not None:
+        cycle_count = int(last_cycle_event["data"].get("cycle_count") or 0)
+
+    return {
+        "last_cycle_timestamp": last_cycle_event["ts"] if last_cycle_event else None,
+        "cycle_count": cycle_count,
+        "events": events,
+        "heartbeats": heartbeats,
+    }
+
+
+@app.route('/agents/autonomous')
+@requires_auth
+def agents_autonomous_page():
+    """Autonomous agent heartbeat and event dashboard."""
+    return render_template(
+        'pages/agents_autonomous.html',
+        current_page='agents-autonomous',
+        page_title='Autonomous Agents',
+        **_load_agents_autonomous_context(),
+    )
 
 
 @app.route('/content')
