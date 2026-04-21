@@ -381,6 +381,52 @@ class TestRunSyncGracefulDegradation:
         assert result.ok is False
         assert tg.call_count == 1, "page once after post-success failure"
 
+    def test_404_before_first_success_demotes_to_not_configured(
+        self, tmp_path, monkeypatch, caplog
+    ):
+        """A 404 on upsert-action before any success means the ontology isn't
+        provisioned yet. Downgrade to INFO, route to the not_configured state,
+        and don't Telegram-alert. This keeps foundry-sync-err.log clean while
+        the user finishes setup, but preserves ERROR for real 4xx/5xx failures.
+        """
+        monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
+        monkeypatch.setenv("PALANTIR_FOUNDRY_TOKEN", "ok-tok")
+
+        signals_dir = tmp_path / "data" / "signals"
+        signals_dir.mkdir(parents=True)
+        (signals_dir / "2026-04-19.jsonl").write_text(
+            json.dumps({"pipeline_id": "t1", "symbol": "BTC"}) + "\n"
+        )
+
+        from lib.foundry.client import FoundryAPIError
+
+        with mock.patch(
+            "lib.foundry.client.FoundryClient.upsert_objects",
+            side_effect=FoundryAPIError(
+                "Foundry API POST /api/v2/ontologies/ontology/actions/sapphire-upsert/apply → 404",
+                status=404,
+            ),
+        ), mock.patch("lib.foundry.sync._send_telegram_alert") as tg, caplog.at_level(
+            "INFO"
+        ):
+            result = run_sync(tmp_path, dry_run=False, force=True)
+
+        assert tg.call_count == 0, "ontology-not-ready must not Telegram"
+        assert result.skipped is True, "should route to not_configured path"
+        assert result.ok is True
+        state_path = tmp_path / "data" / "foundry_sync_state.json"
+        state = json.loads(state_path.read_text())
+        assert state["last_status"] == "not_configured"
+        # Confirm the INFO line fired and no ERROR for the same 404
+        info_msgs = [r.getMessage() for r in caplog.records if r.levelname == "INFO"]
+        error_msgs = [r.getMessage() for r in caplog.records if r.levelname == "ERROR"]
+        assert any("skipped" in m and "404" in m for m in info_msgs), (
+            f"expected INFO log like 'Upload ... skipped (... 404) ...', got {info_msgs!r}"
+        )
+        assert not any("404" in m for m in error_msgs), (
+            "404 must be INFO, not ERROR, while ontology is unprovisioned"
+        )
+
 
 class TestAuthWarningFresh:
     def test_none(self):

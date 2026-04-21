@@ -334,6 +334,7 @@ def run_sync(
     uploaded_anything = False
     if not dry_run:
         from lib.foundry.client import (
+            FoundryAPIError,
             FoundryAuthError,
             FoundryClient,
             FoundryConfigError,
@@ -354,6 +355,12 @@ def run_sync(
             client = None
 
         if client is not None:
+            # A 404 on the upsert action means the ontology/action pair hasn't
+            # been deployed on Foundry yet — it's a setup step, not a runtime
+            # failure. Downgrade the log level so the error file doesn't fill
+            # with one identical ERROR line per 15-min cycle while Ari is still
+            # provisioning the ontology. Other 4xx/5xx codes stay at ERROR.
+            ontology_not_ready = False
             for obj_type, objects in objects_by_type.items():
                 if not objects:
                     continue
@@ -367,9 +374,24 @@ def run_sync(
                     result.errors.append(f"Upload {obj_type}: {exc}")
                     log.error("Upload %s auth failed: %s", obj_type, exc)
                     break  # Don't hammer failing auth on every object type.
+                except FoundryAPIError as exc:
+                    result.errors.append(f"Upload {obj_type}: {exc}")
+                    if exc.status == 404 and not uploaded_anything:
+                        ontology_not_ready = True
+                        log.info(
+                            "Upload %s skipped (ontology action not deployed; "
+                            "HTTP 404) — finish Foundry ontology provisioning to enable",
+                            obj_type,
+                        )
+                    else:
+                        log.error("Upload %s failed: %s", obj_type, exc)
                 except FoundryError as exc:
                     log.error("Upload %s failed: %s", obj_type, exc)
                     result.errors.append(f"Upload {obj_type}: {exc}")
+            if ontology_not_ready and not uploaded_anything:
+                # Whole batch was blocked by the same setup gap — demote to
+                # the "not configured" path so alerting stays quiet.
+                config_missing = True
     else:
         for obj_type, objects in objects_by_type.items():
             result.uploaded_types[obj_type] = len(objects)
