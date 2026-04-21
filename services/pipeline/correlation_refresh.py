@@ -62,6 +62,9 @@ def main() -> int:
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        # Route INFO/DEBUG to stdout so the LaunchAgent's *-err.log only
+        # captures real errors (tracebacks still go to stderr naturally).
+        stream=sys.stdout,
     )
     try:
         out = run(window_days=args.window)
