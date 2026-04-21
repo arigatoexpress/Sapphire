@@ -5,7 +5,6 @@ from __future__ import annotations
 import plistlib
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 PLIST_PATH = ROOT / "infra" / "launchagents" / "com.sapphire.alpha-agent.plist"
 
