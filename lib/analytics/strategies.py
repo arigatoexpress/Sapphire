@@ -558,16 +558,18 @@ class BacktestEngine:
         )
 
         # Project BacktestResult onto the fields strategies.py downstream code reads.
-        # SweepResult consumes: sortino, sharpe, total_return_pct, win_rate,
-        # profit_factor, max_drawdown_pct, calmar, total_trades, plus .report.
+        # SweepResult / format_table / dashboard all expect fractions (0–1) for
+        # win_rate / total_return_pct / max_drawdown_pct, but BacktestResult
+        # carries percents (0–100). Convert here to keep the SweepResult contract
+        # stable across the legacy Backtester and the new run_backtest path.
         from types import SimpleNamespace
         return SimpleNamespace(
             sortino=result.sortino,
             sharpe=result.sharpe,
-            total_return_pct=result.total_return_pct,
-            win_rate=result.win_rate,
+            total_return_pct=result.total_return_pct / 100.0,
+            win_rate=result.win_rate / 100.0,
             profit_factor=result.profit_factor,
-            max_drawdown_pct=result.max_drawdown_pct,
+            max_drawdown_pct=result.max_drawdown_pct / 100.0,
             calmar=result.calmar,
             total_trades=len(result.trades),
             report=result.to_dict(),
