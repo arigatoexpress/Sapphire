@@ -1,0 +1,28 @@
+diff --git a/gateway/run.py b/gateway/run.py
+index 33336081..62839749 100644
+--- a/gateway/run.py
++++ b/gateway/run.py
+@@ -2874,10 +2874,22 @@ class GatewayRunner:
+                 "platform": source.platform.value if source.platform else "",
+                 "user_id": source.user_id,
+                 "session_id": session_entry.session_id,
+-                "message": message_text[:500],
++                "message": message_text[:16000],
+             }
+             await self.hooks.emit("agent:start", hook_ctx)
+ 
++            # Silently drop messages from relay-only bots — hooks already fired
++            # above so the kimi-relay-writer hook can capture the response.
++            # This prevents hermes from LLM-responding to @rarikimibot and
++            # creating an infinite relay loop.
++            _relay_ignore = {
++                x.strip()
++                for x in os.environ.get("TELEGRAM_IGNORED_USER_IDS", "").split(",")
++                if x.strip()
++            }
++            if source.user_id in _relay_ignore:
++                return
++
+             # Expand @ context references (@file:, @folder:, @diff, etc.)
+             if "@" in message_text:
+                 try:
