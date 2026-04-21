@@ -237,3 +237,90 @@ def test_enrich_pipeline_bad_leads_field(tmp_path):
     pipeline.write_text(json.dumps({"leads": "not-a-list"}))
     result = enrich_pipeline(pipeline)
     assert "error" in result
+
+
+# ── Geocoding (added 2026-04-20) ─────────────────────────────────────────────
+
+
+def test_geocode_explicit_coords_win_over_region():
+    from lib.intel.lead_enricher import _geocode_lead
+    lat, lng, src = _geocode_lead({
+        "region": "houston_tx",
+        "latitude": 40.0,
+        "longitude": -80.0,
+    })
+    assert (lat, lng) == (40.0, -80.0)
+    assert src == "explicit"
+
+
+def test_geocode_region_centroid_fallback():
+    from lib.intel.lead_enricher import _geocode_lead
+    lat, lng, src = _geocode_lead({"region": "austin_tx"})
+    assert 30.0 < lat < 31.0
+    assert -98.0 < lng < -97.0
+    assert src == "region_centroid"
+
+
+def test_geocode_region_case_insensitive():
+    from lib.intel.lead_enricher import _geocode_lead
+    lat, _, src = _geocode_lead({"region": "DALLAS_TX"})
+    assert lat is not None
+    assert src == "region_centroid"
+
+
+def test_geocode_returns_none_when_unknown():
+    from lib.intel.lead_enricher import _geocode_lead
+    lat, lng, src = _geocode_lead({"region": "mars_colony_1"})
+    assert lat is None
+    assert lng is None
+    assert src is None
+
+
+def test_geocode_handles_missing_region_silently():
+    from lib.intel.lead_enricher import _geocode_lead
+    assert _geocode_lead({}) == (None, None, None)
+
+
+def test_geocode_bad_coords_falls_through_to_region():
+    from lib.intel.lead_enricher import _geocode_lead
+    lat, _, src = _geocode_lead({
+        "region": "miami_fl",
+        "latitude": "garbage",
+        "longitude": "garbage",
+    })
+    assert lat is not None
+    assert src == "region_centroid"
+
+
+def test_enrich_lead_carries_geo_fields():
+    from lib.intel.lead_enricher import enrich_lead
+    result = enrich_lead({
+        "name": "Test Subdivision",
+        "region": "houston_tx",
+        "description": "C3F subdivision plat",
+    })
+    assert result.latitude is not None
+    assert result.longitude is not None
+    assert result.geo_source == "region_centroid"
+
+
+def test_enrich_pipeline_merges_geo_into_lead(tmp_path):
+    from lib.intel.lead_enricher import enrich_pipeline
+    pipeline = tmp_path / "p.json"
+    pipeline.write_text(json.dumps({
+        "leads": [
+            {
+                "name": "High-grade lead",
+                "region": "dallas_tx",
+                "description": "C3F luxury estates",
+                "score": 0.92,
+            }
+        ]
+    }))
+    out = enrich_pipeline(pipeline)
+    assert out["enriched_count"] == 1
+    reloaded = json.loads(pipeline.read_text())
+    lead = reloaded["leads"][0]
+    assert lead["latitude"] is not None
+    assert lead["longitude"] is not None
+    assert lead["geo_source"] == "region_centroid"

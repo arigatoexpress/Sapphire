@@ -47,7 +47,28 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Run the live publishers against data/content/ready/ (dry-run unless SAPPHIRE_PUBLISH_LIVE=1)",
     )
+    ap.add_argument(
+        "--callback",
+        help="Process a Telegram approval callback (e.g. 'apv:weekly-crypto-brief')",
+    )
+    ap.add_argument("--callback-id", help="Telegram callback_query.id (stops button spinner)")
+    ap.add_argument("--chat-id", help="Chat ID of the original approval message (for edit)")
+    ap.add_argument("--message-id", type=int, help="Message ID of the original approval (for edit)")
+    ap.add_argument("--actor", default="telegram", help="Approver identity (for approval record)")
     args = ap.parse_args(argv)
+
+    if args.callback:
+        from lib.content import telegram_approval
+
+        out = telegram_approval.handle_callback(
+            args.callback,
+            callback_id=args.callback_id,
+            chat_id=args.chat_id,
+            message_id=args.message_id,
+            actor=args.actor,
+        )
+        print(json.dumps(out, indent=2, default=str))
+        return 0 if out.get("ok") else 1
 
     if args.list_drafts:
         print(json.dumps(publisher.list_drafts(), indent=2, default=str))

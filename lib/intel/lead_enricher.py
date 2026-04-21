@@ -63,6 +63,23 @@ REGION_MEDIANS = {
     "default": 400_000,
 }
 
+# Region centroid coordinates (lat, lng) for the Intel v2 map.
+# Keep this aligned with REGION_MEDIANS so every medianed region also plots.
+REGION_CENTROIDS: dict[str, tuple[float, float]] = {
+    "houston_tx": (29.7604, -95.3698),
+    "austin_tx": (30.2672, -97.7431),
+    "dallas_tx": (32.7767, -96.7970),
+    "san_antonio_tx": (29.4241, -98.4936),
+    "phoenix_az": (33.4484, -112.0740),
+    "miami_fl": (25.7617, -80.1918),
+    "los_angeles_ca": (34.0522, -118.2437),
+    # Broader region tags that appear in threat/intel feeds
+    "americas": (10.0, -60.0),
+    "apac": (22.0, 120.0),
+    "emea": (40.0, 20.0),
+    "global": (20.0, 0.0),
+}
+
 
 # ---------------------------------------------------------------------------
 # Dataclasses
@@ -79,6 +96,9 @@ class EnrichedLead:
     builder_info: dict[str, Any] = field(default_factory=dict)
     decision_maker_name: str | None = None
     decision_maker_source: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    geo_source: str | None = None  # "explicit" | "region_centroid" | None
     enriched_at: str = ""
     enrichment_status: str = "pending"   # pending | ok | partial | failed
     notes: list[str] = field(default_factory=list)
@@ -242,6 +262,28 @@ def _extract_builder(lead: dict[str, Any]) -> dict[str, Any]:
     return info
 
 
+def _geocode_lead(lead: dict[str, Any]) -> tuple[float | None, float | None, str | None]:
+    """Return (lat, lng, source) for a lead.
+
+    Precedence: explicit ``latitude``/``longitude`` fields on the lead, then
+    region-tag centroid lookup. Returns ``(None, None, None)`` if neither
+    applies — callers must tolerate missing coords.
+    """
+    lat = lead.get("latitude")
+    lng = lead.get("longitude")
+    try:
+        if lat is not None and lng is not None:
+            return float(lat), float(lng), "explicit"
+    except (TypeError, ValueError):
+        pass
+
+    region = (lead.get("region") or "").lower().strip()
+    if region and region in REGION_CENTROIDS:
+        rlat, rlng = REGION_CENTROIDS[region]
+        return rlat, rlng, "region_centroid"
+    return None, None, None
+
+
 def _find_decision_maker(lead: dict[str, Any]) -> tuple[str | None, str | None]:
     """Try to surface a named decision-maker from the lead record."""
     # Check explicit fields first
@@ -302,6 +344,14 @@ def enrich_lead(lead: dict[str, Any]) -> EnrichedLead:
     except Exception as e:
         result.notes.append(f"decision_maker_failed: {e}")
 
+    try:
+        lat, lng, geo_src = _geocode_lead(lead)
+        result.latitude = lat
+        result.longitude = lng
+        result.geo_source = geo_src
+    except Exception as e:
+        result.notes.append(f"geocode_failed: {e}")
+
     if result.notes:
         result.enrichment_status = "partial"
     else:
@@ -347,6 +397,9 @@ def enrich_pipeline(pipeline_path: Path, grade_filter: str = "A") -> dict[str, A
         lead["neighborhood_median_home_price_usd"] = en.neighborhood_median_home_price_usd
         lead["builder_info"] = en.builder_info
         lead["decision_maker_name"] = en.decision_maker_name
+        lead["latitude"] = en.latitude
+        lead["longitude"] = en.longitude
+        lead["geo_source"] = en.geo_source
         lead["enrichment_status"] = en.enrichment_status
         lead["enriched_at"] = en.enriched_at
         enriched.append(asdict(en))

@@ -116,6 +116,18 @@ def approve(report: Report, *, require_human: bool = False) -> ApprovalRecord:
         ts = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         pending_path = _PENDING_DIR / f"{ts}_{slug}.json"
         pending_path.write_text(json.dumps({"kind": report.kind, "body": report.body}))
+        # Fire-and-forget Telegram approval request with inline keyboard.
+        # Failure to reach Telegram must not block the draft from being parked.
+        try:
+            from lib.content import telegram_approval
+            telegram_approval.request_approval(
+                kind=report.kind,
+                title=report.title,
+                slug=slug,
+                preview=report.body,
+            )
+        except Exception as e:  # noqa: BLE001
+            log.warning("telegram approval request failed: %s", e)
         record = ApprovalRecord(
             kind=report.kind,
             title=report.title,

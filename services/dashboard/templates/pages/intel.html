@@ -266,43 +266,40 @@
     padding-top: var(--space-md);
 }
 
-/* ── Threat Map ── */
+/* ── Threat Map (Leaflet) ── */
 .threat-map-container {
     position: relative;
     width: 100%;
     margin-bottom: var(--space-xl);
 }
 
-.threat-map-svg {
+#intel-leaflet-map {
     width: 100%;
-    height: auto;
+    height: 420px;
+    border: 1px solid var(--border-dim);
+    background: #0a0e1a;
 }
 
-.threat-dot {
-    animation: threatPulse 2.5s ease-in-out infinite;
+/* Dark-theme popup overrides so Leaflet's default white chrome doesn't break the UI */
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+    background: #0a0e1a !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-dim) !important;
 }
-
-.threat-dot:nth-child(2n) { animation-delay: 0.5s; }
-.threat-dot:nth-child(3n) { animation-delay: 1.2s; }
-.threat-dot:nth-child(5n) { animation-delay: 1.8s; }
-
-@keyframes threatPulse {
-    0%, 100% { opacity: 0.7; r: 4; }
-    50% { opacity: 1; r: 6; }
+.leaflet-popup-content {
+    font-family: inherit;
+    font-size: 0.75rem;
+    line-height: 1.45;
+    margin: 8px 10px;
 }
-
-.threat-dot-ring {
-    fill: none;
-    stroke-width: 1;
-    animation: threatRing 2.5s ease-out infinite;
-}
-
-.threat-dot-ring:nth-child(2n) { animation-delay: 0.5s; }
-.threat-dot-ring:nth-child(3n) { animation-delay: 1.2s; }
-
-@keyframes threatRing {
-    0% { r: 4; opacity: 0.6; stroke-width: 1.5; }
-    100% { r: 14; opacity: 0; stroke-width: 0.5; }
+.leaflet-popup-content b { color: var(--green); }
+.leaflet-container a.leaflet-popup-close-button { color: var(--text-muted); }
+.intel-marker-empty {
+    padding: 12px;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    text-align: center;
 }
 
 /* ── Data Sources Table ── */
@@ -457,15 +454,29 @@
     </div>
 </div>
 
-<!-- ── Threat Map ── -->
+<!-- ── Threat Map (Leaflet) ── -->
+<!-- TODO(security): pin Leaflet 1.9.4 via SRI once we fetch the real hashes
+     from https://www.srihash.org/ or the jsDelivr CDN manifest. -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css"
+      crossorigin="anonymous"/>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"
+        crossorigin="anonymous"></script>
 <div class="panel">
     <div class="panel-header">
-        <span class="panel-title">Global Threat Density</span>
-        <span style="font-size:0.7rem; color:var(--text-muted);">CONCEPT VIEW</span>
+        <span class="panel-title">Global Intel Map</span>
+        <span style="font-size:0.7rem; color:var(--text-muted);" id="map-item-count">0 ITEMS</span>
     </div>
     <div class="panel-body">
         <div class="threat-map-container">
-            <svg class="threat-map-svg" viewBox="0 0 800 400" xmlns="http://www.w3.org/2000/svg">
+            <div id="intel-leaflet-map" aria-label="Intel map — markers plot items from /api/intel by region"></div>
+        </div>
+    </div>
+</div>
+
+<!-- legacy SVG kept hidden as a fallback if Leaflet fails to load; do not remove without updating tests -->
+<div style="display:none;" data-legacy="threat-map">
+    <div class="threat-map-container">
+        <svg class="threat-map-svg" viewBox="0 0 800 400" xmlns="http://www.w3.org/2000/svg">
                 <!-- simplified continent outlines -->
                 <!-- North America -->
                 <path d="M120,80 L160,60 L200,65 L220,80 L230,110 L220,140 L200,160 L180,170 L160,180 L140,175 L120,160 L105,140 L100,120 L110,95 Z"
@@ -529,7 +540,6 @@
             </svg>
         </div>
     </div>
-</div>
 
 <!-- ── Data Sources ── -->
 <div class="panel">
@@ -850,6 +860,80 @@
             });
     }
 
+    /* ── Leaflet Map ── */
+    var _intelMap = null;
+    var _intelMarkerLayer = null;
+    var SEVERITY_COLORS = {
+        critical: '#ff3b3b',
+        high: '#ff3b3b',
+        medium: '#ffa726',
+        low: '#00d4ff'
+    };
+
+    function ensureMap() {
+        if (_intelMap) return _intelMap;
+        if (typeof L === 'undefined') return null;  // Leaflet failed to load — skip silently
+        var container = document.getElementById('intel-leaflet-map');
+        if (!container) return null;
+        _intelMap = L.map(container, {
+            center: [20, 0],
+            zoom: 2,
+            minZoom: 2,
+            maxZoom: 10,
+            worldCopyJump: true,
+            attributionControl: true,
+            zoomControl: true
+        });
+        // CartoDB dark-matter tiles — free, no API key, dark-theme friendly
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap &copy; CARTO',
+            subdomains: 'abcd',
+            maxZoom: 19
+        }).addTo(_intelMap);
+        _intelMarkerLayer = L.layerGroup().addTo(_intelMap);
+        return _intelMap;
+    }
+
+    function renderMap(items) {
+        var map = ensureMap();
+        var countEl = document.getElementById('map-item-count');
+        if (!map) {
+            if (countEl) countEl.textContent = 'MAP UNAVAILABLE';
+            return;
+        }
+        _intelMarkerLayer.clearLayers();
+        var plotted = 0;
+        (items || []).forEach(function (it) {
+            if (it.latitude == null || it.longitude == null) return;
+            var lat = Number(it.latitude), lng = Number(it.longitude);
+            if (isNaN(lat) || isNaN(lng)) return;
+            var sev = String(it.severity || 'medium').toLowerCase();
+            var color = SEVERITY_COLORS[sev] || SEVERITY_COLORS.medium;
+            var marker = L.circleMarker([lat, lng], {
+                radius: 7,
+                color: color,
+                weight: 2,
+                fillColor: color,
+                fillOpacity: 0.55
+            });
+            var title = (it.title || '(no title)').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            var region = String(it.region || '').replace(/</g, '&lt;');
+            var source = String(it.source || 'intel').replace(/</g, '&lt;');
+            var ts = String(it.timestamp || '').replace(/</g, '&lt;');
+            var exploited = it.exploited ? ' <span style="color:#ff3b3b">[EXPLOITED]</span>' : '';
+            marker.bindPopup(
+                '<div><b>' + title + '</b>' + exploited + '</div>' +
+                '<div style="color:var(--text-muted); margin-top:4px;">' +
+                '<span style="color:' + color + ';">●</span> ' + sev.toUpperCase() +
+                ' · ' + region + ' · ' + source + '</div>' +
+                (ts ? '<div style="color:var(--text-muted); font-size:0.65rem; margin-top:3px;">' + ts + '</div>' : '')
+            );
+            marker.addTo(_intelMarkerLayer);
+            plotted++;
+        });
+        if (countEl) countEl.textContent = plotted + ' ITEM' + (plotted === 1 ? '' : 'S');
+    }
+
     /* ── Refresh Intel — pulls /api/intel (threat intel + regional workbench) ── */
     function refreshIntel() {
         Promise.all([
@@ -863,8 +947,10 @@
             var sources = data && data.sources ? data.sources : [];
             if (!items.length) {
                 renderFeed(INTEL_ITEMS);
+                renderMap([]);
             } else {
                 renderFeed(items.map(_adaptApiItem));
+                renderMap(items);
             }
             renderSources(sources);
             updateHero(items.length ? items.map(_adaptApiItem) : INTEL_ITEMS, sources, data && data.last_updated);
@@ -874,6 +960,7 @@
         }).catch(function (err) {
             console.warn('intel fetch failed, showing seed items', err);
             renderFeed(INTEL_ITEMS);
+            renderMap([]);
             renderSources([]);
             updateHero(INTEL_ITEMS, [], Date.now());
         });
