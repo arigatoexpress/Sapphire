@@ -150,3 +150,47 @@ def test_save_result_writes_file(tmp_path) -> None:
     out = save_result(r, out_dir=tmp_path)
     assert out.exists()
     assert out.suffix == ".json"
+
+
+def test_win_rate_is_fraction_not_percent() -> None:
+    # Regression: win_rate must be a fraction in [0, 1] so downstream formatters
+    # using `:.1%` (which multiplies by 100) render correctly. A previous bug
+    # stored it as a percent (0–100), causing format_table to print 5000.0%.
+    # Force two wins out of four trades via a strategy that takes profit twice
+    # and stops out twice.
+    from datetime import UTC, datetime, timedelta
+
+    from lib.analytics.backtest_engine import Bar, run_backtest
+
+    base = datetime(2026, 1, 1, tzinfo=UTC)
+    bars: list[Bar] = []
+    # run_backtest requires ≥20 bars. Pad with flat bars at index 0; signals
+    # fire at indices 20, 22, 24, 26 with the next bar moving up/down to hit
+    # TP/SL — yielding 2 wins + 2 losses.
+    flat_count = 20
+    flat_prices = [100.0] * flat_count
+    move_prices = [100.0, 110.0, 100.0, 90.0, 100.0, 110.0, 100.0, 90.0]
+    prices = flat_prices + move_prices
+    for i, c in enumerate(prices):
+        bars.append(Bar(
+            ts=base + timedelta(days=i), open=c, high=c * 1.01, low=c * 0.99,
+            close=c, volume=1000.0,
+        ))
+
+    entry_indices = {flat_count + k for k in (0, 2, 4, 6)}
+
+    def alternating(symbol, bars, i):
+        if i in entry_indices:
+            p = bars[i].close
+            return {
+                "symbol": symbol, "action": "buy", "price": p,
+                "take_profit": p * 1.05, "stop_loss": p * 0.95,
+                "confidence": 0.5, "strategy": "alt",
+            }
+        return None
+
+    r = run_backtest("ALT", bars=bars, signal_fn=alternating)
+    assert len(r.trades) == 4
+    assert r.win_rate == 0.5, f"expected 0.5 (fraction), got {r.win_rate}"
+    # Verify the formatter contract: `:.1%` on the fraction yields "50.0%".
+    assert f"{r.win_rate:.1%}" == "50.0%"
