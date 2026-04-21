@@ -52,27 +52,45 @@ sanitization approach as F1.
 Either install them (`launchctl bootstrap gui/$UID ...`) or remove them
 from the repo if they're no longer wanted.
 
-### F4. Duplicate-intent agents
-- `com.sapphire.morning-brief.plist` (LaunchAgent, 7 AM CT, 12 sections, sends via Telegram)
+### F4. `morning-brief.plist` and `daily-brief.plist` are a confirmed duplicate
+Both plists are currently loaded on the Mac, both fire at 06:00 daily,
+and both call the exact same script:
+```
+/usr/local/bin/python3 /Users/aribs/Code/Sapphire/services/intelligence/daily_brief.py
+```
+The only differences are the `EnvironmentVariables` block (morning-brief
+is slightly richer — adds `SAPPHIRE_SECRETS_DIR`) and the log path. Net
+effect: the 8-section morning brief runs twice every morning and Ari
+receives two identical Telegram messages at ~06:00.
+
+**Recommended fix**: keep `morning-brief.plist`, remove `daily-brief.plist`:
+```
+launchctl bootout gui/$(id -u)/com.sapphire.daily-brief
+rm ~/Library/LaunchAgents/com.sapphire.daily-brief.plist
+# then delete infra/launchagents/com.sapphire.daily-brief.plist from repo
+```
+This is a Mac state change, so not executed by this audit.
+
+### F5. Scheduled-task overlap with morning brief
+- `com.sapphire.morning-brief.plist` (LaunchAgent, 7 AM CT via MDT, 12 sections, sends via Telegram)
 - `~/.claude/scheduled-tasks/sapphire-morning-briefing/` (Claude scheduled task, 8 AM, 7 sections, sends via Telegram)
 
 These overlap. Morning brief is the canonical production path
 (LaunchAgent runs even when Claude Code is closed). The scheduled task
 duplicates ~80% of its work one hour later and only runs while Claude
-Code is open — this is drift, not intent. Recommend either:
+Code is open. Recommend either:
   - **consolidate**: delete the scheduled task, extend the LaunchAgent
     to cover the extra sections (threat-intel, github, regional);
   - **specialize**: rename the scheduled task to
     `sapphire-afternoon-deep-dive` with non-overlapping work.
 
-Similar overlap candidates to check:
-- `com.sapphire.daily-brief.plist` (06:00 LaunchAgent) vs
-  `com.sapphire.morning-brief.plist` (07:00 LaunchAgent) — two near-
-  identical agents 60 min apart, both generating briefs.
-- `com.sapphire.security-pipeline.plist` (daily 3 AM) vs
-  `~/.claude/scheduled-tasks/dependency-security-scan/` (Wed 4 AM) —
-  the weekly is a narrower subset; keep both only if the narrower check
-  actually catches more (unlikely).
+### F6. Security scan overlap
+- `com.sapphire.security-pipeline.plist` (daily 3 AM)
+- `~/.claude/scheduled-tasks/dependency-security-scan/` (Wed 4 AM)
+
+The weekly scheduled task is a narrower subset of the daily pipeline;
+keep only if it catches something the daily pipeline misses. Quick
+verification needed.
 
 ## Clean plists now version-controlled (this commit)
 
