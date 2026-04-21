@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import ssl
 import time
 import urllib.error
 import urllib.parse
@@ -30,6 +31,18 @@ from pathlib import Path
 from typing import Any
 
 log = logging.getLogger("foundry.client")
+
+# Bearer tokens travel in Authorization headers — MITM-ing these calls leaks
+# credentials. Prefer certifi's CA bundle (system Python can lag, and local
+# cert-intercepting tools inject self-signed roots into the macOS keychain that
+# default_context picks up). Fall back to the system store if certifi is absent;
+# never disable verification.
+_SSL_CTX = ssl.create_default_context()
+try:
+    import certifi
+    _SSL_CTX.load_verify_locations(certifi.where())
+except ImportError:
+    pass
 
 # ---------------------------------------------------------------------------
 # Auth helpers
@@ -156,7 +169,7 @@ class FoundryAuth:
             method="POST",
         )
         try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
+            with urllib.request.urlopen(req, timeout=15, context=_SSL_CTX) as resp:
                 data = json.loads(resp.read())
         except Exception as exc:
             raise FoundryAuthError(f"OAuth token refresh failed: {exc}") from exc
@@ -243,7 +256,7 @@ class FoundryClient:
         req = urllib.request.Request(url, data=data, headers=headers, method=method)
 
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            with urllib.request.urlopen(req, timeout=self.timeout, context=_SSL_CTX) as resp:
                 raw = resp.read()
                 return json.loads(raw) if raw else {}
         except urllib.error.HTTPError as exc:
@@ -316,7 +329,7 @@ class FoundryClient:
         }
         req = urllib.request.Request(url, data=ndjson.encode(), headers=headers, method="POST")
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            with urllib.request.urlopen(req, timeout=self.timeout, context=_SSL_CTX) as resp:
                 raw = resp.read()
                 return json.loads(raw) if raw else {"rows_uploaded": len(rows)}
         except urllib.error.HTTPError as exc:

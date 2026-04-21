@@ -212,7 +212,7 @@ def _telegram_summary(results: list[tuple[DispatchItem, PublishResult]]) -> None
     if not results:
         return
     try:
-        from lib.telegram.src.sapphire_telegram import safe_send  # type: ignore[import]
+        from sapphire_telegram import safe_send  # type: ignore[import]
     except Exception:
         logger.info("telegram safe_send not importable — skipping summary ping")
         return

@@ -105,30 +105,38 @@ def send_telegram_message(
     formatted = f"{prefix} *Sapphire OS*\n\n{message}"
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = json.dumps(
-        {
+
+    def _post(parse_mode: str | None) -> dict:
+        body = {
             "chat_id": target,
             "text": formatted,
-            "parse_mode": "Markdown",
             "disable_web_page_preview": True,
         }
-    ).encode()
+        if parse_mode:
+            body["parse_mode"] = parse_mode
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(body).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10, context=_SSL_CTX) as resp:
+                return json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode() if e.fp else ""
+            return {"error": f"HTTP {e.code}: {err_body}", "_http_code": e.code, "_body": err_body}
+        except Exception as e:
+            return {"error": str(e)}
 
-    req = urllib.request.Request(
-        url,
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-
-    try:
-        with urllib.request.urlopen(req, timeout=10, context=_SSL_CTX) as resp:
-            return json.loads(resp.read())
-    except urllib.error.HTTPError as e:
-        body = e.read().decode() if e.fp else ""
-        return {"error": f"HTTP {e.code}: {body}"}
-    except Exception as e:
-        return {"error": str(e)}
+    result = _post("Markdown")
+    # Telegram returns 400 with "can't parse entities" when a stray _, *, or `
+    # breaks formatting — fall back to plain text so the message still lands.
+    if result.get("_http_code") == 400 and "parse entities" in result.get("_body", ""):
+        result = _post(None)
+    result.pop("_http_code", None)
+    result.pop("_body", None)
+    return result
 
 
 def run(message: str, priority: str = "p1") -> str:
