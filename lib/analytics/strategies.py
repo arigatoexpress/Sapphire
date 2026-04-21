@@ -559,15 +559,22 @@ class BacktestEngine:
 
         # Project BacktestResult onto the fields strategies.py downstream code reads.
         # SweepResult / format_table / dashboard all expect fractions (0–1) for
-        # win_rate / total_return_pct / max_drawdown_pct, but BacktestResult
-        # carries percents (0–100). Convert here to keep the SweepResult contract
-        # stable across the legacy Backtester and the new run_backtest path.
+        # win_rate / total_return_pct / max_drawdown_pct.
+        #
+        # Unit map (origin/main, post-#102):
+        #   - win_rate:         already a fraction (PR #102 dropped the *100 in
+        #                       backtest_engine._finalize) — pass through verbatim.
+        #   - total_return_pct: still percent (0–100) — divide by 100.
+        #   - max_drawdown_pct: still percent (0–100) — divide by 100.
+        #
+        # Previous version of this projection divided win_rate by 100 too, which
+        # double-divided after #102 landed (50% → 0.005 instead of 0.5).
         from types import SimpleNamespace
         return SimpleNamespace(
             sortino=result.sortino,
             sharpe=result.sharpe,
             total_return_pct=result.total_return_pct / 100.0,
-            win_rate=result.win_rate / 100.0,
+            win_rate=result.win_rate,
             profit_factor=result.profit_factor,
             max_drawdown_pct=result.max_drawdown_pct / 100.0,
             calmar=result.calmar,
