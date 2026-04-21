@@ -2,7 +2,7 @@
 
 > Self-sovereign AI operations platform for quantitative trading, intelligence, and content.
 
-![Tests](https://img.shields.io/badge/tests-1967%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1978%20passing-brightgreen)
 ![CI](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml/badge.svg?branch=main)
 ![Security](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml/badge.svg?branch=main)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
@@ -16,33 +16,46 @@ Sapphire is a continuously-running operating system for capital allocation and r
 
 ## Architecture
 
-```mermaid
-graph TD
-    TG[Telegram operator] --> HG[hermes gateway]
-    HG --> IP[Inference Proxy :11435<br/>4-tier LLM failover]
+```
+  CONTROL PLANE
+  -------------
+  Telegram  -->  hermes gateway  -->  Inference Proxy :11435
+  operator                            4-tier failover:
+                                        T1 Windows GPU  (RTX 5070 Ti)
+                                        T2 Pi rari1 / rari2
+                                        T3 Mac Ollama (CPU)
+                                        T4 Kimi Cloud (non-sensitive)
 
-    IP --> GPU[Windows GPU<br/>RTX 5070 Ti<br/>Tier 1]
-    IP --> PIS[Pi cluster<br/>rari1 + rari2<br/>Tier 2]
-    IP --> MAC[Mac Ollama<br/>Tier 3]
-    IP --> KC[Kimi Cloud<br/>Tier 4]
+  TRADING PATH
+  ------------
+  TradingView --> webhook :9090 --> signal-logger :18081 --> Risk Kernel
+  (Pine)         (Windows)          (Mac)                    circuit breaker
+                                                             position sizing
+                                                             confirmation firewall
+                                                                  |
+                                    +-----------------------------+--------------+
+                                    v                             v              v
+                             Paper portfolio             Robinhood Crypto   Robinhood
+                             ($100K sim, ATR SL/TP)      (Ed25519 REST)     Chain
+                                                                            (on-chain
+                                                                             signals)
 
-    TV[TradingView] --> WH[Webhook :9090<br/>Windows]
-    WH --> SL[Signal Logger :18081<br/>Mac]
-    SL --> RK[Risk kernel<br/>circuit breaker<br/>position sizing]
-    RK --> PT[Paper + live execution]
-    RK --> RH[Robinhood Crypto<br/>live portfolio]
-    RK --> RC[Robinhood Chain<br/>on-chain signals]
+  EVENT BUS  (Redis primary, JSONL fallback at data/events/bus.jsonl)
+  ---------
+     ^ producers          v consumers
+     |                    |
+     |  Risk kernel       +--> Dashboard :8080  (31 pages, SSE)
+     |  Chain intel       +--> Content engine   (weekly auto-publish)
+     |  Threat intel      +--> Telegram alerts  (priority-tagged)
+     |  Strategies        +--> Foundry sync ----> Palantir Foundry ontology
+     |  Heartbeat              (15-min delta)    (PaperTrade, Signal,
+     |                                            ChainMetric, ThreatAlert)
+     +--- Security platform (deps, models, network, heartbeat, kill switches)
 
-    EB[(Event Bus<br/>Redis → JSONL)] --> DSH[Dashboard :8080<br/>31 pages SSE]
-    EB --> CE[Content engine<br/>weekly publish]
-    EB --> TA[Telegram alerts]
-    EB --> FS[Foundry sync<br/>ontology objects]
-
-    GS[gcp_sync.py] --> BQ[(BigQuery<br/>sapphire.*)]
-    FS --> PF[(Palantir Foundry<br/>PaperTrade, Signal,<br/>ChainMetric, ThreatAlert)]
-
-    SEC[Security platform<br/>deps · models · network<br/>heartbeat · kill switches] --> EB
-    CP[Control Plane :8082] --> DSH
+  SIDECARS
+  --------
+  Control Plane :8082  (projects, tasks, Kimi bridge)
+  gcp_sync (hourly)    --> GCS data lake + BigQuery sapphire.*
 ```
 
 ---
@@ -51,7 +64,7 @@ graph TD
 
 | Metric | Value |
 |--------|-------|
-| Passing unit + plugin tests | **1,967** (1,932 core + 35 plugin) |
+| Passing unit + plugin tests | **1,978** (1,943 core + 35 plugin) |
 | Dashboard pages | **31** |
 | Quant strategies (`lib/analytics/strategies.py`) | **7** |
 | Pine Script strategies | **5** |
@@ -324,7 +337,7 @@ python3 -m lib.content publish
 ## Testing
 
 ```bash
-# Unit tests — 1,919 passing
+# Unit tests — 1,943 passing
 /usr/local/bin/python3 -m pytest tests/unit/ --tb=short -q
 
 # Plugin tests — 35 passing
