@@ -154,21 +154,27 @@ GPU_ONLY_MODELS = {
     "nemotron-cascade-2",
 }
 
-# Models that can run on Pi (3.8GB RAM ceiling — nemotron-mini:4b is max)
+# Models that fit on Pi in principle (used for aliasing + inventory visibility).
 PI_MODELS = {
     "nemotron-mini:4b", "nemotron-mini", "nemotron-mini:latest",
     "gemma2:2b", "qwen2.5:0.5b", "smollm2:1.7b",
 }
-PI_DEFAULT_MODEL  = "qwen2.5:0.5b"  # fastest Pi model (~20s cold load); nemotron-mini times out
+# Models we trust for live Pi routing. nemotron-mini is installed on the Pis,
+# but it times out often enough that T2 should downshift to the smaller qwen
+# default instead of blackholing "fast" traffic.
+PI_SERVE_MODELS = {"qwen2.5:0.5b", "smollm2:1.7b", "gemma2:2b"}
+PI_DEFAULT_MODEL = "qwen2.5:0.5b"  # fastest Pi model (~20s cold load)
 MAC_FALLBACK_MODEL = "hermes3:8b"       # model known to be on Mac Ollama
 
 # Mac models (models confirmed available locally)
 MAC_MODELS = {"hermes3:8b", "llama3.2:3b", "nemotron-mini:latest", "llama3.2:latest"}
 
-# Enable Pi tiers independently — rari2 is offline so set PI_RARI2_ENABLED=0 to skip the 30s timeout
+# Enable Pi tiers independently — both Pis are online as of 2026-04-18.
 PI_RARI1_ENABLED = os.getenv("PI_RARI1_ENABLED", os.getenv("PI_OLLAMA_ENABLED", "0")) == "1"
 PI_RARI2_ENABLED = os.getenv("PI_RARI2_ENABLED", "0") == "1"
 PI_ENABLED = PI_RARI1_ENABLED or PI_RARI2_ENABLED  # any Pi active
+PI_PROBE_TIMEOUT_SEC = float(os.getenv("PI_PROBE_TIMEOUT_SEC", "10"))
+PI_CHAT_TIMEOUT_SEC = int(os.getenv("PI_CHAT_TIMEOUT_SEC", "30"))
 
 # ─── Health Tracking ─────────────────────────────────────────────────────────
 ENDPOINTS = ["windows-gpu", "pi-rari1", "pi-rari2", "mac-local", "kimi-cloud"]
@@ -578,15 +584,66 @@ def _call_kimi_cloud(messages: list, max_tokens: int = 2048,
 # ─── Background Health Probe ─────────────────────────────────────────────────
 
 def _probe_endpoint(name: str, url: str):
-    """Lightweight connectivity check — HEAD /api/tags or /v1/models."""
+    """Lightweight connectivity check against `GET /api/tags`."""
     try:
-        req = urllib.request.Request(f"{url}/api/tags", method="GET",
-                                     headers={"Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=4) as resp:
+        timeout = PI_PROBE_TIMEOUT_SEC if name.startswith("pi-") else 4
+        req = urllib.request.Request(
+            f"{url}/api/tags",
+            method="GET",
+            headers={"Accept": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             if resp.status == 200:
                 _mark_ok(name)
     except Exception:
         pass  # Probe failures don't change health state — only real requests do
+
+
+def _enabled_pi_targets() -> list[tuple[str, str]]:
+    """Return enabled Pi endpoints in failover order."""
+    targets: list[tuple[str, str]] = []
+    if PI_RARI1_ENABLED:
+        targets.append(("pi-rari1", PI_RARI1))
+    if PI_RARI2_ENABLED:
+        targets.append(("pi-rari2", PI_RARI2))
+    return targets
+
+
+def _select_pi_model(model: str) -> str:
+    """Choose the Pi-safe model to use for T2 routing."""
+    return model if model in PI_SERVE_MODELS else PI_DEFAULT_MODEL
+
+
+def _try_pi_tier(
+    model: str,
+    messages: list,
+    max_tokens: int,
+    temperature: float,
+    timeout: int = PI_CHAT_TIMEOUT_SEC,
+) -> tuple[str | None, dict | None, list[str]]:
+    """Try the enabled Pi endpoints in order and return the first success."""
+    pi_model = _select_pi_model(model)
+    if pi_model != model:
+        log.info("Pi fallback: substituting model '%s' → '%s'", model, pi_model)
+
+    tried: list[str] = []
+    for endpoint_name, base_url in _enabled_pi_targets():
+        if not _is_healthy(endpoint_name):
+            continue
+        tried.append(endpoint_name)
+        response = _try_ollama_native(
+            endpoint_name,
+            base_url,
+            pi_model,
+            messages,
+            max_tokens,
+            temperature,
+            timeout=timeout,
+        )
+        if response:
+            response["model"] = f"{response['model']} ({endpoint_name})"
+            return endpoint_name, response, tried
+    return None, None, tried
 
 
 def _background_health_probe():
@@ -786,28 +843,17 @@ class ProxyHandler(BaseHTTPRequestHandler):
 
         # ── Tier 2: Pi ────────────────────────────────────────────────────────
         if PI_ENABLED:
-            # Graceful model substitution: use Pi-compatible model
-            pi_model = model if model in PI_MODELS else PI_DEFAULT_MODEL
-            if pi_model != model:
-                log.info("Pi fallback: substituting model '%s' → '%s'", model, pi_model)
-
-            if PI_RARI1_ENABLED and _is_healthy("pi-rari1"):
-                tried.append("pi-rari1")
-                resp = _try_ollama_native("pi-rari1", PI_RARI1, pi_model,
-                                          messages, max_tokens, temperature, timeout=30)
-                if resp:
-                    resp["model"] = f"{resp['model']} (pi-rari1)"
-                    self._respond(200, resp, tier="pi-rari1")
-                    return
-
-            if PI_RARI2_ENABLED and _is_healthy("pi-rari2"):
-                tried.append("pi-rari2")
-                resp = _try_ollama_native("pi-rari2", PI_RARI2, pi_model,
-                                          messages, max_tokens, temperature, timeout=30)
-                if resp:
-                    resp["model"] = f"{resp['model']} (pi-rari2)"
-                    self._respond(200, resp, tier="pi-rari2")
-                    return
+            tier, resp, pi_tried = _try_pi_tier(
+                model,
+                messages,
+                max_tokens,
+                temperature,
+                timeout=PI_CHAT_TIMEOUT_SEC,
+            )
+            tried.extend(pi_tried)
+            if resp and tier:
+                self._respond(200, resp, tier=tier)
+                return
 
         # ── Tier 3: Mac local ────────────────────────────────────────────────
         tried.append("mac-local")
