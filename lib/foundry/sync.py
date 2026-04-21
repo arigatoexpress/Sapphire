@@ -212,8 +212,10 @@ def load_sync_history(root: Path | None = None, *, limit: int = 50) -> list[dict
 def _send_telegram_alert(message: str) -> None:
     """Best-effort Telegram notification on sync failure."""
     try:
-        # Reuse Sapphire's existing telegram helper if available
-        from lib.telegram.src.sapphire_telegram.safe_send import send
+        # Reuse Sapphire's existing telegram helper if available.
+        # sapphire_telegram is a top-level package (lib/telegram/src is on
+        # sys.path; see tests/conftest.py:44).
+        from sapphire_telegram.safe_send import send
         send(message, priority="high")
         return
     except Exception:
@@ -226,7 +228,15 @@ def _send_telegram_alert(message: str) -> None:
         log.warning("No Telegram credentials — cannot send sync failure alert")
         return
 
+    import ssl
     import urllib.request
+
+    ctx = ssl.create_default_context()
+    try:
+        import certifi
+        ctx.load_verify_locations(certifi.where())
+    except ImportError:
+        pass
 
     try:
         url = f"https://api.telegram.org/bot{token}/sendMessage"
@@ -234,7 +244,7 @@ def _send_telegram_alert(message: str) -> None:
         req = urllib.request.Request(
             url, data=data, headers={"Content-Type": "application/json"}, method="POST"
         )
-        urllib.request.urlopen(req, timeout=10)
+        urllib.request.urlopen(req, timeout=10, context=ctx)
     except Exception as exc:
         log.warning("Telegram alert failed: %s", exc)
 
