@@ -67,7 +67,7 @@ inference-proxy:  ## Start inference-proxy :11435 (with x402)
 
 # ---------- data / ops ----------
 
-.PHONY: content-generate content-publish heartbeat-status
+.PHONY: content-generate content-publish heartbeat-status alpha-agent-status
 content-generate:  ## Generate weekly report draft
 	$(PY) -m lib.content generate
 
@@ -76,6 +76,21 @@ content-publish:  ## Promote draft → ready/
 
 heartbeat-status:  ## Print heartbeat daemon last known state
 	cat data/heartbeat_state.json 2>/dev/null | $(PY) -m json.tool || echo "no heartbeat state yet"
+
+alpha-agent-status:  ## Show recent alpha agent logs and latest heartbeat
+	@mkdir -p /Users/aribs/Library/Logs/sapphire
+	@echo "== alpha-agent.out (last 40 lines) =="
+	@tail -n 40 /Users/aribs/Library/Logs/sapphire/alpha-agent.out 2>/dev/null || echo "no alpha-agent stdout log yet"
+	@echo
+	@echo "== alpha-agent.err (last 40 lines) =="
+	@tail -n 40 /Users/aribs/Library/Logs/sapphire/alpha-agent.err 2>/dev/null || echo "no alpha-agent stderr log yet"
+	@echo
+	@echo "== data/agents/alpha.heartbeat =="
+	@if test -s data/agents/alpha.heartbeat; then \
+		$(PY) -m json.tool data/agents/alpha.heartbeat; \
+	else \
+		echo "no alpha heartbeat yet"; \
+	fi
 
 # ---------- CI mirror ----------
 

@@ -73,7 +73,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 
 ## Module Map
 
-**Key counts (verified 2026-04-19):** 1,967 passing tests (1,932 core + 35 plugin) · 31 dashboard pages · 7 quant strategies · 10 LaunchAgents · 21 scheduled tasks · 2 smart contracts.
+**Key counts (tests verified 2026-04-19; LaunchAgents updated 2026-04-20):** 1,967 passing tests (1,932 core + 35 plugin) · 31 dashboard pages · 7 quant strategies · 11 LaunchAgents · 21 scheduled tasks · 2 smart contracts.
 
 | Path | Type | Description |
 |------|------|-------------|
@@ -86,7 +86,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `lib/security/` | library | **Security platform**: `dependency_scanner` (OSV.dev CVE lookup + CycloneDX 1.5 SBOM), `model_monitor` (Ollama blob SHA-256 + Jinja2 backdoor detection), `network_mapper` (Tailscale topology + trust-zone scoring + attack-surface). |
 | `lib/intel/` | library | `market_intelligence.py`, `lead_enricher.py`. |
 | `lib/payments/` | library | `x402_middleware.py` — HTTP 402 micropayment gate (Flask + raw-socket), EVM signature verification. |
-| `lib/agents/` | library | OpenClaw/NemoClaw dispatch, orchestrator, runtime policy, token governor (under `src/sapphire_agents/`). |
+| `lib/agents/` | library | Paper-only autonomous harness (`base.py`, `alpha_agent.py`, `runner.py`) plus the broader OpenClaw/NemoClaw dispatch stack under `src/sapphire_agents/`. |
 | `lib/telegram/` | library | `kimi_relay.py`, `login_widget.py` (HMAC-SHA256 Login Widget verifier). |
 | `lib/trading/` | library | `solana_wallet.py`. |
 | `services/alpha/` | service | Trading engine + signal logger [Mac:18081]. |
@@ -111,7 +111,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `data/content/` | data | Content engine drafts + ready/ queue. |
 | `data/chain/` | data | Deployed contract addresses (`deployments.json`), chain snapshots. |
 | `data/benchmarks/kadima-labs/` | data | Kadima Labs AI benchmark (v1–v3). |
-| `infra/launchagents/` | infra | 10 macOS LaunchAgent plists (content-engine, content-publisher, morning-brief, backtest-weekly, foundry-sync, heartbeat, market-intel, security-pipeline, self-optimization, tradingview-cdp). |
+| `infra/launchagents/` | infra | 11 macOS LaunchAgent plists (alpha-agent, content-engine, content-publisher, morning-brief, backtest-weekly, foundry-sync, heartbeat, market-intel, security-pipeline, self-optimization, tradingview-cdp) plus 1 disabled template. |
 | `infra/agent-manifest.yaml` | infra | Lean 5-tool subset the LLM sees. |
 | `infra/tool-registry.yaml` | infra | Full plugin tool registry (CI-enforced by `scripts/validate_tool_registry.py`). |
 | `infra/tailscale-acl.json` | infra | Tailscale mesh ACL. |
