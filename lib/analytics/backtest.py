@@ -22,7 +22,7 @@ import argparse
 import json
 import logging
 import math
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -75,6 +75,7 @@ class BacktestConfig:
     sma_fast: int = 10
     sma_slow: int = 30
     initial_capital: float = 100_000.0
+    fee_bps: float = 0.0
     position_pct: float = 0.10           # 10% of equity per trade
     rr_ratio: float = 1.67               # take-profit / stop-loss ratio
     atr_period: int = 14
@@ -364,9 +365,12 @@ def _simulate(
             if exit_price is not None:
                 pnl_per_unit = (exit_price - entry) if direction == "long" else (entry - exit_price)
                 units = open_trade["units"]
-                pnl = pnl_per_unit * units
+                gross_pnl_pct = (pnl_per_unit / entry) if entry else 0.0
+                fee_pct = (cfg.fee_bps / 10_000.0) * 2
+                net_pnl_pct = gross_pnl_pct - fee_pct
+                pnl = open_trade["position_value"] * net_pnl_pct
                 equity += pnl
-                pnl_pct = (pnl_per_unit / entry) * 100 if entry else 0.0
+                pnl_pct = net_pnl_pct * 100
                 trades.append(Trade(
                     symbol=open_trade["symbol"],
                     direction=direction,
@@ -418,6 +422,7 @@ def _simulate(
                 "entry_price": entry_price,
                 "stop":        stop,
                 "target":      target,
+                "position_value": position_value,
                 "units":       units,
                 "confidence":  confidence,
                 "regime":      regime,
@@ -492,8 +497,31 @@ def _metrics(
 class Backtester:
     """Runs a backtest — one-shot or WITH-vs-WITHOUT comparison."""
 
-    def __init__(self, cfg: BacktestConfig | None = None):
-        self.cfg = cfg or BacktestConfig()
+    def __init__(
+        self,
+        cfg: BacktestConfig | float | int | None = None,
+        fee_bps: float | None = None,
+        bankroll: float | None = None,
+    ):
+        if isinstance(cfg, BacktestConfig):
+            base_cfg = cfg
+        elif isinstance(cfg, (int, float)):
+            if bankroll is not None:
+                raise TypeError("bankroll cannot be provided twice")
+            base_cfg = BacktestConfig(initial_capital=float(cfg))
+        elif cfg is None:
+            base_cfg = BacktestConfig()
+        else:
+            raise TypeError(f"unsupported Backtester config type: {type(cfg).__name__}")
+
+        if bankroll is not None or fee_bps is not None:
+            base_cfg = replace(
+                base_cfg,
+                initial_capital=float(bankroll) if bankroll is not None else base_cfg.initial_capital,
+                fee_bps=float(fee_bps) if fee_bps is not None else base_cfg.fee_bps,
+            )
+
+        self.cfg = base_cfg
 
     def run_symbol(self, symbol: str, *, with_regime: bool) -> BacktestResult:
         bars = _load_ohlcv(symbol, self.cfg.period_days)
