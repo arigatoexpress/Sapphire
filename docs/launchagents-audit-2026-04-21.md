@@ -84,13 +84,17 @@ Code is open. Recommend either:
   - **specialize**: rename the scheduled task to
     `sapphire-afternoon-deep-dive` with non-overlapping work.
 
-### F6. Security scan overlap
-- `com.sapphire.security-pipeline.plist` (daily 3 AM)
-- `~/.claude/scheduled-tasks/dependency-security-scan/` (Wed 4 AM)
+### F6. Security scan overlap — not actually redundant (verified)
+- `com.sapphire.security-pipeline.plist` (daily 3 AM) — scans `~/Code/Sapphire`
+  only: pip-audit + npm audit + regex secret patterns + CISA KEV + NVD.
+- `~/.claude/scheduled-tasks/dependency-security-scan/` (Wed 4 AM) — scans
+  **all 5 sibling repos** (Sapphire, Project-Go-Forward, regional-intel-workbench,
+  Cointracker, claw-code) with pip-audit + npm audit + cargo audit + secret
+  greps + outdated-deps check.
 
-The weekly scheduled task is a narrower subset of the daily pipeline;
-keep only if it catches something the daily pipeline misses. Quick
-verification needed.
+These are complementary, not duplicate. Keep both. (Originally flagged
+as "likely subset" in the initial audit pass; on-read review shows the
+weekly task's repo coverage is the differentiator.)
 
 ## Clean plists now version-controlled (this commit)
 
