@@ -368,7 +368,8 @@ def run_sync(
             # ERROR + Telegram-alerting. Otherwise a broken prod ontology
             # silently looks like "skipped, no problem here".
             never_succeeded = state.first_success_at is None
-            ontology_not_ready = False
+            saw_404 = False
+            saw_non_404_failure = False  # includes auth, non-404 API, generic FoundryError
             for obj_type, objects in objects_by_type.items():
                 if not objects:
                     continue
@@ -379,28 +380,37 @@ def run_sync(
                     log.info("Uploaded %d %s objects", len(objects), obj_type)
                 except FoundryAuthError as exc:
                     auth_failed = True
+                    saw_non_404_failure = True
                     result.errors.append(f"Upload {obj_type}: {exc}")
                     log.error("Upload %s auth failed: %s", obj_type, exc)
                     break  # Don't hammer failing auth on every object type.
                 except FoundryAPIError as exc:
                     result.errors.append(f"Upload {obj_type}: {exc}")
                     if exc.status == 404 and not uploaded_anything and never_succeeded:
-                        ontology_not_ready = True
+                        saw_404 = True
                         log.info(
                             "Upload %s skipped (ontology action not deployed; "
                             "HTTP 404) — finish Foundry ontology provisioning to enable",
                             obj_type,
                         )
                     else:
+                        saw_non_404_failure = True
                         log.error("Upload %s failed: %s", obj_type, exc)
                 except FoundryError as exc:
+                    saw_non_404_failure = True
                     log.error("Upload %s failed: %s", obj_type, exc)
                     result.errors.append(f"Upload {obj_type}: {exc}")
-            if ontology_not_ready and not uploaded_anything and never_succeeded:
-                # Whole batch was blocked by the same setup gap — demote to
-                # the "not configured" path so alerting stays quiet. This
-                # guard doesn't fire post-first-success, so regressions after
-                # a prior successful sync still page via the standard path.
+            # Only demote to not_configured when EVERY failure was a pre-first-
+            # success 404. If the batch mixed a 404 with any other failure
+            # (500, timeout, auth, etc.), the run is a genuine error and must
+            # alert through the standard path — not be silently swallowed.
+            # (codex review #106 P1 follow-up: r3117240955)
+            if (
+                saw_404
+                and not saw_non_404_failure
+                and not uploaded_anything
+                and never_succeeded
+            ):
                 config_missing = True
     else:
         for obj_type, objects in objects_by_type.items():

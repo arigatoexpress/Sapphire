@@ -54,6 +54,8 @@ for src in "$AGENTS_DIR"/*.plist; do
     if [[ -f "$dest" ]]; then
       if ! cmp -s "$src" "$dest"; then
         echo "[would reload]  $name"
+      elif ! launchctl print "gui/$uid/$name" >/dev/null 2>&1; then
+        echo "[would load]    $name  (file current, agent not loaded)"
       else
         echo "[no-op]         $name"
       fi
@@ -63,8 +65,20 @@ for src in "$AGENTS_DIR"/*.plist; do
     continue
   fi
 
+  # File is byte-identical to the repo version. Normally we'd skip, but if
+  # the agent isn't currently loaded (e.g. after a manual `bootout` or a
+  # fresh session), a re-run of this script is the user's way of saying
+  # "reload everything" — bootstrap it back in rather than silently skipping.
+  # (codex review #106 P2 follow-up: r3117240963)
   if [[ -f "$dest" ]] && cmp -s "$src" "$dest"; then
-    skipped=$((skipped + 1))
+    if launchctl print "gui/$uid/$name" >/dev/null 2>&1; then
+      skipped=$((skipped + 1))
+      continue
+    fi
+    # File current but agent unloaded — bootstrap without copying.
+    launchctl bootstrap "gui/$uid" "$dest"
+    echo "[loaded]        $name  (file unchanged, agent was unloaded)"
+    installed=$((installed + 1))
     continue
   fi
 

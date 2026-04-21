@@ -427,6 +427,56 @@ class TestRunSyncGracefulDegradation:
             "404 must be INFO, not ERROR, while ontology is unprovisioned"
         )
 
+    def test_404_mixed_with_non_404_failure_does_not_demote(
+        self, tmp_path, monkeypatch, caplog
+    ):
+        """Codex review #106 P1 follow-up (r3117240955): if the batch mixes a
+        pre-success 404 with any other failure (e.g. 500), the run is a real
+        failure and must alert — not be silently demoted to not_configured.
+        """
+        monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
+        monkeypatch.setenv("PALANTIR_FOUNDRY_TOKEN", "ok-tok")
+
+        signals_dir = tmp_path / "data" / "signals"
+        signals_dir.mkdir(parents=True)
+        (signals_dir / "2026-04-19.jsonl").write_text(
+            json.dumps({"pipeline_id": "t1", "symbol": "BTC"}) + "\n"
+        )
+
+        from lib.foundry.client import FoundryAPIError
+
+        # First upload returns 404, second returns 500
+        side_effects = [
+            FoundryAPIError("not deployed → 404", status=404),
+            FoundryAPIError("server exploded → 500", status=500),
+        ]
+        with mock.patch.dict(
+            "lib.foundry.ingestion.ALL_TRANSFORMS",
+            {"TypeA": lambda r: [{"id": "a1"}], "TypeB": lambda r: [{"id": "b1"}]},
+            clear=True,
+        ), mock.patch(
+            "lib.foundry.client.FoundryClient.upsert_objects",
+            side_effect=side_effects,
+        ), mock.patch(
+            "lib.foundry.sync._send_telegram_alert"
+        ), caplog.at_level("INFO"):
+            result = run_sync(tmp_path, dry_run=False, force=True)
+
+        # The mixed-error case must NOT be demoted to not_configured —
+        # the 500 is a real failure that deserves visibility.
+        assert result.skipped is False, (
+            "mixed 404+500 must not silently demote to skipped/not_configured"
+        )
+        assert result.ok is False
+        state_path = tmp_path / "data" / "foundry_sync_state.json"
+        state = json.loads(state_path.read_text())
+        assert state["last_status"] == "error"
+        # The 500 ERROR log must be present.
+        error_msgs = [r.getMessage() for r in caplog.records if r.levelname == "ERROR"]
+        assert any("500" in m for m in error_msgs), (
+            f"expected an ERROR log for the 500; got {error_msgs!r}"
+        )
+
     def test_404_after_first_success_pages_as_regression(
         self, tmp_path, monkeypatch, caplog
     ):
