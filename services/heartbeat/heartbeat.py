@@ -26,8 +26,13 @@ NOTIFY_DIR = ROOT / "plugins" / "claw-sapphire" / "tools"
 HEARTBEAT_LOG = ROOT / "data" / "health" / "heartbeat.jsonl"
 
 logging.basicConfig(
+    # basicConfig defaults to stderr → every INFO ("Heartbeat: 6 up / 0 down")
+    # ends up in the LaunchAgent's *-err.log, making real errors hard to find.
+    # Route everything to stdout; exceptions and tracebacks still surface on
+    # stderr naturally.
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
+    stream=sys.stdout,
 )
 log = logging.getLogger("heartbeat")
 

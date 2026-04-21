@@ -38,6 +38,9 @@ log = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
+    # Route INFO/DEBUG to stdout so the LaunchAgent's *-err.log only
+    # captures real errors (tracebacks still go to stderr naturally).
+    stream=sys.stdout,
 )
 
 

@@ -19,6 +19,7 @@ import argparse
 import hashlib
 import json
 import logging
+import sys
 import urllib.error
 import urllib.request
 from datetime import UTC, datetime
@@ -178,6 +179,9 @@ def main() -> int:
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        # Route INFO/DEBUG to stdout so the LaunchAgent's *-err.log only
+        # captures real errors (tracebacks still go to stderr naturally).
+        stream=sys.stdout,
     )
     if not args.metrics and not args.health:
         args.metrics = args.health = True
