@@ -6,7 +6,7 @@ Autonomous trading + intelligence + content ops. Telegram-first, agent-driven, e
 
 ```bash
 # Test
-pytest tests/unit/ --tb=short -q           # 1,932 passing (use /usr/local/bin/python3 on Mac)
+pytest tests/unit/ --tb=short -q           # 1,958 passing (use /usr/local/bin/python3 on Mac)
 pytest plugins/claw-sapphire/tests/ -q     # 35 plugin tests (budget, router, state, technical_analysis, trading_brain)
 
 # Lint
@@ -73,7 +73,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 
 ## Module Map
 
-**Key counts (tests verified 2026-04-19; LaunchAgents updated 2026-04-20):** 1,967 passing tests (1,932 core + 35 plugin) · 31 dashboard pages · 7 quant strategies · 11 LaunchAgents · 21 scheduled tasks · 2 smart contracts.
+**Key counts (tests verified 2026-04-20):** 1,993 passing tests (1,958 core + 35 plugin) · 31 dashboard pages · 7 quant strategies · 11 LaunchAgents · 21 scheduled tasks · 2 smart contracts.
 
 | Path | Type | Description |
 |------|------|-------------|
@@ -234,7 +234,7 @@ Registries: `data/connectors.json`, `data/device_topology.json`
 
 The performance.html template was previously hardcoded demo data (fake "Ultra v3 Momentum" strategies, fake $12,847 P&L). All panels now fetch the above endpoints on load + every 60s.
 
-Tests at `tests/unit/test_strategy_performance.py`, `test_backtest_results.py`, `test_forecast.py` (57 tests). To regenerate a backtest sweep: `python3 -m lib.analytics.run_strategies --days 90` — note: currently blocked by a signature-drift bug in `Backtester.__init__` where `strategies.py` passes `fee_bps` that `backtest.py` no longer accepts. The Apr-18 artifacts remain valid for the leaderboard until that is refactored.
+Tests at `tests/unit/test_strategy_performance.py`, `test_backtest_results.py`, `test_forecast.py` (57 tests). To regenerate a backtest sweep: `python3 -m lib.analytics.run_strategies --days 90` — writes fresh `strategy_sweep_*.json` + `best_per_symbol_*.json` to `data/backtests/strategies/` (Backtester `fee_bps`/`bankroll` kwargs accepted since PR #98).
 
 ## 21 Scheduled Tasks (Claude Code)
 
