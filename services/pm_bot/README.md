@@ -1,0 +1,109 @@
+# Sapphire PM Bot
+
+Minimal Telegram-first PM surface for Sapphire phase 1. The service receives Telegram webhook or polling updates, hands them to [`sapphire_pm_bot`](../../plugins/claw-sapphire/tools/sapphire_pm_bot.py), and sends the formatted response back through the Telegram Bot API.
+
+## Prerequisites
+
+- Python 3.11+
+- Application Default Credentials already configured on the Mac:
+  - `gcloud auth application-default login`
+- Service deps installed:
+  - `pip install -r /Users/aribs/Code/Sapphire/services/pm_bot/requirements.txt`
+
+## Environment Variables
+
+Required:
+
+- `SAPPHIRE_PM_BOT_TOKEN=123456:abc`
+- `SAPPHIRE_PM_BOT_ALLOWED_USER_IDS=12345,67890`
+
+Optional:
+
+- `THO_API_KEY=...`
+  - Required for `/rag`
+- `MODE=webhook`
+  - Set `MODE=polling` for local long-poll development
+- `SAPPHIRE_PM_BOT_HOST=127.0.0.1`
+- `SAPPHIRE_PM_BOT_PORT=18082`
+- `THO_API_BASE_URL=https://project-go-forward-trgi34bxuq-uc.a.run.app`
+- `THO_FIRESTORE_PROJECT=tho-ai-agent`
+- `SAPPHIRE_PM_BOT_DEFAULT_PROJECT_ID=<firestore-project-id>`
+  - Optional override for `/pm new` if project auto-detection is not enough
+
+## Run Locally
+
+Webhook mode:
+
+```bash
+cd /Users/aribs/Code/Sapphire/services/pm_bot
+MODE=webhook python3 -m uvicorn server:app --host 127.0.0.1 --port 18082
+```
+
+Polling mode:
+
+```bash
+cd /Users/aribs/Code/Sapphire/services/pm_bot
+MODE=polling python3 server.py
+```
+
+`MODE=polling` is intended for local development. Telegram must not still have a webhook registered for the same bot token when polling is active; the service attempts `deleteWebhook` on startup in polling mode.
+
+## Register The Webhook
+
+The webhook URL must be publicly reachable. In practice that means a tunnel such as Tailscale Funnel or another HTTPS endpoint that forwards to `http://127.0.0.1:18082/telegram/webhook`.
+
+Set the webhook:
+
+```bash
+curl -s "https://api.telegram.org/bot${SAPPHIRE_PM_BOT_TOKEN}/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d "{\"url\":\"https://YOUR-PUBLIC-URL/telegram/webhook\",\"allowed_updates\":[\"message\"]}"
+```
+
+Clear the webhook for polling:
+
+```bash
+curl -s "https://api.telegram.org/bot${SAPPHIRE_PM_BOT_TOKEN}/deleteWebhook" \
+  -H "Content-Type: application/json" \
+  -d '{"drop_pending_updates":false}'
+```
+
+## LaunchAgent
+
+The LaunchAgent plist ships here:
+
+- [`services/pm_bot/launchagent/com.sapphire.pm-bot.plist`](/Users/aribs/Code/Sapphire/services/pm_bot/launchagent/com.sapphire.pm-bot.plist)
+
+Install manually when ready:
+
+```bash
+cp /Users/aribs/Code/Sapphire/services/pm_bot/launchagent/com.sapphire.pm-bot.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.sapphire.pm-bot.plist
+```
+
+Logs go to:
+
+- `~/Library/Logs/sapphire-pm-bot.log`
+
+## Test Recipe
+
+Tool tests:
+
+```bash
+cd /Users/aribs/Code/Sapphire
+pytest plugins/claw-sapphire/tests/test_sapphire_pm_bot.py -q
+```
+
+Full plugin suite:
+
+```bash
+cd /Users/aribs/Code/Sapphire
+pytest plugins/claw-sapphire/tests/ -q
+```
+
+Quick manual smoke test with the service running:
+
+- DM the bot `/help`
+- DM the bot `/status`
+- DM the bot `/pm list`
+- DM the bot `/rag what forms are needed for a sale in Harris County`

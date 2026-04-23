@@ -81,6 +81,13 @@ tools:
     description: "Unified market data — equity quotes, crypto OHLCV, FRED macro, news via OpenBB + TradingView live chart data + Pine CI. Actions: quote, crypto, historical, fred, news, snapshot, tv_quote, tv_ohlcv, tv_levels, tv_strategy, pine_ci."
 
   # ── internal / programmatically invoked ──────────────────────────────────
+  - name: sapphire_pm_bot
+    path: plugins/claw-sapphire/tools/sapphire_pm_bot.py
+    status: internal
+    owner: sapphire
+    consumers: [services.pm-bot]
+    description: Telegram command router for the Sapphire PM bot. Enforces allowlists, formats status, lists/creates PM tasks, and queries THO RAG.
+
   # Trading & signals
   - name: predict
     path: plugins/claw-sapphire/tools/internal/predict.py
