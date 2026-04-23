@@ -30,6 +30,47 @@ logging.basicConfig(
 logger = logging.getLogger("sapphire.pm_bot")
 
 
+# Fallback secret file paths, matching plugins/claw-sapphire/tools/notify.py.
+# Lets the PM bot share a Telegram bot with the rest of the Sapphire stack
+# without duplicating token plumbing.
+_SECRET_PATHS = [
+    Path.home() / ".config" / "sapphire-secrets" / "telegram_bot_token",
+    Path.home() / ".config" / "sapphire" / "telegram_bot_token",
+]
+
+
+def _resolve_bot_token() -> str:
+    """Resolve the Telegram bot token in priority order.
+
+    1. `SAPPHIRE_PM_BOT_TOKEN`   — explicit override (per-bot deployment)
+    2. `TELEGRAM_BOT_TOKEN`      — shared Sapphire bot (notify, watchdog, etc.)
+    3. `~/.config/sapphire-secrets/telegram_bot_token` file
+    4. `~/.config/sapphire/telegram_bot_token` file
+
+    Returns empty string if nothing is configured. The caller (`main()`)
+    fails-closed on empty so the service refuses to start with a clear
+    critical-log message.
+    """
+    explicit = os.getenv("SAPPHIRE_PM_BOT_TOKEN", "").strip()
+    if explicit:
+        return explicit
+
+    shared = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    if shared:
+        return shared
+
+    for path in _SECRET_PATHS:
+        try:
+            if path.exists():
+                contents = path.read_text().strip()
+                if contents:
+                    return contents
+        except OSError:
+            continue
+
+    return ""
+
+
 @dataclass(frozen=True)
 class Settings:
     token: str
@@ -42,7 +83,7 @@ class Settings:
     def from_env(cls) -> "Settings":
         port_text = os.getenv("SAPPHIRE_PM_BOT_PORT", "18082").strip() or "18082"
         return cls(
-            token=os.getenv("SAPPHIRE_PM_BOT_TOKEN", "").strip(),
+            token=_resolve_bot_token(),
             mode=os.getenv("MODE", "webhook").strip().lower() or "webhook",
             host=os.getenv("SAPPHIRE_PM_BOT_HOST", "127.0.0.1").strip() or "127.0.0.1",
             port=int(port_text),
@@ -101,8 +142,12 @@ app = FastAPI(title="Sapphire PM Bot", version="0.1.0")
 
 def _validate_startup_config() -> None:
     if not SETTINGS.token:
-        logger.critical("SAPPHIRE_PM_BOT_TOKEN is not set; refusing to start")
-        raise RuntimeError("SAPPHIRE_PM_BOT_TOKEN is required")
+        logger.critical(
+            "No Telegram bot token found. Set SAPPHIRE_PM_BOT_TOKEN (override) "
+            "or TELEGRAM_BOT_TOKEN (shared with notify/watchdog) or drop it "
+            "at ~/.config/sapphire-secrets/telegram_bot_token. Refusing to start."
+        )
+        raise RuntimeError("Telegram bot token is required")
     if SETTINGS.mode not in {"webhook", "polling"}:
         raise RuntimeError(f"Unsupported MODE={SETTINGS.mode!r}; expected 'webhook' or 'polling'")
 

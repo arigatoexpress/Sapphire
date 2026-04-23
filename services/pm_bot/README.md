@@ -14,7 +14,11 @@ Minimal Telegram-first PM surface for Sapphire phase 1. The service receives Tel
 
 Required:
 
-- `SAPPHIRE_PM_BOT_TOKEN=123456:abc`
+- Telegram bot token — resolved in this priority order:
+  1. `SAPPHIRE_PM_BOT_TOKEN=123456:abc` — explicit override for a dedicated PM bot
+  2. `TELEGRAM_BOT_TOKEN=...` — share the existing Sapphire bot that `notify` / `watchdog` / etc. already use (recommended — one less token to rotate)
+  3. `~/.config/sapphire-secrets/telegram_bot_token` — file fallback (same location used by `plugins/claw-sapphire/tools/notify.py`)
+  4. `~/.config/sapphire/telegram_bot_token` — legacy file location
 - `SAPPHIRE_PM_BOT_ALLOWED_USER_IDS=12345,67890`
 
 Optional:
