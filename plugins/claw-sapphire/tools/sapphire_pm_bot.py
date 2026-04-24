@@ -71,6 +71,10 @@ SAPPHIRE_PROJECT_NAMES = {
     "sapphire ai pm manager",
     "sapphire platform",
 }
+THO_API_KEY_PATHS = (
+    Path.home() / ".config" / "sapphire-secrets" / "tho_api_key",
+    Path.home() / ".config" / "sapphire" / "tho_api_key",
+)
 CRM_DEAL_URL_TEMPLATE = THO_BASE_URL.rstrip("/") + "/crm/deals/{deal_id}"
 MDV2_ESCAPE_RE = re.compile(r"([_*\[\]()~`>#\+\-=|{}.!\\])")
 EMAIL_RE = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
@@ -194,6 +198,30 @@ def _preview(text: str, limit: int = 200) -> str:
     if len(compact) <= limit:
         return compact
     return compact[: limit - 1].rstrip() + "…"
+
+
+def _read_secret_file(path: Path) -> str:
+    try:
+        return path.read_text().strip()
+    except OSError:
+        return ""
+
+
+def _resolve_tho_api_key() -> str:
+    env_key = str(os.getenv("THO_API_KEY", "")).strip()
+    if env_key:
+        return env_key
+
+    explicit_path = str(os.getenv("THO_API_KEY_FILE", "")).strip()
+    if explicit_path:
+        return _read_secret_file(Path(explicit_path).expanduser())
+
+    for path in THO_API_KEY_PATHS:
+        value = _read_secret_file(path)
+        if value:
+            return value
+
+    return ""
 
 
 def _task_public_url(task: dict[str, Any]) -> str | None:
@@ -523,7 +551,7 @@ def _handle_rag(text: str) -> dict[str, Any]:
     if not match:
         return _response("Usage: /rag <query>", None)
 
-    api_key = str(os.getenv("THO_API_KEY", "")).strip()
+    api_key = _resolve_tho_api_key()
     if not api_key:
         return _response("THO API not configured on this host", None)
 

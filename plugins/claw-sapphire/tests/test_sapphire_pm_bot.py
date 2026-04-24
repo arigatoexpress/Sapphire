@@ -215,6 +215,7 @@ def test_pm_new_happy_path(monkeypatch):
 def test_rag_happy_path(monkeypatch):
     monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
     monkeypatch.setenv("THO_API_KEY", "secret")
+    monkeypatch.delenv("THO_API_KEY_FILE", raising=False)
 
     captured: dict[str, object] = {}
 
@@ -251,9 +252,38 @@ def test_rag_happy_path(monkeypatch):
     assert captured["headers"] == {"Authorization": "Bearer secret"}
 
 
+def test_rag_uses_api_key_file(monkeypatch, tmp_path):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    monkeypatch.delenv("THO_API_KEY", raising=False)
+    key_file = tmp_path / "tho_api_key"
+    key_file.write_text(" file-secret \n")
+    monkeypatch.setenv("THO_API_KEY_FILE", str(key_file))
+
+    captured: dict[str, object] = {}
+
+    class _Response:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"results": []}
+
+    def _fake_post(url, json=None, headers=None, timeout=None):
+        captured["headers"] = headers
+        return _Response()
+
+    monkeypatch.setattr(pm_bot.requests, "post", _fake_post)
+
+    pm_bot.handle_telegram_command(_make_update("/rag what forms are needed"))
+
+    assert captured["headers"] == {"Authorization": "Bearer file-secret"}
+
+
 def test_rag_fails_closed_when_api_key_missing(monkeypatch):
     monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
     monkeypatch.delenv("THO_API_KEY", raising=False)
+    monkeypatch.delenv("THO_API_KEY_FILE", raising=False)
+    monkeypatch.setattr(pm_bot, "THO_API_KEY_PATHS", ())
 
     response = pm_bot.handle_telegram_command(_make_update("/rag tell me about sales forms"))
 
