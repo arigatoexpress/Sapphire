@@ -236,6 +236,41 @@ def test_recovered_restart_does_not_notify(monkeypatch, supervisor_env):
     assert alerts == []
 
 
+def test_recovery_detected_via_pid_change_when_exit_code_stale(monkeypatch, supervisor_env):
+    """launchctl's LastExitStatus persists after a successful kickstart — so a
+    recovered service can still read exit_code=1. Use the PID change (new
+    process replaced the old one) as the authoritative recovery signal.
+    """
+    label = "ai.hermes.gateway"
+    alerts: list[tuple[str, str]] = []
+    monkeypatch.setattr(service_supervisor, "_run", FakeRun())
+    monkeypatch.setattr(
+        service_supervisor,
+        "send_alert",
+        lambda message, priority="p1": alerts.append((message, priority)),
+    )
+    # Before restart: crashed, exit_code=1, pid=100
+    # After restart:  loaded, exit_code STILL 1 (stale), pid=200 (new process)
+    install_status_sequence(
+        monkeypatch,
+        [
+            {label: status(label, exit_code=1, pid=100)},
+            [status(label, exit_code=1, pid=200)],  # PID changed → actually restarted
+        ],
+    )
+
+    result = service_supervisor.supervise_once(labels=[label])
+
+    assert result["ok"] is True, f"expected recovery, got: {result}"
+    assert result["recovered"], "PID change should register as recovered"
+    assert not result["failed"], "should not escalate when PID proves restart succeeded"
+    assert alerts == [], "Telegram should stay silent on successful restart"
+
+    payload = result["recovered"][0]
+    assert payload["pid_before"] == 100
+    assert payload["pid_after"] == 200
+
+
 def test_activity_written_to_firestore_on_every_action(monkeypatch, supervisor_env):
     label = "ai.hermes.gateway"
     db = FakeDB()
