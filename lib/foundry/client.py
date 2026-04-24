@@ -9,6 +9,8 @@ Configuration resolution order:
      - ``foundry_url`` — Foundry stack URL
      - ``foundry_token`` — bearer token
      - ``foundry_client_id`` / ``foundry_client_secret`` — OAuth
+     - ``foundry_ontology`` — ontology API name or RID
+     - ``foundry_upsert_action`` — action API name
 
 Env variables:
   PALANTIR_FOUNDRY_URL / FOUNDRY_URL          — Foundry stack URL
@@ -58,6 +60,8 @@ _CLIENT_ID_ENVS = ("PALANTIR_FOUNDRY_CLIENT_ID", "FOUNDRY_CLIENT_ID")
 _CLIENT_SECRET_ENVS = ("PALANTIR_FOUNDRY_CLIENT_SECRET", "FOUNDRY_CLIENT_SECRET")
 _ONTOLOGY_ENVS = ("PALANTIR_FOUNDRY_ONTOLOGY", "FOUNDRY_ONTOLOGY")
 _UPSERT_ACTION_ENVS = ("PALANTIR_FOUNDRY_UPSERT_ACTION", "FOUNDRY_UPSERT_ACTION")
+_DEFAULT_ONTOLOGY = "ontology"
+_DEFAULT_UPSERT_ACTION = "sapphire-upsert"
 
 _DEFAULT_SECRETS_DIR = Path.home() / ".config" / "sapphire-secrets"
 
@@ -107,11 +111,15 @@ def _resolve_client_secret() -> str | None:
 
 
 def _resolve_ontology_api_name() -> str:
-    return _first_env(*_ONTOLOGY_ENVS) or "ontology"
+    return _first_env(*_ONTOLOGY_ENVS) or _read_secret_file("foundry_ontology") or _DEFAULT_ONTOLOGY
 
 
 def _resolve_upsert_action_api_name() -> str:
-    return _first_env(*_UPSERT_ACTION_ENVS) or "sapphire-upsert"
+    return (
+        _first_env(*_UPSERT_ACTION_ENVS)
+        or _read_secret_file("foundry_upsert_action")
+        or _DEFAULT_UPSERT_ACTION
+    )
 
 
 def _quote_path_segment(value: str) -> str:
@@ -239,9 +247,18 @@ class FoundryClient:
         client.upsert_objects("ri.ontology..objectType.PaperTrade", rows)
     """
 
-    def __init__(self, auth: FoundryAuth, *, timeout: int = 30):
+    def __init__(
+        self,
+        auth: FoundryAuth,
+        *,
+        timeout: int = 30,
+        ontology: str | None = None,
+        upsert_action: str | None = None,
+    ):
         self.auth = auth
         self.timeout = timeout
+        self.ontology = (ontology or _resolve_ontology_api_name()).strip()
+        self.upsert_action = (upsert_action or _resolve_upsert_action_api_name()).strip()
 
     @classmethod
     def from_env(cls, **kwargs: Any) -> FoundryClient:
@@ -305,8 +322,15 @@ class FoundryClient:
     def health(self) -> dict[str, Any]:
         """Check Foundry stack health.  Returns ``{"ok": True/False, ...}``."""
         try:
-            self._get("/api/v2/datasets", params={"pageSize": "1"})
-            return {"ok": True, "auth_mode": self.auth.auth_mode, "datasets_accessible": True}
+            ontologies = self.list_ontologies()
+            return {
+                "ok": True,
+                "auth_mode": self.auth.auth_mode,
+                "ontologies_accessible": True,
+                "ontology_count": len(ontologies.get("data") or []),
+                "configured_ontology": self.ontology,
+                "configured_upsert_action": self.upsert_action,
+            }
         except FoundryAPIError as exc:
             return {
                 "ok": False,
@@ -364,13 +388,54 @@ class FoundryClient:
 
     # -- ontology operations --------------------------------------------------
 
+    def list_ontologies(self) -> dict[str, Any]:
+        return self._get("/api/v2/ontologies")
+
     def list_object_types(self) -> dict[str, Any]:
-        ontology = _quote_path_segment(_resolve_ontology_api_name())
+        ontology = _quote_path_segment(self.ontology)
         return self._get(f"/api/v2/ontologies/{ontology}/objectTypes")
 
+    def list_action_types(self) -> dict[str, Any]:
+        ontology = _quote_path_segment(self.ontology)
+        return self._get(f"/api/v2/ontologies/{ontology}/actionTypes")
+
     def list_actions(self) -> dict[str, Any]:
-        ontology = _quote_path_segment(_resolve_ontology_api_name())
-        return self._get(f"/api/v2/ontologies/{ontology}/actions")
+        return self.list_action_types()
+
+    def validate_upsert_target(self) -> None:
+        """Fail fast if the configured ontology/action cannot be found."""
+        ontology_items = self.list_ontologies().get("data") or []
+        ontology_names = {
+            value
+            for item in ontology_items
+            if isinstance(item, dict)
+            for value in (item.get("apiName"), item.get("rid"))
+            if value
+        }
+        if self.ontology not in ontology_names:
+            known = ", ".join(sorted(str(name) for name in ontology_names)[:5]) or "none"
+            raise FoundryConfigError(
+                f"Configured Foundry ontology {self.ontology!r} was not found. "
+                f"Set PALANTIR_FOUNDRY_ONTOLOGY or {_secrets_dir() / 'foundry_ontology'} "
+                f"to one of the deployed ontology API names/RIDs. Visible: {known}."
+            )
+
+        action_items = self.list_action_types().get("data") or []
+        action_names = {
+            value
+            for item in action_items
+            if isinstance(item, dict)
+            for value in (item.get("apiName"), item.get("rid"))
+            if value
+        }
+        if self.upsert_action not in action_names:
+            known = ", ".join(sorted(str(name) for name in action_names)[:8]) or "none"
+            raise FoundryConfigError(
+                f"Configured Foundry upsert action {self.upsert_action!r} was not found "
+                f"in ontology {self.ontology!r}. Set PALANTIR_FOUNDRY_UPSERT_ACTION "
+                f"or {_secrets_dir() / 'foundry_upsert_action'} after the Sapphire action "
+                f"is deployed. Visible actions: {known}."
+            )
 
     def load_objects(
         self,
@@ -382,8 +447,9 @@ class FoundryClient:
         params: dict[str, str] = {"pageSize": str(page_size)}
         if page_token:
             params["pageToken"] = page_token
-        ontology = _quote_path_segment(_resolve_ontology_api_name())
-        return self._get(f"/api/v2/ontologies/{ontology}/objects/{object_type}", params=params)
+        ontology = _quote_path_segment(self.ontology)
+        obj = _quote_path_segment(object_type)
+        return self._get(f"/api/v2/ontologies/{ontology}/objects/{obj}", params=params)
 
     def upsert_objects(
         self,
@@ -393,8 +459,8 @@ class FoundryClient:
         primary_key: str = "id",
     ) -> dict[str, Any]:
         """Bulk-upsert ontology objects via the apply-action batch endpoint."""
-        ontology = _quote_path_segment(_resolve_ontology_api_name())
-        action = _quote_path_segment(_resolve_upsert_action_api_name())
+        ontology = _quote_path_segment(self.ontology)
+        action = _quote_path_segment(self.upsert_action)
         return self._post(
             f"/api/v2/ontologies/{ontology}/actions/{action}/apply",
             body={
@@ -413,8 +479,9 @@ class FoundryClient:
         *,
         page_size: int = 100,
     ) -> dict[str, Any]:
-        ontology = _quote_path_segment(_resolve_ontology_api_name())
+        ontology = _quote_path_segment(self.ontology)
+        obj = _quote_path_segment(object_type)
         return self._post(
-            f"/api/v2/ontologies/{ontology}/objects/{object_type}/search",
+            f"/api/v2/ontologies/{ontology}/objects/{obj}/search",
             body={"query": query, "pageSize": page_size},
         )

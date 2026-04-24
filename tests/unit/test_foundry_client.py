@@ -109,6 +109,7 @@ class TestFoundryClientHealth:
         result = client.health()
         assert result["ok"] is True
         assert result["auth_mode"] == "token"
+        assert result["ontologies_accessible"] is True
 
     def test_health_api_error(self, monkeypatch):
         monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
@@ -172,7 +173,43 @@ class TestFoundryClientDatasets:
 
         client.list_actions()
 
-        client._get.assert_called_once_with("/api/v2/ontologies/sapphire-prod/actions")
+        client._get.assert_called_once_with("/api/v2/ontologies/sapphire-prod/actionTypes")
+
+    def test_validate_upsert_target_accepts_configured_action(self, monkeypatch):
+        monkeypatch.setenv("FOUNDRY_ONTOLOGY", "sapphire-prod")
+        monkeypatch.setenv("FOUNDRY_UPSERT_ACTION", "bulk-upsert")
+        client = self._make_client(monkeypatch)
+        client._get = mock.Mock(side_effect=[
+            {"data": [{"apiName": "sapphire-prod", "rid": "ri.ontology.main.ontology.1"}]},
+            {"data": [{"apiName": "bulk-upsert", "rid": "ri.action.main.action.1"}]},
+        ])
+
+        client.validate_upsert_target()
+
+        assert client._get.call_args_list[0].args[0] == "/api/v2/ontologies"
+        assert client._get.call_args_list[1].args[0] == (
+            "/api/v2/ontologies/sapphire-prod/actionTypes"
+        )
+
+    def test_validate_upsert_target_raises_when_ontology_missing(self, monkeypatch):
+        monkeypatch.setenv("FOUNDRY_ONTOLOGY", "missing")
+        client = self._make_client(monkeypatch)
+        client._get = mock.Mock(return_value={"data": [{"apiName": "default"}]})
+
+        with pytest.raises(FoundryConfigError, match="Configured Foundry ontology"):
+            client.validate_upsert_target()
+
+    def test_validate_upsert_target_raises_when_action_missing(self, monkeypatch):
+        monkeypatch.setenv("FOUNDRY_ONTOLOGY", "default")
+        monkeypatch.setenv("FOUNDRY_UPSERT_ACTION", "sapphire-upsert")
+        client = self._make_client(monkeypatch)
+        client._get = mock.Mock(side_effect=[
+            {"data": [{"apiName": "default"}]},
+            {"data": [{"apiName": "other-action"}]},
+        ])
+
+        with pytest.raises(FoundryConfigError, match="Configured Foundry upsert action"):
+            client.validate_upsert_target()
 
     def test_search_objects(self, monkeypatch):
         client = self._make_client(monkeypatch)
@@ -213,6 +250,18 @@ class TestSecretsDirFallback:
         monkeypatch.setenv("SAPPHIRE_SECRETS_DIR", str(tmp_path))
         with pytest.raises(FoundryConfigError, match="No Foundry URL"):
             FoundryAuth.from_env()
+
+    def test_ontology_and_action_resolved_from_secrets_files(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("SAPPHIRE_SECRETS_DIR", str(tmp_path))
+        (tmp_path / "foundry_url").write_text("https://kadima.example.com\n")
+        (tmp_path / "foundry_token").write_text("secret-tok\n")
+        (tmp_path / "foundry_ontology").write_text("sapphire-prod\n")
+        (tmp_path / "foundry_upsert_action").write_text("bulk-upsert\n")
+
+        client = FoundryClient.from_env()
+
+        assert client.ontology == "sapphire-prod"
+        assert client.upsert_action == "bulk-upsert"
 
 
 class TestExceptions:
