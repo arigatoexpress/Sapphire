@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -222,10 +223,181 @@ def test_pulse_runs_all_collectors(fake_run, tmp_path):
         repos=[("arigato/r", repo_path, "r")],
         cloud_run=[("proj", "us-central1", "svc")],
         services=["com.sapphire.fake"],
+        include_trading=False,
+        include_webhook_delivery=False,
     )
     assert len(p.repos) == 1
     assert len(p.cloud_run) == 1
     assert len(p.services) == 1
+
+
+def test_pulse_runs_trading_and_webhook_collectors(monkeypatch):
+    monkeypatch.setattr(dev_pulse, "collect_trading_status", lambda: dev_pulse.TradingStatus(
+        last_signal_at="2026-04-24T12:00:00+00:00",
+        signals_today_count=3,
+        open_paper_positions=1,
+        paper_portfolio_value=101000.0,
+        paper_unrealized_pnl_usd=12.0,
+        paper_realized_pnl_today_usd=5.0,
+    ))
+    monkeypatch.setattr(dev_pulse, "collect_webhook_delivery_status", lambda db: dev_pulse.WebhookDeliveryStatus(
+        partner_id_stats=[{"partner_id": "etai", "attempted_24h": 1, "success_24h": 1}],
+        total_attempted_24h=1,
+        total_failed_24h=0,
+    ))
+
+    p = dev_pulse.pulse(
+        repos=[],
+        cloud_run=[],
+        services=[],
+        webhook_db=object(),
+        max_workers=2,
+    )
+
+    assert p.trading is not None
+    assert p.trading.signals_today_count == 3
+    assert p.webhook_delivery is not None
+    assert p.webhook_delivery.total_attempted_24h == 1
+
+
+# ── trading status ─────────────────────────────────────────────────────────
+
+
+def test_collect_trading_status_reads_signals_and_portfolio(tmp_path):
+    now = datetime.now().astimezone()
+    signals_dir = tmp_path / "signals"
+    signals_dir.mkdir()
+    (signals_dir / "today.jsonl").write_text(
+        "\n".join(
+            [
+                json.dumps({"timestamp": (now - timedelta(hours=1)).isoformat(), "symbol": "BTC"}),
+                json.dumps({"timestamp": (now - timedelta(minutes=10)).isoformat(), "symbol": "ETH"}),
+            ]
+        )
+    )
+    (signals_dir / "old.jsonl").write_text(
+        json.dumps({"timestamp": (now - timedelta(days=2)).isoformat(), "symbol": "SOL"})
+    )
+    paper_log = tmp_path / "paper_trading.jsonl"
+    paper_log.write_text(
+        json.dumps(
+            {
+                "pipeline_id": "paper-1",
+                "timestamp": now.isoformat(),
+                "paper_status": "closed",
+                "paper_pnl_usd": 2.5,
+            }
+        )
+    )
+    portfolio = tmp_path / "paper_portfolio.json"
+    portfolio.write_text(
+        json.dumps(
+            {
+                "capital": 101234.56,
+                "positions": [{"symbol": "BTCUSDT", "unrealized_pnl_usd": 12.25}],
+                "history": [{"closed_at": now.isoformat(), "pnl": 5.0, "pipeline_id": "hist-1"}],
+            }
+        )
+    )
+
+    status = dev_pulse.collect_trading_status(paper_log, signals_dir, portfolio)
+
+    assert status.signals_today_count == 2
+    assert status.last_signal_at == (now - timedelta(minutes=10)).isoformat()
+    assert status.open_paper_positions == 1
+    assert status.paper_portfolio_value == 101234.56
+    assert status.paper_unrealized_pnl_usd == 12.25
+    assert status.paper_realized_pnl_today_usd == 7.5
+
+
+def test_collect_trading_status_handles_missing_files(tmp_path):
+    status = dev_pulse.collect_trading_status(
+        tmp_path / "missing-paper.jsonl",
+        tmp_path / "missing-signals",
+        tmp_path / "missing-portfolio.json",
+    )
+
+    assert status.last_signal_at is None
+    assert status.signals_today_count == 0
+    assert status.open_paper_positions == 0
+    assert status.error is None
+
+
+# ── webhook delivery status ────────────────────────────────────────────────
+
+
+class FakeDoc:
+    def __init__(self, data: dict):
+        self._data = data
+
+    def to_dict(self):
+        return dict(self._data)
+
+
+class FakeQuery:
+    def __init__(self, docs: list[dict]):
+        self.docs = docs
+
+    def where(self, *args, **kwargs):
+        return self
+
+    def stream(self):
+        return [FakeDoc(doc) for doc in self.docs]
+
+
+class FakeDB:
+    def __init__(self, docs: list[dict]):
+        self.docs = docs
+
+    def collection(self, name: str):
+        assert name == "activities"
+        return FakeQuery(self.docs)
+
+
+def test_collect_webhook_delivery_status_empty_without_db():
+    status = dev_pulse.collect_webhook_delivery_status(db=None)
+
+    assert status.partner_id_stats == []
+    assert status.total_attempted_24h == 0
+    assert status.total_failed_24h == 0
+
+
+def test_collect_webhook_delivery_status_aggregates_partner_activity():
+    now = datetime.now(timezone.utc)
+    db = FakeDB(
+        [
+            {
+                "activity_type": "partner_webhook_delivery.delivered",
+                "created_at": now - timedelta(hours=1),
+                "metadata": {"partner_id": "etai"},
+            },
+            {
+                "activity_type": "partner_webhook_delivery.failed",
+                "created_at": now - timedelta(hours=2),
+                "metadata": {"partner_id": "etai", "error": "HTTP 500"},
+            },
+            {
+                "activity_type": "partner_webhook_delivery.attempted",
+                "created_at": now - timedelta(hours=3),
+                "metadata": {"partner_id": "other"},
+            },
+            {
+                "activity_type": "partner_webhook_delivery.failed",
+                "created_at": now - timedelta(days=2),
+                "metadata": {"partner_id": "old", "error": "ignored"},
+            },
+            {"activity_type": "task_created", "created_at": now, "metadata": {}},
+        ]
+    )
+
+    status = dev_pulse.collect_webhook_delivery_status(db=db, lookback_hours=24)
+
+    assert status.total_attempted_24h == 3
+    assert status.total_failed_24h == 1
+    by_partner = {item["partner_id"]: item for item in status.partner_id_stats}
+    assert by_partner["etai"]["attempted_24h"] == 2
+    assert by_partner["etai"]["success_24h"] == 1
+    assert by_partner["etai"]["last_error"] == "HTTP 500"
 
 
 # ── MarkdownV2 formatter ───────────────────────────────────────────────────
@@ -282,3 +454,59 @@ def test_format_markdown_v2_handles_empty_pulse():
     out = dev_pulse.format_markdown_v2(dev_pulse.DevPulse())
     # Even with nothing to report, should not crash and starts with title
     assert out.startswith("*dev pulse*")
+
+
+def test_format_markdown_v2_includes_trading_and_webhook_sections():
+    pulse_result = dev_pulse.DevPulse(
+        trading=dev_pulse.TradingStatus(
+            last_signal_at="2026-04-24T12:00:00+00:00",
+            signals_today_count=2,
+            open_paper_positions=1,
+            paper_portfolio_value=101000.0,
+            paper_unrealized_pnl_usd=10.0,
+            paper_realized_pnl_today_usd=5.0,
+        ),
+        webhook_delivery=dev_pulse.WebhookDeliveryStatus(
+            partner_id_stats=[
+                {
+                    "partner_id": "etai_endpoint",
+                    "attempted_24h": 3,
+                    "success_24h": 2,
+                    "last_error": "HTTP 500",
+                }
+            ],
+            total_attempted_24h=3,
+            total_failed_24h=1,
+        ),
+    )
+
+    out = dev_pulse.format_markdown_v2(pulse_result)
+
+    assert "*trading*" in out
+    assert "signals today: 2" in out
+    assert "*partner webhooks*" in out
+    assert "etai\\_endpoint" in out
+
+
+def test_format_morning_digest_markdown_includes_new_sections():
+    pulse_result = dev_pulse.DevPulse(
+        trading=dev_pulse.TradingStatus(
+            last_signal_at="2026-04-24T12:00:00+00:00",
+            signals_today_count=2,
+            open_paper_positions=1,
+            paper_portfolio_value=101000.0,
+            paper_unrealized_pnl_usd=10.0,
+            paper_realized_pnl_today_usd=5.0,
+        ),
+        webhook_delivery=dev_pulse.WebhookDeliveryStatus(
+            partner_id_stats=[],
+            total_attempted_24h=0,
+            total_failed_24h=0,
+        ),
+    )
+
+    out = dev_pulse.format_morning_digest_markdown(pulse_result)
+
+    assert "Sapphire Morning Digest" in out
+    assert "*Trading*" in out
+    assert "*Partner Webhooks*" in out

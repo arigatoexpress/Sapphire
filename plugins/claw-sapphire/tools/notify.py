@@ -84,7 +84,7 @@ def send_telegram_message(
 
     Args:
         message: The message text (supports Markdown).
-        priority: p0 (immediate), p1 (normal), p2 (low).
+        priority: p0 (immediate), p1 (normal), p2 (low), p3 (informational).
         bot_token: Override bot token.
         chat_id: Override chat ID.
 
@@ -100,7 +100,7 @@ def send_telegram_message(
         return {"error": "No TELEGRAM_CHAT_ID found in env or secrets"}
 
     # Format with priority prefix
-    prefix_map = {"p0": "🚨", "p1": "📋", "p2": "ℹ️"}
+    prefix_map = {"p0": "🚨", "p1": "📋", "p2": "ℹ️", "p3": "📰"}
     prefix = prefix_map.get(priority, "📋")
     formatted = f"{prefix} *Sapphire OS*\n\n{message}"
 
@@ -155,7 +155,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Send Sapphire Telegram notification")
     parser.add_argument("message", help="Message to send")
-    parser.add_argument("--priority", default="p1", choices=["p0", "p1", "p2"])
+    parser.add_argument("--priority", default="p1", choices=["p0", "p1", "p2", "p3"])
     args = parser.parse_args()
 
     print(run(args.message, args.priority))

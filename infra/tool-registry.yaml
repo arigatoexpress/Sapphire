@@ -92,8 +92,15 @@ tools:
     path: plugins/claw-sapphire/tools/dev_pulse.py
     status: internal
     owner: sapphire
-    consumers: [services.pm-bot, scheduled-tasks.morning-briefing]
-    description: Cross-repo developer pulse — aggregates open PRs, CI state, Cloud Run revisions, and LaunchAgent health across THO, Sapphire, cyber-threat-bot, regional-intel-workbench, Cointracker in one parallel fan-out. Formats MarkdownV2 for Telegram.
+    consumers: [services.pm-bot, scheduled-tasks.morning-briefing, scheduled-tasks.morning-digest]
+    description: Cross-repo developer pulse — aggregates open PRs, CI state, Cloud Run revisions, LaunchAgent health, trading signal state, and partner webhook delivery audit in one parallel fan-out. Formats MarkdownV2 for Telegram.
+
+  - name: morning_digest
+    path: plugins/claw-sapphire/tools/morning_digest.py
+    status: internal
+    owner: sapphire
+    consumers: [scheduled-tasks.morning-digest]
+    description: Scheduled 8 AM Telegram digest built from dev_pulse, delivered through the shared Sapphire notify path at p3 informational priority.
 
   - name: service_supervisor
     path: plugins/claw-sapphire/tools/service_supervisor.py
