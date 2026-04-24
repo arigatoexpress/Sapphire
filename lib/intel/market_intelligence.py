@@ -674,12 +674,25 @@ class MarketIntelligence:
         except Exception as e:
             log.warning("Hyperliquid asset fetch failed: %s", e)
 
-        def run(name: str, fn):
+        def _previous_feed(name: str) -> Any | None:
+            if not isinstance(prev, dict):
+                return None
+            data = prev.get(name)
+            return data if data else None
+
+        def run(name: str, fn, *, fallback_to_previous: bool = False):
             try:
                 result = fn()
                 with lock:
                     results[name] = result
             except Exception as e:
+                fallback = _previous_feed(name) if fallback_to_previous else None
+                if fallback is not None:
+                    log.warning("Feed %s failed; using previous snapshot: %s", name, e)
+                    with lock:
+                        results[name] = fallback
+                        errors[name] = f"{e}; using previous snapshot"
+                    return
                 log.warning("Feed %s failed: %s", name, e)
                 with lock:
                     errors[name] = str(e)
@@ -690,9 +703,10 @@ class MarketIntelligence:
             threading.Thread(target=run, args=("political", _fetch_political)),
             threading.Thread(target=run, args=("liquidation",
                 lambda ctxs=hl_ctxs: _fetch_liquidation() if ctxs is None else
-                    _fetch_liquidation_from_ctxs(ctxs))),
+                    _fetch_liquidation_from_ctxs(ctxs)), kwargs={"fallback_to_previous": True}),
             threading.Thread(target=run, args=("order_flow",
-                lambda ctxs=hl_ctxs: _fetch_order_flow(ctxs))),
+                lambda ctxs=hl_ctxs: _fetch_order_flow(ctxs)),
+                kwargs={"fallback_to_previous": True}),
         ]
 
         for t in threads:
