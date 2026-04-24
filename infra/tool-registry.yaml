@@ -95,6 +95,13 @@ tools:
     consumers: [services.pm-bot, scheduled-tasks.morning-briefing]
     description: Cross-repo developer pulse — aggregates open PRs, CI state, Cloud Run revisions, and LaunchAgent health across THO, Sapphire, cyber-threat-bot, regional-intel-workbench, Cointracker in one parallel fan-out. Formats MarkdownV2 for Telegram.
 
+  - name: service_supervisor
+    path: plugins/claw-sapphire/tools/service_supervisor.py
+    status: internal
+    owner: sapphire
+    consumers: [scheduled-tasks.service-supervisor, services.pm-bot]
+    description: LaunchAgent self-healing supervisor — detects crashed services, restarts with rate limits, escalates to Telegram only if restart fails. Shares notification surface with watchdog.
+
   # Trading & signals
   - name: predict
     path: plugins/claw-sapphire/tools/internal/predict.py

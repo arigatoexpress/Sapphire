@@ -267,3 +267,39 @@ def test_claw_stub_happy_path(monkeypatch):
     response = pm_bot.handle_telegram_command(_make_update("/claw investigate backlog"))
 
     assert response["text"] == "claw session not yet wired (phase 2)"
+
+
+def test_svc_status_uses_service_supervisor_dry_run(monkeypatch):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    captured: dict[str, bool] = {}
+
+    def _fake_supervise_once(*, dry_run=False):
+        captured["dry_run"] = dry_run
+        return {
+            "ok": True,
+            "attempted": [
+                {
+                    "label": "ai.hermes.gateway",
+                    "restart_action": "kickstart",
+                    "reason": "crashed",
+                    "exit_code_before": 1,
+                }
+            ],
+            "recovered": [],
+            "failed": [],
+            "skipped_cooldown": [],
+            "errors": [],
+        }
+
+    monkeypatch.setitem(
+        sys.modules,
+        "service_supervisor",
+        SimpleNamespace(supervise_once=_fake_supervise_once),
+    )
+
+    response = pm_bot.handle_telegram_command(_make_update("/svc status"))
+
+    assert captured["dry_run"] is True
+    assert response["parse_mode"] == "MarkdownV2"
+    assert "svc status" in response["text"]
+    assert "ai\\.hermes\\.gateway" in response["text"]
