@@ -88,6 +88,13 @@ tools:
     consumers: [services.pm-bot]
     description: Telegram command router for the Sapphire PM bot. Enforces allowlists, formats status, lists/creates PM tasks, and queries THO RAG.
 
+  - name: dev_pulse
+    path: plugins/claw-sapphire/tools/dev_pulse.py
+    status: internal
+    owner: sapphire
+    consumers: [services.pm-bot, scheduled-tasks.morning-briefing]
+    description: Cross-repo developer pulse — aggregates open PRs, CI state, Cloud Run revisions, and LaunchAgent health across THO, Sapphire, cyber-threat-bot, regional-intel-workbench, Cointracker in one parallel fan-out. Formats MarkdownV2 for Telegram.
+
   # Trading & signals
   - name: predict
     path: plugins/claw-sapphire/tools/internal/predict.py

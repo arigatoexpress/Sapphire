@@ -45,6 +45,7 @@ STATUS_HELP_TEXT = (
     "Available commands:\n"
     "• /help\n"
     "• /status\n"
+    "• /dev pulse\n"
     "• /pm list [--project <id>]\n"
     "• /pm new <title>\n"
     "• /rag <query>\n"
@@ -567,6 +568,27 @@ def _handle_claw(_text: str) -> dict[str, Any]:
     return _response("claw session not yet wired (phase 2)", None)
 
 
+def _handle_dev_pulse() -> dict[str, Any]:
+    """Cross-repo dev pulse via dev_pulse tool — imported lazily to keep
+    sapphire_pm_bot importable without gh/gcloud/git installed in test envs.
+    """
+    try:
+        import dev_pulse  # type: ignore
+    except Exception as e:
+        return _response(
+            escape_markdown_v2(f"dev_pulse unavailable: {type(e).__name__}"),
+            "MarkdownV2",
+        )
+    try:
+        result = dev_pulse.pulse()
+    except Exception as e:
+        return _response(
+            escape_markdown_v2(f"dev_pulse failed: {type(e).__name__}: {e}")[:3500],
+            "MarkdownV2",
+        )
+    return _response(dev_pulse.format_markdown_v2(result), "MarkdownV2")
+
+
 def handle_telegram_command(update: dict[str, Any]) -> dict[str, Any]:
     """Route a normalized Telegram update into a formatted bot response."""
     refusal = _ensure_allowed(update)
@@ -578,6 +600,8 @@ def handle_telegram_command(update: dict[str, Any]) -> dict[str, Any]:
         return _handle_help()
     if text == "/status":
         return _format_status_report()
+    if text in {"/dev", "/dev pulse", "/pulse"}:
+        return _handle_dev_pulse()
     if text.startswith("/pm list"):
         return _handle_pm_list(text)
     if text.startswith("/pm new"):

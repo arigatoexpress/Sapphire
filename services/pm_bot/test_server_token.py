@@ -8,7 +8,6 @@ from pathlib import Path
 
 import pytest
 
-
 SERVICES_DIR = Path(__file__).resolve().parent
 if str(SERVICES_DIR) not in sys.path:
     sys.path.insert(0, str(SERVICES_DIR))
