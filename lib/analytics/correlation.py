@@ -126,6 +126,49 @@ def _save_cache(df: pd.DataFrame) -> None:
         pass
 
 
+def _publish_refresh_warning(kind: str, **payload: object) -> None:
+    payload = {"kind": kind, **payload}
+    log.warning("correlation refresh warning: %s", json.dumps(payload, sort_keys=True, default=str))
+    if _EVENT_BUS is not None:
+        try:
+            _EVENT_BUS.publish("correlation.refresh_warning", payload)
+        except Exception as exc:
+            log.debug("event bus warning publish failed: %s", exc)
+
+
+def _normalize_close_series(data: pd.DataFrame | None, label: str) -> pd.Series | None:
+    """Extract a usable close series from yfinance's shifting return shapes."""
+    if data is None or data.empty:
+        return None
+
+    close: pd.Series | pd.DataFrame | None = None
+    if isinstance(data.columns, pd.MultiIndex):
+        if "Close" in data.columns.get_level_values(0):
+            close = data["Close"]
+        elif "Close" in data.columns.get_level_values(-1):
+            close = data.xs("Close", axis=1, level=-1)
+    elif "Close" in data.columns:
+        close = data["Close"]
+
+    if close is None:
+        numeric = data.select_dtypes(include="number")
+        if numeric.empty:
+            return None
+        close = numeric.iloc[:, 0]
+
+    if isinstance(close, pd.DataFrame):
+        if close.empty:
+            return None
+        close = close.iloc[:, 0]
+
+    series = pd.to_numeric(close, errors="coerce").dropna()
+    if series.empty:
+        return None
+
+    series.name = label
+    return series
+
+
 def _fetch_prices_openbb(symbols: dict[str, str], days: int = 180) -> pd.DataFrame:
     """Fallback historical fetcher via the local OpenBB service."""
     start = (datetime.now(UTC) - timedelta(days=days + 10)).strftime("%Y-%m-%d")
@@ -193,8 +236,10 @@ def _fetch_prices(symbols: dict[str, str], days: int = 180) -> pd.DataFrame:
         return cached[list(symbols.keys())].copy()
 
     frames: dict[str, pd.Series] = {}
+    failures: dict[str, str] = {}
     try:
         import yfinance as yf
+        logging.getLogger("yfinance").setLevel(logging.CRITICAL)
     except Exception:
         yf = None
 
@@ -211,39 +256,66 @@ def _fetch_prices(symbols: dict[str, str], days: int = 180) -> pd.DataFrame:
                     auto_adjust=True,
                     threads=True,
                 )
-                if data is None or data.empty:
+                series = _normalize_close_series(data, label)
+                if series is None:
+                    failures[label] = "empty_or_invalid_yfinance_frame"
                     continue
-                col = "Close" if "Close" in data.columns else data.columns[0]
-                series = data[col]
-                if isinstance(series, pd.DataFrame):
-                    series = series.iloc[:, 0]
-                series.name = label
                 frames[label] = series
-            except Exception:
+            except Exception as exc:
+                failures[label] = exc.__class__.__name__
                 continue
 
-    if not frames:
+    missing = {label: ticker for label, ticker in symbols.items() if label not in frames}
+    if missing:
         try:
-            df = _fetch_prices_openbb(symbols, days=days)
-            _save_cache(df)
-            return df
-        except Exception:
-            pass
-        if stale_cached is not None:
-            available = [s for s in symbols if s in stale_cached.columns]
-            if available:
-                log.warning(
-                    "live refresh failed; using stale correlation cache (%0.1fh old)",
-                    (time.time() - CACHE_FILE.stat().st_mtime) / 3600,
-                )
-                return stale_cached[available].copy()
-        raise RuntimeError("No price data could be fetched from yfinance or OpenBB")
+            openbb = _fetch_prices_openbb(missing, days=days)
+            for label in missing:
+                if label in openbb.columns:
+                    frames[label] = pd.to_numeric(openbb[label], errors="coerce").dropna().rename(label)
+            missing = {label: ticker for label, ticker in symbols.items() if label not in frames}
+        except Exception as exc:
+            _publish_refresh_warning(
+                "openbb_fallback_failed",
+                missing_symbols=sorted(missing),
+                error=exc.__class__.__name__,
+            )
 
-    df = pd.concat(frames.values(), axis=1)
-    df.columns = list(frames.keys())
+    if missing and stale_cached is not None:
+        stale_available = [label for label in missing if label in stale_cached.columns]
+        for label in stale_available:
+            frames[label] = pd.to_numeric(stale_cached[label], errors="coerce").dropna().rename(label)
+        if stale_available:
+            age_hours = (time.time() - CACHE_FILE.stat().st_mtime) / 3600 if CACHE_FILE.exists() else None
+            _publish_refresh_warning(
+                "using_stale_price_cache",
+                stale_symbols=sorted(stale_available),
+                unresolved_symbols=sorted(set(missing) - set(stale_available)),
+                yfinance_failures=failures,
+                cache_age_hours=round(age_hours, 2) if age_hours is not None else None,
+            )
+        missing = {label: ticker for label, ticker in symbols.items() if label not in frames}
+
+    if not frames:
+        raise RuntimeError("No price data could be fetched from yfinance, OpenBB, or stale cache")
+
+    if missing:
+        _publish_refresh_warning(
+            "partial_price_refresh",
+            missing_symbols=sorted(missing),
+            available_symbols=sorted(frames),
+            yfinance_failures=failures,
+        )
+
+    ordered = [label for label in symbols if label in frames]
+    df = pd.concat([frames[label] for label in ordered], axis=1)
+    df.columns = ordered
     df.index = pd.to_datetime(df.index).tz_localize(None)
     df = df.sort_index().ffill().dropna(how="all")
-    _save_cache(df)
+
+    # Do not replace a fuller last-known-good cache with a degraded partial
+    # refresh. The next run can still recover missing symbols from the cache.
+    if not missing or stale_cached is None:
+        _save_cache(df)
     return df
 
 

@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
+import pandas as pd
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -202,3 +204,78 @@ def test_signal_enhancer_clamps_confidence():
     es = eng.enhance("BTC", "buy", 0.99)
     # Capped at 0.99 max even with boost
     assert es.adjusted_confidence <= 0.99
+
+
+# ---------------------------------------------------------------------------
+# Correlation refresh price fetch fallbacks
+# ---------------------------------------------------------------------------
+
+
+def test_correlation_fetch_merges_stale_cache_for_yfinance_failures(monkeypatch):
+    from lib.analytics import correlation as corr
+
+    idx = pd.date_range("2026-04-01", periods=4, freq="D")
+    stale = pd.DataFrame(
+        {
+            "BTC": [100.0, 101.0, 102.0, 103.0],
+            "ETH": [200.0, 201.0, 202.0, 203.0],
+        },
+        index=idx,
+    )
+
+    def _load_cache(*, allow_stale=False):
+        return stale if allow_stale else None
+
+    saved: list[pd.DataFrame] = []
+    warnings: list[tuple[str, dict[str, object]]] = []
+
+    def _download(ticker, **_kwargs):
+        if ticker == "BTC-USD":
+            return pd.DataFrame({"Close": [110.0, 111.0, 112.0, 113.0]}, index=idx)
+        return None
+
+    monkeypatch.setattr(corr, "_load_cache", _load_cache)
+    monkeypatch.setattr(corr, "_save_cache", saved.append)
+    monkeypatch.setattr(corr, "_fetch_prices_openbb", lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("down")))
+    monkeypatch.setattr(corr, "_publish_refresh_warning", lambda kind, **payload: warnings.append((kind, payload)))
+    monkeypatch.setitem(sys.modules, "yfinance", SimpleNamespace(download=_download))
+
+    result = corr._fetch_prices({"BTC": "BTC-USD", "ETH": "ETH-USD"})
+
+    assert list(result.columns) == ["BTC", "ETH"]
+    assert result["BTC"].iloc[-1] == 113.0
+    assert result["ETH"].iloc[-1] == 203.0
+    assert saved and list(saved[-1].columns) == ["BTC", "ETH"]
+    assert any(kind == "using_stale_price_cache" for kind, _payload in warnings)
+
+
+def test_correlation_fetch_does_not_overwrite_full_cache_with_partial(monkeypatch):
+    from lib.analytics import correlation as corr
+
+    idx = pd.date_range("2026-04-01", periods=4, freq="D")
+    stale = pd.DataFrame(
+        {
+            "BTC": [100.0, 101.0, 102.0, 103.0],
+            "ETH": [200.0, 201.0, 202.0, 203.0],
+        },
+        index=idx,
+    )
+
+    def _load_cache(*, allow_stale=False):
+        return stale if allow_stale else None
+
+    def _download(ticker, **_kwargs):
+        if ticker == "BTC-USD":
+            return pd.DataFrame({"Close": [110.0, 111.0, 112.0, 113.0]}, index=idx)
+        return None
+
+    saved: list[pd.DataFrame] = []
+    monkeypatch.setattr(corr, "_load_cache", _load_cache)
+    monkeypatch.setattr(corr, "_save_cache", saved.append)
+    monkeypatch.setattr(corr, "_fetch_prices_openbb", lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("down")))
+    monkeypatch.setitem(sys.modules, "yfinance", SimpleNamespace(download=_download))
+
+    result = corr._fetch_prices({"BTC": "BTC-USD", "ETH": "ETH-USD", "SOL": "SOL-USD"})
+
+    assert list(result.columns) == ["BTC", "ETH"]
+    assert saved == []
