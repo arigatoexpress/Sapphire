@@ -20,6 +20,22 @@ from lib.foundry.client import (
 def _isolate_secrets(tmp_path, monkeypatch):
     """Point SAPPHIRE_SECRETS_DIR at an empty tmp dir so tests don't read the
     real ~/.config/sapphire-secrets/ files on the developer machine."""
+    for name in (
+        "PALANTIR_FOUNDRY_URL",
+        "FOUNDRY_URL",
+        "PALANTIR_FOUNDRY_TOKEN",
+        "FOUNDRY_TOKEN",
+        "FOUNDRY_API_TOKEN",
+        "PALANTIR_FOUNDRY_CLIENT_ID",
+        "FOUNDRY_CLIENT_ID",
+        "PALANTIR_FOUNDRY_CLIENT_SECRET",
+        "FOUNDRY_CLIENT_SECRET",
+        "PALANTIR_FOUNDRY_ONTOLOGY",
+        "FOUNDRY_ONTOLOGY",
+        "PALANTIR_FOUNDRY_UPSERT_ACTION",
+        "FOUNDRY_UPSERT_ACTION",
+    ):
+        monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("SAPPHIRE_SECRETS_DIR", str(tmp_path))
 
 
@@ -136,7 +152,27 @@ class TestFoundryClientDatasets:
         objects = [{"id": "1", "symbol": "BTC"}]
         client.upsert_objects("PaperTrade", objects)
         call_args = client._post.call_args
-        assert "sapphire-upsert" in call_args[0][0]
+        assert call_args[0][0] == "/api/v2/ontologies/ontology/actions/sapphire-upsert/apply"
+
+    def test_upsert_objects_uses_configured_ontology_and_action(self, monkeypatch):
+        monkeypatch.setenv("PALANTIR_FOUNDRY_ONTOLOGY", "sapphire-ops")
+        monkeypatch.setenv("PALANTIR_FOUNDRY_UPSERT_ACTION", "bulk-upsert-v2")
+        client = self._make_client(monkeypatch)
+        client._post = mock.Mock(return_value={"editedObjectTypes": ["ServiceHealth"]})
+
+        client.upsert_objects("ServiceHealth", [{"id": "svc-1"}])
+
+        call_args = client._post.call_args
+        assert call_args[0][0] == "/api/v2/ontologies/sapphire-ops/actions/bulk-upsert-v2/apply"
+
+    def test_list_actions_uses_configured_ontology(self, monkeypatch):
+        monkeypatch.setenv("FOUNDRY_ONTOLOGY", "sapphire-prod")
+        client = self._make_client(monkeypatch)
+        client._get = mock.Mock(return_value={"data": []})
+
+        client.list_actions()
+
+        client._get.assert_called_once_with("/api/v2/ontologies/sapphire-prod/actions")
 
     def test_search_objects(self, monkeypatch):
         client = self._make_client(monkeypatch)
