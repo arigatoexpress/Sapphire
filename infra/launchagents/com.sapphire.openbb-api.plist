@@ -7,8 +7,13 @@
     <key>ProgramArguments</key>
     <array>
         <string>/Library/Frameworks/Python.framework/Versions/3.12/bin/python3</string>
-        <string>-c</string>
-        <string>from openbb_core.api.rest_api import app; import uvicorn; uvicorn.run(app, host='127.0.0.1', port=6900)</string>
+        <string>-m</string>
+        <string>uvicorn</string>
+        <string>services.openbb_api.server:app</string>
+        <string>--host</string>
+        <string>127.0.0.1</string>
+        <string>--port</string>
+        <string>6900</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
@@ -22,6 +27,10 @@
     <dict>
         <key>PATH</key>
         <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>PYTHONPATH</key>
+        <string>/Users/aribs/Code/Sapphire</string>
     </dict>
+    <key>WorkingDirectory</key>
+    <string>/Users/aribs/Code/Sapphire</string>
 </dict>
 </plist>
