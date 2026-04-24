@@ -8,6 +8,9 @@ patching ``_common`` would not catch).
 
 from __future__ import annotations
 
+import http.client
+import json
+
 import pytest
 
 from lib.chain import sources
@@ -46,6 +49,51 @@ def test_get_env_raises_when_missing(monkeypatch):
     monkeypatch.delenv("DOES_NOT_EXIST", raising=False)
     with pytest.raises(sources.SourceError):
         _common.get_env("DOES_NOT_EXIST")
+
+
+# --- shared source HTTP helpers -------------------------------------------
+
+
+def _clear_source_cache() -> None:
+    with sources._cache_lock:
+        sources._cache.clear()
+
+
+def test_http_post_json_retries_incomplete_reads(monkeypatch):
+    _clear_source_cache()
+    monkeypatch.setattr(sources.time, "sleep", lambda _seconds: None)
+    calls = 0
+
+    def fake_request(*_args, **_kwargs):
+        nonlocal calls
+        calls += 1
+        if calls < 3:
+            raise http.client.IncompleteRead(b"{", 2)
+        return 200, "OK", b'{"ok": true}'
+
+    monkeypatch.setattr(sources, "_pooled_https_request", fake_request)
+    out = sources._http_post_json("https://api.hyperliquid.xyz/info", {"type": "metaAndAssetCtxs"})
+
+    assert out == {"ok": True}
+    assert calls == 3
+
+
+def test_http_post_json_returns_stale_cache_after_retry_exhaustion(monkeypatch):
+    _clear_source_cache()
+    monkeypatch.setattr(sources.time, "sleep", lambda _seconds: None)
+    url = "https://api.hyperliquid.xyz/info"
+    payload = {"type": "metaAndAssetCtxs"}
+    cache_key = f"POST {url} {json.dumps(payload, sort_keys=True)}"
+    stale = {"cached": True}
+
+    with sources._cache_lock:
+        sources._cache[cache_key] = (sources.time.monotonic() - sources.CACHE_TTL - 1, stale)
+
+    def fake_request(*_args, **_kwargs):
+        raise http.client.IncompleteRead(b"{", 2)
+
+    monkeypatch.setattr(sources, "_pooled_https_request", fake_request)
+    assert sources._http_post_json(url, payload) == stale
 
 
 # --- BGeometrics -----------------------------------------------------------
