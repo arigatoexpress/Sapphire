@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import sys
 import threading
 import time
@@ -28,6 +29,16 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
 logger = logging.getLogger("sapphire.pm_bot")
+
+_TELEGRAM_BOT_URL_RE = re.compile(r"(https://api\.telegram\.org/bot)[^/\s]+(/[^,\s)]*)?")
+_TELEGRAM_TOKEN_RE = re.compile(r"\b\d{7,12}:[A-Za-z0-9_-]{20,}\b")
+
+
+def _redact_sensitive_text(value: object) -> str:
+    """Return log/health-safe text with bot credentials removed."""
+    text = str(value)
+    text = _TELEGRAM_BOT_URL_RE.sub(r"\1[REDACTED]\2", text)
+    return _TELEGRAM_TOKEN_RE.sub("[REDACTED_TELEGRAM_TOKEN]", text)
 
 
 # Fallback secret file paths, matching plugins/claw-sapphire/tools/notify.py.
@@ -101,7 +112,13 @@ class TelegramAPI:
 
     def _post(self, method: str, payload: dict[str, Any]) -> dict[str, Any]:
         response = requests.post(self._url(method), json=payload, timeout=self._timeout)
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as exc:
+            detail = _redact_sensitive_text(response.text[:500])
+            raise RuntimeError(
+                f"Telegram API HTTP error for {method}: status={response.status_code} body={detail}"
+            ) from exc
         data = response.json()
         if not data.get("ok"):
             raise RuntimeError(f"Telegram API error for {method}: {data}")
@@ -206,7 +223,7 @@ def _polling_loop() -> None:
     try:
         TELEGRAM_API.delete_webhook(drop_pending_updates=False)
     except Exception as exc:  # pragma: no cover - network/runtime behavior
-        logger.warning("Could not delete Telegram webhook before polling: %s", exc)
+        logger.warning("Could not delete Telegram webhook before polling: %s", _redact_sensitive_text(exc))
 
     offset = int(POLLING_STATE.get("offset") or 0)
     while not POLLING_STOP.is_set():
@@ -223,8 +240,9 @@ def _polling_loop() -> None:
                 except Exception as exc:  # pragma: no cover - network/runtime behavior
                     logger.exception("Failed to process Telegram update: %s", exc)
         except Exception as exc:  # pragma: no cover - network/runtime behavior
-            POLLING_STATE["last_error"] = str(exc)
-            logger.warning("Telegram polling error: %s", exc)
+            safe_error = _redact_sensitive_text(exc)
+            POLLING_STATE["last_error"] = safe_error
+            logger.warning("Telegram polling error: %s", safe_error)
             time.sleep(5)
 
     logger.info("Telegram polling loop stopped")

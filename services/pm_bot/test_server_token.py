@@ -108,3 +108,18 @@ def test_empty_secrets_file_skipped(monkeypatch, tmp_path, reload_server):
         ],
     )
     assert server._resolve_bot_token() == "secondary-file-token"
+
+
+def test_redacts_telegram_token_from_error_text(monkeypatch, reload_server):
+    fake_token = "1234567890:abcdefghijklmnopqrstuvwxyzABCDE"
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_TOKEN", fake_token)
+    server = reload_server()
+
+    unsafe = (
+        "409 Client Error: Conflict for url: "
+        f"https://api.telegram.org/bot{fake_token}/getUpdates"
+    )
+
+    safe = server._redact_sensitive_text(unsafe)
+    assert fake_token not in safe
+    assert "https://api.telegram.org/bot[REDACTED]/getUpdates" in safe
