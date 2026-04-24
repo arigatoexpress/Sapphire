@@ -58,6 +58,12 @@ def healthz():
             "ts": datetime.now(UTC).isoformat()}
 
 
+@app.get("/__/hosting/verification")
+def firebase_hosting_verification():
+    """Return 200 for Firebase Hosting ownership probes routed to this service."""
+    return ("ok\n", 200, {"Cache-Control": "no-store", "Content-Type": "text/plain"})
+
+
 @app.get("/api/summary")
 def summary():
     rows = _rows(f"""
