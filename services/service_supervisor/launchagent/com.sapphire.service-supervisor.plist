@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Rationale: use launchd StartInterval with a one-shot wrapper so launchd
+     launches and reaps the supervisor every minute; the Python state file
+     carries cooldowns across invocations without another persistent process. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.sapphire.service-supervisor</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/zsh</string>
+        <string>/Users/aribs/Code/Sapphire/services/service_supervisor/run_once.sh</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/aribs/Code/Sapphire</string>
+    <key>StartInterval</key>
+    <integer>60</integer>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/aribs/Library/Logs/sapphire-service-supervisor.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/aribs/Library/Logs/sapphire-service-supervisor.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>THO_FIRESTORE_PROJECT</key>
+        <string>tho-ai-agent</string>
+    </dict>
+</dict>
+</plist>

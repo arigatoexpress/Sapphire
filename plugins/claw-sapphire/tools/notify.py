@@ -139,6 +139,11 @@ def send_telegram_message(
     return result
 
 
+def send_alert(message: str, priority: str = "p1") -> dict:
+    """Shared alert helper for internal Sapphire tools."""
+    return send_telegram_message(message, priority=priority)
+
+
 def run(message: str, priority: str = "p1") -> str:
     """Tool entry point for claw-code."""
     result = send_telegram_message(message, priority)

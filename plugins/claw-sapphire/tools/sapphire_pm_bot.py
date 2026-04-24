@@ -46,6 +46,7 @@ STATUS_HELP_TEXT = (
     "• /help\n"
     "• /status\n"
     "• /dev pulse\n"
+    "• /svc status\n"
     "• /pm list [--project <id>]\n"
     "• /pm new <title>\n"
     "• /rag <query>\n"
@@ -589,6 +590,50 @@ def _handle_dev_pulse() -> dict[str, Any]:
     return _response(dev_pulse.format_markdown_v2(result), "MarkdownV2")
 
 
+def _format_service_supervisor_markdown_v2(result: dict[str, Any]) -> str:
+    lines = [
+        "svc status (dry run)",
+        f"ok: {bool(result.get('ok'))}",
+    ]
+    for key in ("attempted", "recovered", "failed", "skipped_cooldown"):
+        items = result.get(key) or []
+        lines.append(f"{key}: {len(items)}")
+        for item in items[:8]:
+            if not isinstance(item, dict):
+                continue
+            label = str(item.get("label") or "unknown")
+            reason = str(item.get("reason") or item.get("skip_reason") or "n/a")
+            action = str(item.get("restart_action") or item.get("skip_reason") or "n/a")
+            exit_code = item.get("exit_code_before")
+            suffix = f" exit={exit_code}" if exit_code is not None else ""
+            lines.append(f"• {label} | {action} | {reason}{suffix}")
+    errors = result.get("errors") or []
+    if errors:
+        lines.append(f"errors: {len(errors)}")
+        for error in errors[:5]:
+            lines.append(f"• {str(error)[:200]}")
+    return "\n".join(escape_markdown_v2(line) for line in lines)
+
+
+def _handle_svc_status() -> dict[str, Any]:
+    """Dry-run LaunchAgent self-healing preview."""
+    try:
+        import service_supervisor  # type: ignore
+    except Exception as e:
+        return _response(
+            escape_markdown_v2(f"service_supervisor unavailable: {type(e).__name__}"),
+            "MarkdownV2",
+        )
+    try:
+        result = service_supervisor.supervise_once(dry_run=True)
+    except Exception as e:
+        return _response(
+            escape_markdown_v2(f"service_supervisor failed: {type(e).__name__}: {e}")[:3500],
+            "MarkdownV2",
+        )
+    return _response(_format_service_supervisor_markdown_v2(result), "MarkdownV2")
+
+
 def handle_telegram_command(update: dict[str, Any]) -> dict[str, Any]:
     """Route a normalized Telegram update into a formatted bot response."""
     refusal = _ensure_allowed(update)
@@ -602,6 +647,8 @@ def handle_telegram_command(update: dict[str, Any]) -> dict[str, Any]:
         return _format_status_report()
     if text in {"/dev", "/dev pulse", "/pulse"}:
         return _handle_dev_pulse()
+    if text == "/svc status":
+        return _handle_svc_status()
     if text.startswith("/pm list"):
         return _handle_pm_list(text)
     if text.startswith("/pm new"):
