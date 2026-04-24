@@ -37,7 +37,7 @@ DEFAULT_REPOS = [
     ("arigatoexpress/Sapphire", Path.home() / "Code" / "Sapphire", "sapphire"),
     ("arigatoexpress/cyber-threat-bot", Path.home() / "Code" / "cyber-threat-bot", "threat"),
     ("arigatoexpress/regional-intel-workbench", Path.home() / "Code" / "regional-intel-workbench", "intel"),
-    ("arigatoexpress/Cointracker", Path.home() / "Code" / "Cointracker", "crypto"),
+    ("arigatoexpress/crypto-tax-tracker", Path.home() / "Code" / "Cointracker", "crypto"),
 ]
 
 DEFAULT_CLOUD_RUN_SERVICES = [
