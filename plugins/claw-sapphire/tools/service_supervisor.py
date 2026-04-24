@@ -259,9 +259,7 @@ def _is_restart_successful(before: ServiceStatus, after: ServiceStatus) -> bool:
         return True
     # Fallback: launchctl sometimes clears the exit code on full bootstrap.
     # If it did, trust it.
-    if after.exit_code in (None, 0):
-        return True
-    return False
+    return after.exit_code in (None, 0)
 
 
 def _monitored_labels(labels: list[str] | None, summary: dict[str, Any]) -> list[str]:
