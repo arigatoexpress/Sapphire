@@ -343,6 +343,7 @@ def run_sync(
 
         try:
             client = FoundryClient.from_env()
+            client.validate_upsert_target()
         except FoundryConfigError as exc:
             # No URL or credentials yet. This is expected before the user has
             # provisioned Foundry — log once and bail without paging Telegram.

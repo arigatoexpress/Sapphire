@@ -317,6 +317,34 @@ class TestRunSyncGracefulDegradation:
         state = json.loads(state_path.read_text())
         assert state["last_status"] == "not_configured"
 
+    def test_foundry_preflight_config_error_exits_ok_and_skipped(
+        self, tmp_path, monkeypatch
+    ):
+        """Missing ontology/action config is a setup gap, not a per-object error."""
+        monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
+        monkeypatch.setenv("PALANTIR_FOUNDRY_TOKEN", "ok-tok")
+
+        signals_dir = tmp_path / "data" / "signals"
+        signals_dir.mkdir(parents=True)
+        (signals_dir / "2026-04-19.jsonl").write_text(
+            json.dumps({"pipeline_id": "t1", "symbol": "BTC"}) + "\n"
+        )
+
+        from lib.foundry.client import FoundryConfigError
+
+        with mock.patch(
+            "lib.foundry.client.FoundryClient.validate_upsert_target",
+            side_effect=FoundryConfigError("Configured Foundry ontology missing"),
+        ), mock.patch("lib.foundry.sync._send_telegram_alert") as tg:
+            result = run_sync(tmp_path, dry_run=False, force=True)
+
+        assert tg.call_count == 0
+        assert result.ok is True
+        assert result.skipped is True
+        state_path = tmp_path / "data" / "foundry_sync_state.json"
+        state = json.loads(state_path.read_text())
+        assert state["last_status"] == "not_configured"
+
     def test_auth_failure_before_first_success_does_not_telegram(
         self, tmp_path, monkeypatch
     ):
@@ -333,6 +361,9 @@ class TestRunSyncGracefulDegradation:
         from lib.foundry.client import FoundryAuthError
 
         with mock.patch(
+            "lib.foundry.client.FoundryClient.validate_upsert_target",
+            return_value=None,
+        ), mock.patch(
             "lib.foundry.client.FoundryClient.upsert_objects",
             side_effect=FoundryAuthError("401 unauthorized"),
         ), mock.patch("lib.foundry.sync._send_telegram_alert") as tg:
@@ -373,6 +404,9 @@ class TestRunSyncGracefulDegradation:
         from lib.foundry.client import FoundryAPIError
 
         with mock.patch(
+            "lib.foundry.client.FoundryClient.validate_upsert_target",
+            return_value=None,
+        ), mock.patch(
             "lib.foundry.client.FoundryClient.upsert_objects",
             side_effect=FoundryAPIError("500 Internal", status=500),
         ), mock.patch("lib.foundry.sync._send_telegram_alert") as tg:
@@ -401,6 +435,9 @@ class TestRunSyncGracefulDegradation:
         from lib.foundry.client import FoundryAPIError
 
         with mock.patch(
+            "lib.foundry.client.FoundryClient.validate_upsert_target",
+            return_value=None,
+        ), mock.patch(
             "lib.foundry.client.FoundryClient.upsert_objects",
             side_effect=FoundryAPIError(
                 "Foundry API POST /api/v2/ontologies/ontology/actions/sapphire-upsert/apply → 404",
@@ -454,6 +491,9 @@ class TestRunSyncGracefulDegradation:
             "lib.foundry.ingestion.ALL_TRANSFORMS",
             {"TypeA": lambda r: [{"id": "a1"}], "TypeB": lambda r: [{"id": "b1"}]},
             clear=True,
+        ), mock.patch(
+            "lib.foundry.client.FoundryClient.validate_upsert_target",
+            return_value=None,
         ), mock.patch(
             "lib.foundry.client.FoundryClient.upsert_objects",
             side_effect=side_effects,
@@ -509,6 +549,9 @@ class TestRunSyncGracefulDegradation:
         from lib.foundry.client import FoundryAPIError
 
         with mock.patch(
+            "lib.foundry.client.FoundryClient.validate_upsert_target",
+            return_value=None,
+        ), mock.patch(
             "lib.foundry.client.FoundryClient.upsert_objects",
             side_effect=FoundryAPIError(
                 "Foundry API POST /api/v2/ontologies/ontology/actions/sapphire-upsert/apply → 404",
