@@ -23,8 +23,10 @@ Required:
 
 Optional:
 
+- `THO_API_KEY_FILE=~/.config/sapphire-secrets/tho_api_key`
+  - Required for `/rag`; prefer the file path over putting `THO_API_KEY` directly in the LaunchAgent environment
 - `THO_API_KEY=...`
-  - Required for `/rag`
+  - Supported for local development only
 - `MODE=webhook`
   - Set `MODE=polling` for local long-poll development
 - `SAPPHIRE_PM_BOT_HOST=127.0.0.1`
