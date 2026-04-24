@@ -24,7 +24,7 @@ from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "lib"))
 from nemotron import MODELS, generate
 from technical_analysis import TechnicalProfile, analyze_all
 
