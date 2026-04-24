@@ -80,7 +80,7 @@ class Settings:
     telegram_timeout_seconds: float
 
     @classmethod
-    def from_env(cls) -> "Settings":
+    def from_env(cls) -> Settings:
         port_text = os.getenv("SAPPHIRE_PM_BOT_PORT", "18082").strip() or "18082"
         return cls(
             token=_resolve_bot_token(),
