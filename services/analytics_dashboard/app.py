@@ -52,7 +52,10 @@ def _clean(rows: list[dict]) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
+@app.get("/health")
 @app.get("/healthz")
+@app.get("/healthz/")
+@app.get("/_ah/health")
 def healthz():
     return {"ok": True, "project": PROJECT, "dataset": DATASET,
             "ts": datetime.now(UTC).isoformat()}
