@@ -217,6 +217,7 @@ def _entry(
         "dry_run": dry_run,
         "loaded_before": status.loaded,
         "exit_code_before": status.exit_code,
+        "pid_before": status.pid,
     }
     if after is not None:
         data.update(
@@ -233,6 +234,34 @@ def _entry(
     if duration_seconds is not None:
         data["duration_seconds"] = round(duration_seconds, 3)
     return data
+
+
+def _is_restart_successful(before: ServiceStatus, after: ServiceStatus) -> bool:
+    """Return True when a `launchctl kickstart -k` actually replaced the process.
+
+    launchctl's `LastExitStatus` field persists the PREVIOUS exit code even
+    after a successful restart — a service that crashed once and was
+    KeepAlive-revived will read `exit_code == 1` indefinitely. Relying on
+    exit_code alone would keep marking healthy services as "failed" and
+    Telegram-spam the operator.
+
+    Authoritative signal: the PID changed (or appeared). A new PID means
+    launchd actually replaced the process. If the PID is unchanged and
+    exit_code still non-zero, the restart did NOT happen.
+    """
+    if not after.loaded:
+        return False
+    # PID appeared where there was none before → fresh start ✓
+    if before.pid is None and after.pid is not None:
+        return True
+    # PID changed → kickstart replaced the process ✓
+    if after.pid is not None and after.pid != before.pid:
+        return True
+    # Fallback: launchctl sometimes clears the exit code on full bootstrap.
+    # If it did, trust it.
+    if after.exit_code in (None, 0):
+        return True
+    return False
 
 
 def _monitored_labels(labels: list[str] | None, summary: dict[str, Any]) -> list[str]:
@@ -403,7 +432,7 @@ def supervise_once(
         state["restart_attempts"] = attempts
         _mark_event_seen(state, f"{label}:{reason}")
 
-        if rc == 0 and _is_healthy(after):
+        if rc == 0 and _is_restart_successful(status, after):
             label_state["consecutive_failures"] = 0
             summary["recovered"].append(payload)
             _record_activity(summary, "recovered", payload, _now(), dry_run=False)
