@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rtk find:*)",
+      "Bash(tailscale status:*)",
+      "Bash(rtk sops:*)",
+      "Bash(rtk git:*)",
+      "Bash(chmod:*)",
+      "Bash(rtk read:*)",
+      "Bash(pbcopy)",
+      "Bash(bash infra/setup-sops.sh 2>&1)",
+      "Bash(rtk ps:*)",
+      "Bash(source /Users/aribs/.config/sapphire-secrets/.env.robinhood)",
+      "Bash(/usr/local/bin/python3 services/telegram-bot/app.py --poll)",
+      "Bash(mkdir *)",
+      "Bash(rm *)",
+      "Bash(launchctl list *)",
+      "Bash(launchctl unload *)",
+      "Bash(launchctl load *)",
+      "Bash(rtk read *)",
+      "Bash(rtk du *)"
+    ]
+  }
+}
