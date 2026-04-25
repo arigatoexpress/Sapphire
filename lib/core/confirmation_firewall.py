@@ -161,6 +161,12 @@ _PAPER_FINANCIAL_PATTERNS = re.compile(
     re.IGNORECASE,
 )
 
+_CONFIRMATION_REPLY_PATTERN = re.compile(
+    r"^\s*/?(confirm|approve|deny|reject|cancel)\s+([a-z0-9]{8})\s*$",
+    re.IGNORECASE,
+)
+_APPROVE_REPLY_WORDS = {"confirm", "approve"}
+
 
 def _audit_text(value: str, max_len: int = 160) -> str:
     """Return a redacted, bounded preview safe enough for local audit logs."""
@@ -394,6 +400,54 @@ def _cleanup_expired_pending(now: float | None = None) -> int:
     return removed
 
 
+def parse_confirmation_reply(text: str) -> tuple[str, str] | None:
+    """Parse a bare confirmation reply like ``CONFIRM ABC123EF``.
+
+    Returns (``"approve"`` | ``"deny"``, code) or None when the text is not
+    a confirmation-firewall reply. The parser intentionally accepts only a
+    short bare command plus code so normal conversation cannot accidentally
+    approve or deny a pending action.
+    """
+    match = _CONFIRMATION_REPLY_PATTERN.match(str(text or ""))
+    if not match:
+        return None
+    verb = match.group(1).lower()
+    action = "approve" if verb in _APPROVE_REPLY_WORDS else "deny"
+    return action, match.group(2).upper()
+
+
+def handle_confirmation_reply(
+    text: str,
+    *,
+    firewall: ConfirmationFirewall | None = None,
+) -> dict[str, object] | None:
+    """Approve or deny a pending confirmation from a terse user reply.
+
+    The returned payload excludes the original action/details by design; chat
+    integrations should echo only the code and status.
+    """
+    parsed = parse_confirmation_reply(text)
+    if parsed is None:
+        return None
+
+    action, code = parsed
+    fw = firewall or ConfirmationFirewall()
+    if action == "approve":
+        ok = fw.approve_pending(code)
+        status = "approved" if ok else "not_found_or_expired"
+    else:
+        ok = fw.deny_pending(code)
+        status = "denied" if ok else "not_found_or_expired"
+
+    return {
+        "matched": True,
+        "action": action,
+        "code": code,
+        "ok": ok,
+        "status": status,
+    }
+
+
 def _approve_pending(code: str) -> bool:
     """Mark a pending confirmation as approved (called by hermes-agent handler)."""
     path = PENDING_DIR / f"{code}.json"
@@ -413,17 +467,23 @@ def _approve_pending(code: str) -> bool:
         return False
 
 
-def _deny_pending(code: str) -> None:
+def _deny_pending(code: str) -> bool:
     """Mark a pending confirmation as denied."""
     path = PENDING_DIR / f"{code}.json"
     if not path.exists():
-        return
+        return False
     try:
         data = json.loads(path.read_text())
+        if data.get("status") != "pending":
+            return False
+        if time.time() > data.get("expires", 0):
+            path.unlink(missing_ok=True)
+            return False
         data["status"] = "denied"
         path.write_text(json.dumps(data, indent=2))
+        return True
     except (json.JSONDecodeError, OSError):
-        pass
+        return False
 
 
 # ─── Telegram Notification ────────────────────────────────────────────────────
@@ -712,10 +772,15 @@ class ConfirmationFirewall:
         )
         return approved
 
-    def deny_pending(self, code: str) -> None:
+    def deny_pending(self, code: str) -> bool:
         """Deny a pending confirmation."""
-        _deny_pending(code)
-        self._append_audit("confirmation.pending_denied", code=code)
+        denied = _deny_pending(code)
+        self._append_audit(
+            "confirmation.pending_denied",
+            code=code,
+            status="denied" if denied else "not_found_or_expired",
+        )
+        return denied
 
     def list_pending(self) -> list[dict]:
         """Return all non-expired pending confirmations."""
