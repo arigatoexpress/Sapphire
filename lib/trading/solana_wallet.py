@@ -402,13 +402,14 @@ class SolanaWallet:
         fw = self._confirmation_firewall or ConfirmationFirewall()
         amount_usd = self._approval_amount_usd(proposal)
         details = (
+            "Mode: paper simulation. "
             f"{proposal.input_amount} {proposal.input_token} "
             f"for ~{proposal.quoted_output} {proposal.output_token}"
         )
         try:
             approved = bool(
                 fw.request_confirmation(
-                    action=f"swap {proposal.input_token}->{proposal.output_token}",
+                    action=f"paper swap {proposal.input_token}->{proposal.output_token}",
                     risk=ActionRisk.FINANCIAL,
                     details=details,
                     amount=amount_usd,
