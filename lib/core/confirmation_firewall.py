@@ -29,6 +29,7 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
+import os
 import re
 import time
 import uuid
@@ -43,10 +44,13 @@ log = logging.getLogger(__name__)
 SAPPHIRE_STATE = Path.home() / ".sapphire"
 PENDING_DIR    = SAPPHIRE_STATE / "pending_confirmations"
 LIMITS_FILE    = SAPPHIRE_STATE / "financial_limits.json"
+AUDIT_LOG      = SAPPHIRE_STATE / "audit" / "confirmation_firewall.jsonl"
 
 CONFIRMATION_TIMEOUT = 300   # 5 minutes
 DESTRUCTIVE_DELAY    = 30    # seconds after approval before executing
 DAILY_AUTO_LIMIT     = 100.0 # USD — financial actions below this are auto-approved
+DAILY_AUTO_LIMIT_ENV = "SAPPHIRE_FIREWALL_DAILY_AUTO_LIMIT"
+AUDIT_LOG_ENV        = "SAPPHIRE_CONFIRMATION_FIREWALL_AUDIT_LOG"
 
 # ─── Risk Classification ──────────────────────────────────────────────────────
 
@@ -126,6 +130,46 @@ def classify_action(action: str, target: str = "") -> ActionRisk:
     if _SYSTEM_MODIFY_PATTERNS.search(text):
         return ActionRisk.SYSTEM_MODIFY
     return ActionRisk.READ_ONLY
+
+
+def _current_daily_auto_limit() -> float:
+    """Return the configured daily financial auto-approve limit."""
+    raw = os.environ.get(DAILY_AUTO_LIMIT_ENV)
+    if raw is None or raw == "":
+        return DAILY_AUTO_LIMIT
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        log.warning(
+            "invalid %s=%r; using default %.2f",
+            DAILY_AUTO_LIMIT_ENV,
+            raw,
+            DAILY_AUTO_LIMIT,
+        )
+        return DAILY_AUTO_LIMIT
+
+
+_AUDIT_SECRET_PATTERNS = (
+    re.compile(r"(?i)\b(api[_-]?key|token|password|secret|private[_-]?key)\s*[:=]\s*[^,\s]+"),
+    re.compile(r"(?i)\b(bearer)\s+[a-z0-9._~+/=-]+"),
+)
+
+
+def _audit_text(value: str, max_len: int = 160) -> str:
+    """Return a redacted, bounded preview safe enough for local audit logs."""
+    text = str(value or "")
+    for pattern in _AUDIT_SECRET_PATTERNS:
+        text = pattern.sub(lambda m: f"{m.group(1)}=<redacted>", text)
+    text = " ".join(text.split())
+    if len(text) > max_len:
+        return text[: max_len - 3] + "..."
+    return text
+
+
+def _details_fingerprint(details: str) -> dict[str, int | str]:
+    """Record evidence of details without writing raw details to disk."""
+    body = str(details or "")
+    return {"details_len": len(body)}
 
 
 # ─── Financial Limit Tracking ─────────────────────────────────────────────────
@@ -446,6 +490,9 @@ class ConfirmationFirewall:
     daily spend tracking (file-backed).
     """
 
+    def __init__(self, audit_path: str | Path | bool | None = None) -> None:
+        self._audit_path = self._resolve_audit_path(audit_path)
+
     def classify_action(self, action: str, target: str = "") -> ActionRisk:
         """Classify action into risk level. Delegates to module-level function."""
         return classify_action(action, target)
@@ -478,6 +525,14 @@ class ConfirmationFirewall:
         # ── Auto-approve low-risk actions ──────────────────────────────────────
         if risk in (ActionRisk.READ_ONLY, ActionRisk.SELF_MODIFY):
             log.debug("Firewall auto-approved: %s [%s]", action, risk.value)
+            self._append_audit(
+                "confirmation.auto_approved",
+                action=action,
+                risk=risk,
+                details=details,
+                amount=amount,
+                reason="low_risk",
+            )
             return True
 
         # ── Financial: atomically reserve against daily limit ────────────────
@@ -485,17 +540,53 @@ class ConfirmationFirewall:
         # single reserve-or-rollback call so concurrent callers cannot each
         # see spent=$0 and all commit past the cap.
         if risk == ActionRisk.FINANCIAL and amount > 0:
-            approved, new_total = _try_consume_daily_budget(amount, DAILY_AUTO_LIMIT)
+            daily_auto_limit = _current_daily_auto_limit()
+            if daily_auto_limit > 0:
+                approved, new_total = _try_consume_daily_budget(amount, daily_auto_limit)
+            else:
+                approved, new_total = False, _load_daily_spend() + amount
             if approved:
                 log.info("Firewall financial auto-approved: $%.2f (daily: $%.2f/$%.2f)",
-                         amount, new_total, DAILY_AUTO_LIMIT)
+                         amount, new_total, daily_auto_limit)
+                self._append_audit(
+                    "confirmation.financial_auto_approved",
+                    action=action,
+                    risk=risk,
+                    details=details,
+                    amount=amount,
+                    reason="daily_auto_limit",
+                    daily_total=new_total,
+                    daily_limit=daily_auto_limit,
+                )
                 return True
-            log.info("Firewall financial limit exceeded: $%.2f would bring daily to $%.2f",
-                     amount, new_total)
+            log.info(
+                "Firewall financial auto-approve unavailable: $%.2f would bring daily to $%.2f "
+                "(limit $%.2f)",
+                amount,
+                new_total,
+                daily_auto_limit,
+            )
+            self._append_audit(
+                "confirmation.financial_auto_approval_unavailable",
+                action=action,
+                risk=risk,
+                details=details,
+                amount=amount,
+                daily_total=new_total,
+                daily_limit=daily_auto_limit,
+            )
 
         # ── Generate confirmation code ─────────────────────────────────────────
         code = str(uuid.uuid4()).split("-")[0].upper()  # 8-char code
         _write_pending(code, action, risk, details)
+        self._append_audit(
+            "confirmation.pending_created",
+            action=action,
+            risk=risk,
+            details=details,
+            amount=amount,
+            code=code,
+        )
 
         # ── Send Telegram notification ─────────────────────────────────────────
         send_fn = _send_fn or _send_confirmation_request
@@ -518,13 +609,37 @@ class ConfirmationFirewall:
                 if risk == ActionRisk.DESTRUCTIVE:
                     log.info("Firewall: DESTRUCTIVE action — enforcing %ds delay", DESTRUCTIVE_DELAY)
                     sleep(DESTRUCTIVE_DELAY)
+                self._append_audit(
+                    "confirmation.approved",
+                    action=action,
+                    risk=risk,
+                    details=details,
+                    amount=amount,
+                    code=code,
+                )
                 return True
             if status == "denied":
                 log.info("Firewall: denied [%s]: %s", risk.value, action)
+                self._append_audit(
+                    "confirmation.denied",
+                    action=action,
+                    risk=risk,
+                    details=details,
+                    amount=amount,
+                    code=code,
+                )
                 return False
 
         log.warning("Firewall: timed out after %ds — denying [%s]: %s",
                     CONFIRMATION_TIMEOUT, risk.value, action)
+        self._append_audit(
+            "confirmation.timed_out",
+            action=action,
+            risk=risk,
+            details=details,
+            amount=amount,
+            code=code,
+        )
         return False
 
     def auto_approve(self, action: str, target: str = "", details: str = "") -> bool:
@@ -543,11 +658,18 @@ class ConfirmationFirewall:
 
     def approve_pending(self, code: str) -> bool:
         """Approve a pending confirmation (called by hermes-agent message handler)."""
-        return _approve_pending(code)
+        approved = _approve_pending(code)
+        self._append_audit(
+            "confirmation.pending_approved",
+            code=code,
+            status="approved" if approved else "not_found_or_expired",
+        )
+        return approved
 
     def deny_pending(self, code: str) -> None:
         """Deny a pending confirmation."""
         _deny_pending(code)
+        self._append_audit("confirmation.pending_denied", code=code)
 
     def list_pending(self) -> list[dict]:
         """Return all non-expired pending confirmations."""
@@ -562,3 +684,46 @@ class ConfirmationFirewall:
             except (json.JSONDecodeError, OSError):
                 pass
         return sorted(results, key=lambda d: d.get("created", 0))
+
+    def _append_audit(
+        self,
+        event_type: str,
+        *,
+        action: str = "",
+        risk: ActionRisk | None = None,
+        details: str = "",
+        amount: float = 0.0,
+        **extra: object,
+    ) -> None:
+        if self._audit_path is None:
+            return
+        record: dict[str, object] = {
+            "event_type": event_type,
+            "ts": time.time(),
+        }
+        if action:
+            record["action"] = _audit_text(action)
+        if risk is not None:
+            record["risk"] = risk.value
+        if details:
+            record.update(_details_fingerprint(details))
+        if amount > 0:
+            record["amount"] = amount
+        record.update(extra)
+        try:
+            self._audit_path.parent.mkdir(parents=True, exist_ok=True)
+            with self._audit_path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n")
+        except Exception as e:
+            log.error("confirmation firewall audit append failed: %s", e)
+
+    @staticmethod
+    def _resolve_audit_path(audit_path: str | Path | bool | None) -> Path | None:
+        if audit_path is False:
+            return None
+        if audit_path:
+            return Path(audit_path).expanduser()
+        configured = os.environ.get(AUDIT_LOG_ENV)
+        if configured:
+            return Path(configured).expanduser()
+        return AUDIT_LOG

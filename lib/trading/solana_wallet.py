@@ -6,7 +6,7 @@ Paper mode (LIVE_TRADING=0 — the default):
   - Balance / swaps are simulated against an in-memory position ledger
   - Jupiter quote API is called READ-ONLY for realistic price inputs;
     no transaction is ever signed or broadcast
-  - Every proposed trade requires a Telegram approval before it's logged
+  - Every executable proposal must pass the confirmation firewall first
 
 Live mode (LIVE_TRADING=1) — NOT IMPLEMENTED HERE by design. To go live:
   1. Install the `solana`, `solders`, `base58` packages
@@ -135,9 +135,10 @@ class SolanaWallet:
     deliberately out of scope.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, confirmation_firewall: Any | None = None) -> None:
         self._fernet = None
         self._keypair: tuple[bytes, bytes] | None = None    # (private, public)
+        self._confirmation_firewall = confirmation_firewall
 
     # ──────────────────────────────────────────────────────────────────
     # Init / load
@@ -350,12 +351,13 @@ class SolanaWallet:
             audit=audit,
         )
 
-        # Request Telegram approval (the firewall). Failures degrade gracefully
-        # to auto-approve in paper mode so tests / CI don't deadlock.
+        # Request firewall approval. Even in paper mode this fails closed when
+        # the firewall is unavailable so an integration bug cannot execute a
+        # simulated trade and teach the rest of the system a false approval path.
         approved = self._request_approval(proposal)
         if approved:
             proposal.status = "APPROVED"
-            proposal.approver = "telegram" if proposal.telegram_code else "auto"
+            proposal.approver = "confirmation_firewall"
             if auto_execute_paper and q is not None:
                 self._simulate_swap(proposal)
                 proposal.status = "EXECUTED_PAPER"
@@ -386,30 +388,51 @@ class SolanaWallet:
     def _request_approval(self, proposal: Proposal) -> bool:
         """Ask the confirmation firewall to gate this trade.
 
-        If the firewall is unavailable in paper mode we auto-approve so the
-        pipeline is exercised end-to-end during development. Live mode would
-        hard-fail instead.
+        Firewall failures deny the proposal in both paper and future live mode.
+        Paper execution should exercise the same authorization path instead of
+        silently succeeding when imports, config, or Telegram plumbing regress.
         """
         try:
-            import sys
-            alpha_path = ROOT / "services" / "alpha"
-            if str(alpha_path) not in sys.path:
-                sys.path.insert(0, str(alpha_path))
-            from confirmation_firewall import ConfirmationFirewall  # type: ignore
-            fw = ConfirmationFirewall()
-            code = fw.request_confirmation(
-                action=f"swap {proposal.input_token}→{proposal.output_token}",
-                detail=f"{proposal.input_amount} {proposal.input_token} "
-                       f"for ~{proposal.quoted_output} {proposal.output_token}",
-                risk="financial",
+            from lib.core.confirmation_firewall import ActionRisk, ConfirmationFirewall
+        except Exception:
+            log.warning("confirmation firewall unavailable; denying paper proposal")
+            proposal.audit.append("confirmation_firewall_unavailable")
+            return False
+
+        fw = self._confirmation_firewall or ConfirmationFirewall()
+        amount_usd = self._approval_amount_usd(proposal)
+        details = (
+            f"{proposal.input_amount} {proposal.input_token} "
+            f"for ~{proposal.quoted_output} {proposal.output_token}"
+        )
+        try:
+            approved = bool(
+                fw.request_confirmation(
+                    action=f"swap {proposal.input_token}->{proposal.output_token}",
+                    risk=ActionRisk.FINANCIAL,
+                    details=details,
+                    amount=amount_usd,
+                )
             )
-            proposal.telegram_code = code
-            # In paper mode the firewall may auto-approve or return PENDING.
-            # We treat PENDING as approved for paper since no funds move.
-            return bool(code)
-        except Exception as e:
-            log.debug("firewall unavailable: %s — auto-approving in paper mode", e)
-            return not LIVE_TRADING
+        except Exception:
+            log.warning("confirmation firewall request failed; denying paper proposal")
+            proposal.audit.append("confirmation_firewall_error")
+            return False
+
+        proposal.audit.append(
+            "confirmation_firewall_approved" if approved else "confirmation_firewall_denied"
+        )
+        return approved
+
+    @staticmethod
+    def _approval_amount_usd(proposal: Proposal) -> float:
+        """Best-effort USD notional for firewall daily-limit accounting."""
+        stablecoins = {"USDC", "USDT"}
+        if proposal.input_token in stablecoins:
+            return max(0.0, float(proposal.input_amount))
+        if proposal.output_token in stablecoins:
+            return max(0.0, float(proposal.quoted_output))
+        return 0.0
 
     def _simulate_swap(self, proposal: Proposal) -> None:
         """Update the paper ledger as if the swap filled at the quoted price."""

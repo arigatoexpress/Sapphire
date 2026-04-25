@@ -13,7 +13,9 @@ plain-sync makes debugging and testing trivial.
 
 from __future__ import annotations
 
+import http.client
 import json
+import logging
 import ssl
 import threading
 import time
@@ -32,6 +34,11 @@ except ImportError:
 DEFAULT_TIMEOUT = 12
 CACHE_TTL = 300  # 5 minutes
 USER_AGENT = "sapphire-os/0.4 (+on-chain-intel)"
+RETRY_ATTEMPTS = 3
+RETRY_BACKOFF_SECONDS = (0.5, 1.5)
+RETRYABLE_HTTP_CODES = {408, 425, 429, 500, 502, 503, 504}
+
+log = logging.getLogger(__name__)
 
 
 class SourceError(RuntimeError):
@@ -44,6 +51,9 @@ class SourceError(RuntimeError):
 
 _cache: dict[str, tuple[float, Any]] = {}
 _cache_lock = threading.Lock()
+_pool_lock = threading.Lock()
+_pool_io_lock = threading.Lock()
+_https_pool: dict[tuple[str, int], http.client.HTTPSConnection] = {}
 
 
 def _cache_get(key: str) -> Any | None:
@@ -54,60 +64,178 @@ def _cache_get(key: str) -> Any | None:
     return None
 
 
+def _cache_get_stale(key: str) -> Any | None:
+    with _cache_lock:
+        entry = _cache.get(key)
+        return entry[1] if entry else None
+
+
 def _cache_set(key: str, value: Any) -> None:
     with _cache_lock:
         _cache[key] = (time.monotonic(), value)
 
 
-def _http_get(url: str, timeout: int = DEFAULT_TIMEOUT) -> Any:
-    cached = _cache_get(url)
+def _endpoint_label(url: str) -> str:
+    parsed = urllib.parse.urlparse(url)
+    return f"{parsed.netloc}{parsed.path}"
+
+
+def _close_pooled_https_connection(key: tuple[str, int]) -> None:
+    with _pool_lock:
+        conn = _https_pool.pop(key, None)
+    if conn is not None:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def _pooled_https_request(
+    method: str,
+    url: str,
+    *,
+    body: bytes | None,
+    headers: dict[str, str],
+    timeout: int,
+) -> tuple[int, str, bytes]:
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme != "https" or not parsed.hostname:
+        req = urllib.request.Request(url, data=body, method=method, headers=headers)
+        with urllib.request.urlopen(req, timeout=timeout, context=_SSL_CTX) as r:
+            return r.status, r.reason, r.read()
+
+    port = parsed.port or 443
+    key = (parsed.hostname, port)
+    path = urllib.parse.urlunparse(("", "", parsed.path or "/", parsed.params, parsed.query, ""))
+
+    # http.client connections are not thread-safe; one lock keeps the tiny pool simple.
+    with _pool_io_lock:
+        with _pool_lock:
+            conn = _https_pool.get(key)
+            if conn is None:
+                conn = http.client.HTTPSConnection(
+                    parsed.hostname,
+                    port=port,
+                    timeout=timeout,
+                    context=_SSL_CTX,
+                )
+                _https_pool[key] = conn
+            else:
+                conn.timeout = timeout
+
+        try:
+            conn.request(method, path, body=body, headers=headers)
+            resp = conn.getresponse()
+            raw = resp.read()
+            if (resp.getheader("Connection") or "").lower() == "close":
+                _close_pooled_https_connection(key)
+            return resp.status, resp.reason, raw
+        except Exception:
+            _close_pooled_https_connection(key)
+            raise
+
+
+def _json_request_with_retry(
+    method: str,
+    url: str,
+    *,
+    cache_key: str,
+    body: bytes | None,
+    headers: dict[str, str],
+    timeout: int,
+) -> Any:
+    cached = _cache_get(cache_key)
     if cached is not None:
         return cached
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
-    try:
-        with urllib.request.urlopen(req, timeout=timeout, context=_SSL_CTX) as r:
-            body = r.read()
-    except urllib.error.HTTPError as e:
-        raise SourceError(f"GET {url} → HTTP {e.code}: {e.reason}") from e
-    except Exception as e:
-        raise SourceError(f"GET {url} → {type(e).__name__}: {e}") from e
-    try:
-        data = json.loads(body)
-    except json.JSONDecodeError as e:
-        raise SourceError(f"GET {url} → invalid JSON: {e}") from e
-    _cache_set(url, data)
-    return data
+
+    endpoint = _endpoint_label(url)
+    last_error: Exception | None = None
+    for attempt in range(1, RETRY_ATTEMPTS + 1):
+        try:
+            status, reason, raw = _pooled_https_request(
+                method,
+                url,
+                body=body,
+                headers=headers,
+                timeout=timeout,
+            )
+            if status >= 400:
+                message = f"{method} {endpoint} -> HTTP {status}: {reason}"
+                if status not in RETRYABLE_HTTP_CODES:
+                    raise SourceError(message)
+                raise urllib.error.HTTPError(url, status, reason, {}, None)
+
+            parsed = json.loads(raw)
+            _cache_set(cache_key, parsed)
+            return parsed
+        except urllib.error.HTTPError as e:
+            if e.code not in RETRYABLE_HTTP_CODES:
+                raise SourceError(f"{method} {endpoint} -> HTTP {e.code}: {e.reason}") from e
+            last_error = e
+        except SourceError:
+            raise
+        except json.JSONDecodeError as e:
+            last_error = e
+        except Exception as e:
+            last_error = e
+
+        if attempt < RETRY_ATTEMPTS:
+            delay = RETRY_BACKOFF_SECONDS[min(attempt - 1, len(RETRY_BACKOFF_SECONDS) - 1)]
+            log.warning(
+                "source_http_retry method=%s endpoint=%s attempt=%s/%s error=%s: %s",
+                method,
+                endpoint,
+                attempt,
+                RETRY_ATTEMPTS,
+                type(last_error).__name__,
+                last_error,
+            )
+            time.sleep(delay)
+
+    stale = _cache_get_stale(cache_key)
+    if stale is not None:
+        log.warning(
+            "source_http_stale_cache method=%s endpoint=%s attempts=%s last_error=%s: %s",
+            method,
+            endpoint,
+            RETRY_ATTEMPTS,
+            type(last_error).__name__,
+            last_error,
+        )
+        return stale
+
+    assert last_error is not None
+    if isinstance(last_error, json.JSONDecodeError):
+        raise SourceError(f"{method} {endpoint} -> invalid JSON: {last_error}") from last_error
+    raise SourceError(f"{method} {endpoint} -> {type(last_error).__name__}: {last_error}") from last_error
+
+
+def _http_get(url: str, timeout: int = DEFAULT_TIMEOUT) -> Any:
+    return _json_request_with_retry(
+        "GET",
+        url,
+        cache_key=url,
+        body=None,
+        headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
+        timeout=timeout,
+    )
 
 
 def _http_post_json(url: str, payload: dict, timeout: int = DEFAULT_TIMEOUT) -> Any:
     cache_key = f"POST {url} {json.dumps(payload, sort_keys=True)}"
-    cached = _cache_get(cache_key)
-    if cached is not None:
-        return cached
     data = json.dumps(payload).encode()
-    req = urllib.request.Request(
+    return _json_request_with_retry(
+        "POST",
         url,
-        data=data,
-        method="POST",
+        cache_key=cache_key,
+        body=data,
         headers={
             "User-Agent": USER_AGENT,
             "Accept": "application/json",
             "Content-Type": "application/json",
         },
+        timeout=timeout,
     )
-    try:
-        with urllib.request.urlopen(req, timeout=timeout, context=_SSL_CTX) as r:
-            body = r.read()
-    except urllib.error.HTTPError as e:
-        raise SourceError(f"POST {url} → HTTP {e.code}: {e.reason}") from e
-    except Exception as e:
-        raise SourceError(f"POST {url} → {type(e).__name__}: {e}") from e
-    try:
-        parsed = json.loads(body)
-    except json.JSONDecodeError as e:
-        raise SourceError(f"POST {url} → invalid JSON: {e}") from e
-    _cache_set(cache_key, parsed)
-    return parsed
 
 
 # ---------------------------------------------------------------------------

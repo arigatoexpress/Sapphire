@@ -425,6 +425,15 @@ def _save_intelligence_snapshot(result: dict, symbol: str) -> None:
         pass
 
 
+def _should_save_snapshot(inp: dict) -> bool:
+    raw = inp.get("save_snapshot", True)
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, str):
+        return raw.strip().lower() not in {"0", "false", "no", "off"}
+    return bool(raw)
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -454,7 +463,7 @@ def main() -> None:
             sample_count=int(inp.get("sample_count", 1)),
         )
         symbol = inp.get("symbol", "BTC-USD")
-        if "error" not in result:
+        if "error" not in result and _should_save_snapshot(inp):
             _save_intelligence_snapshot(result, symbol)
         print(json.dumps(result, indent=2))
 
@@ -466,9 +475,10 @@ def main() -> None:
             interval=inp.get("interval", "1h"),
         )
         # Save each symbol
-        for sym, r in result.get("symbols", {}).items():
-            if "error" not in r:
-                _save_intelligence_snapshot(r, sym)
+        if _should_save_snapshot(inp):
+            for sym, r in result.get("symbols", {}).items():
+                if "error" not in r:
+                    _save_intelligence_snapshot(r, sym)
         print(json.dumps(result, indent=2))
 
     else:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -59,7 +60,7 @@ def recorders():
 
 
 @pytest.fixture
-def switch(clock, recorders):
+def switch(clock, recorders, tmp_path):
     publisher, notifier = recorders
     return KillSwitch(
         max_drawdown_24h=0.05,
@@ -68,6 +69,7 @@ def switch(clock, recorders):
         publish_event=publisher,
         notify=notifier,
         now=clock.now,
+        audit_path=tmp_path / "kill_switch.jsonl",
     )
 
 
@@ -241,28 +243,93 @@ def test_event_payload_fields(switch, recorders, clock):
     assert "reason" in data
 
 
+def test_appends_activation_to_audit_log(clock, recorders, tmp_path):
+    audit_path = tmp_path / "audit" / "kill_switch.jsonl"
+    pub, notifier = recorders
+    ks = KillSwitch(
+        publish_event=pub,
+        notify=notifier,
+        now=clock.now,
+        audit_path=audit_path,
+    )
+    ks.check(100_000)
+    clock.advance(hours=1)
+
+    assert ks.check(90_000) is True
+
+    lines = audit_path.read_text().splitlines()
+    assert len(lines) == 1
+    record = json.loads(lines[0])
+    assert record["event_type"] == "kill_switch.activated"
+    assert record["kind"] == "activated"
+    assert record["portfolio_value"] == 90_000
+    assert "drawdown" in record["reason"]
+
+
+def test_appends_deactivation_to_audit_log(switch, clock, tmp_path):
+    audit_path = tmp_path / "kill_switch-deactivation.jsonl"
+    ks = KillSwitch(now=clock.now, notify=lambda *a, **k: None, audit_path=audit_path)
+    ks.check(100_000)
+    clock.advance(hours=1)
+    ks.check(90_000)
+
+    assert ks.check_recovery(0.025) is True
+
+    records = [json.loads(line) for line in audit_path.read_text().splitlines()]
+    assert [r["event_type"] for r in records] == [
+        "kill_switch.activated",
+        "kill_switch.deactivated",
+    ]
+
+
+def test_audit_path_can_be_disabled(clock, recorders, tmp_path):
+    pub, notifier = recorders
+    ks = KillSwitch(
+        publish_event=pub,
+        notify=notifier,
+        now=clock.now,
+        audit_path=False,
+    )
+    ks.check(100_000)
+    clock.advance(hours=1)
+    ks.check(90_000)
+
+    assert list(tmp_path.rglob("*.jsonl")) == []
+
+
 # ---------------------------------------------------------------------------
 # Resilience
 # ---------------------------------------------------------------------------
 
 
-def test_publisher_failure_does_not_break_check(clock):
+def test_publisher_failure_does_not_break_check(clock, tmp_path):
     def broken_pub(*args, **kwargs):
         raise RuntimeError("redis is sad")
 
-    ks = KillSwitch(publish_event=broken_pub, notify=lambda *a, **k: None, now=clock.now)
+    ks = KillSwitch(
+        publish_event=broken_pub,
+        notify=lambda *a, **k: None,
+        now=clock.now,
+        audit_path=tmp_path / "kill_switch.jsonl",
+    )
     ks.check(100_000)
     clock.advance(hours=1)
     # Must not raise even though publisher blows up
     assert ks.check(90_000) is True
     assert ks.is_active
+    assert (tmp_path / "kill_switch.jsonl").exists()
 
 
-def test_notifier_failure_does_not_break_check(clock):
+def test_notifier_failure_does_not_break_check(clock, tmp_path):
     def broken_notify(*args, **kwargs):
         raise RuntimeError("telegram 502")
 
-    ks = KillSwitch(publish_event=lambda *a, **k: None, notify=broken_notify, now=clock.now)
+    ks = KillSwitch(
+        publish_event=lambda *a, **k: None,
+        notify=broken_notify,
+        now=clock.now,
+        audit_path=tmp_path / "kill_switch.jsonl",
+    )
     ks.check(100_000)
     clock.advance(hours=1)
     assert ks.check(90_000) is True

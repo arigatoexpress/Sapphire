@@ -21,11 +21,14 @@ Thread-safe; intended as a process singleton via :func:`get_kill_switch`.
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import threading
 from collections import deque
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 log = logging.getLogger(__name__)
@@ -119,6 +122,7 @@ class KillSwitch:
         publish_event: Any = None,
         notify: Any = None,
         now: Any = None,
+        audit_path: str | Path | bool | None = None,
     ) -> None:
         if max_drawdown_24h <= 0 or max_drawdown_24h >= 1:
             raise ValueError("max_drawdown_24h must be in (0, 1)")
@@ -144,6 +148,7 @@ class KillSwitch:
         self._publish_event = publish_event
         self._notify = notify
         self._now = now or (lambda: datetime.now(UTC))
+        self._audit_path = self._resolve_audit_path(audit_path)
 
     # ------------------------------------------------------------------
     # Public state
@@ -321,6 +326,13 @@ class KillSwitch:
         except Exception as e:
             log.error("kill_switch event publish failed: %s", e)
 
+        # Durable local audit log. This intentionally runs independently of
+        # the event bus and Telegram so operator-visible state survives outages.
+        try:
+            self._append_audit(event)
+        except Exception as e:
+            log.error("kill_switch audit append failed: %s", e)
+
         # Telegram (P0 priority)
         try:
             notifier = self._notify or _default_notifier()
@@ -342,6 +354,29 @@ class KillSwitch:
                 notifier(text, priority="p0")
         except Exception as e:
             log.error("kill_switch telegram notify failed: %s", e)
+
+    def _append_audit(self, event: KillSwitchEvent) -> None:
+        if self._audit_path is None:
+            return
+        record = {
+            "event_type": f"kill_switch.{event.kind}",
+            **event.to_dict(),
+        }
+        self._audit_path.parent.mkdir(parents=True, exist_ok=True)
+        with self._audit_path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n")
+
+    @staticmethod
+    def _resolve_audit_path(audit_path: str | Path | bool | None) -> Path | None:
+        if audit_path is False:
+            return None
+        if audit_path:
+            return Path(audit_path).expanduser()
+        configured = os.environ.get("SAPPHIRE_KILL_SWITCH_AUDIT_LOG")
+        if configured:
+            return Path(configured).expanduser()
+        state_dir = Path(os.environ.get("SAPPHIRE_STATE_DIR", Path.home() / ".sapphire"))
+        return state_dir / "audit" / "kill_switch.jsonl"
 
 
 # ---------------------------------------------------------------------------

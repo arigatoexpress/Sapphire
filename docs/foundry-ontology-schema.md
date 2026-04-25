@@ -159,6 +159,25 @@ The sync engine (`lib/foundry/sync.py`) runs on a 15-minute schedule with these 
 - **Alerting:** Telegram notification on sync failure (via `lib.telegram` or direct API)
 - **Dashboard:** `/api/foundry/sync-status` endpoint exposes sync state to the intel page
 
+### Runtime Foundry Target
+
+`lib/foundry/client.py` defaults to the historical Foundry API path:
+
+- Ontology API name: `ontology`
+- Upsert action API name: `sapphire-upsert`
+
+If the Foundry partner renames the ontology or action, set these without code changes:
+
+- `PALANTIR_FOUNDRY_ONTOLOGY` or `FOUNDRY_ONTOLOGY`
+- `PALANTIR_FOUNDRY_UPSERT_ACTION` or `FOUNDRY_UPSERT_ACTION`
+- `~/.config/sapphire-secrets/foundry_ontology`
+- `~/.config/sapphire-secrets/foundry_upsert_action`
+
+The sync preflights the configured ontology/action once per run. If the target is missing, it records
+`last_status=not_configured` instead of logging one upload 404 per object type. Use
+`FoundryClient.list_ontologies()` and `FoundryClient.list_action_types()` to inspect available API names
+once the service credential has permission.
+
 ---
 
 ## Foundry Actions (Planned — Phase 2)

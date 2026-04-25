@@ -3,17 +3,32 @@
     "PreToolUse": [
       {
         "matcher": "Edit|Write",
-        "command": "bash -c 'FILE=\"${CLAUDE_TOOL_INPUT_FILE_PATH:-}\"; [[ -z \"$FILE\" ]] && exit 0; [[ \"$FILE\" == *trading_signals* || \"$FILE\" == *migrated_customers* || \"$FILE\" == *.env || \"$FILE\" == *secrets* || \"$FILE\" == *secret_* || \"$FILE\" == */keys.txt || \"$FILE\" == *sapphire-secrets* ]] && echo \"BLOCKED: $FILE is a protected data/secret file\" && exit 2; exit 0'"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'FILE=\"${CLAUDE_TOOL_INPUT_FILE_PATH:-}\"; [[ -z \"$FILE\" ]] && exit 0; [[ \"$FILE\" == *trading_signals* || \"$FILE\" == *migrated_customers* || \"$FILE\" == *.env || \"$FILE\" == *secrets* || \"$FILE\" == *secret_* || \"$FILE\" == */keys.txt || \"$FILE\" == *sapphire-secrets* ]] && echo \"BLOCKED: $FILE is a protected data/secret file\" && exit 2; exit 0'"
+          }
+        ]
       }
     ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",
-        "command": "bash -c 'FILE=\"${CLAUDE_TOOL_INPUT_FILE_PATH:-}\"; [[ -z \"$FILE\" ]] && exit 0; [[ \"$FILE\" == *.py ]] && /usr/local/bin/python3 -m ruff format --quiet \"$FILE\" 2>/dev/null && /usr/local/bin/python3 -m ruff check --fix --quiet \"$FILE\" 2>/dev/null; exit 0'"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'FILE=\"${CLAUDE_TOOL_INPUT_FILE_PATH:-}\"; [[ -z \"$FILE\" ]] && exit 0; [[ \"$FILE\" == *.py ]] && /usr/local/bin/python3 -m ruff format --quiet \"$FILE\" 2>/dev/null && /usr/local/bin/python3 -m ruff check --fix --quiet \"$FILE\" 2>/dev/null; exit 0'"
+          }
+        ]
       },
       {
         "matcher": "Edit|Write",
-        "command": "bash -c 'FILE=\"${CLAUDE_TOOL_INPUT_FILE_PATH:-}\"; [[ -z \"$FILE\" ]] && exit 0; [[ \"$FILE\" == *.py && \"$FILE\" != *test_* && \"$FILE\" != *conftest* ]] && BASE=$(basename \"$FILE\" .py) && TEST=$(find tests/ -name \"test_${BASE}.py\" 2>/dev/null | head -1) && [[ -n \"$TEST\" ]] && /usr/local/bin/python3 -m pytest \"$TEST\" --tb=line -q --no-header 2>&1 | tail -3; exit 0'"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'FILE=\"${CLAUDE_TOOL_INPUT_FILE_PATH:-}\"; [[ -z \"$FILE\" ]] && exit 0; [[ \"$FILE\" == *.py && \"$FILE\" != *test_* && \"$FILE\" != *conftest* ]] && BASE=$(basename \"$FILE\" .py) && TEST=$(find tests/ -name \"test_${BASE}.py\" 2>/dev/null | head -1) && [[ -n \"$TEST\" ]] && /usr/local/bin/python3 -m pytest \"$TEST\" --tb=line -q --no-header 2>&1 | tail -3; exit 0'"
+          }
+        ]
       }
     ]
   },

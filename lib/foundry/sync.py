@@ -44,7 +44,7 @@ _HISTORY_FILE = "data/foundry_sync_history.jsonl"
 # Dataset source groups — maps Foundry object type → local file patterns
 _SOURCE_PATTERNS: dict[str, list[str]] = {
     "PaperTrade": ["data/signals/*.jsonl", "data/paper_portfolio.json"],
-    "Alert": ["data/system_events.jsonl", "data/security/*.json"],
+    "Alert": ["data/system_events.jsonl", "data/security/**/*.json"],
     "ServiceHealth": ["data/health/*.ndjson", "data/health/heartbeat.jsonl"],
     "ThreatIntel": [
         "data/intelligence/*/threats.json",
@@ -343,6 +343,12 @@ def run_sync(
 
         try:
             client = FoundryClient.from_env()
+            target_types = [
+                obj_type
+                for obj_type, objects in objects_by_type.items()
+                if objects
+            ]
+            client.validate_write_target(target_types)
         except FoundryConfigError as exc:
             # No URL or credentials yet. This is expected before the user has
             # provisioned Foundry — log once and bail without paging Telegram.
@@ -374,7 +380,10 @@ def run_sync(
                 if not objects:
                     continue
                 try:
-                    client.upsert_objects(obj_type, objects)
+                    if client.write_mode == "dataset":
+                        client.upload_dataset_objects(obj_type, objects)
+                    else:
+                        client.upsert_objects(obj_type, objects)
                     result.uploaded_types[obj_type] = len(objects)
                     uploaded_anything = True
                     log.info("Uploaded %d %s objects", len(objects), obj_type)
@@ -386,7 +395,12 @@ def run_sync(
                     break  # Don't hammer failing auth on every object type.
                 except FoundryAPIError as exc:
                     result.errors.append(f"Upload {obj_type}: {exc}")
-                    if exc.status == 404 and not uploaded_anything and never_succeeded:
+                    if (
+                        client.write_mode == "action"
+                        and exc.status == 404
+                        and not uploaded_anything
+                        and never_succeeded
+                    ):
                         saw_404 = True
                         log.info(
                             "Upload %s skipped (ontology action not deployed; "

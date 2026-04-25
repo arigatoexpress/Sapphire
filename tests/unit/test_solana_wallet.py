@@ -9,6 +9,7 @@ from __future__ import annotations
 import importlib
 import os
 import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -182,3 +183,141 @@ def test_quote_unknown_token_returns_none(wallet_mod):
     # No network call made because mint lookup fails first
     assert w.quote("NOTATOKEN", "USDC", 1.0) is None
     assert w.quote("SOL", "ALSONOTATOKEN", 1.0) is None
+
+
+# ---------------------------------------------------------------------------
+# Confirmation firewall integration
+# ---------------------------------------------------------------------------
+
+
+class _RecordingFirewall:
+    def __init__(self, approved=True, error: Exception | None = None):
+        self.approved = approved
+        self.error = error
+        self.calls = []
+
+    def request_confirmation(self, **kwargs):
+        self.calls.append(kwargs)
+        if self.error:
+            raise self.error
+        return self.approved
+
+
+def _proposal(**overrides):
+    from lib.trading.solana_wallet import Proposal
+
+    data = {
+        "id": "prop-test",
+        "ts": "2026-04-25T00:00:00+00:00",
+        "input_token": "SOL",
+        "output_token": "USDC",
+        "input_amount": 1.0,
+        "quoted_output": 123.45,
+        "quote_price": 123.45,
+        "status": "PENDING",
+    }
+    data.update(overrides)
+    return Proposal(**data)
+
+
+def _install_fake_event_bus(monkeypatch):
+    published = []
+
+    class FakeBus:
+        def publish(self, event_type, payload, source=None):
+            published.append((event_type, payload, source))
+
+    monkeypatch.setitem(
+        sys.modules,
+        "lib.core.event_bus",
+        types.SimpleNamespace(get_bus=lambda: FakeBus()),
+    )
+    return published
+
+
+def test_approval_amount_usd_prefers_stablecoin_side(wallet_mod):
+    w = wallet_mod.SolanaWallet()
+
+    assert w._approval_amount_usd(_proposal(output_token="USDC")) == pytest.approx(123.45)
+    assert w._approval_amount_usd(
+        _proposal(input_token="USDT", output_token="SOL", input_amount=50.0)
+    ) == pytest.approx(50.0)
+    assert w._approval_amount_usd(
+        _proposal(input_token="SOL", output_token="JUP", quoted_output=10.0)
+    ) == pytest.approx(0.0)
+
+
+def test_request_approval_uses_confirmation_firewall(wallet_mod):
+    firewall = _RecordingFirewall(approved=True)
+    w = wallet_mod.SolanaWallet(confirmation_firewall=firewall)
+    prop = _proposal()
+
+    assert w._request_approval(prop) is True
+
+    assert prop.audit[-1] == "confirmation_firewall_approved"
+    call = firewall.calls[0]
+    assert call["action"] == "swap SOL->USDC"
+    assert call["risk"].value == "financial"
+    assert call["details"] == "1.0 SOL for ~123.45 USDC"
+    assert call["amount"] == pytest.approx(123.45)
+
+
+def test_request_approval_fails_closed_on_firewall_error(wallet_mod):
+    firewall = _RecordingFirewall(error=RuntimeError("firewall offline"))
+    w = wallet_mod.SolanaWallet(confirmation_firewall=firewall)
+    prop = _proposal()
+
+    assert w._request_approval(prop) is False
+
+    assert prop.audit[-1] == "confirmation_firewall_error"
+
+
+def test_propose_swap_denial_does_not_execute_paper_trade(wallet_mod, monkeypatch):
+    _install_fake_event_bus(monkeypatch)
+    firewall = _RecordingFirewall(approved=False)
+    w = wallet_mod.SolanaWallet(confirmation_firewall=firewall)
+    w.init_wallet()
+    monkeypatch.setattr(
+        w,
+        "quote",
+        lambda *_args, **_kwargs: {
+            "out_amount": 100.0,
+            "price": 100.0,
+            "route_plan_hops": 1,
+        },
+    )
+    before = w.balance()
+
+    prop = w.propose_swap("SOL", "USDC", 1.0, reason="unit test")
+
+    assert prop.status == "DENIED"
+    assert prop.approver is None
+    assert "confirmation_firewall_denied" in prop.audit
+    assert "approval_not_granted" in prop.audit
+    assert w.balance() == before
+
+
+def test_propose_swap_approval_executes_paper_trade(wallet_mod, monkeypatch):
+    published = _install_fake_event_bus(monkeypatch)
+    firewall = _RecordingFirewall(approved=True)
+    w = wallet_mod.SolanaWallet(confirmation_firewall=firewall)
+    w.init_wallet()
+    monkeypatch.setattr(
+        w,
+        "quote",
+        lambda *_args, **_kwargs: {
+            "out_amount": 100.0,
+            "price": 100.0,
+            "route_plan_hops": 1,
+        },
+    )
+
+    prop = w.propose_swap("SOL", "USDC", 1.0, reason="unit test")
+
+    assert prop.status == "EXECUTED_PAPER"
+    assert prop.approver == "confirmation_firewall"
+    assert "confirmation_firewall_approved" in prop.audit
+    assert "paper_swap_simulated" in prop.audit
+    assert w.balance()["SOL"] == pytest.approx(wallet_mod.PAPER_STARTING_SOL - 1.0)
+    assert w.balance()["USDC"] == pytest.approx(wallet_mod.PAPER_STARTING_USDC + 100.0)
+    assert published[0][0] == "trade.proposed"

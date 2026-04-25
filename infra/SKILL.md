@@ -44,6 +44,27 @@ rsync -av infra/pi/rari2/ rari@100.87.225.89:/etc/systemd/system/
 ssh rari@100.87.225.89 sudo systemctl daemon-reload
 ```
 
+## Pi SSH Access
+
+Use key-based SSH only. Do not use `sshpass`, password prompts, or inline passwords in
+agent workflows.
+
+Dedicated Mac commander key:
+
+```bash
+~/.ssh/sapphire_rari_ed25519
+```
+
+Install the public key from a trusted interactive shell when the Pi is reachable:
+
+```bash
+ssh-copy-id -i ~/.ssh/sapphire_rari_ed25519.pub rari@100.87.225.89
+ssh -i ~/.ssh/sapphire_rari_ed25519 -o BatchMode=yes rari@100.87.225.89 'printf key-ok'
+```
+
+If SSH is unreachable over Tailscale and LAN, leave the Pi out of the production path
+and keep Mac/Windows operation healthy; Sapphire must not depend on Pi availability.
+
 ## Devices
 
 | Device | Tailscale IP | Role |
