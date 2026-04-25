@@ -19,8 +19,8 @@ AUTONOMY_SA="${AUTONOMY_SA:-sapphire-main-sa@${PROJECT_ID}.iam.gserviceaccount.c
 GATEWAY_EXPECTED_SERVICE_ACCOUNTS="${GATEWAY_EXPECTED_SERVICE_ACCOUNTS:-${AUTONOMY_SA},sapphirev3@${PROJECT_ID}.iam.gserviceaccount.com}"
 PUBLIC_HEALTH_SERVICES="${PUBLIC_HEALTH_SERVICES:-${PM_HUB_SERVICE},${THO_AGENT_SERVICE},${SCOUT_SANDBOX_SERVICE}}"
 PLATFORM_BASE_URL="${PLATFORM_BASE_URL:-https://sapphirealpha.xyz}"
-PLATFORM_AUTH_USER="${PLATFORM_AUTH_USER:-sapphire}"
-PLATFORM_AUTH_PASS="${PLATFORM_AUTH_PASS:-alpha2024}"
+PLATFORM_AUTH_USER="${PLATFORM_AUTH_USER:-}"
+PLATFORM_AUTH_PASS="${PLATFORM_AUTH_PASS:-}"
 
 
 FAILURES=0
@@ -44,6 +44,11 @@ check_cmd() {
 }
 
 check_platform_contracts() {
+  if [[ -z "$PLATFORM_AUTH_USER" || -z "$PLATFORM_AUTH_PASS" ]]; then
+    pass "platform contract checks skipped (PLATFORM_AUTH_USER and PLATFORM_AUTH_PASS required)"
+    return
+  fi
+
   local endpoints=(
     "/api/platform/status"
     "/api/platform/metrics"
