@@ -64,12 +64,23 @@ When multiple agents are active:
 
 Rough guidance; the human will override when needed:
 
-- **Claude Code (me)** — ongoing review, architecture decisions, multi-step refactors, handoff coordination between agents. Strong on operational judgment.
-- **Codex** — well-scoped refactors, test-writing, repo hygiene passes. Good at following prescriptive specs.
+- **Codex** — primary production-autonomy lead for Sapphire OS. Owns repo hygiene, operational triage, architecture decisions, multi-step implementation, PR coordination, CI follow-through, deployment notes, and cross-repo handoffs unless Ari explicitly assigns another lead.
+- **Claude Code** — constrained reviewer/helper. Useful for second opinions, prose-heavy docs, or isolated review passes, but should not drive production-autonomy, broaden local permissions, merge PRs, or take over operations unless Ari explicitly asks.
 - **Kimi Code / long-context agents** — large code surveys, cross-repo pattern extraction, research-heavy writing.
 - **Local models via inference proxy** (hermes3, deepseek-r1, qwen3) — small, frequent, latency-sensitive tasks (form extraction, quick summaries, classification). Free tier on the mesh.
 
 When a task involves real money, production credentials, or shared infrastructure — always loop in the human.
+
+## Codex lead operating model
+
+Codex is expected to keep the project moving without waiting for Claude handoffs:
+
+- Start from a current-state verification, not stale audit notes.
+- Keep `/Users/aribs/Code/Sapphire` clean on `origin/main` whenever possible because LaunchAgents execute from that path.
+- Use short-lived worktrees under `/Users/aribs/Code/_worktrees/` for PR work, then remove clean worktrees after merge or abandonment.
+- Preserve local WIP before cleanup with a backup branch plus patch/stash when there is any risk of losing user work.
+- Prefer non-draft PRs for low-risk docs/test/tooling changes after local checks pass; use draft PRs for risky production behavior until the blast radius is clear.
+- Treat Claude-local settings as a safety surface: narrow allowlists when safe, and do not add broad service-control, workflow-disable, secret-read, or production-mutating permissions.
 
 ## Mesh inference (tiers)
 
