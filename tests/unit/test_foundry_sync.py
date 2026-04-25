@@ -30,6 +30,10 @@ def _isolate_secrets(tmp_path_factory, monkeypatch):
         "PALANTIR_FOUNDRY_TOKEN", "FOUNDRY_TOKEN", "FOUNDRY_API_TOKEN",
         "PALANTIR_FOUNDRY_CLIENT_ID", "FOUNDRY_CLIENT_ID",
         "PALANTIR_FOUNDRY_CLIENT_SECRET", "FOUNDRY_CLIENT_SECRET",
+        "PALANTIR_FOUNDRY_ONTOLOGY", "FOUNDRY_ONTOLOGY",
+        "PALANTIR_FOUNDRY_UPSERT_ACTION", "FOUNDRY_UPSERT_ACTION",
+        "PALANTIR_FOUNDRY_WRITE_MODE", "FOUNDRY_WRITE_MODE",
+        "PALANTIR_FOUNDRY_DATASET_MAP", "FOUNDRY_DATASET_MAP",
     ):
         monkeypatch.delenv(v, raising=False)
 
@@ -333,7 +337,7 @@ class TestRunSyncGracefulDegradation:
         from lib.foundry.client import FoundryConfigError
 
         with mock.patch(
-            "lib.foundry.client.FoundryClient.validate_upsert_target",
+            "lib.foundry.client.FoundryClient.validate_write_target",
             side_effect=FoundryConfigError("Configured Foundry ontology missing"),
         ), mock.patch("lib.foundry.sync._send_telegram_alert") as tg:
             result = run_sync(tmp_path, dry_run=False, force=True)
@@ -361,7 +365,7 @@ class TestRunSyncGracefulDegradation:
         from lib.foundry.client import FoundryAuthError
 
         with mock.patch(
-            "lib.foundry.client.FoundryClient.validate_upsert_target",
+            "lib.foundry.client.FoundryClient.validate_write_target",
             return_value=None,
         ), mock.patch(
             "lib.foundry.client.FoundryClient.upsert_objects",
@@ -404,7 +408,7 @@ class TestRunSyncGracefulDegradation:
         from lib.foundry.client import FoundryAPIError
 
         with mock.patch(
-            "lib.foundry.client.FoundryClient.validate_upsert_target",
+            "lib.foundry.client.FoundryClient.validate_write_target",
             return_value=None,
         ), mock.patch(
             "lib.foundry.client.FoundryClient.upsert_objects",
@@ -435,7 +439,7 @@ class TestRunSyncGracefulDegradation:
         from lib.foundry.client import FoundryAPIError
 
         with mock.patch(
-            "lib.foundry.client.FoundryClient.validate_upsert_target",
+            "lib.foundry.client.FoundryClient.validate_write_target",
             return_value=None,
         ), mock.patch(
             "lib.foundry.client.FoundryClient.upsert_objects",
@@ -492,7 +496,7 @@ class TestRunSyncGracefulDegradation:
             {"TypeA": lambda r: [{"id": "a1"}], "TypeB": lambda r: [{"id": "b1"}]},
             clear=True,
         ), mock.patch(
-            "lib.foundry.client.FoundryClient.validate_upsert_target",
+            "lib.foundry.client.FoundryClient.validate_write_target",
             return_value=None,
         ), mock.patch(
             "lib.foundry.client.FoundryClient.upsert_objects",
@@ -549,7 +553,7 @@ class TestRunSyncGracefulDegradation:
         from lib.foundry.client import FoundryAPIError
 
         with mock.patch(
-            "lib.foundry.client.FoundryClient.validate_upsert_target",
+            "lib.foundry.client.FoundryClient.validate_write_target",
             return_value=None,
         ), mock.patch(
             "lib.foundry.client.FoundryClient.upsert_objects",
@@ -572,6 +576,77 @@ class TestRunSyncGracefulDegradation:
         assert any("404" in m for m in error_msgs), (
             f"expected ERROR carrying 404 once first_success_at is set; got ERRORs={error_msgs!r}"
         )
+
+    def test_dataset_mode_uploads_dataset_snapshot(
+        self, tmp_path, monkeypatch
+    ):
+        """Dataset write mode uploads JSONL snapshots and does not require an action."""
+        monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
+        monkeypatch.setenv("PALANTIR_FOUNDRY_TOKEN", "ok-tok")
+        monkeypatch.setenv("FOUNDRY_WRITE_MODE", "dataset")
+        monkeypatch.setenv(
+            "FOUNDRY_DATASET_MAP",
+            '{"PaperTrade":"ri.foundry.main.dataset.paper"}',
+        )
+
+        signals_dir = tmp_path / "data" / "signals"
+        signals_dir.mkdir(parents=True)
+        (signals_dir / "2026-04-19.jsonl").write_text(
+            json.dumps({"pipeline_id": "t1", "symbol": "BTC"}) + "\n"
+        )
+
+        with mock.patch(
+            "lib.foundry.client.FoundryClient.validate_write_target",
+            return_value=None,
+        ) as validate, mock.patch(
+            "lib.foundry.client.FoundryClient.upload_dataset_objects",
+            return_value={"objects_uploaded": 1},
+        ) as upload, mock.patch("lib.foundry.sync._send_telegram_alert") as tg:
+            result = run_sync(tmp_path, dry_run=False, force=True)
+
+        assert tg.call_count == 0
+        assert result.ok is True
+        assert result.skipped is False
+        assert result.uploaded_types["PaperTrade"] == 1
+        validate.assert_called_once_with(["PaperTrade"])
+        upload.assert_called_once()
+        assert upload.call_args.args[0] == "PaperTrade"
+
+    def test_dataset_mode_404_is_not_demoted(
+        self, tmp_path, monkeypatch
+    ):
+        """Dataset upload 404s are real write failures, not missing action setup."""
+        monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
+        monkeypatch.setenv("PALANTIR_FOUNDRY_TOKEN", "ok-tok")
+        monkeypatch.setenv("FOUNDRY_WRITE_MODE", "dataset")
+        monkeypatch.setenv(
+            "FOUNDRY_DATASET_MAP",
+            '{"PaperTrade":"ri.foundry.main.dataset.paper"}',
+        )
+
+        signals_dir = tmp_path / "data" / "signals"
+        signals_dir.mkdir(parents=True)
+        (signals_dir / "2026-04-19.jsonl").write_text(
+            json.dumps({"pipeline_id": "t1", "symbol": "BTC"}) + "\n"
+        )
+
+        from lib.foundry.client import FoundryAPIError
+
+        with mock.patch(
+            "lib.foundry.client.FoundryClient.validate_write_target",
+            return_value=None,
+        ), mock.patch(
+            "lib.foundry.client.FoundryClient.upload_dataset_objects",
+            side_effect=FoundryAPIError("dataset missing", status=404),
+        ), mock.patch("lib.foundry.sync._send_telegram_alert") as tg:
+            result = run_sync(tmp_path, dry_run=False, force=True)
+
+        assert tg.call_count == 0
+        assert result.ok is False
+        assert result.skipped is False
+        state_path = tmp_path / "data" / "foundry_sync_state.json"
+        state = json.loads(state_path.read_text())
+        assert state["last_status"] == "error"
 
 
 class TestAuthWarningFresh:
