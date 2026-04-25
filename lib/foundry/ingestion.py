@@ -6,7 +6,7 @@ ready for :meth:`FoundryClient.upsert_objects` or
 
 Object types (see docs/foundry-ontology-schema.md):
   - PaperTrade     — from data/signals/*.jsonl + data/paper_portfolio.json
-  - Alert          — from data/security/*.json + data/system_events.jsonl
+  - Alert          — from data/security/**/*.json + data/system_events.jsonl
   - ServiceHealth  — from heartbeat / data/health/*.ndjson
   - ThreatIntel    — from data/intelligence/*/threats.json + data/threat_intel/*.md
   - DailyBrief     — from data/intelligence/*/daily_brief.json
@@ -189,10 +189,10 @@ def transform_alerts(
             "_sapphire_source": "data/system_events.jsonl",
         })
 
-    # 2) data/security/*.json — if any structured security reports exist
+    # 2) data/security/**/*.json — if any structured security reports exist
     security_dir = root / "data" / "security"
     if security_dir.is_dir():
-        for fpath in security_dir.glob("*.json"):
+        for fpath in security_dir.rglob("*.json"):
             report = _load_json(fpath)
             if not report:
                 continue

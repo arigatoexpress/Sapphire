@@ -199,6 +199,21 @@ class TestTransformAlerts:
         assert len(alerts) == 2
         assert alerts[0]["category"] == "security_report"
 
+    def test_from_dated_security_subdirectory(self, tmp_path):
+        sec_dir = tmp_path / "data" / "security" / "2026-04-25"
+        sec_dir.mkdir(parents=True)
+        (sec_dir / "pipeline.json").write_text(json.dumps({
+            "timestamp": "2026-04-25T09:10:29Z",
+            "posture": "needs_attention",
+        }))
+
+        alerts = transform_alerts(tmp_path)
+
+        assert len(alerts) == 1
+        assert alerts[0]["title"] == "pipeline"
+        assert alerts[0]["category"] == "security_report"
+        assert alerts[0]["_sapphire_source"] == "data/security/2026-04-25/pipeline.json"
+
     def test_empty(self, tmp_path):
         assert transform_alerts(tmp_path) == []
 

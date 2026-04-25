@@ -34,6 +34,10 @@ def _isolate_secrets(tmp_path, monkeypatch):
         "FOUNDRY_ONTOLOGY",
         "PALANTIR_FOUNDRY_UPSERT_ACTION",
         "FOUNDRY_UPSERT_ACTION",
+        "PALANTIR_FOUNDRY_WRITE_MODE",
+        "FOUNDRY_WRITE_MODE",
+        "PALANTIR_FOUNDRY_DATASET_MAP",
+        "FOUNDRY_DATASET_MAP",
     ):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("SAPPHIRE_SECRETS_DIR", str(tmp_path))
@@ -217,6 +221,109 @@ class TestFoundryClientDatasets:
         client.search_objects("PaperTrade", {"type": "eq", "field": "symbol", "value": "BTC"})
         client._post.assert_called_once()
 
+    def test_write_mode_and_dataset_map_resolved_from_env(self, monkeypatch):
+        monkeypatch.setenv("FOUNDRY_WRITE_MODE", "dataset")
+        monkeypatch.setenv(
+            "FOUNDRY_DATASET_MAP",
+            '{"PaperTrade":"ri.foundry.main.dataset.paper"}',
+        )
+        client = self._make_client(monkeypatch)
+
+        assert client.write_mode == "dataset"
+        assert client.dataset_map == {"PaperTrade": "ri.foundry.main.dataset.paper"}
+
+    def test_invalid_write_mode_raises(self, monkeypatch):
+        monkeypatch.setenv("FOUNDRY_WRITE_MODE", "spaceship")
+
+        with pytest.raises(FoundryConfigError, match="Invalid Foundry write mode"):
+            self._make_client(monkeypatch)
+
+    def test_invalid_dataset_map_json_raises(self, monkeypatch):
+        monkeypatch.setenv("FOUNDRY_DATASET_MAP", "not-json")
+
+        with pytest.raises(FoundryConfigError, match="dataset map"):
+            self._make_client(monkeypatch)
+
+    def test_upload_dataset_objects_uses_configured_dataset(self, monkeypatch):
+        client = self._make_client(monkeypatch)
+        client.dataset_map = {"PaperTrade": "ri.foundry.main.dataset.paper"}
+        client.upload_dataset_file = mock.Mock(return_value={})
+
+        result = client.upload_dataset_objects("PaperTrade", [{"id": "1"}])
+
+        client.upload_dataset_file.assert_called_once()
+        args, kwargs = client.upload_dataset_file.call_args
+        assert args[0] == "ri.foundry.main.dataset.paper"
+        assert args[1] == "sapphire_sync/PaperTrade.jsonl"
+        assert '{"id": "1"}' in args[2]
+        assert kwargs["branch"] == "master"
+        assert result["objects_uploaded"] == 1
+
+    def test_upload_dataset_file_encodes_nested_file_path(self, monkeypatch):
+        client = self._make_client(monkeypatch)
+        seen_urls: list[str] = []
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_exc_info):
+                return False
+
+            def read(self):
+                return b'{"path":"sapphire_sync/PaperTrade.jsonl"}'
+
+        def fake_urlopen(req, **_kwargs):
+            seen_urls.append(req.full_url)
+            return FakeResponse()
+
+        monkeypatch.setattr("lib.foundry.client.urllib.request.urlopen", fake_urlopen)
+
+        client.upload_dataset_file(
+            "ri.foundry.main.dataset.paper",
+            "sapphire_sync/PaperTrade.jsonl",
+            "{}\n",
+        )
+
+        assert "files/sapphire_sync%2FPaperTrade.jsonl/upload" in seen_urls[0]
+
+    def test_upload_dataset_objects_raises_when_mapping_missing(self, monkeypatch):
+        client = self._make_client(monkeypatch)
+
+        with pytest.raises(FoundryConfigError, match="No Foundry dataset RID"):
+            client.upload_dataset_objects("PaperTrade", [{"id": "1"}])
+
+    def test_validate_dataset_target_accepts_configured_resources(self, monkeypatch):
+        monkeypatch.setenv("FOUNDRY_ONTOLOGY", "sapphire-prod")
+        client = self._make_client(monkeypatch)
+        client.dataset_map = {"PaperTrade": "ri.foundry.main.dataset.paper"}
+        client._get = mock.Mock(side_effect=[
+            {"data": [{"apiName": "sapphire-prod", "rid": "ri.ontology.main.ontology.1"}]},
+            {"data": [{"apiName": "PaperTrade", "rid": "ri.ontology.main.object-type.1"}]},
+            {"rid": "ri.foundry.main.dataset.paper"},
+        ])
+
+        client.validate_dataset_target(["PaperTrade"])
+
+        assert client._get.call_args_list[0].args[0] == "/api/v2/ontologies"
+        assert client._get.call_args_list[1].args[0] == (
+            "/api/v2/ontologies/sapphire-prod/objectTypes"
+        )
+        assert client._get.call_args_list[2].args[0] == (
+            "/api/v2/datasets/ri.foundry.main.dataset.paper"
+        )
+
+    def test_validate_dataset_target_raises_when_object_type_missing(self, monkeypatch):
+        client = self._make_client(monkeypatch)
+        client.dataset_map = {"PaperTrade": "ri.foundry.main.dataset.paper"}
+        client._get = mock.Mock(side_effect=[
+            {"data": [{"apiName": "ontology"}]},
+            {"data": [{"apiName": "OtherType"}]},
+        ])
+
+        with pytest.raises(FoundryConfigError, match="object type"):
+            client.validate_dataset_target(["PaperTrade"])
+
 
 # ---------------------------------------------------------------------------
 # Exception hierarchy
@@ -257,11 +364,17 @@ class TestSecretsDirFallback:
         (tmp_path / "foundry_token").write_text("secret-tok\n")
         (tmp_path / "foundry_ontology").write_text("sapphire-prod\n")
         (tmp_path / "foundry_upsert_action").write_text("bulk-upsert\n")
+        (tmp_path / "foundry_write_mode").write_text("dataset\n")
+        (tmp_path / "foundry_dataset_map").write_text(
+            '{"PaperTrade":"ri.foundry.main.dataset.paper"}\n'
+        )
 
         client = FoundryClient.from_env()
 
         assert client.ontology == "sapphire-prod"
         assert client.upsert_action == "bulk-upsert"
+        assert client.write_mode == "dataset"
+        assert client.dataset_map == {"PaperTrade": "ri.foundry.main.dataset.paper"}
 
 
 class TestExceptions:
