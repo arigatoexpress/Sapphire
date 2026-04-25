@@ -113,17 +113,21 @@ def summarize_service(project: str, region: str, service: dict[str, Any]) -> dic
     metadata = service.get("metadata") or {}
     annotations = metadata.get("annotations") or {}
     status = service.get("status") or {}
-    template = ((service.get("spec") or {}).get("template") or {}).get("spec") or {}
+    template_obj = ((service.get("spec") or {}).get("template") or {})
+    template_annotations = (template_obj.get("metadata") or {}).get("annotations") or {}
+    template = template_obj.get("spec") or {}
     containers = template.get("containers") or []
     first_container = containers[0] if containers else {}
     resources = first_container.get("resources") or {}
     limits = resources.get("limits") or {}
     min_scale = _parse_int(
-        annotations.get("autoscaling.knative.dev/minScale")
+        template_annotations.get("autoscaling.knative.dev/minScale")
+        or annotations.get("autoscaling.knative.dev/minScale")
         or annotations.get("run.googleapis.com/minScale")
     )
     max_scale = _parse_int(
-        annotations.get("autoscaling.knative.dev/maxScale")
+        template_annotations.get("autoscaling.knative.dev/maxScale")
+        or annotations.get("autoscaling.knative.dev/maxScale")
         or annotations.get("run.googleapis.com/maxScale")
     )
     risks = _service_cost_risks(min_scale=min_scale, max_scale=max_scale)

@@ -47,6 +47,33 @@ def test_summarize_service_excludes_env_values():
     assert summary["memory_limit"] == "512Mi"
 
 
+def test_summarize_service_prefers_template_scale_annotations():
+    service = {
+        "metadata": {
+            "name": "sapphire-gcs-to-bq",
+            "annotations": {
+                "run.googleapis.com/maxScale": "60",
+            },
+        },
+        "status": {"latestReadyRevisionName": "sapphire-gcs-to-bq-00001-test"},
+        "spec": {
+            "template": {
+                "metadata": {
+                    "annotations": {
+                        "autoscaling.knative.dev/maxScale": "5",
+                    },
+                },
+                "spec": {"containers": [{"resources": {"limits": {"cpu": "0.3333"}}}]},
+            }
+        },
+    }
+
+    summary = cost_report.summarize_service("tho-ai-agent", "us-central1", service)
+
+    assert summary["max_scale"] == 5
+    assert "max_scale_high" not in summary["cost_risks"]
+
+
 def test_render_markdown_does_not_include_billing_account_identifier():
     report = {
         "generated_at": "2026-04-25T00:00:00+00:00",
