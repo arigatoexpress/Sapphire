@@ -28,6 +28,17 @@ log = logging.getLogger("analytics")
 app = Flask(__name__)
 bq = bigquery.Client(project=PROJECT)
 
+_KNOWN_PROBE_PATHS = {
+    "/.git/config",
+    "/feed/",
+    "/wp-admin/install.php",
+    "/wp-includes/ID3/license.txt",
+    "/xmlrpc.php",
+}
+_KNOWN_PROBE_SUFFIXES = (
+    "/wp-includes/wlwmanifest.xml",
+)
+
 
 def _rows(query: str, params: list[bigquery.ScalarQueryParameter] | None = None) -> list[dict]:
     job = bq.query(
@@ -45,6 +56,14 @@ def _jsonable(v):
 
 def _clean(rows: list[dict]) -> list[dict]:
     return [{k: _jsonable(v) for k, v in r.items()} for r in rows]
+
+
+def _is_known_probe_path(path: str) -> bool:
+    normalized = "/" + path.lstrip("/")
+    return (
+        normalized in _KNOWN_PROBE_PATHS
+        or normalized.endswith(_KNOWN_PROBE_SUFFIXES)
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -159,6 +178,13 @@ def signals_recent():
 @app.get("/")
 def index():
     return render_template("index.html", project=PROJECT, dataset=DATASET)
+
+
+@app.route("/<path:path>", methods=["GET", "HEAD", "POST"])
+def probe_sink(path: str):
+    if _is_known_probe_path(path):
+        return ("", 204, {"Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow"})
+    return ("Not found\n", 404, {"Content-Type": "text/plain"})
 
 
 if __name__ == "__main__":
