@@ -22,6 +22,8 @@ from lib.core.confirmation_firewall import (  # type: ignore
     _record_spend,
     _try_consume_daily_budget,
     classify_action,
+    handle_confirmation_reply,
+    parse_confirmation_reply,
 )
 
 
@@ -352,3 +354,90 @@ class TestConfirmationAudit:
         assert "sample-details-token" not in text
         assert "sample-bearer" not in text
         assert "token=<redacted>" in text
+
+
+class TestConfirmationReplyHandler:
+    def _records(self, path: Path) -> list[dict]:
+        return [json.loads(line) for line in path.read_text().splitlines()]
+
+    def test_parse_confirmation_reply_accepts_bare_commands(self):
+        assert parse_confirmation_reply("CONFIRM ab12cd34") == ("approve", "AB12CD34")
+        assert parse_confirmation_reply("/approve AB12CD34") == ("approve", "AB12CD34")
+        assert parse_confirmation_reply("deny ab12cd34") == ("deny", "AB12CD34")
+        assert parse_confirmation_reply("cancel ab12cd34") == ("deny", "AB12CD34")
+
+    def test_parse_confirmation_reply_ignores_conversation(self):
+        assert parse_confirmation_reply("please confirm this later") is None
+        assert parse_confirmation_reply("CONFIRM") is None
+        assert parse_confirmation_reply("CONFIRM ABC123") is None
+        assert parse_confirmation_reply("CONFIRM ABC12345 and do it") is None
+
+    def test_handle_confirmation_reply_approves_pending_code(self, tmp_path):
+        audit_path = tmp_path / "audit.jsonl"
+        fw = ConfirmationFirewall(audit_path=audit_path)
+        path = fw_module._write_pending(
+            "ABC12345",
+            "paper trade SOL",
+            ActionRisk.FINANCIAL,
+            "paper-only unit test",
+        )
+
+        result = handle_confirmation_reply("CONFIRM abc12345", firewall=fw)
+
+        assert result == {
+            "matched": True,
+            "action": "approve",
+            "code": "ABC12345",
+            "ok": True,
+            "status": "approved",
+        }
+        assert json.loads(path.read_text())["status"] == "approved"
+        records = self._records(audit_path)
+        assert records[-1]["event_type"] == "confirmation.pending_approved"
+        assert records[-1]["status"] == "approved"
+
+    def test_handle_confirmation_reply_denies_pending_code(self, tmp_path):
+        audit_path = tmp_path / "audit.jsonl"
+        fw = ConfirmationFirewall(audit_path=audit_path)
+        path = fw_module._write_pending(
+            "ABC12345",
+            "paper trade SOL",
+            ActionRisk.FINANCIAL,
+            "paper-only unit test",
+        )
+
+        result = handle_confirmation_reply("DENY abc12345", firewall=fw)
+
+        assert result == {
+            "matched": True,
+            "action": "deny",
+            "code": "ABC12345",
+            "ok": True,
+            "status": "denied",
+        }
+        assert json.loads(path.read_text())["status"] == "denied"
+        records = self._records(audit_path)
+        assert records[-1]["event_type"] == "confirmation.pending_denied"
+        assert records[-1]["status"] == "denied"
+
+    def test_handle_confirmation_reply_reports_missing_code(self, tmp_path):
+        audit_path = tmp_path / "audit.jsonl"
+        fw = ConfirmationFirewall(audit_path=audit_path)
+
+        result = handle_confirmation_reply("CONFIRM abc12345", firewall=fw)
+
+        assert result == {
+            "matched": True,
+            "action": "approve",
+            "code": "ABC12345",
+            "ok": False,
+            "status": "not_found_or_expired",
+        }
+        records = self._records(audit_path)
+        assert records[-1]["event_type"] == "confirmation.pending_approved"
+        assert records[-1]["status"] == "not_found_or_expired"
+
+    def test_handle_confirmation_reply_ignores_non_reply(self, tmp_path):
+        fw = ConfirmationFirewall(audit_path=tmp_path / "audit.jsonl")
+
+        assert handle_confirmation_reply("hello there", firewall=fw) is None
