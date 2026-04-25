@@ -256,9 +256,9 @@ def test_request_approval_uses_confirmation_firewall(wallet_mod):
 
     assert prop.audit[-1] == "confirmation_firewall_approved"
     call = firewall.calls[0]
-    assert call["action"] == "swap SOL->USDC"
+    assert call["action"] == "paper swap SOL->USDC"
     assert call["risk"].value == "financial"
-    assert call["details"] == "1.0 SOL for ~123.45 USDC"
+    assert call["details"] == "Mode: paper simulation. 1.0 SOL for ~123.45 USDC"
     assert call["amount"] == pytest.approx(123.45)
 
 

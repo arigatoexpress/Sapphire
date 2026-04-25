@@ -10,7 +10,7 @@ Confirmation flow:
 3. For anything riskier: send Telegram message with unique code + expiry
 4. Poll ~/.sapphire/pending_confirmations/<code>.json for user reply
 5. DESTRUCTIVE: enforce 30-second delay after approval
-6. FINANCIAL: enforce daily $100 auto-approve limit
+6. FINANCIAL: enforce daily $100 auto-approve limit for paper/dry-run actions only
 
 Usage:
     fw = ConfirmationFirewall()
@@ -48,9 +48,10 @@ AUDIT_LOG      = SAPPHIRE_STATE / "audit" / "confirmation_firewall.jsonl"
 
 CONFIRMATION_TIMEOUT = 300   # 5 minutes
 DESTRUCTIVE_DELAY    = 30    # seconds after approval before executing
-DAILY_AUTO_LIMIT     = 100.0 # USD — financial actions below this are auto-approved
+DAILY_AUTO_LIMIT     = 100.0 # USD — paper/dry-run financial actions below this are auto-approved
 DAILY_AUTO_LIMIT_ENV = "SAPPHIRE_FIREWALL_DAILY_AUTO_LIMIT"
 AUDIT_LOG_ENV        = "SAPPHIRE_CONFIRMATION_FIREWALL_AUDIT_LOG"
+LIVE_FINANCIAL_AUTO_APPROVAL_ENV = "SAPPHIRE_FIREWALL_ALLOW_LIVE_FINANCIAL_AUTO_APPROVAL"
 
 # ─── Risk Classification ──────────────────────────────────────────────────────
 
@@ -154,6 +155,12 @@ _AUDIT_SECRET_PATTERNS = (
     re.compile(r"(?i)\b(bearer)\s+[a-z0-9._~+/=-]+"),
 )
 
+_PAPER_FINANCIAL_PATTERNS = re.compile(
+    r"\b(paper(?:[-_\s]?only)?|dry[-_\s]?run|simulat(?:e|ed|ion)|sandbox|"
+    r"backtest|testnet|mock)\b",
+    re.IGNORECASE,
+)
+
 
 def _audit_text(value: str, max_len: int = 160) -> str:
     """Return a redacted, bounded preview safe enough for local audit logs."""
@@ -170,6 +177,17 @@ def _details_fingerprint(details: str) -> dict[str, int | str]:
     """Record evidence of details without writing raw details to disk."""
     body = str(details or "")
     return {"details_len": len(body)}
+
+
+def _truthy_env(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _is_paper_or_dry_run_financial(action: str, details: str = "") -> bool:
+    """Return True only when a financial action explicitly says it is non-live."""
+    if _truthy_env(LIVE_FINANCIAL_AUTO_APPROVAL_ENV):
+        return True
+    return bool(_PAPER_FINANCIAL_PATTERNS.search(f"{action}\n{details}"))
 
 
 # ─── Financial Limit Tracking ─────────────────────────────────────────────────
@@ -325,9 +343,9 @@ def _write_pending(code: str, action: str, risk: ActionRisk, details: str) -> Pa
     path = PENDING_DIR / f"{code}.json"
     path.write_text(json.dumps({
         "code":    code,
-        "action":  action,
+        "action":  _audit_text(action, max_len=220),
         "risk":    risk.value,
-        "details": details,
+        "details": _audit_text(details, max_len=1200),
         "created": time.time(),
         "expires": time.time() + CONFIRMATION_TIMEOUT,
         "status":  "pending",  # pending | approved | denied
@@ -440,14 +458,16 @@ def _send_confirmation_request(code: str, action: str, risk: ActionRisk,
         ActionRisk.DESTRUCTIVE:    "🚨",
     }.get(risk, "⚠️")
 
+    safe_action = _audit_text(action, max_len=220)
+    safe_details = _audit_text(details, max_len=1200)
     amount_line = f"\n💵 Amount: ${amount:.2f}" if amount > 0 else ""
     delay_line  = "\n⏱ 30-second delay enforced after approval" if risk == ActionRisk.DESTRUCTIVE else ""
 
     text = (
         f"{risk_emoji} *ACTION REQUIRES CONFIRMATION*\n"
         f"Risk: `{risk.value.upper()}`\n\n"
-        f"*Action:* `{action}`\n"
-        f"*Details:* {details}"
+        f"*Action:* `{safe_action}`\n"
+        f"*Details:* {safe_details}"
         f"{amount_line}"
         f"{delay_line}\n\n"
         f"*Confirmation code:*\n`CONFIRM {code}`\n\n"
@@ -541,10 +561,15 @@ class ConfirmationFirewall:
         # see spent=$0 and all commit past the cap.
         if risk == ActionRisk.FINANCIAL and amount > 0:
             daily_auto_limit = _current_daily_auto_limit()
-            if daily_auto_limit > 0:
+            auto_allowed = _is_paper_or_dry_run_financial(action, details)
+            if not auto_allowed:
+                approved, new_total = False, _load_daily_spend() + amount
+                denial_reason = "requires_paper_or_dry_run"
+            elif daily_auto_limit > 0:
                 approved, new_total = _try_consume_daily_budget(amount, daily_auto_limit)
             else:
                 approved, new_total = False, _load_daily_spend() + amount
+                denial_reason = "daily_auto_limit_disabled"
             if approved:
                 log.info("Firewall financial auto-approved: $%.2f (daily: $%.2f/$%.2f)",
                          amount, new_total, daily_auto_limit)
@@ -559,6 +584,8 @@ class ConfirmationFirewall:
                     daily_limit=daily_auto_limit,
                 )
                 return True
+            if auto_allowed and daily_auto_limit > 0:
+                denial_reason = "daily_auto_limit_exceeded"
             log.info(
                 "Firewall financial auto-approve unavailable: $%.2f would bring daily to $%.2f "
                 "(limit $%.2f)",
@@ -572,6 +599,7 @@ class ConfirmationFirewall:
                 risk=risk,
                 details=details,
                 amount=amount,
+                reason=denial_reason,
                 daily_total=new_total,
                 daily_limit=daily_auto_limit,
             )

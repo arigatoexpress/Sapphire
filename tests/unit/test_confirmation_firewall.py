@@ -213,6 +213,36 @@ class TestConfirmationAudit:
         assert record["daily_total"] == pytest.approx(25.0)
         assert record["daily_limit"] == pytest.approx(DAILY_AUTO_LIMIT)
 
+    def test_live_financial_under_limit_requires_explicit_confirmation(self, tmp_path):
+        audit_path = tmp_path / "audit.jsonl"
+        fw = ConfirmationFirewall(audit_path=audit_path)
+
+        def approve_immediately(code, *_args):
+            assert fw.approve_pending(code) is True
+            return True
+
+        approved = fw.request_confirmation(
+            "buy SOL on mainnet",
+            ActionRisk.FINANCIAL,
+            amount=25.0,
+            details="live exchange order",
+            poll_interval=0,
+            _send_fn=approve_immediately,
+            _sleep_fn=lambda _seconds: None,
+        )
+
+        assert approved is True
+        records = self._records(audit_path)
+        assert records[0]["event_type"] == "confirmation.financial_auto_approval_unavailable"
+        assert records[0]["reason"] == "requires_paper_or_dry_run"
+        assert [r["event_type"] for r in records] == [
+            "confirmation.financial_auto_approval_unavailable",
+            "confirmation.pending_created",
+            "confirmation.pending_approved",
+            "confirmation.approved",
+        ]
+        assert _load_daily_spend() == pytest.approx(25.0)
+
     def test_financial_auto_limit_can_be_disabled(self, tmp_path, monkeypatch):
         audit_path = tmp_path / "audit.jsonl"
         monkeypatch.setenv("SAPPHIRE_FIREWALL_DAILY_AUTO_LIMIT", "0")
@@ -254,3 +284,54 @@ class TestConfirmationAudit:
         record = self._records(audit_path)[0]
         assert "abc123" not in record["action"]
         assert "token=<redacted>" in record["action"]
+
+    def test_pending_record_redacts_secret_like_fields(self):
+        path = fw_module._write_pending(
+            "ABC123",
+            "post token=sample-token to webhook",
+            ActionRisk.EXTERNAL_SEND,
+            "token=sample-details-token bearer sample-bearer",
+        )
+
+        record = json.loads(path.read_text())
+        serialized = json.dumps(record)
+        assert "sample-token" not in serialized
+        assert "sample-details-token" not in serialized
+        assert "sample-bearer" not in serialized
+        assert "token=<redacted>" in record["action"]
+        assert "token=<redacted>" in record["details"]
+
+    def test_telegram_confirmation_payload_redacts_secret_like_fields(self, monkeypatch):
+        import urllib.request
+
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "dummy-token")
+        monkeypatch.setenv("TELEGRAM_CHAT_ID", "123")
+        captured = {}
+
+        class _Response:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+        def fake_urlopen(req, *_, **__):
+            captured["payload"] = json.loads(req.data.decode())
+            return _Response()
+
+        monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+
+        assert fw_module._send_confirmation_request(
+            "ABC123",
+            "post token=sample-token to webhook",
+            ActionRisk.EXTERNAL_SEND,
+            "token=sample-details-token bearer sample-bearer",
+        ) is True
+
+        text = captured["payload"]["text"]
+        assert "sample-token" not in text
+        assert "sample-details-token" not in text
+        assert "sample-bearer" not in text
+        assert "token=<redacted>" in text
