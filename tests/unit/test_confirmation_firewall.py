@@ -16,6 +16,7 @@ import lib.core.confirmation_firewall as fw_module  # type: ignore
 from lib.core.confirmation_firewall import (  # type: ignore
     DAILY_AUTO_LIMIT,
     ActionRisk,
+    ConfirmationFirewall,
     _load_daily_spend,
     _record_spend,
     _try_consume_daily_budget,
@@ -167,3 +168,89 @@ class TestTryConsumeBudget:
         _record_spend(DAILY_AUTO_LIMIT)
         _try_consume_daily_budget(10.0, DAILY_AUTO_LIMIT)
         assert _load_daily_spend() == pytest.approx(DAILY_AUTO_LIMIT)
+
+
+class TestConfirmationAudit:
+    def _records(self, path: Path) -> list[dict]:
+        return [json.loads(line) for line in path.read_text().splitlines()]
+
+    def test_low_risk_auto_approval_is_audited(self, tmp_path):
+        audit_path = tmp_path / "audit.jsonl"
+        fw = ConfirmationFirewall(audit_path=audit_path)
+
+        approved = fw.request_confirmation(
+            "health check services",
+            ActionRisk.READ_ONLY,
+            details="safe local read",
+        )
+
+        assert approved is True
+        records = self._records(audit_path)
+        assert records[0]["event_type"] == "confirmation.auto_approved"
+        assert records[0]["risk"] == "read_only"
+        assert records[0]["details_len"] == len("safe local read")
+
+    def test_audit_path_can_be_disabled(self, tmp_path):
+        fw = ConfirmationFirewall(audit_path=False)
+
+        assert fw.request_confirmation("cat status", ActionRisk.READ_ONLY) is True
+        assert list(tmp_path.rglob("*.jsonl")) == []
+
+    def test_financial_auto_approval_is_audited(self, tmp_path):
+        audit_path = tmp_path / "audit.jsonl"
+        fw = ConfirmationFirewall(audit_path=audit_path)
+
+        approved = fw.request_confirmation(
+            "paper trade SOL",
+            ActionRisk.FINANCIAL,
+            amount=25.0,
+            details="paper-only sizing note",
+        )
+
+        assert approved is True
+        record = self._records(audit_path)[0]
+        assert record["event_type"] == "confirmation.financial_auto_approved"
+        assert record["daily_total"] == pytest.approx(25.0)
+        assert record["daily_limit"] == pytest.approx(DAILY_AUTO_LIMIT)
+
+    def test_financial_auto_limit_can_be_disabled(self, tmp_path, monkeypatch):
+        audit_path = tmp_path / "audit.jsonl"
+        monkeypatch.setenv("SAPPHIRE_FIREWALL_DAILY_AUTO_LIMIT", "0")
+        fw = ConfirmationFirewall(audit_path=audit_path)
+
+        def approve_immediately(code, *_args):
+            assert fw.approve_pending(code) is True
+            return True
+
+        approved = fw.request_confirmation(
+            "paper trade SOL",
+            ActionRisk.FINANCIAL,
+            amount=25.0,
+            details="paper-only sizing note",
+            poll_interval=0,
+            _send_fn=approve_immediately,
+            _sleep_fn=lambda _seconds: None,
+        )
+
+        assert approved is True
+        event_types = [r["event_type"] for r in self._records(audit_path)]
+        assert event_types == [
+            "confirmation.financial_auto_approval_unavailable",
+            "confirmation.pending_created",
+            "confirmation.pending_approved",
+            "confirmation.approved",
+        ]
+        assert _load_daily_spend() == pytest.approx(25.0)
+
+    def test_audit_redacts_secret_like_action_text(self, tmp_path):
+        audit_path = tmp_path / "audit.jsonl"
+        fw = ConfirmationFirewall(audit_path=audit_path)
+
+        fw.request_confirmation(
+            "send token=abc123 to webhook",
+            ActionRisk.READ_ONLY,
+        )
+
+        record = self._records(audit_path)[0]
+        assert "abc123" not in record["action"]
+        assert "token=<redacted>" in record["action"]
