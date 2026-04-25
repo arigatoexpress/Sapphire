@@ -376,6 +376,24 @@ def _poll_pending(code: str) -> str | None:
     return None
 
 
+def _cleanup_expired_pending(now: float | None = None) -> int:
+    """Remove expired pending confirmation files and return the count."""
+    if not PENDING_DIR.exists():
+        return 0
+    cutoff = time.time() if now is None else now
+    removed = 0
+    for path in PENDING_DIR.glob("*.json"):
+        try:
+            data = json.loads(path.read_text())
+            expires = float(data.get("expires", 0))
+        except (json.JSONDecodeError, OSError, TypeError, ValueError):
+            continue
+        if expires and cutoff > expires:
+            path.unlink(missing_ok=True)
+            removed += 1
+    return removed
+
+
 def _approve_pending(code: str) -> bool:
     """Mark a pending confirmation as approved (called by hermes-agent handler)."""
     path = PENDING_DIR / f"{code}.json"
@@ -701,6 +719,7 @@ class ConfirmationFirewall:
 
     def list_pending(self) -> list[dict]:
         """Return all non-expired pending confirmations."""
+        _cleanup_expired_pending()
         if not PENDING_DIR.exists():
             return []
         results = []

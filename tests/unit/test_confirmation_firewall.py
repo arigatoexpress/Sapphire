@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -300,6 +301,22 @@ class TestConfirmationAudit:
         assert "sample-bearer" not in serialized
         assert "token=<redacted>" in record["action"]
         assert "token=<redacted>" in record["details"]
+
+    def test_list_pending_prunes_expired_records(self):
+        path = fw_module._write_pending(
+            "ABC123",
+            "paper trade SOL",
+            ActionRisk.FINANCIAL,
+            "paper-only unit test",
+        )
+        record = json.loads(path.read_text())
+        record["expires"] = time.time() - 1
+        path.write_text(json.dumps(record))
+
+        fw = ConfirmationFirewall(audit_path=False)
+
+        assert fw.list_pending() == []
+        assert not path.exists()
 
     def test_telegram_confirmation_payload_redacts_secret_like_fields(self, monkeypatch):
         import urllib.request
