@@ -49,6 +49,10 @@ plist is explicitly disabled.
 | `.github/workflows/weekly-backtest.yml` | Sun 04:00 UTC | `com.sapphire.backtest-weekly` | GitHub Actions artifact `weekly-backtest-<run_id>` |
 | `.github/workflows/threat-refresh.yml` | 01:10, 05:10, 09:10, 13:10, 17:10, 21:10 UTC | `com.sapphire.threat-refresh` | GitHub Actions artifact `threat-refresh-<run_id>`; uses the wrapper's native public-source mode so no private cross-repo token is required |
 
+Threat-refresh entered soak tracking on 2026-04-26 after a close-time manual
+comparison matched all 15 canonical IDs with 0 FAIL rows. Evidence:
+`docs/org/threat-refresh-shadow-soak-2026-04-26.md`.
+
 Compare local and remote weekly backtest artifacts with:
 
 ```bash

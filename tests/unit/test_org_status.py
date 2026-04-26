@@ -96,6 +96,26 @@ def test_crypto_tax_tracker_tracks_completed_guardrail_pr() -> None:
     ]
 
 
+def test_threat_refresh_tracks_soak_evidence() -> None:
+    routines = {routine["id"]: routine for routine in _manifest()["routines"]}
+    routine = routines["threat-refresh"]
+
+    assert routine["stage"] == "soaking"
+    assert routine["remote_workflow"] == ".github/workflows/threat-refresh.yml"
+    assert routine["comparator"] == "scripts/ops/compare_threat_artifacts.py"
+    assert routine["soak_tracking"]["evidence_doc"] == "docs/org/threat-refresh-shadow-soak-2026-04-26.md"
+    assert routine["soak_tracking"]["latest_comparison"] == {
+        "compared_at": "2026-04-26T16:11:03Z",
+        "verdict": "WARN",
+        "rows_compared": 15,
+        "rows_pass": 12,
+        "rows_warn": 3,
+        "rows_fail": 0,
+        "missing_in_local": 0,
+        "missing_in_remote": 0,
+    }
+
+
 def test_hermes_agent_tracks_runtime_checkout_and_local_patches() -> None:
     repos = {repo["id"]: repo for repo in _manifest()["repos"]}
     repo = repos["hermes-agent"]
