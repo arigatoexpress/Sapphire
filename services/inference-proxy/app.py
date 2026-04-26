@@ -16,9 +16,10 @@ Benchmark-informed routing (RTX 5070 Ti, 2026-04-14):
   balanced    → hermes3:8b           118 tok/s  4.7 GB  general chat, tool calls
   code        → gemma4:latest        154 tok/s  9.0 GB  code gen (best GPU model, via Ollama)
   reason      → deepseek-r1:14b       80 tok/s  9.0 GB  structured R1 chain-of-thought
-  qwen-reason → qwen3.5:9b           107 tok/s  6.6 GB  fast reasoning (via Ollama)
-  deep        → qwen3:14b             81 tok/s  9.3 GB  deep analysis, multi-step
+  qwen-reason → qwen3.6:27b           ~70 tok/s 17.0 GB  fast reasoning (via Ollama)
+  deep        → qwen3.6:27b           ~70 tok/s 17.0 GB  deep analysis, multi-step
   large       → qwen2.5:32b          2.7 tok/s 19.9 GB  background / batch (RAM spill)
+  # qwen3.6:35b-a3b (24 GB) available on Windows as next-gen large-class MoE
   cascade     → nemotron-cascade-2    16 tok/s 22.6 GB  MoE deep analysis (fits in VRAM)
 
 Endpoints:
@@ -114,15 +115,16 @@ MODEL_TIERS = {
     "tiny":      "qwen2.5:0.5b",        # ultra-light, Pi-native
 
     # GPU-heavy — benchmark-calibrated 2026-04-14 (RTX 5070 Ti)
-    "deep":           "qwen3:14b",              # 81 tok/s, 9.3 GB — deep multi-step
+    "deep":           "qwen3.6:27b",            # ~70 tok/s, 17.0 GB — deep multi-step (qwen3.6)
     "code":           "gemma4:latest",          # 154 tok/s, 9.0 GB — best code model (via Ollama)
     "fast-code":      "gemma4:latest",          # alias
     "reason":         "deepseek-r1:14b",        # 80 tok/s, 9.0 GB — structured R1 reasoning
-    "qwen-reason":    "qwen3.5:9b",             # 107 tok/s, 6.6 GB — fast reasoning (via Ollama)
-    "fast-reason":    "qwen3.5:9b",             # alias
+    "qwen-reason":    "qwen3.6:27b",            # ~70 tok/s, 17.0 GB — fast reasoning (via Ollama)
+    "fast-reason":    "qwen3.6:27b",            # alias
     "large":          "qwen2.5:32b",            # 2.7 tok/s, 19.9 GB — background/batch (RAM spill)
     "cascade":        "nemotron-cascade-2",     # 16 tok/s, 22.6 GB — MoE, fits 16 GB VRAM
     "moe":            "nemotron-cascade-2",     # alias
+    "qwen3.6":        "qwen3.6:27b",            # latest Qwen generation (27B dense)
 
     # Legacy aliases (kept for compatibility)
     "qwen2.5-coder":  "qwen2.5-coder:14b",     # 72 tok/s — superseded by gemma4 for code
@@ -140,16 +142,18 @@ MODEL_TIERS = {
 
 # Models that require Windows GPU (too large for Pi/Mac).
 # gemma3:27b removed — consistently times out on llama-server b8795 (OOM at 17.4 GB).
-# gemma4:latest and qwen3.5:9b are GPU-routed but NOT blocking (they use Ollama backend).
+# gemma4:latest is GPU-routed through the Windows Ollama backend.
+# qwen3.6:27b is available on Windows and Mac.
+# qwen3.6:35b-a3b remains GPU-only.
 GPU_ONLY_MODELS = {
-    # Benchmarked 14B class — confirmed GPU-only (9–10 GB, fit in 16 GB VRAM)
-    "qwen3:14b", "qwen2.5-coder:14b", "deepseek-r1:14b", "phi4:latest",
+    # Benchmarked 14B+ class — confirmed GPU-only (fit in 16 GB VRAM or spill)
+    "qwen2.5-coder:14b", "deepseek-r1:14b", "phi4:latest",
     # Large class — RAM spill but still routed to Windows only
     "deepseek-r1:32b", "qwen2.5:32b", "qwen2.5:14b",
     # Via Ollama (no llama-server compat), GPU Windows only
-    "gemma4:latest", "qwen3.5:9b",
+    "gemma4:latest",
     # Oversized / exotic
-    "llama3.3:70b", "qwq:latest",
+    "llama3.3:70b", "qwq:latest", "qwen3.6:35b-a3b",
     # MoE — 22.6 GB, fits in 16 GB VRAM via sparse activation
     "nemotron-cascade-2",
 }
@@ -167,7 +171,8 @@ PI_DEFAULT_MODEL = "qwen2.5:0.5b"  # fastest Pi model (~20s cold load)
 MAC_FALLBACK_MODEL = "hermes3:8b"       # model known to be on Mac Ollama
 
 # Mac models (models confirmed available locally)
-MAC_MODELS = {"hermes3:8b", "llama3.2:3b", "nemotron-mini:latest", "llama3.2:latest"}
+MAC_MODELS = {"hermes3:8b", "llama3.2:3b", "nemotron-mini:latest", "llama3.2:latest", "qwen3.6:27b"}
+MAC_EXACT_FALLBACK_MODELS = MAC_MODELS - PI_SERVE_MODELS
 
 # Enable Pi tiers independently — both Pis are online as of 2026-04-18.
 PI_RARI1_ENABLED = os.getenv("PI_RARI1_ENABLED", os.getenv("PI_OLLAMA_ENABLED", "0")) == "1"
@@ -842,7 +847,10 @@ class ProxyHandler(BaseHTTPRequestHandler):
             return
 
         # ── Tier 2: Pi ────────────────────────────────────────────────────────
-        if PI_ENABLED:
+        # If the requested model is installed on Mac and not Pi-serveable, keep
+        # the exact model instead of silently downshifting to PI_DEFAULT_MODEL.
+        prefer_exact_mac = model in MAC_EXACT_FALLBACK_MODELS
+        if PI_ENABLED and not prefer_exact_mac:
             tier, resp, pi_tried = _try_pi_tier(
                 model,
                 messages,
@@ -854,6 +862,8 @@ class ProxyHandler(BaseHTTPRequestHandler):
             if resp and tier:
                 self._respond(200, resp, tier=tier)
                 return
+        elif PI_ENABLED and prefer_exact_mac:
+            log.info("Skipping Pi substitute for exact Mac model '%s'", model)
 
         # ── Tier 3: Mac local ────────────────────────────────────────────────
         tried.append("mac-local")

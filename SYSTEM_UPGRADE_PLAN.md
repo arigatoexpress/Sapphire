@@ -123,8 +123,8 @@ Both Pis are live inference nodes on the Tailscale mesh:
 
 | Node | IP | Status | Models | Agent |
 |------|-----|--------|--------|-------|
-| rari1 | 100.120.191.1 | ✅ ONLINE | nemotron-mini:latest, smollm2:1.7b, qwen2.5:0.5b | market-watchdog :19001 |
-| rari2 | 100.87.225.89 | ✅ ONLINE | nemotron-mini:latest, nemotron-mini:4b, gemma2:2b, qwen2.5:0.5b, smollm2:1.7b | health-monitor :19002 |
+| rari1 | 100.120.191.1 | ✅ ONLINE | nemotron-mini:latest, smollm2:1.7b, qwen2.5:0.5b, qwen3:0.6b | market-watchdog :19001 |
+| rari2 | 100.87.225.89 | ✅ ONLINE | nemotron-mini:latest, nemotron-mini:4b, gemma2:2b, qwen2.5:0.5b, smollm2:1.7b, qwen3:0.6b | health-monitor :19002 |
 
 ```python
 # inference-proxy — Pi T2 tier (both enabled)

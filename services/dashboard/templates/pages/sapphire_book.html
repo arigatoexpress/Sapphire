@@ -226,10 +226,10 @@
                     <p>Sapphire uses a 4-tier inference mesh with the Mac as commander and Windows GPU as primary inference engine.</p>
                     <h4>Inference Tiers</h4>
                     <ul>
-                        <li><strong>T1 Windows GPU</strong> (100.71.10.48) — RTX 5070 Ti, 27 Ollama models, ~0.4s latency</li>
+                        <li><strong>T1 Windows GPU</strong> (100.71.10.48) — RTX 5070 Ti, 28 Ollama models, ~0.4s latency</li>
                         <li><strong>T2a rari1</strong> (100.120.191.1) — Pi, nemotron-mini + smollm2 + qwen2.5:0.5b</li>
                         <li><strong>T2b rari2</strong> (100.87.225.89) — Pi, 4 models (offline — needs power cycle)</li>
-                        <li><strong>T3 Mac Local</strong> (127.0.0.1:11434) — 6 Ollama models, ~90s CPU fallback</li>
+                        <li><strong>T3 Mac Local</strong> (127.0.0.1:11434) — 7+ Ollama models, exact fallback for installed models</li>
                         <li><strong>T4 Kimi Cloud</strong> (api.moonshot.cn) — Non-sensitive tasks only, regex sensitivity gate</li>
                     </ul>
                     <h4>Model Aliases</h4>
@@ -238,7 +238,8 @@
                         <li><code>balanced</code> → hermes3:8b (118 tok/s)</li>
                         <li><code>code</code> → gemma4:latest (154 tok/s)</li>
                         <li><code>reason</code> → deepseek-r1:14b (80 tok/s)</li>
-                        <li><code>deep</code> → qwen3:14b (81 tok/s)</li>
+                        <li><code>deep</code> → qwen3.6:27b (~70 tok/s)</li>
+                        <li><code>qwen-reason</code> → qwen3.6:27b (~70 tok/s)</li>
                         <li><code>large</code> → qwen2.5:32b (2.7 tok/s)</li>
                     </ul>
                     <h4>Tailscale Mesh</h4>

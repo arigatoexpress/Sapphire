@@ -612,7 +612,7 @@ function renderCategories(health, sys) {
     `;
 
     document.getElementById('windows-services').innerHTML = `
-        ${svcRow('ollama-gpu', tiers.t1?.healthy ?? false, ':11434 · RTX 5070 Ti · 27 models', null)}
+        ${svcRow('ollama-gpu', tiers.t1?.healthy ?? false, ':11434 · RTX 5070 Ti · 28 models', null)}
         ${svcRow('tradingview-cdp', cdp.connected ?? false, ':9222 · ' + (cdp.connected ? `${cdp.tv_tabs} TV tabs` : 'disconnected'), null)}
         ${svcRow('webhook', true, ':9090 · tradingview ingest', null)}
     `;

@@ -224,7 +224,7 @@ def classify_messages(messages: list[dict]) -> ClassifierResult:
 
 _CATEGORY_TO_MODEL: dict[TaskCategory, str] = {
     TaskCategory.FACTUAL:   "fast",        # nemotron-mini:4b — instant
-    TaskCategory.CODE:      "code",        # qwen2.5-coder:14b
+    TaskCategory.CODE:      "code",        # gemma4:latest (supersedes qwen2.5-coder:14b)
     TaskCategory.REASONING: "reason",      # deepseek-r1:14b
     TaskCategory.RESEARCH:  "kimi-cloud",  # Kimi Cloud (sensitivity-gated by proxy)
     TaskCategory.CREATIVE:  "balanced",    # hermes3:8b

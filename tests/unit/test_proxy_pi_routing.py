@@ -6,6 +6,7 @@ import json
 import sys
 import threading
 import time
+import urllib.request
 from collections import deque
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -35,6 +36,12 @@ class FakePiHTTPServer(ThreadingMixIn, HTTPServer):
     def __init__(self, server_address: tuple[str, int], state: FakePiState) -> None:
         self.state = state
         super().__init__(server_address, FakePiHandler)
+
+
+class FakeProxyHTTPServer(ThreadingMixIn, HTTPServer):
+    """Threaded HTTP server running the real proxy handler."""
+
+    daemon_threads = True
 
 
 class FakePiHandler(BaseHTTPRequestHandler):
@@ -135,6 +142,15 @@ def _start_fake_pi(*behaviors: dict[str, Any]) -> FakePiFixture:
     return FakePiFixture(server=server, thread=thread, state=state)
 
 
+def _start_proxy() -> tuple[FakeProxyHTTPServer, threading.Thread, str]:
+    """Start the proxy handler on an ephemeral localhost port."""
+    server = FakeProxyHTTPServer(("127.0.0.1", 0), proxy_app.ProxyHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    host, port = server.server_address
+    return server, thread, f"http://{host}:{port}"
+
+
 @pytest.fixture
 def fake_pi() -> FakePiFixture:
     """Yield a healthy fake Pi server."""
@@ -222,3 +238,77 @@ def test_pi_routing_falls_back_to_rari2_when_rari1_fails(
             fixture.server.shutdown()
             fixture.server.server_close()
             fixture.thread.join(timeout=2.0)
+
+
+def test_qwen36_deep_can_fall_back_to_exact_mac_model() -> None:
+    """qwen3.6 is Mac-installed, so Windows failure must not force a 503."""
+    assert proxy_app.MODEL_TIERS["deep"] == "qwen3.6:27b"
+    assert proxy_app.MODEL_TIERS["qwen3.6"] == "qwen3.6:27b"
+    assert "qwen3.6:27b" in proxy_app.MAC_MODELS
+    assert "qwen3.6:27b" in proxy_app.MAC_EXACT_FALLBACK_MODELS
+    assert "qwen3.6:27b" not in proxy_app.GPU_ONLY_MODELS
+
+
+def test_qwen36_deep_skips_pi_substitution_for_exact_mac_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Windows miss should fall through to exact Mac qwen3.6, not a Pi tiny model."""
+    monkeypatch.setattr(proxy_app, "PI_RARI1_ENABLED", True)
+    monkeypatch.setattr(proxy_app, "PI_RARI2_ENABLED", False)
+    monkeypatch.setattr(proxy_app, "PI_ENABLED", True)
+    monkeypatch.setitem(proxy_app._endpoint_health, "windows-gpu", True)
+    monkeypatch.setitem(proxy_app._endpoint_health, "mac-local", True)
+
+    def fake_ollama_native(
+        endpoint_name: str,
+        base_url: str,
+        model: str,
+        messages: list,
+        max_tokens: int,
+        temperature: float,
+        timeout: int = 60,
+    ) -> dict | None:
+        assert endpoint_name == "windows-gpu"
+        assert model == "qwen3.6:27b"
+        return None
+
+    def fake_mac_local(path: str, body: bytes, model: str = "") -> tuple[int, bytes]:
+        payload = json.loads(body.decode())
+        assert path == "/v1/chat/completions"
+        assert model == "qwen3.6:27b"
+        assert payload["model"] == "qwen3.6:27b"
+        return 200, json.dumps({"model": payload["model"], "choices": []}).encode()
+
+    def fail_pi_tier(*args: Any, **kwargs: Any) -> tuple[str | None, dict | None, list[str]]:
+        pytest.fail("Pi tier should be skipped for qwen3.6 exact Mac fallback")
+
+    monkeypatch.setattr(proxy_app, "_try_ollama_native", fake_ollama_native)
+    monkeypatch.setattr(proxy_app, "_try_mac_local", fake_mac_local)
+    monkeypatch.setattr(proxy_app, "_try_pi_tier", fail_pi_tier)
+
+    server, thread, base_url = _start_proxy()
+    try:
+        req = urllib.request.Request(
+            f"{base_url}/v1/chat/completions",
+            data=json.dumps(
+                {
+                    "model": "deep",
+                    "messages": [{"role": "user", "content": "summarize route"}],
+                    "max_tokens": 16,
+                    "temperature": 0.1,
+                }
+            ).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+
+        with urllib.request.urlopen(req, timeout=2) as response:
+            payload = json.loads(response.read().decode())
+
+        assert response.status == 200
+        assert response.headers["X-Inference-Tier"] == "mac-local"
+        assert payload["model"] == "qwen3.6:27b"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2.0)

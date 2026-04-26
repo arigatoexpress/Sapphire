@@ -18,7 +18,7 @@
         "docker": "29.1.2", "cargo": "1.94.1", "python3": "3.12.8",
         "redis": "7.x", "tv": "tradingview-mcp"
       },
-      "ollamaModels": ["llama3.2:3b", "llama3.3:70b", "abspec999/new1:latest"],
+      "ollamaModels": ["llama3.2:3b", "llama3.3:70b", "qwen3.6:27b", "gpt-oss:20b", "nomic-embed-text:latest", "nemotron-mini:latest", "hermes3:8b"],
       "services": [
         {"name": "control-plane", "port": 8082, "status": "active", "launchAgent": "com.sapphire.control-plane"},
         {"name": "dashboard", "port": 8080, "status": "active", "launchAgent": "com.sapphire.dashboard"},
@@ -45,7 +45,7 @@
       "clawProfile": "windows-workbench",
       "agents": ["claw-code"],
       "gpu": "NVIDIA RTX 5070 Ti (16GB GDDR7)",
-      "ollamaModels": "26 models (nemotron-cascade-2, llama3.3:70b, deepseek-r1, qwen3, gemma3, phi4, etc.)",
+      "ollamaModels": "28 models (nemotron-cascade-2, llama3.3:70b, deepseek-r1, qwen3.6:27b, qwen3, gemma4, gemma3, phi4, gpt-oss:20b, etc.)",
       "services": [
         {"name": "ollama", "port": 11434, "status": "active", "task": "OllamaTailscale"},
         {"name": "webhook", "port": 9090, "status": "active", "task": "SapphireWebhook"}
@@ -79,7 +79,7 @@
         "enableFlag": "PI_OLLAMA_ENABLED=1 in com.sapphire.inference-proxy.plist",
         "setupScript": "~/Code/Sapphire/infra/pi/setup-ollama.sh",
         "ollamaPort": 11434,
-        "modelsToInstall": ["nemotron-mini:4b", "gemma2:2b", "qwen2.5:0.5b", "smollm2:1.7b"],
+        "modelsToInstall": ["nemotron-mini:4b", "gemma2:2b", "qwen2.5:0.5b", "smollm2:1.7b", "qwen3:0.6b"],
         "ramCeiling": "nemotron-mini:4b (~2.7GB loaded) — do NOT pull hermes3:8b"
       },
       "services": [
