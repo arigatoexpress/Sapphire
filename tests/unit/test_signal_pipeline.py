@@ -34,6 +34,8 @@ def pipeline(signals_dir, monkeypatch):
     monkeypatch.setattr("signal_pipeline._NOTIFY_AVAILABLE", False)
     monkeypatch.setattr("signal_pipeline._KERNEL_AVAILABLE", False)
     monkeypatch.setattr("signal_pipeline._FIREWALL_AVAILABLE", False)
+    monkeypatch.setattr("signal_pipeline._DECISION_ENGINE_AVAILABLE", False)
+    monkeypatch.setattr("signal_pipeline._DECISION_ENGINE", None)
     pl = SignalPipeline()
     return pl, signals_dir
 

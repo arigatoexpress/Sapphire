@@ -33,6 +33,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
 
+try:
+    from lib.core.autonomy_audit import AutonomyAuditLog
+except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
+    from autonomy_audit import AutonomyAuditLog
+
 log = logging.getLogger(__name__)
 
 DEFAULT_CHAIN_PATH = Path("data/intelligence/latest/chain.json")
@@ -256,11 +261,14 @@ class DecisionEngine:
         state_loader: StateLoader | None = None,
         decisions_dir: Path | None = None,
         state_path: Path | None = None,
+        audit_log: AutonomyAuditLog | None = None,
+        audit_path: str | Path | bool | None = None,
     ):
         self.rules: list[Rule] = list(rules) if rules is not None else list(self.DEFAULT_RULES)
         self.state_loader = state_loader or StateLoader()
         self.decisions_dir = decisions_dir or DEFAULT_DECISIONS_DIR
         self.state_path = state_path or DEFAULT_STATE_PATH
+        self.audit_log = audit_log if audit_log is not None else AutonomyAuditLog(audit_path)
         self._lock = threading.Lock()
 
     # ── Evaluation ────────────────────────────────────────────────────────────
@@ -306,6 +314,7 @@ class DecisionEngine:
             world_snapshot      = world,
         )
         self._log(decision)
+        self._audit_decision(decision, world)
         return decision
 
     # ── Alerts / regime shift ─────────────────────────────────────────────────
@@ -356,6 +365,7 @@ class DecisionEngine:
                     data={"fear_greed": int(fg)},
                 ))
 
+        self._audit_alerts(alerts, world)
         return alerts
 
     # ── Event-bus compatible dispatch ─────────────────────────────────────────
@@ -401,6 +411,49 @@ class DecisionEngine:
                     f.write(json.dumps(asdict(decision), default=str) + "\n")
             except OSError as e:
                 log.warning("decision log write failed: %s", e)
+
+    def _audit_decision(self, decision: Decision, world: dict[str, Any]) -> None:
+        try:
+            self.audit_log.append(
+                "autonomy.decision_evaluated",
+                actor="decision_engine",
+                action="evaluate_signal",
+                outcome=decision.verdict.lower(),
+                risk="financial_decision",
+                object_ref=decision.signal_id or f"{decision.symbol}:{decision.direction}",
+                metadata={
+                    "signal_id": decision.signal_id,
+                    "symbol": decision.symbol,
+                    "direction": decision.direction,
+                    "original_confidence": decision.original_confidence,
+                    "adjusted_confidence": decision.adjusted_confidence,
+                    "rules_fired": decision.rules_fired,
+                    "reason_count": len(decision.reasons),
+                    "world_keys": sorted(world.keys()),
+                },
+            )
+        except Exception as e:
+            log.warning("autonomy decision audit write failed: %s", e)
+
+    def _audit_alerts(self, alerts: list[Alert], world: dict[str, Any]) -> None:
+        for alert in alerts:
+            try:
+                self.audit_log.append(
+                    "autonomy.alert_detected",
+                    actor="decision_engine",
+                    action="scan_alerts",
+                    outcome=alert.severity,
+                    risk="market_alert",
+                    object_ref=alert.kind,
+                    metadata={
+                        "kind": alert.kind,
+                        "severity": alert.severity,
+                        "data_keys": sorted(alert.data.keys()),
+                        "world_keys": sorted(world.keys()),
+                    },
+                )
+            except Exception as e:
+                log.warning("autonomy alert audit write failed: %s", e)
 
     def _read_last_regime(self) -> str:
         try:
