@@ -101,15 +101,23 @@ def test_agentic_arigato_tracks_protected_cloud_run_service() -> None:
     repo = repos["agentic-arigato"]
 
     assert repo["classification"] == "integration"
-    assert repo["migration_state"] == "active_protected_cloud_run_mapped"
+    assert repo["migration_state"] == "guardrails_complete_protected_cloud_run"
     assert repo["github"] == "arigatoexpress/AgenticArigato"
     assert "CI on PR" in repo["required_guardrails"]
+    assert "pre-commit or equivalent lint/test parity" in repo["required_guardrails"]
     tracking = repo["cloud_run_tracking"]
     assert tracking["project_id"] == "tho-ai-agent"
     assert tracking["service"] == "agentic-pm-hub"
     assert tracking["public_invoker"] is False
     assert tracking["authenticated_health_paths"] == ["/health", "/healthz/"]
     assert tracking["warning_kind"] == "cloud_run_auth_required"
+    assert tracking["repo_pr"] == "https://github.com/arigatoexpress/AgenticArigato/pull/1"
+    assert tracking["validated_commands"] == [
+        "cd bd-analytics-agent && uv run pytest tests/unit -q",
+        "cd bd-analytics-agent && uv run ruff check app/server.py app/agent.py app/retrievers.py app/templates.py app/utils tests/unit",
+        "cd bd-analytics-agent && uv run ruff format app/server.py app/agent.py app/retrievers.py app/templates.py app/utils tests/unit --check",
+        "uvx pre-commit run --all-files",
+    ]
 
 
 def test_threat_refresh_tracks_soak_evidence() -> None:
@@ -246,7 +254,7 @@ def test_classification_report_tracks_absorb_and_archive_candidates() -> None:
     assert report["candidate_archive"]["approved"] == []
     assert "Do not delete" in " ".join(report["candidate_archive"]["policy"])
     assert "agentic-arigato" in report["active_repos"]["integration"]
-    assert "agentic-arigato" in {item["id"] for item in report["blocked_or_watch"]}
+    assert "agentic-arigato" not in {item["id"] for item in report["blocked_or_watch"]}
     assert "crypto-tax-tracker" not in {item["id"] for item in report["blocked_or_watch"]}
     assert "crypto-tax-tracker" not in {item["id"] for item in report["next_reviews"]}
     assert "hermes-agent" not in {item["id"] for item in report["next_reviews"]}
