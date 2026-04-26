@@ -26,6 +26,12 @@ assets, not runtime cutovers. Retargeting Sapphire, Hermes, LaunchAgents, or any
 Cloud Run service to an Ari fork still needs a dedicated PR, tests, blast-radius
 notes, and rollback.
 
+The AIP community registry is tracked as a Foundry/AIP reference clone. Its
+local checkout disables Git LFS clean/smudge filters because upstream zip blobs
+are committed as full objects while `.gitattributes` marks them as LFS. The
+previous dirty LFS checkout is preserved in `_cleanup_backups`; the active clone
+is clean for control-tower status.
+
 `agentic-arigato` owns the protected `agentic-pm-hub` Cloud Run service in
 `tho-ai-agent`. The service should remain private; public unauthenticated probes
 are expected to classify as `cloud_run_auth_required`, while health verification
