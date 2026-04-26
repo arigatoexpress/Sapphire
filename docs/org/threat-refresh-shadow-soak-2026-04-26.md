@@ -69,6 +69,19 @@ dashboard-facing daily artifact and `latest` symlink. The remote workflow alread
 uploads `data/intelligence/**/threats.json`, so scheduled soak comparisons can
 use the nearest local run snapshot instead of a later overwritten daily file.
 
+`scripts/ops/compare_threat_artifacts.py` supports this directly:
+
+```bash
+python3 scripts/ops/compare_threat_artifacts.py \
+  --local-root data/intelligence \
+  --remote-root /path/to/gh-artifact \
+  --max-skew-minutes 30
+```
+
+The report records the selected local and remote run timestamps plus the time
+skew, and refuses to compare pairs outside the skew window unless the operator
+chooses a larger explicit threshold.
+
 ## Snapshot Comparison
 
 A close-time snapshot comparison was captured after run snapshot retention

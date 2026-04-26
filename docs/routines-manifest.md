@@ -71,8 +71,17 @@ Compare local and remote threat-refresh artifacts with:
 
 ```bash
 python3 scripts/ops/compare_threat_artifacts.py \
-  --local data/intelligence/<UTC_DATE>/threats.json \
-  --remote /path/to/gh-artifact/data/intelligence/<UTC_DATE>/threats.json
+  --local-root data/intelligence \
+  --remote-root /path/to/gh-artifact \
+  --max-skew-minutes 30
+```
+
+For explicit one-off comparisons, pass exact artifact paths:
+
+```bash
+python3 scripts/ops/compare_threat_artifacts.py \
+  --local data/intelligence/runs/<LOCAL_TS>/threats.json \
+  --remote /path/to/gh-artifact/data/intelligence/runs/<REMOTE_TS>/threats.json
 ```
 
 All scripts are self-contained — they write their artifacts and exit. A routine is "healthy" if its artifact's mtime is within the expected cadence window.
