@@ -1162,10 +1162,19 @@ class AlphaEngine:
         )
         await publish("risk-alerts", alert)
 
+    def _mirror_core_kill_switch(self, active: bool, reason: str) -> None:
+        try:
+            from lib.core.alpha_kill_switch_bridge import mirror_alpha_kill_switch
+
+            mirror_alpha_kill_switch(active, reason, notify=False)
+        except Exception as exc:
+            logger.warning("Core kill switch mirror skipped: %s", exc)
+
     async def _activate_kill_switch(self, reason: str, agent_id: str = "OBSIDIAN") -> None:
         gate.require(agent_id, Capability.KILL_SWITCH, f"activate_kill_switch({reason!r})")
         self._kill_switch_active = True
         reason = reason.strip() or "Manual kill switch requested via Telegram"
+        self._mirror_core_kill_switch(True, reason)
         self._record_system_log(
             f"Kill switch activated: {reason}",
             level="warning",
@@ -1209,6 +1218,7 @@ class AlphaEngine:
         gate.require(agent_id, Capability.KILL_SWITCH, f"resume_from_kill_switch({reason!r})")
         self._kill_switch_active = False
         reason = reason.strip() or "Manual resume requested via Telegram"
+        self._mirror_core_kill_switch(False, reason)
         self._record_system_log(
             f"Trading resumed: {reason}",
             level="info",

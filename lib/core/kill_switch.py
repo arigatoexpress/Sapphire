@@ -43,7 +43,7 @@ log = logging.getLogger(__name__)
 class KillSwitchEvent:
     """Snapshot of an activation or deactivation."""
 
-    kind: str                 # "activated" | "deactivated"
+    kind: str  # "activated" | "deactivated"
     timestamp: datetime
     reason: str
     portfolio_value: float
@@ -92,7 +92,9 @@ class KillSwitchStatus:
             "triggered_at": self.triggered_at.isoformat() if self.triggered_at else None,
             "reason": self.reason,
             "peak_24h": round(self.peak_24h, 2) if self.peak_24h is not None else None,
-            "peak_all_time": round(self.peak_all_time, 2) if self.peak_all_time is not None else None,
+            "peak_all_time": round(self.peak_all_time, 2)
+            if self.peak_all_time is not None
+            else None,
             "drawdown_24h": round(self.drawdown_24h, 4),
             "drawdown_total": round(self.drawdown_total, 4),
             "last_value": round(self.last_value, 2) if self.last_value is not None else None,
@@ -225,14 +227,10 @@ class KillSwitch:
             reason: str | None = None
             if dd_total >= self.max_drawdown_total:
                 reason = (
-                    f"total drawdown {dd_total:.2%} exceeds limit "
-                    f"{self.max_drawdown_total:.0%}"
+                    f"total drawdown {dd_total:.2%} exceeds limit {self.max_drawdown_total:.0%}"
                 )
             elif dd_24h >= self.max_drawdown_24h:
-                reason = (
-                    f"24h drawdown {dd_24h:.2%} exceeds limit "
-                    f"{self.max_drawdown_24h:.0%}"
-                )
+                reason = f"24h drawdown {dd_24h:.2%} exceeds limit {self.max_drawdown_24h:.0%}"
 
             if reason is None:
                 return False
@@ -287,6 +285,84 @@ class KillSwitch:
         self._emit(event)
         return True
 
+    def force_activate(
+        self,
+        reason: str = "Manual operator kill switch",
+        *,
+        portfolio_value: float | None = None,
+        notify: bool = True,
+    ) -> bool:
+        """Manually activate the switch and emit one durable transition event.
+
+        This is for operator controls that already own their user-facing alert
+        path. Pass ``notify=False`` when the caller will send Telegram itself.
+        Returns True only when this call changed the active state.
+        """
+        ts = self._now()
+        with self._lock:
+            if self._is_active:
+                return False
+            if portfolio_value is not None:
+                if portfolio_value <= 0:
+                    raise ValueError("portfolio_value must be > 0")
+                if self._peak_all_time is None or portfolio_value > self._peak_all_time:
+                    self._peak_all_time = portfolio_value
+                self._samples_24h.append(_PeakSample(ts=ts, value=portfolio_value))
+                self._last_value = portfolio_value
+                self._last_update = ts
+
+            dd_24h, dd_total = self._drawdowns_unsafe()
+            value = self._last_value or 0.0
+            clean_reason = reason.strip() or "Manual operator kill switch"
+            self._is_active = True
+            self._triggered_at = ts
+            self._activation_reason = clean_reason
+            event = KillSwitchEvent(
+                kind="activated",
+                timestamp=ts,
+                reason=clean_reason,
+                portfolio_value=value,
+                drawdown_24h=dd_24h,
+                drawdown_total=dd_total,
+            )
+
+        self._emit(event, notify=notify)
+        return True
+
+    def force_deactivate(
+        self,
+        reason: str = "Manual operator resume",
+        *,
+        notify: bool = True,
+    ) -> bool:
+        """Manually deactivate the switch and emit one durable transition event.
+
+        This is an operator override; automated recovery should still prefer
+        :meth:`check_recovery` so paper-trading evidence controls auto-resume.
+        Returns True only when this call changed the active state.
+        """
+        ts = self._now()
+        with self._lock:
+            if not self._is_active:
+                return False
+            dd_24h, dd_total = self._drawdowns_unsafe()
+            value = self._last_value or 0.0
+            clean_reason = reason.strip() or "Manual operator resume"
+            event = KillSwitchEvent(
+                kind="deactivated",
+                timestamp=ts,
+                reason=clean_reason,
+                portfolio_value=value,
+                drawdown_24h=dd_24h,
+                drawdown_total=dd_total,
+            )
+            self._is_active = False
+            self._triggered_at = None
+            self._activation_reason = None
+
+        self._emit(event, notify=notify)
+        return True
+
     def reset(self) -> None:
         """Clear all state — intended for tests and operator override."""
         with self._lock:
@@ -316,7 +392,7 @@ class KillSwitch:
         dd_total = max(0.0, (peak_total - self._last_value) / peak_total) if peak_total > 0 else 0.0
         return dd_24h, dd_total
 
-    def _emit(self, event: KillSwitchEvent) -> None:
+    def _emit(self, event: KillSwitchEvent, *, notify: bool = True) -> None:
         # Event bus
         try:
             publisher = self._publish_event or _default_publisher()
@@ -334,26 +410,27 @@ class KillSwitch:
             log.error("kill_switch audit append failed: %s", e)
 
         # Telegram (P0 priority)
-        try:
-            notifier = self._notify or _default_notifier()
-            if notifier is not None:
-                if event.kind == "activated":
-                    text = (
-                        f"🚨 KILL SWITCH ACTIVATED\n"
-                        f"{event.reason}\n"
-                        f"Portfolio: ${event.portfolio_value:,.2f} | "
-                        f"24h DD: {event.drawdown_24h:.2%} | "
-                        f"Total DD: {event.drawdown_total:.2%}"
-                    )
-                else:
-                    text = (
-                        f"✅ KILL SWITCH DEACTIVATED\n"
-                        f"{event.reason}\n"
-                        f"Portfolio: ${event.portfolio_value:,.2f}"
-                    )
-                notifier(text, priority="p0")
-        except Exception as e:
-            log.error("kill_switch telegram notify failed: %s", e)
+        if notify:
+            try:
+                notifier = self._notify or _default_notifier()
+                if notifier is not None:
+                    if event.kind == "activated":
+                        text = (
+                            f"🚨 KILL SWITCH ACTIVATED\n"
+                            f"{event.reason}\n"
+                            f"Portfolio: ${event.portfolio_value:,.2f} | "
+                            f"24h DD: {event.drawdown_24h:.2%} | "
+                            f"Total DD: {event.drawdown_total:.2%}"
+                        )
+                    else:
+                        text = (
+                            f"✅ KILL SWITCH DEACTIVATED\n"
+                            f"{event.reason}\n"
+                            f"Portfolio: ${event.portfolio_value:,.2f}"
+                        )
+                    notifier(text, priority="p0")
+            except Exception as e:
+                log.error("kill_switch telegram notify failed: %s", e)
 
     def _append_audit(self, event: KillSwitchEvent) -> None:
         if self._audit_path is None:
@@ -387,6 +464,7 @@ class KillSwitch:
 def _default_publisher():
     try:
         from lib.core.event_bus import publish as _pub
+
         return _pub
     except Exception:
         return None
@@ -395,6 +473,7 @@ def _default_publisher():
 def _default_notifier():
     try:
         from lib.telegram.src.sapphire_telegram.safe_send import send
+
         return send
     except Exception:
         return None
