@@ -18,7 +18,7 @@ Benchmark-informed routing (RTX 5070 Ti, 2026-04-14):
   reason      → deepseek-r1:14b       80 tok/s  9.0 GB  structured R1 chain-of-thought
   qwen-reason → qwen3.5:9b            verified Windows install, fast reasoning
   deep        → qwen3:14b             verified Windows install, deep analysis
-  qwen3.6     → qwen3.6:27b           Mac exact fallback until Windows install
+  qwen3.6     → qwen3.6:27b           Windows primary, Mac exact fallback (~7 tok/s)
   large       → qwen2.5:32b          2.7 tok/s 19.9 GB  background / batch (RAM spill)
   # qwen3.6:35b-a3b (24 GB) pending Windows install as next-gen large-class MoE
   cascade     → nemotron-cascade-2    16 tok/s 22.6 GB  MoE deep analysis (fits in VRAM)
@@ -125,7 +125,7 @@ MODEL_TIERS = {
     "large":          "qwen2.5:32b",            # 2.7 tok/s, 19.9 GB — background/batch (RAM spill)
     "cascade":        "nemotron-cascade-2",     # 16 tok/s, 22.6 GB — MoE, fits 16 GB VRAM
     "moe":            "nemotron-cascade-2",     # alias
-    "qwen3.6":        "qwen3.6:27b",            # latest Qwen generation; Mac exact fallback until Windows install
+    "qwen3.6":        "qwen3.6:27b",            # latest Qwen generation; Windows primary, Mac exact fallback
 
     # Legacy aliases (kept for compatibility)
     "qwen2.5-coder":  "qwen2.5-coder:14b",     # 72 tok/s — superseded by gemma4 for code
@@ -144,8 +144,8 @@ MODEL_TIERS = {
 # Models that require Windows GPU (too large for Pi/Mac).
 # gemma3:27b removed — consistently times out on llama-server b8795 (OOM at 17.4 GB).
 # gemma4:latest is GPU-routed through the Windows Ollama backend.
-# qwen3.6:27b is available on Mac; keep it as an explicit exact fallback until
-# Windows inventory includes it.
+# qwen3.6:27b is installed on Windows and Mac. Keep it out of GPU_ONLY_MODELS
+# so an explicit qwen3.6 request can still fall back to the exact Mac model.
 # qwen3.6:35b-a3b remains GPU-only.
 GPU_ONLY_MODELS = {
     # Benchmarked 14B+ class — confirmed GPU-only (fit in 16 GB VRAM or spill)
