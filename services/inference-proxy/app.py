@@ -717,10 +717,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 req = urllib.request.Request(url, headers={"Accept": "application/json"})
                 with urllib.request.urlopen(req, timeout=5) as resp:
                     data = resp.read()
-                    self.send_response(resp.status)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(data)
+                    self._respond_raw(resp.status, data)
                     return
             except Exception:
                 continue  # Try next endpoint — don't blacklist on GET failures
@@ -813,12 +810,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
         if not is_chat:
             result = _try_mac_local(self.path, body)
             if result:
-                self.send_response(result[0])
-                self.send_header("Content-Type", "application/json")
-                self.send_header("X-Inference-Tier", "mac-local")
-                self.end_headers()
-                self.wfile.write(result[1])
-                _record("proxy", result[0] < 400, 0)
+                self._respond_raw(result[0], result[1], tier="mac-local")
                 return
             self._respond(503, {"error": "All endpoints unavailable"})
             return
@@ -876,12 +868,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
             mac_body = body
         result = _try_mac_local(self.path, mac_body, mac_model)
         if result:
-            self.send_response(result[0])
-            self.send_header("Content-Type", "application/json")
-            self.send_header("X-Inference-Tier", "mac-local")
-            self.end_headers()
-            self.wfile.write(result[1])
-            _record("proxy", result[0] < 400, 0)
+            self._respond_raw(result[0], result[1], tier="mac-local")
             return
 
         # ── Tier 4: Kimi Cloud (non-sensitive fallback) ──────────────────────
@@ -912,19 +899,29 @@ class ProxyHandler(BaseHTTPRequestHandler):
             "hint": "Set MOONSHOT_API_KEY for cloud fallback, or check GPU/Pi connectivity",
         })
 
-    def _respond(self, code: int, body: dict, tier: str = ""):
-        self.send_response(code)
-        self.send_header("Content-Type", "application/json")
-        if tier:
-            self.send_header("X-Inference-Tier", tier)
-        self.end_headers()
-        self.wfile.write(json.dumps(body).encode())
+    def _respond_raw(self, code: int, body: bytes, tier: str = "") -> bool:
+        try:
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json")
+            if tier:
+                self.send_header("X-Inference-Tier", tier)
+            self.end_headers()
+            self.wfile.write(body)
+        except BrokenPipeError:
+            log.warning("client disconnected before %s response could be sent", self.path)
+            if self.command == "POST":
+                _record("proxy", False, 0)
+            return False
         # Record the aggregate "proxy" outcome only after the upstream reply
         # has been validated and the response has been sent. The prior
         # implementation incremented proxy-success at request-parse time,
         # inflating the metric for every failed/503'd request.
         if self.command == "POST":
             _record("proxy", code < 400, 0)
+        return True
+
+    def _respond(self, code: int, body: dict, tier: str = "") -> bool:
+        return self._respond_raw(code, json.dumps(body).encode(), tier=tier)
 
     def log_message(self, format, *args):
         pass  # Suppress default per-request logging (we log our own)
