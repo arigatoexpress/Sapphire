@@ -246,6 +246,21 @@ routines:
     stage: soaking
     remote_workflow: .github/workflows/weekly-backtest.yml
     comparator: scripts/ops/compare_backtest_artifacts.py
+    soak_tracking:
+      started_at: "2026-04-26"
+      evidence_doc: docs/org/backtest-weekly-shadow-soak-2026-04-26.md
+      latest_manual_remote_run_id: "24948338321"
+      latest_comparison:
+        compared_at: "2026-04-26T16:15:51Z"
+        verdict: PASS
+        rows_compared: 756
+        rows_pass: 756
+        rows_warn: 0
+        rows_fail: 0
+        missing_in_local: 0
+        missing_in_remote: 0
+        leaderboard_top3_order_equal: true
+      cutover_gate: "At least 4 scheduled weekly cycles with PASS verdicts, matching top-3 leaderboard order, and zero missing rows."
   - id: threat-refresh
     local_label: com.sapphire.threat-refresh
     stage: soaking
