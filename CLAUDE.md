@@ -6,8 +6,8 @@ Autonomous trading + intelligence + content ops. Telegram-first, agent-driven, e
 
 ```bash
 # Test
-pytest tests/unit/ --tb=short -q           # 1,932 passing (use /usr/local/bin/python3 on Mac)
-pytest plugins/claw-sapphire/tests/ -q     # 35 plugin tests (budget, router, state, technical_analysis, trading_brain)
+pytest tests/unit/ --tb=short -q           # 2,209 passing (use /usr/local/bin/python3 on Mac)
+pytest plugins/claw-sapphire/tests/ -q     # 78 plugin tests (budget, router, state, technical_analysis, trading_brain)
 
 # Lint
 ruff check .                          # pyproject.toml rules (E501 ignored)
@@ -73,12 +73,12 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 
 ## Module Map
 
-**Key counts (verified 2026-04-21):** 2,001 passing tests (1,966 core + 35 plugin) · 31 dashboard pages · 7 quant strategies · 21 LaunchAgents (up from 11 after the 2026-04-21 audit folded in 10 previously-un-versioned production plists; see `docs/launchagents-audit-2026-04-21.md`) · 21 scheduled tasks · 2 smart contracts.
+**Key counts (verified 2026-04-26):** 2,287 passing tests (2,209 core + 78 plugin) · 32 dashboard pages · 7 quant strategies · 20 LaunchAgents (folded in by the 2026-04-21 audit; see `docs/launchagents-audit-2026-04-21.md`) · 21 scheduled tasks · 2 smart contracts.
 
 | Path | Type | Description |
 |------|------|-------------|
 | `lib/core/` | library | Risk kernel, position sizing, **event_bus**, **heartbeat** (60s state machine), **kill_switch** (global + security), **confirmation_firewall** (2-phase commit), **decision_engine** (explainable autonomous ranking), **security_monitor**. Also `src/sapphire_core/` package (cognitive agent, executor, gateway, memory, telegram_bot). |
-| `lib/analytics/` | library | 26 modules — strategies (7: RegimeAwareRSI, FundingRateContrarian, CorrelationBreakout, MultiTFMomentum, SapphireComposite + base + params), CPCV, regime GMM, VPIN, backtest_engine, risk_engine, deflated_sharpe, liquidation, correlation, factors, forecast (Kronos+TA consensus), performance, performance_tracker, prediction_accuracy, brain_accuracy, strategy_performance, backtest_results, signal_enhancer, self_optimizer, run_strategies, sentiment, indicators. |
+| `lib/analytics/` | library | 24 modules — strategies (7: RegimeAwareRSI, FundingRateContrarian, CorrelationBreakout, MultiTFMomentum, SapphireComposite + base + params), CPCV, regime GMM, VPIN, backtest_engine, risk_engine, deflated_sharpe, liquidation, correlation, factors, forecast (Kronos+TA consensus), performance, performance_tracker, prediction_accuracy, brain_accuracy, strategy_performance, backtest_results, signal_enhancer, self_optimizer, run_strategies, sentiment, indicators. |
 | `lib/chain/` | library | On-chain intelligence: regime, funding, OI, TVL, stablecoin supply, whale flow. **`coinmetrics.py`** (on-chain fundamentals), **`robinhood_chain.py`** (Arbitrum Orbit chain ID 46630 web3 client), `intelligence.py`, `sources.py`, `providers/` (CoinGlass, Dune, Whale Alert, Santiment, CoinAPI, BGGeometrics). |
 | `lib/content/` | library | 14-module research-to-publish pipeline: `data_collector` → `thesis_engine` → `draft_generator` → `report_generator` → `visualizations` → `quality` (7-check rubric) → `performance_policy` (blocks premature accuracy claims) → `qa_pipeline` → `formatters` → `approval` (Telegram sign-off) → `publisher`/`auto_publish` → `scheduler` (Mon brief / Wed AI intel / Fri security / daily pulse). Publishers: `substack`, `x`, `linkedin`, `typefully`. Also `outreach.py` (lead-engine integration). |
 | `lib/foundry/` | library | **Palantir Foundry integration**: `client` (bearer + OAuth), `ingestion` (local → ontology objects), `readiness` (repo-grounded audit), `sync` (15-min delta-aware + Telegram alerts). |
@@ -93,7 +93,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `services/analytics_dashboard/` | service | Analytics-focused dashboard variant. |
 | `services/aster/` | service | Aster DEX bot — Solana perps (paused). |
 | `services/control-plane/` | service | PM hub: projects, tasks, events, Kimi bridge [Mac:8082]. |
-| `services/dashboard/` | service | Flask dashboard [Mac:8080] — 31 pages, SSE event stream, performance + forecast + backtest endpoints. |
+| `services/dashboard/` | service | Flask dashboard [Mac:8080] — 32 pages, SSE event stream, performance + forecast + backtest endpoints. |
 | `services/foundry_sync/` | service | Scheduled Foundry sync daemon — wraps `lib/foundry/sync.py`. |
 | `services/heartbeat/` | service | Heartbeat daemon wrapper (`run.py`, `heartbeat.py`). |
 | `services/hyperliquid/` | service | Hyperliquid L1 bot (stub). |
@@ -104,14 +104,14 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `services/security_pipeline/` | service | Scheduled full-system security scan → SOC page. |
 | `services/telegram-bot/` | service | Legacy bot (replaced by hermes-agent gateway). |
 | `services/webhook/` | service | TradingView webhook receiver [Windows:9090]. |
-| `plugins/claw-sapphire/` | plugin | 32 tool scripts on disk (8 registered at top level + 24 in `internal/` + 1 in `_deprecated/`), 10 libs, 35 tests. |
+| `plugins/claw-sapphire/` | plugin | 63 tool scripts on disk (36 at top level + 25 in `internal/` + 2 in `_deprecated/`), 10 libs, 78 tests. |
 | `contracts/` | solidity | **`SapphireSignalVerifier.sol`** (on-chain signal registry with ZK proof hash field), **`SapphirePaymentGate.sol`** (micropayment gate). Deployed on Robinhood Chain testnet via `scripts/deploy_robinhood_chain.py`. |
 | `pine/` | pine | 5 TradingView strategies (standalone/: v1, v2, v3 Ultra, MultiSymbol Screener, Mac variant). |
 | `skills/` | skills | Agent-executable capabilities. |
 | `data/content/` | data | Content engine drafts + ready/ queue. |
 | `data/chain/` | data | Deployed contract addresses (`deployments.json`), chain snapshots. |
 | `data/benchmarks/kadima-labs/` | data | Kadima Labs AI benchmark (v1–v3). |
-| `infra/launchagents/` | infra | 21 macOS LaunchAgent plists (11 pre-existing + 10 folded in by the 2026-04-21 audit: chain-refresh, control-plane, correlation-refresh, daily-brief, gcp-sync, logrotate, openbb-api, signal-logger, telemetry-collector, threat-refresh) plus 1 disabled template. |
+| `infra/launchagents/` | infra | 20 macOS LaunchAgent plists (folded in by the 2026-04-21 audit: chain-refresh, control-plane, correlation-refresh, daily-brief, gcp-sync, logrotate, openbb-api, signal-logger, telemetry-collector, threat-refresh) plus 1 disabled template. |
 | `infra/agent-manifest.yaml` | infra | Lean 5-tool subset the LLM sees. |
 | `infra/tool-registry.yaml` | infra | Full plugin tool registry (CI-enforced by `scripts/validate_tool_registry.py`). |
 | `infra/tailscale-acl.json` | infra | Tailscale mesh ACL. |
@@ -156,20 +156,20 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `~/Code/hermes-agent` | NousResearch/hermes-agent | Conversational framework (Telegram bot) |
 | `~/Code/kimi-tools` | local | Kimi Cloud HTTP client |
 
-## Sapphire Plugin (32 tools on disk, 15 registered in plugin.json)
+## Sapphire Plugin (63 tools on disk, 15 registered in plugin.json)
 
-`plugins/claw-sapphire/plugin.json` declares 15 Claude Code tools (one `sapphire` namespace entry + 14 `sapphire_*` tools): `dispatch`, `verify`, `budget`, `state`, `status`, `notify`, `health_check`, `market`, `predict_kronos`, `threat_intel`, `lumo_research`, `starred_repos`, `macro_data`, `lead_engine`, `trading_brain`. The other 17 are standalone scripts invoked via stdin JSON by hermes skills, scheduled tasks, dashboards, or other tools.
+`plugins/claw-sapphire/plugin.json` declares 15 Claude Code tools (one `sapphire` namespace entry + 14 `sapphire_*` tools, for 16 entries total): `dispatch`, `verify`, `budget`, `state`, `status`, `notify`, `health_check`, `market`, `predict_kronos`, `threat_intel`, `lumo_research`, `starred_repos`, `macro_data`, `lead_engine`, `trading_brain`. The remaining tool scripts are standalone, invoked via stdin JSON by hermes skills, scheduled tasks, dashboards, or other tools.
 
 ```
 plugins/claw-sapphire/tools/
-├── <name>.py               registered  (8 top-level files, agent-facing)
-├── internal/<name>.py      internal    (24, invoked by scheduled tasks / hermes / services)
-└── _deprecated/<name>.py   deprecated  (1, in sunset window)
+├── <name>.py               registered  (36 top-level files, agent-facing)
+├── internal/<name>.py      internal    (25, invoked by scheduled tasks / hermes / services)
+└── _deprecated/<name>.py   deprecated  (2, in sunset window)
 ```
 
 Tool groups:
 - **Intel / analytics (6):** `vote_monitor`, `watchdog`, `digest`, `research`, `events`, `qa_aware_factory`
-- **Trading (8):** `predict` (6-factor TA, **verified 58% overall, BTC 75%, ETH 62%, SOL 38% on 24 scored predictions**), `signal_generator`, `paper_trader`, `crypto_portfolio`, `backtest`, `macro_data` (graceful error when FRED key is missing), `trading_brain`, `market_sentiment`
+- **Trading (8):** `predict` (6-factor TA, **verified 61.1% overall, BTC 83.3%, ETH 50.0%, SOL 50.0% on 36 scored of 42 predictions**), `signal_generator`, `paper_trader`, `crypto_portfolio`, `backtest`, `macro_data` (graceful error when FRED key is missing), `trading_brain`, `market_sentiment`
 - **Other (5 + 1 legacy alias):** `lead_engine`, `lead_enrich`, `lumo`, `tho_intel`, `solana_wallet`, `kronos_predict` (legacy wrapper — prefer `predict_kronos`)
 
 **Agent manifest** (`infra/agent-manifest.yaml`) — the lean 5-tool subset the LLM actually sees: `sapphire_market`, `sapphire_dispatch`, `sapphire_notify`, `sapphire_verify`, `sapphire_state`.
@@ -207,7 +207,7 @@ Tool groups:
 TradingView → webhook (Win :9090) → signal logger (Mac :18081) → Telegram
 Autonomous signal generator scans RSI/MACD/BB/MA → generates signals → paper trades
 Paper portfolio: $100K, ATR-based SL/TP (1.67:1 R:R), 10% position sizing
-Prediction accuracy: 58% overall, BTC 75%
+Prediction accuracy: 61.1% overall, BTC 83.3% (n=36 scored of 42)
 
 ## Hermes Agent (Telegram Bot)
 
