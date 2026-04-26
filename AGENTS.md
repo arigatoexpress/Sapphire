@@ -92,11 +92,11 @@ Call via the inference proxy at `http://127.0.0.1:11435` (Mac LaunchAgent `com.s
 | `balanced` | `hermes3:8b` (Windows, 118 tok/s) | tool calls, chat |
 | `code` | `gemma4:latest` (Windows, 154 tok/s) | code-only tasks |
 | `reason` | `deepseek-r1:14b` (Windows, 80 tok/s) | structured reasoning |
-| `qwen-reason` | `qwen3.6:27b` (Windows, ~70 tok/s) | faster reasoning |
-| `deep` | `qwen3.6:27b` (Windows, ~70 tok/s) | multi-step analysis |
+| `qwen-reason` | `qwen3.5:9b` (Windows, 107 tok/s) | faster reasoning |
+| `deep` | `qwen3:14b` (Windows, 80 tok/s) | multi-step analysis |
 | `cascade/moe` | `nemotron-cascade-2` (Windows, 16 tok/s) | MoE, fits 16 GB VRAM |
 | `large` | `qwen2.5:32b` (Windows, background) | overnight / batch |
-| `qwen3.6` | `qwen3.6:27b` (Windows/Mac) | latest Qwen generation |
+| `qwen3.6` | `qwen3.6:27b` (Mac local, Windows install pending) | explicit latest-Qwen local test |
 | Cloud fallback | Kimi K2 via moonshot.cn | when Windows is offline |
 
 Windows PC (Tailscale `100.71.10.48`) must be online for tiers 1–5. The proxy falls back to Kimi automatically on timeout; you don't need to handle it.
