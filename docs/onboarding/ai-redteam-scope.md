@@ -39,10 +39,11 @@ The GPU node runs 28 models. The model aliases the proxy exposes (see
 |---|---|---|
 | `fast`, `quick` | `nemotron-mini:latest` | T1 GPU / T2 Pi |
 | `auto`, `balanced` | `hermes3:8b` | T1 GPU |
-| `deep` | `qwen3.6:27b` | T1 GPU / T3 Mac exact fallback |
+| `deep` | `qwen3:14b` | T1 GPU |
 | `code` | `gemma4:latest` | T1 GPU |
 | `reason` | `deepseek-r1:14b` | T1 GPU (GPU-only) |
-| `qwen-reason` | `qwen3.6:27b` | T1 GPU / T3 Mac exact fallback |
+| `qwen-reason` | `qwen3.5:9b` | T1 GPU |
+| `qwen3.6` | `qwen3.6:27b` | T3 Mac exact fallback until Windows install |
 | `cascade`, `moe` | `nemotron-cascade-2` | T1 GPU |
 | `large` | `qwen2.5:32b` | T1 GPU (GPU-only) |
 | `kimi` | Kimi Cloud (Moonshot) | T4 cloud — sensitivity-gated |
