@@ -71,3 +71,14 @@ Use `scripts/ops/safety_status_report.py` for paste-safe status. The report
 summarizes autonomy event, actor, outcome, and risk counts, and hashes action
 and object references for recent events. It intentionally omits raw metadata
 values, prompts, request bodies, order payloads, and secret-like text.
+
+The same report also performs a lightweight schema read-back check:
+
+- total lines and valid JSON record count
+- malformed line count
+- missing required field counts for `event_type`, `ts`, `actor`, `action`, and
+  `outcome`
+- count of records that still contain unredacted secret-shaped keys or text
+
+These checks emit counts only. They do not print raw audit metadata or the
+offending values.
