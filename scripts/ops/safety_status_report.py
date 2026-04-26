@@ -68,6 +68,8 @@ def summarize_kill_switch(
         return {
             "audit_exists": False,
             "inferred_active": None,
+            "state_source": "audit_missing",
+            "state_confidence": "unknown",
             "last_transition": None,
             "event_counts": {},
             "recent_events": [],
@@ -89,12 +91,18 @@ def summarize_kill_switch(
     ]
     last_transition = _safe_kill_switch_event(transitions[-1]) if transitions else None
     inferred_active = None
+    state_source = "no_transition_events"
+    state_confidence = "unknown"
     if last_transition:
         inferred_active = last_transition["event_type"] == "kill_switch.activated"
+        state_source = "last_transition"
+        state_confidence = "inferred_from_audit"
 
     return {
         "audit_exists": True,
         "inferred_active": inferred_active,
+        "state_source": state_source,
+        "state_confidence": state_confidence,
         "last_transition": last_transition,
         "event_counts": dict(Counter(_event_type(record) for record in records)),
         "recent_events": [_safe_kill_switch_event(record) for record in records[-max(0, recent) :]],
@@ -216,6 +224,26 @@ def render_markdown(report: dict[str, Any]) -> str:
     else:
         lines.extend(["", "No active pending confirmations."])
 
+    if firewall.get("expired_pending"):
+        lines.extend(
+            [
+                "",
+                "### Expired Pending Files",
+                "",
+                "| Code | Risk | Status | Expired | Seconds Expired | Action Field | Details Field |",
+                "|---|---|---|---:|---:|---:|---:|",
+            ]
+        )
+        for item in firewall["expired_pending"]:
+            lines.append(
+                f"| {item['code']} | {item['risk']} | {item['status']} | "
+                f"{item.get('expires') or '-'} | {item.get('seconds_expired') or 0} | "
+                f"{_yn(item.get('has_action'))} | {_yn(item.get('has_details'))} |"
+            )
+        omitted = int(firewall.get("expired_pending_omitted") or 0)
+        if omitted:
+            lines.append(f"\n{omitted} additional expired pending files omitted.")
+
     lines.extend(
         [
             "",
@@ -223,6 +251,8 @@ def render_markdown(report: dict[str, Any]) -> str:
             "",
             f"- Audit log present: {_yn(kill_switch['audit_exists'])}",
             f"- Inferred active: {_maybe_yn(kill_switch['inferred_active'])}",
+            f"- State source: `{kill_switch.get('state_source', 'unknown')}`",
+            f"- State confidence: `{kill_switch.get('state_confidence', 'unknown')}`",
         ]
     )
     last = kill_switch.get("last_transition")
@@ -232,6 +262,8 @@ def render_markdown(report: dict[str, Any]) -> str:
         )
     else:
         lines.append("- Last transition: none")
+    if kill_switch.get("state_source") == "audit_missing":
+        lines.append("- Operator note: missing audit log does not imply inactive; wait for a real transition or explicit operator action.")
 
     lines.extend(["", "## Recent Kill-Switch Events", ""])
     if kill_switch["recent_events"]:

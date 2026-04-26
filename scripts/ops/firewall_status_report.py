@@ -9,6 +9,7 @@ metadata needed to understand whether the firewall is waiting on a reply.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import time
@@ -28,15 +29,15 @@ def load_pending_confirmations(
     state_dir: Path,
     *,
     now: float | None = None,
-) -> tuple[list[dict[str, Any]], int]:
-    """Return active pending confirmation metadata plus expired-file count."""
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Return active and expired pending confirmation metadata."""
     pending_dir = state_dir / "pending_confirmations"
     if not pending_dir.exists():
-        return [], 0
+        return [], []
 
     cutoff = time.time() if now is None else now
     active: list[dict[str, Any]] = []
-    expired = 0
+    expired: list[dict[str, Any]] = []
     for path in sorted(pending_dir.glob("*.json")):
         try:
             record = json.loads(path.read_text(encoding="utf-8"))
@@ -45,7 +46,7 @@ def load_pending_confirmations(
 
         expires = _float_or_none(record.get("expires"))
         if expires and cutoff > expires:
-            expired += 1
+            expired.append(_safe_expired_pending(record, path=path, now=cutoff, expires=expires))
             continue
         if record.get("status", "pending") != "pending":
             continue
@@ -93,12 +94,15 @@ def build_report(
 ) -> dict[str, Any]:
     state_dir = (state_dir or default_state_dir()).expanduser()
     audit_path = audit_path or state_dir / "audit" / "confirmation_firewall.jsonl"
-    pending, expired_count = load_pending_confirmations(state_dir, now=now)
+    pending, expired = load_pending_confirmations(state_dir, now=now)
+    expired_visible = expired[-max(0, recent) :] if recent > 0 else []
     return {
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "state_dir": str(state_dir),
         "pending_count": len(pending),
-        "expired_pending_count": expired_count,
+        "expired_pending_count": len(expired),
+        "expired_pending": expired_visible,
+        "expired_pending_omitted": max(0, len(expired) - len(expired_visible)),
         "pending": pending,
         "recent_audit": load_recent_audit_events(audit_path.expanduser(), limit=recent),
     }
@@ -124,6 +128,27 @@ def render_markdown(report: dict[str, Any]) -> str:
             )
     else:
         lines.append("No active pending confirmations.")
+
+    lines.extend(["", "## Expired Pending Files", ""])
+    if report.get("expired_pending"):
+        lines.extend(
+            [
+                "| Code | Risk | Status | Created | Expired | Seconds Expired | Action Field | Details Field |",
+                "|---|---|---|---:|---:|---:|---:|---:|",
+            ]
+        )
+        for item in report["expired_pending"]:
+            lines.append(
+                f"| {item['code']} | {item['risk']} | {item['status']} | "
+                f"{item.get('created') or '-'} | {item.get('expires') or '-'} | "
+                f"{item.get('seconds_expired') or 0} | {_yn(item.get('has_action'))} | "
+                f"{_yn(item.get('has_details'))} |"
+            )
+        omitted = int(report.get("expired_pending_omitted") or 0)
+        if omitted:
+            lines.append(f"\n{omitted} additional expired pending files omitted.")
+    else:
+        lines.append("No expired pending files.")
 
     lines.extend(["", "## Recent Audit", ""])
     if report["recent_audit"]:
@@ -151,6 +176,32 @@ def _iso_from_epoch(value: object) -> str | None:
     if ts is None:
         return None
     return datetime.fromtimestamp(ts, UTC).isoformat(timespec="seconds")
+
+
+def _safe_expired_pending(
+    record: dict[str, Any],
+    *,
+    path: Path,
+    now: float,
+    expires: float,
+) -> dict[str, Any]:
+    """Return paste-safe metadata for an expired pending confirmation file."""
+    code = str(record.get("code") or path.stem).upper()
+    return {
+        "code": code,
+        "file_hash": hashlib.sha256(path.name.encode("utf-8")).hexdigest()[:12],
+        "risk": str(record.get("risk") or "unknown"),
+        "status": str(record.get("status") or "pending"),
+        "created": _iso_from_epoch(record.get("created")),
+        "expires": _iso_from_epoch(expires),
+        "seconds_expired": max(0, int(now - expires)),
+        "has_action": "action" in record,
+        "has_details": "details" in record,
+    }
+
+
+def _yn(value: object) -> str:
+    return "yes" if bool(value) else "no"
 
 
 def main(argv: list[str] | None = None) -> int:
