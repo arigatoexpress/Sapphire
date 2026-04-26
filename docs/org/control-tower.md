@@ -33,7 +33,8 @@ python3 scripts/ops/org_status.py --output /tmp/sapphire-org-status.json
 
 `--no-external` skips `gh`, `gcloud`, `launchctl`, and Docker probes. It is the
 CI-safe mode and the right first check when editing the manifest or report
-shape.
+shape. Dirty repository reporting is intentionally sanitized to counts by
+porcelain status category; it does not print filenames or diff contents.
 
 ## Current Waves
 
