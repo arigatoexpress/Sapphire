@@ -14,6 +14,9 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
+from hashlib import sha256
+from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -164,7 +167,45 @@ def _autonomy_cycle(payload: dict[str, Any]) -> dict[str, Any]:
         message="Autonomy cycle triggered via Kimi PM bridge",
         tags=["agent:kimi", "type:pm", "priority:p2"],
     )
+    _audit_autonomy_cycle_request(payload)
     return {"status": "ok", "message": "autonomy cycle queued"}
+
+
+def _audit_autonomy_cycle_request(payload: dict[str, Any]) -> None:
+    """Append a sanitized autonomy audit event for Kimi bridge requests."""
+    try:
+        audit_log_cls = _autonomy_audit_log_cls()
+        actor = str(payload.get("actor") or "kimi")
+        audit_log_cls().append(
+            "autonomy.cycle.requested",
+            actor="kimi_bridge",
+            action="request_autonomy_cycle",
+            outcome="queued",
+            risk="autonomy_coordination",
+            object_ref="control-plane:autonomy_cycle",
+            metadata={
+                "payload_keys": sorted(str(key) for key in payload),
+                "requested_actor_hash": sha256(actor.encode("utf-8")).hexdigest()[:12],
+                "requested_actor_chars": len(actor),
+            },
+        )
+    except Exception as exc:
+        logger.warning("autonomy cycle audit write failed: %s", exc)
+
+
+def _autonomy_audit_log_cls() -> type:
+    try:
+        from lib.core.autonomy_audit import AutonomyAuditLog
+
+        return AutonomyAuditLog
+    except ModuleNotFoundError:
+        repo_root = Path(__file__).resolve().parents[3]
+        repo_root_text = str(repo_root)
+        if repo_root_text not in sys.path:
+            sys.path.insert(0, repo_root_text)
+        from lib.core.autonomy_audit import AutonomyAuditLog
+
+        return AutonomyAuditLog
 
 
 def _sync_board(payload: dict[str, Any]) -> dict[str, Any]:
