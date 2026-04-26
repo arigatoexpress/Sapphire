@@ -38,6 +38,19 @@ def test_combined_report_omits_raw_pending_and_kill_switch_details(tmp_path):
             }
         )
     )
+    (pending_dir / "OLD12345.json").write_text(
+        json.dumps(
+            {
+                "code": "OLD12345",
+                "risk": "financial",
+                "status": "pending",
+                "action": "expired paper trade token=expired-token",
+                "details": "secret=expired-secret",
+                "created": now - 600,
+                "expires": now - 300,
+            }
+        )
+    )
     (audit_dir / "kill_switch.jsonl").write_text(
         json.dumps(
             {
@@ -77,7 +90,12 @@ def test_combined_report_omits_raw_pending_and_kill_switch_details(tmp_path):
     serialized = json.dumps(report)
 
     assert report["confirmation_firewall"]["pending_count"] == 1
+    assert report["confirmation_firewall"]["expired_pending_count"] == 1
+    assert report["confirmation_firewall"]["expired_pending"][0]["code"] == "OLD12345"
+    assert report["confirmation_firewall"]["expired_pending"][0]["has_action"] is True
     assert report["kill_switch"]["inferred_active"] is True
+    assert report["kill_switch"]["state_source"] == "last_transition"
+    assert report["kill_switch"]["state_confidence"] == "inferred_from_audit"
     assert report["kill_switch"]["last_transition"]["reason_hash"]
     assert report["kill_switch"]["last_transition"]["reason_chars"] > 0
     assert report["autonomy_audit"]["audit_exists"] is True
@@ -92,9 +110,13 @@ def test_combined_report_omits_raw_pending_and_kill_switch_details(tmp_path):
     assert report["autonomy_audit"]["recent_events"][0]["object_ref_hash"]
     assert report["autonomy_audit"]["recent_events"][0]["action_hash"]
     assert "paper trade" not in serialized
+    assert "expired paper trade" not in serialized
     assert "password=sample-password" not in serialized
+    assert "expired-secret" not in serialized
     assert "operator halt" not in serialized
     assert "sample-token" not in rendered
+    assert "expired-token" not in rendered
+    assert "OLD12345" in rendered
     assert "sample-key" not in serialized
     assert "do not render this prompt" not in serialized
     assert "BTC:long" not in serialized
@@ -131,6 +153,8 @@ def test_kill_switch_inferred_inactive_from_last_transition(tmp_path):
 
     assert summary["audit_exists"] is True
     assert summary["inferred_active"] is False
+    assert summary["state_source"] == "last_transition"
+    assert summary["state_confidence"] == "inferred_from_audit"
     assert summary["last_transition"]["event_type"] == "kill_switch.deactivated"
     assert summary["event_counts"] == {
         "kill_switch.activated": 1,
@@ -144,6 +168,8 @@ def test_missing_kill_switch_audit_reports_unknown(tmp_path):
     assert summary == {
         "audit_exists": False,
         "inferred_active": None,
+        "state_source": "audit_missing",
+        "state_confidence": "unknown",
         "last_transition": None,
         "event_counts": {},
         "recent_events": [],
@@ -217,6 +243,8 @@ def test_autonomy_audit_summary_counts_and_hashes_sensitive_fields(tmp_path):
             "kill_switch": {
                 "audit_exists": False,
                 "inferred_active": None,
+                "state_source": "audit_missing",
+                "state_confidence": "unknown",
                 "last_transition": None,
                 "recent_events": [],
             },
@@ -283,4 +311,28 @@ def test_json_mode_outputs_combined_report(tmp_path, capsys):
 
     assert output["confirmation_firewall"]["pending_count"] == 0
     assert output["kill_switch"]["inferred_active"] is None
+    assert output["kill_switch"]["state_source"] == "audit_missing"
     assert output["autonomy_audit"]["audit_exists"] is False
+
+
+def test_existing_kill_switch_audit_without_transitions_stays_unknown(tmp_path):
+    audit_path = tmp_path / "kill_switch.jsonl"
+    audit_path.write_text(
+        json.dumps(
+            {
+                "event_type": "kill_switch.audit_initialized",
+                "kind": "initialized",
+                "timestamp": "2026-04-26T12:00:00+00:00",
+                "reason": "operator audit bootstrap",
+            }
+        )
+        + "\n"
+    )
+
+    summary = safety_status.summarize_kill_switch(audit_path)
+
+    assert summary["audit_exists"] is True
+    assert summary["inferred_active"] is None
+    assert summary["state_source"] == "no_transition_events"
+    assert summary["state_confidence"] == "unknown"
+    assert summary["last_transition"] is None

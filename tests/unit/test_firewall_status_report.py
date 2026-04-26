@@ -69,8 +69,18 @@ def test_report_counts_expired_pending_without_rendering_details(tmp_path):
 
     assert report["pending_count"] == 0
     assert report["expired_pending_count"] == 1
+    assert report["expired_pending"][0]["code"] == "OLD12345"
+    assert report["expired_pending"][0]["risk"] == "financial"
+    assert report["expired_pending"][0]["has_action"] is True
+    assert report["expired_pending"][0]["has_details"] is True
+    assert report["expired_pending"][0]["seconds_expired"] == 300
     assert "live trade" not in json.dumps(report)
     assert "sample-password" not in json.dumps(report)
+
+    rendered = firewall_status.render_markdown(report)
+    assert "OLD12345" in rendered
+    assert "live trade" not in rendered
+    assert "sample-password" not in rendered
 
 
 def test_recent_audit_keeps_safe_fields_only(tmp_path):
@@ -111,3 +121,5 @@ def test_json_mode_outputs_report(tmp_path, capsys):
 
     assert output["pending_count"] == 0
     assert output["expired_pending_count"] == 0
+    assert output["expired_pending"] == []
+    assert output["expired_pending_omitted"] == 0
