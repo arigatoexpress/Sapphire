@@ -41,3 +41,10 @@ secrets, order payloads, or full world snapshots.
   execute.
 - Any new autonomous action path should add a focused audit event before it gets
   broader execution power.
+
+## Operator Status
+
+Use `scripts/ops/safety_status_report.py` for paste-safe status. The report
+summarizes autonomy event, actor, outcome, and risk counts, and hashes action
+and object references for recent events. It intentionally omits raw metadata
+values, prompts, request bodies, order payloads, and secret-like text.
