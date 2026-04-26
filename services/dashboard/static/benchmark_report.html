@@ -48,8 +48,8 @@ canvas{max-height:260px}
 <div class="card mb" style="border-left:4px solid #f59e0b">
   <h3 style="color:#f59e0b">Model Update — 2026-04-26</h3>
   <p style="font-size:0.85em;color:#8b949e">
-    Proxy routing updated: <code>qwen3.6:27b</code> replaces <code>qwen3:14b</code> and <code>qwen3.5:9b</code>.
-    New benchmarks pending — run <code>benchmarks/run_benchmark.py</code> on Windows to refresh.
+    Proxy routing verified against live Windows inventory: defaults remain <code>qwen3:14b</code> and <code>qwen3.5:9b</code>; <code>qwen3.6:27b</code> is Mac-local until installed on Windows.
+    New benchmarks pending after Windows <code>qwen3.6</code> install.
   </p>
 </div>
 
@@ -185,8 +185,8 @@ canvas{max-height:260px}
     <li><b style="color:#e6edf3">Models ≤ 14B Q4_K_M</b> — fully fit in VRAM, 70-232 tok/s generation</li>
     <li><b style="color:#e6edf3">Models 17-23 GB</b> — partial VRAM fit; gemma3:27b exceeds limits, nemotron-cascade-2 (MoE) fits due to sparse activation</li>
     <li><b style="color:#e6edf3">Models > 16 GB (dense)</b> — overflow to 63 GB RAM → CPU compute → ~2.7 tok/s</li>
-    <li><b style="color:#e6edf3">qwen3.6 + gemma4</b> — qwen3.6:27b replaces qwen3:14b and qwen3.5:9b; gemma4 via Ollama 0.20.7 backend (154 tok/s)</li>
-    <li><b style="color:#e6edf3">Inference proxy routing</b> — T0:nemotron-mini, T1:hermes3, T2:phi4/qwen3.6/deepseek-r1 14B, T3:gemma4 (Ollama), T4:nemotron-cascade-2</li>
+    <li><b style="color:#e6edf3">Qwen + gemma4</b> — qwen3:14b and qwen3.5:9b remain Windows defaults; qwen3.6:27b is Mac-local pending Windows install; gemma4 via Ollama 0.20.7 backend (154 tok/s)</li>
+    <li><b style="color:#e6edf3">Inference proxy routing</b> — T0:nemotron-mini, T1:hermes3, T2:phi4/qwen3.5/deepseek-r1 14B, T3:gemma4 (Ollama), T4:nemotron-cascade-2</li>
   </ul>
 </div>
 
