@@ -166,8 +166,9 @@ def fake_pi() -> FakePiFixture:
 def test_probe_endpoint_hits_api_tags(fake_pi: FakePiFixture) -> None:
     proxy_app._endpoint_health["pi-rari1"] = False
 
-    proxy_app._probe_endpoint("pi-rari1", fake_pi.base_url)
+    ok = proxy_app._probe_endpoint("pi-rari1", fake_pi.base_url)
 
+    assert ok is True
     assert proxy_app._endpoint_health["pi-rari1"] is True
     assert fake_pi.requests == [
         {
@@ -177,6 +178,20 @@ def test_probe_endpoint_hits_api_tags(fake_pi: FakePiFixture) -> None:
         }
     ]
     assert fake_pi.requests[0]["headers"]["Accept"] == "application/json"
+
+
+def test_probe_endpoint_marks_unreachable_targets_failed() -> None:
+    proxy_app._endpoint_health["pi-rari1"] = True
+
+    ok = proxy_app._probe_endpoint(
+        "pi-rari1",
+        "http://127.0.0.1:1",
+        timeout=0.05,
+        mark_failure=True,
+    )
+
+    assert ok is False
+    assert proxy_app._endpoint_health["pi-rari1"] is False
 
 
 def test_pi_rari1_serves_fast_requests_via_safe_model(
@@ -201,8 +216,9 @@ def test_pi_rari1_serves_fast_requests_via_safe_model(
     assert tried == ["pi-rari1"]
     assert response is not None
     assert response["model"] == f"{proxy_app.PI_DEFAULT_MODEL} (pi-rari1)"
-    assert fake_pi.requests[0]["path"] == "/api/chat"
-    assert fake_pi.requests[0]["body"]["model"] == proxy_app.PI_DEFAULT_MODEL
+    posts = [req for req in fake_pi.requests if req["method"] == "POST"]
+    assert posts[0]["path"] == "/api/chat"
+    assert posts[0]["body"]["model"] == proxy_app.PI_DEFAULT_MODEL
 
 
 def test_pi_routing_falls_back_to_rari2_when_rari1_fails(
@@ -231,8 +247,10 @@ def test_pi_routing_falls_back_to_rari2_when_rari1_fails(
         assert tried == ["pi-rari1", "pi-rari2"]
         assert response is not None
         assert response["model"] == f"{proxy_app.PI_DEFAULT_MODEL} (pi-rari2)"
-        assert rari1.requests[0]["body"]["model"] == proxy_app.PI_DEFAULT_MODEL
-        assert rari2.requests[0]["body"]["model"] == proxy_app.PI_DEFAULT_MODEL
+        rari1_posts = [req for req in rari1.requests if req["method"] == "POST"]
+        rari2_posts = [req for req in rari2.requests if req["method"] == "POST"]
+        assert rari1_posts[0]["body"]["model"] == proxy_app.PI_DEFAULT_MODEL
+        assert rari2_posts[0]["body"]["model"] == proxy_app.PI_DEFAULT_MODEL
     finally:
         for fixture in (rari1, rari2):
             fixture.server.shutdown()
@@ -240,16 +258,24 @@ def test_pi_routing_falls_back_to_rari2_when_rari1_fails(
             fixture.thread.join(timeout=2.0)
 
 
-def test_qwen36_deep_can_fall_back_to_exact_mac_model() -> None:
-    """qwen3.6 is Mac-installed, so Windows failure must not force a 503."""
-    assert proxy_app.MODEL_TIERS["deep"] == "qwen3.6:27b"
+def test_default_qwen_routes_match_verified_windows_inventory() -> None:
+    """Default Qwen routes should use models actually installed on Windows."""
+    assert proxy_app.MODEL_TIERS["deep"] == "qwen3:14b"
+    assert proxy_app.MODEL_TIERS["qwen-reason"] == "qwen3.5:9b"
+    assert proxy_app.MODEL_TIERS["fast-reason"] == "qwen3.5:9b"
+    assert "qwen3:14b" in proxy_app.GPU_ONLY_MODELS
+    assert "qwen3.5:9b" in proxy_app.GPU_ONLY_MODELS
+
+
+def test_qwen36_alias_can_fall_back_to_exact_mac_model() -> None:
+    """qwen3.6 is Mac-installed, so explicit alias must not force a 503."""
     assert proxy_app.MODEL_TIERS["qwen3.6"] == "qwen3.6:27b"
     assert "qwen3.6:27b" in proxy_app.MAC_MODELS
     assert "qwen3.6:27b" in proxy_app.MAC_EXACT_FALLBACK_MODELS
     assert "qwen3.6:27b" not in proxy_app.GPU_ONLY_MODELS
 
 
-def test_qwen36_deep_skips_pi_substitution_for_exact_mac_fallback(
+def test_qwen36_alias_skips_pi_substitution_for_exact_mac_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Windows miss should fall through to exact Mac qwen3.6, not a Pi tiny model."""
@@ -258,6 +284,7 @@ def test_qwen36_deep_skips_pi_substitution_for_exact_mac_fallback(
     monkeypatch.setattr(proxy_app, "PI_ENABLED", True)
     monkeypatch.setitem(proxy_app._endpoint_health, "windows-gpu", True)
     monkeypatch.setitem(proxy_app._endpoint_health, "mac-local", True)
+    monkeypatch.setattr(proxy_app, "_should_preflight", lambda *args, **kwargs: False)
 
     def fake_ollama_native(
         endpoint_name: str,
@@ -292,7 +319,7 @@ def test_qwen36_deep_skips_pi_substitution_for_exact_mac_fallback(
             f"{base_url}/v1/chat/completions",
             data=json.dumps(
                 {
-                    "model": "deep",
+                    "model": "qwen3.6",
                     "messages": [{"role": "user", "content": "summarize route"}],
                     "max_tokens": 16,
                     "temperature": 0.1,

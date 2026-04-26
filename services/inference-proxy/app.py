@@ -16,10 +16,11 @@ Benchmark-informed routing (RTX 5070 Ti, 2026-04-14):
   balanced    → hermes3:8b           118 tok/s  4.7 GB  general chat, tool calls
   code        → gemma4:latest        154 tok/s  9.0 GB  code gen (best GPU model, via Ollama)
   reason      → deepseek-r1:14b       80 tok/s  9.0 GB  structured R1 chain-of-thought
-  qwen-reason → qwen3.6:27b           ~70 tok/s 17.0 GB  fast reasoning (via Ollama)
-  deep        → qwen3.6:27b           ~70 tok/s 17.0 GB  deep analysis, multi-step
+  qwen-reason → qwen3.5:9b           107 tok/s  6.6 GB  fast reasoning (via Ollama)
+  deep        → qwen3:14b             80 tok/s  9.3 GB  deep analysis, multi-step
   large       → qwen2.5:32b          2.7 tok/s 19.9 GB  background / batch (RAM spill)
-  # qwen3.6:35b-a3b (24 GB) available on Windows as next-gen large-class MoE
+  qwen3.6     → qwen3.6:27b           local Mac experimental; Windows install pending
+  # qwen3.6:35b-a3b (24 GB) pending Windows install as next-gen large-class MoE
   cascade     → nemotron-cascade-2    16 tok/s 22.6 GB  MoE deep analysis (fits in VRAM)
 
 Endpoints:
@@ -115,12 +116,12 @@ MODEL_TIERS = {
     "tiny":      "qwen2.5:0.5b",        # ultra-light, Pi-native
 
     # GPU-heavy — benchmark-calibrated 2026-04-14 (RTX 5070 Ti)
-    "deep":           "qwen3.6:27b",            # ~70 tok/s, 17.0 GB — deep multi-step (qwen3.6)
+    "deep":           "qwen3:14b",              # 80 tok/s, 9.3 GB — deep multi-step
     "code":           "gemma4:latest",          # 154 tok/s, 9.0 GB — best code model (via Ollama)
     "fast-code":      "gemma4:latest",          # alias
     "reason":         "deepseek-r1:14b",        # 80 tok/s, 9.0 GB — structured R1 reasoning
-    "qwen-reason":    "qwen3.6:27b",            # ~70 tok/s, 17.0 GB — fast reasoning (via Ollama)
-    "fast-reason":    "qwen3.6:27b",            # alias
+    "qwen-reason":    "qwen3.5:9b",             # 107 tok/s, 6.6 GB — fast reasoning (via Ollama)
+    "fast-reason":    "qwen3.5:9b",             # alias
     "large":          "qwen2.5:32b",            # 2.7 tok/s, 19.9 GB — background/batch (RAM spill)
     "cascade":        "nemotron-cascade-2",     # 16 tok/s, 22.6 GB — MoE, fits 16 GB VRAM
     "moe":            "nemotron-cascade-2",     # alias
@@ -143,11 +144,11 @@ MODEL_TIERS = {
 # Models that require Windows GPU (too large for Pi/Mac).
 # gemma3:27b removed — consistently times out on llama-server b8795 (OOM at 17.4 GB).
 # gemma4:latest is GPU-routed through the Windows Ollama backend.
-# qwen3.6:27b is available on Windows and Mac.
-# qwen3.6:35b-a3b remains GPU-only.
+# qwen3.6:27b is Mac-local until it is installed on the Windows GPU node.
+# qwen3.6:35b-a3b remains pending/GPU-only.
 GPU_ONLY_MODELS = {
     # Benchmarked 14B+ class — confirmed GPU-only (fit in 16 GB VRAM or spill)
-    "qwen2.5-coder:14b", "deepseek-r1:14b", "phi4:latest",
+    "qwen2.5-coder:14b", "qwen3:14b", "qwen3.5:9b", "deepseek-r1:14b", "phi4:latest",
     # Large class — RAM spill but still routed to Windows only
     "deepseek-r1:32b", "qwen2.5:32b", "qwen2.5:14b",
     # Via Ollama (no llama-server compat), GPU Windows only
@@ -180,6 +181,9 @@ PI_RARI2_ENABLED = os.getenv("PI_RARI2_ENABLED", "0") == "1"
 PI_ENABLED = PI_RARI1_ENABLED or PI_RARI2_ENABLED  # any Pi active
 PI_PROBE_TIMEOUT_SEC = float(os.getenv("PI_PROBE_TIMEOUT_SEC", "10"))
 PI_CHAT_TIMEOUT_SEC = int(os.getenv("PI_CHAT_TIMEOUT_SEC", "30"))
+WINDOWS_PROBE_TIMEOUT_SEC = float(os.getenv("WINDOWS_PROBE_TIMEOUT_SEC", "4"))
+WINDOWS_CHAT_TIMEOUT_SEC = int(os.getenv("WINDOWS_CHAT_TIMEOUT_SEC", "60"))
+MAC_PROBE_TIMEOUT_SEC = float(os.getenv("MAC_PROBE_TIMEOUT_SEC", "4"))
 
 # ─── Health Tracking ─────────────────────────────────────────────────────────
 ENDPOINTS = ["windows-gpu", "pi-rari1", "pi-rari2", "mac-local", "kimi-cloud"]
@@ -208,8 +212,18 @@ def _mark_ok(name: str):
     with _health_lock:
         was_failed = not _endpoint_health[name]
         _endpoint_health[name] = True
+        _last_health_check[name] = time.time()
         if was_failed:
             log.info("Endpoint %s recovered", name)
+
+
+def _should_preflight(name: str, max_age_sec: float = 30) -> bool:
+    """Return True when endpoint reachability is stale enough to re-check."""
+    with _health_lock:
+        age = time.time() - _last_health_check.get(name, 0.0)
+        if not _endpoint_health.get(name, False):
+            return age > HEALTH_COOLDOWN
+        return age > max_age_sec
 
 
 # ─── Metrics ─────────────────────────────────────────────────────────────────
@@ -588,10 +602,22 @@ def _call_kimi_cloud(messages: list, max_tokens: int = 2048,
 
 # ─── Background Health Probe ─────────────────────────────────────────────────
 
-def _probe_endpoint(name: str, url: str):
+def _probe_endpoint(
+    name: str,
+    url: str,
+    *,
+    timeout: float | None = None,
+    mark_failure: bool = True,
+) -> bool:
     """Lightweight connectivity check against `GET /api/tags`."""
     try:
-        timeout = PI_PROBE_TIMEOUT_SEC if name.startswith("pi-") else 4
+        if timeout is None:
+            if name.startswith("pi-"):
+                timeout = PI_PROBE_TIMEOUT_SEC
+            elif name == "mac-local":
+                timeout = MAC_PROBE_TIMEOUT_SEC
+            else:
+                timeout = WINDOWS_PROBE_TIMEOUT_SEC
         req = urllib.request.Request(
             f"{url}/api/tags",
             method="GET",
@@ -600,8 +626,16 @@ def _probe_endpoint(name: str, url: str):
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             if resp.status == 200:
                 _mark_ok(name)
-    except Exception:
-        pass  # Probe failures don't change health state — only real requests do
+                return True
+    except Exception as e:
+        if mark_failure:
+            log.warning("x %s probe failed: %s", name, str(e)[:80])
+            _mark_failed(name)
+        return False
+    if mark_failure:
+        log.warning("x %s probe returned non-200 status", name)
+        _mark_failed(name)
+    return False
 
 
 def _enabled_pi_targets() -> list[tuple[str, str]]:
@@ -635,6 +669,14 @@ def _try_pi_tier(
     for endpoint_name, base_url in _enabled_pi_targets():
         if not _is_healthy(endpoint_name):
             continue
+        if _should_preflight(endpoint_name):
+            if not _probe_endpoint(
+                endpoint_name,
+                base_url,
+                timeout=PI_PROBE_TIMEOUT_SEC,
+                mark_failure=True,
+            ):
+                continue
         tried.append(endpoint_name)
         response = _try_ollama_native(
             endpoint_name,
@@ -661,13 +703,17 @@ def _background_health_probe():
     ]
     while True:
         try:
-            time.sleep(30)
             for name, url in probes:
-                # Only probe endpoints that are marked failed (recovery detection)
+                # Probe failed endpoints and any endpoint that has not been
+                # verified recently enough to avoid stale "green" health.
                 with _health_lock:
-                    is_failed = not _endpoint_health.get(name, True)
-                if is_failed:
-                    _probe_endpoint(name, url)
+                    should_probe = (
+                        not _endpoint_health.get(name, True)
+                        or time.time() - _last_health_check.get(name, 0.0) > 30
+                    )
+                if should_probe:
+                    _probe_endpoint(name, url, mark_failure=True)
+            time.sleep(30)
         except Exception:
             pass  # Never let the probe thread die
 
@@ -717,10 +763,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 req = urllib.request.Request(url, headers={"Accept": "application/json"})
                 with urllib.request.urlopen(req, timeout=5) as resp:
                     data = resp.read()
-                    self.send_response(resp.status)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(data)
+                    self._respond_raw(resp.status, data)
                     return
             except Exception:
                 continue  # Try next endpoint — don't blacklist on GET failures
@@ -813,12 +856,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
         if not is_chat:
             result = _try_mac_local(self.path, body)
             if result:
-                self.send_response(result[0])
-                self.send_header("Content-Type", "application/json")
-                self.send_header("X-Inference-Tier", "mac-local")
-                self.end_headers()
-                self.wfile.write(result[1])
-                _record("proxy", result[0] < 400, 0)
+                self._respond_raw(result[0], result[1], tier="mac-local")
                 return
             self._respond(503, {"error": "All endpoints unavailable"})
             return
@@ -826,10 +864,18 @@ class ProxyHandler(BaseHTTPRequestHandler):
         # ── Tier 1: Windows GPU ──────────────────────────────────────────────
         # Native /api/chat (not /v1/chat/completions): Windows Ollama's
         # OpenAI-compat layer returns empty responses — the native endpoint works.
+        if _should_preflight("windows-gpu"):
+            _probe_endpoint(
+                "windows-gpu",
+                WINDOWS_GPU,
+                timeout=WINDOWS_PROBE_TIMEOUT_SEC,
+                mark_failure=True,
+            )
         if _is_healthy("windows-gpu"):
             tried.append("windows-gpu")
         resp = _try_ollama_native("windows-gpu", WINDOWS_GPU, model,
-                                  messages, max_tokens, temperature, timeout=90)
+                                  messages, max_tokens, temperature,
+                                  timeout=WINDOWS_CHAT_TIMEOUT_SEC)
         if resp:
             self._respond(200, resp, tier="windows-gpu")
             return
@@ -876,12 +922,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
             mac_body = body
         result = _try_mac_local(self.path, mac_body, mac_model)
         if result:
-            self.send_response(result[0])
-            self.send_header("Content-Type", "application/json")
-            self.send_header("X-Inference-Tier", "mac-local")
-            self.end_headers()
-            self.wfile.write(result[1])
-            _record("proxy", result[0] < 400, 0)
+            self._respond_raw(result[0], result[1], tier="mac-local")
             return
 
         # ── Tier 4: Kimi Cloud (non-sensitive fallback) ──────────────────────
@@ -912,19 +953,29 @@ class ProxyHandler(BaseHTTPRequestHandler):
             "hint": "Set MOONSHOT_API_KEY for cloud fallback, or check GPU/Pi connectivity",
         })
 
-    def _respond(self, code: int, body: dict, tier: str = ""):
-        self.send_response(code)
-        self.send_header("Content-Type", "application/json")
-        if tier:
-            self.send_header("X-Inference-Tier", tier)
-        self.end_headers()
-        self.wfile.write(json.dumps(body).encode())
+    def _respond_raw(self, code: int, body: bytes, tier: str = "") -> bool:
+        try:
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json")
+            if tier:
+                self.send_header("X-Inference-Tier", tier)
+            self.end_headers()
+            self.wfile.write(body)
+        except BrokenPipeError:
+            log.warning("client disconnected before %s response could be sent", self.path)
+            if self.command == "POST":
+                _record("proxy", False, 0)
+            return False
         # Record the aggregate "proxy" outcome only after the upstream reply
         # has been validated and the response has been sent. The prior
         # implementation incremented proxy-success at request-parse time,
         # inflating the metric for every failed/503'd request.
         if self.command == "POST":
             _record("proxy", code < 400, 0)
+        return True
+
+    def _respond(self, code: int, body: dict, tier: str = "") -> bool:
+        return self._respond_raw(code, json.dumps(body).encode(), tier=tier)
 
     def log_message(self, format, *args):
         pass  # Suppress default per-request logging (we log our own)
