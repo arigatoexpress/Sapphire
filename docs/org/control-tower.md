@@ -88,6 +88,9 @@ shape.
 8. `docs/kimi-tools-absorb-map` - current Wave 3 map. It records that
    `kimi-tools` has no live Sapphire import callers and Kimi fallback
    guardrails are now covered by Sapphire tests before any archive step.
+9. `docs/hermes-sapphire-skill-surface` - current Wave 3 audit. It classifies
+   all 15 Sapphire Hermes skills by blast radius before any consolidation,
+   deletion, or template rewrite.
 
 ## Safety Rules
 
