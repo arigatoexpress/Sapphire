@@ -66,14 +66,10 @@ blocked_or_watch:
   - id: tradingview-mcp-v2
     blocker: Upstream repository is read-only for Ari.
     tracking: https://github.com/tradesdontlie/tradingview-mcp/pull/102
-  - id: crypto-tax-tracker
-    blocker: Guardrail parity still needs direct repo audit and PR.
   - id: hermes-agent
     blocker: Local override branch and upstream integration policy need an explicit consolidation decision.
 
 next_reviews:
-  - id: crypto-tax-tracker
-    action: Audit AGENTS/CLAUDE, CI, pre-commit parity, and README test commands.
   - id: hermes-agent
     action: Map local Sapphire relay/filter commits and decide fork, patch, or absorb strategy.
   - id: kimi-tools

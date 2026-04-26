@@ -119,10 +119,24 @@ repos:
     default_branch: main
     production_adjacent: false
     required_guardrails:
+      - AGENTS.md
       - CLAUDE.md
       - CI on PR
       - pre-commit or equivalent lint/test parity
-    migration_state: hardening_needed
+    migration_state: guardrails_complete
+    hardening_tracking:
+      repo_pr: https://github.com/arigatoexpress/crypto-tax-tracker/pull/2
+      validated_at: "2026-04-26"
+      validated_commands:
+        - .venv/bin/ruff check src tests
+        - .venv/bin/python -m pytest -q
+        - PATH="$PWD/.venv/bin:$PATH" .venv/bin/pre-commit run --all-files
+      guardrails:
+        - AGENTS.md financial/tax-data safety guidance
+        - hard ruff CI
+        - hard pytest CI
+        - pre-commit parity
+        - README local check commands
 
   - id: hermes-agent
     name: hermes-agent
@@ -241,7 +255,7 @@ waves:
     status: in_progress
     objective: Shadow local routines remotely with artifact oracles before retirement
   - id: wave-2-repo-hardening
-    status: queued
+    status: in_progress
     objective: CI/pre-commit/doc parity across active satellites
   - id: wave-3-agent-consolidation
     status: queued
