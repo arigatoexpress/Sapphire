@@ -2358,11 +2358,29 @@ class AlphaEngine:
     async def _dispatch_full_autonomy_cycle(self, trigger: str, force: bool = False, agent_id: str = "OBSIDIAN") -> dict[str, Any]:
         gate.require(agent_id, Capability.AUTONOMY_DISPATCH, f"autonomy_cycle({trigger!r})")
         if not self._full_autonomy_enabled:
+            append_alpha_dispatch_evaluation_audit(
+                trigger=trigger,
+                agent_id=agent_id,
+                outcome="full_autonomy_disabled",
+                reason="full_autonomy_disabled",
+                allow_code_changes=self._autonomy_allow_code_changes,
+                allow_gcloud_changes=self._autonomy_allow_gcloud_changes,
+                approval_required=self._autonomy_require_owner_approval,
+            )
             return {"dispatched": False, "reason": "full_autonomy_disabled"}
 
         now = time.time()
         since_last = now - self._autonomy_last_dispatch_at
         if not force and since_last < self._autonomy_min_dispatch_interval_seconds:
+            append_alpha_dispatch_evaluation_audit(
+                trigger=trigger,
+                agent_id=agent_id,
+                outcome="rate_limited",
+                reason="rate_limited",
+                allow_code_changes=self._autonomy_allow_code_changes,
+                allow_gcloud_changes=self._autonomy_allow_gcloud_changes,
+                approval_required=self._autonomy_require_owner_approval,
+            )
             return {
                 "dispatched": False,
                 "reason": "rate_limited",
