@@ -128,6 +128,17 @@ def test_status_report_includes_runtime_tracking_without_required_runtime_path(t
     }
 
 
+def test_kimi_tools_tracks_absorb_ready_no_live_callers() -> None:
+    repos = {repo["id"]: repo for repo in _manifest()["repos"]}
+    repo = repos["kimi-tools"]
+
+    assert repo["migration_state"] == "absorb_ready_no_live_callers"
+    tracking = repo["absorb_tracking"]
+    assert tracking["consolidation_doc"] == "docs/org/kimi-tools-absorb-map.md"
+    assert tracking["live_callers_found"] is False
+    assert tracking["target_repo"] == "sapphire"
+
+
 def test_classification_report_tracks_absorb_and_archive_candidates() -> None:
     report = _classification_report()
     manifest_ids = {repo["id"] for repo in _manifest()["repos"]}
@@ -141,6 +152,7 @@ def test_classification_report_tracks_absorb_and_archive_candidates() -> None:
     assert "crypto-tax-tracker" not in {item["id"] for item in report["blocked_or_watch"]}
     assert "crypto-tax-tracker" not in {item["id"] for item in report["next_reviews"]}
     assert "hermes-agent" not in {item["id"] for item in report["next_reviews"]}
+    assert report["next_reviews"] == []
 
 
 def test_collect_status_no_external_handles_local_ci_without_live_tools(tmp_path: Path) -> None:
