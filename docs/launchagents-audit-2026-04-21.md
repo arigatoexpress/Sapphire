@@ -71,6 +71,12 @@ rm ~/Library/LaunchAgents/com.sapphire.daily-brief.plist
 ```
 This is a Mac state change, so not executed by this audit.
 
+**2026-04-25 repo-side update**: `infra/launchagents/com.sapphire.daily-brief.plist`
+was removed from version control and `services.pipeline.check_routines` now tracks
+`com.sapphire.morning-brief` as the canonical daily brief surface. The local
+LaunchAgent still needs an explicit operator cutover before it disappears from
+`launchctl list`.
+
 ### F5. Scheduled-task overlap with morning brief
 - `com.sapphire.morning-brief.plist` (LaunchAgent, 7 AM CT via MDT, 12 sections, sends via Telegram)
 - `~/.claude/scheduled-tasks/sapphire-morning-briefing/` (Claude scheduled task, 8 AM, 7 sections, sends via Telegram)

@@ -77,8 +77,8 @@ ROUTINES: list[Routine] = [
             launchagent="com.sapphire.threat-refresh",
             artifact=str(DATA / "intelligence" / "latest" / "threats.json"),
             max_age_secs=6 * 60 * 60),     # every 4h + buffer
-    Routine("daily-brief",         "launchagent_scheduled",
-            launchagent="com.sapphire.daily-brief",
+    Routine("morning-brief",       "launchagent_scheduled",
+            launchagent="com.sapphire.morning-brief",
             artifact=str(DATA / "intelligence" / "latest" / "daily_brief.md"),
             max_age_secs=36 * 60 * 60),
     Routine("logrotate",           "launchagent_scheduled",

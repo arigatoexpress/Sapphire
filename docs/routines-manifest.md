@@ -1,6 +1,6 @@
 # Sapphire OS — Routines Manifest
 
-Last updated: 2026-04-17
+Last updated: 2026-04-25
 
 Every automated routine in the Sapphire OS mesh. Single source of truth — if a job runs on a schedule, it is listed here with its schedule, owner process, output artifact, and recovery runbook. Anything not on this list should either be added or killed.
 
@@ -29,7 +29,7 @@ Check: `launchctl list | grep sapphire` — every row should show a PID (online)
 
 | Label | Cadence | Script | Output | Runbook |
 |-------|---------|--------|--------|---------|
-| `com.sapphire.daily-brief`         | 08:00 CT           | `skills/daily-brief.sh`                     | Telegram digest                                                    | Manual: run script; re-send via `python3 -m plugins.claw-sapphire.tools.notify` |
+| `com.sapphire.morning-brief`       | 06:00 local / 07:00 CT | `services/intelligence/daily_brief.py`      | `data/intelligence/latest/daily_brief.md` + Telegram digest        | Manual dry-run: `python3 services/intelligence/daily_brief.py --dry-run` |
 | `com.sapphire.kronos-daily`        | 07:00 CT           | `scripts/kronos_daily_predictions.py`       | `data/intelligence/YYYY-MM-DD/predictions.json`                    | Manual: `python3 scripts/kronos_daily_predictions.py`; GPU must be up |
 | `com.sapphire.threat-refresh`      | every 4h           | `scripts/threat_refresh.sh`                 | `data/intelligence/YYYY-MM-DD/threats.json`                        | Manual: run script; check CISA/NVD reachability |
 | `com.sapphire.chain-refresh`       | every 15 min       | `services.pipeline.chain_refresh`           | `data/chain/chain_<ts>.json` + `data/intelligence/latest/chain.json` | Manual: `python3 -m services.pipeline.chain_refresh` |
