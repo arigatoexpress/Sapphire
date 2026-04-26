@@ -48,6 +48,16 @@ plist is explicitly disabled.
 |----------|------|------------------------|--------|
 | `.github/workflows/weekly-backtest.yml` | Sun 04:00 UTC | `com.sapphire.backtest-weekly` | GitHub Actions artifact `weekly-backtest-<run_id>` |
 
+Compare local and remote weekly backtest artifacts with:
+
+```bash
+python3 scripts/ops/compare_backtest_artifacts.py \
+  --local-sweep data/backtests/strategies/strategy_sweep_<LOCAL_TS>.json \
+  --remote-sweep /path/to/gh-artifact/data/backtests/strategies/strategy_sweep_<REMOTE_TS>.json \
+  --local-best data/backtests/strategies/best_per_symbol_<LOCAL_TS>.json \
+  --remote-best /path/to/gh-artifact/data/backtests/strategies/best_per_symbol_<REMOTE_TS>.json
+```
+
 All scripts are self-contained — they write their artifacts and exit. A routine is "healthy" if its artifact's mtime is within the expected cadence window.
 
 ## 3. GCP-side routines
