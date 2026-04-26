@@ -28,13 +28,14 @@ Every record includes:
 - `action`
 - `outcome`
 - optional `risk`
-- optional `object_ref`
+- optional `object_ref_hash`
+- optional `object_ref_chars`
 - optional sanitized `metadata`
 
 Decision metadata intentionally records summaries only: signal id, symbol,
 direction, original/adjusted confidence, rules fired, reason count, and
 world-state keys. It does not write raw signals, prompts, request bodies,
-secrets, order payloads, or full world snapshots.
+secrets, order payloads, full object references, or full world snapshots.
 
 Control-plane autonomy cycle metadata records payload key names and a hash of
 the requested actor only. It does not write raw bridge payload values.

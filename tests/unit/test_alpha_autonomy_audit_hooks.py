@@ -38,7 +38,9 @@ def test_session_created_audit_hashes_session_and_omits_instruction(monkeypatch,
     assert record["actor"] == "alpha_engine"
     assert record["action"] == "record_autonomy_session"
     assert record["outcome"] == "pending"
-    assert record["object_ref"] == "alpha_autonomy_session"
+    assert "object_ref" not in record
+    assert record["object_ref_hash"]
+    assert record["object_ref_chars"] == len("alpha_autonomy_session")
     assert metadata["session_key_hash"]
     assert metadata["trigger_code"] == "manual_telegram_password_redacted"
     assert metadata["instruction_chars"] > 0
@@ -75,7 +77,9 @@ def test_session_decision_audit_hashes_sensitive_identifiers(monkeypatch, tmp_pa
     assert record["actor"] == "alpha_engine"
     assert record["action"] == "apply_session_decision"
     assert record["outcome"] == "approved_dispatched"
-    assert record["object_ref"] == "alpha_autonomy_session"
+    assert "object_ref" not in record
+    assert record["object_ref_hash"]
+    assert record["object_ref_chars"] == len("alpha_autonomy_session")
     assert metadata["decision"] == "approve"
     assert metadata["dispatched"] is True
     assert metadata["reason_code"] == "accepted_via_gateway_secret_redacted"
@@ -141,7 +145,9 @@ def test_dispatch_evaluation_audit_summarizes_context(monkeypatch, tmp_path):
     assert record["actor"] == "alpha_engine"
     assert record["action"] == "evaluate_full_autonomy_dispatch"
     assert record["outcome"] == "dry_run"
-    assert record["object_ref"] == "alpha_full_autonomy"
+    assert "object_ref" not in record
+    assert record["object_ref_hash"]
+    assert record["object_ref_chars"] == len("alpha_full_autonomy")
     assert metadata["trigger_code"] == "manual_token_redacted"
     assert metadata["agent_code"] == "obsidian_password_redacted"
     assert metadata["reason_code"] == "hook_secret_redacted"

@@ -308,6 +308,8 @@ def _safe_kill_switch_event(record: dict[str, Any]) -> dict[str, Any]:
 
 def _safe_autonomy_event(record: dict[str, Any]) -> dict[str, Any]:
     object_ref = str(record.get("object_ref") or "")
+    object_ref_hash = _safe_hash(record.get("object_ref_hash"))
+    object_ref_chars = _int_or_none(record.get("object_ref_chars"))
     action = str(record.get("action") or "")
     metadata = record.get("metadata") if isinstance(record.get("metadata"), dict) else {}
     event = {
@@ -325,7 +327,10 @@ def _safe_autonomy_event(record: dict[str, Any]) -> dict[str, Any]:
     else:
         event["action_hash"] = ""
         event["action_chars"] = 0
-    if object_ref:
+    if object_ref_hash:
+        event["object_ref_hash"] = object_ref_hash
+        event["object_ref_chars"] = object_ref_chars or 0
+    elif object_ref:
         event["object_ref_hash"] = hashlib.sha256(object_ref.encode("utf-8")).hexdigest()[:12]
         event["object_ref_chars"] = len(object_ref)
     else:
@@ -410,6 +415,20 @@ def _float_or_none(value: object) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _int_or_none(value: object) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_hash(value: object) -> str:
+    text = str(value or "").strip().lower()
+    if re.fullmatch(r"[a-f0-9]{12}", text):
+        return text
+    return ""
 
 
 def _pct(value: object) -> str:

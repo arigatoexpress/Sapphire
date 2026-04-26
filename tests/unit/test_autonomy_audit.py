@@ -30,6 +30,9 @@ def test_append_writes_structured_jsonl(tmp_path: Path) -> None:
     assert record["event_type"] == "autonomy.decision_evaluated"
     assert record["ts"] == 123.0
     assert record["actor"] == "decision_engine"
+    assert "object_ref" not in record
+    assert record["object_ref_hash"]
+    assert record["object_ref_chars"] == len("sig-1")
     assert record["metadata"]["symbol"] == "BTC"
 
 

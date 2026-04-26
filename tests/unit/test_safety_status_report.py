@@ -248,6 +248,32 @@ def test_autonomy_audit_summary_counts_and_hashes_sensitive_fields(tmp_path):
     assert "1 malformed" in rendered
 
 
+def test_autonomy_audit_summary_accepts_prehashed_object_refs(tmp_path):
+    audit_path = tmp_path / "autonomy.jsonl"
+    audit_path.write_text(
+        json.dumps(
+            {
+                "event_type": "autonomy.decision_evaluated",
+                "ts": 1_775_000_000.0,
+                "actor": "decision_engine",
+                "action": "evaluate_signal",
+                "outcome": "allow",
+                "risk": "financial_decision",
+                "object_ref_hash": "abcdef123456",
+                "object_ref_chars": 24,
+                "metadata": {"symbol": "BTC"},
+            }
+        )
+        + "\n"
+    )
+
+    summary = safety_status.summarize_autonomy_audit(audit_path, recent=1)
+
+    assert summary["schema"]["valid_records"] == 1
+    assert summary["recent_events"][0]["object_ref_hash"] == "abcdef123456"
+    assert summary["recent_events"][0]["object_ref_chars"] == 24
+
+
 def test_json_mode_outputs_combined_report(tmp_path, capsys):
     state_dir = tmp_path / ".sapphire"
     state_dir.mkdir()
