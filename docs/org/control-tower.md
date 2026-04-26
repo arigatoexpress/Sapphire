@@ -71,27 +71,30 @@ shape.
 1. `feat/remote-threat-refresh-shadow` - soaking. First close-time comparison
    evidence is recorded in `docs/org/threat-refresh-shadow-soak-2026-04-26.md`;
    keep collecting scheduled artifacts before disabling the local LaunchAgent.
-2. `infra/org-control-tower` - current PR. Manifest, read-only status script,
+2. `feat/remote-weekly-backtest-shadow` - soaking. First comparison evidence
+   is recorded in `docs/org/backtest-weekly-shadow-soak-2026-04-26.md`; keep
+   local weekly backtest canonical until scheduled cycles satisfy the cutover gate.
+3. `infra/org-control-tower` - shipped. Manifest, read-only status script,
    control-board doc, and validation tests.
-3. `chore/satellite-ci-parity-tradingview` - validated. Upstream PR
+4. `chore/satellite-ci-parity-tradingview` - validated. Upstream PR
    [tradesdontlie/tradingview-mcp#102](https://github.com/tradesdontlie/tradingview-mcp/pull/102)
    adds AGENTS, CI, pre-commit parity, and offline test scripts; blocked on
    upstream maintainer merge.
-4. `chore/repo-classification-report` - tracked in
+5. `chore/repo-classification-report` - tracked in
    `infra/org-classification-report.yaml` and
    `docs/org/repo-classification-report.md`.
-5. `feat/autonomy-audit-log` - tracked. Structured decision/alert audit logging
+6. `feat/autonomy-audit-log` - tracked. Structured decision/alert audit logging
    lives in `docs/org/autonomy-audit-log.md`.
-6. `chore/crypto-tax-hardening-tracked` - current bookkeeping PR. The
+7. `chore/crypto-tax-hardening-tracked` - shipped. The
    crypto-tax-tracker satellite now has AGENTS/CLAUDE guidance, hard ruff and
    pytest CI, pre-commit parity, and README check commands.
-7. `docs/hermes-consolidation-map` - current Wave 3 map. It records the
+8. `docs/hermes-consolidation-map` - shipped Wave 3 map. It records the
    difference between the Hermes development clone and the patched runtime
    checkout before any gateway update, fork, or hook migration.
-8. `docs/kimi-tools-absorb-map` - current Wave 3 map. It records that
+9. `docs/kimi-tools-absorb-map` - shipped Wave 3 map. It records that
    `kimi-tools` has no live Sapphire import callers and Kimi fallback
    guardrails are now covered by Sapphire tests before any archive step.
-9. `docs/hermes-sapphire-skill-surface` - current Wave 3 audit. It classifies
+10. `docs/hermes-sapphire-skill-surface` - shipped Wave 3 audit. It classifies
    all 15 Sapphire Hermes skills by blast radius before any consolidation,
    deletion, or template rewrite.
 
