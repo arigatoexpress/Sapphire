@@ -1,0 +1,44 @@
+name: threat-refresh
+
+on:
+  schedule:
+    # Shadow the local every-4h LaunchAgent during remote-routine migration.
+    # Local remains canonical until shadow artifacts pass soak comparison.
+    - cron: "10 1,5,9,13,17,21 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: threat-refresh-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: refresh threats
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Refresh threats
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          SAPPHIRE_THREATS_DATA_DIR: ${{ github.workspace }}/data/intelligence
+          SAPPHIRE_THREATS_BOT_BIN: native
+        run: |
+          mkdir -p data/intelligence
+          python services/dashboard/refresh_threats.py | tee threat-refresh.log
+      - name: Upload threat artifacts
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: threat-refresh-${{ github.run_id }}
+          path: |
+            threat-refresh.log
+            data/intelligence/**/threats.json
+          if-no-files-found: error
+          retention-days: 30
