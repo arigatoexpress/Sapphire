@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 from collections import Counter
 from datetime import UTC, datetime
@@ -27,6 +28,11 @@ from firewall_status_report import (  # noqa: E402
 )
 from firewall_status_report import (
     default_state_dir,
+)
+
+SECRET_TEXT_PATTERNS = (
+    re.compile(r"(?i)\b(api[_-]?key|token|password|secret|private[_-]?key)\s*[:=]\s*[^,\s]+"),
+    re.compile(r"(?i)\b(bearer)\s+[a-z0-9._~+/=-]+"),
 )
 
 
@@ -89,17 +95,55 @@ def summarize_kill_switch(
     }
 
 
+def summarize_autonomy_audit(
+    audit_path: Path,
+    *,
+    recent: int = 10,
+) -> dict[str, Any]:
+    """Return paste-safe autonomy audit counts and recent event metadata."""
+    audit_path = audit_path.expanduser()
+    if not audit_path.exists():
+        return {
+            "audit_exists": False,
+            "event_counts": {},
+            "actor_counts": {},
+            "outcome_counts": {},
+            "risk_counts": {},
+            "recent_events": [],
+        }
+
+    records: list[dict[str, Any]] = []
+    for line in audit_path.read_text(encoding="utf-8").splitlines():
+        try:
+            parsed = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            records.append(parsed)
+
+    return {
+        "audit_exists": True,
+        "event_counts": dict(Counter(_safe_text(record.get("event_type")) for record in records)),
+        "actor_counts": dict(Counter(_safe_text(record.get("actor")) for record in records)),
+        "outcome_counts": dict(Counter(_safe_text(record.get("outcome")) for record in records)),
+        "risk_counts": dict(Counter(_safe_text(record.get("risk") or "none") for record in records)),
+        "recent_events": [_safe_autonomy_event(record) for record in records[-max(0, recent) :]],
+    }
+
+
 def build_report(
     *,
     state_dir: Path | None = None,
     firewall_audit_path: Path | None = None,
     kill_switch_audit_path: Path | None = None,
+    autonomy_audit_path: Path | None = None,
     recent: int = 10,
     now: float | None = None,
 ) -> dict[str, Any]:
     """Build a combined read-only safety-control report."""
     state_dir = (state_dir or default_state_dir()).expanduser()
     kill_switch_audit_path = kill_switch_audit_path or state_dir / "audit" / "kill_switch.jsonl"
+    autonomy_audit_path = autonomy_audit_path or state_dir / "audit" / "autonomy.jsonl"
     return {
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "state_dir": str(state_dir),
@@ -113,17 +157,22 @@ def build_report(
             kill_switch_audit_path,
             recent=recent,
         ),
+        "autonomy_audit": summarize_autonomy_audit(
+            autonomy_audit_path,
+            recent=recent,
+        ),
     }
 
 
 def render_markdown(report: dict[str, Any]) -> str:
     firewall = report["confirmation_firewall"]
     kill_switch = report["kill_switch"]
+    autonomy = report["autonomy_audit"]
     lines = [
         "# Sapphire Safety Status",
         "",
         f"- Generated: {report['generated_at']}",
-        "- Scope: read-only local audit metadata; no raw actions, reasons, values, or payloads.",
+        "- Scope: read-only local audit metadata; no raw actions, reasons, object refs, values, or payloads.",
         "",
         "## Confirmation Firewall",
         "",
@@ -174,6 +223,36 @@ def render_markdown(report: dict[str, Any]) -> str:
             )
     else:
         lines.append("No recent kill-switch events.")
+
+    lines.extend(
+        [
+            "",
+            "## Autonomy Audit",
+            "",
+            f"- Audit log present: {_yn(autonomy['audit_exists'])}",
+            f"- Event counts: {json.dumps(autonomy['event_counts'], sort_keys=True)}",
+            f"- Risk counts: {json.dumps(autonomy['risk_counts'], sort_keys=True)}",
+            "",
+            "## Recent Autonomy Events",
+            "",
+        ]
+    )
+    if autonomy["recent_events"]:
+        lines.extend(
+            [
+                "| Time | Event | Actor | Outcome | Risk | Object Hash | Metadata Keys |",
+                "|---|---|---|---|---|---|---|",
+            ]
+        )
+        for item in autonomy["recent_events"]:
+            lines.append(
+                f"| {item.get('ts') or '-'} | {item.get('event_type', '-')} | "
+                f"{item.get('actor', '-')} | {item.get('outcome', '-')} | "
+                f"{item.get('risk', '-')} | {item.get('object_ref_hash') or '-'} | "
+                f"{', '.join(item.get('metadata_keys') or []) or '-'} |"
+            )
+    else:
+        lines.append("No recent autonomy audit events.")
     return "\n".join(lines) + "\n"
 
 
@@ -196,6 +275,34 @@ def _safe_kill_switch_event(record: dict[str, Any]) -> dict[str, Any]:
     return event
 
 
+def _safe_autonomy_event(record: dict[str, Any]) -> dict[str, Any]:
+    object_ref = str(record.get("object_ref") or "")
+    action = str(record.get("action") or "")
+    metadata = record.get("metadata") if isinstance(record.get("metadata"), dict) else {}
+    event = {
+        "event_type": _safe_text(record.get("event_type")),
+        "ts": _safe_timestamp(record.get("ts")),
+        "actor": _safe_text(record.get("actor")),
+        "outcome": _safe_text(record.get("outcome")),
+        "risk": _safe_text(record.get("risk") or "none"),
+        "metadata_keys": sorted(_safe_text(key, max_len=60) for key in metadata),
+        "metadata_key_count": len(metadata),
+    }
+    if action:
+        event["action_hash"] = hashlib.sha256(action.encode("utf-8")).hexdigest()[:12]
+        event["action_chars"] = len(action)
+    else:
+        event["action_hash"] = ""
+        event["action_chars"] = 0
+    if object_ref:
+        event["object_ref_hash"] = hashlib.sha256(object_ref.encode("utf-8")).hexdigest()[:12]
+        event["object_ref_chars"] = len(object_ref)
+    else:
+        event["object_ref_hash"] = ""
+        event["object_ref_chars"] = 0
+    return event
+
+
 def _event_type(record: dict[str, Any]) -> str:
     event_type = str(record.get("event_type") or "")
     if event_type:
@@ -204,6 +311,22 @@ def _event_type(record: dict[str, Any]) -> str:
     if kind:
         return f"kill_switch.{kind}"
     return "unknown"
+
+
+def _safe_timestamp(value: object) -> str:
+    ts = _float_or_none(value)
+    if ts is not None:
+        return datetime.fromtimestamp(ts, UTC).isoformat(timespec="seconds")
+    return _safe_text(value, max_len=80)
+
+
+def _safe_text(value: object, *, max_len: int = 120) -> str:
+    text = " ".join(str(value or "").split())
+    for pattern in SECRET_TEXT_PATTERNS:
+        text = pattern.sub(lambda match: f"{match.group(1)}=<redacted>", text)
+    if len(text) > max_len:
+        text = text[: max_len - 3] + "..."
+    return text
 
 
 def _float_or_none(value: object) -> float | None:
@@ -235,6 +358,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--state-dir", type=Path, default=default_state_dir())
     parser.add_argument("--firewall-audit-path", type=Path, default=None)
     parser.add_argument("--kill-switch-audit-path", type=Path, default=None)
+    parser.add_argument("--autonomy-audit-path", type=Path, default=None)
     parser.add_argument("--recent", type=int, default=10)
     parser.add_argument("--json", action="store_true", help="Emit JSON instead of Markdown")
     args = parser.parse_args(argv)
@@ -243,6 +367,7 @@ def main(argv: list[str] | None = None) -> int:
         state_dir=args.state_dir,
         firewall_audit_path=args.firewall_audit_path,
         kill_switch_audit_path=args.kill_switch_audit_path,
+        autonomy_audit_path=args.autonomy_audit_path,
         recent=args.recent,
     )
     if args.json:
