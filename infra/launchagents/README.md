@@ -2,7 +2,7 @@
 
 macOS LaunchAgent definitions for Sapphire background services and schedulers.
 
-Current inventory: 21 active plists in this directory, plus 1 disabled template (`com.sapphire.lumo-api.plist.disabled`). 2026-04-21 audit folded in the 10 production plists that had been running un-versioned on Ari's Mac — see `docs/launchagents-audit-2026-04-21.md`. The remaining Mac-only plists (dashboard, inference-proxy, cloudflare-tunnel, kronos-daily, regional-intel, hermes) are intentionally not versioned here; see the audit for why.
+Current inventory: 20 active plists in this directory, plus 1 disabled template (`com.sapphire.lumo-api.plist.disabled`). 2026-04-21 audit folded in the production plists that had been running un-versioned on Ari's Mac — see `docs/launchagents-audit-2026-04-21.md`. The remaining Mac-only plists (dashboard, inference-proxy, cloudflare-tunnel, kronos-daily, regional-intel, hermes) are intentionally not versioned here; see the audit for why.
 
 ## Active Plists
 
@@ -15,13 +15,12 @@ Current inventory: 21 active plists in this directory, plus 1 disabled template 
 | `com.sapphire.content-publisher.plist` | Scheduled content publishing. | on-demand |
 | `com.sapphire.control-plane.plist` | FastAPI control plane (uvicorn on `:8082`). | KeepAlive |
 | `com.sapphire.correlation-refresh.plist` | Cross-asset correlation refresh. | hourly at :17 |
-| `com.sapphire.daily-brief.plist` | `services/intelligence/daily_brief.py` daily digest. | 06:00 daily |
 | `com.sapphire.foundry-sync.plist` | Foundry sync daemon. | every 15 min |
 | `com.sapphire.gcp-sync.plist` | GCP → BigQuery event pipeline. | hourly at :05 |
 | `com.sapphire.heartbeat.plist` | Platform heartbeat daemon. | KeepAlive |
 | `com.sapphire.logrotate.plist` | Compress + rotate `~/autonomy-status/logs/`. | 03:30 daily |
 | `com.sapphire.market-intel.plist` | Market intelligence refresh. | scheduled |
-| `com.sapphire.morning-brief.plist` | Morning briefing run. | 07:00 CT daily |
+| `com.sapphire.morning-brief.plist` | Canonical morning briefing run (`services/intelligence/daily_brief.py`). | 06:00 local / 07:00 CT daily |
 | `com.sapphire.openbb-api.plist` | OpenBB REST server on `:6900`. | KeepAlive |
 | `com.sapphire.security-pipeline.plist` | Security scan pipeline. | 03:00 daily |
 | `com.sapphire.self-optimization.plist` | Self-improvement review loop. | daily |
