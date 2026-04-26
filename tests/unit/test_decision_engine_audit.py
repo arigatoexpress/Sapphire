@@ -60,4 +60,9 @@ def test_decision_engine_audits_detected_alerts(tmp_path: Path) -> None:
         "autonomy.alert_detected",
         "autonomy.alert_detected",
     ]
-    assert {record["object_ref"] for record in records} == {"funding_extreme", "fear_extreme"}
+    assert all("object_ref" not in record for record in records)
+    assert {record["object_ref_chars"] for record in records} == {
+        len("funding_extreme"),
+        len("fear_extreme"),
+    }
+    assert len({record["object_ref_hash"] for record in records}) == 2

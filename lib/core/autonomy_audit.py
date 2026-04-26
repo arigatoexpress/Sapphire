@@ -7,6 +7,7 @@ existing confirmation-firewall and kill-switch audit logs.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -68,7 +69,8 @@ class AutonomyAuditLog:
         if risk:
             record["risk"] = _bounded_text(risk, max_len=80)
         if object_ref:
-            record["object_ref"] = _bounded_text(object_ref, max_len=160)
+            record["object_ref_hash"] = _stable_hash(object_ref)
+            record["object_ref_chars"] = len(str(object_ref))
         if metadata:
             record["metadata"] = sanitize_metadata(metadata)
 
@@ -128,3 +130,7 @@ def _bounded_text(value: str, *, max_len: int = 240) -> str:
     if len(text) > max_len:
         return text[: max_len - 3] + "..."
     return text
+
+
+def _stable_hash(value: str) -> str:
+    return hashlib.sha256(str(value).encode("utf-8")).hexdigest()[:12]
