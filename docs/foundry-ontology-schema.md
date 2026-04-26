@@ -159,6 +159,18 @@ The sync engine (`lib/foundry/sync.py`) runs on a 15-minute schedule with these 
 - **Alerting:** Telegram notification on sync failure (via `lib.telegram` or direct API)
 - **Dashboard:** `/api/foundry/sync-status` endpoint exposes sync state to the intel page
 
+### Local Schema + Read-Back Audit
+
+`lib/foundry/readiness.py` exposes `build_foundry_schema_audit()` and includes the
+same paste-safe payload under `/api/foundry/readiness` as `schema_audit`.
+
+The audit runs each local transform, checks emitted objects against the required
+fields above, and reads back `data/foundry_sync_history.jsonl` for sync-history
+shape only. It returns object counts, missing-field counts, source-reference
+counts, transform error classes, and sync-history counters. It does not return
+raw object rows, request bodies, Foundry credentials, Telegram values, or raw
+sync error strings.
+
 ### Runtime Foundry Target
 
 `lib/foundry/client.py` defaults to the historical Foundry API path:
@@ -209,7 +221,7 @@ Per the strategy doc, these Actions will be implemented after the ontology layer
 | Path | Description |
 |------|-------------|
 | `lib/foundry/__init__.py` | Package init |
-| `lib/foundry/readiness.py` | Repo artifact + config inspection |
+| `lib/foundry/readiness.py` | Repo artifact + config inspection, local schema audit, sanitized sync-history read-back |
 | `lib/foundry/client.py` | Foundry REST API client (auth, datasets, ontology) |
 | `lib/foundry/ingestion.py` | Local data → Foundry object transforms |
 | `lib/foundry/sync.py` | Delta-aware sync engine + daemon |
@@ -217,4 +229,5 @@ Per the strategy doc, these Actions will be implemented after the ontology layer
 | `data/foundry_sync_history.jsonl` | Append-only sync log |
 | `tests/unit/test_foundry_client.py` | Client unit tests |
 | `tests/unit/test_foundry_ingestion.py` | Ingestion transform tests |
+| `tests/unit/test_foundry_readiness.py` | Readiness + schema audit tests |
 | `tests/unit/test_foundry_sync.py` | Sync engine tests |

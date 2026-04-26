@@ -166,6 +166,8 @@ def test_foundry_readiness_reports_data_ready(app_client, tmp_path, monkeypatch)
     assert groups["system-events"]["files"] == 1
     assert groups["ops-telemetry"]["files"] >= 2
     assert groups["market-forecasts"]["files"] >= 2
+    assert body["schema_audit"]["status"] in {"empty", "ready", "schema_warning"}
+    assert "sync_history_readback" in body["schema_audit"]
 
 
 def test_intel_sources_include_foundry_readiness(app_client, tmp_path, monkeypatch):

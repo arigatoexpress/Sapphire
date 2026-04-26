@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import json
 import os
+from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 _URL_ENV_VARS = (
     "PALANTIR_FOUNDRY_URL",
@@ -100,6 +102,17 @@ _DATASET_GROUPS = (
     },
 )
 
+_OBJECT_REQUIRED_FIELDS: dict[str, tuple[str, ...]] = {
+    "PaperTrade": ("id", "symbol", "direction", "action", "opened_at"),
+    "Alert": ("id", "title", "severity", "category", "source", "timestamp"),
+    "ServiceHealth": ("id", "service", "status", "last_check"),
+    "ThreatIntel": ("id", "title", "source", "published_at"),
+    "DailyBrief": ("id", "date", "title"),
+}
+
+_SYNC_HISTORY_REQUIRED_FIELDS = ("ok", "timestamp", "duration_s")
+_SYNC_HISTORY_FILE = "data/foundry_sync_history.jsonl"
+
 
 def _repo_root() -> Path:
     home_repo = Path.home() / "Code" / "Sapphire"
@@ -157,9 +170,167 @@ def _find_foundry_connector(root: Path) -> dict | None:
     return None
 
 
-def build_foundry_readiness() -> dict:
+def _missing_required_fields(
+    obj: dict[str, Any], required_fields: tuple[str, ...]
+) -> list[str]:
+    return [
+        field
+        for field in required_fields
+        if field not in obj or obj.get(field) is None
+    ]
+
+
+def _audit_sync_history(root: Path) -> dict[str, Any]:
+    history_path = root / _SYNC_HISTORY_FILE
+    summary: dict[str, Any] = {
+        "path": _SYNC_HISTORY_FILE,
+        "exists": history_path.is_file(),
+        "records": 0,
+        "malformed_lines": 0,
+        "missing_required_fields": {},
+        "recent_error_runs": 0,
+        "latest_ok": None,
+        "latest_dry_run": None,
+        "latest_skipped": None,
+        "latest_changed_types": 0,
+        "latest_uploaded_types": 0,
+    }
+    if not history_path.is_file():
+        return summary
+
+    missing_counts: Counter[str] = Counter()
+    latest: dict[str, Any] | None = None
+
+    try:
+        for line in history_path.read_text().splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            try:
+                record = json.loads(stripped)
+            except json.JSONDecodeError:
+                summary["malformed_lines"] += 1
+                continue
+            if not isinstance(record, dict):
+                summary["malformed_lines"] += 1
+                continue
+
+            summary["records"] += 1
+            latest = record
+            if record.get("ok") is False:
+                summary["recent_error_runs"] += 1
+            for field in _SYNC_HISTORY_REQUIRED_FIELDS:
+                if field not in record or record.get(field) is None:
+                    missing_counts[field] += 1
+    except OSError:
+        summary["read_error"] = True
+        return summary
+
+    if latest is not None:
+        changed_types = latest.get("changed_types")
+        uploaded_types = latest.get("uploaded_types")
+        summary["latest_ok"] = latest.get("ok")
+        summary["latest_dry_run"] = latest.get("dry_run")
+        summary["latest_skipped"] = latest.get("skipped")
+        summary["latest_changed_types"] = (
+            len(changed_types) if isinstance(changed_types, dict) else 0
+        )
+        summary["latest_uploaded_types"] = (
+            len(uploaded_types) if isinstance(uploaded_types, dict) else 0
+        )
+
+    summary["missing_required_fields"] = dict(sorted(missing_counts.items()))
+    return summary
+
+
+def build_foundry_schema_audit(root: Path | None = None) -> dict[str, Any]:
+    """Return a paste-safe audit of local Foundry object and sync schemas."""
+    root = root or _repo_root()
+    object_types: list[dict[str, Any]] = []
+    totals = {
+        "object_types": 0,
+        "objects": 0,
+        "invalid_objects": 0,
+        "missing_required_fields": 0,
+        "source_refs": 0,
+        "transform_errors": 0,
+    }
+
+    from lib.foundry.ingestion import ALL_TRANSFORMS
+
+    for object_type, transform in ALL_TRANSFORMS.items():
+        required_fields = _OBJECT_REQUIRED_FIELDS.get(object_type, ("id",))
+        missing_counts: Counter[str] = Counter()
+        object_count = 0
+        invalid_objects = 0
+        source_refs = 0
+        transform_error: str | None = None
+
+        try:
+            objects = transform(root)
+        except Exception as exc:  # pragma: no cover - defensive dashboard path
+            objects = []
+            transform_error = exc.__class__.__name__
+
+        for obj in objects:
+            object_count += 1
+            if not isinstance(obj, dict):
+                invalid_objects += 1
+                continue
+            if obj.get("_sapphire_source"):
+                source_refs += 1
+            missing_counts.update(_missing_required_fields(obj, required_fields))
+
+        missing_total = sum(missing_counts.values())
+        if transform_error:
+            status = "error"
+        elif invalid_objects or missing_total:
+            status = "schema_warning"
+        elif object_count:
+            status = "ready"
+        else:
+            status = "empty"
+
+        totals["object_types"] += 1
+        totals["objects"] += object_count
+        totals["invalid_objects"] += invalid_objects
+        totals["missing_required_fields"] += missing_total
+        totals["source_refs"] += source_refs
+        totals["transform_errors"] += 1 if transform_error else 0
+
+        object_types.append(
+            {
+                "object_type": object_type,
+                "status": status,
+                "objects": object_count,
+                "invalid_objects": invalid_objects,
+                "required_fields": list(required_fields),
+                "missing_required_fields": dict(sorted(missing_counts.items())),
+                "source_refs": source_refs,
+                "transform_error": transform_error,
+            }
+        )
+
+    if totals["transform_errors"]:
+        status = "error"
+    elif totals["invalid_objects"] or totals["missing_required_fields"]:
+        status = "schema_warning"
+    elif totals["objects"]:
+        status = "ready"
+    else:
+        status = "empty"
+
+    return {
+        "status": status,
+        "object_types": object_types,
+        "totals": totals,
+        "sync_history_readback": _audit_sync_history(root),
+    }
+
+
+def build_foundry_readiness(root: Path | None = None) -> dict:
     """Return a safe readiness summary for Sapphire's Foundry integration."""
-    root = _repo_root()
+    root = root or _repo_root()
 
     url_vars = _configured_vars(_URL_ENV_VARS)
     token_vars = _configured_vars(_TOKEN_ENV_VARS)
@@ -274,8 +445,10 @@ def build_foundry_readiness() -> dict:
             "files": total_files,
         },
         "latest_materialization": _isoformat_timestamp(latest_materialization),
+        "schema_audit": build_foundry_schema_audit(root),
         "next_step": next_step,
         "docs": {
             "strategy": "docs/palantir-foundry-strategy-2026-04-19.md",
+            "ontology_schema": "docs/foundry-ontology-schema.md",
         },
     }
