@@ -1,6 +1,7 @@
 """Regression tests for backtest constructor compatibility and short sweeps."""
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -127,8 +128,24 @@ def test_run_strategies_days_7_still_writes_artifact(tmp_path, monkeypatch):
     monkeypatch.setattr(run_strategies, "load_yfinance_ohlcv", lambda symbol, days: _synthetic_bars(symbol, days))
     monkeypatch.setattr(run_strategies, "_ROOT", tmp_path)
     monkeypatch.setattr(strategies_mod, "RESULTS_DIR", out_dir)
+    monkeypatch.setenv("GITHUB_SHA", "abc123")
+    monkeypatch.setenv("GITHUB_RUN_ID", "456")
 
     best = run_strategies.run(days=7, bankroll=10_000.0)
 
     assert best
-    assert any(out_dir.glob("strategy_sweep_*.json"))
+    sweep_path = next(out_dir.glob("strategy_sweep_*.json"))
+    best_path = next(out_dir.glob("best_per_symbol_*.json"))
+    sweep = json.loads(sweep_path.read_text())
+    best_payload = json.loads(best_path.read_text())
+
+    for payload in (sweep, best_payload):
+        metadata = payload["metadata"]
+        assert metadata["source"]["generator"] == "lib.analytics.run_strategies"
+        assert metadata["source"]["git_sha"] == "abc123"
+        assert metadata["source"]["github_run_id"] == "456"
+        assert metadata["config"]["days"] == 7
+        assert metadata["config"]["bankroll"] == 10_000.0
+        assert set(metadata["bar_fingerprints"]) == set(run_strategies.SYMBOLS)
+        assert metadata["bar_fingerprints"]["BTC-USD"]["bars"] == 7
+        assert len(metadata["bar_fingerprints"]["BTC-USD"]["sha256"]) == 64

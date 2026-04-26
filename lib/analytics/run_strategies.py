@@ -15,11 +15,17 @@ Invoked automatically every Saturday at 22:00 by:
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import logging
+import os
+import subprocess
 import sys
 import time
 from datetime import UTC, datetime
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+from typing import Any
 
 # Allow running as `python lib/analytics/run_strategies.py` directly
 _ROOT = Path(__file__).resolve().parents[2]
@@ -64,6 +70,103 @@ def _load_all_bars(symbols: list[str], days: int) -> dict:
         bars_map[sym] = bars
         log.info("    → %d bars", len(bars))
     return bars_map
+
+
+def _artifact_metadata(
+    *,
+    days: int,
+    bankroll: float,
+    active_symbols: list[str],
+    bars_map: dict,
+) -> dict[str, Any]:
+    """Metadata that lets shadow comparisons explain deployment/bar drift."""
+    return {
+        "source": {
+            "generator": "lib.analytics.run_strategies",
+            "git_sha": _git_sha(),
+            "github_sha": os.getenv("GITHUB_SHA") or "",
+            "github_run_id": os.getenv("GITHUB_RUN_ID") or "",
+            "yfinance_version": _package_version("yfinance"),
+        },
+        "config": {
+            "days": days,
+            "bankroll": bankroll,
+            "symbols": list(active_symbols),
+            "aux_symbols": list(AUX_SYMBOLS),
+        },
+        "bar_fingerprints": {
+            symbol: _bar_fingerprint(bars)
+            for symbol, bars in sorted(bars_map.items())
+            if bars
+        },
+    }
+
+
+def _package_version(package: str) -> str | None:
+    try:
+        return version(package)
+    except PackageNotFoundError:
+        return None
+
+
+def _git_sha() -> str:
+    if os.getenv("GITHUB_SHA"):
+        return os.getenv("GITHUB_SHA", "")
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def _bar_fingerprint(bars: list[Any]) -> dict[str, Any]:
+    payload = [_bar_payload(bar) for bar in bars]
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+    return {
+        "sha256": hashlib.sha256(encoded.encode("utf-8")).hexdigest(),
+        "bars": len(payload),
+        "start": payload[0]["ts"][:10] if payload else "",
+        "end": payload[-1]["ts"][:10] if payload else "",
+    }
+
+
+def _bar_payload(bar: Any) -> dict[str, Any]:
+    if isinstance(bar, dict):
+        ts = bar.get("ts") or bar.get("timestamp") or bar.get("date") or ""
+        return {
+            "ts": _ts_value(ts),
+            "open": _float_value(bar.get("open")),
+            "high": _float_value(bar.get("high")),
+            "low": _float_value(bar.get("low")),
+            "close": _float_value(bar.get("close")),
+            "volume": _float_value(bar.get("volume")),
+        }
+    return {
+        "ts": _ts_value(getattr(bar, "ts", None) or getattr(bar, "timestamp", "")),
+        "open": _float_value(getattr(bar, "open", None)),
+        "high": _float_value(getattr(bar, "high", None)),
+        "low": _float_value(getattr(bar, "low", None)),
+        "close": _float_value(getattr(bar, "close", None)),
+        "volume": _float_value(getattr(bar, "volume", None)),
+    }
+
+
+def _ts_value(value: Any) -> str:
+    return value.isoformat() if hasattr(value, "isoformat") else str(value or "")
+
+
+def _float_value(value: Any) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _build_aux_map(
@@ -197,8 +300,15 @@ def run(days: int = 90, bankroll: float = 10_000.0) -> list[SweepResult]:
         log.error("No results produced — all bar loads failed?")
         return []
 
+    metadata = _artifact_metadata(
+        days=days,
+        bankroll=bankroll,
+        active_symbols=active_symbols,
+        bars_map=bars_map,
+    )
+
     # ── 3. Save full sweep ───────────────────────────────────────────────────
-    save_path = save_results(all_results)
+    save_path = save_results(all_results, metadata=metadata)
     print(f"\nFull sweep ({len(all_results)} backtests) saved → {save_path.relative_to(_ROOT)}")
 
     # ── 4. Best params per (strategy, symbol) ───────────────────────────────
@@ -207,12 +317,13 @@ def run(days: int = 90, bankroll: float = 10_000.0) -> list[SweepResult]:
     # Save best-only results as a separate leaner file
     ts_tag = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     best_path = save_path.parent / f"best_per_symbol_{ts_tag}.json"
-    import json
-    best_path.write_text(json.dumps({
+    best_payload = {
         "computed_at": datetime.now(UTC).isoformat(),
         "note": "Best Sortino params per (strategy_cls, symbol)",
+        "metadata": metadata,
         "results": [r.to_dict(include_report=True) for r in best],
-    }, indent=2))
+    }
+    best_path.write_text(json.dumps(best_payload, indent=2))
     print(f"Best params ({len(best)} rows) saved → {best_path.relative_to(_ROOT)}")
 
     # ── 5. Comparison table ──────────────────────────────────────────────────
