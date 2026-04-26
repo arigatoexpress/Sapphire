@@ -53,3 +53,10 @@ At least 7 scheduled daily cycles with:
 
 Revert the PR that adds `.github/workflows/content-engine.yml` and the
 manifest stage change. The local LaunchAgent remains untouched.
+
+## Soak Log
+
+| Cycle | Date (UTC) | Trigger | Run ID | Verdict | FAIL | Missing | Notes |
+|-------|------------|---------|--------|---------|-----:|--------:|-------|
+| 1 | 2026-04-26T20:39Z | workflow_dispatch | [24966520333](https://github.com/arigatoexpress/Sapphire/actions/runs/24966520333) | WARN | 0 | 0 | Body length and rendered-file hash drift across all 4 kinds, all deltas under 50% — expected for first-cycle freshness skew. No remote-only quality failures. Report: `data/content/shadow-reports/content-shadow-comparison-20260426T204118Z.json`. |
+
