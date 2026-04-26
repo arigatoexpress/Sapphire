@@ -248,9 +248,23 @@ routines:
     comparator: scripts/ops/compare_backtest_artifacts.py
   - id: threat-refresh
     local_label: com.sapphire.threat-refresh
-    stage: shadowing
+    stage: soaking
     remote_workflow: .github/workflows/threat-refresh.yml
     comparator: scripts/ops/compare_threat_artifacts.py
+    soak_tracking:
+      started_at: "2026-04-26"
+      evidence_doc: docs/org/threat-refresh-shadow-soak-2026-04-26.md
+      latest_manual_remote_run_id: "24961094947"
+      latest_comparison:
+        compared_at: "2026-04-26T16:11:03Z"
+        verdict: WARN
+        rows_compared: 15
+        rows_pass: 12
+        rows_warn: 3
+        rows_fail: 0
+        missing_in_local: 0
+        missing_in_remote: 0
+      cutover_gate: "At least 24 scheduled cycles over 4 days with zero FAIL and at least 80 percent PASS/WARN-only comparisons."
   - id: correlation-refresh
     local_label: com.sapphire.correlation-refresh
     stage: local

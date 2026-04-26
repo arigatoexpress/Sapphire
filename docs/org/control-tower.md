@@ -40,7 +40,7 @@ shape.
 - **Wave 0: Control Tower** - in progress. Ship the manifest, status script,
   dashboard doc, and validation tests. No production behavior changes.
 - **Wave 1: Routine Migration** - in progress. Weekly backtest and
-  threat-refresh are shadowing remotely while local routines remain canonical.
+  threat-refresh are soaking remotely while local routines remain canonical.
 - **Wave 2: Repo Hardening** - in progress. TradingView MCP v2 guardrails are
   blocked on upstream PR review, and crypto-tax-tracker guardrails are complete
   via [arigatoexpress/crypto-tax-tracker#2](https://github.com/arigatoexpress/crypto-tax-tracker/pull/2).
@@ -68,8 +68,9 @@ shape.
 
 ## First PR Queue
 
-1. `feat/remote-threat-refresh-shadow` - shipped. Keep collecting shadow
-   artifacts before disabling the local LaunchAgent.
+1. `feat/remote-threat-refresh-shadow` - soaking. First close-time comparison
+   evidence is recorded in `docs/org/threat-refresh-shadow-soak-2026-04-26.md`;
+   keep collecting scheduled artifacts before disabling the local LaunchAgent.
 2. `infra/org-control-tower` - current PR. Manifest, read-only status script,
    control-board doc, and validation tests.
 3. `chore/satellite-ci-parity-tradingview` - validated. Upstream PR
