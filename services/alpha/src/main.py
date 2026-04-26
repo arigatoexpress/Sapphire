@@ -39,7 +39,10 @@ from src.api_handlers import (
     handle_security_skills_status,
     handle_system_logs,
 )
-from src.autonomy_audit_hooks import append_alpha_session_decision_audit
+from src.autonomy_audit_hooks import (
+    append_alpha_session_created_audit,
+    append_alpha_session_decision_audit,
+)
 from src.collaboration.forum import SapphireForumService
 from src.collaboration.learning import SwarmLearning
 from src.collaboration.molthub_outreach import MolthubOutreach
@@ -2005,6 +2008,12 @@ class AlphaEngine:
             "dispatched": True,
         }
         self._latest_autonomy_session_key = key
+        append_alpha_session_created_audit(
+            session_key=key,
+            trigger=trigger,
+            instruction_chars=len(trimmed_instruction),
+            approval_required=self._autonomy_require_owner_approval,
+        )
 
         # Phase 3: Create forum approval topic for audit trail
         try:
