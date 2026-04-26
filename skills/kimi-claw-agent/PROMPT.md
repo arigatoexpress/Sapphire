@@ -39,7 +39,7 @@ Located at `plugins/claw-sapphire/tools/`:
 - **Tier 3**: Mac Ollama (hermes3:8b, nemotron-mini — always-on fallback)
 - **Tier 4**: Kimi Cloud (non-sensitive queries only, sensitivity-gated)
 
-Model tier aliases: `fast`→nemotron-mini, `balanced`→hermes3:8b, `deep`→qwen3.6:27b, `code`→gemma4:latest, `reason`→deepseek-r1:14b
+Model tier aliases: `fast`→nemotron-mini, `balanced`→hermes3:8b, `deep`→qwen3:14b, `code`→gemma4:latest, `reason`→deepseek-r1:14b, `qwen-reason`→qwen3.5:9b, `qwen3.6`→qwen3.6:27b (Mac local, Windows install pending)
 
 ## Trading Pipeline
 
