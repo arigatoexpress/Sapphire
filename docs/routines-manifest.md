@@ -61,6 +61,15 @@ Compare local and remote weekly backtest artifacts with:
 
 ```bash
 python3 scripts/ops/compare_backtest_artifacts.py \
+  --local-root data/backtests/strategies \
+  --remote-root /path/to/gh-artifact \
+  --max-skew-minutes 90
+```
+
+For explicit one-off comparisons, pass exact artifact paths:
+
+```bash
+python3 scripts/ops/compare_backtest_artifacts.py \
   --local-sweep data/backtests/strategies/strategy_sweep_<LOCAL_TS>.json \
   --remote-sweep /path/to/gh-artifact/data/backtests/strategies/strategy_sweep_<REMOTE_TS>.json \
   --local-best data/backtests/strategies/best_per_symbol_<LOCAL_TS>.json \

@@ -64,6 +64,20 @@ class Artifact:
         }
 
 
+@dataclass(frozen=True)
+class BacktestCandidate:
+    timestamp: datetime
+    sweep: Path
+    best: Path | None = None
+
+    def summary(self) -> dict[str, Any]:
+        return {
+            "run_timestamp": iso_z(self.timestamp),
+            "sweep": str(self.sweep),
+            "best": str(self.best) if self.best else None,
+        }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     try:
@@ -94,10 +108,27 @@ def main(argv: list[str] | None = None) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--local-sweep", required=True, type=Path)
-    parser.add_argument("--remote-sweep", required=True, type=Path)
-    parser.add_argument("--local-best", type=Path)
-    parser.add_argument("--remote-best", type=Path)
+    inputs = parser.add_argument_group("input selection")
+    inputs.add_argument("--local-sweep", type=Path)
+    inputs.add_argument("--remote-sweep", type=Path)
+    inputs.add_argument("--local-best", type=Path)
+    inputs.add_argument("--remote-best", type=Path)
+    inputs.add_argument(
+        "--local-root",
+        type=Path,
+        help="Directory containing local strategy_sweep_<ts>.json artifacts",
+    )
+    inputs.add_argument(
+        "--remote-root",
+        type=Path,
+        help="Directory containing remote strategy_sweep_<ts>.json artifacts",
+    )
+    parser.add_argument(
+        "--max-skew-minutes",
+        type=float,
+        default=90.0,
+        help="Maximum timestamp skew allowed when selecting nearest backtest artifacts",
+    )
     parser.add_argument("--report-out", type=Path, default=Path("data/backtests/shadow-reports"))
     parser.add_argument("--tolerance-config", type=Path)
     parser.add_argument("--strict", action="store_true", help="Treat WARN verdicts as FAIL")
@@ -108,13 +139,18 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def compare_from_args(args: argparse.Namespace) -> dict[str, Any]:
-    local_sweep = load_artifact(args.local_sweep)
-    remote_sweep = load_artifact(args.remote_sweep)
+    input_selection = resolve_inputs(args)
+    local_sweep = load_artifact(input_selection["local_sweep"])
+    remote_sweep = load_artifact(input_selection["remote_sweep"])
     if local_sweep.sha256 == remote_sweep.sha256:
         raise UsageError("local and remote sweep inputs are identical (sha256 match)")
 
-    local_best = load_artifact(args.local_best) if args.local_best else None
-    remote_best = load_artifact(args.remote_best) if args.remote_best else None
+    local_best = (
+        load_artifact(input_selection["local_best"]) if input_selection["local_best"] else None
+    )
+    remote_best = (
+        load_artifact(input_selection["remote_best"]) if input_selection["remote_best"] else None
+    )
     if local_best and remote_best and local_best.sha256 == remote_best.sha256:
         raise UsageError("local and remote best inputs are identical (sha256 match)")
 
@@ -126,6 +162,7 @@ def compare_from_args(args: argparse.Namespace) -> dict[str, Any]:
         remote_best=remote_best,
         tolerance=tolerance,
         strict=args.strict,
+        selection=input_selection["selection"],
     )
     write_reports(report, args.report_out)
     return report
@@ -139,6 +176,7 @@ def compare_artifacts(
     remote_best: Artifact | None = None,
     tolerance: dict[str, Any] | None = None,
     strict: bool = False,
+    selection: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     tolerance = tolerance or default_tolerance()
     compared_at = datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
@@ -218,7 +256,114 @@ def compare_artifacts(
             "remote_top3": [summarize_row(row) for row in remote_top3],
         },
     }
+    if selection is not None:
+        report["selection"] = selection
     return _json_safe(report)
+
+
+def resolve_inputs(args: argparse.Namespace) -> dict[str, Any]:
+    direct_args = (args.local_sweep, args.remote_sweep, args.local_best, args.remote_best)
+    has_direct = any(value is not None for value in direct_args)
+    has_roots = args.local_root is not None or args.remote_root is not None
+    if has_direct and has_roots:
+        raise UsageError("use either exact artifact paths or --local-root/--remote-root, not both")
+    if has_direct:
+        if args.local_sweep is None or args.remote_sweep is None:
+            raise UsageError("--local-sweep and --remote-sweep must be provided together")
+        return {
+            "local_sweep": args.local_sweep,
+            "remote_sweep": args.remote_sweep,
+            "local_best": args.local_best,
+            "remote_best": args.remote_best,
+            "selection": None,
+        }
+    if args.local_root is None or args.remote_root is None:
+        raise UsageError("provide exact artifact paths or --local-root/--remote-root")
+    if args.max_skew_minutes < 0:
+        raise UsageError("--max-skew-minutes must be >= 0")
+
+    local_candidates = discover_backtest_candidates(args.local_root, "local")
+    remote_candidates = discover_backtest_candidates(args.remote_root, "remote")
+    local, remote, skew_seconds = nearest_candidate_pair(local_candidates, remote_candidates)
+    max_skew_seconds = args.max_skew_minutes * 60
+    if skew_seconds > max_skew_seconds:
+        raise UsageError(
+            "nearest backtest artifacts are "
+            f"{skew_seconds:.0f}s apart, exceeding --max-skew-minutes={args.max_skew_minutes:g}"
+        )
+    selection = {
+        "mode": "nearest_backtest_artifact",
+        "local_root": str(args.local_root),
+        "remote_root": str(args.remote_root),
+        "local": local.summary(),
+        "remote": remote.summary(),
+        "time_skew_seconds": skew_seconds,
+        "max_skew_minutes": args.max_skew_minutes,
+        "candidate_counts": {
+            "local": len(local_candidates),
+            "remote": len(remote_candidates),
+        },
+    }
+    return {
+        "local_sweep": local.sweep,
+        "remote_sweep": remote.sweep,
+        "local_best": local.best,
+        "remote_best": remote.best,
+        "selection": selection,
+    }
+
+
+def discover_backtest_candidates(root: Path, label: str) -> list[BacktestCandidate]:
+    if not root.exists():
+        raise UsageError(f"--{label}-root does not exist: {root}")
+    if not root.is_dir():
+        raise UsageError(f"--{label}-root must be a directory: {root}")
+    try:
+        paths = sorted(root.rglob("*.json"))
+    except OSError as exc:
+        raise InputReadError(f"{root}: {exc}") from exc
+
+    sweeps: dict[datetime, Path] = {}
+    bests: dict[datetime, Path] = {}
+    for path in paths:
+        if (timestamp := parse_artifact_timestamp(path, "strategy_sweep")) is not None:
+            sweeps.setdefault(timestamp, path)
+        elif (timestamp := parse_artifact_timestamp(path, "best_per_symbol")) is not None:
+            bests.setdefault(timestamp, path)
+
+    candidates = [
+        BacktestCandidate(timestamp=timestamp, sweep=sweep, best=bests.get(timestamp))
+        for timestamp, sweep in sweeps.items()
+    ]
+    if not candidates:
+        raise UsageError(f"--{label}-root has no strategy_sweep_<timestamp>.json artifacts: {root}")
+    return sorted(candidates, key=lambda item: item.timestamp)
+
+
+def parse_artifact_timestamp(path: Path, prefix: str) -> datetime | None:
+    marker = f"{prefix}_"
+    if not path.name.startswith(marker) or not path.name.endswith(".json"):
+        return None
+    stamp = path.name.removeprefix(marker).removesuffix(".json")
+    try:
+        return datetime.strptime(stamp, "%Y%m%dT%H%M%SZ").replace(tzinfo=UTC)
+    except ValueError:
+        return None
+
+
+def nearest_candidate_pair(
+    local_candidates: list[BacktestCandidate],
+    remote_candidates: list[BacktestCandidate],
+) -> tuple[BacktestCandidate, BacktestCandidate, float]:
+    best: tuple[BacktestCandidate, BacktestCandidate, float] | None = None
+    for local in local_candidates:
+        for remote in remote_candidates:
+            skew = abs((local.timestamp - remote.timestamp).total_seconds())
+            if best is None or skew < best[2]:
+                best = (local, remote, skew)
+    if best is None:
+        raise UsageError("no local/remote backtest artifact candidates found")
+    return best
 
 
 def compare_row(
@@ -674,7 +819,9 @@ def metadata_summary(
     local_metadata: dict[str, Any],
     remote_metadata: dict[str, Any],
 ) -> dict[str, Any]:
-    local_source = local_metadata.get("source") if isinstance(local_metadata.get("source"), dict) else {}
+    local_source = (
+        local_metadata.get("source") if isinstance(local_metadata.get("source"), dict) else {}
+    )
     remote_source = (
         remote_metadata.get("source") if isinstance(remote_metadata.get("source"), dict) else {}
     )
@@ -832,11 +979,29 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"**Bar window**: local {summary['bar_window_local'][0] or '-'} -> {summary['bar_window_local'][1] or '-'}, "
         f"remote {summary['bar_window_remote'][0] or '-'} -> {summary['bar_window_remote'][1] or '-'}",
         "",
-        "## Top-3 Leaderboard (Sortino)",
-        "",
-        "| Rank | Local | Remote | Match? |",
-        "|---:|---|---|:---:|",
     ]
+    selection = report.get("selection")
+    if isinstance(selection, dict):
+        lines.extend(
+            [
+                "## Artifact Selection",
+                "",
+                f"- Mode: `{selection.get('mode', '-')}`",
+                f"- Local run timestamp: `{selection.get('local', {}).get('run_timestamp', '-')}`",
+                f"- Remote run timestamp: `{selection.get('remote', {}).get('run_timestamp', '-')}`",
+                f"- Time skew seconds: `{selection.get('time_skew_seconds', '-')}`",
+                f"- Candidate counts: local `{selection.get('candidate_counts', {}).get('local', '-')}`, remote `{selection.get('candidate_counts', {}).get('remote', '-')}`",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "## Top-3 Leaderboard (Sortino)",
+            "",
+            "| Rank | Local | Remote | Match? |",
+            "|---:|---|---|:---:|",
+        ]
+    )
     local_top = report["leaderboard"]["local_top3"]
     remote_top = report["leaderboard"]["remote_top3"]
     for idx in range(3):
@@ -932,6 +1097,10 @@ def fmt_bool(value: Any) -> str:
     if value is None:
         return "unknown"
     return "yes" if bool(value) else "no"
+
+
+def iso_z(value: datetime) -> str:
+    return value.astimezone(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def get_nested(row: dict[str, Any], dotted: str) -> Any:
