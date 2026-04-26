@@ -46,6 +46,9 @@ def test_known_public_probes_return_no_content(monkeypatch):
     for path in (
         "/.git/config",
         "/feed/",
+        "/favicon.ico",
+        "/robots.txt",
+        "/security.txt",
         "/wp-admin/install.php?step=1",
         "/wp-includes/ID3/license.txt",
     ):
@@ -53,6 +56,25 @@ def test_known_public_probes_return_no_content(monkeypatch):
         assert response.status_code == 204
         assert response.text == ""
         assert response.headers["Cache-Control"] == "no-store"
+
+
+def test_config_probe_patterns_return_no_content(monkeypatch):
+    client = _load_analytics_app(monkeypatch)
+
+    for path in (
+        "/.env",
+        "/.well-known/assetlinks.json",
+        "/__env.js",
+        "/_config.js",
+        "/config.json",
+        "/env.js",
+        "/runtime-config.js",
+        "/settings.json",
+        "/phpmyadmin/index.php",
+    ):
+        response = client.get(path)
+        assert response.status_code == 204
+        assert response.text == ""
 
 
 def test_wordpress_manifest_probe_suffix_returns_no_content(monkeypatch):
