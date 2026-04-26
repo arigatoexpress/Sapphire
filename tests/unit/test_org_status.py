@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+from copy import deepcopy
 from pathlib import Path
 
 import yaml
@@ -59,14 +60,18 @@ def test_manifest_tracks_required_core_and_satellite_fields() -> None:
             assert repo["required_guardrails"]
 
 
-def test_collect_status_no_external_handles_local_ci_without_live_tools() -> None:
-    manifest = _manifest()
+def test_collect_status_no_external_handles_local_ci_without_live_tools(tmp_path: Path) -> None:
+    manifest = deepcopy(_manifest())
+    for repo in manifest["repos"]:
+        repo["local_path"] = str(tmp_path / repo["id"])
 
     report = org_status.collect_status(manifest, external=False)
 
     assert report["schema_version"] == 1
     assert report["summary"]["repo_count"] == len(manifest["repos"])
     assert "repo_classifications" in report["summary"]
+    assert sorted(report["summary"]["missing_local_repos"]) == sorted(repo["id"] for repo in manifest["repos"])
+    assert report["summary"]["dirty_repos"] == []
     assert len(report["gcp_projects"]) == len(manifest["gcp_projects"])
     assert report["local_runtime"]["docker"]["checked"] is False
     assert all(row["status"] == "not_checked" for row in report["local_runtime"]["launchagents"])

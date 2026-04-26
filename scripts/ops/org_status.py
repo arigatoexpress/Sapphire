@@ -83,7 +83,7 @@ def summarize(manifest: dict[str, Any], repos: list[dict[str, Any]]) -> dict[str
     return {
         "repo_count": len(repos),
         "repo_classifications": classifications,
-        "dirty_repos": [repo["id"] for repo in repos if repo.get("dirty_count", 0) > 0],
+        "dirty_repos": [repo["id"] for repo in repos if (repo.get("dirty_count") or 0) > 0],
         "missing_local_repos": [repo["id"] for repo in repos if not repo.get("exists")],
         "open_pr_count": sum(len(repo.get("open_prs", [])) for repo in repos),
         "routine_stages": stage_counts(manifest.get("routines", [])),
