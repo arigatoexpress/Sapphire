@@ -13,6 +13,7 @@ The autonomy audit log is append-only JSONL. By default it writes to
 
 - `autonomy.decision_evaluated`
 - `autonomy.alert_detected`
+- `autonomy.cycle.requested`
 
 ## Schema
 
@@ -31,6 +32,9 @@ Decision metadata intentionally records summaries only: signal id, symbol,
 direction, original/adjusted confidence, rules fired, reason count, and
 world-state keys. It does not write raw signals, prompts, request bodies,
 secrets, order payloads, or full world snapshots.
+
+Control-plane autonomy cycle metadata records payload key names and a hash of
+the requested actor only. It does not write raw bridge payload values.
 
 ## Safety Rules
 
