@@ -17,31 +17,50 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 DEFAULT_PROJECTS = ("tho-ai-agent", "sapphire-479610")
 DEFAULT_REGION = "us-central1"
 PUBLIC_PROBE_MARKERS = (
+    "/.aws",
+    "/.composer",
     "/.env",
     "/.git",
+    "/.htpasswd",
+    "/.vscode",
     "/.well-known",
     "/__",
     "/_ah",
     "/_config",
     "/actuator",
+    "/application.",
+    "/appsettings.",
     "/boaform",
+    "/config/",
     "/config.",
+    "/connectionstrings.",
+    "/credentials.",
     "/cgi-bin",
     "/definitely-not-a-real-route",
+    "/ecosystem.config.",
     "/env.",
+    "/error.log",
     "/phpmyadmin",
     "/runtime-",
     "/security.txt",
+    "/secrets.",
+    "/server-status",
+    "/serverless.",
     "/settings.",
+    "/storage/",
+    "/terraform.",
     "/vendor/phpunit",
+    "/web.config",
     "/wp-",
+    "backup.zip",
     "wordpress",
     "xmlrpc.php",
+    ".bak",
     ".php",
 )
 
@@ -103,17 +122,19 @@ def summarize_billing(project: str) -> dict[str, Any]:
 
 
 def summarize_cloud_run(project: str, region: str) -> dict[str, Any]:
-    result = _run_gcloud_json([
-        "run",
-        "services",
-        "list",
-        "--project",
-        project,
-        "--region",
-        region,
-        "--platform",
-        "managed",
-    ])
+    result = _run_gcloud_json(
+        [
+            "run",
+            "services",
+            "list",
+            "--project",
+            project,
+            "--region",
+            region,
+            "--platform",
+            "managed",
+        ]
+    )
     if not result.ok:
         return {
             "project": project,
@@ -137,7 +158,7 @@ def summarize_service(project: str, region: str, service: dict[str, Any]) -> dic
     metadata = service.get("metadata") or {}
     annotations = metadata.get("annotations") or {}
     status = service.get("status") or {}
-    template_obj = ((service.get("spec") or {}).get("template") or {})
+    template_obj = (service.get("spec") or {}).get("template") or {}
     template_annotations = (template_obj.get("metadata") or {}).get("annotations") or {}
     template = template_obj.get("spec") or {}
     containers = template.get("containers") or []
@@ -198,20 +219,19 @@ def summarize_logging_warnings(
     lookback = timedelta(hours=hours) if hours is not None else timedelta(days=days)
     lookback_label = f"{hours}h" if hours is not None else f"{days}d"
     since = (datetime.now(UTC) - lookback).isoformat(timespec="seconds")
-    query = (
-        'resource.type="cloud_run_revision" '
-        f'timestamp>="{since}" '
-        'severity>=WARNING'
+    query = f'resource.type="cloud_run_revision" timestamp>="{since}" severity>=WARNING'
+    result = _run_gcloud_json(
+        [
+            "logging",
+            "read",
+            query,
+            "--project",
+            project,
+            "--limit",
+            str(limit),
+        ],
+        timeout=45,
     )
-    result = _run_gcloud_json([
-        "logging",
-        "read",
-        query,
-        "--project",
-        project,
-        "--limit",
-        str(limit),
-    ], timeout=45)
     if not result.ok:
         return {
             "project": project,
@@ -229,7 +249,7 @@ def summarize_logging_warnings(
     by_route_category: Counter[str] = Counter()
     by_warning_kind: Counter[str] = Counter()
     for entry in result.data or []:
-        labels = ((entry.get("resource") or {}).get("labels") or {})
+        labels = (entry.get("resource") or {}).get("labels") or {}
         http_request = entry.get("httpRequest") or {}
         service = str(labels.get("service_name") or "unknown")
         severity = str(entry.get("severity") or "DEFAULT")
@@ -262,7 +282,7 @@ def route_category(request_url: object) -> str:
     if not request_url:
         return "no_http_request"
     try:
-        path = urlparse(str(request_url)).path.lower().rstrip("/") or "/"
+        path = decode_path(urlparse(str(request_url)).path).lower().rstrip("/") or "/"
     except ValueError:
         return "invalid_url"
     if path == "/":
@@ -281,14 +301,22 @@ def route_category(request_url: object) -> str:
     return f"/{first}/*" if first else "other"
 
 
+def decode_path(path: str) -> str:
+    """Decode a URL path without exposing query strings or raw payloads."""
+    decoded = str(path or "")
+    for _ in range(3):
+        next_value = unquote(decoded)
+        if next_value == decoded:
+            break
+        decoded = next_value
+    return decoded
+
+
 def warning_kind(entry: dict[str, Any]) -> str:
     """Classify a warning without returning raw messages, URLs, or payloads."""
     http_request = entry.get("httpRequest") or {}
     status = str(http_request.get("status") or "")
-    text = " ".join(
-        str(entry.get(field) or "").lower()
-        for field in ("textPayload", "message")
-    )
+    text = " ".join(str(entry.get(field) or "").lower() for field in ("textPayload", "message"))
     json_payload = entry.get("jsonPayload")
     if isinstance(json_payload, dict):
         text = f"{text} {str(json_payload.get('message') or '').lower()}"
@@ -356,13 +384,15 @@ def render_markdown(report: dict[str, Any]) -> str:
             )
         )
 
-    lines.extend([
-        "",
-        "## Cloud Run",
-        "",
-        "| Project | Service | Min | Max | CPU | Memory | Latest Ready | Cost Risks |",
-        "|---|---|---:|---:|---|---|---|---|",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Cloud Run",
+            "",
+            "| Project | Service | Min | Max | CPU | Memory | Latest Ready | Cost Risks |",
+            "|---|---|---:|---:|---|---|---|---|",
+        ]
+    )
     for project in report["projects"]:
         cloud_run = project["cloud_run"]
         if not cloud_run["available"]:
@@ -386,13 +416,15 @@ def render_markdown(report: dict[str, Any]) -> str:
                 )
             )
 
-    lines.extend([
-        "",
-        "## Warning Logs",
-        "",
-        "| Project | Available | Entries Sampled | At Limit | By Service | By Severity | By Status | Route Categories | Warning Kinds | Notes |",
-        "|---|---:|---:|---:|---|---|---|---|---|---|",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Warning Logs",
+            "",
+            "| Project | Available | Entries Sampled | At Limit | By Service | By Severity | By Status | Route Categories | Warning Kinds | Notes |",
+            "|---|---:|---:|---:|---|---|---|---|---|---|",
+        ]
+    )
     for project in report["projects"]:
         warnings = project["logging_warnings"]
         lines.append(
@@ -451,7 +483,9 @@ def parse_args() -> argparse.Namespace:
         type=int,
         help="Warning log lookback in hours. Overrides --days when provided.",
     )
-    parser.add_argument("--log-limit", type=int, default=1000, help="Max warning log entries to sample.")
+    parser.add_argument(
+        "--log-limit", type=int, default=1000, help="Max warning log entries to sample."
+    )
     parser.add_argument("--format", choices=("markdown", "json"), default="markdown")
     return parser.parse_args()
 

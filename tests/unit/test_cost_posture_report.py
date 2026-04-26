@@ -264,7 +264,10 @@ def test_render_markdown_marks_warning_sample_at_limit():
     output = cost_report.render_markdown(report)
 
     assert "- Warning lookback: `1h`" in output
-    assert "| Project | Available | Entries Sampled | At Limit | By Service | By Severity | By Status | Route Categories | Warning Kinds | Notes |" in output
+    assert (
+        "| Project | Available | Entries Sampled | At Limit | By Service | By Severity | By Status | Route Categories | Warning Kinds | Notes |"
+        in output
+    )
     assert (
         "| tho-ai-agent | yes | 200 | yes | sapphire-analytics:185 | WARNING:200 | 404:185, 500:15 | /api/*:15, public_probe:185 | client_http_error:185, server_http_error:15 | - |"
         in output
@@ -273,8 +276,15 @@ def test_render_markdown_marks_warning_sample_at_limit():
 
 def test_route_category_collapses_probe_paths_without_query_values():
     assert cost_report.route_category("https://example.invalid/healthz/") == "health"
-    assert cost_report.route_category("https://example.invalid/__env.js?debug=sample") == "public_probe"
+    assert (
+        cost_report.route_category("https://example.invalid/__env.js?debug=sample")
+        == "public_probe"
+    )
     assert cost_report.route_category("https://example.invalid/runtime-config.js") == "public_probe"
+    assert cost_report.route_category("https://example.invalid/.%2565%256ev") == "public_probe"
+    assert cost_report.route_category("https://example.invalid/credentials.json") == "public_probe"
+    assert cost_report.route_category("https://example.invalid/terraform.tfstate") == "public_probe"
+    assert cost_report.route_category("https://example.invalid/weird-backup.zip") == "public_probe"
     assert cost_report.route_category("https://example.invalid/docs/page") == "/docs/*"
 
 
