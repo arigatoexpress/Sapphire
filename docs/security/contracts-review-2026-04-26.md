@@ -403,3 +403,60 @@ Prioritised, with suggested PR boundaries:
    `AccessControl` and consider a UUPS proxy if the verifier is expected to evolve.
 
 This review is doc-only; no `.sol`, `foundry.toml`, or deploy script was modified.
+
+## 2026-04-26 follow-up — High findings landed
+
+Branch: `feat/contracts-high-findings-2026-04-26`. PR title: `Address High findings
+from contracts review (2026-04-26)`. Scope is strictly the four High items from
+the table above; Medium / Low / Info polish is left for follow-up PRs.
+
+### Addressed in this PR
+
+1. **DoS via `setPricePerSignal(0)`** — fixed in `SapphirePaymentGate.sol` by
+   adding `require(price > 0, "Zero price");` to `setPricePerSignal`. Natspec
+   updated to call out the rationale and the link back to this review.
+2. **`setMonthlySubscription(0)` lets anyone subscribe for free** — fixed in
+   `SapphirePaymentGate.sol` by adding `require(price > 0, "Zero price");` to
+   `setMonthlySubscription`. Natspec updated.
+3. **Single-step role transfer** — both contracts now use a hand-rolled
+   two-step transfer (no OpenZeppelin dependency added, per the PR
+   constraints):
+   - `SapphireSignalVerifier.sol`: new `address public pendingOperator;`
+     storage slot, new `acceptOperator()` external function,
+     `transferOperator` now nominates rather than mutates. New events
+     `OperatorTransferStarted(previousOperator, newOperator)` and
+     `OperatorTransferred(previousOperator, newOperator)`.
+   - `SapphirePaymentGate.sol`: symmetric — `pendingTreasury` slot,
+     `acceptTreasury()` function, `TreasuryTransferStarted` and
+     `TreasuryTransferred` events.
+
+   Existing public ABI surfaces (`transferOperator(address)` /
+   `transferTreasury(address)` selectors, plus all storage getters and other
+   functions) are preserved — only their behaviour changes (now they nominate
+   instead of mutating). New functions and storage are additive.
+
+### Deferred
+
+4. **Deployment leaves operator + treasury on a single hot key** — runbook /
+   process finding, not a contract change. The PR constraints explicitly
+   forbid edits to `scripts/deploy_robinhood_chain.py`, so the recommended
+   `--owner` flag and post-deploy `transferOperator` / `transferTreasury` block
+   are out of scope here. The mitigation is documented at
+   `docs/crypto-integrations-plan.md` and is now strictly stronger thanks to
+   the two-step transfer landed in this PR — a single-key deploy can still
+   nominate a multisig as the new role-holder, and the multisig must
+   explicitly call `acceptOperator` / `acceptTreasury` before the takeover
+   completes. A follow-up PR should land the deploy-script change separately.
+
+### Test coverage added
+
+`tests/unit/test_contracts_abi.py` — 41 text-level smoke tests over both
+`.sol` files. Covers (a) presence of the new error strings and event
+signatures, (b) the new two-step storage slots and accept functions, and (c)
+preservation of every previously-public ABI surface. These do not replace a
+real Foundry suite (still recommended in the section above) — they are a
+lightweight CI guard against accidental regression of this PR's changes.
+
+`forge` remains uninstalled in the CI environment, so a runnable Foundry
+suite is still deferred to a follow-up PR.
+
