@@ -289,5 +289,9 @@ waves:
     status: queued
     objective: Schema and audit-log alignment for intel, Foundry, GCS, and BigQuery
   - id: wave-5-autonomy-safety
-    status: queued
+    status: in_progress
     objective: Confirmation firewall, audit log, feedback loop, cost report, and dry-run defaults
+    tracking:
+      - docs/org/autonomy-audit-log.md
+      - scripts/ops/safety_status_report.py
+      - tests/unit/test_autonomy_dry_run_defaults.py
