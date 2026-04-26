@@ -223,6 +223,61 @@ def test_bad_invocation_uses_sysexits_usage_code() -> None:
     assert comparator.main(["--local-sweep", "only-one-side.json", "--quiet"]) == 64
 
 
+def test_nearest_backtest_artifact_selection_writes_metadata(tmp_path: Path) -> None:
+    local_root = tmp_path / "local-backtests"
+    remote_root = tmp_path / "remote-artifact"
+    _write_backtest_pair(local_root, "20260426T010000Z", "2026-04-26T01:00:00+00:00")
+    _write_backtest_pair(local_root, "20260426T040003Z", "2026-04-26T04:00:03+00:00")
+    _write_backtest_pair(
+        remote_root / "data" / "backtests" / "strategies",
+        "20260426T043620Z",
+        "2026-04-26T04:36:20+00:00",
+    )
+    report_dir = tmp_path / "reports"
+
+    exit_code = comparator.main(
+        [
+            "--local-root",
+            str(local_root),
+            "--remote-root",
+            str(remote_root),
+            "--report-out",
+            str(report_dir),
+            "--quiet",
+        ]
+    )
+
+    assert exit_code == 0
+    payload = json.loads(next(report_dir.glob("*.json")).read_text())
+    assert payload["selection"]["mode"] == "nearest_backtest_artifact"
+    assert payload["selection"]["local"]["run_timestamp"] == "2026-04-26T04:00:03Z"
+    assert payload["selection"]["remote"]["run_timestamp"] == "2026-04-26T04:36:20Z"
+    assert payload["selection"]["time_skew_seconds"] == 2177.0
+    assert payload["inputs"]["local_best"]["path"].endswith("best_per_symbol_20260426T040003Z.json")
+    assert payload["summary"]["leaderboard_top3_order_equal"] is True
+
+
+def test_nearest_backtest_artifact_selection_rejects_stale_pairing(tmp_path: Path) -> None:
+    local_root = tmp_path / "local-backtests"
+    remote_root = tmp_path / "remote-artifact"
+    _write_backtest_pair(local_root, "20260426T010000Z", "2026-04-26T01:00:00+00:00")
+    _write_backtest_pair(remote_root, "20260426T030000Z", "2026-04-26T03:00:00+00:00")
+
+    exit_code = comparator.main(
+        [
+            "--local-root",
+            str(local_root),
+            "--remote-root",
+            str(remote_root),
+            "--max-skew-minutes",
+            "30",
+            "--quiet",
+        ]
+    )
+
+    assert exit_code == 64
+
+
 def _artifact(*, computed_at: str, best: bool = False, extra_rows: int = 0) -> dict:
     rows = [
         _row("RegimeAwareRSI", "BTC-USD", 10.0, 2),
@@ -294,5 +349,15 @@ def _report(symbol: str, trades: int) -> dict:
 
 
 def _write(path: Path, payload: dict) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2) + "\n")
     return path
+
+
+def _write_backtest_pair(root: Path, stamp: str, computed_at: str) -> tuple[Path, Path]:
+    sweep = _write(root / f"strategy_sweep_{stamp}.json", _artifact(computed_at=computed_at))
+    best = _write(
+        root / f"best_per_symbol_{stamp}.json",
+        _artifact(computed_at=computed_at, best=True),
+    )
+    return sweep, best

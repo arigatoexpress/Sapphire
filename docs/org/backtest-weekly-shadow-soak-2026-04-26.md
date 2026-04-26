@@ -37,6 +37,17 @@ Comparator command:
 
 ```bash
 python3 scripts/ops/compare_backtest_artifacts.py \
+  --local-root data/backtests/strategies \
+  --remote-root /path/to/gh-artifact \
+  --max-skew-minutes 90
+```
+
+The comparator records the selected local and remote run timestamps, selected
+sweep/best-per-symbol paths, candidate counts, and time skew in the JSON and
+Markdown reports. Exact-path comparison remains available for forensic reruns:
+
+```bash
+python3 scripts/ops/compare_backtest_artifacts.py \
   --local-sweep data/backtests/strategies/strategy_sweep_20260426T040003Z.json \
   --remote-sweep /tmp/sapphire-backtest-shadow.FqMOkm/weekly-backtest-24948338321/data/backtests/strategies/strategy_sweep_20260426T043620Z.json \
   --local-best data/backtests/strategies/best_per_symbol_20260426T040003Z.json \
