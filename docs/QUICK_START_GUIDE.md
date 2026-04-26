@@ -154,7 +154,7 @@ Once TradingView Desktop is configured with the debug port:
 
 ## 📚 More Documentation
 
-- [Operational Status](OPERATIONAL_STATUS.md) - Full system status
-- [TV Agent Windows Setup](TV_AGENT_WINDOWS_SETUP.md) - Windows-specific guide
+- Operational Status <!-- removed: file deleted 2026-03-18 --> - Full system status
+- TV Agent Windows Setup <!-- removed: file deleted 2026-03-18 --> - Windows-specific guide
 - [Logging](LOGGING.md) - Logging infrastructure
 - [GitHub](https://github.com/arigatoexpress/Sapphire) - Full codebase
