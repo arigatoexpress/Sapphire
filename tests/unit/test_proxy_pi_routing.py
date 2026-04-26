@@ -267,7 +267,7 @@ def test_default_qwen_routes_match_verified_windows_inventory() -> None:
 
 
 def test_qwen36_alias_can_fall_back_to_exact_mac_model() -> None:
-    """qwen3.6 is Mac-installed, so explicit alias must not force a 503."""
+    """qwen3.6 keeps exact Mac fallback even when Windows is unavailable."""
     assert proxy_app.MODEL_TIERS["qwen3.6"] == "qwen3.6:27b"
     assert "qwen3.6:27b" in proxy_app.MAC_MODELS
     assert "qwen3.6:27b" in proxy_app.MAC_EXACT_FALLBACK_MODELS

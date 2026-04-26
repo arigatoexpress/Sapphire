@@ -74,7 +74,7 @@ If the Windows GPU were connected to the Pi cluster via wired Ethernet (not WiFi
 - Current network topology doesn't support this without a switch/USB-Ethernet adapter
 
 ### 2. Smaller models with balanced layer split  
-A 27B model like `qwen3.6:27b` (17.0 GB) fits with slight spill in 16 GB VRAM — Pi RPC adds only latency.
+A 27B model like `qwen3.6:27b` (17.4 GB) fits with slight spill in 16 GB VRAM; the 2026-04-26 Windows benchmark measured about 7 tok/s, so it stays an explicit alias rather than the default `deep` route. Pi RPC adds only latency.
 Only models that genuinely spill benefit from RPC, and only when the network is fast.
 
 ### 3. Pi-to-Pi coordination  

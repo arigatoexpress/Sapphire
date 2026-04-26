@@ -45,7 +45,7 @@
       "clawProfile": "windows-workbench",
       "agents": ["claw-code"],
       "gpu": "NVIDIA RTX 5070 Ti (16GB GDDR7)",
-      "ollamaModels": "28 models (nemotron-cascade-2, llama3.3:70b, deepseek-r1, qwen3:14b, qwen3.5:9b, qwen2.5:32b, gemma4, gemma3, phi4, gpt-oss:20b, etc.; qwen3.6:27b install pending)",
+      "ollamaModels": "29 models (nemotron-cascade-2, llama3.3:70b, deepseek-r1, qwen3:14b, qwen3.5:9b, qwen3.6:27b, qwen2.5:32b, gemma4, gemma3, phi4, gpt-oss:20b, etc.; qwen3.6:27b explicit alias benchmarked ~7 tok/s)",
       "services": [
         {"name": "ollama", "port": 11434, "status": "active", "task": "OllamaTailscale"},
         {"name": "webhook", "port": 9090, "status": "active", "task": "SapphireWebhook"}
