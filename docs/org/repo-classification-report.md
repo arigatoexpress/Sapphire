@@ -13,8 +13,8 @@ overlap Sapphire autonomy.
 
 ## Absorb Candidates
 
-- `kimi-tools` -> `sapphire`: absorb-ready, no live callers found. The
-  local-only Kimi HTTP utilities overlap Sapphire inference-proxy/router
+- `kimi-tools` -> `sapphire`: absorb guardrails tested, no live callers found.
+  The local-only Kimi HTTP utilities overlap Sapphire inference-proxy/router
   behavior; follow `docs/org/kimi-tools-absorb-map.md` before archive approval.
 - `tradingview-mcp-v2` -> `tradingview-mcp`: conditional. Upstream hardening is
   open in PR #102, but Ari cannot merge upstream. If it stalls or becomes
@@ -31,8 +31,8 @@ archive after an absorb PR, tests, rollback notes, and a soak window.
 - Keep watching the TradingView MCP v2 upstream guardrail PR.
 - Audit Hermes Sapphire skill command surfaces before moving or deleting any
   agent-facing skill.
-- Add Sapphire tests for Kimi alias/provider behavior before retiring the
-  standalone `kimi-tools` workbench.
+- Keep the standalone `kimi-tools` workbench read-only during soak; archive
+  only through a later dedicated cleanup PR/report.
 
 ## Safety
 
