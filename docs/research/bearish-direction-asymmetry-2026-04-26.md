@@ -22,7 +22,16 @@ What is **not** in this delivery (still proposed in §4):
 
 - Layer A — chain factors (funding rate, OI) into `predict.py`.
 - Layer B — real `direction="short"` emission across `RegimeAwareRSI`, `MultiTFMomentum`, `CorrelationBreakout`, `SapphireComposite`. The trading critical path remains long/flat-only on these strategies.
-- Backtest harness from §4.5 — required before any threshold default is moved away from 1.5.
+
+Subsequent delivery (PR scaffolding the harness, no critical-path changes):
+
+- `lib/analytics/backtest_harness.py` exposes `HarnessConfig`, `run_harness`,
+  and a CLI matching the §4.5 gate. Acceptance defaults are conservative
+  (`total_trades >= 30`, `mean_sortino >= 0.5`, `deflated_sharpe >= 0`,
+  `max_drawdown_pct <= 35.0`). The harness reads CSV from
+  `data/backtests/<symbol>/<timeframe>/*.csv`; those files are **not** in the
+  repo, so the harness exits WARN (10) until they are populated. See §4.5 for
+  the data gap discussion.
 
 Operator default for the production LaunchAgent has **not** been changed. The flag is staged; the historical accuracy snapshot still applies until the operator opts in.
 
@@ -299,27 +308,57 @@ HTTP) and with the existing `tests/conftest.py` fixtures unchanged.
 
 ### 4.5 Backtest plan
 
-Before any Layer lands, run the strategy sweep and the predictor offline:
+Before any Layer lands, run the strategy sweep and the predictor offline through
+the CPCV-grounded harness at [`lib/analytics/backtest_harness.py`](../../lib/analytics/backtest_harness.py).
 
 1. **Window:** 2025-04-01 → 2026-04-25 (one year, includes both up- and
    down-leg regimes; longer than the 90-day default in `lib/analytics/run_strategies.py`).
-2. **Tooling:** extend `lib/analytics/run_strategies.py` with a flag
-   `--include-chain-factors` so the pre/post comparison is one CLI run apart.
-   Persist results under `data/backtests/strategies/bearish_asymmetry/`.
+2. **Tooling:** the harness composes the existing `cpcv_splits`, `BacktestEngine`,
+   and `deflated_sharpe_ratio` primitives — it does not duplicate them. Invoke
+   per-strategy via:
+
+   ```bash
+   python3 -m lib.analytics.backtest_harness \
+       --strategy lib.analytics.strategies:RegimeAwareRSI \
+       --start 2025-04-01 --end 2026-04-25 \
+       --symbols BTC-USD,ETH-USD,SOL-USD
+   ```
+
+   Exit codes follow the same `0 / 10 / 20` (PASS / WARN / FAIL) contract as
+   `scripts/ops/compare_*_artifacts.py`. The pre/post Layer-A comparison is one
+   harness run before and after the chain-factor branch, persisted to
+   `data/backtests/strategies/bearish_asymmetry/`.
 3. **Universe:** BTC, ETH, SOL on daily bars (same as current sweep).
-4. **Metrics & acceptance gates** (all must hold for the change to merge):
+4. **Metrics & acceptance gates** (all must hold for the change to merge — these
+   are the conservative §4.5 thresholds the harness encodes):
+   - `total_trades >= 30` across all CPCV folds (insufficient evidence below this).
+   - `mean_sortino >= 0.5` — the §3 baseline says the system has positive drift,
+     so we require the strategy to actually beat zero on a downside-aware metric.
+   - `deflated_sharpe >= 0` — the Bailey & López de Prado 2014 multiple-testing
+     deflation must remain non-negative; `lib/analytics/deflated_sharpe.py` does
+     the work.
+   - `max_drawdown_pct <= 35.0` — worst-fold drawdown ceiling.
    - Bearish-direction precision (TP / (TP+FP)) goes from $0.125$ to $\ge 0.40$
-     on the holdout half of the window. We will not target $\ge 0.737$ (bull
-     parity) — that overshoots and risks H4 over-fitting.
-   - Bull-direction precision degrades by $\le 5$ percentage points (i.e.
-     stays $\ge 0.687$). This is the "do no harm" gate.
-   - Composite Sortino on the post-fix sweep $\ge$ pre-fix Sortino (current
-     leaderboard at `data/backtests/strategies/strategy_sweep_*.json`).
-   - DSR (deflated Sharpe — already computed in `lib/analytics/deflated_sharpe.py`)
-     for the bear-emitting variant of `FundingRateContrarian` is $> 0$.
-5. **Walk-forward / CPCV validation:** Use the existing `lib/analytics/cpcv.py`
-   harness with embargo = 5 bars. Reject if the bear-precision uplift fails to
-   replicate on $\ge 70\%$ of folds.
+     on the holdout half of the window. The harness does not currently compute
+     direction-conditioned precision; this is the manual sanity check the
+     reviewer runs alongside the harness output.
+   - Bull-direction precision degrades by $\le 5$ percentage points (stays
+     $\ge 0.687$). This is the "do no harm" gate.
+5. **Walk-forward / CPCV validation:** the harness uses
+   `cpcv_n_groups=6, cpcv_test_size=2, cpcv_embargo=0.02` by default
+   (15 splits per symbol, 2 % embargo). Reject if the bear-precision uplift
+   fails to replicate on $\ge 70\%$ of folds.
+6. **Data gap (honestly stated):** the harness reads OHLCV from
+   `data/backtests/<symbol>/<timeframe>/*.csv`. Those files do not exist in the
+   repo today — the trading critical path uses live yfinance via
+   `lib.analytics.backtest_engine.fetch_ohlcv`, which is non-deterministic in
+   CI. When the harness cannot find data for any requested symbol it returns a
+   `HarnessResult` with `acceptance.passes_section_4_5 == False` and
+   `reasons=["no historical data"]`, and the CLI exits **WARN (10)** rather
+   than FAIL. Populating `data/backtests/<symbol>/<timeframe>/*.csv` with the
+   §4.5 reference window (one daily-bars CSV per BTC/ETH/SOL ticker) is a
+   prerequisite for any Layer A or B PR to actually trip the gate; the
+   bootstrap script for that snapshot is **not** in this PR.
 
 If H1 / H2 fail the backtest gate but H3 (the threshold change) passes alone,
 ship only H3 as a defensive measure and reopen the doc.
