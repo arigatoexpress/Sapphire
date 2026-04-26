@@ -52,19 +52,22 @@ repos:
       region: us-central1
       service: agentic-pm-hub
       latest_ready_revision: agentic-pm-hub-00006-b57
-      validated_at: "2026-04-26T16:51:25Z"
+      validated_at: "2026-04-26T16:56:54Z"
       public_invoker: false
       authenticated_health_paths:
         - /health
         - /healthz/
       warning_kind: cloud_run_auth_required
       repo_pr: https://github.com/arigatoexpress/AgenticArigato/pull/1
+      authenticated_health_runbook: https://github.com/arigatoexpress/AgenticArigato/pull/2
+      authenticated_health_script: scripts/ops/check_agentic_pm_hub_health.sh
       validated_commands:
         - cd bd-analytics-agent && uv run pytest tests/unit -q
         - cd bd-analytics-agent && uv run ruff check app/server.py app/agent.py app/retrievers.py app/templates.py app/utils tests/unit
         - cd bd-analytics-agent && uv run ruff format app/server.py app/agent.py app/retrievers.py app/templates.py app/utils tests/unit --check
         - uvx pre-commit run --all-files
-      next_step: Add an authenticated-monitor runbook before any deploy or IAM change.
+        - scripts/ops/check_agentic_pm_hub_health.sh
+      next_step: No deploy or IAM change without a dedicated PR, blast-radius note, and rollback.
 
   - id: claw-code
     name: claw-code
