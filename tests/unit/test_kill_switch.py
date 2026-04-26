@@ -282,6 +282,60 @@ def test_appends_deactivation_to_audit_log(switch, clock, tmp_path):
     ]
 
 
+def test_manual_activate_and_deactivate_can_suppress_notify(clock, recorders, tmp_path):
+    audit_path = tmp_path / "manual-kill-switch.jsonl"
+    pub, notifier = recorders
+    ks = KillSwitch(
+        publish_event=pub,
+        notify=notifier,
+        now=clock.now,
+        audit_path=audit_path,
+    )
+
+    assert ks.force_activate("Telegram operator halt", portfolio_value=101_000, notify=False)
+    assert ks.is_active
+    assert ks.status().reason == "Telegram operator halt"
+    assert pub.events[-1][0] == "kill_switch.activated"
+    assert notifier.messages == []
+
+    assert ks.force_deactivate("Telegram operator resume", notify=False)
+    assert not ks.is_active
+    assert pub.events[-1][0] == "kill_switch.deactivated"
+    assert notifier.messages == []
+
+    records = [json.loads(line) for line in audit_path.read_text().splitlines()]
+    assert [r["event_type"] for r in records] == [
+        "kill_switch.activated",
+        "kill_switch.deactivated",
+    ]
+    assert records[0]["reason"] == "Telegram operator halt"
+    assert records[0]["portfolio_value"] == 101_000
+    assert records[1]["reason"] == "Telegram operator resume"
+
+
+def test_manual_activation_is_transition_only(clock, recorders, tmp_path):
+    pub, notifier = recorders
+    ks = KillSwitch(
+        publish_event=pub,
+        notify=notifier,
+        now=clock.now,
+        audit_path=tmp_path / "kill_switch.jsonl",
+    )
+
+    assert ks.force_activate("first halt") is True
+    assert ks.force_activate("duplicate halt") is False
+
+    activations = [e for e in pub.events if e[0] == "kill_switch.activated"]
+    assert len(activations) == 1
+    assert ks.status().reason == "first halt"
+
+
+def test_manual_deactivation_is_transition_only(switch, recorders):
+    pub, _ = recorders
+    assert switch.force_deactivate("inactive resume") is False
+    assert pub.events == []
+
+
 def test_audit_path_can_be_disabled(clock, recorders, tmp_path):
     pub, notifier = recorders
     ks = KillSwitch(
