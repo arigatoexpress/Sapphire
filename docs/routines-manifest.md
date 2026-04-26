@@ -36,6 +36,17 @@ Check: `launchctl list | grep sapphire` — every row should show a PID (online)
 | `com.sapphire.correlation-refresh` | hourly at :17      | `services.pipeline.correlation_refresh`     | `data/intelligence/latest/correlations.json`                       | Manual: `python3 -m services.pipeline.correlation_refresh` |
 | `com.sapphire.gcp-sync`            | hourly at :05      | `services.pipeline.gcp_sync`                | Uploads to `gs://sapphire-data-lake/raw/*`; Cloud Function loads BQ | Manual: `python3 -m services.pipeline.gcp_sync -v` |
 | `com.sapphire.logrotate`           | 03:30 CT daily     | `scripts/logrotate.sh`                      | `.gz` archives under `~/Library/Logs/sapphire/`                    | Manual: `bash scripts/logrotate.sh` |
+| `com.sapphire.backtest-weekly`      | Sat 22:00 local    | `python3 -m lib.analytics.run_strategies --days 90 --bankroll 10000` | `data/backtests/strategies/*.json`                                 | Remote shadow: `.github/workflows/weekly-backtest.yml`; keep local until artifacts soak clean |
+
+## 2.1 Remote-shadow schedules
+
+Remote shadows run in parallel with local LaunchAgents during the migration window.
+They do not replace the local routine until artifacts are compared and the local
+plist is explicitly disabled.
+
+| Workflow | Cron | Local routine shadowed | Output |
+|----------|------|------------------------|--------|
+| `.github/workflows/weekly-backtest.yml` | Sun 04:00 UTC | `com.sapphire.backtest-weekly` | GitHub Actions artifact `weekly-backtest-<run_id>` |
 
 All scripts are self-contained — they write their artifacts and exit. A routine is "healthy" if its artifact's mtime is within the expected cadence window.
 
