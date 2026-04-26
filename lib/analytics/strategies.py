@@ -767,7 +767,11 @@ def format_table(results: list[SweepResult], title: str = "", top_n: int = 60) -
     return "\n".join(lines)
 
 
-def save_results(results: list[SweepResult], tag: str = "") -> Path:
+def save_results(
+    results: list[SweepResult],
+    tag: str = "",
+    metadata: dict[str, Any] | None = None,
+) -> Path:
     """Persist all SweepResults to data/backtests/strategies/ as JSON."""
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
@@ -778,6 +782,8 @@ def save_results(results: list[SweepResult], tag: str = "") -> Path:
         "total_backtests": len(results),
         "results": [r.to_dict() for r in results],
     }
+    if metadata:
+        payload["metadata"] = metadata
     path.write_text(json.dumps(payload, indent=2))
     log.info("Saved %d results → %s", len(results), path)
     return path
