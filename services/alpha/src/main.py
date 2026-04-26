@@ -40,6 +40,7 @@ from src.api_handlers import (
     handle_system_logs,
 )
 from src.autonomy_audit_hooks import (
+    append_alpha_dispatch_evaluation_audit,
     append_alpha_session_created_audit,
     append_alpha_session_decision_audit,
 )
@@ -2385,6 +2386,16 @@ class AlphaEngine:
         brief = self._autonomy_request_brief(trigger, context)
 
         if self._autonomy_dry_run:
+            append_alpha_dispatch_evaluation_audit(
+                trigger=trigger,
+                agent_id=agent_id,
+                outcome="dry_run",
+                reason="dry_run",
+                context=context,
+                allow_code_changes=self._autonomy_allow_code_changes,
+                allow_gcloud_changes=self._autonomy_allow_gcloud_changes,
+                approval_required=self._autonomy_require_owner_approval,
+            )
             await self.telegram.send_message(
                 (
                     "🧪 Full autonomy dry-run cycle prepared.\n"
@@ -2418,6 +2429,16 @@ class AlphaEngine:
                 allow_gcloud_changes=self._autonomy_allow_gcloud_changes,
             )
         else:
+            append_alpha_dispatch_evaluation_audit(
+                trigger=trigger,
+                agent_id=agent_id,
+                outcome="no_dispatcher_available",
+                reason="no_dispatcher_available",
+                context=context,
+                allow_code_changes=self._autonomy_allow_code_changes,
+                allow_gcloud_changes=self._autonomy_allow_gcloud_changes,
+                approval_required=self._autonomy_require_owner_approval,
+            )
             return {"dispatched": False, "reason": "no_dispatcher_available", "trigger": trigger}
 
         # Resolve agent persona for Telegram messages
@@ -2489,6 +2510,16 @@ class AlphaEngine:
                 )
         else:
             reason = hook_result.get("reason", "unknown")
+            append_alpha_dispatch_evaluation_audit(
+                trigger=trigger,
+                agent_id=agent_id,
+                outcome="not_dispatched",
+                reason=str(reason or "unknown"),
+                context=context,
+                allow_code_changes=self._autonomy_allow_code_changes,
+                allow_gcloud_changes=self._autonomy_allow_gcloud_changes,
+                approval_required=self._autonomy_require_owner_approval,
+            )
             # Configuration-state reasons are not actionable — log quietly,
             # don't spam Telegram on every scheduled cycle.
             config_reasons = {
