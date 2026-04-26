@@ -291,7 +291,7 @@ Deployment: `scripts/deploy_robinhood_chain.py`. Foundry config: `foundry.toml`.
 | T3 Mac Ollama | `127.0.0.1:11434` | ~90 s | CPU inference fallback |
 | T4 Kimi Cloud | `api.moonshot.cn` | varies | Non-sensitive only — sensitivity classifier gates |
 
-**Model aliases:** `fast`/`quick` → nemotron-mini · `auto`/`balanced` → hermes3:8b · `deep` → qwen3.6:27b · `code` → gemma4 · `reason` → deepseek-r1:14b · `qwen-reason` → qwen3.6:27b · `cascade`/`moe` → nemotron-cascade-2 · `large` → qwen2.5:32b · `kimi` → kimi-cloud.
+**Model aliases:** `fast`/`quick` → nemotron-mini · `auto`/`balanced` → hermes3:8b · `deep` → qwen3:14b · `code` → gemma4 · `reason` → deepseek-r1:14b · `qwen-reason` → qwen3.5:9b · `qwen3.6` → qwen3.6:27b (Mac local, Windows install pending) · `cascade`/`moe` → nemotron-cascade-2 · `large` → qwen2.5:32b · `kimi` → kimi-cloud.
 
 **Endpoints:** `/v1/chat/completions` · `/v1/models` · `/health` · `/metrics` · x402-gated (optional).
 
