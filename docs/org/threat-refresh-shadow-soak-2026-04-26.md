@@ -61,6 +61,14 @@ hour 40 minutes before the local artifact and produced a FAIL due to four
 asymmetric CVE IDs. A close-time manual run removed the ID asymmetry, so this is
 being treated as timing drift until scheduled soak evidence proves otherwise.
 
+## Snapshot Retention
+
+`services/dashboard/refresh_threats.py` now writes a timestamped run snapshot at
+`data/intelligence/runs/YYYYMMDDTHHMMSSZ/threats.json` in addition to the
+dashboard-facing daily artifact and `latest` symlink. The remote workflow already
+uploads `data/intelligence/**/threats.json`, so scheduled soak comparisons can
+use the nearest local run snapshot instead of a later overwritten daily file.
+
 ## Soak Gate
 
 Do not retire the local LaunchAgent until all of the following are true:
