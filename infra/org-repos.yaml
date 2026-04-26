@@ -99,7 +99,16 @@ repos:
       - AGENTS.md or CLAUDE.md
       - CI on PR
       - pre-commit or equivalent lint/test parity
-    migration_state: hardening_needed
+    migration_state: upstream_pr_open
+    hardening_tracking:
+      upstream_pr: https://github.com/tradesdontlie/tradingview-mcp/pull/102
+      fork_repo: arigatoexpress/tradingview-mcp-upstream
+      local_branch: chore/ci-agent-guardrails
+      validated_at: "2026-04-26"
+      validated_commands:
+        - npm run check:syntax
+        - npm run test:offline
+      blocker: Upstream repository is read-only for Ari; merge requires upstream maintainer action.
 
   - id: crypto-tax-tracker
     name: crypto-tax-tracker

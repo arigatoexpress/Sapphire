@@ -60,6 +60,18 @@ def test_manifest_tracks_required_core_and_satellite_fields() -> None:
             assert repo["required_guardrails"]
 
 
+def test_tradingview_mcp_v2_tracks_upstream_hardening_pr() -> None:
+    repos = {repo["id"]: repo for repo in _manifest()["repos"]}
+    repo = repos["tradingview-mcp-v2"]
+
+    assert repo["migration_state"] == "upstream_pr_open"
+    assert repo["hardening_tracking"]["upstream_pr"] == "https://github.com/tradesdontlie/tradingview-mcp/pull/102"
+    assert repo["hardening_tracking"]["validated_commands"] == [
+        "npm run check:syntax",
+        "npm run test:offline",
+    ]
+
+
 def test_collect_status_no_external_handles_local_ci_without_live_tools(tmp_path: Path) -> None:
     manifest = deepcopy(_manifest())
     for repo in manifest["repos"]:
