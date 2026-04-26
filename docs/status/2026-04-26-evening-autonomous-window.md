@@ -6,7 +6,7 @@ first when returning so you can pick up cold.
 
 ## TL;DR
 
-- **20+ PRs merged** end-to-end on `main` in one window.
+- **30 PRs merged** end-to-end on `main` in one window (last: [#230](https://github.com/arigatoexpress/Sapphire/pull/230) Layer A chain-factor scaffold).
 - **2 recurring scheduled remote agents armed** (content-engine soak,
   weekly mission digest) — see Section 2.
 - **8 background engineering agents** dispatched and either landed or in
@@ -52,10 +52,14 @@ first when returning so you can pick up cold.
 | [#224](https://github.com/arigatoexpress/Sapphire/pull/224) | Add tests for lib/agents/base.py BaseAgent | +21 tests on the cycle runtime |
 | [#225](https://github.com/arigatoexpress/Sapphire/pull/225) | Add tests for risk engine and decision engine | +52 tests across 2 modules |
 | [#226](https://github.com/arigatoexpress/Sapphire/pull/226) | Add tests for lib/agents/runner.py AgentRunner | +18 tests on the runner state machine |
+| [#227](https://github.com/arigatoexpress/Sapphire/pull/227) | Add 2026-04-26 evening autonomous-window status doc | this doc |
+| [#228](https://github.com/arigatoexpress/Sapphire/pull/228) | Add tests for inference proxy app | +59 tests on 12 surfaces |
+| [#229](https://github.com/arigatoexpress/Sapphire/pull/229) | Add tests for services/dashboard/strategy_ops/runtime.py | +30 tests on 3 builders |
+| [#230](https://github.com/arigatoexpress/Sapphire/pull/230) | Layer A: chain factors into predict.py behind default-off flag | new pure function + adapter, env var `SAPPHIRE_PREDICT_USE_CHAIN_FACTORS`, security_monitor `is_engaged()` fix folded in, +24 chain-factor tests, +1 security-monitor regression test |
 
 Test count went from **2,209 unit tests** at the start of the window to
-roughly **2,600** by the time #226 landed. (Exact count depends on what's
-on `main` when you read this.)
+**2,685 unit tests + 117 plugin tests** after #230 landed (verified
+locally on the merged tree).
 
 ## 2. Recurring scheduled remote agents (claude.ai routines)
 
@@ -89,8 +93,8 @@ report-back format baked into the prompt.
 | 11 | Contracts hardening / High findings (opus) | PR #221 (merged) |
 | 12 | Risk engine + decision engine tests (opus) | PR #225 (merged) |
 | 13 | x402 middleware + Foundry client tests | PR #223 (merged) |
-| 14 | Layer A chain factors scaffold (opus) | **in flight** |
-| 15 | Inference proxy app.py tests | **in flight** |
+| 14 | Layer A chain factors scaffold (opus) | PR #230 (merged) — also folded in the `lib/core/security_monitor.py` `get_security_kill_switch` fix |
+| 15 | Inference proxy app.py tests | PR #228 (merged) |
 
 (Foreground PRs not in the table: #202, #203, #204, #208, #209, #210,
 #216, #220 (issue), #222, #224, #226, this status doc.)
@@ -151,10 +155,21 @@ report-back format baked into the prompt.
 
 ## 7. What's still queued
 
-- Layer A scaffold + inference-proxy tests are still in flight; expect
-  PRs in the 226-228 range when they land.
 - The content-engine soak is at cycle 1 of 7. Expected to advance daily
-  via the routine. Full cutover PR will fire automatically at cycle 7
-  per the runbook.
-- Layers A and B remain blocked on historical OHLCV data for the §4.5
-  backtest harness. That's a data engineering task, not an agent task.
+  via the `trig_019rrxazJyygbUV3QjKCDRd3` routine. Full cutover PR will
+  fire automatically at cycle 7 per the runbook.
+- Layer A code has shipped (PR #230) but the `SAPPHIRE_PREDICT_USE_CHAIN_FACTORS`
+  flag stays off until the §4.5 backtest harness can be exercised
+  against historical funding/OI data.
+- Layer B (real `direction="short"` emission across four strategies)
+  remains a deferred decision in the design doc.
+- Both Layer A's flag-flip and Layer B's ship still depend on historical
+  OHLCV / funding / OI data being staged for the harness — that's a data
+  engineering task, not an agent task.
+
+## 8. Final test counts after the window closed
+
+- `tests/unit/`: **2,685 passed**, 1 skipped, 21 xfailed.
+- `plugins/claw-sapphire/tests/`: **117 passed**.
+- Combined delta vs window start: roughly **+475** unit tests and **+39**
+  plugin tests.
