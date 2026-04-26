@@ -44,8 +44,9 @@ shape.
 - **Wave 2: Repo Hardening** - in progress. TradingView MCP v2 guardrails are
   blocked on upstream PR review, and crypto-tax-tracker guardrails are complete
   via [arigatoexpress/crypto-tax-tracker#2](https://github.com/arigatoexpress/crypto-tax-tracker/pull/2).
-- **Wave 3: Agent Consolidation** - queued. Map Hermes, claw-code, Sapphire
-  plugins, Claude scheduled tasks, OpenClaw remnants, and LaunchAgents.
+- **Wave 3: Agent Consolidation** - in progress. Map Hermes, claw-code, Sapphire
+  plugins, Claude scheduled tasks, OpenClaw remnants, and LaunchAgents. Hermes
+  runtime mapping is documented in `docs/org/hermes-agent-consolidation-map.md`.
 - **Wave 4: Data + Intelligence Platform** - queued. Normalize schemas,
   Foundry, GCS, BigQuery, threat, regional, market, and chain intel flows.
 - **Wave 5: Autonomy Safety** - queued. Finish audit logging, confirmation
@@ -81,6 +82,9 @@ shape.
 6. `chore/crypto-tax-hardening-tracked` - current bookkeeping PR. The
    crypto-tax-tracker satellite now has AGENTS/CLAUDE guidance, hard ruff and
    pytest CI, pre-commit parity, and README check commands.
+7. `docs/hermes-consolidation-map` - current Wave 3 map. It records the
+   difference between the Hermes development clone and the patched runtime
+   checkout before any gateway update, fork, or hook migration.
 
 ## Safety Rules
 

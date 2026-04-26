@@ -119,6 +119,39 @@ def repo_status(repo: dict[str, Any], *, external: bool) -> dict[str, Any]:
         "open_issues": [],
         "errors": [],
     }
+    if repo.get("runtime_tracking"):
+        tracking = dict(repo["runtime_tracking"])
+        runtime_path = Path(str(tracking.get("runtime_path") or ""))
+        runtime_status: dict[str, Any] = {
+            "launchagent_label": tracking.get("launchagent_label"),
+            "runtime_path": str(runtime_path),
+            "expected_branch": tracking.get("runtime_branch"),
+            "exists": runtime_path.exists(),
+            "branch": None,
+            "head": None,
+            "dirty_count": None,
+            "clean": None,
+            "errors": [],
+        }
+        if runtime_path.exists():
+            runtime_branch = run(["git", "branch", "--show-current"], cwd=runtime_path)
+            runtime_head = run(["git", "log", "-1", "--oneline", "--decorate"], cwd=runtime_path)
+            runtime_dirty = run(["git", "status", "--porcelain=v1"], cwd=runtime_path)
+            runtime_status["branch"] = runtime_branch["stdout"].strip() if runtime_branch["ok"] else None
+            runtime_status["head"] = runtime_head["stdout"].strip() if runtime_head["ok"] else None
+            runtime_dirty_lines = runtime_dirty["stdout"].splitlines() if runtime_dirty["ok"] else []
+            runtime_status["dirty_count"] = len(runtime_dirty_lines)
+            runtime_status["clean"] = runtime_dirty["ok"] and len(runtime_dirty_lines) == 0
+            for result_name, result in (
+                ("branch", runtime_branch),
+                ("head", runtime_head),
+                ("dirty", runtime_dirty),
+            ):
+                if not result["ok"]:
+                    runtime_status["errors"].append(
+                        f"git {result_name} failed: {result['stderr'][:160]}"
+                    )
+        status["runtime"] = runtime_status
     if not path.exists():
         status["errors"].append("local path missing")
         return status
@@ -274,12 +307,18 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
         "## Repos",
         "",
-        "| Repo | Class | Branch | Clean | Open PRs | State |",
-        "|---|---|---|:---:|---:|---|",
+        "| Repo | Class | Branch | Runtime | Clean | Open PRs | State |",
+        "|---|---|---|---|:---:|---:|---|",
     ]
     for repo in report["repos"]:
+        runtime = repo.get("runtime") or {}
+        if runtime:
+            runtime_label = runtime.get("branch") or runtime.get("expected_branch") or "missing"
+        else:
+            runtime_label = "-"
         lines.append(
             f"| {repo['id']} | {repo['classification']} | {repo.get('branch') or '-'} | "
+            f"{runtime_label} | "
             f"{'yes' if repo.get('clean') else 'no'} | {len(repo.get('open_prs', []))} | "
             f"{repo.get('migration_state') or '-'} |"
         )
