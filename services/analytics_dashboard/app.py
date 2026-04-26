@@ -30,13 +30,35 @@ bq = bigquery.Client(project=PROJECT)
 
 _KNOWN_PROBE_PATHS = {
     "/.git/config",
+    "/favicon.ico",
+    "/feed",
     "/feed/",
+    "/robots.txt",
+    "/security.txt",
     "/wp-admin/install.php",
     "/wp-includes/ID3/license.txt",
     "/xmlrpc.php",
 }
+_KNOWN_PROBE_PREFIXES = (
+    "/.env",
+    "/.git/",
+    "/.well-known/",
+    "/__",
+    "/_ah/",
+    "/_config",
+    "/actuator",
+    "/boaform",
+    "/cgi-bin",
+    "/config.",
+    "/env.",
+    "/phpmyadmin",
+    "/runtime-",
+    "/settings.",
+    "/wp-",
+)
 _KNOWN_PROBE_SUFFIXES = (
     "/wp-includes/wlwmanifest.xml",
+    ".php",
 )
 
 
@@ -59,10 +81,12 @@ def _clean(rows: list[dict]) -> list[dict]:
 
 
 def _is_known_probe_path(path: str) -> bool:
-    normalized = "/" + path.lstrip("/")
+    normalized = ("/" + path.lstrip("/")).lower().rstrip("/") or "/"
     return (
         normalized in _KNOWN_PROBE_PATHS
+        or normalized.startswith(_KNOWN_PROBE_PREFIXES)
         or normalized.endswith(_KNOWN_PROBE_SUFFIXES)
+        or "wordpress" in normalized
     )
 
 
