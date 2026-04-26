@@ -1,1 +1,1 @@
-{"rari1":{"host":"100.120.191.1","user":"rari","ollama_port":11434,"models":["qwen2.5:0.5b","smollm2:1.7b"],"speed":"11 t/s","ram":"3.8GB","status":"online"}}
+{"rari1":{"host":"100.120.191.1","user":"rari","ollama_port":11434,"models":["qwen2.5:0.5b","qwen3:0.6b","smollm2:1.7b","gemma2:2b"],"speed":"11 t/s","ram":"3.8GB","status":"online"}}

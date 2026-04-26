@@ -45,6 +45,13 @@ canvas{max-height:260px}
 <body>
 <h1>GPU Benchmark — NVIDIA RTX 5070 Ti (16 GB VRAM)</h1>
 <div class="sub">llama-server b8795 + Ollama 0.20.7 · CUDA 12.4 · 2026-04-14 19:22 · Windows 11 Pro · 63 GB RAM</div>
+<div class="card mb" style="border-left:4px solid #f59e0b">
+  <h3 style="color:#f59e0b">Model Update — 2026-04-26</h3>
+  <p style="font-size:0.85em;color:#8b949e">
+    Proxy routing updated: <code>qwen3.6:27b</code> replaces <code>qwen3:14b</code> and <code>qwen3.5:9b</code>.
+    New benchmarks pending — run <code>benchmarks/run_benchmark.py</code> on Windows to refresh.
+  </p>
+</div>
 
 <div class="grid3">
   <div class="card">
@@ -178,8 +185,8 @@ canvas{max-height:260px}
     <li><b style="color:#e6edf3">Models ≤ 14B Q4_K_M</b> — fully fit in VRAM, 70-232 tok/s generation</li>
     <li><b style="color:#e6edf3">Models 17-23 GB</b> — partial VRAM fit; gemma3:27b exceeds limits, nemotron-cascade-2 (MoE) fits due to sparse activation</li>
     <li><b style="color:#e6edf3">Models > 16 GB (dense)</b> — overflow to 63 GB RAM → CPU compute → ~2.7 tok/s</li>
-    <li><b style="color:#e6edf3">qwen3.5 + gemma4</b> — incompatible with llama-server b8795 GGUF format; use Ollama 0.20.7 backend (107 and 154 tok/s respectively)</li>
-    <li><b style="color:#e6edf3">Inference proxy routing</b> — T0:nemotron-mini, T1:hermes3, T2:phi4/qwen3/deepseek-r1 14B, T3:qwen3.5 or gemma4 (Ollama), T4:nemotron-cascade-2</li>
+    <li><b style="color:#e6edf3">qwen3.6 + gemma4</b> — qwen3.6:27b replaces qwen3:14b and qwen3.5:9b; gemma4 via Ollama 0.20.7 backend (154 tok/s)</li>
+    <li><b style="color:#e6edf3">Inference proxy routing</b> — T0:nemotron-mini, T1:hermes3, T2:phi4/qwen3.6/deepseek-r1 14B, T3:gemma4 (Ollama), T4:nemotron-cascade-2</li>
   </ul>
 </div>
 

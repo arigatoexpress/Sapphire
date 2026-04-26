@@ -134,10 +134,10 @@
 {% block extra_js %}
 <script>
 const TIERS = [
-    { key: 'windows-gpu', label: 'T1',  name: 'Windows GPU',  detail: '100.71.10.48:11434 · RTX 5070 Ti · 27 models', speed: '232' },
+    { key: 'windows-gpu', label: 'T1',  name: 'Windows GPU',  detail: '100.71.10.48:11434 · RTX 5070 Ti · 28 models', speed: '232' },
     { key: 'pi-rari1',    label: 'T2a', name: 'Pi rari1',     detail: '100.120.191.1:11434 · ARM · 4 models',           speed: '~40' },
     { key: 'pi-rari2',    label: 'T2b', name: 'Pi rari2',     detail: '100.87.225.89:11434 · ARM · 4 models',           speed: '~40' },
-    { key: 'mac-local',   label: 'T3',  name: 'Mac Local',    detail: '127.0.0.1:11434 · CPU inference · 6 models',     speed: '~12' },
+    { key: 'mac-local',   label: 'T3',  name: 'Mac Local',    detail: '127.0.0.1:11434 · exact fallback · 7+ models',    speed: '~12' },
     { key: 'kimi-cloud',  label: 'T4',  name: 'Kimi Cloud',   detail: 'api.moonshot.cn · non-sensitive only',           speed: 'API' },
 ];
 
@@ -307,11 +307,11 @@ function renderPiVitals(data) {
 
     document.getElementById('rari1-container').innerHTML = piCard(
         'pi-rari1', 'rari1', '100.120.191.1',
-        'nemotron-mini:4b / smollm2:1.7b / qwen2.5:0.5b'
+        'nemotron-mini:4b / smollm2:1.7b / qwen2.5:0.5b / qwen3:0.6b'
     );
     document.getElementById('rari2-container').innerHTML = piCard(
         'pi-rari2', 'rari2', '100.87.225.89',
-        'nemotron-mini:4b / smollm2:1.7b / qwen2.5:0.5b'
+        'nemotron-mini:4b / smollm2:1.7b / qwen2.5:0.5b / qwen3:0.6b'
     );
 }
 
