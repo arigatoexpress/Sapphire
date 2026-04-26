@@ -104,7 +104,7 @@ def test_restart_triggered_on_nonzero_exit_code(monkeypatch, supervisor_env):
     install_status_sequence(
         monkeypatch,
         [
-            {label: status(label, exit_code=1)},
+            {label: status(label, exit_code=1, pid=None)},
             [status(label, exit_code=0)],
         ],
     )
@@ -146,14 +146,14 @@ def test_cooldown_blocks_consecutive_restarts(monkeypatch, supervisor_env):
     install_status_sequence(
         monkeypatch,
         [
-            {label: status(label, exit_code=1)},
+            {label: status(label, exit_code=1, pid=None)},
             [status(label, exit_code=0)],
         ],
     )
     first = service_supervisor.supervise_once(labels=[label])
     assert first["recovered"]
 
-    install_status_sequence(monkeypatch, [{label: status(label, exit_code=1)}])
+    install_status_sequence(monkeypatch, [{label: status(label, exit_code=1, pid=None)}])
     second = service_supervisor.supervise_once(labels=[label])
 
     assert second["attempted"] == []
@@ -177,7 +177,7 @@ def test_global_rate_limit_blocks_when_too_many_in_hour(monkeypatch, supervisor_
     }
     supervisor_env.parent.mkdir(parents=True, exist_ok=True)
     supervisor_env.write_text(json.dumps(state))
-    install_status_sequence(monkeypatch, [{label: status(label, exit_code=1)}])
+    install_status_sequence(monkeypatch, [{label: status(label, exit_code=1, pid=None)}])
 
     result = service_supervisor.supervise_once(labels=[label], max_restarts_per_hour=4)
 
@@ -199,8 +199,8 @@ def test_failed_restart_escalates_to_notify(monkeypatch, supervisor_env):
     install_status_sequence(
         monkeypatch,
         [
-            {label: status(label, exit_code=1)},
-            [status(label, exit_code=1)],
+            {label: status(label, exit_code=1, pid=None)},
+            [status(label, exit_code=1, pid=None)],
         ],
     )
 
@@ -224,7 +224,7 @@ def test_recovered_restart_does_not_notify(monkeypatch, supervisor_env):
     install_status_sequence(
         monkeypatch,
         [
-            {label: status(label, exit_code=1)},
+            {label: status(label, exit_code=1, pid=None)},
             [status(label, exit_code=0)],
         ],
     )
@@ -249,12 +249,12 @@ def test_recovery_detected_via_pid_change_when_exit_code_stale(monkeypatch, supe
         "send_alert",
         lambda message, priority="p1": alerts.append((message, priority)),
     )
-    # Before restart: crashed, exit_code=1, pid=100
+    # Before restart: crashed, exit_code=1, no running pid.
     # After restart:  loaded, exit_code STILL 1 (stale), pid=200 (new process)
     install_status_sequence(
         monkeypatch,
         [
-            {label: status(label, exit_code=1, pid=100)},
+            {label: status(label, exit_code=1, pid=None)},
             [status(label, exit_code=1, pid=200)],  # PID changed → actually restarted
         ],
     )
@@ -267,7 +267,7 @@ def test_recovery_detected_via_pid_change_when_exit_code_stale(monkeypatch, supe
     assert alerts == [], "Telegram should stay silent on successful restart"
 
     payload = result["recovered"][0]
-    assert payload["pid_before"] == 100
+    assert payload["pid_before"] is None
     assert payload["pid_after"] == 200
 
 
@@ -279,7 +279,7 @@ def test_activity_written_to_firestore_on_every_action(monkeypatch, supervisor_e
     install_status_sequence(
         monkeypatch,
         [
-            {label: status(label, exit_code=1)},
+            {label: status(label, exit_code=1, pid=None)},
             [status(label, exit_code=0)],
         ],
     )
@@ -300,7 +300,7 @@ def test_dry_run_never_calls_restart(monkeypatch, supervisor_env):
     label = "ai.hermes.gateway"
     fake_run = FakeRun()
     monkeypatch.setattr(service_supervisor, "_run", fake_run)
-    install_status_sequence(monkeypatch, [{label: status(label, exit_code=1)}])
+    install_status_sequence(monkeypatch, [{label: status(label, exit_code=1, pid=None)}])
 
     result = service_supervisor.supervise_once(labels=[label], dry_run=True)
 

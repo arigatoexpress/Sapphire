@@ -84,12 +84,14 @@ def _status_to_dict(status: ServiceStatus | None) -> dict[str, Any] | None:
 
 
 def _is_healthy(status: ServiceStatus) -> bool:
-    return status.loaded and status.exit_code in (None, 0)
+    return status.loaded and (status.pid is not None or status.exit_code in (None, 0))
 
 
 def _reason_for(status: ServiceStatus) -> str | None:
     if not status.loaded:
         return "unloaded_when_expected"
+    if status.pid is not None:
+        return None
     if status.exit_code not in (None, 0):
         return "crashed"
     return None
