@@ -81,12 +81,7 @@ def test_refresh_marks_critical_when_kill_switch_active(monkeypatch):
     the CRITICAL threshold. Verifies score arithmetic + label boundary."""
 
     fake_ks_module = type(sys)("lib.core.security_kill_switch")
-
-    class _Switch:
-        def is_active(self) -> bool:
-            return True
-
-    fake_ks_module.get_security_kill_switch = lambda: _Switch()  # type: ignore[attr-defined]
+    fake_ks_module.is_engaged = lambda: True  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "lib.core.security_kill_switch", fake_ks_module)
 
     fake_dep_module = type(sys)("lib.security.dependency_scanner")
@@ -116,12 +111,7 @@ def test_refresh_marks_critical_when_kill_switch_active(monkeypatch):
 def test_refresh_score_floor_at_zero(monkeypatch):
     """Score never goes below zero, even if collectors over-deduct."""
     fake_ks_module = type(sys)("lib.core.security_kill_switch")
-
-    class _Switch:
-        def is_active(self) -> bool:
-            return True
-
-    fake_ks_module.get_security_kill_switch = lambda: _Switch()  # type: ignore[attr-defined]
+    fake_ks_module.is_engaged = lambda: True  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "lib.core.security_kill_switch", fake_ks_module)
 
     # Lots of CVEs and model anomalies → cap means minimum score is 100-40-30-20=10.
@@ -160,12 +150,7 @@ def test_refresh_score_floor_at_zero(monkeypatch):
 def test_refresh_label_thresholds(monkeypatch):
     """Label boundaries: >=80 SECURE, 50-79 DEGRADED, <50 CRITICAL."""
     fake_ks_module = type(sys)("lib.core.security_kill_switch")
-
-    class _Switch:
-        def is_active(self) -> bool:
-            return False
-
-    fake_ks_module.get_security_kill_switch = lambda: _Switch()  # type: ignore[attr-defined]
+    fake_ks_module.is_engaged = lambda: False  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "lib.core.security_kill_switch", fake_ks_module)
 
     # 2 critical CVEs → -20 → 80 → still SECURE (boundary).
@@ -193,12 +178,7 @@ def test_refresh_label_thresholds(monkeypatch):
 def test_refresh_label_degraded_when_score_in_middle_band(monkeypatch):
     """Force score=60 → DEGRADED."""
     fake_ks_module = type(sys)("lib.core.security_kill_switch")
-
-    class _Switch:
-        def is_active(self) -> bool:
-            return False
-
-    fake_ks_module.get_security_kill_switch = lambda: _Switch()  # type: ignore[attr-defined]
+    fake_ks_module.is_engaged = lambda: False  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "lib.core.security_kill_switch", fake_ks_module)
 
     fake_dep = type(sys)("lib.security.dependency_scanner")
@@ -235,12 +215,7 @@ def test_refresh_skips_collector_that_raises(monkeypatch):
     """If a collector raises arbitrarily (e.g. network down), refresh still
     completes and the others contribute their share."""
     fake_ks_module = type(sys)("lib.core.security_kill_switch")
-
-    class _Switch:
-        def is_active(self) -> bool:
-            return True
-
-    fake_ks_module.get_security_kill_switch = lambda: _Switch()  # type: ignore[attr-defined]
+    fake_ks_module.is_engaged = lambda: True  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "lib.core.security_kill_switch", fake_ks_module)
 
     fake_dep = type(sys)("lib.security.dependency_scanner")
@@ -310,3 +285,18 @@ def test_get_security_monitor_singleton_returns_same_instance(monkeypatch):
     b = sm.get_security_monitor()
     assert a is b
     assert isinstance(a, sm.SecurityMonitor)
+
+
+def test_security_kill_switch_is_engaged_is_callable():
+    """Regression: refresh() imports `is_engaged` from
+    `lib.core.security_kill_switch`. The earlier code referenced a
+    non-existent `get_security_kill_switch().is_active()` attribute pair,
+    so the import resolved against thin air and the kill-switch branch
+    silently logged at DEBUG and contributed nothing to the score. This
+    test pins the contract by importing the real module and asserting the
+    function exists and returns a bool."""
+    from lib.core.security_kill_switch import is_engaged
+
+    assert callable(is_engaged)
+    # Must return a bool (the kill flag is either present or not).
+    assert isinstance(is_engaged(), bool)

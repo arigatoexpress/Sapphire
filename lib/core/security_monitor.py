@@ -68,9 +68,8 @@ class SecurityMonitor:
 
         # Kill switch
         try:
-            from lib.core.security_kill_switch import get_security_kill_switch
-            ks = get_security_kill_switch()
-            if ks.is_active():
+            from lib.core.security_kill_switch import is_engaged
+            if is_engaged():
                 ks_active = True
                 score -= 40
                 threats.append("security_kill_switch:ACTIVE")
