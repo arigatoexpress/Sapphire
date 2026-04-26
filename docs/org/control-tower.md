@@ -52,7 +52,8 @@ shape.
 - **Wave 5: Autonomy Safety** - in progress. Audit logging is wired for
   decision-engine and Kimi bridge autonomy requests; alpha full-autonomy
   dispatch defaults to dry-run, with code/GCP mutations disabled unless
-  explicitly overridden.
+  explicitly overridden. Cost posture reporting is read-only and flags warning
+  log samples that hit the requested limit.
 
 ## Routine Stages
 

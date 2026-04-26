@@ -186,6 +186,7 @@ def summarize_logging_warnings(project: str, *, days: int, limit: int) -> dict[s
             "available": False,
             "days": days,
             "sample_limit": limit,
+            "sample_at_limit": False,
             "error": result.error,
         }
     by_service: Counter[str] = Counter()
@@ -196,12 +197,14 @@ def summarize_logging_warnings(project: str, *, days: int, limit: int) -> dict[s
         severity = str(entry.get("severity") or "DEFAULT")
         by_service[service] += 1
         by_severity[severity] += 1
+    entries_sampled = sum(by_service.values())
     return {
         "project": project,
         "available": True,
         "days": days,
         "sample_limit": limit,
-        "entries_sampled": sum(by_service.values()),
+        "entries_sampled": entries_sampled,
+        "sample_at_limit": bool(limit > 0 and entries_sampled >= limit),
         "by_service": dict(sorted(by_service.items())),
         "by_severity": dict(sorted(by_severity.items())),
     }
@@ -282,16 +285,17 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
         "## Warning Logs",
         "",
-        "| Project | Available | Entries Sampled | By Service | By Severity | Notes |",
-        "|---|---:|---:|---|---|---|",
+        "| Project | Available | Entries Sampled | At Limit | By Service | By Severity | Notes |",
+        "|---|---:|---:|---:|---|---|---|",
     ])
     for project in report["projects"]:
         warnings = project["logging_warnings"]
         lines.append(
-            "| {project} | {available} | {sampled} | {services} | {severities} | {notes} |".format(
+            "| {project} | {available} | {sampled} | {at_limit} | {services} | {severities} | {notes} |".format(
                 project=warnings["project"],
                 available=_yn(warnings["available"]),
                 sampled=warnings.get("entries_sampled", "-"),
+                at_limit=_yn(bool(warnings.get("sample_at_limit", False))),
                 services=_md_cell(_compact_mapping(warnings.get("by_service", {}))),
                 severities=_md_cell(_compact_mapping(warnings.get("by_severity", {}))),
                 notes=_md_cell(warnings.get("error", "")),

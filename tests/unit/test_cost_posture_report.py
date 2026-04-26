@@ -156,6 +156,48 @@ def test_summarize_logging_warnings_counts_without_raw_messages(monkeypatch):
     summary = cost_report.summarize_logging_warnings("tho-ai-agent", days=7, limit=100)
 
     assert summary["entries_sampled"] == 2
+    assert summary["sample_limit"] == 100
+    assert summary["sample_at_limit"] is False
     assert summary["by_service"] == {"sapphire-analytics": 2}
     assert summary["by_severity"] == {"ERROR": 1, "WARNING": 1}
     assert "raw URL" not in str(summary)
+
+    limited = cost_report.summarize_logging_warnings("tho-ai-agent", days=7, limit=2)
+    assert limited["sample_at_limit"] is True
+
+
+def test_render_markdown_marks_warning_sample_at_limit():
+    report = {
+        "generated_at": "2026-04-26T00:00:00+00:00",
+        "region": "us-central1",
+        "projects": [
+            {
+                "project": "tho-ai-agent",
+                "billing": {
+                    "project": "tho-ai-agent",
+                    "available": True,
+                    "billing_enabled": True,
+                    "billing_account_linked": True,
+                },
+                "cloud_run": {
+                    "project": "tho-ai-agent",
+                    "region": "us-central1",
+                    "available": True,
+                    "services": [],
+                },
+                "logging_warnings": {
+                    "project": "tho-ai-agent",
+                    "available": True,
+                    "entries_sampled": 200,
+                    "sample_at_limit": True,
+                    "by_service": {"sapphire-analytics": 185},
+                    "by_severity": {"WARNING": 200},
+                },
+            }
+        ],
+    }
+
+    output = cost_report.render_markdown(report)
+
+    assert "| Project | Available | Entries Sampled | At Limit |" in output
+    assert "| tho-ai-agent | yes | 200 | yes | sapphire-analytics:185 | WARNING:200 | - |" in output
