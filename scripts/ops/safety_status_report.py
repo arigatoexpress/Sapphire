@@ -15,6 +15,7 @@ import json
 import re
 import sys
 from collections import Counter
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -34,6 +35,11 @@ SECRET_TEXT_PATTERNS = (
     re.compile(r"(?i)\b(api[_-]?key|token|password|secret|private[_-]?key)\s*[:=]\s*[^,\s]+"),
     re.compile(r"(?i)\b(bearer)\s+[a-z0-9._~+/=-]+"),
 )
+SECRET_KEY_RE = re.compile(
+    r"(api[_-]?key|token|password|passwd|secret|private[_-]?key|credential|authorization)",
+    re.IGNORECASE,
+)
+AUTONOMY_REQUIRED_FIELDS = ("event_type", "ts", "actor", "action", "outcome")
 
 
 def load_kill_switch_events(audit_path: Path, *, limit: int) -> list[dict[str, Any]]:
@@ -105,6 +111,7 @@ def summarize_autonomy_audit(
     if not audit_path.exists():
         return {
             "audit_exists": False,
+            "schema": _empty_autonomy_schema(),
             "event_counts": {},
             "actor_counts": {},
             "outcome_counts": {},
@@ -113,16 +120,35 @@ def summarize_autonomy_audit(
         }
 
     records: list[dict[str, Any]] = []
-    for line in audit_path.read_text(encoding="utf-8").splitlines():
+    malformed_lines = 0
+    missing_required: Counter[str] = Counter()
+    unredacted_secret_risk_records = 0
+    lines = audit_path.read_text(encoding="utf-8").splitlines()
+    for line in lines:
         try:
             parsed = json.loads(line)
         except json.JSONDecodeError:
+            malformed_lines += 1
             continue
         if isinstance(parsed, dict):
             records.append(parsed)
+            for field in AUTONOMY_REQUIRED_FIELDS:
+                if parsed.get(field) in (None, ""):
+                    missing_required[field] += 1
+            if _contains_unredacted_secret_like_value(parsed):
+                unredacted_secret_risk_records += 1
+        else:
+            malformed_lines += 1
 
     return {
         "audit_exists": True,
+        "schema": {
+            "total_lines": len(lines),
+            "valid_records": len(records),
+            "malformed_lines": malformed_lines,
+            "missing_required_fields": dict(sorted(missing_required.items())),
+            "unredacted_secret_risk_records": unredacted_secret_risk_records,
+        },
         "event_counts": dict(Counter(_safe_text(record.get("event_type")) for record in records)),
         "actor_counts": dict(Counter(_safe_text(record.get("actor")) for record in records)),
         "outcome_counts": dict(Counter(_safe_text(record.get("outcome")) for record in records)),
@@ -230,6 +256,11 @@ def render_markdown(report: dict[str, Any]) -> str:
             "## Autonomy Audit",
             "",
             f"- Audit log present: {_yn(autonomy['audit_exists'])}",
+            f"- Schema: {autonomy['schema']['valid_records']} valid records / "
+            f"{autonomy['schema']['total_lines']} lines; "
+            f"{autonomy['schema']['malformed_lines']} malformed; "
+            f"{autonomy['schema']['unredacted_secret_risk_records']} unredacted secret-risk records",
+            f"- Missing required fields: {json.dumps(autonomy['schema']['missing_required_fields'], sort_keys=True)}",
             f"- Event counts: {json.dumps(autonomy['event_counts'], sort_keys=True)}",
             f"- Risk counts: {json.dumps(autonomy['risk_counts'], sort_keys=True)}",
             "",
@@ -301,6 +332,51 @@ def _safe_autonomy_event(record: dict[str, Any]) -> dict[str, Any]:
         event["object_ref_hash"] = ""
         event["object_ref_chars"] = 0
     return event
+
+
+def _empty_autonomy_schema() -> dict[str, Any]:
+    return {
+        "total_lines": 0,
+        "valid_records": 0,
+        "malformed_lines": 0,
+        "missing_required_fields": {},
+        "unredacted_secret_risk_records": 0,
+    }
+
+
+def _contains_unredacted_secret_like_value(value: Any) -> bool:
+    if value is None or isinstance(value, bool | int | float):
+        return False
+    if isinstance(value, str):
+        return _text_has_unredacted_secret(value)
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            if SECRET_KEY_RE.search(str(key)) and _non_redacted_secret_value(item):
+                return True
+            if _contains_unredacted_secret_like_value(item):
+                return True
+        return False
+    if isinstance(value, Sequence) and not isinstance(value, bytes | bytearray):
+        return any(_contains_unredacted_secret_like_value(item) for item in value)
+    return _text_has_unredacted_secret(str(value))
+
+
+def _non_redacted_secret_value(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        text = value.strip().lower()
+        return bool(text and text not in {"<redacted>", "redacted"} and "<redacted>" not in text)
+    return True
+
+
+def _text_has_unredacted_secret(text: str) -> bool:
+    for pattern in SECRET_TEXT_PATTERNS:
+        for match in pattern.finditer(text):
+            matched = match.group(0).lower()
+            if "<redacted>" not in matched and "_redacted" not in matched:
+                return True
+    return False
 
 
 def _event_type(record: dict[str, Any]) -> str:

@@ -81,6 +81,13 @@ def test_combined_report_omits_raw_pending_and_kill_switch_details(tmp_path):
     assert report["kill_switch"]["last_transition"]["reason_hash"]
     assert report["kill_switch"]["last_transition"]["reason_chars"] > 0
     assert report["autonomy_audit"]["audit_exists"] is True
+    assert report["autonomy_audit"]["schema"] == {
+        "total_lines": 1,
+        "valid_records": 1,
+        "malformed_lines": 0,
+        "missing_required_fields": {},
+        "unredacted_secret_risk_records": 1,
+    }
     assert report["autonomy_audit"]["event_counts"] == {"autonomy.decision_evaluated": 1}
     assert report["autonomy_audit"]["recent_events"][0]["object_ref_hash"]
     assert report["autonomy_audit"]["recent_events"][0]["action_hash"]
@@ -148,6 +155,13 @@ def test_missing_autonomy_audit_reports_empty(tmp_path):
 
     assert summary == {
         "audit_exists": False,
+        "schema": {
+            "total_lines": 0,
+            "valid_records": 0,
+            "malformed_lines": 0,
+            "missing_required_fields": {},
+            "unredacted_secret_risk_records": 0,
+        },
         "event_counts": {},
         "actor_counts": {},
         "outcome_counts": {},
@@ -215,6 +229,13 @@ def test_autonomy_audit_summary_counts_and_hashes_sensitive_fields(tmp_path):
         "autonomy.alert_detected": 1,
         "autonomy.decision_evaluated": 1,
     }
+    assert summary["schema"] == {
+        "total_lines": 3,
+        "valid_records": 2,
+        "malformed_lines": 1,
+        "missing_required_fields": {"ts": 1},
+        "unredacted_secret_risk_records": 1,
+    }
     assert summary["actor_counts"] == {"decision_engine": 2}
     assert summary["risk_counts"] == {"financial_decision": 1, "market_alert": 1}
     assert summary["recent_events"][0]["action_hash"]
@@ -224,6 +245,7 @@ def test_autonomy_audit_summary_counts_and_hashes_sensitive_fields(tmp_path):
     assert "raw payload" not in serialized
     assert "funding.extreme" not in rendered
     assert "ETH:short" not in rendered
+    assert "1 malformed" in rendered
 
 
 def test_json_mode_outputs_combined_report(tmp_path, capsys):
