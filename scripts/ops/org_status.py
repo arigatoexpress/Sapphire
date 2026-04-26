@@ -22,6 +22,7 @@ except ImportError as exc:  # pragma: no cover - CI installs pyyaml
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MANIFEST = ROOT / "infra" / "org-repos.yaml"
+DEFAULT_HERMES_SKILLS = ROOT / "infra" / "hermes-sapphire-skills.yaml"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -57,6 +58,7 @@ def load_manifest(path: Path = DEFAULT_MANIFEST) -> dict[str, Any]:
 
 def collect_status(manifest: dict[str, Any], *, external: bool = True) -> dict[str, Any]:
     repos = [repo_status(repo, external=external) for repo in manifest.get("repos", [])]
+    hermes_skills = hermes_skill_status(DEFAULT_HERMES_SKILLS)
     report = {
         "schema_version": 1,
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z"),
@@ -65,8 +67,9 @@ def collect_status(manifest: dict[str, Any], *, external: bool = True) -> dict[s
             "generated_for": manifest.get("generated_for"),
             "updated_at": manifest.get("updated_at"),
         },
-        "summary": summarize(manifest, repos),
+        "summary": summarize(manifest, repos, hermes_skills),
         "repos": repos,
+        "hermes_skills": hermes_skills,
         "gcp_projects": gcp_status(manifest.get("gcp_projects", []), external=external),
         "local_runtime": local_runtime_status(manifest.get("local_runtime", {}), external=external),
         "routines": manifest.get("routines", []),
@@ -75,7 +78,11 @@ def collect_status(manifest: dict[str, Any], *, external: bool = True) -> dict[s
     return report
 
 
-def summarize(manifest: dict[str, Any], repos: list[dict[str, Any]]) -> dict[str, Any]:
+def summarize(
+    manifest: dict[str, Any],
+    repos: list[dict[str, Any]],
+    hermes_skills: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     classifications: dict[str, int] = {}
     for repo in manifest.get("repos", []):
         key = str(repo.get("classification") or "unknown")
@@ -87,6 +94,8 @@ def summarize(manifest: dict[str, Any], repos: list[dict[str, Any]]) -> dict[str
         "missing_local_repos": [repo["id"] for repo in repos if not repo.get("exists")],
         "open_pr_count": sum(len(repo.get("open_prs", [])) for repo in repos),
         "routine_stages": stage_counts(manifest.get("routines", [])),
+        "hermes_skill_classes": (hermes_skills or {}).get("classification_counts", {}),
+        "hermes_production_adjacent_skills": (hermes_skills or {}).get("production_adjacent_count", 0),
     }
 
 
@@ -96,6 +105,57 @@ def stage_counts(routines: list[dict[str, Any]]) -> dict[str, int]:
         stage = str(routine.get("stage") or "unknown")
         counts[stage] = counts.get(stage, 0) + 1
     return counts
+
+
+def hermes_skill_status(path: Path = DEFAULT_HERMES_SKILLS) -> dict[str, Any]:
+    status: dict[str, Any] = {
+        "checked": True,
+        "path": str(path),
+        "skill_count": 0,
+        "classification_counts": {},
+        "production_adjacent_count": 0,
+        "skills": [],
+        "errors": [],
+    }
+    if not path.exists():
+        status["checked"] = False
+        status["errors"].append("inventory missing")
+        return status
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except Exception as exc:
+        status["checked"] = False
+        status["errors"].append(f"inventory read failed: {type(exc).__name__}")
+        return status
+
+    skills = data.get("skills") if isinstance(data, dict) else []
+    if not isinstance(skills, list):
+        status["errors"].append("skills inventory is not a list")
+        return status
+
+    counts: dict[str, int] = {}
+    rows = []
+    production_adjacent_count = 0
+    for skill in skills:
+        if not isinstance(skill, dict):
+            continue
+        classification = str(skill.get("classification") or "unknown")
+        counts[classification] = counts.get(classification, 0) + 1
+        production_adjacent = bool(skill.get("production_adjacent"))
+        production_adjacent_count += int(production_adjacent)
+        rows.append(
+            {
+                "id": skill.get("id"),
+                "classification": classification,
+                "production_adjacent": production_adjacent,
+                "next_action": skill.get("next_action"),
+            }
+        )
+    status["skill_count"] = len(rows)
+    status["classification_counts"] = counts
+    status["production_adjacent_count"] = production_adjacent_count
+    status["skills"] = rows
+    return status
 
 
 def repo_status(repo: dict[str, Any], *, external: bool) -> dict[str, Any]:
@@ -304,6 +364,8 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"- Dirty repos: {', '.join(summary['dirty_repos']) or 'none'}",
         f"- Missing local repos: {', '.join(summary['missing_local_repos']) or 'none'}",
         f"- Routine stages: {json.dumps(summary['routine_stages'], sort_keys=True)}",
+        f"- Hermes skill classes: {json.dumps(summary['hermes_skill_classes'], sort_keys=True)}",
+        f"- Hermes production-adjacent skills: {summary['hermes_production_adjacent_skills']}",
         "",
         "## Repos",
         "",
@@ -321,6 +383,20 @@ def render_markdown(report: dict[str, Any]) -> str:
             f"{runtime_label} | "
             f"{'yes' if repo.get('clean') else 'no'} | {len(repo.get('open_prs', []))} | "
             f"{repo.get('migration_state') or '-'} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Hermes Skills",
+            "",
+            "| Skill | Class | Production Adjacent |",
+            "|---|---|:---:|",
+        ]
+    )
+    for skill in report.get("hermes_skills", {}).get("skills", []):
+        lines.append(
+            f"| {skill.get('id') or '-'} | {skill.get('classification') or '-'} | "
+            f"{'yes' if skill.get('production_adjacent') else 'no'} |"
         )
     lines.extend(["", "## Waves", ""])
     for wave in report.get("waves", []):

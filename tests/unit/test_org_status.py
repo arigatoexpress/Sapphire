@@ -204,8 +204,11 @@ def test_collect_status_no_external_handles_local_ci_without_live_tools(tmp_path
     assert report["schema_version"] == 1
     assert report["summary"]["repo_count"] == len(manifest["repos"])
     assert "repo_classifications" in report["summary"]
+    assert report["summary"]["hermes_skill_classes"]["read_only"] == 9
+    assert report["summary"]["hermes_production_adjacent_skills"] == 10
     assert sorted(report["summary"]["missing_local_repos"]) == sorted(repo["id"] for repo in manifest["repos"])
     assert report["summary"]["dirty_repos"] == []
+    assert report["hermes_skills"]["skill_count"] == 15
     assert len(report["gcp_projects"]) == len(manifest["gcp_projects"])
     assert report["local_runtime"]["docker"]["checked"] is False
     assert all(row["status"] == "not_checked" for row in report["local_runtime"]["launchagents"])
@@ -219,8 +222,10 @@ def test_render_markdown_includes_control_board_sections() -> None:
     assert "# Sapphire Autonomous Org Status" in markdown
     assert "## Summary" in markdown
     assert "## Repos" in markdown
+    assert "## Hermes Skills" in markdown
     assert "## Waves" in markdown
     assert "| sapphire | core |" in markdown
+    assert "| tradingview | external_mutating | yes |" in markdown
 
 
 def test_parse_launchctl_maps_pid_and_last_status() -> None:
