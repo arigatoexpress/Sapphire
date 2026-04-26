@@ -134,12 +134,13 @@ def test_threat_refresh_tracks_soak_evidence() -> None:
     assert routine["remote_workflow"] == ".github/workflows/threat-refresh.yml"
     assert routine["comparator"] == "scripts/ops/compare_threat_artifacts.py"
     assert routine["soak_tracking"]["evidence_doc"] == "docs/org/threat-refresh-shadow-soak-2026-04-26.md"
+    assert routine["soak_tracking"]["latest_manual_remote_run_id"] == "24962186595"
     assert routine["soak_tracking"]["latest_comparison"] == {
-        "compared_at": "2026-04-26T16:11:03Z",
+        "compared_at": "2026-04-26T17:04:37Z",
         "verdict": "WARN",
         "rows_compared": 15,
-        "rows_pass": 12,
-        "rows_warn": 3,
+        "rows_pass": 10,
+        "rows_warn": 5,
         "rows_fail": 0,
         "missing_in_local": 0,
         "missing_in_remote": 0,

@@ -306,13 +306,13 @@ routines:
     soak_tracking:
       started_at: "2026-04-26"
       evidence_doc: docs/org/threat-refresh-shadow-soak-2026-04-26.md
-      latest_manual_remote_run_id: "24961094947"
+      latest_manual_remote_run_id: "24962186595"
       latest_comparison:
-        compared_at: "2026-04-26T16:11:03Z"
+        compared_at: "2026-04-26T17:04:37Z"
         verdict: WARN
         rows_compared: 15
-        rows_pass: 12
-        rows_warn: 3
+        rows_pass: 10
+        rows_warn: 5
         rows_fail: 0
         missing_in_local: 0
         missing_in_remote: 0

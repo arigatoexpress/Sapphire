@@ -69,6 +69,29 @@ dashboard-facing daily artifact and `latest` symlink. The remote workflow alread
 uploads `data/intelligence/**/threats.json`, so scheduled soak comparisons can
 use the nearest local run snapshot instead of a later overwritten daily file.
 
+## Snapshot Comparison
+
+A close-time snapshot comparison was captured after run snapshot retention
+shipped:
+
+- Local snapshot:
+  `data/intelligence/runs/20260426T170350Z/threats.json`
+- Remote workflow run: `24962186595`
+- Remote snapshot:
+  `/tmp/threat-soak-new.TlK75P/threat-refresh-24962186595/data/intelligence/runs/20260426T170422Z/threats.json`
+- Local refreshed at: `2026-04-26T17:03:50.685528+00:00`
+- Remote refreshed at: `2026-04-26T17:04:22.553333+00:00`
+- Verdict: WARN
+- Rows compared: 15
+- PASS rows: 10
+- WARN rows: 5
+- FAIL rows: 0
+- Missing in local: 0
+- Missing in remote: 0
+
+WARN rows were all `published_at` day-offset differences for matched CVE IDs.
+There were no missing canonical IDs.
+
 ## Soak Gate
 
 Do not retire the local LaunchAgent until all of the following are true:
