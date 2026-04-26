@@ -363,8 +363,8 @@ upstream_repos:
     ari_fork: arigatoexpress/aip-community-registry
     local_path: /Users/aribs/Code/aip-community-registry
     integration_surface: AIP/Foundry schema reference used during ontology provisioning work.
-    sync_state: forked_lfs_dirty_reference
-    notes: Local clone is preserved and recloned, but Git LFS zip assets still show modified; do not force-clean without a dedicated LFS pass.
+    sync_state: forked_lfs_filter_bypassed_clean_reference
+    notes: Local reference clone disables LFS clean/smudge filters because upstream zip blobs are committed as full objects while attributes mark them as LFS; old dirty checkout is preserved under /Users/aribs/Code/_cleanup_backups.
 
 gcp_projects:
   - project_id: tho-ai-agent

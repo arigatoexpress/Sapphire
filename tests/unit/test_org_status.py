@@ -94,6 +94,10 @@ def test_manifest_tracks_upstream_integration_fleet() -> None:
     assert by_id["openbb"]["ari_fork"] == "arigatoexpress/OpenBB"
     assert by_id["openclaw"]["sync_state"] == "fork_diverged_do_not_force"
     assert by_id["aip-community-registry"]["ari_fork"] == "arigatoexpress/aip-community-registry"
+    assert (
+        by_id["aip-community-registry"]["sync_state"]
+        == "forked_lfs_filter_bypassed_clean_reference"
+    )
 
 
 def test_tradingview_mcp_v2_tracks_upstream_hardening_pr() -> None:
