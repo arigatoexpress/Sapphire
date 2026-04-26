@@ -12,6 +12,20 @@ overlap Sapphire autonomy.
 - `integration`: `agentic-arigato`, `tradingview-mcp-v2`, `hermes-agent`,
   `kimi-tools`
 
+## Upstream Integration Fleet
+
+`infra/org-repos.yaml` now includes a separate `upstream_repos` section for
+starred or locally integrated upstreams that support Sapphire without being
+first-class Core+Satellites. The initial fleet covers OpenBB, OpenClaw,
+NemoClaw, Kronos, Lumo, Hermes, claw-code, TradingView MCP v2, Foundry/Palantir
+SDKs, FRED, lightweight-charts, Goose, RTK, career-ops, and the AIP community
+registry.
+
+The rule is deliberately conservative: forks and clones are inventory/control
+assets, not runtime cutovers. Retargeting Sapphire, Hermes, LaunchAgents, or any
+Cloud Run service to an Ari fork still needs a dedicated PR, tests, blast-radius
+notes, and rollback.
+
 `agentic-arigato` owns the protected `agentic-pm-hub` Cloud Run service in
 `tho-ai-agent`. The service should remain private; public unauthenticated probes
 are expected to classify as `cloud_run_auth_required`, while health verification

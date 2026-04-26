@@ -70,6 +70,32 @@ def test_manifest_tracks_required_core_and_satellite_fields() -> None:
             assert repo["required_guardrails"]
 
 
+def test_manifest_tracks_upstream_integration_fleet() -> None:
+    manifest = _manifest()
+    upstream_repos = manifest["upstream_repos"]
+    by_id = {repo["id"]: repo for repo in upstream_repos}
+
+    assert {repo["id"] for repo in upstream_repos} >= {
+        "openbb",
+        "kronos",
+        "lumo-api-v2",
+        "hermes-agent-upstream",
+        "foundry-platform-python",
+        "nemoclaw",
+    }
+    for repo in upstream_repos:
+        assert repo["id"]
+        assert repo["name"]
+        assert repo["upstream"]
+        assert repo["local_path"].startswith("/Users/aribs/Code/")
+        assert repo["integration_surface"]
+        assert repo["sync_state"]
+
+    assert by_id["openbb"]["ari_fork"] == "arigatoexpress/OpenBB"
+    assert by_id["openclaw"]["sync_state"] == "fork_diverged_do_not_force"
+    assert by_id["aip-community-registry"]["ari_fork"] == "arigatoexpress/aip-community-registry"
+
+
 def test_tradingview_mcp_v2_tracks_upstream_hardening_pr() -> None:
     repos = {repo["id"]: repo for repo in _manifest()["repos"]}
     repo = repos["tradingview-mcp-v2"]
@@ -280,6 +306,13 @@ def test_classification_report_tracks_absorb_and_archive_candidates() -> None:
     }
     assert report["candidate_archive"]["approved"] == []
     assert "Do not delete" in " ".join(report["candidate_archive"]["policy"])
+    assert report["upstream_integration_fleet"]["source_manifest_section"] == "upstream_repos"
+    assert set(report["upstream_integration_fleet"]["tracked"]) >= {
+        "openbb",
+        "kronos",
+        "lumo-api-v2",
+        "foundry-platform-python",
+    }
     assert "agentic-arigato" in report["active_repos"]["integration"]
     assert "agentic-arigato" not in {item["id"] for item in report["blocked_or_watch"]}
     assert "crypto-tax-tracker" not in {item["id"] for item in report["blocked_or_watch"]}
@@ -292,18 +325,25 @@ def test_collect_status_no_external_handles_local_ci_without_live_tools(tmp_path
     manifest = deepcopy(_manifest())
     for repo in manifest["repos"]:
         repo["local_path"] = str(tmp_path / repo["id"])
+    for repo in manifest["upstream_repos"]:
+        repo["local_path"] = str(tmp_path / "upstream" / repo["id"])
 
     report = org_status.collect_status(manifest, external=False)
 
     assert report["schema_version"] == 1
     assert report["summary"]["repo_count"] == len(manifest["repos"])
+    assert report["summary"]["upstream_repo_count"] == len(manifest["upstream_repos"])
     assert "repo_classifications" in report["summary"]
     assert report["summary"]["hermes_skill_classes"]["read_only"] == 9
     assert report["summary"]["hermes_production_adjacent_skills"] == 10
     assert sorted(report["summary"]["missing_local_repos"]) == sorted(
         repo["id"] for repo in manifest["repos"]
     )
+    assert sorted(report["summary"]["upstream_missing_local_repos"]) == sorted(
+        repo["id"] for repo in manifest["upstream_repos"]
+    )
     assert report["summary"]["dirty_repos"] == []
+    assert report["summary"]["upstream_dirty_repos"] == []
     assert report["hermes_skills"]["skill_count"] == 15
     assert len(report["gcp_projects"]) == len(manifest["gcp_projects"])
     assert report["local_runtime"]["docker"]["checked"] is False
@@ -318,9 +358,11 @@ def test_render_markdown_includes_control_board_sections() -> None:
     assert "# Sapphire Autonomous Org Status" in markdown
     assert "## Summary" in markdown
     assert "## Repos" in markdown
+    assert "## Upstream Integration Fleet" in markdown
     assert "## Hermes Skills" in markdown
     assert "## Waves" in markdown
     assert "| sapphire | core |" in markdown
+    assert "| openbb | OpenBB-finance/OpenBB | arigatoexpress/OpenBB |" in markdown
     assert "| tradingview | external_mutating | yes |" in markdown
 
 

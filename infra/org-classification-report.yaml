@@ -27,6 +27,30 @@ active_repos:
     - hermes-agent
     - kimi-tools
 
+upstream_integration_fleet:
+  source_manifest_section: upstream_repos
+  policy:
+    - Forks and clones support inventory, patching, and review; they do not retarget production runtimes by themselves.
+    - Preserve dirty upstream workbenches before cleanup with a branch, patch, and stash.
+    - Do not force-sync diverged Ari forks without a dedicated review.
+  tracked:
+    - openbb
+    - openclaw
+    - nemoclaw
+    - kronos
+    - lumo-api-v2
+    - hermes-agent-upstream
+    - claw-code-upstream
+    - tradingview-mcp-upstream
+    - foundry-platform-python
+    - palantir-python-sdk
+    - fredapi
+    - lightweight-charts
+    - goose
+    - rtk
+    - career-ops-plugin
+    - aip-community-registry
+
 candidate_absorb:
   - id: kimi-tools
     current_classification: integration

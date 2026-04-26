@@ -60,6 +60,7 @@ def load_manifest(path: Path = DEFAULT_MANIFEST) -> dict[str, Any]:
 
 def collect_status(manifest: dict[str, Any], *, external: bool = True) -> dict[str, Any]:
     repos = [repo_status(repo, external=external) for repo in manifest.get("repos", [])]
+    upstream_repos = upstream_fleet_status(manifest.get("upstream_repos", []))
     hermes_skills = hermes_skill_status(DEFAULT_HERMES_SKILLS)
     report = {
         "schema_version": 1,
@@ -69,8 +70,9 @@ def collect_status(manifest: dict[str, Any], *, external: bool = True) -> dict[s
             "generated_for": manifest.get("generated_for"),
             "updated_at": manifest.get("updated_at"),
         },
-        "summary": summarize(manifest, repos, hermes_skills),
+        "summary": summarize(manifest, repos, upstream_repos, hermes_skills),
         "repos": repos,
+        "upstream_repos": upstream_repos,
         "hermes_skills": hermes_skills,
         "gcp_projects": gcp_status(manifest.get("gcp_projects", []), external=external),
         "local_runtime": local_runtime_status(manifest.get("local_runtime", {}), external=external),
@@ -83,6 +85,7 @@ def collect_status(manifest: dict[str, Any], *, external: bool = True) -> dict[s
 def summarize(
     manifest: dict[str, Any],
     repos: list[dict[str, Any]],
+    upstream_repos: list[dict[str, Any]],
     hermes_skills: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     classifications: dict[str, int] = {}
@@ -94,6 +97,13 @@ def summarize(
         "repo_classifications": classifications,
         "dirty_repos": [repo["id"] for repo in repos if (repo.get("dirty_count") or 0) > 0],
         "missing_local_repos": [repo["id"] for repo in repos if not repo.get("exists")],
+        "upstream_repo_count": len(upstream_repos),
+        "upstream_missing_local_repos": [
+            repo["id"] for repo in upstream_repos if not repo.get("exists")
+        ],
+        "upstream_dirty_repos": [
+            repo["id"] for repo in upstream_repos if (repo.get("dirty_count") or 0) > 0
+        ],
         "open_pr_count": sum(len(repo.get("open_prs", [])) for repo in repos),
         "routine_stages": stage_counts(manifest.get("routines", [])),
         "hermes_skill_classes": (hermes_skills or {}).get("classification_counts", {}),
@@ -160,6 +170,67 @@ def hermes_skill_status(path: Path = DEFAULT_HERMES_SKILLS) -> dict[str, Any]:
     status["production_adjacent_count"] = production_adjacent_count
     status["skills"] = rows
     return status
+
+
+def upstream_fleet_status(repos: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [upstream_repo_status(repo) for repo in repos]
+
+
+def upstream_repo_status(repo: dict[str, Any]) -> dict[str, Any]:
+    path = Path(str(repo.get("local_path") or ""))
+    status: dict[str, Any] = {
+        "id": repo.get("id"),
+        "name": repo.get("name"),
+        "upstream": repo.get("upstream"),
+        "ari_fork": repo.get("ari_fork"),
+        "local_path": str(path),
+        "integration_surface": repo.get("integration_surface"),
+        "sync_state": repo.get("sync_state"),
+        "exists": path.exists(),
+        "branch": None,
+        "head": None,
+        "dirty_count": None,
+        "dirty_summary": None,
+        "clean": None,
+        "remotes": {},
+        "errors": [],
+    }
+    if not path.exists():
+        status["errors"].append("local path missing")
+        return status
+
+    branch = run(["git", "branch", "--show-current"], cwd=path)
+    head = run(["git", "log", "-1", "--oneline", "--decorate"], cwd=path)
+    dirty = run(["git", "status", "--porcelain=v1"], cwd=path)
+    remotes = run(["git", "remote", "-v"], cwd=path)
+    status["branch"] = branch["stdout"].strip() if branch["ok"] else None
+    status["head"] = head["stdout"].strip() if head["ok"] else None
+    dirty_lines = dirty["stdout"].splitlines() if dirty["ok"] else []
+    status["dirty_count"] = len(dirty_lines)
+    status["dirty_summary"] = summarize_dirty_lines(dirty_lines)
+    status["clean"] = dirty["ok"] and len(dirty_lines) == 0
+    if remotes["ok"]:
+        status["remotes"] = parse_git_remotes(remotes["stdout"])
+    for result_name, result in (
+        ("branch", branch),
+        ("head", head),
+        ("dirty", dirty),
+        ("remotes", remotes),
+    ):
+        if not result["ok"]:
+            status["errors"].append(f"git {result_name} failed: {result['stderr'][:160]}")
+    return status
+
+
+def parse_git_remotes(output: str) -> dict[str, dict[str, str]]:
+    remotes: dict[str, dict[str, str]] = {}
+    for line in output.splitlines():
+        parts = line.split()
+        if len(parts) < 3:
+            continue
+        name, url, mode = parts[:3]
+        remotes.setdefault(name, {})[mode.strip("()")] = url
+    return remotes
 
 
 def repo_status(repo: dict[str, Any], *, external: bool) -> dict[str, Any]:
@@ -426,9 +497,12 @@ def render_markdown(report: dict[str, Any]) -> str:
         "## Summary",
         "",
         f"- Repos tracked: {summary['repo_count']}",
+        f"- Upstream integrations tracked: {summary['upstream_repo_count']}",
         f"- Open PRs: {summary['open_pr_count']}",
         f"- Dirty repos: {', '.join(summary['dirty_repos']) or 'none'}",
         f"- Missing local repos: {', '.join(summary['missing_local_repos']) or 'none'}",
+        f"- Dirty upstream integrations: {', '.join(summary['upstream_dirty_repos']) or 'none'}",
+        f"- Missing upstream clones: {', '.join(summary['upstream_missing_local_repos']) or 'none'}",
         f"- Routine stages: {json.dumps(summary['routine_stages'], sort_keys=True)}",
         f"- Hermes skill classes: {json.dumps(summary['hermes_skill_classes'], sort_keys=True)}",
         f"- Hermes production-adjacent skills: {summary['hermes_production_adjacent_skills']}",
@@ -462,6 +536,41 @@ def render_markdown(report: dict[str, Any]) -> str:
             ]
         )
         for repo in dirty_repos:
+            dirty = repo.get("dirty_summary") or {}
+            lines.append(
+                f"| {repo['id']} | {dirty.get('entries', repo.get('dirty_count') or 0)} | "
+                f"{dirty.get('tracked', 0)} | {dirty.get('modified', 0)} | "
+                f"{dirty.get('added', 0)} | {dirty.get('deleted', 0)} | "
+                f"{dirty.get('renamed', 0)} | {dirty.get('untracked', 0)} | "
+                f"{dirty.get('unmerged', 0)} |"
+            )
+    lines.extend(
+        [
+            "",
+            "## Upstream Integration Fleet",
+            "",
+            "| Repo | Upstream | Ari Fork | Branch | Clean | State |",
+            "|---|---|---|---|:---:|---|",
+        ]
+    )
+    for repo in report.get("upstream_repos", []):
+        lines.append(
+            f"| {repo['id']} | {repo.get('upstream') or '-'} | "
+            f"{repo.get('ari_fork') or '-'} | {repo.get('branch') or '-'} | "
+            f"{'yes' if repo.get('clean') else 'no'} | {repo.get('sync_state') or '-'} |"
+        )
+    upstream_dirty = [repo for repo in report.get("upstream_repos", []) if repo.get("dirty_count")]
+    if upstream_dirty:
+        lines.extend(
+            [
+                "",
+                "## Dirty Upstream Integration Summary",
+                "",
+                "| Repo | Entries | Tracked | Modified | Added | Deleted | Renamed | Untracked | Unmerged |",
+                "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
+            ]
+        )
+        for repo in upstream_dirty:
             dirty = repo.get("dirty_summary") or {}
             lines.append(
                 f"| {repo['id']} | {dirty.get('entries', repo.get('dirty_count') or 0)} | "
