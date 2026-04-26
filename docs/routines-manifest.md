@@ -31,11 +31,11 @@ Check: `launchctl list | grep sapphire` — every row should show a PID (online)
 |-------|---------|--------|--------|---------|
 | `com.sapphire.morning-brief`       | 06:00 local / 07:00 CT | `services/intelligence/daily_brief.py`      | `data/intelligence/latest/daily_brief.md` + Telegram digest        | Manual dry-run: `python3 services/intelligence/daily_brief.py --dry-run` |
 | `com.sapphire.kronos-daily`        | 07:00 CT           | `scripts/kronos_daily_predictions.py`       | `data/intelligence/YYYY-MM-DD/predictions.json`                    | Manual: `python3 scripts/kronos_daily_predictions.py`; GPU must be up |
-| `com.sapphire.threat-refresh`      | every 4h           | `scripts/threat_refresh.sh`                 | `data/intelligence/YYYY-MM-DD/threats.json`                        | Manual: run script; check CISA/NVD reachability |
+| `com.sapphire.threat-refresh`      | every 4h           | `services/dashboard/refresh_threats.py`     | `data/intelligence/YYYY-MM-DD/threats.json`                        | Manual: `python3 services/dashboard/refresh_threats.py`; check CISA/NVD reachability |
 | `com.sapphire.chain-refresh`       | every 15 min       | `services.pipeline.chain_refresh`           | `data/chain/chain_<ts>.json` + `data/intelligence/latest/chain.json` | Manual: `python3 -m services.pipeline.chain_refresh` |
 | `com.sapphire.correlation-refresh` | hourly at :17      | `services.pipeline.correlation_refresh`     | `data/intelligence/latest/correlations.json`                       | Manual: `python3 -m services.pipeline.correlation_refresh` |
 | `com.sapphire.gcp-sync`            | hourly at :05      | `services.pipeline.gcp_sync`                | Uploads to `gs://sapphire-data-lake/raw/*`; Cloud Function loads BQ | Manual: `python3 -m services.pipeline.gcp_sync -v` |
-| `com.sapphire.logrotate`           | 03:30 CT daily     | `scripts/logrotate.sh`                      | `.gz` archives under `~/Library/Logs/sapphire/`                    | Manual: `bash scripts/logrotate.sh` |
+| `com.sapphire.logrotate`           | 03:30 CT daily     | `infra/logrotate.py`                        | `.gz` archives under `~/autonomy-status/logs/` and `~/.hermes/logs/` | Manual: `python3 infra/logrotate.py` |
 | `com.sapphire.backtest-weekly`      | Sat 22:00 local    | `python3 -m lib.analytics.run_strategies --days 90 --bankroll 10000` | `data/backtests/strategies/*.json`                                 | Remote shadow: `.github/workflows/weekly-backtest.yml`; keep local until artifacts soak clean |
 
 ## 2.1 Remote-shadow schedules
@@ -47,6 +47,7 @@ plist is explicitly disabled.
 | Workflow | Cron | Local routine shadowed | Output |
 |----------|------|------------------------|--------|
 | `.github/workflows/weekly-backtest.yml` | Sun 04:00 UTC | `com.sapphire.backtest-weekly` | GitHub Actions artifact `weekly-backtest-<run_id>` |
+| `.github/workflows/threat-refresh.yml` | 01:10, 05:10, 09:10, 13:10, 17:10, 21:10 UTC | `com.sapphire.threat-refresh` | GitHub Actions artifact `threat-refresh-<run_id>`; uses the wrapper's native public-source mode so no private cross-repo token is required |
 
 Compare local and remote weekly backtest artifacts with:
 
@@ -56,6 +57,14 @@ python3 scripts/ops/compare_backtest_artifacts.py \
   --remote-sweep /path/to/gh-artifact/data/backtests/strategies/strategy_sweep_<REMOTE_TS>.json \
   --local-best data/backtests/strategies/best_per_symbol_<LOCAL_TS>.json \
   --remote-best /path/to/gh-artifact/data/backtests/strategies/best_per_symbol_<REMOTE_TS>.json
+```
+
+Compare local and remote threat-refresh artifacts with:
+
+```bash
+python3 scripts/ops/compare_threat_artifacts.py \
+  --local data/intelligence/<UTC_DATE>/threats.json \
+  --remote /path/to/gh-artifact/data/intelligence/<UTC_DATE>/threats.json
 ```
 
 All scripts are self-contained — they write their artifacts and exit. A routine is "healthy" if its artifact's mtime is within the expected cadence window.
