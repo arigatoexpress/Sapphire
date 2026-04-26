@@ -76,13 +76,19 @@ def main() -> int:
             print(f"Invalid JSON from threat-bot: {e}", file=sys.stderr)
             return 1
 
+    refreshed_at = datetime.now(UTC)
+    run_stamp = refreshed_at.strftime("%Y%m%dT%H%M%SZ")
     out_file = out_dir / "threats.json"
     payload = {
-        "refreshed_at": datetime.now(UTC).isoformat(),
+        "refreshed_at": refreshed_at.isoformat(),
         "source_count": len(threats),
         "threats": threats,
     }
     out_file.write_text(json.dumps(payload, indent=2))
+
+    run_file = data_dir / "runs" / run_stamp / "threats.json"
+    run_file.parent.mkdir(parents=True, exist_ok=True)
+    run_file.write_text(json.dumps(payload, indent=2))
 
     latest = data_dir / "latest"
     try:
@@ -93,6 +99,7 @@ def main() -> int:
         print(f"Symlink update failed: {e}", file=sys.stderr)
 
     print(f"Wrote {len(threats)} threats to {out_file}")
+    print(f"Wrote run snapshot to {run_file}")
     return 0
 
 
