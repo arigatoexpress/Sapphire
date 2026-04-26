@@ -22,6 +22,7 @@ active_repos:
     - tradingview-mcp
     - crypto-tax-tracker
   integration:
+    - agentic-arigato
     - tradingview-mcp-v2
     - hermes-agent
     - kimi-tools
@@ -63,6 +64,9 @@ candidate_archive:
     - Do not delete local clones as part of classification work.
 
 blocked_or_watch:
+  - id: agentic-arigato
+    blocker: Active protected Cloud Run service is mapped, but repo guardrail parity still needs a dedicated PR before any deploy or IAM change.
+    tracking: agentic-pm-hub in tho-ai-agent; unauthenticated probes should classify as cloud_run_auth_required.
   - id: tradingview-mcp-v2
     blocker: Upstream repository is read-only for Ari.
     tracking: https://github.com/tradesdontlie/tradingview-mcp/pull/102

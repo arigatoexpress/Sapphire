@@ -32,6 +32,33 @@ repos:
       - no direct main pushes
     migration_state: active_cloud_run
 
+  - id: agentic-arigato
+    name: AgenticArigato
+    classification: integration
+    role: Private BD analytics agent repo backing the protected agentic-pm-hub Cloud Run service
+    local_path: /Users/aribs/Code/AgenticArigato
+    github: arigatoexpress/AgenticArigato
+    default_branch: main
+    production_adjacent: true
+    required_guardrails:
+      - AGENTS.md
+      - SECURITY.md
+      - CI on PR
+      - no direct main pushes
+    migration_state: active_protected_cloud_run_mapped
+    cloud_run_tracking:
+      project_id: tho-ai-agent
+      region: us-central1
+      service: agentic-pm-hub
+      latest_ready_revision: agentic-pm-hub-00006-b57
+      validated_at: "2026-04-26"
+      public_invoker: false
+      authenticated_health_paths:
+        - /health
+        - /healthz/
+      warning_kind: cloud_run_auth_required
+      next_step: Add CI/pre-commit parity and an authenticated-monitor runbook before any deploy or IAM change.
+
   - id: claw-code
     name: claw-code
     classification: satellite

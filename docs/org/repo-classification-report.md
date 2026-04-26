@@ -9,7 +9,13 @@ overlap Sapphire autonomy.
 - `core`: `sapphire`, `project-go-forward`
 - `satellite`: `claw-code`, `cyber-threat-bot`,
   `regional-intel-workbench`, `tradingview-mcp`, `crypto-tax-tracker`
-- `integration`: `tradingview-mcp-v2`, `hermes-agent`, `kimi-tools`
+- `integration`: `agentic-arigato`, `tradingview-mcp-v2`, `hermes-agent`,
+  `kimi-tools`
+
+`agentic-arigato` owns the protected `agentic-pm-hub` Cloud Run service in
+`tho-ai-agent`. The service should remain private; public unauthenticated probes
+are expected to classify as `cloud_run_auth_required`, while health verification
+uses authenticated requests.
 
 ## Absorb Candidates
 
@@ -28,6 +34,7 @@ archive after an absorb PR, tests, rollback notes, and a soak window.
 
 ## Immediate Follow-Ups
 
+- Add CI/pre-commit parity to `agentic-arigato` before any deploy or IAM change.
 - Keep watching the TradingView MCP v2 upstream guardrail PR.
 - Audit Hermes Sapphire skill command surfaces before moving or deleting any
   agent-facing skill.
