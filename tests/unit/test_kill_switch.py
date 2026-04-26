@@ -427,3 +427,180 @@ def test_event_dataclass_serialization():
     assert d["portfolio_value"] == 90_000.12
     assert d["drawdown_24h"] == 0.055
     assert d["timestamp"].startswith("2026-04-18")
+
+
+# ---------------------------------------------------------------------------
+# Branch coverage additions — boundary, idempotency, audit-path resolution,
+# concurrency, and edge-input behaviour.
+# ---------------------------------------------------------------------------
+
+
+def test_status_to_dict_handles_pristine_state(switch):
+    """A freshly-constructed switch has no peaks; to_dict must not crash."""
+    payload = switch.status().to_dict()
+    assert payload["is_active"] is False
+    assert payload["peak_24h"] is None
+    assert payload["peak_all_time"] is None
+    assert payload["last_value"] is None
+    assert payload["last_update"] is None
+    assert payload["triggered_at"] is None
+    assert payload["drawdown_24h"] == 0.0
+    assert payload["drawdown_total"] == 0.0
+
+
+def test_recovery_at_exact_threshold_deactivates(switch, clock):
+    """The recovery comparison is `<`, so equality with the threshold deactivates."""
+    switch.check(100_000)
+    clock.advance(hours=1)
+    switch.check(90_000)
+    assert switch.is_active
+    # Exact equality must succeed (boundary condition).
+    assert switch.check_recovery(switch.recovery_threshold) is True
+    assert not switch.is_active
+
+
+def test_force_activate_rejects_non_positive_portfolio_value(clock, recorders, tmp_path):
+    pub, notifier = recorders
+    ks = KillSwitch(
+        publish_event=pub,
+        notify=notifier,
+        now=clock.now,
+        audit_path=tmp_path / "kill_switch.jsonl",
+    )
+    with pytest.raises(ValueError):
+        ks.force_activate("operator halt", portfolio_value=0)
+    with pytest.raises(ValueError):
+        ks.force_activate("operator halt", portfolio_value=-100)
+    # Switch must remain inactive after a rejected manual activation.
+    assert not ks.is_active
+    assert pub.events == []
+
+
+def test_force_activate_blank_reason_falls_back_to_default(clock, recorders, tmp_path):
+    pub, notifier = recorders
+    ks = KillSwitch(
+        publish_event=pub,
+        notify=notifier,
+        now=clock.now,
+        audit_path=tmp_path / "kill_switch.jsonl",
+    )
+    assert ks.force_activate("   ", notify=False) is True
+    assert ks.status().reason == "Manual operator kill switch"
+
+
+def test_force_deactivate_blank_reason_falls_back_to_default(clock, recorders, tmp_path):
+    pub, notifier = recorders
+    ks = KillSwitch(
+        publish_event=pub,
+        notify=notifier,
+        now=clock.now,
+        audit_path=tmp_path / "kill_switch.jsonl",
+    )
+    ks.force_activate("first halt", notify=False)
+    assert ks.force_deactivate("   ", notify=False) is True
+    deactivations = [e for e in pub.events if e[0] == "kill_switch.deactivated"]
+    assert deactivations[-1][1]["reason"] == "Manual operator resume"
+
+
+def test_audit_path_resolves_from_explicit_env_var(clock, monkeypatch, tmp_path):
+    audit_target = tmp_path / "env-driven.jsonl"
+    monkeypatch.setenv("SAPPHIRE_KILL_SWITCH_AUDIT_LOG", str(audit_target))
+    ks = KillSwitch(
+        publish_event=lambda *a, **k: None,
+        notify=lambda *a, **k: None,
+        now=clock.now,
+    )
+    ks.check(100_000)
+    clock.advance(hours=1)
+    ks.check(90_000)
+    assert audit_target.exists()
+    record = json.loads(audit_target.read_text().splitlines()[0])
+    assert record["event_type"] == "kill_switch.activated"
+
+
+def test_audit_path_resolves_from_state_dir(clock, monkeypatch, tmp_path):
+    """Without an explicit audit path or env var, audit lands under SAPPHIRE_STATE_DIR."""
+    monkeypatch.delenv("SAPPHIRE_KILL_SWITCH_AUDIT_LOG", raising=False)
+    monkeypatch.setenv("SAPPHIRE_STATE_DIR", str(tmp_path))
+    ks = KillSwitch(
+        publish_event=lambda *a, **k: None,
+        notify=lambda *a, **k: None,
+        now=clock.now,
+    )
+    ks.check(100_000)
+    clock.advance(hours=1)
+    ks.check(90_000)
+    expected = tmp_path / "audit" / "kill_switch.jsonl"
+    assert expected.exists()
+    records = [json.loads(line) for line in expected.read_text().splitlines()]
+    assert records[0]["event_type"] == "kill_switch.activated"
+
+
+def test_check_is_thread_safe_under_concurrent_load(clock, tmp_path):
+    """check() guards state with a lock; concurrent calls must not corrupt peaks."""
+    import threading
+
+    ks = KillSwitch(
+        publish_event=lambda *a, **k: None,
+        notify=lambda *a, **k: None,
+        now=clock.now,
+        audit_path=tmp_path / "kill_switch.jsonl",
+    )
+
+    errors: list[BaseException] = []
+
+    def worker(value: float) -> None:
+        try:
+            ks.check(value)
+        except BaseException as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker, args=(100_000.0 + i,)) for i in range(20)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert errors == []
+    status = ks.status()
+    # Every sample fits in the 24h window, so peak must be the largest value seen.
+    assert status.peak_all_time == 100_019.0
+    assert status.peak_24h == 100_019.0
+
+
+def test_singleton_reset_creates_fresh_instance():
+    """reset_kill_switch drops the cached singleton so config changes take effect."""
+    reset_kill_switch()
+    first = get_kill_switch()
+    reset_kill_switch()
+    second = get_kill_switch()
+    assert first is not second
+    reset_kill_switch()
+
+
+def test_status_to_dict_after_activation_carries_event_metadata(switch, clock):
+    switch.check(100_000)
+    clock.advance(hours=1)
+    switch.check(90_000)
+    payload = switch.status().to_dict()
+    assert payload["is_active"] is True
+    assert payload["triggered_at"] is not None
+    assert payload["reason"] is not None
+    assert payload["last_value"] == 90_000.0
+    assert isinstance(payload["last_update"], str)
+
+
+def test_force_activate_records_supplied_portfolio_value_in_audit(clock, recorders, tmp_path):
+    """force_activate(portfolio_value=X) should bump peaks AND audit value=X."""
+    audit_path = tmp_path / "kill_switch.jsonl"
+    pub, notifier = recorders
+    ks = KillSwitch(
+        publish_event=pub,
+        notify=notifier,
+        now=clock.now,
+        audit_path=audit_path,
+    )
+    assert ks.force_activate("ops halt", portfolio_value=125_000.0, notify=False) is True
+    record = json.loads(audit_path.read_text().splitlines()[0])
+    assert record["portfolio_value"] == 125_000.0
+    assert ks.status().peak_all_time == 125_000.0
