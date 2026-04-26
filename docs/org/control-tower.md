@@ -41,8 +41,9 @@ shape.
   dashboard doc, and validation tests. No production behavior changes.
 - **Wave 1: Routine Migration** - in progress. Weekly backtest and
   threat-refresh are shadowing remotely while local routines remain canonical.
-- **Wave 2: Repo Hardening** - queued. Bring active satellites to CI,
-  pre-commit or equivalent parity, and clear runbooks.
+- **Wave 2: Repo Hardening** - in progress. TradingView MCP v2 guardrails are
+  blocked on upstream PR review, and crypto-tax-tracker guardrails are complete
+  via [arigatoexpress/crypto-tax-tracker#2](https://github.com/arigatoexpress/crypto-tax-tracker/pull/2).
 - **Wave 3: Agent Consolidation** - queued. Map Hermes, claw-code, Sapphire
   plugins, Claude scheduled tasks, OpenClaw remnants, and LaunchAgents.
 - **Wave 4: Data + Intelligence Platform** - queued. Normalize schemas,
@@ -77,6 +78,9 @@ shape.
    `docs/org/repo-classification-report.md`.
 5. `feat/autonomy-audit-log` - tracked. Structured decision/alert audit logging
    lives in `docs/org/autonomy-audit-log.md`.
+6. `chore/crypto-tax-hardening-tracked` - current bookkeeping PR. The
+   crypto-tax-tracker satellite now has AGENTS/CLAUDE guidance, hard ruff and
+   pytest CI, pre-commit parity, and README check commands.
 
 ## Safety Rules
 

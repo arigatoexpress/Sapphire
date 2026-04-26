@@ -77,6 +77,20 @@ def test_tradingview_mcp_v2_tracks_upstream_hardening_pr() -> None:
     ]
 
 
+def test_crypto_tax_tracker_tracks_completed_guardrail_pr() -> None:
+    repos = {repo["id"]: repo for repo in _manifest()["repos"]}
+    repo = repos["crypto-tax-tracker"]
+
+    assert repo["migration_state"] == "guardrails_complete"
+    assert "AGENTS.md" in repo["required_guardrails"]
+    assert repo["hardening_tracking"]["repo_pr"] == "https://github.com/arigatoexpress/crypto-tax-tracker/pull/2"
+    assert repo["hardening_tracking"]["validated_commands"] == [
+        ".venv/bin/ruff check src tests",
+        ".venv/bin/python -m pytest -q",
+        'PATH="$PWD/.venv/bin:$PATH" .venv/bin/pre-commit run --all-files',
+    ]
+
+
 def test_classification_report_tracks_absorb_and_archive_candidates() -> None:
     report = _classification_report()
     manifest_ids = {repo["id"] for repo in _manifest()["repos"]}
@@ -87,6 +101,8 @@ def test_classification_report_tracks_absorb_and_archive_candidates() -> None:
     assert {item["id"] for item in report["candidate_absorb"]} >= {"kimi-tools", "tradingview-mcp-v2"}
     assert report["candidate_archive"]["approved"] == []
     assert "Do not delete" in " ".join(report["candidate_archive"]["policy"])
+    assert "crypto-tax-tracker" not in {item["id"] for item in report["blocked_or_watch"]}
+    assert "crypto-tax-tracker" not in {item["id"] for item in report["next_reviews"]}
 
 
 def test_collect_status_no_external_handles_local_ci_without_live_tools(tmp_path: Path) -> None:
