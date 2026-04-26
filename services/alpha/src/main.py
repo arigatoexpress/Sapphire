@@ -228,7 +228,7 @@ class AlphaEngine:
         self._autonomy_allow_gcloud_changes = self._env_flag(
             "SAPPHIRE_AUTONOMY_ALLOW_GCLOUD_CHANGES", default=False
         )
-        self._autonomy_dry_run = self._env_flag("SAPPHIRE_AUTONOMY_DRY_RUN", default=False)
+        self._autonomy_dry_run = self._env_flag("SAPPHIRE_AUTONOMY_DRY_RUN", default=True)
         self._autonomy_require_owner_approval = self._env_flag(
             "SAPPHIRE_AUTONOMY_REQUIRE_OWNER_APPROVAL", default=False
         )

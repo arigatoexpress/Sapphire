@@ -49,8 +49,10 @@ shape.
   runtime mapping is documented in `docs/org/hermes-agent-consolidation-map.md`.
 - **Wave 4: Data + Intelligence Platform** - queued. Normalize schemas,
   Foundry, GCS, BigQuery, threat, regional, market, and chain intel flows.
-- **Wave 5: Autonomy Safety** - queued. Finish audit logging, confirmation
-  firewall, feedback loops, cost reporting, and dry-run defaults.
+- **Wave 5: Autonomy Safety** - in progress. Audit logging is wired for
+  decision-engine and Kimi bridge autonomy requests; alpha full-autonomy
+  dispatch defaults to dry-run, with code/GCP mutations disabled unless
+  explicitly overridden.
 
 ## Routine Stages
 
