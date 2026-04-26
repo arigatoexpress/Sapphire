@@ -264,7 +264,7 @@ Directional breakdown reveals the model's strongest edge in non-bearish regimes:
 | Neutral | 77.8 % |
 | Bearish | 12.5 % |
 
-This is a known asymmetry: bear-call requires confirmation from on-chain funding/OI, which currently underweights in `MultiTFMomentum`. Fix tracked in `docs/`.
+The asymmetry is statistically distinguishable from the bullish rate (Fisher's exact $p = 0.0085$, two-proportion $z = -2.922$). Root cause is structural: four of five strategies in `lib/analytics/strategies.py` have no `short` branch, and `plugins/claw-sapphire/tools/internal/predict.py` weights `MA↓` at 2.0 (vs. 0.5–1.5 for other single-component bear factors), flipping `net` to bearish even when the underlying ensemble is net-bullish. Full evidence and a layered fix are tracked in [`docs/research/bearish-direction-asymmetry-2026-04-26.md`](docs/research/bearish-direction-asymmetry-2026-04-26.md).
 
 ---
 
