@@ -264,15 +264,34 @@ def test_dispatch_one_loads_tweets_from_jsonl(fake_ready, monkeypatch):
 
 def test_run_end_to_end_dry(fake_ready, monkeypatch):
     monkeypatch.delenv("SAPPHIRE_PUBLISH_LIVE", raising=False)
+    monkeypatch.delenv("SAPPHIRE_CONTENT_TELEGRAM_SUMMARY", raising=False)
 
-    # Silence telegram + event bus
+    # Silence event bus; Telegram should not be called unless explicitly enabled.
     monkeypatch.setattr(auto_publish, "_emit_event", lambda *a, **k: None)
-    monkeypatch.setattr(auto_publish, "_telegram_summary", lambda *a, **k: None)
+    monkeypatch.setattr(
+        auto_publish,
+        "_telegram_summary",
+        lambda *_a, **_k: pytest.fail("Telegram summary should be disabled by default"),
+    )
 
     out = auto_publish.run()
     platforms = {item["item"]["platform"] for item in out["items"]}
     assert platforms == {"linkedin", "substack", "x"}
     assert all(item["result"]["dry_run"] for item in out["items"])
+    assert out["telegram_summary"] is False
+
+
+def test_run_telegram_summary_requires_explicit_enable(fake_ready, monkeypatch):
+    monkeypatch.delenv("SAPPHIRE_PUBLISH_LIVE", raising=False)
+    monkeypatch.setenv("SAPPHIRE_CONTENT_TELEGRAM_SUMMARY", "1")
+    monkeypatch.setattr(auto_publish, "_emit_event", lambda *a, **k: None)
+    called: list[int] = []
+    monkeypatch.setattr(auto_publish, "_telegram_summary", lambda results: called.append(len(results)))
+
+    out = auto_publish.run()
+
+    assert out["telegram_summary"] is True
+    assert called == [3]
 
 
 def test_run_writes_ledger_only_for_live_success(fake_ready, monkeypatch):

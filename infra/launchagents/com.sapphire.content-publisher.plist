@@ -11,9 +11,9 @@
       picks up anything new in the last 48h that hasn't already been
       pushed (idempotency ledger at data/content/published_ledger.json).
 
-      Flip SAPPHIRE_PUBLISH_LIVE=1 below after verifying a full dry-run
-      ledger + Telegram summary look correct. Keep it unset to stay in
-      dry-run mode.
+      Flip SAPPHIRE_PUBLISH_LIVE=1 below only after verifying a full
+      dry-run ledger. Telegram summaries are explicit because remote
+      shadow runs must not send real Telegram messages.
     -->
 
     <key>ProgramArguments</key>
@@ -45,6 +45,9 @@
         <!-- Default is dry-run. Change to 1 once you're confident. -->
         <key>SAPPHIRE_PUBLISH_LIVE</key>
         <string>0</string>
+        <!-- Local scheduled publisher may summarize; remote shadows leave this unset/0. -->
+        <key>SAPPHIRE_CONTENT_TELEGRAM_SUMMARY</key>
+        <string>1</string>
         <!-- Loaded via launchctl setenv in setup; keys are NOT in this file. -->
     </dict>
 

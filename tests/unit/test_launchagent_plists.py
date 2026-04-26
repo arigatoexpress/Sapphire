@@ -65,3 +65,11 @@ def test_routine_health_tracks_canonical_morning_brief() -> None:
     assert "morning-brief" in routine_names
     assert "com.sapphire.daily-brief" not in launchagents
     assert "daily-brief" not in routine_names
+
+
+def test_content_publisher_keeps_telegram_summary_explicit() -> None:
+    plist = _load_plist(INFRA_LAUNCHAGENTS / "com.sapphire.content-publisher.plist")
+    env = plist["EnvironmentVariables"]
+
+    assert env["SAPPHIRE_PUBLISH_LIVE"] == "0"
+    assert env["SAPPHIRE_CONTENT_TELEGRAM_SUMMARY"] == "1"
