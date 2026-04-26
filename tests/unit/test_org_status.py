@@ -112,11 +112,17 @@ def test_agentic_arigato_tracks_protected_cloud_run_service() -> None:
     assert tracking["authenticated_health_paths"] == ["/health", "/healthz/"]
     assert tracking["warning_kind"] == "cloud_run_auth_required"
     assert tracking["repo_pr"] == "https://github.com/arigatoexpress/AgenticArigato/pull/1"
+    assert (
+        tracking["authenticated_health_runbook"]
+        == "https://github.com/arigatoexpress/AgenticArigato/pull/2"
+    )
+    assert tracking["authenticated_health_script"] == "scripts/ops/check_agentic_pm_hub_health.sh"
     assert tracking["validated_commands"] == [
         "cd bd-analytics-agent && uv run pytest tests/unit -q",
         "cd bd-analytics-agent && uv run ruff check app/server.py app/agent.py app/retrievers.py app/templates.py app/utils tests/unit",
         "cd bd-analytics-agent && uv run ruff format app/server.py app/agent.py app/retrievers.py app/templates.py app/utils tests/unit --check",
         "uvx pre-commit run --all-files",
+        "scripts/ops/check_agentic_pm_hub_health.sh",
     ]
 
 
