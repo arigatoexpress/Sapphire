@@ -257,16 +257,24 @@ def test_pi_routing_falls_back_to_rari2_when_rari1_fails(
             fixture.thread.join(timeout=2.0)
 
 
-def test_qwen36_deep_can_fall_back_to_exact_mac_model() -> None:
-    """qwen3.6 is Mac-installed, so Windows failure must not force a 503."""
-    assert proxy_app.MODEL_TIERS["deep"] == "qwen3.6:27b"
+def test_default_qwen_routes_match_verified_windows_inventory() -> None:
+    """Default Qwen routes should use models actually installed on Windows."""
+    assert proxy_app.MODEL_TIERS["deep"] == "qwen3:14b"
+    assert proxy_app.MODEL_TIERS["qwen-reason"] == "qwen3.5:9b"
+    assert proxy_app.MODEL_TIERS["fast-reason"] == "qwen3.5:9b"
+    assert "qwen3:14b" in proxy_app.GPU_ONLY_MODELS
+    assert "qwen3.5:9b" in proxy_app.GPU_ONLY_MODELS
+
+
+def test_qwen36_alias_can_fall_back_to_exact_mac_model() -> None:
+    """qwen3.6 is Mac-installed, so explicit alias must not force a 503."""
     assert proxy_app.MODEL_TIERS["qwen3.6"] == "qwen3.6:27b"
     assert "qwen3.6:27b" in proxy_app.MAC_MODELS
     assert "qwen3.6:27b" in proxy_app.MAC_EXACT_FALLBACK_MODELS
     assert "qwen3.6:27b" not in proxy_app.GPU_ONLY_MODELS
 
 
-def test_qwen36_deep_skips_pi_substitution_for_exact_mac_fallback(
+def test_qwen36_alias_skips_pi_substitution_for_exact_mac_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Windows miss should fall through to exact Mac qwen3.6, not a Pi tiny model."""
@@ -310,7 +318,7 @@ def test_qwen36_deep_skips_pi_substitution_for_exact_mac_fallback(
             f"{base_url}/v1/chat/completions",
             data=json.dumps(
                 {
-                    "model": "deep",
+                    "model": "qwen3.6",
                     "messages": [{"role": "user", "content": "summarize route"}],
                     "max_tokens": 16,
                     "temperature": 0.1,
