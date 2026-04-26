@@ -44,10 +44,12 @@ be retired after an explicit soak.
 
 Use a two-step absorb, then archive:
 
-1. **Absorb docs and model catalog into Sapphire**: create a Sapphire PR that
-   adds tests around the existing Kimi tier aliases and provider fallback order,
-   then moves any still-useful catalog notes into `services/inference-proxy/` or
-   `docs/org/`.
+1. **Absorb docs and model catalog into Sapphire**: Sapphire now has
+   `tests/unit/test_kimi_cloud_fallback.py`, covering Kimi aliases, provider
+   priority, fail-closed missing provider behavior, health-gated provider
+   calls, and dry-run Telegram relay flattening. Move any still-useful catalog
+   notes into `services/inference-proxy/` or `docs/org/` if future work needs
+   them.
 2. **Retire local repo after soak**: once Sapphire tests cover the behavior and
    the inference proxy has passed a health soak, mark `kimi-tools` as
    `candidate_archive` review-only with a rollback note pointing to this map.
@@ -56,12 +58,15 @@ Do not delete `/Users/aribs/Code/kimi-tools` in the absorb PR. The reversible
 cutover is: keep the repo read-only for 14 days after Sapphire coverage lands,
 then quarantine or archive only with a dedicated cleanup PR/report.
 
-## Follow-Up Test Ideas
+## Guardrail Coverage
 
-- Unit-test Kimi model alias resolution and provider priority in Sapphire.
-- Unit-test that cloud fallback remains sensitivity-gated before any external
-  call.
-- Unit-test that missing Moonshot/OpenRouter/relay credentials fail closed and
-  do not throw noisy exceptions.
-- Add a control-tower assertion that `kimi-tools` has no active call sites before
-  any archive approval.
+- `tests/unit/test_kimi_cloud_fallback.py` covers Kimi model alias resolution,
+  Moonshot before OpenRouter priority, OpenRouter fallback, missing-provider
+  fail-closed behavior, health-gated provider calls, and dry-run Telegram relay
+  flattening.
+- `tests/unit/test_sensitivity_filter.py` covers the sensitivity gate that
+  blocks Kimi Cloud routing before external calls for secret-like or private
+  content.
+- The remaining archive gate is procedural: do not delete or move
+  `/Users/aribs/Code/kimi-tools` until a later cleanup PR/report records a soak
+  and rollback path.

@@ -128,15 +128,16 @@ def test_status_report_includes_runtime_tracking_without_required_runtime_path(t
     }
 
 
-def test_kimi_tools_tracks_absorb_ready_no_live_callers() -> None:
+def test_kimi_tools_tracks_absorb_guardrails() -> None:
     repos = {repo["id"]: repo for repo in _manifest()["repos"]}
     repo = repos["kimi-tools"]
 
-    assert repo["migration_state"] == "absorb_ready_no_live_callers"
+    assert repo["migration_state"] == "absorb_guardrails_tested"
     tracking = repo["absorb_tracking"]
     assert tracking["consolidation_doc"] == "docs/org/kimi-tools-absorb-map.md"
     assert tracking["live_callers_found"] is False
     assert tracking["target_repo"] == "sapphire"
+    assert tracking["guardrail_tests"] == ["tests/unit/test_kimi_cloud_fallback.py"]
 
 
 def test_classification_report_tracks_absorb_and_archive_candidates() -> None:

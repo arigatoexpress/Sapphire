@@ -174,13 +174,15 @@ repos:
     production_adjacent: false
     required_guardrails:
       - local README or AGENTS.md
-    migration_state: absorb_ready_no_live_callers
+    migration_state: absorb_guardrails_tested
     absorb_tracking:
       consolidation_doc: docs/org/kimi-tools-absorb-map.md
       validated_at: "2026-04-26"
       live_callers_found: false
       target_repo: sapphire
-      next_step: Add Sapphire tests for Kimi alias/provider behavior, then retire the standalone workbench after soak.
+      guardrail_tests:
+        - tests/unit/test_kimi_cloud_fallback.py
+      next_step: Keep standalone workbench read-only during soak; archive only through a later dedicated cleanup PR.
 
 gcp_projects:
   - project_id: tho-ai-agent
