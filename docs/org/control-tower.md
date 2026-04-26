@@ -68,8 +68,10 @@ shape.
    artifacts before disabling the local LaunchAgent.
 2. `infra/org-control-tower` - current PR. Manifest, read-only status script,
    control-board doc, and validation tests.
-3. `chore/satellite-ci-parity-tradingview` - next. Add or document guardrails
-   for `tradingview-mcp-v2`.
+3. `chore/satellite-ci-parity-tradingview` - validated. Upstream PR
+   [tradesdontlie/tradingview-mcp#102](https://github.com/tradesdontlie/tradingview-mcp/pull/102)
+   adds AGENTS, CI, pre-commit parity, and offline test scripts; blocked on
+   upstream maintainer merge.
 4. `chore/repo-classification-report` - next. Produce a machine-readable
    absorb/archive candidate list for Core+Satellites.
 5. `feat/autonomy-audit-log` - queued. Add structured audit logging before
