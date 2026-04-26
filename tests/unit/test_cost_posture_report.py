@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -196,10 +197,37 @@ def test_summarize_logging_warnings_counts_without_raw_messages(monkeypatch):
     assert limited["sample_at_limit"] is True
 
 
+def test_summarize_logging_warnings_prefers_hours_lookback(monkeypatch):
+    captured = {}
+
+    def fake_run(args, **_kwargs):
+        captured["args"] = args
+        return cost_report.CommandResult(True, [])
+
+    monkeypatch.setattr(cost_report, "_run_gcloud_json", fake_run)
+
+    summary = cost_report.summarize_logging_warnings(
+        "tho-ai-agent",
+        days=7,
+        hours=2,
+        limit=50,
+    )
+
+    query = captured["args"][2]
+    timestamp = query.split('timestamp>="', 1)[1].split('"', 1)[0]
+    since = datetime.fromisoformat(timestamp)
+
+    assert summary["lookback"] == "2h"
+    assert summary["hours"] == 2
+    assert summary["sample_limit"] == 50
+    assert 0 < (datetime.now(UTC) - since).total_seconds() <= 2 * 3600 + 5
+
+
 def test_render_markdown_marks_warning_sample_at_limit():
     report = {
         "generated_at": "2026-04-26T00:00:00+00:00",
         "region": "us-central1",
+        "warning_lookback": "1h",
         "projects": [
             {
                 "project": "tho-ai-agent",
@@ -235,6 +263,7 @@ def test_render_markdown_marks_warning_sample_at_limit():
 
     output = cost_report.render_markdown(report)
 
+    assert "- Warning lookback: `1h`" in output
     assert "| Project | Available | Entries Sampled | At Limit | By Service | By Severity | By Status | Route Categories | Warning Kinds | Notes |" in output
     assert (
         "| tho-ai-agent | yes | 200 | yes | sapphire-analytics:185 | WARNING:200 | 404:185, 500:15 | /api/*:15, public_probe:185 | client_http_error:185, server_http_error:15 | - |"
