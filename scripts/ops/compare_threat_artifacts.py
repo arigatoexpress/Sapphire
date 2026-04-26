@@ -67,6 +67,18 @@ class Artifact:
         }
 
 
+@dataclass(frozen=True)
+class SnapshotCandidate:
+    path: Path
+    timestamp: datetime
+
+    def summary(self) -> dict[str, Any]:
+        return {
+            "path": str(self.path),
+            "run_timestamp": iso_z(self.timestamp),
+        }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     try:
@@ -97,8 +109,25 @@ def main(argv: list[str] | None = None) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--local", required=True, type=Path)
-    parser.add_argument("--remote", required=True, type=Path)
+    inputs = parser.add_argument_group("input selection")
+    inputs.add_argument("--local", type=Path, help="Local threat-refresh artifact JSON")
+    inputs.add_argument("--remote", type=Path, help="Remote threat-refresh artifact JSON")
+    inputs.add_argument(
+        "--local-root",
+        type=Path,
+        help="Directory containing local runs/<YYYYMMDDTHHMMSSZ>/threats.json snapshots",
+    )
+    inputs.add_argument(
+        "--remote-root",
+        type=Path,
+        help="Directory containing remote runs/<YYYYMMDDTHHMMSSZ>/threats.json snapshots",
+    )
+    parser.add_argument(
+        "--max-skew-minutes",
+        type=float,
+        default=30.0,
+        help="Maximum timestamp skew allowed when selecting nearest run snapshots",
+    )
     parser.add_argument("--report-out", type=Path, default=Path("data/intelligence/shadow-reports"))
     parser.add_argument("--strict", action="store_true", help="Treat WARN verdicts as FAIL")
     output = parser.add_mutually_exclusive_group()
@@ -108,14 +137,21 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def compare_from_args(args: argparse.Namespace) -> dict[str, Any]:
-    local = load_artifact(args.local)
-    remote = load_artifact(args.remote)
-    report = compare_artifacts(local=local, remote=remote, strict=args.strict)
+    local_path, remote_path, selection = resolve_inputs(args)
+    local = load_artifact(local_path)
+    remote = load_artifact(remote_path)
+    report = compare_artifacts(local=local, remote=remote, strict=args.strict, selection=selection)
     write_reports(report, args.report_out)
     return report
 
 
-def compare_artifacts(*, local: Artifact, remote: Artifact, strict: bool = False) -> dict[str, Any]:
+def compare_artifacts(
+    *,
+    local: Artifact,
+    remote: Artifact,
+    strict: bool = False,
+    selection: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     compared_at = datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
     local_rows = index_threats(local.threats, "local")
     remote_rows = index_threats(remote.threats, "remote")
@@ -165,7 +201,92 @@ def compare_artifacts(*, local: Artifact, remote: Artifact, strict: bool = False
         },
         "row_diffs": row_diffs,
     }
+    if selection is not None:
+        report["selection"] = selection
     return _json_safe(report)
+
+
+def resolve_inputs(args: argparse.Namespace) -> tuple[Path, Path, dict[str, Any] | None]:
+    has_direct = args.local is not None or args.remote is not None
+    has_roots = args.local_root is not None or args.remote_root is not None
+    if has_direct and has_roots:
+        raise UsageError("use either --local/--remote or --local-root/--remote-root, not both")
+    if has_direct:
+        if args.local is None or args.remote is None:
+            raise UsageError("--local and --remote must be provided together")
+        return args.local, args.remote, None
+    if args.local_root is None or args.remote_root is None:
+        raise UsageError("provide --local/--remote or --local-root/--remote-root")
+    if args.max_skew_minutes < 0:
+        raise UsageError("--max-skew-minutes must be >= 0")
+
+    local_candidates = discover_run_snapshots(args.local_root, "local")
+    remote_candidates = discover_run_snapshots(args.remote_root, "remote")
+    local, remote, skew_seconds = nearest_snapshot_pair(local_candidates, remote_candidates)
+    max_skew_seconds = args.max_skew_minutes * 60
+    if skew_seconds > max_skew_seconds:
+        raise UsageError(
+            "nearest run snapshots are "
+            f"{skew_seconds:.0f}s apart, exceeding --max-skew-minutes={args.max_skew_minutes:g}"
+        )
+    selection = {
+        "mode": "nearest_run_snapshot",
+        "local_root": str(args.local_root),
+        "remote_root": str(args.remote_root),
+        "local": local.summary(),
+        "remote": remote.summary(),
+        "time_skew_seconds": skew_seconds,
+        "max_skew_minutes": args.max_skew_minutes,
+        "candidate_counts": {
+            "local": len(local_candidates),
+            "remote": len(remote_candidates),
+        },
+    }
+    return local.path, remote.path, selection
+
+
+def discover_run_snapshots(root: Path, label: str) -> list[SnapshotCandidate]:
+    if not root.exists():
+        raise UsageError(f"--{label}-root does not exist: {root}")
+    if not root.is_dir():
+        raise UsageError(f"--{label}-root must be a directory: {root}")
+    try:
+        paths = list(root.rglob("threats.json"))
+    except OSError as exc:
+        raise InputReadError(f"{root}: {exc}") from exc
+
+    candidates = [
+        SnapshotCandidate(path=path, timestamp=timestamp)
+        for path in paths
+        if (timestamp := parse_run_snapshot_timestamp(path)) is not None
+    ]
+    if not candidates:
+        raise UsageError(f"--{label}-root has no runs/<timestamp>/threats.json snapshots: {root}")
+    return sorted(candidates, key=lambda item: item.timestamp)
+
+
+def parse_run_snapshot_timestamp(path: Path) -> datetime | None:
+    if path.name != "threats.json" or path.parent.parent.name != "runs":
+        return None
+    try:
+        return datetime.strptime(path.parent.name, "%Y%m%dT%H%M%SZ").replace(tzinfo=UTC)
+    except ValueError:
+        return None
+
+
+def nearest_snapshot_pair(
+    local_candidates: list[SnapshotCandidate],
+    remote_candidates: list[SnapshotCandidate],
+) -> tuple[SnapshotCandidate, SnapshotCandidate, float]:
+    best: tuple[SnapshotCandidate, SnapshotCandidate, float] | None = None
+    for local in local_candidates:
+        for remote in remote_candidates:
+            skew = abs((local.timestamp - remote.timestamp).total_seconds())
+            if best is None or skew < best[2]:
+                best = (local, remote, skew)
+    if best is None:
+        raise UsageError("no local/remote run snapshot candidates found")
+    return best
 
 
 def compare_threat(
@@ -288,7 +409,9 @@ def evidence_shape(raw: Any) -> list[dict[str, str]]:
     shaped = []
     for item in rows:
         if isinstance(item, dict):
-            shaped.append({"label": str(item.get("label") or ""), "url": str(item.get("url") or "")})
+            shaped.append(
+                {"label": str(item.get("label") or ""), "url": str(item.get("url") or "")}
+            )
     return shaped
 
 
@@ -365,19 +488,37 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"**Local**: `{inputs['local']['path']}` ({inputs['local'].get('refreshed_at') or '-'}, {inputs['local']['threat_count']} threats)",
         f"**Remote**: `{inputs['remote']['path']}` ({inputs['remote'].get('refreshed_at') or '-'}, {inputs['remote']['threat_count']} threats)",
         "",
-        "## Summary",
-        "",
-        f"- Compared: {summary['rows_compared']}",
-        f"- PASS: {summary['rows_pass']}",
-        f"- WARN: {summary['rows_warn']}",
-        f"- FAIL: {summary['rows_fail']}",
-        f"- Source count delta: {summary['source_count_delta']}",
-        f"- Missing in local: {len(summary['missing_in_local'])}",
-        f"- Missing in remote: {len(summary['missing_in_remote'])}",
-        "",
-        "## Missing IDs",
-        "",
     ]
+    selection = report.get("selection")
+    if isinstance(selection, dict):
+        lines.extend(
+            [
+                "## Snapshot Selection",
+                "",
+                f"- Mode: `{selection.get('mode', '-')}`",
+                f"- Local run timestamp: `{selection.get('local', {}).get('run_timestamp', '-')}`",
+                f"- Remote run timestamp: `{selection.get('remote', {}).get('run_timestamp', '-')}`",
+                f"- Time skew seconds: `{selection.get('time_skew_seconds', '-')}`",
+                f"- Candidate counts: local `{selection.get('candidate_counts', {}).get('local', '-')}`, remote `{selection.get('candidate_counts', {}).get('remote', '-')}`",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "## Summary",
+            "",
+            f"- Compared: {summary['rows_compared']}",
+            f"- PASS: {summary['rows_pass']}",
+            f"- WARN: {summary['rows_warn']}",
+            f"- FAIL: {summary['rows_fail']}",
+            f"- Source count delta: {summary['source_count_delta']}",
+            f"- Missing in local: {len(summary['missing_in_local'])}",
+            f"- Missing in remote: {len(summary['missing_in_remote'])}",
+            "",
+            "## Missing IDs",
+            "",
+        ]
+    )
     if summary["missing_in_local"] or summary["missing_in_remote"]:
         lines.append(f"- Missing in local: {', '.join(summary['missing_in_local']) or '-'}")
         lines.append(f"- Missing in remote: {', '.join(summary['missing_in_remote']) or '-'}")
@@ -448,6 +589,10 @@ def fmt(value: Any) -> str:
         return f"{value:.6g}"
     text = json.dumps(value, sort_keys=True) if isinstance(value, (dict, list)) else str(value)
     return text.replace("|", "\\|")
+
+
+def iso_z(value: datetime) -> str:
+    return value.astimezone(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def _json_safe(value: Any) -> Any:
