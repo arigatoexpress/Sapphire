@@ -238,15 +238,30 @@ def test_alpha_engine_dispatch_evaluation_path_calls_audit_hook() -> None:
         for kw in call.keywords
         if kw.arg == "outcome" and isinstance(kw.value, ast.Constant)
     }
-    assert outcomes == {"dry_run", "no_dispatcher_available", "not_dispatched"}
+    assert outcomes == {
+        "full_autonomy_disabled",
+        "rate_limited",
+        "dry_run",
+        "no_dispatcher_available",
+        "not_dispatched",
+    }
     for call in calls:
         keyword_names = {kw.arg for kw in call.keywords}
         assert {
             "trigger",
             "agent_id",
             "outcome",
-            "context",
             "allow_code_changes",
             "allow_gcloud_changes",
             "approval_required",
         } <= keyword_names
+        outcome = next(
+            (
+                kw.value.value
+                for kw in call.keywords
+                if kw.arg == "outcome" and isinstance(kw.value, ast.Constant)
+            ),
+            "",
+        )
+        if outcome in {"dry_run", "no_dispatcher_available", "not_dispatched"}:
+            assert "context" in keyword_names

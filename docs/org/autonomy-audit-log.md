@@ -39,11 +39,12 @@ secrets, order payloads, or full world snapshots.
 Control-plane autonomy cycle metadata records payload key names and a hash of
 the requested actor only. It does not write raw bridge payload values.
 
-Alpha dispatch evaluation metadata records trigger/agent/reason codes, venue
-and preferred-symbol counts, failure pressure, pending session count, and
-whether code, GCP, or owner-approval gates were active. It does not write raw
-instructions, full context snapshots, symbol lists, venue payloads, Telegram
-payloads, or dispatcher request bodies.
+Alpha dispatch evaluation metadata records trigger/agent/reason codes,
+available venue and preferred-symbol counts, failure pressure, pending session
+count, and whether code, GCP, or owner-approval gates were active. It covers
+disabled, rate-limited, dry-run, no-dispatcher, and not-dispatched outcomes
+without writing raw instructions, full context snapshots, symbol lists, venue
+payloads, Telegram payloads, or dispatcher request bodies.
 
 Alpha autonomy session decision metadata records decision/outcome, dispatch
 status, reason code, hook-result key names, note length, and hashed session and
