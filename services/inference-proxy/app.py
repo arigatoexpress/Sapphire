@@ -115,12 +115,12 @@ MODEL_TIERS = {
     "tiny":      "qwen2.5:0.5b",        # ultra-light, Pi-native
 
     # GPU-heavy — benchmark-calibrated 2026-04-14 (RTX 5070 Ti)
-    "deep":           "qwen3.6:27b",            # ~70 tok/s, 17.0 GB — deep multi-step (qwen3.6)
+    "deep":           "qwen3:14b",              # 80 tok/s, 9.3 GB — deep multi-step
     "code":           "gemma4:latest",          # 154 tok/s, 9.0 GB — best code model (via Ollama)
     "fast-code":      "gemma4:latest",          # alias
     "reason":         "deepseek-r1:14b",        # 80 tok/s, 9.0 GB — structured R1 reasoning
-    "qwen-reason":    "qwen3.6:27b",            # ~70 tok/s, 17.0 GB — fast reasoning (via Ollama)
-    "fast-reason":    "qwen3.6:27b",            # alias
+    "qwen-reason":    "qwen3.5:9b",             # 107 tok/s, 6.6 GB — fast reasoning (via Ollama)
+    "fast-reason":    "qwen3.5:9b",             # alias
     "large":          "qwen2.5:32b",            # 2.7 tok/s, 19.9 GB — background/batch (RAM spill)
     "cascade":        "nemotron-cascade-2",     # 16 tok/s, 22.6 GB — MoE, fits 16 GB VRAM
     "moe":            "nemotron-cascade-2",     # alias
@@ -143,11 +143,11 @@ MODEL_TIERS = {
 # Models that require Windows GPU (too large for Pi/Mac).
 # gemma3:27b removed — consistently times out on llama-server b8795 (OOM at 17.4 GB).
 # gemma4:latest is GPU-routed through the Windows Ollama backend.
-# qwen3.6:27b is available on Windows and Mac.
-# qwen3.6:35b-a3b remains GPU-only.
+# qwen3.6:27b is Mac-local until it is installed on the Windows GPU node.
+# qwen3.6:35b-a3b remains pending/GPU-only.
 GPU_ONLY_MODELS = {
     # Benchmarked 14B+ class — confirmed GPU-only (fit in 16 GB VRAM or spill)
-    "qwen2.5-coder:14b", "deepseek-r1:14b", "phi4:latest",
+    "qwen2.5-coder:14b", "qwen3:14b", "qwen3.5:9b", "deepseek-r1:14b", "phi4:latest",
     # Large class — RAM spill but still routed to Windows only
     "deepseek-r1:32b", "qwen2.5:32b", "qwen2.5:14b",
     # Via Ollama (no llama-server compat), GPU Windows only
