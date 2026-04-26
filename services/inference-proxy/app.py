@@ -115,7 +115,7 @@ MODEL_TIERS = {
     "tiny":      "qwen2.5:0.5b",        # ultra-light, Pi-native
 
     # GPU-heavy — benchmark-calibrated 2026-04-14 (RTX 5070 Ti)
-    "deep":           "qwen3.6:27b",            # ~70 tok/s, 17.0 GB — deep multi-step (qwen3.6)
+    "deep":           "qwen3:14b",              # 80 tok/s, 9.3 GB — deep multi-step
     "code":           "gemma4:latest",          # 154 tok/s, 9.0 GB — best code model (via Ollama)
     "fast-code":      "gemma4:latest",          # alias
     "reason":         "deepseek-r1:14b",        # 80 tok/s, 9.0 GB — structured R1 reasoning
