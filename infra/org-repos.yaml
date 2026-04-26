@@ -1,0 +1,245 @@
+schema_version: 1
+generated_for: sapphire-autonomous-org
+updated_at: "2026-04-26"
+
+repos:
+  - id: sapphire
+    name: Sapphire
+    classification: core
+    role: Sapphire OS command repo, trading/intelligence/control-plane runtime
+    local_path: /Users/aribs/Code/Sapphire
+    github: arigatoexpress/Sapphire
+    default_branch: main
+    production_adjacent: true
+    required_guardrails:
+      - AGENTS.md
+      - CI on PR
+      - pre-commit or equivalent lint/test parity
+      - no direct main pushes
+    migration_state: command_repo
+
+  - id: project-go-forward
+    name: Project-Go-Forward
+    classification: core
+    role: THO client PM and production business system
+    local_path: /Users/aribs/Code/Project-Go-Forward
+    github: arigatoexpress/Project-Go-Forward
+    default_branch: main
+    production_adjacent: true
+    required_guardrails:
+      - AGENTS.md or CLAUDE.md
+      - CI on PR
+      - no direct main pushes
+    migration_state: active_cloud_run
+
+  - id: claw-code
+    name: claw-code
+    classification: satellite
+    role: Rust agent runtime hosting the claw-sapphire plugin
+    local_path: /Users/aribs/Code/claw-code
+    github: instructkr/claw-code
+    default_branch: main
+    production_adjacent: false
+    required_guardrails:
+      - CLAUDE.md
+      - CI on PR
+    migration_state: active_runtime
+
+  - id: cyber-threat-bot
+    name: cyber-threat-bot
+    classification: satellite
+    role: Public-source CISA/NVD/MITRE threat intelligence collector
+    local_path: /Users/aribs/Code/cyber-threat-bot
+    github: arigatoexpress/cyber-threat-bot
+    default_branch: master
+    production_adjacent: true
+    required_guardrails:
+      - AGENTS.md
+      - CI on PR
+      - no direct main pushes
+    migration_state: active_capability
+
+  - id: regional-intel-workbench
+    name: regional-intel-workbench
+    classification: satellite
+    role: Regional intelligence feeds, maps, and graph workflows
+    local_path: /Users/aribs/Code/regional-intel-workbench
+    github: arigatoexpress/regional-intel-workbench
+    default_branch: main
+    production_adjacent: true
+    required_guardrails:
+      - AGENTS.md
+      - CI on PR
+      - no direct main pushes
+    migration_state: active_capability
+
+  - id: tradingview-mcp
+    name: tradingview-mcp
+    classification: satellite
+    role: Ari-owned TradingView MCP automation bridge
+    local_path: /Users/aribs/Code/tradingview-mcp
+    github: arigatoexpress/tradingview-mcp
+    default_branch: master
+    production_adjacent: true
+    required_guardrails:
+      - CLAUDE.md
+      - CI on PR
+      - no direct main pushes
+    migration_state: active_capability
+
+  - id: tradingview-mcp-v2
+    name: tradingview-mcp-v2
+    classification: integration
+    role: Upstream TradingView MCP bridge with CDP tooling
+    local_path: /Users/aribs/Code/tradingview-mcp-v2
+    github: tradesdontlie/tradingview-mcp
+    default_branch: main
+    production_adjacent: true
+    required_guardrails:
+      - AGENTS.md or CLAUDE.md
+      - CI on PR
+      - pre-commit or equivalent lint/test parity
+    migration_state: hardening_needed
+
+  - id: crypto-tax-tracker
+    name: crypto-tax-tracker
+    classification: satellite
+    role: Crypto tax and Cointracker workbench
+    local_path: /Users/aribs/Code/Cointracker
+    github: arigatoexpress/crypto-tax-tracker
+    default_branch: main
+    production_adjacent: false
+    required_guardrails:
+      - CLAUDE.md
+      - CI on PR
+      - pre-commit or equivalent lint/test parity
+    migration_state: hardening_needed
+
+  - id: hermes-agent
+    name: hermes-agent
+    classification: integration
+    role: Hermes Telegram gateway and conversational framework integration
+    local_path: /Users/aribs/Code/hermes-agent
+    github: NousResearch/hermes-agent
+    default_branch: main
+    production_adjacent: true
+    required_guardrails:
+      - AGENTS.md
+      - local override branch documented
+    migration_state: upstream_integration
+
+  - id: kimi-tools
+    name: kimi-tools
+    classification: integration
+    role: Local Kimi Cloud HTTP client utilities
+    local_path: /Users/aribs/Code/kimi-tools
+    github: null
+    default_branch: main
+    production_adjacent: false
+    required_guardrails:
+      - local README or AGENTS.md
+    migration_state: local_only
+
+gcp_projects:
+  - project_id: tho-ai-agent
+    role: THO production and Sapphire analytics workloads
+    region: us-central1
+    services:
+      - project-go-forward
+      - sapphire-analytics
+      - sapphire-gcs-to-bq
+      - agentic-pm-hub
+      - tho-agent
+    mutation_policy: PR with blast radius and rollback notes
+
+  - project_id: sapphire-479610
+    role: Sapphire DNS and related infrastructure
+    region: us-central1
+    services: []
+    mutation_policy: do not delete; DNS resources require explicit review
+
+  - project_id: forwardai-485602
+    role: ForwardAI historical/related Cloud Run surface
+    region: us-central1
+    services:
+      - tho-ai-agent
+    mutation_policy: inventory before changes
+
+  - project_id: blanga-bis-20260224
+    role: Blanga BIS related Cloud Run surface
+    region: us-central1
+    services:
+      - blanga-bis-beta
+      - tho-agent
+    mutation_policy: inventory before changes
+
+local_runtime:
+  launchagents:
+    - com.sapphire.inference-proxy
+    - com.sapphire.openbb-api
+    - com.sapphire.dashboard
+    - com.sapphire.control-plane
+    - com.sapphire.signal-logger
+    - com.sapphire.threat-refresh
+    - com.sapphire.backtest-weekly
+    - com.sapphire.correlation-refresh
+    - com.sapphire.chain-refresh
+    - com.sapphire.gcp-sync
+    - com.sapphire.kronos-daily
+    - com.sapphire.morning-brief
+    - com.sapphire.logrotate
+    - ai.hermes.gateway
+  docker_expected:
+    - milvus-standalone
+    - milvus-minio
+    - milvus-etcd
+    - aiaster-postgres-1
+    - aiaster-redis-1
+
+routines:
+  - id: backtest-weekly
+    local_label: com.sapphire.backtest-weekly
+    stage: soaking
+    remote_workflow: .github/workflows/weekly-backtest.yml
+    comparator: scripts/ops/compare_backtest_artifacts.py
+  - id: threat-refresh
+    local_label: com.sapphire.threat-refresh
+    stage: shadowing
+    remote_workflow: .github/workflows/threat-refresh.yml
+    comparator: scripts/ops/compare_threat_artifacts.py
+  - id: correlation-refresh
+    local_label: com.sapphire.correlation-refresh
+    stage: local
+    blocked_by: OpenBB local-vs-remote data-source parity decision
+  - id: chain-refresh
+    local_label: com.sapphire.chain-refresh
+    stage: blocked
+    blocked_by: paid API keys, event bus side effects, GCP downstream writes
+  - id: content-engine
+    local_label: com.sapphire.content-engine
+    stage: blocked
+    blocked_by: external publishing and Telegram approval side effects need dry-run firewall
+  - id: logrotate
+    local_label: com.sapphire.logrotate
+    stage: local_only
+    blocked_by: local filesystem log rotation has no remote equivalent
+
+waves:
+  - id: wave-0-control-tower
+    status: in_progress
+    objective: Canonical manifest, org status script, and human control tower
+  - id: wave-1-routine-migration
+    status: in_progress
+    objective: Shadow local routines remotely with artifact oracles before retirement
+  - id: wave-2-repo-hardening
+    status: queued
+    objective: CI/pre-commit/doc parity across active satellites
+  - id: wave-3-agent-consolidation
+    status: queued
+    objective: Consolidate Hermes, claw-code, Sapphire plugins, Claude tasks, and OpenClaw remnants
+  - id: wave-4-data-intelligence-platform
+    status: queued
+    objective: Schema and audit-log alignment for intel, Foundry, GCS, and BigQuery
+  - id: wave-5-autonomy-safety
+    status: queued
+    objective: Confirmation firewall, audit log, feedback loop, cost report, and dry-run defaults

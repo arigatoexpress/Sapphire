@@ -1,0 +1,89 @@
+# Sapphire Autonomous Organization Control Tower
+
+Sapphire is the command repo for the autonomous organization. This board keeps
+the Core+Satellites scope explicit, tracks routine migration stages, and gives
+Codex/Opus one shared operating surface before any production-adjacent change.
+
+## Scope
+
+The canonical scope lives in `infra/org-repos.yaml`.
+
+Active classifications:
+
+- `core`: Sapphire OS and THO production systems.
+- `satellite`: actively used capability repositories.
+- `integration`: upstream forks or local integrations used by Sapphire.
+- `candidate_absorb`: overlapping systems to merge into a core or satellite repo.
+- `candidate_archive`: stale or duplicative systems to freeze after inventory.
+
+The initial Core+Satellites set is Sapphire, Project-Go-Forward, claw-code,
+cyber-threat-bot, regional-intel-workbench, tradingview-mcp,
+tradingview-mcp-v2, crypto-tax-tracker/Cointracker, hermes-agent, and active
+GCP/local runtime services.
+
+## Status Commands
+
+Use the status helper for a read-only snapshot:
+
+```bash
+python3 scripts/ops/org_status.py --no-external --markdown
+python3 scripts/ops/org_status.py --markdown
+python3 scripts/ops/org_status.py --output /tmp/sapphire-org-status.json
+```
+
+`--no-external` skips `gh`, `gcloud`, `launchctl`, and Docker probes. It is the
+CI-safe mode and the right first check when editing the manifest or report
+shape.
+
+## Current Waves
+
+- **Wave 0: Control Tower** - in progress. Ship the manifest, status script,
+  dashboard doc, and validation tests. No production behavior changes.
+- **Wave 1: Routine Migration** - in progress. Weekly backtest and
+  threat-refresh are shadowing remotely while local routines remain canonical.
+- **Wave 2: Repo Hardening** - queued. Bring active satellites to CI,
+  pre-commit or equivalent parity, and clear runbooks.
+- **Wave 3: Agent Consolidation** - queued. Map Hermes, claw-code, Sapphire
+  plugins, Claude scheduled tasks, OpenClaw remnants, and LaunchAgents.
+- **Wave 4: Data + Intelligence Platform** - queued. Normalize schemas,
+  Foundry, GCS, BigQuery, threat, regional, market, and chain intel flows.
+- **Wave 5: Autonomy Safety** - queued. Finish audit logging, confirmation
+  firewall, feedback loops, cost reporting, and dry-run defaults.
+
+## Routine Stages
+
+- `local`: local LaunchAgent/service is canonical.
+- `shadowing`: remote routine exists and produces comparable artifacts.
+- `soaking`: shadow comparisons are being collected against cutover gates.
+- `retired`: local routine has been disabled after shadow success and rollback
+  notes exist.
+- `blocked`: migration is intentionally paused on secrets, side effects, data
+  parity, or safety decisions.
+- `local_only`: no remote equivalent should be built until the surrounding
+  system changes.
+
+## First PR Queue
+
+1. `feat/remote-threat-refresh-shadow` - shipped. Keep collecting shadow
+   artifacts before disabling the local LaunchAgent.
+2. `infra/org-control-tower` - current PR. Manifest, read-only status script,
+   control-board doc, and validation tests.
+3. `chore/satellite-ci-parity-tradingview` - next. Add or document guardrails
+   for `tradingview-mcp-v2`.
+4. `chore/repo-classification-report` - next. Produce a machine-readable
+   absorb/archive candidate list for Core+Satellites.
+5. `feat/autonomy-audit-log` - queued. Add structured audit logging before
+   expanding action autonomy.
+
+## Safety Rules
+
+- Treat the status script as read-only inventory. It must not edit GitHub,
+  Cloud Run, LaunchAgents, Docker, Secret Manager, Firestore, GCS, DNS, or
+  customer data.
+- Do not print secret values, token contents, raw plist secrets, private keys,
+  request bodies, or Secret Manager payloads.
+- Keep production-adjacent repo changes on feature branches with PRs, CI, blast
+  radius, test plan, and rollback notes.
+- Local production services remain canonical until remote replacements pass
+  documented shadow comparisons.
+- Trading remains paper-only. Telegram tests use dry-run paths only.
