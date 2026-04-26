@@ -154,6 +154,15 @@ def test_summarize_logging_warnings_counts_without_raw_messages(monkeypatch):
             },
             "resource": {"labels": {"service_name": "sapphire-analytics"}},
         },
+        {
+            "severity": "WARNING",
+            "textPayload": "The request was not authenticated.",
+            "httpRequest": {
+                "status": 403,
+                "requestUrl": "https://example.invalid/health",
+            },
+            "resource": {"labels": {"service_name": "agentic-pm-hub"}},
+        },
     ]
     monkeypatch.setattr(
         cost_report,
@@ -163,13 +172,22 @@ def test_summarize_logging_warnings_counts_without_raw_messages(monkeypatch):
 
     summary = cost_report.summarize_logging_warnings("tho-ai-agent", days=7, limit=100)
 
-    assert summary["entries_sampled"] == 2
+    assert summary["entries_sampled"] == 3
     assert summary["sample_limit"] == 100
     assert summary["sample_at_limit"] is False
-    assert summary["by_service"] == {"sapphire-analytics": 2}
-    assert summary["by_severity"] == {"ERROR": 1, "WARNING": 1}
-    assert summary["by_status"] == {"404": 1, "500": 1}
-    assert summary["by_route_category"] == {"/api/*": 1, "public_probe": 1}
+    assert summary["by_service"] == {"agentic-pm-hub": 1, "sapphire-analytics": 2}
+    assert summary["by_severity"] == {"ERROR": 1, "WARNING": 2}
+    assert summary["by_status"] == {"403": 1, "404": 1, "500": 1}
+    assert summary["by_route_category"] == {
+        "/api/*": 1,
+        "health": 1,
+        "public_probe": 1,
+    }
+    assert summary["by_warning_kind"] == {
+        "client_http_error": 1,
+        "cloud_run_auth_required": 1,
+        "server_http_error": 1,
+    }
     assert "raw URL" not in str(summary)
     assert "do-not-print" not in str(summary)
     assert ".env" not in str(summary)
@@ -206,6 +224,10 @@ def test_render_markdown_marks_warning_sample_at_limit():
                     "by_severity": {"WARNING": 200},
                     "by_status": {"404": 185, "500": 15},
                     "by_route_category": {"public_probe": 185, "/api/*": 15},
+                    "by_warning_kind": {
+                        "client_http_error": 185,
+                        "server_http_error": 15,
+                    },
                 },
             }
         ],
@@ -213,9 +235,9 @@ def test_render_markdown_marks_warning_sample_at_limit():
 
     output = cost_report.render_markdown(report)
 
-    assert "| Project | Available | Entries Sampled | At Limit | By Service | By Severity | By Status |" in output
+    assert "| Project | Available | Entries Sampled | At Limit | By Service | By Severity | By Status | Route Categories | Warning Kinds | Notes |" in output
     assert (
-        "| tho-ai-agent | yes | 200 | yes | sapphire-analytics:185 | WARNING:200 | 404:185, 500:15 | /api/*:15, public_probe:185 | - |"
+        "| tho-ai-agent | yes | 200 | yes | sapphire-analytics:185 | WARNING:200 | 404:185, 500:15 | /api/*:15, public_probe:185 | client_http_error:185, server_http_error:15 | - |"
         in output
     )
 
@@ -225,3 +247,17 @@ def test_route_category_collapses_probe_paths_without_query_values():
     assert cost_report.route_category("https://example.invalid/__env.js?debug=sample") == "public_probe"
     assert cost_report.route_category("https://example.invalid/runtime-config.js") == "public_probe"
     assert cost_report.route_category("https://example.invalid/docs/page") == "/docs/*"
+
+
+def test_warning_kind_classifies_expected_cloud_run_auth_rejections():
+    assert (
+        cost_report.warning_kind(
+            {
+                "textPayload": "The request was not authenticated. Set the proper Authorization header.",
+                "httpRequest": {"status": 403},
+            }
+        )
+        == "cloud_run_auth_required"
+    )
+    assert cost_report.warning_kind({"httpRequest": {"status": 404}}) == "client_http_error"
+    assert cost_report.warning_kind({"httpRequest": {"status": 503}}) == "server_http_error"
