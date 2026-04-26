@@ -85,6 +85,9 @@ shape.
 7. `docs/hermes-consolidation-map` - current Wave 3 map. It records the
    difference between the Hermes development clone and the patched runtime
    checkout before any gateway update, fork, or hook migration.
+8. `docs/kimi-tools-absorb-map` - current Wave 3 map. It records that
+   `kimi-tools` has no live Sapphire import callers and is ready for a tested
+   Sapphire absorb PR before any archive step.
 
 ## Safety Rules
 

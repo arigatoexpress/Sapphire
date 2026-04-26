@@ -30,11 +30,11 @@ candidate_absorb:
   - id: kimi-tools
     current_classification: integration
     proposed_target: sapphire
-    stage: proposed
-    rationale: Local-only Kimi Cloud HTTP utilities overlap Sapphire/Hermes agent skill and tool surfaces.
+    stage: absorb_ready_no_live_callers
+    rationale: Local-only Kimi Cloud utilities overlap Sapphire inference-proxy/router behavior, and no live Sapphire imports remain.
+    tracking: docs/org/kimi-tools-absorb-map.md
     prerequisites:
-      - Inventory call sites and launch paths.
-      - Add tests around any client behavior moved into Sapphire.
+      - Add Sapphire tests around Kimi alias resolution, provider priority, and fail-closed missing credential behavior.
       - Keep local utility available until replacement has soaked.
     rollback: Restore Sapphire callers to the local utility path.
 
@@ -70,6 +70,4 @@ blocked_or_watch:
     blocker: Local patched runtime is mapped; fork, hook, or upstream decision still required before updating runtime Hermes.
     tracking: docs/org/hermes-agent-consolidation-map.md
 
-next_reviews:
-  - id: kimi-tools
-    action: Find all callers and decide whether to absorb into Sapphire or Hermes skills.
+next_reviews: []
