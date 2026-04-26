@@ -42,13 +42,15 @@ class CIFeedbackProcessor:
 
         created = 0
         for failure in failures[:10]:  # cap at 10 tasks per run
+            kind = failure.get("kind", "failure")
+            tag = "test_error" if kind == "error" else "test_failure"
             self.tasks.create_task(
-                title=f"Fix test: {failure['test_name'][:80]}",
+                title=f"Fix test {kind}: {failure['test_name'][:80]}",
                 phase="ci_remediation",
                 agent="EMERALD",
                 priority="high",
-                description=f"Test failure:\n{failure['message'][:500]}",
-                tags=["ci", "test_failure", "auto_generated"],
+                description=f"Pytest {kind}:\n{failure['message'][:500]}",
+                tags=["ci", tag, "auto_generated"],
             )
             created += 1
 
@@ -62,7 +64,9 @@ class CIFeedbackProcessor:
             "failure_names": [f["test_name"] for f in failures[:10]],
         }
 
-    def process_build_result(self, status: str, build_id: str = "", error: str = "") -> dict[str, Any]:
+    def process_build_result(
+        self, status: str, build_id: str = "", error: str = ""
+    ) -> dict[str, Any]:
         """Process a Cloud Build result. Creates task on failure."""
         if status.upper() == "SUCCESS":
             return {"ok": True, "action": "none"}
@@ -81,15 +85,26 @@ class CIFeedbackProcessor:
 
     @staticmethod
     def _parse_pytest_failures(output: str) -> list[dict[str, str]]:
-        """Extract individual test failures from pytest output."""
+        """Extract individual pytest failures/errors from summary output."""
         failures: list[dict[str, str]] = []
-        # Pattern: FAILED tests/unit/test_foo.py::test_bar - AssertionError: ...
-        pattern = re.compile(r"FAILED\s+([\w/\.\-:]+)\s*[-–]\s*(.*)")
+        # Patterns:
+        #   FAILED tests/unit/test_foo.py::test_bar[param] - AssertionError: ...
+        #   ERROR tests/unit/test_foo.py::test_bar[param] - fixture failed
+        #   ERROR tests/unit/test_foo.py - collection failed
+        pattern = re.compile(r"^(FAILED|ERROR)\s+(.+?)(?:\s+[-–]\s+(.*))?$", re.MULTILINE)
         for match in pattern.finditer(output):
-            failures.append({
-                "test_name": match.group(1).strip(),
-                "message": match.group(2).strip()[:300],
-            })
+            test_name = match.group(2).strip()
+            if ".py" not in test_name and "::" not in test_name:
+                continue
+            kind = "error" if match.group(1) == "ERROR" else "failure"
+            message = (match.group(3) or "").strip() or "see pytest output for details"
+            failures.append(
+                {
+                    "kind": kind,
+                    "test_name": test_name,
+                    "message": message[:300],
+                }
+            )
         return failures
 
     @staticmethod

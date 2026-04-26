@@ -15,8 +15,7 @@ from unittest.mock import MagicMock
 import pytest
 
 # Add alpha-engine source to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "services", "alpha-engine"))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "services", "alpha-engine", "src"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "services", "alpha", "src"))
 
 from ci_feedback import CIFeedbackProcessor
 
@@ -48,14 +47,31 @@ tests/unit/test_baz.py::test_epsilon PASSED
 ====== 3 passed, 2 failed in 5.23s ======
 """
 
+SAMPLE_PYTEST_ERROR_OUTPUT = """\
+ERROR tests/unit/test_api.py::test_endpoint[param-value] - RuntimeError: fixture exploded
+ERROR tests/unit/test_collect.py - ImportError: cannot import name thing
+
+====== 1 passed, 0 failed, 2 errors in 2.34s ======
+"""
+
 
 class TestPytestParsing:
     def test_parse_failures(self):
         failures = CIFeedbackProcessor._parse_pytest_failures(SAMPLE_PYTEST_OUTPUT)
         assert len(failures) == 2
+        assert failures[0]["kind"] == "failure"
         assert failures[0]["test_name"] == "tests/unit/test_bar.py::test_gamma"
         assert "42 != 43" in failures[0]["message"]
         assert failures[1]["test_name"] == "tests/unit/test_bar.py::test_delta"
+
+    def test_parse_errors_and_parametrized_ids(self):
+        failures = CIFeedbackProcessor._parse_pytest_failures(SAMPLE_PYTEST_ERROR_OUTPUT)
+        assert len(failures) == 2
+        assert failures[0]["kind"] == "error"
+        assert failures[0]["test_name"] == "tests/unit/test_api.py::test_endpoint[param-value]"
+        assert "fixture exploded" in failures[0]["message"]
+        assert failures[1]["test_name"] == "tests/unit/test_collect.py"
+        assert "ImportError" in failures[1]["message"]
 
     def test_parse_summary(self):
         passed, failed, errors = CIFeedbackProcessor._parse_pytest_summary(SAMPLE_PYTEST_OUTPUT)
@@ -69,6 +85,14 @@ class TestPytestParsing:
         assert passed == 1197
         assert failed == 0
         assert errors == 1
+
+    def test_parse_summary_with_plural_errors(self):
+        passed, failed, errors = CIFeedbackProcessor._parse_pytest_summary(
+            SAMPLE_PYTEST_ERROR_OUTPUT
+        )
+        assert passed == 1
+        assert failed == 0
+        assert errors == 2
 
     def test_parse_no_failures(self):
         output = "1197 passed in 12.34s"
@@ -106,6 +130,21 @@ class TestProcessTestResults:
         # Verify tasks are assigned to EMERALD
         for call in mock_task_manager.create_task.call_args_list:
             assert call.kwargs.get("agent") == "EMERALD" or call[1].get("agent") == "EMERALD"
+
+    def test_errors_create_tasks(self, processor, mock_task_manager):
+        result = processor.process_test_results(SAMPLE_PYTEST_ERROR_OUTPUT)
+        assert result["ok"]
+        assert result["action"] == "tasks_created"
+        assert result["tasks_created"] == 2
+        assert result["passed"] == 1
+        assert result["failed"] == 0
+        assert result["errors"] == 2
+        assert mock_task_manager.create_task.call_count == 2
+        call = mock_task_manager.create_task.call_args_list[0]
+        assert call.kwargs.get("title") == (
+            "Fix test error: tests/unit/test_api.py::test_endpoint[param-value]"
+        )
+        assert "test_error" in call.kwargs.get("tags")
 
     def test_cap_at_10_tasks(self, processor, mock_task_manager):
         # Generate 15 failures
@@ -145,8 +184,14 @@ class TestProcessBuildResult:
         mock_task_manager.create_task.assert_called_once()
         call_kwargs = mock_task_manager.create_task.call_args
         # Verify task is assigned to OBSIDIAN with critical priority
-        assert call_kwargs.kwargs.get("agent") == "OBSIDIAN" or call_kwargs[1].get("agent") == "OBSIDIAN"
-        assert call_kwargs.kwargs.get("priority") == "critical" or call_kwargs[1].get("priority") == "critical"
+        assert (
+            call_kwargs.kwargs.get("agent") == "OBSIDIAN"
+            or call_kwargs[1].get("agent") == "OBSIDIAN"
+        )
+        assert (
+            call_kwargs.kwargs.get("priority") == "critical"
+            or call_kwargs[1].get("priority") == "critical"
+        )
 
     def test_case_insensitive_success(self, processor, mock_task_manager):
         result = processor.process_build_result("success")
