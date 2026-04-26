@@ -17,9 +17,33 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from urllib.parse import urlparse
 
 DEFAULT_PROJECTS = ("tho-ai-agent", "sapphire-479610")
 DEFAULT_REGION = "us-central1"
+PUBLIC_PROBE_MARKERS = (
+    "/.env",
+    "/.git",
+    "/.well-known",
+    "/__",
+    "/_ah",
+    "/_config",
+    "/actuator",
+    "/boaform",
+    "/config.",
+    "/cgi-bin",
+    "/definitely-not-a-real-route",
+    "/env.",
+    "/phpmyadmin",
+    "/runtime-",
+    "/security.txt",
+    "/settings.",
+    "/vendor/phpunit",
+    "/wp-",
+    "wordpress",
+    "xmlrpc.php",
+    ".php",
+)
 
 
 @dataclass(frozen=True)
@@ -191,12 +215,18 @@ def summarize_logging_warnings(project: str, *, days: int, limit: int) -> dict[s
         }
     by_service: Counter[str] = Counter()
     by_severity: Counter[str] = Counter()
+    by_status: Counter[str] = Counter()
+    by_route_category: Counter[str] = Counter()
     for entry in result.data or []:
         labels = ((entry.get("resource") or {}).get("labels") or {})
+        http_request = entry.get("httpRequest") or {}
         service = str(labels.get("service_name") or "unknown")
         severity = str(entry.get("severity") or "DEFAULT")
+        status = str(http_request.get("status") or "none")
         by_service[service] += 1
         by_severity[severity] += 1
+        by_status[status] += 1
+        by_route_category[route_category(http_request.get("requestUrl"))] += 1
     entries_sampled = sum(by_service.values())
     return {
         "project": project,
@@ -207,7 +237,33 @@ def summarize_logging_warnings(project: str, *, days: int, limit: int) -> dict[s
         "sample_at_limit": bool(limit > 0 and entries_sampled >= limit),
         "by_service": dict(sorted(by_service.items())),
         "by_severity": dict(sorted(by_severity.items())),
+        "by_status": dict(sorted(by_status.items())),
+        "by_route_category": dict(sorted(by_route_category.items())),
     }
+
+
+def route_category(request_url: object) -> str:
+    """Classify a request URL without returning raw paths or query strings."""
+    if not request_url:
+        return "no_http_request"
+    try:
+        path = urlparse(str(request_url)).path.lower().rstrip("/") or "/"
+    except ValueError:
+        return "invalid_url"
+    if path == "/":
+        return "/"
+    if path in {"/health", "/healthz", "/livez", "/readyz"}:
+        return "health"
+    if path in {"/favicon.ico", "/robots.txt"}:
+        return "well_known_static"
+    if any(marker in path for marker in PUBLIC_PROBE_MARKERS):
+        return "public_probe"
+    if path.startswith("/api/"):
+        return "/api/*"
+    if path.startswith(("/assets/", "/static/")):
+        return "static_asset"
+    first = path.strip("/").split("/", 1)[0]
+    return f"/{first}/*" if first else "other"
 
 
 def build_report(projects: list[str], *, region: str, days: int, log_limit: int) -> dict[str, Any]:
@@ -285,19 +341,21 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
         "## Warning Logs",
         "",
-        "| Project | Available | Entries Sampled | At Limit | By Service | By Severity | Notes |",
-        "|---|---:|---:|---:|---|---|---|",
+        "| Project | Available | Entries Sampled | At Limit | By Service | By Severity | By Status | Route Categories | Notes |",
+        "|---|---:|---:|---:|---|---|---|---|---|",
     ])
     for project in report["projects"]:
         warnings = project["logging_warnings"]
         lines.append(
-            "| {project} | {available} | {sampled} | {at_limit} | {services} | {severities} | {notes} |".format(
+            "| {project} | {available} | {sampled} | {at_limit} | {services} | {severities} | {statuses} | {routes} | {notes} |".format(
                 project=warnings["project"],
                 available=_yn(warnings["available"]),
                 sampled=warnings.get("entries_sampled", "-"),
                 at_limit=_yn(bool(warnings.get("sample_at_limit", False))),
                 services=_md_cell(_compact_mapping(warnings.get("by_service", {}))),
                 severities=_md_cell(_compact_mapping(warnings.get("by_severity", {}))),
+                statuses=_md_cell(_compact_mapping(warnings.get("by_status", {}))),
+                routes=_md_cell(_compact_mapping(warnings.get("by_route_category", {}))),
                 notes=_md_cell(warnings.get("error", "")),
             )
         )
