@@ -75,8 +75,8 @@ shape.
 4. `chore/repo-classification-report` - tracked in
    `infra/org-classification-report.yaml` and
    `docs/org/repo-classification-report.md`.
-5. `feat/autonomy-audit-log` - queued. Add structured audit logging before
-   expanding action autonomy.
+5. `feat/autonomy-audit-log` - tracked. Structured decision/alert audit logging
+   lives in `docs/org/autonomy-audit-log.md`.
 
 ## Safety Rules
 

@@ -29,6 +29,7 @@ def tmp_engine(tmp_path):
         state_loader=loader,
         decisions_dir=tmp_path / "decisions",
         state_path=tmp_path / "last_regime.json",
+        audit_path=tmp_path / "autonomy.jsonl",
     )
 
 
