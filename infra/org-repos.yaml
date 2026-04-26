@@ -149,7 +149,20 @@ repos:
     required_guardrails:
       - AGENTS.md
       - local override branch documented
-    migration_state: upstream_integration
+    migration_state: local_runtime_mapped
+    runtime_tracking:
+      consolidation_doc: docs/org/hermes-agent-consolidation-map.md
+      launchagent_label: ai.hermes.gateway
+      runtime_path: /Users/aribs/.hermes/hermes-agent
+      runtime_branch: local/sapphire-relay-ignore
+      dev_clone_path: /Users/aribs/Code/hermes-agent
+      validated_at: "2026-04-26"
+      local_runtime_commits:
+        - sha: 5f2af81c
+          purpose: Ignore relay-only Telegram users after hook capture.
+        - sha: 3ba7bd5f
+          purpose: Intercept Sapphire confirmation replies before LLM handling.
+      decision_needed: Upstream patches, convert to supported hooks, or maintain an Ari fork before updating runtime Hermes.
 
   - id: kimi-tools
     name: kimi-tools
@@ -258,7 +271,7 @@ waves:
     status: in_progress
     objective: CI/pre-commit/doc parity across active satellites
   - id: wave-3-agent-consolidation
-    status: queued
+    status: in_progress
     objective: Consolidate Hermes, claw-code, Sapphire plugins, Claude tasks, and OpenClaw remnants
   - id: wave-4-data-intelligence-platform
     status: queued

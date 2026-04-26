@@ -91,6 +91,43 @@ def test_crypto_tax_tracker_tracks_completed_guardrail_pr() -> None:
     ]
 
 
+def test_hermes_agent_tracks_runtime_checkout_and_local_patches() -> None:
+    repos = {repo["id"]: repo for repo in _manifest()["repos"]}
+    repo = repos["hermes-agent"]
+
+    assert repo["migration_state"] == "local_runtime_mapped"
+    tracking = repo["runtime_tracking"]
+    assert tracking["consolidation_doc"] == "docs/org/hermes-agent-consolidation-map.md"
+    assert tracking["launchagent_label"] == "ai.hermes.gateway"
+    assert tracking["runtime_path"] == "/Users/aribs/.hermes/hermes-agent"
+    assert tracking["dev_clone_path"] == "/Users/aribs/Code/hermes-agent"
+    assert [item["sha"] for item in tracking["local_runtime_commits"]] == [
+        "5f2af81c",
+        "3ba7bd5f",
+    ]
+
+
+def test_status_report_includes_runtime_tracking_without_required_runtime_path(tmp_path: Path) -> None:
+    manifest = deepcopy(_manifest())
+    hermes = next(repo for repo in manifest["repos"] if repo["id"] == "hermes-agent")
+    hermes["runtime_tracking"]["runtime_path"] = str(tmp_path / "missing-runtime")
+
+    report = org_status.collect_status(manifest, external=False)
+    hermes_status = next(repo for repo in report["repos"] if repo["id"] == "hermes-agent")
+
+    assert hermes_status["runtime"] == {
+        "launchagent_label": "ai.hermes.gateway",
+        "runtime_path": str(tmp_path / "missing-runtime"),
+        "expected_branch": "local/sapphire-relay-ignore",
+        "exists": False,
+        "branch": None,
+        "head": None,
+        "dirty_count": None,
+        "clean": None,
+        "errors": [],
+    }
+
+
 def test_classification_report_tracks_absorb_and_archive_candidates() -> None:
     report = _classification_report()
     manifest_ids = {repo["id"] for repo in _manifest()["repos"]}
@@ -103,6 +140,7 @@ def test_classification_report_tracks_absorb_and_archive_candidates() -> None:
     assert "Do not delete" in " ".join(report["candidate_archive"]["policy"])
     assert "crypto-tax-tracker" not in {item["id"] for item in report["blocked_or_watch"]}
     assert "crypto-tax-tracker" not in {item["id"] for item in report["next_reviews"]}
+    assert "hermes-agent" not in {item["id"] for item in report["next_reviews"]}
 
 
 def test_collect_status_no_external_handles_local_ci_without_live_tools(tmp_path: Path) -> None:

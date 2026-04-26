@@ -67,10 +67,9 @@ blocked_or_watch:
     blocker: Upstream repository is read-only for Ari.
     tracking: https://github.com/tradesdontlie/tradingview-mcp/pull/102
   - id: hermes-agent
-    blocker: Local override branch and upstream integration policy need an explicit consolidation decision.
+    blocker: Local patched runtime is mapped; fork, hook, or upstream decision still required before updating runtime Hermes.
+    tracking: docs/org/hermes-agent-consolidation-map.md
 
 next_reviews:
-  - id: hermes-agent
-    action: Map local Sapphire relay/filter commits and decide fork, patch, or absorb strategy.
   - id: kimi-tools
     action: Find all callers and decide whether to absorb into Sapphire or Hermes skills.
