@@ -21,6 +21,13 @@ cyber-threat-bot, regional-intel-workbench, tradingview-mcp,
 tradingview-mcp-v2, crypto-tax-tracker/Cointracker, hermes-agent, and active
 GCP/local runtime services.
 
+`infra/org-repos.yaml` also tracks an **upstream integration fleet** for
+starred or locally integrated repositories that Sapphire depends on or uses as
+architecture references. Each entry records the upstream repo, Ari fork, local
+clone path, integration surface, and sync state. These repos are not
+automatically production surfaces; runtime retargeting still requires a
+dedicated PR and rollback notes.
+
 ## Status Commands
 
 Use the status helper for a read-only snapshot:
@@ -103,6 +110,9 @@ porcelain status category; it does not print filenames or diff contents.
 10. `docs/hermes-sapphire-skill-surface` - shipped Wave 3 audit. It classifies
    all 15 Sapphire Hermes skills by blast radius before any consolidation,
    deletion, or template rewrite.
+11. `infra/upstream-fleet-control` - current. Tracks OpenBB, OpenClaw,
+    NemoClaw, Kronos, Lumo, Hermes, Foundry/Palantir SDKs, FRED, charting,
+    Goose, RTK, and career-ops upstreams with Ari fork/clone posture.
 
 ## Safety Rules
 

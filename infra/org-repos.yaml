@@ -221,6 +221,151 @@ repos:
         - tests/unit/test_kimi_cloud_fallback.py
       next_step: Keep standalone workbench read-only during soak; archive only through a later dedicated cleanup PR.
 
+upstream_repos:
+  - id: openbb
+    name: OpenBB
+    upstream: OpenBB-finance/OpenBB
+    ari_fork: arigatoexpress/OpenBB
+    local_path: /Users/aribs/Code/OpenBB
+    integration_surface: Local OpenBB REST API on port 6900 feeds Sapphire analytics, tools, and routine comparators.
+    sync_state: forked_cloned_synced
+    notes: Source clone is an integration reference; the running local OpenBB service remains canonical.
+
+  - id: openclaw
+    name: openclaw
+    upstream: openclaw/openclaw
+    ari_fork: arigatoexpress/openclaw
+    local_path: /Users/aribs/Code/openclaw
+    integration_surface: Sapphire still references OpenClaw gateway/runtime surfaces during agent consolidation.
+    sync_state: fork_diverged_do_not_force
+    notes: Ari fork has diverged from upstream; do not force-sync without a dedicated review.
+
+  - id: nemoclaw
+    name: NemoClaw
+    upstream: NVIDIA/NemoClaw
+    ari_fork: arigatoexpress/NemoClaw
+    local_path: /Users/aribs/Code/NemoClaw
+    integration_surface: Candidate secure agent-runtime reference for OpenClaw/NemoClaw consolidation.
+    sync_state: forked_cloned_synced
+    notes: Inventory/reference only until a dedicated integration PR changes runtime behavior.
+
+  - id: kronos
+    name: Kronos
+    upstream: shiyu-coder/Kronos
+    ari_fork: arigatoexpress/Kronos
+    local_path: /Users/aribs/Code/Kronos
+    integration_surface: Kronos model code backs Sapphire market forecasting wrappers and daily dry-run routines.
+    sync_state: forked_dirty_local_workbench
+    notes: Local worktree has intentionally unreviewed changes; preserve before cleanup or retargeting.
+
+  - id: lumo-api-v2
+    name: Lumo-Api-V2
+    upstream: carlostkd/Lumo-Api-V2
+    ari_fork: arigatoexpress/Lumo-Api-V2
+    local_path: /Users/aribs/Code/lumo-api
+    integration_surface: Local Lumo API server backs Sapphire security research tools.
+    sync_state: forked_dirty_local_workbench
+    notes: Local worktree has unreviewed changes; do not overwrite during repo hygiene.
+
+  - id: hermes-agent-upstream
+    name: hermes-agent
+    upstream: NousResearch/hermes-agent
+    ari_fork: arigatoexpress/hermes-agent
+    local_path: /Users/aribs/Code/hermes-agent
+    integration_surface: Development clone for the Hermes gateway; runtime checkout is tracked separately above.
+    sync_state: forked_cloned_synced
+    notes: Runtime patches remain in /Users/aribs/.hermes/hermes-agent until hook strategy is decided.
+
+  - id: claw-code-upstream
+    name: claw-code
+    upstream: instructkr/claw-code
+    ari_fork: arigatoexpress/claw-code
+    local_path: /Users/aribs/Code/claw-code
+    integration_surface: Rust agent runtime hosting the Sapphire plugin.
+    sync_state: fork_synced_local_current
+    notes: Local clone keeps upstream origin plus an Ari fork remote.
+
+  - id: tradingview-mcp-upstream
+    name: tradingview-mcp upstream bridge
+    upstream: tradesdontlie/tradingview-mcp
+    ari_fork: arigatoexpress/tradingview-mcp-upstream
+    local_path: /Users/aribs/Code/tradingview-mcp-v2
+    integration_surface: CDP TradingView MCP bridge under upstream hardening review.
+    sync_state: fork_synced_upstream_pr_open
+    notes: Do not retarget production callers until the upstream/fork strategy is chosen.
+
+  - id: foundry-platform-python
+    name: foundry-platform-python
+    upstream: palantir/foundry-platform-python
+    ari_fork: arigatoexpress/foundry-platform-python
+    local_path: /Users/aribs/Code/foundry-platform-python
+    integration_surface: Foundry SDK reference for Sapphire ontology/action readiness and read-back audits.
+    sync_state: forked_cloned_synced
+    notes: Reference clone only; no Foundry success is inferred without real ontology/action read-back.
+
+  - id: palantir-python-sdk
+    name: palantir-python-sdk
+    upstream: palantir/palantir-python-sdk
+    ari_fork: arigatoexpress/palantir-python-sdk
+    local_path: /Users/aribs/Code/palantir-python-sdk
+    integration_surface: Palantir SDK reference for Foundry client behavior.
+    sync_state: forked_cloned_synced
+    notes: Reference clone only.
+
+  - id: fredapi
+    name: fredapi
+    upstream: mortada/fredapi
+    ari_fork: arigatoexpress/fredapi
+    local_path: /Users/aribs/Code/fredapi
+    integration_surface: Optional FRED macro data dependency for Sapphire market tools.
+    sync_state: forked_cloned_synced
+    notes: Library reference; secret-bearing FRED configuration is not tracked here.
+
+  - id: lightweight-charts
+    name: lightweight-charts
+    upstream: tradingview/lightweight-charts
+    ari_fork: arigatoexpress/lightweight-charts
+    local_path: /Users/aribs/Code/lightweight-charts
+    integration_surface: Charting reference for Sapphire dashboards and TradingView-style UI work.
+    sync_state: forked_cloned_synced
+    notes: Reference clone only unless dashboard work explicitly vendors a component.
+
+  - id: goose
+    name: goose
+    upstream: block/goose
+    ari_fork: arigatoexpress/goose
+    local_path: /Users/aribs/Code/goose
+    integration_surface: Agent-runtime reference for future Sapphire/Hermes consolidation.
+    sync_state: forked_cloned_synced
+    notes: Inventory/reference only.
+
+  - id: rtk
+    name: rtk
+    upstream: rtk-ai/rtk
+    ari_fork: arigatoexpress/rtk
+    local_path: /Users/aribs/Code/rtk
+    integration_surface: RTK reference surfaced by the operator workspace instructions.
+    sync_state: forked_cloned_synced
+    notes: Inventory/reference only until a concrete Sapphire integration is approved.
+
+  - id: career-ops-plugin
+    name: career-ops-plugin
+    upstream: andrew-shwetzer/career-ops-plugin
+    ari_fork: arigatoexpress/career-ops-plugin
+    local_path: /Users/aribs/Code/career-ops-plugin
+    integration_surface: Claude/Codex plugin reference adjacent to Ari's broader autonomous workspace.
+    sync_state: forked_cloned_synced
+    notes: Not production-adjacent to Sapphire; tracked to keep starred integration clones organized.
+
+  - id: aip-community-registry
+    name: aip-community-registry
+    upstream: palantir/aip-community-registry
+    ari_fork: arigatoexpress/aip-community-registry
+    local_path: /Users/aribs/Code/aip-community-registry
+    integration_surface: AIP/Foundry schema reference used during ontology provisioning work.
+    sync_state: forked_lfs_dirty_reference
+    notes: Local clone is preserved and recloned, but Git LFS zip assets still show modified; do not force-clean without a dedicated LFS pass.
+
 gcp_projects:
   - project_id: tho-ai-agent
     role: THO production and Sapphire analytics workloads
