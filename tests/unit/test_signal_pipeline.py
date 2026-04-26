@@ -16,6 +16,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "services" / "alpha"))
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "lib" / "core"))
 
+import signal_pipeline as sp  # type: ignore
 from signal_pipeline import SignalPipeline  # type: ignore
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -31,6 +32,7 @@ def signals_dir(tmp_path):
 def pipeline(signals_dir, monkeypatch):
     """SignalPipeline with all externals mocked out."""
     monkeypatch.setattr("signal_pipeline.SIGNALS_DIR", signals_dir)
+    monkeypatch.setattr("signal_pipeline.PAPER_TRADING_LOG", signals_dir.parent / "paper_trading.jsonl")
     monkeypatch.setattr("signal_pipeline._NOTIFY_AVAILABLE", False)
     monkeypatch.setattr("signal_pipeline._KERNEL_AVAILABLE", False)
     monkeypatch.setattr("signal_pipeline._FIREWALL_AVAILABLE", False)
@@ -58,6 +60,36 @@ def _raw(
         "take_profit": tp,
         "stop_loss": sl,
     }
+
+
+# ─── Safety defaults ───────────────────────────────────────────────────────────
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (None, True),
+        ("", True),
+        ("1", True),
+        ("true", True),
+        ("YES", True),
+        ("0", False),
+        ("false", False),
+        ("off", False),
+        ("live-please", True),
+    ],
+)
+def test_paper_trading_env_defaults_fail_closed(monkeypatch, value, expected):
+    if value is None:
+        monkeypatch.delenv("PAPER_TRADING", raising=False)
+    else:
+        monkeypatch.setenv("PAPER_TRADING", value)
+    assert sp._paper_trading_env_enabled() is expected
+
+
+def test_paper_trading_log_redirected_in_tests(pipeline):
+    pl, sig_dir = pipeline
+    pl.process(_raw(action="buy"))
+    assert (sig_dir.parent / "paper_trading.jsonl").exists()
 
 
 # ─── Scoring tests ─────────────────────────────────────────────────────────────

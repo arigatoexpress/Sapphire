@@ -111,12 +111,32 @@ except Exception as e:  # pragma: no cover — import guard
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 
+_PAPER_TRADING_TRUE = {"1", "true", "yes", "y", "on"}
+_PAPER_TRADING_FALSE = {"0", "false", "no", "n", "off"}
+
+
+def _paper_trading_env_enabled() -> bool:
+    """Return paper-trading mode, defaulting safely to enabled."""
+    raw = os.getenv("PAPER_TRADING")
+    if raw is None or raw.strip() == "":
+        return True
+
+    value = raw.strip().lower()
+    if value in _PAPER_TRADING_TRUE:
+        return True
+    if value in _PAPER_TRADING_FALSE:
+        return False
+
+    log.warning("Unrecognized PAPER_TRADING=%r; defaulting to paper trading", raw)
+    return True
+
+
 SIGNALS_DIR   = _ROOT / "data" / "signals"
 SIGNALS_DIR.mkdir(parents=True, exist_ok=True)
 
-# Paper trading — when enabled, signals are scored + logged but Telegram prefix
-# is "[PAPER]" and P&L is tracked in a separate JSONL for review.
-PAPER_TRADING = os.getenv("PAPER_TRADING", "0") == "1"
+# Paper trading — defaults on. Explicitly set PAPER_TRADING=0/false only after
+# a live-execution approval, soak, and rollback plan.
+PAPER_TRADING = _paper_trading_env_enabled()
 PAPER_TRADING_LOG = _ROOT / "data" / "paper_trading.jsonl"
 
 # Confidence thresholds

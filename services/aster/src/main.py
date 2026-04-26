@@ -39,6 +39,26 @@ logger = logging.getLogger(__name__)
 SERVICE_NAME = "bot-aster"
 PLATFORM = Platform.ASTER
 
+_PAPER_TRADING_TRUE = {"1", "true", "yes", "y", "on"}
+_PAPER_TRADING_FALSE = {"0", "false", "no", "n", "off"}
+
+
+def _paper_trading_env_enabled() -> bool:
+    """Return paper-trading mode, defaulting safely to enabled."""
+    raw = os.getenv("PAPER_TRADING")
+    if raw is None or raw.strip() == "":
+        return True
+
+    value = raw.strip().lower()
+    if value in _PAPER_TRADING_TRUE:
+        return True
+    if value in _PAPER_TRADING_FALSE:
+        return False
+
+    logger.warning("Aster: unrecognized PAPER_TRADING=%r; defaulting to paper", raw)
+    return True
+
+
 # Aster API settings
 ASTER_API_KEY = os.getenv("ASTER_API_KEY", "").strip()
 ASTER_API_SECRET = (
@@ -95,8 +115,9 @@ class AsterBot:
             reset_timeout=float(os.getenv("ASTER_CIRCUIT_BREAKER_RESET_SECONDS", "120")),
         )
 
-        # Paper trading mode (disabled by default for production)
-        self.is_paper_trading = os.getenv("PAPER_TRADING", "false").lower() == "true"
+        # Paper trading mode defaults on. Real venue execution requires an
+        # explicit PAPER_TRADING=0/false environment choice.
+        self.is_paper_trading = _paper_trading_env_enabled()
 
         # Telemetry publishing (consumed by api-gateway for realtime dashboard)
         self._position_publish_interval_seconds = max(

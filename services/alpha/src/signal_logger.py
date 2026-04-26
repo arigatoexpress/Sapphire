@@ -77,9 +77,29 @@ if not _WEBHOOK_SECRET:
     )
 
 
+_PAPER_TRADING_TRUE = {"1", "true", "yes", "y", "on"}
+_PAPER_TRADING_FALSE = {"0", "false", "no", "n", "off"}
+
+
+def _paper_trading_env_enabled() -> bool:
+    """Return paper-trading mode, defaulting safely to enabled."""
+    raw = os.environ.get("PAPER_TRADING")
+    if raw is None or raw.strip() == "":
+        return True
+
+    value = raw.strip().lower()
+    if value in _PAPER_TRADING_TRUE:
+        return True
+    if value in _PAPER_TRADING_FALSE:
+        return False
+
+    log.warning("signal_logger: unrecognized PAPER_TRADING=%r; defaulting to paper", raw)
+    return True
+
+
 @app.get("/health")
 async def health():
-    paper_trading = os.environ.get("PAPER_TRADING", "0") == "1"
+    paper_trading = _paper_trading_env_enabled()
     return {
         "status": "ok",
         "mode": "signal_logger",

@@ -6,26 +6,26 @@ Paper trading lets you validate the full signal pipeline — TradingView → web
 
 ## How It Works
 
-When `PAPER_TRADING=1` is set on the signal logger:
+Paper mode is the default when `PAPER_TRADING` is unset:
 - All incoming signals are scored normally by `signal_pipeline.py`
 - Position sizing, R:R, kernel gating — all real calculations
 - Paper P&L is tracked in `data/paper_trading.jsonl`
 - Telegram alerts are prefixed `[PAPER]` so you know they're not live
 - No real orders are placed (the pipeline has no execution layer anyway)
 
-To go **live**: remove `PAPER_TRADING=1` from the LaunchAgent env vars and reload. Nothing else changes.
+To opt out of paper mode, set `PAPER_TRADING=0` or `PAPER_TRADING=false` explicitly. Do not rely on removing the variable; unset, empty, and unrecognized values fail closed to paper mode.
 
 ---
 
-## Step 1 — Enable Paper Trading Mode
+## Step 1 — Verify Paper Trading Mode
 
-Add `PAPER_TRADING=1` to the signal logger LaunchAgent:
+Paper trading is enabled by default. Keeping `PAPER_TRADING=1` in the signal logger LaunchAgent is still recommended because it makes the operational mode visible:
 
 ```bash
 # Edit the plist
 nano ~/Library/LaunchAgents/com.sapphire.signal-logger.plist
 
-# Add inside the <dict> after other EnvironmentVariables:
+# Optional but recommended: add inside the <dict> after other EnvironmentVariables:
 <key>PAPER_TRADING</key>
 <string>1</string>
 
@@ -164,14 +164,15 @@ print(pipeline.signal_stats())
 
 ---
 
-## Step 6 — Going Live
+## Step 6 — Explicitly Opting Out Of Paper Mode
 
 When you're satisfied with paper trading results:
 
-1. Remove `PAPER_TRADING=1` from the LaunchAgent plist
-2. Reload: `launchctl kickstart -k gui/$(id -u)/com.sapphire.signal-logger`
-3. The `[PAPER]` prefix disappears from Telegram
-4. The paper JSONL stays intact for backreference
+1. Get explicit live-execution approval and document the rollback plan
+2. Set `PAPER_TRADING=0` or `PAPER_TRADING=false` in the specific approved runtime
+3. Reload: `launchctl kickstart -k gui/$(id -u)/com.sapphire.signal-logger`
+4. The `[PAPER]` prefix disappears from Telegram
+5. The paper JSONL stays intact for backreference
 
 **That's it.** The pipeline, scoring, and routing are identical. Paper mode only changes the Telegram prefix and the secondary P&L file.
 
