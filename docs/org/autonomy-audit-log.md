@@ -14,6 +14,7 @@ The autonomy audit log is append-only JSONL. By default it writes to
 - `autonomy.decision_evaluated`
 - `autonomy.alert_detected`
 - `autonomy.cycle.requested`
+- `autonomy.dispatch_evaluated`
 - `autonomy.session_created`
 - `autonomy.session_decision_applied`
 
@@ -37,6 +38,12 @@ secrets, order payloads, or full world snapshots.
 
 Control-plane autonomy cycle metadata records payload key names and a hash of
 the requested actor only. It does not write raw bridge payload values.
+
+Alpha dispatch evaluation metadata records trigger/agent/reason codes, venue
+and preferred-symbol counts, failure pressure, pending session count, and
+whether code, GCP, or owner-approval gates were active. It does not write raw
+instructions, full context snapshots, symbol lists, venue payloads, Telegram
+payloads, or dispatcher request bodies.
 
 Alpha autonomy session decision metadata records decision/outcome, dispatch
 status, reason code, hook-result key names, note length, and hashed session and

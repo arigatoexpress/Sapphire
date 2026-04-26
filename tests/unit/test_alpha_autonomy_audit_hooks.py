@@ -13,6 +13,7 @@ if str(ALPHA_ROOT) not in sys.path:
     sys.path.insert(0, str(ALPHA_ROOT))
 
 from src.autonomy_audit_hooks import (  # noqa: E402
+    append_alpha_dispatch_evaluation_audit,
     append_alpha_session_created_audit,
     append_alpha_session_decision_audit,
 )
@@ -110,6 +111,56 @@ def test_session_decision_audit_records_rejection_not_dispatched(monkeypatch, tm
     assert record["metadata"]["hook_result_keys"] == []
 
 
+def test_dispatch_evaluation_audit_summarizes_context(monkeypatch, tmp_path):
+    audit_path = tmp_path / "autonomy.jsonl"
+    monkeypatch.setenv("SAPPHIRE_AUTONOMY_AUDIT_LOG", str(audit_path))
+
+    append_alpha_dispatch_evaluation_audit(
+        trigger="manual token=sample-token",
+        agent_id="OBSIDIAN password=sample-password",
+        outcome="dry_run",
+        reason="hook secret=sample-secret",
+        context={
+            "active_venues": ["ASTER", "LIGHTER"],
+            "preferred_symbols": ["BTC", "ETH", "SOL"],
+            "venue_profiles": {"ASTER": {"role": "momentum"}},
+            "pending_autonomy_sessions": "2",
+            "total_failure_pressure": "3.25",
+            "raw_instruction": "do not serialize this instruction",
+        },
+        allow_code_changes=True,
+        allow_gcloud_changes=False,
+        approval_required=True,
+    )
+
+    record = json.loads(audit_path.read_text(encoding="utf-8").strip())
+    serialized = json.dumps(record)
+    metadata = record["metadata"]
+
+    assert record["event_type"] == "autonomy.dispatch_evaluated"
+    assert record["actor"] == "alpha_engine"
+    assert record["action"] == "evaluate_full_autonomy_dispatch"
+    assert record["outcome"] == "dry_run"
+    assert record["object_ref"] == "alpha_full_autonomy"
+    assert metadata["trigger_code"] == "manual_token_redacted"
+    assert metadata["agent_code"] == "obsidian_password_redacted"
+    assert metadata["reason_code"] == "hook_secret_redacted"
+    assert metadata["active_venue_count"] == 2
+    assert metadata["preferred_symbol_count"] == 3
+    assert metadata["venue_profile_count"] == 1
+    assert metadata["pending_session_count"] == 2
+    assert metadata["failure_pressure"] == 3.25
+    assert metadata["allow_code_changes"] is True
+    assert metadata["allow_gcloud_changes"] is False
+    assert metadata["approval_required"] is True
+    assert "sample-token" not in serialized
+    assert "sample-password" not in serialized
+    assert "sample-secret" not in serialized
+    assert "do not serialize this instruction" not in serialized
+    assert "ASTER" not in serialized
+    assert "BTC" not in serialized
+
+
 def test_alpha_engine_session_decision_path_calls_audit_hook() -> None:
     tree = ast.parse((ALPHA_ROOT / "src" / "main.py").read_text(encoding="utf-8"))
     target_method: ast.AsyncFunctionDef | None = None
@@ -163,3 +214,39 @@ def test_alpha_engine_session_created_path_calls_audit_hook() -> None:
         "instruction_chars",
         "approval_required",
     } <= keyword_names
+
+
+def test_alpha_engine_dispatch_evaluation_path_calls_audit_hook() -> None:
+    tree = ast.parse((ALPHA_ROOT / "src" / "main.py").read_text(encoding="utf-8"))
+    target_method: ast.AsyncFunctionDef | None = None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_dispatch_full_autonomy_cycle":
+            target_method = node
+            break
+
+    assert target_method is not None
+    calls = [
+        node
+        for node in ast.walk(target_method)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "append_alpha_dispatch_evaluation_audit"
+    ]
+    outcomes = {
+        kw.value.value
+        for call in calls
+        for kw in call.keywords
+        if kw.arg == "outcome" and isinstance(kw.value, ast.Constant)
+    }
+    assert outcomes == {"dry_run", "no_dispatcher_available", "not_dispatched"}
+    for call in calls:
+        keyword_names = {kw.arg for kw in call.keywords}
+        assert {
+            "trigger",
+            "agent_id",
+            "outcome",
+            "context",
+            "allow_code_changes",
+            "allow_gcloud_changes",
+            "approval_required",
+        } <= keyword_names
