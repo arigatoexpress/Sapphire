@@ -1,9 +1,30 @@
 # Bearish-Direction Prediction Asymmetry — Research Design Doc
 
 **Date:** 2026-04-26
-**Status:** Research design (no code changes proposed in this PR)
+**Status:** Layer C shipped behind a default-off env flag. Layers A and B remain proposed pending a backtest harness.
 **Owner:** Trading critical path (CODEOWNERS-gated)
-**Decision required by:** Human reviewer — see Section 7
+**Decision history:** Layer C (asymmetric threshold) selected on 2026-04-26 — see Section 8.
+
+## Section 8. Decision and Layer C delivery
+
+The reviewer chose **Option B** in Section 7 — ship Layer C (asymmetric threshold) behind a feature flag, defer Layers A and B until a CPCV-grounded backtest harness exists.
+
+What landed:
+
+- `plugins/claw-sapphire/tools/internal/predict.py` exposes `classify_direction(net, *, bull_threshold, bear_threshold)` as a pure function, plus `_resolve_threshold(env_var, default)` that reads two env vars:
+  - `SAPPHIRE_PREDICT_BULL_THRESHOLD` (default `1.5`)
+  - `SAPPHIRE_PREDICT_BEAR_THRESHOLD` (default `1.5`)
+- Default behavior is unchanged: thresholds are symmetric ±1.5, identical to the legacy inline rule. The flag is opt-in.
+- Operator playbook: setting `SAPPHIRE_PREDICT_BEAR_THRESHOLD=2.5` in the LaunchAgent env raises the bar so an MA-down-only signal (net ≈ -2.0, the dominant false-bear pattern in §2.2) classifies as neutral instead of bearish. Setting it ≥ 3.0 requires at least two bear factors.
+- 15 unit tests in `plugins/claw-sapphire/tests/test_predict.py` cover: default-symmetric behavior, asymmetric-threshold suppression of MA-only false bears, env parsing fallbacks (unset / blank / non-numeric / non-positive / valid).
+
+What is **not** in this delivery (still proposed in §4):
+
+- Layer A — chain factors (funding rate, OI) into `predict.py`.
+- Layer B — real `direction="short"` emission across `RegimeAwareRSI`, `MultiTFMomentum`, `CorrelationBreakout`, `SapphireComposite`. The trading critical path remains long/flat-only on these strategies.
+- Backtest harness from §4.5 — required before any threshold default is moved away from 1.5.
+
+Operator default for the production LaunchAgent has **not** been changed. The flag is staged; the historical accuracy snapshot still applies until the operator opts in.
 
 ## 1. Background
 

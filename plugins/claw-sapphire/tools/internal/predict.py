@@ -30,6 +30,38 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
 SAPPHIRE_DIR = Path.home() / "Code" / "Sapphire"
 PREDICTIONS_FILE = SAPPHIRE_DIR / "data" / "trading_predictions.jsonl"
 
+# Direction classification thresholds. Defaults preserve the legacy symmetric
+# behavior (`net > 1.5` -> bullish, `net < -1.5` -> bearish). Operators can
+# raise the bear threshold via SAPPHIRE_PREDICT_BEAR_THRESHOLD to require more
+# bear evidence before flipping to a short call — see
+# docs/research/bearish-direction-asymmetry-2026-04-26.md (Layer C).
+DEFAULT_BULL_THRESHOLD = 1.5
+DEFAULT_BEAR_THRESHOLD = 1.5
+
+
+def _resolve_threshold(env_var: str, default: float) -> float:
+    raw = os.environ.get(env_var)
+    if not raw:
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
+def classify_direction(
+    net: float,
+    *,
+    bull_threshold: float = DEFAULT_BULL_THRESHOLD,
+    bear_threshold: float = DEFAULT_BEAR_THRESHOLD,
+) -> str:
+    if net > bull_threshold:
+        return "bullish"
+    if net < -bear_threshold:
+        return "bearish"
+    return "neutral"
+
 
 def _get_coingecko_prices() -> dict:
     """Get current prices from CoinGecko."""
@@ -53,6 +85,12 @@ def action_predict() -> dict:
     profiles = analyze_all()
     predictions = []
     now = datetime.now(UTC).isoformat()
+    bull_threshold = _resolve_threshold(
+        "SAPPHIRE_PREDICT_BULL_THRESHOLD", DEFAULT_BULL_THRESHOLD
+    )
+    bear_threshold = _resolve_threshold(
+        "SAPPHIRE_PREDICT_BEAR_THRESHOLD", DEFAULT_BEAR_THRESHOLD
+    )
 
     for sym, profile in profiles.items():
         if profile is None:
@@ -125,12 +163,11 @@ def action_predict() -> dict:
 
         # ─── Direction decision ───
         net = bull_score - bear_score
-        if net > 1.5:
-            direction = "bullish"
-        elif net < -1.5:
-            direction = "bearish"
-        else:
-            direction = "neutral"
+        direction = classify_direction(
+            net,
+            bull_threshold=bull_threshold,
+            bear_threshold=bear_threshold,
+        )
 
         # ─── Confidence: based on how strong the consensus is ───
         total_score = bull_score + bear_score
