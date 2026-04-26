@@ -1,6 +1,6 @@
 # Sapphire OS — Routines Manifest
 
-Last updated: 2026-04-25
+Last updated: 2026-04-26
 
 Every automated routine in the Sapphire OS mesh. Single source of truth — if a job runs on a schedule, it is listed here with its schedule, owner process, output artifact, and recovery runbook. Anything not on this list should either be added or killed.
 
@@ -37,6 +37,7 @@ Check: `launchctl list | grep sapphire` — every row should show a PID (online)
 | `com.sapphire.gcp-sync`            | hourly at :05      | `services.pipeline.gcp_sync`                | Uploads to `gs://sapphire-data-lake/raw/*`; Cloud Function loads BQ | Manual: `python3 -m services.pipeline.gcp_sync -v` |
 | `com.sapphire.logrotate`           | 03:30 CT daily     | `infra/logrotate.py`                        | `.gz` archives under `~/autonomy-status/logs/` and `~/.hermes/logs/` | Manual: `python3 infra/logrotate.py` |
 | `com.sapphire.backtest-weekly`      | Sat 22:00 local    | `python3 -m lib.analytics.run_strategies --days 90 --bankroll 10000` | `data/backtests/strategies/*.json`                                 | Remote shadow: `.github/workflows/weekly-backtest.yml`; keep local until artifacts soak clean |
+| `com.sapphire.content-engine`       | daily 06:00 local  | `python3 -m lib.content`                    | `data/content/drafts/*.json`, `data/content/ready/**/*`, `data/market_pulse/*.md` | Remote shadow: `.github/workflows/content-engine.yml`; keep local until artifacts soak clean |
 
 ## 2.1 Remote-shadow schedules
 
@@ -48,6 +49,7 @@ plist is explicitly disabled.
 |----------|------|------------------------|--------|
 | `.github/workflows/weekly-backtest.yml` | Sun 04:00 UTC | `com.sapphire.backtest-weekly` | GitHub Actions artifact `weekly-backtest-<run_id>` |
 | `.github/workflows/threat-refresh.yml` | 01:10, 05:10, 09:10, 13:10, 17:10, 21:10 UTC | `com.sapphire.threat-refresh` | GitHub Actions artifact `threat-refresh-<run_id>`; uses the wrapper's native public-source mode so no private cross-repo token is required |
+| `.github/workflows/content-engine.yml` | 12:00 UTC daily | `com.sapphire.content-engine` | GitHub Actions artifact `content-engine-<run_id>`; runs with `SAPPHIRE_PUBLISH_LIVE=0` and `SAPPHIRE_CONTENT_TELEGRAM_SUMMARY=0` |
 
 Weekly backtest entered soak tracking on 2026-04-26 after local and remote
 artifacts compared PASS across all 756 rows with matching top-3 leaderboard
@@ -56,6 +58,11 @@ order. Evidence: `docs/org/backtest-weekly-shadow-soak-2026-04-26.md`.
 Threat-refresh entered soak tracking on 2026-04-26 after a close-time manual
 comparison matched all 15 canonical IDs with 0 FAIL rows. Evidence:
 `docs/org/threat-refresh-shadow-soak-2026-04-26.md`.
+
+Content-engine entered remote shadow tracking on 2026-04-26 after publisher
+Telegram side effects were explicitly opt-in. The remote shadow generates
+draft/ready artifacts only; it does not run the live publisher. Evidence:
+`docs/org/content-engine-shadow-soak-2026-04-26.md`.
 
 Compare local and remote weekly backtest artifacts with:
 
@@ -91,6 +98,14 @@ For explicit one-off comparisons, pass exact artifact paths:
 python3 scripts/ops/compare_threat_artifacts.py \
   --local data/intelligence/runs/<LOCAL_TS>/threats.json \
   --remote /path/to/gh-artifact/data/intelligence/runs/<REMOTE_TS>/threats.json
+```
+
+Compare local and remote content-engine artifacts with:
+
+```bash
+python3 scripts/ops/compare_content_artifacts.py \
+  --local-root /Users/aribs/Code/Sapphire \
+  --remote-root /path/to/gh-artifact
 ```
 
 All scripts are self-contained — they write their artifacts and exit. A routine is "healthy" if its artifact's mtime is within the expected cadence window.

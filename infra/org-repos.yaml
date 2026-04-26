@@ -474,8 +474,14 @@ routines:
     blocked_by: paid API keys, event bus side effects, GCP downstream writes
   - id: content-engine
     local_label: com.sapphire.content-engine
-    stage: blocked
-    blocked_by: remote shadow workflow and artifact comparator still needed; publisher side effects are dry-run/Telegram-gated
+    stage: soaking
+    remote_workflow: .github/workflows/content-engine.yml
+    comparator: scripts/ops/compare_content_artifacts.py
+    soak_tracking:
+      started_at: "2026-04-26"
+      evidence_doc: docs/org/content-engine-shadow-soak-2026-04-26.md
+      required_scheduled_successes: 7
+      cutover_gate: "At least 7 scheduled daily cycles with zero FAIL comparisons, no remote-only quality failures, and matching report-kind/platform coverage."
   - id: logrotate
     local_label: com.sapphire.logrotate
     stage: local_only
