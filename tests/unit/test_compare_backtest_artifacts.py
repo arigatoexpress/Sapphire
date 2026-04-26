@@ -137,6 +137,41 @@ def test_join_key_allows_same_strategy_name_with_different_params(tmp_path: Path
     )
 
 
+def test_metadata_summary_surfaces_bar_fingerprint_drift(tmp_path: Path) -> None:
+    local_data = _artifact(computed_at="2026-05-03T04:00:00+00:00")
+    remote_data = _artifact(computed_at="2026-05-03T04:00:10+00:00")
+    local_data["metadata"] = _metadata(btc_sha="btc-local", eth_sha="eth-same")
+    remote_data["metadata"] = _metadata(btc_sha="btc-remote", eth_sha="eth-same")
+    local_sweep = _write(tmp_path / "local_sweep.json", local_data)
+    remote_sweep = _write(tmp_path / "remote_sweep.json", remote_data)
+    report_dir = tmp_path / "reports"
+
+    assert (
+        comparator.main(
+            [
+                "--local-sweep",
+                str(local_sweep),
+                "--remote-sweep",
+                str(remote_sweep),
+                "--report-out",
+                str(report_dir),
+                "--quiet",
+            ]
+        )
+        == 0
+    )
+
+    payload = json.loads(next(path for path in report_dir.glob("*.json")).read_text())
+    metadata = payload["summary"]["metadata"]
+    assert metadata["source"]["git_sha_equal"] is True
+    assert metadata["source"]["yfinance_version_equal"] is True
+    assert metadata["bar_fingerprints"]["status"] == "different"
+    assert metadata["bar_fingerprints"]["matched"] == 1
+    assert metadata["bar_fingerprints"]["differing"] == 1
+    markdown = next(path for path in report_dir.glob("*.md")).read_text()
+    assert "Bar-set fingerprint: different" in markdown
+
+
 def test_identical_sweep_inputs_are_usage_error(tmp_path: Path) -> None:
     data = _artifact(computed_at="2026-05-03T04:00:00+00:00")
     local_sweep = _write(tmp_path / "local_sweep.json", data)
@@ -199,6 +234,22 @@ def _artifact(*, computed_at: str, best: bool = False, extra_rows: int = 0) -> d
     if best:
         rows = [dict(row, report=_report(row["symbol"], row["total_trades"])) for row in rows[:3]]
     return {"computed_at": computed_at, "total_backtests": len(rows), "results": rows}
+
+
+def _metadata(*, btc_sha: str, eth_sha: str) -> dict:
+    return {
+        "source": {
+            "generator": "lib.analytics.run_strategies",
+            "git_sha": "abc123",
+            "github_run_id": "456",
+            "yfinance_version": "0.2.66",
+        },
+        "config": {"days": 90, "bankroll": 10000.0, "symbols": ["BTC-USD", "ETH-USD"]},
+        "bar_fingerprints": {
+            "BTC-USD": {"sha256": btc_sha, "bars": 90, "start": "2026-02-01", "end": "2026-05-01"},
+            "ETH-USD": {"sha256": eth_sha, "bars": 90, "start": "2026-02-01", "end": "2026-05-01"},
+        },
+    }
 
 
 def _row(strategy_cls: str, symbol: str, sortino: float, trades: int) -> dict:

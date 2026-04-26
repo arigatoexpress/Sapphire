@@ -50,6 +50,11 @@ class Artifact:
         results = self.data.get("results")
         return results if isinstance(results, list) else []
 
+    @property
+    def metadata(self) -> dict[str, Any]:
+        metadata = self.data.get("metadata")
+        return metadata if isinstance(metadata, dict) else {}
+
     def summary(self) -> dict[str, Any]:
         return {
             "path": str(self.path),
@@ -166,6 +171,7 @@ def compare_artifacts(
     leaderboard_set_equal = set(local_top3_keys) == set(remote_top3_keys)
     leaderboard_order_equal = local_top3_keys == remote_top3_keys
     bar_windows = collect_bar_windows(local_best_rows, remote_best_rows)
+    metadata = metadata_summary(local_sweep.metadata, remote_sweep.metadata)
 
     verdict = run_verdict(
         row_counts=row_counts,
@@ -204,6 +210,7 @@ def compare_artifacts(
             "bar_window_remote": bar_windows["remote"],
             "missing_in_local": missing_in_local,
             "missing_in_remote": missing_in_remote,
+            "metadata": metadata,
         },
         "row_diffs": row_diffs,
         "leaderboard": {
@@ -663,6 +670,93 @@ def collect_bar_windows(
     return {"local": first_bar_window(local_best), "remote": first_bar_window(remote_best)}
 
 
+def metadata_summary(
+    local_metadata: dict[str, Any],
+    remote_metadata: dict[str, Any],
+) -> dict[str, Any]:
+    local_source = local_metadata.get("source") if isinstance(local_metadata.get("source"), dict) else {}
+    remote_source = (
+        remote_metadata.get("source") if isinstance(remote_metadata.get("source"), dict) else {}
+    )
+    return {
+        "available_local": bool(local_metadata),
+        "available_remote": bool(remote_metadata),
+        "source": {
+            "local_git_sha": local_source.get("git_sha") or "",
+            "remote_git_sha": remote_source.get("git_sha") or "",
+            "git_sha_equal": source_value_equal(local_source, remote_source, "git_sha"),
+            "local_github_run_id": local_source.get("github_run_id") or "",
+            "remote_github_run_id": remote_source.get("github_run_id") or "",
+            "local_yfinance_version": local_source.get("yfinance_version"),
+            "remote_yfinance_version": remote_source.get("yfinance_version"),
+            "yfinance_version_equal": source_value_equal(
+                local_source, remote_source, "yfinance_version"
+            ),
+        },
+        "bar_fingerprints": compare_bar_fingerprints(
+            local_metadata.get("bar_fingerprints"),
+            remote_metadata.get("bar_fingerprints"),
+        ),
+    }
+
+
+def source_value_equal(
+    local_source: dict[str, Any],
+    remote_source: dict[str, Any],
+    key: str,
+) -> bool | None:
+    local = local_source.get(key)
+    remote = remote_source.get(key)
+    if local in (None, "") or remote in (None, ""):
+        return None
+    return local == remote
+
+
+def compare_bar_fingerprints(local_raw: Any, remote_raw: Any) -> dict[str, Any]:
+    local = local_raw if isinstance(local_raw, dict) else {}
+    remote = remote_raw if isinstance(remote_raw, dict) else {}
+    if not local and not remote:
+        status = "unavailable"
+    elif not local or not remote:
+        status = "partial"
+    else:
+        status = "equal"
+
+    missing_in_local = sorted(set(remote) - set(local))
+    missing_in_remote = sorted(set(local) - set(remote))
+    differing: list[dict[str, Any]] = []
+    matched = 0
+    for symbol in sorted(set(local) & set(remote)):
+        local_fp = fingerprint_identity(local.get(symbol))
+        remote_fp = fingerprint_identity(remote.get(symbol))
+        if local_fp == remote_fp:
+            matched += 1
+        else:
+            differing.append({"symbol": symbol, "local": local_fp, "remote": remote_fp})
+
+    if missing_in_local or missing_in_remote or differing:
+        status = "different" if local and remote else status
+
+    return {
+        "status": status,
+        "matched": matched,
+        "differing": len(differing),
+        "missing_in_local": missing_in_local,
+        "missing_in_remote": missing_in_remote,
+        "diffs": differing[:10],
+    }
+
+
+def fingerprint_identity(raw: Any) -> dict[str, Any]:
+    item = raw if isinstance(raw, dict) else {}
+    return {
+        "sha256": item.get("sha256") or "",
+        "bars": item.get("bars"),
+        "start": item.get("start") or "",
+        "end": item.get("end") or "",
+    }
+
+
 def first_bar_window(rows: list[dict[str, Any]]) -> list[str | None]:
     for row in rows:
         report = row.get("report")
@@ -726,6 +820,9 @@ def write_reports(report: dict[str, Any], out_dir: Path) -> None:
 def render_markdown(report: dict[str, Any]) -> str:
     summary = report["summary"]
     inputs = report["inputs"]
+    metadata = summary.get("metadata") or {}
+    source = metadata.get("source") or {}
+    fingerprints = metadata.get("bar_fingerprints") or {}
     lines = [
         f"# Backtest Shadow Comparison - {report['compared_at']}",
         "",
@@ -790,9 +887,18 @@ def render_markdown(report: dict[str, Any]) -> str:
             "",
             f"- Leaderboard top-3 set equal: {summary['leaderboard_top3_set_equal']}",
             f"- Leaderboard top-3 order equal: {summary['leaderboard_top3_order_equal']}",
-            "- Bar-set fingerprint: unavailable in current artifacts",
+            f"- Source git SHA equal: {fmt_bool(source.get('git_sha_equal'))}",
+            f"- yfinance version equal: {fmt_bool(source.get('yfinance_version_equal'))}",
+            f"- Bar-set fingerprint: {fingerprints.get('status') or 'unavailable'} "
+            f"({fingerprints.get('matched', 0)} matched, "
+            f"{fingerprints.get('differing', 0)} differing)",
         ]
     )
+    if fingerprints.get("missing_in_local") or fingerprints.get("missing_in_remote"):
+        lines.append(
+            f"- Fingerprint coverage gaps: missing local={len(fingerprints.get('missing_in_local') or [])}, "
+            f"missing remote={len(fingerprints.get('missing_in_remote') or [])}"
+        )
     return "\n".join(lines) + "\n"
 
 
@@ -820,6 +926,12 @@ def fmt(value: Any) -> str:
     if isinstance(value, float):
         return f"{value:.6g}"
     return str(value)
+
+
+def fmt_bool(value: Any) -> str:
+    if value is None:
+        return "unknown"
+    return "yes" if bool(value) else "no"
 
 
 def get_nested(row: dict[str, Any], dotted: str) -> Any:
