@@ -1,9 +1,9 @@
 # Bearish-Direction Prediction Asymmetry — Research Design Doc
 
 **Date:** 2026-04-26
-**Status:** Layer C shipped behind a default-off env flag. Layers A and B remain proposed pending a backtest harness.
+**Status:** Layer A and Layer C shipped behind default-off env flags. Layer B (strategy short emission) remains proposed.
 **Owner:** Trading critical path (CODEOWNERS-gated)
-**Decision history:** Layer C (asymmetric threshold) selected on 2026-04-26 — see Section 8.
+**Decision history:** Layer C (asymmetric threshold) selected on 2026-04-26 — see Section 8. Layer A (chain factors into `predict.py`) shipped 2026-04-26 — see Section 9.
 
 ## Section 8. Decision and Layer C delivery
 
@@ -454,3 +454,109 @@ is modified.
   - [`plugins/claw-sapphire/lib/technical_analysis.py:254-299`](../../plugins/claw-sapphire/lib/technical_analysis.py#L254-L299)
 - Statistical methods used: Wilson score interval (Wilson 1927); two-proportion
   z-test; Fisher's exact test (closed-form, hypergeometric tail).
+
+## Section 9 — Layer A delivery
+
+Layer A (chain factors into `predict.py`) shipped on 2026-04-26 behind a
+default-off env flag. The §4.5 backtest harness landed in PR #212 and
+remains the gate for any operator-side rollout — until the harness has
+`data/backtests/<symbol>/<timeframe>/*.csv` populated, the production default
+(`SAPPHIRE_PREDICT_USE_CHAIN_FACTORS` unset, equivalent to `0`) keeps the
+legacy six-factor scoring exactly as it was. **The production default is
+unchanged.**
+
+### What landed
+
+- Pure function `chain_factor_deltas(symbol, *, funding_z, oi_change_pct)` in
+  `plugins/claw-sapphire/tools/internal/predict.py`. Returns
+  `(bull_delta, bear_delta, factors)` — no IO, no network, no exceptions in
+  any input shape. Used both directly in `action_predict` and exposed for
+  unit testing.
+- Best-effort adapter `_read_chain_features(symbol)` in the same file. Reads
+  `data/intelligence/latest/chain.json` (the artifact written every 15 min
+  by `services.pipeline.chain_refresh`), tolerates three plausible schemas
+  (`funding.perps[]`, top-level `perps[]`, `per_symbol[<sym>]`), returns
+  `(None, None)` on any error path. Stdlib only — no pandas/numpy.
+- New env flag `SAPPHIRE_PREDICT_USE_CHAIN_FACTORS`. Default `0` (off).
+  Accepted truthy values: `1`, `true`, `yes`, `on` (case-insensitive). When
+  on, `action_predict` reads `(funding_z, oi_change_pct)` for each symbol
+  via the adapter and applies the deltas to `bull_score` / `bear_score`
+  **before** the threshold classification. When the adapter returns
+  `(None, None)` for a symbol — missing file, malformed JSON, symbol not
+  present, non-numeric values — the deltas are not applied and that
+  symbol's record is bit-for-bit identical to the legacy path.
+- Reasoning string carries `FundZ{z:+.1f}↑/↓` and `OI{pct:+.1f}%↑/↓` labels
+  per applied factor so post-hoc inspection of `data/trading_predictions.jsonl`
+  can attribute each call to its inputs.
+
+### Env var contract
+
+| Env var | Default | When set | Effect |
+|---|---|---|---|
+| `SAPPHIRE_PREDICT_USE_CHAIN_FACTORS` | unset (= `0`) | `1`/`true`/`yes`/`on` | Enables the chain-factor read path in `action_predict`. |
+| `SAPPHIRE_PREDICT_BULL_THRESHOLD` | `1.5` | float > 0 | Layer C bull cutoff. Unchanged. |
+| `SAPPHIRE_PREDICT_BEAR_THRESHOLD` | `1.5` | float > 0 | Layer C bear cutoff. Unchanged. |
+
+Operators opt in by setting the chain-factor flag in the LaunchAgent env
+**after** the §4.5 reference data is in place. Roll back by unsetting the
+flag — no code revert needed.
+
+### Factor delta table
+
+Every chain factor contributes at most `0.5` so two factors at full extension
+sum to `1.0`, well below the `1.5` legacy threshold. A single factor cannot
+single-handedly flip a direction.
+
+| Factor | Trigger | Effect | Cap |
+|---|---|---|---|
+| Funding z-score (crowded longs) | `funding_z > +1.5` | `bear_delta += 0.5` | `0.5` |
+| Funding z-score (crowded shorts) | `funding_z < -1.5` | `bull_delta += 0.5` | `0.5` |
+| Funding z-score (noise band) | `|funding_z| <= 1.5` | (none) | — |
+| OI 24h change (amplifies bear) | `oi_change_pct > +5.0` AND bear context dominates | `bear_delta += 0.5` | `0.5` |
+| OI 24h change (amplifies bull) | `oi_change_pct > +5.0` AND bull context dominates | `bull_delta += 0.5` | `0.5` |
+| OI 24h change (no lean) | bull and bear deltas equal (incl. both zero) | (none) | — |
+
+OI is amplification-only, by design: a 5% OI expansion only matters in the
+context of an existing funding lean, mirroring the §4.1 sketch.
+
+### Data file the adapter reads
+
+`data/intelligence/latest/chain.json` — the chain refresh artifact. Schema
+is intentionally tolerant; the adapter probes (in order):
+
+1. `funding.perps[]` — list of `{coin, funding_z, oi_change_pct, ...}`
+   (the shape `services.pipeline.chain_refresh.run` is most likely to emit;
+   `coin` matched case-insensitively).
+2. `perps[]` — same shape, top-level.
+3. `per_symbol[<SYM>]` — `{funding_z, oi_change_pct}` keyed dict (forward-
+   compat shape if a future refresh writes per-symbol entries directly).
+
+If a candidate uses `funding_zscore` instead of `funding_z`, or
+`open_interest_change_pct` instead of `oi_change_pct`, both are accepted.
+
+### Production default unchanged
+
+With `SAPPHIRE_PREDICT_USE_CHAIN_FACTORS` unset or set to `0`, `predict.py`
+produces the same record (modulo the call timestamp) as the legacy six-factor
+code path. The unit test suite at
+`plugins/claw-sapphire/tests/test_chain_factors.py` includes an end-to-end
+equivalence check (`test_action_predict_baseline_record_matches_with_and_without_flag`)
+that runs `action_predict` twice — once with the flag unset, once with the
+flag set but the adapter patched to return `(None, None)` — and asserts the
+two records are identical. The §4.5 backtest harness gate still applies
+before any operator-side rollout.
+
+### Layer A test coverage
+
+24 tests in `plugins/claw-sapphire/tests/test_chain_factors.py`:
+
+- `chain_factor_deltas` — directional symmetry, threshold boundaries, OI
+  amplification rules, hard caps, both-`None` short-circuit (10 tests).
+- `_read_chain_features` — missing file, malformed JSON, symbol absent,
+  primary schema, future schema, empty file, non-JSON-shape, non-numeric
+  values (8 tests).
+- `action_predict` env-flag wiring — flag unset (adapter must not be
+  called), flag on with patched features (deltas applied), flag on with
+  empty adapter (legacy record), flag on with one-sided adapter return
+  (no deltas), flag explicitly `0`, end-to-end baseline equivalence
+  (6 tests).

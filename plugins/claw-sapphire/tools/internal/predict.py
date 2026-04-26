@@ -29,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
 
 SAPPHIRE_DIR = Path.home() / "Code" / "Sapphire"
 PREDICTIONS_FILE = SAPPHIRE_DIR / "data" / "trading_predictions.jsonl"
+CHAIN_LATEST_FILE = SAPPHIRE_DIR / "data" / "intelligence" / "latest" / "chain.json"
 
 # Direction classification thresholds. Defaults preserve the legacy symmetric
 # behavior (`net > 1.5` -> bullish, `net < -1.5` -> bearish). Operators can
@@ -37,6 +38,13 @@ PREDICTIONS_FILE = SAPPHIRE_DIR / "data" / "trading_predictions.jsonl"
 # docs/research/bearish-direction-asymmetry-2026-04-26.md (Layer C).
 DEFAULT_BULL_THRESHOLD = 1.5
 DEFAULT_BEAR_THRESHOLD = 1.5
+
+# Layer A — chain-factor delta caps. Each factor can contribute at most this
+# much to either side, so funding/OI cannot single-handedly flip a direction.
+# See docs/research/bearish-direction-asymmetry-2026-04-26.md §9.
+_CHAIN_FACTOR_DELTA_CAP = 0.5
+_FUNDING_Z_THRESHOLD = 1.5
+_OI_CHANGE_PCT_THRESHOLD = 5.0
 
 
 def _resolve_threshold(env_var: str, default: float) -> float:
@@ -61,6 +69,153 @@ def classify_direction(
     if net < -bear_threshold:
         return "bearish"
     return "neutral"
+
+
+def chain_factor_deltas(
+    symbol: str,
+    *,
+    funding_z: float | None,
+    oi_change_pct: float | None,
+) -> tuple[float, float, list[str]]:
+    """Compute additive bull/bear deltas from on-chain leverage signals.
+
+    Pure function: no IO, no network — every input is passed in by the caller.
+
+    Rationale (Layer A of bearish-direction-asymmetry-2026-04-26 §4.1):
+
+    The base 6-factor scorer in :func:`action_predict` is blind to leverage
+    crowding. When perpetual funding is extremely positive (longs paying shorts),
+    the marginal long is paying carry and is unstable to a downside move; the
+    setup is bear-confirming. The mirror holds for very negative funding.
+    Open-interest changes are direction-agnostic on their own — a 5% OI
+    expansion only matters in the context of an existing lean. We therefore
+    add a small additive delta to whichever side already dominates so OI
+    amplifies rather than dictates.
+
+    Conservative deltas (capped at 0.5 per factor) are deliberate: a single
+    chain factor must never single-handedly flip a direction. Two factors at
+    cap together still only contribute 1.0, well under the legacy ±1.5
+    threshold.
+
+    Args:
+        symbol: Asset symbol (BTC/ETH/SOL/...). Used only to label factors —
+            no per-symbol logic, on purpose.
+        funding_z: Standardized funding rate (z-score against rolling history).
+            Pass ``None`` if unavailable. ``z > +1.5`` -> bear delta;
+            ``z < -1.5`` -> bull delta.
+        oi_change_pct: 24h open-interest change in percent. Pass ``None`` if
+            unavailable. ``> +5%`` adds to whichever side already leads.
+
+    Returns:
+        ``(bull_delta, bear_delta, factors)``. Both deltas are non-negative.
+        ``factors`` is a short list of human-readable labels for the per-call
+        reasoning string.
+    """
+    bull_delta = 0.0
+    bear_delta = 0.0
+    factors: list[str] = []
+
+    # Funding rate z-score. Crowded longs (high positive z) is bear-confirming;
+    # crowded shorts (very negative z) is bull-confirming. Below |z| < 1.5 the
+    # signal is noise and contributes nothing — same threshold the chain refresh
+    # uses to flag "extreme" perps.
+    if funding_z is not None:
+        if funding_z > _FUNDING_Z_THRESHOLD:
+            bear_delta += _CHAIN_FACTOR_DELTA_CAP
+            factors.append(f"FundZ{funding_z:+.1f}↓")
+        elif funding_z < -_FUNDING_Z_THRESHOLD:
+            bull_delta += _CHAIN_FACTOR_DELTA_CAP
+            factors.append(f"FundZ{funding_z:+.1f}↑")
+
+    # OI change amplifies — never originates — direction. We only add weight to
+    # the side that funding already pushed; if funding was neutral or absent
+    # there is no "dominant context" for OI to amplify and we stay silent.
+    if oi_change_pct is not None and oi_change_pct > _OI_CHANGE_PCT_THRESHOLD:
+        if bear_delta > bull_delta:
+            bear_delta += _CHAIN_FACTOR_DELTA_CAP
+            factors.append(f"OI{oi_change_pct:+.1f}%↓")
+        elif bull_delta > bear_delta:
+            bull_delta += _CHAIN_FACTOR_DELTA_CAP
+            factors.append(f"OI{oi_change_pct:+.1f}%↑")
+
+    return bull_delta, bear_delta, factors
+
+
+def _read_chain_features(symbol: str) -> tuple[float | None, float | None]:
+    """Best-effort read of (funding_z, oi_change_pct) for ``symbol``.
+
+    Reads from ``data/intelligence/latest/chain.json``, the artifact written
+    by ``services.pipeline.chain_refresh``. Returns ``(None, None)`` on every
+    error path — file missing, JSON malformed, schema mismatch, symbol absent,
+    values non-numeric. Never raises.
+
+    Schema is intentionally tolerant. The refresh emits perps under
+    ``funding.perps`` (list of ``{"coin", "funding_rate_8h", ...}``); a future
+    revision may emit per-symbol entries directly under ``perps`` or a
+    ``per_symbol`` key. This adapter probes a few common shapes and returns
+    whatever it finds. Stdlib only — no pandas/numpy/etc.
+
+    Tests patch this via ``monkeypatch.setattr(predict, "_read_chain_features",
+    lambda sym: (z, oi))`` rather than touching the filesystem.
+    """
+    try:
+        if not CHAIN_LATEST_FILE.exists():
+            return (None, None)
+        raw = CHAIN_LATEST_FILE.read_text()
+        data = json.loads(raw)
+    except (OSError, json.JSONDecodeError, ValueError):
+        return (None, None)
+    except Exception:  # noqa: BLE001 — adapter must never raise
+        return (None, None)
+
+    sym = symbol.upper()
+
+    # Probe order:
+    #   1. ``funding.perps`` list (chain_refresh.py shape).
+    #   2. ``perps`` list (alternate refresh shape).
+    #   3. ``per_symbol[sym]`` dict (future shape).
+    candidates: list[dict] = []
+    funding_section = data.get("funding") if isinstance(data, dict) else None
+    if isinstance(funding_section, dict):
+        perps = funding_section.get("perps")
+        if isinstance(perps, list):
+            candidates.extend(p for p in perps if isinstance(p, dict))
+    top_perps = data.get("perps") if isinstance(data, dict) else None
+    if isinstance(top_perps, list):
+        candidates.extend(p for p in top_perps if isinstance(p, dict))
+    per_symbol = data.get("per_symbol") if isinstance(data, dict) else None
+    if isinstance(per_symbol, dict):
+        entry = per_symbol.get(sym) or per_symbol.get(symbol)
+        if isinstance(entry, dict):
+            candidates.append(entry)
+
+    funding_z: float | None = None
+    oi_change_pct: float | None = None
+
+    for entry in candidates:
+        coin = entry.get("coin") or entry.get("symbol") or entry.get("ticker")
+        if isinstance(coin, str) and coin.upper() != sym:
+            continue
+        fz = entry.get("funding_z")
+        if fz is None:
+            fz = entry.get("funding_zscore")
+        oi = entry.get("oi_change_pct")
+        if oi is None:
+            oi = entry.get("open_interest_change_pct")
+        if fz is not None and funding_z is None:
+            try:
+                funding_z = float(fz)
+            except (TypeError, ValueError):
+                pass
+        if oi is not None and oi_change_pct is None:
+            try:
+                oi_change_pct = float(oi)
+            except (TypeError, ValueError):
+                pass
+        if funding_z is not None and oi_change_pct is not None:
+            break
+
+    return (funding_z, oi_change_pct)
 
 
 def _get_coingecko_prices() -> dict:
@@ -91,6 +246,12 @@ def action_predict() -> dict:
     bear_threshold = _resolve_threshold(
         "SAPPHIRE_PREDICT_BEAR_THRESHOLD", DEFAULT_BEAR_THRESHOLD
     )
+    # Layer A — opt-in chain factors. Default OFF: production behavior is
+    # unchanged unless the operator explicitly sets the flag in the LaunchAgent
+    # env. See docs/research/bearish-direction-asymmetry-2026-04-26.md §9.
+    use_chain_factors = os.environ.get(
+        "SAPPHIRE_PREDICT_USE_CHAIN_FACTORS", "0"
+    ).strip().lower() in {"1", "true", "yes", "on"}
 
     for sym, profile in profiles.items():
         if profile is None:
@@ -160,6 +321,23 @@ def action_predict() -> dict:
             bull_score += 0.5
         elif profile.change_7d_pct < -5:
             bear_score += 0.5
+
+        # 7. Chain factors (Layer A) — opt-in, default off. Read funding-rate
+        # z-score and 24h OI change from the chain refresh artifact and apply
+        # capped additive deltas. Adapter is best-effort and never raises;
+        # missing values short-circuit the call so the legacy six-factor result
+        # is preserved bit-for-bit.
+        if use_chain_factors:
+            funding_z, oi_change_pct = _read_chain_features(sym)
+            if funding_z is not None and oi_change_pct is not None:
+                bull_delta, bear_delta, chain_factors = chain_factor_deltas(
+                    sym,
+                    funding_z=funding_z,
+                    oi_change_pct=oi_change_pct,
+                )
+                bull_score += bull_delta
+                bear_score += bear_delta
+                factors.extend(chain_factors)
 
         # ─── Direction decision ───
         net = bull_score - bear_score
