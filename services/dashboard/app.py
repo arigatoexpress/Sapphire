@@ -27,8 +27,9 @@ _DASHBOARD_ROOTS = (
 # main repo and misses modules only present in the worktree.
 for _r in reversed(_DASHBOARD_ROOTS):
     _rs = str(_r)
-    if _rs not in sys.path:
-        sys.path.insert(0, _rs)
+    while _rs in sys.path:
+        sys.path.remove(_rs)
+    sys.path.insert(0, _rs)
 
 log = logging.getLogger("dashboard")
 
@@ -63,7 +64,7 @@ if not AUTH_PASSWORD:
 # x402 payment gate — optional, disabled unless X402_ENABLED=1
 import sys as _sys  # noqa: E402
 
-_LIB_PAYMENTS = Path.home() / "Code" / "Sapphire"
+_LIB_PAYMENTS = _DASHBOARD_REPO_ROOT
 if str(_LIB_PAYMENTS) not in sys.path:
     sys.path.insert(0, str(_LIB_PAYMENTS))
 try:
