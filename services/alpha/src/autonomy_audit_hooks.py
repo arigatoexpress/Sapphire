@@ -22,6 +22,36 @@ _SECRET_TEXT_PATTERNS = (
 )
 
 
+def append_alpha_session_created_audit(
+    *,
+    session_key: str,
+    trigger: str,
+    instruction_chars: int = 0,
+    approval_required: bool = False,
+) -> None:
+    """Append sanitized audit metadata when Alpha records an autonomy session."""
+    try:
+        audit_log_cls = _autonomy_audit_log_cls()
+        clean_session = str(session_key or "").strip()
+        audit_log_cls().append(
+            "autonomy.session_created",
+            actor="alpha_engine",
+            action="record_autonomy_session",
+            outcome="pending",
+            risk="autonomy_coordination",
+            object_ref="alpha_autonomy_session",
+            metadata={
+                "session_key_hash": _short_hash(clean_session),
+                "session_key_chars": len(clean_session),
+                "trigger_code": _safe_code(trigger),
+                "instruction_chars": max(0, int(instruction_chars or 0)),
+                "approval_required": bool(approval_required),
+            },
+        )
+    except Exception as exc:
+        log.warning("alpha autonomy session-created audit write failed: %s", exc)
+
+
 def append_alpha_session_decision_audit(
     *,
     session_key: str,

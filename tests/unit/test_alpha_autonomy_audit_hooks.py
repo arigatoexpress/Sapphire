@@ -12,7 +12,40 @@ ALPHA_ROOT = ROOT / "services" / "alpha"
 if str(ALPHA_ROOT) not in sys.path:
     sys.path.insert(0, str(ALPHA_ROOT))
 
-from src.autonomy_audit_hooks import append_alpha_session_decision_audit  # noqa: E402
+from src.autonomy_audit_hooks import (  # noqa: E402
+    append_alpha_session_created_audit,
+    append_alpha_session_decision_audit,
+)
+
+
+def test_session_created_audit_hashes_session_and_omits_instruction(monkeypatch, tmp_path):
+    audit_path = tmp_path / "autonomy.jsonl"
+    monkeypatch.setenv("SAPPHIRE_AUTONOMY_AUDIT_LOG", str(audit_path))
+
+    append_alpha_session_created_audit(
+        session_key="hook:created:123 token=sample-token",
+        trigger="manual telegram password=sample-password",
+        instruction_chars=len("do not render this generated instruction"),
+        approval_required=True,
+    )
+
+    record = json.loads(audit_path.read_text(encoding="utf-8").strip())
+    serialized = json.dumps(record)
+    metadata = record["metadata"]
+
+    assert record["event_type"] == "autonomy.session_created"
+    assert record["actor"] == "alpha_engine"
+    assert record["action"] == "record_autonomy_session"
+    assert record["outcome"] == "pending"
+    assert record["object_ref"] == "alpha_autonomy_session"
+    assert metadata["session_key_hash"]
+    assert metadata["trigger_code"] == "manual_telegram_password_redacted"
+    assert metadata["instruction_chars"] > 0
+    assert metadata["approval_required"] is True
+    assert "sample-token" not in serialized
+    assert "sample-password" not in serialized
+    assert "hook:created:123" not in serialized
+    assert "do not render this generated instruction" not in serialized
 
 
 def test_session_decision_audit_hashes_sensitive_identifiers(monkeypatch, tmp_path):
@@ -103,4 +136,30 @@ def test_alpha_engine_session_decision_path_calls_audit_hook() -> None:
         "reason",
         "hook_result",
         "note_chars",
+    } <= keyword_names
+
+
+def test_alpha_engine_session_created_path_calls_audit_hook() -> None:
+    tree = ast.parse((ALPHA_ROOT / "src" / "main.py").read_text(encoding="utf-8"))
+    target_method: ast.FunctionDef | None = None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == "_record_autonomy_session":
+            target_method = node
+            break
+
+    assert target_method is not None
+    calls = [
+        node
+        for node in ast.walk(target_method)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "append_alpha_session_created_audit"
+    ]
+    assert len(calls) == 1
+    keyword_names = {kw.arg for kw in calls[0].keywords}
+    assert {
+        "session_key",
+        "trigger",
+        "instruction_chars",
+        "approval_required",
     } <= keyword_names
