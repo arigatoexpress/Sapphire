@@ -37,7 +37,7 @@ jobs:
           mkdir -p data/backtests/strategies
           python -m lib.analytics.run_strategies --days 90 --bankroll 10000 | tee backtest-weekly.log
       - name: Upload backtest artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: weekly-backtest-${{ github.run_id }}
