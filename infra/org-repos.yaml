@@ -281,6 +281,10 @@ waves:
   - id: wave-3-agent-consolidation
     status: in_progress
     objective: Consolidate Hermes, claw-code, Sapphire plugins, Claude tasks, and OpenClaw remnants
+    tracking:
+      - docs/org/hermes-agent-consolidation-map.md
+      - docs/org/kimi-tools-absorb-map.md
+      - docs/org/hermes-sapphire-skill-surface.md
   - id: wave-4-data-intelligence-platform
     status: queued
     objective: Schema and audit-log alignment for intel, Foundry, GCS, and BigQuery

@@ -1,0 +1,230 @@
+schema_version: 1
+generated_for: sapphire-autonomous-org
+updated_at: "2026-04-26"
+source_root: /Users/aribs/.hermes/skills/sapphire
+scope: Hermes Sapphire skills only; this inventory is read-only and does not change live Hermes behavior.
+
+classification_policy:
+  read_only: Reads local files, local HTTP status, or public APIs without intended state changes.
+  local_mutating: Changes local process, local files, local UI, or local-only paper state.
+  external_mutating: Sends messages, writes external services, or changes remote application state.
+  production_adjacent: Touches trading, customer/admin data, Telegram, service restarts, or operational controls.
+
+skills:
+  - id: cyber-intel
+    path: /Users/aribs/.hermes/skills/sapphire/cyber-intel/SKILL.md
+    line_count: 120
+    classification: read_only
+    production_adjacent: false
+    surfaces:
+      - lumo research
+      - cyber-threat-bot
+      - Sapphire threat_intel tool
+    side_effects:
+      - external web/API reads
+    next_action: Keep as separate security-intel capability; no absorb pressure.
+
+  - id: inference-tier
+    path: /Users/aribs/.hermes/skills/sapphire/inference-tier/SKILL.md
+    line_count: 123
+    classification: local_mutating
+    production_adjacent: true
+    surfaces:
+      - inference proxy health
+      - Ollama tier status
+      - LaunchAgent kickstart commands
+    side_effects:
+      - can restart inference-proxy
+      - can restart Hermes gateway
+    next_action: Split status and restart commands; keep restart path confirmation-gated.
+
+  - id: kimi-delegate
+    path: /Users/aribs/.hermes/skills/sapphire/kimi-delegate/SKILL.md
+    line_count: 77
+    classification: external_mutating
+    production_adjacent: true
+    surfaces:
+      - Moonshot/Kimi cloud delegation
+      - Telegram relay design
+      - Hermes relay hook
+    side_effects:
+      - may send relay messages when automation is enabled
+    next_action: Keep disabled/manual until relay credentials and dry-run tests are explicit.
+
+  - id: macro-data
+    path: /Users/aribs/.hermes/skills/sapphire/macro-data/SKILL.md
+    line_count: 37
+    classification: read_only
+    production_adjacent: false
+    surfaces:
+      - Sapphire macro_data tool
+      - public macroeconomic data providers
+    side_effects:
+      - external API reads
+    next_action: Keep; low-risk read path.
+
+  - id: paper-trading
+    path: /Users/aribs/.hermes/skills/sapphire/paper-trading/SKILL.md
+    line_count: 59
+    classification: local_mutating
+    production_adjacent: true
+    surfaces:
+      - Sapphire paper_trader tool
+      - Sapphire crypto_portfolio tool
+    side_effects:
+      - can execute paper-only trades
+      - can close paper-only positions
+    guardrails:
+      - paper-only
+    next_action: Keep paper-only and route any execution through confirmation firewall before expanding autonomy.
+
+  - id: regional-intel
+    path: /Users/aribs/.hermes/skills/sapphire/regional-intel/SKILL.md
+    line_count: 258
+    classification: read_only
+    production_adjacent: false
+    surfaces:
+      - regional-intel local service
+      - local briefing/artifact reads
+      - public regional news feeds
+    side_effects:
+      - local HTTP reads
+      - external API reads
+    next_action: Candidate for schema/audit alignment in Wave 4.
+
+  - id: repo-discovery
+    path: /Users/aribs/.hermes/skills/sapphire/repo-discovery/SKILL.md
+    line_count: 43
+    classification: read_only
+    production_adjacent: false
+    surfaces:
+      - Sapphire starred_repos tool
+      - local starred repo reports
+    side_effects:
+      - local report reads
+      - possible GitHub public reads
+    next_action: Keep as read-only discovery surface.
+
+  - id: system-health
+    path: /Users/aribs/.hermes/skills/sapphire/system-health/SKILL.md
+    line_count: 38
+    classification: read_only
+    production_adjacent: true
+    surfaces:
+      - Sapphire health_check tool
+      - inference proxy health endpoint
+    side_effects:
+      - local HTTP reads
+    next_action: Keep as safe default status path.
+
+  - id: system-ops
+    path: /Users/aribs/.hermes/skills/sapphire/system-ops/SKILL.md
+    line_count: 287
+    classification: local_mutating
+    production_adjacent: true
+    surfaces:
+      - Sapphire status/models/logs/metrics
+      - service restart map
+      - LaunchAgent kickstart commands
+    side_effects:
+      - can restart allowlisted local services
+      - can read operational logs
+    next_action: Split read-only status commands from restart commands and require confirmation for restart.
+
+  - id: tho-operations
+    path: /Users/aribs/.hermes/skills/sapphire/tho-operations/SKILL.md
+    line_count: 47
+    classification: production_adjacent
+    production_adjacent: true
+    surfaces:
+      - THO Cloud Run admin verification endpoint
+      - customer search/count endpoints
+    side_effects:
+      - reads customer/admin data
+      - obtains short-lived admin token
+    secret_posture:
+      credential_literal_present: true
+      remediation: replace hard-coded verification payload with Secret Manager or local secret-file indirection before further automation
+    next_action: Highest-priority skill cleanup; do not quote, copy, or expand the embedded credential-like literal.
+
+  - id: threat-intel
+    path: /Users/aribs/.hermes/skills/sapphire/threat-intel/SKILL.md
+    line_count: 46
+    classification: read_only
+    production_adjacent: false
+    surfaces:
+      - cyber-threat-bot CLI
+      - Sapphire threat_intel tool
+    side_effects:
+      - public threat feed reads
+    next_action: Keep; aligns with threat-refresh remote shadow.
+
+  - id: trading-analysis
+    path: /Users/aribs/.hermes/skills/sapphire/trading-analysis/SKILL.md
+    line_count: 55
+    classification: read_only
+    production_adjacent: true
+    surfaces:
+      - public market data
+      - local trading prediction and signal files
+    side_effects:
+      - public API reads
+      - local operational data reads
+    guardrails:
+      - read-only
+      - paper-trading context only
+    next_action: Keep read-only; avoid adding execution commands.
+
+  - id: trading-brain
+    path: /Users/aribs/.hermes/skills/sapphire/trading-brain/SKILL.md
+    line_count: 99
+    classification: read_only
+    production_adjacent: true
+    surfaces:
+      - Sapphire trading_brain tool
+      - local intelligence snapshots
+    side_effects:
+      - computes trading decisions
+      - reads local intelligence artifacts
+    guardrails:
+      - paper-trading context only
+    next_action: Add audit-log hook before any decision becomes action-triggering.
+
+  - id: trading-signals
+    path: /Users/aribs/.hermes/skills/sapphire/trading-signals/SKILL.md
+    line_count: 402
+    classification: read_only
+    production_adjacent: true
+    surfaces:
+      - signal logger local API reads
+      - OpenBB local API reads
+      - Pine/trading signal summaries
+    side_effects:
+      - local HTTP reads
+      - local operational data reads
+    guardrails:
+      - read-only
+      - paper-trading context only
+    next_action: Keep read-only; any signal write/post path belongs in TradingView or alpha service with confirmation.
+
+  - id: tradingview
+    path: /Users/aribs/.hermes/skills/sapphire/tradingview/SKILL.md
+    line_count: 479
+    classification: external_mutating
+    production_adjacent: true
+    surfaces:
+      - TradingView MCP CLI
+      - local TradingView CDP LaunchAgent
+      - signal logger write endpoint
+      - Telegram notify tool
+      - TradingView alert mutation commands
+    side_effects:
+      - can restart TradingView CDP bridge
+      - can mutate TradingView alerts
+      - can post dry-run/research signals locally
+      - can send Telegram notifications through notify tool
+    guardrails:
+      - dry-run signal mode required
+      - no real trading execution
+      - no real Telegram test messages
+    next_action: Highest-priority skill split; separate read-only chart/query commands from alert/signal/notify mutations.

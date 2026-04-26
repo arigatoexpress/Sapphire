@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "ops" / "org_status.py"
 MANIFEST = ROOT / "infra" / "org-repos.yaml"
 CLASSIFICATION_REPORT = ROOT / "infra" / "org-classification-report.yaml"
+HERMES_SKILLS = ROOT / "infra" / "hermes-sapphire-skills.yaml"
 
 SPEC = importlib.util.spec_from_file_location("org_status", SCRIPT)
 assert SPEC and SPEC.loader
@@ -26,6 +27,10 @@ def _manifest() -> dict:
 
 def _classification_report() -> dict:
     return yaml.safe_load(CLASSIFICATION_REPORT.read_text(encoding="utf-8"))
+
+
+def _hermes_skills() -> dict:
+    return yaml.safe_load(HERMES_SKILLS.read_text(encoding="utf-8"))
 
 
 def test_manifest_tracks_required_core_and_satellite_fields() -> None:
@@ -138,6 +143,39 @@ def test_kimi_tools_tracks_absorb_guardrails() -> None:
     assert tracking["live_callers_found"] is False
     assert tracking["target_repo"] == "sapphire"
     assert tracking["guardrail_tests"] == ["tests/unit/test_kimi_cloud_fallback.py"]
+
+
+def test_hermes_sapphire_skill_surface_inventory_is_complete_and_sanitized() -> None:
+    inventory = _hermes_skills()
+    allowed_classes = {
+        "read_only",
+        "local_mutating",
+        "external_mutating",
+        "production_adjacent",
+    }
+    skills = inventory["skills"]
+
+    assert inventory["schema_version"] == 1
+    assert len(skills) == 15
+    assert {skill["classification"] for skill in skills} <= allowed_classes
+    assert {skill["id"] for skill in skills} >= {
+        "tradingview",
+        "system-ops",
+        "tho-operations",
+        "paper-trading",
+        "trading-brain",
+    }
+    assert all(skill["path"].startswith("/Users/aribs/.hermes/skills/sapphire/") for skill in skills)
+    assert all(skill["next_action"] for skill in skills)
+
+    by_id = {skill["id"]: skill for skill in skills}
+    assert by_id["tho-operations"]["secret_posture"]["credential_literal_present"] is True
+    assert by_id["tradingview"]["classification"] == "external_mutating"
+    assert by_id["system-ops"]["classification"] == "local_mutating"
+
+    serialized = json.dumps(inventory)
+    assert "4832" not in serialized
+    assert "X-Admin-Token" not in serialized
 
 
 def test_classification_report_tracks_absorb_and_archive_candidates() -> None:
