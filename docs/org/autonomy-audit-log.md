@@ -18,6 +18,16 @@ The autonomy audit log is append-only JSONL. By default it writes to
 - `autonomy.session_created`
 - `autonomy.session_decision_applied`
 
+Kill-switch audit events are separate from autonomy decision events:
+
+- `kill_switch.activated`
+- `kill_switch.deactivated`
+- `kill_switch.operator_baseline`
+
+`kill_switch.operator_baseline` is an operator-observed state marker. It does
+not toggle the kill switch, publish to the event bus, send Telegram, or pretend
+to be a historical activation/deactivation transition.
+
 ## Schema
 
 Every record includes:
@@ -72,6 +82,11 @@ Use `scripts/ops/safety_status_report.py` for paste-safe status. The report
 summarizes autonomy event, actor, outcome, and risk counts, and hashes action
 and object references for recent events. It intentionally omits raw metadata
 values, prompts, request bodies, order payloads, and secret-like text.
+
+Use `scripts/ops/record_kill_switch_baseline.py --observed-active false` to
+dry-run a baseline event, then add `--apply` only after verifying the operator
+state. The safety report treats a baseline as `operator_observed` confidence
+when there are no later activation/deactivation transition events.
 
 The same report also performs a lightweight schema read-back check:
 

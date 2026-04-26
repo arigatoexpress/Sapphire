@@ -171,6 +171,7 @@ def test_missing_kill_switch_audit_reports_unknown(tmp_path):
         "state_source": "audit_missing",
         "state_confidence": "unknown",
         "last_transition": None,
+        "last_baseline": None,
         "event_counts": {},
         "recent_events": [],
     }
@@ -246,6 +247,7 @@ def test_autonomy_audit_summary_counts_and_hashes_sensitive_fields(tmp_path):
                 "state_source": "audit_missing",
                 "state_confidence": "unknown",
                 "last_transition": None,
+                "last_baseline": None,
                 "recent_events": [],
             },
             "autonomy_audit": summary,
@@ -336,3 +338,57 @@ def test_existing_kill_switch_audit_without_transitions_stays_unknown(tmp_path):
     assert summary["state_source"] == "no_transition_events"
     assert summary["state_confidence"] == "unknown"
     assert summary["last_transition"] is None
+
+
+def test_operator_baseline_infers_state_without_transition(tmp_path):
+    audit_path = tmp_path / "kill_switch.jsonl"
+    audit_path.write_text(
+        json.dumps(
+            {
+                "event_type": "kill_switch.operator_baseline",
+                "kind": "operator_baseline",
+                "timestamp": "2026-04-26T12:00:00+00:00",
+                "observed_active": False,
+                "reason": "operator baseline token=redacted-test-token",
+            }
+        )
+        + "\n"
+    )
+
+    summary = safety_status.summarize_kill_switch(audit_path)
+    rendered = safety_status.render_markdown(
+        {
+            "generated_at": "2026-04-26T00:00:00+00:00",
+            "state_dir": str(tmp_path),
+            "confirmation_firewall": {
+                "pending_count": 0,
+                "expired_pending_count": 0,
+                "pending": [],
+            },
+            "kill_switch": summary,
+            "autonomy_audit": {
+                "audit_exists": False,
+                "schema": {
+                    "total_lines": 0,
+                    "valid_records": 0,
+                    "malformed_lines": 0,
+                    "missing_required_fields": {},
+                    "unredacted_secret_risk_records": 0,
+                },
+                "event_counts": {},
+                "actor_counts": {},
+                "outcome_counts": {},
+                "risk_counts": {},
+                "recent_events": [],
+            },
+        }
+    )
+    serialized = json.dumps(summary)
+
+    assert summary["inferred_active"] is False
+    assert summary["state_source"] == "operator_baseline"
+    assert summary["state_confidence"] == "operator_observed"
+    assert summary["last_transition"] is None
+    assert summary["last_baseline"]["observed_active"] is False
+    assert "redacted-test-token" not in serialized
+    assert "redacted-test-token" not in rendered

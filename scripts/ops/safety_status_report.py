@@ -71,6 +71,7 @@ def summarize_kill_switch(
             "state_source": "audit_missing",
             "state_confidence": "unknown",
             "last_transition": None,
+            "last_baseline": None,
             "event_counts": {},
             "recent_events": [],
         }
@@ -89,7 +90,11 @@ def summarize_kill_switch(
         for record in records
         if _event_type(record) in {"kill_switch.activated", "kill_switch.deactivated"}
     ]
+    baselines = [
+        record for record in records if _event_type(record) == "kill_switch.operator_baseline"
+    ]
     last_transition = _safe_kill_switch_event(transitions[-1]) if transitions else None
+    last_baseline = _safe_kill_switch_event(baselines[-1]) if baselines else None
     inferred_active = None
     state_source = "no_transition_events"
     state_confidence = "unknown"
@@ -97,6 +102,10 @@ def summarize_kill_switch(
         inferred_active = last_transition["event_type"] == "kill_switch.activated"
         state_source = "last_transition"
         state_confidence = "inferred_from_audit"
+    elif last_baseline and isinstance(last_baseline.get("observed_active"), bool):
+        inferred_active = bool(last_baseline["observed_active"])
+        state_source = "operator_baseline"
+        state_confidence = "operator_observed"
 
     return {
         "audit_exists": True,
@@ -104,6 +113,7 @@ def summarize_kill_switch(
         "state_source": state_source,
         "state_confidence": state_confidence,
         "last_transition": last_transition,
+        "last_baseline": last_baseline,
         "event_counts": dict(Counter(_event_type(record) for record in records)),
         "recent_events": [_safe_kill_switch_event(record) for record in records[-max(0, recent) :]],
     }
@@ -256,12 +266,18 @@ def render_markdown(report: dict[str, Any]) -> str:
         ]
     )
     last = kill_switch.get("last_transition")
+    baseline = kill_switch.get("last_baseline")
     if last:
         lines.append(
             f"- Last transition: `{last['event_type']}` at `{last.get('timestamp') or '-'}`"
         )
     else:
         lines.append("- Last transition: none")
+    if baseline:
+        lines.append(
+            f"- Last baseline: `observed_active={_maybe_yn(baseline.get('observed_active'))}` "
+            f"at `{baseline.get('timestamp') or '-'}`"
+        )
     if kill_switch.get("state_source") == "audit_missing":
         lines.append("- Operator note: missing audit log does not imply inactive; wait for a real transition or explicit operator action.")
 
@@ -329,6 +345,8 @@ def _safe_kill_switch_event(record: dict[str, Any]) -> dict[str, Any]:
         "drawdown_total": _float_or_none(record.get("drawdown_total")),
         "portfolio_value_present": "portfolio_value" in record,
     }
+    if isinstance(record.get("observed_active"), bool):
+        event["observed_active"] = bool(record["observed_active"])
     if reason:
         event["reason_hash"] = hashlib.sha256(reason.encode("utf-8")).hexdigest()[:12]
         event["reason_chars"] = len(reason)
