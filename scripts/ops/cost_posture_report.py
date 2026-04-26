@@ -188,8 +188,16 @@ def _service_cost_risks(*, min_scale: int | None, max_scale: int | None) -> list
     return risks
 
 
-def summarize_logging_warnings(project: str, *, days: int, limit: int) -> dict[str, Any]:
-    since = (datetime.now(UTC) - timedelta(days=days)).isoformat(timespec="seconds")
+def summarize_logging_warnings(
+    project: str,
+    *,
+    days: int,
+    limit: int,
+    hours: int | None = None,
+) -> dict[str, Any]:
+    lookback = timedelta(hours=hours) if hours is not None else timedelta(days=days)
+    lookback_label = f"{hours}h" if hours is not None else f"{days}d"
+    since = (datetime.now(UTC) - lookback).isoformat(timespec="seconds")
     query = (
         'resource.type="cloud_run_revision" '
         f'timestamp>="{since}" '
@@ -209,6 +217,8 @@ def summarize_logging_warnings(project: str, *, days: int, limit: int) -> dict[s
             "project": project,
             "available": False,
             "days": days,
+            "hours": hours,
+            "lookback": lookback_label,
             "sample_limit": limit,
             "sample_at_limit": False,
             "error": result.error,
@@ -234,6 +244,8 @@ def summarize_logging_warnings(project: str, *, days: int, limit: int) -> dict[s
         "project": project,
         "available": True,
         "days": days,
+        "hours": hours,
+        "lookback": lookback_label,
         "sample_limit": limit,
         "entries_sampled": entries_sampled,
         "sample_at_limit": bool(limit > 0 and entries_sampled >= limit),
@@ -289,16 +301,29 @@ def warning_kind(entry: dict[str, Any]) -> str:
     return "other_warning"
 
 
-def build_report(projects: list[str], *, region: str, days: int, log_limit: int) -> dict[str, Any]:
+def build_report(
+    projects: list[str],
+    *,
+    region: str,
+    days: int,
+    log_limit: int,
+    hours: int | None = None,
+) -> dict[str, Any]:
     return {
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "region": region,
+        "warning_lookback": f"{hours}h" if hours is not None else f"{days}d",
         "projects": [
             {
                 "project": project,
                 "billing": summarize_billing(project),
                 "cloud_run": summarize_cloud_run(project, region),
-                "logging_warnings": summarize_logging_warnings(project, days=days, limit=log_limit),
+                "logging_warnings": summarize_logging_warnings(
+                    project,
+                    days=days,
+                    hours=hours,
+                    limit=log_limit,
+                ),
             }
             for project in projects
         ],
@@ -311,6 +336,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
         f"- Generated: `{report['generated_at']}`",
         f"- Region: `{report['region']}`",
+        f"- Warning lookback: `{report.get('warning_lookback', 'unknown')}`",
         "- Scope: read-only gcloud summary; no billing accounts, env vars, or raw logs printed.",
         "",
         "## Billing",
@@ -420,6 +446,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--region", default=DEFAULT_REGION)
     parser.add_argument("--days", type=int, default=7, help="Warning log lookback window.")
+    parser.add_argument(
+        "--hours",
+        type=int,
+        help="Warning log lookback in hours. Overrides --days when provided.",
+    )
     parser.add_argument("--log-limit", type=int, default=1000, help="Max warning log entries to sample.")
     parser.add_argument("--format", choices=("markdown", "json"), default="markdown")
     return parser.parse_args()
@@ -427,8 +458,16 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    if args.hours is not None and args.hours <= 0:
+        raise SystemExit("--hours must be greater than 0")
     projects = args.projects or list(DEFAULT_PROJECTS)
-    report = build_report(projects, region=args.region, days=args.days, log_limit=args.log_limit)
+    report = build_report(
+        projects,
+        region=args.region,
+        days=args.days,
+        hours=args.hours,
+        log_limit=args.log_limit,
+    )
     if args.format == "json":
         print(json.dumps(report, indent=2, sort_keys=True))
     else:
