@@ -217,6 +217,7 @@ def summarize_logging_warnings(project: str, *, days: int, limit: int) -> dict[s
     by_severity: Counter[str] = Counter()
     by_status: Counter[str] = Counter()
     by_route_category: Counter[str] = Counter()
+    by_warning_kind: Counter[str] = Counter()
     for entry in result.data or []:
         labels = ((entry.get("resource") or {}).get("labels") or {})
         http_request = entry.get("httpRequest") or {}
@@ -227,6 +228,7 @@ def summarize_logging_warnings(project: str, *, days: int, limit: int) -> dict[s
         by_severity[severity] += 1
         by_status[status] += 1
         by_route_category[route_category(http_request.get("requestUrl"))] += 1
+        by_warning_kind[warning_kind(entry)] += 1
     entries_sampled = sum(by_service.values())
     return {
         "project": project,
@@ -239,6 +241,7 @@ def summarize_logging_warnings(project: str, *, days: int, limit: int) -> dict[s
         "by_severity": dict(sorted(by_severity.items())),
         "by_status": dict(sorted(by_status.items())),
         "by_route_category": dict(sorted(by_route_category.items())),
+        "by_warning_kind": dict(sorted(by_warning_kind.items())),
     }
 
 
@@ -264,6 +267,26 @@ def route_category(request_url: object) -> str:
         return "static_asset"
     first = path.strip("/").split("/", 1)[0]
     return f"/{first}/*" if first else "other"
+
+
+def warning_kind(entry: dict[str, Any]) -> str:
+    """Classify a warning without returning raw messages, URLs, or payloads."""
+    http_request = entry.get("httpRequest") or {}
+    status = str(http_request.get("status") or "")
+    text = " ".join(
+        str(entry.get(field) or "").lower()
+        for field in ("textPayload", "message")
+    )
+    json_payload = entry.get("jsonPayload")
+    if isinstance(json_payload, dict):
+        text = f"{text} {str(json_payload.get('message') or '').lower()}"
+    if status == "403" and "request was not authenticated" in text:
+        return "cloud_run_auth_required"
+    if status.startswith("4"):
+        return "client_http_error"
+    if status.startswith("5"):
+        return "server_http_error"
+    return "other_warning"
 
 
 def build_report(projects: list[str], *, region: str, days: int, log_limit: int) -> dict[str, Any]:
@@ -341,13 +364,13 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
         "## Warning Logs",
         "",
-        "| Project | Available | Entries Sampled | At Limit | By Service | By Severity | By Status | Route Categories | Notes |",
-        "|---|---:|---:|---:|---|---|---|---|---|",
+        "| Project | Available | Entries Sampled | At Limit | By Service | By Severity | By Status | Route Categories | Warning Kinds | Notes |",
+        "|---|---:|---:|---:|---|---|---|---|---|---|",
     ])
     for project in report["projects"]:
         warnings = project["logging_warnings"]
         lines.append(
-            "| {project} | {available} | {sampled} | {at_limit} | {services} | {severities} | {statuses} | {routes} | {notes} |".format(
+            "| {project} | {available} | {sampled} | {at_limit} | {services} | {severities} | {statuses} | {routes} | {kinds} | {notes} |".format(
                 project=warnings["project"],
                 available=_yn(warnings["available"]),
                 sampled=warnings.get("entries_sampled", "-"),
@@ -356,6 +379,7 @@ def render_markdown(report: dict[str, Any]) -> str:
                 severities=_md_cell(_compact_mapping(warnings.get("by_severity", {}))),
                 statuses=_md_cell(_compact_mapping(warnings.get("by_status", {}))),
                 routes=_md_cell(_compact_mapping(warnings.get("by_route_category", {}))),
+                kinds=_md_cell(_compact_mapping(warnings.get("by_warning_kind", {}))),
                 notes=_md_cell(warnings.get("error", "")),
             )
         )

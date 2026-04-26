@@ -54,7 +54,10 @@ shape.
   dispatch defaults to dry-run, with code/GCP mutations disabled unless
   explicitly overridden. Cost posture reporting is read-only and flags warning
   log samples that hit the requested limit, grouped by service, severity, HTTP
-  status, and sanitized route category.
+  status, sanitized route category, and warning kind. Protected Cloud Run
+  services such as `agentic-pm-hub` should keep unauthenticated public probes at
+  `cloud_run_auth_required`; authenticated health checks remain the correct
+  verification path.
 
 ## Routine Stages
 
