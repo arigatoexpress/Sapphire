@@ -44,20 +44,27 @@ repos:
       - AGENTS.md
       - SECURITY.md
       - CI on PR
+      - pre-commit or equivalent lint/test parity
       - no direct main pushes
-    migration_state: active_protected_cloud_run_mapped
+    migration_state: guardrails_complete_protected_cloud_run
     cloud_run_tracking:
       project_id: tho-ai-agent
       region: us-central1
       service: agentic-pm-hub
       latest_ready_revision: agentic-pm-hub-00006-b57
-      validated_at: "2026-04-26"
+      validated_at: "2026-04-26T16:51:25Z"
       public_invoker: false
       authenticated_health_paths:
         - /health
         - /healthz/
       warning_kind: cloud_run_auth_required
-      next_step: Add CI/pre-commit parity and an authenticated-monitor runbook before any deploy or IAM change.
+      repo_pr: https://github.com/arigatoexpress/AgenticArigato/pull/1
+      validated_commands:
+        - cd bd-analytics-agent && uv run pytest tests/unit -q
+        - cd bd-analytics-agent && uv run ruff check app/server.py app/agent.py app/retrievers.py app/templates.py app/utils tests/unit
+        - cd bd-analytics-agent && uv run ruff format app/server.py app/agent.py app/retrievers.py app/templates.py app/utils tests/unit --check
+        - uvx pre-commit run --all-files
+      next_step: Add an authenticated-monitor runbook before any deploy or IAM change.
 
   - id: claw-code
     name: claw-code

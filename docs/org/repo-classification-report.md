@@ -15,7 +15,8 @@ overlap Sapphire autonomy.
 `agentic-arigato` owns the protected `agentic-pm-hub` Cloud Run service in
 `tho-ai-agent`. The service should remain private; public unauthenticated probes
 are expected to classify as `cloud_run_auth_required`, while health verification
-uses authenticated requests.
+uses authenticated requests. Guardrail parity shipped in
+[arigatoexpress/AgenticArigato#1](https://github.com/arigatoexpress/AgenticArigato/pull/1).
 
 ## Absorb Candidates
 
@@ -34,7 +35,8 @@ archive after an absorb PR, tests, rollback notes, and a soak window.
 
 ## Immediate Follow-Ups
 
-- Add CI/pre-commit parity to `agentic-arigato` before any deploy or IAM change.
+- Add an authenticated-monitor runbook for `agentic-pm-hub` before any deploy or
+  IAM change.
 - Keep watching the TradingView MCP v2 upstream guardrail PR.
 - Audit Hermes Sapphire skill command surfaces before moving or deleting any
   agent-facing skill.
