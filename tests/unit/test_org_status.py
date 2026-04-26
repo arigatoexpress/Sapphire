@@ -96,6 +96,22 @@ def test_crypto_tax_tracker_tracks_completed_guardrail_pr() -> None:
     ]
 
 
+def test_agentic_arigato_tracks_protected_cloud_run_service() -> None:
+    repos = {repo["id"]: repo for repo in _manifest()["repos"]}
+    repo = repos["agentic-arigato"]
+
+    assert repo["classification"] == "integration"
+    assert repo["migration_state"] == "active_protected_cloud_run_mapped"
+    assert repo["github"] == "arigatoexpress/AgenticArigato"
+    assert "CI on PR" in repo["required_guardrails"]
+    tracking = repo["cloud_run_tracking"]
+    assert tracking["project_id"] == "tho-ai-agent"
+    assert tracking["service"] == "agentic-pm-hub"
+    assert tracking["public_invoker"] is False
+    assert tracking["authenticated_health_paths"] == ["/health", "/healthz/"]
+    assert tracking["warning_kind"] == "cloud_run_auth_required"
+
+
 def test_threat_refresh_tracks_soak_evidence() -> None:
     routines = {routine["id"]: routine for routine in _manifest()["routines"]}
     routine = routines["threat-refresh"]
@@ -229,6 +245,8 @@ def test_classification_report_tracks_absorb_and_archive_candidates() -> None:
     assert {item["id"] for item in report["candidate_absorb"]} >= {"kimi-tools", "tradingview-mcp-v2"}
     assert report["candidate_archive"]["approved"] == []
     assert "Do not delete" in " ".join(report["candidate_archive"]["policy"])
+    assert "agentic-arigato" in report["active_repos"]["integration"]
+    assert "agentic-arigato" in {item["id"] for item in report["blocked_or_watch"]}
     assert "crypto-tax-tracker" not in {item["id"] for item in report["blocked_or_watch"]}
     assert "crypto-tax-tracker" not in {item["id"] for item in report["next_reviews"]}
     assert "hermes-agent" not in {item["id"] for item in report["next_reviews"]}
