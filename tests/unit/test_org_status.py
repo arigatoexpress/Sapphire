@@ -12,6 +12,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "ops" / "org_status.py"
 MANIFEST = ROOT / "infra" / "org-repos.yaml"
+CLASSIFICATION_REPORT = ROOT / "infra" / "org-classification-report.yaml"
 
 SPEC = importlib.util.spec_from_file_location("org_status", SCRIPT)
 assert SPEC and SPEC.loader
@@ -21,6 +22,10 @@ SPEC.loader.exec_module(org_status)
 
 def _manifest() -> dict:
     return yaml.safe_load(MANIFEST.read_text(encoding="utf-8"))
+
+
+def _classification_report() -> dict:
+    return yaml.safe_load(CLASSIFICATION_REPORT.read_text(encoding="utf-8"))
 
 
 def test_manifest_tracks_required_core_and_satellite_fields() -> None:
@@ -70,6 +75,18 @@ def test_tradingview_mcp_v2_tracks_upstream_hardening_pr() -> None:
         "npm run check:syntax",
         "npm run test:offline",
     ]
+
+
+def test_classification_report_tracks_absorb_and_archive_candidates() -> None:
+    report = _classification_report()
+    manifest_ids = {repo["id"] for repo in _manifest()["repos"]}
+
+    assert report["schema_version"] == 1
+    assert report["source_manifest"] == "infra/org-repos.yaml"
+    assert {item["id"] for item in report["candidate_absorb"]} <= manifest_ids
+    assert {item["id"] for item in report["candidate_absorb"]} >= {"kimi-tools", "tradingview-mcp-v2"}
+    assert report["candidate_archive"]["approved"] == []
+    assert "Do not delete" in " ".join(report["candidate_archive"]["policy"])
 
 
 def test_collect_status_no_external_handles_local_ci_without_live_tools(tmp_path: Path) -> None:

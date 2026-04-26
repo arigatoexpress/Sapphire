@@ -1,0 +1,80 @@
+schema_version: 1
+generated_for: sapphire-autonomous-org
+updated_at: "2026-04-26"
+source_manifest: infra/org-repos.yaml
+scope: Core+Satellites only; older experiments remain inventory-only unless they overlap Sapphire autonomy.
+
+classification_policy:
+  core: Sapphire OS, THO production, or a command-plane repo.
+  satellite: Ari-owned active capability repo with a live Sapphire/THO use case.
+  integration: upstream fork, local tool, or external repo used by Sapphire.
+  candidate_absorb: overlapping repo/tool proposed for consolidation into a core or satellite repo.
+  candidate_archive: stale or duplicative repo proposed for freeze/archive after inventory and replacement.
+
+active_repos:
+  core:
+    - sapphire
+    - project-go-forward
+  satellite:
+    - claw-code
+    - cyber-threat-bot
+    - regional-intel-workbench
+    - tradingview-mcp
+    - crypto-tax-tracker
+  integration:
+    - tradingview-mcp-v2
+    - hermes-agent
+    - kimi-tools
+
+candidate_absorb:
+  - id: kimi-tools
+    current_classification: integration
+    proposed_target: sapphire
+    stage: proposed
+    rationale: Local-only Kimi Cloud HTTP utilities overlap Sapphire/Hermes agent skill and tool surfaces.
+    prerequisites:
+      - Inventory call sites and launch paths.
+      - Add tests around any client behavior moved into Sapphire.
+      - Keep local utility available until replacement has soaked.
+    rollback: Restore Sapphire callers to the local utility path.
+
+  - id: tradingview-mcp-v2
+    current_classification: integration
+    proposed_target: tradingview-mcp
+    stage: conditional
+    rationale: Upstream CDP bridge overlaps Ari-owned tradingview-mcp; upstream hardening is open but not mergeable by Ari.
+    condition: If upstream PR #102 stalls or the integration becomes production-critical, consolidate required behavior into the Ari-owned bridge or pin the Ari fork.
+    prerequisites:
+      - Keep offline CI and agent guardrails from upstream PR #102.
+      - Preserve CDP safety defaults and manual-only chart mutation behavior.
+      - Confirm Sapphire callers before changing package source.
+    rollback: Repoint callers to the upstream integration clone.
+
+candidate_archive:
+  approved: []
+  review_only:
+    - id: kimi-tools
+      after: kimi-tools absorb completes and replacement soaks.
+      reason: Local-only repo should not remain a separate maintenance surface if its behavior moves into Sapphire.
+
+  policy:
+    - Do not delete or archive any repo from this list without a dedicated PR.
+    - Archive only after inventory, replacement, rollback notes, and a soak window.
+    - Do not delete local clones as part of classification work.
+
+blocked_or_watch:
+  - id: tradingview-mcp-v2
+    blocker: Upstream repository is read-only for Ari.
+    tracking: https://github.com/tradesdontlie/tradingview-mcp/pull/102
+  - id: crypto-tax-tracker
+    blocker: Guardrail parity still needs direct repo audit and PR.
+  - id: hermes-agent
+    blocker: Local override branch and upstream integration policy need an explicit consolidation decision.
+
+next_reviews:
+  - id: crypto-tax-tracker
+    action: Audit AGENTS/CLAUDE, CI, pre-commit parity, and README test commands.
+  - id: hermes-agent
+    action: Map local Sapphire relay/filter commits and decide fork, patch, or absorb strategy.
+  - id: kimi-tools
+    action: Find all callers and decide whether to absorb into Sapphire or Hermes skills.

@@ -72,8 +72,9 @@ shape.
    [tradesdontlie/tradingview-mcp#102](https://github.com/tradesdontlie/tradingview-mcp/pull/102)
    adds AGENTS, CI, pre-commit parity, and offline test scripts; blocked on
    upstream maintainer merge.
-4. `chore/repo-classification-report` - next. Produce a machine-readable
-   absorb/archive candidate list for Core+Satellites.
+4. `chore/repo-classification-report` - tracked in
+   `infra/org-classification-report.yaml` and
+   `docs/org/repo-classification-report.md`.
 5. `feat/autonomy-audit-log` - queued. Add structured audit logging before
    expanding action autonomy.
 
