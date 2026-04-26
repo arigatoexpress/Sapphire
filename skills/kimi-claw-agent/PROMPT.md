@@ -34,12 +34,12 @@ Located at `plugins/claw-sapphire/tools/`:
 ## Inference Architecture
 
 4-tier inference proxy at Mac:11435:
-- **Tier 1**: Windows GPU (hermes3:8b, qwen3.6:27b, deepseek-r1, 28 models)
+- **Tier 1**: Windows GPU (hermes3:8b, qwen3:14b, qwen3.5:9b, deepseek-r1, 28 models)
 - **Tier 2**: Pi rari1 (qwen2.5:0.5b, smollm2:1.7b — edge/lightweight)
 - **Tier 3**: Mac Ollama (hermes3:8b, nemotron-mini — always-on fallback)
 - **Tier 4**: Kimi Cloud (non-sensitive queries only, sensitivity-gated)
 
-Model tier aliases: `fast`→nemotron-mini, `balanced`→hermes3:8b, `deep`→qwen3.6:27b, `code`→gemma4:latest, `reason`→deepseek-r1:14b
+Model tier aliases: `fast`→nemotron-mini, `balanced`→hermes3:8b, `deep`→qwen3:14b, `code`→gemma4:latest, `reason`→deepseek-r1:14b, `qwen-reason`→qwen3.5:9b, `qwen3.6`→qwen3.6:27b (Mac local, Windows install pending)
 
 ## Trading Pipeline
 
