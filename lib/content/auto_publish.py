@@ -13,11 +13,13 @@ Flow
 2. Dispatch via the matching :class:`PublisherClient`.
 3. Emit ``content.published`` to the event bus (success OR failure).
 4. Append the outcome to the ledger.
-5. Telegram-ping Ari with a per-run summary.
+5. Optionally Telegram-ping Ari with a per-run summary.
 
 The orchestrator is dry-run by default. Set ``SAPPHIRE_PUBLISH_LIVE=1``
 in the LaunchAgent env to flip every client into live mode. This lets
 the pipeline run end-to-end in CI without risking a real post.
+Telegram summaries are disabled by default and must be explicitly enabled
+with ``SAPPHIRE_CONTENT_TELEGRAM_SUMMARY=1``.
 """
 
 from __future__ import annotations
@@ -47,6 +49,7 @@ PLATFORM_DIRS: dict[str, str] = {
 
 # How far back to look for un-published renderings.
 DEFAULT_WINDOW = timedelta(hours=48)
+_TRUE_VALUES = {"1", "true", "yes", "on"}
 
 
 @dataclass
@@ -227,12 +230,20 @@ def _telegram_summary(results: list[tuple[DispatchItem, PublishResult]]) -> None
     safe_send.send("\n".join(lines), priority=priority)
 
 
+def _env_flag(name: str, *, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return default
+    return raw.strip().lower() in _TRUE_VALUES
+
+
 # --- entry point ------------------------------------------------------------
 
 
 def run(
     *,
     dry_run: bool | None = None,
+    telegram_summary: bool | None = None,
     window: timedelta = DEFAULT_WINDOW,
     platforms: Iterable[str] = PLATFORM_DIRS.keys(),
 ) -> dict[str, Any]:
@@ -250,10 +261,16 @@ def run(
                 "remote_id": result.remote_id,
             }
     _write_ledger(ledger)
-    _telegram_summary(results)
+    if telegram_summary is None:
+        telegram_summary = _env_flag("SAPPHIRE_CONTENT_TELEGRAM_SUMMARY", default=False)
+    if telegram_summary:
+        _telegram_summary(results)
+    else:
+        logger.info("content publisher Telegram summary disabled")
 
     return {
         "run_at": datetime.now().isoformat(timespec="seconds"),
+        "telegram_summary": bool(telegram_summary),
         "items": [
             {"item": {"platform": i.platform, "kind": i.kind, "path": str(i.path)},
              "result": asdict(r)}

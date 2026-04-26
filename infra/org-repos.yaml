@@ -475,7 +475,7 @@ routines:
   - id: content-engine
     local_label: com.sapphire.content-engine
     stage: blocked
-    blocked_by: external publishing and Telegram approval side effects need dry-run firewall
+    blocked_by: remote shadow workflow and artifact comparator still needed; publisher side effects are dry-run/Telegram-gated
   - id: logrotate
     local_label: com.sapphire.logrotate
     stage: local_only
