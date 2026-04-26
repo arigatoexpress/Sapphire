@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -285,7 +286,61 @@ def test_route_category_collapses_probe_paths_without_query_values():
     assert cost_report.route_category("https://example.invalid/credentials.json") == "public_probe"
     assert cost_report.route_category("https://example.invalid/terraform.tfstate") == "public_probe"
     assert cost_report.route_category("https://example.invalid/weird-backup.zip") == "public_probe"
+    assert cost_report.route_category("https://example.invalid/composer.json") == "public_probe"
+    assert cost_report.route_category("https://example.invalid/docker-compose.yml") == "public_probe"
+    assert cost_report.route_category("https://example.invalid/openapi.json") == "public_probe"
+    assert cost_report.route_category("https://example.invalid/server.js") == "public_probe"
     assert cost_report.route_category("https://example.invalid/docs/page") == "/docs/*"
+
+
+def test_local_retention_summary_counts_without_filenames(tmp_path):
+    audit_dir = tmp_path / "audit"
+    audit_dir.mkdir()
+    old_file = audit_dir / "secret_named_file.jsonl"
+    old_file.write_text("token=do-not-print\n", encoding="utf-8")
+    old_ts = datetime(2026, 1, 1, tzinfo=UTC).timestamp()
+    os.utime(old_file, (old_ts, old_ts))
+    missing_dir = tmp_path / "missing"
+
+    summary = cost_report.summarize_local_retention(
+        (
+            {
+                "id": "audit",
+                "path": str(audit_dir),
+                "retention_days": 1,
+                "max_size_mb": 10,
+                "kind": "audit_jsonl",
+            },
+            {
+                "id": "missing",
+                "path": str(missing_dir),
+                "retention_days": 1,
+                "max_size_mb": 10,
+                "kind": "local_logs",
+            },
+        ),
+        now=datetime(2026, 4, 26, tzinfo=UTC),
+    )
+    rendered = cost_report.render_markdown(
+        {
+            "generated_at": "2026-04-26T00:00:00+00:00",
+            "region": "us-central1",
+            "warning_lookback": "1h",
+            "projects": [],
+            "local_retention": summary,
+        }
+    )
+
+    assert summary["target_count"] == 2
+    assert summary["risk_count"] == 2
+    by_id = {row["id"]: row for row in summary["targets"]}
+    assert by_id["audit"]["file_count"] == 1
+    assert by_id["audit"]["oldest_age_days"] == 115
+    assert by_id["audit"]["risks"] == ["oldest_exceeds_retention"]
+    assert by_id["missing"]["risks"] == ["missing"]
+    assert "secret_named_file" not in str(summary)
+    assert "do-not-print" not in str(summary)
+    assert "## Local Retention" in rendered
 
 
 def test_warning_kind_classifies_expected_cloud_run_auth_rejections():

@@ -11,16 +11,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 from collections import Counter
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
 DEFAULT_PROJECTS = ("tho-ai-agent", "sapphire-479610")
 DEFAULT_REGION = "us-central1"
+ROOT = Path(__file__).resolve().parents[2]
 PUBLIC_PROBE_MARKERS = (
     "/.aws",
     "/.composer",
@@ -39,20 +42,26 @@ PUBLIC_PROBE_MARKERS = (
     "/config/",
     "/config.",
     "/connectionstrings.",
+    "/composer.",
     "/credentials.",
     "/cgi-bin",
     "/definitely-not-a-real-route",
+    "/docker-compose.",
     "/ecosystem.config.",
     "/env.",
     "/error.log",
+    "/openapi.",
+    "/package.",
     "/phpmyadmin",
     "/runtime-",
     "/security.txt",
     "/secrets.",
+    "/server.",
     "/server-status",
     "/serverless.",
     "/settings.",
     "/storage/",
+    "/swagger",
     "/terraform.",
     "/vendor/phpunit",
     "/web.config",
@@ -62,6 +71,57 @@ PUBLIC_PROBE_MARKERS = (
     "xmlrpc.php",
     ".bak",
     ".php",
+)
+LOCAL_RETENTION_TARGETS = (
+    {
+        "id": "sapphire-audit",
+        "path": "~/.sapphire/audit",
+        "retention_days": 365,
+        "max_size_mb": 512,
+        "kind": "audit_jsonl",
+    },
+    {
+        "id": "pending-confirmations",
+        "path": "~/.sapphire/pending_confirmations",
+        "retention_days": 1,
+        "max_size_mb": 16,
+        "kind": "operator_queue",
+    },
+    {
+        "id": "archived-confirmations",
+        "path": "~/.sapphire/archived_pending_confirmations",
+        "retention_days": 45,
+        "max_size_mb": 64,
+        "kind": "operator_archive",
+    },
+    {
+        "id": "autonomy-status-logs",
+        "path": "~/autonomy-status/logs",
+        "retention_days": 30,
+        "max_size_mb": 1024,
+        "kind": "local_logs",
+    },
+    {
+        "id": "strategy-backtests",
+        "path": "data/backtests/strategies",
+        "retention_days": 180,
+        "max_size_mb": 1024,
+        "kind": "routine_artifacts",
+    },
+    {
+        "id": "threat-intelligence",
+        "path": "data/intelligence",
+        "retention_days": 180,
+        "max_size_mb": 1024,
+        "kind": "routine_artifacts",
+    },
+    {
+        "id": "foundry-sync-history",
+        "path": "data/foundry_sync_history.jsonl",
+        "retention_days": 365,
+        "max_size_mb": 256,
+        "kind": "audit_jsonl",
+    },
 )
 
 
@@ -277,6 +337,90 @@ def summarize_logging_warnings(
     }
 
 
+def summarize_local_retention(
+    targets: tuple[dict[str, Any], ...] = LOCAL_RETENTION_TARGETS,
+    *,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Summarize local audit/log/artifact retention without printing filenames."""
+    now = now or datetime.now(UTC)
+    rows = [summarize_retention_target(target, now=now) for target in targets]
+    return {
+        "checked": True,
+        "target_count": len(rows),
+        "risk_count": sum(1 for row in rows if row["risks"]),
+        "targets": rows,
+    }
+
+
+def summarize_retention_target(target: dict[str, Any], *, now: datetime) -> dict[str, Any]:
+    path = _resolve_local_path(str(target["path"]))
+    retention_days = int(target["retention_days"])
+    max_size_mb = float(target["max_size_mb"])
+    files = list(_iter_files(path)) if path.exists() else []
+    size_bytes = sum(_safe_size(file) for file in files)
+    mtimes = [_safe_mtime(file) for file in files]
+    mtimes = [mtime for mtime in mtimes if mtime is not None]
+    oldest_age_days = _age_days(min(mtimes), now) if mtimes else None
+    newest_age_days = _age_days(max(mtimes), now) if mtimes else None
+    size_mb = size_bytes / (1024 * 1024)
+    risks: list[str] = []
+    if not path.exists():
+        risks.append("missing")
+    if oldest_age_days is not None and oldest_age_days > retention_days:
+        risks.append("oldest_exceeds_retention")
+    if size_mb > max_size_mb:
+        risks.append("size_exceeds_budget")
+    return {
+        "id": target["id"],
+        "kind": target["kind"],
+        "exists": path.exists(),
+        "path_kind": "home" if str(target["path"]).startswith("~") else "repo",
+        "file_count": len(files),
+        "size_mb": round(size_mb, 3),
+        "oldest_age_days": oldest_age_days,
+        "newest_age_days": newest_age_days,
+        "retention_days": retention_days,
+        "max_size_mb": max_size_mb,
+        "risks": risks,
+    }
+
+
+def _resolve_local_path(raw_path: str) -> Path:
+    if raw_path.startswith("~"):
+        return Path(raw_path).expanduser()
+    return ROOT / raw_path
+
+
+def _iter_files(path: Path):
+    if path.is_file():
+        yield path
+        return
+    if not path.is_dir():
+        return
+    for root, _dirs, names in os.walk(path):
+        for name in names:
+            yield Path(root) / name
+
+
+def _safe_size(path: Path) -> int:
+    try:
+        return path.stat().st_size
+    except OSError:
+        return 0
+
+
+def _safe_mtime(path: Path) -> datetime | None:
+    try:
+        return datetime.fromtimestamp(path.stat().st_mtime, UTC)
+    except OSError:
+        return None
+
+
+def _age_days(timestamp: datetime, now: datetime) -> int:
+    return max(0, int((now - timestamp).total_seconds() // 86400))
+
+
 def route_category(request_url: object) -> str:
     """Classify a request URL without returning raw paths or query strings."""
     if not request_url:
@@ -336,8 +480,9 @@ def build_report(
     days: int,
     log_limit: int,
     hours: int | None = None,
+    include_local_retention: bool = True,
 ) -> dict[str, Any]:
-    return {
+    report = {
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "region": region,
         "warning_lookback": f"{hours}h" if hours is not None else f"{days}d",
@@ -356,6 +501,9 @@ def build_report(
             for project in projects
         ],
     }
+    if include_local_retention:
+        report["local_retention"] = summarize_local_retention()
+    return report
 
 
 def render_markdown(report: dict[str, Any]) -> str:
@@ -441,6 +589,30 @@ def render_markdown(report: dict[str, Any]) -> str:
                 notes=_md_cell(warnings.get("error", "")),
             )
         )
+    retention = report.get("local_retention")
+    if retention:
+        lines.extend(
+            [
+                "",
+                "## Local Retention",
+                "",
+                "| Target | Kind | Exists | Files | Size MB | Oldest Days | Retention Days | Risks |",
+                "|---|---|---:|---:|---:|---:|---:|---|",
+            ]
+        )
+        for target in retention.get("targets", []):
+            lines.append(
+                "| {target} | {kind} | {exists} | {files} | {size} | {oldest} | {retention_days} | {risks} |".format(
+                    target=target["id"],
+                    kind=target["kind"],
+                    exists=_yn(bool(target["exists"])),
+                    files=target["file_count"],
+                    size=target["size_mb"],
+                    oldest=_none_dash(target["oldest_age_days"]),
+                    retention_days=target["retention_days"],
+                    risks=", ".join(target["risks"]) or "-",
+                )
+            )
     return "\n".join(lines) + "\n"
 
 
@@ -486,6 +658,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--log-limit", type=int, default=1000, help="Max warning log entries to sample."
     )
+    parser.add_argument(
+        "--no-local-retention",
+        action="store_true",
+        help="Skip local audit/log/artifact retention summary.",
+    )
     parser.add_argument("--format", choices=("markdown", "json"), default="markdown")
     return parser.parse_args()
 
@@ -501,6 +678,7 @@ def main() -> int:
         days=args.days,
         hours=args.hours,
         log_limit=args.log_limit,
+        include_local_retention=not args.no_local_retention,
     )
     if args.format == "json":
         print(json.dumps(report, indent=2, sort_keys=True))
