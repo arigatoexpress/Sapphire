@@ -174,6 +174,7 @@ def test_threat_refresh_tracks_soak_evidence() -> None:
         == "docs/org/threat-refresh-shadow-soak-2026-04-26.md"
     )
     assert routine["soak_tracking"]["latest_manual_remote_run_id"] == "24962186595"
+    assert routine["soak_tracking"]["required_scheduled_successes"] == 24
     assert routine["soak_tracking"]["latest_comparison"] == {
         "compared_at": "2026-04-26T17:04:37Z",
         "verdict": "WARN",
@@ -197,6 +198,7 @@ def test_backtest_weekly_tracks_soak_evidence() -> None:
         routine["soak_tracking"]["evidence_doc"]
         == "docs/org/backtest-weekly-shadow-soak-2026-04-26.md"
     )
+    assert routine["soak_tracking"]["required_scheduled_successes"] == 4
     assert routine["soak_tracking"]["latest_comparison"] == {
         "compared_at": "2026-04-26T16:15:51Z",
         "verdict": "PASS",
