@@ -139,11 +139,19 @@ def test_summarize_logging_warnings_counts_without_raw_messages(monkeypatch):
         {
             "severity": "WARNING",
             "textPayload": "raw URL or payload should not render",
+            "httpRequest": {
+                "status": 404,
+                "requestUrl": "https://example.invalid/.env?debug=do-not-print",
+            },
             "resource": {"labels": {"service_name": "sapphire-analytics"}},
         },
         {
             "severity": "ERROR",
             "jsonPayload": {"message": "raw structured message should not render"},
+            "httpRequest": {
+                "status": 500,
+                "requestUrl": "https://example.invalid/api/run?debug=do-not-print",
+            },
             "resource": {"labels": {"service_name": "sapphire-analytics"}},
         },
     ]
@@ -160,7 +168,11 @@ def test_summarize_logging_warnings_counts_without_raw_messages(monkeypatch):
     assert summary["sample_at_limit"] is False
     assert summary["by_service"] == {"sapphire-analytics": 2}
     assert summary["by_severity"] == {"ERROR": 1, "WARNING": 1}
+    assert summary["by_status"] == {"404": 1, "500": 1}
+    assert summary["by_route_category"] == {"/api/*": 1, "public_probe": 1}
     assert "raw URL" not in str(summary)
+    assert "do-not-print" not in str(summary)
+    assert ".env" not in str(summary)
 
     limited = cost_report.summarize_logging_warnings("tho-ai-agent", days=7, limit=2)
     assert limited["sample_at_limit"] is True
@@ -192,6 +204,8 @@ def test_render_markdown_marks_warning_sample_at_limit():
                     "sample_at_limit": True,
                     "by_service": {"sapphire-analytics": 185},
                     "by_severity": {"WARNING": 200},
+                    "by_status": {"404": 185, "500": 15},
+                    "by_route_category": {"public_probe": 185, "/api/*": 15},
                 },
             }
         ],
@@ -199,5 +213,15 @@ def test_render_markdown_marks_warning_sample_at_limit():
 
     output = cost_report.render_markdown(report)
 
-    assert "| Project | Available | Entries Sampled | At Limit |" in output
-    assert "| tho-ai-agent | yes | 200 | yes | sapphire-analytics:185 | WARNING:200 | - |" in output
+    assert "| Project | Available | Entries Sampled | At Limit | By Service | By Severity | By Status |" in output
+    assert (
+        "| tho-ai-agent | yes | 200 | yes | sapphire-analytics:185 | WARNING:200 | 404:185, 500:15 | /api/*:15, public_probe:185 | - |"
+        in output
+    )
+
+
+def test_route_category_collapses_probe_paths_without_query_values():
+    assert cost_report.route_category("https://example.invalid/healthz/") == "health"
+    assert cost_report.route_category("https://example.invalid/__env.js?debug=sample") == "public_probe"
+    assert cost_report.route_category("https://example.invalid/runtime-config.js") == "public_probe"
+    assert cost_report.route_category("https://example.invalid/docs/page") == "/docs/*"

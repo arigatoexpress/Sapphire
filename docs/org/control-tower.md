@@ -53,7 +53,8 @@ shape.
   decision-engine and Kimi bridge autonomy requests; alpha full-autonomy
   dispatch defaults to dry-run, with code/GCP mutations disabled unless
   explicitly overridden. Cost posture reporting is read-only and flags warning
-  log samples that hit the requested limit.
+  log samples that hit the requested limit, grouped by service, severity, HTTP
+  status, and sanitized route category.
 
 ## Routine Stages
 
