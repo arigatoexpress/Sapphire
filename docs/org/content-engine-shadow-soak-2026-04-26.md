@@ -1,0 +1,55 @@
+# Content-Engine Remote Shadow Soak
+
+## Goal
+
+Move `content-engine` from blocked to remote-shadow soak without changing the
+local canonical runtime. The Mac LaunchAgent remains authoritative until the
+documented soak gate passes and a later PR disables it with rollback notes.
+
+## What Changed
+
+- Remote workflow: `.github/workflows/content-engine.yml`
+- Local routine shadowed: `com.sapphire.content-engine`
+- Comparator: `scripts/ops/compare_content_artifacts.py`
+- Uploaded artifact: `content-engine-<run_id>`
+
+## Safety Posture
+
+- The workflow runs `python -m lib.content`, which writes draft and ready files.
+- It does not run `python -m lib.content --publish`.
+- `SAPPHIRE_PUBLISH_LIVE=0` is set in the workflow.
+- `SAPPHIRE_CONTENT_TELEGRAM_SUMMARY=0` is set in the workflow.
+- Local content publishing side effects remain governed by the separate
+  `com.sapphire.content-publisher` LaunchAgent and its explicit opt-ins.
+
+## Comparator
+
+Run after downloading a GitHub Actions artifact:
+
+```bash
+python3 scripts/ops/compare_content_artifacts.py \
+  --local-root /Users/aribs/Code/Sapphire \
+  --remote-root /path/to/downloaded/content-engine-artifact
+```
+
+The comparator checks:
+
+- Matching report kinds.
+- Matching platform coverage per report kind.
+- Remote quality failures when the local rendering passed.
+- Rendered artifact existence and size/hash drift.
+- Source/tag/title drift as WARN unless strict mode is requested.
+
+## Soak Gate
+
+At least 7 scheduled daily cycles with:
+
+- zero FAIL comparisons,
+- no remote-only quality failures,
+- matching report-kind/platform coverage,
+- local LaunchAgent rollback documented before any disablement.
+
+## Rollback
+
+Revert the PR that adds `.github/workflows/content-engine.yml` and the
+manifest stage change. The local LaunchAgent remains untouched.

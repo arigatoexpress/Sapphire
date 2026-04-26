@@ -1,0 +1,52 @@
+name: content-engine
+
+on:
+  schedule:
+    # Shadow the local 06:00 America/Denver content-engine LaunchAgent.
+    # GitHub cron is UTC, so this is exact during MDT and one hour early during MST.
+    # Local remains canonical until shadow artifacts pass soak comparison.
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: content-engine-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    name: generate content artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install optional content dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "yfinance>=0.2,<0.3"
+      - name: Run content engine shadow
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          SAPPHIRE_PUBLISH_LIVE: "0"
+          SAPPHIRE_CONTENT_TELEGRAM_SUMMARY: "0"
+        run: |
+          mkdir -p data/content
+          python -m lib.content | tee content-engine.log
+      - name: Upload content artifacts
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: content-engine-${{ github.run_id }}
+          path: |
+            content-engine.log
+            data/content/drafts/*.json
+            data/content/ready/**/*
+            data/market_pulse/*.md
+          if-no-files-found: error
+          retention-days: 30
