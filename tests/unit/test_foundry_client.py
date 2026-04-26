@@ -387,3 +387,249 @@ class TestExceptions:
         err = FoundryAPIError("test", status=404, body='{"error":"not found"}')
         assert err.status == 404
         assert "not found" in err.body
+
+
+# ---------------------------------------------------------------------------
+# Auth header construction + OAuth refresh — exercise real urlopen plumbing
+# ---------------------------------------------------------------------------
+
+
+import io  # noqa: E402
+import json as _json  # noqa: E402
+import urllib.error  # noqa: E402
+
+from lib.foundry import client as _client_mod  # noqa: E402
+
+
+class _FakeResp:
+    """Minimal context-manager-shaped urlopen response."""
+
+    def __init__(self, body: bytes):
+        self._body = body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_exc_info):
+        return False
+
+    def read(self):
+        return self._body
+
+
+class TestAuthHeaderConstruction:
+    """Verify the bearer header reaches the wire on outbound requests."""
+
+    def test_bearer_token_mode_sends_authorization_header(self, monkeypatch):
+        monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
+        monkeypatch.setenv("PALANTIR_FOUNDRY_TOKEN", "tok-bear-123")
+        client = FoundryClient.from_env()
+
+        seen: dict[str, str] = {}
+
+        def fake_urlopen(req, **_kwargs):
+            seen["auth"] = req.headers.get("Authorization", "")
+            seen["url"] = req.full_url
+            seen["accept"] = req.headers.get("Accept", "")
+            return _FakeResp(b'{"data":[]}')
+
+        monkeypatch.setattr(_client_mod.urllib.request, "urlopen", fake_urlopen)
+
+        result = client._get("/api/v2/datasets")
+        assert result == {"data": []}
+        assert seen["auth"] == "Bearer tok-bear-123"
+        assert seen["url"].endswith("/api/v2/datasets")
+        assert "application/json" in seen["accept"]
+
+    def test_request_returns_empty_dict_for_empty_body(self, monkeypatch):
+        monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
+        monkeypatch.setenv("PALANTIR_FOUNDRY_TOKEN", "tok")
+        client = FoundryClient.from_env()
+
+        monkeypatch.setattr(
+            _client_mod.urllib.request, "urlopen",
+            lambda req, **_kw: _FakeResp(b""),
+        )
+        assert client._get("/anything") == {}
+
+    def test_request_post_serializes_json_body(self, monkeypatch):
+        monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
+        monkeypatch.setenv("PALANTIR_FOUNDRY_TOKEN", "tok")
+        client = FoundryClient.from_env()
+
+        captured: dict[str, object] = {}
+
+        def fake_urlopen(req, **_kw):
+            captured["data"] = req.data
+            captured["method"] = req.get_method()
+            captured["ctype"] = req.headers.get("Content-type", "")
+            return _FakeResp(b'{"ok":true}')
+
+        monkeypatch.setattr(_client_mod.urllib.request, "urlopen", fake_urlopen)
+        client._post("/api/path", body={"hello": "world"})
+
+        assert captured["method"] == "POST"
+        assert _json.loads(captured["data"]) == {"hello": "world"}
+        assert "application/json" in captured["ctype"]
+
+    def test_http_error_is_wrapped_with_status_and_body(self, monkeypatch):
+        monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
+        monkeypatch.setenv("PALANTIR_FOUNDRY_TOKEN", "tok")
+        client = FoundryClient.from_env()
+
+        def fake_urlopen(req, **_kw):
+            raise urllib.error.HTTPError(
+                req.full_url, 403, "Forbidden", hdrs=None,
+                fp=io.BytesIO(b'{"errorCode":"ACCESS_DENIED"}'),
+            )
+
+        monkeypatch.setattr(_client_mod.urllib.request, "urlopen", fake_urlopen)
+
+        with pytest.raises(FoundryAPIError) as excinfo:
+            client._get("/api/v2/datasets/any")
+        err = excinfo.value
+        assert err.status == 403
+        assert "ACCESS_DENIED" in err.body
+
+    def test_generic_error_is_wrapped_as_foundry_api_error(self, monkeypatch):
+        monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
+        monkeypatch.setenv("PALANTIR_FOUNDRY_TOKEN", "tok")
+        client = FoundryClient.from_env()
+
+        def fake_urlopen(req, **_kw):
+            raise OSError("connection refused")
+
+        monkeypatch.setattr(_client_mod.urllib.request, "urlopen", fake_urlopen)
+
+        with pytest.raises(FoundryAPIError, match="connection refused"):
+            client._get("/api/v2/datasets")
+
+
+class TestOAuthRefresh:
+    """The OAuth flow uses a separate /multipass/api/oauth2/token endpoint."""
+
+    def test_oauth_flow_fetches_and_caches_access_token(self, monkeypatch):
+        monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
+        monkeypatch.setenv("PALANTIR_FOUNDRY_CLIENT_ID", "cid")
+        monkeypatch.setenv("PALANTIR_FOUNDRY_CLIENT_SECRET", "csecret")
+        auth = FoundryAuth.from_env()
+
+        calls: list[str] = []
+
+        def fake_urlopen(req, **_kw):
+            calls.append(req.full_url)
+            assert req.full_url.endswith("/multipass/api/oauth2/token")
+            assert b"grant_type=client_credentials" in req.data
+            return _FakeResp(b'{"access_token":"new-jwt","expires_in":3600}')
+
+        monkeypatch.setattr(_client_mod.urllib.request, "urlopen", fake_urlopen)
+        token1 = auth.bearer_token()
+        token2 = auth.bearer_token()  # cached, no second HTTP call
+        assert token1 == "new-jwt"
+        assert token2 == "new-jwt"
+        assert len(calls) == 1, "OAuth token must be cached until expiry"
+
+    def test_oauth_failure_raises_auth_error(self, monkeypatch):
+        monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
+        monkeypatch.setenv("PALANTIR_FOUNDRY_CLIENT_ID", "cid")
+        monkeypatch.setenv("PALANTIR_FOUNDRY_CLIENT_SECRET", "csecret")
+        auth = FoundryAuth.from_env()
+
+        def fake_urlopen(req, **_kw):
+            raise OSError("network down")
+
+        monkeypatch.setattr(_client_mod.urllib.request, "urlopen", fake_urlopen)
+
+        with pytest.raises(FoundryAuthError, match="OAuth token refresh failed"):
+            auth.bearer_token()
+
+    def test_oauth_token_refreshes_after_expiry(self, monkeypatch):
+        """When the cached OAuth token is past expiry, the next bearer_token()
+        triggers another fetch.
+        """
+        monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
+        monkeypatch.setenv("PALANTIR_FOUNDRY_CLIENT_ID", "cid")
+        monkeypatch.setenv("PALANTIR_FOUNDRY_CLIENT_SECRET", "csecret")
+        auth = FoundryAuth.from_env()
+
+        responses = iter([
+            _FakeResp(b'{"access_token":"first","expires_in":1}'),
+            _FakeResp(b'{"access_token":"second","expires_in":3600}'),
+        ])
+        monkeypatch.setattr(
+            _client_mod.urllib.request, "urlopen",
+            lambda *_a, **_kw: next(responses),
+        )
+
+        token1 = auth.bearer_token()
+        # Force expiry: bearer_token() considers expired if `time() > expiry-30`
+        auth._oauth_expiry = 0.0
+        token2 = auth.bearer_token()
+        assert token1 == "first"
+        assert token2 == "second"
+
+
+class TestUploadAndOntologyURLs:
+    """Higher-level methods route to the right Foundry paths."""
+
+    def _client(self, monkeypatch):
+        monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
+        monkeypatch.setenv("PALANTIR_FOUNDRY_TOKEN", "tok")
+        return FoundryClient.from_env()
+
+    def test_load_objects_url_includes_pagesize_and_token(self, monkeypatch):
+        client = self._client(monkeypatch)
+        client._get = mock.Mock(return_value={"data": []})
+
+        client.load_objects("PaperTrade", page_size=50, page_token="cursor-xyz")
+        path, params = client._get.call_args.args[0], client._get.call_args.kwargs["params"]
+        assert path == "/api/v2/ontologies/ontology/objects/PaperTrade"
+        assert params["pageSize"] == "50"
+        assert params["pageToken"] == "cursor-xyz"
+
+    def test_list_object_types_uses_quoted_ontology(self, monkeypatch):
+        monkeypatch.setenv("FOUNDRY_ONTOLOGY", "weird/name")
+        client = self._client(monkeypatch)
+        client._get = mock.Mock(return_value={"data": []})
+
+        client.list_object_types()
+        called_path = client._get.call_args.args[0]
+        # Slash inside the ontology api name must be URL-encoded.
+        assert "weird%2Fname" in called_path
+        assert called_path.startswith("/api/v2/ontologies/")
+
+    def test_upload_rows_serialises_ndjson(self, monkeypatch):
+        client = self._client(monkeypatch)
+        captured: dict[str, bytes] = {}
+
+        def fake_urlopen(req, **_kw):
+            captured["data"] = req.data
+            captured["url"] = req.full_url
+            captured["ctype"] = req.headers.get("Content-type", "")
+            return _FakeResp(b'{"rows_uploaded":2}')
+
+        monkeypatch.setattr(_client_mod.urllib.request, "urlopen", fake_urlopen)
+
+        result = client.upload_rows(
+            "ri.foundry.main.dataset.x", "master",
+            [{"id": "1"}, {"id": "2"}],
+        )
+        body = captured["data"].decode()
+        assert body == '{"id": "1"}\n{"id": "2"}'
+        assert "x-ndjson" in captured["ctype"]
+        assert result["rows_uploaded"] == 2
+
+
+class TestHealthErrorPaths:
+    def test_health_handles_generic_foundry_error(self, monkeypatch):
+        monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
+        monkeypatch.setenv("PALANTIR_FOUNDRY_TOKEN", "tok")
+        client = FoundryClient.from_env()
+
+        client._get = mock.Mock(side_effect=FoundryError("some boom"))
+        result = client.health()
+        assert result["ok"] is False
+        assert result["auth_mode"] == "token"
+        assert result["error"] == "some boom"
+        # generic FoundryError path doesn't set `status`
+        assert "status" not in result
