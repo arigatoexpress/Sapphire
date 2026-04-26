@@ -75,7 +75,10 @@ def test_tradingview_mcp_v2_tracks_upstream_hardening_pr() -> None:
     repo = repos["tradingview-mcp-v2"]
 
     assert repo["migration_state"] == "upstream_pr_open"
-    assert repo["hardening_tracking"]["upstream_pr"] == "https://github.com/tradesdontlie/tradingview-mcp/pull/102"
+    assert (
+        repo["hardening_tracking"]["upstream_pr"]
+        == "https://github.com/tradesdontlie/tradingview-mcp/pull/102"
+    )
     assert repo["hardening_tracking"]["validated_commands"] == [
         "npm run check:syntax",
         "npm run test:offline",
@@ -88,7 +91,10 @@ def test_crypto_tax_tracker_tracks_completed_guardrail_pr() -> None:
 
     assert repo["migration_state"] == "guardrails_complete"
     assert "AGENTS.md" in repo["required_guardrails"]
-    assert repo["hardening_tracking"]["repo_pr"] == "https://github.com/arigatoexpress/crypto-tax-tracker/pull/2"
+    assert (
+        repo["hardening_tracking"]["repo_pr"]
+        == "https://github.com/arigatoexpress/crypto-tax-tracker/pull/2"
+    )
     assert repo["hardening_tracking"]["validated_commands"] == [
         ".venv/bin/ruff check src tests",
         ".venv/bin/python -m pytest -q",
@@ -133,7 +139,10 @@ def test_threat_refresh_tracks_soak_evidence() -> None:
     assert routine["stage"] == "soaking"
     assert routine["remote_workflow"] == ".github/workflows/threat-refresh.yml"
     assert routine["comparator"] == "scripts/ops/compare_threat_artifacts.py"
-    assert routine["soak_tracking"]["evidence_doc"] == "docs/org/threat-refresh-shadow-soak-2026-04-26.md"
+    assert (
+        routine["soak_tracking"]["evidence_doc"]
+        == "docs/org/threat-refresh-shadow-soak-2026-04-26.md"
+    )
     assert routine["soak_tracking"]["latest_manual_remote_run_id"] == "24962186595"
     assert routine["soak_tracking"]["latest_comparison"] == {
         "compared_at": "2026-04-26T17:04:37Z",
@@ -154,7 +163,10 @@ def test_backtest_weekly_tracks_soak_evidence() -> None:
     assert routine["stage"] == "soaking"
     assert routine["remote_workflow"] == ".github/workflows/weekly-backtest.yml"
     assert routine["comparator"] == "scripts/ops/compare_backtest_artifacts.py"
-    assert routine["soak_tracking"]["evidence_doc"] == "docs/org/backtest-weekly-shadow-soak-2026-04-26.md"
+    assert (
+        routine["soak_tracking"]["evidence_doc"]
+        == "docs/org/backtest-weekly-shadow-soak-2026-04-26.md"
+    )
     assert routine["soak_tracking"]["latest_comparison"] == {
         "compared_at": "2026-04-26T16:15:51Z",
         "verdict": "PASS",
@@ -184,7 +196,9 @@ def test_hermes_agent_tracks_runtime_checkout_and_local_patches() -> None:
     ]
 
 
-def test_status_report_includes_runtime_tracking_without_required_runtime_path(tmp_path: Path) -> None:
+def test_status_report_includes_runtime_tracking_without_required_runtime_path(
+    tmp_path: Path,
+) -> None:
     manifest = deepcopy(_manifest())
     hermes = next(repo for repo in manifest["repos"] if repo["id"] == "hermes-agent")
     hermes["runtime_tracking"]["runtime_path"] = str(tmp_path / "missing-runtime")
@@ -200,6 +214,7 @@ def test_status_report_includes_runtime_tracking_without_required_runtime_path(t
         "branch": None,
         "head": None,
         "dirty_count": None,
+        "dirty_summary": None,
         "clean": None,
         "errors": [],
     }
@@ -237,7 +252,9 @@ def test_hermes_sapphire_skill_surface_inventory_is_complete_and_sanitized() -> 
         "paper-trading",
         "trading-brain",
     }
-    assert all(skill["path"].startswith("/Users/aribs/.hermes/skills/sapphire/") for skill in skills)
+    assert all(
+        skill["path"].startswith("/Users/aribs/.hermes/skills/sapphire/") for skill in skills
+    )
     assert all(skill["next_action"] for skill in skills)
 
     by_id = {skill["id"]: skill for skill in skills}
@@ -257,7 +274,10 @@ def test_classification_report_tracks_absorb_and_archive_candidates() -> None:
     assert report["schema_version"] == 1
     assert report["source_manifest"] == "infra/org-repos.yaml"
     assert {item["id"] for item in report["candidate_absorb"]} <= manifest_ids
-    assert {item["id"] for item in report["candidate_absorb"]} >= {"kimi-tools", "tradingview-mcp-v2"}
+    assert {item["id"] for item in report["candidate_absorb"]} >= {
+        "kimi-tools",
+        "tradingview-mcp-v2",
+    }
     assert report["candidate_archive"]["approved"] == []
     assert "Do not delete" in " ".join(report["candidate_archive"]["policy"])
     assert "agentic-arigato" in report["active_repos"]["integration"]
@@ -280,7 +300,9 @@ def test_collect_status_no_external_handles_local_ci_without_live_tools(tmp_path
     assert "repo_classifications" in report["summary"]
     assert report["summary"]["hermes_skill_classes"]["read_only"] == 9
     assert report["summary"]["hermes_production_adjacent_skills"] == 10
-    assert sorted(report["summary"]["missing_local_repos"]) == sorted(repo["id"] for repo in manifest["repos"])
+    assert sorted(report["summary"]["missing_local_repos"]) == sorted(
+        repo["id"] for repo in manifest["repos"]
+    )
     assert report["summary"]["dirty_repos"] == []
     assert report["hermes_skills"]["skill_count"] == 15
     assert len(report["gcp_projects"]) == len(manifest["gcp_projects"])
@@ -300,6 +322,51 @@ def test_render_markdown_includes_control_board_sections() -> None:
     assert "## Waves" in markdown
     assert "| sapphire | core |" in markdown
     assert "| tradingview | external_mutating | yes |" in markdown
+
+
+def test_dirty_summary_counts_porcelain_without_paths() -> None:
+    summary = org_status.summarize_dirty_lines(
+        [
+            " M README.md",
+            "A  docs/new.md",
+            " D old.txt",
+            "R  old.py -> new.py",
+            "?? scratch.env",
+            "UU conflict.py",
+        ]
+    )
+
+    assert summary == {
+        "entries": 6,
+        "tracked": 5,
+        "modified": 1,
+        "added": 1,
+        "deleted": 1,
+        "renamed": 1,
+        "copied": 0,
+        "untracked": 1,
+        "ignored": 0,
+        "unmerged": 1,
+        "other": 0,
+    }
+
+
+def test_render_markdown_dirty_summary_is_sanitized() -> None:
+    report = org_status.collect_status(_manifest(), external=False)
+    repo = next(row for row in report["repos"] if row["id"] == "sapphire")
+    repo["dirty_count"] = 2
+    repo["clean"] = False
+    repo["dirty_summary"] = org_status.summarize_dirty_lines(
+        [" M docs/control.md", "?? scratch.env"]
+    )
+    report["summary"]["dirty_repos"] = ["sapphire"]
+
+    markdown = org_status.render_markdown(report)
+
+    assert "## Dirty Repo Summary" in markdown
+    assert "| sapphire | 2 | 1 | 1 | 0 | 0 | 0 | 1 | 0 |" in markdown
+    assert "scratch.env" not in markdown
+    assert "docs/control.md" not in markdown
 
 
 def test_parse_launchctl_maps_pid_and_last_status() -> None:

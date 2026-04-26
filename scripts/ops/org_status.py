@@ -45,7 +45,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--markdown", action="store_true")
-    parser.add_argument("--no-external", action="store_true", help="Skip gh/gcloud/launchctl/docker probes")
+    parser.add_argument(
+        "--no-external", action="store_true", help="Skip gh/gcloud/launchctl/docker probes"
+    )
     return parser
 
 
@@ -95,7 +97,9 @@ def summarize(
         "open_pr_count": sum(len(repo.get("open_prs", [])) for repo in repos),
         "routine_stages": stage_counts(manifest.get("routines", [])),
         "hermes_skill_classes": (hermes_skills or {}).get("classification_counts", {}),
-        "hermes_production_adjacent_skills": (hermes_skills or {}).get("production_adjacent_count", 0),
+        "hermes_production_adjacent_skills": (hermes_skills or {}).get(
+            "production_adjacent_count", 0
+        ),
     }
 
 
@@ -174,6 +178,7 @@ def repo_status(repo: dict[str, Any], *, external: bool) -> dict[str, Any]:
         "branch": None,
         "head": None,
         "dirty_count": None,
+        "dirty_summary": None,
         "clean": None,
         "open_prs": [],
         "open_issues": [],
@@ -190,6 +195,7 @@ def repo_status(repo: dict[str, Any], *, external: bool) -> dict[str, Any]:
             "branch": None,
             "head": None,
             "dirty_count": None,
+            "dirty_summary": None,
             "clean": None,
             "errors": [],
         }
@@ -197,10 +203,15 @@ def repo_status(repo: dict[str, Any], *, external: bool) -> dict[str, Any]:
             runtime_branch = run(["git", "branch", "--show-current"], cwd=runtime_path)
             runtime_head = run(["git", "log", "-1", "--oneline", "--decorate"], cwd=runtime_path)
             runtime_dirty = run(["git", "status", "--porcelain=v1"], cwd=runtime_path)
-            runtime_status["branch"] = runtime_branch["stdout"].strip() if runtime_branch["ok"] else None
+            runtime_status["branch"] = (
+                runtime_branch["stdout"].strip() if runtime_branch["ok"] else None
+            )
             runtime_status["head"] = runtime_head["stdout"].strip() if runtime_head["ok"] else None
-            runtime_dirty_lines = runtime_dirty["stdout"].splitlines() if runtime_dirty["ok"] else []
+            runtime_dirty_lines = (
+                runtime_dirty["stdout"].splitlines() if runtime_dirty["ok"] else []
+            )
             runtime_status["dirty_count"] = len(runtime_dirty_lines)
+            runtime_status["dirty_summary"] = summarize_dirty_lines(runtime_dirty_lines)
             runtime_status["clean"] = runtime_dirty["ok"] and len(runtime_dirty_lines) == 0
             for result_name, result in (
                 ("branch", runtime_branch),
@@ -222,6 +233,7 @@ def repo_status(repo: dict[str, Any], *, external: bool) -> dict[str, Any]:
     status["head"] = head["stdout"].strip() if head["ok"] else None
     dirty_lines = dirty["stdout"].splitlines() if dirty["ok"] else []
     status["dirty_count"] = len(dirty_lines)
+    status["dirty_summary"] = summarize_dirty_lines(dirty_lines)
     status["clean"] = dirty["ok"] and len(dirty_lines) == 0
     for result_name, result in (("branch", branch), ("head", head), ("dirty", dirty)):
         if not result["ok"]:
@@ -230,6 +242,48 @@ def repo_status(repo: dict[str, Any], *, external: bool) -> dict[str, Any]:
         status["open_prs"] = gh_items("pr", str(repo["github"]))
         status["open_issues"] = gh_items("issue", str(repo["github"]))
     return status
+
+
+def summarize_dirty_lines(lines: list[str]) -> dict[str, int]:
+    summary = {
+        "entries": len(lines),
+        "tracked": 0,
+        "modified": 0,
+        "added": 0,
+        "deleted": 0,
+        "renamed": 0,
+        "copied": 0,
+        "untracked": 0,
+        "ignored": 0,
+        "unmerged": 0,
+        "other": 0,
+    }
+    for line in lines:
+        status = line[:2]
+        if status == "??":
+            summary["untracked"] += 1
+            continue
+        if status == "!!":
+            summary["ignored"] += 1
+            continue
+
+        summary["tracked"] += 1
+        if "U" in status:
+            summary["unmerged"] += 1
+        matched = False
+        for code, key in (
+            ("M", "modified"),
+            ("A", "added"),
+            ("D", "deleted"),
+            ("R", "renamed"),
+            ("C", "copied"),
+        ):
+            if code in status:
+                summary[key] += 1
+                matched = True
+        if not matched and "U" not in status:
+            summary["other"] += 1
+    return summary
 
 
 def gh_items(kind: str, repo: str) -> list[dict[str, Any]]:
@@ -283,7 +337,9 @@ def gcp_status(projects: list[dict[str, Any]], *, external: bool) -> list[dict[s
                         {
                             "name": item.get("metadata", {}).get("name"),
                             "url": item.get("status", {}).get("url"),
-                            "latest_ready_revision": item.get("status", {}).get("latestReadyRevisionName"),
+                            "latest_ready_revision": item.get("status", {}).get(
+                                "latestReadyRevisionName"
+                            ),
                         }
                         for item in json.loads(result["stdout"] or "[]")
                     ]
@@ -307,7 +363,10 @@ def launchagent_status(labels: list[str], *, external: bool) -> list[dict[str, A
         return [{"label": label, "status": "not_checked"} for label in labels]
     result = run(["launchctl", "list"], timeout=10)
     if not result["ok"]:
-        return [{"label": label, "status": "unknown", "error": result["stderr"][:200]} for label in labels]
+        return [
+            {"label": label, "status": "unknown", "error": result["stderr"][:200]}
+            for label in labels
+        ]
     parsed = parse_launchctl(result["stdout"])
     rows = []
     for label in labels:
@@ -336,14 +395,21 @@ def docker_status(expected: list[str], *, external: bool) -> dict[str, Any]:
         return {"checked": False, "expected": expected, "containers": []}
     result = run(["docker", "ps", "--format", "{{json .}}"], timeout=10)
     if not result["ok"]:
-        return {"checked": True, "expected": expected, "containers": [], "error": result["stderr"][:200]}
+        return {
+            "checked": True,
+            "expected": expected,
+            "containers": [],
+            "error": result["stderr"][:200],
+        }
     containers = []
     for line in result["stdout"].splitlines():
         try:
             item = json.loads(line)
         except json.JSONDecodeError:
             continue
-        containers.append({"name": item.get("Names"), "status": item.get("Status"), "ports": item.get("Ports")})
+        containers.append(
+            {"name": item.get("Names"), "status": item.get("Status"), "ports": item.get("Ports")}
+        )
     return {
         "checked": True,
         "expected": expected,
@@ -384,6 +450,26 @@ def render_markdown(report: dict[str, Any]) -> str:
             f"{'yes' if repo.get('clean') else 'no'} | {len(repo.get('open_prs', []))} | "
             f"{repo.get('migration_state') or '-'} |"
         )
+    dirty_repos = [repo for repo in report["repos"] if repo.get("dirty_count")]
+    if dirty_repos:
+        lines.extend(
+            [
+                "",
+                "## Dirty Repo Summary",
+                "",
+                "| Repo | Entries | Tracked | Modified | Added | Deleted | Renamed | Untracked | Unmerged |",
+                "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
+            ]
+        )
+        for repo in dirty_repos:
+            dirty = repo.get("dirty_summary") or {}
+            lines.append(
+                f"| {repo['id']} | {dirty.get('entries', repo.get('dirty_count') or 0)} | "
+                f"{dirty.get('tracked', 0)} | {dirty.get('modified', 0)} | "
+                f"{dirty.get('added', 0)} | {dirty.get('deleted', 0)} | "
+                f"{dirty.get('renamed', 0)} | {dirty.get('untracked', 0)} | "
+                f"{dirty.get('unmerged', 0)} |"
+            )
     lines.extend(
         [
             "",
