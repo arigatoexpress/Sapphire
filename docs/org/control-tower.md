@@ -36,12 +36,19 @@ Use the status helper for a read-only snapshot:
 python3 scripts/ops/org_status.py --no-external --markdown
 python3 scripts/ops/org_status.py --markdown
 python3 scripts/ops/org_status.py --output /tmp/sapphire-org-status.json
+python3 scripts/ops/routine_soak_status.py --format markdown
 ```
 
 `--no-external` skips `gh`, `gcloud`, `launchctl`, and Docker probes. It is the
 CI-safe mode and the right first check when editing the manifest or report
 shape. Dirty repository reporting is intentionally sanitized to counts by
 porcelain status category; it does not print filenames or diff contents.
+
+Use `routine_soak_status.py` when deciding whether a remote-shadow routine has
+enough scheduled GitHub Actions cycles to move from soak collection to artifact
+review. It reads `infra/org-repos.yaml`, counts scheduled/manual workflow runs
+since each routine's `started_at`, and reports gate progress without downloading
+artifacts or printing raw run logs.
 
 ## Current Waves
 
@@ -83,7 +90,8 @@ porcelain status category; it does not print filenames or diff contents.
 
 1. `feat/remote-threat-refresh-shadow` - soaking. First close-time comparison
    evidence is recorded in `docs/org/threat-refresh-shadow-soak-2026-04-26.md`;
-   keep collecting scheduled artifacts before disabling the local LaunchAgent.
+   `scripts/ops/routine_soak_status.py` tracks scheduled cycle progress before
+   disabling the local LaunchAgent.
 2. `feat/remote-weekly-backtest-shadow` - soaking. First comparison evidence
    is recorded in `docs/org/backtest-weekly-shadow-soak-2026-04-26.md`; keep
    local weekly backtest canonical until scheduled cycles satisfy the cutover gate.
