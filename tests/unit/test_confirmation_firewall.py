@@ -441,3 +441,310 @@ class TestConfirmationReplyHandler:
         fw = ConfirmationFirewall(audit_path=tmp_path / "audit.jsonl")
 
         assert handle_confirmation_reply("hello there", firewall=fw) is None
+
+
+# ---------------------------------------------------------------------------
+# Branch coverage additions — 2-phase commit cycle, timeout, destructive
+# delay, env-driven overrides, and edge-case state file handling.
+# ---------------------------------------------------------------------------
+
+
+class TestTwoPhaseCommitCycle:
+    """The firewall runs a prepare/commit cycle on every gated action.
+
+    prepare:   _write_pending writes the pending JSON
+    commit:    approve_pending rewrites status="approved"
+    abort:     deny_pending rewrites status="denied"
+    timeout:   _poll_pending observes expires<now and unlinks the file
+    """
+
+    def test_prepare_then_commit_keeps_record_until_polled(self, tmp_path):
+        fw = ConfirmationFirewall(audit_path=tmp_path / "audit.jsonl")
+        path = fw_module._write_pending(
+            "PREPCOMM",
+            "paper trade SOL",
+            ActionRisk.FINANCIAL,
+            "paper-only unit test",
+        )
+
+        assert path.exists()
+        assert fw.approve_pending("PREPCOMM") is True
+        # commit phase records "approved" — file still on disk until poll consumes it.
+        assert json.loads(path.read_text())["status"] == "approved"
+        assert fw_module._poll_pending("PREPCOMM") == "approved"
+        assert not path.exists()
+
+    def test_prepare_then_abort_marks_denied_and_clears_on_poll(self, tmp_path):
+        fw = ConfirmationFirewall(audit_path=tmp_path / "audit.jsonl")
+        path = fw_module._write_pending(
+            "PREPABRT",
+            "paper trade SOL",
+            ActionRisk.FINANCIAL,
+            "paper-only unit test",
+        )
+
+        assert fw.deny_pending("PREPABRT") is True
+        assert json.loads(path.read_text())["status"] == "denied"
+        assert fw_module._poll_pending("PREPABRT") == "denied"
+        assert not path.exists()
+
+    def test_prepare_without_commit_times_out(self, tmp_path):
+        fw_module._write_pending(
+            "TIMEDOUT",
+            "paper trade SOL",
+            ActionRisk.FINANCIAL,
+            "paper-only unit test",
+        )
+        path = fw_module.PENDING_DIR / "TIMEDOUT.json"
+        record = json.loads(path.read_text())
+        record["expires"] = time.time() - 1
+        path.write_text(json.dumps(record))
+
+        # Poll past the expiry → returns "denied" by design (fail-closed).
+        assert fw_module._poll_pending("TIMEDOUT") == "denied"
+        assert not path.exists()
+
+    def test_double_prepare_for_distinct_codes_keeps_both(self):
+        fw_module._write_pending("FIRST123", "paper trade BTC", ActionRisk.FINANCIAL, "")
+        fw_module._write_pending("SCND4567", "paper trade ETH", ActionRisk.FINANCIAL, "")
+
+        fw = ConfirmationFirewall(audit_path=False)
+        codes = {p["code"] for p in fw.list_pending()}
+        assert codes == {"FIRST123", "SCND4567"}
+
+    def test_approve_pending_rejects_already_committed_record(self):
+        fw_module._write_pending("DBLCOMMT", "trade", ActionRisk.FINANCIAL, "")
+        fw = ConfirmationFirewall(audit_path=False)
+
+        assert fw.approve_pending("DBLCOMMT") is True
+        # second approve must fail closed — the record is now in a non-pending state.
+        assert fw.approve_pending("DBLCOMMT") is False
+
+    def test_deny_pending_rejects_already_committed_record(self):
+        fw_module._write_pending("DBLDENY1", "trade", ActionRisk.FINANCIAL, "")
+        fw = ConfirmationFirewall(audit_path=False)
+
+        assert fw.approve_pending("DBLDENY1") is True
+        # cannot deny something already approved — fail closed.
+        assert fw.deny_pending("DBLDENY1") is False
+
+    def test_approve_unknown_code_returns_false(self):
+        fw = ConfirmationFirewall(audit_path=False)
+        assert fw.approve_pending("NOPENOPE") is False
+        assert fw.deny_pending("NOPENOPE") is False
+
+    def test_approve_pending_on_expired_record_fails_closed(self):
+        path = fw_module._write_pending("EXPIRED1", "trade", ActionRisk.FINANCIAL, "")
+        record = json.loads(path.read_text())
+        record["expires"] = time.time() - 1
+        path.write_text(json.dumps(record))
+
+        fw = ConfirmationFirewall(audit_path=False)
+        # The expired record must NOT be approved; it is also unlinked so a
+        # later replay cannot revive it.
+        assert fw.approve_pending("EXPIRED1") is False
+        assert not path.exists()
+
+
+class TestPendingCleanup:
+    def test_cleanup_expired_pending_removes_only_stale(self, monkeypatch):
+        live = fw_module._write_pending("LIVE1234", "trade", ActionRisk.FINANCIAL, "")
+        stale = fw_module._write_pending("STAL1234", "trade", ActionRisk.FINANCIAL, "")
+        record = json.loads(stale.read_text())
+        record["expires"] = time.time() - 100
+        stale.write_text(json.dumps(record))
+
+        removed = fw_module._cleanup_expired_pending()
+        assert removed == 1
+        assert live.exists()
+        assert not stale.exists()
+
+    def test_cleanup_handles_missing_directory(self, isolated_state):
+        # Force the directory away.
+        import shutil
+
+        shutil.rmtree(fw_module.PENDING_DIR, ignore_errors=True)
+        assert fw_module._cleanup_expired_pending() == 0
+
+    def test_cleanup_skips_corrupt_records(self, monkeypatch):
+        fw_module.PENDING_DIR.mkdir(parents=True, exist_ok=True)
+        bad = fw_module.PENDING_DIR / "BADJSON1.json"
+        bad.write_text("{not json")
+        # Must not raise on malformed JSON.
+        assert fw_module._cleanup_expired_pending() == 0
+        assert bad.exists()  # untouched (no expiry to evaluate)
+
+
+class TestEnvOverrides:
+    def test_live_financial_override_promotes_to_paper_path(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("SAPPHIRE_FIREWALL_ALLOW_LIVE_FINANCIAL_AUTO_APPROVAL", "1")
+        audit = tmp_path / "audit.jsonl"
+        fw = ConfirmationFirewall(audit_path=audit)
+
+        approved = fw.request_confirmation(
+            "buy SOL on mainnet",
+            ActionRisk.FINANCIAL,
+            amount=10.0,
+            details="live exchange order",
+        )
+        assert approved is True
+        records = [json.loads(line) for line in audit.read_text().splitlines()]
+        assert records[0]["event_type"] == "confirmation.financial_auto_approved"
+
+    def test_invalid_daily_limit_env_falls_back_to_default(self, monkeypatch):
+        monkeypatch.setenv("SAPPHIRE_FIREWALL_DAILY_AUTO_LIMIT", "not-a-number")
+        assert fw_module._current_daily_auto_limit() == DAILY_AUTO_LIMIT
+
+    def test_blank_daily_limit_env_falls_back_to_default(self, monkeypatch):
+        monkeypatch.setenv("SAPPHIRE_FIREWALL_DAILY_AUTO_LIMIT", "")
+        assert fw_module._current_daily_auto_limit() == DAILY_AUTO_LIMIT
+
+    def test_negative_daily_limit_env_clamped_to_zero(self, monkeypatch):
+        monkeypatch.setenv("SAPPHIRE_FIREWALL_DAILY_AUTO_LIMIT", "-50")
+        # max(0.0, float(-50)) → 0.0
+        assert fw_module._current_daily_auto_limit() == 0.0
+
+    def test_paper_financial_keywords_trigger_auto_path(self):
+        # Each paper/sandbox/dry-run keyword should classify as auto-eligible.
+        for action in [
+            "paper trade ETH",
+            "dry-run buy BTC",
+            "simulate sell SOL",
+            "sandbox trade USD",
+            "backtest order BTC",
+            "testnet swap ETH",
+        ]:
+            assert fw_module._is_paper_or_dry_run_financial(action) is True
+
+    def test_audit_path_resolves_from_env(self, monkeypatch, tmp_path):
+        env_target = tmp_path / "env-firewall.jsonl"
+        monkeypatch.setenv(
+            "SAPPHIRE_CONFIRMATION_FIREWALL_AUDIT_LOG", str(env_target)
+        )
+        fw = ConfirmationFirewall()  # no explicit path
+        fw.request_confirmation(
+            "health check",
+            ActionRisk.READ_ONLY,
+            details="all good",
+        )
+        assert env_target.exists()
+
+
+class TestRequestConfirmationFlow:
+    def test_timeout_returns_false_and_audits_timed_out(self, tmp_path, monkeypatch):
+        audit = tmp_path / "audit.jsonl"
+        fw = ConfirmationFirewall(audit_path=audit)
+
+        # Drive the deadline past now() so the loop body never executes.
+        monkeypatch.setattr(fw_module, "CONFIRMATION_TIMEOUT", 0)
+        approved = fw.request_confirmation(
+            "post tweet about market",
+            ActionRisk.EXTERNAL_SEND,
+            details="external send action",
+            poll_interval=0,
+            _send_fn=lambda *a, **k: True,
+            _sleep_fn=lambda _seconds: None,
+        )
+        assert approved is False
+        events = [json.loads(line)["event_type"] for line in audit.read_text().splitlines()]
+        assert events[-1] == "confirmation.timed_out"
+
+    def test_destructive_approval_enforces_post_approval_delay(self, tmp_path, monkeypatch):
+        audit = tmp_path / "audit.jsonl"
+        fw = ConfirmationFirewall(audit_path=audit)
+        sleeps: list[float] = []
+
+        def approve_immediately(code, *_args):
+            assert fw.approve_pending(code) is True
+            return True
+
+        approved = fw.request_confirmation(
+            "rm -rf /tmp/data",
+            ActionRisk.DESTRUCTIVE,
+            details="destructive cleanup",
+            poll_interval=0,
+            _send_fn=approve_immediately,
+            _sleep_fn=lambda seconds: sleeps.append(seconds),
+        )
+        assert approved is True
+        # The poll sleep (0) plus the destructive delay (DESTRUCTIVE_DELAY) must both occur.
+        assert fw_module.DESTRUCTIVE_DELAY in sleeps
+
+    def test_denied_request_returns_false_and_audits(self, tmp_path):
+        audit = tmp_path / "audit.jsonl"
+        fw = ConfirmationFirewall(audit_path=audit)
+
+        def deny_immediately(code, *_args):
+            assert fw.deny_pending(code) is True
+            return True
+
+        approved = fw.request_confirmation(
+            "git push origin main",
+            ActionRisk.EXTERNAL_SEND,
+            details="external publish",
+            poll_interval=0,
+            _send_fn=deny_immediately,
+            _sleep_fn=lambda _seconds: None,
+        )
+        assert approved is False
+        events = [json.loads(line)["event_type"] for line in audit.read_text().splitlines()]
+        assert events[-1] == "confirmation.denied"
+
+    def test_self_modify_auto_approves_without_confirmation(self, tmp_path):
+        audit = tmp_path / "audit.jsonl"
+        fw = ConfirmationFirewall(audit_path=audit)
+
+        # _send_fn must NOT fire for SELF_MODIFY — fail loudly if it does.
+        def fail_send(*_args, **_kwargs):
+            raise AssertionError("SELF_MODIFY should auto-approve without sending")
+
+        approved = fw.request_confirmation(
+            "write log entry today",
+            ActionRisk.SELF_MODIFY,
+            details="self-only",
+            _send_fn=fail_send,
+            _sleep_fn=lambda _seconds: None,
+        )
+        assert approved is True
+        events = [json.loads(line)["event_type"] for line in audit.read_text().splitlines()]
+        assert events == ["confirmation.auto_approved"]
+
+
+class TestAutoApproveHelper:
+    def test_auto_approve_passes_safe_actions(self):
+        fw = ConfirmationFirewall(audit_path=False)
+        assert fw.auto_approve("cat /var/log/system.log") is True
+        assert fw.auto_approve("write log note", target="self") is True
+
+    def test_auto_approve_rejects_high_risk_actions(self):
+        fw = ConfirmationFirewall(audit_path=False)
+        assert fw.auto_approve("rm -rf /tmp/x") is False
+        assert fw.auto_approve("buy BTC at market") is False
+        assert fw.auto_approve("git push origin main") is False
+
+
+class TestPendingFileEdgeCases:
+    def test_poll_pending_returns_none_on_corrupt_file(self):
+        fw_module.PENDING_DIR.mkdir(parents=True, exist_ok=True)
+        path = fw_module.PENDING_DIR / "CORRUPT1.json"
+        path.write_text("{partial")
+        # Per the doc string in _poll_pending: corrupt reads return None,
+        # never silently deny — so the action keeps polling.
+        assert fw_module._poll_pending("CORRUPT1") is None
+
+    def test_poll_pending_returns_none_for_unknown_code(self):
+        assert fw_module._poll_pending("MISSING9") is None
+
+    def test_list_pending_skips_corrupt_files(self):
+        fw_module.PENDING_DIR.mkdir(parents=True, exist_ok=True)
+        good = fw_module._write_pending(
+            "GOODONE1", "paper trade SOL", ActionRisk.FINANCIAL, ""
+        )
+        bad = fw_module.PENDING_DIR / "BADJSON1.json"
+        bad.write_text("{")
+        fw = ConfirmationFirewall(audit_path=False)
+
+        codes = [p["code"] for p in fw.list_pending()]
+        assert "GOODONE1" in codes
+        # Corrupt file is ignored, not crash-loaded.
+        assert good.exists()
