@@ -27,6 +27,20 @@ def isolated_signals(tmp_path, monkeypatch):
 
     monkeypatch.setattr(sl, "SIGNALS_PATH", tmp_path / "trading_signals.jsonl")
     monkeypatch.setattr(sl, "EVENTS_PATH", tmp_path / "system_events.jsonl")
+    monkeypatch.setattr(sl, "_WEBHOOK_SECRET", "test-secret")
+
+    if sl._PIPELINE_AVAILABLE:
+        import signal_pipeline as sp
+
+        pipeline_dir = tmp_path / "pipeline_signals"
+        pipeline_dir.mkdir()
+        monkeypatch.setattr(sp, "SIGNALS_DIR", pipeline_dir)
+        monkeypatch.setattr(sp, "PAPER_TRADING_LOG", tmp_path / "paper_trading.jsonl")
+        monkeypatch.setattr(sp, "_NOTIFY_AVAILABLE", False)
+        monkeypatch.setattr(sp, "_KERNEL_AVAILABLE", False)
+        monkeypatch.setattr(sp, "_FIREWALL_AVAILABLE", False)
+        monkeypatch.setattr(sp, "_DECISION_ENGINE_AVAILABLE", False)
+        monkeypatch.setattr(sp, "_DECISION_ENGINE", None)
 
     # Silence side effects: Nemotron + Telegram notifications
     def _stub_generate(*args, **kwargs):
@@ -51,7 +65,7 @@ def isolated_signals(tmp_path, monkeypatch):
 def client(isolated_signals):
     import signal_logger as sl
     from fastapi.testclient import TestClient
-    return TestClient(sl.app)
+    return TestClient(sl.app, client=("127.0.0.1", 50000))
 
 
 def test_health_endpoint(client):
@@ -60,10 +74,38 @@ def test_health_endpoint(client):
     body = r.json()
     assert body["status"] == "ok"
     assert body["mode"] == "signal_logger"
+    assert body["paper_trading"] is True
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (None, True),
+        ("", True),
+        ("1", True),
+        ("true", True),
+        ("0", False),
+        ("false", False),
+        ("typo", True),
+    ],
+)
+def test_health_paper_trading_defaults_fail_closed(client, monkeypatch, value, expected):
+    import signal_logger as sl
+
+    if value is None:
+        monkeypatch.delenv("PAPER_TRADING", raising=False)
+    else:
+        monkeypatch.setenv("PAPER_TRADING", value)
+
+    assert sl._paper_trading_env_enabled() is expected
+    r = client.get("/health")
+    assert r.status_code == 200
+    assert r.json()["paper_trading"] is expected
 
 
 def test_signal_post_appends_jsonl(client, isolated_signals):
     payload = {
+        "secret": "test-secret",
         "symbol": "BTCUSDT",
         "action": "BUY",
         "strategy": "ema_cross",
@@ -91,6 +133,7 @@ def test_signal_post_appends_jsonl(client, isolated_signals):
 
 def test_signal_post_appends_system_events(client, isolated_signals):
     client.post("/api/signals", json={
+        "secret": "test-secret",
         "symbol": "ETHUSDT",
         "action": "SELL",
         "price": 3200.0,
@@ -109,6 +152,7 @@ def test_signal_post_appends_system_events(client, isolated_signals):
 def test_recent_signals_returns_reverse_chronological(client, isolated_signals):
     for i, sym in enumerate(["BTCUSDT", "ETHUSDT", "SOLUSDT"]):
         client.post("/api/signals", json={
+            "secret": "test-secret",
             "symbol": sym, "action": "BUY", "price": 100.0 + i, "confidence": 0.5,
         })
     r = client.get("/api/signals/recent")
@@ -128,6 +172,7 @@ def test_invalid_json_rejected(client):
 
 def test_legacy_create_route_also_works(client, isolated_signals):
     r = client.post("/api/signals/create", json={
+        "secret": "test-secret",
         "symbol": "BTCUSDT", "action": "BUY", "price": 1.0, "confidence": 0.1,
     })
     assert r.status_code == 200
