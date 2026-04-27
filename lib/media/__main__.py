@@ -51,8 +51,9 @@ def _work_orders(args: argparse.Namespace) -> int:
 
 
 def _selected_work_orders(args: argparse.Namespace) -> list[Path]:
-    if args.work_orders:
-        return list(args.work_orders)
+    explicit = [*(args.work_order_options or []), *args.work_orders]
+    if explicit:
+        return explicit
     return discover_work_orders(args.work_order_root, limit=args.limit)
 
 
@@ -133,6 +134,14 @@ def _status(args: argparse.Namespace) -> int:
 
 
 def _add_factory_io_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--work-order",
+        dest="work_order_options",
+        action="append",
+        type=Path,
+        default=[],
+        help="Work-order JSON file. May be repeated. Alias for positional paths.",
+    )
     parser.add_argument(
         "work_orders",
         nargs="*",

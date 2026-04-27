@@ -219,3 +219,29 @@ def test_media_cli_validate_run_and_status(tmp_path, monkeypatch, capsys):
     status_summary = json.loads(capsys.readouterr().out)
     assert status_summary["count"] == 1
     assert status_summary["runs"][0]["status"] == "ready"
+
+
+def test_media_cli_accepts_work_order_option_alias(tmp_path, monkeypatch, capsys):
+    work_order_path, work_order = _minimal_work_order(tmp_path)
+    run_root = tmp_path / "data" / "media" / "runs"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "python -m lib.media",
+            "run",
+            "--work-order",
+            str(work_order_path),
+            "--root",
+            str(tmp_path),
+            "--run-root",
+            str(run_root),
+            "--pretty",
+        ],
+    )
+
+    assert media_main() == 0
+    run_summary = json.loads(capsys.readouterr().out)
+    assert run_summary["ok"] is True
+    assert run_summary["runs"][0]["work_order_id"] == work_order["work_order_id"]
