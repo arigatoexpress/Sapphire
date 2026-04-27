@@ -2,7 +2,7 @@
 
 macOS LaunchAgent definitions for Sapphire background services and schedulers.
 
-Current inventory: 20 active plists in this directory, plus 1 disabled template (`com.sapphire.lumo-api.plist.disabled`). 2026-04-21 audit folded in the production plists that had been running un-versioned on Ari's Mac — see `docs/launchagents-audit-2026-04-21.md`. The remaining Mac-only plists (dashboard, inference-proxy, cloudflare-tunnel, kronos-daily, regional-intel, hermes) are intentionally not versioned here; see the audit for why.
+Current inventory: 20 active plists in this directory, plus 1 disabled template (`com.sapphire.lumo-api.plist.disabled`). The 2026-04-21 audit folded in the production plists that had been running un-versioned on Ari's Mac — see `docs/launchagents-audit-2026-04-21.md`. Some service-owned LaunchAgents live with their service code under `services/*/launchagent/`; this currently includes `services/pm_bot/launchagent/com.sapphire.pm-bot.plist` and `services/service_supervisor/launchagent/com.sapphire.service-supervisor.plist`. The remaining Mac-only plists (dashboard, inference-proxy, cloudflare-tunnel, kronos-daily, regional-intel, hermes) are intentionally not versioned here; see the audit for why.
 
 ## Active Plists
 
