@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import requests
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TOOL_DIR = REPO_ROOT / "plugins" / "claw-sapphire" / "tools"
@@ -85,6 +85,7 @@ def _resolve_bot_token() -> str:
 @dataclass(frozen=True)
 class Settings:
     token: str
+    webhook_secret: str
     mode: str
     host: str
     port: int
@@ -95,6 +96,10 @@ class Settings:
         port_text = os.getenv("SAPPHIRE_PM_BOT_PORT", "18082").strip() or "18082"
         return cls(
             token=_resolve_bot_token(),
+            webhook_secret=(
+                os.getenv("SAPPHIRE_PM_BOT_WEBHOOK_SECRET", "").strip()
+                or os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
+            ),
             mode=os.getenv("MODE", "webhook").strip().lower() or "webhook",
             host=os.getenv("SAPPHIRE_PM_BOT_HOST", "127.0.0.1").strip() or "127.0.0.1",
             port=int(port_text),
@@ -281,11 +286,17 @@ def health() -> dict[str, Any]:
         "mode": SETTINGS.mode,
         "polling_active": polling_active,
         "last_poll_error": POLLING_STATE.get("last_error"),
+        "webhook_secret_configured": bool(SETTINGS.webhook_secret),
     }
 
 
 @app.post("/telegram/webhook")
 async def telegram_webhook(request: Request) -> dict[str, Any]:
+    if SETTINGS.webhook_secret:
+        secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+        if secret != SETTINGS.webhook_secret:
+            raise HTTPException(status_code=403, detail="invalid secret")
+
     update = await request.json()
     processed = process_update(update)
     return {"ok": True, "processed": processed}

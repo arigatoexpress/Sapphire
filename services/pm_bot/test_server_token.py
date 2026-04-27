@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 
 SERVICES_DIR = Path(__file__).resolve().parent
 if str(SERVICES_DIR) not in sys.path:
@@ -19,6 +20,8 @@ def reload_server(monkeypatch):
     # Clear any cached module so from_env runs fresh under the monkeypatched env
     monkeypatch.delenv("SAPPHIRE_PM_BOT_TOKEN", raising=False)
     monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.delenv("SAPPHIRE_PM_BOT_WEBHOOK_SECRET", raising=False)
+    monkeypatch.delenv("TELEGRAM_WEBHOOK_SECRET", raising=False)
     monkeypatch.delenv("MODE", raising=False)
 
     if "server" in sys.modules:
@@ -123,3 +126,72 @@ def test_redacts_telegram_token_from_error_text(monkeypatch, reload_server):
     safe = server._redact_sensitive_text(unsafe)
     assert fake_token not in safe
     assert "https://api.telegram.org/bot[REDACTED]/getUpdates" in safe
+
+
+def test_health_reports_webhook_secret_configured(monkeypatch, reload_server):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_TOKEN", "test-token")
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_WEBHOOK_SECRET", "test-webhook-secret")
+    server = reload_server()
+
+    with TestClient(server.app) as client:
+        response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json()["webhook_secret_configured"] is True
+
+
+def test_shared_webhook_secret_fallback(monkeypatch, reload_server):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_TOKEN", "test-token")
+    monkeypatch.setenv("TELEGRAM_WEBHOOK_SECRET", "shared-webhook-secret")
+    server = reload_server()
+
+    assert server.SETTINGS.webhook_secret == "shared-webhook-secret"
+
+
+def test_webhook_rejects_bad_secret_before_json(monkeypatch, reload_server):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_TOKEN", "test-token")
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_WEBHOOK_SECRET", "expected-secret")
+    server = reload_server()
+    calls = []
+
+    def fail_process_update(update):
+        calls.append(update)
+        raise AssertionError("process_update should not run for bad secret")
+
+    monkeypatch.setattr(server, "process_update", fail_process_update)
+
+    with TestClient(server.app) as client:
+        response = client.post(
+            "/telegram/webhook",
+            content=b"not-json",
+            headers={"X-Telegram-Bot-Api-Secret-Token": "wrong-secret"},
+        )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "invalid secret"
+    assert calls == []
+
+
+def test_webhook_accepts_valid_secret_without_sending(monkeypatch, reload_server):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_TOKEN", "test-token")
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_WEBHOOK_SECRET", "expected-secret")
+    server = reload_server()
+    calls = []
+
+    def fake_process_update(update):
+        calls.append(update)
+        return True
+
+    monkeypatch.setattr(server, "process_update", fake_process_update)
+    update = {"message": {"chat": {"id": 123}, "text": "/help"}}
+
+    with TestClient(server.app) as client:
+        response = client.post(
+            "/telegram/webhook",
+            json=update,
+            headers={"X-Telegram-Bot-Api-Secret-Token": "expected-secret"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "processed": True}
+    assert calls == [update]
