@@ -521,6 +521,20 @@ Every routine that has a remote replacement runs in a parallel GitHub Actions sh
 
 Status: `python3 scripts/ops/routine_soak_status.py --format json`.
 
+### 10.4 Autonomous Org Control Tower
+
+Sapphire's cross-repo operating board lives in
+[`docs/org/control-tower.md`](docs/org/control-tower.md). Start production
+clusters from [`docs/org/autonomous-org-cluster-prompt.md`](docs/org/autonomous-org-cluster-prompt.md),
+keep GitHub spend controlled with
+[`docs/org/no-spend-github-actions-strategy.md`](docs/org/no-spend-github-actions-strategy.md),
+and verify current scope with:
+
+```bash
+python3 scripts/ops/org_status.py --no-external --markdown
+python3 scripts/ops/autonomous_org_prompt.py --check
+```
+
 ---
 
 ## 11. Quick Start

@@ -54,6 +54,24 @@ review. It reads `infra/org-repos.yaml`, counts scheduled/manual workflow runs
 since each routine's `started_at`, and reports gate progress without downloading
 artifacts or printing raw run logs.
 
+## Cluster Prompt And No-Spend CI
+
+The canonical operator prompt for multi-agent production pushes is
+`docs/org/autonomous-org-cluster-prompt.md`. Regenerate it after org manifest
+changes with:
+
+```bash
+python3 scripts/ops/autonomous_org_prompt.py --output docs/org/autonomous-org-cluster-prompt.md
+python3 scripts/ops/autonomous_org_prompt.py --check
+```
+
+The no-spend policy lives in `docs/org/no-spend-github-actions-strategy.md`.
+Each active repo in `infra/org-repos.yaml` has a `ci_strategy` value so agents
+can choose local CI, the Sapphire self-hosted runner gate, draft-only
+auto-deploy handling, or upstream-fork local verification without guessing.
+The org status report renders these strategy counts and the per-repo strategy
+in the repo board.
+
 ## Current Waves
 
 - **Wave 0: Control Tower** - in progress. Ship the manifest, status script,

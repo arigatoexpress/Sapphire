@@ -108,6 +108,7 @@ def summarize(
     return {
         "repo_count": len(repos),
         "repo_classifications": classifications,
+        "ci_strategies": strategy_counts(manifest.get("repos", [])),
         "dirty_repos": [repo["id"] for repo in repos if (repo.get("dirty_count") or 0) > 0],
         "missing_local_repos": [repo["id"] for repo in repos if not repo.get("exists")],
         "upstream_repo_count": len(upstream_repos),
@@ -138,6 +139,14 @@ def stage_counts(routines: list[dict[str, Any]]) -> dict[str, int]:
     for routine in routines:
         stage = str(routine.get("stage") or "unknown")
         counts[stage] = counts.get(stage, 0) + 1
+    return counts
+
+
+def strategy_counts(repos: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for repo in repos:
+        strategy = str(repo.get("ci_strategy") or "unspecified")
+        counts[strategy] = counts.get(strategy, 0) + 1
     return counts
 
 
@@ -352,6 +361,7 @@ def repo_status(repo: dict[str, Any], *, external: bool) -> dict[str, Any]:
         "pr_github": repo.get("pr_github", repo.get("github")),
         "issue_github": repo.get("issue_github", repo.get("github")),
         "default_branch": repo.get("default_branch"),
+        "ci_strategy": repo.get("ci_strategy"),
         "production_adjacent": bool(repo.get("production_adjacent")),
         "migration_state": repo.get("migration_state"),
         "exists": path.exists(),
@@ -626,14 +636,15 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"- Missing upstream clones: {', '.join(summary['upstream_missing_local_repos']) or 'none'}",
         f"- Active worktrees: {summary['worktree_count']}",
         f"- Dirty worktrees: {', '.join(summary['dirty_worktrees']) or 'none'}",
+        f"- CI strategies: {json.dumps(summary.get('ci_strategies', {}), sort_keys=True)}",
         f"- Routine stages: {json.dumps(summary['routine_stages'], sort_keys=True)}",
         f"- Hermes skill classes: {json.dumps(summary['hermes_skill_classes'], sort_keys=True)}",
         f"- Hermes production-adjacent skills: {summary['hermes_production_adjacent_skills']}",
         "",
         "## Repos",
         "",
-        "| Repo | Class | Branch | Runtime | Clean | Open PRs | State |",
-        "|---|---|---|---|:---:|---:|---|",
+        "| Repo | Class | Branch | Runtime | Clean | Open PRs | CI Strategy | State |",
+        "|---|---|---|---|:---:|---:|---|---|",
     ]
     for repo in report["repos"]:
         runtime = repo.get("runtime") or {}
@@ -646,6 +657,7 @@ def render_markdown(report: dict[str, Any]) -> str:
             f"{runtime_label} | "
             f"{'yes' if repo.get('clean') else 'no'} | "
             f"{count_actionable_items(repo.get('open_prs', []))} | "
+            f"{repo.get('ci_strategy') or '-'} | "
             f"{repo.get('migration_state') or '-'} |"
         )
     dirty_repos = [repo for repo in report["repos"] if repo.get("dirty_count")]

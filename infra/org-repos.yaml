@@ -10,6 +10,7 @@ repos:
     local_path: /Users/aribs/Code/Sapphire
     github: arigatoexpress/Sapphire
     default_branch: main
+    ci_strategy: sapphire_self_hosted_gate
     production_adjacent: true
     required_guardrails:
       - AGENTS.md
@@ -25,6 +26,7 @@ repos:
     local_path: /Users/aribs/Code/Project-Go-Forward
     github: arigatoexpress/Project-Go-Forward
     default_branch: main
+    ci_strategy: draft_auto_deploy
     production_adjacent: true
     required_guardrails:
       - AGENTS.md or CLAUDE.md
@@ -39,6 +41,7 @@ repos:
     local_path: /Users/aribs/Code/AgenticArigato
     github: arigatoexpress/AgenticArigato
     default_branch: main
+    ci_strategy: local_evidence_skip_ci_bootstrap
     production_adjacent: true
     required_guardrails:
       - AGENTS.md
@@ -78,6 +81,7 @@ repos:
     pr_github: arigatoexpress/claw-code
     issue_github: arigatoexpress/claw-code
     default_branch: main
+    ci_strategy: upstream_fork_local_only
     production_adjacent: false
     required_guardrails:
       - CLAUDE.md
@@ -91,6 +95,7 @@ repos:
     local_path: /Users/aribs/Code/cyber-threat-bot
     github: arigatoexpress/cyber-threat-bot
     default_branch: master
+    ci_strategy: local_evidence_skip_ci_bootstrap
     production_adjacent: true
     required_guardrails:
       - AGENTS.md
@@ -105,6 +110,7 @@ repos:
     local_path: /Users/aribs/Code/regional-intel-workbench
     github: arigatoexpress/regional-intel-workbench
     default_branch: main
+    ci_strategy: local_evidence_skip_ci_bootstrap
     production_adjacent: true
     required_guardrails:
       - AGENTS.md
@@ -119,6 +125,7 @@ repos:
     local_path: /Users/aribs/Code/tradingview-mcp
     github: arigatoexpress/tradingview-mcp
     default_branch: master
+    ci_strategy: local_evidence_skip_ci_bootstrap
     production_adjacent: true
     required_guardrails:
       - CLAUDE.md
@@ -135,6 +142,7 @@ repos:
     pr_github: arigatoexpress/tradingview-mcp-upstream
     issue_github: arigatoexpress/tradingview-mcp-upstream
     default_branch: main
+    ci_strategy: upstream_fork_local_only
     production_adjacent: true
     required_guardrails:
       - AGENTS.md or CLAUDE.md
@@ -158,6 +166,7 @@ repos:
     local_path: /Users/aribs/Code/Cointracker
     github: arigatoexpress/crypto-tax-tracker
     default_branch: main
+    ci_strategy: local_evidence_skip_ci_bootstrap
     production_adjacent: false
     required_guardrails:
       - AGENTS.md
@@ -188,6 +197,7 @@ repos:
     pr_github: arigatoexpress/hermes-agent
     issue_github: arigatoexpress/hermes-agent
     default_branch: main
+    ci_strategy: upstream_fork_local_only
     production_adjacent: true
     required_guardrails:
       - AGENTS.md
@@ -214,6 +224,7 @@ repos:
     local_path: /Users/aribs/Code/kimi-tools
     github: null
     default_branch: main
+    ci_strategy: local_evidence_skip_ci_bootstrap
     production_adjacent: false
     required_guardrails:
       - local README or AGENTS.md

@@ -49,9 +49,16 @@ def test_manifest_tracks_required_core_and_satellite_fields() -> None:
         "role",
         "local_path",
         "default_branch",
+        "ci_strategy",
         "production_adjacent",
         "required_guardrails",
         "migration_state",
+    }
+    allowed_ci_strategies = {
+        "sapphire_self_hosted_gate",
+        "local_evidence_skip_ci_bootstrap",
+        "draft_auto_deploy",
+        "upstream_fork_local_only",
     }
 
     repos = manifest["repos"]
@@ -64,10 +71,26 @@ def test_manifest_tracks_required_core_and_satellite_fields() -> None:
     }
     for repo in repos:
         assert repo["classification"] in allowed_classes
+        assert repo["ci_strategy"] in allowed_ci_strategies
         if repo["classification"] in {"core", "satellite"}:
             assert required <= set(repo)
             assert repo["github"], f"{repo['id']} needs a GitHub repo"
             assert repo["required_guardrails"]
+
+
+def test_production_adjacent_repos_have_no_spend_ci_posture() -> None:
+    repos = {repo["id"]: repo for repo in _manifest()["repos"]}
+
+    for repo in repos.values():
+        if repo["production_adjacent"]:
+            assert repo["ci_strategy"], f"{repo['id']} needs ci_strategy"
+
+    assert repos["sapphire"]["ci_strategy"] == "sapphire_self_hosted_gate"
+    assert repos["project-go-forward"]["ci_strategy"] == "draft_auto_deploy"
+    assert repos["hermes-agent"]["ci_strategy"] == "upstream_fork_local_only"
+    assert repos["regional-intel-workbench"]["ci_strategy"] == (
+        "local_evidence_skip_ci_bootstrap"
+    )
 
 
 def test_manifest_tracks_upstream_integration_fleet() -> None:
@@ -387,6 +410,8 @@ def test_collect_status_no_external_handles_local_ci_without_live_tools(tmp_path
     assert report["summary"]["repo_count"] == len(manifest["repos"])
     assert report["summary"]["upstream_repo_count"] == len(manifest["upstream_repos"])
     assert "repo_classifications" in report["summary"]
+    assert report["summary"]["ci_strategies"]["sapphire_self_hosted_gate"] == 1
+    assert report["summary"]["ci_strategies"]["draft_auto_deploy"] == 1
     assert report["summary"]["open_prs_checked"] is False
     assert "worktree_count" in report["summary"]
     assert "dirty_worktrees" in report["summary"]
@@ -420,7 +445,9 @@ def test_render_markdown_includes_control_board_sections() -> None:
     assert "## Hermes Skills" in markdown
     assert "## Waves" in markdown
     assert "- Open PRs: not checked (--no-external)" in markdown
+    assert "- CI strategies:" in markdown
     assert "| sapphire | core |" in markdown
+    assert "| sapphire | core | main | - | yes | 0 | sapphire_self_hosted_gate |" in markdown
     assert "| openbb | OpenBB-finance/OpenBB | arigatoexpress/OpenBB |" in markdown
     assert "| tradingview | external_mutating | yes |" in markdown
 
