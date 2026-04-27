@@ -339,6 +339,26 @@ def test_sovereign_thesis_endpoint_is_research_only(app_client):
     assert any(row["status"] == "needs_wiring" for row in body["evidence_ledger"])
 
 
+def test_continuous_intelligence_endpoint_is_dry_run(app_client):
+    _, client = app_client
+    r = client.get("/api/autonomy/continuous-intelligence", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["mode"] == "read_only_task_planning"
+    assert body["execution_enabled"] is False
+    assert body["live_trading_enabled"] is False
+    assert body["telegram_sends_enabled"] is False
+    assert body["writes_by_default"] is False
+    assert body["tasks"]
+    assert body["next_dispatch"]
+    assert {task["lane"] for task in body["tasks"]} >= {
+        "strategy_backtest",
+        "confluence_scan",
+        "thesis_research",
+    }
+    assert any(target["id"] == "windows-gpu" for target in body["runtime_targets"])
+
+
 def test_sovereign_thesis_page_renders(app_client):
     _, client = app_client
     r = client.get("/sovereign-thesis", headers={"Authorization": _AUTH})

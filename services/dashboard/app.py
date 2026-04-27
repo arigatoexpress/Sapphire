@@ -2469,6 +2469,43 @@ def api_investments_thesis():
         }), 200
 
 
+@app.route('/api/autonomy/continuous-intelligence')
+@requires_auth
+def api_autonomy_continuous_intelligence():
+    """Read-only work planner for continuous strategy, confluence, and thesis tasks."""
+    try:
+        from lib.autonomy.continuous_intelligence import build_continuous_intelligence_plan
+
+        live = str(request.args.get('live') or '').lower() in {'1', 'true', 'yes'}
+        return jsonify(build_continuous_intelligence_plan(fetch_live=live))
+    except Exception as e:
+        log.warning("continuous intelligence API error: %s", e)
+        return jsonify({
+            'generated_at': datetime.now(UTC).isoformat(),
+            'mode': 'read_only_task_planning',
+            'live_requested': False,
+            'execution_enabled': False,
+            'live_trading_enabled': False,
+            'telegram_sends_enabled': False,
+            'writes_by_default': False,
+            'error': str(e),
+            'safety': {
+                'execution_enabled': False,
+                'live_trading_enabled': False,
+                'telegram_sends_enabled': False,
+                'writes_by_default': False,
+                'guards': ['read_only_task_generation', 'dry_run_dispatch_only'],
+            },
+            'runtime_targets': [],
+            'totals': {'tasks': 0, 'blocked': 0, 'lanes': {}, 'priorities': {}, 'runtimes': {}},
+            'inputs': {},
+            'tasks': [],
+            'next_dispatch': [],
+            'operating_loop': [],
+            'source_docs': [],
+        }), 200
+
+
 @app.route('/api/investments/sources')
 @requires_auth
 def api_investments_sources():
