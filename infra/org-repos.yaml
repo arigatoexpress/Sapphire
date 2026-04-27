@@ -261,8 +261,8 @@ upstream_repos:
     ari_fork: arigatoexpress/Kronos
     local_path: /Users/aribs/Code/Kronos
     integration_surface: Kronos model code backs Sapphire market forecasting wrappers and daily dry-run routines.
-    sync_state: forked_dirty_local_workbench
-    notes: Local worktree has intentionally unreviewed changes; preserve before cleanup or retargeting.
+    sync_state: forked_model_cache_ignored_clean
+    notes: Local .models Hugging Face cache is ignored via .git/info/exclude; worktree is clean but behind upstream.
 
   - id: lumo-api-v2
     name: Lumo-Api-V2
@@ -270,8 +270,8 @@ upstream_repos:
     ari_fork: arigatoexpress/Lumo-Api-V2
     local_path: /Users/aribs/Code/lumo-api
     integration_surface: Local Lumo API server backs Sapphire security research tools.
-    sync_state: forked_dirty_local_workbench
-    notes: Local worktree has unreviewed changes; do not overwrite during repo hygiene.
+    sync_state: forked_clean_local_workbench
+    notes: Local worktree is clean; keep as a local security-research integration workbench.
 
   - id: hermes-agent-upstream
     name: hermes-agent
