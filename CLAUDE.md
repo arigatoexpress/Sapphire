@@ -6,8 +6,8 @@ Autonomous trading + intelligence + content ops. Telegram-first, agent-driven, e
 
 ```bash
 # Test
-pytest tests/unit/ --tb=short -q           # 2,209 passing (use /usr/local/bin/python3 on Mac)
-pytest plugins/claw-sapphire/tests/ -q     # 78 plugin tests (budget, router, state, technical_analysis, trading_brain)
+pytest tests/unit/ --tb=short -q           # 3,310 passing (plus 1 skipped, 21 xfailed)
+pytest plugins/claw-sapphire/tests/ -q     # 117 plugin tests (budget, router, state, technical_analysis, trading_brain)
 
 # Lint
 ruff check .                          # pyproject.toml rules (E501 ignored)
@@ -73,7 +73,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 
 ## Module Map
 
-**Key counts (verified 2026-04-26):** 2,287 passing tests (2,209 core + 78 plugin) · 32 dashboard pages · 7 quant strategies · 20 LaunchAgents (folded in by the 2026-04-21 audit; see `docs/launchagents-audit-2026-04-21.md`) · 21 scheduled tasks · 2 smart contracts.
+**Key counts (verified 2026-04-27):** 3,427 passing tests (3,310 core + 117 plugin; plus 1 skipped and 21 expected-fail red-team guards in core) · 32 dashboard pages · 7 quant strategies · 20 LaunchAgents (folded in by the 2026-04-21 audit; see `docs/launchagents-audit-2026-04-21.md`) · 21 scheduled tasks · 2 smart contracts.
 
 | Path | Type | Description |
 |------|------|-------------|
