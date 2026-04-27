@@ -30,13 +30,18 @@ thesis should be questioned before any strategy work uses it.
 ## Model
 
 The config defines lenses such as hard money, self custody, censorship
-resistance, counterparty minimization, energy abundance, autonomy defense, AI
-infrastructure, tokenized finance, jurisdictional resilience, and productive
-capital. Assets are scored against those lenses using conviction-adjusted
-weights.
+resistance, privacy engineering, post-quantum readiness, counterparty
+minimization, energy abundance, autonomy defense, AI infrastructure, tokenized
+finance, the ETH economic zone, protocol progress, jurisdictional resilience,
+and productive capital. Assets are scored against those lenses using
+conviction-adjusted weights.
 
-The first universe includes Sapphire-liked crypto assets plus the solar, drone,
-space, defense, AI, nuclear, grid, and energy names from the Kimi research pack.
+The current crypto stance explicitly prefers Ethereum over Bitcoin while still
+tracking Bitcoin as an aligned hard-money asset. The ETH preference is grounded
+in privacy work, post-quantum migration planning, L2/economic-zone depth, and
+protocol advancement. The first universe includes Sapphire-liked crypto assets
+plus the solar, drone, space, defense, AI, nuclear, grid, and energy names from
+the Kimi research pack.
 
 ## Source Plan
 
@@ -48,6 +53,8 @@ coverage. Source gaps become ops tasks rather than silent confidence:
 - EIA for electricity, gas, grid, and energy abundance data
 - CoinGecko, Hyperliquid, and DeFiLlama for crypto market, perps, and DeFi data
 - Robinhood read-only holdings/venue readiness
+- Ethereum Foundation roadmap, privacy, post-quantum, account abstraction, and
+  platform updates for ETH thesis evidence
 - Kimi research pack as a source-pack signal, not a source of truth
 
 Each asset now emits an evidence ledger row per required or present source. Rows

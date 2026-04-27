@@ -8,6 +8,8 @@ def test_canonicalize_symbol_corrects_known_aliases():
     assert lab.canonicalize_symbol("MATIC-USD") == "POL"
     assert lab.canonicalize_symbol("BTCUSDT") == "BTC"
     assert lab.canonicalize_symbol("ETH/USD") == "ETH"
+    assert lab.canonicalize_symbol("KRAKEN:XMRUSD") == "XMR"
+    assert lab.canonicalize_symbol("BINANCE:OPUSDT") == "OP"
 
 
 def test_parse_trending_tokens_marks_liked_and_keeps_unknowns():
@@ -56,9 +58,11 @@ def test_build_market_universe_without_live_fetch_is_deterministic(monkeypatch):
     report = lab.build_market_universe(fetch_live=False)
 
     symbols = [row["symbol"] for row in report["liked_tokens"]]
-    assert symbols[:5] == ["BTC", "ETH", "SOL", "HYPE", "ZEC"]
+    assert symbols[:6] == ["ETH", "BTC", "ZEC", "XMR", "AAVE", "LINK"]
     assert report["stale"] is False
-    assert report["venue_matrix"][0]["tradingview"] == "BINANCE:BTCUSDT"
+    assert report["venue_matrix"][0]["tradingview"] == "BINANCE:ETHUSDT"
+    assert "preferred" in report["liked_tokens"][0]["tags"]
+    assert {row["symbol"] for row in report["liked_tokens"]} >= {"UNI", "ENS", "ARB", "OP"}
     assert report["corrected_aliases"]["MATIC"] == "POL"
 
 

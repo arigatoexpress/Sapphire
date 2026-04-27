@@ -86,7 +86,7 @@ ASSET_SPECS: dict[str, AssetSpec] = {
         "BTC",
         "BTC-USD",
         "high",
-        ("core", "liked", "perp", "robinhood"),
+        ("aligned", "liked", "perp", "robinhood"),
     ),
     "ETH": AssetSpec(
         "ETH",
@@ -97,7 +97,7 @@ ASSET_SPECS: dict[str, AssetSpec] = {
         "ETH",
         "ETH-USD",
         "high",
-        ("core", "liked", "perp", "robinhood"),
+        ("core", "preferred", "liked", "perp", "robinhood", "ethereum_zone"),
     ),
     "SOL": AssetSpec(
         "SOL",
@@ -132,6 +132,17 @@ ASSET_SPECS: dict[str, AssetSpec] = {
         "medium",
         ("liked", "privacy", "perp"),
     ),
+    "XMR": AssetSpec(
+        "XMR",
+        "Monero",
+        "monero",
+        "KRAKEN:XMRUSD",
+        "XMR-USD",
+        None,
+        None,
+        "watch",
+        ("liked", "privacy", "paper"),
+    ),
     "LINK": AssetSpec(
         "LINK",
         "Chainlink",
@@ -154,6 +165,17 @@ ASSET_SPECS: dict[str, AssetSpec] = {
         "medium",
         ("l2", "perp"),
     ),
+    "OP": AssetSpec(
+        "OP",
+        "Optimism",
+        "optimism",
+        "BINANCE:OPUSDT",
+        "OP-USD",
+        "OP",
+        None,
+        "medium",
+        ("l2", "ethereum_zone", "perp"),
+    ),
     "AVAX": AssetSpec(
         "AVAX",
         "Avalanche",
@@ -175,6 +197,28 @@ ASSET_SPECS: dict[str, AssetSpec] = {
         "AAVE-USD",
         "medium",
         ("defi", "perp"),
+    ),
+    "UNI": AssetSpec(
+        "UNI",
+        "Uniswap",
+        "uniswap",
+        "BINANCE:UNIUSDT",
+        "UNI-USD",
+        "UNI",
+        None,
+        "medium",
+        ("defi", "ethereum_zone", "perp"),
+    ),
+    "ENS": AssetSpec(
+        "ENS",
+        "Ethereum Name Service",
+        "ethereum-name-service",
+        "BINANCE:ENSUSDT",
+        "ENS-USD",
+        None,
+        None,
+        "watch",
+        ("identity", "ethereum_zone", "paper"),
     ),
     "TAO": AssetSpec(
         "TAO",
@@ -211,7 +255,7 @@ ASSET_SPECS: dict[str, AssetSpec] = {
     ),
 }
 
-DEFAULT_LIKED_SYMBOLS = ("BTC", "ETH", "SOL", "HYPE", "ZEC", "LINK", "ARB", "AVAX", "AAVE", "TAO")
+DEFAULT_LIKED_SYMBOLS = ("ETH", "BTC", "ZEC", "XMR", "AAVE", "LINK", "UNI", "ENS", "ARB", "OP", "SOL", "HYPE", "TAO")
 CORRECTED_ALIASES = {
     "HYPER": "HYPE",
     "HYPERUSDT": "HYPE",
@@ -224,10 +268,15 @@ CORRECTED_ALIASES = {
     "ETHUSDT": "ETH",
     "SOLUSDT": "SOL",
     "ZECUSDT": "ZEC",
+    "XMRUSDT": "XMR",
+    "XMRUSD": "XMR",
     "LINKUSDT": "LINK",
     "AVAXUSDT": "AVAX",
     "ARBUSDT": "ARB",
+    "OPUSDT": "OP",
     "AAVEUSDT": "AAVE",
+    "UNIUSDT": "UNI",
+    "ENSUSDT": "ENS",
     "TAOUSDT": "TAO",
 }
 
