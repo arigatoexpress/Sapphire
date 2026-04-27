@@ -23,6 +23,12 @@ Required:
 
 Optional:
 
+- `SAPPHIRE_PM_BOT_WEBHOOK_SECRET=...`
+  - Recommended for webhook mode. The service compares this against
+    Telegram's `X-Telegram-Bot-Api-Secret-Token` header and rejects bad
+    requests with `403` before parsing JSON.
+- `TELEGRAM_WEBHOOK_SECRET=...`
+  - Shared fallback if `SAPPHIRE_PM_BOT_WEBHOOK_SECRET` is not set.
 - `THO_API_KEY_FILE=~/.config/sapphire-secrets/tho_api_key`
   - Required for `/rag`; prefer the file path over putting `THO_API_KEY` directly in the LaunchAgent environment
 - `THO_API_KEY=...`
@@ -63,7 +69,7 @@ Set the webhook:
 ```bash
 curl -s "https://api.telegram.org/bot${SAPPHIRE_PM_BOT_TOKEN}/setWebhook" \
   -H "Content-Type: application/json" \
-  -d "{\"url\":\"https://YOUR-PUBLIC-URL/telegram/webhook\",\"allowed_updates\":[\"message\"]}"
+  -d "{\"url\":\"https://YOUR-PUBLIC-URL/telegram/webhook\",\"allowed_updates\":[\"message\"],\"secret_token\":\"${SAPPHIRE_PM_BOT_WEBHOOK_SECRET}\"}"
 ```
 
 Clear the webhook for polling:
