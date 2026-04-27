@@ -93,7 +93,7 @@ resource "google_sql_database" "trading_db" {
 resource "google_sql_user" "trading_user" {
   name     = "trading_user"
   instance = google_sql_database_instance.sapphire_db.name
-  password = "changeme123" # User should change this
+  password = var.trading_db_password
 }
 
 # Redis

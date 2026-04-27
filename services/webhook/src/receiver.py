@@ -40,7 +40,7 @@ _FIRESTORE_AVAILABLE = False
 
 SYSTEM_LOGS_COLLECTION = "system_logs"
 
-WEBHOOK_SECRET  = os.getenv("WEBHOOK_SECRET", "sapphire_trading_2024")  # Must match Pine Script alert body
+WEBHOOK_SECRET  = os.getenv("WEBHOOK_SECRET", "")  # Must match Pine Script alert body
 OLLAMA_URL      = os.getenv("OLLAMA_URL", "http://localhost:11434")   # Local Ollama (RTX 5070 Ti)
 WEBHOOK_PORT    = int(os.getenv("WEBHOOK_PORT", "9090"))
 LOG_FILE        = os.getenv("WEBHOOK_LOG_FILE", "C:/sapphire/webhook.log")

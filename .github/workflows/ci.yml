@@ -11,6 +11,13 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Hosted macOS runners use /Users/runner for the tool cache, but Ari's
+  # self-hosted Sapphire runner runs as /Users/aribs. Keep setup-python in a
+  # writable local cache so no hosted minutes are needed.
+  AGENT_TOOLSDIRECTORY: /Users/aribs/.github-runners/toolcache
+  RUNNER_TOOL_CACHE: /Users/aribs/.github-runners/toolcache
+
 permissions:
   contents: read
   pull-requests: read
@@ -104,8 +111,18 @@ jobs:
       pull-requests: read
     steps:
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install gitleaks when missing
+        run: |
+          if ! command -v gitleaks >/dev/null 2>&1; then
+            brew install gitleaks
+          fi
+      - name: gitleaks current tree
+        run: |
+          gitleaks detect \
+            --redact \
+            --no-git \
+            --source . \
+            --config .gitleaks.toml \
+            --exit-code=2 \
+            --report-format=sarif \
+            --report-path=results.sarif

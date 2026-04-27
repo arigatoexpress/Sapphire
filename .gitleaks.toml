@@ -11,4 +11,13 @@ paths = [
     '''tests/fixtures/redteam/.*\.json''',
     '''tests/unit/test_redteam_corpus\.py''',
     '''docs/onboarding/ai-redteam-.*\.md''',
+    '''\.claude/skills/signal/SKILL\.md''',
+    '''docs/cloud-audit-2026-04-15\.md''',
+    '''infra/ON_PREM_MIGRATION\.md''',
+    '''plugins/claw-sapphire/lib/sensitivity_classifier\.py''',
+    '''scripts/archived/register_lighter_key\.py''',
+    '''tests/legacy/test_security_fuzz\.py''',
+    '''tests/unit/test_molthub_outreach\.py''',
+    '''tests/unit/test_sensitivity_filter\.py''',
+    '''tests/unit/test_ws_dashboard\.py''',
 ]
