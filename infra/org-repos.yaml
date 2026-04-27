@@ -532,8 +532,13 @@ waves:
       - docs/org/kimi-tools-absorb-map.md
       - docs/org/hermes-sapphire-skill-surface.md
   - id: wave-4-data-intelligence-platform
-    status: queued
+    status: in_progress
     objective: Schema and audit-log alignment for intel, Foundry, GCS, and BigQuery
+    tracking:
+      - infra/gcp/regional_intel_mapping.json
+      - docs/gcp-data-engineering.md
+      - docs/foundry-ontology-schema.md
+      - docs/continuous-intelligence-workplan.md
   - id: wave-5-autonomy-safety
     status: in_progress
     objective: Confirmation firewall, audit log, feedback loop, cost report, and dry-run defaults
