@@ -308,3 +308,28 @@ def test_investment_probes_endpoint_is_non_live_by_default(app_client):
     probes = {row["id"]: row for row in body["probes"]}
     assert probes["sec_company_tickers"]["status"] == "not_requested"
     assert body["series_catalog"]
+
+
+def test_sovereign_thesis_endpoint_is_research_only(app_client):
+    _, client = app_client
+    r = client.get("/api/investments/thesis", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["mode"] == "research_intel_only"
+    assert body["safety"]["live_trading_enabled"] is False
+    assert body["safety"]["execution_enabled"] is False
+    assert body["totals"]["assets"] >= 20
+    rows = {row["symbol"]: row for row in body["assets"]}
+    assert rows["BTC"]["fit"] == "core"
+    assert "hard_money" in rows["BTC"]["aligned_lenses"]
+    assert "BWXT" in rows
+    assert body["ops_queue"]
+
+
+def test_sovereign_thesis_page_renders(app_client):
+    _, client = app_client
+    r = client.get("/sovereign-thesis", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert "Sovereign Thesis" in html
+    assert "/api/investments/thesis" in html

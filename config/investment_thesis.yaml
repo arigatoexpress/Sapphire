@@ -1,0 +1,517 @@
+{
+  "version": 1,
+  "name": "Sapphire Sovereign Thesis Matrix",
+  "mode": "research_intel_only",
+  "worldview": {
+    "stance": "cypherpunk_austrian",
+    "principles": [
+      "hard_money_over_discretionary_credit",
+      "self_custody_over_intermediated_claims",
+      "permissionless_networks_over_chokepoints",
+      "productive_capital_over_fiat_beta",
+      "energy_abundance_as_real_growth",
+      "defense_autonomy_as_resilience",
+      "falsifiable_theses_over_narrative"
+    ]
+  },
+  "lenses": [
+    {
+      "id": "hard_money",
+      "label": "Hard Money",
+      "weight": 1.35,
+      "austrian_principle": "scarcity and credible monetary rules beat discretionary supply",
+      "positive_tags": ["hard_money", "fixed_supply", "monetary_premium", "store_of_value"],
+      "negative_tags": ["fiat_beta", "dilutive_tokenomics"],
+      "source_requirements": [
+        "fred:M2SL",
+        "fred:FEDFUNDS",
+        "treasury:debt_to_penny",
+        "coingecko:market_data"
+      ]
+    },
+    {
+      "id": "self_custody",
+      "label": "Self Custody",
+      "weight": 1.2,
+      "austrian_principle": "property rights require exit from custodial chokepoints",
+      "positive_tags": ["self_custody", "bearer_asset", "wallet_native", "permissionless_settlement"],
+      "negative_tags": ["custodial_only", "permissioned_redemption"],
+      "source_requirements": [
+        "chain:wallet_support",
+        "coingecko:asset_metadata",
+        "venue:withdrawal_capability"
+      ]
+    },
+    {
+      "id": "censorship_resistance",
+      "label": "Censorship Resistance",
+      "weight": 1.15,
+      "austrian_principle": "speech, trade, and settlement should survive political pressure",
+      "positive_tags": ["censorship_resistance", "privacy", "decentralized_consensus", "permissionless_settlement"],
+      "negative_tags": ["blacklist_admin", "centralized_sequencer_only"],
+      "source_requirements": [
+        "chain:validator_distribution",
+        "chain:client_diversity",
+        "policy:regulatory_pressure"
+      ]
+    },
+    {
+      "id": "counterparty_minimization",
+      "label": "Counterparty Min.",
+      "weight": 1.1,
+      "austrian_principle": "reduce trust in leverage chains and rehypothecation",
+      "positive_tags": ["counterparty_minimized", "transparent_reserves", "public_settlement", "cash_flow_resilience"],
+      "negative_tags": ["rehypothecation_risk", "opaque_balance_sheet", "excessive_leverage"],
+      "source_requirements": [
+        "sec:companyfacts",
+        "defillama:stablecoins",
+        "hyperliquid:open_interest",
+        "robinhood:holdings_read_only"
+      ]
+    },
+    {
+      "id": "energy_abundance",
+      "label": "Energy Abundance",
+      "weight": 1.05,
+      "austrian_principle": "real prosperity compounds through cheap, reliable energy",
+      "positive_tags": ["nuclear", "grid", "solar", "storage", "lng", "power_market", "uranium"],
+      "negative_tags": ["subsidy_fragility", "commodity_margin_squeeze"],
+      "source_requirements": [
+        "eia:electricity",
+        "eia:natural_gas",
+        "fred:INDPRO",
+        "sec:companyfacts"
+      ]
+    },
+    {
+      "id": "autonomy_defense",
+      "label": "Autonomy Defense",
+      "weight": 1.0,
+      "austrian_principle": "resilient societies decentralize sensing, production, and defense capacity",
+      "positive_tags": ["drones", "space", "defense", "autonomy", "sensors", "resilience"],
+      "negative_tags": ["program_concentration", "procurement_delay"],
+      "source_requirements": [
+        "sec:submissions",
+        "gov:contract_awards",
+        "news:geopolitical_catalysts"
+      ]
+    },
+    {
+      "id": "ai_infra",
+      "label": "AI Infrastructure",
+      "weight": 0.95,
+      "austrian_principle": "intelligence leverage favors scarce compute, data, and operational distribution",
+      "positive_tags": ["ai", "compute", "data_network", "automation", "software_platform"],
+      "negative_tags": ["ai_narrative_without_moat"],
+      "source_requirements": [
+        "sec:companyfacts",
+        "market:revenue_growth",
+        "source_pack:kimi"
+      ]
+    },
+    {
+      "id": "tokenized_finance",
+      "label": "Tokenized Finance",
+      "weight": 0.9,
+      "austrian_principle": "markets get freer when settlement and collateral become programmable",
+      "positive_tags": ["defi", "oracle", "rwa", "perp_venue", "settlement_layer"],
+      "negative_tags": ["regulatory_chokepoint", "oracle_capture"],
+      "source_requirements": [
+        "defillama:tvl",
+        "coingecko:market_data",
+        "hyperliquid:asset_contexts"
+      ]
+    },
+    {
+      "id": "jurisdictional_resilience",
+      "label": "Jurisdictional Resilience",
+      "weight": 0.85,
+      "austrian_principle": "optionality across jurisdictions protects capital and operations",
+      "positive_tags": ["global_market", "exportable_product", "permissionless_network", "multi_jurisdiction"],
+      "negative_tags": ["single_regulator_chokepoint", "tariff_fragility"],
+      "source_requirements": [
+        "sec:submissions",
+        "policy:jurisdiction_scan",
+        "macro:currency_stress"
+      ]
+    },
+    {
+      "id": "productive_capital",
+      "label": "Productive Capital",
+      "weight": 0.8,
+      "austrian_principle": "capital should produce cash flows, capability, or settlement utility",
+      "positive_tags": ["cash_flow", "industrial_capacity", "network_utility", "mission_critical"],
+      "negative_tags": ["pure_multiple_expansion", "unproven_unit_economics"],
+      "source_requirements": [
+        "sec:companyfacts",
+        "market:unit_economics",
+        "source_pack:kimi"
+      ]
+    }
+  ],
+  "assets": [
+    {
+      "symbol": "BTC",
+      "name": "Bitcoin",
+      "asset_class": "crypto",
+      "conviction": 0.96,
+      "thesis_tags": ["hard_money", "fixed_supply", "self_custody", "bearer_asset", "censorship_resistance", "counterparty_minimized", "permissionless_network", "monetary_premium"],
+      "lens_scores": {"hard_money": 1, "self_custody": 1, "censorship_resistance": 1, "counterparty_minimization": 1, "jurisdictional_resilience": 0.9, "tokenized_finance": 0.25, "energy_abundance": 0.2, "productive_capital": 0.2},
+      "venue_symbols": {"tradingview": "BINANCE:BTCUSDT", "hyperliquid": "BTC", "robinhood": "BTC-USD", "coingecko": "bitcoin"},
+      "evidence_sources": ["coingecko:market_data", "hyperliquid:asset_contexts", "fred:M2SL", "treasury:debt_to_penny"],
+      "invalidation_triggers": [
+        {"id": "btc_security_budget_pressure", "condition": "persistent fee compression plus falling security spend", "severity": "high", "status": "watch"},
+        {"id": "btc_custodial_capture", "condition": "spot ownership migrates materially into rehypothecated custodial claims", "severity": "medium", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "ZEC",
+      "name": "Zcash",
+      "asset_class": "crypto",
+      "conviction": 0.74,
+      "thesis_tags": ["privacy", "self_custody", "censorship_resistance", "bearer_asset", "permissionless_settlement"],
+      "lens_scores": {"self_custody": 0.9, "censorship_resistance": 1, "hard_money": 0.55, "counterparty_minimization": 0.7, "jurisdictional_resilience": 0.85},
+      "venue_symbols": {"tradingview": "BINANCE:ZECUSDT", "hyperliquid": "ZEC", "robinhood": "ZEC-USD", "coingecko": "zcash"},
+      "evidence_sources": ["coingecko:market_data", "hyperliquid:asset_contexts", "policy:regulatory_pressure"],
+      "invalidation_triggers": [
+        {"id": "zec_liquidity_decay", "condition": "privacy premium rises while liquidity and venue support deteriorate", "severity": "medium", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "XMR",
+      "name": "Monero",
+      "asset_class": "crypto_watch",
+      "conviction": 0.7,
+      "thesis_tags": ["privacy", "self_custody", "censorship_resistance", "bearer_asset", "jurisdictional_resilience"],
+      "lens_scores": {"self_custody": 0.85, "censorship_resistance": 1, "hard_money": 0.5, "counterparty_minimization": 0.7, "jurisdictional_resilience": 1},
+      "venue_symbols": {"tradingview": "KRAKEN:XMRUSD", "coingecko": "monero"},
+      "evidence_sources": ["coingecko:market_data", "policy:regulatory_pressure"],
+      "invalidation_triggers": [
+        {"id": "xmr_venue_fragility", "condition": "venue access declines faster than private settlement demand rises", "severity": "medium", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "ETH",
+      "name": "Ethereum",
+      "asset_class": "crypto",
+      "conviction": 0.78,
+      "thesis_tags": ["settlement_layer", "defi", "self_custody", "tokenized_finance", "network_utility"],
+      "lens_scores": {"tokenized_finance": 1, "self_custody": 0.85, "productive_capital": 0.7, "counterparty_minimization": 0.55, "jurisdictional_resilience": 0.65, "hard_money": 0.35},
+      "venue_symbols": {"tradingview": "BINANCE:ETHUSDT", "hyperliquid": "ETH", "robinhood": "ETH-USD", "coingecko": "ethereum"},
+      "evidence_sources": ["defillama:tvl", "coingecko:market_data", "hyperliquid:asset_contexts"],
+      "invalidation_triggers": [
+        {"id": "eth_l2_value_leakage", "condition": "settlement revenue fails to capture L2 activity", "severity": "medium", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "SOL",
+      "name": "Solana",
+      "asset_class": "crypto",
+      "conviction": 0.76,
+      "thesis_tags": ["settlement_layer", "defi", "self_custody", "network_utility", "tokenized_finance"],
+      "lens_scores": {"tokenized_finance": 0.9, "self_custody": 0.75, "productive_capital": 0.65, "counterparty_minimization": 0.45, "jurisdictional_resilience": 0.6},
+      "venue_symbols": {"tradingview": "BINANCE:SOLUSDT", "hyperliquid": "SOL", "robinhood": "SOL-USD", "coingecko": "solana"},
+      "evidence_sources": ["defillama:tvl", "coingecko:market_data", "hyperliquid:asset_contexts"],
+      "invalidation_triggers": [
+        {"id": "sol_outage_or_fee_spike", "condition": "network reliability or fee market breaks under demand", "severity": "high", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "HYPE",
+      "name": "Hyperliquid",
+      "asset_class": "crypto",
+      "conviction": 0.77,
+      "thesis_tags": ["perp_venue", "tokenized_finance", "public_settlement", "network_utility"],
+      "lens_scores": {"tokenized_finance": 1, "productive_capital": 0.75, "counterparty_minimization": 0.55, "jurisdictional_resilience": 0.55, "self_custody": 0.35},
+      "venue_symbols": {"tradingview": "HYPEUSDT", "hyperliquid": "HYPE", "coingecko": "hyperliquid"},
+      "evidence_sources": ["hyperliquid:asset_contexts", "coingecko:market_data", "defillama:tvl"],
+      "invalidation_triggers": [
+        {"id": "hype_exchange_capture", "condition": "venue growth becomes dependent on opaque leverage or governance capture", "severity": "high", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "LINK",
+      "name": "Chainlink",
+      "asset_class": "crypto",
+      "conviction": 0.7,
+      "thesis_tags": ["oracle", "tokenized_finance", "rwa", "network_utility"],
+      "lens_scores": {"tokenized_finance": 0.95, "productive_capital": 0.65, "jurisdictional_resilience": 0.45, "counterparty_minimization": 0.45},
+      "venue_symbols": {"tradingview": "BINANCE:LINKUSDT", "hyperliquid": "LINK", "robinhood": "LINK-USD", "coingecko": "chainlink"},
+      "evidence_sources": ["coingecko:market_data", "defillama:tvl"],
+      "invalidation_triggers": [
+        {"id": "link_oracle_capture", "condition": "oracle market becomes commoditized or captured by single counterparties", "severity": "medium", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "ONDO",
+      "name": "Ondo",
+      "asset_class": "crypto",
+      "conviction": 0.62,
+      "thesis_tags": ["rwa", "tokenized_finance", "settlement_layer"],
+      "lens_scores": {"tokenized_finance": 0.9, "productive_capital": 0.45, "jurisdictional_resilience": 0.35, "counterparty_minimization": -0.2},
+      "venue_symbols": {"tradingview": "BINANCE:ONDOUSDT", "hyperliquid": "ONDO", "coingecko": "ondo-finance"},
+      "evidence_sources": ["coingecko:market_data", "defillama:tvl", "policy:regulatory_pressure"],
+      "invalidation_triggers": [
+        {"id": "ondo_permissioned_claim_risk", "condition": "RWA demand remains custodial and permissioned without crypto-native escape value", "severity": "medium", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "TAO",
+      "name": "Bittensor",
+      "asset_class": "crypto",
+      "conviction": 0.58,
+      "thesis_tags": ["ai", "data_network", "self_custody", "permissionless_network"],
+      "lens_scores": {"ai_infra": 0.9, "self_custody": 0.55, "productive_capital": 0.4, "jurisdictional_resilience": 0.5},
+      "venue_symbols": {"tradingview": "BINANCE:TAOUSDT", "hyperliquid": "TAO", "coingecko": "bittensor"},
+      "evidence_sources": ["coingecko:market_data", "source_pack:kimi"],
+      "invalidation_triggers": [
+        {"id": "tao_ai_subsidy_loop", "condition": "emissions subsidize activity without durable model-market demand", "severity": "high", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "CEG",
+      "name": "Constellation Energy",
+      "asset_class": "equity",
+      "conviction": 0.82,
+      "thesis_tags": ["nuclear", "power_market", "cash_flow", "energy_abundance", "mission_critical"],
+      "lens_scores": {"energy_abundance": 1, "productive_capital": 0.85, "jurisdictional_resilience": 0.45, "ai_infra": 0.35},
+      "venue_symbols": {"tradingview": "NASDAQ:CEG", "yfinance": "CEG"},
+      "evidence_sources": ["sec:companyfacts", "eia:electricity", "source_pack:kimi"],
+      "invalidation_triggers": [
+        {"id": "ceg_power_price_reversion", "condition": "power price contracts reset lower while capex intensity rises", "severity": "medium", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "BWXT",
+      "name": "BWX Technologies",
+      "asset_class": "equity",
+      "conviction": 0.8,
+      "thesis_tags": ["nuclear", "defense", "industrial_capacity", "mission_critical", "cash_flow"],
+      "lens_scores": {"energy_abundance": 0.85, "autonomy_defense": 0.75, "productive_capital": 0.85, "jurisdictional_resilience": 0.45},
+      "venue_symbols": {"tradingview": "NYSE:BWXT", "yfinance": "BWXT"},
+      "evidence_sources": ["sec:companyfacts", "sec:submissions", "source_pack:kimi"],
+      "invalidation_triggers": [
+        {"id": "bwxt_program_delay", "condition": "nuclear/defense program timing slips without offsetting backlog", "severity": "medium", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "CCJ",
+      "name": "Cameco",
+      "asset_class": "equity",
+      "conviction": 0.72,
+      "thesis_tags": ["uranium", "nuclear", "energy_abundance", "global_market"],
+      "lens_scores": {"energy_abundance": 0.95, "productive_capital": 0.55, "jurisdictional_resilience": 0.55},
+      "venue_symbols": {"tradingview": "NYSE:CCJ", "yfinance": "CCJ"},
+      "evidence_sources": ["sec:companyfacts", "eia:electricity", "source_pack:kimi"],
+      "invalidation_triggers": [
+        {"id": "ccj_uranium_cycle_reversal", "condition": "uranium supply returns faster than reactor demand", "severity": "medium", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "GEV",
+      "name": "GE Vernova",
+      "asset_class": "equity",
+      "conviction": 0.7,
+      "thesis_tags": ["grid", "power_market", "industrial_capacity", "energy_abundance"],
+      "lens_scores": {"energy_abundance": 0.85, "productive_capital": 0.65, "jurisdictional_resilience": 0.5},
+      "venue_symbols": {"tradingview": "NYSE:GEV", "yfinance": "GEV"},
+      "evidence_sources": ["sec:companyfacts", "eia:electricity", "source_pack:kimi"],
+      "invalidation_triggers": [
+        {"id": "gev_margin_execution", "condition": "grid/power backlog fails to translate into durable margins", "severity": "medium", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "VST",
+      "name": "Vistra",
+      "asset_class": "equity",
+      "conviction": 0.69,
+      "thesis_tags": ["power_market", "energy_abundance", "cash_flow"],
+      "lens_scores": {"energy_abundance": 0.8, "productive_capital": 0.75, "jurisdictional_resilience": 0.35},
+      "venue_symbols": {"tradingview": "NYSE:VST", "yfinance": "VST"},
+      "evidence_sources": ["sec:companyfacts", "eia:electricity", "source_pack:kimi"],
+      "invalidation_triggers": [
+        {"id": "vst_power_cycle", "condition": "merchant power upside reverses faster than capital returns", "severity": "medium", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "NEE",
+      "name": "NextEra Energy",
+      "asset_class": "equity",
+      "conviction": 0.64,
+      "thesis_tags": ["grid", "solar", "power_market", "cash_flow", "energy_abundance"],
+      "lens_scores": {"energy_abundance": 0.75, "productive_capital": 0.7, "jurisdictional_resilience": 0.3},
+      "venue_symbols": {"tradingview": "NYSE:NEE", "yfinance": "NEE"},
+      "evidence_sources": ["sec:companyfacts", "eia:electricity", "source_pack:kimi"],
+      "invalidation_triggers": [
+        {"id": "nee_rate_sensitivity", "condition": "higher real rates pressure utility multiples and renewables economics", "severity": "medium", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "BEP",
+      "name": "Brookfield Renewable Partners",
+      "asset_class": "equity",
+      "conviction": 0.58,
+      "thesis_tags": ["grid", "renewables", "cash_flow", "energy_abundance"],
+      "lens_scores": {"energy_abundance": 0.65, "productive_capital": 0.6, "jurisdictional_resilience": 0.35},
+      "venue_symbols": {"tradingview": "NYSE:BEP", "yfinance": "BEP"},
+      "evidence_sources": ["sec:companyfacts", "eia:electricity", "source_pack:kimi"],
+      "invalidation_triggers": [
+        {"id": "bep_debt_refinancing", "condition": "renewable cash flows fail to outrun financing costs", "severity": "medium", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "FSLR",
+      "name": "First Solar",
+      "asset_class": "equity",
+      "conviction": 0.62,
+      "thesis_tags": ["solar", "industrial_capacity", "energy_abundance", "global_market"],
+      "lens_scores": {"energy_abundance": 0.7, "productive_capital": 0.55, "jurisdictional_resilience": 0.45},
+      "venue_symbols": {"tradingview": "NASDAQ:FSLR", "yfinance": "FSLR"},
+      "evidence_sources": ["sec:companyfacts", "eia:electricity", "source_pack:kimi"],
+      "invalidation_triggers": [
+        {"id": "fslr_policy_margin", "condition": "tariff/subsidy edge fades before domestic scale compounds", "severity": "medium", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "ENPH",
+      "name": "Enphase Energy",
+      "asset_class": "equity",
+      "conviction": 0.5,
+      "thesis_tags": ["solar", "storage", "grid", "energy_abundance"],
+      "lens_scores": {"energy_abundance": 0.55, "productive_capital": 0.35, "jurisdictional_resilience": 0.25},
+      "venue_symbols": {"tradingview": "NASDAQ:ENPH", "yfinance": "ENPH"},
+      "evidence_sources": ["sec:companyfacts", "eia:electricity", "source_pack:kimi"],
+      "invalidation_triggers": [
+        {"id": "enph_resi_solar_slump", "condition": "residential solar demand remains weak through rate cycle", "severity": "medium", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "FLNC",
+      "name": "Fluence Energy",
+      "asset_class": "equity",
+      "conviction": 0.48,
+      "thesis_tags": ["storage", "grid", "energy_abundance", "industrial_capacity"],
+      "lens_scores": {"energy_abundance": 0.6, "productive_capital": 0.35, "jurisdictional_resilience": 0.25},
+      "venue_symbols": {"tradingview": "NASDAQ:FLNC", "yfinance": "FLNC"},
+      "evidence_sources": ["sec:companyfacts", "eia:electricity", "source_pack:kimi"],
+      "invalidation_triggers": [
+        {"id": "flnc_storage_margin", "condition": "storage revenue grows without durable gross margin or working-capital discipline", "severity": "high", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "LNG",
+      "name": "Cheniere Energy",
+      "asset_class": "equity",
+      "conviction": 0.66,
+      "thesis_tags": ["lng", "energy_abundance", "cash_flow", "global_market"],
+      "lens_scores": {"energy_abundance": 0.75, "productive_capital": 0.75, "jurisdictional_resilience": 0.55},
+      "venue_symbols": {"tradingview": "NYSE:LNG", "yfinance": "LNG"},
+      "evidence_sources": ["sec:companyfacts", "eia:natural_gas", "source_pack:kimi"],
+      "invalidation_triggers": [
+        {"id": "lng_spread_compression", "condition": "global LNG spreads compress and contract coverage weakens", "severity": "medium", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "WMB",
+      "name": "Williams Companies",
+      "asset_class": "equity",
+      "conviction": 0.6,
+      "thesis_tags": ["natural_gas", "energy_abundance", "cash_flow", "grid"],
+      "lens_scores": {"energy_abundance": 0.65, "productive_capital": 0.75, "jurisdictional_resilience": 0.35},
+      "venue_symbols": {"tradingview": "NYSE:WMB", "yfinance": "WMB"},
+      "evidence_sources": ["sec:companyfacts", "eia:natural_gas", "source_pack:kimi"],
+      "invalidation_triggers": [
+        {"id": "wmb_volume_regulatory", "condition": "gas volume growth or pipeline permits disappoint", "severity": "medium", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "KTOS",
+      "name": "Kratos Defense & Security Solutions",
+      "asset_class": "equity",
+      "conviction": 0.68,
+      "thesis_tags": ["drones", "defense", "autonomy", "sensors", "industrial_capacity"],
+      "lens_scores": {"autonomy_defense": 0.95, "productive_capital": 0.5, "ai_infra": 0.35, "jurisdictional_resilience": 0.45},
+      "venue_symbols": {"tradingview": "NASDAQ:KTOS", "yfinance": "KTOS"},
+      "evidence_sources": ["sec:companyfacts", "sec:submissions", "source_pack:kimi"],
+      "invalidation_triggers": [
+        {"id": "ktos_program_scale", "condition": "drone/defense backlog fails to scale margins", "severity": "medium", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "HEI",
+      "name": "HEICO",
+      "asset_class": "equity",
+      "conviction": 0.66,
+      "thesis_tags": ["defense", "aerospace", "industrial_capacity", "cash_flow"],
+      "lens_scores": {"autonomy_defense": 0.65, "productive_capital": 0.85, "jurisdictional_resilience": 0.4},
+      "venue_symbols": {"tradingview": "NYSE:HEI", "yfinance": "HEI"},
+      "evidence_sources": ["sec:companyfacts", "sec:submissions", "source_pack:kimi"],
+      "invalidation_triggers": [
+        {"id": "hei_multiple_risk", "condition": "quality premium expands beyond cash-flow durability", "severity": "medium", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "PLTR",
+      "name": "Palantir",
+      "asset_class": "equity",
+      "conviction": 0.72,
+      "thesis_tags": ["ai", "data_network", "software_platform", "defense", "mission_critical"],
+      "lens_scores": {"ai_infra": 0.95, "autonomy_defense": 0.75, "productive_capital": 0.7, "jurisdictional_resilience": 0.45},
+      "venue_symbols": {"tradingview": "NASDAQ:PLTR", "yfinance": "PLTR"},
+      "evidence_sources": ["sec:companyfacts", "sec:submissions", "source_pack:kimi"],
+      "invalidation_triggers": [
+        {"id": "pltr_valuation_execution", "condition": "AI platform revenue growth cannot justify premium multiple", "severity": "high", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "RKLB",
+      "name": "Rocket Lab",
+      "asset_class": "equity",
+      "conviction": 0.62,
+      "thesis_tags": ["space", "defense", "industrial_capacity", "sensors", "autonomy"],
+      "lens_scores": {"autonomy_defense": 0.8, "productive_capital": 0.45, "jurisdictional_resilience": 0.5},
+      "venue_symbols": {"tradingview": "NASDAQ:RKLB", "yfinance": "RKLB"},
+      "evidence_sources": ["sec:companyfacts", "sec:submissions", "source_pack:kimi"],
+      "invalidation_triggers": [
+        {"id": "rklb_launch_margin", "condition": "launch cadence and space systems backlog fail to produce margin path", "severity": "high", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "JOBY",
+      "name": "Joby Aviation",
+      "asset_class": "equity",
+      "conviction": 0.42,
+      "thesis_tags": ["autonomy", "industrial_capacity", "transport", "aviation"],
+      "lens_scores": {"autonomy_defense": 0.35, "productive_capital": 0.15, "jurisdictional_resilience": 0.2},
+      "venue_symbols": {"tradingview": "NYSE:JOBY", "yfinance": "JOBY"},
+      "evidence_sources": ["sec:companyfacts", "sec:submissions", "source_pack:kimi"],
+      "invalidation_triggers": [
+        {"id": "joby_certification_cash", "condition": "certification slips while cash burn stays high", "severity": "high", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "SHLD",
+      "name": "Global X Defense Tech ETF",
+      "asset_class": "etf",
+      "conviction": 0.64,
+      "thesis_tags": ["defense", "ai", "drones", "cybersecurity", "sensors", "autonomy"],
+      "lens_scores": {"autonomy_defense": 0.9, "ai_infra": 0.55, "productive_capital": 0.45, "jurisdictional_resilience": 0.45},
+      "venue_symbols": {"tradingview": "NYSEARCA:SHLD", "yfinance": "SHLD"},
+      "evidence_sources": ["provider:globalx", "source_pack:kimi"],
+      "invalidation_triggers": [
+        {"id": "shld_theme_crowding", "condition": "defense-tech theme becomes crowded without earnings follow-through", "severity": "medium", "status": "watch"}
+      ]
+    }
+  ],
+  "source_docs": [
+    "https://www.sec.gov/edgar/sec-api-documentation",
+    "https://fred.stlouisfed.org/docs/api/fred/series/series_observations.html",
+    "https://fiscaldata.treasury.gov/api-documentation/",
+    "https://www.eia.gov/opendata/documentation.php",
+    "https://docs.coingecko.com/reference/endpoint-overview",
+    "https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint/perpetuals",
+    "https://defillama.com/docs/api",
+    "https://robinhood.com/us/en/support/articles/crypto-api/",
+    "https://www.globalxetfs.com/funds/shld"
+  ]
+}

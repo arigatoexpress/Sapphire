@@ -1,0 +1,260 @@
+{% extends 'base.html' %}
+
+{% block title %}Sovereign Thesis{% endblock %}
+
+{% block extra_css %}
+.thesis-meta {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.thesis-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(320px, .8fr);
+    gap: 16px;
+}
+
+.thesis-table-wrap {
+    overflow-x: auto;
+}
+
+.lens-chip-row,
+.source-chip-row {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.lens-chip,
+.source-chip {
+    border: 1px solid var(--border-dim);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: .62rem;
+    white-space: nowrap;
+}
+
+.lens-chip.core { color: var(--green); border-color: rgba(154,255,120,.45); }
+.lens-chip.supporting { color: var(--amber); border-color: rgba(98,255,64,.45); }
+.lens-chip.risk { color: var(--red); border-color: rgba(255,111,158,.45); }
+.source-chip.gap { color: var(--red); border-color: rgba(255,111,158,.45); }
+
+.principle-list {
+    display: grid;
+    gap: 8px;
+}
+
+.principle-item {
+    border: 1px solid var(--border-dim);
+    background: rgba(98,255,64,.025);
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: var(--text-secondary);
+    line-height: 1.45;
+    font-size: .78rem;
+}
+
+@media (max-width: 1100px) {
+    .thesis-grid { grid-template-columns: 1fr; }
+}
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:var(--space-xl);flex-wrap:wrap;">
+    <div>
+        <h1 style="font-size:1.4rem;font-weight:700;color:var(--text-primary);margin:0 0 4px;">Sovereign Thesis</h1>
+        <p style="color:var(--text-muted);font-size:.85rem;margin:0;">Research-only thesis matrix, evidence gaps, and invalidation watches.</p>
+    </div>
+    <button class="btn primary" onclick="loadSovereignThesis()">Refresh</button>
+</div>
+
+<div class="grid grid-4" style="margin-bottom:var(--space-xl);">
+    <div class="stat-card">
+        <div class="stat-label">Assets</div>
+        <div class="stat-value" id="st-assets">--</div>
+        <div class="stat-change" id="st-assets-sub">Universe</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Lenses</div>
+        <div class="stat-value" id="st-lenses">--</div>
+        <div class="stat-change">Principles</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Core</div>
+        <div class="stat-value" id="st-core">--</div>
+        <div class="stat-change">High-fit</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Watches</div>
+        <div class="stat-value" id="st-watches">--</div>
+        <div class="stat-change" id="st-watches-sub">Invalidations</div>
+    </div>
+</div>
+
+<div class="thesis-grid" style="margin-bottom:var(--space-xl);">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Asset Matrix</h3>
+            <div class="thesis-meta">
+                <span class="pill neutral" id="st-mode">research</span>
+                <span class="pill neutral" id="st-ts">--</span>
+            </div>
+        </div>
+        <div class="card-body no-pad">
+            <div class="thesis-table-wrap">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Asset</th>
+                            <th>Fit</th>
+                            <th>Score</th>
+                            <th>Lenses</th>
+                            <th>Gaps</th>
+                        </tr>
+                    </thead>
+                    <tbody id="st-assets-table"><tr><td colspan="6" class="loading">Loading</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Worldview</h3>
+            <span class="pill neutral" id="st-worldview">--</span>
+        </div>
+        <div class="card-body">
+            <div class="principle-list" id="st-principles">
+                <div class="loading">Loading</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Ops Queue</h3>
+            <span class="pill neutral" id="st-ops-total">--</span>
+        </div>
+        <div class="card-body no-pad">
+            <div class="thesis-table-wrap">
+                <table class="data-table">
+                    <thead><tr><th>Priority</th><th>Symbol</th><th>Action</th><th>Mode</th></tr></thead>
+                    <tbody id="st-ops-table"><tr><td colspan="4" class="loading">Loading</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Source Requirements</h3>
+            <span class="pill neutral" id="st-sources-total">--</span>
+        </div>
+        <div class="card-body no-pad">
+            <div class="thesis-table-wrap">
+                <table class="data-table">
+                    <thead><tr><th>Source</th><th>Lens</th><th>Assets</th><th>Status</th></tr></thead>
+                    <tbody id="st-sources-table"><tr><td colspan="4" class="loading">Loading</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function esc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function pill(value) {
+    const raw = String(value || 'neutral');
+    const cls = raw.includes('core') ? 'success' : raw.includes('risk') || raw.includes('tripped') ? 'danger' : 'neutral';
+    return `<span class="pill ${cls}">${esc(raw)}</span>`;
+}
+
+function renderChips(items, cls = 'source-chip') {
+    if (!items || !items.length) return '<span class="source-chip">none</span>';
+    return `<div class="source-chip-row">${items.slice(0, 5).map(item => `<span class="${cls}">${esc(item)}</span>`).join('')}</div>`;
+}
+
+function renderLensChips(cells) {
+    const active = (cells || []).filter(cell => cell.state !== 'neutral').slice(0, 5);
+    if (!active.length) return '<span class="lens-chip">neutral</span>';
+    return `<div class="lens-chip-row">${active.map(cell => `<span class="lens-chip ${esc(cell.state)}">${esc(cell.id)}</span>`).join('')}</div>`;
+}
+
+async function loadSovereignThesis() {
+    let data;
+    try {
+        const response = await fetch('/api/investments/thesis');
+        data = await response.json();
+    } catch (err) {
+        data = { error: String(err), totals: {}, worldview: {}, assets: [], ops_queue: [], source_requirements: [] };
+    }
+
+    const totals = data.totals || {};
+    document.getElementById('st-assets').textContent = totals.assets ?? '--';
+    document.getElementById('st-assets-sub').textContent = `${totals.aligned_assets || 0} aligned`;
+    document.getElementById('st-lenses').textContent = totals.lenses ?? '--';
+    document.getElementById('st-core').textContent = totals.core_assets ?? '--';
+    document.getElementById('st-watches').textContent = totals.invalidation_watches ?? '--';
+    document.getElementById('st-watches-sub').textContent = `${totals.tripped_invalidations || 0} tripped`;
+    document.getElementById('st-mode').textContent = data.mode || 'research';
+    document.getElementById('st-ts').textContent = data.generated_at ? new Date(data.generated_at).toLocaleTimeString() : '--';
+
+    const worldview = data.worldview || {};
+    document.getElementById('st-worldview').textContent = worldview.stance || '--';
+    const principles = worldview.principles || [];
+    document.getElementById('st-principles').innerHTML = principles.length
+        ? principles.map(item => `<div class="principle-item">${esc(item).replaceAll('_', ' ')}</div>`).join('')
+        : '<div class="empty-state">No principles loaded</div>';
+
+    const assets = data.assets || [];
+    document.getElementById('st-assets-table').innerHTML = assets.length
+        ? assets.map(row => `
+            <tr>
+                <td>${row.rank}</td>
+                <td><strong>${esc(row.symbol)}</strong><div style="color:var(--text-muted);font-size:.7rem;">${esc(row.name)}</div></td>
+                <td>${pill(row.fit)}</td>
+                <td>${esc(row.relative_score)}%</td>
+                <td>${renderLensChips(row.lens_cells)}</td>
+                <td>${renderChips(row.source_gaps, 'source-chip gap')}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="6" class="empty-state">No assets</td></tr>';
+
+    const ops = data.ops_queue || [];
+    document.getElementById('st-ops-total').textContent = `${ops.length} tasks`;
+    document.getElementById('st-ops-table').innerHTML = ops.length
+        ? ops.map(row => `
+            <tr>
+                <td>${pill(row.priority)}</td>
+                <td>${esc(row.symbol)}</td>
+                <td>${esc(row.action)}</td>
+                <td>${esc(row.safe_mode)}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="4" class="empty-state">No ops tasks</td></tr>';
+
+    const sources = data.source_requirements || [];
+    document.getElementById('st-sources-total').textContent = `${sources.length} sources`;
+    document.getElementById('st-sources-table').innerHTML = sources.length
+        ? sources.map(row => `
+            <tr>
+                <td>${esc(row.id)}</td>
+                <td>${esc(row.lens)}</td>
+                <td>${esc(row.asset_count)}</td>
+                <td>${pill(row.configured ? 'configured' : 'needs wiring')}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="4" class="empty-state">No source requirements</td></tr>';
+}
+
+loadSovereignThesis();
+</script>
+{% endblock %}
