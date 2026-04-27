@@ -40,6 +40,35 @@
 .lens-chip.supporting { color: var(--amber); border-color: rgba(98,255,64,.45); }
 .lens-chip.risk { color: var(--red); border-color: rgba(255,111,158,.45); }
 .source-chip.gap { color: var(--red); border-color: rgba(255,111,158,.45); }
+.source-chip.wired { color: var(--amber); border-color: rgba(98,255,64,.45); }
+.source-chip.evidenced { color: var(--green); border-color: rgba(154,255,120,.45); }
+
+.coverage-cell {
+    min-width: 92px;
+}
+
+.coverage-bar {
+    width: 82px;
+    height: 5px;
+    border: 1px solid var(--border-dim);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 4px;
+    background: rgba(255,255,255,.03);
+}
+
+.coverage-fill {
+    height: 100%;
+    background: var(--green);
+}
+
+.path-cell {
+    max-width: 360px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-muted);
+}
 
 .principle-list {
     display: grid;
@@ -65,7 +94,7 @@
 <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:var(--space-xl);flex-wrap:wrap;">
     <div>
         <h1 style="font-size:1.4rem;font-weight:700;color:var(--text-primary);margin:0 0 4px;">Sovereign Thesis</h1>
-        <p style="color:var(--text-muted);font-size:.85rem;margin:0;">Research-only thesis matrix, evidence gaps, and invalidation watches.</p>
+        <p style="color:var(--text-muted);font-size:.85rem;margin:0;">Research-only thesis matrix, evidence ledger, and invalidation watches.</p>
     </div>
     <button class="btn primary" onclick="loadSovereignThesis()">Refresh</button>
 </div>
@@ -77,14 +106,14 @@
         <div class="stat-change" id="st-assets-sub">Universe</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">Lenses</div>
-        <div class="stat-value" id="st-lenses">--</div>
-        <div class="stat-change">Principles</div>
+        <div class="stat-label">Evidence</div>
+        <div class="stat-value" id="st-evidence">--</div>
+        <div class="stat-change" id="st-evidence-sub">Required</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">Core</div>
-        <div class="stat-value" id="st-core">--</div>
-        <div class="stat-change">High-fit</div>
+        <div class="stat-label">Wired</div>
+        <div class="stat-value" id="st-wired">--</div>
+        <div class="stat-change" id="st-wired-sub">Feeds</div>
     </div>
     <div class="stat-card">
         <div class="stat-label">Watches</div>
@@ -111,11 +140,12 @@
                             <th>Asset</th>
                             <th>Fit</th>
                             <th>Score</th>
+                            <th>Evidence</th>
                             <th>Lenses</th>
                             <th>Gaps</th>
                         </tr>
                     </thead>
-                    <tbody id="st-assets-table"><tr><td colspan="6" class="loading">Loading</td></tr></tbody>
+                    <tbody id="st-assets-table"><tr><td colspan="7" class="loading">Loading</td></tr></tbody>
                 </table>
             </div>
         </div>
@@ -135,6 +165,38 @@
 </div>
 
 <div class="grid grid-2">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Evidence Ledger</h3>
+            <span class="pill neutral" id="st-ledger-total">--</span>
+        </div>
+        <div class="card-body no-pad">
+            <div class="thesis-table-wrap">
+                <table class="data-table">
+                    <thead><tr><th>Status</th><th>Asset</th><th>Source</th><th>Provider</th><th>Lenses</th></tr></thead>
+                    <tbody id="st-ledger-table"><tr><td colspan="5" class="loading">Loading</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Materialization Plan</h3>
+            <span class="pill neutral" id="st-stage-total">dry-run</span>
+        </div>
+        <div class="card-body no-pad">
+            <div class="thesis-table-wrap">
+                <table class="data-table">
+                    <thead><tr><th>Table</th><th>Rows</th><th>Target</th></tr></thead>
+                    <tbody id="st-stage-table"><tr><td colspan="3" class="loading">Loading</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-2" style="margin-top:var(--space-xl);">
     <div class="card">
         <div class="card-header">
             <h3 class="card-title">Ops Queue</h3>
@@ -158,8 +220,8 @@
         <div class="card-body no-pad">
             <div class="thesis-table-wrap">
                 <table class="data-table">
-                    <thead><tr><th>Source</th><th>Lens</th><th>Assets</th><th>Status</th></tr></thead>
-                    <tbody id="st-sources-table"><tr><td colspan="4" class="loading">Loading</td></tr></tbody>
+                    <thead><tr><th>Source</th><th>Provider</th><th>Assets</th><th>Evidenced</th><th>Needs</th></tr></thead>
+                    <tbody id="st-sources-table"><tr><td colspan="5" class="loading">Loading</td></tr></tbody>
                 </table>
             </div>
         </div>
@@ -173,7 +235,13 @@ function esc(value) {
 
 function pill(value) {
     const raw = String(value || 'neutral');
-    const cls = raw.includes('core') ? 'success' : raw.includes('risk') || raw.includes('tripped') ? 'danger' : 'neutral';
+    const cls = raw.includes('core') || raw.includes('evidenced') || raw.includes('configured')
+        ? 'green'
+        : raw.includes('risk') || raw.includes('tripped') || raw.includes('needs') || raw === 'P1'
+            ? 'red'
+            : raw.includes('wired') || raw === 'P2'
+                ? 'amber'
+                : 'neutral';
     return `<span class="pill ${cls}">${esc(raw)}</span>`;
 }
 
@@ -188,20 +256,54 @@ function renderLensChips(cells) {
     return `<div class="lens-chip-row">${active.map(cell => `<span class="lens-chip ${esc(cell.state)}">${esc(cell.id)}</span>`).join('')}</div>`;
 }
 
+function pct(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? `${number.toFixed(1)}%` : '--';
+}
+
+function renderCoverage(summary) {
+    const coverage = Number((summary || {}).coverage_pct ?? 0);
+    const wired = Number((summary || {}).wired_pct ?? coverage);
+    return `
+        <div class="coverage-cell">
+            <strong>${pct(coverage)}</strong>
+            <div style="color:var(--text-muted);font-size:.66rem;">${pct(wired)} wired</div>
+            <div class="coverage-bar"><div class="coverage-fill" style="width:${Math.max(0, Math.min(100, coverage))}%"></div></div>
+        </div>
+    `;
+}
+
+function sourceClass(status) {
+    if (status === 'evidenced') return 'source-chip evidenced';
+    if (status === 'provider_wired') return 'source-chip wired';
+    return 'source-chip gap';
+}
+
 async function loadSovereignThesis() {
     let data;
     try {
-        const response = await fetch('/api/investments/thesis');
+        const response = await fetch(`${window.location.origin}/api/investments/thesis`);
         data = await response.json();
     } catch (err) {
-        data = { error: String(err), totals: {}, worldview: {}, assets: [], ops_queue: [], source_requirements: [] };
+        data = {
+            error: String(err),
+            totals: {},
+            worldview: {},
+            assets: [],
+            evidence_ledger: [],
+            ops_queue: [],
+            source_requirements: [],
+            materialization_plan: { tables: [] }
+        };
     }
 
     const totals = data.totals || {};
     document.getElementById('st-assets').textContent = totals.assets ?? '--';
-    document.getElementById('st-assets-sub').textContent = `${totals.aligned_assets || 0} aligned`;
-    document.getElementById('st-lenses').textContent = totals.lenses ?? '--';
-    document.getElementById('st-core').textContent = totals.core_assets ?? '--';
+    document.getElementById('st-assets-sub').textContent = `${totals.lenses || 0} lenses · ${totals.aligned_assets || 0} aligned`;
+    document.getElementById('st-evidence').textContent = pct(totals.evidence_coverage_pct);
+    document.getElementById('st-evidence-sub').textContent = `${totals.evidence_required || 0} required`;
+    document.getElementById('st-wired').textContent = pct(totals.evidence_wired_pct);
+    document.getElementById('st-wired-sub').textContent = `${totals.evidence_needs_wiring || 0} need wiring`;
     document.getElementById('st-watches').textContent = totals.invalidation_watches ?? '--';
     document.getElementById('st-watches-sub').textContent = `${totals.tripped_invalidations || 0} tripped`;
     document.getElementById('st-mode').textContent = data.mode || 'research';
@@ -222,11 +324,39 @@ async function loadSovereignThesis() {
                 <td><strong>${esc(row.symbol)}</strong><div style="color:var(--text-muted);font-size:.7rem;">${esc(row.name)}</div></td>
                 <td>${pill(row.fit)}</td>
                 <td>${esc(row.relative_score)}%</td>
+                <td>${renderCoverage(row.evidence_summary)}</td>
                 <td>${renderLensChips(row.lens_cells)}</td>
                 <td>${renderChips(row.source_gaps, 'source-chip gap')}</td>
             </tr>
         `).join('')
-        : '<tr><td colspan="6" class="empty-state">No assets</td></tr>';
+        : '<tr><td colspan="7" class="empty-state">No assets</td></tr>';
+
+    const ledger = data.evidence_ledger || [];
+    document.getElementById('st-ledger-total').textContent = `${ledger.length} rows`;
+    document.getElementById('st-ledger-table').innerHTML = ledger.length
+        ? ledger.slice(0, 22).map(row => `
+            <tr>
+                <td>${pill(row.status)}</td>
+                <td><strong>${esc(row.symbol)}</strong><div style="color:var(--text-muted);font-size:.66rem;">${esc(row.fit)}</div></td>
+                <td><span class="${sourceClass(row.status)}">${esc(row.source_id)}</span></td>
+                <td>${esc(row.provider)}<div style="color:var(--text-muted);font-size:.66rem;">${esc(row.connector_id)}</div></td>
+                <td>${renderChips(row.lenses || [], 'lens-chip supporting')}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="5" class="empty-state">No evidence rows</td></tr>';
+
+    const stage = data.materialization_plan || {};
+    const stageTables = stage.tables || [];
+    document.getElementById('st-stage-total').textContent = `${stage.total_rows || 0} rows · ${stage.mode || 'dry-run'}`;
+    document.getElementById('st-stage-table').innerHTML = stageTables.length
+        ? stageTables.map(row => `
+            <tr>
+                <td>${esc(row.table)}</td>
+                <td>${esc(row.rows)}</td>
+                <td class="path-cell" title="${esc(row.target)}">${esc(row.target)}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="3" class="empty-state">No staging tables</td></tr>';
 
     const ops = data.ops_queue || [];
     document.getElementById('st-ops-total').textContent = `${ops.length} tasks`;
@@ -247,12 +377,13 @@ async function loadSovereignThesis() {
         ? sources.map(row => `
             <tr>
                 <td>${esc(row.id)}</td>
-                <td>${esc(row.lens)}</td>
+                <td>${esc(row.provider)}<div style="color:var(--text-muted);font-size:.66rem;">${esc(row.connector_id)}</div></td>
                 <td>${esc(row.asset_count)}</td>
-                <td>${pill(row.configured ? 'configured' : 'needs wiring')}</td>
+                <td>${esc(row.evidenced || 0)} · ${esc(row.provider_wired || 0)} wired</td>
+                <td>${pill((row.needs_wiring || 0) ? `${row.needs_wiring} needs` : (row.configured ? 'configured' : 'needs wiring'))}</td>
             </tr>
         `).join('')
-        : '<tr><td colspan="4" class="empty-state">No source requirements</td></tr>';
+        : '<tr><td colspan="5" class="empty-state">No source requirements</td></tr>';
 }
 
 loadSovereignThesis();
