@@ -231,6 +231,17 @@ ASSET_SPECS: dict[str, AssetSpec] = {
         "medium",
         ("ai", "perp"),
     ),
+    "ONDO": AssetSpec(
+        "ONDO",
+        "Ondo",
+        "ondo-finance",
+        "BINANCE:ONDOUSDT",
+        "ONDO-USD",
+        "ONDO",
+        None,
+        "medium",
+        ("rwa", "tokenized_finance", "perp"),
+    ),
     "POL": AssetSpec(
         "POL",
         "Polygon",
@@ -255,7 +266,7 @@ ASSET_SPECS: dict[str, AssetSpec] = {
     ),
 }
 
-DEFAULT_LIKED_SYMBOLS = ("ETH", "BTC", "ZEC", "XMR", "AAVE", "LINK", "UNI", "ENS", "ARB", "OP", "SOL", "HYPE", "TAO")
+DEFAULT_LIKED_SYMBOLS = ("ETH", "BTC", "ZEC", "XMR", "AAVE", "LINK", "ONDO", "UNI", "ENS", "ARB", "OP", "SOL", "HYPE", "TAO")
 CORRECTED_ALIASES = {
     "HYPER": "HYPE",
     "HYPERUSDT": "HYPE",
@@ -278,6 +289,7 @@ CORRECTED_ALIASES = {
     "UNIUSDT": "UNI",
     "ENSUSDT": "ENS",
     "TAOUSDT": "TAO",
+    "ONDOUSDT": "ONDO",
 }
 
 

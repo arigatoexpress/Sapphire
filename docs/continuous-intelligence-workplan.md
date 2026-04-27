@@ -26,7 +26,8 @@ Mac, Windows GPU inference, GitHub Actions, and human review can claim.
 1. Observe market universe, sovereign thesis, strategy performance, and
    backtest artifacts.
 2. Generate claimable tasks for strategy backtests, confluence scans, thesis
-   research, data staging, TradingView parity checks, and promotion gates.
+   research, data staging, institutional tokenization, agentic payments,
+   TradingView parity checks, and promotion gates.
 3. Dispatch only read-only or dry-run work to Windows GPU, Mac local, or GitHub
    Actions.
 4. Store artifacts under a future ignored autonomy path such as
@@ -45,6 +46,8 @@ already has useful components:
 - Strategy-performance feedback aggregation.
 - CPCV backtest harness and weekly backtest artifacts.
 - TradingView dry-run capability matrix.
+- x402 middleware, Base/USDC agent-payment rails, and an ETH-centered
+  tokenized-finance thesis.
 
 What was missing was a contract between those components and the worker mesh.
 `lib.autonomy.continuous_intelligence` now gives the mesh a task list with
@@ -58,9 +61,11 @@ blockers, and acceptance gates.
 - `confluence_scan`: ask Windows GPU inference to find agreement and conflict
   across thesis, market, performance, and catalyst inputs.
 - `strategy_mutation`: generate hypotheses only; no file edits or auto-apply.
-- `thesis_research`: refresh privacy, quantum-risk, Ethereum economic-zone, and
-  investment-catalyst evidence.
-- `ops_validation`: keep TradingView alert schema parity deep and dry-run.
+- `thesis_research`: refresh privacy, quantum-risk, Ethereum economic-zone,
+  institutional tokenization, agentic payments, and investment-catalyst
+  evidence.
+- `ops_validation`: keep TradingView alert schema parity and x402 agent-market
+  smoke tests deep and dry-run.
 - `promotion_gate`: convert evidence into a human-review packet before code or
   executor behavior changes.
 
@@ -87,3 +92,5 @@ trading, order signing, order submission, and Telegram sends remain forbidden.
    sources, with freshness and invalidation timestamps.
 5. Add backtest-result comparators that automatically mark candidate strategy
    variants as reject, needs-data, or ready-for-human-review.
+6. Add tokenization/agentic-payment artifact consumers so official source
+   updates can refresh the thesis ledger without enabling real payments.

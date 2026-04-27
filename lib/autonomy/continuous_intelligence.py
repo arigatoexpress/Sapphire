@@ -20,6 +20,19 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SYMBOLS = ("ETH", "BTC", "ZEC", "XMR", "AAVE", "LINK", "UNI", "ENS")
 DEFAULT_BACKTEST_SYMBOLS = ("ETH-USD", "BTC-USD", "ZEC-USD")
+TOKENIZATION_AGENTIC_SYMBOLS = ("ETH", "LINK", "ONDO", "COIN", "JPM", "AAVE", "UNI", "TAO")
+TOKENIZATION_AGENTIC_SOURCE_DOCS = (
+    "https://docs.cdp.coinbase.com/x402/docs/welcome",
+    "https://docs.base.org/ai-agents/payments/pay-for-services-with-x402",
+    "https://docs.base.org/ai-agents/payments/accepting-payments",
+    "https://www.base.org/agents",
+    "https://chain.link/smartdata",
+    "https://www.dtcc.com/-/media/Files/Downloads/DTCC-Connection/Smart_NAV-Report.pdf",
+    "https://www.jpmorgan.com/kinexys/digital-assets/tokenized-collateral-network",
+    "https://www.franklintempleton.com/about-us/our-teams/specialist-investment-managers/digital-assets/digital-assets-technology",
+    "https://securitize.io/learn/press/blackrock-launches-first-tokenized-fund-buidl-on-the-ethereum-network",
+    "https://docs.ondo.finance/ondo-global-markets",
+)
 SAFE_MODES = {"read_only", "paper", "dry_run"}
 PRIORITY_ORDER = {"P1": 0, "P2": 1, "P3": 2}
 
@@ -212,6 +225,7 @@ def _source_docs(market: dict[str, Any], thesis: dict[str, Any]) -> list[str]:
     docs: list[str] = []
     docs.extend(str(doc) for doc in market.get("source_docs") or [])
     docs.extend(str(doc) for doc in thesis.get("source_docs") or [])
+    docs.extend(TOKENIZATION_AGENTIC_SOURCE_DOCS)
     return list(dict.fromkeys(docs))
 
 
@@ -433,6 +447,46 @@ def _build_tasks(
             source_docs=tuple(docs[:8]),
         ),
         _task(
+            id="institutional-tokenization-agentic-payments-refresh",
+            lane="thesis_research",
+            priority="P1",
+            title="Refresh institutional tokenization and agentic payment rails",
+            description=(
+                "Track the convergence of tokenized collateral, tokenized money-market "
+                "funds, RWA oracles, Base/USDC agent wallets, and x402 pay-per-request "
+                "APIs as a core ETH economic-zone and productive-capital thesis."
+            ),
+            target_runtime="windows-gpu",
+            model_tier="reason",
+            cadence="daily",
+            safe_mode="read_only",
+            symbols=TOKENIZATION_AGENTIC_SYMBOLS,
+            inputs=(
+                "sovereign_thesis",
+                "x402_middleware",
+                "source_requirements",
+                "institutional_tokenization_sources",
+                "agentic_payment_sources",
+            ),
+            prompt=(
+                "Research official/primary sources first. Return ledger-ready JSON "
+                "for institutional tokenization, agent wallets, x402, and tokenized "
+                "collateral. For each claim include source_url, affected_symbol, "
+                "thesis_lens, adoption_signal, custody_or_permissioning_risk, "
+                "invalidation, confidence, and stale_after."
+            ),
+            expected_artifacts=(
+                "data/.autonomy/continuous_intelligence/tokenization-agentic-payments-*.json",
+            ),
+            acceptance=(
+                "Primary sources are used for every adoption claim",
+                "Permissioned collateral rails are separated from self-custody/open-protocol rails",
+                "x402 tasks remain dry-run unless a later human-approved payment PR enables testnet",
+                "No financial advice or order recommendation is emitted",
+            ),
+            source_docs=TOKENIZATION_AGENTIC_SOURCE_DOCS,
+        ),
+        _task(
             id="investment-news-catalyst-scan",
             lane="thesis_research",
             priority="P2",
@@ -453,6 +507,34 @@ def _build_tasks(
                 "Invalidations are kept even when they hurt the thesis",
                 "No paywalled or secret content is copied into artifacts",
             ),
+        ),
+        _task(
+            id="x402-agent-market-dry-run-plan",
+            lane="ops_validation",
+            priority="P2",
+            title="Design dry-run x402 agent market smoke tests",
+            description=(
+                "Turn Sapphire's existing x402 middleware into a testable agent-market "
+                "surface: paid research endpoints, paid inference endpoints, event-bus "
+                "accounting, replay protection, and facilitator cutover gates."
+            ),
+            target_runtime="mac-local",
+            model_tier="code",
+            cadence="weekly",
+            safe_mode="dry_run",
+            symbols=("X402", "USDC", "BASE", "COIN"),
+            inputs=("x402_middleware", "event_bus", "inference_proxy", "dashboard_api"),
+            expected_artifacts=(
+                "docs/research/x402-agent-market-smoke-*.md",
+                "data/.autonomy/continuous_intelligence/x402-smoke-*.json",
+            ),
+            acceptance=(
+                "X402_ENABLED stays disabled by default",
+                "Mock verifier and Base Sepolia paths are separated from mainnet",
+                "No wallet seed, private key, or payment credential is written to artifacts",
+                "Event-bus payment.required/received/rejected traces are covered in dry-run",
+            ),
+            source_docs=TOKENIZATION_AGENTIC_SOURCE_DOCS[:4],
         ),
         _task(
             id="closed-trade-labeling-gap",
