@@ -560,3 +560,7 @@ before any operator-side rollout.
   empty adapter (legacy record), flag on with one-sided adapter return
   (no deltas), flag explicitly `0`, end-to-end baseline equivalence
   (6 tests).
+
+## Section 11 — Layer B follow-up
+
+Layer B short-branch design: see [`docs/research/bearish-direction-asymmetry-layer-b-design-2026-04-26.md`](./bearish-direction-asymmetry-layer-b-design-2026-04-26.md).
