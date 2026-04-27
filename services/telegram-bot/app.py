@@ -18,16 +18,64 @@ import ssl
 import subprocess
 import sys
 import urllib.request
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 SECRETS_DIR = Path.home() / ".config" / "sapphire-secrets"
 SAPPHIRE_DIR = Path.home() / "Code" / "Sapphire"
 CLAW_BIN = Path.home() / ".local" / "bin" / "claw"
 PLUGIN_DIR = SAPPHIRE_DIR / "plugins" / "claw-sapphire"
 
-BOT_TOKEN = (SECRETS_DIR / "telegram_bot_token").read_text().strip()
-CHAT_ID = (SECRETS_DIR / "telegram_chat_id").read_text().strip()
-ALLOWED_USERS = {int(CHAT_ID)}
+Sender = Callable[[str, str | None], dict[str, Any]]
+
+
+def _truthy_env(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _read_secret_file(name: str) -> str:
+    try:
+        return (SECRETS_DIR / name).read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+def _load_secret(*env_names: str, file_name: str) -> str:
+    for env_name in env_names:
+        value = os.environ.get(env_name, "").strip()
+        if value:
+            return value
+    return _read_secret_file(file_name)
+
+
+def _load_allowed_users(chat_id: str) -> set[int]:
+    raw = (
+        os.environ.get("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS")
+        or os.environ.get("ALLOWED_TELEGRAM_USER_IDS")
+        or os.environ.get("TELEGRAM_ALLOWED_USER_IDS")
+        or ""
+    )
+    users = set()
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            users.add(int(part))
+        except ValueError:
+            continue
+    if not users and chat_id:
+        try:
+            users.add(int(chat_id))
+        except ValueError:
+            pass
+    return users
+
+
+BOT_TOKEN = _load_secret("TELEGRAM_BOT_TOKEN", file_name="telegram_bot_token")
+CHAT_ID = _load_secret("TELEGRAM_CHAT_ID", file_name="telegram_chat_id")
+ALLOWED_USERS = _load_allowed_users(CHAT_ID)
 
 # SSL context
 _SSL_CTX = ssl.create_default_context()
@@ -55,6 +103,8 @@ COMMAND_MAP = {
 
 def tg_api(method: str, data: dict | None = None) -> dict:
     """Call Telegram Bot API."""
+    if not BOT_TOKEN:
+        raise RuntimeError("Telegram bot token is not configured")
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/{method}"
     if data:
         payload = json.dumps(data).encode()
@@ -65,12 +115,25 @@ def tg_api(method: str, data: dict | None = None) -> dict:
         return json.loads(resp.read())
 
 
-def send_message(text: str, chat_id: str = CHAT_ID) -> dict:
+def send_message(text: str, chat_id: str | None = None) -> dict:
     """Send Telegram message, splitting if needed."""
     if not text or not text.strip():
         return {"ok": False, "error": "empty_message"}
+    chat_id = chat_id or CHAT_ID
+    if not chat_id:
+        return {"ok": False, "error": "missing_chat_id"}
     if len(text) > 4000:
         text = text[:4000] + "\n\n_(truncated)_"
+    if _truthy_env("TELEGRAM_DRY_RUN"):
+        return {
+            "ok": True,
+            "dry_run": True,
+            "method": "sendMessage",
+            "chat_id": chat_id,
+            "text_len": len(text),
+        }
+    if not BOT_TOKEN:
+        return {"ok": False, "error": "missing_bot_token"}
     return tg_api("sendMessage", {
         "chat_id": chat_id,
         "text": text,
@@ -116,8 +179,14 @@ def run_tool_direct(tool_script: str, input_data: dict | None = None) -> str:
         return f"Error: {e}"
 
 
-def handle_command(cmd: str, args: str, chat_id: str) -> str:
+def handle_command(
+    cmd: str,
+    args: str,
+    chat_id: str,
+    sender: Sender | None = None,
+) -> str | None:
     """Process a bot command."""
+    sender = sender or send_message
     # Direct tool calls (fast, no claw overhead)
     if cmd == "/status":
         return run_tool_direct("status.py")
@@ -128,7 +197,7 @@ def handle_command(cmd: str, args: str, chat_id: str) -> str:
     elif cmd == "/verify" and args:
         return run_tool_direct("verify.py", {"repo": args.strip()})
     elif cmd == "/dispatch" and args:
-        send_message("🏭 Dispatching...", chat_id)
+        sender("🏭 Dispatching...", chat_id)
         return run_tool_direct("dispatch.py", {"task": args.strip()})
 
     # Market data commands
@@ -153,10 +222,10 @@ def handle_command(cmd: str, args: str, chat_id: str) -> str:
 
     # Threat intelligence
     elif cmd == "/threats":
-        send_message("🔍 Scanning threat sources...", chat_id)
+        sender("🔍 Scanning threat sources...", chat_id)
         return run_tool_direct("threat_intel.py", {"action": "scan"})
     elif cmd == "/threat" and args:
-        send_message(f"📋 Generating brief for {args.strip().upper()}...", chat_id)
+        sender(f"📋 Generating brief for {args.strip().upper()}...", chat_id)
         result = run_tool_direct("threat_intel.py", {"action": "brief", "target": args.strip()})
         try:
             data = json.loads(result)
@@ -164,7 +233,7 @@ def handle_command(cmd: str, args: str, chat_id: str) -> str:
         except Exception:
             return result
     elif cmd == "/offers":
-        send_message("💰 Analyzing threat revenue opportunities...", chat_id)
+        sender("💰 Analyzing threat revenue opportunities...", chat_id)
         result = run_tool_direct("threat_intel.py", {"action": "offers", "profile": str(Path.home() / "Code/cyber-threat-bot/profiles/kadima-digital.json")})
         try:
             data = json.loads(result)
@@ -174,7 +243,7 @@ def handle_command(cmd: str, args: str, chat_id: str) -> str:
 
     # System health
     elif cmd == "/health":
-        send_message("🔬 Running 20-point health check...", chat_id)
+        sender("🔬 Running 20-point health check...", chat_id)
         result = run_tool_direct("health_check.py")
         try:
             data = json.loads(result)
@@ -193,10 +262,10 @@ def handle_command(cmd: str, args: str, chat_id: str) -> str:
 
     # Commands that use claw-code (more capable but slower)
     elif cmd == "/scan":
-        send_message("🔍 Scanning all repos...", chat_id)
+        sender("🔍 Scanning all repos...", chat_id)
         return run_tool_direct("verify.py", {"all": True})
     elif cmd == "/fix":
-        send_message("🔧 Running auto-fixer...", chat_id)
+        sender("🔧 Running auto-fixer...", chat_id)
         result = subprocess.run(
             ["python3", "-m", "ruff", "check", "--fix", "--select", "E,F,I", "."],
             capture_output=True, text=True, cwd=str(SAPPHIRE_DIR), env=ENV, timeout=60,
@@ -219,24 +288,24 @@ def handle_command(cmd: str, args: str, chat_id: str) -> str:
     elif cmd == "/models":
         return run_tool_direct("status.py")
     elif cmd == "/ask" and args:
-        send_message("🧠 Thinking...", chat_id)
+        sender("🧠 Thinking...", chat_id)
         from lib.nemotron import MODELS, generate
         result = generate(args, model=MODELS["classify"], timeout=30)
         if result.success and result.response:
             return f"{result.response}\n\n_({result.endpoint} • {result.model} • {result.eval_tokens} tokens • {result.tokens_per_second} t/s)_"
         return f"❌ {result.error or 'Nemotron returned empty response — model may be loading'}"
     elif cmd == "/think" and args:
-        send_message("🧠 Deep thinking with nemotron-cascade-2...", chat_id)
+        sender("🧠 Deep thinking with nemotron-cascade-2...", chat_id)
         from lib.nemotron import MODELS, generate
         result = generate(args, model=MODELS["analyze"], timeout=120, max_tokens=1024)
         if result.success and result.response:
             return f"{result.response}\n\n_({result.endpoint} • {result.model} • {result.eval_tokens} tokens • {result.tokens_per_second} t/s)_"
         return f"❌ {result.error or 'Nemotron returned empty response — model may be loading'}"
     elif cmd == "/escalate" and args:
-        send_message("🔴 Escalating to Claude...", chat_id)
+        sender("🔴 Escalating to Claude...", chat_id)
         return run_tool_direct("dispatch.py", {"task": args.strip(), "tier": "t3"})
     elif cmd == "/kimi" and args:
-        send_message("🟡 Routing to Kimi...", chat_id)
+        sender("🟡 Routing to Kimi...", chat_id)
         return run_tool_direct("dispatch.py", {"task": args.strip(), "tier": "t1"})
     elif cmd in ("/help", "/start"):
         return """🤖 *NemotronRariBot — Sapphire OS*
@@ -279,14 +348,15 @@ def handle_command(cmd: str, args: str, chat_id: str) -> str:
         return None  # Not a recognized command
 
 
-def handle_message(msg: dict) -> None:
+def handle_message(msg: dict, sender: Sender | None = None) -> None:
     """Process a Telegram message."""
+    sender = sender or send_message
     chat_id = str(msg["chat"]["id"])
     user_id = msg["from"]["id"]
     text = msg.get("text", "").strip()
 
     if user_id not in ALLOWED_USERS:
-        send_message("⛔ Unauthorized.", chat_id)
+        sender("⛔ Unauthorized.", chat_id)
         return
 
     if text.startswith("/"):
@@ -294,16 +364,16 @@ def handle_message(msg: dict) -> None:
         cmd = parts[0].lower().split("@")[0]
         args = parts[1] if len(parts) > 1 else ""
 
-        result = handle_command(cmd, args, chat_id)
+        result = handle_command(cmd, args, chat_id, sender=sender)
         if result:
-            send_message(result, chat_id)
+            sender(result, chat_id)
         else:
-            send_message(f"Unknown command: `{cmd}`. Use /help.", chat_id)
+            sender(f"Unknown command: `{cmd}`. Use /help.", chat_id)
     else:
         # Free text → Hermes 3 conversational AI on Windows GPU
-        send_message("🧠", chat_id)  # Thinking indicator
+        sender("🧠", chat_id)  # Thinking indicator
         response = chat_with_hermes(text, chat_id)
-        send_message(response, chat_id)
+        sender(response, chat_id)
 
 
 # ─── Conversational AI (Hermes 3 on Windows GPU) ────────────────────────────
