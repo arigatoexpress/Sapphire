@@ -121,6 +121,10 @@ def guarded_static(filename):
 _cache = {}
 _cache_time = {}
 CACHE_DURATION = 10  # seconds
+CHAIN_OVERVIEW_CACHE_DURATION = 60
+PORTFOLIO_CACHE_DURATION = 30
+CASCADE_CACHE_DURATION = 30
+STRATEGY_PERFORMANCE_CACHE_DURATION = 30
 
 # ── In-process latency metrics (per-route rolling) ─────────────────────────
 # Keeps a bounded ring buffer of (method, path, ms) samples plus per-route
@@ -154,10 +158,10 @@ def _metrics_after_request(response):
     response.headers['X-Response-Time-ms'] = f'{elapsed_ms:.1f}'
     return response
 
-def get_cached(key, fetch_func):
-    """Get cached data or fetch fresh"""
+def get_cached(key, fetch_func, ttl=CACHE_DURATION, *, raise_on_miss=False):
+    """Get cached data or fetch fresh, returning stale data if refresh fails."""
     now = time.time()
-    if key in _cache and now - _cache_time.get(key, 0) < CACHE_DURATION:
+    if key in _cache and now - _cache_time.get(key, 0) < ttl:
         return _cache[key]
 
     try:
@@ -167,7 +171,11 @@ def get_cached(key, fetch_func):
         return data
     except Exception as e:
         log.warning("Cache fetch failed for '%s': %s", key, e)
-        return _cache.get(key, {})
+        if key in _cache:
+            return _cache[key]
+        if raise_on_miss:
+            raise
+        return {}
 
 def fetch_sync(url):
     """Synchronous fetch — 4 MB response cap to prevent memory pressure."""
@@ -1127,10 +1135,19 @@ def api_chain_overview():
     _root = _Path.home() / 'Code' / 'Sapphire'
     if str(_root) not in _sys.path:
         _sys.path.insert(0, str(_root))
-    try:
+
+    def fetch():
         from lib.chain import ChainIntelligence
         ci = ChainIntelligence()
-        return jsonify(ci.snapshot())
+        return ci.snapshot(alert_on_shift=False)
+
+    try:
+        return jsonify(get_cached(
+            'chain_overview',
+            fetch,
+            ttl=CHAIN_OVERVIEW_CACHE_DURATION,
+            raise_on_miss=True,
+        ))
     except Exception as e:
         log.exception("chain overview failed")
         return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
@@ -2268,11 +2285,18 @@ def api_foundry_sync_status():
 @requires_auth
 def api_portfolio():
     """Live Robinhood portfolio snapshot."""
-    try:
+    def fetch():
         from lib.portfolio.robinhood import RobinhoodReader
         reader = RobinhoodReader()
-        snapshot = reader.get_snapshot()
-        return jsonify(snapshot)
+        return reader.get_snapshot()
+
+    try:
+        return jsonify(get_cached(
+            'portfolio_snapshot',
+            fetch,
+            ttl=PORTFOLIO_CACHE_DURATION,
+            raise_on_miss=True,
+        ))
     except Exception as e:
         log.warning("portfolio API error: %s", e)
         return jsonify({
@@ -2311,11 +2335,19 @@ def api_factors():
 @requires_auth
 def api_cascade():
     """Live liquidation cascade risk via Hyperliquid OI + funding data."""
-    try:
+    def fetch():
         from lib.analytics.liquidation import CascadeDetector
         from lib.analytics.liquidation import to_dict as cascade_to_dict
         report = CascadeDetector().assess_all(['BTC', 'ETH', 'SOL', 'LINK', 'ARB', 'AVAX'])
-        return jsonify(cascade_to_dict(report))
+        return cascade_to_dict(report)
+
+    try:
+        return jsonify(get_cached(
+            'cascade_risk',
+            fetch,
+            ttl=CASCADE_CACHE_DURATION,
+            raise_on_miss=True,
+        ))
     except Exception as e:
         log.warning("cascade API error: %s", e)
         return jsonify({'error': str(e), 'risk_score': 0, 'risk_label': 'UNAVAILABLE',
@@ -2466,11 +2498,19 @@ def api_strategy_performance():
     and data/paper_portfolio.json history, normalizes, and groups by strategy and
     hold-duration bucket (1h/4h/1d/7d/30d/all).
     """
-    try:
+    def fetch():
         from lib.analytics.strategy_performance import report
         payload = report()
         payload['last_updated'] = time.time()
-        return jsonify(payload)
+        return payload
+
+    try:
+        return jsonify(get_cached(
+            'strategy_performance',
+            fetch,
+            ttl=STRATEGY_PERFORMANCE_CACHE_DURATION,
+            raise_on_miss=True,
+        ))
     except Exception as e:
         log.warning("strategy performance API error: %s", e)
         return jsonify({
