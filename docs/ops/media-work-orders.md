@@ -33,6 +33,7 @@ Run the dry-run factory for explicit work orders, or omit paths to consume the
 JSON files already present in `data/media/work_orders/`:
 
 ```bash
+python3 -m lib.media run --work-order data/media/work_orders/<work_order_id>.json --pretty
 python3 -m lib.media run data/media/work_orders/<work_order_id>.json --pretty
 python3 -m lib.media run --limit 1 --pretty
 ```

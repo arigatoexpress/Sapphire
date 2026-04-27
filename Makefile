@@ -10,6 +10,7 @@ GOOGLE_MEMBERSHIP_ARGS = $(foreach membership,$(GOOGLE_MEMBERSHIPS),--membership
 GOOGLE_COST_HOURS ?= 24
 GOOGLE_COST_LOG_LIMIT ?= 25
 GOOGLE_READINESS_OUT ?= data/google/production-readiness/latest.md
+PRODUCTION_READINESS_OUT ?= data/readiness/production-readiness-latest.md
 
 .DEFAULT_GOAL := help
 
@@ -76,6 +77,7 @@ inference-proxy:  ## Start inference-proxy :11435 (with x402)
 
 .PHONY: content-generate content-publish heartbeat-status alpha-agent-status
 .PHONY: google-readiness google-readiness-offline google-readiness-cost google-readiness-artifact
+.PHONY: production-readiness production-readiness-offline production-readiness-artifact
 content-generate:  ## Generate weekly report draft
 	$(PY) -m lib.content generate
 
@@ -111,6 +113,25 @@ google-readiness-artifact:  ## Write ignored readiness artifact with cost postur
 		--cost-hours $(GOOGLE_COST_HOURS) \
 		--cost-log-limit $(GOOGLE_COST_LOG_LIMIT) \
 		--output $(GOOGLE_READINESS_OUT)
+
+production-readiness:  ## Print full-system read-only production readiness matrix
+	$(PY) scripts/ops/production_readiness_matrix.py \
+		--project $(GOOGLE_PROJECT) \
+		--region $(GOOGLE_REGION) \
+		$(GOOGLE_MEMBERSHIP_ARGS) \
+		--include-cost \
+		--format markdown
+
+production-readiness-offline:  ## Print full-system no-external readiness matrix
+	$(PY) scripts/ops/production_readiness_matrix.py --no-external --format markdown
+
+production-readiness-artifact:  ## Write ignored full-system readiness matrix
+	$(PY) scripts/ops/production_readiness_matrix.py \
+		--project $(GOOGLE_PROJECT) \
+		--region $(GOOGLE_REGION) \
+		$(GOOGLE_MEMBERSHIP_ARGS) \
+		--include-cost \
+		--output $(PRODUCTION_READINESS_OUT)
 
 heartbeat-status:  ## Print heartbeat daemon last known state
 	cat data/heartbeat_state.json 2>/dev/null | $(PY) -m json.tool || echo "no heartbeat state yet"
