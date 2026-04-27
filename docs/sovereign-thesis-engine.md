@@ -11,6 +11,8 @@ signal and does not place orders.
 - Dashboard: `/sovereign-thesis`
 - API: `/api/investments/thesis`
 - CLI: `python3 -m lib.intel.sovereign_thesis --pretty`
+- Explicit local staging preview:
+  `python3 -m lib.intel.sovereign_thesis --write-preview /tmp/sapphire-thesis-stage`
 
 ## Safety
 
@@ -20,7 +22,7 @@ The engine is read-only by construction:
 - no order submission
 - no Telegram sends
 - no default network fetches
-- no writes to `data/`
+- no writes to `data/` unless `--write-preview DIR` is explicitly passed
 
 Every asset carries invalidation triggers so the dashboard can track when a
 thesis should be questioned before any strategy work uses it.
@@ -48,10 +50,17 @@ coverage. Source gaps become ops tasks rather than silent confidence:
 - Robinhood read-only holdings/venue readiness
 - Kimi research pack as a source-pack signal, not a source of truth
 
+Each asset now emits an evidence ledger row per required or present source. Rows
+are classified as `evidenced`, `provider_wired`, or `needs_wiring`, so the UI
+can distinguish real source coverage from connectors that exist but still need
+asset-level evidence. The report also emits a dry-run materialization plan for
+normalized asset, lens, evidence, invalidation, and ops queue tables.
+
 ## Local Checks
 
 ```bash
 python3 -m lib.intel.sovereign_thesis --pretty
+python3 -m lib.intel.sovereign_thesis --write-preview /tmp/sapphire-thesis-stage
 ruff check lib/intel/sovereign_thesis.py tests/unit/test_sovereign_thesis.py
 python3 -m pytest tests/unit/test_sovereign_thesis.py tests/integration/test_dashboard_endpoints.py -q
 ```

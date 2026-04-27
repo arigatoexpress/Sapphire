@@ -319,11 +319,18 @@ def test_sovereign_thesis_endpoint_is_research_only(app_client):
     assert body["safety"]["live_trading_enabled"] is False
     assert body["safety"]["execution_enabled"] is False
     assert body["totals"]["assets"] >= 20
+    assert body["totals"]["evidence_required"] >= 250
+    assert body["totals"]["evidence_needs_wiring"] >= 1
+    assert body["evidence_summary"]["wired_pct"] >= body["evidence_summary"]["coverage_pct"]
+    assert body["materialization_plan"]["writes_by_default"] is False
+    assert body["materialization_plan"]["total_rows"] > len(body["assets"])
     rows = {row["symbol"]: row for row in body["assets"]}
     assert rows["BTC"]["fit"] == "core"
     assert "hard_money" in rows["BTC"]["aligned_lenses"]
+    assert rows["BTC"]["evidence_ledger"]
     assert "BWXT" in rows
     assert body["ops_queue"]
+    assert any(row["status"] == "needs_wiring" for row in body["evidence_ledger"])
 
 
 def test_sovereign_thesis_page_renders(app_client):
@@ -332,4 +339,6 @@ def test_sovereign_thesis_page_renders(app_client):
     assert r.status_code == 200
     html = r.get_data(as_text=True)
     assert "Sovereign Thesis" in html
+    assert "Evidence Ledger" in html
+    assert "Materialization Plan" in html
     assert "/api/investments/thesis" in html

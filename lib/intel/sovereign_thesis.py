@@ -20,6 +20,178 @@ ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG_PATH = ROOT / "config" / "investment_thesis.yaml"
 
 
+SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
+    "chain:client_diversity": {
+        "provider": "chain",
+        "connector_id": "chain_research",
+        "configured": True,
+        "cadence": "manual/research",
+    },
+    "chain:validator_distribution": {
+        "provider": "chain",
+        "connector_id": "chain_research",
+        "configured": True,
+        "cadence": "manual/research",
+    },
+    "chain:wallet_support": {
+        "provider": "chain",
+        "connector_id": "wallet_research",
+        "configured": True,
+        "cadence": "manual/research",
+    },
+    "coingecko:asset_metadata": {
+        "provider": "coingecko",
+        "connector_id": "coingecko_market",
+        "configured": True,
+        "cadence": "on_demand",
+    },
+    "coingecko:market_data": {
+        "provider": "coingecko",
+        "connector_id": "coingecko_market",
+        "configured": True,
+        "cadence": "on_demand",
+    },
+    "defillama:stablecoins": {
+        "provider": "defillama",
+        "connector_id": "defillama_defi",
+        "configured": True,
+        "cadence": "daily",
+    },
+    "defillama:tvl": {
+        "provider": "defillama",
+        "connector_id": "defillama_defi",
+        "configured": True,
+        "cadence": "daily",
+    },
+    "eia:electricity": {
+        "provider": "eia",
+        "connector_id": "eia_energy",
+        "configured": True,
+        "cadence": "daily/monthly",
+    },
+    "eia:natural_gas": {
+        "provider": "eia",
+        "connector_id": "eia_energy",
+        "configured": True,
+        "cadence": "weekly/monthly",
+    },
+    "fred:FEDFUNDS": {
+        "provider": "fred",
+        "connector_id": "fred_macro",
+        "configured": True,
+        "cadence": "monthly",
+    },
+    "fred:INDPRO": {
+        "provider": "fred",
+        "connector_id": "fred_macro",
+        "configured": True,
+        "cadence": "monthly",
+    },
+    "fred:M2SL": {
+        "provider": "fred",
+        "connector_id": "fred_macro",
+        "configured": True,
+        "cadence": "weekly",
+    },
+    "gov:contract_awards": {
+        "provider": "gov",
+        "connector_id": "contract_awards",
+        "configured": False,
+        "cadence": "planned",
+    },
+    "hyperliquid:asset_contexts": {
+        "provider": "hyperliquid",
+        "connector_id": "hyperliquid_info",
+        "configured": True,
+        "cadence": "on_demand",
+    },
+    "hyperliquid:open_interest": {
+        "provider": "hyperliquid",
+        "connector_id": "hyperliquid_info",
+        "configured": True,
+        "cadence": "on_demand",
+    },
+    "macro:currency_stress": {
+        "provider": "macro",
+        "connector_id": "currency_stress",
+        "configured": False,
+        "cadence": "planned",
+    },
+    "market:revenue_growth": {
+        "provider": "market",
+        "connector_id": "sec_companyfacts",
+        "configured": True,
+        "cadence": "quarterly",
+    },
+    "market:unit_economics": {
+        "provider": "market",
+        "connector_id": "sec_companyfacts",
+        "configured": True,
+        "cadence": "quarterly",
+    },
+    "news:geopolitical_catalysts": {
+        "provider": "news",
+        "connector_id": "research_events",
+        "configured": True,
+        "cadence": "manual/research",
+    },
+    "policy:jurisdiction_scan": {
+        "provider": "policy",
+        "connector_id": "jurisdiction_scan",
+        "configured": False,
+        "cadence": "planned",
+    },
+    "policy:regulatory_pressure": {
+        "provider": "policy",
+        "connector_id": "policy_research",
+        "configured": True,
+        "cadence": "manual/research",
+    },
+    "provider:globalx": {
+        "provider": "provider",
+        "connector_id": "globalx_provider_page",
+        "configured": True,
+        "cadence": "manual/research",
+    },
+    "robinhood:holdings_read_only": {
+        "provider": "robinhood",
+        "connector_id": "robinhood_crypto_readonly",
+        "configured": True,
+        "cadence": "on_demand",
+    },
+    "sec:companyfacts": {
+        "provider": "sec",
+        "connector_id": "sec_companyfacts",
+        "configured": True,
+        "cadence": "quarterly/intraday",
+    },
+    "sec:submissions": {
+        "provider": "sec",
+        "connector_id": "sec_submissions",
+        "configured": True,
+        "cadence": "intraday",
+    },
+    "source_pack:kimi": {
+        "provider": "research_pack",
+        "connector_id": "kimi_research_pack",
+        "configured": True,
+        "cadence": "on_attach",
+    },
+    "treasury:debt_to_penny": {
+        "provider": "treasury",
+        "connector_id": "treasury_fiscaldata",
+        "configured": True,
+        "cadence": "daily",
+    },
+    "venue:withdrawal_capability": {
+        "provider": "venue",
+        "connector_id": "venue_metadata",
+        "configured": True,
+        "cadence": "manual/research",
+    },
+}
+
+
 @dataclass(frozen=True)
 class ThesisLens:
     id: str
@@ -204,15 +376,85 @@ def _asset_lens_cells(asset: ThesisAsset, lenses: list[ThesisLens]) -> list[dict
     return cells
 
 
+def _required_source_lenses(cells: list[dict[str, Any]]) -> dict[str, list[str]]:
+    required: dict[str, set[str]] = {}
+    for cell in cells:
+        if cell["state"] not in {"core", "supporting"}:
+            continue
+        for source in cell.get("source_requirements", []):
+            required.setdefault(str(source), set()).add(str(cell["id"]))
+    return {source: sorted(lenses) for source, lenses in required.items()}
+
+
 def _source_gap(asset: ThesisAsset, cells: list[dict[str, Any]]) -> list[str]:
-    required = {
-        source
-        for cell in cells
-        if cell["state"] in {"core", "supporting"}
-        for source in cell.get("source_requirements", [])
-    }
+    required = set(_required_source_lenses(cells))
     present = set(asset.evidence_sources)
     return sorted(required.difference(present))
+
+
+def _source_registry_row(source_id: str) -> dict[str, Any]:
+    fallback_provider = source_id.split(":", 1)[0] if ":" in source_id else "unknown"
+    row = SOURCE_REGISTRY.get(source_id) or {}
+    return {
+        "provider": str(row.get("provider") or fallback_provider),
+        "connector_id": str(row.get("connector_id") or source_id.replace(":", "_")),
+        "configured": bool(row.get("configured", False)),
+        "cadence": str(row.get("cadence") or "unknown"),
+    }
+
+
+def _asset_evidence_ledger(asset: ThesisAsset, cells: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    required = _required_source_lenses(cells)
+    present = set(asset.evidence_sources)
+    entries: list[dict[str, Any]] = []
+    for source_id in sorted(set(required) | present):
+        registry = _source_registry_row(source_id)
+        is_required = source_id in required
+        is_present = source_id in present
+        if is_present:
+            status = "evidenced"
+        elif registry["configured"]:
+            status = "provider_wired"
+        else:
+            status = "needs_wiring"
+        entries.append(
+            {
+                "source_id": source_id,
+                "status": status,
+                "role": "required" if is_required else "extra_evidence",
+                "required": is_required,
+                "present": is_present,
+                "provider": registry["provider"],
+                "connector_id": registry["connector_id"],
+                "configured": registry["configured"],
+                "cadence": registry["cadence"],
+                "lenses": required.get(source_id, []),
+            }
+        )
+    status_rank = {"needs_wiring": 0, "provider_wired": 1, "evidenced": 2}
+    entries.sort(key=lambda row: (status_rank.get(row["status"], 9), row["source_id"]))
+    return entries
+
+
+def _evidence_summary(ledger: list[dict[str, Any]]) -> dict[str, Any]:
+    required = [row for row in ledger if row["required"]]
+    evidenced = [row for row in required if row["status"] == "evidenced"]
+    provider_wired = [row for row in required if row["status"] == "provider_wired"]
+    needs_wiring = [row for row in required if row["status"] == "needs_wiring"]
+    denominator = len(required)
+    return {
+        "required": denominator,
+        "evidenced": len(evidenced),
+        "provider_wired": len(provider_wired),
+        "needs_wiring": len(needs_wiring),
+        "coverage_pct": round((len(evidenced) / denominator) * 100, 1) if denominator else 100.0,
+        "wired_pct": round(
+            ((len(evidenced) + len(provider_wired)) / denominator) * 100,
+            1,
+        )
+        if denominator
+        else 100.0,
+    }
 
 
 def _asset_row(asset: ThesisAsset, lenses: list[ThesisLens], max_raw: float) -> dict[str, Any]:
@@ -221,6 +463,8 @@ def _asset_row(asset: ThesisAsset, lenses: list[ThesisLens], max_raw: float) -> 
     negative_score = sum(min(0.0, cell["weighted_score"]) for cell in cells)
     relative = round((positive_score / max_raw) * 100, 1) if max_raw > 0 else 0.0
     gaps = _source_gap(asset, cells)
+    ledger = _asset_evidence_ledger(asset, cells)
+    evidence = _evidence_summary(ledger)
     watch_flags = [
         {
             "id": str(trigger.get("id") or ""),
@@ -246,6 +490,8 @@ def _asset_row(asset: ThesisAsset, lenses: list[ThesisLens], max_raw: float) -> 
         "venue_symbols": dict(asset.venue_symbols),
         "evidence_sources": list(asset.evidence_sources),
         "source_gaps": gaps,
+        "evidence_summary": evidence,
+        "evidence_ledger": ledger,
         "lens_cells": cells,
         "aligned_lenses": aligned,
         "supporting_lenses": supporting,
@@ -294,25 +540,223 @@ def _ops_queue(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def _source_requirements(lenses: list[ThesisLens], rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     counts: Counter[str] = Counter()
+    status_counts: dict[str, Counter[str]] = {}
     for row in rows:
         for source in row["evidence_sources"]:
             counts[source] += 1
         for source in row["source_gaps"]:
             counts[source] += 1
+        for entry in row.get("evidence_ledger") or []:
+            source_id = str(entry.get("source_id") or "")
+            if source_id:
+                status_counts.setdefault(source_id, Counter())[str(entry.get("status") or "unknown")] += 1
     lens_map = {
         source: lens.id
         for lens in lenses
         for source in lens.source_requirements
     }
-    return [
+    rows_out = []
+    for source, count in counts.most_common():
+        registry = _source_registry_row(source)
+        statuses = status_counts.get(source, Counter())
+        rows_out.append(
+            {
+                "id": source,
+                "lens": lens_map.get(source, "asset_specific"),
+                "asset_count": count,
+                "provider": registry["provider"],
+                "connector_id": registry["connector_id"],
+                "configured": registry["configured"],
+                "cadence": registry["cadence"],
+                "evidenced": statuses.get("evidenced", 0),
+                "provider_wired": statuses.get("provider_wired", 0),
+                "needs_wiring": statuses.get("needs_wiring", 0),
+            }
+        )
+    return rows_out
+
+
+def _global_evidence_ledger(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    ledger = [
         {
-            "id": source,
-            "lens": lens_map.get(source, "asset_specific"),
-            "asset_count": count,
-            "configured": source not in {"gov:contract_awards", "policy:jurisdiction_scan", "macro:currency_stress"},
+            "symbol": row["symbol"],
+            "asset_class": row["asset_class"],
+            "fit": row["fit"],
+            "relative_score": row["relative_score"],
+            **entry,
         }
-        for source, count in counts.most_common()
+        for row in rows
+        for entry in row.get("evidence_ledger") or []
     ]
+    status_rank = {"needs_wiring": 0, "provider_wired": 1, "evidenced": 2}
+    ledger.sort(
+        key=lambda item: (
+            status_rank.get(str(item.get("status")), 9),
+            -float(item.get("relative_score") or 0),
+            str(item.get("symbol") or ""),
+            str(item.get("source_id") or ""),
+        )
+    )
+    return ledger
+
+
+def _global_evidence_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    ledger = _global_evidence_ledger(rows)
+    required = [row for row in ledger if row.get("required")]
+    statuses = Counter(str(row.get("status") or "unknown") for row in required)
+    total = len(required)
+    return {
+        "required": total,
+        "evidenced": statuses.get("evidenced", 0),
+        "provider_wired": statuses.get("provider_wired", 0),
+        "needs_wiring": statuses.get("needs_wiring", 0),
+        "coverage_pct": round((statuses.get("evidenced", 0) / total) * 100, 1) if total else 100.0,
+        "wired_pct": round(
+            ((statuses.get("evidenced", 0) + statuses.get("provider_wired", 0)) / total)
+            * 100,
+            1,
+        )
+        if total
+        else 100.0,
+    }
+
+
+def build_thesis_materialization_rows(report: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    """Build normalized thesis rows for local/GCS staging without writing by default."""
+    timestamp = report.get("generated_at") or _now_iso()
+    assets = report.get("assets") or []
+    return {
+        "sovereign_thesis_assets": [
+            {
+                "timestamp": timestamp,
+                "rank": asset.get("rank"),
+                "symbol": asset.get("symbol"),
+                "name": asset.get("name"),
+                "asset_class": asset.get("asset_class"),
+                "fit": asset.get("fit"),
+                "relative_score": asset.get("relative_score"),
+                "conviction": asset.get("conviction"),
+                "coverage_pct": (asset.get("evidence_summary") or {}).get("coverage_pct"),
+                "wired_pct": (asset.get("evidence_summary") or {}).get("wired_pct"),
+                "source_gap_count": len(asset.get("source_gaps") or []),
+                "watch_count": asset.get("watch_count"),
+            }
+            for asset in assets
+        ],
+        "sovereign_thesis_lens_cells": [
+            {
+                "timestamp": timestamp,
+                "symbol": asset.get("symbol"),
+                "lens_id": cell.get("id"),
+                "state": cell.get("state"),
+                "value": cell.get("value"),
+                "weighted_score": cell.get("weighted_score"),
+                "source_requirements": cell.get("source_requirements") or [],
+            }
+            for asset in assets
+            for cell in asset.get("lens_cells") or []
+        ],
+        "sovereign_thesis_evidence_ledger": [
+            {
+                "timestamp": timestamp,
+                "symbol": row.get("symbol"),
+                "source_id": row.get("source_id"),
+                "status": row.get("status"),
+                "provider": row.get("provider"),
+                "connector_id": row.get("connector_id"),
+                "configured": row.get("configured"),
+                "required": row.get("required"),
+                "present": row.get("present"),
+                "lenses": row.get("lenses") or [],
+            }
+            for row in report.get("evidence_ledger") or []
+        ],
+        "sovereign_thesis_invalidations": [
+            {
+                "timestamp": timestamp,
+                "symbol": row.get("symbol"),
+                "id": row.get("id"),
+                "severity": row.get("severity"),
+                "status": row.get("status"),
+                "condition": row.get("condition"),
+            }
+            for row in report.get("invalidation_queue") or []
+        ],
+        "sovereign_thesis_ops_queue": [
+            {
+                "timestamp": timestamp,
+                "priority": row.get("priority"),
+                "symbol": row.get("symbol"),
+                "action": row.get("action"),
+                "safe_mode": row.get("safe_mode"),
+                "reason": row.get("reason"),
+            }
+            for row in report.get("ops_queue") or []
+        ],
+    }
+
+
+def _today_stamp() -> str:
+    return datetime.now(UTC).strftime("%Y-%m-%d")
+
+
+def _run_stamp() -> str:
+    return datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+
+
+def build_thesis_materialization_plan(
+    report: dict[str, Any],
+    *,
+    out_dir: str | Path | None = None,
+) -> dict[str, Any]:
+    rows = build_thesis_materialization_rows(report)
+    base_dir = Path(out_dir) if out_dir else ROOT / "data" / ".gcp_stage" / "sovereign_thesis"
+    today = _today_stamp()
+    run_id = _run_stamp()
+    tables = [
+        {
+            "table": table,
+            "rows": len(table_rows),
+            "target": str(base_dir / "raw" / table / today / f"{run_id}.ndjson"),
+        }
+        for table, table_rows in rows.items()
+    ]
+    return {
+        "mode": "dry-run-preview",
+        "writes_by_default": False,
+        "base_dir": str(base_dir),
+        "tables": tables,
+        "total_rows": sum(table["rows"] for table in tables),
+    }
+
+
+def write_thesis_materialization_preview(
+    out_dir: str | Path,
+    *,
+    config_path: str | Path | None = None,
+) -> dict[str, Any]:
+    """Explicit dry-run writer for ignored local thesis staging paths."""
+    report = build_sovereign_thesis_report(config_path)
+    rows = build_thesis_materialization_rows(report)
+    base_dir = Path(out_dir)
+    today = _today_stamp()
+    run_id = _run_stamp()
+    written: list[dict[str, Any]] = []
+    for table, table_rows in rows.items():
+        target = base_dir / "raw" / table / today / f"{run_id}.ndjson"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            "".join(json.dumps(row, sort_keys=True) + "\n" for row in table_rows),
+            encoding="utf-8",
+        )
+        written.append({"table": table, "rows": len(table_rows), "path": str(target)})
+    return {
+        "timestamp": _now_iso(),
+        "mode": "dry-run-write",
+        "base_dir": str(base_dir),
+        "written": written,
+        "total_rows": sum(row["rows"] for row in written),
+    }
 
 
 def build_sovereign_thesis_report(config_path: str | Path | None = None) -> dict[str, Any]:
@@ -351,8 +795,11 @@ def build_sovereign_thesis_report(config_path: str | Path | None = None) -> dict
     ]
     tripped = [flag for flag in invalidations if flag.get("status") == "tripped"]
     source_requirements = _source_requirements(lenses, rows)
+    evidence_ledger = _global_evidence_ledger(rows)
+    evidence_summary = _global_evidence_summary(rows)
+    ops_queue = _ops_queue(rows)
 
-    return {
+    payload = {
         "generated_at": _now_iso(),
         "mode": "research_intel_only",
         "config_path": str(Path(config_path) if config_path else DEFAULT_CONFIG_PATH),
@@ -379,7 +826,12 @@ def build_sovereign_thesis_report(config_path: str | Path | None = None) -> dict
             "invalidation_watches": len(invalidations),
             "tripped_invalidations": len(tripped),
             "source_requirements": len(source_requirements),
+            "evidence_required": evidence_summary["required"],
+            "evidence_coverage_pct": evidence_summary["coverage_pct"],
+            "evidence_wired_pct": evidence_summary["wired_pct"],
+            "evidence_needs_wiring": evidence_summary["needs_wiring"],
         },
+        "evidence_summary": evidence_summary,
         "asset_classes": dict(sorted(class_counts.items())),
         "lenses": [asdict(lens) for lens in lenses],
         "assets": rows,
@@ -393,20 +845,31 @@ def build_sovereign_thesis_report(config_path: str | Path | None = None) -> dict
             for row in rows
         ],
         "invalidation_queue": invalidations,
-        "ops_queue": _ops_queue(rows),
+        "ops_queue": ops_queue,
         "source_requirements": source_requirements,
+        "evidence_ledger": evidence_ledger,
         "source_docs": list(_as_list(config.get("source_docs"))),
         "runtime_ms": round((time.perf_counter() - started) * 1000, 1),
     }
+    payload["materialization_plan"] = build_thesis_materialization_plan(payload)
+    return payload
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Build the Sapphire sovereign thesis matrix")
     parser.add_argument("--config", default=None, help="Optional thesis config path")
     parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON")
+    parser.add_argument(
+        "--write-preview",
+        metavar="DIR",
+        help="Write ignored NDJSON staging files under DIR/raw/* (explicit dry-run materialization)",
+    )
     args = parser.parse_args(argv)
 
-    payload = build_sovereign_thesis_report(args.config)
+    if args.write_preview:
+        payload = write_thesis_materialization_preview(args.write_preview, config_path=args.config)
+    else:
+        payload = build_sovereign_thesis_report(args.config)
     print(json.dumps(payload, indent=2 if args.pretty else None, sort_keys=args.pretty))
     return 0
 
@@ -415,10 +878,13 @@ __all__ = [
     "DEFAULT_CONFIG_PATH",
     "ThesisAsset",
     "ThesisLens",
+    "build_thesis_materialization_plan",
+    "build_thesis_materialization_rows",
     "build_sovereign_thesis_report",
     "load_thesis_config",
     "parse_assets",
     "parse_lenses",
+    "write_thesis_materialization_preview",
 ]
 
 
