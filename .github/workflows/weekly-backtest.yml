@@ -18,7 +18,7 @@ concurrency:
 jobs:
   strategy-sweep:
     name: strategy sweep
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.SAPPHIRE_RUNNER && fromJSON(vars.SAPPHIRE_RUNNER) || 'ubuntu-latest' }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6
