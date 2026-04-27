@@ -41,9 +41,21 @@ Not applied in this commit — requires Mac state change + a token rotation
 (the token has appeared in a Claude session transcript; rotate as a
 precaution).
 
+**2026-04-27 repo-side update**: `services/inference-proxy/launchagent/com.sapphire.inference-proxy.plist`
+now tracks the sanitized LaunchAgent shape and contains only non-secret Pi
+routing flags. Runtime deployment copies the current local values into
+`~/.sapphire/secrets.env` and removes the token/chat-id values from the
+live plist. BotFather rotation is still recommended because the previous
+token should be treated as burnt.
+
 ### F2. `AUTH_PASSWORD=sapphire` in `com.sapphire.dashboard.plist` (Mac only)
 Documented in CLAUDE.md, so not a secret — but still better as env. Same
 sanitization approach as F1.
+
+**2026-04-27 repo-side update**: `services/dashboard/start.sh` and
+`services/dashboard/launchagent/com.sapphire.dashboard.plist` now track the
+sanitized service-owned LaunchAgent. The plist contains only `PATH` and `PORT`;
+`AUTH_PASSWORD` is sourced from `~/.sapphire/secrets.env` at runtime.
 
 ### F3. Two repo plists never installed on Mac
 - `com.sapphire.alpha-agent.plist` — in repo, not in `~/Library/LaunchAgents/`.
@@ -122,8 +134,8 @@ no embedded secret values (only paths + non-secret config):
 
 | Plist | Status | Reason |
 |---|---|---|
-| `com.sapphire.dashboard.plist` | pending | Embeds `AUTH_PASSWORD` (F2) |
-| `com.sapphire.inference-proxy.plist` | pending | Embeds Telegram token (F1) |
+| `com.sapphire.dashboard.plist` | service-owned | Tracked at `services/dashboard/launchagent/com.sapphire.dashboard.plist`; secrets sourced from `~/.sapphire/secrets.env` |
+| `com.sapphire.inference-proxy.plist` | service-owned | Tracked at `services/inference-proxy/launchagent/com.sapphire.inference-proxy.plist`; secrets sourced from `~/.sapphire/secrets.env` |
 | `ai.hermes.gateway.plist` | skip | Lives at `~/.hermes/`, not under Sapphire repo scope |
 | `com.sapphire.cloudflare-tunnel.plist` | skip | User-specific cert paths; not reproducible across machines |
 | `com.sapphire.kronos-daily.plist` | skip | Points to `~/Code/Kronos/.venv/bin/python3` — separate repo |

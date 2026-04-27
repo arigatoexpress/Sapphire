@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import plistlib
 import sys
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -212,6 +213,7 @@ def _readiness_gates(report: dict[str, Any]) -> list[ReadinessStatus]:
     vertex_totals = summary["vertex_resource_totals"]
     gemini_cli = summary["gemini_cli"]
     vertex_busy = vertex_totals["custom_jobs"] > 0 or vertex_totals["endpoints"] > 0
+    launchagent_gate = _launchagent_retargeting_gate()
 
     gates: list[ReadinessStatus] = [
         {
@@ -246,9 +248,9 @@ def _readiness_gates(report: dict[str, Any]) -> list[ReadinessStatus]:
         },
         {
             "id": "launchagent_retargeting",
-            "status": "blocked",
-            "evidence": "RELAY_READER_TOKEN rotation is still the active prerequisite.",
-            "next_gate": "Rotate and test the relay token before sanitized service-owned plists or wrappers are implemented.",
+            "status": launchagent_gate["status"],
+            "evidence": launchagent_gate["evidence"],
+            "next_gate": launchagent_gate["next_gate"],
         },
     ]
     if summary["cost_posture_included"]:
@@ -261,6 +263,87 @@ def _readiness_gates(report: dict[str, Any]) -> list[ReadinessStatus]:
             }
         )
     return gates
+
+
+def _launchagent_retargeting_gate(
+    *,
+    secrets_env: Path | None = None,
+    live_dir: Path | None = None,
+    tracked_plists: list[Path] | None = None,
+) -> ReadinessStatus:
+    secrets_env = secrets_env or Path.home() / ".sapphire" / "secrets.env"
+    secret_keys = _secret_env_keys(secrets_env)
+    required_secret_refs = {"AUTH_PASSWORD", "RELAY_READER_TOKEN", "KIMI_RELAY_CHAT_ID"}
+    missing_secret_refs = sorted(required_secret_refs - secret_keys)
+
+    secret_env_keys = {
+        "com.sapphire.dashboard.plist": {"AUTH_PASSWORD"},
+        "com.sapphire.inference-proxy.plist": {
+            "KIMI_RELAY_CHAT_ID",
+            "OPENROUTER_API_KEY",
+            "RELAY_READER_TOKEN",
+        },
+    }
+    live_dir = live_dir or Path.home() / "Library" / "LaunchAgents"
+    live_secret_keys: dict[str, list[str]] = {}
+    for plist_name, blocked_keys in secret_env_keys.items():
+        env = _plist_environment(live_dir / plist_name)
+        present = sorted(blocked_keys & set(env))
+        if present:
+            live_secret_keys[plist_name] = present
+
+    if tracked_plists is None:
+        tracked_plists = [
+            Path("services/dashboard/launchagent/com.sapphire.dashboard.plist"),
+            Path("services/inference-proxy/launchagent/com.sapphire.inference-proxy.plist"),
+        ]
+    missing_tracked = [str(path) for path in tracked_plists if not path.exists()]
+
+    if not missing_secret_refs and not live_secret_keys and not missing_tracked:
+        return {
+            "status": "pass",
+            "evidence": "Live dashboard/inference-proxy plists are sanitized; required secret references are present in ~/.sapphire/secrets.env.",
+            "next_gate": "BotFather RELAY_READER_TOKEN rotation is still recommended if the previous relay token is considered burnt.",
+        }
+
+    blockers = []
+    if missing_secret_refs:
+        blockers.append(f"missing secrets-env refs: {', '.join(missing_secret_refs)}")
+    if live_secret_keys:
+        labels = ", ".join(f"{name} has {', '.join(keys)}" for name, keys in live_secret_keys.items())
+        blockers.append(f"live plist secret env remains: {labels}")
+    if missing_tracked:
+        blockers.append(f"missing tracked sanitized plists: {', '.join(missing_tracked)}")
+    return {
+        "status": "needs_attention",
+        "evidence": "; ".join(blockers),
+        "next_gate": "Move AUTH_PASSWORD, RELAY_READER_TOKEN, and KIMI_RELAY_CHAT_ID refs to ~/.sapphire/secrets.env, deploy sanitized service-owned plists, bounce dashboard/inference-proxy, then re-run readiness.",
+    }
+
+
+def _secret_env_keys(path: Path) -> set[str]:
+    keys: set[str] = set()
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return keys
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        if value.strip():
+            keys.add(key.strip())
+    return keys
+
+
+def _plist_environment(path: Path) -> dict[str, str]:
+    try:
+        data = plistlib.loads(path.read_bytes())
+    except (OSError, plistlib.InvalidFileException):
+        return {}
+    env = data.get("EnvironmentVariables") or {}
+    return env if isinstance(env, dict) else {}
 
 
 def _status_from_tool(tool: dict[str, Any]) -> str:

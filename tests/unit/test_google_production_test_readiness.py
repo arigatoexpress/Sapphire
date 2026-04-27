@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import plistlib
 import sys
 from pathlib import Path
 
@@ -82,6 +83,19 @@ def _cost_builder(*_args: object, **_kwargs: object) -> dict[str, object]:
     }
 
 
+def _write_plist(path: Path, env: dict[str, str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(
+        plistlib.dumps(
+            {
+                "Label": path.stem,
+                "ProgramArguments": ["/bin/bash", "/tmp/start.sh"],
+                "EnvironmentVariables": env,
+            }
+        )
+    )
+
+
 def test_collect_readiness_combines_google_surfaces_without_writes() -> None:
     report = readiness.collect_readiness(
         projects=["tho-ai-agent"],
@@ -154,5 +168,57 @@ def test_markdown_contains_gates_and_live_action_blocks() -> None:
     assert "# Google Production-Testing Readiness" in markdown
     assert "No workflow dispatches, LaunchAgent retargets" in markdown
     assert "Vertex evals before training" in markdown
-    assert "RELAY_READER_TOKEN rotation" in markdown
+    assert "RELAY_READER_TOKEN" in markdown
     assert "Cost Posture" in markdown
+
+
+def test_launchagent_retargeting_gate_passes_when_runtime_is_sanitized(tmp_path: Path) -> None:
+    secrets_env = tmp_path / ".sapphire" / "secrets.env"
+    secrets_env.parent.mkdir()
+    secrets_env.write_text(
+        "\n".join(
+            [
+                "AUTH_PASSWORD=present",
+                "RELAY_READER_TOKEN=present",
+                "KIMI_RELAY_CHAT_ID=present",
+            ]
+        )
+    )
+    live_dir = tmp_path / "LaunchAgents"
+    _write_plist(live_dir / "com.sapphire.dashboard.plist", {"PATH": "/bin", "PORT": "8080"})
+    _write_plist(
+        live_dir / "com.sapphire.inference-proxy.plist",
+        {"PI_RARI1_ENABLED": "1", "PI_RARI2_ENABLED": "1"},
+    )
+    tracked = [tmp_path / "dashboard.plist", tmp_path / "inference.plist"]
+    for path in tracked:
+        _write_plist(path, {})
+
+    gate = readiness._launchagent_retargeting_gate(
+        secrets_env=secrets_env,
+        live_dir=live_dir,
+        tracked_plists=tracked,
+    )
+
+    assert gate["status"] == "pass"
+
+
+def test_launchagent_retargeting_gate_flags_live_secret_env(tmp_path: Path) -> None:
+    secrets_env = tmp_path / ".sapphire" / "secrets.env"
+    secrets_env.parent.mkdir()
+    secrets_env.write_text("AUTH_PASSWORD=present\n")
+    live_dir = tmp_path / "LaunchAgents"
+    _write_plist(live_dir / "com.sapphire.dashboard.plist", {"AUTH_PASSWORD": "secret"})
+    _write_plist(
+        live_dir / "com.sapphire.inference-proxy.plist",
+        {"RELAY_READER_TOKEN": "secret", "PI_RARI1_ENABLED": "1"},
+    )
+
+    gate = readiness._launchagent_retargeting_gate(
+        secrets_env=secrets_env,
+        live_dir=live_dir,
+        tracked_plists=[],
+    )
+
+    assert gate["status"] == "needs_attention"
+    assert "live plist secret env remains" in gate["evidence"]
