@@ -4,6 +4,12 @@ Last updated: 2026-04-17
 
 End-to-end reference for the `tho-ai-agent` project's data plane: what lives in GCP, how data flows from the Mac into BigQuery, and how to recover when something breaks.
 
+Cost-aware Vertex AI augmentation is tracked in
+[`docs/ops/gcp-vertex-ai-complement-plan.md`](ops/gcp-vertex-ai-complement-plan.md).
+Use `python3 scripts/ops/gcp_ai_inventory.py --format markdown` for read-only
+AI/data-plane inventory before any batch prediction, embedding, tuning, or
+training work.
+
 ## 1. Resource inventory
 
 ### Project, location, identities
