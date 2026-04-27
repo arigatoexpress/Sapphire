@@ -8,6 +8,7 @@ configured enough to start wiring it up?"
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from collections import Counter
@@ -142,6 +143,26 @@ _OBJECT_REQUIRED_FIELDS: dict[str, tuple[str, ...]] = {
 
 _SYNC_HISTORY_REQUIRED_FIELDS = ("ok", "timestamp", "duration_s")
 _SYNC_HISTORY_FILE = "data/foundry_sync_history.jsonl"
+_REGIONAL_MANIFEST_FILE = "data/foundry/regional-intel/manifest.json"
+_REGIONAL_OBJECT_TYPES = ("Region", "IntelItem", "IntelSourceHealth")
+_REGIONAL_MANIFEST_FIELDS = (
+    "schema_version",
+    "generated_at",
+    "snapshot_updated_at",
+    "region",
+    "object_types",
+    "dropped_rows",
+    "source_health_summary",
+    "policy",
+)
+_DROPPED_ROW_DETAIL_FIELDS = (
+    "reason",
+    "object_type",
+    "kind",
+    "item_id",
+    "region_id",
+    "missing_fields",
+)
 
 
 def _repo_root() -> Path:
@@ -212,6 +233,269 @@ def _missing_required_fields(
         for field in required_fields
         if field not in obj or obj.get(field) is None
     ]
+
+
+def _sha256_file(path: Path) -> str | None:
+    try:
+        digest = hashlib.sha256()
+        with path.open("rb") as fh:
+            for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+    except OSError:
+        return None
+
+
+def _count_ndjson_rows(path: Path) -> int | None:
+    try:
+        with path.open("r", encoding="utf-8") as fh:
+            return sum(1 for line in fh if line.strip())
+    except OSError:
+        return None
+
+
+def _is_nonnegative_int(value: Any) -> bool:
+    return type(value) is int and value >= 0
+
+
+def _count_bucket_total(
+    bucket: dict[str, Any],
+    *,
+    errors: list[str],
+    error_prefix: str,
+) -> int:
+    total = 0
+    for key, value in bucket.items():
+        if not _is_nonnegative_int(value):
+            errors.append(f"{error_prefix}.invalid_count:{key}")
+            continue
+        total += value
+    return total
+
+
+def _audit_regional_manifest_v2(root: Path) -> dict[str, Any]:
+    """Validate the regional-intel manifest v2 contract without exposing rows."""
+    manifest_path = root / _REGIONAL_MANIFEST_FILE
+    regional_dir = manifest_path.parent
+    export_files_present = any(
+        (regional_dir / f"{object_type}.ndjson").is_file()
+        for object_type in _REGIONAL_OBJECT_TYPES
+    )
+    summary: dict[str, Any] = {
+        "path": _REGIONAL_MANIFEST_FILE,
+        "exists": manifest_path.is_file(),
+        "status": "absent",
+        "schema_version": None,
+        "generated_at": None,
+        "snapshot_updated_at": None,
+        "region": None,
+        "errors": [],
+        "object_types": {},
+        "dropped_rows": {
+            "total": 0,
+            "by_reason": {},
+            "by_object_type": {},
+            "by_kind": {},
+            "missing_fields": {},
+            "details": 0,
+        },
+        "source_health_summary": {},
+        "policy": {"present": False, "keys": []},
+    }
+    errors: list[str] = summary["errors"]
+
+    if not manifest_path.is_file():
+        if export_files_present:
+            summary["status"] = "missing"
+            errors.append("manifest_missing_with_regional_exports")
+        return summary
+
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        summary["status"] = "invalid"
+        errors.append("manifest_unreadable_or_invalid_json")
+        return summary
+
+    if not isinstance(manifest, dict):
+        summary["status"] = "invalid"
+        errors.append("manifest_not_object")
+        return summary
+
+    missing_top = [
+        field
+        for field in _REGIONAL_MANIFEST_FIELDS
+        if field not in manifest or manifest.get(field) is None
+    ]
+    errors.extend(f"missing_top_level:{field}" for field in missing_top)
+    if manifest.get("schema_version") != 2:
+        errors.append("schema_version_not_2")
+
+    summary["schema_version"] = manifest.get("schema_version")
+    summary["generated_at"] = manifest.get("generated_at")
+    summary["snapshot_updated_at"] = manifest.get("snapshot_updated_at")
+    summary["region"] = manifest.get("region")
+
+    object_types = manifest.get("object_types")
+    if not isinstance(object_types, dict):
+        errors.append("object_types_not_object")
+        object_types = {}
+    for object_type in _REGIONAL_OBJECT_TYPES:
+        spec = object_types.get(object_type)
+        type_summary: dict[str, Any] = {
+            "filename": None,
+            "rows": None,
+            "file_sha256_present": False,
+            "file_sha256_matches": None,
+            "row_hashes": 0,
+            "path_present": False,
+            "file_present": False,
+            "actual_rows": None,
+        }
+        if not isinstance(spec, dict):
+            errors.append(f"object_type_missing_or_invalid:{object_type}")
+            summary["object_types"][object_type] = type_summary
+            continue
+
+        filename = spec.get("filename")
+        rows = spec.get("rows")
+        file_sha256 = spec.get("file_sha256")
+        row_hashes = spec.get("row_hashes")
+        type_summary.update(
+            {
+                "filename": filename,
+                "rows": rows,
+                "file_sha256_present": bool(file_sha256),
+                "row_hashes": len(row_hashes) if isinstance(row_hashes, list) else 0,
+                "path_present": bool(spec.get("path")),
+            }
+        )
+        for field in ("filename", "rows", "file_sha256", "row_hashes"):
+            if field not in spec or spec.get(field) is None:
+                errors.append(f"{object_type}.missing:{field}")
+        if not isinstance(filename, str) or not filename.endswith(".ndjson"):
+            errors.append(f"{object_type}.filename_invalid")
+        if not _is_nonnegative_int(rows):
+            errors.append(f"{object_type}.rows_invalid")
+        if not isinstance(row_hashes, list):
+            errors.append(f"{object_type}.row_hashes_invalid")
+        elif _is_nonnegative_int(rows) and len(row_hashes) != rows:
+            errors.append(f"{object_type}.row_hashes_count_mismatch")
+
+        candidate = regional_dir / str(filename or f"{object_type}.ndjson")
+        if candidate.is_file():
+            type_summary["file_present"] = True
+            type_summary["actual_rows"] = _count_ndjson_rows(candidate)
+            if file_sha256:
+                type_summary["file_sha256_matches"] = _sha256_file(candidate) == file_sha256
+                if type_summary["file_sha256_matches"] is False:
+                    errors.append(f"{object_type}.file_sha256_mismatch")
+            if _is_nonnegative_int(rows) and type_summary["actual_rows"] != rows:
+                errors.append(f"{object_type}.row_count_mismatch")
+        summary["object_types"][object_type] = type_summary
+
+    dropped_rows = manifest.get("dropped_rows")
+    if not isinstance(dropped_rows, dict):
+        errors.append("dropped_rows_not_object")
+        dropped_rows = {}
+    details_raw = dropped_rows.get("details")
+    if details_raw is None:
+        details = []
+    elif isinstance(details_raw, list):
+        details = details_raw
+    else:
+        errors.append("dropped_rows.details_not_list")
+        details = []
+    by_object_type: Counter[str] = Counter()
+    by_kind: Counter[str] = Counter()
+    missing_fields: Counter[str] = Counter()
+    for detail in details:
+        if not isinstance(detail, dict):
+            errors.append("dropped_rows.detail_not_object")
+            continue
+        for field in _DROPPED_ROW_DETAIL_FIELDS:
+            if field not in detail:
+                errors.append(f"dropped_rows.detail_missing:{field}")
+        if detail.get("object_type"):
+            by_object_type[str(detail["object_type"])] += 1
+        if detail.get("kind"):
+            by_kind[str(detail["kind"])] += 1
+        missing_fields_value = detail.get("missing_fields")
+        if missing_fields_value is None:
+            continue
+        if not isinstance(missing_fields_value, list):
+            errors.append("dropped_rows.detail_missing_fields_not_list")
+            continue
+        for field in missing_fields_value:
+            missing_fields[str(field)] += 1
+    by_reason_raw = dropped_rows.get("by_reason")
+    if by_reason_raw is None:
+        by_reason = {}
+    elif isinstance(by_reason_raw, dict):
+        by_reason = by_reason_raw
+    else:
+        errors.append("dropped_rows.by_reason_not_object")
+        by_reason = {}
+    total = dropped_rows.get("total")
+    if not _is_nonnegative_int(total):
+        errors.append("dropped_rows.total_invalid")
+        total = 0
+    if _count_bucket_total(
+        by_reason,
+        errors=errors,
+        error_prefix="dropped_rows.by_reason",
+    ) != total:
+        errors.append("dropped_rows.by_reason_total_mismatch")
+    if len(details) != total:
+        errors.append("dropped_rows.details_count_mismatch")
+    summary["dropped_rows"] = {
+        "total": total,
+        "by_reason": dict(sorted(by_reason.items())),
+        "by_object_type": dict(sorted(by_object_type.items())),
+        "by_kind": dict(sorted(by_kind.items())),
+        "missing_fields": dict(sorted(missing_fields.items())),
+        "details": len(details),
+    }
+
+    source_health = manifest.get("source_health_summary")
+    if not isinstance(source_health, dict):
+        errors.append("source_health_summary_not_object")
+        source_health = {}
+    for field in (
+        "total_sources",
+        "live_pull_sources",
+        "total_item_count",
+        "by_status",
+        "by_category",
+        "by_region",
+    ):
+        if field not in source_health:
+            errors.append(f"source_health_summary.missing:{field}")
+    for field in ("total_sources", "live_pull_sources", "total_item_count"):
+        if field in source_health and not _is_nonnegative_int(source_health.get(field)):
+            errors.append(f"source_health_summary.invalid_count:{field}")
+    for field in ("by_status", "by_category", "by_region"):
+        if field in source_health and not isinstance(source_health.get(field), dict):
+            errors.append(f"source_health_summary.invalid_bucket:{field}")
+    summary["source_health_summary"] = {
+        "total_sources": source_health.get("total_sources"),
+        "live_pull_sources": source_health.get("live_pull_sources"),
+        "total_item_count": source_health.get("total_item_count"),
+        "by_status": source_health.get("by_status") if isinstance(source_health.get("by_status"), dict) else {},
+        "by_category": source_health.get("by_category") if isinstance(source_health.get("by_category"), dict) else {},
+        "by_region": source_health.get("by_region") if isinstance(source_health.get("by_region"), dict) else {},
+    }
+
+    policy = manifest.get("policy")
+    summary["policy"] = {
+        "present": isinstance(policy, dict),
+        "keys": sorted(policy.keys()) if isinstance(policy, dict) else [],
+    }
+    if not isinstance(policy, dict):
+        errors.append("policy_not_object")
+
+    summary["status"] = "ready" if not errors else "schema_warning"
+    return summary
 
 
 def _audit_sync_history(root: Path) -> dict[str, Any]:
@@ -345,9 +629,16 @@ def build_foundry_schema_audit(root: Path | None = None) -> dict[str, Any]:
             }
         )
 
+    regional_manifest = _audit_regional_manifest_v2(root)
+    manifest_blocks_ready = regional_manifest["status"] in {
+        "invalid",
+        "missing",
+        "schema_warning",
+    }
+
     if totals["transform_errors"]:
         status = "error"
-    elif totals["invalid_objects"] or totals["missing_required_fields"]:
+    elif totals["invalid_objects"] or totals["missing_required_fields"] or manifest_blocks_ready:
         status = "schema_warning"
     elif totals["objects"]:
         status = "ready"
@@ -359,6 +650,7 @@ def build_foundry_schema_audit(root: Path | None = None) -> dict[str, Any]:
         "object_types": object_types,
         "totals": totals,
         "sync_history_readback": _audit_sync_history(root),
+        "regional_manifest": regional_manifest,
     }
 
 

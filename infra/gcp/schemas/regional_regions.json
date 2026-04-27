@@ -1,0 +1,17 @@
+[
+  {"name": "object_id", "type": "STRING", "mode": "REQUIRED", "description": "Stable regional ontology identifier"},
+  {"name": "region_id", "type": "STRING", "mode": "REQUIRED", "description": "Regional workbench region key"},
+  {"name": "name", "type": "STRING", "mode": "REQUIRED", "description": "Human-readable region label"},
+  {"name": "summary", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "bbox", "type": "FLOAT64", "mode": "REPEATED", "description": "Optional geographic bounding box"},
+  {"name": "focus_keywords", "type": "STRING", "mode": "REPEATED"},
+  {"name": "source_keys", "type": "STRING", "mode": "REPEATED"},
+  {"name": "snapshot_updated_at", "type": "TIMESTAMP", "mode": "REQUIRED"},
+  {"name": "notes", "type": "STRING", "mode": "REPEATED"},
+  {"name": "provenance", "type": "JSON", "mode": "NULLABLE"},
+  {"name": "manifest_generated_at", "type": "TIMESTAMP", "mode": "NULLABLE"},
+  {"name": "manifest_region", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "row_hash", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "timestamp", "type": "TIMESTAMP", "mode": "REQUIRED"},
+  {"name": "ingested_at", "type": "TIMESTAMP", "mode": "REQUIRED"}
+]

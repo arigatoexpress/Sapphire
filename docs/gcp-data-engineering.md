@@ -38,6 +38,9 @@ End-to-end reference for the `tho-ai-agent` project's data plane: what lives in 
 | `inference_metrics`  | `tier, model`               | GCF from GCS       | telemetry_collector → `raw/metrics/` |
 | `service_health`     | `service_name, status`      | GCF from GCS       | telemetry_collector → `raw/health/` |
 | `leads`              | `grade, status`             | (planned)          | `lead-refresh` (not yet implemented) |
+| `regional_regions`   | `region_id, name`           | planned GCF from GCS | regional-intel workbench export → `raw/regional_regions/` |
+| `regional_intel_items` | `region_id, kind, source_name` | planned GCF from GCS | regional-intel workbench export → `raw/regional_intel_items/` |
+| `regional_source_health` | `status, category`       | planned GCF from GCS | regional-intel workbench export → `raw/regional_source_health/` |
 
 **Rollup tables** (materialized by scheduled queries):
 
@@ -169,9 +172,18 @@ Any new producer must pick one path. This is the contract.
 | `services/pipeline/telemetry_collector.py` (proxy)  | B    | GCS `raw/metrics/YYYY-MM-DD/*.ndjson`        | `inference_metrics` |
 | `services/pipeline/telemetry_collector.py` (probes) | B    | GCS `raw/health/YYYY-MM-DD/*.ndjson`         | `service_health` |
 | (planned) `scripts/lead_refresh.sh`                 | B    | GCS `raw/leads/YYYY-MM-DD/*.ndjson`          | `leads` |
+| (planned) regional-intel export promotion           | B    | GCS `raw/regional_regions/YYYY-MM-DD/*.ndjson` | `regional_regions` |
+| (planned) regional-intel export promotion           | B    | GCS `raw/regional_intel_items/YYYY-MM-DD/*.ndjson` | `regional_intel_items` |
+| (planned) regional-intel export promotion           | B    | GCS `raw/regional_source_health/YYYY-MM-DD/*.ndjson` | `regional_source_health` |
 | alerting consumers                                  | —    | topic `sapphire-alerts` (pull)               | (no BQ sink)  |
 
 Rule: **pick one path per table.** Never publish and batch-load into the same table — duplicate keys cannot be deduped post-hoc without a partitioning rewrite (see §5).
+
+Regional-intel promotion is metadata-ready but intentionally not automated from
+this repo. The tracked contract is
+[`infra/gcp/regional_intel_mapping.json`](../infra/gcp/regional_intel_mapping.json):
+runtime NDJSON and the manifest stay under ignored `data/foundry/regional-intel/`,
+while paste-safe readiness is exposed through the local Foundry readiness audit.
 
 ## 4. Operational runbook
 

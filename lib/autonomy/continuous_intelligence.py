@@ -55,6 +55,7 @@ class IntelligenceTask:
     command: str | None = None
     python_api: str | None = None
     prompt: str | None = None
+    ooda_packet: dict[str, Any] | None = None
     expected_artifacts: tuple[str, ...] = ()
     acceptance: tuple[str, ...] = ()
     blocked_by: tuple[str, ...] = ()
@@ -353,6 +354,60 @@ def _build_tasks(
                 "No live execution setting changes",
             ),
             blocked_by=cpcv_blockers,
+        ),
+        _task(
+            id="regional-intel-ooda-readiness-review",
+            lane="regional_ooda",
+            priority="P1",
+            title="Review regional-intel manifest v2 readiness",
+            description=(
+                "Use the regional-intel manifest v2 contract to review exported "
+                "Region, IntelItem, and IntelSourceHealth coverage, provenance "
+                "dropped-row counts, and safe export follow-ups."
+            ),
+            target_runtime="mac-local",
+            model_tier="none",
+            cadence="daily_on_export",
+            safe_mode="read_only",
+            inputs=(
+                "data/foundry/regional-intel/manifest.json",
+                "infra/gcp/regional_intel_mapping.json",
+                "docs/foundry-ontology-schema.md",
+            ),
+            python_api="lib.foundry.readiness.build_foundry_schema_audit",
+            ooda_packet={
+                "observe": (
+                    "Read local manifest metadata and row counts only; do not inspect "
+                    "or copy source payload bodies."
+                ),
+                "orient": (
+                    "Compare manifest schema_version=2, object type row/hash metadata, "
+                    "source_health_summary, policy keys, and dropped-row count buckets."
+                ),
+                "decide": (
+                    "Classify readiness as ready, absent, or schema_warning using the "
+                    "paste-safe regional_manifest audit."
+                ),
+                "act": [
+                    "Review /api/foundry/readiness for local manifest status.",
+                    "Export fresh regional NDJSON from regional-intel-workbench if row/hash counts drift.",
+                    "Open a PR for schema or mapping metadata changes before any GCP or Foundry write.",
+                ],
+            },
+            expected_artifacts=(
+                "local /api/foundry/readiness regional_manifest readout",
+                "optional docs/research/regional-intel-readiness-*.md",
+            ),
+            acceptance=(
+                "Act items are review/export recommendations only",
+                "No GCP, Foundry, workflow dispatch, Telegram, or trading write is invoked",
+                "Dropped-row reporting includes counts by reason/object/kind but no source payloads",
+            ),
+            source_docs=(
+                "docs/foundry-ontology-schema.md",
+                "docs/gcp-data-engineering.md",
+                "infra/gcp/regional_intel_mapping.json",
+            ),
         ),
         _task(
             id="windows-confluence-scan-preferred-assets",

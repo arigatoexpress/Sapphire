@@ -185,7 +185,9 @@ def test_logs_filter_by_level_and_service(app_client, tmp_path, monkeypatch):
 def test_foundry_readiness_reports_data_ready(app_client, tmp_path, monkeypatch):
     _, client = app_client
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
-    data_dir = tmp_path / "Code" / "Sapphire" / "data"
+    repo_root = tmp_path / "Code" / "Sapphire"
+    monkeypatch.setenv("SAPPHIRE_REPO_ROOT", str(repo_root))
+    data_dir = repo_root / "data"
     (data_dir / "health").mkdir(parents=True)
     (data_dir / "metrics").mkdir(parents=True)
     (data_dir / "intelligence" / "2026-04-19").mkdir(parents=True)

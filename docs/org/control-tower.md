@@ -84,8 +84,11 @@ in the repo board.
 - **Wave 3: Agent Consolidation** - in progress. Map Hermes, claw-code, Sapphire
   plugins, Claude scheduled tasks, OpenClaw remnants, and LaunchAgents. Hermes
   runtime mapping is documented in `docs/org/hermes-agent-consolidation-map.md`.
-- **Wave 4: Data + Intelligence Platform** - queued. Normalize schemas,
+- **Wave 4: Data + Intelligence Platform** - in progress. Normalize schemas,
   Foundry, GCS, BigQuery, threat, regional, market, and chain intel flows.
+  Regional-intel readiness now has a read-only OODA task and tracked
+  GCS/BigQuery mapping metadata; runtime NDJSON and manifests remain ignored
+  under `data/foundry/regional-intel/`.
 - **Wave 5: Autonomy Safety** - in progress. Audit logging is wired for
   decision-engine and Kimi bridge autonomy requests; alpha full-autonomy
   dispatch defaults to dry-run, with code/GCP mutations disabled unless

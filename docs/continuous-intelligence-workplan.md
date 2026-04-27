@@ -27,7 +27,7 @@ Mac, Windows GPU inference, GitHub Actions, and human review can claim.
    backtest artifacts.
 2. Generate claimable tasks for strategy backtests, confluence scans, thesis
    research, data staging, institutional tokenization, agentic payments,
-   TradingView parity checks, and promotion gates.
+   regional OODA readiness, TradingView parity checks, and promotion gates.
 3. Dispatch only read-only or dry-run work to Windows GPU, Mac local, or GitHub
    Actions.
 4. Store artifacts under a future ignored autonomy path such as
@@ -66,6 +66,8 @@ blockers, and acceptance gates.
   evidence.
 - `ops_validation`: keep TradingView alert schema parity and x402 agent-market
   smoke tests deep and dry-run.
+- `regional_ooda`: review regional-intel manifest v2 readiness, source-health
+  coverage, and dropped-row provenance counts using local/export actions only.
 - `promotion_gate`: convert evidence into a human-review packet before code or
   executor behavior changes.
 
@@ -80,6 +82,8 @@ The planner hard-codes:
 
 Every task has `safe_mode` set to `read_only`, `dry_run`, or `paper`. Live
 trading, order signing, order submission, and Telegram sends remain forbidden.
+Regional OODA act items are recommendations to review local status, export from
+the workbench, or open a PR before any GCP or Foundry write.
 
 ## Next PRs
 

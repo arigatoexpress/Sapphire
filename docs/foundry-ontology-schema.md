@@ -204,6 +204,29 @@ Regional-intel source coverage and live-pull status.
 
 ---
 
+## Regional Manifest v2 Readiness
+
+The regional-intel workbench exports a runtime manifest at
+`data/foundry/regional-intel/manifest.json`. Sapphire treats this file as local
+runtime data and does not commit it, but the Foundry readiness audit validates
+the v2 contract when the file is present.
+
+Required manifest fields:
+
+| Field | Purpose |
+|-------|---------|
+| `schema_version` | Must be `2` |
+| `generated_at` | Manifest generation timestamp |
+| `snapshot_updated_at` | Regional snapshot timestamp |
+| `region` | Workbench region or region bundle identifier |
+| `object_types` | `Region`, `IntelItem`, and `IntelSourceHealth` metadata with `filename`, `rows`, `file_sha256`, and `row_hashes` |
+| `dropped_rows` | Paste-safe provenance counts: `total`, `by_reason`, and detail buckets |
+| `source_health_summary` | Source coverage counts by status, category, and region |
+| `policy` | Public-source and operator-use policy metadata |
+
+The readiness audit reports dropped-row counts by reason, object type, kind, and
+missing field only. It does not expose source payloads or row bodies.
+
 ## Ontology Links
 
 These relationships connect object types in the Foundry ontology:
