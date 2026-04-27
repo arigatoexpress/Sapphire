@@ -29,14 +29,8 @@ jobs:
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-          cache: pip
-      - name: Install ruff
-        run: python -m pip install "ruff==0.7.4"
       - name: ruff check
-        run: ruff check --output-format=github .
+        run: uv run --python 3.11 --no-project --with ruff==0.7.4 ruff check --output-format=github .
       # Note: `ruff format --check` would currently flag 373 pre-existing
       # files. The PostToolUse hook + pre-commit keep new code formatted;
       # a repo-wide bulk format pass is a separate follow-up commit.
@@ -51,21 +45,13 @@ jobs:
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-          cache: pip
-      - name: Install test deps
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements-test.txt
       - name: pytest (unit)
         # PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 is set at the job level to avoid
         # loading stray plugins. pytest-asyncio must then be loaded explicitly
         # via -p, otherwise pytest 9.x fails async tests (8.x silently skipped
         # them, which hid the gap until the pytest bump in #78).
         run: |
-          pytest tests/unit/ \
+          uv run --python 3.11 --no-project --with-requirements requirements-test.txt pytest tests/unit/ \
             --tb=short -q \
             --maxfail=25 \
             --durations=20 \
@@ -79,16 +65,8 @@ jobs:
     needs: lint
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-          cache: pip
-      - name: Install
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements-test.txt
       - name: pytest (claw-sapphire)
-        run: pytest plugins/claw-sapphire/tests/ -q
+        run: uv run --python 3.11 --no-project --with-requirements requirements-test.txt pytest plugins/claw-sapphire/tests/ -q
 
   tool-registry:
     name: tool registry invariants
@@ -96,11 +74,7 @@ jobs:
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-      - run: python -m pip install pyyaml
-      - run: python scripts/validate_tool_registry.py
+      - run: uv run --python 3.11 --no-project --with pyyaml python scripts/validate_tool_registry.py
 
   secrets-scan:
     name: gitleaks (secrets)
