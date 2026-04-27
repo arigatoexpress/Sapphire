@@ -8,6 +8,11 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = ROOT / ".github" / "workflows"
+ROUTINE_WORKFLOWS = (
+    "content-engine.yml",
+    "threat-refresh.yml",
+    "weekly-backtest.yml",
+)
 
 
 def _workflow(name: str) -> dict:
@@ -69,3 +74,13 @@ def test_threat_refresh_needs_no_repository_write_permission() -> None:
 
     assert workflow["permissions"] == {"contents": "read"}
     assert workflow["concurrency"]["cancel-in-progress"] == "false"
+
+
+def test_remote_routines_pin_self_hosted_runner_tool_cache() -> None:
+    expected = "/Users/aribs/.github-runners/toolcache"
+
+    for workflow_name in ROUTINE_WORKFLOWS:
+        env = _workflow(workflow_name)["env"]
+
+        assert env["AGENT_TOOLSDIRECTORY"] == expected
+        assert env["RUNNER_TOOL_CACHE"] == expected
