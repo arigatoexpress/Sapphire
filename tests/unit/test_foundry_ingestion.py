@@ -13,7 +13,10 @@ from lib.foundry.ingestion import (
     transform_alerts,
     transform_all,
     transform_daily_briefs,
+    transform_intel_items,
+    transform_intel_source_health,
     transform_paper_trades,
+    transform_regions,
     transform_service_health,
     transform_threat_intel,
 )
@@ -421,6 +424,104 @@ class TestTransformDailyBriefs:
 
 
 # ---------------------------------------------------------------------------
+# Regional intelligence Foundry export transforms
+# ---------------------------------------------------------------------------
+
+
+class TestTransformRegionalIntel:
+    def test_region_export_adds_id_alias_and_source_ref(self, tmp_path):
+        export_dir = tmp_path / "data" / "foundry" / "regional-intel"
+        export_dir.mkdir(parents=True)
+        (export_dir / "Region.ndjson").write_text(
+            json.dumps(
+                {
+                    "object_id": "regional-intel:region:austin_tx",
+                    "region_id": "austin_tx",
+                    "name": "Austin, TX",
+                    "summary": "Creative business expansion signals.",
+                    "snapshot_updated_at": "2026-04-27T18:00:00Z",
+                }
+            )
+            + "\n"
+        )
+
+        rows = transform_regions(tmp_path)
+
+        assert rows == [
+            {
+                "object_id": "regional-intel:region:austin_tx",
+                "id": "regional-intel:region:austin_tx",
+                "region_id": "austin_tx",
+                "name": "Austin, TX",
+                "summary": "Creative business expansion signals.",
+                "snapshot_updated_at": "2026-04-27T18:00:00Z",
+                "_sapphire_source": "data/foundry/regional-intel/Region.ndjson",
+            }
+        ]
+
+    def test_intel_item_export_preserves_provenance(self, tmp_path):
+        export_dir = tmp_path / "data" / "foundry" / "regional-intel"
+        export_dir.mkdir(parents=True)
+        (export_dir / "IntelItem.ndjson").write_text(
+            json.dumps(
+                {
+                    "object_id": "regional-intel:item:news:item-1",
+                    "item_id": "item-1",
+                    "kind": "news",
+                    "region_id": "austin_tx",
+                    "title": "New venue permit",
+                    "summary": "Venue expansion signal",
+                    "score": 0.91,
+                    "source_name": "Austin Monitor",
+                    "source_url": "https://example.test/story",
+                    "observed_at": "2026-04-27T17:00:00Z",
+                    "snapshot_updated_at": "2026-04-27T18:00:00Z",
+                }
+            )
+            + "\n"
+        )
+
+        rows = transform_intel_items(tmp_path)
+
+        assert len(rows) == 1
+        assert rows[0]["id"] == "regional-intel:item:news:item-1"
+        assert rows[0]["source_name"] == "Austin Monitor"
+        assert rows[0]["source_url"] == "https://example.test/story"
+
+    def test_source_health_export_since_filter(self, tmp_path):
+        export_dir = tmp_path / "data" / "foundry" / "regional-intel"
+        export_dir.mkdir(parents=True)
+        (export_dir / "IntelSourceHealth.ndjson").write_text(
+            json.dumps(
+                {
+                    "object_id": "regional-intel:source:old",
+                    "source_key": "old",
+                    "name": "Old Source",
+                    "status": "empty",
+                    "snapshot_updated_at": "2026-04-20T00:00:00Z",
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "object_id": "regional-intel:source:new",
+                    "source_key": "new",
+                    "name": "New Source",
+                    "status": "live",
+                    "snapshot_updated_at": "2026-04-27T00:00:00Z",
+                }
+            )
+            + "\n"
+        )
+
+        rows = transform_intel_source_health(
+            tmp_path, since=datetime(2026, 4, 26, tzinfo=UTC)
+        )
+
+        assert [row["source_key"] for row in rows] == ["new"]
+
+
+# ---------------------------------------------------------------------------
 # transform_all
 # ---------------------------------------------------------------------------
 
@@ -435,6 +536,9 @@ class TestTransformAll:
         assert "ServiceHealth" in result
         assert "ThreatIntel" in result
         assert "DailyBrief" in result
+        assert "Region" in result
+        assert "IntelItem" in result
+        assert "IntelSourceHealth" in result
         # All should be lists (possibly empty)
         for v in result.values():
             assert isinstance(v, list)

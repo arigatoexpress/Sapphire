@@ -100,6 +100,18 @@ _DATASET_GROUPS = (
         "transport": "Batch dataset sync + media sets",
         "ontology": ("Decision", "IntelItem", "Task", "Region"),
     },
+    {
+        "id": "regional-intel",
+        "label": "Regional Intelligence",
+        "patterns": (
+            "data/foundry/regional-intel/Region.ndjson",
+            "data/foundry/regional-intel/IntelItem.ndjson",
+            "data/foundry/regional-intel/IntelSourceHealth.ndjson",
+            "data/foundry/regional-intel/manifest.json",
+        ),
+        "transport": "Sibling workbench export + batch dataset sync",
+        "ontology": ("Region", "IntelItem", "IntelSourceHealth"),
+    },
 )
 
 _OBJECT_REQUIRED_FIELDS: dict[str, tuple[str, ...]] = {
@@ -108,6 +120,24 @@ _OBJECT_REQUIRED_FIELDS: dict[str, tuple[str, ...]] = {
     "ServiceHealth": ("id", "service", "status", "last_check"),
     "ThreatIntel": ("id", "title", "source", "published_at"),
     "DailyBrief": ("id", "date", "title"),
+    "Region": ("object_id", "region_id", "name", "snapshot_updated_at"),
+    "IntelItem": (
+        "object_id",
+        "item_id",
+        "kind",
+        "region_id",
+        "title",
+        "source_name",
+        "source_url",
+        "snapshot_updated_at",
+    ),
+    "IntelSourceHealth": (
+        "object_id",
+        "source_key",
+        "name",
+        "status",
+        "snapshot_updated_at",
+    ),
 }
 
 _SYNC_HISTORY_REQUIRED_FIELDS = ("ok", "timestamp", "duration_s")
@@ -115,10 +145,14 @@ _SYNC_HISTORY_FILE = "data/foundry_sync_history.jsonl"
 
 
 def _repo_root() -> Path:
+    override = os.getenv("SAPPHIRE_REPO_ROOT")
+    if override:
+        return Path(override).expanduser()
+
     home_repo = Path.home() / "Code" / "Sapphire"
     local_repo = Path(__file__).resolve().parents[2]
-    for candidate in (home_repo, local_repo):
-        if candidate.exists():
+    for candidate in (local_repo, home_repo):
+        if (candidate / "lib" / "foundry").exists() or (candidate / "AGENTS.md").exists():
             return candidate
     return local_repo
 

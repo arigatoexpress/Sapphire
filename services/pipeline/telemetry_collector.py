@@ -55,7 +55,7 @@ SERVICES = [
     ("ollama-windows",   "windows",  "100.71.10.48",   11434, "/api/tags"),
     ("ollama-rari1",     "rari1",    "100.120.191.1",  11434, "/api/tags"),
     ("ollama-rari2",     "rari2",    "100.87.225.89",  11434, "/api/tags"),
-    ("regional-intel",   "mac",      "127.0.0.1",      8787,  "/health"),
+    ("regional-intel",   "mac",      "127.0.0.1",      8787,  "/api/health"),
     ("tho-cloud-run",    "cloud_run","project-go-forward-691674245427.us-central1.run.app", 443, "/"),
 ]
 

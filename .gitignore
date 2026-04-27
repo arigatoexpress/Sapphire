@@ -66,6 +66,7 @@ data/.autonomy/
 data/.security_kill_switch_active
 data/.gcp_sync_state.json
 data/.watchdog_state.json
+data/foundry/
 data/foundry_sync_state.json
 data/foundry_sync_history.jsonl
 data/security/
