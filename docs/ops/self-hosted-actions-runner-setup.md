@@ -50,27 +50,24 @@ without paying GitHub for runner minutes.
 
    Logs land at `~/actions-runner/_diag/Runner_<date>.log`.
 
-4. Switch the workflows to prefer the self-hosted runner. Edit each
-   workflow's `runs-on:` from `ubuntu-latest` to a list with a
-   conditional fallback. You can land this as a separate PR:
+4. The workflow files in `.github/workflows/*.yml` already opt-in via
+   the `SAPPHIRE_RUNNER` repo variable — every `runs-on:` resolves to:
 
    ```yaml
-   jobs:
-     lint:
-       runs-on: [self-hosted, macOS, arm64, sapphire-commander]
+   runs-on: ${{ vars.SAPPHIRE_RUNNER && fromJSON(vars.SAPPHIRE_RUNNER) || 'ubuntu-latest' }}
    ```
 
-   Or, to keep the option of falling back to GitHub-hosted once billing
-   is restored:
+   To activate the self-hosted runner across every workflow, go to
+   `Settings -> Secrets and variables -> Actions -> Variables` and set
+   the repo-scoped variable `SAPPHIRE_RUNNER` to a JSON-encoded list of
+   labels:
 
-   ```yaml
-   jobs:
-     lint:
-       runs-on: ${{ vars.SAPPHIRE_RUNNER || 'ubuntu-latest' }}
+   ```
+   ["self-hosted","macOS","arm64","sapphire-commander"]
    ```
 
-   and set the repo variable `SAPPHIRE_RUNNER=self-hosted` in
-   `Settings -> Actions -> Variables`.
+   To revert to GitHub-hosted runners once billing is restored, simply
+   delete the `SAPPHIRE_RUNNER` variable. No workflow edit needed.
 
 5. Confirm a workflow run pushes through:
 
