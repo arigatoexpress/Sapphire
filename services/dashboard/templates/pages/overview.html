@@ -269,6 +269,50 @@
     </a>
 </div>
 
+<!-- Portfolio + strategy snapshot -->
+<div class="grid grid-4" style="margin-bottom: 20px">
+    <div class="kpi">
+        <div class="kpi-label">Portfolio equity</div>
+        <div class="kpi-value" id="kpi-equity">—</div>
+        <div class="kpi-delta" id="kpi-equity-delta">loading</div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-label">Market regime</div>
+        <div class="kpi-value" id="kpi-regime">—</div>
+        <div class="kpi-delta" id="kpi-regime-delta">loading</div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-label">VPIN</div>
+        <div class="kpi-value" id="kpi-vpin">—</div>
+        <div class="kpi-delta" id="kpi-vpin-delta">loading</div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-label">Cascade risk</div>
+        <div class="kpi-value" id="kpi-cascade">—</div>
+        <div class="kpi-delta" id="kpi-cascade-delta">loading</div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-label">Best strategy</div>
+        <div class="kpi-value" id="kpi-perf-best">—</div>
+        <div class="kpi-delta" id="kpi-perf-best-delta">loading</div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-label">Weakest strategy</div>
+        <div class="kpi-value" id="kpi-perf-worst">—</div>
+        <div class="kpi-delta" id="kpi-perf-worst-delta">loading</div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-label">Content drafts</div>
+        <div class="kpi-value" id="kpi-content">—</div>
+        <div class="kpi-delta" id="kpi-content-delta">loading</div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-label">Health</div>
+        <div class="kpi-value" id="kpi-health">—</div>
+        <div class="kpi-delta" id="kpi-health-delta">loading</div>
+    </div>
+</div>
+
 <!-- Service health + tiers -->
 <div class="grid grid-2" style="margin-bottom: 20px">
     <div class="card">
@@ -351,6 +395,54 @@ const TIER_META = {
     'kimi-cloud':  { tag: 'T4', name: 'Kimi Cloud',   device: 'non-sensitive only' },
 };
 
+function setText(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+}
+
+function setDelta(id, text, tone = '') {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    el.className = 'kpi-delta' + (tone ? ' ' + tone : '');
+}
+
+function setUnavailable(valueId, deltaId, message = 'unavailable') {
+    setText(valueId, '—');
+    setDelta(deltaId, message);
+}
+
+function asNumber(value, fallback = 0) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+}
+
+function ratePct(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const n = Number(value);
+    if (!Number.isFinite(n)) return null;
+    return n > 1 ? n : n * 100;
+}
+
+function formatUsd(value) {
+    const n = asNumber(value, 0);
+    const opts = Math.abs(n) < 1000
+        ? { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+        : { maximumFractionDigits: 0 };
+    return '$' + n.toLocaleString(undefined, opts);
+}
+
+function formatSignedUsd(value) {
+    const n = asNumber(value, 0);
+    return (n >= 0 ? '+' : '-') + formatUsd(Math.abs(n));
+}
+
+async function fetchJSON(path) {
+    const response = await fetch(path, { credentials: 'same-origin' });
+    if (!response.ok) throw new Error(`${path} returned ${response.status}`);
+    return response.json();
+}
+
 function countUp(el, target, opts = {}) {
     const duration = opts.duration || 500;
     const suffix = opts.suffix || '';
@@ -415,9 +507,11 @@ async function refreshAll() {
 }
 
 function renderSystem(d) {
-    const healthy = d.healthy_count;
-    const total = d.total_count;
-    const ratio = healthy / total;
+    const svcs = Array.isArray(d.services) ? d.services : [];
+    const total = svcs.length || asNumber(d.total_count, 0);
+    const reportedHealthy = asNumber(d.healthy_count, 0);
+    const healthy = svcs.length ? svcs.filter(s => s.healthy).length : Math.min(reportedHealthy, total);
+    const ratio = total > 0 ? healthy / total : 0;
 
     // Hero
     const state = ratio >= 0.8 ? 'Nominal' : ratio >= 0.5 ? 'Degraded' : 'Critical';
@@ -454,7 +548,6 @@ function renderSystem(d) {
     pd.className = 'kpi-delta ' + (piUp === 2 ? 'positive' : piUp === 1 ? '' : 'negative');
 
     // Service grid
-    const svcs = d.services || [];
     const badge = document.getElementById('svc-badge');
     badge.textContent = `${healthy}/${total}`;
     badge.className = 'pill ' + (ratio >= 0.8 ? 'green' : ratio >= 0.5 ? 'amber' : 'red');
@@ -546,97 +639,107 @@ setInterval(refreshAll, 60000);
 
 // ── Sapphire summary cards ────────────────────────────────────────────────────
 async function loadSummaryCards() {
+    const strategyPerformanceRequest = fetchJSON('/api/strategy-performance');
+
     // Portfolio equity
     try {
-        const p = await fetch('/api/portfolio/summary').then(r => r.json());
-        const eq = p.equity || 100000;
-        const pnl = p.total_pnl_usd || 0;
-        document.getElementById('kpi-equity').textContent = '$' + Math.round(eq).toLocaleString();
-        const ed = document.getElementById('kpi-equity-delta');
-        ed.textContent = (pnl >= 0 ? '+' : '') + '$' + pnl.toFixed(2) + ' P&L · ' + ((p.win_rate||0)*100).toFixed(0) + '% win';
-        ed.className = 'kpi-delta ' + (pnl >= 0 ? 'positive' : 'negative');
-    } catch(e) { document.getElementById('kpi-equity').textContent = '—'; document.getElementById('kpi-equity-delta').textContent = 'unavailable'; }
+        const [p, perf] = await Promise.all([
+            fetchJSON('/api/portfolio'),
+            strategyPerformanceRequest,
+        ]);
+        const holdings = Array.isArray(p.holdings) ? p.holdings : [];
+        const holdingsValue = holdings.reduce((sum, h) => sum + asNumber(h.market_value, 0), 0);
+        const equity = asNumber(p.cash, 0) + holdingsValue;
+        const pnl = asNumber(p.day_pnl, 0);
+        const winRate = ratePct(perf.overall?.win_rate);
+        const winText = winRate === null ? 'win n/a' : winRate.toFixed(0) + '% win';
+        setText('kpi-equity', formatUsd(equity));
+        setDelta('kpi-equity-delta', `${formatSignedUsd(pnl)} P&L · ${winText}`, pnl >= 0 ? 'positive' : 'negative');
+    } catch(e) {
+        setUnavailable('kpi-equity', 'kpi-equity-delta');
+    }
 
     // Regime + VPIN from chain overview
     try {
-        const c = await fetch('/api/chain/overview').then(r => r.json());
+        const c = await fetchJSON('/api/chain/overview');
         const regime = (c.regime || c.market_regime || '—').toUpperCase();
-        document.getElementById('kpi-regime').textContent = regime;
-        document.getElementById('kpi-regime-delta').textContent = c.regime_confidence ? 'conf ' + (c.regime_confidence*100).toFixed(0) + '%' : 'on-chain signal';
+        setText('kpi-regime', regime);
+        setDelta('kpi-regime-delta', c.regime_confidence ? 'conf ' + (c.regime_confidence*100).toFixed(0) + '%' : 'on-chain signal');
 
         const vpin = c.vpin !== undefined ? parseFloat(c.vpin) : null;
         if (vpin !== null) {
-            document.getElementById('kpi-vpin').textContent = vpin.toFixed(3);
-            const vd = document.getElementById('kpi-vpin-delta');
-            vd.textContent = vpin > 0.7 ? 'HIGH — toxic flow' : vpin > 0.4 ? 'ELEVATED' : 'normal';
-            vd.className = 'kpi-delta ' + (vpin > 0.7 ? 'negative' : vpin > 0.4 ? '' : 'positive');
+            setText('kpi-vpin', vpin.toFixed(3));
+            setDelta('kpi-vpin-delta', vpin > 0.7 ? 'HIGH — toxic flow' : vpin > 0.4 ? 'ELEVATED' : 'normal',
+                vpin > 0.7 ? 'negative' : vpin > 0.4 ? '' : 'positive');
         }
     } catch(e) {
-        document.getElementById('kpi-regime').textContent = '—';
-        document.getElementById('kpi-regime-delta').textContent = 'chain offline';
-        document.getElementById('kpi-vpin').textContent = '—';
-        document.getElementById('kpi-vpin-delta').textContent = 'unavailable';
+        setUnavailable('kpi-regime', 'kpi-regime-delta', 'chain offline');
+        setUnavailable('kpi-vpin', 'kpi-vpin-delta');
     }
 
     // Cascade risk
     try {
-        const ca = await fetch('/api/cascade/risk').then(r => r.json());
-        const coins = ca.coins || [];
-        if (coins.length) {
-            const top = coins.sort((a,b) => b.risk_score - a.risk_score)[0];
-            document.getElementById('kpi-cascade').textContent = Math.round(top.risk_score);
-            const cd = document.getElementById('kpi-cascade-delta');
-            cd.textContent = top.symbol + ' — ' + (top.risk_score >= 75 ? 'CRITICAL' : top.risk_score >= 50 ? 'HIGH' : top.risk_score >= 25 ? 'ELEVATED' : 'LOW');
-            cd.className = 'kpi-delta ' + (top.risk_score >= 75 ? 'negative' : top.risk_score >= 50 ? '' : 'positive');
+        const ca = await fetchJSON('/api/cascade');
+        const assets = Array.isArray(ca.assets) ? ca.assets : [];
+        if (assets.length) {
+            const top = [...assets].sort((a,b) => asNumber(b.risk_score, 0) - asNumber(a.risk_score, 0))[0];
+            const score = asNumber(top.risk_score, 0);
+            const riskLabel = top.risk_label || (score >= 75 ? 'CRITICAL' : score >= 50 ? 'HIGH' : score >= 25 ? 'ELEVATED' : 'LOW');
+            setText('kpi-cascade', Math.round(score));
+            setDelta('kpi-cascade-delta', (top.coin || '—') + ' — ' + riskLabel,
+                score >= 75 ? 'negative' : score >= 50 ? '' : 'positive');
         } else {
-            document.getElementById('kpi-cascade').textContent = '—';
-            document.getElementById('kpi-cascade-delta').textContent = ca.status || 'no data';
+            setUnavailable('kpi-cascade', 'kpi-cascade-delta', ca.alert || ca.status || ca.risk_label || 'no data');
         }
-    } catch(e) { document.getElementById('kpi-cascade').textContent = '—'; document.getElementById('kpi-cascade-delta').textContent = 'unavailable'; }
+    } catch(e) {
+        setUnavailable('kpi-cascade', 'kpi-cascade-delta');
+    }
 
     // Strategy performance
     try {
-        const perf = await fetch('/api/performance/strategies').then(r => r.json());
-        const rb = perf.regime_breakdown || {};
-        const regimes = Object.entries(rb);
-        if (regimes.length) {
-            regimes.sort((a,b) => (b[1].win_rate||0) - (a[1].win_rate||0));
-            const best = regimes[0];
-            const worst = regimes[regimes.length - 1];
-            document.getElementById('kpi-perf-best').textContent = best[0];
-            document.getElementById('kpi-perf-best-delta').textContent = ((best[1].win_rate||0)*100).toFixed(0) + '% win rate';
-            document.getElementById('kpi-perf-worst').textContent = worst[0];
-            const wd = document.getElementById('kpi-perf-worst-delta');
-            wd.textContent = ((worst[1].win_rate||0)*100).toFixed(0) + '% win rate';
-            wd.className = 'kpi-delta ' + ((worst[1].win_rate||0) < 0.4 ? 'negative' : '');
+        const perf = await strategyPerformanceRequest;
+        const strategies = Object.entries(perf.by_strategy || {})
+            .filter(([, stats]) => ratePct(stats?.win_rate) !== null)
+            .sort((a,b) => ratePct(b[1].win_rate) - ratePct(a[1].win_rate));
+        if (strategies.length) {
+            const best = strategies[0];
+            const worst = strategies[strategies.length - 1];
+            const bestWinRate = ratePct(best[1].win_rate);
+            const worstWinRate = ratePct(worst[1].win_rate);
+            setText('kpi-perf-best', best[0]);
+            setDelta('kpi-perf-best-delta', bestWinRate.toFixed(0) + '% win rate', bestWinRate >= 55 ? 'positive' : '');
+            setText('kpi-perf-worst', worst[0]);
+            setDelta('kpi-perf-worst-delta', worstWinRate.toFixed(0) + '% win rate', worstWinRate < 40 ? 'negative' : '');
         } else {
-            document.getElementById('kpi-perf-best').textContent = '—';
-            document.getElementById('kpi-perf-best-delta').textContent = 'no backtest data';
-            document.getElementById('kpi-perf-worst').textContent = '—';
-            document.getElementById('kpi-perf-worst-delta').textContent = 'run backtest';
+            setUnavailable('kpi-perf-best', 'kpi-perf-best-delta', 'no strategy data');
+            setUnavailable('kpi-perf-worst', 'kpi-perf-worst-delta', 'run backtest');
         }
     } catch(e) {
-        document.getElementById('kpi-perf-best').textContent = '—';
-        document.getElementById('kpi-perf-worst').textContent = '—';
+        setUnavailable('kpi-perf-best', 'kpi-perf-best-delta');
+        setUnavailable('kpi-perf-worst', 'kpi-perf-worst-delta');
     }
 
     // Content drafts
     try {
-        const ct = await fetch('/api/content/drafts').then(r => r.json());
-        document.getElementById('kpi-content').textContent = ct.count || 0;
-        document.getElementById('kpi-content-delta').textContent = (ct.count||0) > 0 ? 'drafts ready to publish' : 'no drafts — run content engine';
-        document.getElementById('kpi-content-delta').className = 'kpi-delta ' + ((ct.count||0) > 0 ? 'positive' : '');
-    } catch(e) { document.getElementById('kpi-content').textContent = '—'; document.getElementById('kpi-content-delta').textContent = 'unavailable'; }
+        const ct = await fetchJSON('/api/content/drafts');
+        const count = asNumber(ct.count, 0);
+        setText('kpi-content', count);
+        setDelta('kpi-content-delta', count > 0 ? 'drafts ready to publish' : 'no drafts — run content engine',
+            count > 0 ? 'positive' : '');
+    } catch(e) {
+        setUnavailable('kpi-content', 'kpi-content-delta');
+    }
 
     // System health
     try {
-        const h = await fetch('/api/health/summary').then(r => r.json());
+        const h = await fetchJSON('/api/health/summary');
         const total = (h.healthy_count||0) + (h.unhealthy_count||0);
-        document.getElementById('kpi-health').textContent = (h.healthy_count||0) + '/' + total;
-        const hd = document.getElementById('kpi-health-delta');
-        hd.textContent = h.healthy ? 'all services nominal' : (h.unhealthy_count||0) + ' down';
-        hd.className = 'kpi-delta ' + (h.healthy ? 'positive' : 'negative');
-    } catch(e) { document.getElementById('kpi-health').textContent = '—'; document.getElementById('kpi-health-delta').textContent = 'unavailable'; }
+        setText('kpi-health', (h.healthy_count||0) + '/' + total);
+        setDelta('kpi-health-delta', h.healthy ? 'all services nominal' : (h.unhealthy_count||0) + ' down',
+            h.healthy ? 'positive' : 'negative');
+    } catch(e) {
+        setUnavailable('kpi-health', 'kpi-health-delta');
+    }
 }
 
 loadSummaryCards();
