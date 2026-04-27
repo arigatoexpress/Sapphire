@@ -78,10 +78,12 @@ your proposed fix.
 - [ ] If the finding is sensitive (§ 5.2 of `ai-redteam-scope.md`), **do
       not open a PR yet.** Telegram-DM Ari first.
 - [ ] Watch CI — `.github/workflows/ci.yml` runs ruff, tests, plugin tests,
-      registry, gitleaks. Green means you're ready for review.
+      registry, gitleaks. Green means the PR is ready to merge unless it
+      touches a high-risk path in `CODEOWNERS`.
 
-**Done if:** CI is green and the PR is awaiting review from @arigatoexpress
-(per `CODEOWNERS`).
+**Done if:** CI is green, the PR has a clear rollback note, and any
+`CODEOWNERS` review requirement is limited to the specific high-risk paths it
+touches.
 
 ## After the first week
 
@@ -94,6 +96,6 @@ Recurring cadence that works well here:
   pushing.
 - **Any day:** `make doctor` if something feels off.
 
-Keep the scope tight — one finding per PR, one concern per issue. The
-reviewers can move faster that way and you build a trail of small wins
-rather than one sprawling mega-PR.
+Keep the scope tight — one finding per PR, one concern per issue. Small PRs
+are faster to verify and build a trail of wins rather than one sprawling
+mega-PR.

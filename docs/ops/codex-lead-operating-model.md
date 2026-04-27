@@ -14,6 +14,9 @@ back into stale Claude-led assumptions.
 - Preserve local WIP before cleanup with a backup branch, patch, and stash.
 - Watch CI, update issue/PR records, and remove clean temporary worktrees after
   they are no longer needed.
+- Push branches, open PRs, and merge green non-draft Sapphire PRs without a
+  standing human review gate when the work is reversible, verified, and outside
+  the high-risk surfaces named in `AGENTS.md` and `.github/CODEOWNERS`.
 - Keep trading paper-only and Telegram tests dry-run unless Ari explicitly
   authorizes a real operational path.
 

@@ -33,12 +33,23 @@ It talks to sibling repos — `Project-Go-Forward` (THO app), `cyber-threat-bot`
 - Branch naming: `feat/*`, `fix/*`, `chore/*`, `docs/*`, `test/*`.
 - Match the existing commit-message style in `git log`.
 
-### PRs
+### PRs and merges
 
-- Open a **draft** PR unless the task is an exploratory throwaway branch.
-- **Never merge your own PR without the human approving.** Production-adjacent repos (this one, THO, cyber-threat-bot) require human in the loop.
+- Open ready-to-merge PRs by default once local verification passes. Use draft
+  PRs only for exploratory work, unclear blast radius, or intentionally blocked
+  production behavior.
+- Codex may push branches and merge its own green, non-draft Sapphire PRs
+  without waiting for human review when the change is reversible, CI or
+  documented local verification is clean, the rollback path is clear, and no
+  high-risk surface below is being activated.
+- Human approval is required before real money movement, live trade execution,
+  production Telegram sends, secret exposure/rotation, destructive data or
+  infrastructure deletion, workflow/branch-protection disabling, force-pushing
+  shared protected branches, or broadening permissions on sensitive systems.
+- Sibling repos keep their own `AGENTS.md` rules unless Ari explicitly grants a
+  separate autonomy window for that repo.
 - Run touched-file lint (`ruff check <files>`) before push. Full-repo sweeps go in their own `chore/` PRs.
-- If a test fails, fix it or mark it skip-with-reason — don't ignore.
+- If a test fails, fix it or mark it skip-with-reason; do not ignore it.
 
 ### Conflict avoidance
 
@@ -62,14 +73,16 @@ When multiple agents are active:
 
 ## Division of labor — when to pick which agent
 
-Rough guidance; the human will override when needed:
+Rough guidance; Ari can override when needed:
 
 - **Codex** — primary production-autonomy lead for Sapphire OS. Owns repo hygiene, operational triage, architecture decisions, multi-step implementation, PR coordination, CI follow-through, deployment notes, and cross-repo handoffs unless Ari explicitly assigns another lead.
 - **Claude Code** — constrained reviewer/helper. Useful for second opinions, prose-heavy docs, or isolated review passes, but should not drive production-autonomy, broaden local permissions, merge PRs, or take over operations unless Ari explicitly asks.
 - **Kimi Code / long-context agents** — large code surveys, cross-repo pattern extraction, research-heavy writing.
 - **Local models via inference proxy** (hermes3, deepseek-r1, qwen3) — small, frequent, latency-sensitive tasks (form extraction, quick summaries, classification). Free tier on the mesh.
 
-When a task involves real money, production credentials, or shared infrastructure — always loop in the human.
+When a task involves real money, production credentials, destructive shared
+infrastructure changes, or live external messaging, stop at the safest
+non-mutating artifact unless Ari has explicitly authorized that exact live step.
 
 ## Codex lead operating model
 

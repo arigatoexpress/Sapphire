@@ -1,12 +1,11 @@
-# Default owner — Ari reviews everything
-* @arigatoexpress
+# Sapphire has no default code owner. Low-risk autonomy PRs may be pushed and
+# merged by Codex after clean verification. Keep explicit Ari review only for
+# high-risk surfaces where a mistaken change can expose secrets, spend money,
+# disable safety controls, mutate production ingress, or execute trades.
 
-# CI / dev environment — require explicit review
-/.github/ @arigatoexpress
-/.pre-commit-config.yaml @arigatoexpress
-/pyproject.toml @arigatoexpress
-/Makefile @arigatoexpress
-/scripts/ops/ @arigatoexpress
+# CI / automation control plane
+/.github/workflows/ @arigatoexpress
+/.github/actions/ @arigatoexpress
 
 # Security-sensitive paths
 /lib/security/ @arigatoexpress
@@ -16,6 +15,8 @@
 /services/webhook/ @arigatoexpress
 /contracts/ @arigatoexpress
 /.git-secrets-patterns @arigatoexpress
+/.gitleaks.toml @arigatoexpress
+/.sops.yaml @arigatoexpress
 
 # Trading / execution critical path
 /lib/analytics/strategies.py @arigatoexpress
@@ -23,8 +24,3 @@
 /lib/portfolio/robinhood.py @arigatoexpress
 /lib/trading/ @arigatoexpress
 /services/alpha/ @arigatoexpress
-
-# Authoritative docs
-/CLAUDE.md @arigatoexpress
-/README.md @arigatoexpress
-/docs/architecture-overview.md @arigatoexpress
