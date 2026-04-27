@@ -1,0 +1,21 @@
+[
+  {"name": "object_id", "type": "STRING", "mode": "REQUIRED", "description": "Stable regional-intel item identifier"},
+  {"name": "item_id", "type": "STRING", "mode": "REQUIRED", "description": "Workbench item key"},
+  {"name": "kind", "type": "STRING", "mode": "REQUIRED", "description": "news | permit | business | contact | organization"},
+  {"name": "region_id", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "title", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "summary", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "score", "type": "FLOAT64", "mode": "NULLABLE"},
+  {"name": "source_name", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "source_url", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "observed_at", "type": "TIMESTAMP", "mode": "NULLABLE"},
+  {"name": "snapshot_updated_at", "type": "TIMESTAMP", "mode": "REQUIRED"},
+  {"name": "attributes", "type": "JSON", "mode": "NULLABLE"},
+  {"name": "notes", "type": "STRING", "mode": "REPEATED"},
+  {"name": "provenance", "type": "JSON", "mode": "NULLABLE"},
+  {"name": "manifest_generated_at", "type": "TIMESTAMP", "mode": "NULLABLE"},
+  {"name": "manifest_region", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "row_hash", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "timestamp", "type": "TIMESTAMP", "mode": "REQUIRED"},
+  {"name": "ingested_at", "type": "TIMESTAMP", "mode": "REQUIRED"}
+]

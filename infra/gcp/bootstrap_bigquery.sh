@@ -37,6 +37,9 @@ declare -a TABLES=(
   "threat_intel:timestamp:severity,source"
   "leads:timestamp:grade,status"
   "service_health:timestamp:service_name,status"
+  "regional_regions:timestamp:region_id,name"
+  "regional_intel_items:timestamp:region_id,kind,source_name"
+  "regional_source_health:timestamp:status,category"
 )
 
 create_or_update() {

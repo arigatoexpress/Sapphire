@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from hashlib import sha256
 
 from lib.foundry.readiness import (
     build_foundry_readiness,
@@ -78,8 +79,8 @@ def _write_foundry_fixture(root):
     )
     regional_dir = data_dir / "foundry" / "regional-intel"
     regional_dir.mkdir(parents=True)
-    (regional_dir / "Region.ndjson").write_text(
-        json.dumps(
+    regional_rows = {
+        "Region": [
             {
                 "object_id": "regional-intel:region:austin_tx",
                 "region_id": "austin_tx",
@@ -87,11 +88,8 @@ def _write_foundry_fixture(root):
                 "summary": "Expansion and civic signals.",
                 "snapshot_updated_at": "2026-04-26T08:05:00Z",
             }
-        )
-        + "\n"
-    )
-    (regional_dir / "IntelItem.ndjson").write_text(
-        json.dumps(
+        ],
+        "IntelItem": [
             {
                 "object_id": "regional-intel:item:news:item-1",
                 "item_id": "item-1",
@@ -105,11 +103,8 @@ def _write_foundry_fixture(root):
                 "observed_at": "2026-04-26T08:05:00Z",
                 "snapshot_updated_at": "2026-04-26T08:05:00Z",
             }
-        )
-        + "\n"
-    )
-    (regional_dir / "IntelSourceHealth.ndjson").write_text(
-        json.dumps(
+        ],
+        "IntelSourceHealth": [
             {
                 "object_id": "regional-intel:source:austin-monitor",
                 "source_key": "austin-monitor",
@@ -122,8 +117,42 @@ def _write_foundry_fixture(root):
                 "last_seen_at": "2026-04-26T08:05:00Z",
                 "snapshot_updated_at": "2026-04-26T08:05:00Z",
             }
+        ],
+    }
+    object_types = {}
+    for object_type, rows in regional_rows.items():
+        content = "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows)
+        filename = f"{object_type}.ndjson"
+        (regional_dir / filename).write_text(content)
+        object_types[object_type] = {
+            "filename": filename,
+            "rows": len(rows),
+            "file_sha256": sha256(content.encode()).hexdigest(),
+            "row_hashes": [
+                sha256(json.dumps(row, sort_keys=True).encode()).hexdigest()
+                for row in rows
+            ],
+        }
+    (regional_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "generated_at": "2026-04-26T08:05:01Z",
+                "snapshot_updated_at": "2026-04-26T08:05:00Z",
+                "region": "austin_tx",
+                "object_types": object_types,
+                "dropped_rows": {"total": 0, "by_reason": {}, "details": []},
+                "source_health_summary": {
+                    "total_sources": 1,
+                    "live_pull_sources": 1,
+                    "total_item_count": 1,
+                    "by_status": {"live": 1},
+                    "by_category": {"news": 1},
+                    "by_region": {"austin_tx": 1},
+                },
+                "policy": {"public_sources_only": True, "safe_use": "review_only"},
+            }
         )
-        + "\n"
     )
 
 
@@ -192,6 +221,11 @@ def test_schema_audit_reports_required_field_health_and_history_readback(tmp_pat
     assert history["latest_ok"] is False
     assert history["latest_dry_run"] is True
     assert history["latest_changed_types"] == 1
+    manifest = audit["regional_manifest"]
+    assert manifest["status"] == "ready"
+    assert manifest["schema_version"] == 2
+    assert manifest["object_types"]["Region"]["file_sha256_matches"] is True
+    assert manifest["dropped_rows"]["total"] == 0
 
 
 def test_schema_audit_warns_on_missing_required_fields(tmp_path):
@@ -219,6 +253,147 @@ def test_schema_audit_warns_on_missing_required_fields(tmp_path):
     assert paper_trade["missing_required_fields"] == {"opened_at": 1}
 
 
+def test_regional_manifest_absent_is_safe_when_runtime_data_absent(tmp_path):
+    audit = build_foundry_schema_audit(tmp_path)
+
+    manifest = audit["regional_manifest"]
+    assert manifest["status"] == "absent"
+    assert manifest["exists"] is False
+    assert manifest["errors"] == []
+
+
+def test_regional_manifest_reports_paste_safe_dropped_row_counts(tmp_path):
+    regional_dir = tmp_path / "data" / "foundry" / "regional-intel"
+    regional_dir.mkdir(parents=True)
+    for object_type in ("Region", "IntelItem", "IntelSourceHealth"):
+        (regional_dir / f"{object_type}.ndjson").write_text("")
+
+    empty_sha = sha256(b"").hexdigest()
+    (regional_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "generated_at": "2026-04-26T08:05:01Z",
+                "snapshot_updated_at": "2026-04-26T08:05:00Z",
+                "region": "austin_tx",
+                "object_types": {
+                    object_type: {
+                        "filename": f"{object_type}.ndjson",
+                        "rows": 0,
+                        "file_sha256": empty_sha,
+                        "row_hashes": [],
+                    }
+                    for object_type in ("Region", "IntelItem", "IntelSourceHealth")
+                },
+                "dropped_rows": {
+                    "total": 2,
+                    "by_reason": {"missing_required_fields": 2},
+                    "details": [
+                        {
+                            "reason": "missing_required_fields",
+                            "object_type": "IntelItem",
+                            "kind": "permit",
+                            "item_id": "sensitive-source-row-1",
+                            "region_id": "austin_tx",
+                            "missing_fields": ["source_url", "title"],
+                        },
+                        {
+                            "reason": "missing_required_fields",
+                            "object_type": "IntelItem",
+                            "kind": "news",
+                            "item_id": "sensitive-source-row-2",
+                            "region_id": "austin_tx",
+                            "missing_fields": ["source_url"],
+                        },
+                    ],
+                },
+                "source_health_summary": {
+                    "total_sources": 1,
+                    "live_pull_sources": 0,
+                    "total_item_count": 0,
+                    "by_status": {"manual": 1},
+                    "by_category": {"permit": 1},
+                    "by_region": {"austin_tx": 1},
+                },
+                "policy": {"public_sources_only": True},
+            }
+        )
+    )
+
+    manifest = build_foundry_schema_audit(tmp_path)["regional_manifest"]
+
+    assert manifest["status"] == "ready"
+    assert manifest["dropped_rows"] == {
+        "total": 2,
+        "by_reason": {"missing_required_fields": 2},
+        "by_object_type": {"IntelItem": 2},
+        "by_kind": {"news": 1, "permit": 1},
+        "missing_fields": {"source_url": 2, "title": 1},
+        "details": 2,
+    }
+    assert "sensitive-source-row-1" not in json.dumps(manifest)
+
+
+def test_regional_manifest_malformed_count_buckets_warn_without_crashing(tmp_path):
+    regional_dir = tmp_path / "data" / "foundry" / "regional-intel"
+    regional_dir.mkdir(parents=True)
+    for object_type in ("Region", "IntelItem", "IntelSourceHealth"):
+        (regional_dir / f"{object_type}.ndjson").write_text("")
+
+    empty_sha = sha256(b"").hexdigest()
+    (regional_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "generated_at": "2026-04-26T08:05:01Z",
+                "snapshot_updated_at": "2026-04-26T08:05:00Z",
+                "region": "austin_tx",
+                "object_types": {
+                    object_type: {
+                        "filename": f"{object_type}.ndjson",
+                        "rows": 0,
+                        "file_sha256": empty_sha,
+                        "row_hashes": [],
+                    }
+                    for object_type in ("Region", "IntelItem", "IntelSourceHealth")
+                },
+                "dropped_rows": {
+                    "total": 1,
+                    "by_reason": {"missing_required_fields": "two"},
+                    "details": [
+                        {
+                            "reason": "missing_required_fields",
+                            "object_type": "IntelItem",
+                            "kind": "news",
+                            "item_id": "row-id-is-not-exposed",
+                            "region_id": "austin_tx",
+                            "missing_fields": "source_url",
+                        }
+                    ],
+                },
+                "source_health_summary": {
+                    "total_sources": "one",
+                    "live_pull_sources": 0,
+                    "total_item_count": 0,
+                    "by_status": [],
+                    "by_category": {},
+                    "by_region": {},
+                },
+                "policy": {"public_sources_only": True},
+            }
+        )
+    )
+
+    manifest = build_foundry_schema_audit(tmp_path)["regional_manifest"]
+
+    assert manifest["status"] == "schema_warning"
+    assert "dropped_rows.by_reason.invalid_count:missing_required_fields" in manifest["errors"]
+    assert "dropped_rows.detail_missing_fields_not_list" in manifest["errors"]
+    assert "source_health_summary.invalid_count:total_sources" in manifest["errors"]
+    assert "source_health_summary.invalid_bucket:by_status" in manifest["errors"]
+    assert "row-id-is-not-exposed" not in json.dumps(manifest)
+
+
 def test_readiness_embeds_schema_audit(tmp_path):
     _write_foundry_fixture(tmp_path)
 
@@ -230,7 +405,7 @@ def test_readiness_embeds_schema_audit(tmp_path):
         group for group in readiness["dataset_groups"] if group["id"] == "regional-intel"
     )
     assert regional_group["status"] == "ready"
-    assert regional_group["files"] == 3
+    assert regional_group["files"] == 4
     assert readiness["docs"]["ontology_schema"] == "docs/foundry-ontology-schema.md"
 
 

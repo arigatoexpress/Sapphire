@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "mode": "metadata_only",
+  "producer": "regional-intel-workbench",
+  "manifest_contract": {
+    "path": "data/foundry/regional-intel/manifest.json",
+    "schema_version": 2,
+    "required_object_types": [
+      "Region",
+      "IntelItem",
+      "IntelSourceHealth"
+    ]
+  },
+  "safety": {
+    "local_default": "read_only",
+    "writes_by_default": false,
+    "gcp_writes_require_explicit_operator_run": true,
+    "foundry_writes_require_explicit_operator_run": true,
+    "paste_safe_status_fields": [
+      "schema_version",
+      "generated_at",
+      "snapshot_updated_at",
+      "region",
+      "object_types.rows",
+      "object_types.row_hash_count",
+      "dropped_rows.total",
+      "dropped_rows.by_reason",
+      "dropped_rows.by_object_type",
+      "dropped_rows.by_kind",
+      "source_health_summary"
+    ]
+  },
+  "exports": [
+    {
+      "object_type": "Region",
+      "runtime_file": "data/foundry/regional-intel/Region.ndjson",
+      "gcs_prefix": "raw/regional_regions/YYYY-MM-DD/",
+      "bigquery_table": "sapphire.regional_regions",
+      "schema_file": "infra/gcp/schemas/regional_regions.json",
+      "partition_field": "timestamp",
+      "cluster_fields": [
+        "region_id",
+        "name"
+      ],
+      "foundry_ontology_type": "Region"
+    },
+    {
+      "object_type": "IntelItem",
+      "runtime_file": "data/foundry/regional-intel/IntelItem.ndjson",
+      "gcs_prefix": "raw/regional_intel_items/YYYY-MM-DD/",
+      "bigquery_table": "sapphire.regional_intel_items",
+      "schema_file": "infra/gcp/schemas/regional_intel_items.json",
+      "partition_field": "timestamp",
+      "cluster_fields": [
+        "region_id",
+        "kind",
+        "source_name"
+      ],
+      "foundry_ontology_type": "IntelItem"
+    },
+    {
+      "object_type": "IntelSourceHealth",
+      "runtime_file": "data/foundry/regional-intel/IntelSourceHealth.ndjson",
+      "gcs_prefix": "raw/regional_source_health/YYYY-MM-DD/",
+      "bigquery_table": "sapphire.regional_source_health",
+      "schema_file": "infra/gcp/schemas/regional_source_health.json",
+      "partition_field": "timestamp",
+      "cluster_fields": [
+        "status",
+        "category"
+      ],
+      "foundry_ontology_type": "IntelSourceHealth"
+    }
+  ]
+}

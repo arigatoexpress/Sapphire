@@ -27,6 +27,7 @@ def test_continuous_intelligence_plan_has_real_work_lanes() -> None:
     assert any(task["id"] == "eth-privacy-quantum-research-refresh" for task in tasks)
     assert any(task["id"] == "institutional-tokenization-agentic-payments-refresh" for task in tasks)
     assert any(task["id"] == "x402-agent-market-dry-run-plan" for task in tasks)
+    assert any(task["id"] == "regional-intel-ooda-readiness-review" for task in tasks)
     assert plan["inputs"]["market_universe"]["liked_symbols"][:3] == ["ETH", "BTC", "ZEC"]
     assert "https://docs.cdp.coinbase.com/x402/docs/welcome" in plan["source_docs"]
 
@@ -56,6 +57,25 @@ def test_tokenization_and_x402_tasks_are_explicitly_non_executing() -> None:
     assert "https://chain.link/smartdata" in tokenization["source_docs"]
     assert x402["safe_mode"] == "dry_run"
     assert any("X402_ENABLED stays disabled" in gate for gate in x402["acceptance"])
+
+
+def test_regional_ooda_task_is_read_only_review_and_export_only() -> None:
+    plan = ci.build_continuous_intelligence_plan(fetch_live=False)
+    task = {
+        task["id"]: task
+        for task in plan["tasks"]
+    }["regional-intel-ooda-readiness-review"]
+
+    assert task["lane"] == "regional_ooda"
+    assert task["target_runtime"] == "mac-local"
+    assert task["safe_mode"] == "read_only"
+    assert task["python_api"] == "lib.foundry.readiness.build_foundry_schema_audit"
+    assert set(task["ooda_packet"]) == {"observe", "orient", "decide", "act"}
+    assert all(
+        any(keyword in action.lower() for keyword in ("review", "export", "open a pr"))
+        for action in task["ooda_packet"]["act"]
+    )
+    assert "No GCP, Foundry, workflow dispatch, Telegram, or trading write is invoked" in task["acceptance"]
 
 
 def test_cli_emits_json(capsys) -> None:
