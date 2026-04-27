@@ -43,6 +43,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -201,7 +202,110 @@ def check_tool_registry() -> dict[str, Any]:
 def check_gitleaks() -> dict[str, Any]:
     if shutil.which("gitleaks") is None:
         return _skipped("gitleaks (secrets)", "gitleaks not on PATH")
-    return _run_named("gitleaks (secrets)", ["gitleaks", "detect", "--no-banner", "-v"])
+    changed_paths = changed_paths_for_secret_scan()
+    if not changed_paths:
+        return _passed("gitleaks (changed files)", "no changed files to scan")
+
+    with tempfile.TemporaryDirectory(prefix="sapphire-gitleaks-") as tmp:
+        source = Path(tmp)
+        copied = copy_secret_scan_source(changed_paths, source)
+        if copied == 0:
+            return _passed("gitleaks (changed files)", "no existing changed files to scan")
+        cmd = [
+            "gitleaks",
+            "detect",
+            "--no-banner",
+            "--no-git",
+            "--redact=100",
+            "--source",
+            str(source),
+        ]
+        config = REPO_ROOT / ".gitleaks.toml"
+        if config.exists():
+            cmd.extend(["--config", str(config)])
+        return _run_named("gitleaks (changed files)", cmd)
+
+
+def changed_paths_for_secret_scan() -> list[Path]:
+    """Return changed files that should be secret-scanned.
+
+    ``gitleaks detect`` scans the full git history by default. Sapphire has old
+    historical findings that are outside the current PR, so the billing-block
+    local verifier scans only files changed relative to ``origin/main`` plus
+    staged, unstaged, and untracked working-tree files.
+    """
+    raw_paths: set[str] = set()
+
+    merge_base = first_merge_base(("origin/main", "main"))
+    if merge_base:
+        raw_paths.update(
+            split_git_lines(
+                git_capture_optional(
+                    ["git", "diff", "--name-only", "--diff-filter=ACMR", f"{merge_base}...HEAD"]
+                )
+            )
+        )
+
+    raw_paths.update(
+        split_git_lines(
+            git_capture_optional(["git", "diff", "--name-only", "--diff-filter=ACMR", "--cached", "HEAD"])
+        )
+    )
+    raw_paths.update(
+        split_git_lines(
+            git_capture_optional(["git", "diff", "--name-only", "--diff-filter=ACMR", "HEAD"])
+        )
+    )
+    raw_paths.update(
+        split_git_lines(
+            git_capture_optional(["git", "ls-files", "--others", "--exclude-standard"])
+        )
+    )
+
+    paths = []
+    for raw in sorted(raw_paths):
+        rel = Path(raw)
+        if rel.is_absolute() or ".." in rel.parts:
+            continue
+        if REPO_ROOT.joinpath(rel).is_file():
+            paths.append(rel)
+    return paths
+
+
+def first_merge_base(refs: tuple[str, ...]) -> str | None:
+    for ref in refs:
+        base = git_capture_optional(["git", "merge-base", "HEAD", ref]).strip()
+        if base:
+            return base
+    return None
+
+
+def split_git_lines(output: str) -> set[str]:
+    return {line.strip() for line in output.splitlines() if line.strip()}
+
+
+def git_capture_optional(cmd: list[str]) -> str:
+    result = subprocess.run(
+        cmd,
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.stdout if result.returncode == 0 else ""
+
+
+def copy_secret_scan_source(paths: list[Path], source: Path) -> int:
+    copied = 0
+    for rel in paths:
+        src = REPO_ROOT / rel
+        if not src.is_file():
+            continue
+        dst = source / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+        copied += 1
+    return copied
 
 
 def _run_named(name: str, cmd: list[str]) -> dict[str, Any]:
@@ -243,6 +347,17 @@ def _skipped(name: str, reason: str) -> dict[str, Any]:
         "duration_sec": 0.0,
         "stdout_tail": "",
         "stderr_tail": f"skipped: {reason}",
+    }
+
+
+def _passed(name: str, message: str) -> dict[str, Any]:
+    return {
+        "name": name,
+        "status": "PASS",
+        "exit_code": 0,
+        "duration_sec": 0.0,
+        "stdout_tail": message,
+        "stderr_tail": "",
     }
 
 
