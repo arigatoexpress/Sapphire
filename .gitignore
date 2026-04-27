@@ -88,6 +88,7 @@ qwen*.json
 services/control-plane/app/data/system_events.jsonl
 
 # Local-only state
+.playwright-cli/
 .claude/launch.json
 .claude/worktrees/
 .claude/scheduled_tasks.lock

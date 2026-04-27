@@ -43,6 +43,10 @@ GET /api/autonomy/continuous-intelligence/lease-preview
 Both endpoints keep `write_enabled=false`, `execution_enabled=false`,
 `live_trading_enabled=false`, and `telegram_sends_enabled=false`.
 
+The `/sovereign-thesis` page renders these same surfaces as a read-only control
+panel: next dispatch tasks, local artifact status, and Windows GPU lease
+previews.
+
 ## Safety
 
 - Writes are opt-in at the module/CLI layer.
