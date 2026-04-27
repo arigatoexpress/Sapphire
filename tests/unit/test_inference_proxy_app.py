@@ -613,6 +613,44 @@ class TestPostValidation:
         assert payload["code"] == "all_tiers_exhausted_sensitive"
 
 
+class TestKimiRelayFallback:
+    def test_relay_uses_reader_token_gate_not_legacy_kimi_claw_token(
+        self,
+        app_module,
+        monkeypatch,
+    ):
+        monkeypatch.setattr(app_module, "MOONSHOT_API_KEY", "")
+        monkeypatch.setattr(app_module, "OPENROUTER_API_KEY", "")
+        monkeypatch.setattr(app_module, "_KIMI_RELAY_AVAILABLE", True)
+        monkeypatch.setattr(app_module, "_kimi_relay_fn", lambda query: f"relay saw: {query}")
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "sender-token")
+        monkeypatch.setenv("RELAY_READER_TOKEN", "reader-token")
+        monkeypatch.setenv("KIMI_RELAY_CHAT_ID", "-100")
+        monkeypatch.delenv("KIMI_CLAW_BOT_TOKEN", raising=False)
+
+        result = app_module._call_kimi_cloud(
+            [{"role": "user", "content": "summarize readiness"}]
+        )
+
+        assert result is not None
+        assert result["model"] == "kimi-relay"
+        assert "summarize readiness" in result["choices"][0]["message"]["content"]
+
+    def test_relay_requires_sender_reader_and_chat_env(self, app_module, monkeypatch):
+        def boom(_query):
+            raise AssertionError("relay should not be called without all env gates")
+
+        monkeypatch.setattr(app_module, "MOONSHOT_API_KEY", "")
+        monkeypatch.setattr(app_module, "OPENROUTER_API_KEY", "")
+        monkeypatch.setattr(app_module, "_KIMI_RELAY_AVAILABLE", True)
+        monkeypatch.setattr(app_module, "_kimi_relay_fn", boom)
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "sender-token")
+        monkeypatch.delenv("RELAY_READER_TOKEN", raising=False)
+        monkeypatch.setenv("KIMI_RELAY_CHAT_ID", "-100")
+
+        assert app_module._call_kimi_cloud([{"role": "user", "content": "hello"}]) is None
+
+
 # ─── /health and /metrics shape ───────────────────────────────────────────────
 
 

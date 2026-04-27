@@ -552,8 +552,9 @@ def _call_kimi_cloud(messages: list, max_tokens: int = 2048,
     # Telegram relay fallback — @rarikimibot in shared group
     if _KIMI_RELAY_AVAILABLE and _kimi_relay_fn:
         relay_chat_id = os.environ.get("KIMI_RELAY_CHAT_ID", "")
-        kimi_token    = os.environ.get("KIMI_CLAW_BOT_TOKEN", "")
-        if relay_chat_id and kimi_token:
+        send_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+        reader_token = os.environ.get("RELAY_READER_TOKEN", "")
+        if relay_chat_id and send_token and reader_token:
             # Flatten messages into a single query string for the relay
             query_parts = []
             for m in messages:
@@ -595,7 +596,10 @@ def _call_kimi_cloud(messages: list, max_tokens: int = 2048,
                     _record("kimi-cloud", False, elapsed)
                     log.warning("x kimi-relay failed: %s", str(e)[:80])
         else:
-            log.debug("kimi-relay: KIMI_RELAY_CHAT_ID or KIMI_CLAW_BOT_TOKEN not set")
+            log.debug(
+                "kimi-relay: TELEGRAM_BOT_TOKEN, RELAY_READER_TOKEN, or "
+                "KIMI_RELAY_CHAT_ID not set"
+            )
 
     log.debug("kimi-cloud: no API key or relay configured, skipping tier")
     return None

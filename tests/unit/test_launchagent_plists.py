@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import plistlib
+import re
 from pathlib import Path
 
 from services.pipeline import check_routines
@@ -10,6 +11,13 @@ from services.pipeline import check_routines
 ROOT = Path(__file__).resolve().parents[2]
 INFRA_LAUNCHAGENTS = ROOT / "infra" / "launchagents"
 SERVICE_LAUNCHAGENT_DIRS = tuple((ROOT / "services").glob("*/launchagent"))
+SENSITIVE_ENV_RE = re.compile(r"(TOKEN|SECRET|PASSWORD|PIN|BEARER|_KEY|KEY_)", re.I)
+SANITIZED_ENV_NAMES = {
+    "AUTH_PASSWORD",
+    "RELAY_READER_TOKEN",
+    "OPENROUTER_API_KEY",
+    "KIMI_RELAY_CHAT_ID",
+}
 
 
 def _plist_paths() -> list[Path]:
@@ -73,3 +81,38 @@ def test_content_publisher_keeps_telegram_summary_explicit() -> None:
 
     assert env["SAPPHIRE_PUBLISH_LIVE"] == "0"
     assert env["SAPPHIRE_CONTENT_TELEGRAM_SUMMARY"] == "1"
+
+
+def test_dashboard_and_inference_proxy_plists_are_sanitized() -> None:
+    expected = {
+        ROOT
+        / "services"
+        / "dashboard"
+        / "launchagent"
+        / "com.sapphire.dashboard.plist": {
+            "label": "com.sapphire.dashboard",
+            "wrapper": "/Users/aribs/Code/Sapphire/services/dashboard/start.sh",
+            "env": {"PATH", "PORT"},
+        },
+        ROOT
+        / "services"
+        / "inference-proxy"
+        / "launchagent"
+        / "com.sapphire.inference-proxy.plist": {
+            "label": "com.sapphire.inference-proxy",
+            "wrapper": "/Users/aribs/Code/Sapphire/services/inference-proxy/start.sh",
+            "env": {"PI_RARI1_ENABLED", "PI_RARI2_ENABLED"},
+        },
+    }
+
+    for path, expectation in expected.items():
+        plist = _load_plist(path)
+        env = plist.get("EnvironmentVariables") or {}
+        arguments = plist.get("ProgramArguments") or []
+
+        assert plist["Label"] == expectation["label"]
+        assert arguments == ["/bin/bash", expectation["wrapper"]]
+        assert set(env) == expectation["env"]
+        assert not (SANITIZED_ENV_NAMES & set(env))
+        for key in env:
+            assert not SENSITIVE_ENV_RE.search(key), f"{path} embeds sensitive env key {key}"
