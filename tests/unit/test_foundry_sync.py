@@ -12,6 +12,7 @@ from lib.foundry.sync import (
     SyncState,
     _auth_warning_fresh,
     _file_hash,
+    _repo_root,
     detect_changes,
     get_sync_status,
     load_sync_history,
@@ -101,6 +102,13 @@ class TestFileHash:
         assert _file_hash(tmp_path / "nope.txt") == ""
 
 
+class TestRepoRoot:
+    def test_env_override_wins(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("SAPPHIRE_REPO_ROOT", str(tmp_path))
+
+        assert _repo_root() == tmp_path
+
+
 # ---------------------------------------------------------------------------
 # Delta detection
 # ---------------------------------------------------------------------------
@@ -159,6 +167,20 @@ class TestDetectChanges:
         }
         changes = detect_changes(state, current)
         assert "Alert" in changes
+
+    def test_regional_intel_change(self):
+        state = SyncState(files={})
+        current = {
+            "data/foundry/regional-intel/IntelItem.ndjson": {
+                "mtime": 1000,
+                "hash": "regional",
+                "size": 50,
+            }
+        }
+        changes = detect_changes(state, current)
+        assert changes == {
+            "IntelItem": ["data/foundry/regional-intel/IntelItem.ndjson"]
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -293,6 +315,7 @@ class TestGetSyncStatus:
         assert status["last_status"] == "ok"
         assert status["sync_count"] == 1
         assert status["tracked_files"] >= 0
+        assert "IntelItem" in status["source_types"]
 
 
 # ---------------------------------------------------------------------------

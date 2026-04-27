@@ -10,6 +10,9 @@ Object types (see docs/foundry-ontology-schema.md):
   - ServiceHealth  — from heartbeat / data/health/*.ndjson
   - ThreatIntel    — from data/intelligence/*/threats.json + data/threat_intel/*.md
   - DailyBrief     — from data/intelligence/*/daily_brief.json
+  - Region         — from data/foundry/regional-intel/Region.ndjson
+  - IntelItem      — from data/foundry/regional-intel/IntelItem.ndjson
+  - IntelSourceHealth — from data/foundry/regional-intel/IntelSourceHealth.ndjson
 """
 
 from __future__ import annotations
@@ -17,6 +20,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import re
 from datetime import UTC, datetime
 from pathlib import Path
@@ -24,12 +28,23 @@ from typing import Any
 
 log = logging.getLogger("foundry.ingestion")
 
+_REGIONAL_EXPORT_DIR = Path("data/foundry/regional-intel")
+_REGIONAL_OBJECT_FILES = {
+    "Region": "Region.ndjson",
+    "IntelItem": "IntelItem.ndjson",
+    "IntelSourceHealth": "IntelSourceHealth.ndjson",
+}
+
 
 def _repo_root() -> Path:
+    override = os.getenv("SAPPHIRE_REPO_ROOT")
+    if override:
+        return Path(override).expanduser()
+
     home_repo = Path.home() / "Code" / "Sapphire"
     local_repo = Path(__file__).resolve().parents[2]
-    for c in (home_repo, local_repo):
-        if c.exists():
+    for c in (local_repo, home_repo):
+        if (c / "lib" / "foundry").exists() or (c / "AGENTS.md").exists():
             return c
     return local_repo
 
@@ -522,6 +537,72 @@ def transform_daily_briefs(
 
 
 # ---------------------------------------------------------------------------
+# Regional intelligence exports — Foundry-ready NDJSON from sibling workbench
+# ---------------------------------------------------------------------------
+
+
+def _load_regional_export(
+    root: Path,
+    object_type: str,
+    *,
+    since: datetime | None = None,
+) -> list[dict[str, Any]]:
+    """Load staged regional-intel Foundry NDJSON rows for one object type."""
+    filename = _REGIONAL_OBJECT_FILES[object_type]
+    fpath = root / _REGIONAL_EXPORT_DIR / filename
+    rows: list[dict[str, Any]] = []
+    for row in _load_jsonl(fpath, max_lines=10000):
+        if not isinstance(row, dict):
+            continue
+        ts = (
+            row.get("observed_at")
+            or row.get("last_seen_at")
+            or row.get("snapshot_updated_at")
+        )
+        if since and ts and str(ts) < since.isoformat():
+            continue
+        obj = dict(row)
+        object_id = obj.get("object_id") or obj.get("id")
+        if object_id:
+            obj.setdefault("id", object_id)
+            obj.setdefault("object_id", object_id)
+        obj["_sapphire_source"] = str(fpath.relative_to(root))
+        rows.append(obj)
+    log.info("Transformed %d %s objects from %s", len(rows), object_type, fpath)
+    return rows
+
+
+def transform_regions(
+    root: Path | None = None,
+    *,
+    since: datetime | None = None,
+) -> list[dict[str, Any]]:
+    """Read staged regional-intel Region export rows."""
+    root = root or _repo_root()
+    return _load_regional_export(root, "Region", since=since)
+
+
+def transform_intel_items(
+    root: Path | None = None,
+    *,
+    since: datetime | None = None,
+) -> list[dict[str, Any]]:
+    """Read staged regional-intel IntelItem export rows."""
+    root = root or _repo_root()
+    return _load_regional_export(root, "IntelItem", since=since)
+
+
+def transform_intel_source_health(
+    root: Path | None = None,
+    *,
+    since: datetime | None = None,
+) -> list[dict[str, Any]]:
+    """Read staged regional-intel IntelSourceHealth export rows."""
+    root = root or _repo_root()
+    return _load_regional_export(root, "IntelSourceHealth", since=since)
+
+
+# ---------------------------------------------------------------------------
 # Convenience: all transforms
 # ---------------------------------------------------------------------------
 
@@ -532,6 +613,9 @@ ALL_TRANSFORMS: dict[str, Any] = {
     "ServiceHealth": transform_service_health,
     "ThreatIntel": transform_threat_intel,
     "DailyBrief": transform_daily_briefs,
+    "Region": transform_regions,
+    "IntelItem": transform_intel_items,
+    "IntelSourceHealth": transform_intel_source_health,
 }
 
 

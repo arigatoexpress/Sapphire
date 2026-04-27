@@ -76,6 +76,55 @@ def _write_foundry_fixture(root):
             }
         )
     )
+    regional_dir = data_dir / "foundry" / "regional-intel"
+    regional_dir.mkdir(parents=True)
+    (regional_dir / "Region.ndjson").write_text(
+        json.dumps(
+            {
+                "object_id": "regional-intel:region:austin_tx",
+                "region_id": "austin_tx",
+                "name": "Austin, TX",
+                "summary": "Expansion and civic signals.",
+                "snapshot_updated_at": "2026-04-26T08:05:00Z",
+            }
+        )
+        + "\n"
+    )
+    (regional_dir / "IntelItem.ndjson").write_text(
+        json.dumps(
+            {
+                "object_id": "regional-intel:item:news:item-1",
+                "item_id": "item-1",
+                "kind": "news",
+                "region_id": "austin_tx",
+                "title": "Venue permit",
+                "summary": "New venue permit signal.",
+                "score": 0.8,
+                "source_name": "Austin Monitor",
+                "source_url": "https://example.test/permit",
+                "observed_at": "2026-04-26T08:05:00Z",
+                "snapshot_updated_at": "2026-04-26T08:05:00Z",
+            }
+        )
+        + "\n"
+    )
+    (regional_dir / "IntelSourceHealth.ndjson").write_text(
+        json.dumps(
+            {
+                "object_id": "regional-intel:source:austin-monitor",
+                "source_key": "austin-monitor",
+                "name": "Austin Monitor",
+                "category": "news",
+                "region_ids": ["austin_tx"],
+                "live_pull": True,
+                "status": "live",
+                "item_count": 1,
+                "last_seen_at": "2026-04-26T08:05:00Z",
+                "snapshot_updated_at": "2026-04-26T08:05:00Z",
+            }
+        )
+        + "\n"
+    )
 
 
 def test_schema_audit_reports_required_field_health_and_history_readback(tmp_path):
@@ -111,10 +160,10 @@ def test_schema_audit_reports_required_field_health_and_history_readback(tmp_pat
     audit = build_foundry_schema_audit(tmp_path)
 
     assert audit["status"] == "ready"
-    assert audit["totals"]["object_types"] == 5
-    assert audit["totals"]["objects"] == 5
+    assert audit["totals"]["object_types"] == 8
+    assert audit["totals"]["objects"] == 8
     assert audit["totals"]["missing_required_fields"] == 0
-    assert audit["totals"]["source_refs"] == 5
+    assert audit["totals"]["source_refs"] == 8
     object_types = {item["object_type"]: item for item in audit["object_types"]}
     assert object_types["PaperTrade"]["required_fields"] == [
         "id",
@@ -124,6 +173,17 @@ def test_schema_audit_reports_required_field_health_and_history_readback(tmp_pat
         "opened_at",
     ]
     assert object_types["ThreatIntel"]["status"] == "ready"
+    assert object_types["Region"]["status"] == "ready"
+    assert object_types["IntelItem"]["required_fields"] == [
+        "object_id",
+        "item_id",
+        "kind",
+        "region_id",
+        "title",
+        "source_name",
+        "source_url",
+        "snapshot_updated_at",
+    ]
 
     history = audit["sync_history_readback"]
     assert history["records"] == 2
@@ -165,7 +225,12 @@ def test_readiness_embeds_schema_audit(tmp_path):
     readiness = build_foundry_readiness(tmp_path)
 
     assert readiness["schema_audit"]["status"] == "ready"
-    assert readiness["schema_audit"]["totals"]["objects"] == 5
+    assert readiness["schema_audit"]["totals"]["objects"] == 8
+    regional_group = next(
+        group for group in readiness["dataset_groups"] if group["id"] == "regional-intel"
+    )
+    assert regional_group["status"] == "ready"
+    assert regional_group["files"] == 3
     assert readiness["docs"]["ontology_schema"] == "docs/foundry-ontology-schema.md"
 
 

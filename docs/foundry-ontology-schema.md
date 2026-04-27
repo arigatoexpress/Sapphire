@@ -132,6 +132,78 @@ Generated daily intelligence briefs combining market, threat, and operational da
 
 ---
 
+### Region
+
+Regional intelligence market and civic areas exported from the regional-intel workbench.
+
+| Property | Type | Source Field | Description |
+|----------|------|-------------|-------------|
+| `object_id` | `string` (PK) | `object_id` | Stable regional ontology identifier |
+| `id` | `string` | derived from `object_id` | Compatibility alias used by Sapphire audit tooling |
+| `region_id` | `string` | `region_id` | Workbench region key, for example `austin_tx` |
+| `name` | `string` | `name` | Human region label |
+| `summary` | `string` | `summary` | Region context for operators and agents |
+| `bbox` | `double[]` | `bbox` | Optional geographic bounds |
+| `focus_keywords` | `string[]` | `focus_keywords` | Regional collection focus terms |
+| `source_keys` | `string[]` | `source_keys` | Source identifiers used for this region |
+| `snapshot_updated_at` | `timestamp` | `snapshot_updated_at` | Workbench snapshot timestamp |
+| `notes` | `string[]` | `notes` | Operator notes |
+| `provenance` | `object` | `provenance` | Public-source and ethics policy metadata |
+
+**Data sources:** `data/foundry/regional-intel/Region.ndjson`
+
+---
+
+### IntelItem
+
+Regional opportunities, permits, news, businesses, contacts, and organizations.
+
+| Property | Type | Source Field | Description |
+|----------|------|-------------|-------------|
+| `object_id` | `string` (PK) | `object_id` | Stable regional-intel item identifier |
+| `id` | `string` | derived from `object_id` | Compatibility alias used by Sapphire audit tooling |
+| `item_id` | `string` | `item_id` | Workbench item key |
+| `kind` | `string` | `kind` | `news`, `permit`, `business`, `contact`, or `organization` |
+| `region_id` | `string` | `region_id` | Owning region key |
+| `title` | `string` | `title` | Item title |
+| `summary` | `string` | `summary` | Short operator summary |
+| `score` | `double` | `score` | Workbench relevance or lead score |
+| `source_name` | `string` | `source_name` | Public source label |
+| `source_url` | `string` | `source_url` | Public source URL |
+| `observed_at` | `timestamp` | `observed_at` | Source observation time when available |
+| `snapshot_updated_at` | `timestamp` | `snapshot_updated_at` | Workbench snapshot timestamp |
+| `attributes` | `object` | `attributes` | Kind-specific structured attributes |
+| `notes` | `string[]` | `notes` | Item notes |
+| `provenance` | `object` | `provenance` | Public-source and ethics policy metadata |
+
+**Data sources:** `data/foundry/regional-intel/IntelItem.ndjson`
+
+---
+
+### IntelSourceHealth
+
+Regional-intel source coverage and live-pull status.
+
+| Property | Type | Source Field | Description |
+|----------|------|-------------|-------------|
+| `object_id` | `string` (PK) | `object_id` | Stable source identifier |
+| `id` | `string` | derived from `object_id` | Compatibility alias used by Sapphire audit tooling |
+| `source_key` | `string` | `source_key` | Regional workbench source key |
+| `name` | `string` | `name` | Source display name |
+| `category` | `string` | `category` | Source category |
+| `region_ids` | `string[]` | `region_ids` | Regions covered by the source |
+| `live_pull` | `boolean` | `live_pull` | Whether the source is collected live |
+| `status` | `string` | `status` | `live`, `empty`, `manual`, or failure state |
+| `item_count` | `integer` | `item_count` | Items emitted in the snapshot |
+| `last_seen_at` | `timestamp` | `last_seen_at` | Last observed source activity |
+| `snapshot_updated_at` | `timestamp` | `snapshot_updated_at` | Workbench snapshot timestamp |
+| `notes` | `string[]` | `notes` | Source notes |
+| `provenance` | `object` | `provenance` | Public-source and ethics policy metadata |
+
+**Data sources:** `data/foundry/regional-intel/IntelSourceHealth.ndjson`
+
+---
+
 ## Ontology Links
 
 These relationships connect object types in the Foundry ontology:
@@ -144,6 +216,9 @@ These relationships connect object types in the Foundry ontology:
 | `brief_threats` | DailyBrief | ThreatIntel | 1:N | Threats referenced in brief |
 | `brief_trades` | DailyBrief | PaperTrade | 1:N | Trades referenced in brief |
 | `service_threats` | ServiceHealth | ThreatIntel | N:M | Threats affecting services |
+| `region_items` | Region | IntelItem | 1:N | Regional items observed inside a region |
+| `region_sources` | Region | IntelSourceHealth | N:M | Public sources covering a region |
+| `item_alerts` | IntelItem | Alert | 1:N | Operational alerts derived from regional intelligence |
 
 ---
 
@@ -158,6 +233,16 @@ The sync engine (`lib/foundry/sync.py`) runs on a 15-minute schedule with these 
 - **History:** Append-only log at `data/foundry_sync_history.jsonl`
 - **Alerting:** Telegram notification on sync failure (via `lib.telegram` or direct API)
 - **Dashboard:** `/api/foundry/sync-status` endpoint exposes sync state to the intel page
+
+Regional intelligence objects are staged by the sibling workbench and then read
+by Sapphire's normal Foundry sync. From `~/Code/regional-intel-workbench`, run:
+
+```bash
+python3 -m app.cli intel-foundry-export --output-dir ~/Code/Sapphire/data/foundry/regional-intel --json
+```
+
+Use `--refresh` only when the operator explicitly wants to refresh public
+sources before export; the default reads the latest stored local snapshot.
 
 ### Local Schema + Read-Back Audit
 
@@ -225,6 +310,7 @@ Per the strategy doc, these Actions will be implemented after the ontology layer
 | `lib/foundry/client.py` | Foundry REST API client (auth, datasets, ontology) |
 | `lib/foundry/ingestion.py` | Local data → Foundry object transforms |
 | `lib/foundry/sync.py` | Delta-aware sync engine + daemon |
+| `data/foundry/regional-intel/*.ndjson` | Ignored staging area for regional workbench Foundry exports |
 | `data/foundry_sync_state.json` | Persisted file-change state |
 | `data/foundry_sync_history.jsonl` | Append-only sync log |
 | `tests/unit/test_foundry_client.py` | Client unit tests |

@@ -54,14 +54,21 @@ _SOURCE_PATTERNS: dict[str, list[str]] = {
         "data/intelligence/*/daily_brief.json",
         "data/intelligence/*/daily_brief.md",
     ],
+    "Region": ["data/foundry/regional-intel/Region.ndjson"],
+    "IntelItem": ["data/foundry/regional-intel/IntelItem.ndjson"],
+    "IntelSourceHealth": ["data/foundry/regional-intel/IntelSourceHealth.ndjson"],
 }
 
 
 def _repo_root() -> Path:
+    override = os.getenv("SAPPHIRE_REPO_ROOT")
+    if override:
+        return Path(override).expanduser()
+
     home_repo = Path.home() / "Code" / "Sapphire"
     local_repo = Path(__file__).resolve().parents[2]
-    for c in (home_repo, local_repo):
-        if c.exists():
+    for c in (local_repo, home_repo):
+        if (c / "lib" / "foundry").exists() or (c / "AGENTS.md").exists():
             return c
     return local_repo
 
