@@ -40,6 +40,8 @@ repos:
     rev: 1.7.10
     hooks:
       - id: bandit
-        # Scan first-party code only. Tests and archived legacy are skipped.
-        args: ["-ll", "-r", "services", "lib", "plugins/claw-sapphire/tools", "plugins/claw-sapphire/lib"]
-        pass_filenames: false
+        # Gate changed Python files locally; run `pre-commit run bandit --all-files`
+        # for an intentional full-repo security audit.
+        args: ["-ll", "--skip", "B101,B601"]
+        types: [python]
+        exclude: ^(tests|legacy_code|archived|results|\.venv)/

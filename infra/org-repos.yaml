@@ -75,6 +75,8 @@ repos:
     role: Rust agent runtime hosting the claw-sapphire plugin
     local_path: /Users/aribs/Code/claw-code
     github: instructkr/claw-code
+    pr_github: arigatoexpress/claw-code
+    issue_github: arigatoexpress/claw-code
     default_branch: main
     production_adjacent: false
     required_guardrails:
@@ -130,6 +132,8 @@ repos:
     role: Upstream TradingView MCP bridge with CDP tooling
     local_path: /Users/aribs/Code/tradingview-mcp-v2
     github: tradesdontlie/tradingview-mcp
+    pr_github: arigatoexpress/tradingview-mcp-upstream
+    issue_github: arigatoexpress/tradingview-mcp-upstream
     default_branch: main
     production_adjacent: true
     required_guardrails:
@@ -181,6 +185,8 @@ repos:
     role: Hermes Telegram gateway and conversational framework integration
     local_path: /Users/aribs/Code/hermes-agent
     github: NousResearch/hermes-agent
+    pr_github: arigatoexpress/hermes-agent
+    issue_github: arigatoexpress/hermes-agent
     default_branch: main
     production_adjacent: true
     required_guardrails:

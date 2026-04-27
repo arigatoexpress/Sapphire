@@ -242,6 +242,7 @@ def test_hermes_agent_tracks_runtime_checkout_and_local_patches() -> None:
     repo = repos["hermes-agent"]
 
     assert repo["migration_state"] == "local_runtime_mapped"
+    assert repo["pr_github"] == "arigatoexpress/hermes-agent"
     tracking = repo["runtime_tracking"]
     assert tracking["consolidation_doc"] == "docs/org/hermes-agent-consolidation-map.md"
     assert tracking["launchagent_label"] == "ai.hermes.gateway"
@@ -251,6 +252,27 @@ def test_hermes_agent_tracks_runtime_checkout_and_local_patches() -> None:
         "5f2af81c",
         "3ba7bd5f",
     ]
+
+
+def test_actionable_pr_tracking_uses_ari_forks_for_upstream_integrations() -> None:
+    repos = {repo["id"]: repo for repo in _manifest()["repos"]}
+
+    assert repos["claw-code"]["github"] == "instructkr/claw-code"
+    assert repos["claw-code"]["pr_github"] == "arigatoexpress/claw-code"
+    assert repos["tradingview-mcp-v2"]["github"] == "tradesdontlie/tradingview-mcp"
+    assert repos["tradingview-mcp-v2"]["pr_github"] == "arigatoexpress/tradingview-mcp-upstream"
+    assert repos["hermes-agent"]["github"] == "NousResearch/hermes-agent"
+    assert repos["hermes-agent"]["pr_github"] == "arigatoexpress/hermes-agent"
+
+
+def test_open_pr_count_excludes_probe_errors() -> None:
+    report = org_status.collect_status(_manifest(), external=False)
+    report["repos"][0]["open_prs"] = [
+        {"number": 1, "title": "real"},
+        {"error": "repo unavailable"},
+    ]
+
+    assert org_status.count_actionable_items(report["repos"][0]["open_prs"]) == 1
 
 
 def test_status_report_includes_runtime_tracking_without_required_runtime_path(
