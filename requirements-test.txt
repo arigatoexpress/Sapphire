@@ -31,7 +31,7 @@ redis==5.2.1
 numpy==2.4.4
 pandas==3.0.2
 scipy==1.15.0
-scikit-learn==1.6.0
+scikit-learn==1.8.0
 
 # logging / config
 loguru==0.7.3
@@ -46,6 +46,6 @@ firebase-admin==6.9.0
 
 # crypto / chain
 web3>=7.0,<8
-eth-account>=0.13,<1
-cryptography==44.0.0
-certifi==2026.2.25
+eth-account>=0.13.7,<1
+cryptography==47.0.0
+certifi==2026.4.22
