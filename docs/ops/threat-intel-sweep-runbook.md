@@ -52,10 +52,31 @@ threats appear, exit 0 silently.
 4. Cross-reference with Sapphire's dependencies. Read top-level package
    names from each of these manifests if they exist:
    ```bash
-   for f in pyproject.toml requirements.txt requirements-test.txt \
-            services/*/requirements.txt clients/*/requirements.txt; do
-     [ -f "$f" ] && cat "$f" | grep -oE '^[a-zA-Z0-9_-]+' | sort -u
-   done > /tmp/sapphire-deps.txt
+   {
+     # requirements.txt-style files: take the package name before any
+     # version specifier or comment
+     for f in requirements.txt requirements-test.txt \
+              services/*/requirements.txt clients/*/requirements.txt; do
+       [ -f "$f" ] && grep -hoE '^[a-zA-Z0-9_.-]+' "$f"
+     done
+     # pyproject.toml: parse project dependency arrays only. Grep/regex over
+     # the whole TOML file captures unrelated quoted strings such as Ruff
+     # rule codes and workspace paths.
+     [ -f pyproject.toml ] && python3 - <<'PY'
+import re
+import tomllib
+from pathlib import Path
+data = tomllib.loads(Path("pyproject.toml").read_text())
+project = data.get("project", {})
+deps = list(project.get("dependencies", []))
+for values in (project.get("optional-dependencies", {}) or {}).values():
+    deps.extend(values)
+for dep in deps:
+    name = re.split(r'\s*(?:[<>=!~]=?|;|\[)', dep, maxsplit=1)[0].strip()
+    if name:
+        print(name)
+PY
+   } | sort -u > /tmp/sapphire-deps.txt
    ```
    For each KEV entry, check whether its `vendorProject` or affected
    product overlaps lexically with `/tmp/sapphire-deps.txt`. Mark
