@@ -148,6 +148,51 @@ def test_shared_webhook_secret_fallback(monkeypatch, reload_server):
     assert server.SETTINGS.webhook_secret == "shared-webhook-secret"
 
 
+def test_webhook_secret_falls_back_to_secret_file(monkeypatch, tmp_path, reload_server):
+    fake_home = tmp_path
+    sapphire_secrets = fake_home / ".config" / "sapphire-secrets"
+    sapphire_secrets.mkdir(parents=True)
+    (sapphire_secrets / "telegram_webhook_secret").write_text("  file-webhook-secret  \n")
+
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_TOKEN", "test-token")
+    server = reload_server()
+    from pathlib import Path as _Path
+    monkeypatch.setattr(
+        server,
+        "_WEBHOOK_SECRET_PATHS",
+        [
+            _Path(fake_home) / ".config" / "sapphire-secrets" / "sapphire_pm_bot_webhook_secret",
+            _Path(fake_home) / ".config" / "sapphire-secrets" / "telegram_webhook_secret",
+            _Path(fake_home) / ".config" / "sapphire" / "telegram_webhook_secret",
+        ],
+    )
+
+    assert server._resolve_webhook_secret() == "file-webhook-secret"
+
+
+def test_explicit_webhook_secret_wins_over_secret_file(monkeypatch, tmp_path, reload_server):
+    fake_home = tmp_path
+    sapphire_secrets = fake_home / ".config" / "sapphire-secrets"
+    sapphire_secrets.mkdir(parents=True)
+    (sapphire_secrets / "telegram_webhook_secret").write_text("file-webhook-secret")
+
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_TOKEN", "test-token")
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_WEBHOOK_SECRET", "env-webhook-secret")
+    server = reload_server()
+    from pathlib import Path as _Path
+    monkeypatch.setattr(
+        server,
+        "_WEBHOOK_SECRET_PATHS",
+        [
+            _Path(fake_home) / ".config" / "sapphire-secrets" / "sapphire_pm_bot_webhook_secret",
+            _Path(fake_home) / ".config" / "sapphire-secrets" / "telegram_webhook_secret",
+            _Path(fake_home) / ".config" / "sapphire" / "telegram_webhook_secret",
+        ],
+    )
+
+    assert server._resolve_webhook_secret() == "env-webhook-secret"
+
+
 def test_webhook_rejects_bad_secret_before_json(monkeypatch, reload_server):
     monkeypatch.setenv("SAPPHIRE_PM_BOT_TOKEN", "test-token")
     monkeypatch.setenv("SAPPHIRE_PM_BOT_WEBHOOK_SECRET", "expected-secret")

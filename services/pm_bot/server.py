@@ -49,6 +49,24 @@ _SECRET_PATHS = [
     Path.home() / ".config" / "sapphire" / "telegram_bot_token",
 ]
 
+_WEBHOOK_SECRET_PATHS = [
+    Path.home() / ".config" / "sapphire-secrets" / "sapphire_pm_bot_webhook_secret",
+    Path.home() / ".config" / "sapphire-secrets" / "telegram_webhook_secret",
+    Path.home() / ".config" / "sapphire" / "telegram_webhook_secret",
+]
+
+
+def _read_first_secret_file(paths: list[Path]) -> str:
+    for path in paths:
+        try:
+            if path.exists():
+                contents = path.read_text().strip()
+                if contents:
+                    return contents
+        except OSError:
+            continue
+    return ""
+
 
 def _resolve_bot_token() -> str:
     """Resolve the Telegram bot token in priority order.
@@ -70,16 +88,24 @@ def _resolve_bot_token() -> str:
     if shared:
         return shared
 
-    for path in _SECRET_PATHS:
-        try:
-            if path.exists():
-                contents = path.read_text().strip()
-                if contents:
-                    return contents
-        except OSError:
-            continue
+    file_token = _read_first_secret_file(_SECRET_PATHS)
+    if file_token:
+        return file_token
 
     return ""
+
+
+def _resolve_webhook_secret() -> str:
+    """Resolve the Telegram webhook secret without embedding it in launchd plists."""
+    explicit = os.getenv("SAPPHIRE_PM_BOT_WEBHOOK_SECRET", "").strip()
+    if explicit:
+        return explicit
+
+    shared = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
+    if shared:
+        return shared
+
+    return _read_first_secret_file(_WEBHOOK_SECRET_PATHS)
 
 
 @dataclass(frozen=True)
@@ -96,10 +122,7 @@ class Settings:
         port_text = os.getenv("SAPPHIRE_PM_BOT_PORT", "18082").strip() or "18082"
         return cls(
             token=_resolve_bot_token(),
-            webhook_secret=(
-                os.getenv("SAPPHIRE_PM_BOT_WEBHOOK_SECRET", "").strip()
-                or os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
-            ),
+            webhook_secret=_resolve_webhook_secret(),
             mode=os.getenv("MODE", "webhook").strip().lower() or "webhook",
             host=os.getenv("SAPPHIRE_PM_BOT_HOST", "127.0.0.1").strip() or "127.0.0.1",
             port=int(port_text),

@@ -29,6 +29,10 @@ Optional:
     requests with `403` before parsing JSON.
 - `TELEGRAM_WEBHOOK_SECRET=...`
   - Shared fallback if `SAPPHIRE_PM_BOT_WEBHOOK_SECRET` is not set.
+- `~/.config/sapphire-secrets/sapphire_pm_bot_webhook_secret`
+  - File fallback for LaunchAgent deployments; avoids embedding secret values in plists.
+- `~/.config/sapphire-secrets/telegram_webhook_secret`
+  - Shared file fallback for the same webhook secret.
 - `THO_API_KEY_FILE=~/.config/sapphire-secrets/tho_api_key`
   - Required for `/rag`; prefer the file path over putting `THO_API_KEY` directly in the LaunchAgent environment
 - `THO_API_KEY=...`

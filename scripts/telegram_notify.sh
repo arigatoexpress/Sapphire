@@ -18,4 +18,4 @@ REPO_DIR="$(dirname "$SCRIPT_DIR")"
 MESSAGE="${1:?Usage: telegram_notify.sh \"message\" [priority]}"
 PRIORITY="${2:-p1}"
 
-exec python3 "$REPO_DIR/plugins/claw-sapphire/src/tools/notify.py" "$MESSAGE" --priority "$PRIORITY"
+exec python3 "$REPO_DIR/plugins/claw-sapphire/tools/notify.py" "$MESSAGE" --priority "$PRIORITY"
