@@ -25,7 +25,13 @@ experiments.
 
 ## One Command Readiness
 
-Run the harness from the Sapphire repo root:
+Run the harness from the Sapphire repo root with the Make target:
+
+```bash
+make google-readiness
+```
+
+The target expands to the guarded read-only command:
 
 ```bash
 python3 scripts/ops/google_production_test_readiness.py \
@@ -39,32 +45,27 @@ python3 scripts/ops/google_production_test_readiness.py \
 Write a local ignored artifact for comparison over time:
 
 ```bash
-python3 scripts/ops/google_production_test_readiness.py \
-  --project tho-ai-agent \
-  --region us-central1 \
-  --membership google_developer_premium \
-  --membership google_ai_plus \
-  --output data/google/production-readiness/latest.md
+make google-readiness-artifact
 ```
 
 Include read-only billing, Cloud Run, warning-log taxonomy, and local retention
 posture when deciding whether to start a capped live experiment:
 
 ```bash
-python3 scripts/ops/google_production_test_readiness.py \
-  --project tho-ai-agent \
-  --region us-central1 \
-  --membership google_developer_premium \
-  --membership google_ai_plus \
-  --include-cost \
-  --cost-hours 24 \
-  --cost-log-limit 25
+make google-readiness-cost
 ```
 
 For offline/no-CLI planning:
 
 ```bash
-python3 scripts/ops/google_production_test_readiness.py --no-external
+make google-readiness-offline
+```
+
+Override defaults without editing files:
+
+```bash
+make google-readiness GOOGLE_PROJECT=tho-ai-agent GOOGLE_REGION=us-central1
+make google-readiness-artifact GOOGLE_READINESS_OUT=data/google/production-readiness/latest.md
 ```
 
 ## Production-Test Ladder

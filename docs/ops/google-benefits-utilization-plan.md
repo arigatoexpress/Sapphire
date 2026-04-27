@@ -28,6 +28,12 @@ python3 scripts/ops/google_workspace_threat_hygiene.py --days 30
 Generate the full production-testing readiness view:
 
 ```bash
+make google-readiness
+```
+
+Or run the underlying script directly:
+
+```bash
 python3 scripts/ops/google_production_test_readiness.py \
   --membership google_developer_premium \
   --membership google_ai_plus \
