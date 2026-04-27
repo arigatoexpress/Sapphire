@@ -98,6 +98,47 @@ def test_opportunities_reads_signals_jsonl(app_client, tmp_path, monkeypatch):
     assert ops[0]["edge"] == 0.03
 
 
+def test_market_universe_endpoint_uses_strategy_lab(app_client, monkeypatch):
+    _, client = app_client
+    from lib.trading import strategy_lab
+
+    monkeypatch.setattr(
+        strategy_lab,
+        "build_market_universe",
+        lambda fetch_live=True: {
+            "generated_at": "2026-04-27T00:00:00+00:00",
+            "stale": False,
+            "liked_tokens": [{"symbol": "BTC", "tradingview_symbol": "BINANCE:BTCUSDT"}],
+            "trending_tokens": [{"symbol": "AAVE", "source": "coingecko_trending"}],
+            "venue_matrix": [{"symbol": "BTC", "tradingview": "BINANCE:BTCUSDT"}],
+            "corrected_aliases": {"MATIC": "POL"},
+        },
+    )
+
+    r = client.get("/api/analytics/market-universe", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["liked_tokens"][0]["symbol"] == "BTC"
+    assert body["trending_tokens"][0]["symbol"] == "AAVE"
+    assert body["corrected_aliases"]["MATIC"] == "POL"
+
+
+def test_order_draft_endpoint_is_dry_run(app_client):
+    _, client = app_client
+
+    r = client.post(
+        "/api/trading/order-draft",
+        headers={"Authorization": _AUTH},
+        json={"symbol": "BTCUSDT", "action": "buy", "notional_usd": 50},
+    )
+
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["execution_enabled"] is False
+    assert all(draft["execution_enabled"] is False for draft in body["drafts"])
+    assert {draft["venue"] for draft in body["drafts"]} >= {"paper", "hyperliquid"}
+
+
 def test_logs_endpoint_returns_shape(app_client):
     _, client = app_client
     r = client.get("/api/logs?hours=24", headers={"Authorization": _AUTH})

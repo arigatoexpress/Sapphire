@@ -454,6 +454,30 @@ class CoinGeckoClient:
 
     BASE = "https://api.coingecko.com/api/v3"
 
+    def simple_prices(self, coin_ids: list[str], vs_currency: str = "usd") -> dict:
+        """Current prices + 24h changes for CoinGecko ids."""
+        ids = ",".join(sorted({str(cid).strip() for cid in coin_ids if str(cid).strip()}))
+        if not ids:
+            return {}
+        params = urllib.parse.urlencode(
+            {
+                "ids": ids,
+                "vs_currencies": vs_currency,
+                "include_24hr_change": "true",
+            }
+        )
+        resp = _http_get(f"{self.BASE}/simple/price?{params}")
+        if not isinstance(resp, dict):
+            raise SourceError("CoinGecko /simple/price returned non-dict")
+        return resp
+
+    def trending_search(self) -> dict:
+        """Coins/NFTs/categories trending in CoinGecko search."""
+        resp = _http_get(f"{self.BASE}/search/trending")
+        if not isinstance(resp, dict):
+            raise SourceError("CoinGecko /search/trending returned non-dict")
+        return resp
+
     def global_market(self) -> GlobalMarket:
         resp = _http_get(f"{self.BASE}/global")
         if not isinstance(resp, dict) or "data" not in resp:

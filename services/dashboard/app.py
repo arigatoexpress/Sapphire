@@ -125,6 +125,8 @@ CHAIN_OVERVIEW_CACHE_DURATION = 60
 PORTFOLIO_CACHE_DURATION = 30
 CASCADE_CACHE_DURATION = 30
 STRATEGY_PERFORMANCE_CACHE_DURATION = 30
+MARKET_UNIVERSE_CACHE_DURATION = 60
+STRATEGY_LAB_CACHE_DURATION = 300
 
 # ── In-process latency metrics (per-route rolling) ─────────────────────────
 # Keeps a bounded ring buffer of (method, path, ms) samples plus per-route
@@ -311,46 +313,54 @@ def api_status():
 
     return jsonify(get_cached('status', fetch))
 
-_WATCHLIST_SPEC = {
-    'major_crypto': [
-        ('ETH', 'Ethereum', 'perp', 'HIGH', 'ethereum'),
-        ('BTC', 'Bitcoin', 'perp', 'HIGH', 'bitcoin'),
-    ],
-    'mid_cap': [
-        ('SOL', 'Solana', 'perp', 'MEDIUM', 'solana'),
-        ('HYPE', 'Hyperliquid', 'spot', 'MEDIUM', 'hyperliquid'),
-    ],
-}
-
-
 @app.route('/api/watchlist')
 @requires_auth
 def api_watchlist():
-    """Organized watchlist with *live* CoinGecko prices (cached 10s)."""
+    """Organized watchlist with corrected symbols, liked tokens, and trending tokens."""
     def fetch():
-        all_ids = ','.join(cg_id for items in _WATCHLIST_SPEC.values() for _, _, _, _, cg_id in items)
-        prices: dict = fetch_sync(
-            f'https://api.coingecko.com/api/v3/simple/price?ids={all_ids}'
-            f'&vs_currencies=usd&include_24hr_change=true'
-        ) or {}
+        from lib.trading.strategy_lab import build_market_universe
 
-        def _enrich(rows):
-            out = []
-            for sym, name, typ, prio, cg_id in rows:
-                p = prices.get(cg_id) or {}
-                out.append({
-                    'symbol': sym,
-                    'name': name,
-                    'type': typ,
-                    'priority': prio,
-                    'price': p.get('usd'),
-                    'change_24h_pct': round(p.get('usd_24h_change'), 2) if p.get('usd_24h_change') is not None else None,
-                })
-            return out
+        universe = build_market_universe(fetch_live=True)
+        liked = universe.get('liked_tokens', [])
+        core_symbols = {'BTC', 'ETH', 'SOL', 'HYPE', 'ZEC'}
+        major_crypto = [
+            {
+                'symbol': row.get('symbol'),
+                'name': row.get('name'),
+                'type': 'perp' if row.get('hyperliquid_symbol') else 'spot',
+                'priority': str(row.get('priority', 'medium')).upper(),
+                'price': row.get('price_usd'),
+                'change_24h_pct': row.get('change_24h_pct'),
+                'tradingview_symbol': row.get('tradingview_symbol'),
+                'hyperliquid_symbol': row.get('hyperliquid_symbol'),
+                'robinhood_symbol': row.get('robinhood_symbol'),
+            }
+            for row in liked
+            if row.get('symbol') in core_symbols
+        ]
+        mid_cap = [
+            {
+                'symbol': row.get('symbol'),
+                'name': row.get('name'),
+                'type': 'perp' if row.get('hyperliquid_symbol') else 'spot',
+                'priority': str(row.get('priority', 'medium')).upper(),
+                'price': row.get('price_usd'),
+                'change_24h_pct': row.get('change_24h_pct'),
+                'tradingview_symbol': row.get('tradingview_symbol'),
+                'hyperliquid_symbol': row.get('hyperliquid_symbol'),
+                'robinhood_symbol': row.get('robinhood_symbol'),
+            }
+            for row in liked
+            if row.get('symbol') not in core_symbols
+        ]
 
         return {
-            'major_crypto': _enrich(_WATCHLIST_SPEC['major_crypto']),
-            'mid_cap': _enrich(_WATCHLIST_SPEC['mid_cap']),
+            'major_crypto': major_crypto,
+            'mid_cap': mid_cap,
+            'liked_tokens': liked,
+            'trending_tokens': universe.get('trending_tokens', []),
+            'venue_matrix': universe.get('venue_matrix', []),
+            'corrected_aliases': universe.get('corrected_aliases', {}),
             'pair_analysis': [
                 {'symbol': 'ETHBTC', 'name': 'ETH/BTC Ratio', 'type': 'pair', 'priority': 'HIGH',
                  'strategy': 'Z<-2: BUY ETH, Z>2: SELL ETH'},
@@ -358,10 +368,71 @@ def api_watchlist():
                  'strategy': 'Z<-2: BUY SOL, Z>2: SELL SOL'},
             ],
             'timestamp': datetime.now().isoformat(),
-            'stale': not bool(prices),
+            'stale': bool(universe.get('stale')),
         }
 
-    return jsonify(get_cached('watchlist', fetch))
+    return jsonify(get_cached('watchlist', fetch, ttl=MARKET_UNIVERSE_CACHE_DURATION))
+
+
+@app.route('/api/analytics/market-universe')
+@requires_auth
+def api_analytics_market_universe():
+    """Market universe for analytics: Sapphire-liked, trending, and venue symbols."""
+    def fetch():
+        from lib.trading.strategy_lab import build_market_universe
+
+        return build_market_universe(fetch_live=True)
+
+    return jsonify(get_cached('market_universe', fetch, ttl=MARKET_UNIVERSE_CACHE_DURATION))
+
+
+@app.route('/api/tradingview/capabilities')
+@requires_auth
+def api_tradingview_capabilities():
+    """TradingView capability matrix and alert template."""
+    def fetch():
+        from lib.trading.strategy_lab import build_tradingview_capability_matrix
+
+        return build_tradingview_capability_matrix()
+
+    return jsonify(get_cached('tradingview_capabilities', fetch, ttl=STRATEGY_LAB_CACHE_DURATION))
+
+
+@app.route('/api/trading/strategy-lab')
+@requires_auth
+def api_trading_strategy_lab():
+    """Dry-run strategy lab across paper, TradingView, Robinhood, and Hyperliquid."""
+    def fetch():
+        from lib.trading.strategy_lab import build_strategy_lab_report
+
+        return build_strategy_lab_report(fetch_live=True)
+
+    return jsonify(get_cached('strategy_lab', fetch, ttl=STRATEGY_LAB_CACHE_DURATION))
+
+
+@app.route('/api/trading/order-draft', methods=['POST'])
+@requires_auth
+def api_trading_order_draft():
+    """Build non-submitting venue order drafts for strategy testing."""
+    try:
+        body = request.get_json(silent=True) or {}
+        from lib.trading.strategy_lab import build_order_drafts
+
+        drafts = build_order_drafts(
+            body.get('symbol', 'BTC'),
+            body.get('action', 'buy'),
+            notional_usd=float(body.get('notional_usd', 100.0) or 100.0),
+            strategy=str(body.get('strategy') or 'strategy_lab'),
+        )
+        return jsonify({
+            'execution_enabled': False,
+            'mode': 'draft_only',
+            'drafts': drafts,
+            'timestamp': datetime.now(UTC).isoformat(),
+        })
+    except Exception as e:
+        log.exception("order draft failed")
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 400
 
 @app.route('/api/proposals')
 @requires_auth

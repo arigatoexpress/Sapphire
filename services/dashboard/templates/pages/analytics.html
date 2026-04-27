@@ -26,6 +26,60 @@
     </div>
 </div>
 
+<div class="grid grid-3" style="margin-bottom: var(--space-xl);">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-star" style="margin-right: 8px; color: var(--warning);"></i>Sapphire Tokens</h3>
+            <span class="badge badge-info" id="universe-source">—</span>
+        </div>
+        <div class="card-body">
+            <table class="data-table compact-table">
+                <thead><tr><th>Symbol</th><th>Price</th><th>24h</th></tr></thead>
+                <tbody id="liked-token-tbody"><tr><td colspan="3" class="loading">Loading…</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-fire" style="margin-right: 8px; color: var(--danger);"></i>Trending Tokens</h3>
+            <span class="badge badge-info">CoinGecko</span>
+        </div>
+        <div class="card-body">
+            <table class="data-table compact-table">
+                <thead><tr><th>Symbol</th><th>Name</th><th>24h</th></tr></thead>
+                <tbody id="trending-token-tbody"><tr><td colspan="3" class="loading">Loading…</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-route" style="margin-right: 8px; color: var(--primary);"></i>Venue Symbols</h3>
+            <span class="badge badge-warning">Dry Run</span>
+        </div>
+        <div class="card-body">
+            <table class="data-table compact-table">
+                <thead><tr><th>Symbol</th><th>TradingView</th><th>HL</th><th>RH</th></tr></thead>
+                <tbody id="venue-symbol-tbody"><tr><td colspan="4" class="loading">Loading…</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-plug" style="margin-right: 8px; color: var(--primary);"></i>TradingView Coverage</h3>
+        <span class="badge badge-warning" id="tv-live-gate">Execution Off</span>
+    </div>
+    <div class="card-body">
+        <table class="data-table">
+            <thead><tr><th>Area</th><th>Status</th><th>Depth</th><th>Tests</th></tr></thead>
+            <tbody id="tv-capability-tbody"><tr><td colspan="4" class="loading">Loading…</td></tr></tbody>
+        </table>
+    </div>
+</div>
+
 <!-- Equity curve with BTC benchmark -->
 <div class="card" style="margin-bottom: var(--space-xl);">
     <div class="card-header">
@@ -109,6 +163,11 @@
   .data-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
   .data-table th, .data-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--border, #333); }
   .data-table th { font-weight: 600; color: var(--muted, #888); }
+  .compact-table { font-size: 0.78rem; table-layout: fixed; }
+  .compact-table th, .compact-table td { padding: 5px 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .token-up { color: #22c55e; }
+  .token-down { color: #ef4444; }
+  .venue-muted { color: var(--muted, #888); }
   .heatmap-row { display: grid; grid-template-columns: 60px repeat(12, 1fr); gap: 2px; margin-bottom: 2px; }
   .heatmap-cell { padding: 6px; text-align: center; border-radius: 3px; font-size: 0.75rem; }
   .heatmap-label { font-weight: 600; padding: 6px; }
@@ -122,11 +181,95 @@
   Chart.defaults.borderColor = 'rgba(255,255,255,0.08)';
 
   function fmt(n, d) { d = (d == null) ? 2 : d; return (n == null || !isFinite(n)) ? '—' : Number(n).toFixed(d); }
+  function fmtUsd(n) {
+    if (n == null || !isFinite(n)) return '—';
+    const v = Number(n);
+    if (Math.abs(v) >= 1000) return '$' + v.toLocaleString(undefined, { maximumFractionDigits: 0 });
+    if (Math.abs(v) >= 1) return '$' + v.toFixed(2);
+    return '$' + v.toPrecision(3);
+  }
+  function fmtPct(n) { return (n == null || !isFinite(n)) ? '—' : Number(n).toFixed(2) + '%'; }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function pctClass(n) { return Number(n || 0) >= 0 ? 'token-up' : 'token-down'; }
   function pctColor(v) {
     if (v == null || !isFinite(v) || v === 0) return '#222';
     const clamped = Math.max(-10, Math.min(10, v));
     if (clamped >= 0) return `rgba(34, 197, 94, ${0.15 + (clamped / 10) * 0.65})`;
     return `rgba(239, 68, 68, ${0.15 + (Math.abs(clamped) / 10) * 0.65})`;
+  }
+
+  try {
+    const [universe, tvCaps] = await Promise.all([
+      fetch('/api/analytics/market-universe').then(r => r.json()),
+      fetch('/api/tradingview/capabilities').then(r => r.json()),
+    ]);
+    document.getElementById('universe-source').textContent = universe.stale ? 'Fallback' : 'Live';
+
+    const likedBody = document.getElementById('liked-token-tbody');
+    likedBody.innerHTML = '';
+    for (const row of (universe.liked_tokens || []).slice(0, 8)) {
+      likedBody.insertAdjacentHTML('beforeend', `
+        <tr>
+          <td><strong>${esc(row.symbol)}</strong></td>
+          <td>${fmtUsd(row.price_usd)}</td>
+          <td class="${pctClass(row.change_24h_pct)}">${fmtPct(row.change_24h_pct)}</td>
+        </tr>`);
+    }
+    if (!(universe.liked_tokens || []).length) {
+      likedBody.innerHTML = '<tr><td colspan="3" class="venue-muted">No token rows</td></tr>';
+    }
+
+    const trendingBody = document.getElementById('trending-token-tbody');
+    trendingBody.innerHTML = '';
+    for (const row of (universe.trending_tokens || []).slice(0, 8)) {
+      trendingBody.insertAdjacentHTML('beforeend', `
+        <tr>
+          <td><strong>${esc(row.symbol)}</strong></td>
+          <td title="${esc(row.name)}">${esc(row.name)}</td>
+          <td class="${pctClass(row.change_24h_pct)}">${fmtPct(row.change_24h_pct)}</td>
+        </tr>`);
+    }
+    if (!(universe.trending_tokens || []).length) {
+      trendingBody.innerHTML = '<tr><td colspan="3" class="venue-muted">No trending rows</td></tr>';
+    }
+
+    const venueBody = document.getElementById('venue-symbol-tbody');
+    venueBody.innerHTML = '';
+    for (const row of (universe.venue_matrix || []).slice(0, 8)) {
+      venueBody.insertAdjacentHTML('beforeend', `
+        <tr>
+          <td><strong>${esc(row.symbol)}</strong></td>
+          <td title="${esc(row.tradingview)}">${esc(row.tradingview)}</td>
+          <td>${esc(row.hyperliquid || '—')}</td>
+          <td>${esc(row.robinhood_crypto || '—')}</td>
+        </tr>`);
+    }
+    if (!(universe.venue_matrix || []).length) {
+      venueBody.innerHTML = '<tr><td colspan="4" class="venue-muted">No venue rows</td></tr>';
+    }
+
+    const tvBody = document.getElementById('tv-capability-tbody');
+    tvBody.innerHTML = '';
+    for (const row of (tvCaps.groups || [])) {
+      tvBody.insertAdjacentHTML('beforeend', `
+        <tr>
+          <td><strong>${esc(row.area)}</strong></td>
+          <td>${esc(row.status)}</td>
+          <td>${esc(row.depth)}</td>
+          <td>${esc((row.test_modes || []).join(', '))}</td>
+        </tr>`);
+    }
+    if (!(tvCaps.groups || []).length) {
+      tvBody.innerHTML = '<tr><td colspan="4" class="venue-muted">No capability rows</td></tr>';
+    }
+  } catch (e) {
+    document.getElementById('universe-source').textContent = 'Offline';
+    document.getElementById('liked-token-tbody').innerHTML = '<tr><td colspan="3" class="venue-muted">Unavailable</td></tr>';
+    document.getElementById('trending-token-tbody').innerHTML = '<tr><td colspan="3" class="venue-muted">Unavailable</td></tr>';
+    document.getElementById('venue-symbol-tbody').innerHTML = '<tr><td colspan="4" class="venue-muted">Unavailable</td></tr>';
+    document.getElementById('tv-capability-tbody').innerHTML = '<tr><td colspan="4" class="venue-muted">Unavailable</td></tr>';
   }
 
   let resp;
