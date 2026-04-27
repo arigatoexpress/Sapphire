@@ -62,8 +62,11 @@ def test_build_market_universe_without_live_fetch_is_deterministic(monkeypatch):
     assert report["stale"] is False
     assert report["venue_matrix"][0]["tradingview"] == "BINANCE:ETHUSDT"
     assert "preferred" in report["liked_tokens"][0]["tags"]
-    assert {row["symbol"] for row in report["liked_tokens"]} >= {"UNI", "ENS", "ARB", "OP"}
+    assert {row["symbol"] for row in report["liked_tokens"]} >= {"ONDO", "UNI", "ENS", "ARB", "OP"}
     assert report["corrected_aliases"]["MATIC"] == "POL"
+    ondo = {row["symbol"]: row for row in report["liked_tokens"]}["ONDO"]
+    assert ondo["tradingview_symbol"] == "BINANCE:ONDOUSDT"
+    assert "tokenized_finance" in ondo["tags"]
 
 
 def test_order_drafts_never_enable_execution():

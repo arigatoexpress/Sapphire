@@ -122,7 +122,7 @@ def test_default_sovereign_thesis_report_covers_ari_universe() -> None:
     assert report["worldview"]["stance"] == "cypherpunk_austrian"
     assert report["safety"]["telegram_sends_enabled"] is False
     assert report["totals"]["assets"] >= 30
-    assert report["totals"]["lenses"] >= 14
+    assert report["totals"]["lenses"] >= 15
     assert report["assets"][0]["symbol"] == "ETH"
     assert rows["ETH"]["fit"] == "core"
     assert rows["BTC"]["fit"] == "aligned"
@@ -132,6 +132,7 @@ def test_default_sovereign_thesis_report_covers_ari_universe() -> None:
     assert "post_quantum_readiness" in rows["ETH"]["aligned_lenses"]
     assert "eth_economic_zone" in rows["ETH"]["aligned_lenses"]
     assert "protocol_advancement" in rows["ETH"]["aligned_lenses"]
+    assert "agentic_payments" in rows["ETH"]["aligned_lenses"]
     assert "ethereum:post_quantum" in {row["source_id"] for row in rows["ETH"]["evidence_ledger"]}
     assert "censorship_resistance" in rows["ZEC"]["aligned_lenses"]
     assert rows["XMR"]["asset_class"] == "crypto_watch"
@@ -139,6 +140,9 @@ def test_default_sovereign_thesis_report_covers_ari_universe() -> None:
     assert rows["BWXT"]["asset_class"] == "equity"
     assert rows["SHLD"]["name"] == "Global X Defense Tech ETF"
     assert rows["PLTR"]["venue_symbols"]["tradingview"] == "NASDAQ:PLTR"
+    assert rows["COIN"]["asset_class"] == "equity"
+    assert "agentic_payments" in rows["COIN"]["aligned_lenses"]
+    assert rows["JPM"]["asset_class"] == "equity_watch"
     assert report["evidence_summary"]["required"] >= 250
     assert 0 < report["totals"]["evidence_coverage_pct"] < report["totals"]["evidence_wired_pct"]
     assert rows["BTC"]["evidence_summary"]["needs_wiring"] >= 1
@@ -162,6 +166,9 @@ def test_default_sovereign_thesis_tracks_invalidations_and_sources() -> None:
     assert "hyperliquid:asset_contexts" in requirements
     assert "ethereum:l2_economy" in requirements
     assert "crypto:post_quantum_roadmap" in requirements
+    assert "coinbase:x402_docs" in requirements
+    assert "chainlink:smartdata" in requirements
+    assert "jpmorgan:kinexys" in requirements
     assert requirements["policy:jurisdiction_scan"]["configured"] is False
     assert requirements["policy:jurisdiction_scan"]["needs_wiring"] >= 1
     assert any(row["status"] == "needs_wiring" for row in report["evidence_ledger"])

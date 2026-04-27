@@ -25,7 +25,10 @@ def test_continuous_intelligence_plan_has_real_work_lanes() -> None:
     assert any(task["target_runtime"] == "windows-gpu" for task in tasks)
     assert any(task["lane"] == "strategy_backtest" and task.get("command") for task in tasks)
     assert any(task["id"] == "eth-privacy-quantum-research-refresh" for task in tasks)
+    assert any(task["id"] == "institutional-tokenization-agentic-payments-refresh" for task in tasks)
+    assert any(task["id"] == "x402-agent-market-dry-run-plan" for task in tasks)
     assert plan["inputs"]["market_universe"]["liked_symbols"][:3] == ["ETH", "BTC", "ZEC"]
+    assert "https://docs.cdp.coinbase.com/x402/docs/welcome" in plan["source_docs"]
 
 
 def test_continuous_intelligence_task_contracts_are_safe_and_unique() -> None:
@@ -39,6 +42,20 @@ def test_continuous_intelligence_task_contracts_are_safe_and_unique() -> None:
     assert all("order submission" not in task["description"].lower() for task in plan["tasks"])
     assert plan["next_dispatch"]
     assert all(task["priority"] == "P1" for task in plan["next_dispatch"])
+
+
+def test_tokenization_and_x402_tasks_are_explicitly_non_executing() -> None:
+    plan = ci.build_continuous_intelligence_plan(fetch_live=False)
+    tasks = {task["id"]: task for task in plan["tasks"]}
+    tokenization = tasks["institutional-tokenization-agentic-payments-refresh"]
+    x402 = tasks["x402-agent-market-dry-run-plan"]
+
+    assert tokenization["target_runtime"] == "windows-gpu"
+    assert tokenization["safe_mode"] == "read_only"
+    assert {"ETH", "LINK", "ONDO", "COIN"} <= set(tokenization["symbols"])
+    assert "https://chain.link/smartdata" in tokenization["source_docs"]
+    assert x402["safe_mode"] == "dry_run"
+    assert any("X402_ENABLED stays disabled" in gate for gate in x402["acceptance"])
 
 
 def test_cli_emits_json(capsys) -> None:

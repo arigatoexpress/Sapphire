@@ -11,6 +11,8 @@
       "privacy_as_default_financial_freedom",
       "cryptographic_agility_over_ossification",
       "economic_zones_over_single_asset_maximalism",
+      "institutional_tokenization_with_exit_rights",
+      "agentic_commerce_over_account_walled_gardens",
       "protocol_advancement_over_static_narrative",
       "productive_capital_over_fiat_beta",
       "energy_abundance_as_real_growth",
@@ -142,14 +144,31 @@
     {
       "id": "tokenized_finance",
       "label": "Tokenized Finance",
-      "weight": 0.9,
-      "austrian_principle": "markets get freer when settlement and collateral become programmable",
-      "positive_tags": ["defi", "oracle", "rwa", "perp_venue", "settlement_layer"],
-      "negative_tags": ["regulatory_chokepoint", "oracle_capture"],
+      "weight": 1.08,
+      "austrian_principle": "markets get freer when settlement, collateral, and asset servicing become programmable without destroying exit rights",
+      "positive_tags": ["defi", "oracle", "rwa", "institutional_tokenization", "tokenized_collateral", "tokenized_mmfs", "smart_nav", "rwa_oracle", "perp_venue", "settlement_layer"],
+      "negative_tags": ["regulatory_chokepoint", "oracle_capture", "permissioned_redemption_only"],
       "source_requirements": [
         "defillama:tvl",
         "coingecko:market_data",
-        "hyperliquid:asset_contexts"
+        "hyperliquid:asset_contexts",
+        "chainlink:smartdata",
+        "dtcc:smart_nav",
+        "franklin:benji",
+        "blackrock:buidl"
+      ]
+    },
+    {
+      "id": "agentic_payments",
+      "label": "Agentic Payments",
+      "weight": 0.92,
+      "austrian_principle": "agents and APIs become economically sovereign when payment is open, programmable, low-friction, and not trapped behind account silos",
+      "positive_tags": ["x402", "agentic_payments", "agent_wallets", "usdc_micropayments", "base", "pay_per_request", "http_402", "machine_payments"],
+      "negative_tags": ["closed_payment_account", "platform_tollbooth", "custodial_only"],
+      "source_requirements": [
+        "coinbase:x402_docs",
+        "base:x402_docs",
+        "base:agents"
       ]
     },
     {
@@ -254,10 +273,10 @@
       "name": "Ethereum",
       "asset_class": "crypto",
       "conviction": 0.95,
-      "thesis_tags": ["settlement_layer", "defi", "self_custody", "tokenized_finance", "network_utility", "privacy_roadmap", "post_quantum_roadmap", "crypto_agility", "eth_economic_zone", "l2_economy", "rollup_centric", "protocol_advancement", "account_abstraction", "zero_knowledge", "smart_wallets", "pectra", "fusaka"],
-      "lens_scores": {"tokenized_finance": 1, "self_custody": 0.95, "productive_capital": 0.8, "counterparty_minimization": 0.7, "jurisdictional_resilience": 0.8, "hard_money": 0.55, "privacy_engineering": 0.85, "post_quantum_readiness": 0.95, "eth_economic_zone": 1, "protocol_advancement": 1, "censorship_resistance": 0.65},
+      "thesis_tags": ["settlement_layer", "defi", "self_custody", "tokenized_finance", "institutional_tokenization", "agentic_payments", "x402", "base", "usdc_micropayments", "network_utility", "privacy_roadmap", "post_quantum_roadmap", "crypto_agility", "eth_economic_zone", "l2_economy", "rollup_centric", "protocol_advancement", "account_abstraction", "zero_knowledge", "smart_wallets", "pectra", "fusaka"],
+      "lens_scores": {"tokenized_finance": 1, "agentic_payments": 0.85, "self_custody": 0.95, "productive_capital": 0.8, "counterparty_minimization": 0.7, "jurisdictional_resilience": 0.8, "hard_money": 0.55, "privacy_engineering": 0.85, "post_quantum_readiness": 0.95, "eth_economic_zone": 1, "protocol_advancement": 1, "censorship_resistance": 0.65},
       "venue_symbols": {"tradingview": "BINANCE:ETHUSDT", "hyperliquid": "ETH", "robinhood": "ETH-USD", "coingecko": "ethereum"},
-      "evidence_sources": ["defillama:tvl", "coingecko:market_data", "hyperliquid:asset_contexts", "privacy:protocol_design", "crypto:post_quantum_roadmap", "protocol:upgrade_roadmap", "chain:economic_activity", "ethereum:privacy_cluster", "ethereum:post_quantum", "ethereum:l2_economy", "ethereum:protocol_roadmap", "ethereum:account_abstraction", "ethereum:eip_tracker", "ethereum:zero_knowledge"],
+      "evidence_sources": ["defillama:tvl", "coingecko:market_data", "hyperliquid:asset_contexts", "chainlink:smartdata", "dtcc:smart_nav", "blackrock:buidl", "franklin:benji", "coinbase:x402_docs", "base:x402_docs", "base:agents", "privacy:protocol_design", "crypto:post_quantum_roadmap", "protocol:upgrade_roadmap", "chain:economic_activity", "ethereum:privacy_cluster", "ethereum:post_quantum", "ethereum:l2_economy", "ethereum:protocol_roadmap", "ethereum:account_abstraction", "ethereum:eip_tracker", "ethereum:zero_knowledge"],
       "invalidation_triggers": [
         {"id": "eth_l2_value_leakage", "condition": "settlement revenue fails to capture L2 activity", "severity": "medium", "status": "watch"},
         {"id": "eth_privacy_delivery_gap", "condition": "privacy cluster progress fails to produce usable private payments, identity, or wallet flows", "severity": "high", "status": "watch"},
@@ -360,10 +379,10 @@
       "name": "Chainlink",
       "asset_class": "crypto",
       "conviction": 0.7,
-      "thesis_tags": ["oracle", "tokenized_finance", "rwa", "network_utility"],
-      "lens_scores": {"tokenized_finance": 0.95, "productive_capital": 0.65, "jurisdictional_resilience": 0.45, "counterparty_minimization": 0.45},
+      "thesis_tags": ["oracle", "tokenized_finance", "institutional_tokenization", "rwa", "rwa_oracle", "smart_nav", "network_utility"],
+      "lens_scores": {"tokenized_finance": 1, "productive_capital": 0.65, "jurisdictional_resilience": 0.45, "counterparty_minimization": 0.45},
       "venue_symbols": {"tradingview": "BINANCE:LINKUSDT", "hyperliquid": "LINK", "robinhood": "LINK-USD", "coingecko": "chainlink"},
-      "evidence_sources": ["coingecko:market_data", "defillama:tvl"],
+      "evidence_sources": ["coingecko:market_data", "defillama:tvl", "chainlink:smartdata", "dtcc:smart_nav"],
       "invalidation_triggers": [
         {"id": "link_oracle_capture", "condition": "oracle market becomes commoditized or captured by single counterparties", "severity": "medium", "status": "watch"}
       ]
@@ -373,10 +392,10 @@
       "name": "Ondo",
       "asset_class": "crypto",
       "conviction": 0.62,
-      "thesis_tags": ["rwa", "tokenized_finance", "settlement_layer"],
-      "lens_scores": {"tokenized_finance": 0.9, "productive_capital": 0.45, "jurisdictional_resilience": 0.35, "counterparty_minimization": -0.2},
+      "thesis_tags": ["rwa", "tokenized_finance", "institutional_tokenization", "tokenized_collateral", "tokenized_mmfs", "settlement_layer"],
+      "lens_scores": {"tokenized_finance": 0.95, "productive_capital": 0.45, "jurisdictional_resilience": 0.35, "counterparty_minimization": -0.2},
       "venue_symbols": {"tradingview": "BINANCE:ONDOUSDT", "hyperliquid": "ONDO", "coingecko": "ondo-finance"},
-      "evidence_sources": ["coingecko:market_data", "defillama:tvl", "policy:regulatory_pressure"],
+      "evidence_sources": ["coingecko:market_data", "defillama:tvl", "ondo:global_markets", "chainlink:smartdata", "policy:regulatory_pressure"],
       "invalidation_triggers": [
         {"id": "ondo_permissioned_claim_risk", "condition": "RWA demand remains custodial and permissioned without crypto-native escape value", "severity": "medium", "status": "watch"}
       ]
@@ -392,6 +411,33 @@
       "evidence_sources": ["coingecko:market_data", "source_pack:kimi"],
       "invalidation_triggers": [
         {"id": "tao_ai_subsidy_loop", "condition": "emissions subsidize activity without durable model-market demand", "severity": "high", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "COIN",
+      "name": "Coinbase",
+      "asset_class": "equity",
+      "conviction": 0.68,
+      "thesis_tags": ["agentic_payments", "x402", "base", "usdc_micropayments", "institutional_tokenization", "software_platform", "network_utility"],
+      "lens_scores": {"agentic_payments": 0.95, "tokenized_finance": 0.65, "eth_economic_zone": 0.45, "ai_infra": 0.55, "productive_capital": 0.7, "jurisdictional_resilience": 0.45, "counterparty_minimization": 0.2, "self_custody": -0.25},
+      "venue_symbols": {"tradingview": "NASDAQ:COIN", "yfinance": "COIN"},
+      "evidence_sources": ["sec:companyfacts", "market:revenue_growth", "coinbase:x402_docs", "base:x402_docs", "base:agents"],
+      "invalidation_triggers": [
+        {"id": "coin_agentic_payment_platform_capture", "condition": "x402/Base agent payments fail to escape platform-dependency or produce durable fee-bearing usage", "severity": "medium", "status": "watch"},
+        {"id": "coin_regulatory_or_custody_drag", "condition": "custodial/regulatory risk overwhelms open-protocol upside", "severity": "medium", "status": "watch"}
+      ]
+    },
+    {
+      "symbol": "JPM",
+      "name": "JPMorgan Chase",
+      "asset_class": "equity_watch",
+      "conviction": 0.56,
+      "thesis_tags": ["institutional_tokenization", "tokenized_collateral", "deposit_token", "tokenized_mmfs", "cash_flow"],
+      "lens_scores": {"tokenized_finance": 0.75, "productive_capital": 0.85, "counterparty_minimization": -0.45, "self_custody": -0.55, "jurisdictional_resilience": 0.35},
+      "venue_symbols": {"tradingview": "NYSE:JPM", "yfinance": "JPM"},
+      "evidence_sources": ["sec:companyfacts", "market:revenue_growth", "jpmorgan:kinexys"],
+      "invalidation_triggers": [
+        {"id": "jpm_permissioned_tokenization_chokepoint", "condition": "institutional tokenization remains bank-permissioned rails without public-chain composability or user exit", "severity": "medium", "status": "watch"}
       ]
     },
     {
@@ -644,6 +690,18 @@
     "https://ethereum.org/roadmap/future-proofing/quantum-resistance/",
     "https://blog.ethereum.org/2025/10/08/privacy-commitment",
     "https://blog.ethereum.org/2026/02/17/platform",
-    "https://blog.ethereum.org/en/2025/04/23/pectra-mainnet"
+    "https://blog.ethereum.org/en/2025/04/23/pectra-mainnet",
+    "https://docs.cdp.coinbase.com/x402/docs/welcome",
+    "https://docs.base.org/ai-agents/payments/pay-for-services-with-x402",
+    "https://docs.base.org/ai-agents/payments/accepting-payments",
+    "https://www.base.org/agents",
+    "https://chain.link/smartdata",
+    "https://www.dtcc.com/-/media/Files/Downloads/DTCC-Connection/Smart_NAV-Report.pdf",
+    "https://www.jpmorgan.com/kinexys/digital-assets/tokenized-collateral-network",
+    "https://am.jpmorgan.com/us/en/asset-management/institutional/about-us/media/press-releases/jp-morgan-asset-management-launches-its-first-tokenized-money-market-fund/",
+    "https://www.franklintempleton.com/about-us/our-teams/specialist-investment-managers/digital-assets/digital-assets-technology",
+    "https://securitize.io/learn/press/blackrock-launches-first-tokenized-fund-buidl-on-the-ethereum-network",
+    "https://docs.ondo.finance/",
+    "https://docs.ondo.finance/ondo-global-markets"
   ]
 }

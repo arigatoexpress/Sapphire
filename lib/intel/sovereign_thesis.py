@@ -63,6 +63,42 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "configured": True,
         "cadence": "daily",
     },
+    "base:agents": {
+        "provider": "base",
+        "connector_id": "base_agentic_economy",
+        "configured": True,
+        "cadence": "manual/research",
+    },
+    "base:x402_docs": {
+        "provider": "base",
+        "connector_id": "base_x402_docs",
+        "configured": True,
+        "cadence": "manual/research",
+    },
+    "blackrock:buidl": {
+        "provider": "blackrock/securitize",
+        "connector_id": "buidl_research",
+        "configured": True,
+        "cadence": "manual/research",
+    },
+    "chainlink:smartdata": {
+        "provider": "chainlink",
+        "connector_id": "chainlink_smartdata",
+        "configured": True,
+        "cadence": "manual/research",
+    },
+    "coinbase:x402_docs": {
+        "provider": "coinbase",
+        "connector_id": "coinbase_x402_docs",
+        "configured": True,
+        "cadence": "manual/research",
+    },
+    "dtcc:smart_nav": {
+        "provider": "dtcc",
+        "connector_id": "dtcc_smart_nav",
+        "configured": True,
+        "cadence": "manual/research",
+    },
     "eia:electricity": {
         "provider": "eia",
         "connector_id": "eia_energy",
@@ -147,6 +183,12 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "configured": True,
         "cadence": "weekly",
     },
+    "franklin:benji": {
+        "provider": "franklin_templeton",
+        "connector_id": "franklin_benji",
+        "configured": True,
+        "cadence": "manual/research",
+    },
     "gov:contract_awards": {
         "provider": "gov",
         "connector_id": "contract_awards",
@@ -164,6 +206,12 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
         "connector_id": "hyperliquid_info",
         "configured": True,
         "cadence": "on_demand",
+    },
+    "jpmorgan:kinexys": {
+        "provider": "jpmorgan",
+        "connector_id": "kinexys_research",
+        "configured": True,
+        "cadence": "manual/research",
     },
     "macro:currency_stress": {
         "provider": "macro",
@@ -198,6 +246,12 @@ SOURCE_REGISTRY: dict[str, dict[str, Any]] = {
     "policy:regulatory_pressure": {
         "provider": "policy",
         "connector_id": "policy_research",
+        "configured": True,
+        "cadence": "manual/research",
+    },
+    "ondo:global_markets": {
+        "provider": "ondo",
+        "connector_id": "ondo_global_markets",
         "configured": True,
         "cadence": "manual/research",
     },
@@ -417,7 +471,7 @@ def _cell_state(value: float) -> str:
 def _fit_label(relative_score: float) -> str:
     if relative_score >= 72:
         return "core"
-    if relative_score >= 52:
+    if relative_score >= 45:
         return "aligned"
     if relative_score >= 30:
         return "watch"
