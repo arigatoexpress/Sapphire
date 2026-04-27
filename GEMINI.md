@@ -18,6 +18,8 @@ operator and Sapphire remains the command authority.
 ## Useful Entry Points
 
 ```bash
+make google-readiness-offline
+make google-readiness
 python3 scripts/ops/google_production_test_readiness.py --no-external
 python3 scripts/ops/google_benefits_inventory.py --no-external
 python3 scripts/ops/gcp_ai_inventory.py --no-external

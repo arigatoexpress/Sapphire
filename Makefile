@@ -3,12 +3,19 @@
 PY ?= /usr/local/bin/python3
 RUFF ?= ruff
 PYTEST ?= $(PY) -m pytest
+GOOGLE_PROJECT ?= tho-ai-agent
+GOOGLE_REGION ?= us-central1
+GOOGLE_MEMBERSHIPS ?= google_developer_premium google_ai_plus
+GOOGLE_MEMBERSHIP_ARGS = $(foreach membership,$(GOOGLE_MEMBERSHIPS),--membership $(membership))
+GOOGLE_COST_HOURS ?= 24
+GOOGLE_COST_LOG_LIMIT ?= 25
+GOOGLE_READINESS_OUT ?= data/google/production-readiness/latest.md
 
 .DEFAULT_GOAL := help
 
 .PHONY: help
 help:  ## Show this help
-	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage: make \033[36m<target>\033[0m\n\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage: make \033[36m<target>\033[0m\n\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-28s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
 # ---------- setup ----------
 
@@ -68,11 +75,42 @@ inference-proxy:  ## Start inference-proxy :11435 (with x402)
 # ---------- data / ops ----------
 
 .PHONY: content-generate content-publish heartbeat-status alpha-agent-status
+.PHONY: google-readiness google-readiness-offline google-readiness-cost google-readiness-artifact
 content-generate:  ## Generate weekly report draft
 	$(PY) -m lib.content generate
 
 content-publish:  ## Promote draft → ready/
 	$(PY) -m lib.content publish
+
+google-readiness:  ## Print live read-only Google/GCP production-test readiness
+	$(PY) scripts/ops/google_production_test_readiness.py \
+		--project $(GOOGLE_PROJECT) \
+		--region $(GOOGLE_REGION) \
+		$(GOOGLE_MEMBERSHIP_ARGS) \
+		--format markdown
+
+google-readiness-offline:  ## Print no-external Google/GCP production-test readiness
+	$(PY) scripts/ops/google_production_test_readiness.py --no-external --format markdown
+
+google-readiness-cost:  ## Print live read-only readiness with cost posture
+	$(PY) scripts/ops/google_production_test_readiness.py \
+		--project $(GOOGLE_PROJECT) \
+		--region $(GOOGLE_REGION) \
+		$(GOOGLE_MEMBERSHIP_ARGS) \
+		--include-cost \
+		--cost-hours $(GOOGLE_COST_HOURS) \
+		--cost-log-limit $(GOOGLE_COST_LOG_LIMIT) \
+		--format markdown
+
+google-readiness-artifact:  ## Write ignored readiness artifact with cost posture
+	$(PY) scripts/ops/google_production_test_readiness.py \
+		--project $(GOOGLE_PROJECT) \
+		--region $(GOOGLE_REGION) \
+		$(GOOGLE_MEMBERSHIP_ARGS) \
+		--include-cost \
+		--cost-hours $(GOOGLE_COST_HOURS) \
+		--cost-log-limit $(GOOGLE_COST_LOG_LIMIT) \
+		--output $(GOOGLE_READINESS_OUT)
 
 heartbeat-status:  ## Print heartbeat daemon last known state
 	cat data/heartbeat_state.json 2>/dev/null | $(PY) -m json.tool || echo "no heartbeat state yet"
