@@ -24,11 +24,3 @@ updates:
         patterns: ["pytest*"]
       ruff:
         patterns: ["ruff*"]
-    ignore:
-      # firebase-admin 7.x requires google-cloud-storage >= 3.1.1, which
-      # conflicts with clients/blanga/requirements.txt (pinned <3.0). The
-      # storage 3.x uplift needs a cross-cutting review — see closed PR #81.
-      # Unblock by widening the blanga cap and auditing gcs_persistence.py,
-      # then remove this ignore entry.
-      - dependency-name: "firebase-admin"
-        update-types: ["version-update:semver-major"]
