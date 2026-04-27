@@ -80,6 +80,13 @@ def _iso(ts: Any) -> str | None:
     return s
 
 
+def _file_mtime_iso(path: Path) -> str | None:
+    try:
+        return _iso(datetime.fromtimestamp(path.stat().st_mtime, UTC))
+    except OSError:
+        return None
+
+
 # ---------------------------------------------------------------------------
 # PaperTrade — signals.jsonl → Foundry PaperTrade objects
 # ---------------------------------------------------------------------------
@@ -254,8 +261,10 @@ def transform_service_health(
                     or row.get("name")
                     or fpath.stem
                 )
-                ts = row.get("timestamp")
-                svc_id = _deterministic_id(svc, ts or "")
+                last_check = _iso(row.get("timestamp") or row.get("ts")) or _file_mtime_iso(
+                    fpath
+                )
+                svc_id = _deterministic_id(svc, last_check or "")
                 objects.append({
                     "id": svc_id,
                     "service": svc,
@@ -265,7 +274,7 @@ def transform_service_health(
                         or row.get("latency"),
                     "uptime_pct": row.get("uptime_pct"),
                     "error_count": row.get("error_count", 0),
-                    "last_check": _iso(ts),
+                    "last_check": last_check,
                     "host": row.get("host") or row.get("endpoint"),
                     "tier": row.get("tier"),
                     "notes": row.get("notes") or row.get("error") or "",
@@ -279,7 +288,9 @@ def transform_service_health(
             for row in _load_jsonl(heartbeat_path, max_lines=500):
                 if not isinstance(row, dict):
                     continue
-                ts = row.get("timestamp")
+                last_check = _iso(row.get("timestamp") or row.get("ts")) or _file_mtime_iso(
+                    heartbeat_path
+                )
                 services_field = row.get("services")
                 if isinstance(services_field, dict):
                     for svc_name, svc_val in services_field.items():
@@ -300,7 +311,7 @@ def transform_service_health(
                             notes = "heartbeat"
                         else:
                             continue
-                        svc_id = _deterministic_id(svc_name, ts or "", "heartbeat")
+                        svc_id = _deterministic_id(svc_name, last_check or "", "heartbeat")
                         objects.append({
                             "id": svc_id,
                             "service": svc_name,
@@ -308,7 +319,7 @@ def transform_service_health(
                             "latency_ms": latency,
                             "uptime_pct": None,
                             "error_count": 0,
-                            "last_check": _iso(ts),
+                            "last_check": last_check,
                             "host": None,
                             "tier": None,
                             "notes": notes,
@@ -318,6 +329,7 @@ def transform_service_health(
     # Fallback: build from known services in infrastructure topology
     topology_path = root / "data" / "device_topology.json"
     topo = _load_json(topology_path)
+    topology_last_check = _file_mtime_iso(topology_path)
     devices = topo.get("devices") or {}
     if isinstance(devices, dict):
         device_items = devices.items()
@@ -347,7 +359,7 @@ def transform_service_health(
                     "latency_ms": None,
                     "uptime_pct": None,
                     "error_count": 0,
-                    "last_check": None,
+                    "last_check": topology_last_check,
                     "host": device.get("tailscaleIp") or device.get("ip") or device_name,
                     "tier": None,
                     "notes": f"From topology ({device_name})",

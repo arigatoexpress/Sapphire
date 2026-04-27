@@ -167,3 +167,30 @@ def test_readiness_embeds_schema_audit(tmp_path):
     assert readiness["schema_audit"]["status"] == "ready"
     assert readiness["schema_audit"]["totals"]["objects"] == 5
     assert readiness["docs"]["ontology_schema"] == "docs/foundry-ontology-schema.md"
+
+
+def test_schema_audit_accepts_topology_service_health_last_check_fallback(tmp_path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(parents=True)
+    (data_dir / "device_topology.json").write_text(
+        json.dumps(
+            {
+                "devices": [
+                    {
+                        "name": "mac",
+                        "ip": "100.67.171.79",
+                        "services": ["dashboard", "proxy"],
+                    }
+                ]
+            }
+        )
+    )
+
+    audit = build_foundry_schema_audit(tmp_path)
+
+    service_health = next(
+        item for item in audit["object_types"] if item["object_type"] == "ServiceHealth"
+    )
+    assert service_health["status"] == "ready"
+    assert service_health["missing_required_fields"] == {}
+    assert audit["totals"]["missing_required_fields"] == 0

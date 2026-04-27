@@ -235,6 +235,7 @@ class TestTransformServiceHealth:
         assert len(objs) >= 1
         assert objs[0]["service"] == "dashboard"
         assert objs[0]["status"] == "healthy"
+        assert objs[0]["last_check"]
 
     def test_from_topology_fallback(self, tmp_path):
         (tmp_path / "data").mkdir(parents=True)
@@ -247,6 +248,7 @@ class TestTransformServiceHealth:
         objs = transform_service_health(tmp_path)
         assert len(objs) == 2
         assert objs[0]["status"] == "unknown"
+        assert all(obj["last_check"] for obj in objs)
 
     def test_empty(self, tmp_path):
         assert transform_service_health(tmp_path) == []
@@ -290,6 +292,7 @@ class TestTransformServiceHealth:
         dash = next(o for o in objs if o["service"] == "dashboard")
         assert dash["status"] == "healthy"
         assert dash["latency_ms"] == 12
+        assert dash["last_check"] == "2026-04-19T10:00:00Z"
 
     def test_non_dict_row_does_not_crash(self, tmp_path):
         """A stray string line must not break the whole transform."""
