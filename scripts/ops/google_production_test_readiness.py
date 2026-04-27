@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parent.parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
@@ -297,7 +298,11 @@ def _launchagent_retargeting_gate(
             Path("services/dashboard/launchagent/com.sapphire.dashboard.plist"),
             Path("services/inference-proxy/launchagent/com.sapphire.inference-proxy.plist"),
         ]
-    missing_tracked = [str(path) for path in tracked_plists if not path.exists()]
+    missing_tracked = []
+    for path in tracked_plists:
+        check_path = path if path.is_absolute() else REPO_ROOT / path
+        if not check_path.exists():
+            missing_tracked.append(str(path))
 
     if not missing_secret_refs and not live_secret_keys and not missing_tracked:
         return {

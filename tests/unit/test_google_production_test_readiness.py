@@ -203,6 +203,36 @@ def test_launchagent_retargeting_gate_passes_when_runtime_is_sanitized(tmp_path:
     assert gate["status"] == "pass"
 
 
+def test_launchagent_retargeting_gate_resolves_default_plists_from_repo_root(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    dashboard_plist = repo_root / "services/dashboard/launchagent/com.sapphire.dashboard.plist"
+    inference_plist = repo_root / "services/inference-proxy/launchagent/com.sapphire.inference-proxy.plist"
+    _write_plist(dashboard_plist, {})
+    _write_plist(inference_plist, {})
+
+    secrets_env = tmp_path / ".sapphire" / "secrets.env"
+    secrets_env.parent.mkdir()
+    secrets_env.write_text(
+        "AUTH_PASSWORD=present\nRELAY_READER_TOKEN=present\nKIMI_RELAY_CHAT_ID=present\n"
+    )
+    live_dir = tmp_path / "LaunchAgents"
+    _write_plist(live_dir / "com.sapphire.dashboard.plist", {"PATH": "/bin", "PORT": "8080"})
+    _write_plist(live_dir / "com.sapphire.inference-proxy.plist", {"PI_RARI1_ENABLED": "1"})
+
+    monkeypatch.setattr(readiness, "REPO_ROOT", repo_root)
+    monkeypatch.chdir(tmp_path)
+
+    gate = readiness._launchagent_retargeting_gate(
+        secrets_env=secrets_env,
+        live_dir=live_dir,
+    )
+
+    assert gate["status"] == "pass"
+
+
 def test_launchagent_retargeting_gate_flags_live_secret_env(tmp_path: Path) -> None:
     secrets_env = tmp_path / ".sapphire" / "secrets.env"
     secrets_env.parent.mkdir()
