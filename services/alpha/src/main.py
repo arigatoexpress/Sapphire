@@ -2887,29 +2887,34 @@ class AlphaEngine:
                     )
 
             elif intent_type == "media_publish":
-                topic = params.get("topic", "market update")
-                targets = params.get("channels", ["twitter", "substack"])
-                await self.media_manager.request_publish(
-                    topic=topic, targets=targets
+                from src.media.intent_routing import (
+                    normalize_media_targets,
+                    queue_media_publish_from_intent,
                 )
+
+                topic = params.get("topic", "market update")
+                targets = normalize_media_targets(params)
+                request = queue_media_publish_from_intent(
+                    media_manager=self.media_manager,
+                    draft_resolver=self._resolve_media_draft_for_publish,
+                    params=params,
+                    source="chat_intent",
+                )
+                request_id = request.get("request_id", "unknown")
+                status = request.get("status", "queued")
                 await self.telegram.send_as(
                     EMERALD,
-                    f"Drafting something about {topic} for {', '.join(targets)}. I'll send it for your review.",
+                    (
+                        f"Drafted `{request_id}` about {topic} for {', '.join(targets)}. "
+                        f"Status: `{status}`."
+                    ),
                 )
 
             elif intent_type == "media_status":
+                from src.media.intent_routing import format_media_queue_status
+
                 status = self.media_manager.get_status_snapshot()
-                mode = status.get("mode", "unknown")
-                pending = status.get("pending_requests", 0)
-                if pending > 0:
-                    await self.telegram.send_as(
-                        EMERALD,
-                        f"We have {pending} piece(s) in the queue. Mode: {mode}.",
-                    )
-                else:
-                    await self.telegram.send_as(
-                        EMERALD, f"Queue is clear — nothing pending. Mode: {mode}."
-                    )
+                await self.telegram.send_as(EMERALD, format_media_queue_status(status))
 
             elif intent_type == "operations":
                 # Route operations to the existing control handler chain
