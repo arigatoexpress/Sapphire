@@ -14,6 +14,7 @@ Quick usage:
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import logging
 import os
@@ -137,8 +138,7 @@ def _disable_content_engine(result: KillSwitchResult) -> None:
 def _send_telegram_alert(result: KillSwitchResult) -> None:
     """Send a P0 Telegram alert before revoking any tokens."""
     try:
-        sys.path.insert(0, str(_SAPPHIRE / "plugins" / "claw-sapphire" / "tools"))
-        from notify import send_telegram_message  # type: ignore[import]
+        send_telegram_message = _load_telegram_sender()
         msg = (
             "🚨 *SECURITY KILL SWITCH ENGAGED* 🚨\n\n"
             f"Reason: {result.reason}\n"
@@ -150,6 +150,21 @@ def _send_telegram_alert(result: KillSwitchResult) -> None:
         result.actions.append("Telegram P0 alert sent")
     except Exception as exc:
         result.errors.append(f"Telegram alert: {exc}")
+
+
+def _load_telegram_sender():
+    """Load the local notify tool without mutating global import paths."""
+    existing = sys.modules.get("notify")
+    if existing is not None and hasattr(existing, "send_telegram_message"):
+        return existing.send_telegram_message
+
+    path = _SAPPHIRE / "plugins" / "claw-sapphire" / "tools" / "notify.py"
+    spec = importlib.util.spec_from_file_location("sapphire_notify_tool", path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"cannot load notify tool from {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.send_telegram_message
 
 
 def engage(reason: str = "Manual security kill switch") -> KillSwitchResult:

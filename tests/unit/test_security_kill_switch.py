@@ -177,6 +177,16 @@ def test_engage_collects_actions_in_order(isolated_paths, stub_externals):
     assert any("Telegram P0 alert sent" in a for a in result.actions)
 
 
+def test_send_telegram_alert_does_not_mutate_sys_path(isolated_paths, stub_externals):
+    before = list(sys.path)
+    result = sks.KillSwitchResult(reason="import hygiene")
+
+    sks._send_telegram_alert(result)
+
+    assert sys.path == before
+    assert any("Telegram P0 alert sent" in a for a in result.actions)
+
+
 def test_engage_non_fatal_when_subprocess_raises(isolated_paths, monkeypatch):
     """Errors from subprocess must NOT abort engage()."""
 
