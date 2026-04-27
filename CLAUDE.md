@@ -236,30 +236,50 @@ The performance.html template was previously hardcoded demo data (fake "Ultra v3
 
 Tests at `tests/unit/test_strategy_performance.py`, `test_backtest_results.py`, `test_forecast.py` (57 tests). To regenerate a backtest sweep: `python3 -m lib.analytics.run_strategies --days 90` — runs in ~2s and produces a fresh `strategy_sweep_*.json` + `best_per_symbol_*.json` under `data/backtests/strategies/`. The previous "signature-drift bug" note was stale: `Backtester.__init__` accepts both `(cfg)` and `(bankroll, fee_bps)` since PR #98, and the actual Apr-21 zero-trade regression was a unit-mismatch in `BacktestEngine.run` that emitted percent-scaled `total_return_pct`/`win_rate`/`max_drawdown_pct` against a fraction-scale dashboard contract — fixed by dividing by 100 in the `SimpleNamespace` projection.
 
-## 21 Scheduled Tasks (Claude Code)
+## Cloud Routines (claude.ai/code/routines) — 8
 
-All in `~/.claude/scheduled-tasks/`. Run 24/7 when Claude Code is open.
+These run on Anthropic infrastructure on cron, regardless of whether Claude Code is open or the Mac is online. Each is driven by a runbook in `docs/ops/<name>-runbook.md` and produces a single GitHub-side-effect (issue or draft PR). Manage via the `RemoteTrigger` MCP tool (`list`, `get`, `create`, `update`, `run`) or the `claude.ai/code/routines` UI.
+
+| Routine | Cron (UTC) | Runbook | Side effect |
+|---|---|---|---|
+| Sapphire mission status digest | `0 14 * * 1` | `mission-status-digest-runbook.md` | Mon issue, label `mission-digest` |
+| Sapphire content-engine soak collector | `0 13 * * *` | `content-engine-soak-runbook.md` | Daily PR if drift |
+| Sapphire factory test guardian | `0 4 * * *` | `factory-test-guardian-runbook.md` | Issue per test-failure fingerprint |
+| Sapphire factory repo fixer | `0 5 * * *` | `factory-repo-fixer-runbook.md` | Daily draft PR if ruff fixed anything |
+| Sapphire dependency drift digest | `0 12 * * 3` | `dependency-drift-digest-runbook.md` | Weekly digest issue |
+| Sapphire threat intel sweep | `0 11 * * *` | `threat-intel-sweep-runbook.md` | Issue per new-CVE fingerprint |
+| Sapphire github discovery | `0 13 * * 1` | `github-discovery-runbook.md` | Weekly digest issue |
+| Sapphire evening digest | `0 0 * * *` | `evening-digest-runbook.md` | Daily issue |
+
+All 8 are read-only or PR/issue-only (no auto-merge, no live trading, no secrets in body, restricted-path fences on the only fixer). The pattern: cloud routine prompt instructs the agent to read its runbook and execute it exactly — runbook is the full task spec.
+
+**Soak window**: cloud routines launched 2026-04-27. Local mirrors of the 5 last cloud routines (factory-test-guardian, factory-repo-fixer, threat-intel-sweep, github-discovery, evening-digest) stay live until ~2026-05-11; retire then only with evidence the cloud equivalents produce clean signals.
+
+## 22 Scheduled Tasks (Claude Code)
+
+All in `~/.claude/scheduled-tasks/`. Run when Claude Code is open. Tasks marked `[CLOUD]` have a cloud-routine equivalent firing on Anthropic infra; both run during the soak window.
 - sapphire-morning-briefing (8 AM) — 6-section digest → Telegram
 - trading-research (5:42 AM) — TA predictions + scoring
 - market-pulse (8/12/4 M-F) — signal scan + paper trade stops
-- threat-intel-sweep (6:30 AM + 2 PM) — CISA/NVD
-- github-discovery (7 AM) — star sync + trending
+- threat-intel-sweep (6:30 AM + 2 PM) — CISA/NVD `[CLOUD]`
+- github-discovery (7 AM) — star sync + trending `[CLOUD]`
 - tho-production-healthcheck (*/2h) — watchdog
-- tho-test-writer (11 AM + 11 PM) — coverage growth
+- tho-test-writer (11 AM + 11 PM) — coverage growth (now opens draft PR)
 - creative-experimenter (2 AM) — nightly R&D
-- factory-test-guardian (3 AM + 3 PM) — all test suites
-- factory-repo-fixer (*/6h) — auto-fix lint
+- factory-test-guardian (3 AM + 3 PM) — all test suites `[CLOUD]`
+- factory-repo-fixer (*/6h) — auto-fix lint via branch + draft PR (no longer pushes to main directly) `[CLOUD]`
 - code-quality-sweep (1 PM) — dead code, imports
-- evening-digest (6 PM) — daily summary
+- evening-digest (6 PM) — daily summary `[CLOUD]`
 - sapphire-self-improvement (8:53 PM) — priorities
 - sapphire-ci-monitor (*/3h) — lint + tests
 - factory-client-delivery (10 AM M-F) — THO production
-- vote-monitor-collector (*/4h) — DeFi pool snapshots
+- vote-monitor-collector (*/4h) — DeFi pool snapshots; uses regional-intel `/api/health` + `digest`
 - dependency-security-scan (Wed 4 AM) — vuln + secrets
 - sapphire-weekly-review (Sun 9 AM) — architecture audit
 - backtest-sweep (weekly) — full strategy backtest sweep
-- lead-generation (daily) — autonomous outreach
-- pull-gcp-secrets (on-demand) — GCP secret sync
+- lead-generation (daily) — paste-safe summary only (Telegram send removed)
+- scheduled-task-health-monitor (daily 9 AM) — meta: lists tasks via MCP, opens issue if any task is >2× its expected interval stale
+- pull-gcp-secrets — `[RETIRED 2026-04-27]` (one-shot fired 2026-04-02)
 
 ## Gotchas
 
