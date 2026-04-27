@@ -25,6 +25,19 @@ Generate a Gmail/Drive cleanup plan without touching Google APIs:
 python3 scripts/ops/google_workspace_threat_hygiene.py --days 30
 ```
 
+Generate the full production-testing readiness view:
+
+```bash
+python3 scripts/ops/google_production_test_readiness.py \
+  --membership google_developer_premium \
+  --membership google_ai_plus \
+  --project tho-ai-agent \
+  --region us-central1
+```
+
+See [`docs/ops/google-production-testing-runbook.md`](google-production-testing-runbook.md)
+for the one-command harness, live gates, and economical test ladder.
+
 ## Benefit Map
 
 | Benefit Lane | What It Unlocks | Sapphire Use | Gate |
@@ -41,11 +54,12 @@ python3 scripts/ops/google_workspace_threat_hygiene.py --days 30
 
 1. Confirm the exact plan names in Google dashboards: Developer Program tier, Google AI tier, Google One storage amount, AI credits, and YouTube membership. Do not paste secrets or payment details.
 2. Use `scripts/ops/google_benefits_inventory.py` and `scripts/ops/gcp_ai_inventory.py` after each account or GCP change.
-3. Keep Google Cloud writes inside `tho-ai-agent` unless a runbook explicitly says otherwise.
-4. Use Cloud Storage free-tier-aware buckets for summarized artifacts only. Do not put secrets, raw Gmail, raw Drive files, private keys, or trading credentials in consumer Drive or GCS.
-5. Use BigQuery's free monthly storage/query posture for summaries and eval metrics before any custom storage/index service.
-6. Use Gemini API free-tier prototypes before Vertex AI; use Vertex batch before online endpoints; use evals before tuning/training.
-7. Build Gmail/Drive threat hygiene as dry-run findings first: label proposal, risk score, evidence snippets, and reversible actions.
+3. Run `scripts/ops/google_production_test_readiness.py` before any live Gemini, Vertex, GCS, BigQuery, Gmail, Drive, or Veo experiment.
+4. Keep Google Cloud writes inside `tho-ai-agent` unless a runbook explicitly says otherwise.
+5. Use Cloud Storage free-tier-aware buckets for summarized artifacts only. Do not put secrets, raw Gmail, raw Drive files, private keys, or trading credentials in consumer Drive or GCS.
+6. Use BigQuery's free monthly storage/query posture for summaries and eval metrics before any custom storage/index service.
+7. Use Gemini API free-tier prototypes before Vertex AI; use Vertex batch before online endpoints; use evals before tuning/training.
+8. Build Gmail/Drive threat hygiene as dry-run findings first: label proposal, risk score, evidence snippets, and reversible actions.
 
 ## Gmail / Drive Threat Hygiene Ladder
 
