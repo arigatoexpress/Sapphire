@@ -2385,9 +2385,34 @@ def api_investments_intel():
                 'totals': {'assets': 0, 'connectors': 0, 'configured_connectors': 0},
                 'missing_envs': [],
             },
+            'source_probes': {'summary': {}, 'probes': [], 'series_catalog': []},
             'ops_queue': [],
             'analysis_lenses': [],
+            'series_catalog': [],
+            'materialization_plan': {'tables': [], 'total_rows': 0},
             'mindset': [],
+        }), 200
+
+
+@app.route('/api/investments/probes')
+@requires_auth
+def api_investments_probes():
+    """Read-only investment source probes; live network probes require ?live=1."""
+    try:
+        from lib.intel.investment_intel import probe_source_mesh
+
+        live = str(request.args.get('live') or '').lower() in {'1', 'true', 'yes'}
+        return jsonify(probe_source_mesh(live=live))
+    except Exception as e:
+        log.warning("investment probes API error: %s", e)
+        return jsonify({
+            'timestamp': datetime.now(UTC).isoformat(),
+            'mode': 'read-only',
+            'live_requested': False,
+            'error': str(e),
+            'probes': [],
+            'summary': {'total': 0, 'ready': 0, 'errors': 0},
+            'series_catalog': [],
         }), 200
 
 
@@ -2412,6 +2437,8 @@ def api_investments_sources():
                 'totals': {'assets': 0, 'connectors': 0, 'configured_connectors': 0},
                 'missing_envs': [],
             },
+            'source_probes': {'summary': {}, 'probes': [], 'series_catalog': []},
+            'series_catalog': [],
             'robinhood': {'configured': False, 'mode': 'read-only portfolio snapshot'},
         }), 200
 

@@ -9,12 +9,15 @@ source coverage without enabling trading, Telegram sends, or live data writes.
 - Dashboard page: `/investment-intel`
 - Report API: `/api/investments/intel`
 - Source API: `/api/investments/sources`
+- Probe API: `/api/investments/probes`
 - Module: `lib.intel.investment_intel`
 
 The APIs return normalized assets, connector coverage, source readiness, ops
 queue items, analysis lenses, and research-pack mindset principles.
 Add `?live=1` to `/api/investments/intel` to request a read-only CoinGecko
 spot/trending preview for the crypto bridge.
+Add `?live=1` to `/api/investments/probes` to execute public read-only source
+checks. Without that flag, probes return readiness and planned coverage only.
 
 ## Research Pack Ingestion
 
@@ -58,9 +61,32 @@ Primary documentation:
 - Live-source helper clients are latent infrastructure and raise explicit errors
   when required API keys are absent.
 
+## Dry-Run Materialization
+
+The report includes a materialization preview for five staging tables:
+
+- `investment_assets`
+- `investment_source_coverage`
+- `investment_ops_queue`
+- `investment_crypto_watchlist`
+- `investment_research_pack`
+
+Nothing writes by default. To explicitly generate ignored local NDJSON staging
+files:
+
+```bash
+python3 -m lib.intel.investment_intel \
+  --zip "$SAPPHIRE_INVESTMENT_RESEARCH_ZIP" \
+  --write-preview data/.gcp_stage/investment_intel
+```
+
+This writes under `data/.gcp_stage/investment_intel/raw/<table>/YYYY-MM-DD/*.ndjson`.
+It does not call BigQuery, upload to GCS, place trades, or send Telegram
+messages.
+
 ## Next Materialization Step
 
-The next safe PR can add scheduled, dry-run collectors that write normalized
-NDJSON to a staging path, then let the existing GCS-to-BigQuery path handle
-materialization after review. Keep raw research packs and live data artifacts
-out of git.
+The next safe PR can add a scheduler wrapper that invokes the explicit
+`--write-preview` command, reviews the NDJSON shape, and only then connects the
+ignored staging path to the existing GCS sync flow. Keep raw research packs and
+live data artifacts out of git.

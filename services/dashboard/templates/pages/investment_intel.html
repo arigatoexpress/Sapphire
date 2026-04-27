@@ -147,6 +147,38 @@
     </div>
 </div>
 
+<div class="grid grid-2" style="margin-bottom:var(--space-xl);">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Source Probes</h3>
+            <span class="pill neutral" id="ii-probe-summary">--</span>
+        </div>
+        <div class="card-body no-pad">
+            <div class="intel-table-wrap">
+                <table class="data-table">
+                    <thead><tr><th>Source</th><th>Status</th><th>Observed</th><th>Detail</th></tr></thead>
+                    <tbody id="ii-probes"><tr><td colspan="4" class="loading">Loading</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Materialization Plan</h3>
+            <span class="pill neutral" id="ii-materialization-total">--</span>
+        </div>
+        <div class="card-body no-pad">
+            <div class="intel-table-wrap">
+                <table class="data-table">
+                    <thead><tr><th>Table</th><th>Rows</th><th>Target</th></tr></thead>
+                    <tbody id="ii-materialization"><tr><td colspan="3" class="loading">Loading</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="card">
     <div class="card-header">
         <h3 class="card-title">Universe Coverage</h3>
@@ -171,6 +203,21 @@
                 <tbody id="ii-universe">
                     <tr><td colspan="6" class="loading">Loading</td></tr>
                 </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-top:var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title">Series Catalog</h3>
+        <span class="pill neutral" id="ii-series-total">--</span>
+    </div>
+    <div class="card-body no-pad">
+        <div class="intel-table-wrap">
+            <table class="data-table">
+                <thead><tr><th>Provider</th><th>Series</th><th>Themes</th><th>Assets</th><th>Purpose</th></tr></thead>
+                <tbody id="ii-series"><tr><td colspan="5" class="loading">Loading</td></tr></tbody>
             </table>
         </div>
     </div>
@@ -250,6 +297,10 @@ async function loadInvestmentIntel() {
     const connectorById = Object.fromEntries(connectors.map(row => [row.id, row]));
     const ops = data.ops_queue || [];
     const readyOps = ops.filter(row => row.status === 'ready').length;
+    const probes = data.source_probes || {};
+    const probeSummary = probes.summary || {};
+    const materialization = data.materialization_plan || {};
+    const series = data.series_catalog || [];
 
     document.getElementById('ii-assets').textContent = totals.assets || (data.universe || []).length || 0;
     document.getElementById('ii-connectors').textContent = totals.connectors || connectors.length || 0;
@@ -263,6 +314,11 @@ async function loadInvestmentIntel() {
     document.getElementById('ii-missing-envs').textContent = `env: ${(mesh.missing_envs || []).length}`;
     document.getElementById('ii-pack-files').textContent = `files: ${(data.research_pack?.files || []).length}`;
     document.getElementById('ii-source-total').textContent = `${connectors.length} connectors`;
+    document.getElementById('ii-probe-summary').textContent =
+        `${probeSummary.ready || 0} ready / ${probeSummary.total || 0}`;
+    document.getElementById('ii-materialization-total').textContent =
+        `${materialization.total_rows || 0} rows`;
+    document.getElementById('ii-series-total').textContent = `${series.length} series`;
 
     const mindset = data.mindset || [];
     document.getElementById('ii-mindset').innerHTML = mindset.length
@@ -282,6 +338,29 @@ async function loadInvestmentIntel() {
         `).join('')
         : '<div class="empty-state">No lenses</div>';
 
+    const probeRows = probes.probes || [];
+    document.getElementById('ii-probes').innerHTML = probeRows.length
+        ? probeRows.map(row => `
+            <tr>
+                <td>${esc(row.label)}</td>
+                <td>${statusPill(row.status)}</td>
+                <td>${row.observed_count == null ? '—' : esc(row.observed_count)}</td>
+                <td>${esc(row.detail)}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="4" class="empty-state">No probe rows</td></tr>';
+
+    const materializationRows = materialization.tables || [];
+    document.getElementById('ii-materialization').innerHTML = materializationRows.length
+        ? materializationRows.map(row => `
+            <tr>
+                <td>${esc(row.table)}</td>
+                <td>${esc(row.rows)}</td>
+                <td style="font-size:.68rem;color:var(--text-muted);">${esc(row.target)}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="3" class="empty-state">No materialization rows</td></tr>';
+
     const universe = data.universe || [];
     document.getElementById('ii-universe').innerHTML = universe.length
         ? universe.map(asset => `
@@ -295,6 +374,21 @@ async function loadInvestmentIntel() {
             </tr>
         `).join('')
         : '<tr><td colspan="6" class="empty-state">No universe rows</td></tr>';
+
+    document.getElementById('ii-series').innerHTML = series.length
+        ? series.map(row => `
+            <tr>
+                <td>${esc(row.provider)}</td>
+                <td>
+                    <div style="color:var(--text-primary);">${esc(row.label)}</div>
+                    <div style="color:var(--text-muted);font-size:.68rem;">${esc(row.provider_series)}</div>
+                </td>
+                <td>${esc((row.themes || []).join(', '))}</td>
+                <td>${esc((row.assets || []).join(', '))}</td>
+                <td>${esc(row.purpose)}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="5" class="empty-state">No series rows</td></tr>';
 
     document.getElementById('ii-sources').innerHTML = connectors.length
         ? connectors.map(source => `

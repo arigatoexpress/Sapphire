@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import zipfile
 from pathlib import Path
 
@@ -71,6 +72,9 @@ def test_build_report_includes_equity_and_crypto_source_mesh(tmp_path):
     assert any(row["id"] == "crypto-source-bridge" for row in report["ops_queue"])
     assert {row["symbol"] for row in report["crypto_bridge"]["tokens_we_like"]} >= {"BTC", "HYPE"}
     assert report["crypto_bridge"]["live_requested"] is False
+    assert report["source_probes"]["summary"]["total"] >= 8
+    assert report["series_catalog"]
+    assert report["materialization_plan"]["total_rows"] > len(report["universe"])
 
 
 def test_crypto_bridge_can_fetch_live_coingecko_snapshot(monkeypatch):
@@ -114,6 +118,61 @@ def test_source_report_sanitizes_robinhood_to_presence_only(tmp_path, monkeypatc
     assert source_report["robinhood"]["configured"] is True
     assert "secret-key" not in str(source_report)
     assert "secret-private" not in str(source_report)
+
+
+def test_probe_source_mesh_non_live_does_not_touch_network(tmp_path):
+    pack_path = tmp_path / "research.zip"
+    _write_research_zip(pack_path)
+
+    probes = intel.probe_source_mesh(pack_path, live=False)
+    statuses = {row["id"]: row for row in probes["probes"]}
+
+    assert probes["mode"] == "read-only"
+    assert probes["live_requested"] is False
+    assert statuses["kimi_research_pack"]["status"] == "ready"
+    assert statuses["sec_company_tickers"]["status"] == "not_requested"
+    assert probes["series_catalog"]
+
+
+def test_probe_source_mesh_live_uses_read_only_callbacks(monkeypatch, tmp_path):
+    pack_path = tmp_path / "research.zip"
+    _write_research_zip(pack_path)
+    monkeypatch.setenv(intel.SEC_USER_AGENT_ENV, "sapphire-test contact@example.com")
+    monkeypatch.setattr(intel, "_request_json", lambda *_args, **_kwargs: {"0": {"ticker": "AAPL"}})
+    monkeypatch.setattr(
+        intel,
+        "build_crypto_bridge",
+        lambda *_args, **_kwargs: {"trending": [{"symbol": "HYPE"}]},
+    )
+    monkeypatch.setattr(intel, "_probe_hyperliquid", lambda: ("ok", 3))
+    monkeypatch.setattr(intel, "_probe_defillama", lambda: ("ok", 4))
+
+    probes = intel.probe_source_mesh(pack_path, live=True)
+    statuses = {row["id"]: row for row in probes["probes"]}
+
+    assert statuses["sec_company_tickers"]["status"] == "ready"
+    assert statuses["coingecko_market"]["observed_count"] == 1
+    assert statuses["hyperliquid_info"]["observed_count"] == 3
+    assert statuses["defillama_defi"]["observed_count"] == 4
+
+
+def test_materialization_preview_builds_rows_and_writes_ndjson(tmp_path):
+    pack_path = tmp_path / "research.zip"
+    _write_research_zip(pack_path)
+    report = intel.build_investment_intel_report(pack_path)
+
+    rows = intel.build_materialization_rows(report)
+    assert rows["investment_assets"]
+    assert rows["investment_source_coverage"]
+    assert rows["investment_research_pack"][0]["csv_asset_count"] == 1
+
+    out = intel.write_materialization_preview(tmp_path / "stage", zip_path=pack_path)
+
+    assert out["mode"] == "dry-run-write"
+    assert out["total_rows"] == sum(item["rows"] for item in out["written"])
+    first = Path(out["written"][0]["path"])
+    assert first.exists()
+    assert json.loads(first.read_text().splitlines()[0])["timestamp"]
 
 
 def test_public_source_clients_construct_official_urls(monkeypatch):

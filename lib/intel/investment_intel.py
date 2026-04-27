@@ -8,6 +8,7 @@ secrets; downstream callers decide when to materialize snapshots.
 
 from __future__ import annotations
 
+import argparse
 import csv
 import json
 import os
@@ -89,6 +90,41 @@ class SourceConnector:
             "status": "ready" if configured or not self.auth_envs else "needs_key",
             "mode": "read-only" if not self.mutation else "mutation-gated",
         }
+
+
+@dataclass(frozen=True)
+class SeriesSignal:
+    id: str
+    label: str
+    provider: str
+    provider_series: str
+    themes: tuple[str, ...]
+    assets: tuple[str, ...]
+    cadence: str
+    purpose: str
+    auth_env: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            **asdict(self),
+            "themes": list(self.themes),
+            "assets": list(self.assets),
+            "configured": bool(os.environ.get(self.auth_env)) if self.auth_env else True,
+        }
+
+
+@dataclass(frozen=True)
+class SourceProbe:
+    id: str
+    label: str
+    status: str
+    detail: str
+    latency_ms: float | None = None
+    observed_count: int | None = None
+    checked_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
 
 
 @dataclass
@@ -454,6 +490,95 @@ SOURCE_CONNECTORS: tuple[SourceConnector, ...] = (
     ),
 )
 
+SERIES_CATALOG: tuple[SeriesSignal, ...] = (
+    SeriesSignal(
+        id="fed_funds",
+        label="Effective Federal Funds Rate",
+        provider="FRED",
+        provider_series="FEDFUNDS",
+        themes=("macro", "rates", "growth-valuation"),
+        assets=("FSLR", "RKLB", "JOBY", "BTC", "ETH", "SOL"),
+        cadence="monthly",
+        purpose="Discount-rate pressure on long-duration growth and crypto risk appetite.",
+        auth_env="FRED_API_KEY",
+    ),
+    SeriesSignal(
+        id="treasury_10y",
+        label="10-Year Treasury Constant Maturity",
+        provider="FRED",
+        provider_series="DGS10",
+        themes=("macro", "rates", "ai-power"),
+        assets=("NEE", "BEP", "CEG", "FSLR", "VST", "WMB"),
+        cadence="daily",
+        purpose="Rates lens for utilities, infrastructure, and speculative duration risk.",
+        auth_env="FRED_API_KEY",
+    ),
+    SeriesSignal(
+        id="industrial_production",
+        label="Industrial Production Index",
+        provider="FRED",
+        provider_series="INDPRO",
+        themes=("macro", "industrial-demand", "defense"),
+        assets=("GEV", "HEI", "KTOS", "BWXT", "WMB"),
+        cadence="monthly",
+        purpose="Cyclical demand backdrop for industrial and defense supply-chain names.",
+        auth_env="FRED_API_KEY",
+    ),
+    SeriesSignal(
+        id="electricity_retail_sales",
+        label="Electricity Retail Sales",
+        provider="EIA",
+        provider_series="electricity/retail-sales",
+        themes=("ai-power", "grid", "utility"),
+        assets=("NEE", "CEG", "VST", "GEV", "WMB"),
+        cadence="monthly",
+        purpose="Track realized electricity demand across AI-power beneficiary lanes.",
+        auth_env="EIA_API_KEY",
+    ),
+    SeriesSignal(
+        id="electricity_operational_generation",
+        label="Electricity Operational Generation",
+        provider="EIA",
+        provider_series="electricity/electricity-power-operational-data",
+        themes=("ai-power", "nuclear", "natural-gas", "solar"),
+        assets=("CEG", "VST", "GEV", "FSLR", "NEE", "LNG", "WMB"),
+        cadence="daily/monthly",
+        purpose="Generation mix signal for nuclear, gas, solar, and grid equipment theses.",
+        auth_env="EIA_API_KEY",
+    ),
+    SeriesSignal(
+        id="natural_gas_storage",
+        label="Natural Gas Storage",
+        provider="EIA",
+        provider_series="natural-gas/stor/wkly",
+        themes=("natural-gas", "ai-power"),
+        assets=("LNG", "WMB", "GEV", "VST"),
+        cadence="weekly",
+        purpose="Gas supply pressure lens for LNG, midstream, and power generation.",
+        auth_env="EIA_API_KEY",
+    ),
+    SeriesSignal(
+        id="coingecko_trending",
+        label="CoinGecko Trending Search",
+        provider="CoinGecko",
+        provider_series="search/trending",
+        themes=("crypto", "attention", "breadth"),
+        assets=("BTC", "ETH", "SOL", "HYPE", "LINK", "ONDO"),
+        cadence="minutes",
+        purpose="Attention and breadth pulse for the crypto watchlist.",
+    ),
+    SeriesSignal(
+        id="hyperliquid_market_context",
+        label="Hyperliquid Market Context",
+        provider="Hyperliquid",
+        provider_series="metaAndAssetCtxs",
+        themes=("crypto", "perps", "venue-risk"),
+        assets=("BTC", "ETH", "SOL", "HYPE", "LINK"),
+        cadence="near-real-time",
+        purpose="Funding, open-interest, and volume context for funded venue oversight.",
+    ),
+)
+
 
 THEME_CONNECTORS: dict[str, tuple[str, ...]] = {
     "ai-power": ("fred_macro", "eia_energy"),
@@ -487,6 +612,14 @@ class SourceHTTPError(RuntimeError):
 
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _today_stamp() -> str:
+    return datetime.now(UTC).date().isoformat()
+
+
+def _run_stamp() -> str:
+    return datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
 
 
 def _request_json(
@@ -1088,6 +1221,336 @@ def build_crypto_bridge(
     return bridge
 
 
+def build_series_catalog() -> list[dict[str, Any]]:
+    return [series.to_dict() for series in SERIES_CATALOG]
+
+
+def _probe(
+    probe_id: str,
+    label: str,
+    callback,
+    *,
+    live: bool,
+) -> SourceProbe:
+    if not live:
+        return SourceProbe(
+            id=probe_id,
+            label=label,
+            status="not_requested",
+            detail="Live probe not requested; source remains mapped for dry-run planning.",
+        )
+    started = time.perf_counter()
+    try:
+        detail, count = callback()
+        return SourceProbe(
+            id=probe_id,
+            label=label,
+            status="ready",
+            detail=detail,
+            latency_ms=round((time.perf_counter() - started) * 1000, 2),
+            observed_count=count,
+        )
+    except Exception as exc:
+        return SourceProbe(
+            id=probe_id,
+            label=label,
+            status="error",
+            detail=f"{type(exc).__name__}: {exc}",
+            latency_ms=round((time.perf_counter() - started) * 1000, 2),
+        )
+
+
+def probe_source_mesh(
+    zip_path: str | Path | None = None,
+    *,
+    live: bool = False,
+) -> dict[str, Any]:
+    """Probe source readiness without mutating external state."""
+
+    research_pack = load_research_pack(zip_path)
+    rh = _robinhood_readiness()
+    probes: list[SourceProbe] = [
+        SourceProbe(
+            id="kimi_research_pack",
+            label="Kimi research pack",
+            status="ready" if research_pack.available else "needs_config",
+            detail=(
+                f"{research_pack.source_kind}: {len(research_pack.files)} files, "
+                f"{len(research_pack.csv_assets)} CSV assets"
+                if research_pack.available
+                else research_pack.error or f"Set {RESEARCH_ZIP_ENV} to attach the latest pack."
+            ),
+            observed_count=len(research_pack.csv_assets),
+        ),
+        SourceProbe(
+            id="robinhood_crypto_readonly",
+            label="Robinhood Crypto read-only",
+            status="ready" if rh["configured"] else "needs_secret_presence",
+            detail="Credential files present; no portfolio request was made."
+            if rh["configured"]
+            else "Credential file presence missing or partial.",
+            observed_count=sum(1 for present in rh["required_files_present"].values() if present),
+        ),
+        SourceProbe(
+            id="fred_macro",
+            label="FRED macro",
+            status="ready" if os.environ.get("FRED_API_KEY") else "needs_key",
+            detail="FRED_API_KEY configured."
+            if os.environ.get("FRED_API_KEY")
+            else "FRED_API_KEY absent; catalog is mapped but live reads are disabled.",
+            observed_count=sum(1 for row in SERIES_CATALOG if row.provider == "FRED"),
+        ),
+        SourceProbe(
+            id="eia_energy",
+            label="EIA energy",
+            status="ready" if os.environ.get("EIA_API_KEY") else "needs_key",
+            detail="EIA_API_KEY configured."
+            if os.environ.get("EIA_API_KEY")
+            else "EIA_API_KEY absent; catalog is mapped but live reads are disabled.",
+            observed_count=sum(1 for row in SERIES_CATALOG if row.provider == "EIA"),
+        ),
+    ]
+
+    sec_probe = (
+        _probe(
+            "sec_company_tickers",
+            "SEC company ticker map",
+            lambda: (
+                "official SEC company_tickers.json reachable",
+                len(
+                    _request_json(
+                        "https://www.sec.gov/files/company_tickers.json",
+                        headers={"User-Agent": os.environ[SEC_USER_AGENT_ENV]},
+                    )
+                ),
+            ),
+            live=live,
+        )
+        if not live or os.environ.get(SEC_USER_AGENT_ENV)
+        else SourceProbe(
+            id="sec_company_tickers",
+            label="SEC company ticker map",
+            status="needs_config",
+            detail=f"Set {SEC_USER_AGENT_ENV} to a contact user-agent before probing SEC.",
+        )
+    )
+
+    probes.extend(
+        [
+            sec_probe,
+            _probe(
+                "coingecko_market",
+                "CoinGecko trending + spot",
+                lambda: (
+                    "CoinGecko simple-price/trending reachable",
+                    len(build_crypto_bridge(build_universe(research_pack), fetch_live=True)["trending"]),
+                ),
+                live=live,
+            ),
+            _probe(
+                "hyperliquid_info",
+                "Hyperliquid market context",
+                lambda: _probe_hyperliquid(),
+                live=live,
+            ),
+            _probe(
+                "defillama_defi",
+                "DeFiLlama stablecoins",
+                lambda: _probe_defillama(),
+                live=live,
+            ),
+        ]
+    )
+
+    rows = [probe.to_dict() for probe in probes]
+    return {
+        "timestamp": _now_iso(),
+        "mode": "read-only",
+        "live_requested": live,
+        "probes": rows,
+        "summary": {
+            "total": len(rows),
+            "ready": sum(1 for row in rows if row["status"] == "ready"),
+            "needs_key": sum(1 for row in rows if row["status"] == "needs_key"),
+            "needs_config": sum(1 for row in rows if row["status"] == "needs_config"),
+            "errors": sum(1 for row in rows if row["status"] == "error"),
+            "not_requested": sum(1 for row in rows if row["status"] == "not_requested"),
+        },
+        "series_catalog": build_series_catalog(),
+    }
+
+
+def _probe_hyperliquid() -> tuple[str, int]:
+    from lib.chain.sources import HyperliquidClient
+
+    assets = HyperliquidClient().meta_and_asset_ctxs()
+    return "Hyperliquid metaAndAssetCtxs reachable", len(assets)
+
+
+def _probe_defillama() -> tuple[str, int]:
+    from lib.chain.sources import DefiLlamaClient
+
+    stablecoins = DefiLlamaClient().stablecoins()
+    return f"DeFiLlama stablecoins reachable (${stablecoins.total_usd:,.0f} total)", stablecoins.count
+
+
+def build_materialization_rows(report: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    """Build normalized rows for GCS/BQ staging without writing by default."""
+
+    timestamp = report.get("timestamp") or _now_iso()
+    assets = report.get("universe") or []
+    mesh = report.get("source_mesh") or {}
+    research = report.get("research_pack") or {}
+    crypto = (report.get("crypto_bridge") or {}).get("tokens_we_like") or []
+
+    return {
+        "investment_assets": [
+            {
+                "timestamp": timestamp,
+                "symbol": asset["symbol"],
+                "name": asset["name"],
+                "asset_class": asset["asset_class"],
+                "risk_tier": asset["risk_tier"],
+                "watch_level": asset["watch_level"],
+                "themes": asset.get("themes") or [],
+                "connectors": asset.get("connectors") or [],
+                "thesis": asset.get("thesis"),
+                "source_note": asset.get("source_note"),
+            }
+            for asset in assets
+        ],
+        "investment_source_coverage": [
+            {
+                "timestamp": timestamp,
+                "symbol": coverage["symbol"],
+                "asset_class": coverage["asset_class"],
+                "connector_id": connector_id,
+                "connector_count": coverage["connector_count"],
+                "ready_connectors": coverage["ready_connectors"],
+            }
+            for coverage in mesh.get("coverage") or []
+            for connector_id in coverage.get("connectors") or []
+        ],
+        "investment_ops_queue": [
+            {
+                "timestamp": timestamp,
+                "id": row["id"],
+                "lane": row["lane"],
+                "status": row["status"],
+                "title": row["title"],
+                "detail": row["detail"],
+            }
+            for row in report.get("ops_queue") or []
+        ],
+        "investment_crypto_watchlist": [
+            {
+                "timestamp": timestamp,
+                "symbol": row["symbol"],
+                "name": row["name"],
+                "risk_tier": row["risk_tier"],
+                "watch_level": row["watch_level"],
+                "coingecko_id": row.get("coingecko_id"),
+                "connectors": row.get("connectors") or [],
+            }
+            for row in crypto
+        ],
+        "investment_research_pack": [
+            {
+                "timestamp": timestamp,
+                "available": bool(research.get("available")),
+                "source_label": research.get("source_label"),
+                "source_kind": research.get("source_kind"),
+                "file_count": len(research.get("files") or []),
+                "csv_asset_count": len(research.get("csv_assets") or []),
+                "top_idea_count": len(research.get("top_ideas") or []),
+                "section_count": len(research.get("sections") or []),
+            }
+        ],
+    }
+
+
+def build_materialization_plan(report: dict[str, Any], *, out_dir: str | Path | None = None) -> dict[str, Any]:
+    rows = build_materialization_rows(report)
+    base_dir = Path(out_dir) if out_dir else ROOT / "data" / ".gcp_stage" / "investment_intel"
+    today = _today_stamp()
+    run_id = _run_stamp()
+    tables = [
+        {
+            "table": table,
+            "rows": len(table_rows),
+            "target": str(base_dir / "raw" / table / today / f"{run_id}.ndjson"),
+        }
+        for table, table_rows in rows.items()
+    ]
+    return {
+        "mode": "dry-run-preview",
+        "writes_by_default": False,
+        "base_dir": str(base_dir),
+        "tables": tables,
+        "total_rows": sum(table["rows"] for table in tables),
+    }
+
+
+def write_materialization_preview(
+    out_dir: str | Path,
+    *,
+    zip_path: str | Path | None = None,
+    fetch_live_crypto: bool = False,
+) -> dict[str, Any]:
+    """Explicit dry-run writer for ignored local staging paths."""
+
+    report = build_investment_intel_report(zip_path, fetch_live_crypto=fetch_live_crypto)
+    rows = build_materialization_rows(report)
+    base_dir = Path(out_dir)
+    today = _today_stamp()
+    run_id = _run_stamp()
+    written: list[dict[str, Any]] = []
+    for table, table_rows in rows.items():
+        target = base_dir / "raw" / table / today / f"{run_id}.ndjson"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            "".join(json.dumps(row, sort_keys=True) + "\n" for row in table_rows),
+            encoding="utf-8",
+        )
+        written.append({"table": table, "rows": len(table_rows), "path": str(target)})
+    return {
+        "timestamp": _now_iso(),
+        "mode": "dry-run-write",
+        "base_dir": str(base_dir),
+        "written": written,
+        "total_rows": sum(row["rows"] for row in written),
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Sapphire investment intel source mesh")
+    parser.add_argument("--zip", dest="zip_path", help="Optional Kimi research ZIP path")
+    parser.add_argument("--live-crypto", action="store_true", help="Fetch read-only CoinGecko preview")
+    parser.add_argument("--probe-live", action="store_true", help="Probe public live sources")
+    parser.add_argument(
+        "--write-preview",
+        metavar="DIR",
+        help="Write ignored NDJSON staging files under DIR/raw/* (explicit dry-run materialization)",
+    )
+    args = parser.parse_args(argv)
+
+    if args.write_preview:
+        payload = write_materialization_preview(
+            args.write_preview,
+            zip_path=args.zip_path,
+            fetch_live_crypto=args.live_crypto,
+        )
+    elif args.probe_live:
+        payload = probe_source_mesh(args.zip_path, live=True)
+    else:
+        payload = build_investment_intel_report(
+            args.zip_path,
+            fetch_live_crypto=args.live_crypto,
+        )
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0
+
+
 def build_investment_intel_report(
     zip_path: str | Path | None = None,
     *,
@@ -1100,15 +1563,17 @@ def build_investment_intel_report(
     ops_queue = build_ops_queue(research_pack, mesh)
     static = load_static_watchlist()
 
-    return {
+    report = {
         "timestamp": _now_iso(),
         "mode": "read-only",
         "disclaimer": "Research and operations intelligence only; not financial advice or trade execution.",
         "research_pack": research_pack.to_dict(),
         "universe": universe,
         "source_mesh": mesh,
+        "source_probes": probe_source_mesh(zip_path, live=False),
         "ops_queue": ops_queue,
         "analysis_lenses": build_analysis_lenses(universe),
+        "series_catalog": build_series_catalog(),
         "crypto_bridge": build_crypto_bridge(universe, fetch_live=fetch_live_crypto),
         "mindset": research_pack.mindset_principles,
         "catalyst_calendar_highlights": static.get("catalyst_calendar_highlights") or [],
@@ -1119,6 +1584,8 @@ def build_investment_intel_report(
         ],
         "latency_ms": round((time.perf_counter() - started) * 1000, 2),
     }
+    report["materialization_plan"] = build_materialization_plan(report)
+    return report
 
 
 def build_source_report(zip_path: str | Path | None = None) -> dict[str, Any]:
@@ -1130,6 +1597,8 @@ def build_source_report(zip_path: str | Path | None = None) -> dict[str, Any]:
         "mode": "read-only",
         "research_pack": research_pack.to_dict(),
         "source_mesh": mesh,
+        "source_probes": probe_source_mesh(zip_path, live=False),
+        "series_catalog": build_series_catalog(),
         "robinhood": _robinhood_readiness(),
     }
 
@@ -1141,11 +1610,21 @@ __all__ = [
     "SecEdgarClient",
     "SourceConnector",
     "SourceHTTPError",
+    "SourceProbe",
     "build_investment_intel_report",
     "build_crypto_bridge",
+    "build_materialization_plan",
+    "build_materialization_rows",
+    "build_series_catalog",
     "build_source_report",
     "build_source_mesh",
     "build_universe",
     "load_research_pack",
     "load_static_watchlist",
+    "probe_source_mesh",
+    "write_materialization_preview",
 ]
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

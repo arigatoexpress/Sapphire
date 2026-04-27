@@ -283,6 +283,9 @@ def test_investment_intel_endpoint_returns_source_mesh(app_client, tmp_path, mon
     assert "hyperliquid_info" in symbols["BTC"]["connectors"]
     assert body["crypto_bridge"]["live_requested"] is False
     assert {row["symbol"] for row in body["crypto_bridge"]["tokens_we_like"]} >= {"BTC", "HYPE"}
+    assert body["source_probes"]["summary"]["total"] >= 8
+    assert body["materialization_plan"]["total_rows"] > len(body["universe"])
+    assert body["series_catalog"]
 
 
 def test_investment_sources_endpoint_returns_robinhood_presence(app_client):
@@ -293,3 +296,15 @@ def test_investment_sources_endpoint_returns_robinhood_presence(app_client):
     assert body["mode"] == "read-only"
     assert "source_mesh" in body
     assert body["robinhood"]["mode"] == "read-only portfolio snapshot"
+
+
+def test_investment_probes_endpoint_is_non_live_by_default(app_client):
+    _, client = app_client
+    r = client.get("/api/investments/probes", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["mode"] == "read-only"
+    assert body["live_requested"] is False
+    probes = {row["id"]: row for row in body["probes"]}
+    assert probes["sec_company_tickers"]["status"] == "not_requested"
+    assert body["series_catalog"]
