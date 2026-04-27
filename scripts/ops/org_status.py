@@ -124,7 +124,7 @@ def summarize(
             if (repo.get("dirty_count") or 0) > 0
         ],
         "open_prs_checked": external,
-        "open_pr_count": sum(len(repo.get("open_prs", [])) for repo in repos),
+        "open_pr_count": sum(count_actionable_items(repo.get("open_prs", [])) for repo in repos),
         "routine_stages": stage_counts(manifest.get("routines", [])),
         "hermes_skill_classes": (hermes_skills or {}).get("classification_counts", {}),
         "hermes_production_adjacent_skills": (hermes_skills or {}).get(
@@ -293,7 +293,9 @@ def worktree_status(root: Path = ROOT) -> list[dict[str, Any]]:
             continue
 
         dirty = run(["git", "status", "--porcelain=v1"], cwd=path)
-        upstream = run(["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], cwd=path)
+        upstream = run(
+            ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], cwd=path
+        )
         dirty_lines = dirty["stdout"].splitlines() if dirty["ok"] else []
         row["dirty_count"] = len(dirty_lines)
         row["dirty_summary"] = summarize_dirty_lines(dirty_lines)
@@ -347,6 +349,8 @@ def repo_status(repo: dict[str, Any], *, external: bool) -> dict[str, Any]:
         "role": repo.get("role"),
         "local_path": str(path),
         "github": repo.get("github"),
+        "pr_github": repo.get("pr_github", repo.get("github")),
+        "issue_github": repo.get("issue_github", repo.get("github")),
         "default_branch": repo.get("default_branch"),
         "production_adjacent": bool(repo.get("production_adjacent")),
         "migration_state": repo.get("migration_state"),
@@ -414,10 +418,17 @@ def repo_status(repo: dict[str, Any], *, external: bool) -> dict[str, Any]:
     for result_name, result in (("branch", branch), ("head", head), ("dirty", dirty)):
         if not result["ok"]:
             status["errors"].append(f"git {result_name} failed: {result['stderr'][:160]}")
-    if external and repo.get("github"):
-        status["open_prs"] = gh_items("pr", str(repo["github"]))
-        status["open_issues"] = gh_items("issue", str(repo["github"]))
+    if external:
+        if status.get("pr_github"):
+            status["open_prs"] = gh_items("pr", str(status["pr_github"]))
+        if status.get("issue_github"):
+            status["open_issues"] = gh_items("issue", str(status["issue_github"]))
     return status
+
+
+def count_actionable_items(items: list[dict[str, Any]]) -> int:
+    """Count GitHub items while excluding probe error sentinels."""
+    return sum(1 for item in items if not item.get("error"))
 
 
 def summarize_dirty_lines(lines: list[str]) -> dict[str, int]:
@@ -633,7 +644,8 @@ def render_markdown(report: dict[str, Any]) -> str:
         lines.append(
             f"| {repo['id']} | {repo['classification']} | {repo.get('branch') or '-'} | "
             f"{runtime_label} | "
-            f"{'yes' if repo.get('clean') else 'no'} | {len(repo.get('open_prs', []))} | "
+            f"{'yes' if repo.get('clean') else 'no'} | "
+            f"{count_actionable_items(repo.get('open_prs', []))} | "
             f"{repo.get('migration_state') or '-'} |"
         )
     dirty_repos = [repo for repo in report["repos"] if repo.get("dirty_count")]
