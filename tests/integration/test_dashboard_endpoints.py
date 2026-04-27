@@ -401,4 +401,9 @@ def test_sovereign_thesis_page_renders(app_client):
     assert "Sovereign Thesis" in html
     assert "Evidence Ledger" in html
     assert "Materialization Plan" in html
+    assert "Continuous Intelligence" in html
+    assert "Artifact Lease Preview" in html
     assert "/api/investments/thesis" in html
+    assert "/api/autonomy/continuous-intelligence" in html
+    assert "/api/autonomy/continuous-intelligence/artifacts" in html
+    assert "/api/autonomy/continuous-intelligence/lease-preview" in html

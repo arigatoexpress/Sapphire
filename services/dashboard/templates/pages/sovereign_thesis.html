@@ -85,6 +85,33 @@
     font-size: .78rem;
 }
 
+.ci-meta {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.ci-title {
+    color: var(--text-primary);
+    font-weight: 650;
+    max-width: 360px;
+    white-space: normal;
+}
+
+.ci-sub {
+    color: var(--text-muted);
+    font-size: .66rem;
+    margin-top: 3px;
+}
+
+.ci-file-row {
+    display: grid;
+    grid-template-columns: minmax(100px, .8fr) minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+}
+
 @media (max-width: 1100px) {
     .thesis-grid { grid-template-columns: 1fr; }
 }
@@ -119,6 +146,50 @@
         <div class="stat-label">Watches</div>
         <div class="stat-value" id="st-watches">--</div>
         <div class="stat-change" id="st-watches-sub">Invalidations</div>
+    </div>
+</div>
+
+<div class="grid grid-2" style="margin-bottom:var(--space-xl);">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Continuous Intelligence</h3>
+            <div class="ci-meta">
+                <span class="pill neutral" id="st-ci-mode">read-only</span>
+                <span class="pill neutral" id="st-ci-total">--</span>
+            </div>
+        </div>
+        <div class="card-body no-pad">
+            <div class="thesis-table-wrap">
+                <table class="data-table">
+                    <thead><tr><th>Priority</th><th>Lane</th><th>Runtime</th><th>Task</th></tr></thead>
+                    <tbody id="st-ci-table"><tr><td colspan="4" class="loading">Loading</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Artifact Lease Preview</h3>
+            <div class="ci-meta">
+                <span class="pill neutral" id="st-artifacts-total">--</span>
+                <span class="pill neutral" id="st-lease-total">dry-run</span>
+            </div>
+        </div>
+        <div class="card-body no-pad">
+            <div class="thesis-table-wrap">
+                <table class="data-table">
+                    <thead><tr><th>Surface</th><th>Status</th><th>Rows</th></tr></thead>
+                    <tbody id="st-artifacts-table"><tr><td colspan="3" class="loading">Loading</td></tr></tbody>
+                </table>
+            </div>
+            <div class="thesis-table-wrap" style="border-top:1px solid var(--border-dim);">
+                <table class="data-table">
+                    <thead><tr><th>Runtime</th><th>Lease</th><th>Mode</th></tr></thead>
+                    <tbody id="st-lease-table"><tr><td colspan="3" class="loading">Loading</td></tr></tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -261,6 +332,13 @@ function pct(value) {
     return Number.isFinite(number) ? `${number.toFixed(1)}%` : '--';
 }
 
+function shortStamp(value) {
+    if (!value) return '--';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return String(value).replace('T', ' ').slice(0, 19);
+    return parsed.toLocaleTimeString();
+}
+
 function renderCoverage(summary) {
     const coverage = Number((summary || {}).coverage_pct ?? 0);
     const wired = Number((summary || {}).wired_pct ?? coverage);
@@ -277,6 +355,83 @@ function sourceClass(status) {
     if (status === 'evidenced') return 'source-chip evidenced';
     if (status === 'provider_wired') return 'source-chip wired';
     return 'source-chip gap';
+}
+
+async function loadContinuousIntelligencePanel() {
+    const fail = err => {
+        const message = esc(err?.message || err || 'continuous intelligence unavailable');
+        document.getElementById('st-ci-table').innerHTML = `<tr><td colspan="4" class="empty-state">${message}</td></tr>`;
+        document.getElementById('st-artifacts-table').innerHTML = `<tr><td colspan="3" class="empty-state">${message}</td></tr>`;
+        document.getElementById('st-lease-table').innerHTML = `<tr><td colspan="3" class="empty-state">${message}</td></tr>`;
+    };
+
+    let plan;
+    let artifacts;
+    let lease;
+    try {
+        const [planResp, artifactsResp, leaseResp] = await Promise.all([
+            fetch(`${window.location.origin}/api/autonomy/continuous-intelligence`),
+            fetch(`${window.location.origin}/api/autonomy/continuous-intelligence/artifacts`),
+            fetch(`${window.location.origin}/api/autonomy/continuous-intelligence/lease-preview?agent_id=windows-gpu&target_runtime=windows-gpu&limit=3`)
+        ]);
+        plan = await planResp.json();
+        artifacts = await artifactsResp.json();
+        lease = await leaseResp.json();
+    } catch (err) {
+        fail(err);
+        return;
+    }
+
+    const totals = plan.totals || {};
+    const nextDispatch = plan.next_dispatch || [];
+    document.getElementById('st-ci-mode').textContent = plan.mode || 'read-only';
+    document.getElementById('st-ci-total').textContent = `${totals.tasks || 0} tasks`;
+    document.getElementById('st-ci-table').innerHTML = nextDispatch.length
+        ? nextDispatch.slice(0, 8).map(task => `
+            <tr>
+                <td>${pill(task.priority)}</td>
+                <td>${esc((task.lane || '').replaceAll('_', ' '))}</td>
+                <td>${esc(task.target_runtime || '--')}</td>
+                <td>
+                    <div class="ci-title">${esc(task.title)}</div>
+                    <div class="ci-sub">${esc((task.symbols || []).slice(0, 6).join(', ') || task.safe_mode || 'read only')}</div>
+                </td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="4" class="empty-state">No dispatch rows</td></tr>';
+
+    const files = artifacts.files || {};
+    const fileRows = Object.entries(files);
+    document.getElementById('st-artifacts-total').textContent = `${(artifacts.snapshot_preview || {}).records || 0} preview`;
+    document.getElementById('st-artifacts-table').innerHTML = fileRows.length
+        ? fileRows.map(([name, row]) => `
+            <tr>
+                <td>
+                    <div class="ci-file-row">
+                        <span>${esc(name.replaceAll('_', ' '))}</span>
+                        <span class="ci-sub">${esc(shortStamp(row.latest_at))}</span>
+                    </div>
+                </td>
+                <td>${pill(row.exists ? 'ready' : 'not written')}</td>
+                <td>${esc(row.rows || 0)}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="3" class="empty-state">No artifact rows</td></tr>';
+
+    const leases = lease.leases || [];
+    document.getElementById('st-lease-total').textContent = `${lease.leased_count || 0} dry-run`;
+    document.getElementById('st-lease-table').innerHTML = leases.length
+        ? leases.map(row => `
+            <tr>
+                <td>${esc(row.target_runtime || '--')}</td>
+                <td>
+                    <div class="ci-title">${esc(row.task?.title || row.task_id)}</div>
+                    <div class="ci-sub">${esc(row.task_id)} · expires ${esc(shortStamp(row.expires_at))}</div>
+                </td>
+                <td>${pill(row.safe_mode || 'read_only')}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="3" class="empty-state">No dry-run leases</td></tr>';
 }
 
 async function loadSovereignThesis() {
@@ -387,5 +542,6 @@ async function loadSovereignThesis() {
 }
 
 loadSovereignThesis();
+loadContinuousIntelligencePanel();
 </script>
 {% endblock %}
