@@ -27,6 +27,15 @@ For a no-network control-tower view:
 python3 scripts/ops/gcp_ai_inventory.py --no-external
 ```
 
+For the broader Google membership, Gmail/Drive, Google One, YouTube, and
+developer-credit posture, pair this with
+[`docs/ops/google-benefits-utilization-plan.md`](google-benefits-utilization-plan.md)
+and:
+
+```bash
+python3 scripts/ops/google_benefits_inventory.py --no-external
+```
+
 ## Guardrails
 
 - No secret values are read, printed, copied, or rotated by this lane.
