@@ -365,6 +365,10 @@ def test_collect_status_no_external_handles_local_ci_without_live_tools(tmp_path
     assert report["summary"]["repo_count"] == len(manifest["repos"])
     assert report["summary"]["upstream_repo_count"] == len(manifest["upstream_repos"])
     assert "repo_classifications" in report["summary"]
+    assert report["summary"]["open_prs_checked"] is False
+    assert "worktree_count" in report["summary"]
+    assert "dirty_worktrees" in report["summary"]
+    assert isinstance(report["worktrees"], list)
     assert report["summary"]["hermes_skill_classes"]["read_only"] == 9
     assert report["summary"]["hermes_production_adjacent_skills"] == 10
     assert sorted(report["summary"]["missing_local_repos"]) == sorted(
@@ -389,9 +393,11 @@ def test_render_markdown_includes_control_board_sections() -> None:
     assert "# Sapphire Autonomous Org Status" in markdown
     assert "## Summary" in markdown
     assert "## Repos" in markdown
+    assert "## Active Worktrees" in markdown
     assert "## Upstream Integration Fleet" in markdown
     assert "## Hermes Skills" in markdown
     assert "## Waves" in markdown
+    assert "- Open PRs: not checked (--no-external)" in markdown
     assert "| sapphire | core |" in markdown
     assert "| openbb | OpenBB-finance/OpenBB | arigatoexpress/OpenBB |" in markdown
     assert "| tradingview | external_mutating | yes |" in markdown
@@ -440,6 +446,60 @@ def test_render_markdown_dirty_summary_is_sanitized() -> None:
     assert "| sapphire | 2 | 1 | 1 | 0 | 0 | 0 | 1 | 0 |" in markdown
     assert "scratch.env" not in markdown
     assert "docs/control.md" not in markdown
+
+
+def test_parse_worktree_porcelain_maps_active_lanes() -> None:
+    output = "\n".join(
+        [
+            "worktree /Users/aribs/Code/Sapphire",
+            "HEAD 23c572cb8fd7e492430bbd61df7eb5af527d8eb0",
+            "branch refs/heads/main",
+            "",
+            "worktree /Users/aribs/Code/_worktrees/sapphire-lane",
+            "HEAD b3e045565d86030aaa6438dd5ab6485959a346a7",
+            "branch refs/heads/feat/sapphire-lane",
+            "locked by operator",
+            "",
+        ]
+    )
+
+    assert org_status.parse_worktree_porcelain(output) == [
+        {
+            "path": "/Users/aribs/Code/Sapphire",
+            "head": "23c572cb8fd7",
+            "branch": "main",
+        },
+        {
+            "path": "/Users/aribs/Code/_worktrees/sapphire-lane",
+            "head": "b3e045565d86",
+            "branch": "feat/sapphire-lane",
+            "locked": "by operator",
+        },
+    ]
+
+
+def test_render_markdown_worktree_summary_is_sanitized() -> None:
+    report = org_status.collect_status(_manifest(), external=False)
+    report["worktrees"] = [
+        {
+            "path": "/Users/aribs/Code/_worktrees/sapphire-secret-lane",
+            "branch": "feat/secret-lane",
+            "upstream": "origin/main",
+            "clean": False,
+            "dirty_count": 1,
+            "dirty_summary": org_status.summarize_dirty_lines(["?? scratch.env"]),
+            "head": "abc123",
+        }
+    ]
+    report["summary"]["worktree_count"] = 1
+    report["summary"]["dirty_worktrees"] = ["feat/secret-lane"]
+
+    markdown = org_status.render_markdown(report)
+
+    assert "## Active Worktrees" in markdown
+    assert "| /Users/aribs/Code/_worktrees/sapphire-secret-lane | feat/secret-lane |" in markdown
+    assert "- Dirty worktrees: feat/secret-lane" in markdown
+    assert "scratch.env" not in markdown
 
 
 def test_parse_launchctl_maps_pid_and_last_status() -> None:

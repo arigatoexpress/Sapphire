@@ -62,6 +62,7 @@ def collect_status(manifest: dict[str, Any], *, external: bool = True) -> dict[s
     repos = [repo_status(repo, external=external) for repo in manifest.get("repos", [])]
     upstream_repos = upstream_fleet_status(manifest.get("upstream_repos", []))
     hermes_skills = hermes_skill_status(DEFAULT_HERMES_SKILLS)
+    worktrees = worktree_status(ROOT)
     report = {
         "schema_version": 1,
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z"),
@@ -70,9 +71,17 @@ def collect_status(manifest: dict[str, Any], *, external: bool = True) -> dict[s
             "generated_for": manifest.get("generated_for"),
             "updated_at": manifest.get("updated_at"),
         },
-        "summary": summarize(manifest, repos, upstream_repos, hermes_skills),
+        "summary": summarize(
+            manifest,
+            repos,
+            upstream_repos,
+            hermes_skills,
+            worktrees=worktrees,
+            external=external,
+        ),
         "repos": repos,
         "upstream_repos": upstream_repos,
+        "worktrees": worktrees,
         "hermes_skills": hermes_skills,
         "gcp_projects": gcp_status(manifest.get("gcp_projects", []), external=external),
         "local_runtime": local_runtime_status(manifest.get("local_runtime", {}), external=external),
@@ -87,11 +96,15 @@ def summarize(
     repos: list[dict[str, Any]],
     upstream_repos: list[dict[str, Any]],
     hermes_skills: dict[str, Any] | None = None,
+    *,
+    worktrees: list[dict[str, Any]] | None = None,
+    external: bool = True,
 ) -> dict[str, Any]:
     classifications: dict[str, int] = {}
     for repo in manifest.get("repos", []):
         key = str(repo.get("classification") or "unknown")
         classifications[key] = classifications.get(key, 0) + 1
+    worktrees = worktrees or []
     return {
         "repo_count": len(repos),
         "repo_classifications": classifications,
@@ -104,6 +117,13 @@ def summarize(
         "upstream_dirty_repos": [
             repo["id"] for repo in upstream_repos if (repo.get("dirty_count") or 0) > 0
         ],
+        "worktree_count": len(worktrees),
+        "dirty_worktrees": [
+            str(repo.get("branch") or repo.get("path") or "unknown")
+            for repo in worktrees
+            if (repo.get("dirty_count") or 0) > 0
+        ],
+        "open_prs_checked": external,
         "open_pr_count": sum(len(repo.get("open_prs", [])) for repo in repos),
         "routine_stages": stage_counts(manifest.get("routines", [])),
         "hermes_skill_classes": (hermes_skills or {}).get("classification_counts", {}),
@@ -231,6 +251,91 @@ def parse_git_remotes(output: str) -> dict[str, dict[str, str]]:
         name, url, mode = parts[:3]
         remotes.setdefault(name, {})[mode.strip("()")] = url
     return remotes
+
+
+def worktree_status(root: Path = ROOT) -> list[dict[str, Any]]:
+    result = run(["git", "worktree", "list", "--porcelain"], cwd=root)
+    if not result["ok"]:
+        return [
+            {
+                "path": str(root),
+                "branch": None,
+                "head": None,
+                "upstream": None,
+                "clean": None,
+                "dirty_count": None,
+                "dirty_summary": None,
+                "main_checkout": True,
+                "errors": [f"git worktree list failed: {result['stderr'][:160]}"],
+            }
+        ]
+
+    rows = []
+    for item in parse_worktree_porcelain(result["stdout"]):
+        path = Path(str(item.get("path") or ""))
+        row: dict[str, Any] = {
+            "path": str(path),
+            "branch": item.get("branch"),
+            "head": item.get("head"),
+            "upstream": None,
+            "clean": None,
+            "dirty_count": None,
+            "dirty_summary": None,
+            "main_checkout": path == root,
+            "detached": bool(item.get("detached")),
+            "locked": bool(item.get("locked")),
+            "prunable": bool(item.get("prunable")),
+            "errors": [],
+        }
+        if not path.exists():
+            row["errors"].append("worktree path missing")
+            rows.append(row)
+            continue
+
+        dirty = run(["git", "status", "--porcelain=v1"], cwd=path)
+        upstream = run(["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], cwd=path)
+        dirty_lines = dirty["stdout"].splitlines() if dirty["ok"] else []
+        row["dirty_count"] = len(dirty_lines)
+        row["dirty_summary"] = summarize_dirty_lines(dirty_lines)
+        row["clean"] = dirty["ok"] and len(dirty_lines) == 0
+        row["upstream"] = upstream["stdout"].strip() if upstream["ok"] else None
+        if not dirty["ok"]:
+            row["errors"].append(f"git dirty failed: {dirty['stderr'][:160]}")
+        rows.append(row)
+    return rows
+
+
+def parse_worktree_porcelain(output: str) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    current: dict[str, Any] = {}
+
+    def flush() -> None:
+        if not current:
+            return
+        branch = current.get("branch")
+        if isinstance(branch, str) and branch.startswith("refs/heads/"):
+            current["branch"] = branch.removeprefix("refs/heads/")
+        rows.append(dict(current))
+        current.clear()
+
+    for line in output.splitlines():
+        if not line:
+            flush()
+            continue
+        key, separator, value = line.partition(" ")
+        if key == "worktree":
+            flush()
+            current["path"] = value
+        elif key == "HEAD":
+            current["head"] = value[:12]
+        elif key == "branch":
+            current["branch"] = value
+        elif separator:
+            current[key] = value
+        else:
+            current[key] = True
+    flush()
+    return rows
 
 
 def repo_status(repo: dict[str, Any], *, external: bool) -> dict[str, Any]:
@@ -491,6 +596,11 @@ def docker_status(expected: list[str], *, external: bool) -> dict[str, Any]:
 
 def render_markdown(report: dict[str, Any]) -> str:
     summary = report["summary"]
+    open_prs = (
+        str(summary["open_pr_count"])
+        if summary.get("open_prs_checked")
+        else "not checked (--no-external)"
+    )
     lines = [
         f"# Sapphire Autonomous Org Status - {report['generated_at']}",
         "",
@@ -498,11 +608,13 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
         f"- Repos tracked: {summary['repo_count']}",
         f"- Upstream integrations tracked: {summary['upstream_repo_count']}",
-        f"- Open PRs: {summary['open_pr_count']}",
+        f"- Open PRs: {open_prs}",
         f"- Dirty repos: {', '.join(summary['dirty_repos']) or 'none'}",
         f"- Missing local repos: {', '.join(summary['missing_local_repos']) or 'none'}",
         f"- Dirty upstream integrations: {', '.join(summary['upstream_dirty_repos']) or 'none'}",
         f"- Missing upstream clones: {', '.join(summary['upstream_missing_local_repos']) or 'none'}",
+        f"- Active worktrees: {summary['worktree_count']}",
+        f"- Dirty worktrees: {', '.join(summary['dirty_worktrees']) or 'none'}",
         f"- Routine stages: {json.dumps(summary['routine_stages'], sort_keys=True)}",
         f"- Hermes skill classes: {json.dumps(summary['hermes_skill_classes'], sort_keys=True)}",
         f"- Hermes production-adjacent skills: {summary['hermes_production_adjacent_skills']}",
@@ -544,6 +656,23 @@ def render_markdown(report: dict[str, Any]) -> str:
                 f"{dirty.get('renamed', 0)} | {dirty.get('untracked', 0)} | "
                 f"{dirty.get('unmerged', 0)} |"
             )
+    lines.extend(
+        [
+            "",
+            "## Active Worktrees",
+            "",
+            "| Path | Branch | Upstream | Clean | Dirty Entries | Head |",
+            "|---|---|---|:---:|---:|---|",
+        ]
+    )
+    for worktree in report.get("worktrees", []):
+        lines.append(
+            f"| {worktree.get('path') or '-'} | {worktree.get('branch') or '-'} | "
+            f"{worktree.get('upstream') or '-'} | "
+            f"{'yes' if worktree.get('clean') else 'no'} | "
+            f"{worktree.get('dirty_count') if worktree.get('dirty_count') is not None else '-'} | "
+            f"{worktree.get('head') or '-'} |"
+        )
     lines.extend(
         [
             "",

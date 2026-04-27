@@ -43,6 +43,10 @@ python3 scripts/ops/routine_soak_status.py --format markdown
 CI-safe mode and the right first check when editing the manifest or report
 shape. Dirty repository reporting is intentionally sanitized to counts by
 porcelain status category; it does not print filenames or diff contents.
+The local git worktree inventory still runs in `--no-external` mode so parallel
+Codex/Claude/human lanes are visible before starting a new silo branch. When
+external probes are skipped, the Open PR count is reported as `not checked`
+rather than a confirmed zero.
 
 Use `routine_soak_status.py` when deciding whether a remote-shadow routine has
 enough scheduled GitHub Actions cycles to move from soak collection to artifact
