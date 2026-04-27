@@ -67,6 +67,7 @@ data/.watchdog_state.json
 data/foundry_sync_state.json
 data/foundry_sync_history.jsonl
 data/security/
+data/ci/
 data/paper_trading.jsonl
 data/system_events.jsonl
 data/trading_predictions.jsonl
