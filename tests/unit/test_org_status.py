@@ -212,6 +212,31 @@ def test_backtest_weekly_tracks_soak_evidence() -> None:
     }
 
 
+def test_content_engine_tracks_soak_evidence() -> None:
+    routines = {routine["id"]: routine for routine in _manifest()["routines"]}
+    routine = routines["content-engine"]
+
+    assert routine["stage"] == "soaking"
+    assert routine["remote_workflow"] == ".github/workflows/content-engine.yml"
+    assert routine["comparator"] == "scripts/ops/compare_content_artifacts.py"
+    assert (
+        routine["soak_tracking"]["evidence_doc"]
+        == "docs/org/content-engine-shadow-soak-2026-04-26.md"
+    )
+    assert routine["soak_tracking"]["required_scheduled_successes"] == 7
+    assert routine["soak_tracking"]["latest_manual_remote_run_id"] == "24966520333"
+    assert routine["soak_tracking"]["latest_comparison"] == {
+        "compared_at": "2026-04-26T20:41:18Z",
+        "verdict": "WARN",
+        "rows_compared": 4,
+        "rows_pass": 0,
+        "rows_warn": 4,
+        "rows_fail": 0,
+        "missing_in_local": 0,
+        "missing_in_remote": 0,
+    }
+
+
 def test_hermes_agent_tracks_runtime_checkout_and_local_patches() -> None:
     repos = {repo["id"]: repo for repo in _manifest()["repos"]}
     repo = repos["hermes-agent"]

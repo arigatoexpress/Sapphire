@@ -481,6 +481,16 @@ routines:
       started_at: "2026-04-26"
       evidence_doc: docs/org/content-engine-shadow-soak-2026-04-26.md
       required_scheduled_successes: 7
+      latest_manual_remote_run_id: "24966520333"
+      latest_comparison:
+        compared_at: "2026-04-26T20:41:18Z"
+        verdict: WARN
+        rows_compared: 4
+        rows_pass: 0
+        rows_warn: 4
+        rows_fail: 0
+        missing_in_local: 0
+        missing_in_remote: 0
       cutover_gate: "At least 7 scheduled daily cycles with zero FAIL comparisons, no remote-only quality failures, and matching report-kind/platform coverage."
   - id: logrotate
     local_label: com.sapphire.logrotate
