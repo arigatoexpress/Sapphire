@@ -18,7 +18,8 @@ permissions:
 jobs:
   lint:
     name: lint (ruff)
-    runs-on: ${{ vars.SAPPHIRE_RUNNER && fromJSON(vars.SAPPHIRE_RUNNER) || 'ubuntu-latest' }}
+    if: ${{ vars.SAPPHIRE_RUNNER != '' }}
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
@@ -35,7 +36,8 @@ jobs:
 
   test:
     name: test (pytest)
-    runs-on: ${{ vars.SAPPHIRE_RUNNER && fromJSON(vars.SAPPHIRE_RUNNER) || 'ubuntu-latest' }}
+    if: ${{ vars.SAPPHIRE_RUNNER != '' }}
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     needs: lint
     env:
       AUTH_PASSWORD: ci-placeholder
@@ -65,7 +67,8 @@ jobs:
 
   plugin-test:
     name: plugin tests
-    runs-on: ${{ vars.SAPPHIRE_RUNNER && fromJSON(vars.SAPPHIRE_RUNNER) || 'ubuntu-latest' }}
+    if: ${{ vars.SAPPHIRE_RUNNER != '' }}
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     needs: lint
     steps:
       - uses: actions/checkout@v6
@@ -82,7 +85,8 @@ jobs:
 
   tool-registry:
     name: tool registry invariants
-    runs-on: ${{ vars.SAPPHIRE_RUNNER && fromJSON(vars.SAPPHIRE_RUNNER) || 'ubuntu-latest' }}
+    if: ${{ vars.SAPPHIRE_RUNNER != '' }}
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
@@ -93,7 +97,8 @@ jobs:
 
   secrets-scan:
     name: gitleaks (secrets)
-    runs-on: ${{ vars.SAPPHIRE_RUNNER && fromJSON(vars.SAPPHIRE_RUNNER) || 'ubuntu-latest' }}
+    if: ${{ vars.SAPPHIRE_RUNNER != '' }}
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     permissions:
       contents: read
       pull-requests: read

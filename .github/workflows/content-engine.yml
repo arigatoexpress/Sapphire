@@ -18,7 +18,8 @@ concurrency:
 jobs:
   generate:
     name: generate content artifacts
-    runs-on: ${{ vars.SAPPHIRE_RUNNER && fromJSON(vars.SAPPHIRE_RUNNER) || 'ubuntu-latest' }}
+    if: ${{ vars.SAPPHIRE_RUNNER != '' }}
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6

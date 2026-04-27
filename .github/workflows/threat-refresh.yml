@@ -17,7 +17,8 @@ concurrency:
 jobs:
   refresh:
     name: refresh threats
-    runs-on: ${{ vars.SAPPHIRE_RUNNER && fromJSON(vars.SAPPHIRE_RUNNER) || 'ubuntu-latest' }}
+    if: ${{ vars.SAPPHIRE_RUNNER != '' }}
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6

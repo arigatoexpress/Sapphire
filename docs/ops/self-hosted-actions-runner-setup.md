@@ -50,14 +50,17 @@ without paying GitHub for runner minutes.
 
    Logs land at `~/actions-runner/_diag/Runner_<date>.log`.
 
-4. The workflow files in `.github/workflows/*.yml` already opt-in via
-   the `SAPPHIRE_RUNNER` repo variable — every `runs-on:` resolves to:
+4. The workflow files in `.github/workflows/*.yml` already opt in via
+   the `SAPPHIRE_RUNNER` repo variable. Jobs are skipped when the variable is
+   unset, so PRs and scheduled workflows do not fall back to paid
+   GitHub-hosted runners. Every job is gated like this:
 
    ```yaml
-   runs-on: ${{ vars.SAPPHIRE_RUNNER && fromJSON(vars.SAPPHIRE_RUNNER) || 'ubuntu-latest' }}
+   if: ${{ vars.SAPPHIRE_RUNNER != '' }}
+   runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
    ```
 
-   To activate the self-hosted runner across every workflow, go to
+   To activate the free self-hosted runner across every workflow, go to
    `Settings -> Secrets and variables -> Actions -> Variables` and set
    the repo-scoped variable `SAPPHIRE_RUNNER` to a JSON-encoded list of
    labels:
@@ -66,8 +69,9 @@ without paying GitHub for runner minutes.
    ["self-hosted","macOS","arm64","sapphire-commander"]
    ```
 
-   To revert to GitHub-hosted runners once billing is restored, simply
-   delete the `SAPPHIRE_RUNNER` variable. No workflow edit needed.
+   To pause remote CI without paying GitHub, delete the `SAPPHIRE_RUNNER`
+   variable. No workflow edit needed; the jobs will skip until the variable is
+   restored.
 
 5. Confirm a workflow run pushes through:
 
@@ -114,9 +118,9 @@ This is the procedure I used during the 2026-04-26 evening autonomous
 window to admin-merge tests-only and doc-only PRs while CI was billing-
 blocked. See [issue #220](https://github.com/arigatoexpress/Sapphire/issues/220) for the full bypass log.
 
-## Decommissioning when GitHub-hosted CI returns
+## Decommissioning the self-hosted runner
 
-Once billing is restored and you want to retire the self-hosted runner:
+When you want to retire the self-hosted runner:
 
 ```bash
 cd ~/actions-runner
@@ -126,8 +130,9 @@ cd ~/actions-runner
 rm -rf ~/actions-runner
 ```
 
-And revert the `runs-on:` change in `.github/workflows/*.yml` (or set
-the repo variable `SAPPHIRE_RUNNER=` to empty).
+Then delete the `SAPPHIRE_RUNNER` repository variable. This keeps Sapphire in
+local-CI/no-spend mode; do not add a GitHub-hosted runner fallback unless Ari
+explicitly approves paid Actions spend.
 
 ## Cost summary
 
