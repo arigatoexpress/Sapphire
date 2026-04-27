@@ -1,0 +1,420 @@
+{% extends 'base.html' %}
+
+{% block title %}Investment Intel{% endblock %}
+
+{% block extra_css %}
+.intel-meta {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.intel-table-wrap {
+    overflow-x: auto;
+}
+
+.source-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.source-chip {
+    border: 1px solid var(--border-dim);
+    color: var(--text-muted);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.62rem;
+    white-space: nowrap;
+}
+
+.source-chip.ready {
+    border-color: rgba(154,255,120,0.45);
+    color: var(--green);
+}
+
+.source-chip.needs_key,
+.source-chip.needs_config,
+.source-chip.needs_secret_presence {
+    border-color: rgba(98,255,64,0.45);
+    color: var(--amber);
+}
+
+.mindset-list {
+    display: grid;
+    gap: 8px;
+}
+
+.mindset-item {
+    border: 1px solid var(--border-dim);
+    background: rgba(98,255,64,0.025);
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: var(--text-secondary);
+    line-height: 1.45;
+    font-size: 0.82rem;
+}
+
+.lens-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.lens-block {
+    border: 1px solid var(--border-dim);
+    border-radius: 8px;
+    padding: 12px;
+    background: rgba(255,255,255,0.015);
+}
+
+.lens-title {
+    color: var(--amber);
+    font-family: var(--font-header);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.95rem;
+    margin-bottom: 8px;
+}
+
+.lens-detail {
+    color: var(--text-secondary);
+    font-size: 0.76rem;
+    line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+    .lens-grid { grid-template-columns: 1fr; }
+}
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:var(--space-xl);flex-wrap:wrap;">
+    <div>
+        <h1 style="font-size:1.4rem;font-weight:700;color:var(--text-primary);margin:0 0 4px;">Investment Intel</h1>
+        <p style="color:var(--text-muted);font-size:.85rem;margin:0;">Read-only investment, source, ops, and crypto intelligence.</p>
+    </div>
+    <button class="btn primary" onclick="loadInvestmentIntel()">Refresh</button>
+</div>
+
+<div class="grid grid-4" style="margin-bottom:var(--space-xl);">
+    <div class="stat-card">
+        <div class="stat-label">Assets</div>
+        <div class="stat-value" id="ii-assets">--</div>
+        <div class="stat-change" id="ii-assets-sub">Universe</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Connectors</div>
+        <div class="stat-value" id="ii-connectors">--</div>
+        <div class="stat-change" id="ii-connectors-sub">Configured</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Research Pack</div>
+        <div class="stat-value" id="ii-pack" style="font-size:1rem;">--</div>
+        <div class="stat-change" id="ii-pack-sub">Source</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Ops Queue</div>
+        <div class="stat-value" id="ii-ops">--</div>
+        <div class="stat-change" id="ii-ops-sub">Ready lanes</div>
+    </div>
+</div>
+
+<div class="grid grid-2" style="margin-bottom:var(--space-xl);">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Research Mindset</h3>
+            <span class="pill neutral" id="ii-ts">--</span>
+        </div>
+        <div class="card-body">
+            <div class="mindset-list" id="ii-mindset">
+                <div class="loading">Loading</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Analysis Lenses</h3>
+            <span class="pill neutral" id="ii-mode">read-only</span>
+        </div>
+        <div class="card-body">
+            <div class="lens-grid" id="ii-lenses">
+                <div class="loading">Loading</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-2" style="margin-bottom:var(--space-xl);">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Source Probes</h3>
+            <span class="pill neutral" id="ii-probe-summary">--</span>
+        </div>
+        <div class="card-body no-pad">
+            <div class="intel-table-wrap">
+                <table class="data-table">
+                    <thead><tr><th>Source</th><th>Status</th><th>Observed</th><th>Detail</th></tr></thead>
+                    <tbody id="ii-probes"><tr><td colspan="4" class="loading">Loading</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Materialization Plan</h3>
+            <span class="pill neutral" id="ii-materialization-total">--</span>
+        </div>
+        <div class="card-body no-pad">
+            <div class="intel-table-wrap">
+                <table class="data-table">
+                    <thead><tr><th>Table</th><th>Rows</th><th>Target</th></tr></thead>
+                    <tbody id="ii-materialization"><tr><td colspan="3" class="loading">Loading</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Universe Coverage</h3>
+        <div class="intel-meta">
+            <span class="pill neutral" id="ii-missing-envs">env: --</span>
+            <span class="pill neutral" id="ii-pack-files">files: --</span>
+        </div>
+    </div>
+    <div class="card-body no-pad">
+        <div class="intel-table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th>Name</th>
+                        <th>Class</th>
+                        <th>Tier</th>
+                        <th>Themes</th>
+                        <th>Sources</th>
+                    </tr>
+                </thead>
+                <tbody id="ii-universe">
+                    <tr><td colspan="6" class="loading">Loading</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-top:var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title">Series Catalog</h3>
+        <span class="pill neutral" id="ii-series-total">--</span>
+    </div>
+    <div class="card-body no-pad">
+        <div class="intel-table-wrap">
+            <table class="data-table">
+                <thead><tr><th>Provider</th><th>Series</th><th>Themes</th><th>Assets</th><th>Purpose</th></tr></thead>
+                <tbody id="ii-series"><tr><td colspan="5" class="loading">Loading</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-2" style="margin-top:var(--space-xl);">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Source Mesh</h3>
+            <span class="pill neutral" id="ii-source-total">--</span>
+        </div>
+        <div class="card-body no-pad">
+            <div class="intel-table-wrap">
+                <table class="data-table">
+                    <thead><tr><th>Connector</th><th>Category</th><th>Status</th><th>Cadence</th></tr></thead>
+                    <tbody id="ii-sources"><tr><td colspan="4" class="loading">Loading</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Ops Queue</h3>
+            <span class="pill neutral">dry-run</span>
+        </div>
+        <div class="card-body no-pad">
+            <div class="intel-table-wrap">
+                <table class="data-table">
+                    <thead><tr><th>Lane</th><th>Status</th><th>Work</th></tr></thead>
+                    <tbody id="ii-ops-table"><tr><td colspan="3" class="loading">Loading</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function esc(value) {
+    return String(value == null ? '' : value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
+
+function statusPill(status) {
+    const cls = status === 'ready' ? 'green' : (status === 'planned' ? 'neutral' : 'amber');
+    return `<span class="pill ${cls}">${esc(status || 'unknown')}</span>`;
+}
+
+function sourceChips(connectors, connectorById) {
+    return `<div class="source-list">${(connectors || []).map(id => {
+        const row = connectorById[id] || {};
+        const status = row.status || 'ready';
+        return `<span class="source-chip ${esc(status)}" title="${esc(row.label || id)}">${esc(id)}</span>`;
+    }).join('')}</div>`;
+}
+
+async function loadInvestmentIntel() {
+    let data;
+    try {
+        const resp = await fetch('/api/investments/intel');
+        data = await resp.json();
+    } catch (err) {
+        document.getElementById('ii-mindset').innerHTML = `<div class="empty-state">${esc(err.message)}</div>`;
+        return;
+    }
+
+    const mesh = data.source_mesh || {};
+    const totals = mesh.totals || {};
+    const connectors = mesh.connectors || [];
+    const connectorById = Object.fromEntries(connectors.map(row => [row.id, row]));
+    const ops = data.ops_queue || [];
+    const readyOps = ops.filter(row => row.status === 'ready').length;
+    const probes = data.source_probes || {};
+    const probeSummary = probes.summary || {};
+    const materialization = data.materialization_plan || {};
+    const series = data.series_catalog || [];
+
+    document.getElementById('ii-assets').textContent = totals.assets || (data.universe || []).length || 0;
+    document.getElementById('ii-connectors').textContent = totals.connectors || connectors.length || 0;
+    document.getElementById('ii-connectors-sub').textContent = `${totals.configured_connectors || 0} configured`;
+    document.getElementById('ii-pack').textContent = data.research_pack?.available ? 'AVAILABLE' : 'MISSING';
+    document.getElementById('ii-pack-sub').textContent = data.research_pack?.source_label || 'not configured';
+    document.getElementById('ii-ops').textContent = ops.length;
+    document.getElementById('ii-ops-sub').textContent = `${readyOps} ready`;
+    document.getElementById('ii-ts').textContent = (data.timestamp || '').replace('T', ' ').slice(0, 19);
+    document.getElementById('ii-mode').textContent = data.mode || 'read-only';
+    document.getElementById('ii-missing-envs').textContent = `env: ${(mesh.missing_envs || []).length}`;
+    document.getElementById('ii-pack-files').textContent = `files: ${(data.research_pack?.files || []).length}`;
+    document.getElementById('ii-source-total').textContent = `${connectors.length} connectors`;
+    document.getElementById('ii-probe-summary').textContent =
+        `${probeSummary.ready || 0} ready / ${probeSummary.total || 0}`;
+    document.getElementById('ii-materialization-total').textContent =
+        `${materialization.total_rows || 0} rows`;
+    document.getElementById('ii-series-total').textContent = `${series.length} series`;
+
+    const mindset = data.mindset || [];
+    document.getElementById('ii-mindset').innerHTML = mindset.length
+        ? mindset.map(item => `<div class="mindset-item">${esc(item)}</div>`).join('')
+        : '<div class="empty-state">No mindset data</div>';
+
+    const lenses = data.analysis_lenses || [];
+    document.getElementById('ii-lenses').innerHTML = lenses.length
+        ? lenses.map(lens => `
+            <div class="lens-block">
+                <div class="lens-title">${esc(lens.label)}</div>
+                <div class="lens-detail">
+                    <div>${esc((lens.symbols || []).join(', ') || 'no mapped symbols')}</div>
+                    <div style="margin-top:6px;color:var(--text-muted);">${esc((lens.metrics || []).join(' / '))}</div>
+                </div>
+            </div>
+        `).join('')
+        : '<div class="empty-state">No lenses</div>';
+
+    const probeRows = probes.probes || [];
+    document.getElementById('ii-probes').innerHTML = probeRows.length
+        ? probeRows.map(row => `
+            <tr>
+                <td>${esc(row.label)}</td>
+                <td>${statusPill(row.status)}</td>
+                <td>${row.observed_count == null ? '—' : esc(row.observed_count)}</td>
+                <td>${esc(row.detail)}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="4" class="empty-state">No probe rows</td></tr>';
+
+    const materializationRows = materialization.tables || [];
+    document.getElementById('ii-materialization').innerHTML = materializationRows.length
+        ? materializationRows.map(row => `
+            <tr>
+                <td>${esc(row.table)}</td>
+                <td>${esc(row.rows)}</td>
+                <td style="font-size:.68rem;color:var(--text-muted);">${esc(row.target)}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="3" class="empty-state">No materialization rows</td></tr>';
+
+    const universe = data.universe || [];
+    document.getElementById('ii-universe').innerHTML = universe.length
+        ? universe.map(asset => `
+            <tr>
+                <td><strong style="color:var(--amber);">${esc(asset.symbol)}</strong></td>
+                <td>${esc(asset.name)}</td>
+                <td>${esc(asset.asset_class)}</td>
+                <td>${esc(asset.risk_tier)}</td>
+                <td>${esc((asset.themes || []).join(', '))}</td>
+                <td>${sourceChips(asset.connectors || [], connectorById)}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="6" class="empty-state">No universe rows</td></tr>';
+
+    document.getElementById('ii-series').innerHTML = series.length
+        ? series.map(row => `
+            <tr>
+                <td>${esc(row.provider)}</td>
+                <td>
+                    <div style="color:var(--text-primary);">${esc(row.label)}</div>
+                    <div style="color:var(--text-muted);font-size:.68rem;">${esc(row.provider_series)}</div>
+                </td>
+                <td>${esc((row.themes || []).join(', '))}</td>
+                <td>${esc((row.assets || []).join(', '))}</td>
+                <td>${esc(row.purpose)}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="5" class="empty-state">No series rows</td></tr>';
+
+    document.getElementById('ii-sources').innerHTML = connectors.length
+        ? connectors.map(source => `
+            <tr>
+                <td><a href="${esc(source.docs_url)}" target="_blank" rel="noreferrer" style="color:var(--amber);">${esc(source.label)}</a></td>
+                <td>${esc(source.category)}</td>
+                <td>${statusPill(source.status)}</td>
+                <td>${esc(source.cadence)}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="4" class="empty-state">No sources</td></tr>';
+
+    document.getElementById('ii-ops-table').innerHTML = ops.length
+        ? ops.map(row => `
+            <tr>
+                <td>${esc(row.lane)}</td>
+                <td>${statusPill(row.status)}</td>
+                <td>
+                    <div style="color:var(--text-primary);">${esc(row.title)}</div>
+                    <div style="color:var(--text-muted);font-size:.72rem;margin-top:3px;">${esc(row.detail)}</div>
+                </td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="3" class="empty-state">No ops rows</td></tr>';
+}
+
+loadInvestmentIntel();
+</script>
+{% endblock %}

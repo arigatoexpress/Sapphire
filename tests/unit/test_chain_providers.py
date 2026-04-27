@@ -96,6 +96,48 @@ def test_http_post_json_returns_stale_cache_after_retry_exhaustion(monkeypatch):
     assert sources._http_post_json(url, payload) == stale
 
 
+def test_coingecko_simple_prices_builds_snapshot_query(monkeypatch):
+    captured = {}
+
+    def fake_get(url, timeout=sources.DEFAULT_TIMEOUT):
+        captured["url"] = url
+        return {"bitcoin": {"usd": 100000, "usd_24h_change": 1.2}}
+
+    monkeypatch.setattr(sources, "_http_get", fake_get)
+    out = sources.CoinGeckoClient().simple_prices(["bitcoin", "bitcoin"])
+
+    assert out["bitcoin"]["usd"] == 100000
+    assert "/simple/price?" in captured["url"]
+    assert "ids=bitcoin" in captured["url"]
+    assert "include_24hr_change=true" in captured["url"]
+
+
+def test_coingecko_trending_normalizes_coin_rows(monkeypatch):
+    monkeypatch.setattr(
+        sources,
+        "_http_get",
+        lambda *_args, **_kwargs: {
+            "coins": [
+                {
+                    "item": {
+                        "id": "hyperliquid",
+                        "symbol": "hype",
+                        "name": "Hyperliquid",
+                        "market_cap_rank": 15,
+                        "score": 0,
+                    }
+                }
+            ]
+        },
+    )
+
+    trending = sources.CoinGeckoClient().trending()
+
+    assert trending[0].coin_id == "hyperliquid"
+    assert trending[0].symbol == "HYPE"
+    assert trending[0].market_cap_rank == 15
+
+
 # --- BGeometrics -----------------------------------------------------------
 
 

@@ -449,6 +449,15 @@ class GlobalMarket:
     market_cap_change_pct_24h: float
 
 
+@dataclass
+class TrendingCoin:
+    coin_id: str
+    symbol: str
+    name: str
+    market_cap_rank: int | None
+    score: int | None
+
+
 class CoinGeckoClient:
     """CoinGecko public API adapter — market globals + historical prices."""
 
@@ -498,6 +507,55 @@ class CoinGeckoClient:
         """Historical prices for a coin. Returns {prices: [[ts_ms, price], ...], ...}."""
         url = f"{self.BASE}/coins/{coin_id}/market_chart?vs_currency={vs_currency}&days={days}"
         return _http_get(url)
+
+    def simple_prices(
+        self,
+        coin_ids: list[str],
+        *,
+        vs_currency: str = "usd",
+        include_market_cap: bool = True,
+        include_24hr_vol: bool = True,
+        include_24hr_change: bool = True,
+    ) -> dict[str, dict]:
+        """Fast spot snapshot for one or more CoinGecko coin IDs."""
+        clean_ids = sorted({coin_id.strip() for coin_id in coin_ids if coin_id.strip()})
+        if not clean_ids:
+            return {}
+        params = urllib.parse.urlencode(
+            {
+                "ids": ",".join(clean_ids),
+                "vs_currencies": vs_currency,
+                "include_market_cap": str(include_market_cap).lower(),
+                "include_24hr_vol": str(include_24hr_vol).lower(),
+                "include_24hr_change": str(include_24hr_change).lower(),
+            }
+        )
+        resp = _http_get(f"{self.BASE}/simple/price?{params}")
+        if not isinstance(resp, dict):
+            raise SourceError("CoinGecko /simple/price returned non-dict")
+        return resp
+
+    def trending(self, limit: int = 10) -> list[TrendingCoin]:
+        """Coins trending in CoinGecko search over the last 24 hours."""
+        resp = _http_get(f"{self.BASE}/search/trending")
+        coins = resp.get("coins") if isinstance(resp, dict) else None
+        if not isinstance(coins, list):
+            raise SourceError("CoinGecko /search/trending returned no coins")
+        out: list[TrendingCoin] = []
+        for entry in coins[: max(0, limit)]:
+            item = entry.get("item") if isinstance(entry, dict) else None
+            if not isinstance(item, dict):
+                continue
+            out.append(
+                TrendingCoin(
+                    coin_id=str(item.get("id") or ""),
+                    symbol=str(item.get("symbol") or "").upper(),
+                    name=str(item.get("name") or ""),
+                    market_cap_rank=item.get("market_cap_rank"),
+                    score=item.get("score"),
+                )
+            )
+        return out
 
 
 # ---------------------------------------------------------------------------
