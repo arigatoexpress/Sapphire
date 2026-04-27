@@ -62,6 +62,7 @@ data/metrics/
 data/signals/
 data/vote_monitor/
 data/.gcp_stage/
+data/.autonomy/
 data/.gcp_sync_state.json
 data/.watchdog_state.json
 data/foundry_sync_state.json

@@ -2506,6 +2506,79 @@ def api_autonomy_continuous_intelligence():
         }), 200
 
 
+@app.route('/api/autonomy/continuous-intelligence/artifacts')
+@requires_auth
+def api_autonomy_continuous_intelligence_artifacts():
+    """Read-only artifact status and snapshot preview for continuous intelligence."""
+    try:
+        from lib.autonomy.continuous_intelligence_artifacts import artifact_status, snapshot_tasks
+
+        status = artifact_status()
+        preview = snapshot_tasks(write=False)
+        return jsonify({
+            **status,
+            'snapshot_preview': preview,
+            'write_enabled': False,
+        })
+    except Exception as e:
+        log.warning("continuous intelligence artifact API error: %s", e)
+        return jsonify({
+            'mode': 'continuous_intelligence_artifact_status',
+            'error': str(e),
+            'write_enabled': False,
+            'writes_by_default': False,
+            'execution_enabled': False,
+            'live_trading_enabled': False,
+            'telegram_sends_enabled': False,
+            'files': {},
+            'totals': {},
+            'snapshot_preview': {'records': 0, 'write_enabled': False},
+        }), 200
+
+
+@app.route('/api/autonomy/continuous-intelligence/lease-preview')
+@requires_auth
+def api_autonomy_continuous_intelligence_lease_preview():
+    """Preview dry-run task leases. This endpoint never writes lease files."""
+    try:
+        from lib.autonomy.continuous_intelligence_artifacts import lease_tasks
+
+        try:
+            limit = int(request.args.get('limit', '3'))
+        except ValueError:
+            limit = 3
+        capabilities = [
+            item.strip()
+            for item in request.args.getlist('capability')
+            if item.strip()
+        ]
+        payload = lease_tasks(
+            agent_id=str(request.args.get('agent_id') or 'windows-gpu'),
+            capabilities=capabilities,
+            target_runtime=request.args.get('target_runtime') or None,
+            limit=limit,
+            write=False,
+        )
+        return jsonify(payload)
+    except Exception as e:
+        log.warning("continuous intelligence lease preview API error: %s", e)
+        return jsonify({
+            'mode': 'dry_run_task_lease',
+            'error': str(e),
+            'write_enabled': False,
+            'writes_by_default': False,
+            'leases': [],
+            'leased_count': 0,
+            'candidate_count': 0,
+            'safety': {
+                'dry_run_dispatch_only': True,
+                'execution_enabled': False,
+                'live_trading_enabled': False,
+                'telegram_sends_enabled': False,
+            },
+        }), 200
+
+
 @app.route('/api/investments/sources')
 @requires_auth
 def api_investments_sources():
