@@ -2296,6 +2296,16 @@ def intel_page():
     return render_template('pages/intel.html', current_page='intel', page_title='Intel')
 
 
+@app.route('/investment-intel')
+@requires_auth
+def investment_intel_page():
+    return render_template(
+        'pages/investment_intel.html',
+        current_page='investment-intel',
+        page_title='Investment Intel',
+    )
+
+
 @app.route('/api/foundry/readiness')
 @requires_auth
 def api_foundry_readiness():
@@ -2349,6 +2359,60 @@ def api_foundry_sync_status():
             'source_types': [],
             'error': str(e),
             'last_updated': time.time(),
+        }), 200
+
+
+@app.route('/api/investments/intel')
+@requires_auth
+def api_investments_intel():
+    """Read-only investment intelligence source mesh and thesis report."""
+    try:
+        from lib.intel.investment_intel import build_investment_intel_report
+
+        live_crypto = str(request.args.get('live') or '').lower() in {'1', 'true', 'yes'}
+        return jsonify(build_investment_intel_report(fetch_live_crypto=live_crypto))
+    except Exception as e:
+        log.warning("investment intel API error: %s", e)
+        return jsonify({
+            'timestamp': datetime.now(UTC).isoformat(),
+            'mode': 'read-only',
+            'error': str(e),
+            'research_pack': {'available': False, 'source_label': 'unavailable'},
+            'universe': [],
+            'source_mesh': {
+                'connectors': [],
+                'coverage': [],
+                'totals': {'assets': 0, 'connectors': 0, 'configured_connectors': 0},
+                'missing_envs': [],
+            },
+            'ops_queue': [],
+            'analysis_lenses': [],
+            'mindset': [],
+        }), 200
+
+
+@app.route('/api/investments/sources')
+@requires_auth
+def api_investments_sources():
+    """Read-only source connection map for equities, macro, energy, and crypto."""
+    try:
+        from lib.intel.investment_intel import build_source_report
+
+        return jsonify(build_source_report())
+    except Exception as e:
+        log.warning("investment sources API error: %s", e)
+        return jsonify({
+            'timestamp': datetime.now(UTC).isoformat(),
+            'mode': 'read-only',
+            'error': str(e),
+            'research_pack': {'available': False, 'source_label': 'unavailable'},
+            'source_mesh': {
+                'connectors': [],
+                'coverage': [],
+                'totals': {'assets': 0, 'connectors': 0, 'configured_connectors': 0},
+                'missing_envs': [],
+            },
+            'robinhood': {'configured': False, 'mode': 'read-only portfolio snapshot'},
         }), 200
 
 

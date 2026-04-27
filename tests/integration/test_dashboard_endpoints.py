@@ -10,6 +10,7 @@ import base64
 import json
 import os
 import sys
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -243,3 +244,52 @@ def test_intel_sources_include_foundry_readiness(app_client, tmp_path, monkeypat
     assert sources["Threat snapshots"]["items"] == 1
     assert sources["Palantir Foundry"]["status"] == "partial"
     assert sources["Palantir Foundry"]["items"] >= 1
+
+
+def test_investment_intel_endpoint_returns_source_mesh(app_client, tmp_path, monkeypatch):
+    _, client = app_client
+    pack_path = tmp_path / "investment.zip"
+    with zipfile.ZipFile(pack_path, "w") as zf:
+        zf.writestr(
+            "investment_research.agent.final.md",
+            "\n".join(
+                [
+                    "# Asymmetric Bets 2026",
+                    "## Top 10 Conviction Ideas",
+                    "| # | Ticker | Company | Risk Tier | Price Target | Implied Upside | Key Catalyst |",
+                    "|---|--------|---------|-----------|-------------|----------------|--------------|",
+                    "| 1 | BWXT | BWX Technologies | Moderate | 250 | +20% | Nuclear demand |",
+                    "Principle: multi-theme premium plus source freshness.",
+                ]
+            ),
+        )
+        zf.writestr(
+            "BWXT_info.csv",
+            "symbol,longName,sectorDisp,industryDisp,currentPrice\n"
+            "BWXT,BWX Technologies Inc.,Industrials,Aerospace & Defense,223.15\n",
+        )
+    monkeypatch.setenv("SAPPHIRE_INVESTMENT_RESEARCH_ZIP", str(pack_path))
+
+    r = client.get("/api/investments/intel", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["mode"] == "read-only"
+    assert body["research_pack"]["available"] is True
+    assert body["source_mesh"]["totals"]["connectors"] >= 8
+    symbols = {asset["symbol"]: asset for asset in body["universe"]}
+    assert "BWXT" in symbols
+    assert "BTC" in symbols
+    assert "sec_companyfacts" in symbols["BWXT"]["connectors"]
+    assert "hyperliquid_info" in symbols["BTC"]["connectors"]
+    assert body["crypto_bridge"]["live_requested"] is False
+    assert {row["symbol"] for row in body["crypto_bridge"]["tokens_we_like"]} >= {"BTC", "HYPE"}
+
+
+def test_investment_sources_endpoint_returns_robinhood_presence(app_client):
+    _, client = app_client
+    r = client.get("/api/investments/sources", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["mode"] == "read-only"
+    assert "source_mesh" in body
+    assert body["robinhood"]["mode"] == "read-only portfolio snapshot"
