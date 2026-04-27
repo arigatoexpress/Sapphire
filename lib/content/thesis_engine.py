@@ -77,46 +77,53 @@ class ThesisEngine:
         regime: str | None = None,
         factor_score: float | None = None,
     ) -> Thesis:
-        supporting: list[str] = []
-        against: list[str] = []
+        bull_reasons: list[str] = []
+        bear_reasons: list[str] = []
+        neutral_reasons: list[str] = []
         bull_votes = 0
         bear_votes = 0
 
         direction = (prediction or {}).get("direction", "neutral")
         if direction in ("bullish", "strong_bullish"):
             bull_votes += 2
-            supporting.append(f"TA model: {direction}")
+            bull_reasons.append(f"TA model: {direction}")
         elif direction in ("bearish", "strong_bearish"):
             bear_votes += 2
-            against.append(f"TA model: {direction}")
+            bear_reasons.append(f"TA model: {direction}")
         else:
-            supporting.append("TA model: neutral")
+            neutral_reasons.append("TA model: neutral")
 
         if regime == "RISK_ON":
             bull_votes += 1
-            supporting.append("chain regime: RISK_ON")
+            bull_reasons.append("chain regime: RISK_ON")
         elif regime == "RISK_OFF":
             bear_votes += 1
-            against.append("chain regime: RISK_OFF")
+            bear_reasons.append("chain regime: RISK_OFF")
 
         if factor_score is not None:
             if factor_score > 0.3:
                 bull_votes += 1
-                supporting.append(f"factor score: {factor_score:+.2f}")
+                bull_reasons.append(f"factor score: {factor_score:+.2f}")
             elif factor_score < -0.3:
                 bear_votes += 1
-                against.append(f"factor score: {factor_score:+.2f}")
+                bear_reasons.append(f"factor score: {factor_score:+.2f}")
 
         total = bull_votes + bear_votes or 1
         if bull_votes > bear_votes:
             stance = "bull"
             confidence = round(bull_votes / total, 2)
+            supporting = bull_reasons or neutral_reasons
+            against = bear_reasons
         elif bear_votes > bull_votes:
             stance = "bear"
             confidence = round(bear_votes / total, 2)
+            supporting = bear_reasons or neutral_reasons
+            against = bull_reasons
         else:
             stance = "neutral"
             confidence = 0.5
+            supporting = neutral_reasons or ["mixed bullish/bearish evidence"]
+            against = bull_reasons + bear_reasons
 
         headline = _pick_headline(stance, asset, supporting)
         return Thesis(

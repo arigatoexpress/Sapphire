@@ -2306,6 +2306,16 @@ def investment_intel_page():
     )
 
 
+@app.route('/sovereign-thesis')
+@requires_auth
+def sovereign_thesis_page():
+    return render_template(
+        'pages/sovereign_thesis.html',
+        current_page='sovereign-thesis',
+        page_title='Sovereign Thesis',
+    )
+
+
 @app.route('/api/foundry/readiness')
 @requires_auth
 def api_foundry_readiness():
@@ -2413,6 +2423,49 @@ def api_investments_probes():
             'probes': [],
             'summary': {'total': 0, 'ready': 0, 'errors': 0},
             'series_catalog': [],
+        }), 200
+
+
+@app.route('/api/investments/thesis')
+@requires_auth
+def api_investments_thesis():
+    """Read-only cypherpunk/Austrian thesis matrix for investments."""
+    try:
+        from lib.intel.sovereign_thesis import build_sovereign_thesis_report
+
+        return jsonify(build_sovereign_thesis_report())
+    except Exception as e:
+        log.warning("investment thesis API error: %s", e)
+        return jsonify({
+            'generated_at': datetime.now(UTC).isoformat(),
+            'mode': 'research_intel_only',
+            'error': str(e),
+            'worldview': {'stance': 'cypherpunk_austrian', 'principles': []},
+            'safety': {
+                'live_trading_enabled': False,
+                'execution_enabled': False,
+                'telegram_sends_enabled': False,
+                'guards': ['research_intel_only'],
+            },
+            'totals': {
+                'assets': 0,
+                'lenses': 0,
+                'core_assets': 0,
+                'aligned_assets': 0,
+                'watch_assets': 0,
+                'speculative_assets': 0,
+                'invalidation_watches': 0,
+                'tripped_invalidations': 0,
+                'source_requirements': 0,
+            },
+            'asset_classes': {},
+            'lenses': [],
+            'assets': [],
+            'matrix': [],
+            'invalidation_queue': [],
+            'ops_queue': [],
+            'source_requirements': [],
+            'source_docs': [],
         }), 200
 
 
