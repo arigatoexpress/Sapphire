@@ -359,6 +359,40 @@ def test_continuous_intelligence_endpoint_is_dry_run(app_client):
     assert any(target["id"] == "windows-gpu" for target in body["runtime_targets"])
 
 
+def test_continuous_intelligence_artifacts_endpoint_is_read_only(app_client):
+    _, client = app_client
+    r = client.get("/api/autonomy/continuous-intelligence/artifacts", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["mode"] == "continuous_intelligence_artifact_status"
+    assert body["write_enabled"] is False
+    assert body["writes_by_default"] is False
+    assert body["execution_enabled"] is False
+    assert body["live_trading_enabled"] is False
+    assert body["telegram_sends_enabled"] is False
+    assert body["snapshot_preview"]["write_enabled"] is False
+    assert body["snapshot_preview"]["records"] >= 10
+
+
+def test_continuous_intelligence_lease_preview_is_dry_run(app_client):
+    _, client = app_client
+    r = client.get(
+        "/api/autonomy/continuous-intelligence/lease-preview"
+        "?agent_id=windows-gpu&target_runtime=windows-gpu&limit=2",
+        headers={"Authorization": _AUTH},
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["mode"] == "dry_run_task_lease"
+    assert body["write_enabled"] is False
+    assert body["writes_by_default"] is False
+    assert body["safety"]["dry_run_dispatch_only"] is True
+    assert body["safety"]["execution_enabled"] is False
+    assert body["safety"]["telegram_sends_enabled"] is False
+    assert body["leased_count"] >= 1
+    assert all(lease["target_runtime"] == "windows-gpu" for lease in body["leases"])
+
+
 def test_sovereign_thesis_page_renders(app_client):
     _, client = app_client
     r = client.get("/sovereign-thesis", headers={"Authorization": _AUTH})
