@@ -319,3 +319,161 @@ def test_log_event_does_not_raise_when_path_unwritable(monkeypatch, isolated_pat
     # Must not raise.
     sks._log_event(result)
     assert failures["called"] >= 1
+
+
+# ---------------------------------------------------------------------------
+# _disable_content_engine — exception path
+# ---------------------------------------------------------------------------
+
+
+def test_disable_content_engine_collects_error_when_subprocess_raises(monkeypatch):
+    """If launchctl subprocess.run raises, the error is captured in result.errors."""
+    result = sks.KillSwitchResult(reason="launchctl failure")
+
+    def boom(*_a, **_kw):
+        raise OSError("launchctl missing")
+
+    monkeypatch.setattr(sks.subprocess, "run", boom)
+    sks._disable_content_engine(result)
+
+    assert any("Unload com.sapphire.content-engine" in e for e in result.errors)
+    # No success action recorded when the call raised.
+    assert not any("LaunchAgent" in a for a in result.actions)
+
+
+# ---------------------------------------------------------------------------
+# _load_telegram_sender — filesystem fallback path
+# ---------------------------------------------------------------------------
+
+
+def test_load_telegram_sender_uses_cached_module(monkeypatch):
+    """A `notify` module already in sys.modules with send_telegram_message wins."""
+    cached = type(sys)("notify")
+    sentinel = object()
+    cached.send_telegram_message = sentinel  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "notify", cached)
+
+    assert sks._load_telegram_sender() is sentinel
+
+
+def test_load_telegram_sender_loads_from_disk_when_cache_invalid(monkeypatch, tmp_path):
+    """If the cached module lacks send_telegram_message, the disk loader runs.
+
+    We point _SAPPHIRE at a tmp dir holding a minimal notify.py and assert the
+    spec/loader path executes and returns the function from disk.
+    """
+    # Cache an unrelated module so the early return is skipped.
+    monkeypatch.setitem(sys.modules, "notify", type(sys)("notify"))
+
+    # Build the directory layout the loader expects.
+    tools_dir = tmp_path / "plugins" / "claw-sapphire" / "tools"
+    tools_dir.mkdir(parents=True)
+    notify_path = tools_dir / "notify.py"
+    notify_path.write_text(
+        "def send_telegram_message(msg, priority='p1'):\n"
+        "    return {'msg': msg, 'priority': priority, 'from_disk': True}\n"
+    )
+
+    monkeypatch.setattr(sks, "_SAPPHIRE", tmp_path)
+
+    sender = sks._load_telegram_sender()
+    out = sender("hello", priority="p0")
+    assert out == {"msg": "hello", "priority": "p0", "from_disk": True}
+
+
+def test_load_telegram_sender_raises_when_path_missing(monkeypatch, tmp_path):
+    """When neither cache nor disk path is valid, ImportError is raised."""
+    monkeypatch.setitem(sys.modules, "notify", type(sys)("notify"))
+    # Point at an empty tmp dir — notify.py does not exist there.
+    monkeypatch.setattr(sks, "_SAPPHIRE", tmp_path)
+
+    with pytest.raises((ImportError, FileNotFoundError)):
+        sks._load_telegram_sender()
+
+
+# ---------------------------------------------------------------------------
+# CLI entrypoint — covers the __main__ block
+# ---------------------------------------------------------------------------
+
+
+def test_module_runs_as_script_with_default_reason(monkeypatch, tmp_path, capsys):
+    """Executing the module as `python3 -m lib.core.security_kill_switch`."""
+    import runpy
+
+    # Redirect on-disk paths the module touches.
+    flag = tmp_path / "data" / ".security_kill_switch_active"
+    events = tmp_path / "data" / "system_events.jsonl"
+    monkeypatch.setattr(sks, "_KILL_FLAG", flag)
+    monkeypatch.setattr(sks, "_EVENTS_PATH", events)
+
+    # Stub every external side-effect so nothing real runs.
+    monkeypatch.setattr(sks.subprocess, "check_output", lambda *_a, **_kw: "")
+    monkeypatch.setattr(sks.subprocess, "run", lambda *_a, **_kw: None)
+    monkeypatch.setattr(sks.os, "kill", lambda *_a, **_kw: None)
+
+    fake_module = type(sys)("notify")
+    fake_module.send_telegram_message = lambda *_a, **_kw: None  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "notify", fake_module)
+
+    monkeypatch.setattr(sys, "argv", ["security_kill_switch"])
+
+    with pytest.raises(SystemExit) as excinfo:
+        runpy.run_module("lib.core.security_kill_switch", run_name="__main__")
+
+    # All sub-calls were stubbed so no errors should be collected.
+    assert excinfo.value.code == 0
+    captured = capsys.readouterr()
+    assert "Security Kill Switch ENGAGED" in captured.out
+    assert "Manual CLI invocation" in captured.out
+
+
+def test_module_runs_as_script_with_custom_reason(monkeypatch, tmp_path, capsys):
+    """The CLI joins extra argv tokens into the engagement reason."""
+    import runpy
+
+    monkeypatch.setattr(sks, "_KILL_FLAG", tmp_path / "data" / ".security_kill_switch_active")
+    monkeypatch.setattr(sks, "_EVENTS_PATH", tmp_path / "data" / "system_events.jsonl")
+    monkeypatch.setattr(sks.subprocess, "check_output", lambda *_a, **_kw: "")
+    monkeypatch.setattr(sks.subprocess, "run", lambda *_a, **_kw: None)
+    monkeypatch.setattr(sks.os, "kill", lambda *_a, **_kw: None)
+
+    fake_module = type(sys)("notify")
+    fake_module.send_telegram_message = lambda *_a, **_kw: None  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "notify", fake_module)
+
+    monkeypatch.setattr(sys, "argv", ["security_kill_switch", "ops", "drill"])
+
+    with pytest.raises(SystemExit) as excinfo:
+        runpy.run_module("lib.core.security_kill_switch", run_name="__main__")
+
+    assert excinfo.value.code == 0
+    out = capsys.readouterr().out
+    assert "Reason: ops drill" in out
+
+
+def test_module_exit_code_one_when_errors_collected(monkeypatch, tmp_path, capsys):
+    """When engage() collects any errors, the CLI exits with status 1."""
+    import runpy
+
+    monkeypatch.setattr(sks, "_KILL_FLAG", tmp_path / "data" / ".security_kill_switch_active")
+    monkeypatch.setattr(sks, "_EVENTS_PATH", tmp_path / "data" / "system_events.jsonl")
+
+    # Force every subprocess call to raise so each step appends an error.
+    def boom(*_a, **_kw):
+        raise OSError("simulated failure")
+
+    monkeypatch.setattr(sks.subprocess, "check_output", boom)
+    monkeypatch.setattr(sks.subprocess, "run", boom)
+    # Telegram path also fails.
+    fake_module = type(sys)("notify")
+    fake_module.send_telegram_message = boom  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "notify", fake_module)
+
+    monkeypatch.setattr(sys, "argv", ["security_kill_switch", "forced"])
+
+    with pytest.raises(SystemExit) as excinfo:
+        runpy.run_module("lib.core.security_kill_switch", run_name="__main__")
+
+    assert excinfo.value.code == 1
+    out = capsys.readouterr().out
+    assert "Errors (non-fatal)" in out
