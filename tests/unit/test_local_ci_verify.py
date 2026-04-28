@@ -57,3 +57,30 @@ def test_copy_secret_scan_source_preserves_relative_paths(tmp_path, monkeypatch)
 
     assert copied == 1
     assert (out / "src" / "file.py").read_text(encoding="utf-8") == "ok"
+
+
+def test_test_inventory_check_uses_readme_gate(monkeypatch) -> None:
+    calls: list[tuple[str, list[str]]] = []
+
+    def fake_run_named(name: str, cmd: list[str]) -> dict:
+        calls.append((name, cmd))
+        return {"name": name, "status": "PASS", "exit_code": 0}
+
+    monkeypatch.setattr(local_ci_verify, "DEFAULT_PYTHON", "/tmp/python")
+    monkeypatch.setattr(local_ci_verify, "_run_named", fake_run_named)
+
+    result = local_ci_verify.check_test_inventory()
+
+    assert result["status"] == "PASS"
+    assert calls == [
+        (
+            "README test inventory",
+            [
+                "/tmp/python",
+                "scripts/ops/test_inventory.py",
+                "--check-readme",
+                "--max-drift",
+                "50",
+            ],
+        )
+    ]

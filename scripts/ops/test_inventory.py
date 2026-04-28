@@ -14,6 +14,7 @@ import re
 import subprocess
 import sys
 import time
+import urllib.parse
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -33,6 +34,9 @@ README_TESTS_RE = re.compile(
 )
 README_FILES_RE = re.compile(
     r"\| Test files \| \*\*(?P<files>[\d,]+)\+\*\* \|"
+)
+README_BADGE_RE = re.compile(
+    r"\[!\[Tests\]\(https://img\.shields\.io/badge/tests-(?P<label>[^-]+)-2ea44f\)\]"
 )
 
 
@@ -141,6 +145,9 @@ def parse_collect_output(output: str) -> tuple[int, int]:
 
 def read_readme_counts(readme_path: Path = README) -> dict[str, int]:
     text = readme_path.read_text(encoding="utf-8")
+    badge_match = README_BADGE_RE.search(text)
+    if not badge_match:
+        raise ValueError("README Tests badge was not found")
     tests_match = README_TESTS_RE.search(text)
     if not tests_match:
         raise ValueError("README Passing tests row was not found")
@@ -151,8 +158,17 @@ def read_readme_counts(readme_path: Path = README) -> dict[str, int]:
         name: int(value.replace(",", ""))
         for name, value in tests_match.groupdict().items()
     }
+    counts["badge_total"] = parse_badge_total(badge_match.group("label"))
     counts["files"] = int(files_match.group("files").replace(",", ""))
     return counts
+
+
+def parse_badge_total(label: str) -> int:
+    decoded = urllib.parse.unquote(label)
+    match = re.match(r"(?P<total>[\d,]+)\+?\s+passing$", decoded)
+    if not match:
+        raise ValueError(f"README Tests badge has unexpected label: {decoded!r}")
+    return int(match.group("total").replace(",", ""))
 
 
 def check_readme_inventory(
@@ -171,6 +187,7 @@ def check_readme_inventory(
         key: actual[key] - advertised[key]
         for key in ("total", "unit", "plugin", "files")
     }
+    deltas["badge_total"] = actual["total"] - advertised["badge_total"]
     overclaims = {
         key: delta
         for key, delta in deltas.items()

@@ -120,6 +120,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--skip-registry", action="store_true", help="Skip the tool registry validator."
     )
     parser.add_argument(
+        "--skip-test-inventory",
+        action="store_true",
+        help="Skip the README test inventory verifier.",
+    )
+    parser.add_argument(
         "--report-out",
         type=Path,
         default=REPO_ROOT / "data" / "ci",
@@ -155,6 +160,8 @@ def run_checks(args: argparse.Namespace) -> dict[str, Any]:
     if not args.skip_registry:
         checks.append(check_tool_registry())
     checks.append(check_repo_structure())
+    if not args.skip_test_inventory:
+        checks.append(check_test_inventory())
     checks.append(check_gitleaks())  # runs only if gitleaks is on PATH
     checks.append(check_docs_plist_gitleaks())  # docs-specific custom rules
 
@@ -209,6 +216,19 @@ def check_repo_structure() -> dict[str, Any]:
     return _run_named(
         "repo structure invariants",
         [DEFAULT_PYTHON, "scripts/ops/check_repo_structure.py"],
+    )
+
+
+def check_test_inventory() -> dict[str, Any]:
+    return _run_named(
+        "README test inventory",
+        [
+            DEFAULT_PYTHON,
+            "scripts/ops/test_inventory.py",
+            "--check-readme",
+            "--max-drift",
+            "50",
+        ],
     )
 
 

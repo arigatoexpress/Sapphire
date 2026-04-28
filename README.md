@@ -8,7 +8,7 @@
 
 [![CI](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
 [![Security](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml)
-[![Tests](https://img.shields.io/badge/tests-2%2C287%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-3%2C550%2B%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3776ab?logo=python&logoColor=white)](https://www.python.org/)
 [![Solidity](https://img.shields.io/badge/solidity-0.8.x-363636?logo=solidity&logoColor=white)](contracts/)
 [![Mesh](https://img.shields.io/badge/mesh-tailscale-242424?logo=tailscale&logoColor=white)](infra/tailscale-acl.json)
@@ -335,7 +335,7 @@ The dashboard surfaces a read-only OODA preview at [`/api/gemini-ooda`](services
 
 Sapphire is operated under a strict "no-spend, local-CI-as-merge-evidence" posture:
 
-- **Self-hosted GitHub runner.** Hosted Actions are gated behind `vars.SAPPHIRE_RUNNER`; commits intentionally land with `[skip ci]` so the GitHub-paid runners never fire. The full local CI (`scripts/ops/local_ci_verify.py --verbose`) is the merge gate.
+- **Self-hosted GitHub runner.** Hosted Actions are gated behind `vars.SAPPHIRE_RUNNER`; commits intentionally land with `[skip ci]` so the GitHub-paid runners never fire. The full local CI (`scripts/ops/local_ci_verify.py --verbose`) is the merge gate, including README test-inventory drift.
 - **Production-readiness sweep.** [`scripts/ops/production_readiness_sweep.py`](scripts/ops/production_readiness_sweep.py) probes repo state, all 20 LaunchAgents, local HTTP endpoints, the kill switch, autonomy-audit redaction, routine soaks, GitHub PR/issue queues, GCP/Vertex inventory, the Workspace threat-hygiene template, the Telegram bot, the Gemini live readiness probe, and bounded GCS/BigQuery write probes. The latest run (external mode) is `49 pass / 3 warn / 0 fail`; the three warnings are the routine soak gates and the manual Gemini-live live-call gate.
 - **Hermes runtime guard.** The Sapphire runtime quick-exec command guard is promoted to the live `ai.hermes.gateway` LaunchAgent with `SAPPHIRE_REPO_PATH` set; readiness is verified by [`scripts/ops/hermes_runtime_readiness.py`](scripts/ops/hermes_runtime_readiness.py).
 
