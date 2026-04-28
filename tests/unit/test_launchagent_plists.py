@@ -75,6 +75,14 @@ def test_routine_health_tracks_canonical_morning_brief() -> None:
     assert "daily-brief" not in routine_names
 
 
+def test_routine_health_tracks_trading_shadow_controller() -> None:
+    launchagents = {routine.launchagent for routine in check_routines.ROUTINES}
+    routine_names = {routine.name for routine in check_routines.ROUTINES}
+
+    assert "com.sapphire.trading-shadow-controller" in launchagents
+    assert "trading-shadow-controller" in routine_names
+
+
 def test_content_publisher_keeps_telegram_summary_explicit() -> None:
     plist = _load_plist(INFRA_LAUNCHAGENTS / "com.sapphire.content-publisher.plist")
     env = plist["EnvironmentVariables"]
@@ -96,6 +104,25 @@ def test_gemini_ooda_daily_launchagent_is_dry_run_only() -> None:
     assert plist["StartCalendarInterval"] == {"Hour": 6, "Minute": 30}
     assert env["PYTHONPATH"] == "/Users/aribs/Code/Sapphire"
     assert env["SAPPHIRE_GEMINI_LIVE"] == "0"
+
+
+def test_trading_shadow_controller_launchagent_is_paper_only() -> None:
+    plist = _load_plist(INFRA_LAUNCHAGENTS / "com.sapphire.trading-shadow-controller.plist")
+    env = plist["EnvironmentVariables"]
+    arguments = plist["ProgramArguments"]
+
+    assert plist["Label"] == "com.sapphire.trading-shadow-controller"
+    assert arguments == [
+        "/usr/local/bin/python3",
+        "/Users/aribs/Code/Sapphire/scripts/ops/trading_shadow_controller.py",
+        "--output",
+    ]
+    assert plist["WorkingDirectory"] == "/Users/aribs/Code/Sapphire"
+    assert plist["StartInterval"] == 1800
+    assert plist["RunAtLoad"] is True
+    assert env["PYTHONPATH"] == "/Users/aribs/Code/Sapphire"
+    assert "--execute" not in arguments
+    assert not any(key.startswith("ROBINHOOD") for key in env)
 
 
 def test_dashboard_and_inference_proxy_plists_are_sanitized() -> None:

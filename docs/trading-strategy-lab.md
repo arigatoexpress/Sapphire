@@ -91,6 +91,9 @@ What it automates:
   ```bash
   python3 scripts/ops/trading_shadow_controller.py --output
   ```
+- Run every 30 minutes via the versioned paper-only LaunchAgent
+  `infra/launchagents/com.sapphire.trading-shadow-controller.plist` once that
+  plist is installed.
 
 What remains blocked:
 
