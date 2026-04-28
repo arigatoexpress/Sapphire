@@ -68,6 +68,18 @@ jobs:
       - name: pytest (claw-sapphire)
         run: uv run --python 3.11 --no-project --with-requirements requirements-test.txt pytest plugins/claw-sapphire/tests/ -q
 
+  test-inventory:
+    name: test inventory
+    if: ${{ vars.SAPPHIRE_RUNNER != '' }}
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
+    needs: lint
+    steps:
+      - uses: actions/checkout@v6
+      - name: README test inventory
+        run: |
+          uv run --python 3.11 --no-project --with-requirements requirements-test.txt \
+            python scripts/ops/test_inventory.py --check-readme --max-drift 50
+
   tool-registry:
     name: tool registry invariants
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}

@@ -121,8 +121,8 @@ flowchart LR
 
 | Surface | Count | Detail |
 |---|---:|---|
-| Passing tests | **3,380+** | 3,260+ unit · 130 plugin (`pytest tests/unit/ && pytest plugins/claw-sapphire/tests/`) |
-| Test files | **120+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
+| Passing tests | **3,550+** | 3,420+ unit · 130 plugin (`python scripts/ops/test_inventory.py --check-readme`) |
+| Test files | **185+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
 | Dashboard pages | **32** | Flask + SSE, basic-auth, Gemini OODA panel on `/sovereign-thesis` |
 | Quant strategies | **7** | `lib/analytics/strategies.py` |
 | Pine strategies | **5** | `pine/standalone/` |
