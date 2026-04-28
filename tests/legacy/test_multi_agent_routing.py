@@ -4,37 +4,15 @@ Validates that the trigger → agent routing in _autonomy_trigger_info()
 correctly dispatches to OBSIDIAN, EMERALD, and SAPPHIRE based on
 trigger category and rotation cycle.
 """
+
 from __future__ import annotations
 
 import os
-import sys
-import types
-
-# Stub heavy dependencies before importing main
-_stubs = {}
-for mod_name in [
-    "uvloop",
-    "google",
-    "google.cloud",
-    "google.cloud.firestore_v1",
-    "google.generativeai",
-    "aiohttp",
-    "aiohttp.web",
-    "firebase_admin",
-    "telegram",
-    "telegram.ext",
-]:
-    if mod_name not in sys.modules:
-        _stubs[mod_name] = types.ModuleType(mod_name)
-        sys.modules[mod_name] = _stubs[mod_name]
-
-# Provide the heavy deps that main.py tries to import
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha-engine/src"))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/alpha-engine/shared"))
 
 import pytest
 
 # ---------- Minimal mock of AlphaEngine for trigger routing ---------- #
+
 
 class _MinimalEngine:
     """Stripped-down stand-in for the parts of AlphaEngine that
@@ -56,18 +34,31 @@ class _MinimalEngine:
         if active_count < self._trading_gate_min_active_venues:
             return {"trigger": "venue_shortfall", "agent": "OBSIDIAN", "category": "infrastructure"}
         if total_failures > self._trading_gate_max_failure_pressure:
-            return {"trigger": "failure_pressure", "agent": "OBSIDIAN", "category": "infrastructure"}
+            return {
+                "trigger": "failure_pressure",
+                "agent": "OBSIDIAN",
+                "category": "infrastructure",
+            }
 
         cycle = self._autonomy_dispatch_count % 3
         if cycle == 0:
-            return {"trigger": "scheduled_maintenance", "agent": "OBSIDIAN", "category": "maintenance"}
+            return {
+                "trigger": "scheduled_maintenance",
+                "agent": "OBSIDIAN",
+                "category": "maintenance",
+            }
         elif cycle == 1:
-            return {"trigger": "scheduled_improvement", "agent": "EMERALD", "category": "improvement"}
+            return {
+                "trigger": "scheduled_improvement",
+                "agent": "EMERALD",
+                "category": "improvement",
+            }
         else:
             return {"trigger": "scheduled_review", "agent": "SAPPHIRE", "category": "review"}
 
 
 # ---------- Healthy context fixture ---------- #
+
 
 def _healthy_context(**overrides):
     base = {
@@ -164,7 +155,9 @@ class TestScheduledRotation:
         for i in range(9):
             e._autonomy_dispatch_count = i
             info = e._autonomy_trigger_info(ctx)
-            assert info["agent"] == expected_agents[i], f"Dispatch {i}: expected {expected_agents[i]}, got {info['agent']}"
+            assert (
+                info["agent"] == expected_agents[i]
+            ), f"Dispatch {i}: expected {expected_agents[i]}, got {info['agent']}"
 
     def test_high_dispatch_count_still_rotates(self):
         """Large dispatch counts don't break rotation."""
@@ -196,7 +189,7 @@ class TestAgentInstructionFocus:
     def main_source(self):
         main_path = os.path.join(
             os.path.dirname(__file__),
-            "../../services/alpha-engine/src/main.py",
+            "../../services/alpha/src/main.py",
         )
         with open(main_path) as f:
             return f.read()

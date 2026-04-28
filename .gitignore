@@ -94,6 +94,7 @@ data/threat_intel/
 results/
 qwen*.json
 services/control-plane/app/data/system_events.jsonl
+services/alpha/src/collaboration/reputation_store.json
 
 # Local-only state
 .playwright-cli/
