@@ -1,0 +1,24 @@
+{
+  "artifact_bytes": 4087,
+  "artifact_mtime": "2026-04-28T22:40:47+00:00",
+  "artifact_path": "data/research_notes/2026-04-29/sapphire-composite/research-note.pdf",
+  "artifact_sha256": "b6a6c0957e045c57054ecb0ed18414862f9899f461472303fe49eb3d76ff4b48",
+  "provenance": {
+    "envelope_hash": "7e3a4edc6dd42bfb1a5b7f91c10349ff40902a06324e980d559f9a926338c80a",
+    "expires_at": null,
+    "generated_at": "2026-04-28T22:40:47+00:00",
+    "generator": "lib.research_notes.render",
+    "metadata": {
+      "chart_renderer": "reportlab-vector-fallback",
+      "drawdown_chart_renderer": "reportlab-vector-fallback",
+      "note_id": "2026-04-29/sapphire-composite",
+      "strategy_slug": "sapphire-composite"
+    },
+    "model": null,
+    "payload_hash": "e0f56b4e8ab8b96acf2b876d456b0128cec590153e0a67bb3d5a5fe359c61ecd",
+    "prompt_hash": null,
+    "schema_version": 1,
+    "source_hashes": {},
+    "ttl_seconds": null
+  }
+}

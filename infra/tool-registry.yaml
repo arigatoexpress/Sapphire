@@ -373,6 +373,13 @@ tools:
     consumers: [services.narrative_evaluation, services.dashboard]
     description: Narrative Engine Self-Evaluation Loop 0.1.0. Scores elapsed NarrativeThesis horizons against local actual outcomes, writes idempotent provenance-stamped score rows under data/narrative_evaluation, and reports rolling stats by symbol/timeframe/edge bucket/source mix/regime plus false-positive and calibration diagnostics. Pure, dry-run/mock-default, no live LLM calls, no Telegram sends, no trading critical path. Actions, score-thesis/aggregates/diagnostics/calibration/status.
 
+  - name: research_notes
+    path: plugins/claw-sapphire/tools/internal/research_notes.py
+    status: internal
+    owner: sapphire
+    consumers: [services.research_notes]
+    description: Research Notes Pipeline 0.1.0. Offline composer and PDF renderer for buyer-readable strategy notes from local backtest sweep, closed-trade performance, and context artifacts. Writes provenance-stamped PDFs under data/research_notes. No live data calls, no Telegram sends, no customer data, no trade execution. Actions, compose/render/latest/aggregate-summary/build.
+
   # Intel — BigQuery vector retrieval over the Sapphire intel corpus
   - name: intel_search
     path: plugins/claw-sapphire/tools/internal/intel_search.py
