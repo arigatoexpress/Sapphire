@@ -1,6 +1,6 @@
 # Tranche 5 Live-Soak Readiness Runbook
 
-This runbook covers local, operator-safe verification before any Tranche 4
+This runbook covers local, operator-safe verification before any Tranche 5
 daemon or plugin is considered for a live soak. The harness is read-only: it
 does not call live APIs, send Telegram messages, place trades, load
 LaunchAgents, or mutate event-bus state.
@@ -35,7 +35,7 @@ python3 scripts/ops/tranche5_live_soak_readiness.py --strict --json
 
 ## What It Checks
 
-The harness inventories these Tranche 4 surfaces:
+The harness inventories these Tranche 5 surfaces:
 
 - Narrative Synthesis
 - Regulatory + Macro Intelligence
@@ -49,7 +49,8 @@ For each surface it reports:
 
 - Live and publish environment gates, with values redacted
 - Cache and counter locations
-- Latest generated artifacts and JSONL row counts where applicable
+- Latest generated artifacts, missing artifact patterns, and JSONL row counts
+  where applicable
 - Required service, library, and plugin files
 - LaunchAgent templates where they exist
 - Safe local status commands
@@ -115,9 +116,9 @@ If status is `warn`, inspect `summary.enabled_live_or_publish_flags` and unset
 those variables before repeating the local gate.
 
 If status is `fail`, inspect `missing_required_files` and
-`summary.status_command_failures`. Missing Tranche 4 files usually indicate the
+`summary.status_command_failures`. Missing Tranche 5 files usually indicate the
 branch is not based on the expected `origin/main` baseline.
 
 If artifacts are absent, that is not automatically a failure. The harness
-reports artifact availability so an operator can tell whether a surface has
-recent dry-run output to inspect before a soak.
+reports `missing_artifact_patterns` so an operator can tell whether a surface
+has recent dry-run output to inspect before a soak.

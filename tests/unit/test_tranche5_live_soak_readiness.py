@@ -9,7 +9,7 @@ from pathlib import Path
 from scripts.ops import tranche5_live_soak_readiness as soak
 
 
-def test_collect_readiness_inventories_tranche4_surfaces_without_running_commands(
+def test_collect_readiness_inventories_tranche5_surfaces_without_running_commands(
     monkeypatch,
 ) -> None:
     for spec in soak.SURFACES:
@@ -30,6 +30,7 @@ def test_collect_readiness_inventories_tranche4_surfaces_without_running_command
     } <= surface_ids
     assert report["mode"] == "read-only-local"
     assert report["summary"]["status_commands_ran"] is False
+    assert report["summary"]["missing_artifact_patterns"] >= 0
     assert all(
         command["ran"] is False
         for surface in report["surfaces"]
@@ -103,6 +104,34 @@ def test_custom_surface_inventory_counts_cache_counters_and_latest_artifacts(
     assert fixture["artifacts"][0]["match_count"] == 2
     assert fixture["artifacts"][0]["latest"][0]["path"] == str(newer)
     assert fixture["artifacts"][0]["latest"][0]["jsonl_rows"] == 2
+    assert fixture["missing_artifact_patterns"] == []
+    assert report["summary"]["missing_artifact_patterns"] == 0
+
+
+def test_missing_artifact_patterns_are_reported_without_failing(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    required = tmp_path / "service.py"
+    required.write_text("# required\n", encoding="utf-8")
+    missing_pattern = str(tmp_path / "artifacts" / "*.jsonl")
+    surface = soak.SurfaceSpec(
+        surface_id="fixture",
+        label="Fixture Surface",
+        kind="test",
+        owners=("tests",),
+        artifact_globs=(missing_pattern,),
+        required_files=(required,),
+    )
+    monkeypatch.setattr(soak, "SURFACES", (surface,))
+
+    report = soak.collect_readiness(run_status=False)
+    fixture = report["surfaces"][0]
+
+    assert report["status"] == "pass"
+    assert report["summary"]["missing_artifact_patterns"] == 1
+    assert report["summary"]["surfaces_missing_artifacts"] == 1
+    assert fixture["missing_artifact_patterns"] == [missing_pattern]
 
 
 def test_run_status_uses_injected_runner_and_redacts_secretish_output(

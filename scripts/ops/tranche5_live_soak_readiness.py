@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Dry-run/live-soak readiness harness for Tranche 4 intelligence surfaces.
+"""Dry-run/live-soak readiness harness for Tranche 5 intelligence surfaces.
 
 The harness is intentionally read-only by default. It inventories live gates,
 cache/counter directories, latest generated artifacts, LaunchAgent templates,
-and safe local status commands for the Tranche 4 daemons and plugin tools. It
+and safe local status commands for the Tranche 5 daemons and plugin tools. It
 does not call live APIs, send Telegram messages, place trades, install
 LaunchAgents, mutate event-bus state, or read secret values.
 """
@@ -489,6 +489,8 @@ def collect_readiness(
     surfaces: list[dict[str, Any]] = []
     enabled_live_flags: list[str] = []
     missing_required_total = 0
+    missing_artifact_patterns_total = 0
+    surfaces_missing_artifacts = 0
     command_failures = 0
 
     for spec in SURFACES:
@@ -507,6 +509,13 @@ def collect_readiness(
         command_failures += sum(
             1 for row in commands if row.get("ran") and row.get("result", {}).get("ok") is False
         )
+        artifacts = _latest_artifacts(spec.artifact_globs)
+        missing_artifact_patterns = [
+            row["pattern"] for row in artifacts if row["match_count"] == 0
+        ]
+        missing_artifact_patterns_total += len(missing_artifact_patterns)
+        if missing_artifact_patterns:
+            surfaces_missing_artifacts += 1
         surface = {
             "id": spec.surface_id,
             "label": spec.label,
@@ -522,7 +531,8 @@ def collect_readiness(
             "enabled_live_or_publish_flags": enabled,
             "cache_dirs": _cache_reports(spec),
             "counters": _counter_reports(spec),
-            "artifacts": _latest_artifacts(spec.artifact_globs),
+            "artifacts": artifacts,
+            "missing_artifact_patterns": missing_artifact_patterns,
             "required_files": [_path_summary(path) for path in spec.required_files],
             "missing_required_files": missing_required,
             "launchagent_templates": [
@@ -553,6 +563,8 @@ def collect_readiness(
             "fail": statuses.count("fail"),
             "enabled_live_or_publish_flags": sorted(set(enabled_live_flags)),
             "missing_required_files": missing_required_total,
+            "missing_artifact_patterns": missing_artifact_patterns_total,
+            "surfaces_missing_artifacts": surfaces_missing_artifacts,
             "status_commands_ran": bool(run_status),
             "status_command_failures": command_failures,
         },
@@ -577,6 +589,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"- Status: `{report['status']}`",
         f"- Surfaces: `{summary['surfaces']}` pass=`{summary['pass']}` warn=`{summary['warn']}` fail=`{summary['fail']}`",
         f"- Enabled live/publish flags: `{', '.join(summary['enabled_live_or_publish_flags']) or 'none'}`",
+        f"- Missing artifact patterns: `{summary['missing_artifact_patterns']}` across `{summary['surfaces_missing_artifacts']}` surfaces",
         f"- Status commands ran: `{str(summary['status_commands_ran']).lower()}`",
         "",
         "## Guardrails",
@@ -588,6 +601,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         enabled = ", ".join(surface["enabled_live_or_publish_flags"]) or "none"
         cache_count = sum(1 for row in surface["cache_dirs"] if row["exists"])
         artifact_count = sum(row["match_count"] for row in surface["artifacts"])
+        missing_artifacts = surface["missing_artifact_patterns"]
         missing = len(surface["missing_required_files"])
         lines.extend(
             [
@@ -598,10 +612,14 @@ def render_markdown(report: dict[str, Any]) -> str:
                 f"- Enabled live/publish flags: `{enabled}`",
                 f"- Existing cache dirs: `{cache_count}/{len(surface['cache_dirs'])}`",
                 f"- Latest artifact matches: `{artifact_count}`",
+                f"- Missing artifact patterns: `{len(missing_artifacts)}`",
                 f"- Missing required files: `{missing}`",
-                "- Safe commands:",
             ]
         )
+        if missing_artifacts:
+            lines.append("- Missing artifact pattern list:")
+            lines.extend(f"  - `{pattern}`" for pattern in missing_artifacts)
+        lines.append("- Safe commands:")
         for command in surface["dry_run_status_commands"]:
             cmd = " ".join(command["argv"])
             stdin = command.get("stdin_json")
