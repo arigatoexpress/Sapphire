@@ -31,11 +31,14 @@ def test_docs_plist_secret_rule_matches_docs_plist_excerpt() -> None:
 def test_dashboard_rejects_known_default_password() -> None:
     app_source = (ROOT / "services/dashboard/app.py").read_text()
 
-    assert "'sapphire'" in app_source
+    assert re.search(r"""["']sapphire["']""", app_source)
     assert "WEAK_AUTH_PASSWORDS" in app_source
     assert "must not use a known default value" in app_source
-    assert "parsed.scheme not in {'http', 'https'}" in app_source
-    assert "os.environ.get('HOST', '127.0.0.1')" in app_source
+    assert re.search(r"""parsed\.scheme not in \{["']http["'], ["']https["']\}""", app_source)
+    assert (
+        "os.environ.get('HOST', '127.0.0.1')" in app_source
+        or 'os.environ.get("HOST", "127.0.0.1")' in app_source
+    )
 
 
 def test_dashboard_startup_reads_secret_file() -> None:

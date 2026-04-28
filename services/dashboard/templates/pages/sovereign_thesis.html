@@ -197,6 +197,12 @@
                 </ul>
             </div>
             <div style="font-size:.6rem;color:var(--text-muted);" id="st-ooda-status">--</div>
+            <div>
+                <div style="font-size:.62rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Daily Delta</div>
+                <ul id="st-ooda-diff" style="margin:4px 0 0 18px;padding:0;font-size:.72rem;line-height:1.4;">
+                    <li class="loading">Loading</li>
+                </ul>
+            </div>
         </div>
     </div>
 
@@ -582,12 +588,13 @@ async function loadGeminiOodaPanel() {
         document.getElementById('st-ooda-orient').innerHTML = `<span class="empty-state">${message}</span>`;
         document.getElementById('st-ooda-decide').innerHTML = `<span class="empty-state">${message}</span>`;
         document.getElementById('st-ooda-act').innerHTML = `<li class="empty-state">${message}</li>`;
+        document.getElementById('st-ooda-diff').innerHTML = `<li class="empty-state">${message}</li>`;
         document.getElementById('st-ooda-status').textContent = '';
     };
 
     let payload;
     try {
-        const resp = await fetch(`${window.location.origin}/api/gemini-ooda`);
+        const resp = await fetch(`${window.location.origin}/api/gemini-ooda?diff=1`);
         payload = await resp.json();
     } catch (err) {
         fail(err);
@@ -622,6 +629,25 @@ async function loadGeminiOodaPanel() {
     const cached = meta.cached ? 'cached · ' : '';
     document.getElementById('st-ooda-status').textContent =
         `${sensitive}${cached}live_env=${status.live_env ? 'yes' : 'no'} · cache_entries=${status.cache_entries ?? 0}`;
+
+    const diff = payload.daily_diff || {};
+    if (!diff.available) {
+        document.getElementById('st-ooda-diff').innerHTML =
+            `<li class="empty-state">${esc((diff.reason || 'daily packet not available').replaceAll('_', ' '))}</li>`;
+    } else {
+        const rows = [];
+        const added = diff.added || [];
+        const removed = diff.removed || [];
+        const mutated = diff.mutated || [];
+        if (added.length) rows.push(`added: ${added.slice(0, 3).map(esc).join(', ')}`);
+        if (removed.length) rows.push(`removed: ${removed.slice(0, 3).map(esc).join(', ')}`);
+        mutated.slice(0, 4).forEach(item => {
+            rows.push(`${esc(item.key)}: ${esc(item.before)} -> ${esc(item.after)}`);
+        });
+        document.getElementById('st-ooda-diff').innerHTML = rows.length
+            ? rows.map(item => `<li>${item}</li>`).join('')
+            : '<li class="empty-state">no key changes versus yesterday</li>';
+    }
 }
 
 loadSovereignThesis();

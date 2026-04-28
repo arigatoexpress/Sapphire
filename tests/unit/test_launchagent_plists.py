@@ -47,9 +47,9 @@ def test_launchagents_do_not_target_stale_worktrees() -> None:
     for path in _plist_paths():
         plist = _load_plist(path)
         working_directory = plist.get("WorkingDirectory")
-        assert working_directory is None or "/Code/_worktrees/" not in working_directory, (
-            f"{path} points WorkingDirectory at stale worktree {working_directory!r}"
-        )
+        assert (
+            working_directory is None or "/Code/_worktrees/" not in working_directory
+        ), f"{path} points WorkingDirectory at stale worktree {working_directory!r}"
 
 
 def test_daily_brief_has_one_versioned_launchagent() -> None:
@@ -83,13 +83,24 @@ def test_content_publisher_keeps_telegram_summary_explicit() -> None:
     assert env["SAPPHIRE_CONTENT_TELEGRAM_SUMMARY"] == "1"
 
 
+def test_gemini_ooda_daily_launchagent_is_dry_run_only() -> None:
+    plist = _load_plist(INFRA_LAUNCHAGENTS / "com.sapphire.gemini-ooda-daily.plist")
+    env = plist["EnvironmentVariables"]
+
+    assert plist["Label"] == "com.sapphire.gemini-ooda-daily"
+    assert plist["ProgramArguments"] == [
+        "/bin/zsh",
+        "/Users/aribs/Code/Sapphire/scripts/ops/gemini_ooda_daily.sh",
+    ]
+    assert plist["WorkingDirectory"] == "/Users/aribs/Code/Sapphire"
+    assert plist["StartCalendarInterval"] == {"Hour": 6, "Minute": 30}
+    assert env["PYTHONPATH"] == "/Users/aribs/Code/Sapphire"
+    assert env["SAPPHIRE_GEMINI_LIVE"] == "0"
+
+
 def test_dashboard_and_inference_proxy_plists_are_sanitized() -> None:
     expected = {
-        ROOT
-        / "services"
-        / "dashboard"
-        / "launchagent"
-        / "com.sapphire.dashboard.plist": {
+        ROOT / "services" / "dashboard" / "launchagent" / "com.sapphire.dashboard.plist": {
             "label": "com.sapphire.dashboard",
             "wrapper": "/Users/aribs/Code/Sapphire/services/dashboard/start.sh",
             "env": {"PATH", "PORT"},
