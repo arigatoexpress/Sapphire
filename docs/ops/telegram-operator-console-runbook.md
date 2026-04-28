@@ -103,7 +103,8 @@ fired (this is by design; see the threat model).
 
 | Command | Purpose | CONFIRM required? |
 |---|---|---|
-| `/routines list` | List scheduled tasks with paused state. | No — read-only. |
+| `/routines list` | List scheduled tasks with `(paused at <timestamp>)` tags. | No — read-only. |
+| `/routines status` | List only paused routines with timestamps, including valid flags whose scheduled-task directory is missing. | No — read-only. |
 | `/routines pause <name>` | Set a pause flag. Routine skips at startup. | No — pausing is the safe default. |
 | `/routines resume <name> CONFIRM` | Remove pause flag. | **Yes**. Without `CONFIRM`, returns the confirmation-required message. |
 | `/cancel-routine <name> CONFIRM` | Same as `/routines pause` but with the dangerous-action wording. | **Yes**. |
@@ -208,9 +209,9 @@ that response is policy, not policy-against-disclosure.
 ### 5.1 Operator paused a routine and wants it back
 
 ```
-/routines list                            # confirm <name> shows [PAUSED]
+/routines status                          # confirm <name> appears with paused_at
 /routines resume <name> CONFIRM           # remove the flag
-/routines list                            # confirm flag is gone
+/routines status                          # confirm no pause flag remains
 ```
 
 If the second command says "No pause flag set," the recovery is already

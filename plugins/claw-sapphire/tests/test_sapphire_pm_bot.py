@@ -435,6 +435,94 @@ def test_routines_list_returns_table(monkeypatch, tmp_path):
     assert "evening\\-digest" in response["text"]
 
 
+def test_routines_list_marks_paused_tasks_with_timestamp(monkeypatch, tmp_path):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    fake_dir = tmp_path / "scheduled-tasks"
+    fake_dir.mkdir()
+    (fake_dir / "morning-briefing").mkdir()
+    (fake_dir / "evening-digest").mkdir()
+    pause_dir = tmp_path / "pause"
+    pause_dir.mkdir()
+    (pause_dir / "morning-briefing").write_text("2026-04-28T10:00:00+00:00\n")
+    monkeypatch.setattr(pm_bot, "_SCHEDULED_TASKS_DIR", fake_dir)
+    monkeypatch.setattr(pm_bot, "_ROUTINE_PAUSE_DIR", pause_dir)
+
+    response = pm_bot.handle_telegram_command(_make_update("/routines list"))
+
+    assert response["parse_mode"] == "MarkdownV2"
+    assert "morning\\-briefing" in response["text"]
+    assert "paused at 2026" in response["text"]
+    assert "evening\\-digest \\| last\\_mtime" in response["text"]
+    assert "evening\\-digest \\| last\\_mtime" in response["text"].split("paused at")[0]
+
+
+def test_routines_status_returns_only_paused_routines(monkeypatch, tmp_path):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    fake_dir = tmp_path / "scheduled-tasks"
+    fake_dir.mkdir()
+    (fake_dir / "morning-briefing").mkdir()
+    (fake_dir / "evening-digest").mkdir()
+    pause_dir = tmp_path / "pause"
+    pause_dir.mkdir()
+    (pause_dir / "morning-briefing").write_text("2026-04-28T10:00:00+00:00\n")
+    monkeypatch.setattr(pm_bot, "_SCHEDULED_TASKS_DIR", fake_dir)
+    monkeypatch.setattr(pm_bot, "_ROUTINE_PAUSE_DIR", pause_dir)
+
+    response = pm_bot.handle_telegram_command(_make_update("/routines status"))
+
+    assert response["parse_mode"] == "MarkdownV2"
+    assert "Paused routines \\(1\\)" in response["text"]
+    assert "morning\\-briefing" in response["text"]
+    assert "paused\\_at\\=2026" in response["text"]
+    assert "evening\\-digest" not in response["text"]
+
+
+def test_routines_status_handles_empty_pause_dir(monkeypatch, tmp_path):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    monkeypatch.setattr(pm_bot, "_ROUTINE_PAUSE_DIR", tmp_path / "missing-pause")
+
+    response = pm_bot.handle_telegram_command(_make_update("/routines status"))
+
+    assert response["parse_mode"] == "MarkdownV2"
+    assert "No paused routines" in response["text"]
+
+
+def test_routines_status_skips_invalid_pause_flag_names(monkeypatch, tmp_path):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    pause_dir = tmp_path / "pause"
+    pause_dir.mkdir()
+    (pause_dir / "valid-routine").write_text("2026-04-28T10:00:00+00:00\n")
+    (pause_dir / "bad.name").write_text("2026-04-28T10:00:00+00:00\n")
+    monkeypatch.setattr(pm_bot, "_ROUTINE_PAUSE_DIR", pause_dir)
+
+    response = pm_bot.handle_telegram_command(_make_update("/routines status"))
+
+    assert "valid\\-routine" in response["text"]
+    assert "bad\\.name" not in response["text"]
+
+
+def test_routines_status_shows_flags_even_without_scheduled_task_dir(monkeypatch, tmp_path):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    pause_dir = tmp_path / "pause"
+    pause_dir.mkdir()
+    (pause_dir / "factory-repo-fixer").write_text("2026-04-28T10:00:00+00:00\n")
+    monkeypatch.setattr(pm_bot, "_SCHEDULED_TASKS_DIR", tmp_path / "missing-tasks")
+    monkeypatch.setattr(pm_bot, "_ROUTINE_PAUSE_DIR", pause_dir)
+
+    response = pm_bot.handle_telegram_command(_make_update("/routines status"))
+
+    assert "factory\\-repo\\-fixer" in response["text"]
+    assert "paused\\_at\\=2026" in response["text"]
+
+
+def test_help_mentions_routines_status(monkeypatch):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+
+    response = pm_bot.handle_telegram_command(_make_update("/help"))
+
+    assert "/routines status" in response["text"]
+
+
 def test_routines_pause_creates_flag_file(monkeypatch, tmp_path):
     monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
     fake_tasks = tmp_path / "scheduled-tasks"

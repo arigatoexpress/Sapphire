@@ -75,7 +75,7 @@ inference-proxy:  ## Start inference-proxy :11435 (with x402)
 
 # ---------- data / ops ----------
 
-.PHONY: content-generate content-publish heartbeat-status alpha-agent-status
+.PHONY: content-generate content-publish heartbeat-status alpha-agent-status safe-merge
 .PHONY: google-readiness google-readiness-offline google-readiness-cost google-readiness-artifact
 .PHONY: production-readiness production-readiness-offline production-readiness-artifact hermes-runtime-readiness
 content-generate:  ## Generate weekly report draft
@@ -153,6 +153,10 @@ alpha-agent-status:  ## Show recent alpha agent logs and latest heartbeat
 	else \
 		echo "no alpha heartbeat yet"; \
 	fi
+
+safe-merge:  ## Squash-merge PR=<number> with explicit [skip ci] subject and scoped run cancellation
+	@test -n "$(PR)" || (echo "Usage: make safe-merge PR=<number>" >&2; exit 2)
+	$(PY) scripts/ops/sapphire_safe_merge.py "$(PR)"
 
 # ---------- CI mirror ----------
 

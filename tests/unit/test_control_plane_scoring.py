@@ -390,8 +390,8 @@ def test_score_news_empty_input_returns_empty():
 def test_score_news_now_defaults_to_current_time(monkeypatch):
     """If no `now` is passed, score_news uses the current UTC time."""
     with _control_plane_app_namespace():
-        from app.scoring import NewsItem as _NewsItem  # noqa: F401
         import app.scoring as scoring_mod
+        from app.scoring import NewsItem as _NewsItem  # noqa: F401
 
     fixed_now = datetime(2026, 4, 28, 12, 0, 0, tzinfo=UTC)
 

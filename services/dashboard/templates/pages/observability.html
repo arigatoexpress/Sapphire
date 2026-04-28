@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}Observability{% endblock %}
+
+{% block content %}
+<style>
+.obs-header {
+    margin-bottom: var(--space-xl);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: var(--space-md);
+}
+.obs-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+    gap: var(--space-lg);
+}
+.obs-panel {
+    border: 1px solid var(--border-color);
+    background: rgba(10, 16, 10, 0.66);
+    padding: var(--space-lg);
+}
+.obs-panel h2 {
+    color: var(--amber);
+    font-size: 1.15rem;
+    font-weight: 400;
+    letter-spacing: 0;
+    margin-bottom: var(--space-md);
+}
+.obs-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-md);
+    margin-bottom: var(--space-md);
+}
+.obs-stat {
+    border: 1px solid var(--border-dim);
+    padding: var(--space-md);
+    min-height: 82px;
+}
+.obs-stat .label {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+}
+.obs-stat .value {
+    color: var(--text-primary);
+    font-size: 1.6rem;
+    margin-top: var(--space-sm);
+}
+.obs-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+.obs-table th,
+.obs-table td {
+    border-bottom: 1px solid var(--border-dim);
+    padding: 10px 8px;
+    text-align: left;
+    overflow-wrap: anywhere;
+}
+.obs-table th {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+}
+.obs-empty {
+    border: 1px dashed var(--border-dim);
+    color: var(--text-muted);
+    padding: var(--space-lg);
+}
+.obs-badge {
+    border: 1px solid var(--amber);
+    color: var(--amber);
+    padding: 2px 8px;
+    display: inline-block;
+    min-width: 72px;
+    text-align: center;
+}
+@media (max-width: 900px) {
+    .obs-grid,
+    .obs-stats { grid-template-columns: 1fr; }
+}
+</style>
+
+<div class="obs-header">
+    <h1>Observability</h1>
+    <p class="text-muted">Live operator state for pause controls and merge-readiness guardrails.</p>
+</div>
+
+<script type="application/json" id="routine-pause-seed">{{ routine_pause_summary | tojson }}</script>
+
+<div class="obs-grid">
+    <section class="obs-panel">
+        <h2>Routine Pause Status</h2>
+        <div class="obs-stats">
+            <div class="obs-stat">
+                <div class="label">Paused</div>
+                <div class="value" id="obs-paused-count">0</div>
+            </div>
+            <div class="obs-stat">
+                <div class="label">State</div>
+                <div class="value" id="obs-pause-state">PASS</div>
+            </div>
+            <div class="obs-stat">
+                <div class="label">Generated</div>
+                <div class="value" id="obs-pause-generated">--</div>
+            </div>
+        </div>
+        <div id="obs-paused-table"></div>
+    </section>
+
+    <section class="obs-panel">
+        <h2>Merge Guardrail</h2>
+        <table class="obs-table">
+            <tbody>
+                <tr>
+                    <th>Wrapper</th>
+                    <td><code>scripts/ops/sapphire_safe_merge.py</code></td>
+                </tr>
+                <tr>
+                    <th>Make target</th>
+                    <td><code>make safe-merge PR=&lt;N&gt;</code></td>
+                </tr>
+                <tr>
+                    <th>Subject</th>
+                    <td><span class="obs-badge">[skip ci]</span></td>
+                </tr>
+                <tr>
+                    <th>Run cancel scope</th>
+                    <td>PR head branch, PR head SHA, or exact squash subject on main.</td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+</div>
+
+<script>
+function esc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    }[ch]));
+}
+
+function renderPauseStatus(payload) {
+    const rows = payload.paused_routines || [];
+    document.getElementById('obs-paused-count').textContent = rows.length;
+    document.getElementById('obs-pause-state').textContent = String(payload.status || 'unknown').toUpperCase();
+    document.getElementById('obs-pause-generated').textContent = payload.generated_at || '--';
+    const target = document.getElementById('obs-paused-table');
+    if (!rows.length) {
+        target.innerHTML = '<div class="obs-empty">No paused routines</div>';
+        return;
+    }
+    target.innerHTML = `
+        <table class="obs-table">
+            <thead>
+                <tr><th>Routine</th><th>Paused at</th></tr>
+            </thead>
+            <tbody>
+                ${rows.map(row => `<tr><td>${esc(row.name)}</td><td>${esc(row.paused_at)}</td></tr>`).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+function refreshPauseStatus() {
+    fetch(`${window.location.origin}/api/routine-pause-status`)
+        .then(response => response.json())
+        .then(renderPauseStatus)
+        .catch(() => {});
+}
+
+renderPauseStatus(JSON.parse(document.getElementById('routine-pause-seed').textContent || '{}'));
+setInterval(refreshPauseStatus, 15000);
+</script>
+{% endblock %}

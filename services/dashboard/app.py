@@ -41,6 +41,8 @@ import contextlib
 
 from flask import Flask, Response, jsonify, render_template, request, send_file, send_from_directory
 
+from lib.core import routine_pause
+
 # Disable Flask's auto-registered /static/<path> route. It was bypassing the
 # @requires_auth decorator and exposing static/benchmark_report.html
 # (infrastructure topology: GPU models, VRAM, endpoints) to any caller.
@@ -52,6 +54,7 @@ _DASHBOARD_REPO_ROOT = Path(__file__).resolve().parents[2]
 _AGENT_EVENTS_FILE = _DASHBOARD_REPO_ROOT / "data" / "events" / "bus.jsonl"
 _AGENT_HEARTBEAT_DIR = _DASHBOARD_REPO_ROOT / "data" / "agents"
 _GEMINI_OODA_DAILY_DIR = _DASHBOARD_REPO_ROOT / "data" / ".autonomy" / "gemini-ooda"
+_ROUTINE_PAUSE_DIR = Path.home() / ".sapphire" / "routine_pause"
 
 # Configuration
 # Pi-less mode: services run on Mac (localhost) and rari2 (Tailscale)
@@ -626,6 +629,20 @@ def _build_launchagent_summary() -> dict[str, Any]:
         "checked": True,
         "totals": totals,
         "launchagents": rows,
+    }
+
+
+def _build_routine_pause_summary(pause_dir: Path | None = None) -> dict[str, Any]:
+    rows = [
+        {"name": record.name, "paused_at": record.paused_at}
+        for record in routine_pause.list_paused(pause_dir=pause_dir or _ROUTINE_PAUSE_DIR)
+    ]
+    return {
+        "mode": "read_only_routine_pause_status",
+        "status": "warn" if rows else "pass",
+        "generated_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
+        "totals": {"paused": len(rows)},
+        "paused_routines": rows,
     }
 
 
@@ -3166,6 +3183,17 @@ def diligence_page():
     )
 
 
+@app.route("/observability")
+@requires_auth
+def observability_page():
+    return render_template(
+        "pages/observability.html",
+        current_page="observability",
+        page_title="Observability",
+        routine_pause_summary=_build_routine_pause_summary(),
+    )
+
+
 @app.route("/api/diligence-summary")
 @requires_auth
 def api_diligence_summary():
@@ -3199,6 +3227,12 @@ def api_test_suite_health():
 @requires_auth
 def api_launchagent_summary():
     return jsonify(_build_launchagent_summary())
+
+
+@app.route("/api/routine-pause-status")
+@requires_auth
+def api_routine_pause_status():
+    return jsonify(_build_routine_pause_summary())
 
 
 @app.route("/api/foundry/readiness")
