@@ -24,6 +24,8 @@ market data/order drafts, and Robinhood Chain testnet attestations.
 - `GET /api/trading/strategy-lab` returns the combined strategy lab report.
 - `POST /api/trading/order-draft` returns venue payload drafts for a symbol,
   action, and notional without signing or submitting anything.
+- The strategy-lab report includes `real_funds_readiness`, which documents the
+  Robinhood Crypto pilot caps and why stock automation remains blocked.
 
 Example draft request:
 
@@ -49,7 +51,12 @@ The lab canonicalizes venue symbols before routing:
   `{{strategy.order.action}}`, `{{strategy.order.contracts}}`, and
   `{{strategy.market_position}}` are represented in the lab alert template.
 - Robinhood Crypto API support is kept read-first in Sapphire; order payloads
-  here are intent drafts only.
+  here are v2-shaped intent drafts only.
+- `scripts/ops/robinhood_live_readiness.py` renders an offline readiness report
+  without network calls, secret reads, signatures, or order submission.
+- `scripts/ops/robinhood_live_readiness.py --live-read-only` may load local
+  Robinhood credentials and call read-only API endpoints, but still redacts
+  account identifiers and cannot submit orders.
 - Hyperliquid order drafts model the exchange action shape but omit nonce and
   signature by design.
 - Robinhood Chain integration targets testnet chain id `46630` only.

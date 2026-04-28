@@ -60,6 +60,32 @@ def _as_float(value: Any) -> float | None:
         return None
 
 
+def _quote_midpoint(item: dict[str, Any]) -> float | None:
+    """Return the midpoint from Robinhood's current v2 quote shape."""
+    bid = _as_float(item.get("bid_inclusive_of_sell_spread"))
+    ask = _as_float(item.get("ask_inclusive_of_buy_spread"))
+    if bid is not None and ask is not None:
+        return (bid + ask) / 2.0
+    if bid is not None:
+        return bid
+    if ask is not None:
+        return ask
+
+    price = _as_float(item.get("price"))
+    if price is not None:
+        return price
+
+    legacy_bid = _as_float(item.get("bid"))
+    legacy_ask = _as_float(item.get("ask"))
+    if legacy_bid is not None and legacy_ask is not None:
+        return (legacy_bid + legacy_ask) / 2.0
+    if legacy_bid is not None:
+        return legacy_bid
+    if legacy_ask is not None:
+        return legacy_ask
+    return None
+
+
 def _load_credentials() -> tuple[str, bytes]:
     """Load API key + Ed25519 private key bytes from the secrets dir."""
     api_key = (_SECRETS / "robinhood_api_key").read_text().strip()
@@ -152,7 +178,7 @@ def _request(
                 last_exc = RuntimeError(
                     f"Robinhood {method.upper()} {path} -> HTTP {exc.code}: {err_body}"
                 )
-                time.sleep(2 ** attempt)
+                time.sleep(2**attempt)
                 continue
             raise RuntimeError(
                 f"Robinhood {method.upper()} {path} -> HTTP {exc.code}: {err_body}"
@@ -162,7 +188,7 @@ def _request(
                 last_exc = RuntimeError(
                     f"Robinhood {method.upper()} {path} -> {type(exc).__name__}: {exc}"
                 )
-                time.sleep(2 ** attempt)
+                time.sleep(2**attempt)
                 continue
             raise RuntimeError(
                 f"Robinhood {method.upper()} {path} -> {type(exc).__name__}: {exc}"
@@ -200,9 +226,13 @@ class RobinhoodReader:
         body: dict[str, Any] | None = None,
         timeout: int = 15,
     ) -> Any:
-        return _request(method, path, self._api_key, self._private_bytes, body=body, timeout=timeout)
+        return _request(
+            method, path, self._api_key, self._private_bytes, body=body, timeout=timeout
+        )
 
-    def _get_results(self, base_path: str, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    def _get_results(
+        self, base_path: str, params: dict[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
         if not self._available:
             return []
 
@@ -261,15 +291,7 @@ class RobinhoodReader:
         prices: dict[str, float] = {}
         for item in results:
             symbol = str(item.get("symbol") or "").upper()
-            bid = _as_float(item.get("bid"))
-            ask = _as_float(item.get("ask"))
-            price = None
-            if bid is not None and ask is not None:
-                price = (bid + ask) / 2.0
-            elif bid is not None:
-                price = bid
-            elif ask is not None:
-                price = ask
+            price = _quote_midpoint(item)
             if symbol and price is not None:
                 prices[symbol] = price
         return prices
@@ -389,14 +411,17 @@ class RobinhoodReader:
                 continue
             symbol = f"{asset_code}-USD"
             symbols.append(symbol)
-            live_rows.append({
-                "asset_code": asset_code,
-                "symbol": asset_code,
-                "trading_pair": symbol,
-                "qty": quantity,
-                "available_qty": _as_float(row.get("quantity_available_for_trading")) or quantity,
-                "account_number": row.get("account_number", ""),
-            })
+            live_rows.append(
+                {
+                    "asset_code": asset_code,
+                    "symbol": asset_code,
+                    "trading_pair": symbol,
+                    "qty": quantity,
+                    "available_qty": _as_float(row.get("quantity_available_for_trading"))
+                    or quantity,
+                    "account_number": row.get("account_number", ""),
+                }
+            )
 
         if not live_rows:
             return []
@@ -428,7 +453,9 @@ class RobinhoodReader:
                 row["weight"] = row["market_value"] / total_market_value * 100.0
 
         live_rows.sort(
-            key=lambda row: row.get("market_value") if row.get("market_value") is not None else -1.0,
+            key=lambda row: (
+                row.get("market_value") if row.get("market_value") is not None else -1.0
+            ),
             reverse=True,
         )
         total_val = sum(h.get("market_value") or 0.0 for h in live_rows)
@@ -487,18 +514,30 @@ class RobinhoodReader:
 
         sectors = []
         if holdings_value:
-            sectors.append({"name": "Crypto", "pct": (holdings_value / total_val * 100) if total_val else 0})
+            sectors.append(
+                {"name": "Crypto", "pct": (holdings_value / total_val * 100) if total_val else 0}
+            )
         if cash:
-            sectors.append({"name": "Cash & Equivalents", "pct": (cash / total_val * 100) if total_val else 0})
+            sectors.append(
+                {"name": "Cash & Equivalents", "pct": (cash / total_val * 100) if total_val else 0}
+            )
 
         asset_classes = []
         if holdings_value:
             asset_classes.append(
-                {"name": "Crypto", "pct": (holdings_value / total_val * 100) if total_val else 0, "color": "#62ff40"}
+                {
+                    "name": "Crypto",
+                    "pct": (holdings_value / total_val * 100) if total_val else 0,
+                    "color": "#62ff40",
+                }
             )
         if cash:
             asset_classes.append(
-                {"name": "Cash", "pct": (cash / total_val * 100) if total_val else 0, "color": "#6a8e67"}
+                {
+                    "name": "Cash",
+                    "pct": (cash / total_val * 100) if total_val else 0,
+                    "color": "#6a8e67",
+                }
             )
 
         is_live = pv.get("source") == "robinhood"
@@ -550,7 +589,10 @@ class RobinhoodReader:
                     "current_price_usd": holding.get("price"),
                     "unrealized_pnl_usd": holding.get("total_return"),
                     "unrealized_pnl_pct": (
-                        (holding["total_return"] / ((holding.get("avg_cost") or 0.0) * holding["qty"]))
+                        (
+                            holding["total_return"]
+                            / ((holding.get("avg_cost") or 0.0) * holding["qty"])
+                        )
                         if holding.get("total_return") is not None
                         and holding.get("avg_cost") not in {None, 0.0}
                         and holding["qty"] > 0

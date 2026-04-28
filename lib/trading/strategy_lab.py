@@ -49,11 +49,18 @@ TRADINGVIEW_DOCS = (
 
 VENUE_DOCS = {
     "robinhood_crypto": "https://robinhood.com/us/en/support/articles/crypto-api/",
+    "robinhood_crypto_api": "https://docs.robinhood.com/crypto/trading/",
     "robinhood_chain": "https://docs.robinhood.com/chain/connecting/",
     "hyperliquid_info": "https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint",
     "hyperliquid_exchange": "https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/exchange-endpoint",
     "coingecko_trending": "https://docs.coingecko.com/reference/trending-search",
 }
+
+ROBINHOOD_CRYPTO_BASE_URL = "https://trading.robinhood.com"
+ROBINHOOD_CRYPTO_V2_ORDER_ENDPOINT = "/api/v2/crypto/trading/orders/"
+ROBINHOOD_CRYPTO_V2_ESTIMATED_PRICE_ENDPOINT = "/api/v2/crypto/trading/estimated_price/"
+ROBINHOOD_FIRST_REAL_FUNDS_TEST_MAX_USD = 5.0
+ROBINHOOD_DAILY_REAL_FUNDS_TEST_MAX_USD = 10.0
 
 ROBINHOOD_AUTH_ENV_VARS = ("".join(("ROBINHOOD_", "API", "_KEY")), "ROBINHOOD_ED25519_PRIVATE_B64")
 ROBINHOOD_AUTH_FILE_NAMES = (
@@ -266,7 +273,22 @@ ASSET_SPECS: dict[str, AssetSpec] = {
     ),
 }
 
-DEFAULT_LIKED_SYMBOLS = ("ETH", "BTC", "ZEC", "XMR", "AAVE", "LINK", "ONDO", "UNI", "ENS", "ARB", "OP", "SOL", "HYPE", "TAO")
+DEFAULT_LIKED_SYMBOLS = (
+    "ETH",
+    "BTC",
+    "ZEC",
+    "XMR",
+    "AAVE",
+    "LINK",
+    "ONDO",
+    "UNI",
+    "ENS",
+    "ARB",
+    "OP",
+    "SOL",
+    "HYPE",
+    "TAO",
+)
 CORRECTED_ALIASES = {
     "HYPER": "HYPE",
     "HYPERUSDT": "HYPE",
@@ -398,7 +420,11 @@ def parse_trending_tokens(
         item = coin.get("item") if isinstance(coin, dict) else None
         if not isinstance(item, dict):
             continue
-        spec = asset_spec(item.get("symbol"), name=str(item.get("name") or ""), coingecko_id=str(item.get("id") or ""))
+        spec = asset_spec(
+            item.get("symbol"),
+            name=str(item.get("name") or ""),
+            coingecko_id=str(item.get("id") or ""),
+        )
         if not spec.symbol or spec.symbol in seen:
             continue
         data = item.get("data") if isinstance(item.get("data"), dict) else {}
@@ -420,7 +446,9 @@ def parse_trending_tokens(
                 "robinhood_symbol": spec.robinhood_symbol,
                 "market_cap_rank": item.get("market_cap_rank"),
                 "price_usd": _safe_float(data.get("price")),
-                "change_24h_pct": round(float(change), 2) if _safe_float(change) is not None else None,
+                "change_24h_pct": round(float(change), 2)
+                if _safe_float(change) is not None
+                else None,
                 "trend_score": item.get("score"),
                 "tags": tags,
                 "source": "coingecko_trending",
@@ -595,6 +623,126 @@ def normalize_action(action: Any) -> str:
     return "hold"
 
 
+def _robinhood_crypto_order_payload(
+    *,
+    symbol: str,
+    action_norm: str,
+    notional_usd: float,
+) -> dict[str, Any]:
+    """Build an official-v2-shaped Robinhood Crypto draft without submit ability."""
+    side = "buy" if action_norm == "buy" else "sell" if action_norm in {"sell", "close"} else "hold"
+    payload: dict[str, Any] = {
+        "api_version": "v2",
+        "base_url": ROBINHOOD_CRYPTO_BASE_URL,
+        "method": "POST",
+        "endpoint": ROBINHOOD_CRYPTO_V2_ORDER_ENDPOINT,
+        "query_params": {"account_number": "<robinhood_crypto_account_number>"},
+        "symbol": symbol,
+        "side": side,
+        "requested_notional_usd": notional_usd,
+        "credential_required": True,
+        "credential_scope_required": [
+            "read_crypto_accounts",
+            "read_crypto_quotes",
+            "place_crypto_orders_with_fee_tiers",
+        ],
+        "docs": VENUE_DOCS["robinhood_crypto_api"],
+        "live_test_caps": {
+            "funded_cash_budget_usd": 50.0,
+            "first_order_max_notional_usd": ROBINHOOD_FIRST_REAL_FUNDS_TEST_MAX_USD,
+            "daily_max_notional_usd": ROBINHOOD_DAILY_REAL_FUNDS_TEST_MAX_USD,
+            "requested_exceeds_first_order_cap": notional_usd
+            > ROBINHOOD_FIRST_REAL_FUNDS_TEST_MAX_USD,
+        },
+        "pre_submit_gates": [
+            "TRADINGVIEW_EXECUTION_ENABLED=false until intentionally flipped",
+            "manual Ari confirmation in the active terminal",
+            "account.is_api_tradable=true",
+            "buying_power >= order_notional_plus_fee",
+            "trading_pair.status=tradable",
+            "estimated_price spread within configured threshold",
+            "client_order_id generated once and logged before submit",
+            "kill switch clear immediately before submit",
+        ],
+        "execution_blocked_by_default": True,
+    }
+
+    if side == "hold":
+        payload["blocked_reason"] = "hold action has no Robinhood order body"
+        return payload
+
+    estimated_side = "ask" if side == "buy" else "bid"
+    limit_config: dict[str, Any] = {
+        "limit_price": "<guarded_limit_price_from_estimated_price>",
+        "time_in_force": "gtc",
+    }
+    if side == "buy":
+        limit_config["quote_amount"] = "<usd_quote_amount_after_live_test_cap>"
+    else:
+        limit_config["asset_quantity"] = "<asset_quantity_to_sell_after_position_check>"
+
+    payload.update(
+        {
+            "order_type": "limit",
+            "estimated_price_preflight": {
+                "method": "GET",
+                "endpoint": ROBINHOOD_CRYPTO_V2_ESTIMATED_PRICE_ENDPOINT,
+                "query_params": {
+                    "symbol": symbol,
+                    "side": estimated_side,
+                    "quantity": "<asset_quantity_or_test_quantity>",
+                },
+            },
+            "body_template": {
+                "client_order_id": "<uuid_v4_at_submit_time>",
+                "side": side,
+                "type": "limit",
+                "symbol": symbol,
+                "limit_order_config": limit_config,
+            },
+        }
+    )
+    return payload
+
+
+def build_robinhood_real_funds_readiness(*, configured: bool = False) -> dict[str, Any]:
+    """Readiness plan for the funded Robinhood Crypto test budget."""
+    return {
+        "stage": "draft_ready_not_submit_ready",
+        "configured": configured,
+        "cash_budget_usd": 50.0,
+        "crypto": {
+            "official_api_available": True,
+            "base_url": ROBINHOOD_CRYPTO_BASE_URL,
+            "preferred_version": "v2",
+            "order_endpoint": ROBINHOOD_CRYPTO_V2_ORDER_ENDPOINT,
+            "quote_endpoint": "/api/v2/crypto/marketdata/best_bid_ask/",
+            "estimated_price_endpoint": ROBINHOOD_CRYPTO_V2_ESTIMATED_PRICE_ENDPOINT,
+            "docs": VENUE_DOCS["robinhood_crypto_api"],
+            "first_order_max_notional_usd": ROBINHOOD_FIRST_REAL_FUNDS_TEST_MAX_USD,
+            "daily_max_notional_usd": ROBINHOOD_DAILY_REAL_FUNDS_TEST_MAX_USD,
+        },
+        "stocks": {
+            "official_public_trading_api_identified": False,
+            "mode": "manual_or_future_approved_broker_only",
+            "reason": "Robinhood's public trading API documentation is for Robinhood Crypto; equity order types are documented for app, web classic, and Legend flows, not a public stock-trading API.",
+        },
+        "submit_blockers": [
+            "no Sapphire submit/cancel/replace method exists for Robinhood orders",
+            "no real order without explicit operator order details and confirmation",
+            "no stock or ETF automation through unofficial Robinhood endpoints",
+            "no background scheduler can bypass the confirmation wall",
+        ],
+        "promotion_gates": [
+            "local unit and integration tests pass",
+            "read-only account and quote calls succeed with redacted logging",
+            "order draft matches v2 schema and stays unsigned",
+            "paper order has expected fill/fee/slippage accounting",
+            "Ari manually approves one capped live crypto limit order",
+        ],
+    }
+
+
 def build_order_drafts(
     symbol: Any,
     action: Any,
@@ -658,14 +806,16 @@ def build_order_drafts(
                 action=action_norm,
                 notional_usd=notional,
                 execution_enabled=False,
-                payload={
-                    "symbol": spec.robinhood_symbol,
-                    "side": "buy" if is_buy else "sell" if action_norm == "sell" else "close",
-                    "notional_usd": notional,
-                    "api_version": "v2",
-                    "credential_required": True,
-                },
-                notes=notes,
+                payload=_robinhood_crypto_order_payload(
+                    symbol=spec.robinhood_symbol,
+                    action_norm=action_norm,
+                    notional_usd=notional,
+                ),
+                notes=(
+                    *notes,
+                    "v2_fee_tier_endpoint",
+                    "requires_manual_confirmation",
+                ),
             )
         )
 
@@ -712,7 +862,9 @@ def build_order_drafts(
     return [asdict(draft) for draft in drafts]
 
 
-def _secret_group_present(*, env_vars: tuple[str, ...] = (), file_names: tuple[str, ...] = ()) -> bool:
+def _secret_group_present(
+    *, env_vars: tuple[str, ...] = (), file_names: tuple[str, ...] = ()
+) -> bool:
     if env_vars and all(os.getenv(env_var) for env_var in env_vars):
         return True
     if not file_names:
@@ -769,6 +921,9 @@ def build_strategy_lab_report(*, fetch_live: bool = True) -> dict[str, Any]:
         },
         "market_universe": market,
         "tradingview": tradingview,
+        "real_funds_readiness": build_robinhood_real_funds_readiness(
+            configured=robinhood_configured
+        ),
         "venues": [
             {
                 "id": "paper",
@@ -809,7 +964,11 @@ def build_strategy_lab_report(*, fetch_live: bool = True) -> dict[str, Any]:
                 "id": "backtest_liked_universe",
                 "surface": "/api/risk/backtest",
                 "mode": "paper",
-                "symbols": [row["yfinance_symbol"] for row in market["liked_tokens"] if row.get("yfinance_symbol")],
+                "symbols": [
+                    row["yfinance_symbol"]
+                    for row in market["liked_tokens"]
+                    if row.get("yfinance_symbol")
+                ],
             },
             {
                 "id": "tradingview_payload_fixture",
@@ -827,6 +986,7 @@ def build_strategy_lab_report(*, fetch_live: bool = True) -> dict[str, Any]:
         "source_docs": [
             *TRADINGVIEW_DOCS,
             VENUE_DOCS["robinhood_crypto"],
+            VENUE_DOCS["robinhood_crypto_api"],
             VENUE_DOCS["robinhood_chain"],
             VENUE_DOCS["hyperliquid_info"],
             VENUE_DOCS["hyperliquid_exchange"],
