@@ -3340,6 +3340,16 @@ def observability_page():
     )
 
 
+@app.route("/narrative-eval")
+@requires_auth
+def narrative_eval_page():
+    return render_template(
+        "pages/narrative_eval.html",
+        current_page="narrative-eval",
+        page_title="Narrative Eval",
+    )
+
+
 @app.route("/api/diligence-summary")
 @requires_auth
 def api_diligence_summary():
@@ -3423,6 +3433,57 @@ def api_cross_asset_breakdowns():
 @requires_auth
 def api_routine_pause_status():
     return jsonify(_maybe_buyer_safe_payload(_build_routine_pause_summary()))
+
+
+@app.route("/api/narrative-eval-summary")
+@requires_auth
+def api_narrative_eval_summary():
+    try:
+        from services.narrative_evaluation.run import summary
+
+        limit = int(request.args.get("limit") or 1000)
+        date = request.args.get("date") or None
+        return jsonify(summary(date=date, limit=limit))
+    except Exception as e:
+        log.warning("narrative eval summary API error: %s", e)
+        return jsonify(
+            {
+                "ok": False,
+                "error": str(e),
+                "overall": {"total": 0, "scored": 0, "accuracy": None},
+                "by_symbol": {},
+                "by_timeframe": {},
+                "by_edge_bucket": {},
+                "recent": [],
+            }
+        ), 200
+
+
+@app.route("/api/narrative-eval-aggregates")
+@requires_auth
+def api_narrative_eval_aggregates():
+    try:
+        from services.narrative_evaluation.run import aggregates, calibration, diagnostics
+
+        date = request.args.get("date") or None
+        limit = int(request.args.get("limit") or 1000)
+        view = str(request.args.get("view") or "aggregates").lower()
+        if view == "diagnostics":
+            return jsonify(diagnostics(date=date, limit=limit))
+        if view == "calibration":
+            return jsonify(calibration(date=date, limit=limit))
+        group_by = request.args.get("group_by") or "symbol"
+        return jsonify(aggregates(group_by=group_by, date=date, limit=limit))
+    except Exception as e:
+        log.warning("narrative eval aggregates API error: %s", e)
+        return jsonify(
+            {
+                "ok": False,
+                "error": str(e),
+                "generated_at": datetime.now(UTC).isoformat(),
+                "groups": {},
+            }
+        ), 200
 
 
 @app.route("/api/foundry/readiness")

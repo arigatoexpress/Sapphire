@@ -352,6 +352,13 @@ tools:
     consumers: [services.synthesis]
     description: LLM Narrative Synthesis Engine 0.1.0. Turns signal_correlator edge_score outputs into provenance-stamped NarrativeThesis payloads with evidence bullets, counter-thesis, invalidators, next signal to watch, implied position, and deterministic rubric gating. Dry-run deterministic by default; live Gemini mode requires SAPPHIRE_NARRATIVE_LIVE=1 plus a key plus the sensitivity gate. Caps, ≤6144 output tokens, ≤18000 input chars, ≤6 live calls/hour, ≤750k tokens/month, publish rubric ≥0.70. Actions, synthesize-once/latest/history/rubric-score/status.
 
+  - name: narrative_eval
+    path: plugins/claw-sapphire/tools/internal/narrative_eval.py
+    status: internal
+    owner: sapphire
+    consumers: [services.narrative_evaluation, services.dashboard]
+    description: Narrative Engine Self-Evaluation Loop 0.1.0. Scores elapsed NarrativeThesis horizons against local actual outcomes, writes idempotent provenance-stamped score rows under data/narrative_evaluation, and reports rolling stats by symbol/timeframe/edge bucket/source mix/regime plus false-positive and calibration diagnostics. Pure, dry-run/mock-default, no live LLM calls, no Telegram sends, no trading critical path. Actions, score-thesis/aggregates/diagnostics/calibration/status.
+
   # Intel — BigQuery vector retrieval over the Sapphire intel corpus
   - name: intel_search
     path: plugins/claw-sapphire/tools/internal/intel_search.py
