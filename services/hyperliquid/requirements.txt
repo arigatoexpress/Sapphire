@@ -4,6 +4,8 @@ eth-account>=0.13.7
 eth-keys>=0.6.0
 python-dotenv>=1.0.0
 redis>=5.0.0
+PyYAML>=6.0.0
+websockets>=16.0,<17
 # Optional: uncomment for GCP Pub/Sub backend
 # google-cloud-pubsub>=2.18.0
 # google-cloud-firestore>=2.14.0

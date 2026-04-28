@@ -13,6 +13,26 @@ test_command: pytest tests/
 
 Trading bot for Hyperliquid (`https://api.hyperliquid.xyz`) — a high-performance L1 DEX for perpetuals.
 
+## Public Feed Signal Mode
+
+`src/hyperliquid_bot/public_feed.py` is the Sapphire signal-only public feed.
+It subscribes to public `trades`, `bbo`, and `l2Book` WebSocket feeds for
+configured symbols and emits only read-only event-bus signals:
+
+- `hyperliquid.trade`
+- `hyperliquid.imbalance`
+- `hyperliquid.book.thin`
+
+It is blocked unless `SAPPHIRE_HYPERLIQUID_LIVE=1` and still never reads wallet
+keys, never calls authenticated endpoints, and never submits trades.
+
+Dry-run tool checks:
+
+```bash
+echo '{"action":"status"}' | /usr/local/bin/python3 plugins/claw-sapphire/tools/hyperliquid.py
+echo '{"action":"subscribe-test"}' | /usr/local/bin/python3 plugins/claw-sapphire/tools/hyperliquid.py
+```
+
 ## Hyperliquid Facts
 
 - REST: `https://api.hyperliquid.xyz` (no API key, wallet signs orders)

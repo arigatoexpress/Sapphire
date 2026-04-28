@@ -175,6 +175,13 @@ tools:
       - hermes-agent.trading-brain
     description: Multi-source decision engine — TA + ensemble + Kronos + macro consensus for BTC/ETH/SOL.
 
+  - name: hyperliquid
+    path: plugins/claw-sapphire/tools/internal/hyperliquid.py
+    status: internal
+    owner: sapphire
+    consumers: [scheduled-tasks.market-pulse, hermes-agent.trading-analysis]
+    description: Signal-only Hyperliquid public-feed status/latest/subscribe-test tool. No wallet keys, no authenticated endpoints, no trade execution.
+
   - name: market_sentiment
     path: plugins/claw-sapphire/tools/internal/market_sentiment.py
     status: internal
