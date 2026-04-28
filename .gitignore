@@ -72,6 +72,7 @@ data/foundry/
 data/google/
 data/media/
 data/readiness/
+data/*.envelope.json
 data/foundry_sync_state.json
 data/foundry_sync_history.jsonl
 data/security/
