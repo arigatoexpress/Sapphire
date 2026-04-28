@@ -55,6 +55,7 @@ def _load_repo_lib_module(qualname: str, relpath: str):
 _load_repo_lib_module("lib.event_impact.event_corpus", "lib/event_impact/event_corpus.py")
 _load_repo_lib_module("lib.event_impact.impact_modeler", "lib/event_impact/impact_modeler.py")
 _load_repo_lib_module("lib.event_impact.lookup", "lib/event_impact/lookup.py")
+_load_repo_lib_module("lib.event_impact.audit", "lib/event_impact/audit.py")
 _event_impact_pkg = _load_repo_lib_module("lib.event_impact", "lib/event_impact/__init__.py")
 
 DEFAULT_CORPUS_PATH = _event_impact_pkg.DEFAULT_CORPUS_PATH
@@ -63,6 +64,12 @@ load_events = _event_impact_pkg.load_events
 lookup = _event_impact_pkg.lookup
 events_by_category = sys.modules["lib.event_impact.event_corpus"].events_by_category
 ImpactModel = sys.modules["lib.event_impact.impact_modeler"].ImpactModel
+HistoricalEvent = sys.modules["lib.event_impact.event_corpus"].HistoricalEvent
+audit_mod = sys.modules["lib.event_impact.audit"]
+audit_expected_reactions = audit_mod.audit_expected_reactions
+audit_from_files = audit_mod.audit_from_files
+load_bars_by_asset = audit_mod.load_bars_by_asset
+load_audit_model = audit_mod.load_model
 
 CACHE_DIR = Path.home() / ".cache" / "sapphire" / "event_impact"
 DEFAULT_MODEL_DIR = REPO_ROOT / "data" / "event_impact"
@@ -129,11 +136,8 @@ def rebuild_action(payload: dict[str, Any]) -> dict[str, Any]:
     return {"ok": True, "model_path": str(path), "mode": "rebuild", "version": VERSION}
 
 
-def accuracy_audit_action(payload: dict[str, Any]) -> dict[str, Any]:
-    """Compare predicted sign to supplied realized outcomes.
-
-    Payload shape: ``{"observations": [{"expected": {...}, "actual_return_pct": 1.2}]}``.
-    """
+def _legacy_observation_accuracy_audit(payload: dict[str, Any]) -> dict[str, Any]:
+    """Compare predicted sign to precomputed realized outcomes."""
     observations = payload.get("observations") or []
     if not isinstance(observations, list):
         return {"ok": False, "error": "observations must be a list"}
@@ -159,6 +163,84 @@ def accuracy_audit_action(payload: dict[str, Any]) -> dict[str, Any]:
         "correct": correct,
         "accuracy": round(correct / scored, 6) if scored else None,
         "rows": rows,
+        "issued_at": datetime.now(UTC).isoformat(),
+    }
+
+
+def _coerce_horizons(raw: Any) -> tuple[int, ...]:
+    if raw is None:
+        return (1, 6, 24, 168)
+    if not isinstance(raw, list):
+        raise ValueError("horizons_hours must be a list of integers")
+    horizons = tuple(int(v) for v in raw)
+    if not horizons:
+        raise ValueError("horizons_hours must not be empty")
+    return horizons
+
+
+def _coerce_assets(raw: Any) -> tuple[str, ...] | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, list):
+        raise ValueError("assets must be a list of symbols")
+    return tuple(str(asset).upper() for asset in raw if str(asset).strip())
+
+
+def _events_from_payload(payload: dict[str, Any]) -> list[Any]:
+    if payload.get("events_path"):
+        return load_events(Path(payload["events_path"]))
+    raw_events = payload.get("events") or []
+    if not isinstance(raw_events, list):
+        raise ValueError("events must be a list")
+    return [HistoricalEvent.from_dict(row) for row in raw_events if isinstance(row, dict)]
+
+
+def _bars_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    if payload.get("bars_path"):
+        return load_bars_by_asset(Path(payload["bars_path"]))
+    raw = payload.get("bars_by_asset") or {}
+    if not isinstance(raw, dict):
+        raise ValueError("bars_by_asset must be an asset mapping")
+    return raw
+
+
+def _model_from_payload(payload: dict[str, Any]) -> Any:
+    if payload.get("model_path"):
+        return load_audit_model(Path(payload["model_path"]))
+    if isinstance(payload.get("model"), dict):
+        return payload["model"]
+    return _load_model(None)
+
+
+def accuracy_audit_action(payload: dict[str, Any]) -> dict[str, Any]:
+    """Audit expected profiles against supplied historical events and bars.
+
+    Preferred offline payload:
+
+    ``{"model_path": "...", "events_path": "...", "bars_path": "...", "horizons_hours": [24]}``
+
+    For backward compatibility, ``{"observations": [...]}`` still runs the
+    original precomputed-observation scorer.
+    """
+    if "observations" in payload and not any(
+        payload.get(key) for key in ("events_path", "events", "bars_path", "bars_by_asset", "model_path", "model")
+    ):
+        return _legacy_observation_accuracy_audit(payload)
+    try:
+        report = audit_expected_reactions(
+            _events_from_payload(payload),
+            _bars_from_payload(payload),
+            _model_from_payload(payload),
+            horizons_hours=_coerce_horizons(payload.get("horizons_hours")),
+            assets=_coerce_assets(payload.get("assets")),
+        )
+    except (FileNotFoundError, ValueError, KeyError, TypeError) as exc:
+        return {"ok": False, "error": str(exc), "action": "accuracy-audit"}
+    return {
+        "ok": True,
+        "version": VERSION,
+        "mode": "offline-fixture-audit",
+        "audit": report.to_dict(),
         "issued_at": datetime.now(UTC).isoformat(),
     }
 

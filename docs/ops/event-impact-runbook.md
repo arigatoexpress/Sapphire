@@ -74,6 +74,104 @@ where `sub_category="*"`. If no category profile exists, it returns
 band. Do not suppress this. A no-data result is valuable evidence that
 Sapphire is not fabricating precision.
 
+## Offline Accuracy Audit
+
+The `accuracy-audit` action has two modes. The original mode accepts
+precomputed observations:
+
+```json
+{
+  "action": "accuracy-audit",
+  "observations": [
+    {
+      "expected": {"direction_consensus": 1.0},
+      "actual_return_pct": 2.4
+    }
+  ]
+}
+```
+
+That mode is useful for tiny hand checks, but it does not prove that the
+realized return was computed from the same historical event corpus and OHLCV
+window. Prefer the offline fixture-backed mode for audits:
+
+```bash
+echo '{
+  "action": "accuracy-audit",
+  "model_path": "tests/fixtures/event_impact/audit_model.json",
+  "events_path": "tests/fixtures/event_impact/audit_events.jsonl",
+  "bars_path": "tests/fixtures/event_impact/audit_bars.json",
+  "horizons_hours": [24]
+}' | /usr/local/bin/python3 plugins/claw-sapphire/tools/internal/event_impact.py
+```
+
+The audit mode makes no network calls. It loads a model file containing
+expected reaction profiles, a JSONL event file using the same `HistoricalEvent`
+schema as the corpus, and an OHLCV JSON fixture keyed by asset or represented as
+a flat list of asset-tagged bars.
+
+For every event, asset, and horizon, it performs the same lookup Sapphire would
+perform for a live macro event, then computes the realized close-to-close return
+from the supplied bars. Rows are scored only when all of these are true:
+
+- the lookup found an expected profile rather than `matched_level="no_data"`;
+- a start bar and a post-horizon bar are available;
+- the expected profile has a non-zero direction;
+- the realized return is non-zero.
+
+The report includes `direction_accuracy`, mean/median absolute error,
+per-asset and per-category counts, matched-level counts, and row-level notes.
+The notes are deliberately blunt:
+
+- `no_expected_profile` means the model could not make a historical claim.
+- `missing_post_event_bar` means the supplied OHLCV fixture cannot score that
+  event/horizon.
+- `flat_expected_direction` or `flat_realized_return` means sign accuracy would
+  be misleading.
+- `small_scored_sample_wide_intervals` is emitted whenever fewer than 20 rows
+  were scored.
+
+Treat this as a calibration audit, not a performance advertisement. A fixture
+with three events is useful because it proves the audit path is deterministic;
+it does not prove that FOMC, ETF, or bank-failure priors are reliable.
+Production claims should quote the scored sample size, no-data count,
+confidence bands, and corpus date. If those are small or wide, say so.
+
+Example output shape:
+
+```json
+{
+  "ok": true,
+  "mode": "offline-fixture-audit",
+  "audit": {
+    "summary": {
+      "observations": 3,
+      "scored": 3,
+      "direction_correct": 2,
+      "direction_accuracy": 0.666667,
+      "caveats": [
+        "small_scored_sample_wide_intervals",
+        "direction_accuracy_is_context_not_a_trading_signal"
+      ]
+    }
+  }
+}
+```
+
+The same pure helper is available in Python:
+
+```python
+from lib.event_impact.audit import audit_from_files
+
+report = audit_from_files(
+    events_path="tests/fixtures/event_impact/audit_events.jsonl",
+    bars_path="tests/fixtures/event_impact/audit_bars.json",
+    model_path="tests/fixtures/event_impact/audit_model.json",
+    horizons_hours=(24,),
+)
+print(report.to_dict()["summary"])
+```
+
 ## Rebuild
 
 Rebuilds are disabled by default. To run one locally:
@@ -108,6 +206,7 @@ Focused tests:
 ```bash
 /usr/local/bin/python3 -m pytest \
   tests/unit/test_event_corpus.py \
+  tests/unit/test_event_impact_audit.py \
   tests/unit/test_impact_modeler.py \
   tests/unit/test_event_impact_lookup.py \
   plugins/claw-sapphire/tests/test_event_impact.py \

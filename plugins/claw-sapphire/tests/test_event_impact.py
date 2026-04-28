@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 TOOL_PATH = Path(__file__).resolve().parents[1] / "tools" / "internal" / "event_impact.py"
+FIXTURES = Path(__file__).resolve().parents[3] / "tests" / "fixtures" / "event_impact"
 
 
 def _tool():
@@ -107,6 +108,50 @@ def test_accuracy_audit_handles_unscored_rows():
     )
     assert out["scored"] == 0
     assert out["accuracy"] is None
+
+
+def test_accuracy_audit_offline_fixture_paths():
+    out = _tool().accuracy_audit_action(
+        {
+            "model_path": str(FIXTURES / "audit_model.json"),
+            "events_path": str(FIXTURES / "audit_events.jsonl"),
+            "bars_path": str(FIXTURES / "audit_bars.json"),
+            "horizons_hours": [24],
+        }
+    )
+    assert out["ok"] is True
+    assert out["mode"] == "offline-fixture-audit"
+    assert out["audit"]["summary"]["scored"] == 3
+    assert out["audit"]["summary"]["direction_accuracy"] == 0.666667
+    assert "small_scored_sample_wide_intervals" in out["audit"]["summary"]["caveats"]
+
+
+def test_accuracy_audit_offline_asset_filter():
+    out = _tool().accuracy_audit_action(
+        {
+            "model_path": str(FIXTURES / "audit_model.json"),
+            "events_path": str(FIXTURES / "audit_events.jsonl"),
+            "bars_path": str(FIXTURES / "audit_bars.json"),
+            "horizons_hours": [24],
+            "assets": ["ETH"],
+        }
+    )
+    assert out["ok"] is True
+    assert out["audit"]["summary"]["observations"] == 1
+    assert out["audit"]["observations_detail"][0]["asset"] == "ETH"
+
+
+def test_accuracy_audit_offline_rejects_bad_shapes():
+    out = _tool().accuracy_audit_action(
+        {
+            "model_path": str(FIXTURES / "audit_model.json"),
+            "events": "not-a-list",
+            "bars_by_asset": {},
+            "horizons_hours": [24],
+        }
+    )
+    assert out["ok"] is False
+    assert out["action"] == "accuracy-audit"
 
 
 def test_handle_unknown_action_lists_valid_actions():
