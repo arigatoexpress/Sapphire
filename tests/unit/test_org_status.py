@@ -447,7 +447,14 @@ def test_render_markdown_includes_control_board_sections() -> None:
     assert "- Open PRs: not checked (--no-external)" in markdown
     assert "- CI strategies:" in markdown
     assert "| sapphire | core |" in markdown
-    assert "| sapphire | core | main | - | yes | 0 | sapphire_self_hosted_gate |" in markdown
+    # Branch name is intentionally not pinned: this test runs from any local
+    # checkout, including feature branches. Confirm the row shape (class, CI
+    # strategy, command-repo state) without hard-coding the branch label.
+    sapphire_row = next(
+        line for line in markdown.splitlines() if line.startswith("| sapphire | core |")
+    )
+    assert "sapphire_self_hosted_gate" in sapphire_row
+    assert "command_repo" in sapphire_row
     assert "| openbb | OpenBB-finance/OpenBB | arigatoexpress/OpenBB |" in markdown
     assert "| tradingview | external_mutating | yes |" in markdown
 
