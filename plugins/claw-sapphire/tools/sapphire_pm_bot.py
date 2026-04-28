@@ -16,7 +16,7 @@ Phase 2 (Wave 4 hardening — operator console):
 - forbidden-command guard rejects /trade /buy /sell /transfer /withdraw
   /rotate-key /launch /exec /eval /sudo /shell etc. with a generic refusal
 - LIVE_TRADING_DISABLED_FROM_TELEGRAM tripwire asserted on every dispatch
-- /health, /services, /routines list|pause|resume, /digest morning|dev,
+- /health, /services, /routines list|status|pause|resume, /digest morning|dev,
   /cancel-routine, /whoami — all read-only or strictly bounded with
   CONFIRM-token gate on dangerous reversibles
 
@@ -28,6 +28,7 @@ always did; the new commands sit alongside them.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import logging
 import os
@@ -46,8 +47,25 @@ try:
 except Exception:  # pragma: no cover
     firestore = None
 
+_TOOL_REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(_TOOL_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_TOOL_REPO_ROOT))
+
 import status as sapphire_status_tool
 from internal import _telegram_safety as safety
+
+try:
+    from lib.core import routine_pause
+except ImportError:  # plugin-local `lib` can shadow repo `lib` in test harnesses
+    _routine_pause_spec = importlib.util.spec_from_file_location(
+        "_sapphire_core_routine_pause",
+        _TOOL_REPO_ROOT / "lib" / "core" / "routine_pause.py",
+    )
+    if _routine_pause_spec is None or _routine_pause_spec.loader is None:
+        raise
+    routine_pause = importlib.util.module_from_spec(_routine_pause_spec)
+    sys.modules[_routine_pause_spec.name] = routine_pause
+    _routine_pause_spec.loader.exec_module(routine_pause)
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +108,7 @@ STATUS_HELP_TEXT = (
     "• /rag <query>\n"
     "• /claw <prompt>\n"
     "• /routines list\n"
+    "• /routines status\n"
     "• /routines pause <name>\n"
     "• /routines resume <name> CONFIRM\n"
     "• /digest morning\n"
@@ -843,6 +862,9 @@ def _list_scheduled_tasks() -> list[dict[str, Any]]:
     """Enumerate scheduled-task directories with last-modified hint."""
     if not _SCHEDULED_TASKS_DIR.exists():
         return []
+    paused_by_name = {
+        record.name: record for record in routine_pause.list_paused(pause_dir=_ROUTINE_PAUSE_DIR)
+    }
     out: list[dict[str, Any]] = []
     for entry in sorted(_SCHEDULED_TASKS_DIR.iterdir()):
         if not entry.is_dir():
@@ -855,15 +877,22 @@ def _list_scheduled_tasks() -> list[dict[str, Any]]:
             last_modified = datetime.fromtimestamp(mtime, tz=UTC).isoformat(timespec="minutes")
         except OSError:
             last_modified = "?"
-        paused = (_ROUTINE_PAUSE_DIR / entry.name).exists()
+        pause_record = paused_by_name.get(entry.name)
+        paused = pause_record is not None
         out.append(
             {
                 "name": entry.name,
                 "last_modified": last_modified,
                 "paused": paused,
+                "paused_at": pause_record.paused_at if pause_record else None,
             }
         )
     return out
+
+
+def _list_paused_routines() -> list[routine_pause.RoutinePause]:
+    """Return valid pause flags without exposing local paths."""
+    return routine_pause.list_paused(pause_dir=_ROUTINE_PAUSE_DIR)
 
 
 def _handle_routines_list() -> dict[str, Any]:
@@ -881,8 +910,31 @@ def _handle_routines_list() -> dict[str, Any]:
         )
     lines = [f"Scheduled tasks ({len(items)})"]
     for item in items:
-        flag = " [PAUSED]" if item["paused"] else ""
+        flag = ""
+        if item["paused"]:
+            paused_at = item.get("paused_at") or "unknown"
+            flag = f" (paused at {paused_at})"
         lines.append(f"• {item['name']} | last_mtime={item['last_modified']}{flag}")
+    return _response(
+        "\n".join(escape_markdown_v2(line) for line in lines), "MarkdownV2"
+    )
+
+
+def _handle_routines_status() -> dict[str, Any]:
+    """Return only paused routines and their pause timestamps."""
+    safety.assert_no_live_trading()
+    try:
+        rows = _list_paused_routines()
+    except Exception as e:
+        return _response(
+            escape_markdown_v2(f"routines status failed: {type(e).__name__}: {e}")[:500],
+            "MarkdownV2",
+        )
+    if not rows:
+        return _response(escape_markdown_v2("No paused routines."), "MarkdownV2")
+    lines = [f"Paused routines ({len(rows)})"]
+    for row in rows:
+        lines.append(f"• {row.name} | paused_at={row.paused_at}")
     return _response(
         "\n".join(escape_markdown_v2(line) for line in lines), "MarkdownV2"
     )
@@ -1121,6 +1173,8 @@ def _dispatch(text: str, update: dict[str, Any]) -> dict[str, Any]:
         return _handle_whoami(update)
     if text == "/routines list":
         return _handle_routines_list()
+    if text == "/routines status":
+        return _handle_routines_status()
     if text.startswith("/routines pause"):
         return _handle_routines_pause(text)
     if text.startswith("/routines resume"):
