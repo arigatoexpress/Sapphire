@@ -101,6 +101,44 @@ SAPPHIRE_EVENT_IMPACT_REBUILD=1 \
 Prefer the script for operator rebuilds because it is easier to inspect
 the command-line arguments and resulting path.
 
+## Post-Corpus Audit
+
+Use `services/event_impact/audit.py` to compare a fitted model snapshot
+against held-out events that happened after the model cutoff. The helper
+is deterministic and offline: it reads a model JSON file, a held-out event
+JSONL file using the same corpus schema, and a local OHLCV JSON file keyed
+by asset. It does not call OpenBB, brokers, wallets, trading venues, or
+external APIs.
+
+```bash
+/usr/local/bin/python3 services/event_impact/audit.py \
+  --model data/event_impact/model_2026-04-28.json \
+  --events scratch/event_impact/post_corpus_events.jsonl \
+  --bars-json scratch/event_impact/post_corpus_bars.json \
+  --horizon 6 \
+  --horizon 24 \
+  --output scratch/event_impact/post_corpus_audit.json
+```
+
+Expected `bars-json` shape:
+
+```json
+{
+  "BTC": [
+    {"timestamp": "2026-05-01T18:00:00+00:00", "close": 64000.0},
+    {"timestamp": "2026-05-02T18:00:00+00:00", "close": 65200.0}
+  ]
+}
+```
+
+The report includes row-level expected reaction fields, realized return,
+sign correctness, confidence-interval containment, and unscored reasons
+such as `missing_price_window`, `no_model_profile`, or
+`neutral_prediction_or_actual`. Treat low accuracy as a calibration signal,
+not a trade instruction. True live validation still requires operator-curated
+post-corpus events, locally captured OHLCV, and a separate review that the
+events were not used in the fitted model.
+
 ## Verification
 
 Focused tests:
@@ -110,6 +148,7 @@ Focused tests:
   tests/unit/test_event_corpus.py \
   tests/unit/test_impact_modeler.py \
   tests/unit/test_event_impact_lookup.py \
+  tests/unit/test_event_impact_post_corpus_audit.py \
   plugins/claw-sapphire/tests/test_event_impact.py \
   -q --tb=short
 ```
