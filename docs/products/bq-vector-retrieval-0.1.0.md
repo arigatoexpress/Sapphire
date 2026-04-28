@@ -66,11 +66,13 @@ following are true at call time:
 3. `SAPPHIRE_BQ_PROJECT` matches the constructor's `project` argument
 
 The gate is fail-closed and re-checked on every call. The current 0.1.0
-build *registers* live attempts (for rate accounting) but returns a clear
-`live-not-implemented` marker — the actual BigQuery I/O is the next
-tranche. The mock backend is intentionally good enough that the rest of
-Sapphire (dashboard, hermes skills, scheduled tasks) can integrate against
-the same API today.
+build wires the live BigQuery path behind those gates: `upsert()` creates
+the fixed-schema table idempotently, loads a temporary staging table, and
+MERGEs rows by stable `id`; `query()` executes a parameterized
+`VECTOR_SEARCH` query using the caller's embedding and `top_k`. The mock
+backend remains the default and is intentionally good enough that the rest
+of Sapphire (dashboard, hermes skills, scheduled tasks) can integrate
+against the same API without touching BigQuery in CI.
 
 ## Embeddings
 
@@ -158,17 +160,18 @@ expose any record text.
 | `lib/intel/embedders.py`                                         | Mock embedder + registry           |
 | `plugins/claw-sapphire/tools/internal/intel_search.py`           | Plugin tool (real impl)            |
 | `plugins/claw-sapphire/tools/intel_search.py`                    | 30-line compat shim                |
-| `tests/unit/test_bq_vector_store.py`                             | 32-case lib tests                  |
-| `tests/unit/test_intel_embedders.py`                             | 11-case embedder tests             |
-| `plugins/claw-sapphire/tests/test_intel_search.py`               | 10-case plugin tool tests          |
+| `tests/unit/test_bq_vector_store.py`                             | Mock/gate lib tests                |
+| `tests/unit/test_bq_vector_store_live.py`                        | Mocked live BigQuery tests         |
+| `tests/unit/test_intel_embedders.py`                             | Embedder tests                     |
+| `plugins/claw-sapphire/tests/test_intel_search.py`               | Plugin tool tests                  |
 | `docs/ops/intel-search-runbook.md`                               | Operator runbook                   |
 | `infra/tool-registry.yaml`                                       | Registry entry under "Intel" block |
 
 ## Roadmap
 
-* **0.2.0** — wire the live BigQuery upsert + `VECTOR_SEARCH` query;
-  introduce a Vertex `text-embedding-gecko@003` embedder behind the same
-  gate. Expand `MAX_LIVE_INDEX_PER_HOUR` only after a soak window.
+* **0.2.0** — introduce a production semantic embedder behind the same
+  gate and add a bounded soak report for live BigQuery writes/searches.
+  Expand `MAX_LIVE_INDEX_PER_HOUR` only after that soak window.
 * **0.3.0** — surface `intel_search` results in the dashboard intel page
   and through hermes skills.
 * **0.4.0** — Foundry sync: write a `IntelVectorRecord` ontology object

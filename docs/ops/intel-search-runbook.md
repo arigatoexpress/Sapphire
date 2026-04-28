@@ -156,13 +156,17 @@ are true at call time:
 2. `GOOGLE_APPLICATION_CREDENTIALS` resolves to a readable file
 3. `SAPPHIRE_BQ_PROJECT` matches the constructor's `project` argument
 
-Until 0.2.0 wires the actual BigQuery I/O, a passing live gate still
-returns `live-not-implemented`. Live `index` attempts are rate-limited at
-2/hour regardless; the counter is persisted under
+The live path is wired. A passing gate will contact BigQuery: `index`
+creates the destination table idempotently, loads a staging table, and
+MERGEs rows by stable `id`; `search` executes parameterized
+`VECTOR_SEARCH`. Live `index` attempts are rate-limited at 2/hour
+regardless; the counter is persisted under
 `~/.cache/sapphire/bq_vector_live_rate.json` and pruned to a 1-hour
 window on every check.
 
-To preview live mode locally without spending anything:
+For no-spend local verification, leave `live` unset/false and use the mock
+backend. Only run the live command when the operator has approved a bounded
+BigQuery write/search:
 
 ```bash
 SAPPHIRE_BQ_LIVE=1 \
@@ -172,9 +176,8 @@ echo '{"action":"index","live":true,"snapshot_dir":"data/intelligence"}' \
   | python3 plugins/claw-sapphire/tools/intel_search.py
 ```
 
-You will get `mode: live-not-implemented` until the live writer ships in
-0.2.0. The point is to confirm the gates pass; if any gate fails, the
-response includes a clear `gate.reason`.
+If any gate fails, the response includes a clear `gate.reason` and no
+BigQuery client is constructed.
 
 ## Troubleshooting
 
@@ -202,25 +205,25 @@ these constants directly so they cannot drift.
 
 ## Soak Posture
 
-* This feature is mock-only in 0.1.0; there is nothing to soak in
-  production yet.
-* When 0.2.0 wires the live writer:
-  * Run with `SAPPHIRE_BQ_LIVE=1` for a one-shot index from a
-    representative snapshot, watch the per-hour counter, confirm
-    `stats` reflects the live total, and verify that `search` from a
-    fresh shell hits the live table.
-  * Telegram-style alerting is not wired today (mock-only by design); the
-    next tranche will add a Telegram failure alert path that mirrors the
-    Foundry sync pattern in `lib/foundry/sync.py`.
-* For the current 0.1.0 build, the verification gate is the local
-  pytest run plus `python3 scripts/validate_tool_registry.py`. Both must
-  pass before promotion.
+* Live BigQuery writes/searches are available but remain opt-in behind the
+  three live gates.
+* Before any recurring production use, run one operator-approved index from
+  a representative snapshot, watch the per-hour counter, confirm the table
+  schema in BigQuery, and verify that `search` from a fresh shell hits the
+  live table.
+* Telegram-style alerting is not wired today; a later tranche can add a
+  failure alert path that mirrors the Foundry sync pattern in
+  `lib/foundry/sync.py`.
+* For this build, the verification gate is the local pytest run plus
+  `python3 scripts/validate_tool_registry.py`. Both must pass before
+  promotion.
 
 ## Verification Checklist
 
 ```bash
 ruff check .
 python3 -m pytest tests/unit/test_bq_vector_store.py \
+                  tests/unit/test_bq_vector_store_live.py \
                   tests/unit/test_intel_embedders.py \
                   plugins/claw-sapphire/tests/test_intel_search.py \
                   -x --tb=short
