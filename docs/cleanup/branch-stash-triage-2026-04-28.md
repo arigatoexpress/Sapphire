@@ -12,7 +12,8 @@ stashes, worktrees, or files were deleted.
 - Local-only branches: 30
 - Branches already merged into `origin/main`: 3
 - Stashes: 35
-- Registered Sapphire worktrees: root checkout and this docs worktree
+- Registered Sapphire worktrees after PR #342 cleanup: root checkout and
+  `sapphire-robinhood-manual-order`
 - Extra `_worktrees` directories not registered as git worktrees:
   `sapphire-claude-md-cloud-routines`, `sapphire-claw-plugin-schema`
 
@@ -37,7 +38,9 @@ Prefix counts:
 
 ## Do Not Touch Yet
 
-- `docs/control-tower-status-20260428`: current docs worktree branch.
+- `feat/robinhood-manual-order`: active dirty worktree at
+  `/Users/aribs/Code/_worktrees/sapphire-robinhood-manual-order`, containing
+  Robinhood manual-order docs/script/test WIP.
 - Any `backup/*` branch without Ari approval.
 - All 35 stashes. They are concentrated conflict/WIP snapshots from 2026-04-20
   through 2026-04-26 and should be reviewed, exported, or dropped only in a
