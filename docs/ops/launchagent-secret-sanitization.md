@@ -9,7 +9,7 @@ follow-up PR after the rotation gate (below) clears.
 
 ## Background
 
-The 2026-04-21 audit (`docs/launchagents-audit-2026-04-21.md`) flagged two
+The 2026-04-21 audit (`docs/archive/2026/audits/launchagents-audit-2026-04-21.md`) flagged two
 LaunchAgents as live-only and secret-bearing:
 
 - **F1**: `com.sapphire.inference-proxy.plist` — embeds a Telegram bot token
@@ -149,7 +149,7 @@ functionality. Both behaviors are preferable to a hard crash.
       `inference-proxy` from the "intentionally not versioned" list and
       point at the new service-owned locations.
 - [ ] Add a `2026-XX-XX repo-side update` inline note to
-      `docs/launchagents-audit-2026-04-21.md` (matches the existing
+      `docs/archive/2026/audits/launchagents-audit-2026-04-21.md` (matches the existing
       pattern at lines 74–78) closing F1 and F2.
 - [ ] Run local CI verifier: `python3 scripts/ops/local_ci_verify.py
       --verbose`.
@@ -216,7 +216,7 @@ implementation PR that follows)
 
 ## References
 
-- `docs/launchagents-audit-2026-04-21.md` — original F1/F2 findings.
+- `docs/archive/2026/audits/launchagents-audit-2026-04-21.md` — original F1/F2 findings.
 - `infra/launchagents/README.md` — current LaunchAgent inventory and
   service-owned-plist convention.
 - `services/inference-proxy/start.sh` — existing wrapper that the

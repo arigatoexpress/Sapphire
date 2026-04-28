@@ -1,7 +1,7 @@
 # Sapphire OS — Living Audit
 
 **Last verified:** 2026-04-18
-**Scope:** Every claim in [CLAUDE.md](../CLAUDE.md) checked against live services, actual file existence, running tests, and observed data freshness. Supersedes and replaces: `opus-audit-2026-04-17.md`, `technical-audit-2026-04-16.md`, `overnight-technical-report-2026-04-16.md`, `overnight-run-report.md`, `e2e-test-report-2026-04-16.md`, `system-cohesion-audit.md`.
+**Scope:** Every claim in [CLAUDE.md](../../../../CLAUDE.md) checked against live services, actual file existence, running tests, and observed data freshness. Supersedes and replaces: `opus-audit-2026-04-17.md`, `technical-audit-2026-04-16.md`, `overnight-technical-report-2026-04-16.md`, `overnight-run-report.md`, `e2e-test-report-2026-04-16.md`, `system-cohesion-audit.md`.
 
 ## Top-line verdict
 
@@ -30,7 +30,7 @@
 
 | Issue | Impact | Fix |
 |-------|--------|-----|
-| The old orphan-tool claim is too broad: `trading_brain`, `tho_intel`, and `lumo` are still repo-local orphan entrypoints, but `lead_engine` and `macro_data` are active inside the standalone tool graph | Overstates deletion candidates and hides real registration choices | See `docs/tool-surface-audit-2026-04-19.md`; wire, archive, or register only with explicit product intent |
+| The old orphan-tool claim is too broad: `trading_brain`, `tho_intel`, and `lumo` are still repo-local orphan entrypoints, but `lead_engine` and `macro_data` are active inside the standalone tool graph | Overstates deletion candidates and hides real registration choices | See [`tool-surface-audit-2026-04-19.md`](tool-surface-audit-2026-04-19.md); wire, archive, or register only with explicit product intent |
 | `data/market_pulse/` and `data/threat_intel/` frozen at 2026-04-08 | health_check flags RED; tasks run but don't persist | SKILL.md hardened 2026-04-18 to always write a file in STEP 1 |
 | Proxy log shows intermittent "No route to host" to Pi + Windows | Inference falls back to slow Mac (90s+ per call) | Tailscale reachability jitter — investigate routes |
 | Dashboard has `app_backup.py`, `app_with_auth.py` stale variants | Confusion + accidental edits | **Deleted 2026-04-18** |
@@ -72,6 +72,6 @@
 ## Still TODO (not done)
 
 1. Re-verify opus-audit C2 (body cap) and C5 (TLS) findings
-2. Decide whether to wire or retire `confirmation_firewall`, `trading_brain`, `tho_intel`, and `lumo`; keep `lead_engine` and `macro_data` unless the standalone tool graph is redesigned (see `docs/tool-surface-audit-2026-04-19.md`)
+2. Decide whether to wire or retire `confirmation_firewall`, `trading_brain`, `tho_intel`, and `lumo`; keep `lead_engine` and `macro_data` unless the standalone tool graph is redesigned (see [`tool-surface-audit-2026-04-19.md`](tool-surface-audit-2026-04-19.md))
 3. Revisit whether any remaining companions truly deserve plugin-surface promotion, or whether the surface should now stabilize at 12 registered tools
 4. Investigate intermittent Tailscale route failures in proxy log
