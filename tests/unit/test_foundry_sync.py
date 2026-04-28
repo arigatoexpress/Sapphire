@@ -650,9 +650,19 @@ class TestRunSyncGracefulDegradation:
         assert result.ok is True
         assert result.skipped is False
         assert result.uploaded_types["PaperTrade"] == 1
-        validate.assert_called_once_with(["PaperTrade"])
-        upload.assert_called_once()
-        assert upload.call_args.args[0] == "PaperTrade"
+        # Post-Tranche-4 the validator is called with whatever the fixture
+        # surfaces, which now includes IntelVectorRecord alongside PaperTrade.
+        # Pin the assertion to the PaperTrade presence + single invocation.
+        validate.assert_called_once()
+        called_with = validate.call_args.args[0]
+        assert "PaperTrade" in called_with
+        # PaperTrade is uploaded; other Tranche-4 ontology types may also
+        # upload from their fixtures. The invariant is that PaperTrade
+        # specifically went through the upload_dataset_objects path.
+        upload_targets = [call.args[0] for call in upload.call_args_list]
+        assert "PaperTrade" in upload_targets
+        paper_trade_call = next(c for c in upload.call_args_list if c.args[0] == "PaperTrade")
+        assert isinstance(paper_trade_call.args[1], list)
 
     def test_dataset_mode_404_is_not_demoted(self, tmp_path, monkeypatch):
         """Dataset upload 404s are real write failures, not missing action setup."""
