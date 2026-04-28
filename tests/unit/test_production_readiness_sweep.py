@@ -150,3 +150,70 @@ def test_inference_health_passes_when_all_tiers_healthy(monkeypatch) -> None:
 
     assert check.status == "PASS"
     assert "degraded_tiers" not in check.evidence
+
+
+def test_satellite_ci_no_spend_gates_pass_for_gated_workflows(tmp_path: Path) -> None:
+    repo = tmp_path / "satellite"
+    workflows = repo / ".github" / "workflows"
+    workflows.mkdir(parents=True)
+    (workflows / "ci.yml").write_text(
+        """
+jobs:
+  test:
+    if: ${{ vars.SAPPHIRE_RUNNER != '' }}
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER || '"ubuntu-latest"') }}
+    steps:
+      - run: echo ok
+""",
+        encoding="utf-8",
+    )
+    manifest = tmp_path / "org-repos.yaml"
+    manifest.write_text(
+        f"""
+repos:
+  - id: satellite
+    local_path: {repo}
+    ci_strategy: local_evidence_skip_ci_bootstrap
+  - id: project-go-forward
+    local_path: /does/not/matter
+    ci_strategy: draft_auto_deploy
+""",
+        encoding="utf-8",
+    )
+
+    check = sweep.probe_satellite_ci_no_spend_gates(manifest)
+
+    assert check.status == "PASS"
+    assert "checked_repos=1" in check.evidence
+    assert "exceptions=project-go-forward:draft_auto_deploy" in check.evidence
+
+
+def test_satellite_ci_no_spend_gates_fail_for_ungated_jobs(tmp_path: Path) -> None:
+    repo = tmp_path / "satellite"
+    workflows = repo / ".github" / "workflows"
+    workflows.mkdir(parents=True)
+    (workflows / "ci.yml").write_text(
+        """
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo paid
+""",
+        encoding="utf-8",
+    )
+    manifest = tmp_path / "org-repos.yaml"
+    manifest.write_text(
+        f"""
+repos:
+  - id: satellite
+    local_path: {repo}
+    ci_strategy: local_evidence_skip_ci_bootstrap
+""",
+        encoding="utf-8",
+    )
+
+    check = sweep.probe_satellite_ci_no_spend_gates(manifest)
+
+    assert check.status == "FAIL"
+    assert "violations=satellite:ci.yml:test" in check.evidence
