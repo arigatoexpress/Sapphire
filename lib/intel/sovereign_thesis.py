@@ -16,6 +16,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from lib.core.provenance import write_envelope_sidecar
+
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG_PATH = ROOT / "config" / "investment_thesis.yaml"
 
@@ -411,12 +413,9 @@ def _asset_from_mapping(row: dict[str, Any]) -> ThesisAsset:
     if not symbol:
         raise ValueError("thesis asset requires symbol")
     lens_scores = {
-        str(key): _as_float(value)
-        for key, value in _as_mapping(row.get("lens_scores")).items()
+        str(key): _as_float(value) for key, value in _as_mapping(row.get("lens_scores")).items()
     }
-    invalidations = tuple(
-        _as_mapping(item) for item in _as_list(row.get("invalidation_triggers"))
-    )
+    invalidations = tuple(_as_mapping(item) for item in _as_list(row.get("invalidation_triggers")))
     return ThesisAsset(
         symbol=symbol,
         name=str(row.get("name") or symbol),
@@ -658,7 +657,9 @@ def _ops_queue(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return queue[:24]
 
 
-def _source_requirements(lenses: list[ThesisLens], rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _source_requirements(
+    lenses: list[ThesisLens], rows: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     counts: Counter[str] = Counter()
     status_counts: dict[str, Counter[str]] = {}
     for row in rows:
@@ -669,12 +670,10 @@ def _source_requirements(lenses: list[ThesisLens], rows: list[dict[str, Any]]) -
         for entry in row.get("evidence_ledger") or []:
             source_id = str(entry.get("source_id") or "")
             if source_id:
-                status_counts.setdefault(source_id, Counter())[str(entry.get("status") or "unknown")] += 1
-    lens_map = {
-        source: lens.id
-        for lens in lenses
-        for source in lens.source_requirements
-    }
+                status_counts.setdefault(source_id, Counter())[
+                    str(entry.get("status") or "unknown")
+                ] += 1
+    lens_map = {source: lens.id for lens in lenses for source in lens.source_requirements}
     rows_out = []
     for source, count in counts.most_common():
         registry = _source_registry_row(source)
@@ -732,8 +731,7 @@ def _global_evidence_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "needs_wiring": statuses.get("needs_wiring", 0),
         "coverage_pct": round((statuses.get("evidenced", 0) / total) * 100, 1) if total else 100.0,
         "wired_pct": round(
-            ((statuses.get("evidenced", 0) + statuses.get("provider_wired", 0)) / total)
-            * 100,
+            ((statuses.get("evidenced", 0) + statuses.get("provider_wired", 0)) / total) * 100,
             1,
         )
         if total
@@ -869,6 +867,12 @@ def write_thesis_materialization_preview(
             "".join(json.dumps(row, sort_keys=True) + "\n" for row in table_rows),
             encoding="utf-8",
         )
+        write_envelope_sidecar(
+            target,
+            generator="lib.intel.sovereign_thesis",
+            source_paths=(config_path,) if config_path else (DEFAULT_CONFIG_PATH,),
+            metadata={"table": table, "rows": len(table_rows), "mode": "dry-run-write"},
+        )
         written.append({"table": table, "rows": len(table_rows), "path": str(target)})
     return {
         "timestamp": _now_iso(),
@@ -899,7 +903,9 @@ def build_sovereign_thesis_report(config_path: str | Path | None = None) -> dict
         raw_rows.append(asset)
 
     rows = [_asset_row(asset, lenses, max_score) for asset in raw_rows]
-    rows.sort(key=lambda row: (row["relative_score"], row["conviction"], row["symbol"]), reverse=True)
+    rows.sort(
+        key=lambda row: (row["relative_score"], row["conviction"], row["symbol"]), reverse=True
+    )
     for index, row in enumerate(rows, start=1):
         row["rank"] = index
 
