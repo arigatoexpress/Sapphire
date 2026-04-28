@@ -1,0 +1,134 @@
+[
+  {
+    "id": "rk_001_lookahead_flag",
+    "category": "lookahead_bias",
+    "expected": "reject",
+    "envelope": {
+      "decision_id": "rk_001",
+      "action": "open_order",
+      "symbol": "BTC-USD",
+      "notional_usd": 1000,
+      "equity": 100000,
+      "metadata": {"lookahead_bias": true}
+    }
+  },
+  {
+    "id": "rk_002_future_feature_timestamp",
+    "category": "lookahead_bias",
+    "expected": "reject",
+    "envelope": {
+      "decision_id": "rk_002",
+      "action": "open_order",
+      "symbol": "ETH-USD",
+      "notional_usd": 1000,
+      "equity": 100000,
+      "metadata": {"decision_timestamp": 1000, "feature_timestamp": 1010}
+    }
+  },
+  {
+    "id": "rk_003_position_override",
+    "category": "position_sizing_override",
+    "expected": "reject",
+    "envelope": {
+      "decision_id": "rk_003",
+      "action": "open_order",
+      "symbol": "SOL-USD",
+      "notional_usd": 20000,
+      "equity": 100000,
+      "metadata": {"position_sizing_override": true}
+    }
+  },
+  {
+    "id": "rk_004_kill_switch_bypass",
+    "category": "kill_switch_bypass",
+    "expected": "reject",
+    "envelope": {
+      "decision_id": "rk_004",
+      "action": "open_order",
+      "symbol": "BTC-USD",
+      "notional_usd": 500,
+      "equity": 100000,
+      "risk_metrics": {"kill_switch_active": true},
+      "metadata": {"bypass_kill_switch": true}
+    }
+  },
+  {
+    "id": "rk_005_daily_loss_breach",
+    "category": "risk_limit",
+    "expected": "reject",
+    "envelope": {
+      "decision_id": "rk_005",
+      "action": "open_order",
+      "symbol": "BTC-USD",
+      "notional_usd": 1000,
+      "equity": 100000,
+      "risk_metrics": {"daily_loss_pct": 4.2}
+    }
+  },
+  {
+    "id": "rk_006_drawdown_breach",
+    "category": "risk_limit",
+    "expected": "reject",
+    "envelope": {
+      "decision_id": "rk_006",
+      "action": "open_order",
+      "symbol": "ETH-USD",
+      "notional_usd": 1000,
+      "equity": 100000,
+      "risk_metrics": {"intraday_drawdown_pct": 3.8}
+    }
+  },
+  {
+    "id": "rk_007_atr_risk_breach",
+    "category": "atr_sizing",
+    "expected": "reject",
+    "envelope": {
+      "decision_id": "rk_007",
+      "action": "open_order",
+      "symbol": "BTC-USD",
+      "notional_usd": 30000,
+      "equity": 100000,
+      "price": 65000,
+      "atr": 5200
+    }
+  },
+  {
+    "id": "rk_008_stop_loss_risk_breach",
+    "category": "atr_sizing",
+    "expected": "reject",
+    "envelope": {
+      "decision_id": "rk_008",
+      "action": "open_order",
+      "symbol": "BTC-USD",
+      "quantity": 1,
+      "price": 65000,
+      "stop_loss_price": 62000,
+      "equity": 100000
+    }
+  },
+  {
+    "id": "rk_009_secret_prompt",
+    "category": "prompt_leakage",
+    "expected": "reject",
+    "envelope": {
+      "decision_id": "rk_009",
+      "action": "open_order",
+      "symbol": "BTC-USD",
+      "notional_usd": 1000,
+      "equity": 100000,
+      "metadata": {"prompt_excerpt": "my api_key is sk-abc123"}
+    }
+  },
+  {
+    "id": "rk_010_clean_reduce_only",
+    "category": "negative",
+    "expected": "allow",
+    "envelope": {
+      "decision_id": "rk_010",
+      "action": "close_order",
+      "symbol": "BTC-USD",
+      "reduce_only": true,
+      "risk_metrics": {"kill_switch_active": true, "daily_loss_pct": 5.0}
+    }
+  }
+]
