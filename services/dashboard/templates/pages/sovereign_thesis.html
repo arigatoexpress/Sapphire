@@ -170,6 +170,38 @@
 
     <div class="card">
         <div class="card-header">
+            <h3 class="card-title">Gemini OODA (dry-run)</h3>
+            <div class="ci-meta">
+                <span class="pill neutral" id="st-ooda-mode">--</span>
+                <span class="pill neutral" id="st-ooda-cap">--</span>
+            </div>
+        </div>
+        <div class="card-body" style="display:grid;gap:8px;">
+            <div style="font-size:.66rem;color:var(--text-muted);" id="st-ooda-topic">Loading topic</div>
+            <div>
+                <div style="font-size:.62rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Observe</div>
+                <div id="st-ooda-observe" class="loading">Loading</div>
+            </div>
+            <div>
+                <div style="font-size:.62rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Orient</div>
+                <div id="st-ooda-orient" class="loading">Loading</div>
+            </div>
+            <div>
+                <div style="font-size:.62rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Decide</div>
+                <div id="st-ooda-decide" class="loading">Loading</div>
+            </div>
+            <div>
+                <div style="font-size:.62rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;">Act</div>
+                <ul id="st-ooda-act" style="margin:4px 0 0 18px;padding:0;font-size:.74rem;line-height:1.4;">
+                    <li class="loading">Loading</li>
+                </ul>
+            </div>
+            <div style="font-size:.6rem;color:var(--text-muted);" id="st-ooda-status">--</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
             <h3 class="card-title">Artifact Lease Preview</h3>
             <div class="ci-meta">
                 <span class="pill neutral" id="st-artifacts-total">--</span>
@@ -541,7 +573,59 @@ async function loadSovereignThesis() {
         : '<tr><td colspan="5" class="empty-state">No source requirements</td></tr>';
 }
 
+async function loadGeminiOodaPanel() {
+    const fail = err => {
+        const message = esc(err?.message || err || 'gemini-ooda unavailable');
+        document.getElementById('st-ooda-mode').textContent = 'unavailable';
+        document.getElementById('st-ooda-topic').textContent = '--';
+        document.getElementById('st-ooda-observe').innerHTML = `<span class="empty-state">${message}</span>`;
+        document.getElementById('st-ooda-orient').innerHTML = `<span class="empty-state">${message}</span>`;
+        document.getElementById('st-ooda-decide').innerHTML = `<span class="empty-state">${message}</span>`;
+        document.getElementById('st-ooda-act').innerHTML = `<li class="empty-state">${message}</li>`;
+        document.getElementById('st-ooda-status').textContent = '';
+    };
+
+    let payload;
+    try {
+        const resp = await fetch(`${window.location.origin}/api/gemini-ooda`);
+        payload = await resp.json();
+    } catch (err) {
+        fail(err);
+        return;
+    }
+
+    if (payload.error) {
+        fail(payload.error);
+        return;
+    }
+
+    const synthesis = payload.synthesis || {};
+    const ooda = synthesis.ooda || {};
+    const meta = synthesis.metadata || {};
+    const status = payload.tool_status || {};
+
+    document.getElementById('st-ooda-mode').textContent = meta.mode_actual || 'dry-run';
+    const calls = (status.calls_last_hour ?? 0);
+    const monthTokens = (status.month_tokens ?? 0);
+    document.getElementById('st-ooda-cap').textContent = `${calls}/${status.max_calls_per_hour ?? 8}h · ${monthTokens}/${status.max_tokens_per_month ?? 500000} mo`;
+    document.getElementById('st-ooda-topic').textContent = `topic: ${esc(payload.topic || '--')}`;
+    document.getElementById('st-ooda-observe').textContent = ooda.observe || '--';
+    document.getElementById('st-ooda-orient').textContent = ooda.orient || '--';
+    document.getElementById('st-ooda-decide').textContent = ooda.decide || '--';
+
+    const act = Array.isArray(ooda.act) ? ooda.act : [];
+    document.getElementById('st-ooda-act').innerHTML = act.length
+        ? act.map(item => `<li>${esc(item)}</li>`).join('')
+        : '<li class="empty-state">no act items</li>';
+
+    const sensitive = (meta.sensitivity || {}).sensitive ? 'sensitivity:blocked · ' : '';
+    const cached = meta.cached ? 'cached · ' : '';
+    document.getElementById('st-ooda-status').textContent =
+        `${sensitive}${cached}live_env=${status.live_env ? 'yes' : 'no'} · cache_entries=${status.cache_entries ?? 0}`;
+}
+
 loadSovereignThesis();
 loadContinuousIntelligencePanel();
+loadGeminiOodaPanel();
 </script>
 {% endblock %}
