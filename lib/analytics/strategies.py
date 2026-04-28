@@ -795,12 +795,20 @@ def save_results(
     results: list[SweepResult],
     tag: str = "",
     metadata: dict[str, Any] | None = None,
+    output_dir: Path | None = None,
 ) -> Path:
-    """Persist all SweepResults to data/backtests/strategies/ as JSON."""
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    """Persist all SweepResults to data/backtests/strategies/ as JSON.
+
+    `output_dir` overrides the default `RESULTS_DIR` location (used by
+    `lib.analytics.run_strategies --output-dir <path>` so callers can drop
+    sweep artifacts into a scratch path without polluting the canonical
+    `data/backtests/strategies/` tree).
+    """
+    target_dir = output_dir if output_dir is not None else RESULTS_DIR
+    target_dir.mkdir(parents=True, exist_ok=True)
     ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     suffix = f"_{tag}" if tag else ""
-    path = RESULTS_DIR / f"strategy_sweep_{ts}{suffix}.json"
+    path = target_dir / f"strategy_sweep_{ts}{suffix}.json"
     payload = {
         "computed_at": datetime.now(UTC).isoformat(),
         "total_backtests": len(results),
