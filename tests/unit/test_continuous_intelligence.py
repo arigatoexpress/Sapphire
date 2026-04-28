@@ -78,6 +78,26 @@ def test_regional_ooda_task_is_read_only_review_and_export_only() -> None:
     assert "No GCP, Foundry, workflow dispatch, Telegram, or trading write is invoked" in task["acceptance"]
 
 
+def test_gemini_ooda_task_is_dry_run_with_caps() -> None:
+    plan = ci.build_continuous_intelligence_plan(fetch_live=False)
+    task = {task["id"]: task for task in plan["tasks"]}["gemini-ooda-synthesis-dry-run"]
+
+    assert task["lane"] == "ai_complement"
+    assert task["target_runtime"] == "mac-local"
+    assert task["model_tier"] == "gemini-flash-bounded"
+    assert task["safe_mode"] == "dry_run"
+    assert "gemini_ooda.py" in task["command"]
+    assert task["command"].endswith("plugins/claw-sapphire/tools/gemini_ooda.py")
+    assert "\"mode\":\"dry-run\"" in task["command"]
+    assert set(task["ooda_packet"]) == {"observe", "orient", "decide", "act"}
+    assert any(
+        "SAPPHIRE_GEMINI_LIVE=1" in gate
+        for gate in task["acceptance"]
+    )
+    assert any("sensitivity" in gate.lower() for gate in task["acceptance"])
+    assert "docs/ops/gemini-ooda-synthesizer-runbook.md" in task["source_docs"]
+
+
 def test_cli_emits_json(capsys) -> None:
     exit_code = ci.cli(["--pretty"])
 

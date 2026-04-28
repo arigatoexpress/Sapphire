@@ -410,6 +410,77 @@ def _build_tasks(
             ),
         ),
         _task(
+            id="gemini-ooda-synthesis-dry-run",
+            lane="ai_complement",
+            priority="P2",
+            title="Bounded Gemini OODA synthesis on the latest thesis snapshot",
+            description=(
+                "Use the Sapphire-bounded gemini_ooda plugin tool to draft an "
+                "OODA packet from the current thesis + market state. Default mode "
+                "is dry-run, which produces a deterministic mock packet without "
+                "contacting Gemini; live mode requires SAPPHIRE_GEMINI_LIVE=1, the "
+                "sensitivity gate, and the per-hour + per-month token caps to be "
+                "below the breaker."
+            ),
+            target_runtime="mac-local",
+            model_tier="gemini-flash-bounded",
+            cadence="daily_dry_run",
+            safe_mode="dry_run",
+            symbols=tuple(dict.fromkeys([*thesis_symbols[:4], *liked[:4]])),
+            inputs=(
+                "sovereign_thesis",
+                "market_universe",
+                "strategy_performance",
+                "plugins/claw-sapphire/tools/gemini_ooda.py",
+            ),
+            command=(
+                "echo '{\"action\":\"synthesize\",\"topic\":\"Sapphire daily thesis OODA\","
+                "\"mode\":\"dry-run\"}' | python3 plugins/claw-sapphire/tools/gemini_ooda.py"
+            ),
+            ooda_packet={
+                "observe": (
+                    "Read sovereign_thesis, market_universe, and strategy_performance "
+                    "snapshots. Do not include secret values, customer PINs, mesh IPs, "
+                    "or position sizes in the prompt; the sensitivity gate will block "
+                    "them in live mode anyway."
+                ),
+                "orient": (
+                    "Frame the synthesis as a paste-safe topic + context the OODA tool "
+                    "can hand to Gemini Flash. Live mode is reserved for moments where "
+                    "the local 4-tier mesh underperforms on structured output."
+                ),
+                "decide": (
+                    "Stay in dry-run unless an operator has reviewed the per-call cap, "
+                    "set SAPPHIRE_GEMINI_LIVE=1, and confirmed there is room in the "
+                    "monthly token budget."
+                ),
+                "act": [
+                    "Run the dry-run command above; cache the resulting JSON.",
+                    "Diff the OODA packet against yesterday's; surface deltas only.",
+                    "Open a PR if the runbook caps need to change before promoting "
+                    "the tool to a higher cadence or skill.",
+                ],
+            },
+            expected_artifacts=(
+                "data/.autonomy/continuous_intelligence/gemini-ooda-*.json",
+                "~/.cache/sapphire/gemini_ooda/<topic-hash>.json (live mode only)",
+            ),
+            acceptance=(
+                "Dry-run mode produces a deterministic mock OODA packet without contacting Google",
+                "Live mode is gated by SAPPHIRE_GEMINI_LIVE=1, the sensitivity classifier, and rate/cost caps",
+                "No Telegram send, trading action, GCS/BigQuery write, or LaunchAgent retarget happens",
+            ),
+            source_docs=(
+                "docs/ops/gemini-ooda-synthesizer-runbook.md",
+                "docs/ops/gcp-vertex-ai-complement-plan.md",
+                "docs/ops/google-benefits-utilization-plan.md",
+            ),
+            notes=(
+                "Per-call output capped at MAX_OUTPUT_TOKENS_HARD=4096; per-hour cap MAX_CALLS_PER_HOUR=8;"
+                " per-month cap MAX_TOKENS_PER_MONTH=500_000.",
+            ),
+        ),
+        _task(
             id="windows-confluence-scan-preferred-assets",
             lane="confluence_scan",
             priority="P1",
