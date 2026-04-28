@@ -194,7 +194,7 @@ tools:
     status: internal
     owner: sapphire
     consumers: [scheduled-tasks.market-pulse, hermes-agent.trading-analysis]
-    description: Signal-only Hyperliquid public-feed status/latest/subscribe-test tool. No wallet keys, no authenticated endpoints, no trade execution.
+    description: Hyperliquid public-feed signal tool (status/latest/subscribe-test) plus live-status read-only inspector for the executor (killswitch, trading-enabled flag, daily PnL ledger, recent trades). Does not place or sign orders — execution lives in services/hyperliquid + lib/trading/hyperliquid_live.
 
   - name: market_sentiment
     path: plugins/claw-sapphire/tools/internal/market_sentiment.py

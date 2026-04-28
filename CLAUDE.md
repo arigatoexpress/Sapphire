@@ -96,7 +96,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `services/dashboard/` | service | Flask dashboard [Mac:8080] — 32 pages, SSE event stream, performance + forecast + backtest endpoints. |
 | `services/foundry_sync/` | service | Scheduled Foundry sync daemon — wraps `lib/foundry/sync.py`. |
 | `services/heartbeat/` | service | Heartbeat daemon wrapper (`run.py`, `heartbeat.py`). |
-| `services/hyperliquid/` | service | Hyperliquid L1 bot (stub). |
+| `services/hyperliquid/` | service | Hyperliquid L1 bot — public-feed signal subscriber + live-trading executor (`lib.trading.hyperliquid_live`, hard caps: $5/order, 3x lev, 5 positions, $25/day loss, file-killswitch). Mainnet refused until EIP-712 signing is verified on testnet (`policy.signing_verified=False`). |
 | `services/inference-proxy/` | service | 4-tier LLM failover [Mac:11435] + x402 gate. |
 | `services/intelligence/` | service | Daily brief generator, chain refresh. |
 | `services/pipeline/` | service | GCP sync — events → GCS + BigQuery (hourly watermark). |
@@ -208,6 +208,15 @@ TradingView → webhook (Win :9090) → signal logger (Mac :18081) → Telegram
 Autonomous signal generator scans RSI/MACD/BB/MA → generates signals → paper trades
 Paper portfolio: $100K, ATR-based SL/TP (1.67:1 R:R), 10% position sizing
 Prediction accuracy: 61.1% overall, BTC 83.3% (n=36 scored of 42)
+
+**Hyperliquid live executor (`lib/trading/hyperliquid_live.py`):**
+- Caps: `$5/order`, `3x` max leverage, `5` max open positions, `$25/day` realized-loss auto-pause.
+- Killswitch: `~/.sapphire/hyperliquid_trading_pause` (drop file → blocks every order, mirrors routine-pause from #392).
+- Gates: `HYPERLIQUID_TRADING_ENABLED=0` (default → all orders dry-run-logged), `HYPERLIQUID_TESTNET=1` (default → testnet).
+- Key: macOS keychain `security -a sapphire-hyperliquid -s sapphire -w` first, env `HYPERLIQUID_PRIVATE_KEY` fallback.
+- Mainnet refused until `HyperliquidLivePolicy.signing_verified=True`. The current `client.py:_sign_action` does sha256→`encode_defunct` instead of full EIP-712 — known broken, fix tracked separately. Verify on testnet before flipping the policy field.
+- Audit: every `execute_signal` appends to `data/hyperliquid_trades.jsonl`; daily realized loss tally at `data/hyperliquid_daily_pnl.json`.
+- Read-only status: `echo '{"action":"live-status"}' | python3 plugins/claw-sapphire/tools/hyperliquid.py`.
 
 ## Hermes Agent (Telegram Bot)
 

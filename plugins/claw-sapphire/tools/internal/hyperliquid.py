@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
-"""Dry-run/status tool for Sapphire's Hyperliquid public-feed signals."""
+"""Dry-run/status tool for Sapphire's Hyperliquid public-feed signals.
+
+Also exposes ``live-status`` for the trading executor — reports killswitch
+state, trading-enabled flag, today's daily-loss tally, and recent trade-log
+entries without touching the network or wallet keys.
+"""
 
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -21,7 +27,12 @@ from hyperliquid_bot.public_feed import (  # noqa: E402
     status_payload,
 )
 
-VALID_ACTIONS = ("status", "latest", "subscribe-test")
+from lib.trading.hyperliquid_live import (  # noqa: E402
+    HyperliquidLivePolicy,
+    killswitch_active,
+)
+
+VALID_ACTIONS = ("status", "latest", "subscribe-test", "live-status")
 
 
 def handle(payload: dict[str, Any]) -> dict[str, Any]:
@@ -35,7 +46,51 @@ def handle(payload: dict[str, Any]) -> dict[str, Any]:
     if action == "subscribe-test":
         config = load_symbol_config()
         return HyperliquidPublicFeedSubscriber(config.symbols).subscribe_test()
+    if action == "live-status":
+        return _live_status_payload(int(payload.get("limit") or 5))
     return {"error": f"unknown action '{action}'", "valid_actions": list(VALID_ACTIONS)}
+
+
+def _live_status_payload(limit: int) -> dict[str, Any]:
+    policy = HyperliquidLivePolicy()
+    trade_log = ROOT / policy.trade_log_path
+    daily_pnl = ROOT / policy.daily_pnl_path
+    return {
+        "trading_enabled": os.getenv("HYPERLIQUID_TRADING_ENABLED", "0").strip().lower()
+        in ("1", "true", "yes"),
+        "testnet_default": os.getenv("HYPERLIQUID_TESTNET", "true").strip().lower()
+        not in ("0", "false", "no", "off"),
+        "signing_verified": policy.signing_verified,
+        "killswitch_active": killswitch_active(policy),
+        "killswitch_path": str(Path(policy.killswitch_path).expanduser()),
+        "policy": policy.to_dict(),
+        "daily_pnl": _read_json(daily_pnl),
+        "recent_trades": _tail_jsonl(trade_log, limit),
+    }
+
+
+def _read_json(path: Path) -> dict[str, Any] | None:
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _tail_jsonl(path: Path, limit: int) -> list[dict[str, Any]]:
+    if not path.exists() or limit <= 0:
+        return []
+    rows: list[dict[str, Any]] = []
+    try:
+        for line in path.read_text(encoding="utf-8").splitlines()[-limit:]:
+            try:
+                rows.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+    except OSError:
+        return []
+    return rows
 
 
 def run(action: str = "status", **kwargs: Any) -> str:

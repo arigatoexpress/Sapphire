@@ -1,10 +1,17 @@
-"""Hyperliquid trading bot — subscribes to Sapphire signals and executes on Hyperliquid.
+"""Hyperliquid trading bot — subscribes to Sapphire signals and executes via the
+risk-managed :class:`HyperliquidLiveExecutor`.
 
 Signal flow:
-    services/alpha → pubsub topic 'trading-signals' → this bot → Hyperliquid API
+    services/alpha → pubsub topic 'trading-signals' → this bot → executor → client
 
-Supported pairs (Hyperliquid has 150+ assets):
-    BTC, ETH, SOL, HYPE, ZEC and any asset in the Hyperliquid universe
+Caps (see ``lib.trading.hyperliquid_live.HyperliquidLivePolicy``):
+    - $5/order notional
+    - 3x max leverage
+    - 5 max open positions
+    - $25/day realized-loss auto-pause
+    - killswitch file ``~/.sapphire/hyperliquid_trading_pause``
+    - ``HYPERLIQUID_TRADING_ENABLED=0`` default → all orders dry-run
+    - mainnet refused until signing is verified on testnet
 """
 
 from __future__ import annotations
@@ -16,7 +23,7 @@ import signal
 import sys
 from pathlib import Path
 
-# Load .env from service directory
+# Load .env from service directory (dev convenience)
 try:
     from dotenv import load_dotenv
 
@@ -27,74 +34,92 @@ except ImportError:
     pass
 
 # Add shared lib to path (monorepo structure)
-sys.path.insert(0, str(Path(__file__).parents[3] / "lib" / "core" / "src"))
+ROOT = Path(__file__).resolve().parents[4]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "lib" / "core" / "src"))
 
-from sapphire_core.logging_config import setup_logging
+from sapphire_core.logging_config import setup_logging  # noqa: E402
 
-from .client import HyperliquidClient
+from lib.trading.hyperliquid_live import (  # noqa: E402
+    HyperliquidLiveExecutor,
+    HyperliquidLivePolicy,
+    load_private_key,
+)
+
+from .client import HyperliquidClient  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
-PRIVATE_KEY = os.getenv("HYPERLIQUID_PRIVATE_KEY", "").strip()
-TESTNET = os.getenv("HYPERLIQUID_TESTNET", "false").lower() == "true"
-DEFAULT_SIZE_USD = float(os.getenv("HYPERLIQUID_SIZE_USD", "100"))
+
+def _resolve_testnet() -> bool:
+    raw = os.getenv("HYPERLIQUID_TESTNET", "true").strip().lower()
+    return raw not in ("0", "false", "no", "off")
 
 
 class HyperliquidBot:
     """Sapphire signal executor for Hyperliquid."""
 
-    def __init__(self) -> None:
-        if not PRIVATE_KEY:
-            raise ValueError("HYPERLIQUID_PRIVATE_KEY not set")
-        self._client = HyperliquidClient(PRIVATE_KEY, testnet=TESTNET)
+    def __init__(
+        self,
+        *,
+        policy: HyperliquidLivePolicy | None = None,
+        testnet: bool | None = None,
+    ) -> None:
+        self.policy = policy or HyperliquidLivePolicy()
+        private_key = load_private_key(self.policy)
+        if not private_key:
+            raise RuntimeError(
+                "no Hyperliquid private key found — store one in macOS keychain "
+                f"(account={self.policy.keychain_account!r} "
+                f"service={self.policy.keychain_service!r}) "
+                "or export HYPERLIQUID_PRIVATE_KEY for dev"
+            )
+        self.testnet = _resolve_testnet() if testnet is None else testnet
+        self._client = HyperliquidClient(private_key, testnet=self.testnet)
+        self._executor: HyperliquidLiveExecutor | None = None
         self.running = False
 
     async def start(self) -> None:
         self.running = True
-        logger.info("HyperliquidBot starting (testnet=%s)", TESTNET)
+        logger.info("HyperliquidBot starting (testnet=%s)", self.testnet)
         async with self._client:
-            state = await self._client.get_user_state()
-            margin = state.get("marginSummary", {})
+            self._executor = HyperliquidLiveExecutor(
+                self._client, policy=self.policy, testnet=self.testnet
+            )
+            status = await self._executor.status()
             logger.info(
-                "Account: address=%s equity=%s",
-                self._client.address,
-                margin.get("accountValue", "?"),
+                "Account: address=%s open_positions=%d trading_enabled=%s",
+                status.get("address"),
+                status["state"]["open_positions"],
+                status["trading_enabled"],
             )
             await self._run_loop()
 
     async def _run_loop(self) -> None:
-        """Main loop — polls for signals from control-plane or pubsub."""
-        # TODO: subscribe to sapphire pubsub 'trading-signals' topic
-        # and route signals to self._execute()
+        """Main loop — TODO wire pubsub 'trading-signals' subscription.
+
+        Until the subscription lands, the bot simply heartbeats so the LaunchAgent
+        / systemd unit stays healthy. Signals can also be injected for tests via
+        :meth:`execute`.
+        """
         while self.running:
             await asyncio.sleep(5)
 
     async def execute(self, signal: dict) -> dict:
-        """Execute a trading signal.
+        """Execute a trading signal through the risk-managed executor.
 
         Args:
-            signal: {symbol, action: 'buy'|'sell'|'close', size_usd, confidence}
+            signal: ``{symbol, action: 'buy'|'sell'|'close', size_usd, confidence,
+                       leverage?}``
 
         Returns:
-            Hyperliquid order response.
+            ``ExecutionResult.to_dict()`` — includes status, verdict, response.
         """
-        symbol = signal.get("symbol", "BTC").upper()
-        action = signal.get("action", "").lower()
-        size_usd = float(signal.get("size_usd", DEFAULT_SIZE_USD))
-
-        if action == "close":
-            logger.info("Closing position: %s", symbol)
-            return await self._client.close_position(symbol)
-
-        mids = await self._client.get_all_mids()
-        price = float(mids.get(symbol, 0))
-        if not price:
-            return {"status": "error", "error": f"No price for {symbol}"}
-
-        size = size_usd / price
-        is_buy = action == "buy"
-        logger.info("Placing %s %s size=%.6f @ ~%.2f", action, symbol, size, price)
-        return await self._client.market_order(symbol, is_buy, size)
+        if self._executor is None:
+            raise RuntimeError("bot not started — call start() first")
+        result = await self._executor.execute_signal(signal)
+        return result.to_dict()
 
     def stop(self) -> None:
         self.running = False
