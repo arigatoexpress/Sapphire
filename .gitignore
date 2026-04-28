@@ -43,6 +43,7 @@ Thumbs.db
 memory/
 output/
 data/backtests/
+data/backups/
 data/decisions/
 
 # Build
