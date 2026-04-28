@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Template only. Copy to ~/Library/LaunchAgents/ and set SAPPHIRE_HYPERLIQUID_LIVE=1 only after operator approval. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.sapphire.hyperliquid-public-feed</string>
+  <key>WorkingDirectory</key>
+  <string>/Users/aribs/Code/Sapphire</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/python3</string>
+    <string>-m</string>
+    <string>hyperliquid_bot.public_feed</string>
+    <string>daemon</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/usr/local/bin:/usr/bin:/bin</string>
+    <key>PYTHONPATH</key>
+    <string>/Users/aribs/Code/Sapphire/services/hyperliquid/src:/Users/aribs/Code/Sapphire</string>
+    <key>SAPPHIRE_HYPERLIQUID_LIVE</key>
+    <string>0</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <false/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/aribs/autonomy-status/logs/hyperliquid-public-feed.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/aribs/autonomy-status/logs/hyperliquid-public-feed.err</string>
+</dict>
+</plist>
