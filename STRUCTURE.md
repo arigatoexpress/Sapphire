@@ -34,8 +34,6 @@ policy, and a rule for what must not drift into it.
   Retention: git for current docs; stale audits move to `docs/archive/`.
 - `infra/` — LaunchAgents, registries, org manifests, and cloud templates.
   Retention: git, no secret payloads.
-- `legacy_code/` — frozen archive awaiting cold-tier extraction. Retention:
-  deprecated in git; next cleanup PR should move it to the cold tier.
 - `lib/` — reusable Sapphire libraries and product kernels. Retention: git.
 - `patches/` — small reviewable patch artifacts. Retention: git while active;
   stale patches move to `docs/archive/` or the cold tier.
@@ -97,7 +95,7 @@ policy, and a rule for what must not drift into it.
 | Source, tests, schemas, docs | T1 git | permanent while current; archived docs stay indexed |
 | `data/health`, `data/metrics`, `data/chain`, `data/intelligence/latest` | T2 hot local | 7 days unless promoted to GCS/BigQuery |
 | `data/backtests`, `data/content`, recent security/soak evidence | T2 warm local | 30-90 days, then compress or promote |
-| `legacy_code/`, `results/`, generated benchmarks | T4 cold backup candidate | copy to Proton/GCS cold before git removal |
+| `results/`, generated benchmarks | T4 cold backup candidate | copy to Proton/GCS cold before git removal |
 | THO customer docs and contracts | T5 Google Drive | never mirrored into Sapphire git |
 
 ## Review Checklist

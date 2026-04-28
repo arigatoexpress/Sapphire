@@ -56,7 +56,7 @@ def main(argv: list[str] | None = None) -> int:
 
 def build_plan(repo: Path, proton_root: Path) -> list[SyncAction]:
     cold_root = proton_root / "cold-tier" / "sapphire"
-    return [
+    actions = [
         SyncAction(
             "T2-hot",
             "verify_only",
@@ -73,31 +73,34 @@ def build_plan(repo: Path, proton_root: Path) -> list[SyncAction]:
             "GCP staging must be visible before any prune decision",
             False,
         ),
-        SyncAction(
-            "T4-cold",
-            "copy_tree",
-            str(repo / "legacy_code"),
-            str(cold_root / "legacy_code"),
+    ]
+    cold_candidates = [
+        (
+            "legacy_code",
+            "legacy_code",
             "legacy source is frozen and should leave git after cold backup proof",
-            True,
         ),
-        SyncAction(
-            "T4-cold",
-            "copy_tree",
-            str(repo / "results"),
-            str(cold_root / "results"),
-            "dated generated reports are cold artifacts, not active source",
-            True,
-        ),
-        SyncAction(
-            "T4-cold",
-            "copy_tree",
-            str(repo / "data/benchmarks"),
-            str(cold_root / "data-benchmarks"),
+        ("results", "results", "dated generated reports are cold artifacts, not active source"),
+        (
+            "data/benchmarks",
+            "data-benchmarks",
             "benchmark output should be preserved outside git/local hot paths",
-            True,
         ),
     ]
+    for source_rel, dest_name, reason in cold_candidates:
+        source = repo / source_rel
+        if source.exists():
+            actions.append(
+                SyncAction(
+                    "T4-cold",
+                    "copy_tree",
+                    str(source),
+                    str(cold_root / dest_name),
+                    reason,
+                    True,
+                )
+            )
+    return actions
 
 
 def print_plan(actions: list[SyncAction]) -> None:
