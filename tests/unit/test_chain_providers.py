@@ -159,8 +159,10 @@ def test_bgeometrics_uses_bearer_header(monkeypatch):
 # --- Santiment -------------------------------------------------------------
 
 
-def test_santiment_posts_graphql(monkeypatch):
+def test_santiment_posts_graphql(monkeypatch, tmp_path):
+    monkeypatch.setenv("SAPPHIRE_SANTIMENT_LIVE", "1")
     monkeypatch.setenv("SANTIMENT_API_KEY", "s-key")
+    monkeypatch.setenv("SAPPHIRE_ONCHAIN_USAGE_FILE", str(tmp_path / "usage.json"))
     captured = {}
 
     def fake(url, payload, *, headers=None, **_):
@@ -173,7 +175,44 @@ def test_santiment_posts_graphql(monkeypatch):
     )
     assert captured["url"].endswith("/graphql")
     assert captured["headers"]["Authorization"] == "Apikey s-key"
-    assert "social_volume_total" in captured["payload"]["query"]
+    assert captured["payload"]["variables"]["metric"] == "social_volume_total"
+
+
+def test_santiment_fixture_mode_does_not_post(monkeypatch):
+    monkeypatch.delenv("SAPPHIRE_SANTIMENT_LIVE", raising=False)
+    monkeypatch.delenv("SANTIMENT_API_KEY", raising=False)
+
+    def boom(*_args, **_kwargs):
+        raise AssertionError("network should not be called")
+
+    monkeypatch.setattr(santiment_mod, "http_post_json", boom)
+    snap = SantimentClient().asset_snapshot("BTC")
+
+    assert snap["mode"] == "fixture"
+    assert snap["social_volume_total"] == 4200
+    assert snap["social_dominance_total"] == 18.4
+    assert snap["age_consumed"] == 7900000
+    assert snap["network_growth"] == 121000
+
+
+def test_santiment_named_metrics_use_expected_metric_names(monkeypatch, tmp_path):
+    monkeypatch.setenv("SAPPHIRE_SANTIMENT_LIVE", "1")
+    monkeypatch.setenv("SANTIMENT_API_KEY", "s-key")
+    monkeypatch.setenv("SAPPHIRE_ONCHAIN_USAGE_FILE", str(tmp_path / "usage.json"))
+    metrics: list[str] = []
+
+    def fake(_url, payload, *, headers=None, **_):
+        del headers
+        metrics.append(payload["variables"]["metric"])
+        return {"data": {"getMetric": {"timeseriesData": []}}}
+
+    monkeypatch.setattr(santiment_mod, "http_post_json", fake)
+    client = SantimentClient()
+    client.social_dominance("bitcoin")
+    client.age_consumed("bitcoin")
+    client.network_growth("bitcoin")
+
+    assert metrics == ["social_dominance_total", "age_consumed", "network_growth"]
 
 
 # --- Dune -----------------------------------------------------------------

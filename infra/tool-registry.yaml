@@ -396,6 +396,14 @@ tools:
     consumers: [services.cross-asset, services.dashboard]
     description: Cross-Asset Correlation Matrix + Regime Detection 0.1.0. Cache-first/dry-run-default rolling Pearson, Spearman, and Kendall matrices across crypto, equities, gold, dollar/forex, VIX, and Hyperliquid-derived assets; deterministic regime labels, breakdown events, and lead/lag analysis. Live source pulls require SAPPHIRE_CROSS_ASSET_LIVE=1. Caps, ≤24 assets, ≤365 days, ≥30 observations for long windows. Actions, matrix/regime/breakdowns/lead-lag/status.
 
+  # On-chain intelligence 0.2.0
+  - name: onchain_intel
+    path: plugins/claw-sapphire/tools/internal/onchain_intel.py
+    status: internal
+    owner: sapphire
+    consumers: [services.onchain_intel, scheduled-tasks.chain-refresh, hermes-agent.trading-analysis]
+    description: On-chain intelligence 0.2.0 across Glassnode, Santiment, Ethereum RPC, and Solana RPC. Fixture by default; live calls require per-provider SAPPHIRE_*_LIVE gates plus key/RPC envs. Enforces local caps of 60/hour, 100k/day, and 730-day backfill. Read-only only; no wallet keys, no transactions, no trading.
+
   # ── deprecated / sunset window ───────────────────────────────────────────
   - name: kronos_predict
     path: plugins/claw-sapphire/tools/_deprecated/kronos_predict.py
