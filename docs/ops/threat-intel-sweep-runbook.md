@@ -212,6 +212,48 @@ exits with `DependabotFetchError: gh api returned error envelope: ...`,
 so the runbook does not silently believe the repo has zero alerts.
 This is the failure mode that #393 was originally about.
 
+## Issue #393 readiness verifier
+
+When a threat-intel issue is already open and the remaining work is to
+verify whether the issue can be commented or closed, run the read-only
+readiness helper:
+
+```bash
+python3 scripts/ops/threat_intel_issue_393_readiness.py --markdown-only
+```
+
+The helper produces a paste-safe evidence block for issue #393. It:
+
+* runs the Dependabot alerts fetcher and records whether GHAS data is
+  available, unavailable, or skipped;
+* fetches the current CISA KEV catalog and checks the runbook's
+  critical-candidate window against Sapphire dependency manifests;
+* scans repo/config evidence only for the ransomware-linked products
+  called out in issue #393: PaperCut NG/MF, JetBrains TeamCity,
+  Microsoft Exchange Server, and Cisco Secure Firewall Management
+  Center.
+
+Use the helper's `readiness.recommendation` field as follows:
+
+* `ready_to_close` means CISA/dependency checks are clear,
+  repo/config deployment evidence is absent for the named products, and
+  Dependabot alerts were available with zero critical/high open alerts.
+* `comment_with_evidence_ghas_unavailable_or_nonzero` means the
+  CISA/deployment checks are clear, but GHAS/Dependabot still needs a
+  repo-admin decision or a nonzero alert follow-up before closing.
+* `keep_open_action_required` means the helper found a dependency or
+  repo/config deployment signal that needs remediation or human review.
+
+For offline tests or incident retrospectives, save a CISA KEV payload and
+pass it explicitly:
+
+```bash
+python3 scripts/ops/threat_intel_issue_393_readiness.py \
+  --kev-json /tmp/kev.json \
+  --as-of 2026-04-28 \
+  --markdown-only
+```
+
 ## Related
 
 * `docs/products/customer-dossier-0.2.0.md` — paired cohort surface
