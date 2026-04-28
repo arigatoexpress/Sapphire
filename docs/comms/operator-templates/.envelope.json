@@ -1,0 +1,86 @@
+{
+  "envelope_version": "0.1.0",
+  "generated_at_utc": "2026-04-28T21:52:49.805760+00:00",
+  "worktree_branch": "docs/operator-comms-templates",
+  "head_sha_at_write_time": "1bcf221aa9e7719363102ac1c6d55b55840eedfe",
+  "description": "Operator communications template library \u2014 provenance sidecar.",
+  "parent_readme": {
+    "file": "README.md",
+    "size_bytes": 8266,
+    "sha256": "a9971ad8796728e79aeafbbc831076a23682259bb6b6e8897fc1b8aebc12b65c"
+  },
+  "templates": [
+    {
+      "file": "operator-templates/acquirer-positive-reply-response.md",
+      "size_bytes": 2521,
+      "sha256": "d86d63fd9d30f3d2cf96f7e0ca6184e0940dbe86e96e66abe1876ef271044a4e"
+    },
+    {
+      "file": "operator-templates/acquirer-skeptical-reply-response.md",
+      "size_bytes": 3335,
+      "sha256": "ee217648cd3460ca859c97fb67c51a30e3de786bf7bd654a19c77cad6abe4653"
+    },
+    {
+      "file": "operator-templates/etai-followup-no-reply-day-3.md",
+      "size_bytes": 2666,
+      "sha256": "e35e2b98bf145aaffa49dd90d013807f55d056f8893b27cfb646172932230582"
+    },
+    {
+      "file": "operator-templates/etai-integration-memo-share.md",
+      "size_bytes": 3190,
+      "sha256": "01d78eac681a5babed64116b8a8a701e117aa4f29a84d8dc7a33fac7c8770140"
+    },
+    {
+      "file": "operator-templates/intro-call-prep-template.md",
+      "size_bytes": 5159,
+      "sha256": "9acc4251443b8db2e0cc3b36a2f28b987a568aeeee6f635423ee35900a36ca90"
+    },
+    {
+      "file": "operator-templates/live-trade-cap-bump-self-approval.md",
+      "size_bytes": 4432,
+      "sha256": "2de49f4b0bd2b063fb4347f879a23666d73b7f548f950d4e49180e4db791754a"
+    },
+    {
+      "file": "operator-templates/live-trade-incident-report.md",
+      "size_bytes": 5026,
+      "sha256": "a559fd1e42442005bfe2459c0fd11cea8e8c378efbdd7ff014bc7c32541c9ac9"
+    },
+    {
+      "file": "operator-templates/palantir-followup-day-21.md",
+      "size_bytes": 1865,
+      "sha256": "e1608c637dc7d75d9192ba8e203087fd8c1333178eed86a6d40e5d1becf1a6d5"
+    },
+    {
+      "file": "operator-templates/palantir-followup-day-7.md",
+      "size_bytes": 1735,
+      "sha256": "e628cd9dd2aba49808a92c4edb6ab21b4771f10a0d846d6a90f84800a1f46a6f"
+    },
+    {
+      "file": "operator-templates/robinhood-cortex-cold-pitch.md",
+      "size_bytes": 3532,
+      "sha256": "9c89ca5394edab5f43a6ab2e2e47d13093e11a5c227bb3b920b430377aebdd46"
+    },
+    {
+      "file": "operator-templates/tho-celeste-link-broken.md",
+      "size_bytes": 2468,
+      "sha256": "23a557db40e94cc02f3abb2177a0432df3d60cd184b566528a9a21ffa45c483e"
+    },
+    {
+      "file": "operator-templates/tho-doc-bug-acknowledgement.md",
+      "size_bytes": 2405,
+      "sha256": "c978d146ed6b0433a7a0673139b36dd0a9cf4aec707086fa168e405c55b8e830"
+    },
+    {
+      "file": "operator-templates/tho-weekly-cadence.md",
+      "size_bytes": 2122,
+      "sha256": "4564c33c4b3a0cad3981763135133396ff71a96fc24cb0569ccb9b1bbec9ce8e"
+    }
+  ],
+  "template_count": 13,
+  "audit_notes": [
+    "Each entry sha256 is the file as-written at envelope generation time.",
+    "If a template is edited, regenerate this envelope to keep the audit trail current.",
+    "No PII in any template body; placeholders only.",
+    "YAML frontmatter validated; placeholders quoted to keep them parseable."
+  ]
+}
