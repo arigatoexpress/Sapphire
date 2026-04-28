@@ -409,3 +409,44 @@ def test_sovereign_thesis_page_renders(app_client):
     assert "/api/autonomy/continuous-intelligence" in html
     assert "/api/autonomy/continuous-intelligence/artifacts" in html
     assert "/api/autonomy/continuous-intelligence/lease-preview" in html
+    assert "Gemini OODA (dry-run)" in html
+    assert "/api/gemini-ooda" in html
+
+
+def test_gemini_ooda_endpoint_is_dry_run_dashboard(app_client):
+    _, client = app_client
+    r = client.get("/api/gemini-ooda", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["mode"] == "gemini_ooda_dry_run_dashboard"
+    assert body["safety"]["execution_enabled"] is False
+    assert body["safety"]["live_trading_enabled"] is False
+    assert body["safety"]["telegram_sends_enabled"] is False
+    assert body["safety"]["writes_by_default"] is False
+    assert "dashboard_endpoint_dry_run_only" in body["safety"]["guards"]
+    assert body["topic"]
+    synthesis = body.get("synthesis") or {}
+    assert synthesis
+    assert "ooda" in synthesis
+    metadata = synthesis.get("metadata") or {}
+    # Endpoint always requests dry-run; live mode requires the env-gated tool path.
+    assert metadata.get("mode_actual") in {
+        "dry-run",
+        "dry-run-blocked-by-env",
+        "dry-run-safety",
+    }
+    status = body.get("tool_status") or {}
+    assert status.get("max_calls_per_hour") == 8
+    assert status.get("max_tokens_per_month") == 500_000
+
+
+def test_gemini_ooda_endpoint_accepts_topic_override(app_client):
+    _, client = app_client
+    r = client.get(
+        "/api/gemini-ooda?topic=Probe%20OODA%20override&context=paste-safe%20context%20block",
+        headers={"Authorization": _AUTH},
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["topic"] == "Probe OODA override"
+    assert body["context_summary_chars"] == len("paste-safe context block")

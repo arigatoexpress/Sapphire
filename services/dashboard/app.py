@@ -2506,6 +2506,102 @@ def api_autonomy_continuous_intelligence():
         }), 200
 
 
+@app.route('/api/gemini-ooda')
+@requires_auth
+def api_gemini_ooda():
+    """Read-only Gemini OODA synthesizer surface — dry-run by default.
+
+    Returns the tool's status block and an optional dry-run synthesis from
+    the current sovereign-thesis snapshot. Live Gemini calls require
+    SAPPHIRE_GEMINI_LIVE=1 + the sensitivity gate + the rate/cost caps in
+    the underlying tool; this endpoint never opts into live mode itself.
+    """
+    try:
+        import importlib.util
+        from pathlib import Path
+
+        sapphire_root = Path(__file__).resolve().parents[2]
+        tool_path = sapphire_root / "plugins" / "claw-sapphire" / "tools" / "internal" / "gemini_ooda.py"
+        spec = importlib.util.spec_from_file_location("gemini_ooda_dashboard", tool_path)
+        if spec is None or spec.loader is None:
+            raise RuntimeError("could not locate gemini_ooda tool")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        topic_arg = (request.args.get('topic') or '').strip()
+        topic = topic_arg or "Sapphire daily thesis OODA snapshot"
+        context_arg = (request.args.get('context') or '').strip()
+        if not context_arg:
+            try:
+                from lib.intel.sovereign_thesis import build_sovereign_thesis_report
+
+                thesis = build_sovereign_thesis_report()
+                top_assets = (thesis.get('asset_matrix') or {}).get('rows') or []
+                ranked = sorted(
+                    [row for row in top_assets if row.get('score') is not None],
+                    key=lambda row: row.get('score') or 0,
+                    reverse=True,
+                )[:4]
+                summary = ", ".join(
+                    f"{row.get('asset', '?')} score={row.get('score'):.2f}"
+                    for row in ranked
+                ) or "no ranked assets available"
+                lens_count = len((thesis.get('lenses') or {}).get('rows') or [])
+                context_arg = (
+                    f"Top thesis assets (paste-safe summary, no positions): {summary}. "
+                    f"Lenses tracked: {lens_count}. Mode is research_intel_only."
+                )
+            except Exception:
+                context_arg = "Sovereign-thesis snapshot unavailable; use a paste-safe summary in the next request."
+
+        synthesis = module.synthesize(
+            topic=topic,
+            context=context_arg,
+            mode='dry-run',
+            model='gemini-2.5-flash',
+            max_output_tokens=512,
+            ttl_seconds=86400,
+        )
+        status = module.status()
+
+        return jsonify({
+            'mode': 'gemini_ooda_dry_run_dashboard',
+            'safety': {
+                'execution_enabled': False,
+                'live_trading_enabled': False,
+                'telegram_sends_enabled': False,
+                'writes_by_default': False,
+                'guards': [
+                    'dashboard_endpoint_dry_run_only',
+                    'live_mode_requires_sapphire_gemini_live_env',
+                    'live_mode_requires_sensitivity_gate',
+                    'per_hour_and_per_month_token_caps_enforced',
+                ],
+            },
+            'topic': topic,
+            'context_summary_chars': len(context_arg),
+            'synthesis': synthesis,
+            'tool_status': status,
+            'last_updated': time.time(),
+        })
+    except Exception as e:
+        log.warning("gemini-ooda API error: %s", e)
+        return jsonify({
+            'mode': 'gemini_ooda_dry_run_dashboard',
+            'error': str(e),
+            'safety': {
+                'execution_enabled': False,
+                'live_trading_enabled': False,
+                'telegram_sends_enabled': False,
+                'writes_by_default': False,
+                'guards': ['dashboard_endpoint_dry_run_only'],
+            },
+            'synthesis': None,
+            'tool_status': None,
+            'last_updated': time.time(),
+        }), 200
+
+
 @app.route('/api/autonomy/continuous-intelligence/artifacts')
 @requires_auth
 def api_autonomy_continuous_intelligence_artifacts():
