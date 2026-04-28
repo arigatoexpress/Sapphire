@@ -48,6 +48,9 @@ Allowed now:
 - Run `scripts/ops/robinhood_live_readiness.py --live-read-only` to load local
   Robinhood credentials in-process and perform redacted read-only account,
   product, quote, and estimated-price probes.
+- Generate a manual-only Robinhood limit-order dry run with
+  `scripts/ops/robinhood_manual_order.py`. It writes a redacted audit record and
+  prints the exact confirmation token required for a real order.
 
 Blocked now:
 
@@ -56,6 +59,8 @@ Blocked now:
 - Stock, ETF, or options automation through unofficial Robinhood endpoints.
 - Any order larger than the live pilot caps below.
 - Printing secret values, raw signatures, or full account identifiers.
+- Running `robinhood_manual_order.py --execute` without the exact typed
+  confirmation token printed by the matching dry run.
 
 ## Pilot Caps
 
@@ -87,8 +92,10 @@ Blocked now:
    - UUID `client_order_id`;
    - `side`, `type`, `symbol`, and the matching order config;
    - no API signature generated during draft mode.
-6. The kill switch is clear immediately before submit.
-7. Ari gives an explicit one-order confirmation in the active terminal with:
+6. The manual order dry run prints the expected confirmation token and writes a
+   redacted audit record.
+7. The kill switch is clear immediately before submit.
+8. Ari gives an explicit one-order confirmation in the active terminal with:
    symbol, side, order type, limit price, maximum notional, and maximum loss.
 
 ## Promotion Sequence
@@ -96,9 +103,20 @@ Blocked now:
 1. Paper-only replay against the same symbol and notional.
 2. Live read-only account and quote check.
 3. Generate the order draft and review it.
-4. Manually confirmed single live limit order capped at `$5`.
-5. Immediately monitor order state, fills, fee, spread, and portfolio delta.
-6. Stop. Do not loop. Produce a post-trade note before any second order.
+4. Generate the manual order dry run:
+
+   ```bash
+   python3 scripts/ops/robinhood_manual_order.py \
+     --side buy \
+     --symbol BTC \
+     --limit-price <guarded_limit_price> \
+     --quote-amount-usd 5
+   ```
+
+5. Manually confirmed single live limit order capped at `$5` using the exact
+   confirmation token from the dry run.
+6. Immediately monitor order state, fills, fee, spread, and portfolio delta.
+7. Stop. Do not loop. Produce a post-trade note before any second order.
 
 ## Hard Stop Conditions
 

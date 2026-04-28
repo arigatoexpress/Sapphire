@@ -91,6 +91,7 @@ data/leads/.enrich_cache/
 data/market_pulse/
 data/performance/
 data/threat_intel/
+data/trading/
 results/
 qwen*.json
 services/control-plane/app/data/system_events.jsonl
