@@ -57,9 +57,12 @@ TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
 # Auth configuration — credentials required via environment variables
 AUTH_USERNAME = os.environ.get('AUTH_USERNAME', 'sapphire')
 AUTH_PASSWORD = os.environ.get('AUTH_PASSWORD', '')
+WEAK_AUTH_PASSWORDS = {'sapphire', 'password', 'changeme', 'admin'}
 
 if not AUTH_PASSWORD:
     raise RuntimeError("AUTH_PASSWORD environment variable must be set")
+if AUTH_PASSWORD.lower() in WEAK_AUTH_PASSWORDS:
+    raise RuntimeError("AUTH_PASSWORD must not use a known default value")
 
 # x402 payment gate — optional, disabled unless X402_ENABLED=1
 import sys as _sys  # noqa: E402
@@ -182,14 +185,18 @@ def get_cached(key, fetch_func, ttl=CACHE_DURATION, *, raise_on_miss=False):
 def fetch_sync(url):
     """Synchronous fetch — 4 MB response cap to prevent memory pressure."""
     import ssl
+    import urllib.parse
     import urllib.request
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in {'http', 'https'}:
+        return {}
     try:
         import certifi
         ctx = ssl.create_default_context(cafile=certifi.where())
     except ImportError:
         ctx = ssl.create_default_context()
     try:
-        with urllib.request.urlopen(url, timeout=5, context=ctx) as response:
+        with urllib.request.urlopen(url, timeout=5, context=ctx) as response:  # nosec B310 - URL scheme is restricted above.
             data = response.read(4 * 1024 * 1024)  # 4 MB cap
             return json.loads(data)
     except Exception:
@@ -2841,7 +2848,7 @@ def api_intel():
     workbench_items = 0
     try:
         import urllib.request as _ureq
-        with _ureq.urlopen('http://127.0.0.1:8787/api/intel/recent?limit=10', timeout=3) as r:
+        with _ureq.urlopen('http://127.0.0.1:8787/api/intel/recent?limit=10', timeout=3) as r:  # nosec B310 - fixed loopback URL.
             wb_data = json.loads(r.read())
             workbench_items = len(wb_data.get('items') or [])
             for item in (wb_data.get('items') or []):
@@ -3346,4 +3353,5 @@ if __name__ == '__main__':
     except Exception:
         pass
     port = int(os.environ.get('PORT', 8080))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    host = os.environ.get('HOST', '127.0.0.1')
+    app.run(host=host, port=port, debug=False)
