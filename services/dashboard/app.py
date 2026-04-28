@@ -4908,6 +4908,96 @@ def api_security_score():
     )
 
 
+# ---------------------------------------------------------------------------
+# Observability aggregator endpoints (Tranche 3, Lane 2)
+# ---------------------------------------------------------------------------
+#
+# These three GET endpoints back the ``/observability`` page. The page renders
+# its skeleton from Jinja and then polls these every 15s for live state.
+#
+# All three are auth-gated via @requires_auth and are safe to expose: every
+# field flows through ``lib.observability.aggregator`` which never echoes
+# secrets or absolute home-directory paths back into the JSON envelope.
+
+
+def _build_observability_system_summary() -> dict[str, Any]:
+    """Wrap aggregator + redactor into a single dict for the summary endpoint."""
+    from lib.observability import build_system_snapshot
+    from lib.security.pii_redactor import redact_record
+
+    snapshot = build_system_snapshot()
+    payload = snapshot.to_dict()
+    # Belt-and-braces: the aggregator already abbreviates paths and excludes
+    # raw secrets, but ``redact_record`` is idempotent and provides a second
+    # layer in case a future signal source contributes a stray PII string.
+    return redact_record(payload)
+
+
+def _build_observability_stream_rates() -> dict[str, Any]:
+    from lib.observability import build_stream_rates_only
+    from lib.security.pii_redactor import redact_record
+
+    return redact_record(build_stream_rates_only())
+
+
+def _build_observability_launchagents() -> dict[str, Any]:
+    from lib.observability import build_launchagents_only
+    from lib.security.pii_redactor import redact_record
+
+    return redact_record(build_launchagents_only())
+
+
+@app.route("/api/observability-system-summary")
+@requires_auth
+def api_observability_system_summary():
+    try:
+        return jsonify(_build_observability_system_summary())
+    except Exception as exc:
+        log.warning("observability summary error: %s", exc)
+        return jsonify(
+            {
+                "mode": "read_only_observability_snapshot",
+                "status": "unknown",
+                "error": f"{exc.__class__.__name__}: {exc}"[:200],
+                "schema_version": 1,
+            }
+        ), 200
+
+
+@app.route("/api/observability-stream-rates")
+@requires_auth
+def api_observability_stream_rates():
+    try:
+        return jsonify(_build_observability_stream_rates())
+    except Exception as exc:
+        log.warning("observability stream-rates error: %s", exc)
+        return jsonify(
+            {
+                "mode": "read_only_observability_stream_rates",
+                "status": "unknown",
+                "error": f"{exc.__class__.__name__}: {exc}"[:200],
+                "sources": [],
+            }
+        ), 200
+
+
+@app.route("/api/observability-launchagents")
+@requires_auth
+def api_observability_launchagents():
+    try:
+        return jsonify(_build_observability_launchagents())
+    except Exception as exc:
+        log.warning("observability launchagents error: %s", exc)
+        return jsonify(
+            {
+                "mode": "read_only_observability_launchagents",
+                "status": "unknown",
+                "error": f"{exc.__class__.__name__}: {exc}"[:200],
+                "launchagents": [],
+            }
+        ), 200
+
+
 if __name__ == "__main__":
     # Start background metrics collector (snapshots every 5 min)
     try:
