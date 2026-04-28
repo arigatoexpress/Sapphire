@@ -288,8 +288,16 @@ def test_pulse_runs_trading_and_webhook_collectors(monkeypatch):
 # ── trading status ─────────────────────────────────────────────────────────
 
 
-def test_collect_trading_status_reads_signals_and_portfolio(tmp_path):
-    now = datetime.now().astimezone()
+def test_collect_trading_status_reads_signals_and_portfolio(tmp_path, monkeypatch):
+    fixed_now = datetime(2026, 4, 28, 12, 0, 0).astimezone()
+
+    class _FrozenDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return fixed_now if tz is None else fixed_now.astimezone(tz)
+
+    monkeypatch.setattr(dev_pulse, "datetime", _FrozenDatetime)
+    now = fixed_now
     signals_dir = tmp_path / "signals"
     signals_dir.mkdir()
     (signals_dir / "today.jsonl").write_text(
