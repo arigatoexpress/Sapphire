@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -40,6 +41,7 @@ def test_redact_text_replaces_secret_shapes_and_paths() -> None:
     assert "/Users/aribs" not in redacted
     assert "super-secret" not in redacted
     assert "abcdefghijklmnop" not in redacted
+    assert "Bearer " not in redacted
     assert "ari@example.com" not in redacted
     assert "Ari" not in redacted
     assert "the operator's dashboard" in redacted
@@ -57,6 +59,17 @@ def test_forbidden_residue_detects_secret_assignment_after_redaction() -> None:
     assert "MOONSHOT_API_KEY=" in module.forbidden_residue("MOONSHOT_API_KEY=value", manifest)
 
 
+def test_bearer_redaction_does_not_reintroduce_forbidden_literal() -> None:
+    module = _load_module()
+    manifest = module.load_manifest()
+
+    redacted, counts = module.redact_text("Authorization: Bearer abcdefghijklmnop", manifest)
+
+    assert counts["bearer_token"] == 1
+    assert "Bearer " not in redacted
+    assert module.forbidden_residue(redacted, manifest) == []
+
+
 def test_build_report_is_green_for_current_repo_and_writes_build_json(tmp_path) -> None:
     module = _load_module()
     report = module.build_report(output_dir=tmp_path)
@@ -65,8 +78,13 @@ def test_build_report_is_green_for_current_repo_and_writes_build_json(tmp_path) 
     assert report["totals"]["routes"] >= 5
     assert report["totals"]["sources_scanned"] >= 10
     assert report["totals"]["screenshot_placeholders"] >= 1
-    assert Path(report["written"]["plan"]).exists()
-    assert Path(report["written"]["redaction_report"]).exists()
+    assert report["written"]["plan"] == "[outside-repo]/dashboard-public-demo-plan.json"
+    assert report["written"]["redaction_report"] == (
+        "[outside-repo]/dashboard-public-demo-redaction-report.json"
+    )
+    assert (tmp_path / "dashboard-public-demo-plan.json").exists()
+    assert (tmp_path / "dashboard-public-demo-redaction-report.json").exists()
+    assert str(tmp_path) not in json.dumps(report)
 
 
 def test_build_report_no_write_has_no_written_key(tmp_path) -> None:
@@ -129,6 +147,16 @@ def test_main_pretty_no_write_returns_zero(capsys) -> None:
     payload = json.loads(capsys.readouterr().out)
     assert payload["ok"] is True
     assert payload["mode"] == "dry-run"
+
+
+def test_manifest_routes_exist_in_dashboard_app() -> None:
+    module = _load_module()
+    manifest = module.load_manifest()
+    app_source = REPO_ROOT.joinpath("services/dashboard/app.py").read_text(encoding="utf-8")
+    dashboard_routes = set(re.findall(r'@app\.route\("([^"]+)"', app_source))
+
+    for route in manifest["safe_routes"]:
+        assert route["path"] in dashboard_routes
 
 
 def test_invalid_manifest_schema_raises(tmp_path) -> None:
