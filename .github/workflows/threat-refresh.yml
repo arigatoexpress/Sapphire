@@ -28,9 +28,6 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
       - name: Refresh threats
         env:
           PYTHONPATH: ${{ github.workspace }}
@@ -38,7 +35,7 @@ jobs:
           SAPPHIRE_THREATS_BOT_BIN: native
         run: |
           mkdir -p data/intelligence
-          python services/dashboard/refresh_threats.py | tee threat-refresh.log
+          uv run --python 3.11 --no-project python services/dashboard/refresh_threats.py | tee threat-refresh.log
       - name: Upload threat artifacts
         uses: actions/upload-artifact@v7
         if: always()
