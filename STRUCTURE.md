@@ -32,6 +32,8 @@ policy, and a rule for what must not drift into it.
 - `deploy/` — deployment helpers and service definitions. Retention: git.
 - `docs/` — current runbooks, architecture, diligence, and dated reports.
   Retention: git for current docs; stale audits move to `docs/archive/`.
+- `examples/` — small runnable product-surface examples that demonstrate
+  public APIs without runtime secrets or external mutations. Retention: git.
 - `infra/` — LaunchAgents, registries, org manifests, and cloud templates.
   Retention: git, no secret payloads.
 - `lib/` — reusable Sapphire libraries and product kernels. Retention: git.
