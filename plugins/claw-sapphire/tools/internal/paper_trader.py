@@ -406,6 +406,116 @@ def action_check_stops() -> dict:
     }
 
 
+def action_monitor() -> dict:
+    """Read-only preview: what would `check_stops` do at current prices?
+
+    Walks open positions and returns the *intended* trigger for each one
+    without mutating portfolio state, taking partial profit, or recording
+    outcomes. Useful for dashboards, alerts, and operator review before
+    actually firing `check_stops`.
+    """
+    pf = _load_portfolio()
+    rows: list[dict] = []
+    summary = {
+        "would_close": 0,
+        "would_partial": 0,
+        "would_trail": 0,
+        "no_action": 0,
+        "no_price": 0,
+    }
+
+    TRAILING_ACTIVATE_BPS = 60
+    TRAILING_DISTANCE_BPS = 40
+
+    for pos in pf["positions"]:
+        _normalize_position(pos)
+        current = _get_price(pos["symbol"])
+        if current is None:
+            rows.append({
+                "symbol": pos["symbol"],
+                "side": pos["side"],
+                "trigger": "no_price",
+                "current": None,
+                "reason": "price feed unavailable",
+            })
+            summary["no_price"] += 1
+            continue
+
+        is_long = pos["side"] == "BUY"
+        entry = pos["entry_price"]
+        pnl_bps = ((current - entry) / entry * 10000) if is_long else ((entry - current) / entry * 10000)
+
+        peak = pos.get("peak_price", entry)
+        if is_long:
+            peak = max(peak, current)
+        else:
+            peak = min(peak, current)
+
+        partial_tp = pos.get("partial_tp")
+        partial_taken = bool(pos.get("partial_taken", False))
+        partial_ready = bool(
+            partial_tp
+            and not partial_taken
+            and ((current >= partial_tp) if is_long else (current <= partial_tp))
+        )
+
+        trailing_active = bool(pos.get("trailing_active") or pnl_bps >= TRAILING_ACTIVATE_BPS)
+        if trailing_active:
+            if is_long:
+                trail_level = peak * (1 - TRAILING_DISTANCE_BPS / 10000)
+                trailing_breach = current <= trail_level
+            else:
+                trail_level = peak * (1 + TRAILING_DISTANCE_BPS / 10000)
+                trailing_breach = current >= trail_level
+        else:
+            trail_level = None
+            trailing_breach = False
+
+        hit_stop = (current <= pos["stop_loss"]) if is_long else (current >= pos["stop_loss"])
+        hit_tp = (current >= pos["take_profit"]) if is_long else (current <= pos["take_profit"])
+
+        if trailing_breach:
+            trigger = "trailing_stop"
+            summary["would_close"] += 1
+            summary["would_trail"] += 1
+        elif hit_stop:
+            trigger = "stop_loss"
+            summary["would_close"] += 1
+        elif hit_tp:
+            trigger = "take_profit"
+            summary["would_close"] += 1
+        elif partial_ready:
+            trigger = "partial_50pct"
+            summary["would_partial"] += 1
+        else:
+            trigger = "hold"
+            summary["no_action"] += 1
+
+        rows.append({
+            "symbol": pos["symbol"],
+            "side": pos["side"],
+            "entry": pos["entry_price"],
+            "current": current,
+            "peak": peak,
+            "stop_loss": pos["stop_loss"],
+            "take_profit": pos["take_profit"],
+            "partial_tp": partial_tp,
+            "partial_taken": partial_taken,
+            "trailing_active": trailing_active,
+            "trail_level": trail_level,
+            "pnl_bps": round(pnl_bps, 2),
+            "trigger": trigger,
+        })
+
+    return {
+        "mode": "monitor_dry_run",
+        "writes": False,
+        "open_positions": len(pf["positions"]),
+        "summary": summary,
+        "rows": rows,
+    }
+
+
 def action_positions() -> dict:
     """Show open positions with unrealized PnL."""
     pf = _load_portfolio()
@@ -546,6 +656,8 @@ def main():
         )
     elif action == "check_stops":
         result = action_check_stops()
+    elif action == "monitor":
+        result = action_monitor()
     elif action == "positions":
         result = action_positions()
     elif action == "close":
