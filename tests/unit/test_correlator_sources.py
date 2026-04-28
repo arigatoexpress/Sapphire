@@ -31,18 +31,20 @@ def _iso(now: datetime) -> str:
     return now.isoformat()
 
 
-def test_available_sources_lists_nine_classes() -> None:
+def test_available_sources_lists_fourteen_classes() -> None:
     classes = available_sources()
-    assert len(classes) == 9
+    assert len(classes) == 14
     names = {c.__name__ for c in classes}
     assert "TradingViewSource" in names
     assert "KronosForecastSource" in names
     assert "CrossAssetRegimeSource" in names
+    assert "DeFiLlamaSource" in names
+    assert "LaborSource" in names
 
 
-def test_build_default_sources_returns_nine_instances() -> None:
+def test_build_default_sources_returns_fourteen_instances() -> None:
     instances = build_default_sources()
-    assert len(instances) == 9
+    assert len(instances) == 14
     assert {type(s).__name__ for s in instances} == {c.__name__ for c in available_sources()}
 
 
