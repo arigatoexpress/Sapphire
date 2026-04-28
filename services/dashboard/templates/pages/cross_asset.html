@@ -1,0 +1,351 @@
+{% extends "base.html" %}
+
+{% block title %}Cross-Asset Intel{% endblock %}
+
+{% block extra_css %}
+.cross-asset-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(280px, .9fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    margin-bottom: 20px;
+}
+.ca-panel {
+    background: var(--bg-card);
+    padding: 18px 20px;
+}
+.ca-panel-title {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin-bottom: 8px;
+}
+.ca-regime {
+    font-size: 30px;
+    line-height: 1.08;
+    font-weight: 600;
+    color: var(--text-primary);
+    word-break: break-word;
+}
+.ca-confidence {
+    margin-top: 10px;
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+.ca-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--border);
+}
+.ca-metric {
+    background: var(--bg-card);
+    padding: 14px 16px;
+    min-height: 72px;
+}
+.ca-metric-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+}
+.ca-metric-value {
+    margin-top: 6px;
+    font-family: var(--font-mono);
+    font-size: 22px;
+    color: var(--text-primary);
+}
+.ca-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(300px, .8fr);
+    gap: 20px;
+}
+.ca-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.ca-select {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 12px;
+}
+.ca-heatmap-wrap {
+    overflow-x: auto;
+    padding-bottom: 2px;
+}
+.ca-heatmap {
+    display: grid;
+    gap: 2px;
+    min-width: 620px;
+}
+.ca-cell {
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.ca-header {
+    color: var(--text-muted);
+    background: rgba(255,255,255,.03);
+    font-size: 10px;
+}
+.ca-diag {
+    color: var(--text-muted);
+    background: rgba(255,255,255,.04);
+}
+.ca-strip {
+    display: grid;
+    grid-template-columns: repeat(30, minmax(8px, 1fr));
+    gap: 3px;
+    min-height: 22px;
+}
+.ca-strip-seg {
+    height: 18px;
+    border-radius: 3px;
+    background: rgba(255,255,255,.06);
+}
+.ca-table td, .ca-table th {
+    vertical-align: top;
+}
+.ca-driver {
+    display: inline-block;
+    margin: 0 5px 5px 0;
+    padding: 3px 6px;
+    border-radius: 4px;
+    background: rgba(255,255,255,.05);
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-family: var(--font-mono);
+}
+@media (max-width: 1040px) {
+    .cross-asset-hero,
+    .ca-layout {
+        grid-template-columns: 1fr;
+    }
+}
+@media (max-width: 720px) {
+    .ca-metrics {
+        grid-template-columns: 1fr;
+    }
+    .ca-regime {
+        font-size: 24px;
+    }
+}
+{% endblock %}
+
+{% block content %}
+<div class="cross-asset-hero">
+    <div class="ca-panel">
+        <div class="ca-panel-title">Current regime</div>
+        <div class="ca-regime" id="ca-regime-label">loading</div>
+        <div class="ca-confidence" id="ca-regime-confidence">--</div>
+        <div style="margin-top:14px" id="ca-regime-drivers"></div>
+    </div>
+    <div class="ca-panel">
+        <div class="ca-panel-title">30-snapshot history</div>
+        <div class="ca-strip" id="ca-regime-strip"></div>
+        <div class="muted mono" style="font-size:11px;margin-top:10px" id="ca-generated">--</div>
+    </div>
+</div>
+
+<div class="ca-metrics" style="margin-bottom:20px">
+    <div class="ca-metric">
+        <div class="ca-metric-label">Risk corr</div>
+        <div class="ca-metric-value" id="ca-risk-corr">--</div>
+    </div>
+    <div class="ca-metric">
+        <div class="ca-metric-label">Dollar corr</div>
+        <div class="ca-metric-value" id="ca-dollar-corr">--</div>
+    </div>
+    <div class="ca-metric">
+        <div class="ca-metric-label">Breakdowns</div>
+        <div class="ca-metric-value" id="ca-breakdown-count">--</div>
+    </div>
+</div>
+
+<div class="ca-layout">
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Correlation heatmap</span>
+            <div class="ca-toolbar">
+                <select class="ca-select" id="ca-window">
+                    <option value="7d">7d</option>
+                    <option value="24h">24h</option>
+                    <option value="30d">30d</option>
+                </select>
+                <select class="ca-select" id="ca-method">
+                    <option value="pearson">Pearson</option>
+                    <option value="spearman">Spearman</option>
+                    <option value="kendall">Kendall</option>
+                </select>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="ca-heatmap-wrap">
+                <div class="ca-heatmap" id="ca-heatmap"></div>
+            </div>
+        </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:20px">
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Breakdown events</span>
+                <span class="muted mono" style="font-size:11px" id="ca-breakdown-meta">--</span>
+            </div>
+            <div class="card-body no-pad">
+                <table class="data-table ca-table">
+                    <thead><tr><th>Pair</th><th>Move</th><th>Z</th></tr></thead>
+                    <tbody id="ca-breakdowns"><tr><td colspan="3" class="muted">loading</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Lead/lag</span>
+                <span class="muted mono" style="font-size:11px">top pairs</span>
+            </div>
+            <div class="card-body no-pad">
+                <table class="data-table ca-table">
+                    <thead><tr><th>Pair</th><th>Lag</th><th>Corr</th></tr></thead>
+                    <tbody id="ca-lead-lag"><tr><td colspan="3" class="muted">loading</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function esc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[ch]));
+}
+function fmt(value, digits) {
+    const n = Number(value);
+    return Number.isFinite(n) ? (n >= 0 ? '+' : '') + n.toFixed(digits || 2) : '--';
+}
+function heatColor(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 'rgba(255,255,255,.035)';
+    const mag = Math.min(1, Math.abs(n));
+    if (n >= 0) {
+        return `rgba(${30 + 20 * (1 - mag)}, ${95 + 120 * mag}, ${82 + 30 * (1 - mag)}, ${0.28 + 0.62 * mag})`;
+    }
+    return `rgba(${130 + 100 * mag}, ${60 + 20 * (1 - mag)}, ${82 + 20 * (1 - mag)}, ${0.28 + 0.62 * mag})`;
+}
+function regimeColor(label) {
+    if (label === 'crisis_correlation_spike') return 'var(--red)';
+    if (label === 'risk_off_flight_to_dollar') return 'var(--amber)';
+    if (label === 'risk_on_correlated') return 'var(--green)';
+    if (label === 'risk_on_decorrelated') return 'var(--accent-bright)';
+    return 'var(--text-muted)';
+}
+function renderHeatmap(payload) {
+    const matrix = payload.matrix;
+    const el = document.getElementById('ca-heatmap');
+    if (!matrix || !matrix.assets || !matrix.matrix) {
+        el.innerHTML = '<div class="muted">matrix unavailable</div>';
+        return;
+    }
+    const assets = matrix.assets;
+    const cols = `64px repeat(${assets.length}, minmax(52px, 1fr))`;
+    let html = `<div class="ca-cell ca-header"></div>`;
+    for (const asset of assets) html += `<div class="ca-cell ca-header">${esc(asset)}</div>`;
+    for (let i = 0; i < assets.length; i++) {
+        html += `<div class="ca-cell ca-header">${esc(assets[i])}</div>`;
+        for (let j = 0; j < assets.length; j++) {
+            const v = matrix.matrix[i][j];
+            if (i === j) {
+                html += '<div class="ca-cell ca-diag">1.00</div>';
+            } else {
+                html += `<div class="ca-cell" style="background:${heatColor(v)}" title="${esc(assets[i])}/${esc(assets[j])} ${fmt(v, 3)}">${fmt(v, 2)}</div>`;
+            }
+        }
+    }
+    el.style.gridTemplateColumns = cols;
+    el.innerHTML = html;
+    document.getElementById('ca-breakdown-count').textContent = String(payload.breakdown_count ?? 0);
+}
+function renderRegime(payload) {
+    const regime = payload.regime || {};
+    const label = regime.label || 'regime_uncertain';
+    const labelEl = document.getElementById('ca-regime-label');
+    labelEl.textContent = label.replace(/_/g, ' ');
+    labelEl.style.color = regimeColor(label);
+    document.getElementById('ca-regime-confidence').textContent =
+        `${fmt((regime.confidence || 0) * 100, 0)}% confidence`;
+    const metrics = regime.metrics || {};
+    document.getElementById('ca-risk-corr').textContent = fmt(metrics.risk_asset_correlation, 2);
+    document.getElementById('ca-dollar-corr').textContent = fmt(metrics.risk_dollar_correlation, 2);
+    document.getElementById('ca-generated').textContent = payload.generated_at || '--';
+    document.getElementById('ca-regime-drivers').innerHTML =
+        (regime.drivers || []).slice(0, 8).map(d => `<span class="ca-driver">${esc(d)}</span>`).join('');
+    const history = (payload.history || []).slice(-30);
+    document.getElementById('ca-regime-strip').innerHTML = history.map(item => {
+        const color = regimeColor(item.label || 'regime_uncertain');
+        return `<div class="ca-strip-seg" title="${esc(item.timestamp || item.generated_at || '')} ${esc(item.label || '')}" style="background:${color}"></div>`;
+    }).join('') || '<div class="muted mono" style="font-size:11px">no history</div>';
+}
+function renderBreakdowns(payload) {
+    const rows = payload.breakdowns || [];
+    document.getElementById('ca-breakdown-meta').textContent = `${rows.length} active`;
+    document.getElementById('ca-breakdowns').innerHTML = rows.length ? rows.slice(0, 12).map(row => `
+        <tr>
+            <td class="mono">${esc((row.pair || []).join('/'))}</td>
+            <td>${esc(row.direction || '')}<div class="muted mono" style="font-size:11px">${fmt(row.current, 2)} vs ${fmt(row.baseline_mean, 2)}</div></td>
+            <td class="num">${fmt(row.z_score, 1)}</td>
+        </tr>
+    `).join('') : '<tr><td colspan="3" class="muted">none</td></tr>';
+    document.getElementById('ca-lead-lag').innerHTML = (payload.lead_lag || []).slice(0, 10).map(row => `
+        <tr>
+            <td class="mono">${esc((row.pair || []).join('/'))}</td>
+            <td>${esc(row.interpretation || 'n/a')}</td>
+            <td class="num">${fmt(row.correlation, 2)}</td>
+        </tr>
+    `).join('') || '<tr><td colspan="3" class="muted">none</td></tr>';
+}
+async function refreshMatrix() {
+    const windowName = document.getElementById('ca-window').value;
+    const method = document.getElementById('ca-method').value;
+    const response = await fetch(`/api/cross-asset-matrix?window=${encodeURIComponent(windowName)}&method=${encodeURIComponent(method)}`);
+    renderHeatmap(await response.json());
+}
+async function refreshRegime() {
+    const response = await fetch('/api/cross-asset-regime');
+    renderRegime(await response.json());
+}
+async function refreshBreakdowns() {
+    const response = await fetch('/api/cross-asset-breakdowns');
+    renderBreakdowns(await response.json());
+}
+async function refreshAll() {
+    try {
+        await Promise.all([refreshMatrix(), refreshRegime(), refreshBreakdowns()]);
+        window.markRefresh && window.markRefresh();
+    } catch (err) {
+        document.getElementById('ca-heatmap').innerHTML = `<div class="muted">fetch failed: ${esc(err.message || err)}</div>`;
+    }
+}
+document.getElementById('ca-window').addEventListener('change', refreshMatrix);
+document.getElementById('ca-method').addEventListener('change', refreshMatrix);
+document.addEventListener('DOMContentLoaded', refreshAll);
+setInterval(refreshAll, 300000);
+</script>
+{% endblock %}

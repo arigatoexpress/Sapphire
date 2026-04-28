@@ -141,6 +141,7 @@ CASCADE_CACHE_DURATION = 30
 STRATEGY_PERFORMANCE_CACHE_DURATION = 30
 MARKET_UNIVERSE_CACHE_DURATION = 60
 STRATEGY_LAB_CACHE_DURATION = 300
+CROSS_ASSET_CACHE_DURATION = 300
 
 # ── In-process latency metrics (per-route rolling) ─────────────────────────
 # Keeps a bounded ring buffer of (method, path, ms) samples plus per-route
@@ -280,6 +281,82 @@ def _extract_diligence_doc(path: Path) -> dict[str, Any]:
             "evidence_items": len(evidence),
         },
     }
+
+
+def _build_cross_asset_snapshot() -> dict[str, Any]:
+    """Build the cache-first cross-asset dashboard payload."""
+    try:
+        from services.cross_asset.run import build_snapshot
+
+        return build_snapshot(live=False)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("cross-asset snapshot unavailable: %s", exc)
+        return {
+            "ok": False,
+            "mode": "unavailable",
+            "error": _paste_safe_text(f"{type(exc).__name__}: {exc}", limit=180),
+            "matrix": {"windows": {}, "breakdown_events": []},
+            "regime": {
+                "label": "regime_uncertain",
+                "confidence": 0.0,
+                "drivers": ["snapshot unavailable"],
+                "metrics": {},
+            },
+            "breakdowns": [],
+            "lead_lag": [],
+            "source_summary": {},
+        }
+
+
+def _cross_asset_snapshot_cached() -> dict[str, Any]:
+    return get_cached(
+        "cross_asset_snapshot",
+        _build_cross_asset_snapshot,
+        ttl=CROSS_ASSET_CACHE_DURATION,
+    )
+
+
+def _matrix_payload(snapshot: dict[str, Any], *, window: str, method: str) -> dict[str, Any]:
+    matrix_root = snapshot.get("matrix") or {}
+    windows = matrix_root.get("windows") or {}
+    selected = (windows.get(window) or {}).get(method)
+    if selected is None and windows:
+        first_window = next(iter(windows))
+        first_methods = windows.get(first_window) or {}
+        first_method = method if method in first_methods else next(iter(first_methods), method)
+        selected = first_methods.get(first_method)
+        window = first_window
+        method = first_method
+    return {
+        "ok": bool(snapshot.get("ok", True)),
+        "mode": snapshot.get("mode", "cache_or_dry_run"),
+        "generated_at": snapshot.get("generated_at"),
+        "window": window,
+        "method": method,
+        "matrix": selected,
+        "available_windows": sorted(windows),
+        "available_methods": sorted({name for methods in windows.values() for name in methods}),
+        "breakdown_count": len(snapshot.get("breakdowns") or []),
+        "source_summary": snapshot.get("source_summary") or {},
+        "error": snapshot.get("error"),
+    }
+
+
+def _cross_asset_regime_history(limit: int = 30) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for root in _DASHBOARD_ROOTS:
+        data_root = root / "data" / "cross_asset"
+        if not data_root.exists():
+            continue
+        for path in sorted(data_root.glob("*/regimes.jsonl"))[-limit:]:
+            try:
+                for line in path.read_text(encoding="utf-8").splitlines():
+                    if line.strip():
+                        raw = json.loads(line)
+                        rows.append(raw.get("payload") or raw)
+            except (OSError, json.JSONDecodeError):
+                continue
+    return rows[-limit:]
 
 
 def _build_diligence_summary(root: Path | None = None) -> dict[str, Any]:
@@ -3152,6 +3229,16 @@ def investment_intel_page():
     )
 
 
+@app.route("/cross-asset")
+@requires_auth
+def cross_asset_page():
+    return render_template(
+        "pages/cross_asset.html",
+        current_page="cross-asset",
+        page_title="Cross-Asset Intel",
+    )
+
+
 @app.route("/sovereign-thesis")
 @requires_auth
 def sovereign_thesis_page():
@@ -3227,6 +3314,50 @@ def api_test_suite_health():
 @requires_auth
 def api_launchagent_summary():
     return jsonify(_build_launchagent_summary())
+
+
+@app.route("/api/cross-asset-matrix")
+@requires_auth
+def api_cross_asset_matrix():
+    window = request.args.get("window", "7d")
+    method = request.args.get("method", "pearson")
+    snapshot = _cross_asset_snapshot_cached()
+    return jsonify(_matrix_payload(snapshot, window=window, method=method))
+
+
+@app.route("/api/cross-asset-regime")
+@requires_auth
+def api_cross_asset_regime():
+    snapshot = _cross_asset_snapshot_cached()
+    history = _cross_asset_regime_history()
+    if not history and snapshot.get("regime"):
+        history = [snapshot["regime"]]
+    return jsonify(
+        {
+            "ok": bool(snapshot.get("ok", True)),
+            "mode": snapshot.get("mode", "cache_or_dry_run"),
+            "generated_at": snapshot.get("generated_at"),
+            "regime": snapshot.get("regime"),
+            "history": history[-30:],
+            "error": snapshot.get("error"),
+        }
+    )
+
+
+@app.route("/api/cross-asset-breakdowns")
+@requires_auth
+def api_cross_asset_breakdowns():
+    snapshot = _cross_asset_snapshot_cached()
+    return jsonify(
+        {
+            "ok": bool(snapshot.get("ok", True)),
+            "mode": snapshot.get("mode", "cache_or_dry_run"),
+            "generated_at": snapshot.get("generated_at"),
+            "breakdowns": snapshot.get("breakdowns") or [],
+            "lead_lag": snapshot.get("lead_lag") or [],
+            "error": snapshot.get("error"),
+        }
+    )
 
 
 @app.route("/api/routine-pause-status")

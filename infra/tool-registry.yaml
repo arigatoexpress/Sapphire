@@ -389,6 +389,13 @@ tools:
     consumers: []
     description: Hyperliquid Counter-Party Intelligence 0.1.0. Read-only public leaderboard and position-change tracker for top traders, dry-run by default and live-gated by SAPPHIRE_HYPERLIQUID_LIVE=1. Emits smart-money consensus signals without wallet keys or trade execution. Caps, ≤100 tracked traders, ≤12 refreshes/hour, min 30d PnL $50k, position-change threshold 15%. Actions, leaderboard/position-changes/smart-money-consensus/status.
 
+  - name: cross_asset_intel
+    path: plugins/claw-sapphire/tools/internal/cross_asset_intel.py
+    status: internal
+    owner: sapphire
+    consumers: [services.cross-asset, services.dashboard]
+    description: Cross-Asset Correlation Matrix + Regime Detection 0.1.0. Cache-first/dry-run-default rolling Pearson, Spearman, and Kendall matrices across crypto, equities, gold, dollar/forex, VIX, and Hyperliquid-derived assets; deterministic regime labels, breakdown events, and lead/lag analysis. Live source pulls require SAPPHIRE_CROSS_ASSET_LIVE=1. Caps, ≤24 assets, ≤365 days, ≥30 observations for long windows. Actions, matrix/regime/breakdowns/lead-lag/status.
+
   # ── deprecated / sunset window ───────────────────────────────────────────
   - name: kronos_predict
     path: plugins/claw-sapphire/tools/_deprecated/kronos_predict.py
