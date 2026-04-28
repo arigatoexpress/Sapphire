@@ -1,0 +1,27 @@
+# Copy to infra/telegram_channels.yaml on the runtime host.
+# Do not commit the real channel list if it reveals private sources.
+defaults:
+  backend: mtproto
+  poll_interval_seconds: 300
+  pull_limit_per_channel: 25
+  min_quality: 0.45
+  data_dir: data/telegram_intel
+
+classifier:
+  enabled: false
+  model: balanced
+
+channels:
+  - id: security-research-example
+    source: "@example_security_channel"
+    label: Example Security Channel
+    enabled: false
+    backend: mtproto
+    topics: [security, infra]
+
+  - id: market-structure-example
+    source: "@example_market_channel"
+    label: Example Market Channel
+    enabled: false
+    backend: mtproto
+    topics: [markets, onchain]
