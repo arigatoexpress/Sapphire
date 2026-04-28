@@ -115,3 +115,266 @@ def test_base_nav_links_observability(client):
 
     assert response.status_code == 200
     assert "/observability" in response.get_data(as_text=True)
+
+
+# ---------------------------------------------------------------------------
+# Tranche-3 / Lane 2: aggregator-backed endpoints
+# ---------------------------------------------------------------------------
+
+
+def _stub_snapshot_payload() -> dict:
+    return {
+        "schema_version": 1,
+        "mode": "read_only_observability_snapshot",
+        "status": "pass",
+        "generated_at": "2026-04-28T12:00:00+00:00",
+        "heartbeat": {
+            "status": "pass",
+            "checked_at": "2026-04-28T12:00:00+00:00",
+            "totals": {"labels": 1, "running": 1, "loaded": 1, "not_loaded": 0, "unknown": 0},
+            "uptime_seconds": 12345,
+            "error": None,
+            "launchagents": [
+                {
+                    "label": "com.sapphire.demo",
+                    "status_label": "running",
+                    "pid": 999,
+                    "last_exit": 0,
+                    "last_fired_at": "2026-04-28T11:55:00+00:00",
+                    "restart_count": 0,
+                }
+            ],
+        },
+        "inference_proxy": {
+            "cache_dir": "~/.cache/sapphire/inference_proxy",
+            "tiers": [
+                {"tier": "T1_GPU", "endpoint": "100.71.10.48:11434", "healthy": True,
+                 "latency_ms": 410, "last_check": "2026-04-28T12:00:00+00:00"}
+            ],
+            "token_consumption": {"total": 12345, "by_tier": {"T1_GPU": 12345}, "window": "lifetime"},
+            "last_updated": "2026-04-28T11:00:00+00:00",
+            "available": True,
+            "note": None,
+        },
+        "signal_streams": [
+            {
+                "source": "tradingview",
+                "relative_path": "data/signals",
+                "rate_1h": 3,
+                "rate_24h": 21,
+                "files_seen": 5,
+                "latest_record_at": "2026-04-28T11:55:00+00:00",
+                "note": None,
+            }
+        ],
+        "provenance": {
+            "status": "pass",
+            "checked": 12,
+            "missing_or_invalid": 0,
+            "last_verify_at": "2026-04-28T12:00:00+00:00",
+            "invalid_sample": [],
+            "error": None,
+        },
+        "routine_pause": {
+            "status": "pass",
+            "totals": {"paused": 0},
+            "paused_routines": [],
+        },
+        "event_bus": {
+            "relative_path": "data/events/bus.jsonl",
+            "events_seen": 8,
+            "distinct_topics": 2,
+            "topic_distribution": [
+                {"topic": "signal.generated", "count": 5},
+                {"topic": "threat.detected", "count": 3},
+            ],
+            "latest_event_at": "2026-04-28T12:00:00+00:00",
+            "earliest_event_at": "2026-04-28T11:00:00+00:00",
+            "note": None,
+        },
+    }
+
+
+def _stub_stream_rates_payload() -> dict:
+    return {
+        "mode": "read_only_observability_stream_rates",
+        "generated_at": "2026-04-28T12:00:00+00:00",
+        "totals": {"rate_1h": 3, "rate_24h": 21},
+        "sources": [
+            {
+                "source": "tradingview",
+                "relative_path": "data/signals",
+                "rate_1h": 3,
+                "rate_24h": 21,
+                "files_seen": 5,
+                "latest_record_at": "2026-04-28T11:55:00+00:00",
+                "note": None,
+            }
+        ],
+    }
+
+
+def _stub_launchagents_payload() -> dict:
+    return {
+        "mode": "read_only_observability_launchagents",
+        "generated_at": "2026-04-28T12:00:00+00:00",
+        "status": "pass",
+        "totals": {"labels": 1, "running": 1, "loaded": 1, "not_loaded": 0, "unknown": 0},
+        "error": None,
+        "launchagents": [
+            {
+                "label": "com.sapphire.demo",
+                "status_label": "running",
+                "pid": 999,
+                "last_exit": 0,
+                "last_fired_at": "2026-04-28T11:55:00+00:00",
+                "restart_count": 0,
+            }
+        ],
+    }
+
+
+def test_observability_system_summary_requires_auth(client):
+    response = client.get("/api/observability-system-summary")
+    assert response.status_code == 401
+
+
+def test_observability_system_summary_returns_full_envelope(client, monkeypatch):
+    monkeypatch.setattr(
+        dashboard_app,
+        "_build_observability_system_summary",
+        _stub_snapshot_payload,
+    )
+    response = client.get("/api/observability-system-summary", headers=_auth_header())
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["mode"] == "read_only_observability_snapshot"
+    assert payload["heartbeat"]["totals"]["running"] == 1
+    assert payload["inference_proxy"]["tiers"][0]["healthy"] is True
+    assert payload["signal_streams"][0]["rate_1h"] == 3
+    assert payload["event_bus"]["distinct_topics"] == 2
+
+
+def test_observability_system_summary_handles_aggregator_exception(client, monkeypatch):
+    def boom():
+        raise RuntimeError("aggregator failed")
+
+    monkeypatch.setattr(dashboard_app, "_build_observability_system_summary", boom)
+    response = client.get("/api/observability-system-summary", headers=_auth_header())
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "unknown"
+    assert "RuntimeError" in payload["error"]
+
+
+def test_observability_system_summary_no_secrets_in_payload(client, monkeypatch):
+    monkeypatch.setattr(
+        dashboard_app,
+        "_build_observability_system_summary",
+        _stub_snapshot_payload,
+    )
+    response = client.get("/api/observability-system-summary", headers=_auth_header())
+    serialized = json.dumps(response.get_json())
+    # Sanity probes: no home directory, no secrets.env, no api-key tokens.
+    home = str(Path.home())
+    assert home not in serialized
+    assert "secrets.env" not in serialized
+    assert "api_key" not in serialized.lower()
+
+
+def test_observability_stream_rates_requires_auth(client):
+    response = client.get("/api/observability-stream-rates")
+    assert response.status_code == 401
+
+
+def test_observability_stream_rates_returns_totals(client, monkeypatch):
+    monkeypatch.setattr(
+        dashboard_app,
+        "_build_observability_stream_rates",
+        _stub_stream_rates_payload,
+    )
+    response = client.get("/api/observability-stream-rates", headers=_auth_header())
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["mode"] == "read_only_observability_stream_rates"
+    assert payload["totals"]["rate_1h"] == 3
+    assert payload["sources"][0]["source"] == "tradingview"
+
+
+def test_observability_stream_rates_handles_exception(client, monkeypatch):
+    def boom():
+        raise OSError("disk gone")
+
+    monkeypatch.setattr(dashboard_app, "_build_observability_stream_rates", boom)
+    response = client.get("/api/observability-stream-rates", headers=_auth_header())
+    assert response.status_code == 200
+    assert response.get_json()["status"] == "unknown"
+
+
+def test_observability_launchagents_requires_auth(client):
+    response = client.get("/api/observability-launchagents")
+    assert response.status_code == 401
+
+
+def test_observability_launchagents_returns_rows(client, monkeypatch):
+    monkeypatch.setattr(
+        dashboard_app,
+        "_build_observability_launchagents",
+        _stub_launchagents_payload,
+    )
+    response = client.get("/api/observability-launchagents", headers=_auth_header())
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["mode"] == "read_only_observability_launchagents"
+    assert payload["totals"]["running"] == 1
+    assert payload["launchagents"][0]["label"] == "com.sapphire.demo"
+
+
+def test_observability_launchagents_handles_exception(client, monkeypatch):
+    def boom():
+        raise RuntimeError("launchctl unavailable")
+
+    monkeypatch.setattr(dashboard_app, "_build_observability_launchagents", boom)
+    response = client.get("/api/observability-launchagents", headers=_auth_header())
+    assert response.status_code == 200
+    assert response.get_json()["status"] == "unknown"
+
+
+def test_observability_page_includes_new_panels_and_endpoint_polling(client, monkeypatch, tmp_path):
+    monkeypatch.setattr(dashboard_app, "_ROUTINE_PAUSE_DIR", tmp_path / "pause")
+    response = client.get("/observability", headers=_auth_header())
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    # New aggregator-backed sections must appear and poll the new endpoint.
+    assert "System Heartbeat" in html
+    assert "Inference Proxy" in html
+    assert "Signal Streams" in html
+    assert "Provenance Coverage" in html
+    assert "Event Bus" in html
+    assert "/api/observability-system-summary" in html
+
+
+def test_build_observability_system_summary_redacts_pii(monkeypatch):
+    def fake_snapshot():
+        class _Stub:
+            def to_dict(self_inner):
+                return {
+                    "name": "Jane Doe",
+                    "phone": "+1 555 123 9876",
+                    "email": "jane@example.com",
+                    "endpoint": "100.71.10.48:11434",
+                    "label": "com.sapphire.demo",
+                }
+        return _Stub()
+
+    monkeypatch.setattr(
+        "lib.observability.build_system_snapshot",
+        lambda: fake_snapshot(),
+    )
+    payload = dashboard_app._build_observability_system_summary()
+    assert payload["name"].startswith("customer_")
+    assert "9876" in payload["phone"]
+    assert payload["email"].startswith("ja***")
+    # Non-PII fields stay intact.
+    assert payload["endpoint"] == "100.71.10.48:11434"
+    assert payload["label"] == "com.sapphire.demo"

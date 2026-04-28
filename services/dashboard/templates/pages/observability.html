@@ -76,6 +76,23 @@
     min-width: 72px;
     text-align: center;
 }
+.obs-badge.ok { border-color: var(--green, #5be67a); color: var(--green, #5be67a); }
+.obs-badge.warn { border-color: var(--amber); color: var(--amber); }
+.obs-badge.err { border-color: var(--red, #ff6961); color: var(--red, #ff6961); }
+.obs-section-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+    gap: var(--space-lg);
+    margin-top: var(--space-lg);
+}
+.obs-tier {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border-dim);
+    padding: 8px 0;
+    font-size: 0.92rem;
+}
+.obs-tier:last-child { border-bottom: none; }
 @media (max-width: 900px) {
     .obs-grid,
     .obs-stats { grid-template-columns: 1fr; }
@@ -84,12 +101,66 @@
 
 <div class="obs-header">
     <h1>Observability</h1>
-    <p class="text-muted">Live operator state for pause controls and merge-readiness guardrails.</p>
+    <p class="text-muted">Single-pane-of-glass system state — heartbeat, inference proxy, signal streams, provenance, pause controls, event bus.</p>
 </div>
 
 <script type="application/json" id="routine-pause-seed">{{ routine_pause_summary | tojson }}</script>
 
-<div class="obs-grid">
+<div class="obs-section-grid">
+    <section class="obs-panel">
+        <h2>System Heartbeat</h2>
+        <div class="obs-stats">
+            <div class="obs-stat"><div class="label">Status</div><div class="value" id="obs-hb-status">--</div></div>
+            <div class="obs-stat"><div class="label">Running</div><div class="value" id="obs-hb-running">0</div></div>
+            <div class="obs-stat"><div class="label">Labels</div><div class="value" id="obs-hb-labels">0</div></div>
+        </div>
+        <div id="obs-hb-error" class="text-muted" style="margin-bottom: var(--space-sm);"></div>
+        <div id="obs-hb-table"></div>
+    </section>
+
+    <section class="obs-panel">
+        <h2>Inference Proxy</h2>
+        <div class="obs-stats">
+            <div class="obs-stat"><div class="label">Tokens (total)</div><div class="value" id="obs-ip-tokens">0</div></div>
+            <div class="obs-stat"><div class="label">Cache</div><div class="value" id="obs-ip-cache" style="font-size:0.9rem;">--</div></div>
+            <div class="obs-stat"><div class="label">Updated</div><div class="value" id="obs-ip-updated" style="font-size:0.9rem;">--</div></div>
+        </div>
+        <div id="obs-ip-tiers"></div>
+    </section>
+
+    <section class="obs-panel">
+        <h2>Signal Streams</h2>
+        <div class="obs-stats">
+            <div class="obs-stat"><div class="label">1h</div><div class="value" id="obs-ss-rate1">0</div></div>
+            <div class="obs-stat"><div class="label">24h</div><div class="value" id="obs-ss-rate24">0</div></div>
+            <div class="obs-stat"><div class="label">Sources</div><div class="value" id="obs-ss-sources">0</div></div>
+        </div>
+        <div id="obs-ss-table"></div>
+    </section>
+
+    <section class="obs-panel">
+        <h2>Provenance Coverage</h2>
+        <div class="obs-stats">
+            <div class="obs-stat"><div class="label">Status</div><div class="value" id="obs-pv-status">--</div></div>
+            <div class="obs-stat"><div class="label">Checked</div><div class="value" id="obs-pv-checked">0</div></div>
+            <div class="obs-stat"><div class="label">Missing</div><div class="value" id="obs-pv-missing">0</div></div>
+        </div>
+        <div id="obs-pv-error" class="text-muted"></div>
+        <div id="obs-pv-table"></div>
+    </section>
+
+    <section class="obs-panel">
+        <h2>Event Bus</h2>
+        <div class="obs-stats">
+            <div class="obs-stat"><div class="label">Events</div><div class="value" id="obs-eb-events">0</div></div>
+            <div class="obs-stat"><div class="label">Topics</div><div class="value" id="obs-eb-topics">0</div></div>
+            <div class="obs-stat"><div class="label">Newest</div><div class="value" id="obs-eb-latest" style="font-size:0.9rem;">--</div></div>
+        </div>
+        <div id="obs-eb-table"></div>
+    </section>
+</div>
+
+<div class="obs-grid" style="margin-top: var(--space-lg);">
     <section class="obs-panel">
         <h2>Routine Pause Status</h2>
         <div class="obs-stats">
@@ -174,7 +245,153 @@ function refreshPauseStatus() {
         .catch(() => {});
 }
 
+function statusBadge(status) {
+    const s = String(status || 'unknown').toLowerCase();
+    const cls = s === 'pass' ? 'ok' : s === 'warn' ? 'warn' : 'err';
+    return `<span class="obs-badge ${cls}">${esc(s.toUpperCase())}</span>`;
+}
+
+function renderHeartbeat(payload) {
+    const hb = (payload && payload.heartbeat) || {};
+    const totals = hb.totals || {};
+    document.getElementById('obs-hb-status').innerHTML = statusBadge(hb.status);
+    document.getElementById('obs-hb-running').textContent = totals.running || 0;
+    document.getElementById('obs-hb-labels').textContent = totals.labels || 0;
+    document.getElementById('obs-hb-error').textContent = hb.error ? `Probe error: ${hb.error}` : '';
+    const rows = (hb.launchagents || []).slice(0, 30);
+    const target = document.getElementById('obs-hb-table');
+    if (!rows.length) {
+        target.innerHTML = '<div class="obs-empty">No LaunchAgents discovered</div>';
+        return;
+    }
+    target.innerHTML = `
+        <table class="obs-table">
+            <thead><tr><th>Label</th><th>Status</th><th>PID</th><th>Last fired</th></tr></thead>
+            <tbody>
+                ${rows.map(row => `<tr>
+                    <td>${esc(row.label)}</td>
+                    <td>${esc(row.status_label)}</td>
+                    <td>${row.pid == null ? '--' : esc(row.pid)}</td>
+                    <td>${esc(row.last_fired_at || '--')}</td>
+                </tr>`).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+function renderInferenceProxy(payload) {
+    const ip = (payload && payload.inference_proxy) || {};
+    const tokens = ip.token_consumption || {};
+    document.getElementById('obs-ip-tokens').textContent = tokens.total || 0;
+    document.getElementById('obs-ip-cache').textContent = ip.cache_dir || '--';
+    document.getElementById('obs-ip-updated').textContent = ip.last_updated || (ip.available === false ? 'cache absent' : '--');
+    const tiers = ip.tiers || [];
+    const target = document.getElementById('obs-ip-tiers');
+    if (!tiers.length) {
+        target.innerHTML = '<div class="obs-empty">No tier health data</div>';
+        return;
+    }
+    target.innerHTML = tiers.map(tier => `
+        <div class="obs-tier">
+            <span>${esc(tier.tier)} <small class="text-muted">${esc(tier.endpoint)}</small></span>
+            <span>${tier.healthy ? statusBadge('pass') : statusBadge('warn')}</span>
+        </div>
+    `).join('');
+}
+
+function renderSignalStreams(payload) {
+    const streams = (payload && payload.signal_streams) || [];
+    const total1h = streams.reduce((acc, s) => acc + (s.rate_1h || 0), 0);
+    const total24h = streams.reduce((acc, s) => acc + (s.rate_24h || 0), 0);
+    document.getElementById('obs-ss-rate1').textContent = total1h;
+    document.getElementById('obs-ss-rate24').textContent = total24h;
+    document.getElementById('obs-ss-sources').textContent = streams.length;
+    const target = document.getElementById('obs-ss-table');
+    if (!streams.length) {
+        target.innerHTML = '<div class="obs-empty">No streams configured</div>';
+        return;
+    }
+    target.innerHTML = `
+        <table class="obs-table">
+            <thead><tr><th>Source</th><th>1h</th><th>24h</th><th>Latest</th></tr></thead>
+            <tbody>
+                ${streams.map(stream => `<tr>
+                    <td>${esc(stream.source)} <small class="text-muted">${esc(stream.relative_path)}</small></td>
+                    <td>${stream.rate_1h || 0}</td>
+                    <td>${stream.rate_24h || 0}</td>
+                    <td>${esc(stream.latest_record_at || '--')}</td>
+                </tr>`).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+function renderProvenance(payload) {
+    const pv = (payload && payload.provenance) || {};
+    document.getElementById('obs-pv-status').innerHTML = statusBadge(pv.status);
+    document.getElementById('obs-pv-checked').textContent = pv.checked || 0;
+    document.getElementById('obs-pv-missing').textContent = pv.missing_or_invalid || 0;
+    document.getElementById('obs-pv-error').textContent = pv.error || '';
+    const sample = pv.invalid_sample || [];
+    const target = document.getElementById('obs-pv-table');
+    if (!sample.length) {
+        target.innerHTML = '<div class="obs-empty">No invalid sidecars</div>';
+        return;
+    }
+    target.innerHTML = `
+        <table class="obs-table">
+            <thead><tr><th>Artifact</th><th>Reason</th></tr></thead>
+            <tbody>
+                ${sample.map(row => `<tr><td>${esc(row.artifact)}</td><td>${esc(row.reason)}</td></tr>`).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+function renderEventBus(payload) {
+    const eb = (payload && payload.event_bus) || {};
+    document.getElementById('obs-eb-events').textContent = eb.events_seen || 0;
+    document.getElementById('obs-eb-topics').textContent = eb.distinct_topics || 0;
+    document.getElementById('obs-eb-latest').textContent = eb.latest_event_at || '--';
+    const dist = eb.topic_distribution || [];
+    const target = document.getElementById('obs-eb-table');
+    if (!dist.length) {
+        target.innerHTML = '<div class="obs-empty">No recent events</div>';
+        return;
+    }
+    target.innerHTML = `
+        <table class="obs-table">
+            <thead><tr><th>Topic</th><th>Count</th></tr></thead>
+            <tbody>
+                ${dist.map(row => `<tr><td>${esc(row.topic)}</td><td>${row.count || 0}</td></tr>`).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+function refreshSystemSummary() {
+    fetch(`${window.location.origin}/api/observability-system-summary`)
+        .then(response => response.json())
+        .then(payload => {
+            renderHeartbeat(payload);
+            renderInferenceProxy(payload);
+            renderSignalStreams(payload);
+            renderProvenance(payload);
+            renderEventBus(payload);
+            if (payload && payload.routine_pause) {
+                renderPauseStatus({
+                    paused_routines: payload.routine_pause.paused_routines || [],
+                    status: payload.routine_pause.status,
+                    generated_at: payload.generated_at,
+                });
+            }
+        })
+        .catch(() => {});
+}
+
 renderPauseStatus(JSON.parse(document.getElementById('routine-pause-seed').textContent || '{}'));
+refreshSystemSummary();
 setInterval(refreshPauseStatus, 15000);
+setInterval(refreshSystemSummary, 15000);
 </script>
 {% endblock %}
