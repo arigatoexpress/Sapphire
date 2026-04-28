@@ -1,0 +1,1 @@
+"""Narrative synthesis service package."""
