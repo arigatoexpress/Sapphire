@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from lib.autonomy.continuous_intelligence import build_continuous_intelligence_plan
+from lib.core.provenance import write_envelope_sidecar
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ARTIFACT_DIR = ROOT / "data" / ".autonomy" / "continuous_intelligence"
@@ -103,6 +104,14 @@ def _append_jsonl(path: Path, rows: list[dict[str, Any]], *, write: bool) -> Non
     with path.open("a", encoding="utf-8") as fh:
         for row in rows:
             fh.write(json.dumps(row, sort_keys=True) + "\n")
+    write_envelope_sidecar(
+        path,
+        generator="lib.autonomy.continuous_intelligence_artifacts",
+        metadata={
+            "record_count": len(_jsonl_rows(path)),
+            "artifact_family": "continuous_intelligence",
+        },
+    )
 
 
 def _assert_no_sensitive_keys(payload: Any, *, path: str = "result") -> None:
@@ -348,9 +357,7 @@ def artifact_status(*, artifact_dir: Path = DEFAULT_ARTIFACT_DIR) -> dict[str, A
             "exists": path.exists(),
             "rows": len(rows),
             "latest_at": (
-                latest.get("captured_at")
-                or latest.get("leased_at")
-                or latest.get("recorded_at")
+                latest.get("captured_at") or latest.get("leased_at") or latest.get("recorded_at")
                 if latest
                 else None
             ),

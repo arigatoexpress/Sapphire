@@ -31,6 +31,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from lib.core.provenance import write_envelope_sidecar
+
 log = logging.getLogger("foundry.sync")
 
 # ---------------------------------------------------------------------------
@@ -97,14 +99,20 @@ class SyncState:
 
     def save(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({
-            "files": self.files,
-            "last_sync": self.last_sync,
-            "last_status": self.last_status,
-            "sync_count": self.sync_count,
-            "first_success_at": self.first_success_at,
-            "last_auth_warning_at": self.last_auth_warning_at,
-        }, indent=2, default=str))
+        path.write_text(
+            json.dumps(
+                {
+                    "files": self.files,
+                    "last_sync": self.last_sync,
+                    "last_status": self.last_status,
+                    "sync_count": self.sync_count,
+                    "first_success_at": self.first_success_at,
+                    "last_auth_warning_at": self.last_auth_warning_at,
+                },
+                indent=2,
+                default=str,
+            )
+        )
 
     @classmethod
     def load(cls, path: Path) -> SyncState:
@@ -172,7 +180,11 @@ def detect_changes(
                 if not fnmatch.fnmatch(fkey, pattern):
                     continue
                 prev = state.files.get(fkey)
-                if prev is None or prev.get("hash") != finfo.get("hash") or prev.get("mtime") != finfo.get("mtime"):
+                if (
+                    prev is None
+                    or prev.get("hash") != finfo.get("hash")
+                    or prev.get("mtime") != finfo.get("mtime")
+                ):
                     changed_files.append(fkey)
         if changed_files:
             changed_types[obj_type] = changed_files
@@ -190,6 +202,11 @@ def _append_history(root: Path, record: dict[str, Any]) -> None:
     history_path.parent.mkdir(parents=True, exist_ok=True)
     with history_path.open("a") as fh:
         fh.write(json.dumps(record, default=str) + "\n")
+    write_envelope_sidecar(
+        history_path,
+        generator="lib.foundry.sync",
+        metadata={"artifact_family": "foundry_sync_history"},
+    )
 
 
 def load_sync_history(root: Path | None = None, *, limit: int = 50) -> list[dict[str, Any]]:
@@ -220,6 +237,7 @@ def _send_telegram_alert(message: str) -> None:
     """Best-effort Telegram notification on sync failure."""
     try:
         from lib.telegram.src.sapphire_telegram.safe_send import send
+
         send(message, priority="high")
         return
     except Exception:
@@ -238,6 +256,7 @@ def _send_telegram_alert(message: str) -> None:
     ctx = ssl.create_default_context()
     try:
         import certifi
+
         ctx.load_verify_locations(certifi.where())
     except ImportError:
         pass
@@ -248,7 +267,7 @@ def _send_telegram_alert(message: str) -> None:
         req = urllib.request.Request(
             url, data=data, headers={"Content-Type": "application/json"}, method="POST"
         )
-        urllib.request.urlopen(req, timeout=10, context=ctx)
+        urllib.request.urlopen(req, timeout=10, context=ctx)  # nosec B310 - fixed Telegram HTTPS API base.
     except Exception as exc:
         log.warning("Telegram alert failed: %s", exc)
 
@@ -350,11 +369,7 @@ def run_sync(
 
         try:
             client = FoundryClient.from_env()
-            target_types = [
-                obj_type
-                for obj_type, objects in objects_by_type.items()
-                if objects
-            ]
+            target_types = [obj_type for obj_type, objects in objects_by_type.items() if objects]
             client.validate_write_target(target_types)
         except FoundryConfigError as exc:
             # No URL or credentials yet. This is expected before the user has
@@ -426,12 +441,7 @@ def run_sync(
             # (500, timeout, auth, etc.), the run is a genuine error and must
             # alert through the standard path — not be silently swallowed.
             # (codex review #106 P1 follow-up: r3117240955)
-            if (
-                saw_404
-                and not saw_non_404_failure
-                and not uploaded_anything
-                and never_succeeded
-            ):
+            if saw_404 and not saw_non_404_failure and not uploaded_anything and never_succeeded:
                 config_missing = True
     else:
         for obj_type, objects in objects_by_type.items():
@@ -587,7 +597,9 @@ def _daemon(root: Path, *, interval: int = _DEFAULT_INTERVAL, dry_run: bool = Fa
 def main() -> None:
     parser = argparse.ArgumentParser(description="Foundry sync for Sapphire")
     parser.add_argument("--daemon", action="store_true", help="Run in daemon mode (15-min loop)")
-    parser.add_argument("--interval", type=int, default=_DEFAULT_INTERVAL, help="Sync interval in seconds")
+    parser.add_argument(
+        "--interval", type=int, default=_DEFAULT_INTERVAL, help="Sync interval in seconds"
+    )
     parser.add_argument("--dry-run", action="store_true", help="Transform but don't upload")
     parser.add_argument("--force", action="store_true", help="Sync all types regardless of changes")
     args = parser.parse_args()

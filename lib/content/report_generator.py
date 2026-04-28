@@ -27,6 +27,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from lib.core.provenance import write_envelope_sidecar
+
 from .performance_policy import (
     has_public_accuracy_track_record,
     small_sample_accuracy_notice,
@@ -37,14 +39,14 @@ DATA_DIR = REPO_ROOT / "data"
 
 # Commodity + macro tickers for weekly brief context
 _MACRO_TICKERS: dict[str, tuple[str, str]] = {
-    "GLD":      ("Gold (GLD)",      "commodity"),
-    "SLV":      ("Silver (SLV)",    "commodity"),
-    "USO":      ("Oil (USO)",       "commodity"),
-    "URA":      ("Uranium (URA)",   "commodity"),
-    "COPX":     ("Copper (COPX)",   "commodity"),
-    "DX-Y.NYB": ("DXY",             "macro"),
-    "^VIX":     ("VIX",             "macro"),
-    "^TNX":     ("10Y Yield",       "macro"),
+    "GLD": ("Gold (GLD)", "commodity"),
+    "SLV": ("Silver (SLV)", "commodity"),
+    "USO": ("Oil (USO)", "commodity"),
+    "URA": ("Uranium (URA)", "commodity"),
+    "COPX": ("Copper (COPX)", "commodity"),
+    "DX-Y.NYB": ("DXY", "macro"),
+    "^VIX": ("VIX", "macro"),
+    "^TNX": ("10Y Yield", "macro"),
 }
 
 
@@ -52,6 +54,7 @@ def _fetch_macro_context() -> dict[str, Any]:
     """Fetch 5-day returns for commodity and macro tickers via yfinance."""
     try:
         import yfinance as yf  # optional — brief still renders without it
+
         tickers = list(_MACRO_TICKERS.keys())
         raw = yf.download(tickers, period="6d", interval="1d", progress=False, auto_adjust=True)
         closes = raw["Close"] if "Close" in raw.columns else raw
@@ -76,6 +79,7 @@ def _fetch_macro_context() -> dict[str, Any]:
 
 # ---------- models ----------
 
+
 @dataclass
 class Report:
     kind: str
@@ -99,6 +103,7 @@ class Report:
 
 
 # ---------- data loaders ----------
+
 
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
@@ -152,11 +157,18 @@ def _persist_market_pulse(body: str, sources: list[str]) -> None:
     text = f"{body}\n\n## Sources\n\n{footer}\n"
     try:
         path.write_text(text)
+        write_envelope_sidecar(
+            path,
+            generator="lib.content.report_generator",
+            source_paths=tuple(sources),
+            metadata={"kind": "market_pulse"},
+        )
     except OSError:
         pass
 
 
 # ---------- fact extractors ----------
+
 
 def prediction_stats(preds: list[dict]) -> dict[str, Any]:
     """Overall + per-symbol accuracy from scored predictions."""
@@ -252,19 +264,22 @@ def threat_intel_summary(md_path: Path | None) -> dict[str, Any]:
         exp_m = _EXPLOITED_RE.search(b)
         if not (title_m and cve_m):
             continue
-        items.append({
-            "title": title_m.group(1).strip(),
-            "cve": cve_m.group(1).strip(),
-            "priority_score": float(prio_m.group(1)) if prio_m else 0.0,
-            "cvss": float(cvss_m.group(1)) if cvss_m else None,
-            "exploited": (exp_m.group(1).lower() == "yes") if exp_m else False,
-        })
+        items.append(
+            {
+                "title": title_m.group(1).strip(),
+                "cve": cve_m.group(1).strip(),
+                "priority_score": float(prio_m.group(1)) if prio_m else 0.0,
+                "cvss": float(cvss_m.group(1)) if cvss_m else None,
+                "exploited": (exp_m.group(1).lower() == "yes") if exp_m else False,
+            }
+        )
         if len(items) >= 5:
             break
     return {"path": str(md_path), "items": items, "count": len(items)}
 
 
 # ---------- report generators ----------
+
 
 def _rel(path: Path) -> str:
     try:
@@ -435,6 +450,7 @@ def generate_market_pulse_tweet() -> Report:
 
 # ---------- body renderers (markdown) ----------
 
+
 def _fmt_pct(p: float) -> str:
     return f"{p * 100:.1f}%"
 
@@ -455,15 +471,10 @@ def _render_crypto_brief(f: dict[str, Any]) -> str:
         )
         for sym, v in preds["by_symbol"].items():
             lines.append(
-                f"- {sym}: {v['hits']}/{v['total']} correct "
-                f"({_fmt_pct(v['accuracy'])})"
+                f"- {sym}: {v['hits']}/{v['total']} correct " f"({_fmt_pct(v['accuracy'])})"
             )
     else:
-        lines.append(
-            small_sample_accuracy_notice(
-                preds, subject="The 6-factor TA model"
-            )
-        )
+        lines.append(small_sample_accuracy_notice(preds, subject="The 6-factor TA model"))
         if preds["by_symbol"]:
             lines.append(
                 "Coverage is live across "
@@ -486,8 +497,7 @@ def _render_crypto_brief(f: dict[str, Any]) -> str:
             if rsi is not None:
                 extra = f", RSI {rsi:.1f}"
             lines.append(
-                f"- {sym} {d} → target ${tp} "
-                f"(entry ${ep}, conf {_fmt_pct(conf)}{extra})"
+                f"- {sym} {d} → target ${tp} " f"(entry ${ep}, conf {_fmt_pct(conf)}{extra})"
             )
         lines.append("")
 
@@ -548,8 +558,7 @@ def _render_ai_intel(f: dict[str, Any]) -> str:
     lines.append("## Projects Tracked")
     lines.append("")
     lines.append(
-        f"{f['tracked_projects']} projects in the active ledger "
-        f"(data/tracked_projects.json)."
+        f"{f['tracked_projects']} projects in the active ledger " f"(data/tracked_projects.json)."
     )
     return "\n".join(lines)
 
@@ -583,13 +592,8 @@ def _render_market_pulse(f: dict[str, Any]) -> str:
         tp = fc.get("target_price")
         conf = fc.get("confidence", 0)
         tf = fc.get("timeframe", "24h")
-        parts.append(
-            f"{sym} forecast {d} toward ${tp} "
-            f"({conf:.0%} confidence, {tf} horizon)"
-        )
-    forecast_text = (
-        "; ".join(parts) if parts else "no live forecasts available today"
-    )
+        parts.append(f"{sym} forecast {d} toward ${tp} " f"({conf:.0%} confidence, {tf} horizon)")
+    forecast_text = "; ".join(parts) if parts else "no live forecasts available today"
     port = f["portfolio"]
     holdings = port.get("open_positions", 0)
     book_val = port.get("total_value", 0)
@@ -599,12 +603,7 @@ def _render_market_pulse(f: dict[str, Any]) -> str:
             f"across {preds.get('total', 0)} scored signals. "
         )
     else:
-        performance_line = (
-            small_sample_accuracy_notice(
-                preds, subject="The prediction model"
-            )
-            + " "
-        )
+        performance_line = small_sample_accuracy_notice(preds, subject="The prediction model") + " "
     return (
         f"Sapphire market pulse: {forecast_text}. "
         f"{performance_line}"

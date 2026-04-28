@@ -69,6 +69,7 @@ def main(argv: list[str] | None = None) -> int:
     checks.extend(probe_launchagents())
     checks.extend(probe_local_endpoints(env))
     checks.extend(probe_safety())
+    checks.extend(probe_provenance())
     checks.extend(probe_routines(no_external=args.no_external))
     checks.extend(probe_github(no_external=args.no_external))
     checks.extend(probe_google_readiness(args, no_external=args.no_external))
@@ -160,7 +161,11 @@ def probe_repo() -> list[Check]:
             "repo",
             "canonical_checkout_clean",
             "WARN" if dirty else "PASS",
-            (branch.stdout.strip().splitlines()[0] if branch.stdout.strip() else "git status unavailable")
+            (
+                branch.stdout.strip().splitlines()[0]
+                if branch.stdout.strip()
+                else "git status unavailable"
+            )
             + (f"; dirty entries={len(status.stdout.splitlines())}" if dirty else ""),
             status.duration_ms + branch.duration_ms,
         )
@@ -329,7 +334,11 @@ def probe_launchagents() -> list[Check]:
             continue
         pid, status = item
         if kind == "always_on" and pid == "-":
-            checks.append(Check("launchagent", label, "FAIL", f"loaded but not running (last_status={status})"))
+            checks.append(
+                Check(
+                    "launchagent", label, "FAIL", f"loaded but not running (last_status={status})"
+                )
+            )
         else:
             evidence = "running" if pid != "-" else f"loaded idle (last_status={status})"
             checks.append(Check("launchagent", label, "PASS", evidence))
@@ -355,7 +364,12 @@ def probe_local_endpoints(env: dict[str, str]) -> list[Check]:
         tcp_check("local", "openbb_api_tcp", "127.0.0.1", 6900),
         tcp_check("local", "redis_tcp", "127.0.0.1", 6379),
         http_check("local", "ollama_tags", "http://127.0.0.1:11434/api/tags"),
-        http_check("local", "tradingview_cdp_version", "http://127.0.0.1:9222/json/version", warn_on_error=True),
+        http_check(
+            "local",
+            "tradingview_cdp_version",
+            "http://127.0.0.1:9222/json/version",
+            warn_on_error=True,
+        ),
     ]
     password = env.get("AUTH_PASSWORD")
     if password:
@@ -368,7 +382,14 @@ def probe_local_endpoints(env: dict[str, str]) -> list[Check]:
             )
         )
     else:
-        checks.append(Check("local", "dashboard_authenticated_root", "WARN", "AUTH_PASSWORD not available to probe"))
+        checks.append(
+            Check(
+                "local",
+                "dashboard_authenticated_root",
+                "WARN",
+                "AUTH_PASSWORD not available to probe",
+            )
+        )
     return checks
 
 
@@ -376,7 +397,7 @@ def inference_proxy_health_check() -> Check:
     started = time.perf_counter()
     url = "http://127.0.0.1:11435/health"
     try:
-        with urllib.request.urlopen(url, timeout=5) as response:
+        with urllib.request.urlopen(url, timeout=5) as response:  # nosec B310 - fixed localhost health URL.
             status_code = response.status
             body = response.read(1024 * 1024)
     except urllib.error.HTTPError as exc:
@@ -423,9 +444,13 @@ def inference_proxy_health_check() -> Check:
 
 
 def probe_safety() -> list[Check]:
-    result = run([sys.executable, "scripts/ops/safety_status_report.py", "--json"], cwd=ROOT, timeout=30)
+    result = run(
+        [sys.executable, "scripts/ops/safety_status_report.py", "--json"], cwd=ROOT, timeout=30
+    )
     if not result.ok:
-        return [Check("safety", "safety_status_report", "FAIL", short_error(result), result.duration_ms)]
+        return [
+            Check("safety", "safety_status_report", "FAIL", short_error(result), result.duration_ms)
+        ]
     try:
         report = json.loads(result.stdout)
     except json.JSONDecodeError:
@@ -433,7 +458,14 @@ def probe_safety() -> list[Check]:
     checks: list[Check] = []
     kill = report.get("kill_switch", {})
     active = bool(kill.get("inferred_active"))
-    checks.append(Check("safety", "kill_switch_inactive", "PASS" if not active else "FAIL", f"inferred_active={active}"))
+    checks.append(
+        Check(
+            "safety",
+            "kill_switch_inactive",
+            "PASS" if not active else "FAIL",
+            f"inferred_active={active}",
+        )
+    )
     firewall = report.get("confirmation_firewall", {})
     expired = int(firewall.get("expired_pending_count") or 0)
     checks.append(
@@ -446,8 +478,35 @@ def probe_safety() -> list[Check]:
     )
     schema = (report.get("autonomy_audit") or {}).get("schema", {})
     leaks = int(schema.get("unredacted_secret_risk_records") or 0)
-    checks.append(Check("safety", "autonomy_audit_redaction", "PASS" if leaks == 0 else "FAIL", f"unredacted_secret_risk_records={leaks}"))
+    checks.append(
+        Check(
+            "safety",
+            "autonomy_audit_redaction",
+            "PASS" if leaks == 0 else "FAIL",
+            f"unredacted_secret_risk_records={leaks}",
+        )
+    )
     return checks
+
+
+def probe_provenance() -> list[Check]:
+    result = run(
+        [sys.executable, "scripts/ops/provenance_verify.py", "--older-than-hours", "24"],
+        cwd=ROOT,
+        timeout=60,
+    )
+    try:
+        report = json.loads(result.stdout or "{}")
+    except json.JSONDecodeError:
+        return [
+            Check("provenance", "artifact_envelopes", "WARN", "invalid JSON", result.duration_ms)
+        ]
+    status = "PASS" if result.ok and report.get("ok") else "WARN"
+    evidence = (
+        f"checked={report.get('checked', 0)}; "
+        f"missing_or_invalid={report.get('missing_or_invalid', 0)}"
+    )
+    return [Check("provenance", "artifact_envelopes", status, evidence, result.duration_ms)]
 
 
 def probe_routines(*, no_external: bool) -> list[Check]:
@@ -456,11 +515,17 @@ def probe_routines(*, no_external: bool) -> list[Check]:
         cmd.append("--no-external")
     result = run(cmd, cwd=ROOT, timeout=60)
     if not result.ok:
-        return [Check("routines", "routine_soak_status", "WARN", short_error(result), result.duration_ms)]
+        return [
+            Check(
+                "routines", "routine_soak_status", "WARN", short_error(result), result.duration_ms
+            )
+        ]
     try:
         report = json.loads(result.stdout)
     except json.JSONDecodeError:
-        return [Check("routines", "routine_soak_status", "WARN", "invalid JSON", result.duration_ms)]
+        return [
+            Check("routines", "routine_soak_status", "WARN", "invalid JSON", result.duration_ms)
+        ]
     checks: list[Check] = []
     for routine in report.get("routines", []):
         gate = routine.get("gate_state")
@@ -480,13 +545,32 @@ def probe_routines(*, no_external: bool) -> list[Check]:
 def probe_github(*, no_external: bool) -> list[Check]:
     if no_external:
         return [Check("github", "open_prs", "SKIP", "--no-external")]
-    result = run(["gh", "pr", "list", "--repo", "arigatoexpress/Sapphire", "--json", "number,title,state,isDraft"], cwd=ROOT)
+    result = run(
+        [
+            "gh",
+            "pr",
+            "list",
+            "--repo",
+            "arigatoexpress/Sapphire",
+            "--json",
+            "number,title,state,isDraft",
+        ],
+        cwd=ROOT,
+    )
     if not result.ok:
         return [Check("github", "open_prs", "WARN", short_error(result), result.duration_ms)]
     prs = json.loads(result.stdout or "[]")
     non_draft = [pr for pr in prs if not pr.get("isDraft")]
     status = "PASS" if not non_draft else "WARN"
-    return [Check("github", "open_prs", status, f"open={len(prs)} non_draft={len(non_draft)}", result.duration_ms)]
+    return [
+        Check(
+            "github",
+            "open_prs",
+            status,
+            f"open={len(prs)} non_draft={len(non_draft)}",
+            result.duration_ms,
+        )
+    ]
 
 
 def probe_google_readiness(args: argparse.Namespace, *, no_external: bool) -> list[Check]:
@@ -509,7 +593,15 @@ def probe_google_readiness(args: argparse.Namespace, *, no_external: bool) -> li
         cmd.append("--no-external")
     result = run(cmd, cwd=ROOT, timeout=90)
     if not result.ok:
-        return [Check("gcp", "google_production_readiness", "WARN", short_error(result), result.duration_ms)]
+        return [
+            Check(
+                "gcp",
+                "google_production_readiness",
+                "WARN",
+                short_error(result),
+                result.duration_ms,
+            )
+        ]
     report = json.loads(result.stdout)
     summary = report.get("summary", {})
     gates = report.get("readiness_gates", [])
@@ -524,8 +616,18 @@ def probe_google_readiness(args: argparse.Namespace, *, no_external: bool) -> li
     ]
     for gate in gates:
         gate_status = str(gate.get("status"))
-        status = "PASS" if gate_status == "pass" else ("WARN" if gate_status in {"manual_gate", "blocked", "unknown", "needs_attention"} else "FAIL")
-        checks.append(Check("gcp", f"gate_{gate.get('id')}", status, f"{gate_status}: {gate.get('evidence')}"))
+        status = (
+            "PASS"
+            if gate_status == "pass"
+            else (
+                "WARN"
+                if gate_status in {"manual_gate", "blocked", "unknown", "needs_attention"}
+                else "FAIL"
+            )
+        )
+        checks.append(
+            Check("gcp", f"gate_{gate.get('id')}", status, f"{gate_status}: {gate.get('evidence')}")
+        )
     return checks
 
 
@@ -556,7 +658,15 @@ def probe_gcp_writes(args: argparse.Namespace) -> list[Check]:
     try:
         gcs_path = f"gs://{args.bucket}/ops/production-readiness/{probe_id}.json"
         gcs = run(["gcloud", "storage", "cp", str(temp_path), gcs_path], cwd=ROOT, timeout=60)
-        checks.append(Check("gcp_write", "gcs_probe_object", "PASS" if gcs.ok else "FAIL", gcs_path if gcs.ok else short_error(gcs), gcs.duration_ms))
+        checks.append(
+            Check(
+                "gcp_write",
+                "gcs_probe_object",
+                "PASS" if gcs.ok else "FAIL",
+                gcs_path if gcs.ok else short_error(gcs),
+                gcs.duration_ms,
+            )
+        )
 
         table_ref = f"`{args.project}.{args.dataset}.{args.bq_table}`"
         create_sql = (
@@ -564,14 +674,31 @@ def probe_gcp_writes(args: argparse.Namespace) -> list[Check]:
             "(probe_id STRING, timestamp TIMESTAMP, source STRING, mode STRING)"
         )
         create = bq_query(args.project, create_sql)
-        checks.append(Check("gcp_write", "bq_probe_table", "PASS" if create.ok else "FAIL", f"{args.dataset}.{args.bq_table}" if create.ok else short_error(create), create.duration_ms))
+        checks.append(
+            Check(
+                "gcp_write",
+                "bq_probe_table",
+                "PASS" if create.ok else "FAIL",
+                f"{args.dataset}.{args.bq_table}" if create.ok else short_error(create),
+                create.duration_ms,
+            )
+        )
         if create.ok:
+            # Operator-supplied BigQuery probe table, not user input.
             insert_sql = (
-                f"INSERT INTO {table_ref} (probe_id, timestamp, source, mode) "
+                f"INSERT INTO {table_ref} (probe_id, timestamp, source, mode) "  # nosec B608
                 f"VALUES ('{probe_id}', CURRENT_TIMESTAMP(), 'production_readiness_sweep', 'bounded_live_write_probe')"
             )
             insert = bq_query(args.project, insert_sql)
-            checks.append(Check("gcp_write", "bq_probe_insert", "PASS" if insert.ok else "FAIL", f"probe_id={probe_id}" if insert.ok else short_error(insert), insert.duration_ms))
+            checks.append(
+                Check(
+                    "gcp_write",
+                    "bq_probe_insert",
+                    "PASS" if insert.ok else "FAIL",
+                    f"probe_id={probe_id}" if insert.ok else short_error(insert),
+                    insert.duration_ms,
+                )
+            )
     finally:
         with contextlib_suppress():
             temp_path.unlink()
@@ -606,13 +733,25 @@ def probe_gemini_live(args: argparse.Namespace) -> list[Check]:
             timeout=60,
         )
     if not result.ok:
-        return [Check("gemini", "vertex_live_probe", "WARN", short_error(result), result.duration_ms)]
+        return [
+            Check("gemini", "vertex_live_probe", "WARN", short_error(result), result.duration_ms)
+        ]
     payload = parse_json_from_mixed_output(result.stdout)
     if not isinstance(payload, dict):
-        return [Check("gemini", "vertex_live_probe", "WARN", "invalid Gemini JSON output", result.duration_ms)]
+        return [
+            Check(
+                "gemini",
+                "vertex_live_probe",
+                "WARN",
+                "invalid Gemini JSON output",
+                result.duration_ms,
+            )
+        ]
     response = str(payload.get("response", "")).strip()
     stats = payload.get("stats") if isinstance(payload.get("stats"), dict) else {}
-    model_stats = ((stats.get("models") or {}) if isinstance(stats, dict) else {}).get(args.gemini_model, {})
+    model_stats = ((stats.get("models") or {}) if isinstance(stats, dict) else {}).get(
+        args.gemini_model, {}
+    )
     tokens = model_stats.get("tokens", {}) if isinstance(model_stats, dict) else {}
     tools = stats.get("tools", {}) if isinstance(stats, dict) else {}
     ok = response == GEMINI_PROBE_RESPONSE and int(tools.get("totalCalls") or 0) == 0
@@ -620,7 +759,9 @@ def probe_gemini_live(args: argparse.Namespace) -> list[Check]:
         f"model={args.gemini_model}; response_ok={ok}; "
         f"tool_calls={tools.get('totalCalls', 0)}; total_tokens={tokens.get('total', 'unknown')}"
     )
-    return [Check("gemini", "vertex_live_probe", "PASS" if ok else "WARN", evidence, result.duration_ms)]
+    return [
+        Check("gemini", "vertex_live_probe", "PASS" if ok else "WARN", evidence, result.duration_ms)
+    ]
 
 
 def parse_json_from_mixed_output(output: str) -> dict[str, Any] | None:
@@ -647,20 +788,32 @@ def apply_gemini_probe_to_google_gate(checks: list[Check], gemini_checks: list[C
 
 
 def bq_query(project: str, sql: str) -> RunResult:
-    return run(["bq", "query", "--project_id", project, "--use_legacy_sql=false", "--quiet", sql], cwd=ROOT, timeout=90)
+    return run(
+        ["bq", "query", "--project_id", project, "--use_legacy_sql=false", "--quiet", sql],
+        cwd=ROOT,
+        timeout=90,
+    )
 
 
 def telegram_check(name: str, token: str, method: str) -> Check:
     started = time.perf_counter()
     try:
-        with urllib.request.urlopen(f"https://api.telegram.org/bot{token}/{method}", timeout=10) as response:
+        with urllib.request.urlopen(  # nosec B310 - fixed Telegram HTTPS API base.
+            f"https://api.telegram.org/bot{token}/{method}", timeout=10
+        ) as response:
             body = response.read(1024 * 1024)
             status_code = response.status
     except urllib.error.HTTPError as exc:
         status_code = exc.code
         body = exc.read(1024 * 1024)
     except Exception as exc:
-        return Check("telegram", name, "WARN", exc.__class__.__name__, int((time.perf_counter() - started) * 1000))
+        return Check(
+            "telegram",
+            name,
+            "WARN",
+            exc.__class__.__name__,
+            int((time.perf_counter() - started) * 1000),
+        )
     try:
         parsed = json.loads(body)
     except json.JSONDecodeError:
@@ -672,7 +825,13 @@ def telegram_check(name: str, token: str, method: str) -> Check:
         public_hint = f"; username=@{result['username']}"
     elif method == "getWebhookInfo":
         public_hint = f"; pending_update_count={result.get('pending_update_count', 'unknown')}"
-    return Check("telegram", name, "PASS" if ok else "WARN", f"http={status_code}{public_hint}", int((time.perf_counter() - started) * 1000))
+    return Check(
+        "telegram",
+        name,
+        "PASS" if ok else "WARN",
+        f"http={status_code}{public_hint}",
+        int((time.perf_counter() - started) * 1000),
+    )
 
 
 def http_check(
@@ -689,14 +848,20 @@ def http_check(
         token = base64.b64encode(f"{auth[0]}:{auth[1]}".encode()).decode()
         request.add_header("Authorization", f"Basic {token}")
     try:
-        with urllib.request.urlopen(request, timeout=5) as response:
+        with urllib.request.urlopen(request, timeout=5) as response:  # nosec B310 - readiness probe URL is from static check list.
             status_code = response.status
             body = response.read(1024 * 1024)
     except urllib.error.HTTPError as exc:
         status_code = exc.code
         body = exc.read(4096)
     except Exception as exc:
-        return Check(category, name, "WARN" if warn_on_error else "FAIL", exc.__class__.__name__, int((time.perf_counter() - started) * 1000))
+        return Check(
+            category,
+            name,
+            "WARN" if warn_on_error else "FAIL",
+            exc.__class__.__name__,
+            int((time.perf_counter() - started) * 1000),
+        )
     status = "PASS" if 200 <= status_code < 300 else ("WARN" if warn_on_error else "FAIL")
     hint = ""
     with contextlib_suppress():
@@ -706,16 +871,34 @@ def http_check(
                 hint = f"; status={parsed.get('status')}"
             elif parsed.get("healthy") is not None:
                 hint = f"; healthy={parsed.get('healthy')}"
-    return Check(category, name, status, f"http={status_code}{hint}", int((time.perf_counter() - started) * 1000))
+    return Check(
+        category,
+        name,
+        status,
+        f"http={status_code}{hint}",
+        int((time.perf_counter() - started) * 1000),
+    )
 
 
 def tcp_check(category: str, name: str, host: str, port: int) -> Check:
     started = time.perf_counter()
     try:
         with socket.create_connection((host, port), timeout=3):
-            return Check(category, name, "PASS", f"{host}:{port} reachable", int((time.perf_counter() - started) * 1000))
+            return Check(
+                category,
+                name,
+                "PASS",
+                f"{host}:{port} reachable",
+                int((time.perf_counter() - started) * 1000),
+            )
     except OSError as exc:
-        return Check(category, name, "FAIL", exc.__class__.__name__, int((time.perf_counter() - started) * 1000))
+        return Check(
+            category,
+            name,
+            "FAIL",
+            exc.__class__.__name__,
+            int((time.perf_counter() - started) * 1000),
+        )
 
 
 @dataclass
@@ -748,9 +931,16 @@ def run(
             timeout=timeout,
             check=False,
         )
-        return RunResult(proc.returncode, proc.stdout, proc.stderr, int((time.perf_counter() - started) * 1000))
+        return RunResult(
+            proc.returncode, proc.stdout, proc.stderr, int((time.perf_counter() - started) * 1000)
+        )
     except subprocess.TimeoutExpired as exc:
-        return RunResult(124, exc.stdout or "", exc.stderr or "timeout", int((time.perf_counter() - started) * 1000))
+        return RunResult(
+            124,
+            exc.stdout or "",
+            exc.stderr or "timeout",
+            int((time.perf_counter() - started) * 1000),
+        )
     except FileNotFoundError as exc:
         return RunResult(127, "", str(exc), int((time.perf_counter() - started) * 1000))
 

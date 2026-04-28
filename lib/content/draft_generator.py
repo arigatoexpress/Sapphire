@@ -19,6 +19,7 @@ from typing import Any
 
 from lib.content import report_generator
 from lib.content.report_generator import Report
+from lib.core.provenance import write_envelope_sidecar
 
 log = logging.getLogger(__name__)
 
@@ -53,8 +54,13 @@ def _persist(draft: Draft) -> None:
         f"# {draft.report.title}\n\n"
         f"_Status: {draft.status} | Created: {draft.created_at}_\n\n"
         f"{draft.report.body}\n\n"
-        f"---\n\n## Sources\n\n"
-        + "\n".join(f"- `{s}`" for s in draft.report.sources)
+        f"---\n\n## Sources\n\n" + "\n".join(f"- `{s}`" for s in draft.report.sources)
+    )
+    write_envelope_sidecar(
+        path,
+        generator="lib.content.draft_generator",
+        source_paths=tuple(draft.report.sources),
+        metadata={"kind": draft.report.kind, "status": draft.status},
     )
 
 

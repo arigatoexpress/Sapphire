@@ -55,6 +55,7 @@ Safety
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -64,8 +65,29 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "lib"))
+REPO_ROOT = Path(__file__).resolve().parents[4]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+PLUGIN_LIB = str(Path(__file__).parent.parent.parent / "lib")
+if PLUGIN_LIB not in sys.path:
+    sys.path.insert(1, PLUGIN_LIB)
 from sensitivity_classifier import is_sensitive  # noqa: E402
+
+
+def _load_provenance_stamp():
+    spec = importlib.util.spec_from_file_location(
+        "sapphire_core_provenance",
+        REPO_ROOT / "lib" / "core" / "provenance.py",
+    )
+    if spec is None or spec.loader is None:
+        raise ImportError("cannot load Sapphire provenance helper")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules.setdefault("sapphire_core_provenance", module)
+    spec.loader.exec_module(module)
+    return module.stamp
+
+
+stamp = _load_provenance_stamp()
 
 CACHE_DIR = Path.home() / ".cache" / "sapphire" / "gemini_ooda"
 COUNTER_PATH = CACHE_DIR / "counters.json"
@@ -241,7 +263,9 @@ def _live_synthesize(
     """Call Gemini via google.generativeai. ``sdk_call`` is a test seam."""
     prompt = _build_prompt(topic, context)
     if sdk_call is not None:
-        response = sdk_call(prompt, model=model, max_output_tokens=max_output_tokens, api_key=api_key)
+        response = sdk_call(
+            prompt, model=model, max_output_tokens=max_output_tokens, api_key=api_key
+        )
     else:  # pragma: no cover - exercised only in real environments.
         import google.generativeai as genai
 
@@ -341,7 +365,9 @@ def synthesize(
             pass
 
     counters = _prune_calls(_load_counters())
-    expected_tokens = max_output_tokens + min(len(truncated_topic) + len(truncated_context), MAX_INPUT_CHARS_HARD)
+    expected_tokens = max_output_tokens + min(
+        len(truncated_topic) + len(truncated_context), MAX_INPUT_CHARS_HARD
+    )
     allowed, reason = _check_rate_limits(counters, expected_tokens)
     metadata["rate_limit_state"] = {
         "calls_last_hour": len(counters.get("calls", [])),
@@ -356,7 +382,12 @@ def synthesize(
         return {"ooda": ooda, "metadata": metadata}
 
     secrets = _load_secrets()
-    api_key = secrets.get("GEMINI_API_KEY") or secrets.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    api_key = (
+        secrets.get("GEMINI_API_KEY")
+        or secrets.get("GOOGLE_API_KEY")
+        or os.environ.get("GEMINI_API_KEY")
+        or os.environ.get("GOOGLE_API_KEY")
+    )
     if not api_key:
         metadata["mode_actual"] = "dry-run-no-key"
         ooda = _mock_synthesize(truncated_topic, truncated_context, reason=metadata["mode_actual"])
@@ -379,10 +410,19 @@ def synthesize(
 
     tokens = live.pop("_live_tokens", {}) or {}
     counters.setdefault("calls", []).append(time.time())
-    counters["month_tokens"] = counters.get("month_tokens", 0) + int(tokens.get("total_tokens") or 0)
+    counters["month_tokens"] = counters.get("month_tokens", 0) + int(
+        tokens.get("total_tokens") or 0
+    )
     _save_counters(counters)
 
-    cache_payload = {"ooda": live, "tokens": tokens, "_cached_at": time.time()}
+    cache_payload = stamp(
+        {"ooda": live, "tokens": tokens, "_cached_at": time.time()},
+        generator="plugins.claw_sapphire.gemini_ooda",
+        model=model,
+        prompt=_build_prompt(truncated_topic, truncated_context),
+        ttl_seconds=ttl_seconds,
+        metadata={"cache": True, "mode": "live"},
+    )
     try:
         cache_path.parent.mkdir(parents=True, exist_ok=True)
         cache_path.write_text(json.dumps(cache_payload, indent=2, sort_keys=True), encoding="utf-8")
@@ -434,7 +474,10 @@ def handle(payload: dict[str, Any]) -> dict[str, Any]:
             max_output_tokens=int(payload.get("max_output_tokens") or 512),
             ttl_seconds=int(payload.get("ttl_seconds") or 86400),
         )
-    return {"error": f"unknown action '{action}'", "valid_actions": ["synthesize", "status", "models"]}
+    return {
+        "error": f"unknown action '{action}'",
+        "valid_actions": ["synthesize", "status", "models"],
+    }
 
 
 def main(stream_in: Any = sys.stdin, stream_out: Any = sys.stdout) -> int:
