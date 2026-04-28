@@ -345,6 +345,13 @@ tools:
     consumers: []
     description: Vertex/Gemini eval harness. Benchmarks Gemini OODA outputs against the local 4-tier inference mesh and a deterministic mock baseline using a reproducible rubric (structural_validity, actionability, citation_density). Dry-run by default; live mode requires SAPPHIRE_GEMINI_LIVE=1 plus a key plus the sensitivity gate, and applies the same per-hour and per-month caps as gemini_ooda plus a per-run prompt cap.
 
+  - name: narrative_synthesis
+    path: plugins/claw-sapphire/tools/internal/narrative_synthesis.py
+    status: internal
+    owner: sapphire
+    consumers: [services.synthesis]
+    description: LLM Narrative Synthesis Engine 0.1.0. Turns signal_correlator edge_score outputs into provenance-stamped NarrativeThesis payloads with evidence bullets, counter-thesis, invalidators, next signal to watch, implied position, and deterministic rubric gating. Dry-run deterministic by default; live Gemini mode requires SAPPHIRE_NARRATIVE_LIVE=1 plus a key plus the sensitivity gate. Caps, ≤6144 output tokens, ≤18000 input chars, ≤6 live calls/hour, ≤750k tokens/month, publish rubric ≥0.70. Actions, synthesize-once/latest/history/rubric-score/status.
+
   # Intel — BigQuery vector retrieval over the Sapphire intel corpus
   - name: intel_search
     path: plugins/claw-sapphire/tools/internal/intel_search.py
