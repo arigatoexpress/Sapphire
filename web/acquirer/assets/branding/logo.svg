@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 64" width="256" height="64" role="img" aria-label="Sapphire OS">
+  <title>Sapphire OS</title>
+  <desc>Sapphire OS wordmark with monogram for light backgrounds.</desc>
+  <!-- Monogram: octahedral sapphire mark in accent blue -->
+  <g transform="translate(8 8)">
+    <!-- 48x48 monogram -->
+    <g transform="translate(24 24)">
+      <!-- outer rotated square (rhombus) -->
+      <path d="M0,-20 L20,0 L0,20 L-20,0 Z" fill="none" stroke="#0b1220" stroke-width="2.25" stroke-linejoin="miter"/>
+      <!-- inner facet lines -->
+      <path d="M0,-20 L0,20 M-20,0 L20,0" fill="none" stroke="#0b1220" stroke-width="1.25" opacity="0.55"/>
+      <path d="M-20,0 L0,-8 L20,0 L0,8 Z" fill="#1565C0" opacity="0.18"/>
+      <!-- center node -->
+      <circle r="2.4" fill="#0b1220"/>
+    </g>
+  </g>
+  <!-- Wordmark -->
+  <g transform="translate(72 0)" fill="#0b1220" font-family="-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Helvetica, Arial, sans-serif">
+    <text x="0" y="40" font-size="26" font-weight="600" letter-spacing="-0.5">Sapphire</text>
+    <text x="124" y="40" font-size="26" font-weight="300" letter-spacing="2" fill="#1565C0">OS</text>
+  </g>
+</svg>

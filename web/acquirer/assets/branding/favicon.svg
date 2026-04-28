@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Sapphire OS">
+  <title>Sapphire OS</title>
+  <rect width="32" height="32" rx="6" fill="#0b1220"/>
+  <g transform="translate(16 16)">
+    <path d="M0,-10 L10,0 L0,10 L-10,0 Z" fill="none" stroke="#8edcff" stroke-width="1.75" stroke-linejoin="miter"/>
+    <path d="M-10,0 L0,-4 L10,0 L0,4 Z" fill="#6da5ff" opacity="0.35"/>
+    <path d="M0,-10 L0,10 M-10,0 L10,0" stroke="#6da5ff" stroke-width="0.75" opacity="0.55"/>
+    <circle r="1.5" fill="#8edcff"/>
+  </g>
+</svg>

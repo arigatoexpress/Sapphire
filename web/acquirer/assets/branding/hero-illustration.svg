@@ -1,0 +1,161 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 360" width="100%" height="auto" role="img" aria-labelledby="hero-title hero-desc" preserveAspectRatio="xMidYMid meet">
+  <title id="hero-title">Sapphire signal-flow architecture</title>
+  <desc id="hero-desc">
+    Five upstream intelligence sources (TradingView, Telegram, Hyperliquid, Threat-intel,
+    Cross-asset) converge on a central correlation hub, which emits a narrative-thesis
+    output stream.
+  </desc>
+
+  <defs>
+    <!-- subtle background grid -->
+    <pattern id="grid" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0 L0 0 L0 40" fill="none" stroke="#1f2a47" stroke-width="0.5" opacity="0.6"/>
+    </pattern>
+
+    <!-- linear gradient for the hub core -->
+    <radialGradient id="hubCore" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#8edcff" stop-opacity="0.85"/>
+      <stop offset="60%" stop-color="#6da5ff" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#6da5ff" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- flow line gradient (input direction, fades from source to hub) -->
+    <linearGradient id="flowIn" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#6da5ff" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#8edcff" stop-opacity="0.95"/>
+    </linearGradient>
+
+    <!-- flow gradient for output stream -->
+    <linearGradient id="flowOut" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#8edcff" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#8edcff" stop-opacity="0.10"/>
+    </linearGradient>
+
+    <!-- node glow -->
+    <radialGradient id="nodeGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#8edcff" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#6da5ff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- canvas -->
+  <rect width="960" height="360" fill="#0b1220"/>
+  <rect width="960" height="360" fill="url(#grid)"/>
+
+  <!-- Five input sources, distributed vertically on the left -->
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#aab4d4" letter-spacing="0.5">
+
+    <!-- source 1: TradingView -->
+    <g transform="translate(80 60)">
+      <circle r="20" fill="url(#nodeGlow)"/>
+      <circle r="8" fill="none" stroke="#8edcff" stroke-width="1.4"/>
+      <circle r="2" fill="#8edcff"/>
+      <text x="-22" y="-22" text-anchor="end">TradingView</text>
+    </g>
+
+    <!-- source 2: Telegram intel -->
+    <g transform="translate(80 130)">
+      <circle r="18" fill="url(#nodeGlow)"/>
+      <circle r="8" fill="none" stroke="#8edcff" stroke-width="1.4"/>
+      <circle r="2" fill="#8edcff"/>
+      <text x="-22" y="4" text-anchor="end">Telegram intel</text>
+    </g>
+
+    <!-- source 3: Hyperliquid -->
+    <g transform="translate(80 200)">
+      <circle r="20" fill="url(#nodeGlow)"/>
+      <circle r="8" fill="none" stroke="#8edcff" stroke-width="1.4"/>
+      <circle r="2" fill="#8edcff"/>
+      <text x="-22" y="4" text-anchor="end">Hyperliquid</text>
+    </g>
+
+    <!-- source 4: Threat-intel -->
+    <g transform="translate(80 270)">
+      <circle r="18" fill="url(#nodeGlow)"/>
+      <circle r="8" fill="none" stroke="#8edcff" stroke-width="1.4"/>
+      <circle r="2" fill="#8edcff"/>
+      <text x="-22" y="4" text-anchor="end">Threat intel</text>
+    </g>
+
+    <!-- source 5: Cross-asset (offset slightly to balance) -->
+    <g transform="translate(160 320)">
+      <circle r="16" fill="url(#nodeGlow)"/>
+      <circle r="7" fill="none" stroke="#8edcff" stroke-width="1.4"/>
+      <circle r="2" fill="#8edcff"/>
+      <text x="-22" y="4" text-anchor="end">Cross-asset</text>
+    </g>
+  </g>
+
+  <!-- Central correlation hub -->
+  <g transform="translate(480 180)">
+    <!-- ambient glow rings -->
+    <circle r="120" fill="url(#hubCore)" opacity="0.55"/>
+    <circle r="78" fill="none" stroke="#1f2a47" stroke-width="1"/>
+    <circle r="58" fill="none" stroke="#6da5ff" stroke-width="1" opacity="0.4"/>
+    <circle r="38" fill="none" stroke="#8edcff" stroke-width="1.3" opacity="0.65"/>
+
+    <!-- octahedral hub mark (echoes the logo monogram) -->
+    <g>
+      <path d="M0,-26 L26,0 L0,26 L-26,0 Z" fill="#0b1220" stroke="#8edcff" stroke-width="1.6" stroke-linejoin="miter"/>
+      <path d="M-26,0 L0,-10 L26,0 L0,10 Z" fill="#6da5ff" opacity="0.35"/>
+      <path d="M0,-26 L0,26 M-26,0 L26,0" stroke="#6da5ff" stroke-width="0.7" opacity="0.5"/>
+      <circle r="2.5" fill="#8edcff"/>
+    </g>
+
+    <!-- label -->
+    <text y="98" text-anchor="middle"
+          font-family="-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Helvetica, Arial, sans-serif"
+          font-size="11" fill="#e6ecff" letter-spacing="2">
+      CORRELATION HUB
+    </text>
+  </g>
+
+  <!-- Input flow lines (sources -> hub) -->
+  <g fill="none" stroke="url(#flowIn)" stroke-width="1.6" stroke-linecap="round">
+    <path d="M100 60 Q280 60 460 170"/>
+    <path d="M100 130 Q280 140 458 175"/>
+    <path d="M100 200 Q280 195 458 185"/>
+    <path d="M100 270 Q280 250 458 195"/>
+    <path d="M180 320 Q300 280 462 200"/>
+  </g>
+
+  <!-- subtle data tick marks along input flows -->
+  <g fill="#8edcff" opacity="0.7">
+    <circle cx="220" cy="78" r="1.5"/>
+    <circle cx="320" cy="100" r="1.5"/>
+    <circle cx="220" cy="138" r="1.5"/>
+    <circle cx="350" cy="158" r="1.5"/>
+    <circle cx="240" cy="200" r="1.5"/>
+    <circle cx="360" cy="190" r="1.5"/>
+    <circle cx="240" cy="262" r="1.5"/>
+    <circle cx="360" cy="218" r="1.5"/>
+    <circle cx="280" cy="290" r="1.5"/>
+    <circle cx="380" cy="234" r="1.5"/>
+  </g>
+
+  <!-- Output flow: narrative thesis stream to the right -->
+  <g fill="none" stroke="url(#flowOut)" stroke-width="2.2" stroke-linecap="round">
+    <path d="M520 175 Q650 160 820 130"/>
+    <path d="M522 185 Q660 195 870 185"/>
+    <path d="M520 195 Q640 220 820 240"/>
+  </g>
+
+  <!-- Output node: narrative thesis -->
+  <g transform="translate(870 180)"
+     font-family="-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Helvetica, Arial, sans-serif"
+     font-size="11" fill="#e6ecff" letter-spacing="0.5">
+    <circle r="28" fill="url(#nodeGlow)"/>
+    <rect x="-14" y="-14" width="28" height="28" rx="3" fill="#0b1220" stroke="#8edcff" stroke-width="1.4"/>
+    <path d="M-9 -7 h18 M-9 -2 h18 M-9 3 h12 M-9 8 h14"
+          stroke="#8edcff" stroke-width="1" stroke-linecap="round" fill="none"/>
+    <text x="38" y="-4" fill="#aab4d4">Narrative</text>
+    <text x="38" y="10">thesis</text>
+  </g>
+
+  <!-- Footer caption -->
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Helvetica, Arial, sans-serif"
+     font-size="10" fill="#aab4d4" letter-spacing="3">
+    <text x="40" y="345">SAPPHIRE OS</text>
+    <text x="920" y="345" text-anchor="end">SIGNAL FLOW v0.1</text>
+  </g>
+</svg>

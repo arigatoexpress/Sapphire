@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <title>Adversarial defense</title>
+  <!-- shield with central check / signal -->
+  <path d="M16 4 l10 4 v8 q0 8 -10 12 q-10 -4 -10 -12 v-8 z"/>
+  <path d="M11 16 l4 4 l6 -8"/>
+</svg>

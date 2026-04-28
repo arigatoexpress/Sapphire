@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <title>Event impact</title>
+  <!-- impulse spike radiating outward -->
+  <path d="M4 22 h8 l2 -10 l3 16 l3 -12 l2 6 h6"/>
+  <circle cx="16" cy="16" r="11" opacity="0.35"/>
+</svg>

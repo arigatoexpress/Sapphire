@@ -6,6 +6,14 @@
 <meta name="robots" content="noindex,nofollow">
 <title>Sapphire OS — Acquirer Brief 0.1.0</title>
 <meta name="description" content="Sapphire OS: production-graded autonomy control plane. Acquirer brief covering Wave 4 + Tranche 2 surfaces, safety posture, and the diligence packet.">
+<link rel="icon" href="assets/branding/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="assets/branding/favicon.ico" type="image/x-icon">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Sapphire OS — Multi-modal Intelligence Platform">
+<meta property="og:description" content="Built for acquirers, ready for production diligence.">
+<meta property="og:image" content="https://sapphirealpha.xyz/web/acquirer/assets/branding/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://sapphirealpha.xyz/web/acquirer/assets/branding/og-image.png">
 <link rel="stylesheet" href="assets/styles.css">
 </head>
 <body>
@@ -13,7 +21,14 @@
 
 <header class="site-header">
   <div class="brand">
-    <span class="brand-mark" aria-hidden="true">[S]</span>
+    <svg class="brand-mark" viewBox="0 0 32 32" width="20" height="20" aria-hidden="true" focusable="false">
+      <g transform="translate(16 16)">
+        <path d="M0,-10 L10,0 L0,10 L-10,0 Z" fill="none" stroke="#8edcff" stroke-width="1.6" stroke-linejoin="miter"/>
+        <path d="M-10,0 L0,-4 L10,0 L0,4 Z" fill="#6da5ff" opacity="0.35"/>
+        <path d="M0,-10 L0,10 M-10,0 L10,0" stroke="#6da5ff" stroke-width="0.7" opacity="0.55"/>
+        <circle r="1.6" fill="#8edcff"/>
+      </g>
+    </svg>
     <span class="brand-name">Sapphire OS</span>
     <span class="brand-version">Acquirer Brief 0.1.0</span>
   </div>
@@ -29,6 +44,84 @@
 
 <main>
 <section id="mission" class="section">
+  <figure class="hero-illustration" aria-labelledby="hero-title">
+    <svg viewBox="0 0 960 360" width="100%" height="auto" role="img" aria-labelledby="hero-title hero-desc" preserveAspectRatio="xMidYMid meet">
+      <title id="hero-title">Sapphire signal-flow architecture</title>
+      <desc id="hero-desc">Five upstream intelligence sources (TradingView, Telegram, Hyperliquid, Threat-intel, Cross-asset) converge on a central correlation hub, which emits a narrative-thesis output stream.</desc>
+      <defs>
+        <pattern id="hero-grid" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M40 0 L0 0 L0 40" fill="none" stroke="#1f2a47" stroke-width="0.5" opacity="0.6"/>
+        </pattern>
+        <radialGradient id="hero-hubCore" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#8edcff" stop-opacity="0.85"/>
+          <stop offset="60%" stop-color="#6da5ff" stop-opacity="0.30"/>
+          <stop offset="100%" stop-color="#6da5ff" stop-opacity="0"/>
+        </radialGradient>
+        <linearGradient id="hero-flowIn" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#6da5ff" stop-opacity="0.25"/>
+          <stop offset="100%" stop-color="#8edcff" stop-opacity="0.95"/>
+        </linearGradient>
+        <linearGradient id="hero-flowOut" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#8edcff" stop-opacity="0.95"/>
+          <stop offset="100%" stop-color="#8edcff" stop-opacity="0.10"/>
+        </linearGradient>
+        <radialGradient id="hero-nodeGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#8edcff" stop-opacity="0.6"/>
+          <stop offset="100%" stop-color="#6da5ff" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <rect width="960" height="360" fill="#0b1220"/>
+      <rect width="960" height="360" fill="url(#hero-grid)"/>
+      <g font-family="-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#aab4d4" letter-spacing="0.5">
+        <g transform="translate(80 60)"><circle r="20" fill="url(#hero-nodeGlow)"/><circle r="8" fill="none" stroke="#8edcff" stroke-width="1.4"/><circle r="2" fill="#8edcff"/><text x="-22" y="-22" text-anchor="end">TradingView</text></g>
+        <g transform="translate(80 130)"><circle r="18" fill="url(#hero-nodeGlow)"/><circle r="8" fill="none" stroke="#8edcff" stroke-width="1.4"/><circle r="2" fill="#8edcff"/><text x="-22" y="4" text-anchor="end">Telegram intel</text></g>
+        <g transform="translate(80 200)"><circle r="20" fill="url(#hero-nodeGlow)"/><circle r="8" fill="none" stroke="#8edcff" stroke-width="1.4"/><circle r="2" fill="#8edcff"/><text x="-22" y="4" text-anchor="end">Hyperliquid</text></g>
+        <g transform="translate(80 270)"><circle r="18" fill="url(#hero-nodeGlow)"/><circle r="8" fill="none" stroke="#8edcff" stroke-width="1.4"/><circle r="2" fill="#8edcff"/><text x="-22" y="4" text-anchor="end">Threat intel</text></g>
+        <g transform="translate(160 320)"><circle r="16" fill="url(#hero-nodeGlow)"/><circle r="7" fill="none" stroke="#8edcff" stroke-width="1.4"/><circle r="2" fill="#8edcff"/><text x="-22" y="4" text-anchor="end">Cross-asset</text></g>
+      </g>
+      <g transform="translate(480 180)">
+        <circle r="120" fill="url(#hero-hubCore)" opacity="0.55"/>
+        <circle r="78" fill="none" stroke="#1f2a47" stroke-width="1"/>
+        <circle r="58" fill="none" stroke="#6da5ff" stroke-width="1" opacity="0.4"/>
+        <circle r="38" fill="none" stroke="#8edcff" stroke-width="1.3" opacity="0.65"/>
+        <path d="M0,-26 L26,0 L0,26 L-26,0 Z" fill="#0b1220" stroke="#8edcff" stroke-width="1.6" stroke-linejoin="miter"/>
+        <path d="M-26,0 L0,-10 L26,0 L0,10 Z" fill="#6da5ff" opacity="0.35"/>
+        <path d="M0,-26 L0,26 M-26,0 L26,0" stroke="#6da5ff" stroke-width="0.7" opacity="0.5"/>
+        <circle r="2.5" fill="#8edcff"/>
+        <text y="98" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#e6ecff" letter-spacing="2">CORRELATION HUB</text>
+      </g>
+      <g fill="none" stroke="url(#hero-flowIn)" stroke-width="1.6" stroke-linecap="round">
+        <path d="M100 60 Q280 60 460 170"/>
+        <path d="M100 130 Q280 140 458 175"/>
+        <path d="M100 200 Q280 195 458 185"/>
+        <path d="M100 270 Q280 250 458 195"/>
+        <path d="M180 320 Q300 280 462 200"/>
+      </g>
+      <g fill="#8edcff" opacity="0.7">
+        <circle cx="220" cy="78" r="1.5"/><circle cx="320" cy="100" r="1.5"/>
+        <circle cx="220" cy="138" r="1.5"/><circle cx="350" cy="158" r="1.5"/>
+        <circle cx="240" cy="200" r="1.5"/><circle cx="360" cy="190" r="1.5"/>
+        <circle cx="240" cy="262" r="1.5"/><circle cx="360" cy="218" r="1.5"/>
+        <circle cx="280" cy="290" r="1.5"/><circle cx="380" cy="234" r="1.5"/>
+      </g>
+      <g fill="none" stroke="url(#hero-flowOut)" stroke-width="2.2" stroke-linecap="round">
+        <path d="M520 175 Q650 160 820 130"/>
+        <path d="M522 185 Q660 195 870 185"/>
+        <path d="M520 195 Q640 220 820 240"/>
+      </g>
+      <g transform="translate(870 180)" font-family="-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#e6ecff" letter-spacing="0.5">
+        <circle r="28" fill="url(#hero-nodeGlow)"/>
+        <rect x="-14" y="-14" width="28" height="28" rx="3" fill="#0b1220" stroke="#8edcff" stroke-width="1.4"/>
+        <path d="M-9 -7 h18 M-9 -2 h18 M-9 3 h12 M-9 8 h14" stroke="#8edcff" stroke-width="1" stroke-linecap="round" fill="none"/>
+        <text x="38" y="-4" fill="#aab4d4">Narrative</text>
+        <text x="38" y="10">thesis</text>
+      </g>
+      <g font-family="-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#aab4d4" letter-spacing="3">
+        <text x="40" y="345">SAPPHIRE OS</text>
+        <text x="920" y="345" text-anchor="end">SIGNAL FLOW v0.1</text>
+      </g>
+    </svg>
+  </figure>
   <h1>Sapphire is a production-graded autonomy control plane.</h1>
   <p class="lede">
     Sapphire turns one operator, owned local compute, and strict safety gates into an auditable
@@ -53,7 +146,10 @@
 
     <article class="card">
       <header class="card-head">
-        <h3>1. Risk Kernel public surface</h3>
+        <div class="card-title-row">
+          <svg class="capability-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M16 4 l10 4 v8 q0 8 -10 12 q-10 -4 -10 -12 v-8 z"/><path d="M11 16 l4 4 l6 -8"/></svg>
+          <h3>1. Risk Kernel public surface</h3>
+        </div>
         <span class="card-pr">PR #331</span>
       </header>
       <p>
@@ -79,7 +175,10 @@
 
     <article class="card">
       <header class="card-head">
-        <h3>2. Provenance envelopes</h3>
+        <div class="card-title-row">
+          <svg class="capability-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 4 h12 l4 4 v18 a2 2 0 0 1 -2 2 h-14 a2 2 0 0 1 -2 -2 v-20 a2 2 0 0 1 2 -2 z"/><path d="M20 4 v4 h4"/><circle cx="16" cy="20" r="3.2"/><path d="M14 22.8 l-1.6 4 l3.6 -2 l3.6 2 l-1.6 -4"/></svg>
+          <h3>2. Provenance envelopes</h3>
+        </div>
         <span class="card-pr">PR #334</span>
       </header>
       <p>
@@ -106,7 +205,10 @@
 
     <article class="card">
       <header class="card-head">
-        <h3>3. Vertex eval harness</h3>
+        <div class="card-title-row">
+          <svg class="capability-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 11 q4 -6 8 0 t8 0"/><path d="M3 21 q4 6 8 0 t8 0"/><circle cx="24" cy="16" r="3.2"/><path d="M19 16 h2"/><path d="M27.2 16 h2"/></svg>
+          <h3>3. Vertex eval harness</h3>
+        </div>
         <span class="card-pr">PR #372</span>
       </header>
       <p>
@@ -132,7 +234,10 @@
 
     <article class="card">
       <header class="card-head">
-        <h3>4. Telegram operator console</h3>
+        <div class="card-title-row">
+          <svg class="capability-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="9" cy="11" r="3"/><circle cx="23" cy="21" r="3"/><path d="M11.2 13.2 l9.6 5.6"/><path d="M9 14 v9"/><path d="M23 9 v9" opacity="0.35"/><path d="M5 23 h8"/><path d="M19 9 h8" opacity="0.35"/></svg>
+          <h3>4. Telegram operator console</h3>
+        </div>
         <span class="card-pr">PR #373</span>
       </header>
       <p>
@@ -158,7 +263,10 @@
 
     <article class="card">
       <header class="card-head">
-        <h3>5. Threat-intel + customer-dossier dashboards</h3>
+        <div class="card-title-row">
+          <svg class="capability-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 22 h8 l2 -10 l3 16 l3 -12 l2 6 h6"/><circle cx="16" cy="16" r="11" opacity="0.35"/></svg>
+          <h3>5. Threat-intel + customer-dossier dashboards</h3>
+        </div>
         <span class="card-pr">PR #374</span>
       </header>
       <p>
@@ -183,7 +291,10 @@
 
     <article class="card">
       <header class="card-head">
-        <h3>6. BigQuery vector retrieval</h3>
+        <div class="card-title-row">
+          <svg class="capability-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 8 h8"/><path d="M4 16 h6"/><path d="M4 24 h8"/><path d="M12 8 q6 0 8 8 q-2 8 -8 8"/><path d="M10 16 q4 0 10 0"/><path d="M22 12 v8"/><path d="M26 10 v12"/></svg>
+          <h3>6. BigQuery vector retrieval</h3>
+        </div>
         <span class="card-pr">PR #376</span>
       </header>
       <p>
@@ -208,7 +319,10 @@
 
     <article class="card">
       <header class="card-head">
-        <h3>7. Telegram channel intel reader</h3>
+        <div class="card-title-row">
+          <svg class="capability-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="16" cy="16" r="11"/><path d="M5 16 h22"/><path d="M16 5 q6 5.5 0 22 q-6 -16.5 0 -22"/><path d="M7 9 q9 4 18 0"/><path d="M7 23 q9 -4 18 0"/></svg>
+          <h3>7. Telegram channel intel reader</h3>
+        </div>
         <span class="card-pr">PR #388</span>
       </header>
       <p>
@@ -233,7 +347,10 @@
 
     <article class="card">
       <header class="card-head">
-        <h3>8. Hyperliquid public feed</h3>
+        <div class="card-title-row">
+          <svg class="capability-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M16 4 l11 5 l-11 5 l-11 -5 z"/><path d="M5 14 l11 5 l11 -5"/><path d="M5 20 l11 5 l11 -5"/></svg>
+          <h3>8. Hyperliquid public feed</h3>
+        </div>
         <span class="card-pr">PR #389</span>
       </header>
       <p>
@@ -258,7 +375,10 @@
 
     <article class="card card-wide">
       <header class="card-head">
-        <h3>9. Diligence pages: sovereign-thesis story + /diligence aggregate</h3>
+        <div class="card-title-row">
+          <svg class="capability-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 6 v22 h24"/><path d="M4 6 h24" opacity="0.35"/><path d="M16 6 v22" opacity="0.35"/><path d="M6 24 q5 -2 10 -8 t10 -10"/><path d="M6 10 q5 2 10 8 t10 6"/><circle cx="16" cy="16" r="1.5"/></svg>
+          <h3>9. Diligence pages: sovereign-thesis story + /diligence aggregate</h3>
+        </div>
         <span class="card-pr">PR #386</span>
       </header>
       <p>

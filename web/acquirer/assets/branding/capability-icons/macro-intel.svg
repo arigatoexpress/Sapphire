@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <title>Macro intelligence</title>
+  <!-- globe with longitudes + indicator pin -->
+  <circle cx="16" cy="16" r="11"/>
+  <path d="M5 16 h22"/>
+  <path d="M16 5 q6 5.5 0 22 q-6 -16.5 0 -22"/>
+  <path d="M7 9 q9 4 18 0"/>
+  <path d="M7 23 q9 -4 18 0"/>
+</svg>
