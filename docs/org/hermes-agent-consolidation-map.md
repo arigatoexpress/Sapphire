@@ -70,3 +70,20 @@ explicit decisions is made:
 The next non-overlapping Wave 3 task is a command-surface audit of the 15
 Sapphire Hermes skills, with each skill labeled `read_only`, `local_mutating`,
 `external_mutating`, or `production_adjacent`.
+
+## Runtime Readiness Probe
+
+Sapphire now tracks the live/runtime distinction with
+`scripts/ops/hermes_runtime_readiness.py` and the
+`hermes_runtime_quick_exec_guard` production-readiness surface. The probe is
+read-only and reports whether the running `ai.hermes.gateway` checkout has the
+Sapphire confirmation-reply patch, quick-command `exec` CommandGuard patch, and
+`SAPPHIRE_REPO_PATH` LaunchAgent environment needed to make the guard active.
+
+Use this probe before any Hermes runtime promotion, restart, skill rewrite, or
+Telegram command expansion:
+
+```bash
+make hermes-runtime-readiness PY=python3
+make production-readiness-artifact PY=python3
+```

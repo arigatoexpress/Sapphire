@@ -34,6 +34,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import google_production_test_readiness
+import hermes_runtime_readiness
 import org_status
 import routine_soak_status
 import safety_status_report
@@ -181,6 +182,7 @@ def collect_matrix(
     surfaces.extend(git_surfaces(runner))
     surfaces.extend(local_ci_surfaces(ci_report_dir or ROOT / "data" / "ci"))
     surfaces.extend(org_surfaces(external=False))
+    surfaces.extend(hermes_surfaces())
     surfaces.extend(safety_surfaces())
     surfaces.extend(media_surfaces())
 
@@ -341,6 +343,34 @@ def org_surfaces(*, external: bool) -> list[dict[str, Any]]:
         ),
     ]
     return surfaces
+
+
+def hermes_surfaces() -> list[dict[str, Any]]:
+    report = hermes_runtime_readiness.collect_readiness()
+    required = report.get("required_runtime_controls", {})
+    quick = report.get("quick_commands", {})
+    status = report.get("status")
+    if status == "fail":
+        matrix_status = "fail"
+    elif status == "pass":
+        matrix_status = "pass"
+    else:
+        matrix_status = "warn"
+    evidence = (
+        f"runtime_guard={'yes' if required.get('runtime_quick_exec_command_guard') else 'no'}, "
+        f"sapphire_repo_path_env={'yes' if required.get('launchagent_sapphire_repo_path_env') else 'no'}, "
+        f"exec_quick={quick.get('exec_quick_command_count', 0)}, "
+        f"prod_adjacent_exec={quick.get('production_adjacent_exec_count', 0)}"
+    )
+    return [
+        surface(
+            "hermes_runtime_quick_exec_guard",
+            "agents",
+            matrix_status,
+            evidence,
+            str(report.get("next_action") or "Keep Hermes quick exec gated through Sapphire CommandGuard."),
+        )
+    ]
 
 
 def safety_surfaces() -> list[dict[str, Any]]:
