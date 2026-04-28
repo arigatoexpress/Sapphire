@@ -1,7 +1,7 @@
 # Sapphire OS — Investor / Corp-Dev Pitch Deck
 
 **File:** `sapphire-pitch-deck-2026-04-29.pptx` (alongside this README)
-**Build SHA:** `9074c408`
+**Source base SHA:** `67e7c0d4`
 **Build date:** 2026-04-29
 **Default audience:** Palantir Foundry corp-dev (renders cleanly for Robinhood
 Cortex or a specialty acquirer with one slide swap — see Slide 8).
@@ -12,8 +12,8 @@ Cortex or a specialty acquirer with one slide swap — see Slide 8).
 ## What this is
 
 A 12–14-slide acquisition-grade summary of the Sapphire OS diligence packet
-(`docs/diligence/00` through `09-*.md`), the 14 productized surfaces under
-`docs/products/*-{0.1.0,0.2.0}.md`, the kill-switch invariants
+(`docs/diligence/00` through `09-*.md`), the packaged product surfaces under
+`docs/products/`, the kill-switch invariants
 (`docs/security/kill-switch-invariants.md`), the live-trading ramp memo
 (`docs/products/live-trading-ramp-memo.md`), and the competitive landscape
 research (`docs/competitive/landscape-2026-04-28.md`). It is intended for a
@@ -48,11 +48,9 @@ underlying packet.
 - **Stock automation remains blocked.** No official Robinhood equities API
   exists; Slide 9 says so plainly.
 - **Team slide is brief by design.** Operator edits the team page after build.
-- **5,304 tests** is the current count from `scripts/ops/test_inventory.py
-  --check-readme` on 2026-04-28 (4,928 unit + 376 plugin). `CLAUDE.md` notes
-  5,281 from a 2026-04-28 verification snapshot — both are correct snapshots
-  of the same tree at slightly different moments. The deck uses the more
-  recent number.
+- **5,366 tests** is the current count from `scripts/ops/test_inventory.py
+  --check-readme` on 2026-04-28 (4,988 unit + 378 plugin). The deck uses this
+  current inventory snapshot instead of the older `CLAUDE.md` summary.
 
 ## How to render the deck
 
@@ -78,8 +76,8 @@ Slide 8 (`Why Palantir Foundry corp-dev`) is the only audience-specific slide.
 Open `sapphire-pitch-deck-2026-04-29.pptx` in Keynote / PowerPoint and replace
 the three card titles + bodies with the appropriate audience pitch. The
 generator script's `slide_why_audience()` function in
-`/tmp/sapphire-deck-build/build_deck.py` (preserved in the worktree under
-the same path) is the canonical source if a fresh render is preferred.
+`scripts/diligence/build_pitch_deck.py` is the canonical source if a fresh
+render is preferred.
 
 For Robinhood Cortex, lift the alternate framing from the speaker-notes panel
 on Slide 8 (paraphrased: broker-agnostic risk explanation that respects
@@ -92,17 +90,20 @@ ramp discipline that mirrors Cortex's careful insight-vs-execution split).
   line. The notes panel is included in the file size — open the deck, choose
   "Notes view" or "Notes" in your viewer of choice.
 - The sidecar JSON file at `sapphire-pitch-deck-2026-04-29.pptx.envelope.json`
-  records `payload_hash`, `source_hashes` for the 22 source files, generator
-  identity, and operator metadata.
-- Build inputs at HEAD `9074c408`:
+  records `payload_hash`, current `source_hashes`, generator identity, and
+  operator metadata.
+- Build inputs at source base `67e7c0d4`:
   - `docs/diligence/00-09` (10 files)
-  - `docs/products/{risk-kernel,provenance-envelopes,foundry-ontology,
-    signal-correlator,narrative-synthesis,threat-intel-product,
-    customer-dossier,live-trading-ramp-memo}.md` (8 files)
+  - `docs/products/*.md`
   - `docs/security/kill-switch-invariants.md`
   - `docs/competitive/landscape-2026-04-28.md`
+  - `docs/brand/README.md`
   - `CLAUDE.md`
   - `web/acquirer/index.html`
+  - `web/acquirer/assets/styles.css`
+  - `web/acquirer/assets/branding/brand-guidelines.md`
+  - `web/acquirer/assets/branding/logo-dark-bg.png`
+  - `scripts/diligence/build_pitch_deck*.py`
 - Visual identity mirrors the acquirer microsite palette
   (`web/acquirer/assets/styles.css`): `#0b1220` deep navy, `#6da5ff` sapphire
   accent, `#e6ecff` ice text.

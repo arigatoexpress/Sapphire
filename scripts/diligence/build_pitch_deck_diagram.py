@@ -5,10 +5,11 @@ Output: /tmp/sapphire-deck-build/architecture.png at 1600x900 (16:9 friendly).
 """
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 import matplotlib.pyplot as plt
-from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
-from matplotlib.path import Path
-import matplotlib.patches as mpatches
+from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 
 # Palette (from web/acquirer/assets/styles.css)
 BG = "#0b1220"
@@ -53,6 +54,10 @@ def draw_arrow(ax, x1, y1, x2, y2, color=ACCENT, width=1.2, style="-|>"):
 
 
 def main():
+    out_dir = Path(os.environ.get("OUT_DIR", "/tmp/sapphire-deck-build"))
+    out_dir.mkdir(parents=True, exist_ok=True)
+    output_path = out_dir / "architecture.png"
+
     fig, ax = plt.subplots(figsize=(16, 9), dpi=140)
     fig.patch.set_facecolor(BG)
     ax.set_facecolor(BG)
@@ -162,10 +167,10 @@ def main():
         draw_arrow(ax, 9.45, 1.78, out_x - 0.05, y, color=ACCENT, width=0.8)
 
     plt.tight_layout()
-    plt.savefig("/tmp/sapphire-deck-build/architecture.png",
+    plt.savefig(output_path,
                 dpi=140, facecolor=BG, edgecolor="none", bbox_inches="tight",
                 pad_inches=0.15)
-    print("WROTE /tmp/sapphire-deck-build/architecture.png")
+    print(f"WROTE {output_path}")
 
 
 if __name__ == "__main__":
