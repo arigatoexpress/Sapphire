@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from lib.core.provenance import verify
+from lib.core.provenance import sidecar_path, verify
 from services.telegram_intel.models import ChannelConfig, ClassificationResult, RawMessage
 from services.telegram_intel.quality_filter import quality_filter
 from services.telegram_intel.sink import TelegramIntelSink, build_record, canonical_message_id
@@ -75,6 +75,26 @@ def test_sink_writes_daily_jsonl(tmp_path: Path) -> None:
     assert result.written == 1
     assert result.path == tmp_path / "2026-04-28" / "messages.jsonl"
     assert result.path.exists()
+
+
+def test_sink_writes_file_level_envelope_sidecar(tmp_path: Path) -> None:
+    sink = TelegramIntelSink(tmp_path)
+    result = sink.write_records([_record()], when=datetime(2026, 4, 28, tzinfo=UTC))
+    sidecar = sidecar_path(result.path)
+    envelope = json.loads(sidecar.read_text(encoding="utf-8"))
+    assert verify(envelope) is True
+    assert envelope["artifact_path"].endswith("messages.jsonl")
+    assert envelope["provenance"]["generator"] == "services.telegram_intel.reader"
+
+
+def test_sink_updates_file_level_envelope_after_append(tmp_path: Path) -> None:
+    sink = TelegramIntelSink(tmp_path)
+    first = sink.write_records([_record("1")], when=datetime(2026, 4, 28, tzinfo=UTC))
+    first_envelope = json.loads(sidecar_path(first.path).read_text(encoding="utf-8"))
+    sink.write_records([_record("2")], when=datetime(2026, 4, 28, tzinfo=UTC))
+    second_envelope = json.loads(sidecar_path(first.path).read_text(encoding="utf-8"))
+    assert second_envelope["artifact_sha256"] != first_envelope["artifact_sha256"]
+    assert verify(second_envelope) is True
 
 
 def test_sink_deduplicates_existing_records(tmp_path: Path) -> None:

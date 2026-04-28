@@ -25,11 +25,11 @@ GENERATOR = "services.telegram_intel.reader"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-def _load_provenance() -> tuple[Any, Any]:
+def _load_provenance() -> tuple[Any, Any, Any]:
     try:
-        from lib.core.provenance import stamp, verify
+        from lib.core.provenance import stamp, verify, write_envelope_sidecar
 
-        return stamp, verify
+        return stamp, verify, write_envelope_sidecar
     except ModuleNotFoundError:
         spec = importlib.util.spec_from_file_location(
             "sapphire_core_provenance",
@@ -40,10 +40,10 @@ def _load_provenance() -> tuple[Any, Any]:
         module = importlib.util.module_from_spec(spec)
         sys.modules.setdefault("sapphire_core_provenance", module)
         spec.loader.exec_module(module)
-        return module.stamp, module.verify
+        return module.stamp, module.verify, module.write_envelope_sidecar
 
 
-stamp, verify = _load_provenance()
+stamp, verify, write_envelope_sidecar = _load_provenance()
 
 
 @dataclass(frozen=True)
@@ -145,6 +145,17 @@ class TelegramIntelSink:
                 handle.write(json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n")
                 seen.add(canonical_id)
                 written += 1
+        if path.exists():
+            write_envelope_sidecar(
+                path,
+                generator=GENERATOR,
+                source_paths=(Path(__file__),),
+                metadata={
+                    "artifact_type": "telegram_intel_daily_jsonl",
+                    "written": written,
+                    "duplicates": duplicates,
+                },
+            )
         return SinkWriteResult(path=path, written=written, duplicates=duplicates)
 
     def recent(self, *, limit: int = 20) -> list[dict[str, Any]]:
