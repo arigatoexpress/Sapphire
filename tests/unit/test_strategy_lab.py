@@ -78,6 +78,40 @@ def test_order_drafts_never_enable_execution():
     assert venues["hyperliquid"]["payload"]["requires_wallet_signature"] is True
     assert venues["hyperliquid"]["payload"]["coin"] == "BTC"
     assert venues["robinhood_crypto"]["payload"]["symbol"] == "BTC-USD"
+    assert venues["robinhood_crypto"]["payload"]["endpoint"] == "/api/v2/crypto/trading/orders/"
+    assert venues["robinhood_crypto"]["payload"]["body_template"]["type"] == "limit"
+    assert (
+        venues["robinhood_crypto"]["payload"]["body_template"]["limit_order_config"]["quote_amount"]
+        == "<usd_quote_amount_after_live_test_cap>"
+    )
+    assert (
+        venues["robinhood_crypto"]["payload"]["live_test_caps"]["first_order_max_notional_usd"]
+        == 5.0
+    )
+    assert (
+        venues["robinhood_crypto"]["payload"]["live_test_caps"]["requested_exceeds_first_order_cap"]
+        is True
+    )
+
+
+def test_robinhood_sell_draft_requires_position_quantity():
+    drafts = lab.build_order_drafts("BTC", "sell", notional_usd=3.0, strategy="unit")
+    robinhood = {draft["venue"]: draft for draft in drafts}["robinhood_crypto"]
+
+    config = robinhood["payload"]["body_template"]["limit_order_config"]
+    assert robinhood["payload"]["side"] == "sell"
+    assert "asset_quantity" in config
+    assert "quote_amount" not in config
+    assert robinhood["payload"]["live_test_caps"]["requested_exceeds_first_order_cap"] is False
+
+
+def test_robinhood_hold_draft_has_no_order_body():
+    drafts = lab.build_order_drafts("BTC", "hold", notional_usd=3.0, strategy="unit")
+    robinhood = {draft["venue"]: draft for draft in drafts}["robinhood_crypto"]
+
+    assert robinhood["payload"]["side"] == "hold"
+    assert "body_template" not in robinhood["payload"]
+    assert "blocked_reason" in robinhood["payload"]
 
 
 def test_strategy_lab_report_keeps_live_trading_off(monkeypatch):
@@ -89,3 +123,8 @@ def test_strategy_lab_report_keeps_live_trading_off(monkeypatch):
     assert report["safety"]["execution_stage"] == "paper"
     assert "TRADINGVIEW_EXECUTION_ENABLED=false" in report["safety"]["guards"]
     assert report["tradingview"]["broker_rest_endpoints"][0] == "/config"
+    assert report["real_funds_readiness"]["stage"] == "draft_ready_not_submit_ready"
+    assert report["real_funds_readiness"]["crypto"]["first_order_max_notional_usd"] == 5.0
+    assert (
+        report["real_funds_readiness"]["stocks"]["official_public_trading_api_identified"] is False
+    )

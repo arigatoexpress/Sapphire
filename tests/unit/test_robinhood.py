@@ -176,9 +176,7 @@ class TestSignRequest:
         assert headers["Accept"] == "application/json"
         assert headers["Content-Type"] == "application/json"
 
-        message = (
-            f"{_TEST_API_KEY}1700000000/api/v2/crypto/trading/accounts/GET"
-        ).encode()
+        message = (f"{_TEST_API_KEY}1700000000/api/v2/crypto/trading/accounts/GET").encode()
         _, public_key, _ = _test_keypair()
         public_key.verify(base64.b64decode(headers["x-signature"]), message)
 
@@ -384,6 +382,35 @@ class TestBestBidAsk:
     def test_empty_symbols_returns_empty(self, reader):
         assert reader._get_best_bid_ask([]) == {}
 
+    def test_averages_current_v2_inclusive_bid_and_ask(self, reader, monkeypatch):
+        monkeypatch.setattr(
+            reader,
+            "_request_json",
+            lambda *a, **k: {
+                "results": [
+                    {
+                        "symbol": "BTC-USD",
+                        "bid_inclusive_of_sell_spread": "99000",
+                        "ask_inclusive_of_buy_spread": "100000",
+                        "price": "99500",
+                    }
+                ],
+                "next": None,
+            },
+        )
+        assert reader._get_best_bid_ask(["BTC-USD"]) == {"BTC-USD": 99500.0}
+
+    def test_current_v2_mid_price_fallback(self, reader, monkeypatch):
+        monkeypatch.setattr(
+            reader,
+            "_request_json",
+            lambda *a, **k: {
+                "results": [{"symbol": "ETH-USD", "price": "3500.25"}],
+                "next": None,
+            },
+        )
+        assert reader._get_best_bid_ask(["ETH-USD"]) == {"ETH-USD": 3500.25}
+
     def test_averages_bid_and_ask(self, reader, monkeypatch):
         monkeypatch.setattr(
             reader,
@@ -519,10 +546,20 @@ class TestCostBasisReconstruction:
             reader,
             monkeypatch,
             [
-                _order(symbol="BTC-USD", side="buy", qty="2", price="100",
-                       created_at="2024-01-01T00:00:00Z"),
-                _order(symbol="BTC-USD", side="buy", qty="3", price="200",
-                       created_at="2024-02-01T00:00:00Z"),
+                _order(
+                    symbol="BTC-USD",
+                    side="buy",
+                    qty="2",
+                    price="100",
+                    created_at="2024-01-01T00:00:00Z",
+                ),
+                _order(
+                    symbol="BTC-USD",
+                    side="buy",
+                    qty="3",
+                    price="200",
+                    created_at="2024-02-01T00:00:00Z",
+                ),
             ],
         )
         cb = reader._reconstruct_cost_basis("ACC1")
@@ -535,10 +572,20 @@ class TestCostBasisReconstruction:
             reader,
             monkeypatch,
             [
-                _order(symbol="BTC-USD", side="buy", qty="5", price="100",
-                       created_at="2024-01-01T00:00:00Z"),
-                _order(symbol="BTC-USD", side="sell", qty="2", price="150",
-                       created_at="2024-02-01T00:00:00Z"),
+                _order(
+                    symbol="BTC-USD",
+                    side="buy",
+                    qty="5",
+                    price="100",
+                    created_at="2024-01-01T00:00:00Z",
+                ),
+                _order(
+                    symbol="BTC-USD",
+                    side="sell",
+                    qty="2",
+                    price="150",
+                    created_at="2024-02-01T00:00:00Z",
+                ),
             ],
         )
         cb = reader._reconstruct_cost_basis("ACC1")
@@ -576,10 +623,10 @@ class TestCostBasisReconstruction:
             reader,
             monkeypatch,
             [
-                _order(symbol="BTC-USD", side="buy", qty="0.5", price="100",
-                       state="partially_filled"),
-                _order(symbol="BTC-USD", side="buy", qty="1.5", price="200",
-                       state="filled"),
+                _order(
+                    symbol="BTC-USD", side="buy", qty="0.5", price="100", state="partially_filled"
+                ),
+                _order(symbol="BTC-USD", side="buy", qty="1.5", price="200", state="filled"),
             ],
         )
         cb = reader._reconstruct_cost_basis("ACC1")
@@ -594,10 +641,20 @@ class TestCostBasisReconstruction:
             reader,
             monkeypatch,
             [
-                _order(symbol="BTC-USD", side="sell", qty="1", price="200",
-                       created_at="2024-02-01T00:00:00Z"),
-                _order(symbol="BTC-USD", side="buy", qty="2", price="100",
-                       created_at="2024-01-01T00:00:00Z"),
+                _order(
+                    symbol="BTC-USD",
+                    side="sell",
+                    qty="1",
+                    price="200",
+                    created_at="2024-02-01T00:00:00Z",
+                ),
+                _order(
+                    symbol="BTC-USD",
+                    side="buy",
+                    qty="2",
+                    price="100",
+                    created_at="2024-01-01T00:00:00Z",
+                ),
             ],
         )
         cb = reader._reconstruct_cost_basis("ACC1")
@@ -613,8 +670,14 @@ class TestCostBasisReconstruction:
                 # qty=0 → skipped
                 _order(symbol="BTC-USD", side="buy", qty="0", price="100"),
                 # missing price → skipped
-                {"symbol": "BTC-USD", "side": "buy", "filled_asset_quantity": "1",
-                 "average_price": None, "state": "filled", "created_at": "2024-01-01"},
+                {
+                    "symbol": "BTC-USD",
+                    "side": "buy",
+                    "filled_asset_quantity": "1",
+                    "average_price": None,
+                    "state": "filled",
+                    "created_at": "2024-01-01",
+                },
                 # malformed symbol (no dash) → skipped
                 _order(symbol="BTCUSD", side="buy", qty="1", price="100"),
                 # unknown side → skipped
@@ -636,15 +699,17 @@ class TestGetAccount:
             reader,
             "_request_json",
             lambda *a, **k: {
-                "results": [{
-                    "account_number": "ACC1",
-                    "is_api_tradable": True,
-                    "status": "active",
-                    "account_type": "crypto",
-                    "buying_power": "1234.56",
-                    "buying_power_currency": "USD",
-                    "fee_tier_status": {"fee_ratio": "0.0025"},
-                }],
+                "results": [
+                    {
+                        "account_number": "ACC1",
+                        "is_api_tradable": True,
+                        "status": "active",
+                        "account_type": "crypto",
+                        "buying_power": "1234.56",
+                        "buying_power_currency": "USD",
+                        "fee_tier_status": {"fee_ratio": "0.0025"},
+                    }
+                ],
                 "next": None,
             },
         )
@@ -679,12 +744,23 @@ class TestGetHoldings:
             {"account_number": "ACC1", "is_api_tradable": True, "buying_power": "100"}
         ]
         holdings_payload = [
-            {"asset_code": "btc", "total_quantity": "2",
-             "quantity_available_for_trading": "2", "account_number": "ACC1"},
-            {"asset_code": "ETH", "total_quantity": "0",  # zero qty filtered out
-             "quantity_available_for_trading": "0", "account_number": "ACC1"},
-            {"asset_code": "", "total_quantity": "1",  # empty asset filtered out
-             "account_number": "ACC1"},
+            {
+                "asset_code": "btc",
+                "total_quantity": "2",
+                "quantity_available_for_trading": "2",
+                "account_number": "ACC1",
+            },
+            {
+                "asset_code": "ETH",
+                "total_quantity": "0",  # zero qty filtered out
+                "quantity_available_for_trading": "0",
+                "account_number": "ACC1",
+            },
+            {
+                "asset_code": "",
+                "total_quantity": "1",  # empty asset filtered out
+                "account_number": "ACC1",
+            },
         ]
         prices_payload = [{"symbol": "BTC-USD", "bid": "100", "ask": "200"}]
         orders_payload = [_order(symbol="BTC-USD", side="buy", qty="2", price="50")]
@@ -732,8 +808,12 @@ class TestGetHoldings:
         # uppercase `BTC-USD`. The reader must align them so price binds.
         accounts_payload = [{"account_number": "ACC1", "is_api_tradable": True}]
         holdings_payload = [
-            {"asset_code": "btc", "total_quantity": "1",
-             "quantity_available_for_trading": "1", "account_number": "ACC1"}
+            {
+                "asset_code": "btc",
+                "total_quantity": "1",
+                "quantity_available_for_trading": "1",
+                "account_number": "ACC1",
+            }
         ]
         prices_payload = [{"symbol": "BTC-USD", "bid": "1000", "ask": "1000"}]
 
@@ -769,8 +849,14 @@ class TestPortfolioShapes:
             reader,
             monkeypatch,
             holdings=[
-                {"asset_code": "BTC", "qty": 2.0, "price": 150.0,
-                 "avg_cost": 50.0, "market_value": 300.0, "total_return": 200.0},
+                {
+                    "asset_code": "BTC",
+                    "qty": 2.0,
+                    "price": 150.0,
+                    "avg_cost": 50.0,
+                    "market_value": 300.0,
+                    "total_return": 200.0,
+                },
             ],
             account={"source": "robinhood", "buying_power": 1000.0},
         )
