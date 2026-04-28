@@ -34,6 +34,8 @@ NOTIFY_DIR = ROOT / "plugins" / "claw-sapphire" / "tools"
 if str(NOTIFY_DIR) not in sys.path:
     sys.path.insert(0, str(NOTIFY_DIR))
 
+from lib.core.routine_pause import abort_if_paused  # noqa: E402
+
 log = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO,
@@ -869,6 +871,8 @@ def main() -> int:
 
 if __name__ == "__main__":
     import argparse
+
+    abort_if_paused("morning-brief")
 
     p = argparse.ArgumentParser()
     p.add_argument(

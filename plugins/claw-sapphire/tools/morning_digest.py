@@ -10,6 +10,8 @@ from typing import Any
 import dev_pulse
 from notify import send_alert
 
+from lib.core.routine_pause import abort_if_paused
+
 
 def run(*, dry_run: bool = False) -> dict[str, Any]:
     """Collect dev pulse state and send the rich morning digest to Telegram."""
@@ -33,6 +35,7 @@ def run(*, dry_run: bool = False) -> dict[str, Any]:
 
 
 def main() -> None:
+    abort_if_paused("morning-digest")
     parser = argparse.ArgumentParser(description="Send the Sapphire morning digest")
     parser.add_argument("--dry-run", action="store_true", help="Print the digest without sending")
     args = parser.parse_args()

@@ -27,7 +27,12 @@ from pathlib import Path
 
 log = logging.getLogger("telemetry_collector")
 
-ROOT = Path.home() / "Code" / "Sapphire"
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from lib.core.routine_pause import abort_if_paused  # noqa: E402
+
 DATA_DIR = ROOT / "data"
 METRICS_DIR = DATA_DIR / "metrics"
 HEALTH_DIR = DATA_DIR / "health"
@@ -177,6 +182,7 @@ def run(emit_metrics: bool = True, emit_health: bool = True) -> dict[str, int]:
 
 
 def main() -> int:
+    abort_if_paused("telemetry-collector")
     p = argparse.ArgumentParser()
     p.add_argument("--metrics", action="store_true", help="Only collect inference metrics")
     p.add_argument("--health", action="store_true", help="Only collect service health")

@@ -49,6 +49,7 @@ from lib.analytics.strategies import (
     save_results,
     sweep_params,
 )
+from lib.core.routine_pause import abort_if_paused  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -378,6 +379,7 @@ def run(
 
 
 if __name__ == "__main__":
+    abort_if_paused("backtest-weekly")
     p = argparse.ArgumentParser(description="Sapphire multi-strategy sweep runner")
     p.add_argument("--days", type=int, default=90, help="Lookback window (default: 90)")
     p.add_argument(

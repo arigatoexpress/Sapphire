@@ -109,10 +109,14 @@ fired (this is by design; see the threat model).
 | `/cancel-routine <name> CONFIRM` | Same as `/routines pause` but with the dangerous-action wording. | **Yes**. |
 
 Pause-flag mechanism: a file at `~/.sapphire/routine_pause/<name>` is
-written. Scheduled tasks check this file at startup and skip if present.
-The flag is owned by the operator's UID, mode `0644` by default. It
-contains an ISO-8601 UTC timestamp of the pause time — useful as an
-audit hint, but **never as authentication**.
+written. Versioned Python LaunchAgent entrypoints call
+`lib.core.routine_pause.abort_if_paused("<name>")` at startup, and
+prompt-driven Claude scheduled-task skills begin by checking the same
+flag path before any repo, cloud, Telegram, or data-writing work. When a
+flag is present, the routine logs a structured `routine_pause.skipped`
+message and exits successfully. The flag is owned by the operator's UID,
+mode `0644` by default. It contains an ISO-8601 UTC timestamp of the
+pause time — useful as an audit hint, but **never as authentication**.
 
 Routine names are validated against `^[A-Za-z0-9_\-]{1,64}$`. Anything
 with a path separator, shell metacharacter, or longer than 64 characters

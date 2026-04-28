@@ -968,6 +968,10 @@ def collect() -> MarketIntelSnapshot:
 if __name__ == "__main__":
     import argparse
 
+    from lib.core.routine_pause import abort_if_paused
+
+    abort_if_paused("market-intel")
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",

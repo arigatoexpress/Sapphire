@@ -8,8 +8,15 @@ Max size before rotation: 5MB.
 
 import gzip
 import shutil
+import sys
 from datetime import datetime
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from lib.core.routine_pause import abort_if_paused  # noqa: E402
 
 MAX_BYTES = 5 * 1024 * 1024  # 5 MB
 KEEP_COPIES = 3
@@ -51,6 +58,7 @@ def prune_old_rotations(log_dir: Path, stem: str) -> None:
 
 
 def main():
+    abort_if_paused("logrotate")
     print(f"[logrotate] {datetime.now().isoformat()}")
     for log_dir in LOG_DIRS:
         if not log_dir.exists():

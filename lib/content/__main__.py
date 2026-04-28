@@ -20,6 +20,7 @@ if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 from lib.content import publisher, report_generator, scheduler  # noqa: E402
+from lib.core.routine_pause import abort_if_paused  # noqa: E402
 
 GENERATORS = {
     "weekly_crypto_brief": report_generator.generate_weekly_crypto_brief,
@@ -38,6 +39,7 @@ def run_kind(kind: str) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
+    abort_if_paused("content-engine")
     ap = argparse.ArgumentParser(prog="lib.content")
     ap.add_argument("--kind", help="Generate a specific report kind")
     ap.add_argument("--all", action="store_true", help="Run every report kind")

@@ -25,6 +25,8 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from lib.core.routine_pause import abort_if_paused  # noqa: E402
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -157,6 +159,7 @@ def compute_score(secrets_count: int, vuln_count: int, threat_count: int) -> dic
 
 
 def main() -> int:
+    abort_if_paused("security-pipeline", log=log.info)
     log.info("Security pipeline starting for %s", TODAY)
 
     # 1. Secret scan
