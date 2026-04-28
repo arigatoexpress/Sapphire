@@ -2,7 +2,7 @@
 
 macOS LaunchAgent definitions for Sapphire background services and schedulers.
 
-Current inventory: 20 active plists in this directory, plus 1 disabled template (`com.sapphire.lumo-api.plist.disabled`). The 2026-04-21 audit folded in the production plists that had been running un-versioned on Ari's Mac — see `docs/archive/2026/audits/launchagents-audit-2026-04-21.md`. Some service-owned LaunchAgents live with their service code under `services/*/launchagent/`; this currently includes `services/dashboard/launchagent/com.sapphire.dashboard.plist`, `services/inference-proxy/launchagent/com.sapphire.inference-proxy.plist`, `services/pm_bot/launchagent/com.sapphire.pm-bot.plist`, and `services/service_supervisor/launchagent/com.sapphire.service-supervisor.plist`. The remaining Mac-only plists (cloudflare-tunnel, kronos-daily, regional-intel, hermes) are intentionally not versioned here; see the audit for why.
+Current inventory: 21 active plists in this directory, plus 1 disabled template (`com.sapphire.lumo-api.plist.disabled`). The 2026-04-21 audit folded in the production plists that had been running un-versioned on Ari's Mac — see `docs/archive/2026/audits/launchagents-audit-2026-04-21.md`. Some service-owned LaunchAgents live with their service code under `services/*/launchagent/`; this currently includes `services/dashboard/launchagent/com.sapphire.dashboard.plist`, `services/inference-proxy/launchagent/com.sapphire.inference-proxy.plist`, `services/pm_bot/launchagent/com.sapphire.pm-bot.plist`, and `services/service_supervisor/launchagent/com.sapphire.service-supervisor.plist`. The remaining Mac-only plists (cloudflare-tunnel, kronos-daily, regional-intel, hermes) are intentionally not versioned here; see the audit for why.
 
 ## Active Plists
 
@@ -27,6 +27,7 @@ Current inventory: 20 active plists in this directory, plus 1 disabled template 
 | `com.sapphire.signal-logger.plist` | TradingView webhook receiver / uvicorn on `:18081`. | KeepAlive |
 | `com.sapphire.telemetry-collector.plist` | Metric roll-up (`services/pipeline/telemetry_collector.py`). | every 5 min |
 | `com.sapphire.threat-refresh.plist` | Threat-intel feed refresh (`services/dashboard/refresh_threats.py`). | every 4 h |
+| `com.sapphire.trading-shadow-controller.plist` | Paper-shadow trading controller (`scripts/ops/trading_shadow_controller.py --output`); writes capped order candidates only, with no live submit path. | every 30 min |
 | `com.sapphire.tradingview-cdp.plist` | TradingView CDP bridge. | KeepAlive |
 
 ## Alpha Agent

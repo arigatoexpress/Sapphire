@@ -1,6 +1,6 @@
 # Sapphire OS — Routines Manifest
 
-Last updated: 2026-04-26
+Last updated: 2026-04-28
 
 Every automated routine in the Sapphire OS mesh. Single source of truth — if a job runs on a schedule, it is listed here with its schedule, owner process, output artifact, and recovery runbook. Anything not on this list should either be added or killed.
 
@@ -34,6 +34,7 @@ Check: `launchctl list | grep sapphire` — every row should show a PID (online)
 | `com.sapphire.threat-refresh`      | every 4h           | `services/dashboard/refresh_threats.py`     | `data/intelligence/YYYY-MM-DD/threats.json`                        | Manual: `python3 services/dashboard/refresh_threats.py`; check CISA/NVD reachability |
 | `com.sapphire.chain-refresh`       | every 15 min       | `services.pipeline.chain_refresh`           | `data/chain/chain_<ts>.json` + `data/intelligence/latest/chain.json` | Manual: `python3 -m services.pipeline.chain_refresh` |
 | `com.sapphire.correlation-refresh` | hourly at :17      | `services.pipeline.correlation_refresh`     | `data/intelligence/latest/correlations.json`                       | Manual: `python3 -m services.pipeline.correlation_refresh` |
+| `com.sapphire.trading-shadow-controller` | every 30 min | `scripts/ops/trading_shadow_controller.py --output` | `data/trading/shadow-controller-latest.json` | Manual paper-only run: `python3 scripts/ops/trading_shadow_controller.py --output`; no Robinhood credentials or `--execute` flag |
 | `com.sapphire.gcp-sync`            | hourly at :05      | `services.pipeline.gcp_sync`                | Uploads to `gs://sapphire-data-lake/raw/*`; Cloud Function loads BQ | Manual: `python3 -m services.pipeline.gcp_sync -v` |
 | `com.sapphire.logrotate`           | 03:30 CT daily     | `infra/logrotate.py`                        | `.gz` archives under `~/autonomy-status/logs/` and `~/.hermes/logs/` | Manual: `python3 infra/logrotate.py` |
 | `com.sapphire.backtest-weekly`      | Sat 22:00 local    | `python3 -m lib.analytics.run_strategies --days 90 --bankroll 10000` | `data/backtests/strategies/*.json`                                 | Remote shadow: `.github/workflows/weekly-backtest.yml`; keep local until artifacts soak clean |

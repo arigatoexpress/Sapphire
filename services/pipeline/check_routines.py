@@ -65,6 +65,10 @@ ROUTINES: list[Routine] = [
             launchagent="com.sapphire.correlation-refresh",
             artifact=str(DATA / "intelligence" / "latest" / "correlations.json"),
             max_age_secs=2 * 60 * 60),     # 1 h + buffer
+    Routine("trading-shadow-controller", "launchagent_scheduled",
+            launchagent="com.sapphire.trading-shadow-controller",
+            artifact=str(DATA / "trading" / "shadow-controller-latest.json"),
+            max_age_secs=2 * 60 * 60),     # 30 min + buffer
     Routine("gcp-sync",            "launchagent_scheduled",
             launchagent="com.sapphire.gcp-sync",
             artifact=str(DATA / ".gcp_sync_state.json"),
