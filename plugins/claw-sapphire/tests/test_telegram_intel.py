@@ -29,13 +29,17 @@ def _write_config(path: Path) -> Path:
     path.write_text(
         """
 defaults:
-  pull_limit_per_channel: 5
+  max_messages_per_poll: 5
   poll_interval_seconds: 60
+  min_quality_score: 0.45
+  min_message_length: 32
 channels:
-  - id: security
-    source: "@security_feed"
+  - id: "@security_feed"
+    category: security
+    weight: 1.0
     enabled: true
-    topics: [security]
+    backend: mtproto
+    notes: test channel
 """,
         encoding="utf-8",
     )
@@ -43,7 +47,7 @@ channels:
 
 
 def _seed_record(data_dir: Path) -> None:
-    channel = ChannelConfig(id="security", source="@security_feed", topics=("security",))
+    channel = ChannelConfig(id="@security_feed", source="@security_feed", category="security")
     message = RawMessage(
         channel_id="security",
         message_id="1",
@@ -95,7 +99,7 @@ def test_recent_action_reads_sink(tmp_path: Path) -> None:
         {"action": "recent", "data_dir": str(tmp_path / "data"), "limit": 1}
     )
     assert out["ok"] is True
-    assert out["records"][0]["channel"]["id"] == "security"
+    assert out["records"][0]["channel"]["id"] == "@security_feed"
 
 
 def test_pull_once_refuses_without_live_gate(tmp_path: Path) -> None:

@@ -1,10 +1,11 @@
-# Copy to infra/telegram_channels.yaml on the runtime host.
+# Copy to ~/.sapphire/telegram_channels.yaml on the runtime host.
 # Do not commit the real channel list if it reveals private sources.
 defaults:
   backend: mtproto
   poll_interval_seconds: 300
-  pull_limit_per_channel: 25
-  min_quality: 0.45
+  max_messages_per_poll: 25
+  min_quality_score: 0.45
+  min_message_length: 32
   data_dir: data/telegram_intel
 
 classifier:
@@ -12,16 +13,16 @@ classifier:
   model: balanced
 
 channels:
-  - id: security-research-example
-    source: "@example_security_channel"
-    label: Example Security Channel
+  - id: "@example_security_channel"
+    category: security
+    weight: 1.2
     enabled: false
     backend: mtproto
-    topics: [security, infra]
+    notes: "Public security research feed; copy real private notes only into ~/.sapphire."
 
-  - id: market-structure-example
-    source: "@example_market_channel"
-    label: Example Market Channel
+  - id: "@example_market_channel"
+    category: crypto
+    weight: 0.9
     enabled: false
-    backend: mtproto
-    topics: [markets, onchain]
+    backend: bot
+    notes: "Bot API reads channel posts only when the bot can see the channel."

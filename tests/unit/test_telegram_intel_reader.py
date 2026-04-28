@@ -16,7 +16,7 @@ from services.telegram_intel.backends import (
     MTProtoBackend,
     _matches_channel,
 )
-from services.telegram_intel.config import ConfigError, load_config
+from services.telegram_intel.config import DEFAULT_CONFIG_PATH, ConfigError, load_config
 from services.telegram_intel.models import (
     MAX_CHANNELS,
     ChannelConfig,
@@ -33,22 +33,31 @@ def _write_config(
     backend: str = "mtproto",
     channels: int = 1,
     classifier: bool = False,
+    weight: float = 1.0,
+    source: bool = False,
 ) -> Path:
     rows = []
     for index in range(channels):
-        rows.append(
-            {
-                "id": f"chan-{index}",
-                "source": f"@channel_{index}",
-                "enabled": enabled,
-                "backend": backend,
-                "topics": ["security"],
-            }
-        )
+        row = {
+            "id": f"chan-{index}",
+            "category": "security",
+            "weight": weight,
+            "enabled": enabled,
+            "backend": backend,
+            "notes": "test channel",
+        }
+        if source:
+            row["source"] = f"@channel_{index}"
+        rows.append(row)
     path.write_text(
         json.dumps(
             {
-                "defaults": {"pull_limit_per_channel": 5, "poll_interval_seconds": 60},
+                "defaults": {
+                    "max_messages_per_poll": 5,
+                    "poll_interval_seconds": 60,
+                    "min_quality_score": 0.45,
+                    "min_message_length": 32,
+                },
                 "classifier": {"enabled": classifier, "model": "balanced"},
                 "channels": rows,
             }
@@ -102,6 +111,14 @@ def test_load_config_parses_enabled_channel(tmp_path: Path) -> None:
     cfg = load_config(_write_config(tmp_path / "channels.yaml"))
     assert len(cfg.enabled_channels) == 1
     assert cfg.enabled_channels[0].backend == "mtproto"
+    assert cfg.enabled_channels[0].source == "chan-0"
+    assert cfg.enabled_channels[0].category == "security"
+    assert cfg.enabled_channels[0].weight == 1.0
+    assert cfg.max_messages_per_poll == 5
+
+
+def test_default_config_path_is_user_sapphire_dir() -> None:
+    assert DEFAULT_CONFIG_PATH == Path.home() / ".sapphire" / "telegram_channels.yaml"
 
 
 def test_load_config_rejects_duplicate_channel_ids(tmp_path: Path) -> None:
@@ -110,9 +127,9 @@ def test_load_config_rejects_duplicate_channel_ids(tmp_path: Path) -> None:
         """
 channels:
   - id: dup
-    source: "@one"
+    category: security
   - id: dup
-    source: "@two"
+    category: security
 """,
         encoding="utf-8",
     )
@@ -126,13 +143,53 @@ def test_load_config_rejects_unsupported_backend(tmp_path: Path) -> None:
         """
 channels:
   - id: a
-    source: "@a"
+    category: security
     backend: rss
 """,
         encoding="utf-8",
     )
     with pytest.raises(ConfigError, match="unsupported backend"):
         load_config(path)
+
+
+def test_load_config_rejects_unsupported_category(tmp_path: Path) -> None:
+    path = tmp_path / "channels.yaml"
+    path.write_text(
+        """
+channels:
+  - id: a
+    category: sports
+""",
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError, match="unsupported category"):
+        load_config(path)
+
+
+def test_load_config_supports_backward_compatible_aliases(tmp_path: Path) -> None:
+    path = tmp_path / "channels.yaml"
+    path.write_text(
+        """
+defaults:
+  pull_limit_per_channel: 7
+  min_quality: 0.4
+channels:
+  - id: alias-channel
+    source: "@alias_source"
+    backend: botapi
+    topics: [security]
+    min_quality: 0.35
+""",
+        encoding="utf-8",
+    )
+    cfg = load_config(path)
+    channel = cfg.enabled_channels[0]
+    assert cfg.max_messages_per_poll == 7
+    assert cfg.pull_limit_per_channel == 7
+    assert channel.source == "@alias_source"
+    assert channel.backend == "bot"
+    assert channel.category == "security"
+    assert channel.min_quality_score == 0.35
 
 
 def test_load_config_enforces_channel_cap(tmp_path: Path) -> None:
@@ -203,6 +260,33 @@ def test_pull_once_filters_low_quality_messages(tmp_path: Path) -> None:
     )
     assert result["stats"]["low_quality_messages"] == 1
     assert result["stats"]["written_messages"] == 0
+
+
+def test_pull_once_applies_channel_weight_to_quality_score(tmp_path: Path) -> None:
+    message = RawMessage(
+        channel_id="chan-0",
+        message_id="weight-1",
+        text="Treasury yield curve steepened as inflation swaps repriced.",
+        published_at="2026-04-28T12:00:00+00:00",
+    )
+    low = pull_once(
+        config_path=_write_config(tmp_path / "low.yaml", weight=0.5),
+        data_dir=tmp_path / "low-data",
+        counter_path=tmp_path / "low-counters.json",
+        backend_factory=lambda name: FakeBackend([message]),
+        require_live_gate=False,
+    )
+    high = pull_once(
+        config_path=_write_config(tmp_path / "high.yaml", weight=1.2),
+        data_dir=tmp_path / "high-data",
+        counter_path=tmp_path / "high-counters.json",
+        backend_factory=lambda name: FakeBackend([message]),
+        require_live_gate=False,
+    )
+
+    assert low["stats"]["low_quality_messages"] == 1
+    assert low["stats"]["written_messages"] == 0
+    assert high["stats"]["written_messages"] == 1
 
 
 def test_pull_once_refuses_real_backend_when_live_gate_fails(tmp_path: Path, monkeypatch) -> None:
@@ -323,6 +407,13 @@ def test_botapi_backend_filters_updates_without_network(monkeypatch) -> None:
     messages = backend.pull_channel(ChannelConfig(id="c", source="@security_feed"), limit=5)
     assert [message.message_id for message in messages] == ["7"]
     assert messages[0].metadata["backend"] == "botapi"
+
+
+def test_build_backend_accepts_prompt_bot_name(monkeypatch) -> None:
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test-token")
+    from services.telegram_intel.backends import build_backend
+
+    assert isinstance(build_backend("bot"), BotAPIBackend)
 
 
 def test_mtproto_backend_uses_mocked_telethon(monkeypatch, tmp_path: Path) -> None:

@@ -11,6 +11,9 @@ MAX_MESSAGES_PER_HOUR = 600
 MAX_CLASSIFICATIONS_PER_HOUR = 200
 MAX_MESSAGE_CHARS = 8000
 TRUNCATION_SUFFIX = "[…]"
+VALID_CATEGORIES = frozenset(
+    {"crypto", "macro", "ai", "security", "trading", "governance"}
+)
 
 
 def utc_now_iso() -> str:
@@ -23,18 +26,28 @@ class ChannelConfig:
 
     id: str
     source: str
+    category: str = "security"
+    weight: float = 1.0
     enabled: bool = True
     backend: str = "mtproto"
     label: str | None = None
     topics: tuple[str, ...] = ()
-    min_quality: float = 0.45
+    notes: str = ""
+    min_quality_score: float = 0.45
+    min_message_length: int = 32
+
+    @property
+    def min_quality(self) -> float:
+        """Backward-compatible alias for older callers/tests."""
+        return self.min_quality_score
 
     def attribution(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "source": self.source,
             "label": self.label or self.id,
-            "topics": list(self.topics),
+            "category": self.category,
+            "weight": self.weight,
             "backend": self.backend,
         }
 

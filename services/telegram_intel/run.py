@@ -26,7 +26,12 @@ from services.telegram_intel.backends import (
     build_backend,
 )
 from services.telegram_intel.classifier import LocalClassifier, available_models
-from services.telegram_intel.config import ConfigError, TelegramIntelConfig, load_config
+from services.telegram_intel.config import (
+    DEFAULT_CONFIG_PATH,
+    ConfigError,
+    TelegramIntelConfig,
+    load_config,
+)
 from services.telegram_intel.models import (
     MAX_CLASSIFICATIONS_PER_HOUR,
     MAX_MESSAGES_PER_HOUR,
@@ -78,7 +83,7 @@ def evaluate_live_gate(
     try:
         cfg = load_config(config_path)
         enabled_channels = len(cfg.enabled_channels)
-        config_display = str(Path(config_path).expanduser() if config_path else Path("infra/telegram_channels.yaml"))
+        config_display = str(Path(config_path).expanduser() if config_path else DEFAULT_CONFIG_PATH)
         if enabled_channels < 1:
             reasons.append("no enabled channels")
     except ConfigError as exc:
@@ -146,7 +151,7 @@ def pull_once(
         remaining = limiter.check("messages", MAX_MESSAGES_PER_HOUR).remaining
         if remaining < 1:
             break
-        limit = min(cfg.pull_limit_per_channel, remaining)
+        limit = min(cfg.max_messages_per_poll, remaining)
         try:
             backend = _backend_for(factory, backend_cache, channel.backend)
             messages = backend.pull_channel(channel, limit=limit)
@@ -159,7 +164,9 @@ def pull_once(
             quality = quality_filter(
                 message.text,
                 channel_id=channel.id,
-                min_score=channel.min_quality,
+                min_score=channel.min_quality_score,
+                min_message_length=channel.min_message_length,
+                score_multiplier=channel.weight,
             )
             if not quality.keep:
                 low_quality += 1
@@ -277,7 +284,7 @@ def daemon(
                     config_path=config_path,
                     data_dir=data_dir,
                     counter_path=counter_path,
-                    source_paths=(Path(config_path) if config_path else Path("infra/telegram_channels.yaml"),),
+                    source_paths=(Path(config_path).expanduser() if config_path else DEFAULT_CONFIG_PATH,),
                 ),
                 sort_keys=True,
             ),

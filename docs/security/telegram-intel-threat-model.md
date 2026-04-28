@@ -2,7 +2,8 @@
 
 ## Assets
 
-- Telegram channel inventory in local config.
+- Telegram channel inventory in local config at
+  `~/.sapphire/telegram_channels.yaml`.
 - Local MTProto session at `~/.sapphire/telegram_intel.session`.
 - Persisted JSONL corpus under `data/telegram_intel/`.
 - Local inference proxy at `127.0.0.1:11435`.
@@ -23,6 +24,9 @@
   are redacted before provenance stamping.
 - Corpus flooding: hard caps enforce 32 enabled channels, 600 messages/hour, and
   200 classifications/hour.
+- Source weighting abuse: channel `weight` is clamped and applied
+  deterministically to the local quality score only, never as a live execution
+  permission.
 - Prompt leakage to local model: classifier receives sanitized/truncated text,
   uses the local proxy only, and falls back after 5 seconds or invalid JSON.
 - Secret exposure: configs do not contain credentials, and the LaunchAgent
@@ -32,4 +36,4 @@
 
 Channel-level attribution is retained for source quality and provenance. Private
 channel names should therefore stay out of committed config and only live in the
-local untracked `infra/telegram_channels.yaml`.
+local untracked `~/.sapphire/telegram_channels.yaml`.

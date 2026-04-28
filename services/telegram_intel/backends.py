@@ -180,6 +180,6 @@ def build_backend(name: str) -> ReaderBackend:
     normalized = (name or "mtproto").strip().lower()
     if normalized == "mtproto":
         return MTProtoBackend()
-    if normalized == "botapi":
+    if normalized in {"bot", "botapi"}:
         return BotAPIBackend()
     raise BackendError(f"unsupported backend: {name}")

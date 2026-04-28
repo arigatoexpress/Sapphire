@@ -8,12 +8,17 @@ persisted record with `lib/core/provenance.py`.
 
 ## Capabilities
 
-- Backends: `mtproto` through Telethon and `botapi` through Telegram Bot API
+- Runtime config: operator copies `infra/telegram_channels.example.yaml` to
+  `~/.sapphire/telegram_channels.yaml`; no real channel list is committed.
+- Backends: `mtproto` through Telethon and `bot` through Telegram Bot API
   channel posts visible to the bot.
 - Sink: `data/telegram_intel/YYYY-MM-DD/messages.jsonl`.
 - Plugin actions: `status`, `pull-once`, `recent`, `quality-test`, `models`.
 - Caps: 32 enabled channels, 600 messages/hour, 200 local-model
   classifications/hour, 8000 characters per stored message.
+- Channel schema: `id`, `category`, `weight`, `backend`, `enabled`, and `notes`;
+  `source`, `botapi`, `pull_limit_per_channel`, and `min_quality` remain
+  backward-compatible aliases.
 - Optional classifier: local inference proxy at `127.0.0.1:11435`, model alias
   `balanced`, 5 second timeout, heuristic fallback.
 

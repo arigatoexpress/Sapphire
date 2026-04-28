@@ -77,6 +77,16 @@ class QualityDecision:
     tags: tuple[str, ...]
     sanitized_text: str
 
+    def with_score(self, score: float, *, keep: bool, reason: str) -> QualityDecision:
+        reasons = tuple(dict.fromkeys((*self.reasons, reason)))
+        return QualityDecision(
+            keep=keep,
+            score=max(0.0, min(1.0, score)),
+            reasons=reasons,
+            tags=self.tags,
+            sanitized_text=self.sanitized_text,
+        )
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "keep": self.keep,
@@ -154,6 +164,8 @@ def quality_filter(
     *,
     channel_id: str | None = None,
     min_score: float = 0.45,
+    min_message_length: int = 32,
+    score_multiplier: float = 1.0,
 ) -> QualityDecision:
     sanitized = sanitize_text(text)
     lowered = sanitized.lower()
@@ -172,7 +184,7 @@ def quality_filter(
         score -= 0.5
 
     length = len(sanitized)
-    if length < 32:
+    if length < max(1, int(min_message_length)):
         reasons.append("short")
         score -= 0.12
     elif length >= 50:
@@ -231,6 +243,10 @@ def quality_filter(
         score -= 0.08
         reasons.append("thin-forward")
 
+    multiplier = max(0.1, min(3.0, float(score_multiplier)))
+    if multiplier != 1.0:
+        score *= multiplier
+        reasons.append("channel-weight")
     score = max(0.0, min(1.0, score))
     keep = score >= min_score and "spam-pattern" not in reasons
     if keep:

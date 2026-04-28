@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Template only. Live collection still refuses to start unless
      SAPPHIRE_TELEGRAM_INTEL_LIVE=1, ~/.sapphire/telegram_intel.session exists,
-     and infra/telegram_channels.yaml has at least one enabled channel. -->
+     and ~/.sapphire/telegram_channels.yaml has at least one enabled channel. -->
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -14,7 +14,7 @@
         <string>/Users/aribs/Code/Sapphire/services/telegram_intel/run.py</string>
         <string>daemon</string>
         <string>--config</string>
-        <string>/Users/aribs/Code/Sapphire/infra/telegram_channels.yaml</string>
+        <string>/Users/aribs/.sapphire/telegram_channels.yaml</string>
     </array>
     <key>WorkingDirectory</key>
     <string>/Users/aribs/Code/Sapphire</string>

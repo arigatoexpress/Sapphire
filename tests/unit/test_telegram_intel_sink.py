@@ -21,7 +21,12 @@ def _record(message_id: str = "1", text: str | None = None) -> dict:
         published_at="2026-04-28T12:00:00+00:00",
         metadata={"author_id": 123, "sender": "@person"},
     )
-    channel = ChannelConfig(id="security", source="@security_feed", topics=("security",))
+    channel = ChannelConfig(
+        id="@security_feed",
+        source="@security_feed",
+        category="security",
+        weight=1.1,
+    )
     quality = quality_filter(message.text, channel_id=channel.id)
     classification = ClassificationResult(
         label="security",
@@ -43,6 +48,8 @@ def test_build_record_is_provenance_stamped() -> None:
 def test_build_record_keeps_channel_attribution_not_sender_metadata() -> None:
     record = _record()
     assert record["channel"]["source"] == "@security_feed"
+    assert record["channel"]["category"] == "security"
+    assert record["channel"]["weight"] == 1.1
     blob = json.dumps(record)
     assert "author_id" not in blob
     assert "@person" not in blob
