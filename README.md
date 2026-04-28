@@ -8,7 +8,7 @@
 
 [![CI](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
 [![Security](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml)
-[![Tests](https://img.shields.io/badge/tests-5%2C357%2B%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-5%2C366%2B%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
 [![Tools](https://img.shields.io/badge/tools-49-0d9488)](infra/tool-registry.yaml)
 [![Dashboard](https://img.shields.io/badge/dashboard-38%20pages-6d28d9)](services/dashboard/templates/pages)
 [![Readiness](https://img.shields.io/badge/readiness-0%20FAIL-2ea44f)](scripts/ops/production_readiness_sweep.py)
@@ -133,8 +133,8 @@ flowchart LR
 
 | Surface | Count | Detail |
 |---|---:|---|
-| Passing tests | **5,357+** | 4,979+ unit · 378 plugin (`python scripts/ops/test_inventory.py --check-readme`) |
-| Test files | **290+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
+| Passing tests | **5,366+** | 4,988+ unit · 378 plugin (`python scripts/ops/test_inventory.py --check-readme`) |
+| Test files | **291+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
 | Dashboard pages | **38** | Flask + SSE, basic-auth, observability, cross-asset, diligence, threat-intel, dossier pages |
 | Quant strategies | **7** | `lib/analytics/strategies.py` |
 | Pine strategies | **5** | `pine/standalone/` |
@@ -704,7 +704,7 @@ python3 -m lib.content publish
 ## 12. Testing & QA
 
 ```bash
-# Unit tests — 4,979 collected; latest full run: 4,958 passed, 1 skipped, 21 xfailed
+# Unit tests — 4,988 collected; latest full run: 4,958 passed, 1 skipped, 21 xfailed
 /usr/local/bin/python3 -m pytest tests/unit/ --tb=short -q
 
 # Plugin tests — 378 collected; latest full run: 378 passed
