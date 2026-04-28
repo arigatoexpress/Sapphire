@@ -231,4 +231,3 @@ All 20 dashboard pages and 2 regional-intel pages render HTTP 200 with no Jinja/
 
 ### Verdict
 Every primary page (overview, system, agents, signals, predictions, SOC, health, regional-intel v2) is now demo-ready. Secondary pages have been consistency-patched so nothing visually fights the system. Ship it.
-

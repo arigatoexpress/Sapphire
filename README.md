@@ -428,7 +428,7 @@ flowchart TB
 | [`plugins/claw-sapphire/lib/sensitivity_classifier.py`](plugins/claw-sapphire/lib/sensitivity_classifier.py) | Regex block on PII / secrets before egress to managed cloud |
 | [`services/security_pipeline/`](services/security_pipeline/) | Scheduled full-system scan; ships findings to SOC dashboard page |
 
-**Perimeter:** Tailscale mesh-only, no open ingress. **Secrets:** GCP Secret Manager or `~/.sapphire/secrets.env` (mode 0600), never in plists. **Audit:** [`docs/audit.md`](docs/audit.md). **Control map:** [`docs/nist-alignment.md`](docs/nist-alignment.md).
+**Perimeter:** Tailscale mesh-only, no open ingress. **Secrets:** GCP Secret Manager or `~/.sapphire/secrets.env` (mode 0600), never in plists. **Security runbook:** [`docs/security/credential-rotation-runbook.md`](docs/security/credential-rotation-runbook.md). **Historical audits:** [`docs/archive/README.md`](docs/archive/README.md). **Control map:** [`docs/nist-alignment.md`](docs/nist-alignment.md).
 
 ---
 
@@ -668,7 +668,7 @@ The `docs/` directory holds 400 K+ words of cross-validated architecture, audit,
 | Document | Purpose |
 |---|---|
 | [`docs/architecture-overview.md`](docs/architecture-overview.md) | Full module wiring, request lifecycles, data flows |
-| [`docs/audit.md`](docs/audit.md) | Security audit — source of current hardening |
+| [`docs/archive/README.md`](docs/archive/README.md) | Historical audit index; active posture lives in readiness sweeps and security runbooks |
 | [`docs/nist-alignment.md`](docs/nist-alignment.md) | NIST CSF control map |
 | [`docs/crypto-integrations-plan.md`](docs/crypto-integrations-plan.md) | x402, Zama FHE, Ika MPC, Aztec Noir, Robinhood Chain |
 | [`docs/foundry-strategy-2026-04-19.md`](docs/foundry-strategy-2026-04-19.md) | Palantir Foundry value thesis + integration plan |

@@ -98,7 +98,7 @@
 **Finding**: `PII_ENCRYPTION_KEY` is set as a plaintext environment variable in the Cloud Run service definition. It is visible to anyone with `gcloud run services describe` access on this project.
 
 ```
-PII_ENCRYPTION_KEY = 1d2Y4lHz0nhlr1DLgMWsVAnrPZ1-Ow8FOQd9u4nfBHw=
+PII_ENCRYPTION_KEY = <redacted historical value>
 ```
 
 **Risk**: Anyone with GCP project access can read this key. If PII is encrypted at rest using this key (customer data, document content), compromise of this key = compromise of all encrypted PII.
@@ -240,4 +240,3 @@ gcloud iam service-accounts disable gooner@sapphire-479610.iam.gserviceaccount.c
 - Pre-deletion manifest archived at `~/Code/Sapphire/archived/sapphire-479610-backup/MANIFEST.md`
 - Buckets contained: 2 empty (sapphire-history, sapphire-trading-performance), 1 placeholder (sapphirealpha-site/index.html 13KB), cloudbuild logs (1.8GB of historical build artifacts)
 - Billing was already disabled, so nothing was actively running
-

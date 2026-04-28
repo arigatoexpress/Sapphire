@@ -71,7 +71,7 @@ audit/tracking doc that contains the marker itself.
 
 | File:line | Tracking artifact |
 |-----------|-------------------|
-| `docs/audit.md:72` | `## Still TODO (not done)` — section header in `docs/audit.md` enumerating 4 follow-ups (opus-audit re-verify, retire/wire decisions, plugin-surface stabilization, Tailscale route flakes). The doc IS the tracker. |
+| `docs/archive/2026/audits/audit.md:72` | `## Still TODO (not done)` — section header in the archived living audit enumerating 4 follow-ups (opus-audit re-verify, retire/wire decisions, plugin-surface stabilization, Tailscale route flakes). The doc is historical context, not the active tracker. |
 | `results/audit-2026-04-18.md:100` | `### TODO Inventory (complete)` — heading introducing the cross-references that follow. |
 | `results/audit-2026-04-18.md:102` | Cross-reference to `services/alpha/src/media/linkedin.py:48` (Bucket A item). |
 | `results/audit-2026-04-18.md:103` | Cross-reference to `services/hyperliquid/.../main.py:65` (Bucket A item). |
@@ -84,7 +84,7 @@ or quoted documentation. No action required.
 Examples (full list omitted for noise reduction):
 - `TOPIC-XXXXX`, `pipeline_XXXX.json`, `CVE-XXXX-NNNN`, `?symbol=XXX`
   in usage strings or log format placeholders.
-- The `frontend-audit-v2.md` line that quotes `Linear writes "Todo",
+- The archived `frontend-audit-v2.md` line that quotes `Linear writes "Todo",
   not "TODO"` to make a UI-style argument.
 - `| TODO comments | 2 |` cells in audit metric tables.
 
