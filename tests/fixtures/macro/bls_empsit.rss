@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>BLS Employment Situation</title>
+    <link>https://www.bls.gov/feed/news_release/empsit.rss</link>
+    <item>
+      <title>Employment Situation: Payroll employment rises by 275,000; unemployment rate unchanged</title>
+      <link>https://www.bls.gov/news.release/empsit.nr0.htm</link>
+      <guid>bls-2026-03</guid>
+      <pubDate>Fri, 06 Mar 2026 13:30:00 GMT</pubDate>
+      <description>Total nonfarm payroll employment increased and wages remained firm.</description>
+    </item>
+    <item>
+      <title>Employment Situation: Payroll growth slows and unemployment rises</title>
+      <link>https://www.bls.gov/news.release/archives/empsit_02062026.htm</link>
+      <guid>bls-2026-02</guid>
+      <pubDate>Fri, 06 Feb 2026 13:30:00 GMT</pubDate>
+      <description>Labor market data showed cooling wage growth.</description>
+    </item>
+  </channel>
+</rss>

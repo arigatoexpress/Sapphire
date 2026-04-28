@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>ECB Press Releases</title>
+    <link>https://www.ecb.europa.eu/rss/press.html</link>
+    <item>
+      <title>ECB monetary policy decisions: Governing Council cuts key interest rates</title>
+      <link>https://www.ecb.europa.eu/press/pr/date/2026/html/ecb.mp260312.en.html</link>
+      <guid>ecb-2026-03-12</guid>
+      <pubDate>Thu, 12 Mar 2026 13:45:00 GMT</pubDate>
+      <description>Inflation has continued to ease across the euro area.</description>
+    </item>
+    <item>
+      <title>ECB publishes euro area bank lending survey</title>
+      <link>https://www.ecb.europa.eu/press/pr/date/2026/html/ecb.pr260120.en.html</link>
+      <guid>ecb-2026-01-20</guid>
+      <pubDate>Tue, 20 Jan 2026 09:00:00 GMT</pubDate>
+      <description>Credit standards were broadly unchanged.</description>
+    </item>
+  </channel>
+</rss>

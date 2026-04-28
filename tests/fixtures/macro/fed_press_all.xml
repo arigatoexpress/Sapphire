@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Federal Reserve Press Releases</title>
+    <link>https://www.federalreserve.gov/feeds/press_all.xml</link>
+    <item>
+      <title>Federal Reserve issues FOMC statement and holds rates unchanged</title>
+      <link>https://www.federalreserve.gov/newsevents/pressreleases/monetary20260129a.htm</link>
+      <guid>fed-2026-01-29</guid>
+      <pubDate>Thu, 29 Jan 2026 19:00:00 GMT</pubDate>
+      <description>The Committee decided to maintain the target range for the federal funds rate.</description>
+    </item>
+    <item>
+      <title>Federal Reserve announces 25 basis point rate hike</title>
+      <link>https://www.federalreserve.gov/newsevents/pressreleases/monetary20260318a.htm</link>
+      <guid>fed-2026-03-18</guid>
+      <pubDate>Wed, 18 Mar 2026 18:00:00 GMT</pubDate>
+      <description>Inflation remains elevated and policy remains restrictive.</description>
+    </item>
+  </channel>
+</rss>

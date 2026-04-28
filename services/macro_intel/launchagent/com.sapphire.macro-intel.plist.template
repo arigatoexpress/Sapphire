@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.sapphire.macro-intel</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/aribs/Code/Sapphire/services/macro_intel/run.py</string>
+    <string>daemon</string>
+    <string>--poll-interval-seconds</string>
+    <string>900</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/aribs/Code/Sapphire</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PYTHONUNBUFFERED</key>
+    <string>1</string>
+    <key>SAPPHIRE_MACRO_CACHE_DIR</key>
+    <string>/Users/aribs/.cache/sapphire/macro</string>
+    <key>SAPPHIRE_MACRO_USER_AGENT</key>
+    <string>SapphireMacroIntel/0.1 (+https://github.com/arigatoexpress/Sapphire; contact=ops@sapphirealpha.xyz)</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <false/>
+  <key>StandardOutPath</key>
+  <string>/Users/aribs/Library/Logs/sapphire/macro-intel.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/aribs/Library/Logs/sapphire/macro-intel.err.log</string>
+</dict>
+</plist>
