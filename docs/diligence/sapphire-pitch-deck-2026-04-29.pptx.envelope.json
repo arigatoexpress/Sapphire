@@ -1,0 +1,63 @@
+{
+  "artifact_bytes": 324947,
+  "artifact_mtime": "2026-04-28T22:02:21+00:00",
+  "artifact_path": "docs/diligence/sapphire-pitch-deck-2026-04-29.pptx",
+  "artifact_sha256": "b0dbf3262ca4c07221cb157b6b8ddce9deafaf2c53c6ba77e5a1dc205d99043b",
+  "provenance": {
+    "envelope_hash": "981502e3a6cd52ff1ea62ccab1938494da8c884b9cbe3cb8a3473de71ef941ab",
+    "expires_at": null,
+    "generated_at": "2026-04-28T22:02:38+00:00",
+    "generator": "scripts/build_sapphire_pitch_deck",
+    "metadata": {
+      "aspect_ratio": "16:9",
+      "audience": "Palantir Foundry corp-dev",
+      "audience_alternates": [
+        "Robinhood Cortex",
+        "specialty acquirer"
+      ],
+      "build_date": "2026-04-29",
+      "fabricated_metrics": 0,
+      "generator_chain": [
+        "build_diagram.py (matplotlib)",
+        "build_deck.py (python-pptx)"
+      ],
+      "head_sha": "9074c408",
+      "open_caveats": [
+        "live-trading $5 first-order described as designed-and-gated; no executed-fill artifact exists in repo",
+        "team-process slide is brief by design \u2014 operator edits afterward"
+      ],
+      "palette": "midnight executive (navy + sapphire + ice)",
+      "slide_count": 14,
+      "word_count_per_slide_max": 240
+    },
+    "model": "python-pptx + matplotlib (no LLM)",
+    "payload_hash": "7af6ecabaaeab74da789dd3a8c6f5ac91423b75f91abbdfe22213f39651ee8bb",
+    "prompt_hash": null,
+    "schema_version": 1,
+    "source_hashes": {
+      "CLAUDE.md": "0a799cdf8652faf3ca6e32bb9e0e97c45cac95ca0a92e809a61b281d74c75b7e",
+      "docs/competitive/landscape-2026-04-28.md": "8bb7e5e9c7eb239f3e7ab771560ece2e4d472e6b108bf6be715de6b65bc9a994",
+      "docs/diligence/00-executive-summary.md": "60167f939f432398c629795ba2e3aa3102c4e25a4505107625eebc9a8ef6d7b7",
+      "docs/diligence/01-architecture.md": "ef4b1d27e870bfea48509efe47d0754dcc7ba26c3230ce1629782682ad44ca44",
+      "docs/diligence/02-product-surfaces.md": "63665aed5e2a657c6a32201747977d8537ce40a5652148e5622eeceabf09e8c2",
+      "docs/diligence/03-security-posture.md": "73516d6f6d3368b673bf0cb4f7e5672d21e0ebd703ef29d38ed945f5dcaf37d6",
+      "docs/diligence/04-data-and-models.md": "6dd59f20ca9c26312ca46dd1eb1aeb7827f46ef37ce531297a93dd6370c1a3aa",
+      "docs/diligence/05-operations.md": "265fdce9a4d64e93dfa6d7fe2bce7f359701a8705c17a1b5423d3f251c8675cc",
+      "docs/diligence/06-financials-and-spend.md": "ac33b35f05e003e99aeb2687f40a7563209077050a77bcce2cc1103e0e109a7b",
+      "docs/diligence/07-roadmap.md": "84008bc8d112ce83214349ed95c88cd57813ec585e5d88bd01465e70e227ce52",
+      "docs/diligence/08-incidents-and-postmortems.md": "1bfea942e21c41d084f74918e4ca1d2cc7315abdc708393fb957270566853e7d",
+      "docs/diligence/09-team-and-process.md": "22186de75b870a50be2a6ebfb6c5b3c8c4ebd4be11aebc9d03e63ab3ddad2475",
+      "docs/products/customer-dossier-0.2.0.md": "1c87ce9417dd2feace795ca153f0c7de169ced2314e0bf99dd0a674790cc8092",
+      "docs/products/foundry-ontology-0.2.0.md": "c120be343f3f2ab502698c09fa8acdadbf6d2d9da1e44fbd4b6be596d918bfae",
+      "docs/products/live-trading-ramp-memo.md": "305f227daee66951174cc6fa4a45ef3db5b66e0569d8e39c1435e40447309308",
+      "docs/products/narrative-synthesis-0.1.0.md": "ea3392e6a3ef2ef3e37df78c75e5f7a9fb7aea4de5586c90d2289579e168f6f0",
+      "docs/products/provenance-envelopes-0.1.0.md": "0f399658245579f442d6e4ec2e33fbe2c5dff7979d8d7d257aa4bc826f4714c5",
+      "docs/products/risk-kernel-0.1.0.md": "989f4acbdf94e8a8e42394869cb9d0ea3a1240579274beda07fb8511c6f532a1",
+      "docs/products/signal-correlator-0.1.0.md": "e544fdb0a1bf26c09961d78cd4dca224ece8bfdcd2e52392f3b8e9e7a10d503c",
+      "docs/products/threat-intel-product-0.1.0.md": "0693d9a2cde5030ec80ecdd7ae2d5b71e6a658aab0358127c95a51e72cfc862d",
+      "docs/security/kill-switch-invariants.md": "84860246ece72f4a45ef3539bfa8778644f3b261a66e585e80e0e21efa61f2ac",
+      "web/acquirer/index.html": "6e9d5db033a0b9c176409fab89668057e1f3083a109a2df4a585a9f5b7380175"
+    },
+    "ttl_seconds": null
+  }
+}
