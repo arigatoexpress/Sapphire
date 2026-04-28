@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.sapphire.live-portfolio</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/python3</string>
+    <string>/Users/aribs/Code/Sapphire/services/live_portfolio_daemon/run.py</string>
+  </array>
+  <key>RunAtLoad</key>
+  <false/>
+  <key>StartInterval</key>
+  <integer>3600</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/aribs/Library/Logs/sapphire/live-portfolio.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/aribs/Library/Logs/sapphire/live-portfolio.err.log</string>
+</dict>
+</plist>
