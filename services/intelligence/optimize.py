@@ -35,6 +35,8 @@ SAPPHIRE_ROOT = Path(__file__).resolve().parents[2]
 if str(SAPPHIRE_ROOT) not in sys.path:
     sys.path.insert(0, str(SAPPHIRE_ROOT))
 
+from lib.core.routine_pause import abort_if_paused  # noqa: E402
+
 SIGNALS_DIR = SAPPHIRE_ROOT / "data" / "signals"
 WEIGHTS_FILE = SAPPHIRE_ROOT / "data" / "enhancer_weights.json"
 EVENTS_LOG = SAPPHIRE_ROOT / "data" / "system_events.jsonl"
@@ -393,6 +395,7 @@ def run(dry_run: bool = False) -> OptimizationReport:
 
 
 if __name__ == "__main__":
+    abort_if_paused("self-optimization")
     dry = "--dry-run" in sys.argv
     r = run(dry_run=dry)
     print(json.dumps(asdict(r), indent=2, default=str))

@@ -24,11 +24,12 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-ROOT = Path.home() / "Code" / "Sapphire"
+ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from lib.chain.intelligence import ChainIntelligence  # noqa: E402
+from lib.core.routine_pause import abort_if_paused  # noqa: E402
 
 log = logging.getLogger("chain_refresh")
 
@@ -138,6 +139,7 @@ def run() -> dict:
 
 
 def main() -> int:
+    abort_if_paused("chain-refresh")
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",

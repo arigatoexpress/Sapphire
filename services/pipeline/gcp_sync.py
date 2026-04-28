@@ -33,6 +33,8 @@ from typing import Any
 
 from google.cloud import bigquery, storage
 
+from lib.core.routine_pause import abort_if_paused
+
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
@@ -557,6 +559,7 @@ def run_sync(sources: list[str] | None = None, dry_run: bool = False) -> list[Sy
 
 
 def main() -> int:
+    abort_if_paused("gcp-sync")
     p = argparse.ArgumentParser()
     p.add_argument(
         "--source",

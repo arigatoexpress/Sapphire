@@ -16,8 +16,11 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from lib.core.routine_pause import abort_if_paused  # noqa: E402
+
 
 def main() -> int:
+    abort_if_paused("foundry-sync")
     from lib.foundry.sync import run_sync
 
     result = run_sync()

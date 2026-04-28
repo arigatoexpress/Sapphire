@@ -483,6 +483,10 @@ def _local_routine_pause_active(routine_name: str = ROUTINE_NAME) -> bool:
 
 def routine_pause_status(routine_name: str = ROUTINE_NAME) -> dict[str, Any]:
     """Check shared routine pause helper when present, otherwise use local files."""
+    if os.environ.get("SAPPHIRE_ROUTINE_PAUSE_DIR"):
+        paused = _local_routine_pause_active(routine_name)
+        return {"paused": paused, "source": "local-fallback"}
+
     try:
         from lib.core import routine_pause
     except Exception:

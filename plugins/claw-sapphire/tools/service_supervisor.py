@@ -22,6 +22,8 @@ from typing import Any
 from dev_pulse import DEFAULT_LAUNCHAGENT_LABELS, ServiceStatus, collect_service_statuses
 from notify import send_alert
 
+from lib.core.routine_pause import abort_if_paused
+
 STATE_FILE = (
     Path.home()
     / "Library"
@@ -463,6 +465,7 @@ def supervise_once(
 
 
 def main() -> None:
+    abort_if_paused("service-supervisor")
     parser = argparse.ArgumentParser(description="Run the Sapphire LaunchAgent supervisor once")
     parser.add_argument(
         "--label", action="append", dest="labels", help="Restrict to one monitored label"

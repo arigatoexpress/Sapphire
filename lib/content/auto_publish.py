@@ -33,6 +33,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from lib.core.routine_pause import abort_if_paused
+
 from .publishers import PublishResult, load_client
 
 logger = logging.getLogger(__name__)
@@ -282,5 +284,6 @@ def run(
 
 
 if __name__ == "__main__":
+    abort_if_paused("content-publisher")
     out = run()
     print(json.dumps(out, indent=2, default=str))
