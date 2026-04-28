@@ -1,0 +1,12 @@
+title = "Sapphire docs credential snippet rules"
+
+# Kept separate from .gitleaks.toml because the local gitleaks 8.30.1 binary
+# does not activate new unique custom rules when [extend] useDefault = true is
+# present. Local CI and pre-commit run this config as a second pass.
+
+[[rules]]
+id = "sapphire-docs-plist-credential-value"
+description = "Detect credential-bearing plist snippets committed inside docs"
+regex = '''(?is)<key>[^<]*(?:API_KEY|TOKEN|SECRET)[^<]*</key>\s*<(?:string|data)>\s*([A-Za-z0-9_./:+\-]{20,})\s*</(?:string|data)>'''
+path = '''(?i)(^|/)docs/.+\.(?:md|markdown|txt|xml|plist)$'''
+secretGroup = 1

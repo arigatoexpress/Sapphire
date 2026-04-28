@@ -65,7 +65,7 @@ def _resolve_python() -> str:
     install at /opt/homebrew/bin/python3 is missing the repo's pytest deps
     and breaks collection, so it's a last resort only.
     """
-    if (env := os.environ.get("PYTHON3")):
+    if env := os.environ.get("PYTHON3"):
         return env
     if Path("/usr/local/bin/python3").exists():
         return "/usr/local/bin/python3"
@@ -86,7 +86,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {REPO_ROOT} is not a git repo", file=sys.stderr)
         return EX_USAGE
 
-    starting_branch = run_capture(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=REPO_ROOT).strip()
+    starting_branch = run_capture(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=REPO_ROOT
+    ).strip()
     fetched_branch: str | None = None
 
     try:
@@ -114,7 +116,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pr", type=int, help="GitHub PR number to fetch and verify.")
     parser.add_argument("--skip-plugin", action="store_true", help="Skip the plugin test suite.")
-    parser.add_argument("--skip-registry", action="store_true", help="Skip the tool registry validator.")
+    parser.add_argument(
+        "--skip-registry", action="store_true", help="Skip the tool registry validator."
+    )
     parser.add_argument(
         "--report-out",
         type=Path,
@@ -151,6 +155,7 @@ def run_checks(args: argparse.Namespace) -> dict[str, Any]:
     if not args.skip_registry:
         checks.append(check_tool_registry())
     checks.append(check_gitleaks())  # runs only if gitleaks is on PATH
+    checks.append(check_docs_plist_gitleaks())  # docs-specific custom rules
 
     statuses = [c["status"] for c in checks]
     if "FAIL" in statuses:
@@ -226,6 +231,45 @@ def check_gitleaks() -> dict[str, Any]:
         return _run_named("gitleaks (changed files)", cmd)
 
 
+def check_docs_plist_gitleaks() -> dict[str, Any]:
+    """Run Sapphire's docs-only plist credential rule over changed docs."""
+    if shutil.which("gitleaks") is None:
+        return _skipped("gitleaks (docs plist)", "gitleaks not on PATH")
+    config = REPO_ROOT / ".gitleaks-docs.toml"
+    if not config.exists():
+        return _skipped("gitleaks (docs plist)", ".gitleaks-docs.toml missing")
+
+    docs_paths = [
+        path
+        for path in changed_paths_for_secret_scan()
+        if path.parts
+        and path.parts[0] == "docs"
+        and path.suffix.lower() in {".md", ".markdown", ".txt", ".xml", ".plist"}
+    ]
+    if not docs_paths:
+        return _passed("gitleaks (docs plist)", "no changed docs to scan")
+
+    with tempfile.TemporaryDirectory(prefix="sapphire-gitleaks-docs-") as tmp:
+        source = Path(tmp)
+        copied = copy_secret_scan_source(docs_paths, source)
+        if copied == 0:
+            return _passed("gitleaks (docs plist)", "no existing changed docs to scan")
+        return _run_named(
+            "gitleaks (docs plist)",
+            [
+                "gitleaks",
+                "detect",
+                "--no-banner",
+                "--no-git",
+                "--redact=100",
+                "--source",
+                str(source),
+                "--config",
+                str(config),
+            ],
+        )
+
+
 def changed_paths_for_secret_scan() -> list[Path]:
     """Return changed files that should be secret-scanned.
 
@@ -248,7 +292,9 @@ def changed_paths_for_secret_scan() -> list[Path]:
 
     raw_paths.update(
         split_git_lines(
-            git_capture_optional(["git", "diff", "--name-only", "--diff-filter=ACMR", "--cached", "HEAD"])
+            git_capture_optional(
+                ["git", "diff", "--name-only", "--diff-filter=ACMR", "--cached", "HEAD"]
+            )
         )
     )
     raw_paths.update(
@@ -257,9 +303,7 @@ def changed_paths_for_secret_scan() -> list[Path]:
         )
     )
     raw_paths.update(
-        split_git_lines(
-            git_capture_optional(["git", "ls-files", "--others", "--exclude-standard"])
-        )
+        split_git_lines(git_capture_optional(["git", "ls-files", "--others", "--exclude-standard"]))
     )
 
     paths = []
@@ -393,9 +437,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         "|---|---|---:|---:|",
     ]
     for c in report["checks"]:
-        lines.append(
-            f"| {c['name']} | {c['status']} | {c['exit_code']} | {c['duration_sec']}s |"
-        )
+        lines.append(f"| {c['name']} | {c['status']} | {c['exit_code']} | {c['duration_sec']}s |")
     fails = [c for c in report["checks"] if c["status"] == "FAIL"]
     if fails:
         lines.extend(["", "## Failures", ""])

@@ -68,7 +68,7 @@ values into this file — only names and rotation paths.**
 
 | Credential | Storage path | Rotation procedure |
 |---|---|---|
-| `AUTH_PASSWORD` (dashboard basic auth) | `~/.config/sapphire-secrets/dashboard_password` | Generate new value (`openssl rand -hex 16`) → update file → restart `com.sapphire.dashboard` |
+| `AUTH_PASSWORD` (dashboard basic auth) | `~/.config/sapphire-secrets/dashboard_password` (mirrored into `~/.sapphire/secrets.env` for the LaunchAgent wrapper) | Generate new value (`openssl rand -hex 16`) → update file and `AUTH_PASSWORD` in `~/.sapphire/secrets.env` (mode 0600) → restart `com.sapphire.dashboard` |
 | `CONTROL_PLANE_TOKEN` | `~/.config/sapphire-secrets/control_api_token` | Generate new value → update file → restart `com.sapphire.control-plane` |
 | `TRADINGVIEW_HMAC_SECRET` | `~/.config/sapphire-secrets/tradingview_hmac_secret` | TradingView alert config → rotate webhook secret → update file → no restart (verified per request) |
 
@@ -156,13 +156,20 @@ and was still present as of 2026-04-27.
 **Status.** Awaiting operator rotation. This file is the single
 canonical record of the incident; do not duplicate.
 
+**2026-04-28 catch-up note.** `docs/security/2026-04-27-proton-audit.md`
+records the redacted Proton Drive audit: 24 files inspected, 16 custom
+credential-shape candidates, and two default `gitleaks` findings. The
+dashboard basic-auth password was also rotated because `sapphire:sapphire`
+still returned HTTP 200 locally before rotation; post-rotation probes return
+HTTP 401 for that default pair.
+
 ---
 
 ## 4. Prevention controls now in place
 
 - `pre-commit` runs `gitleaks` against staged changes. The config now
   flags plist `<key>...API_KEY</key>` excerpts with realistic-shaped
-  values, not just bare tokens. See `.gitleaks.toml`.
+  values, not just bare tokens. See `.gitleaks-docs.toml`.
 - `.gitignore` excludes ad-hoc audit doc patterns
   (`*-audit-private.md`, `audit-private/`, etc.) so an investigation doc
   written during an incident is never committed by default.
