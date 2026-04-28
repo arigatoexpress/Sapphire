@@ -1,14 +1,17 @@
 <div align="center">
 
-<img src="docs/brand/kadima-mark-b-quadrilemniscate-300.png" width="128" alt="Sapphire mark"/>
+<img src="docs/brand/kadima-mark-b-quadrilemniscate-300.png" width="118" alt="Sapphire mark"/>
 
 # Sapphire OS
 
-**A self-sovereign operating system for autonomous capital allocation, intelligence, and content.**
+**A self-sovereign operating system for capital intelligence, autonomous operations, and acquisition-grade diligence.**
 
 [![CI](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
 [![Security](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml)
-[![Tests](https://img.shields.io/badge/tests-5%2C281%2B%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-5%2C296%2B%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
+[![Tools](https://img.shields.io/badge/tools-49-0d9488)](infra/tool-registry.yaml)
+[![Dashboard](https://img.shields.io/badge/dashboard-38%20pages-6d28d9)](services/dashboard/templates/pages)
+[![Readiness](https://img.shields.io/badge/readiness-0%20FAIL-2ea44f)](scripts/ops/production_readiness_sweep.py)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3776ab?logo=python&logoColor=white)](https://www.python.org/)
 [![Solidity](https://img.shields.io/badge/solidity-0.8.x-363636?logo=solidity&logoColor=white)](contracts/)
 [![Mesh](https://img.shields.io/badge/mesh-tailscale-242424?logo=tailscale&logoColor=white)](infra/tailscale-acl.json)
@@ -20,11 +23,11 @@
 
 ## Abstract
 
-Sapphire is a continuously-running, mesh-topology operating system that integrates statistical-arbitrage trading, on-chain analytics, threat intelligence, and content production into a single agent-mediated control plane. It runs on a four-node Tailscale cluster — an Apple Silicon commander, an RTX 5070 Ti inference node, and two Raspberry Pi edge nodes — and uses Google Cloud Platform exclusively as a data lake. The system is observed through an event bus and steered through a Telegram heartbeat. Every signal, inference, publication, and trade is auditable from raw collection to action.
+Sapphire is a continuously-running, mesh-topology operating system that integrates market intelligence, on-chain analytics, adversarial signal defense, macro/regulatory context, threat intelligence, and content production into one agent-mediated control plane. It runs on a four-node Tailscale cluster — an Apple Silicon commander, an RTX 5070 Ti inference node, and two Raspberry Pi edge nodes — and uses Google Cloud Platform as an auditable data lake rather than an uncontrolled runtime dependency. The system is observed through an event bus, steered through operator-gated controls, and documented for acquisition diligence.
 
-The trading subsystem implements seven quantitative strategies under a unified deflated-Sharpe / Sortino / Calmar selection rubric, with combinatorial purged cross-validation and Gaussian-mixture regime classification gating capital deployment. The inference mesh provides four-tier failover (RTX 5070 Ti GPU → Raspberry Pi → Mac CPU → Kimi Cloud) with a sensitivity classifier that fails closed against PII or secret egress to managed cloud endpoints. The content engine is a fourteen-module research-to-publish pipeline with an institutional-grade quality gate that blocks unsupported performance claims before they reach Substack, X, LinkedIn, or Typefully.
+The intelligence subsystem now composes deterministic signal correlation, cross-asset regime detection, regulatory/macro calendars, on-chain provider snapshots, Hyperliquid counter-party tracking, historical event-impact lookup tables, and rubric-gated narrative synthesis. The trading subsystem remains behind risk-kernel, confirmation-firewall, dry-run, and kill-switch controls. The inference mesh provides four-tier failover (RTX 5070 Ti GPU -> Raspberry Pi -> Mac CPU -> Kimi Cloud) with a sensitivity classifier that fails closed against PII or secret egress to managed cloud endpoints. The content engine is a research-to-publish pipeline with an institutional quality gate that blocks unsupported performance claims before they reach Substack, X, LinkedIn, or Typefully.
 
-The platform is operated as a research instrument: every routine produces an artifact, every artifact has a verdict, and every verdict feeds a 32-page operational dashboard.
+The platform is operated as a research instrument: every routine produces an artifact, every artifact has a verdict, every generated artifact carries provenance, and every verdict feeds a 38-page operational dashboard.
 
 > $$\mathrm{NetPnL} = \underbrace{\sum_{t}\,\mathrm{edge}_t\,\cdot\,\mathrm{capital}_t\,\cdot\,\mathrm{efficiency}_t}_{\text{alpha}} \;-\; \underbrace{\sum_{t}\,\mathrm{fees}_t + \mathrm{slip}_t + \mathrm{infra}_t + \mathrm{tail}_t}_{\text{cost}}$$
 
@@ -33,6 +36,7 @@ The platform is operated as a research instrument: every routine produces an art
 ## Contents
 
 1. [System Architecture](#1-system-architecture)
+   - [Tranche 4 Intelligence Layer](#11-tranche-4-intelligence-layer)
 2. [Theoretical Foundations](#2-theoretical-foundations)
 3. [Trading System](#3-trading-system)
 4. [Inference Mesh](#4-inference-mesh)
@@ -79,18 +83,22 @@ flowchart LR
 
     Bus(((Event Bus<br/>Redis · JSONL))):::storage
 
-    ChainIntel[Chain Intelligence<br/>regime · funding · TVL]:::intel
+    ChainIntel[On-chain Intelligence<br/>Glassnode · Santiment · nodes]:::intel
+    CrossAsset[Cross-Asset Regimes<br/>correlation · lead/lag]:::intel
+    MacroIntel[Macro Intel<br/>Fed · SEC · CFTC · Treasury]:::intel
+    Counterparty[Counter-party Intel<br/>Hyperliquid top traders]:::intel
     Threat[Threat Intel<br/>CISA · NVD · ATT&CK]:::intel
-    Macro[OpenBB Macro<br/>32 providers · :6900]:::intel
+    EventImpact[Event Impact<br/>historical reactions]:::intel
     Predict[Kronos Forecast<br/>RSI/MACD/BB consensus]:::intel
+    Narrative[Narrative Synthesis<br/>rubric-gated theses]:::intel
 
     SecPlatform[Security Platform<br/>SBOM · model SHA · network map]:::security
     KillSwitch[Global Kill Switch]:::security
 
-    ContentEngine[Content Engine<br/>14 modules · 7-check rubric]:::content
+    ContentEngine[Content Engine<br/>17 modules · 7-check rubric]:::content
     Publishers[Publishers<br/>Substack · X · LinkedIn · Typefully]:::content
 
-    Dashboard[Dashboard<br/>32 pages · SSE]:::edge
+    Dashboard[Dashboard<br/>38 pages · SSE]:::edge
     Foundry[Palantir Foundry<br/>15-min ontology sync]:::storage
     GCP[GCP Lake<br/>BigQuery sapphire.*]:::storage
 
@@ -102,12 +110,16 @@ flowchart LR
 
     SignalLogger --> Bus
     ChainIntel --> Bus
+    CrossAsset --> Bus
+    MacroIntel --> Bus
+    Counterparty --> Bus
     Threat --> Bus
-    Macro --> Bus
+    EventImpact --> Bus
     Predict --> Bus
     SecPlatform --> Bus
 
     Bus --> Dashboard
+    Bus --> Narrative
     Bus --> ContentEngine --> Publishers
     Bus --> Foundry
     Bus --> GCP
@@ -121,20 +133,74 @@ flowchart LR
 
 | Surface | Count | Detail |
 |---|---:|---|
-| Passing tests | **5,281+** | 4,905+ unit · 376 plugin (`python scripts/ops/test_inventory.py --check-readme`) |
-| Test files | **281+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
-| Dashboard pages | **32** | Flask + SSE, basic-auth, Gemini OODA panel on `/sovereign-thesis` |
+| Passing tests | **5,296+** | 4,920+ unit · 376 plugin (`python scripts/ops/test_inventory.py --check-readme`) |
+| Test files | **282+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
+| Dashboard pages | **38** | Flask + SSE, basic-auth, observability, cross-asset, diligence, threat-intel, dossier pages |
 | Quant strategies | **7** | `lib/analytics/strategies.py` |
 | Pine strategies | **5** | `pine/standalone/` |
-| Plugin tools (registered · internal · deprecated) | **15 · 26 · 2** | `plugins/claw-sapphire/`, includes the bounded `gemini_ooda` AI complement |
-| LaunchAgents | **20** | `infra/launchagents/` plus `ai.hermes.gateway` runtime |
-| Claude scheduled tasks | **21** | `~/.claude/scheduled-tasks/` |
+| Plugin tools (registered · internal · deprecated) | **7 · 41 · 1** | 49 total entries in `infra/tool-registry.yaml` |
+| LaunchAgent definitions | **34** | Active plists plus service-level templates; runtime loading remains operator-controlled |
+| Product docs | **19** | `docs/products/`, including Tranche 4 buyer-facing surfaces |
 | Hermes Telegram skills | **16** | `~/.hermes/skills/sapphire/`, audited in `infra/hermes-sapphire-skills.yaml` |
 | Smart contracts | **2** | `contracts/*.sol` |
-| Inference tiers | **4 + 1** | GPU · Pi · Mac · Kimi Cloud, plus the bounded Gemini OODA lane (dry-run-default) |
+| Inference tiers | **4 + 2** | GPU · Pi · Mac · Kimi Cloud, plus bounded Gemini OODA and narrative synthesis lanes |
 | Content publishers | **4** | Substack · X · LinkedIn · Typefully |
-| Data providers wired | **13** | see §5 |
-| Production-readiness sweep | `scripts/ops/production_readiness_sweep.py` | self-hosted CI runner, no-spend posture, 49 pass / 3 warn / 0 fail external mode |
+| Intelligence/data feeds | **20+** | market, on-chain, macro/regulatory, threat, counter-party, and internal signal feeds |
+| Production-readiness sweep | **0 FAIL** | `scripts/ops/production_readiness_sweep.py --no-external` at Tranche 4 closeout |
+
+### 1.1 Tranche 4 Intelligence Layer
+
+Tranche 4 turns Sapphire from a signal collector into a compound intelligence system. Scores, regimes, macro calendars, on-chain heat, smart-money movement, expected historical reactions, and adversarial telemetry now converge into a narrative context block that can be inspected, tested, and buyer-reviewed.
+
+```mermaid
+flowchart TB
+    classDef source fill:#0A2540,stroke:#0A2540,color:#fff
+    classDef model fill:#0d9488,stroke:#0d9488,color:#fff
+    classDef guard fill:#7c2d12,stroke:#7c2d12,color:#fff
+    classDef output fill:#6d28d9,stroke:#6d28d9,color:#fff
+
+    TV[TradingView / TA / Kronos]:::source
+    HL[Hyperliquid public + top trader feeds]:::source
+    Macro[Official macro and regulatory sources]:::source
+    Chain[Glassnode / Santiment / ETH / SOL]:::source
+    Threat[CISA / NVD / ATT&CK]:::source
+
+    Corr[Signal Correlator<br/>edge_score + corroboration]:::model
+    Regime[Cross-Asset Matrix<br/>regime + breakdowns]:::model
+    Impact[Event-Impact Lookup<br/>expected reaction bands]:::model
+    Narrative[Narrative Synthesis<br/>thesis + invalidators]:::output
+    Adv[Adversarial Defense<br/>wash trade · prompt · oracle checks]:::guard
+    Obs[Observability + Acquirer Views<br/>38 dashboard pages]:::output
+
+    TV --> Corr
+    HL --> Corr
+    Macro --> Impact
+    Macro --> Narrative
+    Chain --> Narrative
+    Regime --> Corr
+    Corr --> Narrative
+    Impact --> Narrative
+
+    Corr --> Adv
+    Regime --> Adv
+    Macro --> Adv
+    Chain --> Adv
+    HL --> Adv
+
+    Narrative --> Obs
+    Adv --> Obs
+```
+
+| Surface | Primary modules | Output | Safety posture |
+|---|---|---|---|
+| Signal correlation | `lib/correlator/`, `services/correlator/` | `edge_score`, corroboration, divergent sources | Read-only adapters, capped fan-in, provenance-stamped JSONL |
+| Narrative synthesis | `lib/synthesis/`, `services/synthesis/` | `NarrativeThesis` with evidence, counter-thesis, invalidators | Dry-run default; live requires `SAPPHIRE_NARRATIVE_LIVE=1`; rubric-gated publish |
+| Cross-asset regimes | `lib/cross_asset/`, `services/cross_asset/` | Correlation matrix, regime label, breakdown events | Cache-first, no live calls in tests, <=24 assets |
+| Macro intelligence | `lib/macro/`, `services/macro_intel/` | Official-source events and forward calendar | Feed caps, source URLs retained, no LLM parser |
+| On-chain intelligence | `lib/chain/aggregator.py`, `services/onchain_intel/` | Heat score and provider snapshots for BTC/ETH/SOL | Per-provider live env gates and caps |
+| Event-impact model | `lib/event_impact/`, `services/event_impact/` | Historical reaction bands by event type and horizon | Honest wide bands for small samples; dry-run publish by default |
+| Counter-party intelligence | `lib/counterparty/`, `services/counterparty/` | Smart-money consensus from public Hyperliquid data | Public-data only, read-only, no wallet keys |
+| Adversarial defense | `lib/security/adversarial_*`, `services/adversarial/` | `adversarial.detection` telemetry | Flag-only by default; quarantine requires opt-in |
 
 ---
 
@@ -336,12 +402,14 @@ The dashboard surfaces a read-only OODA preview at [`/api/gemini-ooda`](services
 Sapphire is operated under a strict "no-spend, local-CI-as-merge-evidence" posture:
 
 - **Self-hosted GitHub runner.** Hosted Actions are gated behind `vars.SAPPHIRE_RUNNER`; commits intentionally land with `[skip ci]` so the GitHub-paid runners never fire. The full local CI (`scripts/ops/local_ci_verify.py --verbose`) is the merge gate, including README test-inventory drift.
-- **Production-readiness sweep.** [`scripts/ops/production_readiness_sweep.py`](scripts/ops/production_readiness_sweep.py) probes repo state, org no-spend workflow gates, satellite merge posture, all 20 LaunchAgents, local HTTP endpoints, the kill switch, autonomy-audit redaction, routine soaks, GitHub PR/issue queues, GCP/Vertex inventory, the Workspace threat-hygiene template, the Telegram bot, the Gemini live readiness probe, and bounded GCS/BigQuery write probes. The latest run (external mode) is `49 pass / 3 warn / 0 fail`; the three warnings are the routine soak gates and the manual Gemini-live live-call gate.
+- **Production-readiness sweep.** [`scripts/ops/production_readiness_sweep.py`](scripts/ops/production_readiness_sweep.py) probes repo state, org no-spend workflow gates, satellite merge posture, LaunchAgent definitions, local HTTP endpoints, the kill switch, autonomy-audit redaction, routine soaks, GitHub PR/issue queues, GCP/Vertex inventory, the Workspace threat-hygiene template, the Telegram bot, the Gemini live readiness probe, and bounded GCS/BigQuery write probes. The Tranche 4 handoff sweep in `--no-external` mode had `0` FAIL rows; remaining WARN rows are manual/live-readiness gates, not failed local invariants.
 - **Hermes runtime guard.** The Sapphire runtime quick-exec command guard is promoted to the live `ai.hermes.gateway` LaunchAgent with `SAPPHIRE_REPO_PATH` set; readiness is verified by [`scripts/ops/hermes_runtime_readiness.py`](scripts/ops/hermes_runtime_readiness.py).
 
 ---
 
 ## 5. Data Sources
+
+Sapphire separates raw providers from intelligence products. Provider clients are bounded and cache-aware; intelligence services transform them into event-bus topics, dashboard artifacts, and narrative context.
 
 ```mermaid
 flowchart LR
@@ -349,10 +417,15 @@ flowchart LR
     classDef market  fill:#1d4ed8,color:#fff,stroke:#1d4ed8
     classDef macro   fill:#6d28d9,color:#fff,stroke:#6d28d9
     classDef sec     fill:#7c2d12,color:#fff,stroke:#7c2d12
+    classDef synth   fill:#374151,color:#fff,stroke:#374151
 
     CM[CoinMetrics]:::onchain
+    GN[Glassnode]:::onchain
+    ETH[ETH RPC]:::onchain
+    SOL[Solana RPC]:::onchain
     DL[DeFiLlama]:::onchain
-    HL[Hyperliquid]:::onchain
+    HL[Hyperliquid public feed]:::market
+    CP[Hyperliquid top traders]:::market
     CG[CoinGecko]:::market
     CGL[CoinGlass]:::market
     DUNE[Dune Analytics]:::onchain
@@ -362,27 +435,42 @@ flowchart LR
     BGG[BGGeometrics]:::onchain
     OBB[OpenBB :6900]:::market
     RH[Robinhood Crypto]:::market
-    FRED[FRED]:::macro
+    FRED[FRED / OpenBB macro]:::macro
+    FED[Federal Reserve]:::macro
+    SEC[SEC]:::macro
+    CFTC[CFTC]:::macro
+    UST[Treasury]:::macro
+    BLS[BLS]:::macro
+    ECB[ECB / BIS]:::macro
     CISA[CISA / NVD]:::sec
+    Corr[Correlator + synthesis context]:::synth
 
-    CM & DL & HL & CG & CGL & DUNE & WHALE & SAN & CAPI & BGG & OBB & RH & FRED & CISA --> Bus[(Event Bus)]
+    CM & GN & ETH & SOL & DL & HL & CP & CG & CGL & DUNE & WHALE & SAN & CAPI & BGG & OBB & RH & FRED & FED & SEC & CFTC & UST & BLS & ECB & CISA --> Bus[(Event Bus)]
+    Bus --> Corr
 ```
 
 | Provider | Module | Auth | Domain |
 |---|---|---|---|
 | CoinMetrics | [`lib/chain/coinmetrics.py`](lib/chain/coinmetrics.py) | API key | On-chain fundamentals |
+| Glassnode | [`lib/chain/providers/glassnode.py`](lib/chain/providers/glassnode.py) | `SAPPHIRE_GLASSNODE_LIVE=1` + API key | HODL waves, NUPL, MVRV-Z, SOPR, LTH supply |
+| Santiment | [`lib/chain/providers/santiment.py`](lib/chain/providers/santiment.py) | `SAPPHIRE_SANTIMENT_LIVE=1` + API key | Social volume, age consumed, network growth |
+| Ethereum node | [`lib/chain/providers/eth_node.py`](lib/chain/providers/eth_node.py) | `SAPPHIRE_ETH_NODE_LIVE=1` + RPC URL | Gas, blocks, pending transaction summaries |
+| Solana node | [`lib/chain/providers/sol_node.py`](lib/chain/providers/sol_node.py) | `SAPPHIRE_SOL_NODE_LIVE=1` + RPC URL | TPS, validator status, stake summaries |
 | DeFiLlama | [`lib/chain/sources.py`](lib/chain/sources.py) | none | TVL, protocol metrics |
-| Hyperliquid | [`lib/chain/sources.py`](lib/chain/sources.py) | none | L1 perps order book |
+| Hyperliquid public feed | [`services/hyperliquid/`](services/hyperliquid/) | `SAPPHIRE_HYPERLIQUID_LIVE=1` | L1 perps public feed |
+| Hyperliquid counter-parties | [`lib/counterparty/`](lib/counterparty/) | `SAPPHIRE_HYPERLIQUID_LIVE=1` | Public top-trader leaderboard and position deltas |
 | CoinGecko | [`lib/chain/sources.py`](lib/chain/sources.py) | none | Market caps, prices |
 | CoinGlass | [`lib/chain/providers/coinglass.py`](lib/chain/providers/coinglass.py) | API key | Options, liquidations, OI |
 | Dune Analytics | [`lib/chain/providers/dune.py`](lib/chain/providers/dune.py) | API key | Custom SQL |
 | Whale Alert | [`lib/chain/providers/whale_alert.py`](lib/chain/providers/whale_alert.py) | API key | Large transactions |
-| Santiment | [`lib/chain/providers/santiment.py`](lib/chain/providers/santiment.py) | API key | Social + on-chain |
 | CoinAPI | [`lib/chain/providers/coinapi.py`](lib/chain/providers/coinapi.py) | API key | OHLCV reference |
 | BGGeometrics | [`lib/chain/providers/bgeometrics.py`](lib/chain/providers/bgeometrics.py) | API key | On-chain metrics |
 | OpenBB | REST `:6900` | none | Equity + crypto OHLCV (32 providers) |
 | Robinhood Crypto | [`lib/portfolio/robinhood.py`](lib/portfolio/robinhood.py) | **Ed25519** | Live portfolio |
 | FRED | REST | API key | Macro indicators |
+| Fed / FOMC | [`lib/macro/sources.py`](lib/macro/sources.py) | none | Press releases and scheduled FOMC events |
+| SEC / CFTC | [`lib/macro/sources.py`](lib/macro/sources.py) | none | Regulatory publications and enforcement signals |
+| Treasury / BLS / ECB / BIS | [`lib/macro/sources.py`](lib/macro/sources.py) | none | Auctions, economic releases, international central-bank context |
 | CISA / NVD | REST | none | Vulnerability intel |
 
 ---
@@ -515,23 +603,23 @@ flowchart LR
 
 ## 10. Operational Telemetry
 
-### 10.1 Dashboard — 32 pages
+### 10.1 Dashboard — 38 pages
 
 `services/dashboard/` — Flask · SSE · basic-auth · 10 s cached fetchers.
 
 | Category | Pages |
 |---|---|
-| **Command** | overview · command_deck · control · system · settings · platform |
-| **Trading** | signals · predictions · portfolio · performance · sapphire_book · risk |
-| **Intelligence** | intel · intelligence · chain · cascade · factors · agents |
-| **Content & ops** | content · organization · activity · logs |
-| **Security** | soc · security · health · infrastructure · production_readiness |
+| **Command** | overview · command_deck · control · system · settings · agents |
+| **Trading** | signals · predictions · portfolio · performance · sapphire_book · risk · factors |
+| **Intelligence** | intel · intelligence · investment_intel · chain · cross_asset · cascade · sovereign_thesis · sovereign_thesis_story |
+| **Content & ops** | content · organization · activity · logs · observability · diligence |
+| **Security** | soc · security · health · infrastructure · production_readiness · threat_intel · customer_dossier |
 | **Architecture** | architecture · analytics |
-| **Integrations** | robinhood_chain · admin_domains |
+| **Integrations** | robinhood_chain · agents_autonomous |
 
-Live event stream at `/api/events/stream`. Performance endpoints wired to real trade data: `/api/strategy-performance` · `/api/performance-timeseries` · `/api/backtest-results` · `/api/forecast`.
+Live event stream at `/api/events/stream`. Performance endpoints wired to real trade data: `/api/strategy-performance` · `/api/performance-timeseries` · `/api/backtest-results` · `/api/forecast`. Tranche 4 feed health is exposed through `/api/observability-tranche4-feeds`, with cross-asset endpoints at `/api/cross-asset-matrix`, `/api/cross-asset-regime`, and `/api/cross-asset-breakdowns`.
 
-### 10.2 Routines — 20 LaunchAgents · 21 scheduled tasks
+### 10.2 Routines — 34 LaunchAgent definitions
 
 Single source of truth: [`docs/routines-manifest.md`](docs/routines-manifest.md).
 
@@ -597,6 +685,14 @@ echo '{"action":"predict"}'                    | python3 plugins/claw-sapphire/t
 echo '{"action":"monitor"}'                    | python3 plugins/claw-sapphire/tools/internal/paper_trader.py   # read-only SL/TP preview
 echo '{"action":"synthesize","topic":"BTC regime","mode":"dry-run"}' \
                                                | python3 plugins/claw-sapphire/tools/gemini_ooda.py             # bounded Gemini OODA, dry-run by default
+echo '{"action":"correlate-once","symbol":"BTC","timeframe":"1h"}' \
+                                               | python3 plugins/claw-sapphire/tools/signal_correlator.py       # dry-run signal fusion
+echo '{"action":"synthesize-once","symbol":"BTC","timeframe":"1h"}' \
+                                               | python3 plugins/claw-sapphire/tools/narrative_synthesis.py     # narrative thesis, dry-run default
+echo '{"action":"status"}'                     | python3 plugins/claw-sapphire/tools/macro_intel.py             # official-source macro daemon status
+echo '{"action":"status"}'                     | python3 plugins/claw-sapphire/tools/onchain_intel.py           # on-chain provider gate status
+echo '{"action":"status"}'                     | python3 plugins/claw-sapphire/tools/counterparty_intel.py      # Hyperliquid public counter-party intel
+echo '{"action":"corpus"}'                     | python3 plugins/claw-sapphire/tools/event_impact.py            # historical event corpus
 
 # 6. Content engine
 python3 -m lib.content generate
@@ -608,10 +704,10 @@ python3 -m lib.content publish
 ## 12. Testing & QA
 
 ```bash
-# Unit tests — 4,905 collected
+# Unit tests — 4,920 collected; latest full run: 4,899 passed, 1 skipped, 21 xfailed
 /usr/local/bin/python3 -m pytest tests/unit/ --tb=short -q
 
-# Plugin tests — 376 collected
+# Plugin tests — 376 collected; latest full run: 376 passed
 /usr/local/bin/python3 -m pytest plugins/claw-sapphire/tests/ -q
 
 # Lint
@@ -620,6 +716,9 @@ ruff check --fix .
 
 # Tool registry invariant (CI-enforced)
 python3 scripts/validate_tool_registry.py
+
+# README inventory guard
+/usr/local/bin/python3 scripts/ops/test_inventory.py --check-readme
 
 # Local CI mirror
 make ci
@@ -677,6 +776,14 @@ The `docs/` directory holds 400 K+ words of cross-validated architecture, audit,
 | [`docs/kronos-integration-plan.md`](docs/kronos-integration-plan.md) | Kronos ML forecasting architecture |
 | [`docs/tradingview-cdp-setup.md`](docs/tradingview-cdp-setup.md) | TradingView CDP setup |
 | [`docs/routines-manifest.md`](docs/routines-manifest.md) | Single source of truth for every scheduled routine |
+| [`docs/products/narrative-synthesis-0.1.0.md`](docs/products/narrative-synthesis-0.1.0.md) | Buyer-facing narrative synthesis surface |
+| [`docs/products/cross-asset-correlation-0.1.0.md`](docs/products/cross-asset-correlation-0.1.0.md) | Cross-asset matrix and regime detection product surface |
+| [`docs/products/macro-intel-0.1.0.md`](docs/products/macro-intel-0.1.0.md) | Regulatory and macro intelligence daemon |
+| [`docs/products/onchain-intelligence-0.2.0.md`](docs/products/onchain-intelligence-0.2.0.md) | Glassnode, Santiment, ETH, and SOL provider deepening |
+| [`docs/products/event-impact-modeling-0.1.0.md`](docs/products/event-impact-modeling-0.1.0.md) | Historical event-impact lookup table |
+| [`docs/products/counterparty-intel-0.1.0.md`](docs/products/counterparty-intel-0.1.0.md) | Hyperliquid public counter-party intelligence |
+| [`docs/products/adversarial-defense-0.1.0.md`](docs/products/adversarial-defense-0.1.0.md) | Adversarial signal-defense layer |
+| [`docs/competitive/landscape-2026-04-28.md`](docs/competitive/landscape-2026-04-28.md) | Primary-source competitive landscape memo |
 | [`docs/QUICK_START_GUIDE.md`](docs/QUICK_START_GUIDE.md) | First-run setup |
 | [`docs/LOGGING.md`](docs/LOGGING.md) | Event + audit log schema |
 | [`docs/setup/`](docs/setup/) | Windows bringup · Pi Ethernet bridge · Cloudflare DNS |
