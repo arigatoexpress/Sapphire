@@ -1,0 +1,53 @@
+{
+  "schema_version": "0.1.0",
+  "generated_at": "2026-04-28T00:00:00+00:00",
+  "horizons_hours": [24],
+  "metadata": {
+    "methodology": "fixture expected reaction model",
+    "small_sample_policy": "fixture forces caveats"
+  },
+  "profiles": [
+    {
+      "category": "fomc_decision",
+      "sub_category": "rate_hike",
+      "asset": "BTC",
+      "horizon_hours": 24,
+      "mean_return_pct": -1.0,
+      "median_return_pct": -1.0,
+      "n": 8,
+      "stdev": 2.0,
+      "confidence_interval_95": [-5.0, 3.0],
+      "direction_consensus": -0.5,
+      "sample_event_ids": ["fixture_prior_fomc"],
+      "notes": ["small_sample_wide_band"]
+    },
+    {
+      "category": "etf_approval",
+      "sub_category": "spot_btc_etf_approval",
+      "asset": "BTC",
+      "horizon_hours": 24,
+      "mean_return_pct": 5.0,
+      "median_return_pct": 4.0,
+      "n": 6,
+      "stdev": 3.0,
+      "confidence_interval_95": [-2.0, 12.0],
+      "direction_consensus": 0.8,
+      "sample_event_ids": ["fixture_prior_etf"],
+      "notes": ["small_sample_wide_band"]
+    },
+    {
+      "category": "macro_shock",
+      "sub_category": "bank_failure",
+      "asset": "ETH",
+      "horizon_hours": 24,
+      "mean_return_pct": 2.0,
+      "median_return_pct": 1.0,
+      "n": 3,
+      "stdev": 5.0,
+      "confidence_interval_95": [-10.0, 14.0],
+      "direction_consensus": 0.33,
+      "sample_event_ids": ["fixture_prior_bank"],
+      "notes": ["small_sample_wide_band"]
+    }
+  ]
+}
