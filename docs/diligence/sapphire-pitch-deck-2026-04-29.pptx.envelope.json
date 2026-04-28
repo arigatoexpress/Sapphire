@@ -1,13 +1,13 @@
 {
-  "artifact_bytes": 324947,
-  "artifact_mtime": "2026-04-28T22:02:21+00:00",
+  "artifact_bytes": 329594,
+  "artifact_mtime": "2026-04-28T22:17:04+00:00",
   "artifact_path": "docs/diligence/sapphire-pitch-deck-2026-04-29.pptx",
-  "artifact_sha256": "b0dbf3262ca4c07221cb157b6b8ddce9deafaf2c53c6ba77e5a1dc205d99043b",
+  "artifact_sha256": "0d5fba32a9d035f0b2b9874b365efeed956e35c6c6a48136349ffc9962dce66e",
   "provenance": {
-    "envelope_hash": "981502e3a6cd52ff1ea62ccab1938494da8c884b9cbe3cb8a3473de71ef941ab",
+    "envelope_hash": "29019fa4d8c2a84356403239ba6b18e8c9033599e46d0a0bfd01f56068312ba7",
     "expires_at": null,
-    "generated_at": "2026-04-28T22:02:38+00:00",
-    "generator": "scripts/build_sapphire_pitch_deck",
+    "generated_at": "2026-04-28T22:17:04+00:00",
+    "generator": "scripts/diligence/build_pitch_deck.py",
     "metadata": {
       "aspect_ratio": "16:9",
       "audience": "Palantir Foundry corp-dev",
@@ -18,24 +18,28 @@
       "build_date": "2026-04-29",
       "fabricated_metrics": 0,
       "generator_chain": [
-        "build_diagram.py (matplotlib)",
-        "build_deck.py (python-pptx)"
+        "scripts/diligence/build_pitch_deck_diagram.py",
+        "scripts/diligence/build_pitch_deck.py"
       ],
-      "head_sha": "9074c408",
+      "head_sha": "67e7c0d4",
       "open_caveats": [
         "live-trading $5 first-order described as designed-and-gated; no executed-fill artifact exists in repo",
-        "team-process slide is brief by design \u2014 operator edits afterward"
+        "team-process slide is brief by design - operator edits afterward"
       ],
-      "palette": "midnight executive (navy + sapphire + ice)",
+      "palette": "Sapphire OS acquirer brand (navy + sapphire + ice)",
+      "plugin_tests": 378,
+      "product_surface_count": 15,
       "slide_count": 14,
-      "word_count_per_slide_max": 240
+      "test_count": 5366,
+      "unit_tests": 4988
     },
     "model": "python-pptx + matplotlib (no LLM)",
-    "payload_hash": "7af6ecabaaeab74da789dd3a8c6f5ac91423b75f91abbdfe22213f39651ee8bb",
+    "payload_hash": "ee6d54ec20c9ccbbf3b257bce646ff5944cbe97e7cf0ef72876880e2434c5315",
     "prompt_hash": null,
     "schema_version": 1,
     "source_hashes": {
       "CLAUDE.md": "0a799cdf8652faf3ca6e32bb9e0e97c45cac95ca0a92e809a61b281d74c75b7e",
+      "docs/brand/README.md": "10a7a35cedfa9e57fb64e030b7bdb548017aaa93bd72beb139d48916da421a4a",
       "docs/competitive/landscape-2026-04-28.md": "8bb7e5e9c7eb239f3e7ab771560ece2e4d472e6b108bf6be715de6b65bc9a994",
       "docs/diligence/00-executive-summary.md": "60167f939f432398c629795ba2e3aa3102c4e25a4505107625eebc9a8ef6d7b7",
       "docs/diligence/01-architecture.md": "ef4b1d27e870bfea48509efe47d0754dcc7ba26c3230ce1629782682ad44ca44",
@@ -47,16 +51,33 @@
       "docs/diligence/07-roadmap.md": "84008bc8d112ce83214349ed95c88cd57813ec585e5d88bd01465e70e227ce52",
       "docs/diligence/08-incidents-and-postmortems.md": "1bfea942e21c41d084f74918e4ca1d2cc7315abdc708393fb957270566853e7d",
       "docs/diligence/09-team-and-process.md": "22186de75b870a50be2a6ebfb6c5b3c8c4ebd4be11aebc9d03e63ab3ddad2475",
+      "docs/products/acquirer-microsite-0.1.0.md": "b06093500ff7e0a898602d0ae9240de354b58d2da92622e167343424ea18a424",
+      "docs/products/adversarial-defense-0.1.0.md": "2f9c0eddac96c8bad61a00860fa677dc82d87cc054343281be528eb11df31575",
+      "docs/products/bq-vector-retrieval-0.1.0.md": "57978178735ff64c2f465be56f062c8fddb514f761a81e7882427ad945adc781",
+      "docs/products/counterparty-intel-0.1.0.md": "24fff29bdb3841f0d2bd233759fc16f193ba1086afdeb7195a2f569a6d195764",
+      "docs/products/cross-asset-correlation-0.1.0.md": "14ce9f64132bb684cc1c3f9aaf690ce73f566e1e3761a47146b4df2375ad1877",
       "docs/products/customer-dossier-0.2.0.md": "1c87ce9417dd2feace795ca153f0c7de169ced2314e0bf99dd0a674790cc8092",
+      "docs/products/customer-dossier-product-0.1.0.md": "f74d20d8dd87c72233aa2657bf9688296237f78e6132553ac6681841f14ae6f8",
+      "docs/products/event-impact-modeling-0.1.0.md": "369c7df7dbc3deb3ce5a707beb872b6931934bd504f1774723bfd89310750d4f",
       "docs/products/foundry-ontology-0.2.0.md": "c120be343f3f2ab502698c09fa8acdadbf6d2d9da1e44fbd4b6be596d918bfae",
+      "docs/products/hyperliquid-signal-0.1.0.md": "49119353cb6725495fe3b3f3d9087b882956f203ab18993f5c5af8eada005fdc",
+      "docs/products/intel-quality-studies-0.1.0.md": "3f9180d0c32b9c2e55afbb6ec0988cd4177faf8aa2a53afc00c3deaf604a7c80",
       "docs/products/live-trading-ramp-memo.md": "305f227daee66951174cc6fa4a45ef3db5b66e0569d8e39c1435e40447309308",
+      "docs/products/macro-intel-0.1.0.md": "f2730d70af596a7f360c7b2ad545a49cc82ead0a8f6330c8041a3f74354ab1ae",
       "docs/products/narrative-synthesis-0.1.0.md": "ea3392e6a3ef2ef3e37df78c75e5f7a9fb7aea4de5586c90d2289579e168f6f0",
+      "docs/products/onchain-intelligence-0.2.0.md": "32286cc82cb921b9e3571b13bfe0756bf2aaa8df2d888b12693504ba939dc504",
       "docs/products/provenance-envelopes-0.1.0.md": "0f399658245579f442d6e4ec2e33fbe2c5dff7979d8d7d257aa4bc826f4714c5",
       "docs/products/risk-kernel-0.1.0.md": "989f4acbdf94e8a8e42394869cb9d0ea3a1240579274beda07fb8511c6f532a1",
       "docs/products/signal-correlator-0.1.0.md": "e544fdb0a1bf26c09961d78cd4dca224ece8bfdcd2e52392f3b8e9e7a10d503c",
+      "docs/products/telegram-intel-reader-0.1.0.md": "7327fe46595ae7673faac9c6f04a9f746364d20f647dd396d2531d40da93e2c7",
       "docs/products/threat-intel-product-0.1.0.md": "0693d9a2cde5030ec80ecdd7ae2d5b71e6a658aab0358127c95a51e72cfc862d",
       "docs/security/kill-switch-invariants.md": "84860246ece72f4a45ef3539bfa8778644f3b261a66e585e80e0e21efa61f2ac",
-      "web/acquirer/index.html": "6e9d5db033a0b9c176409fab89668057e1f3083a109a2df4a585a9f5b7380175"
+      "scripts/diligence/build_pitch_deck.py": "594d0a76a87f6ff27762b7143ba7c29e461e4ac99e11e6d9f075af06cca6fac4",
+      "scripts/diligence/build_pitch_deck_diagram.py": "080f5356fa39c70c576529ddde791a78a799f78b2a180849e7daa23b083490c7",
+      "web/acquirer/assets/branding/brand-guidelines.md": "1b6fc5c71e3d8d6c785f01524e6b6f8734683e7f17e6d5c7d4f4ab0f130a1d66",
+      "web/acquirer/assets/branding/logo-dark-bg.png": "bcacfc8a36efa720a5b696322b14dc9f2b6f916a169d69eda7486286fa793b42",
+      "web/acquirer/assets/styles.css": "5d463c884dd6fc27c185533f427e56575a9d07fd24efb66020b135d6492a3cdc",
+      "web/acquirer/index.html": "403f2d0ef498b3a83f6e99243716f1c185763e6818fc1e4b4d9e3694c896fef9"
     },
     "ttl_seconds": null
   }

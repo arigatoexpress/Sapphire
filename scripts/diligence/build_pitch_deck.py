@@ -18,16 +18,24 @@ the pptx alongside it. Copy the result into docs/diligence/ for distribution.
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
-from datetime import datetime, timezone
+from pathlib import Path
 
 from pptx import Presentation
-from pptx.util import Inches, Pt, Emu
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
-from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
-from pptx.oxml.ns import qn
-from lxml import etree
+from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
+from pptx.util import Inches, Pt
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from lib.core.provenance import write_envelope_sidecar  # noqa: E402
+
+DEFAULT_BUILD_DIR = Path("/tmp/sapphire-deck-build")
+DEFAULT_OUTPUT = REPO_ROOT / "docs/diligence/sapphire-pitch-deck-2026-04-29.pptx"
 
 
 # --- Palette (mirrors web/acquirer/assets/styles.css and the diagram) ---
@@ -50,10 +58,53 @@ BODY_FONT = "Helvetica Neue"
 MONO_FONT = "Menlo"
 
 
-# Provenance (HEAD SHA fetched at build time; date frozen for determinism)
-HEAD_SHA = os.environ.get("SAPPHIRE_HEAD_SHA", "9074c408")
+def _git_short_sha() -> str:
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "--short=8", "HEAD"],
+            cwd=REPO_ROOT,
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except Exception:
+        return "unknown"
+
+
+def _path_from_env(name: str, default: Path) -> Path:
+    raw = os.environ.get(name)
+    path = Path(raw).expanduser() if raw else default
+    return path if path.is_absolute() else REPO_ROOT / path
+
+
+def _source_paths() -> tuple[Path, ...]:
+    fixed = [
+        REPO_ROOT / "CLAUDE.md",
+        REPO_ROOT / "docs/competitive/landscape-2026-04-28.md",
+        REPO_ROOT / "docs/security/kill-switch-invariants.md",
+        REPO_ROOT / "docs/brand/README.md",
+        REPO_ROOT / "scripts/diligence/build_pitch_deck.py",
+        REPO_ROOT / "scripts/diligence/build_pitch_deck_diagram.py",
+        REPO_ROOT / "web/acquirer/index.html",
+        REPO_ROOT / "web/acquirer/assets/styles.css",
+        REPO_ROOT / "web/acquirer/assets/branding/brand-guidelines.md",
+        REPO_ROOT / "web/acquirer/assets/branding/logo-dark-bg.png",
+    ]
+    diligence = sorted((REPO_ROOT / "docs/diligence").glob("[0-9][0-9]-*.md"))
+    products = sorted((REPO_ROOT / "docs/products").glob("*.md"))
+    return tuple(path for path in (*fixed, *diligence, *products) if path.exists())
+
+
+# Provenance (HEAD SHA fetched at build time; date frozen for distribution date)
+HEAD_SHA = os.environ.get("SAPPHIRE_HEAD_SHA") or _git_short_sha()
 BUILD_DATE = "2026-04-29"
 TARGET_AUDIENCE = "Palantir Foundry corp-dev"
+TEST_TOTAL = "5,366"
+UNIT_TESTS = "4,988"
+PLUGIN_TESTS = "378"
+PLUGIN_TOOL_COUNT = "88"
+DASHBOARD_PAGE_COUNT = "38"
+LAUNCHAGENT_COUNT = "24"
+PRODUCT_SURFACE_COUNT = "15"
 
 
 # ---------- Helpers ----------
@@ -212,10 +263,15 @@ def slide_title(prs):
     slide = prs.slides.add_slide(prs.slide_layouts[6])  # blank
     add_dark_background(slide, NAVY_DEEP)
 
-    # Brand mark + name top-left
-    add_text(slide, Inches(0.6), Inches(0.6), Inches(2.0), Inches(0.4),
-             "[ S ]   SAPPHIRE OS", font=MONO_FONT, size=12, bold=True,
-             color=SAPPHIRE_LT)
+    # Brand lockup from the acquirer microsite asset pack.
+    logo = REPO_ROOT / "web/acquirer/assets/branding/logo-dark-bg.png"
+    if logo.exists():
+        slide.shapes.add_picture(str(logo), Inches(0.6), Inches(0.5),
+                                 width=Inches(2.7))
+    else:
+        add_text(slide, Inches(0.6), Inches(0.6), Inches(2.0), Inches(0.4),
+                 "[ S ]   SAPPHIRE OS", font=MONO_FONT, size=12, bold=True,
+                 color=SAPPHIRE_LT)
 
     # Big positioning headline (allow 2 lines, give it 2.2" of vertical room)
     add_text(slide, Inches(0.6), Inches(2.0), Inches(12.1), Inches(2.2),
@@ -253,7 +309,9 @@ def slide_title(prs):
         "auditable before action.\n\n"
         f"Audience for this render: {TARGET_AUDIENCE} — see Slide 8 for "
         "audience-specific framing.\n\n"
-        f"Source: HEAD {HEAD_SHA} @ docs/diligence/00-executive-summary.md"
+        "Source: docs/diligence/00-executive-summary.md + "
+        "web/acquirer/assets/branding/brand-guidelines.md "
+        f"@ SHA {HEAD_SHA}"
     )
     return slide
 
@@ -289,7 +347,7 @@ def slide_thesis(prs):
             "02",
             "Why now",
             "The differentiators are now separable: Risk Kernel, Provenance, Foundry Ontology, "
-            "and a 5,304-test gate exist as packaged surfaces. "
+            f"and a {TEST_TOTAL}-test gate exist as packaged surfaces. "
             "Operator intuition is now file-addressable.",
         ),
         (
@@ -300,7 +358,7 @@ def slide_thesis(prs):
         ),
     ]
 
-    for x, (num, title, body) in zip(starts, items):
+    for x, (num, title, body) in zip(starts, items, strict=True):
         add_card(slide, x, card_y, card_w, card_h, fill=NAVY_CARD)
         add_text(slide, x + Inches(0.3), card_y + Inches(0.3),
                  card_w - Inches(0.6), Inches(0.6),
@@ -319,8 +377,9 @@ def slide_thesis(prs):
         "Three pillars: what, when, why-defensible. Each maps to a section "
         "in the diligence packet (00 executive summary; 02 product surfaces; "
         "03 security posture).\n\n"
-        "Test count is from scripts/ops/test_inventory.py (5,304 collected on "
-        "2026-04-28). Live $5 cap is from docs/products/live-trading-ramp-memo.md.\n\n"
+        "Test count is from scripts/ops/test_inventory.py "
+        f"({TEST_TOTAL} collected on 2026-04-28). Live $5 cap is from "
+        "docs/products/live-trading-ramp-memo.md.\n\n"
         f"Source: docs/diligence/00-executive-summary.md @ SHA {HEAD_SHA}"
     )
     return slide
@@ -346,7 +405,7 @@ def slide_architecture(prs, image_path):
     pic_width_in = pic_height_in * 16.0 / 9.0
     pic_left = Inches((13.333 - pic_width_in) / 2.0)
     pic_top = Inches(1.25)
-    slide.shapes.add_picture(image_path, pic_left, pic_top,
+    slide.shapes.add_picture(str(image_path), pic_left, pic_top,
                              height=Inches(pic_height_in))
 
     add_footer(slide, dark=True, label="3 / 14")
@@ -375,7 +434,7 @@ def slide_capabilities(prs):
              "Capabilities matrix",
              font=HEAD_FONT, size=28, bold=True, color=ICE)
     add_text(slide, Inches(0.6), Inches(0.95), Inches(12.0), Inches(0.4),
-             "Fourteen sellable surfaces. Versioned, tested, separately purchasable.",
+             f"{PRODUCT_SURFACE_COUNT} packaged surfaces. Versioned, tested, separately purchasable.",
              font=HEAD_FONT, size=13, italic=True, color=ICE_MUTED)
 
     # Table
@@ -423,6 +482,9 @@ def slide_capabilities(prs):
         ("Adversarial Defense 0.1.0",
          "5 detectors: wash trade, prompt inj, oracle, false flag, bot pump",
          "telemetry-first"),
+        ("Acquirer Microsite 0.1.0",
+         "Static buyer brief with brand assets, no tracking, no remote JS",
+         "live (static)"),
     ]
 
     table_left = Inches(0.6)
@@ -441,7 +503,7 @@ def slide_capabilities(prs):
     # row heights
     table.rows[0].height = Inches(0.4)
     for r in range(1, n_rows):
-        table.rows[r].height = Inches(0.34)
+        table.rows[r].height = Inches(0.31)
 
     for r, row in enumerate(rows):
         for c, val in enumerate(row):
@@ -461,19 +523,19 @@ def slide_capabilities(prs):
                     else:
                         col = ICE
                     fill = NAVY_ELEV if r % 2 else NAVY_CARD
-                    set_table_cell(cell, val, font=BODY_FONT, size=10.5,
+                    set_table_cell(cell, val, font=BODY_FONT, size=9.8,
                                    bold=True, color=col, fill=fill)
                 else:
                     fill = NAVY_ELEV if r % 2 else NAVY_CARD
                     bold = (c == 0)
                     txt_color = ICE if c == 0 else ICE_MUTED
-                    set_table_cell(cell, val, font=BODY_FONT, size=10.5,
+                    set_table_cell(cell, val, font=BODY_FONT, size=9.8,
                                    bold=bold, color=txt_color, fill=fill)
 
     add_footer(slide, dark=True, label="4 / 14")
     add_speaker_notes(
         slide,
-        "Fourteen versioned product surfaces. Status colors:\n"
+        f"{PRODUCT_SURFACE_COUNT} packaged product surfaces. Status colors:\n"
         "  green = live (read-only or paper) and shipping\n"
         "  amber = dry-run default / mock fixture / telemetry-first\n\n"
         "Every row corresponds to a doc under docs/products/<surface>-<version>.md "
@@ -577,13 +639,13 @@ def slide_traction(prs):
 
     # 8 large stat tiles in 2x4
     stats = [
-        ("5,304", "tests collected",
+        (TEST_TOTAL, "tests collected",
          "scripts/ops/test_inventory.py"),
-        ("63", "plugin tools on disk",
+        (PLUGIN_TOOL_COUNT, "plugin tools on disk",
          "plugins/claw-sapphire/tools/"),
-        ("32", "dashboard pages",
+        (DASHBOARD_PAGE_COUNT, "dashboard page templates",
          "services/dashboard/templates/pages/"),
-        ("24", "macOS LaunchAgents",
+        (LAUNCHAGENT_COUNT, "macOS LaunchAgents",
          "infra/launchagents/"),
         ("7", "quant strategies",
          "lib/analytics/strategies/"),
@@ -626,14 +688,13 @@ def slide_traction(prs):
     add_speaker_notes(
         slide,
         "All metrics grounded:\n"
-        "  • 5,304 tests: from scripts/ops/test_inventory.py output on "
-        "2026-04-28 (4,928 unit + 376 plugin)\n"
-        "  • 63 plugin tools: 36 top-level + 25 internal + 2 deprecated, "
-        "per CLAUDE.md and ls plugins/claw-sapphire/tools/\n"
-        "  • 32 dashboard pages: per CLAUDE.md and "
-        "ls services/dashboard/templates/pages/ (38 files; 32 unique product pages)\n"
-        "  • 24 LaunchAgents: ls infra/launchagents/ (CLAUDE.md notes 20 in audit "
-        "snapshot — current count is 24 after recent additions)\n"
+        f"  • {TEST_TOTAL} tests: from scripts/ops/test_inventory.py output on "
+        f"2026-04-28 ({UNIT_TESTS} unit + {PLUGIN_TESTS} plugin)\n"
+        f"  • {PLUGIN_TOOL_COUNT} plugin tools: 48 top-level + 38 internal "
+        "+ 2 deprecated, per find plugins/claw-sapphire/tools -name '*.py'\n"
+        f"  • {DASHBOARD_PAGE_COUNT} dashboard page templates: "
+        "find services/dashboard/templates/pages -maxdepth 1 -type f\n"
+        f"  • {LAUNCHAGENT_COUNT} LaunchAgents: find infra/launchagents -maxdepth 1 -type f\n"
         "  • 7 quant strategies: lib/analytics/ — RegimeAwareRSI, FundingRate-"
         "Contrarian, CorrelationBreakout, MultiTFMomentum, SapphireComposite + base + params\n"
         "  • 13 Foundry types: 8 from 0.1.0 + 5 added in 0.2.0\n"
@@ -773,7 +834,7 @@ def slide_why_audience(prs):
             "POC fit, not replacement",
             "We don't out-Foundry Foundry — we plug into it.",
             "Sapphire is exactly the right size to be a Foundry pilot tenant: "
-            "5,304 tests, 14 productized surfaces, and provenance discipline that "
+            f"{TEST_TOTAL} tests, {PRODUCT_SURFACE_COUNT} packaged surfaces, and provenance discipline that "
             "maps to your ontology contracts on day one.",
         ),
     ]
@@ -786,7 +847,7 @@ def slide_why_audience(prs):
               Inches(0.55) + card_w + gap,
               Inches(0.55) + (card_w + gap) * 2]
 
-    for x, (title, sub, body) in zip(starts, cards):
+    for x, (title, sub, body) in zip(starts, cards, strict=True):
         add_card(slide, x, card_y, card_w, card_h, fill=NAVY_CARD)
         add_accent_bar(slide, x, card_y, card_w, Inches(0.06), SAPPHIRE)
 
@@ -813,7 +874,7 @@ def slide_why_audience(prs):
         "(Hyperliquid, on-chain, counterparty); (3) live-trading ramp "
         "discipline ($5 → $50 → $500) that mirrors Cortex's careful "
         "informational-vs-execution separation.\n\n"
-        "For specialty acquirer: emphasize compactness — 5,304 tests, "
+        f"For specialty acquirer: emphasize compactness — {TEST_TOTAL} tests, "
         "1 operator, an integrated control plane that demonstrates the "
         "safe-autonomy pattern at carve-out scale.\n\n"
         f"Source: docs/foundry-ontology-schema.md + docs/products/foundry-ontology-0.2.0.md "
@@ -973,7 +1034,8 @@ def slide_team_ip(prs):
                     ip_w - Inches(0.6), ip_h - Inches(1.6),
                     [
                         "Core repo: arigatoexpress/Sapphire (private). "
-                        "5,304 tests · 14 product surfaces · 32 dashboard pages.",
+                        f"{TEST_TOTAL} tests · {PRODUCT_SURFACE_COUNT} packaged surfaces · "
+                        f"{DASHBOARD_PAGE_COUNT} dashboard page templates.",
                         "Satellite repos orchestrated, not absorbed.",
                         "Smart contracts: SapphireSignalVerifier + PaymentGate "
                         "on Robinhood Chain testnet (Arbitrum Orbit).",
@@ -1055,7 +1117,9 @@ def slide_acquisition_rationale(prs):
               Inches(0.55) + card_w + gap,
               Inches(0.55) + (card_w + gap) * 2]
 
-    for x, (label, name, sub, bullets, bottom, color) in zip(starts, options):
+    for x, (label, name, sub, bullets, bottom, color) in zip(
+        starts, options, strict=True
+    ):
         add_card(slide, x, card_y, card_w, card_h, fill=NAVY_CARD)
         add_accent_bar(slide, x, card_y, card_w, Inches(0.06), color)
 
@@ -1276,16 +1340,16 @@ def slide_appendix_provenance(prs):
              font=HEAD_FONT, size=18, bold=True, color=ICE)
 
     provenance_lines = [
-        f"Repo:          arigatoexpress/Sapphire",
+        "Repo:          arigatoexpress/Sapphire",
         f"HEAD:          {HEAD_SHA}",
         f"Build date:    {BUILD_DATE}",
-        f"Branch:        docs/sapphire-pitch-deck-2026-04-29",
-        f"Builder:       /tmp/sapphire-deck-build/",
-        f"PPTX library:  python-pptx",
-        f"Diagram:       matplotlib (PIL backend)",
-        f"Test snapshot: scripts/ops/test_inventory.py @ 2026-04-28",
+        "Branch:        docs/sapphire-pitch-deck-refresh-2026-04-28",
+        "Builder:       /tmp/sapphire-deck-build/",
+        "PPTX library:  python-pptx",
+        "Diagram:       matplotlib (PIL backend)",
+        "Test snapshot: scripts/ops/test_inventory.py @ 2026-04-28",
         f"Audience:      {TARGET_AUDIENCE}",
-        f"Sidecar:       *.envelope.json (lib/core/provenance shape)",
+        "Sidecar:       *.envelope.json (lib/core/provenance shape)",
     ]
     add_text(slide, left_x + Inches(0.35), left_y + Inches(0.95),
              left_w - Inches(0.7), left_h - Inches(1.1),
@@ -1308,10 +1372,10 @@ def slide_appendix_provenance(prs):
         "$ python3 scripts/ops/test_inventory.py --check-readme",
         "",
         "# Plugin tool count",
-        "$ ls plugins/claw-sapphire/tools/*.py | wc -l",
+        "$ find plugins/claw-sapphire/tools -type f -name '*.py' | wc -l",
         "",
         "# Dashboard pages",
-        "$ ls services/dashboard/templates/pages/ | wc -l",
+        "$ find services/dashboard/templates/pages -maxdepth 1 -type f | wc -l",
         "",
         "# Provenance verification",
         "$ python3 scripts/ops/provenance_verify.py --pretty",
@@ -1325,7 +1389,7 @@ def slide_appendix_provenance(prs):
     add_text(slide, right_x + Inches(0.35), right_y + Inches(0.95),
              right_w - Inches(0.7), right_h - Inches(1.1),
              "\n".join(verify_lines),
-             font=MONO_FONT, size=10, color=ICE_MUTED, line_spacing=1.45)
+             font=MONO_FONT, size=9, color=ICE_MUTED, line_spacing=1.28)
 
     # Bottom honest disclosure
     add_text(slide, Inches(0.6), Inches(7.0), Inches(12.1), Inches(0.4),
@@ -1345,9 +1409,10 @@ def slide_appendix_provenance(prs):
 
 
 def main():
-    out_dir = "/tmp/sapphire-deck-build"
-    arch = os.path.join(out_dir, "architecture.png")
-    if not os.path.exists(arch):
+    out_dir = _path_from_env("OUT_DIR", DEFAULT_BUILD_DIR)
+    output = _path_from_env("SAPPHIRE_PITCH_DECK_OUT", DEFAULT_OUTPUT)
+    arch = out_dir / "architecture.png"
+    if not arch.exists():
         sys.exit(f"missing diagram: {arch}")
 
     prs = make_presentation()
@@ -1366,9 +1431,38 @@ def main():
     slide_appendix_diligence(prs)
     slide_appendix_provenance(prs)
 
-    output = os.path.join(out_dir, "sapphire-pitch-deck-2026-04-29.pptx")
+    output.parent.mkdir(parents=True, exist_ok=True)
     prs.save(output)
+    sidecar = write_envelope_sidecar(
+        output,
+        generator="scripts/diligence/build_pitch_deck.py",
+        model="python-pptx + matplotlib (no LLM)",
+        source_paths=_source_paths(),
+        metadata={
+            "aspect_ratio": "16:9",
+            "audience": TARGET_AUDIENCE,
+            "audience_alternates": ["Robinhood Cortex", "specialty acquirer"],
+            "build_date": BUILD_DATE,
+            "fabricated_metrics": 0,
+            "generator_chain": [
+                "scripts/diligence/build_pitch_deck_diagram.py",
+                "scripts/diligence/build_pitch_deck.py",
+            ],
+            "head_sha": HEAD_SHA,
+            "open_caveats": [
+                "live-trading $5 first-order described as designed-and-gated; no executed-fill artifact exists in repo",
+                "team-process slide is brief by design - operator edits afterward",
+            ],
+            "palette": "Sapphire OS acquirer brand (navy + sapphire + ice)",
+            "product_surface_count": int(PRODUCT_SURFACE_COUNT),
+            "slide_count": len(prs.slides),
+            "test_count": int(TEST_TOTAL.replace(",", "")),
+            "unit_tests": int(UNIT_TESTS.replace(",", "")),
+            "plugin_tests": int(PLUGIN_TESTS.replace(",", "")),
+        },
+    )
     print(f"WROTE {output}  ({len(prs.slides)} slides)")
+    print(f"WROTE {sidecar}")
 
 
 if __name__ == "__main__":
