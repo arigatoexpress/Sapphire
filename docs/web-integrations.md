@@ -97,7 +97,7 @@ RESEND_FROM_EMAIL=press@kadima.digital
    `LinkedIn-API-Postman/collection.json`, or the developer console).
 4. Copy to `.env.integrations`:
    - `LINKEDIN_ACCESS_TOKEN=<token>`  (expires in 60 days; refresh via
-     refresh_token flow — see `docs/oauth-linkedin.md` TODO)
+     refresh-token handling; see `docs/oauth-linkedin.md`)
    - `LINKEDIN_AUTHOR_URN=urn:li:person:<your-id>` (personal)
      or `urn:li:organization:<page-id>` (company).
 
