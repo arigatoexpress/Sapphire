@@ -154,6 +154,7 @@ def run_checks(args: argparse.Namespace) -> dict[str, Any]:
         checks.append(check_plugin_tests())
     if not args.skip_registry:
         checks.append(check_tool_registry())
+    checks.append(check_repo_structure())
     checks.append(check_gitleaks())  # runs only if gitleaks is on PATH
     checks.append(check_docs_plist_gitleaks())  # docs-specific custom rules
 
@@ -201,6 +202,13 @@ def check_tool_registry() -> dict[str, Any]:
     return _run_named(
         "tool registry invariants",
         [DEFAULT_PYTHON, "scripts/validate_tool_registry.py"],
+    )
+
+
+def check_repo_structure() -> dict[str, Any]:
+    return _run_named(
+        "repo structure invariants",
+        [DEFAULT_PYTHON, "scripts/ops/check_repo_structure.py"],
     )
 
 
