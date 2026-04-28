@@ -84,3 +84,18 @@ def test_remote_routines_pin_self_hosted_runner_tool_cache() -> None:
 
         assert env["AGENT_TOOLSDIRECTORY"] == expected
         assert env["RUNNER_TOOL_CACHE"] == expected
+
+
+def test_remote_routines_use_uv_instead_of_setup_python() -> None:
+    for workflow_name in ROUTINE_WORKFLOWS:
+        workflow = _workflow(workflow_name)
+        steps = [
+            step
+            for job in workflow["jobs"].values()
+            for step in job["steps"]
+        ]
+        run_blocks = "\n".join(step.get("run", "") for step in steps)
+        used_actions = {step.get("uses", "") for step in steps}
+
+        assert "actions/setup-python" not in used_actions
+        assert "uv run --python 3.11 --no-project" in run_blocks
