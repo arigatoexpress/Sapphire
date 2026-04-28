@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-SERVICES_DIR = Path(__file__).resolve().parent
+SERVICES_DIR = Path(__file__).resolve().parents[2] / "services" / "pm_bot"
 if str(SERVICES_DIR) not in sys.path:
     sys.path.insert(0, str(SERVICES_DIR))
 
