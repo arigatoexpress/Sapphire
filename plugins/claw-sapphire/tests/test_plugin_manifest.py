@@ -44,5 +44,7 @@ def test_manifest_registered_tools_are_intentional():
 
     for tool in tools:
         assert tool["requiredPermission"] == expected_permissions[tool["name"]]
+        assert tool["inputSchema"]["type"] == "object"
+        assert tool["inputSchema"]["additionalProperties"] is True
         tool_path = PLUGIN_ROOT.parent.parent / tool["args"][0]
         assert tool_path.exists(), f"Missing tool target for {tool['name']}: {tool_path}"
