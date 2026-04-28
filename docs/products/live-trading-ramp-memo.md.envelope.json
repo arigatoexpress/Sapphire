@@ -1,0 +1,32 @@
+{
+  "artifact_bytes": 8935,
+  "artifact_mtime": "2026-04-28T16:22:57+00:00",
+  "artifact_path": "docs/products/live-trading-ramp-memo.md",
+  "artifact_sha256": "305f227daee66951174cc6fa4a45ef3db5b66e0569d8e39c1435e40447309308",
+  "provenance": {
+    "envelope_hash": "e7c399a161e1b48a40db5263f9c2124b0d41a4b5b1371e3fcd9fd784c964ff83",
+    "expires_at": null,
+    "generated_at": "2026-04-28T16:24:04+00:00",
+    "generator": "codex-lane-5-live-ramp-docs",
+    "metadata": {
+      "artifact_kind": "diligence_doc",
+      "lane": "tranche-3-lane-5"
+    },
+    "model": "gpt-5",
+    "payload_hash": "2242ba5c4a951a57703d0503f506dcc59e04816c325246b88e24ecb16c0f7a4c",
+    "prompt_hash": "8ee2b8f4632db4a8e776862e5d7a46de38ff7a2a31880c5235781c35973fe932",
+    "schema_version": 1,
+    "source_hashes": {
+      "docs/ops/robinhood-real-funds-readiness.md": "a330007b15e351302936b69a79077718ae6552ea2608eb3b466ec90f756d1a80",
+      "docs/trading-strategy-lab.md": "2d426e71ea19757509fa947a9d7393ae0871c48617ac55e53b42a1dfa0c8d973",
+      "lib/core/confirmation_firewall.py": "4fd9b71ddf23ebf88a4b8e717996b17c65809a3f9cd67fc8f70b595fad366f12",
+      "lib/core/kill_switch.py": "871868eac85c08a391c8b8ab65df51dad9f188ea273520b46122ed8004d21733",
+      "lib/core/risk_kernel/__init__.py": "a166664924a7aa28886affecbf85974f49b3baca73cb623cb1e2cb249806c7a6",
+      "lib/core/routine_pause.py": "3bb75f6de79597eb88ed9dfaf3b1975c6247ea77a8c580ada85c3667cf4a6f88",
+      "lib/core/security_kill_switch.py": "f7a67df177782c5e0bf76293a81c53a325ddc0d54db509ad5a7fb588ddc34b32",
+      "lib/core/src/sapphire_core/risk_kernel.py": "be39dcbd5670bb16ae5250a68394e9eacb2969c76d5f4eaad19fb03980f3af23",
+      "lib/trading/strategy_lab.py": "a4d8d4412ecf3fe65a9d0b67eee25639ddb3ad07de5a4615aa507fd83428c114"
+    },
+    "ttl_seconds": null
+  }
+}
