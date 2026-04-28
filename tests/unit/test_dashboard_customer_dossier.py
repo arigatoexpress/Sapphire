@@ -267,7 +267,11 @@ def test_api_customer_dossier_summary_uses_status_distribution(client, dossier_d
     assert s["total_customers"] == 3
     assert s["document_templates"] == 63
     assert s["deals_recent"] == 1
-    assert s["by_status"] == {"ENROLLED": 1, "LEAD": 1, "CLOSED": 1}
+    # 0.2.0 — cell-suppression: each bucket below the threshold (5) is
+    # reported as the literal "<5" instead of an exact integer. The fixture
+    # has one customer per status, so all three buckets suppress.
+    assert s["by_status"] == {"ENROLLED": "<5", "LEAD": "<5", "CLOSED": "<5"}
+    assert s["cell_suppression"] == {"applied": True, "threshold": 5, "marker": "<5"}
 
 
 def test_api_customer_dossier_no_post_put_delete_patch(client):
@@ -313,7 +317,8 @@ def test_api_customer_dossier_picks_latest_dossier_file(client, dossier_dir):
     response = client.get("/api/customer-dossier", headers=_auth_header())
     payload = response.get_json()
     assert payload["snapshot_path_basename"] == "dossier_2026-04-28.json"
-    assert payload["summary"]["by_status"] == {"NEW": 1}
+    # 0.2.0 — single-record bucket suppresses to "<5".
+    assert payload["summary"]["by_status"] == {"NEW": "<5"}
 
 
 def test_api_customer_dossier_recursive_pii_in_nested_structures(client, dossier_dir):

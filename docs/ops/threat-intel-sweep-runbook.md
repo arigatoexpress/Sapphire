@@ -142,3 +142,80 @@ edit tools.
   review.
 - MITRE ATT&CK enrichment. Belongs in a separate weekly runbook.
 - Any vendor-portal queries that require authentication.
+
+## Dependabot alerts fetcher (closes issue #393)
+
+Issue #393 noted that the inline `gh api` call on step 5 was unreachable
+in some environments (missing scope, gh-cli version drift, or a
+transiently-disabled Dependabot surface). The new
+`scripts/ops/dependabot_alerts_fetch.py` wraps that call with
+**explicit token validation, pagination handling, and a paste-safe
+markdown digest** so the runbook (or any operator) can fetch alerts in
+one command:
+
+```bash
+# Full JSON envelope (default):
+python3 scripts/ops/dependabot_alerts_fetch.py
+
+# Paste-safe markdown digest only (suitable for issue bodies):
+python3 scripts/ops/dependabot_alerts_fetch.py --markdown-only
+
+# Structured JSON without the markdown payload:
+python3 scripts/ops/dependabot_alerts_fetch.py --json-only
+
+# Different repo:
+python3 scripts/ops/dependabot_alerts_fetch.py --repo arigatoexpress/cyber-threat-bot
+
+# Different alert state:
+python3 scripts/ops/dependabot_alerts_fetch.py --state fixed
+```
+
+### Contracts
+
+* **Read-only.** The script only reads the GitHub API. It never opens
+  PRs, creates issues, modifies tracked files, or pushes branches. The
+  threat-intel runbook is responsible for converting the script's
+  output into an issue body when needed.
+* **Token validation first.** A missing or unscoped token surfaces as
+  a non-zero exit with a sanitized error message — not as an empty
+  alert list.
+* **Paste-safe summary.** The markdown digest contains severity
+  buckets, ecosystem counts, and a bounded top-N table (default 10).
+  No token values, no repository secrets, no PII.
+* **Pagination handled.** The script calls `gh api --paginate`, so a
+  repo with >30 alerts does not silently truncate.
+* **Subprocess-injected for testability.** All `gh` calls go through a
+  `Runner` callable. The unit suite at
+  `tests/unit/test_dependabot_alerts_fetch.py` (21 cases) mocks
+  `gh api` end-to-end so the tests never spawn a real `gh` process.
+
+### When the runbook should call it
+
+Replace step 5 (the inline `gh api` call) with:
+
+```bash
+python3 scripts/ops/dependabot_alerts_fetch.py --json-only \
+  > /tmp/sapphire-ghas.json
+```
+
+The structured JSON output mirrors the original `--jq`-projected shape
+closely enough that step 6 (compute the new-critical set) can read
+`alerts[*]` without code changes. If the script exits non-zero, log
+the error and proceed without GHAS data — same fallback as the
+original step 5.
+
+### Error envelope handling
+
+When Dependabot is disabled for a repo, `gh api` returns
+`{"message": "..."}` instead of a list. The fetcher detects this and
+exits with `DependabotFetchError: gh api returned error envelope: ...`,
+so the runbook does not silently believe the repo has zero alerts.
+This is the failure mode that #393 was originally about.
+
+## Related
+
+* `docs/products/customer-dossier-0.2.0.md` — paired cohort surface
+  that now uses cell-suppression + per-tenant hash isolation; same
+  acquirer-readability theme.
+* `tests/unit/test_dependabot_alerts_fetch.py` — full mock-driven
+  test suite for the fetcher.

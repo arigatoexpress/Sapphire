@@ -37,6 +37,7 @@ Public surface:
 from __future__ import annotations
 
 import hashlib
+import hmac
 import re
 from typing import Any
 
@@ -46,6 +47,19 @@ from typing import Any
 # passing strings in.
 _HASH_SALT = "sapphire-pii-redactor-v1"
 _HASH_LEN = 6  # 6 hex chars = 24 bits = enough to disambiguate within a page
+
+# Per-tenant hashing — used by the customer-dossier 0.2.0 surface to isolate
+# anonymized identifiers across tenants. The function is *pure*: callers
+# inject the configured salt (loaded from ``~/.sapphire/secrets.env`` by
+# whatever I/O-tolerant caller — typically ``services/dashboard/app.py``).
+# When ``salt`` is None we fall back to a deterministic-but-randomized default
+# derived from the module-level ``_HASH_SALT`` + the tenant id. This preserves
+# 0.1.0 backward compatibility (a tenant without configured salt still gets a
+# stable, non-reversible hash) while letting live-mode tenants rotate their
+# salt independently.
+_PER_TENANT_HASH_LEN = 16  # 16 hex chars = 64 bits — enough to disambiguate
+                          # across tenants without becoming an ID-of-record.
+_DEFAULT_TENANT_SALT_PREFIX = "sapphire-dossier-default-tenant-salt-v1"
 
 # Phone numbers: tolerant of separators (- . space) and optional country code.
 _PHONE_RE = re.compile(
@@ -163,6 +177,67 @@ def _stable_hash(value: str) -> str:
     """Return ``_HASH_LEN`` hex chars derived from a salted SHA-256."""
     digest = hashlib.sha256((_HASH_SALT + value).encode("utf-8")).hexdigest()
     return digest[:_HASH_LEN]
+
+
+def _default_tenant_salt(tenant_id: str) -> str:
+    """Derive a deterministic-but-randomized default salt for a tenant.
+
+    Used when no operator-configured salt is supplied (non-live mode). The
+    derivation is keyed off the module-level ``_HASH_SALT`` so that the
+    default is **not** trivially guessable, while remaining stable across
+    process restarts and machines (so cached redacted ids round-trip).
+    """
+    canonical = (tenant_id or "").strip().lower()
+    digest = hashlib.sha256(
+        (_DEFAULT_TENANT_SALT_PREFIX + "|" + canonical).encode("utf-8")
+    ).hexdigest()
+    return digest
+
+
+def per_tenant_hash(
+    value: str,
+    tenant_id: str,
+    *,
+    salt: str | None = None,
+) -> str:
+    """Return an HMAC-SHA256 hex digest scoped to ``(value, tenant_id)``.
+
+    Args:
+        value: The cleartext to hash. ``None`` and empty inputs collapse to a
+            stable ``"tenant_<tenant>_unknown"`` token.
+        tenant_id: The tenant scope. Different tenants MUST yield different
+            hashes for the same ``value``. Whitespace-only / ``None`` tenants
+            collapse to the literal ``"unknown"`` scope.
+        salt: Operator-configured per-tenant salt. When provided this is the
+            HMAC key. When ``None`` (non-live / 0.1.0-compat) we derive a
+            deterministic-but-randomized default via :func:`_default_tenant_salt`.
+
+    Properties:
+        * **Determinism**: same ``(value, tenant_id, salt)`` → same hash.
+        * **Isolation**: different ``tenant_id`` → different hash for the same
+          ``value`` (because the HMAC key changes).
+        * **Salt rotation**: changing the operator-supplied ``salt`` for a
+          tenant invalidates every previously-emitted hash for that tenant.
+        * **Backward compat**: with ``salt=None`` the function still emits a
+          stable hash so 0.1.0 callers without a configured salt continue to
+          work without breaking changes.
+
+    The function is intentionally pure — no env reads, no filesystem reads,
+    no network. The dashboard surface loads the salt from the operator
+    secrets store and injects it; the redactor stays a pure transform.
+    """
+    canonical_tenant = (tenant_id or "").strip().lower() or "unknown"
+    if value is None:
+        return f"tenant_{canonical_tenant[:24]}_unknown"
+    s = str(value).strip()
+    if not s:
+        return f"tenant_{canonical_tenant[:24]}_unknown"
+
+    canonical_value = " ".join(s.split()).casefold()
+    key = (salt if salt is not None else _default_tenant_salt(canonical_tenant)).encode("utf-8")
+    msg = (canonical_tenant + "|" + canonical_value).encode("utf-8")
+    digest = hmac.new(key, msg, hashlib.sha256).hexdigest()
+    return f"tenant_{canonical_tenant[:24]}_{digest[:_PER_TENANT_HASH_LEN]}"
 
 
 def redact_name(name: str | None) -> str:
@@ -380,6 +455,7 @@ def redact(value: Any) -> Any:
 
 
 __all__ = [
+    "per_tenant_hash",
     "redact",
     "redact_address",
     "redact_email",
