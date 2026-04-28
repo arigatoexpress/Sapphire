@@ -31,8 +31,11 @@ DEFAULT_REGION = "us-central1"
 DEFAULT_BUCKET = "sapphire-data-lake"
 DEFAULT_DATASET = "sapphire"
 DEFAULT_BQ_TABLE = "production_readiness_probes"
+DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
 DEFAULT_SECRET_ENV = Path.home() / ".sapphire" / "secrets.env"
 SAPPHIRE_SECRETS_DIR = Path.home() / ".config" / "sapphire-secrets"
+GEMINI_PROBE_PROMPT = "Return exactly SAPPHIRE_GEMINI_PROBE_OK and nothing else."
+GEMINI_PROBE_RESPONSE = "SAPPHIRE_GEMINI_PROBE_OK"
 
 
 @dataclass
@@ -57,6 +60,12 @@ def main(argv: list[str] | None = None) -> int:
     checks.extend(probe_routines(no_external=args.no_external))
     checks.extend(probe_github(no_external=args.no_external))
     checks.extend(probe_google_readiness(args, no_external=args.no_external))
+    if args.include_gemini_live_probe and args.no_external:
+        checks.append(Check("gemini", "vertex_live_probe", "SKIP", "--no-external"))
+    elif args.include_gemini_live_probe:
+        gemini_checks = probe_gemini_live(args)
+        checks.extend(gemini_checks)
+        apply_gemini_probe_to_google_gate(checks, gemini_checks)
     if args.include_telegram_probe:
         checks.extend(probe_telegram(env))
     if args.include_gcp_write_probe:
@@ -68,6 +77,7 @@ def main(argv: list[str] | None = None) -> int:
         "duration_ms": int((time.perf_counter() - started) * 1000),
         "mode": {
             "external": not args.no_external,
+            "gemini_live_probe": args.include_gemini_live_probe,
             "telegram_probe": args.include_telegram_probe,
             "gcp_write_probe": args.include_gcp_write_probe,
         },
@@ -96,8 +106,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--bucket", default=DEFAULT_BUCKET)
     parser.add_argument("--dataset", default=DEFAULT_DATASET)
     parser.add_argument("--bq-table", default=DEFAULT_BQ_TABLE)
+    parser.add_argument("--gemini-model", default=DEFAULT_GEMINI_MODEL)
     parser.add_argument("--secret-env", type=Path, default=DEFAULT_SECRET_ENV)
     parser.add_argument("--no-external", action="store_true")
+    parser.add_argument("--include-gemini-live-probe", action="store_true")
     parser.add_argument("--include-telegram-probe", action="store_true")
     parser.add_argument("--include-gcp-write-probe", action="store_true")
     parser.add_argument("--format", choices=("markdown", "json"), default="markdown")
@@ -385,6 +397,74 @@ def probe_gcp_writes(args: argparse.Namespace) -> list[Check]:
     return checks
 
 
+def probe_gemini_live(args: argparse.Namespace) -> list[Check]:
+    env = os.environ.copy()
+    env.update(
+        {
+            "GOOGLE_GENAI_USE_VERTEXAI": "true",
+            "GOOGLE_CLOUD_PROJECT": args.project,
+            "GOOGLE_CLOUD_LOCATION": args.region,
+        }
+    )
+    with tempfile.TemporaryDirectory(prefix="sapphire-gemini-probe-") as probe_dir:
+        result = run(
+            [
+                "gemini",
+                "--skip-trust",
+                "--approval-mode",
+                "plan",
+                "--output-format",
+                "json",
+                "--model",
+                args.gemini_model,
+                "--prompt",
+                GEMINI_PROBE_PROMPT,
+            ],
+            cwd=Path(probe_dir),
+            env=env,
+            timeout=60,
+        )
+    if not result.ok:
+        return [Check("gemini", "vertex_live_probe", "WARN", short_error(result), result.duration_ms)]
+    payload = parse_json_from_mixed_output(result.stdout)
+    if not isinstance(payload, dict):
+        return [Check("gemini", "vertex_live_probe", "WARN", "invalid Gemini JSON output", result.duration_ms)]
+    response = str(payload.get("response", "")).strip()
+    stats = payload.get("stats") if isinstance(payload.get("stats"), dict) else {}
+    model_stats = ((stats.get("models") or {}) if isinstance(stats, dict) else {}).get(args.gemini_model, {})
+    tokens = model_stats.get("tokens", {}) if isinstance(model_stats, dict) else {}
+    tools = stats.get("tools", {}) if isinstance(stats, dict) else {}
+    ok = response == GEMINI_PROBE_RESPONSE and int(tools.get("totalCalls") or 0) == 0
+    evidence = (
+        f"model={args.gemini_model}; response_ok={ok}; "
+        f"tool_calls={tools.get('totalCalls', 0)}; total_tokens={tokens.get('total', 'unknown')}"
+    )
+    return [Check("gemini", "vertex_live_probe", "PASS" if ok else "WARN", evidence, result.duration_ms)]
+
+
+def parse_json_from_mixed_output(output: str) -> dict[str, Any] | None:
+    start = output.find("{")
+    end = output.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        return None
+    try:
+        parsed = json.loads(output[start : end + 1])
+    except json.JSONDecodeError:
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def apply_gemini_probe_to_google_gate(checks: list[Check], gemini_checks: list[Check]) -> None:
+    probe = next((check for check in gemini_checks if check.name == "vertex_live_probe"), None)
+    if probe is None or probe.status != "PASS":
+        return
+    for check in checks:
+        if check.category == "gcp" and check.name == "gate_gemini_api_or_vertex_live_calls":
+            check.status = "PASS"
+            check.evidence = f"pass: Vertex Gemini live probe succeeded; {probe.evidence}"
+            return
+
+
 def bq_query(project: str, sql: str) -> RunResult:
     return run(["bq", "query", "--project_id", project, "--use_legacy_sql=false", "--quiet", sql], cwd=ROOT, timeout=90)
 
@@ -469,12 +549,19 @@ class RunResult:
         return self.returncode == 0
 
 
-def run(cmd: list[str], *, cwd: Path | None = None, timeout: int = 20) -> RunResult:
+def run(
+    cmd: list[str],
+    *,
+    cwd: Path | None = None,
+    timeout: int = 20,
+    env: dict[str, str] | None = None,
+) -> RunResult:
     started = time.perf_counter()
     try:
         proc = subprocess.run(
             cmd,
             cwd=str(cwd or ROOT),
+            env=env,
             text=True,
             capture_output=True,
             timeout=timeout,
