@@ -350,6 +350,14 @@ tools:
     consumers: [scheduled-tasks.telegram-intel-reader, hermes-agent.intel]
     description: Telegram Channel Intel Reader 0.1.0. Gated MTProto/Bot API channel ingestion into provenance-stamped JSONL with pure quality filters, URL defanging, PII redaction, optional local balanced classifier, and caps of 32 channels, 600 messages/hour, 200 classifications/hour. Actions, status/pull-once/recent/quality-test/models.
 
+  # Signals — cross-source correlation engine
+  - name: signal_correlator
+    path: plugins/claw-sapphire/tools/internal/signal_correlator.py
+    status: internal
+    owner: sapphire
+    consumers: []
+    description: Sapphire Signal Correlation Engine 0.1.0. Cross-source fusion across the 8 signal feeds (TradingView / Telegram intel / Hyperliquid public feed / threat-intel / convergence-watchlist / sovereign-thesis / Kronos forecast / TA scanner) into a unified edge_score, consensus label, and corroborated_by/divergent_sources arrays per (symbol, timeframe). Read-only consumer of disk snapshots, never writes back. Caps, ≤16 sources/correlation, ≤1200 correlations/hour, 24h freshness hard limit. Actions, correlate-once/latest/status/weights. Tunable via ~/.sapphire/correlator_weights.yaml.
+
   # ── deprecated / sunset window ───────────────────────────────────────────
   - name: kronos_predict
     path: plugins/claw-sapphire/tools/_deprecated/kronos_predict.py

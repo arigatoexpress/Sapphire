@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Template only. Copy to ~/Library/LaunchAgents/com.sapphire.signal-correlator.plist
+     and `launchctl bootstrap gui/$UID <path>` to load.
+
+     This daemon is read-only across signal sources. It writes to:
+       data/correlated_signals/<date>/signals.jsonl
+       data/correlated_signals/<date>/signals.jsonl.envelope.json
+       ~/.cache/sapphire/correlator/counters.json
+
+     It also publishes `signal.correlated` events to the Sapphire event bus
+     IFF SAPPHIRE_CORRELATOR_LIVE_BUS=1 is set (default off so unit tests
+     and CI never hit Redis). -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.sapphire.signal-correlator</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/python3</string>
+        <string>/Users/aribs/Code/Sapphire/services/correlator/run.py</string>
+        <string>daemon</string>
+        <string>--poll-interval-seconds</string>
+        <string>60</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/aribs/Code/Sapphire</string>
+    <key>RunAtLoad</key>
+    <false/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/aribs/Library/Logs/sapphire/signal-correlator.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/aribs/Library/Logs/sapphire/signal-correlator.err</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HOME</key>
+        <string>/Users/aribs</string>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>PYTHONPATH</key>
+        <string>/Users/aribs/Code/Sapphire</string>
+        <key>SAPPHIRE_CORRELATOR_LIVE_BUS</key>
+        <string>0</string>
+    </dict>
+</dict>
+</plist>
