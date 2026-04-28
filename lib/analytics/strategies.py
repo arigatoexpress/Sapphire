@@ -504,8 +504,14 @@ class BacktestEngine:
     """
 
     def __init__(self, bankroll: float = 10_000.0, fee_bps: float = 5.0) -> None:
-        self.bankroll = bankroll
-        self.fee_bps = fee_bps  # kept for API compat; run_backtest applies no fees
+        from lib.analytics.backtest import BacktestConfig
+
+        self.backtest_config = BacktestConfig(
+            initial_capital=float(bankroll),
+            fee_bps=float(fee_bps),
+        )
+        self.bankroll = self.backtest_config.initial_capital
+        self.fee_bps = self.backtest_config.fee_bps  # kept for API compat; run_backtest applies no fees
 
     def run(
         self,
