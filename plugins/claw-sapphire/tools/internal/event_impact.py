@@ -6,6 +6,7 @@ Actions:
 - ``corpus``: summarize the curated historical event corpus.
 - ``rebuild``: dry-run by default; requires ``SAPPHIRE_EVENT_IMPACT_REBUILD=1``.
 - ``accuracy-audit``: compare post-build realized outcomes when supplied.
+- ``post-corpus-audit``: run the offline held-out event audit helper.
 """
 
 from __future__ import annotations
@@ -163,6 +164,54 @@ def accuracy_audit_action(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def post_corpus_audit_action(payload: dict[str, Any]) -> dict[str, Any]:
+    """Run the offline post-corpus audit helper from the plugin surface."""
+    try:
+        from lib.event_impact.lookup import load_model
+        from services.event_impact.audit import (
+            audit_post_corpus_events,
+            load_bars_json,
+        )
+
+        model_path = Path(str(payload["model_path"]))
+        events_path = Path(str(payload["events_path"]))
+        bars_raw = payload.get("bars_json") or payload.get("bars_path")
+        if not bars_raw:
+            raise ValueError("bars_json or bars_path is required")
+        bars_path = Path(str(bars_raw))
+        horizons = tuple(
+            int(h)
+            for h in payload.get("horizons_hours") or payload.get("horizons") or (6, 24)
+        )
+        if not horizons:
+            raise ValueError("horizons_hours must not be empty")
+        model = load_model(model_path)
+        events = load_events(events_path)
+        report = audit_post_corpus_events(
+            model=model,
+            events=events,
+            bars_by_asset=load_bars_json(bars_path),
+            horizons_hours=horizons,
+            after=payload.get("after"),
+        ).to_dict()
+        output_path = payload.get("output_path")
+        if output_path:
+            target = Path(str(output_path))
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    except (KeyError, OSError, ValueError, TypeError) as exc:
+        return {"ok": False, "action": "post-corpus-audit", "error": str(exc)}
+    return {
+        "ok": True,
+        "action": "post-corpus-audit",
+        "mode": "offline",
+        "audit": report,
+        "output_path": str(output_path) if output_path else None,
+        "version": VERSION,
+        "issued_at": datetime.now(UTC).isoformat(),
+    }
+
+
 def handle(payload: dict[str, Any]) -> dict[str, Any]:
     action = str(payload.get("action") or "lookup").strip().lower()
     if action == "corpus":
@@ -173,9 +222,11 @@ def handle(payload: dict[str, Any]) -> dict[str, Any]:
         return rebuild_action(payload)
     if action == "accuracy-audit":
         return accuracy_audit_action(payload)
+    if action == "post-corpus-audit":
+        return post_corpus_audit_action(payload)
     return {
         "error": f"unknown action '{action}'",
-        "valid_actions": ["lookup", "corpus", "rebuild", "accuracy-audit"],
+        "valid_actions": ["lookup", "corpus", "rebuild", "accuracy-audit", "post-corpus-audit"],
     }
 
 

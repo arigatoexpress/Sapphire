@@ -139,6 +139,24 @@ not a trade instruction. True live validation still requires operator-curated
 post-corpus events, locally captured OHLCV, and a separate review that the
 events were not used in the fitted model.
 
+The same helper is exposed through the plugin for Hermes/scheduled-task
+integration without adding network access:
+
+```bash
+echo '{
+  "action": "post-corpus-audit",
+  "model_path": "data/event_impact/model_2026-04-28.json",
+  "events_path": "scratch/event_impact/post_corpus_events.jsonl",
+  "bars_json": "scratch/event_impact/post_corpus_bars.json",
+  "horizons_hours": [6, 24]
+}' | /usr/local/bin/python3 plugins/claw-sapphire/tools/internal/event_impact.py
+```
+
+The plugin path delegates to `services.event_impact.audit`; it does not rebuild
+models, fetch OHLCV, or publish events. Use it when an operator wants the same
+offline audit report through the plugin contract instead of a direct script
+call.
+
 ## Verification
 
 Focused tests:
