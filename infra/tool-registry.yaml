@@ -159,6 +159,13 @@ tools:
     consumers: [hermes-agent.trading-analysis]
     description: Read-only crypto portfolio snapshot across exchanges.
 
+  - name: live_portfolio
+    path: plugins/claw-sapphire/tools/internal/live_portfolio.py
+    status: internal
+    owner: sapphire
+    consumers: [scheduled-tasks.live-portfolio, hermes-agent.trading-analysis]
+    description: Operator-seeded live capital ledger and ramp-gate status tool. No broker API calls, no trade execution, account hashes only, provenance required for seeded fills.
+
   - name: backtest
     path: plugins/claw-sapphire/tools/internal/backtest.py
     status: internal
