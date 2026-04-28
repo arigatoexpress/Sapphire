@@ -10,6 +10,12 @@ on:
 permissions:
   contents: read
 
+env:
+  # Ari's self-hosted Sapphire runner runs as /Users/aribs, not /Users/runner.
+  # Keep setup-python's tool cache on a writable local path.
+  AGENT_TOOLSDIRECTORY: /Users/aribs/.github-runners/toolcache
+  RUNNER_TOOL_CACHE: /Users/aribs/.github-runners/toolcache
+
 concurrency:
   group: threat-refresh-${{ github.ref }}
   cancel-in-progress: false
