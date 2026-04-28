@@ -100,6 +100,7 @@ def get_proxy_health() -> dict:
     """Query inference proxy /health for 4-tier endpoint status."""
     import urllib.error
     import urllib.request
+
     try:
         with urllib.request.urlopen("http://127.0.0.1:11435/health", timeout=5) as resp:
             data = json.loads(resp.read())

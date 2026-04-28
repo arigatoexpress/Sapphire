@@ -3,6 +3,7 @@
 For on-prem deployment (no lib/agents install), falls back to local
 file-based policy so the service starts without sapphire-agents installed.
 """
+
 from __future__ import annotations
 
 import json

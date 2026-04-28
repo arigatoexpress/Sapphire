@@ -12,4 +12,3 @@ Source-of-truth for what is running:
 
 - `docs/CLOUD_ENVIRONMENT.md`
 - `gcloud run services describe ...`
-

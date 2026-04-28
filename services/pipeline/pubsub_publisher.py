@@ -28,11 +28,11 @@ PROJECT = os.environ.get("GCP_PROJECT", "tho-ai-agent")
 ENABLED = os.environ.get("SAPPHIRE_PUBSUB", "1") == "1"
 
 TOPICS = {
-    "signals":     "sapphire-signals",
-    "regime":      "sapphire-regime-changes",
+    "signals": "sapphire-signals",
+    "regime": "sapphire-regime-changes",
     "predictions": "sapphire-predictions",
-    "threats":     "sapphire-threats",
-    "alerts":      "sapphire-alerts",
+    "threats": "sapphire-threats",
+    "alerts": "sapphire-alerts",
 }
 
 
@@ -52,6 +52,7 @@ def _get_client():
         if _client is None:
             try:
                 from google.cloud import pubsub_v1
+
                 _client = pubsub_v1.PublisherClient()
             except Exception as e:
                 log.warning("pubsub client init failed: %s", e)
@@ -101,26 +102,41 @@ def _log_result(kind: str, future) -> None:
 # ---------------------------------------------------------------------------
 
 
-def publish_signal(row: dict) -> bool:    return publish("signals", row)
-def publish_regime(row: dict) -> bool:    return publish("regime", row)
-def publish_prediction(row: dict) -> bool: return publish("predictions", row)
-def publish_threat(row: dict) -> bool:    return publish("threats", row)
-def publish_alert(row: dict) -> bool:     return publish("alerts", row)
+def publish_signal(row: dict) -> bool:
+    return publish("signals", row)
+
+
+def publish_regime(row: dict) -> bool:
+    return publish("regime", row)
+
+
+def publish_prediction(row: dict) -> bool:
+    return publish("predictions", row)
+
+
+def publish_threat(row: dict) -> bool:
+    return publish("threats", row)
+
+
+def publish_alert(row: dict) -> bool:
+    return publish("alerts", row)
 
 
 if __name__ == "__main__":
     # Smoke test: publish a single regime snapshot
     logging.basicConfig(level=logging.INFO)
     now = _now_iso()
-    ok = publish_regime({
-        "snapshot_id": f"smoke-{int(datetime.now().timestamp())}",
-        "regime": "TRANSITION",
-        "score": 0.05,
-        "confidence": 0.3,
-        "reasoning": ["pubsub smoke test"],
-        "btc_price_usd": 77000.0,
-        "btc_dominance": 57.3,
-        "timestamp": now,
-        "ingested_at": now,
-    })
+    ok = publish_regime(
+        {
+            "snapshot_id": f"smoke-{int(datetime.now().timestamp())}",
+            "regime": "TRANSITION",
+            "score": 0.05,
+            "confidence": 0.3,
+            "reasoning": ["pubsub smoke test"],
+            "btc_price_usd": 77000.0,
+            "btc_dominance": 57.3,
+            "timestamp": now,
+            "ingested_at": now,
+        }
+    )
     print("published:", ok)

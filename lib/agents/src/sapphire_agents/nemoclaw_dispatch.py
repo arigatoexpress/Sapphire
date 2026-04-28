@@ -10,6 +10,7 @@ Task routing:
     type:trading    → openclaw_dispatch (stays on Mac)
     type:pm         → openclaw_dispatch (stays on Mac)
 """
+
 from __future__ import annotations
 
 import logging
@@ -63,7 +64,7 @@ async def dispatch(
         "tags": [
             f"type:{task_type}",
             f"priority:{priority}",
-            *([ f"project:{project}"] if project else []),
+            *([f"project:{project}"] if project else []),
         ],
     }
 

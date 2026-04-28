@@ -155,9 +155,15 @@ def test_live_path_uses_sdk_seam_and_caches(isolated_cache, monkeypatch):
 def test_rate_limit_blocks_excess_calls(isolated_cache, monkeypatch):
     isolated_cache["secrets"].write_text("GEMINI_API_KEY=sk-test-key\n", encoding="utf-8")
     monkeypatch.setenv("SAPPHIRE_GEMINI_LIVE", "1")
-    counters = {"calls": [9999999999.0] * gemini_ooda.MAX_CALLS_PER_HOUR, "month_tokens": 0, "month_key": "9999-12"}
+    counters = {
+        "calls": [9999999999.0] * gemini_ooda.MAX_CALLS_PER_HOUR,
+        "month_tokens": 0,
+        "month_key": "9999-12",
+    }
     isolated_cache["cache_dir"].mkdir(parents=True, exist_ok=True)
-    (isolated_cache["cache_dir"] / "counters.json").write_text(json.dumps(counters), encoding="utf-8")
+    (isolated_cache["cache_dir"] / "counters.json").write_text(
+        json.dumps(counters), encoding="utf-8"
+    )
 
     def fake_sdk(*args, **kwargs):
         raise AssertionError("rate-limited request should never reach the live SDK")
@@ -184,7 +190,9 @@ def test_cost_cap_blocks_when_month_budget_consumed(isolated_cache, monkeypatch)
         "month_key": gemini_ooda._now_utc().strftime("%Y-%m"),
     }
     isolated_cache["cache_dir"].mkdir(parents=True, exist_ok=True)
-    (isolated_cache["cache_dir"] / "counters.json").write_text(json.dumps(counters), encoding="utf-8")
+    (isolated_cache["cache_dir"] / "counters.json").write_text(
+        json.dumps(counters), encoding="utf-8"
+    )
 
     def fake_sdk(*args, **kwargs):
         raise AssertionError("cost-capped request should never reach the live SDK")

@@ -123,7 +123,7 @@ $arpEntries = arp -a | Select-String "192\.168\.(137|2)\.|10\.0\.0\."
 if ($arpEntries) {
     Write-Host "`nPotential Pi addresses found:" -ForegroundColor Green
     $arpEntries | ForEach-Object { Write-Host "  $_" }
-    
+
     # Check SSH on each
     Write-Host "`nTesting SSH connectivity..." -ForegroundColor Blue
     foreach ($entry in $arpEntries) {
@@ -132,7 +132,7 @@ if ($arpEntries) {
             $test = Test-NetConnection -ComputerName $ip -Port 22 -WarningAction SilentlyContinue
             if ($test.TcpTestSucceeded) {
                 Write-Host "  ✅ SSH open on $ip" -ForegroundColor Green
-                
+
                 # Create nodes.json with this IP
                 $nodesConfig = @"
 {

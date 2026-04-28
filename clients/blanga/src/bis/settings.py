@@ -45,19 +45,49 @@ def get_settings() -> BISSettings:
         app_password=app_password,
         app_username=os.getenv("BIS_APP_USERNAME", "blanga").strip() or "blanga",
         project_id=project_id,
-        backup_dir=(os.getenv("BIS_BACKUP_DIR", "/tmp/blanga-bis-backups").strip() or "/tmp/blanga-bis-backups"),
+        backup_dir=(
+            os.getenv("BIS_BACKUP_DIR", "/tmp/blanga-bis-backups").strip()
+            or "/tmp/blanga-bis-backups"
+        ),
         autosave_snapshots=_as_bool(os.getenv("BIS_AUTOSAVE_SNAPSHOTS"), default=True),
         gcs_snapshot_bucket=(os.getenv("BIS_GCS_SNAPSHOT_BUCKET", "").strip()),
-        gcs_snapshot_blob=(os.getenv("BIS_GCS_SNAPSHOT_BLOB", "snapshots/master_arena_snapshot.latest.json").strip()
-                           or "snapshots/master_arena_snapshot.latest.json"),
+        gcs_snapshot_blob=(
+            os.getenv(
+                "BIS_GCS_SNAPSHOT_BLOB", "snapshots/master_arena_snapshot.latest.json"
+            ).strip()
+            or "snapshots/master_arena_snapshot.latest.json"
+        ),
         default_spreadsheet_id=(os.getenv("BIS_GOOGLE_SHEETS_SPREADSHEET_ID", "").strip()),
-        sheets_new_properties_tab=(os.getenv("BIS_SHEETS_NEW_PROPERTIES_TAB", "properties_new_input").strip() or "properties_new_input"),
-        sheets_property_updates_tab=(os.getenv("BIS_SHEETS_PROPERTY_UPDATES_TAB", "property_updates_input").strip() or "property_updates_input"),
-        sheets_notes_tab=(os.getenv("BIS_SHEETS_NOTES_TAB", "notes_input").strip() or "notes_input"),
-        sheets_input_tab=(os.getenv("BIS_SHEETS_INPUT_TAB", "properties_input").strip() or "properties_input"),
-        sheets_computed_tab=(os.getenv("BIS_SHEETS_COMPUTED_TAB", "properties_computed").strip() or "properties_computed"),
-        sheets_master_view_tab=(os.getenv("BIS_SHEETS_MASTER_VIEW_TAB", "properties_master_view").strip() or "properties_master_view"),
-        sheets_reviews_tab=(os.getenv("BIS_SHEETS_REVIEWS_TAB", "reviews_pending").strip() or "reviews_pending"),
-        sheets_change_log_tab=(os.getenv("BIS_SHEETS_CHANGE_LOG_TAB", "change_log_view").strip() or "change_log_view"),
-        sheets_today_tasks_tab=(os.getenv("BIS_SHEETS_TODAY_TASKS_TAB", "today_tasks_view").strip() or "today_tasks_view"),
+        sheets_new_properties_tab=(
+            os.getenv("BIS_SHEETS_NEW_PROPERTIES_TAB", "properties_new_input").strip()
+            or "properties_new_input"
+        ),
+        sheets_property_updates_tab=(
+            os.getenv("BIS_SHEETS_PROPERTY_UPDATES_TAB", "property_updates_input").strip()
+            or "property_updates_input"
+        ),
+        sheets_notes_tab=(
+            os.getenv("BIS_SHEETS_NOTES_TAB", "notes_input").strip() or "notes_input"
+        ),
+        sheets_input_tab=(
+            os.getenv("BIS_SHEETS_INPUT_TAB", "properties_input").strip() or "properties_input"
+        ),
+        sheets_computed_tab=(
+            os.getenv("BIS_SHEETS_COMPUTED_TAB", "properties_computed").strip()
+            or "properties_computed"
+        ),
+        sheets_master_view_tab=(
+            os.getenv("BIS_SHEETS_MASTER_VIEW_TAB", "properties_master_view").strip()
+            or "properties_master_view"
+        ),
+        sheets_reviews_tab=(
+            os.getenv("BIS_SHEETS_REVIEWS_TAB", "reviews_pending").strip() or "reviews_pending"
+        ),
+        sheets_change_log_tab=(
+            os.getenv("BIS_SHEETS_CHANGE_LOG_TAB", "change_log_view").strip() or "change_log_view"
+        ),
+        sheets_today_tasks_tab=(
+            os.getenv("BIS_SHEETS_TODAY_TASKS_TAB", "today_tasks_view").strip()
+            or "today_tasks_view"
+        ),
     )

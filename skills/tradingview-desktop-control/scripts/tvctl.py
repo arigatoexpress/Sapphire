@@ -205,7 +205,7 @@ def list_menus() -> list[str]:
             'tell application "System Events"',
             f'  tell process "{PROCESS_NAME}"',
             "    set namesList to name of menu bar items of menu bar 1",
-            '    set AppleScript\'s text item delimiters to linefeed',
+            "    set AppleScript's text item delimiters to linefeed",
             "    return namesList as text",
             "  end tell",
             "end tell",
@@ -220,9 +220,9 @@ def window_titles() -> list[str]:
             'tell application "System Events"',
             f'  tell process "{PROCESS_NAME}"',
             "    set winCount to count of windows",
-            "    if winCount is 0 then return \"\"",
+            '    if winCount is 0 then return ""',
             "    set namesList to name of windows",
-            '    set AppleScript\'s text item delimiters to linefeed',
+            "    set AppleScript's text item delimiters to linefeed",
             "    return namesList as text",
             "  end tell",
             "end tell",
@@ -236,16 +236,21 @@ def front_window_bounds() -> dict[str, int]:
         [
             'tell application "System Events"',
             f'  tell process "{PROCESS_NAME}"',
-            "    if (count of windows) is 0 then error \"No TradingView window\"",
+            '    if (count of windows) is 0 then error "No TradingView window"',
             "    set p to position of front window",
             "    set s to size of front window",
-            "    return ((item 1 of p) as text) & \",\" & ((item 2 of p) as text) & \",\" & ((item 1 of s) as text) & \",\" & ((item 2 of s) as text)",
+            '    return ((item 1 of p) as text) & "," & ((item 2 of p) as text) & "," & ((item 1 of s) as text) & "," & ((item 2 of s) as text)',
             "  end tell",
             "end tell",
         ]
     )
     x_str, y_str, w_str, h_str = [part.strip() for part in out.split(",", 3)]
-    return {"x": int(float(x_str)), "y": int(float(y_str)), "width": int(float(w_str)), "height": int(float(h_str))}
+    return {
+        "x": int(float(x_str)),
+        "y": int(float(y_str)),
+        "width": int(float(w_str)),
+        "height": int(float(h_str)),
+    }
 
 
 def app_frontmost() -> bool:
@@ -397,7 +402,9 @@ def move_mouse(
     relative_window: bool = False,
     normalized_window: bool = False,
 ) -> tuple[float, float]:
-    tx, ty = _resolve_point(x, y, relative_window=relative_window, normalized_window=normalized_window)
+    tx, ty = _resolve_point(
+        x, y, relative_window=relative_window, normalized_window=normalized_window
+    )
     cg().post_mouse_event(KCG_EVENT_MOUSE_MOVED, tx, ty, KCG_MOUSE_BUTTON_LEFT)
     return tx, ty
 
@@ -427,7 +434,9 @@ def mouse_click(
     else:
         raise ValueError("button must be 'left' or 'right'")
 
-    tx, ty = _resolve_point(x, y, relative_window=relative_window, normalized_window=normalized_window)
+    tx, ty = _resolve_point(
+        x, y, relative_window=relative_window, normalized_window=normalized_window
+    )
     if move_first:
         cg().post_mouse_event(KCG_EVENT_MOUSE_MOVED, tx, ty, cg_button)
         time.sleep(0.02)
@@ -453,8 +462,12 @@ def mouse_drag(
 ) -> dict[str, tuple[float, float]]:
     if button.strip().lower() != "left":
         raise ValueError("drag currently supports only left button")
-    sx, sy = _resolve_point(x1, y1, relative_window=relative_window, normalized_window=normalized_window)
-    ex, ey = _resolve_point(x2, y2, relative_window=relative_window, normalized_window=normalized_window)
+    sx, sy = _resolve_point(
+        x1, y1, relative_window=relative_window, normalized_window=normalized_window
+    )
+    ex, ey = _resolve_point(
+        x2, y2, relative_window=relative_window, normalized_window=normalized_window
+    )
     cg_api = cg()
     cg_api.post_mouse_event(KCG_EVENT_MOUSE_MOVED, sx, sy, KCG_MOUSE_BUTTON_LEFT)
     time.sleep(0.02)
@@ -668,21 +681,23 @@ def capture_mouse_point_record(
         activate_app(launch=launch, delay=0.15)
     mouse = mouse_location()
     if mode == "absolute":
-        return create_point_record(x=mouse["x"], y=mouse["y"], coord_mode=mode, note=note, capture_window_bounds=False)
+        return create_point_record(
+            x=mouse["x"], y=mouse["y"], coord_mode=mode, note=note, capture_window_bounds=False
+        )
     bounds = front_window_bounds()
     rx = float(mouse["x"]) - float(bounds["x"])
     ry = float(mouse["y"]) - float(bounds["y"])
     if mode == "relative_window":
-        return create_point_record(x=rx, y=ry, coord_mode=mode, note=note, capture_window_bounds=False) | {
-            "captured_window_bounds": bounds
-        }
+        return create_point_record(
+            x=rx, y=ry, coord_mode=mode, note=note, capture_window_bounds=False
+        ) | {"captured_window_bounds": bounds}
     if bounds["width"] <= 0 or bounds["height"] <= 0:
         raise ValueError("Invalid front window bounds for normalized capture")
     nx = rx / float(bounds["width"])
     ny = ry / float(bounds["height"])
-    return create_point_record(x=nx, y=ny, coord_mode=mode, note=note, capture_window_bounds=False) | {
-        "captured_window_bounds": bounds
-    }
+    return create_point_record(
+        x=nx, y=ny, coord_mode=mode, note=note, capture_window_bounds=False
+    ) | {"captured_window_bounds": bounds}
 
 
 def set_point(config: dict[str, Any], name: str, point_record: dict[str, Any]) -> None:
@@ -795,7 +810,9 @@ def watchlist_open_from_config(
 ) -> tuple[float, float]:
     if activate:
         activate_app(launch=launch, delay=pre_wait)
-    pname = point_name or watchlist_config_point_name(config, "search_field_point", "watchlist_search_field")
+    pname = point_name or watchlist_config_point_name(
+        config, "search_field_point", "watchlist_search_field"
+    )
     point = click_config_point(config, pname)
     if click_wait > 0:
         time.sleep(click_wait)
@@ -827,7 +844,9 @@ def watchlist_add_from_config(
     wl = _watchlist_cfg(config)
     pname = add_button_point_name or str(wl.get("add_button_point") or "")
     if not pname:
-        pname = fallback_search_point_name or watchlist_config_point_name(config, "search_field_point", "watchlist_search_field")
+        pname = fallback_search_point_name or watchlist_config_point_name(
+            config, "search_field_point", "watchlist_search_field"
+        )
     point = click_config_point(config, pname)
     if click_wait > 0:
         time.sleep(click_wait)
@@ -853,7 +872,9 @@ def watchlist_remove_row_from_config(
     if activate:
         activate_app(launch=launch, delay=pre_wait)
     _watchlist_cfg(config)
-    row_name = row_point_name or watchlist_config_point_name(config, "default_from_row_point", "watchlist_row_1")
+    row_name = row_point_name or watchlist_config_point_name(
+        config, "default_from_row_point", "watchlist_row_1"
+    )
     remove_name = remove_menu_point_name or watchlist_config_point_name(
         config, "remove_menu_item_point", "watchlist_context_remove_item"
     )
@@ -878,8 +899,12 @@ def watchlist_reorder_from_config(
     if activate:
         activate_app(launch=launch, delay=pre_wait)
     _watchlist_cfg(config)
-    from_name = from_point_name or watchlist_config_point_name(config, "default_from_row_point", "watchlist_row_1")
-    to_name = to_point_name or watchlist_config_point_name(config, "default_to_row_point", "watchlist_row_2")
+    from_name = from_point_name or watchlist_config_point_name(
+        config, "default_from_row_point", "watchlist_row_1"
+    )
+    to_name = to_point_name or watchlist_config_point_name(
+        config, "default_to_row_point", "watchlist_row_2"
+    )
     result = drag_between_config_points(config, from_name, to_name, steps=steps, duration=duration)
     return {"from_point_name": from_name, "to_point_name": to_name, "drag": result}
 
@@ -1144,7 +1169,8 @@ def run_action(step: dict[str, Any]) -> None:
         watchlist_add_from_config(
             cfg,
             str(step["symbol"]),
-            add_button_point_name=step.get("add_button_point_name") and str(step["add_button_point_name"]),
+            add_button_point_name=step.get("add_button_point_name")
+            and str(step["add_button_point_name"]),
             fallback_search_point_name=step.get("fallback_search_point_name")
             and str(step["fallback_search_point_name"]),
             activate=_step_bool(step, "activate", True),
@@ -1163,7 +1189,8 @@ def run_action(step: dict[str, Any]) -> None:
         watchlist_remove_row_from_config(
             cfg,
             row_point_name=step.get("row_point_name") and str(step["row_point_name"]),
-            remove_menu_point_name=step.get("remove_menu_point_name") and str(step["remove_menu_point_name"]),
+            remove_menu_point_name=step.get("remove_menu_point_name")
+            and str(step["remove_menu_point_name"]),
             activate=_step_bool(step, "activate", True),
             launch=_step_bool(step, "launch", False),
             pre_wait=_step_float(step, "pre_wait", 0.2),
@@ -1218,7 +1245,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("status", help="Print JSON status for the TradingView app/process")
 
     ap = sub.add_parser("activate", help="Activate (focus) the TradingView app")
-    ap.add_argument("--launch", action="store_true", help="Launch TradingView if not already running")
+    ap.add_argument(
+        "--launch", action="store_true", help="Launch TradingView if not already running"
+    )
     ap.add_argument("--delay", type=float, default=0.25, help="Post-activation delay in seconds")
 
     sub.add_parser("list-menus", help="List top-level menu bar items")
@@ -1234,7 +1263,9 @@ def build_parser() -> argparse.ArgumentParser:
     cs = sub.add_parser("config-show", help="Print a layout config JSON")
     cs.add_argument("file", type=Path)
 
-    css = sub.add_parser("config-set-shortcut", help="Set a shortcut value in config (e.g. symbol_search)")
+    css = sub.add_parser(
+        "config-set-shortcut", help="Set a shortcut value in config (e.g. symbol_search)"
+    )
     css.add_argument("file", type=Path)
     css.add_argument("key")
     css.add_argument("combo")
@@ -1244,7 +1275,11 @@ def build_parser() -> argparse.ArgumentParser:
     csp.add_argument("name")
     csp.add_argument("x", type=float)
     csp.add_argument("y", type=float)
-    csp.add_argument("--coord-mode", default="normalized_window", choices=["absolute", "relative_window", "normalized_window"])
+    csp.add_argument(
+        "--coord-mode",
+        default="normalized_window",
+        choices=["absolute", "relative_window", "normalized_window"],
+    )
     csp.add_argument("--note", default=None)
 
     ccp = sub.add_parser(
@@ -1253,9 +1288,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ccp.add_argument("file", type=Path)
     ccp.add_argument("name")
-    ccp.add_argument("--coord-mode", default="normalized_window", choices=["absolute", "relative_window", "normalized_window"])
+    ccp.add_argument(
+        "--coord-mode",
+        default="normalized_window",
+        choices=["absolute", "relative_window", "normalized_window"],
+    )
     ccp.add_argument("--note", default=None)
-    ccp.add_argument("--delay", type=float, default=0.0, help="Wait before capture so you can move the cursor")
+    ccp.add_argument(
+        "--delay", type=float, default=0.0, help="Wait before capture so you can move the cursor"
+    )
     ccp.add_argument("--launch", action="store_true")
     ccp.add_argument("--no-activate", action="store_false", dest="activate", default=True)
 
@@ -1264,7 +1305,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Timed capture of common watchlist points into config (search/add/rows); requires moving the mouse during prompts",
     )
     cwl.add_argument("file", type=Path)
-    cwl.add_argument("--coord-mode", default="normalized_window", choices=["absolute", "relative_window", "normalized_window"])
+    cwl.add_argument(
+        "--coord-mode",
+        default="normalized_window",
+        choices=["absolute", "relative_window", "normalized_window"],
+    )
     cwl.add_argument("--delay-per-point", type=float, default=8.0)
     cwl.add_argument("--launch", action="store_true")
     cwl.add_argument("--no-activate", action="store_false", dest="activate", default=True)
@@ -1278,10 +1323,16 @@ def build_parser() -> argparse.ArgumentParser:
     cwb.add_argument("--default-to-row-point", default=None)
     cwb.add_argument("--row-points", default=None, help="Comma-separated ordered row point names")
 
-    wc_open = sub.add_parser("watchlist-open-config", help="Open/switch symbol via watchlist search field from config")
+    wc_open = sub.add_parser(
+        "watchlist-open-config", help="Open/switch symbol via watchlist search field from config"
+    )
     wc_open.add_argument("config", type=Path)
     wc_open.add_argument("symbol")
-    wc_open.add_argument("--point-name", default=None, help="Override point name (default watchlist.search_field_point)")
+    wc_open.add_argument(
+        "--point-name",
+        default=None,
+        help="Override point name (default watchlist.search_field_point)",
+    )
     wc_open.add_argument("--click-wait", type=float, default=0.12)
     wc_open.add_argument("--pre-wait", type=float, default=0.2)
     wc_open.add_argument("--type-interval", type=float, default=0.0)
@@ -1290,7 +1341,9 @@ def build_parser() -> argparse.ArgumentParser:
     wc_open.add_argument("--launch", action="store_true")
     wc_open.add_argument("--no-activate", action="store_false", dest="activate", default=True)
 
-    wc_add = sub.add_parser("watchlist-add-config", help="Add symbol to watchlist using configured add/search points")
+    wc_add = sub.add_parser(
+        "watchlist-add-config", help="Add symbol to watchlist using configured add/search points"
+    )
     wc_add.add_argument("config", type=Path)
     wc_add.add_argument("symbol")
     wc_add.add_argument("--add-button-point-name", default=None)
@@ -1305,7 +1358,10 @@ def build_parser() -> argparse.ArgumentParser:
     wc_add.add_argument("--launch", action="store_true")
     wc_add.add_argument("--no-activate", action="store_false", dest="activate", default=True)
 
-    wc_rm = sub.add_parser("watchlist-remove-config", help="Remove a watchlist row using config row + context-menu remove points")
+    wc_rm = sub.add_parser(
+        "watchlist-remove-config",
+        help="Remove a watchlist row using config row + context-menu remove points",
+    )
     wc_rm.add_argument("config", type=Path)
     wc_rm.add_argument("--row-point-name", default=None)
     wc_rm.add_argument("--remove-menu-point-name", default=None)
@@ -1314,7 +1370,9 @@ def build_parser() -> argparse.ArgumentParser:
     wc_rm.add_argument("--launch", action="store_true")
     wc_rm.add_argument("--no-activate", action="store_false", dest="activate", default=True)
 
-    wc_re = sub.add_parser("watchlist-reorder-config", help="Drag between two configured watchlist row points")
+    wc_re = sub.add_parser(
+        "watchlist-reorder-config", help="Drag between two configured watchlist row points"
+    )
     wc_re.add_argument("config", type=Path)
     wc_re.add_argument("--from-point-name", default=None)
     wc_re.add_argument("--to-point-name", default=None)
@@ -1348,8 +1406,16 @@ def build_parser() -> argparse.ArgumentParser:
     def add_point_args(sp: argparse.ArgumentParser) -> None:
         sp.add_argument("x", type=float)
         sp.add_argument("y", type=float)
-        sp.add_argument("--relative-window", action="store_true", help="Treat x,y as offsets from front window origin")
-        sp.add_argument("--normalized-window", action="store_true", help="Treat x,y as 0..1 normalized coords inside front window")
+        sp.add_argument(
+            "--relative-window",
+            action="store_true",
+            help="Treat x,y as offsets from front window origin",
+        )
+        sp.add_argument(
+            "--normalized-window",
+            action="store_true",
+            help="Treat x,y as 0..1 normalized coords inside front window",
+        )
 
     mm = sub.add_parser("move-mouse", help="Move mouse pointer to a point")
     add_point_args(mm)
@@ -1359,7 +1425,9 @@ def build_parser() -> argparse.ArgumentParser:
     mc.add_argument("--button", choices=["left", "right"], default="left")
     mc.add_argument("--clicks", type=int, default=1)
     mc.add_argument("--interval", type=float, default=0.08, help="Delay between clicks")
-    mc.add_argument("--no-move-first", action="store_true", help="Skip explicit mouse move before clicking")
+    mc.add_argument(
+        "--no-move-first", action="store_true", help="Skip explicit mouse move before clicking"
+    )
 
     dg = sub.add_parser("drag", help="Drag from one point to another (left button)")
     dg.add_argument("x1", type=float)
@@ -1371,9 +1439,13 @@ def build_parser() -> argparse.ArgumentParser:
     dg.add_argument("--steps", type=int, default=12)
     dg.add_argument("--duration", type=float, default=0.2)
 
-    sp_search = sub.add_parser("search", help="Open a search dialog/palette via shortcut, type query, optionally confirm")
+    sp_search = sub.add_parser(
+        "search", help="Open a search dialog/palette via shortcut, type query, optionally confirm"
+    )
     sp_search.add_argument("query")
-    sp_search.add_argument("--open-combo", default="cmd+k", help="Shortcut that opens the target search UI")
+    sp_search.add_argument(
+        "--open-combo", default="cmd+k", help="Shortcut that opens the target search UI"
+    )
     sp_search.add_argument("--open-wait", type=float, default=0.25)
     sp_search.add_argument("--pre-wait", type=float, default=0.2)
     sp_search.add_argument("--type-interval", type=float, default=0.0)
@@ -1385,7 +1457,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp_search.add_argument("--launch", action="store_true")
     sp_search.add_argument("--no-activate", action="store_false", dest="activate", default=True)
 
-    ss = sub.add_parser("set-symbol", help="Open symbol search (default cmd+k), type symbol, confirm")
+    ss = sub.add_parser(
+        "set-symbol", help="Open symbol search (default cmd+k), type symbol, confirm"
+    )
     ss.add_argument("symbol")
     ss.add_argument("--open-combo", default="cmd+k")
     ss.add_argument("--open-wait", type=float, default=0.25)
@@ -1399,9 +1473,15 @@ def build_parser() -> argparse.ArgumentParser:
     ss.add_argument("--launch", action="store_true")
     ss.add_argument("--no-activate", action="store_false", dest="activate", default=True)
 
-    ai = sub.add_parser("add-indicator", help="Open indicators search (default '/'), type query, confirm")
+    ai = sub.add_parser(
+        "add-indicator", help="Open indicators search (default '/'), type query, confirm"
+    )
     ai.add_argument("query")
-    ai.add_argument("--open-combo", default="/", help="Indicator search shortcut; override if your mapping differs")
+    ai.add_argument(
+        "--open-combo",
+        default="/",
+        help="Indicator search shortcut; override if your mapping differs",
+    )
     ai.add_argument("--open-wait", type=float, default=0.3)
     ai.add_argument("--pre-wait", type=float, default=0.2)
     ai.add_argument("--type-interval", type=float, default=0.0)
@@ -1414,8 +1494,16 @@ def build_parser() -> argparse.ArgumentParser:
     ai.add_argument("--no-activate", action="store_false", dest="activate", default=True)
 
     for name, help_text, confirm_default in [
-        ("watchlist-search", "Click the watchlist search/input field, type query, optional confirm", False),
-        ("watchlist-open", "Click the watchlist search/input field, type symbol, and confirm", True),
+        (
+            "watchlist-search",
+            "Click the watchlist search/input field, type query, optional confirm",
+            False,
+        ),
+        (
+            "watchlist-open",
+            "Click the watchlist search/input field, type symbol, and confirm",
+            True,
+        ),
     ]:
         ws = sub.add_parser(name, help=help_text)
         ws.add_argument("query" if name == "watchlist-search" else "symbol")
@@ -1482,7 +1570,9 @@ def main() -> int:
             return 0
         if args.cmd == "config-set-point":
             cfg = load_config(args.file)
-            rec = create_point_record(x=args.x, y=args.y, coord_mode=args.coord_mode, note=args.note)
+            rec = create_point_record(
+                x=args.x, y=args.y, coord_mode=args.coord_mode, note=args.note
+            )
             set_point(cfg, args.name, rec)
             save_config(args.file, cfg)
             print(json.dumps({args.name: rec}, indent=2))
@@ -1565,7 +1655,11 @@ def main() -> int:
                 normalized_window=args.normalized_window,
                 move_first=not args.no_move_first,
             )
-            print(json.dumps({"x": tx, "y": ty, "button": args.button, "clicks": args.clicks}, indent=2))
+            print(
+                json.dumps(
+                    {"x": tx, "y": ty, "button": args.button, "clicks": args.clicks}, indent=2
+                )
+            )
             return 0
         if args.cmd == "drag":
             result = mouse_drag(
@@ -1718,9 +1812,7 @@ def main() -> int:
     except OsaScriptError as e:
         msg = str(e)
         if "not allowed assistive access" in msg.lower():
-            msg += (
-                "\nGrant Accessibility access to Codex/Terminal in System Settings > Privacy & Security > Accessibility."
-            )
+            msg += "\nGrant Accessibility access to Codex/Terminal in System Settings > Privacy & Security > Accessibility."
         print(msg, file=sys.stderr)
         return 2
     except CoreGraphicsError as e:

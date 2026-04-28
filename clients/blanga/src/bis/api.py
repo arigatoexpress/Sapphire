@@ -159,7 +159,9 @@ def _create_followup_tasks_from_note(
     return created
 
 
-def _update_followup_task_outcome(*, action_urn: str, outcome: str, note: str) -> dict[str, Any] | None:
+def _update_followup_task_outcome(
+    *, action_urn: str, outcome: str, note: str
+) -> dict[str, Any] | None:
     task = broker_followup_tasks.get(action_urn)
     if not task:
         return None
@@ -230,7 +232,11 @@ def _next_best_actions(limit: int = 20) -> list[dict[str, Any]]:
     # 1) Pending review queue actions (highest leverage for data quality)
     for review in master_arena.list_review_tasks(status="pending")[:50]:
         obs = master_arena.get_field_observation(review.observation_urn)
-        prop = master_arena.get_property(review.entity_urn) if review.entity_type == "property" else None
+        prop = (
+            master_arena.get_property(review.entity_urn)
+            if review.entity_type == "property"
+            else None
+        )
         confidence = obs.confidence if obs else 0.0
         urgency = 85 if review.field_name == "occupancy_status" else 75
         if confidence >= 0.9:
@@ -277,7 +283,10 @@ def _next_best_actions(limit: int = 20) -> list[dict[str, Any]]:
                         "property_address": prop.address_line1,
                         "entity_urn": prop.property_urn,
                         "review_urn": None,
-                        "metadata": {"days_on_market": dom, "listing_status": prop.listing_status.value},
+                        "metadata": {
+                            "days_on_market": dom,
+                            "listing_status": prop.listing_status.value,
+                        },
                         "created_at": prop.updated_at.isoformat(),
                     }
                 )
@@ -294,7 +303,10 @@ def _next_best_actions(limit: int = 20) -> list[dict[str, Any]]:
                         "property_address": prop.address_line1,
                         "entity_urn": prop.property_urn,
                         "review_urn": None,
-                        "metadata": {"days_on_market": dom, "listing_status": prop.listing_status.value},
+                        "metadata": {
+                            "days_on_market": dom,
+                            "listing_status": prop.listing_status.value,
+                        },
                         "created_at": prop.updated_at.isoformat(),
                     }
                 )
@@ -313,14 +325,23 @@ def _next_best_actions(limit: int = 20) -> list[dict[str, Any]]:
                     "property_address": prop.address_line1,
                     "entity_urn": prop.property_urn,
                     "review_urn": None,
-                    "metadata": {"occupancy_status": prop.occupancy_status, "listing_status": prop.listing_status.value},
+                    "metadata": {
+                        "occupancy_status": prop.occupancy_status,
+                        "listing_status": prop.listing_status.value,
+                    },
                     "created_at": prop.updated_at.isoformat(),
                 }
             )
 
     # 4) Recent market events (fresh intel follow-up)
     for event in master_arena.list_market_events(since_days=14)[:30]:
-        if event.event_type.value in {"listed", "sold", "client_news", "industry_news", "new_company"}:
+        if event.event_type.value in {
+            "listed",
+            "sold",
+            "client_news",
+            "industry_news",
+            "new_company",
+        }:
             priority = 70
             if "vacat" in (event.title + " " + event.summary).lower():
                 priority = 90
@@ -336,7 +357,10 @@ def _next_best_actions(limit: int = 20) -> list[dict[str, Any]]:
                     "property_address": event.property_address_hint or "",
                     "entity_urn": event.event_urn,
                     "review_urn": None,
-                    "metadata": {"event_type": event.event_type.value, "source_url": event.source_url},
+                    "metadata": {
+                        "event_type": event.event_type.value,
+                        "source_url": event.source_url,
+                    },
                     "created_at": event.observed_at.isoformat(),
                 }
             )
@@ -344,7 +368,9 @@ def _next_best_actions(limit: int = 20) -> list[dict[str, Any]]:
     # Deduplicate by category+entity+review for readability
     seen = set()
     deduped: list[dict[str, Any]] = []
-    for item in sorted(actions, key=lambda x: (-x["priority_score"], x.get("created_at", "")), reverse=False):
+    for item in sorted(
+        actions, key=lambda x: (-x["priority_score"], x.get("created_at", "")), reverse=False
+    ):
         key = (item["category"], item.get("entity_urn"), item.get("review_urn"))
         if key in seen:
             continue
@@ -409,7 +435,9 @@ def _application_snapshot_payload() -> dict[str, Any]:
 
 def _restore_application_snapshot(payload: dict[str, Any]) -> dict[str, int]:
     # Backward compatibility: old snapshots were raw master_arena payloads
-    arena_payload = payload.get("master_arena") if isinstance(payload.get("master_arena"), dict) else payload
+    arena_payload = (
+        payload.get("master_arena") if isinstance(payload.get("master_arena"), dict) else payload
+    )
     counts = master_arena.restore_snapshot(arena_payload)
 
     audit_events.clear()
@@ -605,7 +633,9 @@ class AutomationRunRequest(BaseModel):
     news_preferred_publications: list[str] = Field(default_factory=list)
     sync_google_sheets_pull: bool = False
     sync_google_sheets_push: bool = False
-    google_sheets_push_targets: list[str] = Field(default_factory=lambda: ["properties_computed", "reviews_pending"])
+    google_sheets_push_targets: list[str] = Field(
+        default_factory=lambda: ["properties_computed", "reviews_pending"]
+    )
     auto_approve_reviews: bool = False
     review_auto_min_confidence: float = 0.90
     review_auto_only_fields: list[str] = Field(default_factory=list)
@@ -737,7 +767,10 @@ def _find_llc_by_name(legal_name: str) -> LlcEntity | None:
 def _resolve_spreadsheet_id(value: str = "") -> str:
     spreadsheet_id = (value or "").strip() or settings.default_spreadsheet_id
     if not spreadsheet_id:
-        raise HTTPException(status_code=400, detail="spreadsheet_id is required (or configure BIS_GOOGLE_SHEETS_SPREADSHEET_ID)")
+        raise HTTPException(
+            status_code=400,
+            detail="spreadsheet_id is required (or configure BIS_GOOGLE_SHEETS_SPREADSHEET_ID)",
+        )
     return spreadsheet_id
 
 
@@ -816,7 +849,10 @@ def _auto_approve_pending_reviews(
 ) -> dict[str, Any]:
     tasks = master_arena.list_review_tasks(status="pending")
     allowed_fields = {_norm(field) for field in only_fields if _norm(field)}
-    thresholds = {**_default_review_thresholds(), **{_norm(k): float(v) for k, v in field_thresholds.items()}}
+    thresholds = {
+        **_default_review_thresholds(),
+        **{_norm(k): float(v) for k, v in field_thresholds.items()},
+    }
 
     candidates: list[ReviewTask] = []
     skipped: list[dict[str, Any]] = []
@@ -827,7 +863,13 @@ def _auto_approve_pending_reviews(
             continue
         field_name = _norm(task.field_name)
         if allowed_fields and field_name not in allowed_fields:
-            skipped.append({"review_urn": task.review_urn, "field_name": task.field_name, "reason": "field_not_selected"})
+            skipped.append(
+                {
+                    "review_urn": task.review_urn,
+                    "field_name": task.field_name,
+                    "reason": "field_not_selected",
+                }
+            )
             continue
         threshold = max(min_confidence, thresholds.get(field_name, min_confidence))
         if obs.confidence < threshold:
@@ -865,7 +907,9 @@ def _auto_approve_pending_reviews(
         "candidates": len(candidates),
         "approved_count": 0 if dry_run else len(approved),
         "approved_reviews": [] if dry_run else approved,
-        "candidate_reviews": [_serialize_review_task(task) for task in candidates] if dry_run else [],
+        "candidate_reviews": [_serialize_review_task(task) for task in candidates]
+        if dry_run
+        else [],
         "skipped": skipped[:100],
         "applied_thresholds": thresholds,
         "min_confidence": min_confidence,
@@ -880,7 +924,13 @@ def _readiness_summary() -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
 
     auth_ok = settings.require_auth and bool(settings.app_password)
-    checks.append({"name": "auth_password", "ok": auth_ok, "detail": "BIS basic auth enabled" if auth_ok else "Auth/password not configured"})
+    checks.append(
+        {
+            "name": "auth_password",
+            "ok": auth_ok,
+            "detail": "BIS basic auth enabled" if auth_ok else "Auth/password not configured",
+        }
+    )
     if not auth_ok:
         recommendations.append("Enable `BIS_APP_PASSWORD` and keep `/api/bis/*` protected.")
 
@@ -889,20 +939,28 @@ def _readiness_summary() -> dict[str, Any]:
         {
             "name": "durable_snapshots_gcs",
             "ok": gcs_ok,
-            "detail": "GCS snapshot bucket configured" if gcs_ok else "GCS snapshot bucket not configured",
+            "detail": "GCS snapshot bucket configured"
+            if gcs_ok
+            else "GCS snapshot bucket not configured",
         }
     )
     if not gcs_ok:
-        recommendations.append("Configure `BIS_GCS_SNAPSHOT_BUCKET` for durable backups beyond Cloud Run local disk.")
+        recommendations.append(
+            "Configure `BIS_GCS_SNAPSHOT_BUCKET` for durable backups beyond Cloud Run local disk."
+        )
     elif not snapshot.get("gcs", {}).get("exists"):
-        recommendations.append("Run `POST /api/bis/system/backup/save` once to create the first durable snapshot.")
+        recommendations.append(
+            "Run `POST /api/bis/system/backup/save` once to create the first durable snapshot."
+        )
 
     sheets_client_ok = sheets_status.available and sheets_status.auth_ok
     checks.append(
         {
             "name": "google_sheets_api_auth",
             "ok": sheets_client_ok,
-            "detail": "Google Sheets API client authenticated" if sheets_client_ok else (sheets_status.error or "Google Sheets API auth unavailable"),
+            "detail": "Google Sheets API client authenticated"
+            if sheets_client_ok
+            else (sheets_status.error or "Google Sheets API auth unavailable"),
         }
     )
     if not sheets_client_ok:
@@ -913,11 +971,15 @@ def _readiness_summary() -> dict[str, Any]:
         {
             "name": "spreadsheet_id_configured",
             "ok": spreadsheet_id_ok,
-            "detail": "Default spreadsheet ID configured" if spreadsheet_id_ok else "Missing `BIS_GOOGLE_SHEETS_SPREADSHEET_ID`",
+            "detail": "Default spreadsheet ID configured"
+            if spreadsheet_id_ok
+            else "Missing `BIS_GOOGLE_SHEETS_SPREADSHEET_ID`",
         }
     )
     if not spreadsheet_id_ok:
-        recommendations.append("Set `BIS_GOOGLE_SHEETS_SPREADSHEET_ID` and share the sheet with the Cloud Run service account.")
+        recommendations.append(
+            "Set `BIS_GOOGLE_SHEETS_SPREADSHEET_ID` and share the sheet with the Cloud Run service account."
+        )
 
     pending_reviews = len(master_arena.list_review_tasks(status="pending"))
     checks.append(
@@ -928,7 +990,9 @@ def _readiness_summary() -> dict[str, Any]:
         }
     )
     if pending_reviews >= 25:
-        recommendations.append("Use `POST /api/bis/reviews/auto-approve` for high-confidence fields to keep the review queue current.")
+        recommendations.append(
+            "Use `POST /api/bis/reviews/auto-approve` for high-confidence fields to keep the review queue current."
+        )
 
     ready_score = sum(1 for check in checks if check["ok"])
     return {
@@ -1202,7 +1266,9 @@ def _import_note_row_impl(row: dict[str, Any]) -> dict[str, Any]:
             note_text=normalized.note_text,
             owner_person_urn=linked_owner.person_urn if linked_owner else None,
             property_urn=linked_property.property_urn if linked_property else None,
-            tags=list(dict.fromkeys(["notes-input", normalized.source_label] + (normalized.tags or []))),
+            tags=list(
+                dict.fromkeys(["notes-input", normalized.source_label] + (normalized.tags or []))
+            ),
             created_by=normalized.entered_by or "broker",
         )
     )
@@ -1257,7 +1323,9 @@ def _apply_property_update_row_impl(row: dict[str, Any]) -> dict[str, Any]:
     date_fields = {"lease_expiration", "listed_at", "sold_at", "ownership_start"}
     bool_fields = {"redo", "potential_listing"}
 
-    if field_name not in text_fields | float_fields | date_fields | bool_fields | {"listing_status"}:
+    if field_name not in text_fields | float_fields | date_fields | bool_fields | {
+        "listing_status"
+    }:
         raise ValueError(f"unsupported property update field: {field_name}")
 
     if field_name == "listing_status":
@@ -1265,25 +1333,43 @@ def _apply_property_update_row_impl(row: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("listing_status cannot be cleared")
         status = ListingStatus(_norm(raw_value).replace("-", "_"))
         if status == ListingStatus.LISTED:
-            master_arena.mark_listed(property_urn=prop.property_urn, listed_at=prop.listed_at, list_price=prop.asking_price)
+            master_arena.mark_listed(
+                property_urn=prop.property_urn,
+                listed_at=prop.listed_at,
+                list_price=prop.asking_price,
+            )
         elif status == ListingStatus.UNDER_CONTRACT:
             master_arena.mark_under_contract(property_urn=prop.property_urn)
         elif status == ListingStatus.SOLD:
-            master_arena.mark_sold(property_urn=prop.property_urn, sold_at=prop.sold_at, close_price=prop.close_price)
+            master_arena.mark_sold(
+                property_urn=prop.property_urn, sold_at=prop.sold_at, close_price=prop.close_price
+            )
         else:
             prop.listing_status = status
             master_arena.upsert_property(prop)
     elif field_name in text_fields:
-        setattr(prop, field_name, "" if normalized.clear_field else raw_value.strip().lower() if field_name == "occupancy_status" else raw_value.strip())
+        setattr(
+            prop,
+            field_name,
+            ""
+            if normalized.clear_field
+            else raw_value.strip().lower()
+            if field_name == "occupancy_status"
+            else raw_value.strip(),
+        )
         master_arena.upsert_property(prop)
     elif field_name in float_fields:
-        setattr(prop, field_name, None if normalized.clear_field else _coerce_float_value(raw_value))
+        setattr(
+            prop, field_name, None if normalized.clear_field else _coerce_float_value(raw_value)
+        )
         master_arena.upsert_property(prop)
     elif field_name in date_fields:
         setattr(prop, field_name, None if normalized.clear_field else _coerce_date_value(raw_value))
         master_arena.upsert_property(prop)
     elif field_name in bool_fields:
-        setattr(prop, field_name, False if normalized.clear_field else _coerce_bool_value(raw_value))
+        setattr(
+            prop, field_name, False if normalized.clear_field else _coerce_bool_value(raw_value)
+        )
         master_arena.upsert_property(prop)
 
     if field_name == "redo":
@@ -1444,11 +1530,17 @@ def _intake_drop_impl(payload: IntakeDropRequest) -> dict[str, Any]:
     }
     _record_audit_event(
         action="intake_drop",
-        actor="dashboard-user" if payload.source_label in {"intake-drop", "google-sheets"} else "broker",
+        actor="dashboard-user"
+        if payload.source_label in {"intake-drop", "google-sheets"}
+        else "broker",
         summary=f"Saved intake for {refreshed_property.address_line1} ({len(review_tasks)} suggested updates, {len(followup_tasks)} follow-ups)",
         entity_type="property",
         entity_urn=refreshed_property.property_urn,
-        details={"review_tasks": len(review_tasks), "followup_tasks": len(followup_tasks), "source_label": payload.source_label},
+        details={
+            "review_tasks": len(review_tasks),
+            "followup_tasks": len(followup_tasks),
+            "source_label": payload.source_label,
+        },
     )
     return result
 
@@ -1498,7 +1590,9 @@ async def system_readiness() -> dict[str, Any]:
 async def ui_overview() -> dict[str, Any]:
     readiness = _readiness_summary()
     pending_reviews = master_arena.list_review_tasks(status="pending")
-    recent_properties = sorted(master_arena.list_properties(), key=lambda p: p.updated_at, reverse=True)[:20]
+    recent_properties = sorted(
+        master_arena.list_properties(), key=lambda p: p.updated_at, reverse=True
+    )[:20]
     recent_events = master_arena.list_market_events(since_days=30)[:10]
     recent_docs = master_arena.list_documents()[:10]
 
@@ -1512,7 +1606,9 @@ async def ui_overview() -> dict[str, Any]:
             "notes": len(master_arena.notes),
             "documents": len(master_arena.documents),
             "pending_reviews": len(pending_reviews),
-            "open_followup_tasks": len([t for t in broker_followup_tasks.values() if t.get("status") == "open"]),
+            "open_followup_tasks": len(
+                [t for t in broker_followup_tasks.values() if t.get("status") == "open"]
+            ),
             "market_events_30d": len(master_arena.list_market_events(since_days=30)),
         },
         "readiness": readiness,
@@ -1521,7 +1617,9 @@ async def ui_overview() -> dict[str, Any]:
         "recent_events": [_serialize_market_event(event) for event in recent_events],
         "recent_documents": [_serialize_document(doc) for doc in recent_docs],
         "recent_audit_events": audit_events[:20],
-        "saved_comp_searches": sorted(saved_comp_searches.values(), key=lambda x: x["updated_at"], reverse=True)[:20],
+        "saved_comp_searches": sorted(
+            saved_comp_searches.values(), key=lambda x: x["updated_at"], reverse=True
+        )[:20],
         "open_followup_tasks": [
             _serialize_followup_task(t)
             for t in sorted(
@@ -1565,8 +1663,16 @@ async def ui_comps_search(payload: UICompsSearchRequest) -> dict[str, Any]:
     limit = max(1, min(payload.limit, 50))
     rows = [_serialize_property(item) for item in matches[:limit]]
 
-    land_psf_values = [row["sale_price_per_land_sf"] for row in rows if row.get("sale_price_per_land_sf") is not None]
-    bldg_psf_values = [row["sale_price_per_building_sf"] for row in rows if row.get("sale_price_per_building_sf") is not None]
+    land_psf_values = [
+        row["sale_price_per_land_sf"]
+        for row in rows
+        if row.get("sale_price_per_land_sf") is not None
+    ]
+    bldg_psf_values = [
+        row["sale_price_per_building_sf"]
+        for row in rows
+        if row.get("sale_price_per_building_sf") is not None
+    ]
     cap_rates = [row["cap_rate"] for row in rows if row.get("cap_rate") is not None]
     dom_values = [row["days_on_market"] for row in rows if row.get("days_on_market") is not None]
 
@@ -1647,8 +1753,12 @@ async def ui_next_actions(limit: int = 20) -> dict[str, Any]:
 async def ui_next_actions_log(payload: NextActionLogRequest) -> dict[str, Any]:
     outcome = (payload.outcome or "done").strip().lower()
     if outcome not in {"done", "snoozed", "ignored"}:
-        raise HTTPException(status_code=400, detail="outcome must be one of: done, snoozed, ignored")
-    followup_task = _update_followup_task_outcome(action_urn=payload.action_urn, outcome=outcome, note=payload.note)
+        raise HTTPException(
+            status_code=400, detail="outcome must be one of: done, snoozed, ignored"
+        )
+    followup_task = _update_followup_task_outcome(
+        action_urn=payload.action_urn, outcome=outcome, note=payload.note
+    )
     if followup_task is not None:
         _autosave_snapshot()
     event = _record_audit_event(
@@ -1659,7 +1769,11 @@ async def ui_next_actions_log(payload: NextActionLogRequest) -> dict[str, Any]:
         entity_urn=payload.action_urn,
         details={"note": payload.note, "task_updated": bool(followup_task)},
     )
-    return {"status": "ok", "audit_event": event, "updated_followup_task": _serialize_followup_task(followup_task) if followup_task else None}
+    return {
+        "status": "ok",
+        "audit_event": event,
+        "updated_followup_task": _serialize_followup_task(followup_task) if followup_task else None,
+    }
 
 
 @router.post("/ui/comps/saved")
@@ -1744,7 +1858,12 @@ async def save_backup_snapshot() -> dict[str, Any]:
         "status": "ok",
         **_save_snapshot(),
     }
-    _record_audit_event(action="backup_save", actor="dashboard-user", summary="Saved BIS backup snapshot", details={"gcs": result.get("gcs_save", {})})
+    _record_audit_event(
+        action="backup_save",
+        actor="dashboard-user",
+        summary="Saved BIS backup snapshot",
+        details={"gcs": result.get("gcs_save", {})},
+    )
     return result
 
 
@@ -1756,7 +1875,9 @@ async def load_backup_snapshot() -> dict[str, Any]:
         if payload is None:
             path = _backup_file_path()
             if not path.exists():
-                raise HTTPException(status_code=404, detail="no backup snapshot found in gcs or local file")
+                raise HTTPException(
+                    status_code=404, detail="no backup snapshot found in gcs or local file"
+                )
             payload = json.loads(path.read_text(encoding="utf-8"))
             source = "local_file"
         counts = _restore_application_snapshot(payload)
@@ -1768,7 +1889,12 @@ async def load_backup_snapshot() -> dict[str, Any]:
         "restored_counts": counts,
         **_snapshot_status(),
     }
-    _record_audit_event(action="backup_load", actor="dashboard-user", summary=f"Loaded backup snapshot from {source}", details={"restored_counts": counts})
+    _record_audit_event(
+        action="backup_load",
+        actor="dashboard-user",
+        summary=f"Loaded backup snapshot from {source}",
+        details={"restored_counts": counts},
+    )
     return result
 
 
@@ -1783,7 +1909,12 @@ async def import_backup_snapshot(payload: SnapshotImportRequest) -> dict[str, An
         "status": "ok",
         "restored_counts": counts,
     }
-    _record_audit_event(action="backup_import", actor="dashboard-user", summary="Imported backup snapshot payload", details={"restored_counts": counts})
+    _record_audit_event(
+        action="backup_import",
+        actor="dashboard-user",
+        summary="Imported backup snapshot payload",
+        details={"restored_counts": counts},
+    )
     return result
 
 
@@ -1830,7 +1961,12 @@ async def sheets_writeback_preview(tab: str = "properties_computed") -> dict[str
 @router.post("/sheets/import")
 async def sheets_import(payload: SheetImportRequest) -> dict[str, Any]:
     tab = _norm(payload.tab).replace("-", "_")
-    supported_import_tabs = {"properties_input", "properties_new_input", "property_updates_input", "notes_input"}
+    supported_import_tabs = {
+        "properties_input",
+        "properties_new_input",
+        "property_updates_input",
+        "notes_input",
+    }
     if tab not in supported_import_tabs:
         raise HTTPException(
             status_code=400,
@@ -1853,10 +1989,16 @@ async def sheets_import(payload: SheetImportRequest) -> dict[str, Any]:
                             "row_number": idx,
                             "address_line1": normalized.address_line1,
                             "owner_name": normalized.owner_name,
-                            "listing_status": normalized.listing_status.value if normalized.listing_status else None,
+                            "listing_status": normalized.listing_status.value
+                            if normalized.listing_status
+                            else None,
                             "occupancy_status": normalized.occupancy_status or "",
-                            "existing_property_urn": existing_prop.property_urn if existing_prop else None,
-                            "duplicate_blocked": bool(existing_prop and tab == "properties_new_input"),
+                            "existing_property_urn": existing_prop.property_urn
+                            if existing_prop
+                            else None,
+                            "duplicate_blocked": bool(
+                                existing_prop and tab == "properties_new_input"
+                            ),
                         }
                     )
                     continue
@@ -1900,7 +2042,9 @@ async def sheets_import(payload: SheetImportRequest) -> dict[str, Any]:
                     {
                         "row_number": idx,
                         "status": "imported",
-                        "mode": "new_property" if tab == "properties_new_input" else "property_intake",
+                        "mode": "new_property"
+                        if tab == "properties_new_input"
+                        else "property_intake",
                         "property_urn": result["property"]["property_urn"],
                         "owner_person_urn": result["owner"]["person_urn"],
                         "address_line1": result["property"]["address_line1"],
@@ -2042,7 +2186,9 @@ async def google_sheets_push(payload: GoogleSheetsPushRequest) -> dict[str, Any]
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     try:
-        write_result = write_sheet_rows(spreadsheet_id=spreadsheet_id, tab_name=target_tab, rows=rows)
+        write_result = write_sheet_rows(
+            spreadsheet_id=spreadsheet_id, tab_name=target_tab, rows=rows
+        )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"google sheets push failed: {exc}") from exc
 
@@ -2236,7 +2382,9 @@ async def run_automation(payload: AutomationRunRequest) -> dict[str, Any]:
         sheets_pull["attempted"] = True
         try:
             spreadsheet_id = _resolve_spreadsheet_id("")
-            rows = read_sheet_rows(spreadsheet_id=spreadsheet_id, tab_name=settings.sheets_input_tab)
+            rows = read_sheet_rows(
+                spreadsheet_id=spreadsheet_id, tab_name=settings.sheets_input_tab
+            )
             import_result = await sheets_import(
                 SheetImportRequest(
                     tab="properties_input",
@@ -2275,7 +2423,9 @@ async def run_automation(payload: AutomationRunRequest) -> dict[str, Any]:
         permit_ingested = len(attached)
         permit_linked = sum(1 for signal in attached if signal.property_urn)
         for signal in attached:
-            permit_source_breakdown[signal.source] = permit_source_breakdown.get(signal.source, 0) + 1
+            permit_source_breakdown[signal.source] = (
+                permit_source_breakdown.get(signal.source, 0) + 1
+            )
 
     news_events_created = 0
     if payload.refresh_news_intel:
@@ -2514,8 +2664,12 @@ async def list_news_sources() -> dict[str, Any]:
 
 
 @router.get("/intel/clients")
-async def get_client_intel(owner_person_urn: str | None = None, since_days: int = 90) -> dict[str, Any]:
-    return client_intel_summary(master_arena, owner_person_urn=owner_person_urn, since_days=since_days)
+async def get_client_intel(
+    owner_person_urn: str | None = None, since_days: int = 90
+) -> dict[str, Any]:
+    return client_intel_summary(
+        master_arena, owner_person_urn=owner_person_urn, since_days=since_days
+    )
 
 
 @router.post("/properties/{property_urn}/redo")
@@ -2524,7 +2678,10 @@ async def set_property_redo(property_urn: str, value: bool = True) -> dict[str, 
         raise HTTPException(status_code=404, detail="property not found")
     master_arena.apply_redo(property_urn, redo=value)
     _autosave_snapshot()
-    return {"status": "ok", "property": _serialize_property(master_arena.get_property(property_urn))}
+    return {
+        "status": "ok",
+        "property": _serialize_property(master_arena.get_property(property_urn)),
+    }
 
 
 @router.get("/properties/{property_urn}")
@@ -2560,7 +2717,9 @@ async def get_property_brief(property_urn: str) -> dict[str, Any]:
     notes = master_arena.notes_rollup_for_property(property_urn)
     documents = master_arena.list_documents(property_urn=property_urn)
     market_events = master_arena.list_market_events(property_urn=property_urn, since_days=180)
-    score = compute_propensity_score(prop, master_arena.list_signals(property_urn=property_urn, since_days=365))
+    score = compute_propensity_score(
+        prop, master_arena.list_signals(property_urn=property_urn, since_days=365)
+    )
 
     return {
         "status": "ok",
@@ -2651,8 +2810,12 @@ async def extract_note_fields(note_urn: str) -> dict[str, Any]:
 
 
 @router.get("/reviews")
-async def list_reviews(status: str = "", entity_urn: str | None = None, field_name: str = "") -> dict[str, Any]:
-    tasks = master_arena.list_review_tasks(status=status, entity_urn=entity_urn, field_name=field_name)
+async def list_reviews(
+    status: str = "", entity_urn: str | None = None, field_name: str = ""
+) -> dict[str, Any]:
+    tasks = master_arena.list_review_tasks(
+        status=status, entity_urn=entity_urn, field_name=field_name
+    )
     return {
         "status": "ok",
         "count": len(tasks),
@@ -2682,7 +2845,11 @@ async def auto_approve_reviews(payload: ReviewAutoApproveRequest) -> dict[str, A
         ),
         entity_type="review_queue",
         entity_urn="pending",
-        details={"dry_run": payload.dry_run, "only_fields": payload.only_fields, "min_confidence": payload.min_confidence},
+        details={
+            "dry_run": payload.dry_run,
+            "only_fields": payload.only_fields,
+            "min_confidence": payload.min_confidence,
+        },
     )
     return result
 
@@ -2762,9 +2929,7 @@ async def parse_om(payload: OMExtractRequest) -> dict[str, Any]:
     master_arena.add_om_extraction(extraction)
     _autosave_snapshot()
 
-    low_confidence_fields = [
-        key for key, value in extraction.confidences.items() if value < 0.90
-    ]
+    low_confidence_fields = [key for key, value in extraction.confidences.items() if value < 0.90]
 
     return {
         "status": "ok",
@@ -2798,7 +2963,10 @@ async def pull_permit_signals(payload: PermitPullRequest) -> dict[str, Any]:
     county_breakdown: dict[str, int] = {}
     for signal in attached:
         source_breakdown[signal.source] = source_breakdown.get(signal.source, 0) + 1
-        county = str(signal.attributes.get("county") or ("Travis" if signal.source == "coa_open_data" else ""))
+        county = str(
+            signal.attributes.get("county")
+            or ("Travis" if signal.source == "coa_open_data" else "")
+        )
         if county:
             county_breakdown[county] = county_breakdown.get(county, 0) + 1
     return {
@@ -2900,7 +3068,9 @@ async def dashboard_submarkets() -> dict[str, Any]:
                 "avg_propensity_score": 0.0,
                 "_score_total": 0.0,
             }
-        score = compute_propensity_score(prop, master_arena.list_signals(property_urn=prop.property_urn, since_days=365))
+        score = compute_propensity_score(
+            prop, master_arena.list_signals(property_urn=prop.property_urn, since_days=365)
+        )
         row = stats[key]
         row["property_count"] += 1
         row["redo_count"] += int(prop.redo)

@@ -2,6 +2,7 @@
 
 All web3 / network calls are fully mocked — no real RPC connection required.
 """
+
 from __future__ import annotations
 
 import json
@@ -19,8 +20,15 @@ sys.path.insert(0, str(ROOT))
 # Helpers — build a minimal fake web3 stack
 # ---------------------------------------------------------------------------
 
-def _make_fake_web3(connected=True, block_number=1_234_567, chain_id=46630,
-                    gas_price=1_000_000_000, signal_count=3, signal_rows=None):
+
+def _make_fake_web3(
+    connected=True,
+    block_number=1_234_567,
+    chain_id=46630,
+    gas_price=1_000_000_000,
+    signal_count=3,
+    signal_rows=None,
+):
     """Return a fake Web3 instance and the matching Account class."""
 
     fake_contract_fn = MagicMock()
@@ -29,12 +37,12 @@ def _make_fake_web3(connected=True, block_number=1_234_567, chain_id=46630,
     if signal_rows is None:
         signal_rows = [
             (
-                b"\x00" * 32,      # strategyId
-                "BTC-USD",         # symbol
-                1,                 # direction (long)
-                7500,              # confidence_bps (75%)
-                1_700_000_000,     # timestamp
-                b"\x00" * 32,      # proofHash
+                b"\x00" * 32,  # strategyId
+                "BTC-USD",  # symbol
+                1,  # direction (long)
+                7500,  # confidence_bps (75%)
+                1_700_000_000,  # timestamp
+                b"\x00" * 32,  # proofHash
             )
         ] * min(signal_count, 1)
 
@@ -52,10 +60,16 @@ def _make_fake_web3(connected=True, block_number=1_234_567, chain_id=46630,
     fake_contract.functions.signalCount.return_value = fake_contract_fn
     fake_contract.functions.getLatestSignals.return_value = fake_latest_fn
     fake_contract.functions.hasAccess.return_value = MagicMock(call=MagicMock(return_value=True))
-    fake_contract.functions.isSubscribed.return_value = MagicMock(call=MagicMock(return_value=False))
+    fake_contract.functions.isSubscribed.return_value = MagicMock(
+        call=MagicMock(return_value=False)
+    )
     fake_contract.functions.credits.return_value = MagicMock(call=MagicMock(return_value=5))
-    fake_contract.functions.pricePerSignal.return_value = MagicMock(call=MagicMock(return_value=int(0.001e18)))
-    fake_contract.functions.monthlySubscription.return_value = MagicMock(call=MagicMock(return_value=int(0.1e18)))
+    fake_contract.functions.pricePerSignal.return_value = MagicMock(
+        call=MagicMock(return_value=int(0.001e18))
+    )
+    fake_contract.functions.monthlySubscription.return_value = MagicMock(
+        call=MagicMock(return_value=int(0.1e18))
+    )
 
     w3 = MagicMock()
     w3.is_connected.return_value = connected
@@ -75,6 +89,7 @@ def _make_fake_web3(connected=True, block_number=1_234_567, chain_id=46630,
 # RobinhoodChainClient — get_chain_status
 # ---------------------------------------------------------------------------
 
+
 class TestGetChainStatus:
     def _make_client(self, connected=True, deployments=None, tmp_path=None):
         from lib.chain.robinhood_chain import RobinhoodChainClient
@@ -89,7 +104,9 @@ class TestGetChainStatus:
         client = self._make_client(tmp_path=tmp_path)
         w3, _, fake_contract = _make_fake_web3(signal_count=5)
 
-        with patch("lib.chain.robinhood_chain.RobinhoodChainClient._ensure_init", return_value=True):
+        with patch(
+            "lib.chain.robinhood_chain.RobinhoodChainClient._ensure_init", return_value=True
+        ):
             client._w3 = w3
             client._initialized = True
             client._verifier_contract = fake_contract
@@ -104,7 +121,9 @@ class TestGetChainStatus:
     def test_returns_disconnected_when_web3_missing(self, tmp_path):
         client = self._make_client(tmp_path=tmp_path)
         # _ensure_init returns False (web3 unavailable)
-        with patch("lib.chain.robinhood_chain.RobinhoodChainClient._ensure_init", return_value=False):
+        with patch(
+            "lib.chain.robinhood_chain.RobinhoodChainClient._ensure_init", return_value=False
+        ):
             client._w3 = None
             client._initialized = True
             status = client.get_chain_status()
@@ -125,7 +144,9 @@ class TestGetChainStatus:
         client = self._make_client(deployments=deployments, tmp_path=tmp_path)
         w3, _, fake_contract = _make_fake_web3()
 
-        with patch("lib.chain.robinhood_chain.RobinhoodChainClient._ensure_init", return_value=True):
+        with patch(
+            "lib.chain.robinhood_chain.RobinhoodChainClient._ensure_init", return_value=True
+        ):
             client._w3 = w3
             client._initialized = True
             client._verifier_contract = fake_contract
@@ -143,15 +164,18 @@ class TestGetChainStatus:
 # RobinhoodChainClient — get_signal_history
 # ---------------------------------------------------------------------------
 
+
 class TestGetSignalHistory:
     def test_returns_empty_when_no_web3(self, tmp_path):
         from lib.chain.robinhood_chain import RobinhoodChainClient
+
         client = RobinhoodChainClient(deployments_file=tmp_path / "dep.json")
         with patch.object(client, "_ensure_init", return_value=False):
             assert client.get_signal_history() == []
 
     def test_returns_empty_when_no_contract(self, tmp_path):
         from lib.chain.robinhood_chain import RobinhoodChainClient
+
         client = RobinhoodChainClient(deployments_file=tmp_path / "dep.json")
         with patch.object(client, "_ensure_init", return_value=True):
             client._verifier_contract = None
@@ -159,6 +183,7 @@ class TestGetSignalHistory:
 
     def test_parses_signal_rows(self, tmp_path):
         from lib.chain.robinhood_chain import RobinhoodChainClient
+
         client = RobinhoodChainClient(deployments_file=tmp_path / "dep.json")
 
         rows = [
@@ -185,9 +210,11 @@ class TestGetSignalHistory:
 # RobinhoodChainClient — check_payment
 # ---------------------------------------------------------------------------
 
+
 class TestCheckPayment:
     def test_returns_error_when_no_web3(self, tmp_path):
         from lib.chain.robinhood_chain import RobinhoodChainClient
+
         client = RobinhoodChainClient(deployments_file=tmp_path / "dep.json")
         with patch.object(client, "_ensure_init", return_value=False):
             result = client.check_payment("0x1234")
@@ -195,14 +222,17 @@ class TestCheckPayment:
 
     def test_returns_access_info(self, tmp_path):
         from lib.chain.robinhood_chain import RobinhoodChainClient
+
         client = RobinhoodChainClient(deployments_file=tmp_path / "dep.json")
         _, _, fake_contract = _make_fake_web3()
 
         fake_web3_module = MagicMock()
         fake_web3_module.Web3.to_checksum_address.side_effect = lambda a: a
 
-        with patch.object(client, "_ensure_init", return_value=True), \
-             patch.dict("sys.modules", {"web3": fake_web3_module}):
+        with (
+            patch.object(client, "_ensure_init", return_value=True),
+            patch.dict("sys.modules", {"web3": fake_web3_module}),
+        ):
             client._payment_contract = fake_contract
             result = client.check_payment("0xDeadBeef")
 
@@ -215,17 +245,21 @@ class TestCheckPayment:
 # RobinhoodChainClient — get_payment_gate_stats
 # ---------------------------------------------------------------------------
 
+
 class TestGetPaymentGateStats:
     def test_returns_pricing(self, tmp_path):
         from lib.chain.robinhood_chain import RobinhoodChainClient
+
         client = RobinhoodChainClient(deployments_file=tmp_path / "dep.json")
         _, _, fake_contract = _make_fake_web3()
 
         fake_web3_module = MagicMock()
         fake_web3_module.Web3.from_wei.side_effect = lambda v, u: v / 1e18
 
-        with patch.object(client, "_ensure_init", return_value=True), \
-             patch.dict("sys.modules", {"web3": fake_web3_module}):
+        with (
+            patch.object(client, "_ensure_init", return_value=True),
+            patch.dict("sys.modules", {"web3": fake_web3_module}),
+        ):
             client._w3 = MagicMock()
             client._w3.from_wei.side_effect = lambda v, u: v / 1e18
             client._payment_contract = fake_contract
@@ -236,6 +270,7 @@ class TestGetPaymentGateStats:
 
     def test_returns_error_when_no_contract(self, tmp_path):
         from lib.chain.robinhood_chain import RobinhoodChainClient
+
         client = RobinhoodChainClient(deployments_file=tmp_path / "dep.json")
         with patch.object(client, "_ensure_init", return_value=True):
             client._payment_contract = None
@@ -246,6 +281,7 @@ class TestGetPaymentGateStats:
 # ---------------------------------------------------------------------------
 # RobinhoodChainClient — deployments loading
 # ---------------------------------------------------------------------------
+
 
 class TestDeploymentsLoading:
     def test_loads_addresses_from_json(self, tmp_path):
@@ -262,6 +298,7 @@ class TestDeploymentsLoading:
         dep_file.write_text(json.dumps(deployments))
 
         from lib.chain.robinhood_chain import RobinhoodChainClient
+
         client = RobinhoodChainClient(deployments_file=dep_file)
         client._load_deployments()
 
@@ -270,6 +307,7 @@ class TestDeploymentsLoading:
 
     def test_handles_missing_deployments_file(self, tmp_path):
         from lib.chain.robinhood_chain import RobinhoodChainClient
+
         client = RobinhoodChainClient(deployments_file=tmp_path / "nonexistent.json")
         client._load_deployments()  # must not raise
         assert client._addresses == {}
@@ -278,6 +316,7 @@ class TestDeploymentsLoading:
         dep_file = tmp_path / "deployments.json"
         dep_file.write_text("{not valid json")
         from lib.chain.robinhood_chain import RobinhoodChainClient
+
         client = RobinhoodChainClient(deployments_file=dep_file)
         client._load_deployments()  # must not raise
         assert client._addresses == {}
@@ -287,8 +326,10 @@ class TestDeploymentsLoading:
 # Constants / module-level sanity
 # ---------------------------------------------------------------------------
 
+
 def test_constants():
     from lib.chain.robinhood_chain import CHAIN_ID, EXPLORER_URL, TESTNET_RPC, TESTNET_WSS
+
     assert CHAIN_ID == 46630
     assert "testnet.chain.robinhood.com" in TESTNET_RPC
     assert "testnet.chain.robinhood.com" in TESTNET_WSS
@@ -297,6 +338,7 @@ def test_constants():
 
 def test_direction_map_covers_all():
     from lib.chain.robinhood_chain import DIRECTION_MAP, DIRECTION_NAMES
+
     for name, val in DIRECTION_MAP.items():
         assert DIRECTION_NAMES[val] == name
 
@@ -305,10 +347,12 @@ def test_direction_map_covers_all():
 # deploy script — dry-run / compile path
 # ---------------------------------------------------------------------------
 
+
 class TestDeployScript:
     def test_save_deployments_creates_file(self, tmp_path):
         """_save_deployments writes correct JSON structure."""
         import importlib.util
+
         spec = importlib.util.spec_from_file_location(
             "deploy_robinhood_chain",
             ROOT / "scripts" / "deploy_robinhood_chain.py",
@@ -332,7 +376,11 @@ class TestDeployScript:
                 "rpc": "https://rpc.testnet.chain.robinhood.com",
                 "deployed_at": 1_700_000_000,
                 "contracts": {
-                    name: {"address": addr, "tx_hash": "", "explorer": f"https://explorer.testnet.chain.robinhood.com/address/{addr}"}
+                    name: {
+                        "address": addr,
+                        "tx_hash": "",
+                        "explorer": f"https://explorer.testnet.chain.robinhood.com/address/{addr}",
+                    }
                     for name, addr in addresses.items()
                 },
             }
@@ -340,7 +388,9 @@ class TestDeployScript:
         dep_file.write_text(json.dumps(data, indent=2))
         loaded = json.loads(dep_file.read_text())
         assert loaded["robinhood_testnet"]["chain_id"] == 46630
-        assert loaded["robinhood_testnet"]["contracts"]["SapphireSignalVerifier"]["address"] == "0xAA"
+        assert (
+            loaded["robinhood_testnet"]["contracts"]["SapphireSignalVerifier"]["address"] == "0xAA"
+        )
         assert "explorer" in loaded["robinhood_testnet"]["contracts"]["SapphirePaymentGate"]
 
     def test_contracts_dir_has_both_solidity_files(self):
@@ -360,9 +410,11 @@ class TestDeployScript:
 # deploy script — --check preflight
 # ---------------------------------------------------------------------------
 
+
 def _load_deploy_module():
     """Load scripts/deploy_robinhood_chain.py without running main()."""
     import importlib.util
+
     spec = importlib.util.spec_from_file_location(
         "deploy_robinhood_chain",
         ROOT / "scripts" / "deploy_robinhood_chain.py",
@@ -391,9 +443,11 @@ class TestPreflightCheck:
         monkeypatch.setattr(mod, "DEPLOYMENTS_FILE", tmp_path / "deployments.json")
 
         w3 = self._mock_w3()
-        with patch.object(mod, "Web3" if hasattr(mod, "Web3") else "web3", create=True), \
-             patch("web3.Web3", return_value=w3), \
-             patch("web3.Web3.HTTPProvider", return_value=MagicMock()):
+        with (
+            patch.object(mod, "Web3" if hasattr(mod, "Web3") else "web3", create=True),
+            patch("web3.Web3", return_value=w3),
+            patch("web3.Web3.HTTPProvider", return_value=MagicMock()),
+        ):
             rc = mod._preflight()
         assert rc == 0
 
@@ -404,8 +458,10 @@ class TestPreflightCheck:
         monkeypatch.setattr(mod, "DEPLOYMENTS_FILE", tmp_path / "deployments.json")
 
         w3 = self._mock_w3()
-        with patch("web3.Web3", return_value=w3), \
-             patch("web3.Web3.HTTPProvider", return_value=MagicMock()):
+        with (
+            patch("web3.Web3", return_value=w3),
+            patch("web3.Web3.HTTPProvider", return_value=MagicMock()),
+        ):
             rc = mod._preflight()
         assert rc == 1
 
@@ -416,8 +472,10 @@ class TestPreflightCheck:
         monkeypatch.setattr(mod, "DEPLOYMENTS_FILE", tmp_path / "deployments.json")
 
         w3 = self._mock_w3(chain_id=1)  # wrong chain
-        with patch("web3.Web3", return_value=w3), \
-             patch("web3.Web3.HTTPProvider", return_value=MagicMock()):
+        with (
+            patch("web3.Web3", return_value=w3),
+            patch("web3.Web3.HTTPProvider", return_value=MagicMock()),
+        ):
             rc = mod._preflight()
         assert rc == 1
 
@@ -428,8 +486,10 @@ class TestPreflightCheck:
         monkeypatch.setattr(mod, "DEPLOYMENTS_FILE", tmp_path / "deployments.json")
 
         w3 = self._mock_w3(balance_wei=int(0.001 * 1e18))  # below 0.01 floor
-        with patch("web3.Web3", return_value=w3), \
-             patch("web3.Web3.HTTPProvider", return_value=MagicMock()):
+        with (
+            patch("web3.Web3", return_value=w3),
+            patch("web3.Web3.HTTPProvider", return_value=MagicMock()),
+        ):
             rc = mod._preflight()
         assert rc == 1
 
@@ -440,18 +500,20 @@ class TestPreflightCheck:
         monkeypatch.setattr(mod, "DEPLOYMENTS_FILE", tmp_path / "deployments.json")
 
         w3 = self._mock_w3(connected=False)
-        with patch("web3.Web3", return_value=w3), \
-             patch("web3.Web3.HTTPProvider", return_value=MagicMock()):
+        with (
+            patch("web3.Web3", return_value=w3),
+            patch("web3.Web3.HTTPProvider", return_value=MagicMock()),
+        ):
             rc = mod._preflight()
         assert rc == 1
 
     @pytest.mark.parametrize(
         "bad_key",
         [
-            "not-a-real-key",              # non-hex
-            "0x" + "zz" * 32,              # hex-length but non-hex digits
-            "",                             # empty (but non-None, so _load_private_key accepts it)
-            "0xdeadbeef",                  # well-formed hex but wrong length
+            "not-a-real-key",  # non-hex
+            "0x" + "zz" * 32,  # hex-length but non-hex digits
+            "",  # empty (but non-None, so _load_private_key accepts it)
+            "0xdeadbeef",  # well-formed hex but wrong length
         ],
     )
     def test_fails_cleanly_on_malformed_key(self, tmp_path, monkeypatch, bad_key):
@@ -462,13 +524,17 @@ class TestPreflightCheck:
         secrets = tmp_path / "robinhood_deploy_key"
         secrets.write_text(bad_key or "placeholder-will-be-overridden")
         monkeypatch.delenv("ROBINHOOD_DEPLOY_KEY", raising=False)
-        monkeypatch.setenv("ROBINHOOD_DEPLOY_KEY", bad_key or " ")  # whitespace keeps _load_private_key path simple
+        monkeypatch.setenv(
+            "ROBINHOOD_DEPLOY_KEY", bad_key or " "
+        )  # whitespace keeps _load_private_key path simple
         monkeypatch.setattr(mod, "SECRETS_FILE", secrets)
         monkeypatch.setattr(mod, "DEPLOYMENTS_FILE", tmp_path / "deployments.json")
 
         w3 = self._mock_w3()
-        with patch("web3.Web3", return_value=w3), \
-             patch("web3.Web3.HTTPProvider", return_value=MagicMock()):
+        with (
+            patch("web3.Web3", return_value=w3),
+            patch("web3.Web3.HTTPProvider", return_value=MagicMock()),
+        ):
             rc = mod._preflight()
         # Either the loader rejected an empty key (return 1) or Account.from_key
         # raised and we caught it (return 1). Both land on a clean non-zero exit.

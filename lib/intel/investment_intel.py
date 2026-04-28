@@ -758,7 +758,9 @@ def _extract_top_ideas(text: str, limit: int = 20) -> list[dict[str, str]]:
     table_lines = [line for line in lines[start : start + 80] if line.strip().startswith("|")]
     if len(table_lines) < 3:
         return []
-    header = [cell.strip().lower().replace(" ", "_") for cell in table_lines[0].strip("|").split("|")]
+    header = [
+        cell.strip().lower().replace(" ", "_") for cell in table_lines[0].strip("|").split("|")
+    ]
     out: list[dict[str, str]] = []
     for line in table_lines[2:]:
         cells = [cell.strip() for cell in line.strip("|").split("|")]
@@ -907,7 +909,9 @@ def load_research_pack(zip_path: str | Path | None = None) -> ResearchPack:
                 ),
                 None,
             )
-            markdown = zf.read(markdown_name).decode("utf-8", errors="replace") if markdown_name else ""
+            markdown = (
+                zf.read(markdown_name).decode("utf-8", errors="replace") if markdown_name else ""
+            )
             return ResearchPack(
                 available=True,
                 source_label=path.name,
@@ -931,7 +935,9 @@ def _asset_from_position(position: dict[str, Any], tier: str) -> InvestmentAsset
     ticker = str(position.get("ticker") or "").upper().strip()
     if not ticker:
         return None
-    asset_class = ASSET_CLASS_ETF if "ETF" in str(position.get("name") or "") else ASSET_CLASS_EQUITY
+    asset_class = (
+        ASSET_CLASS_ETF if "ETF" in str(position.get("name") or "") else ASSET_CLASS_EQUITY
+    )
     return InvestmentAsset(
         symbol=ticker,
         name=str(position.get("name") or ticker),
@@ -1135,7 +1141,12 @@ def build_analysis_lenses(universe: list[dict[str, Any]]) -> list[dict[str, Any]
             "label": "AI Power",
             "symbols": sorted(set(symbols_by_theme.get("ai-power", []))),
             "metrics": ["electricity demand", "PJM/capacity stress", "nuclear fleet", "gas price"],
-            "sources": ["eia_energy", "fred_macro", "sec_companyfacts", "tradingview_signal_research"],
+            "sources": [
+                "eia_energy",
+                "fred_macro",
+                "sec_companyfacts",
+                "tradingview_signal_research",
+            ],
         },
         {
             "id": "defense-space",
@@ -1199,7 +1210,12 @@ def build_crypto_bridge(
         "prices": {},
         "trending": [],
         "errors": {},
-        "sources": ["coingecko_market", "hyperliquid_info", "defillama_defi", "robinhood_crypto_readonly"],
+        "sources": [
+            "coingecko_market",
+            "hyperliquid_info",
+            "defillama_defi",
+            "robinhood_crypto_readonly",
+        ],
     }
     if not fetch_live:
         return bridge
@@ -1343,7 +1359,11 @@ def probe_source_mesh(
                 "CoinGecko trending + spot",
                 lambda: (
                     "CoinGecko simple-price/trending reachable",
-                    len(build_crypto_bridge(build_universe(research_pack), fetch_live=True)["trending"]),
+                    len(
+                        build_crypto_bridge(build_universe(research_pack), fetch_live=True)[
+                            "trending"
+                        ]
+                    ),
                 ),
                 live=live,
             ),
@@ -1391,7 +1411,10 @@ def _probe_defillama() -> tuple[str, int]:
     from lib.chain.sources import DefiLlamaClient
 
     stablecoins = DefiLlamaClient().stablecoins()
-    return f"DeFiLlama stablecoins reachable (${stablecoins.total_usd:,.0f} total)", stablecoins.count
+    return (
+        f"DeFiLlama stablecoins reachable (${stablecoins.total_usd:,.0f} total)",
+        stablecoins.count,
+    )
 
 
 def build_materialization_rows(report: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
@@ -1469,7 +1492,9 @@ def build_materialization_rows(report: dict[str, Any]) -> dict[str, list[dict[st
     }
 
 
-def build_materialization_plan(report: dict[str, Any], *, out_dir: str | Path | None = None) -> dict[str, Any]:
+def build_materialization_plan(
+    report: dict[str, Any], *, out_dir: str | Path | None = None
+) -> dict[str, Any]:
     rows = build_materialization_rows(report)
     base_dir = Path(out_dir) if out_dir else ROOT / "data" / ".gcp_stage" / "investment_intel"
     today = _today_stamp()
@@ -1525,7 +1550,9 @@ def write_materialization_preview(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Sapphire investment intel source mesh")
     parser.add_argument("--zip", dest="zip_path", help="Optional Kimi research ZIP path")
-    parser.add_argument("--live-crypto", action="store_true", help="Fetch read-only CoinGecko preview")
+    parser.add_argument(
+        "--live-crypto", action="store_true", help="Fetch read-only CoinGecko preview"
+    )
     parser.add_argument("--probe-live", action="store_true", help="Probe public live sources")
     parser.add_argument(
         "--write-preview",

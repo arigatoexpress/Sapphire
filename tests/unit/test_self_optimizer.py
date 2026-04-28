@@ -25,7 +25,8 @@ from lib.analytics.self_optimizer import (  # noqa: E402
 def _use_synthetic(monkeypatch) -> None:
     """Force the backtester to use synthetic bars — no network."""
     monkeypatch.setattr(
-        be, "fetch_ohlcv",
+        be,
+        "fetch_ohlcv",
         lambda sym, days=90, interval="1d": be._synthetic_bars(sym, days),
     )
 

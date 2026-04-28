@@ -201,6 +201,7 @@ class AsterBot:
             # Initialize Firestore-backed idempotency guard and warm from recent history.
             try:
                 from google.cloud import firestore as _fs
+
                 _fs_client = _fs.AsyncClient(project=os.getenv("GCP_PROJECT_ID", "sapphire-479610"))
                 self._db = _fs_client
                 self._idempotency = ExecutionIdempotency(
@@ -209,7 +210,9 @@ class AsterBot:
                     ttl_seconds=self._signal_dedupe_ttl_seconds,
                 )
                 warmed = await self._idempotency.warm_from_firestore()
-                logger.info("✅ Idempotency guard ready (warmed %d recent IDs from Firestore)", warmed)
+                logger.info(
+                    "✅ Idempotency guard ready (warmed %d recent IDs from Firestore)", warmed
+                )
             except Exception as _idem_err:
                 logger.warning("⚠️ Idempotency guard degraded to memory-only: %s", _idem_err)
                 self._idempotency = ExecutionIdempotency(
@@ -352,13 +355,15 @@ class AsterBot:
             signal_type = SignalType.EXIT
         else:
             if quantity <= 0:
-                logger.warning(f"Ignoring {action} command for {symbol}: invalid quantity {raw_qty}")
+                logger.warning(
+                    f"Ignoring {action} command for {symbol}: invalid quantity {raw_qty}"
+                )
                 return None
             signal_side = TradeSide.BUY if action in {"BUY", "LONG"} else TradeSide.SELL
 
-        signal_id = str(command.get("signal_key", "")).strip() or str(
-            command.get("signal_id", "")
-        ).strip()
+        signal_id = (
+            str(command.get("signal_key", "")).strip() or str(command.get("signal_id", "")).strip()
+        )
         if not signal_id:
             signal_id = f"hub-{int(time.time() * 1000)}"
 
@@ -592,7 +597,9 @@ class AsterBot:
 
             signal_id = str(signal.signal_id or "").strip()
             if not signal_id:
-                logger.warning(f"🧯 Rejected signal without signal_id on {PLATFORM}: {signal.symbol}")
+                logger.warning(
+                    f"🧯 Rejected signal without signal_id on {PLATFORM}: {signal.symbol}"
+                )
                 return
 
             # Durable idempotency check (memory-first, Firestore-backed).
@@ -647,7 +654,9 @@ class AsterBot:
         payload = {key: value for key, value in signal_data.items() if key in allowed}
         dropped = sorted(set(signal_data.keys()) - set(payload.keys()))
         if dropped:
-            logger.warning("Ignoring unsupported signal keys on %s: %s", PLATFORM.value, ",".join(dropped))
+            logger.warning(
+                "Ignoring unsupported signal keys on %s: %s", PLATFORM.value, ",".join(dropped)
+            )
         return payload
 
     async def _derive_auto_quantity(self, signal: TradeSignal) -> float | None:
@@ -655,7 +664,9 @@ class AsterBot:
         if self._auto_size_notional_usd <= 0:
             return None
         if not self.client:
-            return self._auto_size_fallback_quantity if self._auto_size_fallback_quantity > 0 else None
+            return (
+                self._auto_size_fallback_quantity if self._auto_size_fallback_quantity > 0 else None
+            )
 
         symbol = str(signal.symbol or "").strip().upper()
         normalized_symbol = (
@@ -734,7 +745,9 @@ class AsterBot:
             qty = Decimal("0")
         return float(qty)
 
-    async def _prepare_aster_order(self, symbol: str, requested_quantity: float) -> tuple[str, float]:
+    async def _prepare_aster_order(
+        self, symbol: str, requested_quantity: float
+    ) -> tuple[str, float]:
         """Normalize symbol/quantity and enforce exchange notional constraints before submit."""
         normalized_symbol = (
             self.client._normalize_symbol(symbol)
@@ -777,7 +790,9 @@ class AsterBot:
                 f"Preflight blocked for {normalized_symbol}: quantity {quantity} exceeds max {max_qty}"
             )
         if quantity <= 0:
-            raise ValueError(f"Preflight blocked for {normalized_symbol}: non-positive quantity {quantity}")
+            raise ValueError(
+                f"Preflight blocked for {normalized_symbol}: non-positive quantity {quantity}"
+            )
 
         return normalized_symbol, quantity
 
@@ -824,8 +839,13 @@ class AsterBot:
                     )
 
                 current_side = getattr(current, "side", None)
-                if current_side in (TradeSide.BUY, TradeSide.LONG, "BUY", "LONG") and side != "SELL":
-                    logger.info(f"🧯 Reduce-only ignored for {symbol}: expected SELL to reduce long")
+                if (
+                    current_side in (TradeSide.BUY, TradeSide.LONG, "BUY", "LONG")
+                    and side != "SELL"
+                ):
+                    logger.info(
+                        f"🧯 Reduce-only ignored for {symbol}: expected SELL to reduce long"
+                    )
                     return TradeResult(
                         trade_id="noop",
                         signal_id=signal.signal_id,
@@ -840,8 +860,13 @@ class AsterBot:
                         },
                     )
 
-                if current_side in (TradeSide.SELL, TradeSide.SHORT, "SELL", "SHORT") and side != "BUY":
-                    logger.info(f"🧯 Reduce-only ignored for {symbol}: expected BUY to reduce short")
+                if (
+                    current_side in (TradeSide.SELL, TradeSide.SHORT, "SELL", "SHORT")
+                    and side != "BUY"
+                ):
+                    logger.info(
+                        f"🧯 Reduce-only ignored for {symbol}: expected BUY to reduce short"
+                    )
                     return TradeResult(
                         trade_id="noop",
                         signal_id=signal.signal_id,
@@ -894,7 +919,9 @@ class AsterBot:
                         self._last_leverage_by_symbol[symbol] = desired_leverage
                         logger.info(f"🧯 Leverage set: {symbol} {desired_leverage}x")
                     except Exception as e:
-                        logger.warning(f"Failed to set leverage for {symbol} to {desired_leverage}x: {e}")
+                        logger.warning(
+                            f"Failed to set leverage for {symbol} to {desired_leverage}x: {e}"
+                        )
 
             logger.info(f"⚡ Executing on Aster: {symbol} {side} {quantity}")
 
@@ -946,7 +973,9 @@ class AsterBot:
                         await asyncio.sleep(
                             max(
                                 0.05,
-                                float(os.getenv("ASTER_ORDER_STATUS_POLL_INTERVAL_SECONDS", "0.35")),
+                                float(
+                                    os.getenv("ASTER_ORDER_STATUS_POLL_INTERVAL_SECONDS", "0.35")
+                                ),
                             )
                         )
                         try:
@@ -1028,7 +1057,9 @@ class AsterBot:
                     symbol=symbol,
                     side=signal.side,
                     success=False,
-                    error_message=order_result.get("msg", f"Order not filled (status={status or 'UNKNOWN'})"),
+                    error_message=order_result.get(
+                        "msg", f"Order not filled (status={status or 'UNKNOWN'})"
+                    ),
                     execution_time_ms=execution_time,
                 )
 
@@ -1294,6 +1325,7 @@ async def main():
 
     # Validate required config at startup — fail fast with a clear error.
     from startup_validator import validate_config
+
     validate_config(
         service=SERVICE_NAME,
         required=["ASTER_API_KEY"],
@@ -1302,6 +1334,7 @@ async def main():
     # Secret key: accepts ASTER_SECRET_KEY (Cloud Run) or ASTER_API_SECRET (Pi .env)
     if not ASTER_API_SECRET:
         import sys
+
         logger.critical(
             "❌ [%s] STARTUP FAILED — neither ASTER_SECRET_KEY nor ASTER_API_SECRET is set.",
             SERVICE_NAME,

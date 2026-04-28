@@ -27,6 +27,7 @@ MARKDOWN_DISCLAIMER = "_For informational and educational purposes only. Not inv
 
 # ---------- LinkedIn ----------
 
+
 def _shorten_to(text: str, limit: int) -> str:
     if len(text) <= limit:
         return text
@@ -64,9 +65,7 @@ def _linkedin_crypto(r: Report) -> str:
             f"{s} {v['hits']}/{v['total']}" for s, v in preds["by_symbol"].items()
         )
     else:
-        hook = small_sample_accuracy_notice(
-            preds, subject="Sapphire's 6-factor TA model"
-        )
+        hook = small_sample_accuracy_notice(preds, subject="Sapphire's 6-factor TA model")
         tracked = ", ".join(sorted(preds["by_symbol"])) if preds["by_symbol"] else "live markets"
         symbol_line = (
             f"Coverage is live across {tracked}. "
@@ -76,10 +75,7 @@ def _linkedin_crypto(r: Report) -> str:
         f"Paper book: ${port['capital']:,.0f} on a $100K start "
         f"({port['pnl_pct']:+.2f}%), {port['open_positions']} open."
     )
-    pipe = (
-        f"Signal pipeline: {sig['count']} logged this week, "
-        f"{len(sig['symbols'])} symbols."
-    )
+    pipe = f"Signal pipeline: {sig['count']} logged this week, " f"{len(sig['symbols'])} symbols."
     tail = "Data sources: " + ", ".join(r.sources)
     tags = " ".join(f"#{t}" for t in r.tags if t.isascii())
     body = "\n\n".join([hook, symbol_line, book, pipe, tail, tags])
@@ -89,9 +85,7 @@ def _linkedin_crypto(r: Report) -> str:
 def _linkedin_ai(r: Report) -> str:
     f = r.facts
     top_agent = (
-        max(f["agent_counts"].items(), key=lambda x: x[1])
-        if f["agent_counts"]
-        else ("—", 0)
+        max(f["agent_counts"].items(), key=lambda x: x[1]) if f["agent_counts"] else ("—", 0)
     )
     hook = (
         f"{f['event_count']} agent events across "
@@ -100,8 +94,7 @@ def _linkedin_ai(r: Report) -> str:
     )
     lead = f"Top agent by volume: {top_agent[0]} with {top_agent[1]} events."
     mesh = (
-        "Mesh mix — "
-        + ", ".join(f"{k}:{v}" for k, v in f["device_counts"].items())
+        "Mesh mix — " + ", ".join(f"{k}:{v}" for k, v in f["device_counts"].items())
         if f["device_counts"]
         else "Mesh idle."
     )
@@ -147,19 +140,20 @@ def format_linkedin(r: Report) -> str:
 
 # ---------- Substack ----------
 
+
 def format_substack(r: Report) -> str:
     """Full markdown article: title, generated-at, body, sources."""
     header = f"# {r.title}\n\n_Generated {r.generated_at}_\n"
     body = r.body
     sources = "\n".join(f"- `{s}`" for s in r.sources) if r.sources else "(none)"
     footer = (
-        f"\n\n---\n\n## Data Sources\n\n{sources}\n"
-        f"\n## Disclaimer\n\n{MARKDOWN_DISCLAIMER}\n"
+        f"\n\n---\n\n## Data Sources\n\n{sources}\n" f"\n## Disclaimer\n\n{MARKDOWN_DISCLAIMER}\n"
     )
     return "\n".join([header, body, footer])
 
 
 # ---------- X thread ----------
+
 
 def _split_tweets(parts: list[str], limit: int = X_TWEET_LIMIT) -> list[str]:
     """Pack parts into tweets up to limit chars, numbered N/M."""
@@ -201,11 +195,7 @@ def _x_crypto_parts(r: Report) -> list[str]:
             acc = v["accuracy"] * 100
             parts.append(f"{sym}: {v['hits']}/{v['total']} ({acc:.1f}%).")
     else:
-        parts.append(
-            small_sample_accuracy_notice(
-                preds, subject="The 6-factor TA model"
-            )
-        )
+        parts.append(small_sample_accuracy_notice(preds, subject="The 6-factor TA model"))
         if preds["by_symbol"]:
             parts.append(
                 "Coverage live across "
@@ -252,8 +242,7 @@ def _x_security_parts(r: Report) -> list[str]:
         kev = " KEV" if item["exploited"] else ""
         cvss = f" CVSS {item['cvss']}" if item.get("cvss") is not None else ""
         parts.append(
-            f"{item['cve']}{kev}{cvss} — {item['title']} "
-            f"(prio {item['priority_score']:.2f})."
+            f"{item['cve']}{kev}{cvss} — {item['title']} " f"(prio {item['priority_score']:.2f})."
         )
     parts.append("Source: " + ", ".join(r.sources))
     return parts

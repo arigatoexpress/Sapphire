@@ -28,7 +28,7 @@ except ImportError:
 
 class LLMBenchmark:
     """Benchmark suite for local LLMs via Ollama"""
-    
+
     def __init__(self):
         self.results = []
         self.system_info = self._get_system_info()
@@ -39,7 +39,7 @@ class LLMBenchmark:
                 self.gpu_handle = nvml.nvmlDeviceGetHandleByIndex(0)
             except:
                 pass
-    
+
     def _get_system_info(self) -> dict[str, Any]:
         """Gather system hardware information"""
         info = {
@@ -49,11 +49,11 @@ class LLMBenchmark:
             "cpu": {},
             "ram_gb": None
         }
-        
+
         # Try to get GPU info via nvidia-smi
         try:
             result = subprocess.run(
-                ["nvidia-smi", "--query-gpu=name,memory.total,memory.free,memory.used", 
+                ["nvidia-smi", "--query-gpu=name,memory.total,memory.free,memory.used",
                  "--format=csv,noheader"],
                 capture_output=True, text=True, timeout=10
             )
@@ -68,7 +68,7 @@ class LLMBenchmark:
                     }
         except Exception as e:
             info["gpu_error"] = str(e)
-        
+
         # Try to get RAM info
         try:
             import psutil
@@ -76,9 +76,9 @@ class LLMBenchmark:
             info["ram_gb"] = round(mem.total / (1024**3), 2)
         except:
             pass
-        
+
         return info
-    
+
     def _get_gpu_memory(self) -> int | None:
         """Get current GPU memory usage in MB"""
         if self.gpu_handle:
@@ -88,12 +88,12 @@ class LLMBenchmark:
             except:
                 pass
         return None
-    
+
     def _ollama_generate(self, model: str, prompt: str, timeout: int = 600) -> dict[str, Any]:
         """Generate text using Ollama and measure performance"""
         start_time = time.time()
         gpu_mem_before = self._get_gpu_memory()
-        
+
         try:
             result = subprocess.run(
                 ["ollama", "run", model, prompt],
@@ -103,20 +103,20 @@ class LLMBenchmark:
                 encoding='utf-8',
                 errors='ignore'
             )
-            
+
             end_time = time.time()
             gpu_mem_after = self._get_gpu_memory()
-            
+
             output = result.stdout if result.returncode == 0 else result.stderr
-            
+
             # Estimate tokens (rough approximation: ~4 chars per token)
             output_tokens = len(output) // 4 if output else 0
             input_tokens = len(prompt) // 4
             total_tokens = input_tokens + output_tokens
-            
+
             duration = end_time - start_time
             tokens_per_sec = total_tokens / duration if duration > 0 else 0
-            
+
             return {
                 "success": result.returncode == 0,
                 "output": output[:2000] if output else "",  # Truncate for storage
@@ -127,7 +127,7 @@ class LLMBenchmark:
                 "gpu_memory_after_mb": gpu_mem_after,
                 "error": result.stderr if result.returncode != 0 else None
             }
-            
+
         except subprocess.TimeoutExpired:
             return {
                 "success": False,
@@ -144,68 +144,68 @@ class LLMBenchmark:
                 "tokens_per_second": 0,
                 "error": str(e)
             }
-    
+
     def run_benchmark(self, model: str, warmup: bool = True) -> dict[str, Any]:
         """Run complete benchmark on a model"""
         print(f"\n{'='*60}")
         print(f"Benchmarking: {model}")
         print(f"{'='*60}")
-        
+
         # Warmup run
         if warmup:
             print("  Warmup run (may take 60-180s for first load)...")
             self._ollama_generate(model, "Say hello", timeout=300)
             time.sleep(2)
-        
+
         results = {
             "model": model,
             "timestamp": datetime.now().isoformat(),
             "system_info": self.system_info,
             "tests": {}
         }
-        
+
         # Test 1: Reasoning
         print("  Test 1: Logical Reasoning...")
-        reasoning_prompt = """Solve this step by step: If a train travels 120 km in 2 hours, 
+        reasoning_prompt = """Solve this step by step: If a train travels 120 km in 2 hours,
         and another train travels 150 km in 3 hours, which train is faster and by how much?"""
         results["tests"]["reasoning"] = self._ollama_generate(model, reasoning_prompt)
         time.sleep(1)
-        
+
         # Test 2: Code Generation
         print("  Test 2: Code Generation...")
-        code_prompt = """Write a Python function that calculates the Fibonacci sequence 
+        code_prompt = """Write a Python function that calculates the Fibonacci sequence
         up to n numbers. Include error handling and documentation."""
         results["tests"]["code_generation"] = self._ollama_generate(model, code_prompt)
         time.sleep(1)
-        
+
         # Test 3: General Knowledge
         print("  Test 3: General Knowledge...")
         knowledge_prompt = "Explain quantum computing in simple terms, including its potential applications."
         results["tests"]["general_knowledge"] = self._ollama_generate(model, knowledge_prompt)
         time.sleep(1)
-        
+
         # Test 4: Mathematical Reasoning
         print("  Test 4: Mathematical Reasoning...")
         math_prompt = "Calculate: (15 * 23) + (47 * 12) - (156 / 4). Show your work."
         results["tests"]["math"] = self._ollama_generate(model, math_prompt)
         time.sleep(1)
-        
+
         # Test 5: Creative Writing
         print("  Test 5: Creative Writing...")
         creative_prompt = "Write a short haiku about artificial intelligence."
         results["tests"]["creative_writing"] = self._ollama_generate(model, creative_prompt)
         time.sleep(1)
-        
+
         # Test 6: Context Understanding (longer prompt)
         print("  Test 6: Context Understanding...")
         context_prompt = """Read this scenario and answer the question:
-        
+
         Sarah has 3 apples. She gives 1 to her brother and buys 5 more at the store.
         Her friend gives her twice as many apples as she currently has.
-        
+
         Question: How many apples does Sarah have now? Explain your reasoning."""
         results["tests"]["context"] = self._ollama_generate(model, context_prompt)
-        
+
         # Calculate aggregate scores
         successful_tests = [t for t in results["tests"].values() if t["success"]]
         if successful_tests:
@@ -230,31 +230,31 @@ class LLMBenchmark:
                 "avg_duration_seconds": 0,
                 "total_duration_seconds": 0
             }
-        
+
         print(f"  ✓ Benchmark complete for {model}")
         print(f"    Avg tokens/sec: {results['summary']['avg_tokens_per_second']}")
         print(f"    Total duration: {results['summary']['total_duration_seconds']}s")
-        
+
         return results
-    
+
     def save_results(self, filepath: str = None):
         """Save benchmark results to JSON file"""
         if filepath is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filepath = f"benchmark_results_{timestamp}.json"
-        
+
         output = {
             "benchmark_date": datetime.now().isoformat(),
             "system_info": self.system_info,
             "models_tested": self.results
         }
-        
+
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(output, f, indent=2, ensure_ascii=False)
-        
+
         print(f"\nResults saved to: {filepath}")
         return filepath
-    
+
     def run_all_models(self, models: list[str]):
         """Run benchmarks on multiple models"""
         for model in models:
@@ -277,7 +277,7 @@ def main():
     models_to_test = [
         # Latest Qwen models
         "qwen3:14b",
-        "qwen3:8b", 
+        "qwen3:8b",
         "qwen2.5-coder:14b",
         "qwen2.5-coder:32b",
         "qwq:latest",
@@ -288,7 +288,7 @@ def main():
         "deepseek-r1:14b",
         "gemma3:27b",
     ]
-    
+
     # Filter to only installed models or pull them
     print("Checking installed models...")
     try:
@@ -303,7 +303,7 @@ def main():
     except Exception as e:
         print(f"Could not list models: {e}")
         installed = []
-    
+
     # Only test models that are installed (or try to pull new ones)
     benchmark_models = []
     for model in models_to_test:
@@ -330,28 +330,28 @@ def main():
                     print(f"  [FAIL] Failed to pull {model}: {pull_result.stderr}")
             except Exception as e:
                 print(f"  [ERR] Error pulling {model}: {e}")
-    
+
     # Remove duplicates while preserving order
     seen = set()
     benchmark_models = [x for x in benchmark_models if not (x in seen or seen.add(x))]
-    
+
     if not benchmark_models:
         print("No models available to benchmark!")
         return
-    
+
     print(f"\n{'='*60}")
     print(f"Will benchmark {len(benchmark_models)} models:")
     for m in benchmark_models:
         print(f"  - {m}")
     print(f"{'='*60}\n")
-    
+
     # Run benchmarks
     benchmark = LLMBenchmark()
     benchmark.run_all_models(benchmark_models)
-    
+
     # Save results
     output_file = benchmark.save_results()
-    
+
     # Print summary
     print("\n" + "="*60)
     print("BENCHMARK SUMMARY")

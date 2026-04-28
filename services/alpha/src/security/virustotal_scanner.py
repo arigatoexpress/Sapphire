@@ -32,20 +32,24 @@ class VirusTotalSkillScanner:
         self.max_requests_per_day = max(
             1, min(int(os.getenv("SAPPHIRE_VT_MAX_REQUESTS_PER_DAY", "500")), 50000)
         )
-        self.bundle_timeout_seconds = max(5, min(int(os.getenv("SAPPHIRE_VT_TIMEOUT_SECONDS", "25")), 120))
+        self.bundle_timeout_seconds = max(
+            5, min(int(os.getenv("SAPPHIRE_VT_TIMEOUT_SECONDS", "25")), 120)
+        )
         self.poll_interval_seconds = max(
             2, min(int(os.getenv("SAPPHIRE_VT_POLL_INTERVAL_SECONDS", "5")), 30)
         )
-        self.max_poll_attempts = max(1, min(int(os.getenv("SAPPHIRE_VT_MAX_POLL_ATTEMPTS", "12")), 60))
+        self.max_poll_attempts = max(
+            1, min(int(os.getenv("SAPPHIRE_VT_MAX_POLL_ATTEMPTS", "12")), 60)
+        )
         self.max_skills_per_scan = max(
             1, min(int(os.getenv("SAPPHIRE_VT_MAX_SKILLS_PER_SCAN", "4")), 200)
         )
         self.upload_if_missing_default = self._env_flag(
             "SAPPHIRE_VT_UPLOAD_IF_MISSING", default=False
         )
-        self.enforcement_mode = str(
-            os.getenv("SAPPHIRE_VT_ENFORCEMENT_MODE", "warn")
-        ).strip().lower()
+        self.enforcement_mode = (
+            str(os.getenv("SAPPHIRE_VT_ENFORCEMENT_MODE", "warn")).strip().lower()
+        )
         if self.enforcement_mode not in self._VALID_POLICY_MODES:
             self.enforcement_mode = "warn"
 
@@ -290,7 +294,10 @@ class VirusTotalSkillScanner:
                 for key, value in node.items():
                     lowered_key = str(key or "").strip().lower()
                     if isinstance(value, str):
-                        if any(token in lowered_key for token in {"insight", "verdict", "classification", "ai"}):
+                        if any(
+                            token in lowered_key
+                            for token in {"insight", "verdict", "classification", "ai"}
+                        ):
                             verdict = self._merge_verdicts(verdict, value)
                     walk(value, lowered_key)
                 return
@@ -307,8 +314,12 @@ class VirusTotalSkillScanner:
         file_report: dict[str, Any] | None,
         analysis_report: dict[str, Any] | None,
     ) -> dict[str, Any]:
-        file_stats = self._extract_nested(file_report or {}, ["data", "attributes", "last_analysis_stats"], {})
-        analysis_stats = self._extract_nested(analysis_report or {}, ["data", "attributes", "stats"], {})
+        file_stats = self._extract_nested(
+            file_report or {}, ["data", "attributes", "last_analysis_stats"], {}
+        )
+        analysis_stats = self._extract_nested(
+            analysis_report or {}, ["data", "attributes", "stats"], {}
+        )
         stats = file_stats if isinstance(file_stats, dict) and file_stats else analysis_stats
         if not isinstance(stats, dict):
             stats = {}
@@ -379,7 +390,9 @@ class VirusTotalSkillScanner:
                 "ok": False,
                 "found": False,
                 "status": int(response.get("status", 0) or 0),
-                "error": str(response.get("error") or response.get("text") or "lookup_failed")[:200],
+                "error": str(response.get("error") or response.get("text") or "lookup_failed")[
+                    :200
+                ],
                 "report": {},
             }
         return {
@@ -402,7 +415,9 @@ class VirusTotalSkillScanner:
             return {
                 "ok": False,
                 "status": int(response.get("status", 0) or 0),
-                "error": str(response.get("error") or response.get("text") or "upload_failed")[:200],
+                "error": str(response.get("error") or response.get("text") or "upload_failed")[
+                    :200
+                ],
                 "analysis_id": "",
             }
         analysis_id = str(
@@ -445,9 +460,13 @@ class VirusTotalSkillScanner:
             "report": latest_report,
         }
 
-    async def scan_skill(self, skill_name: str, upload_if_missing: bool | None = None) -> dict[str, Any]:
+    async def scan_skill(
+        self, skill_name: str, upload_if_missing: bool | None = None
+    ) -> dict[str, Any]:
         started = self._now()
-        upload_enabled = self.upload_if_missing_default if upload_if_missing is None else bool(upload_if_missing)
+        upload_enabled = (
+            self.upload_if_missing_default if upload_if_missing is None else bool(upload_if_missing)
+        )
 
         if not self.enabled:
             return {"ok": False, "error": "vt_scanning_disabled", "timestamp": started}
@@ -486,7 +505,9 @@ class VirusTotalSkillScanner:
                     "timestamp": started,
                 }
             if upload_result.get("ok"):
-                analysis_result = await self._poll_analysis(str(upload_result.get("analysis_id", "")))
+                analysis_result = await self._poll_analysis(
+                    str(upload_result.get("analysis_id", ""))
+                )
                 refreshed_lookup = await self._lookup_file(sha256)
                 if refreshed_lookup.get("found"):
                     file_report = refreshed_lookup.get("report", {})
@@ -494,7 +515,9 @@ class VirusTotalSkillScanner:
 
         verdict = self._build_verdict_summary(
             file_report=file_report if isinstance(file_report, dict) else {},
-            analysis_report=analysis_result.get("report", {}) if isinstance(analysis_result, dict) else {},
+            analysis_report=analysis_result.get("report", {})
+            if isinstance(analysis_result, dict)
+            else {},
         )
 
         report = {
@@ -550,9 +573,11 @@ class VirusTotalSkillScanner:
             except Exception as exc:
                 scan_result = {"ok": False, "skill": skill, "error": f"scan_failed:{exc}"}
             results.append(scan_result)
-            verdict = str(
-                self._extract_nested(scan_result, ["security", "verdict"], "unknown")
-            ).strip().lower()
+            verdict = (
+                str(self._extract_nested(scan_result, ["security", "verdict"], "unknown"))
+                .strip()
+                .lower()
+            )
             if verdict not in counts:
                 verdict = "unknown"
             counts[verdict] += 1

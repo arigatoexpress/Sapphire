@@ -6,6 +6,7 @@ Signal flow:
 Supported pairs (Hyperliquid has 150+ assets):
     BTC, ETH, SOL, HYPE, ZEC and any asset in the Hyperliquid universe
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -18,6 +19,7 @@ from pathlib import Path
 # Load .env from service directory
 try:
     from dotenv import load_dotenv
+
     env_path = Path(__file__).parent.parent / ".env"
     if env_path.exists():
         load_dotenv(env_path, override=True)

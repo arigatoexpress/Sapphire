@@ -48,7 +48,9 @@ def report() -> dict[str, Any]:
     scored = [r for r in records if r.get("correct") is not None]
     correct = [r for r in scored if r.get("correct")]
 
-    by_symbol: dict[str, dict[str, int]] = defaultdict(lambda: {"total": 0, "scored": 0, "correct": 0})
+    by_symbol: dict[str, dict[str, int]] = defaultdict(
+        lambda: {"total": 0, "scored": 0, "correct": 0}
+    )
     for r in records:
         sym = r.get("symbol") or "?"
         by_symbol[sym]["total"] += 1
@@ -57,7 +59,9 @@ def report() -> dict[str, Any]:
             if r["correct"]:
                 by_symbol[sym]["correct"] += 1
 
-    by_direction: dict[str, dict[str, int]] = defaultdict(lambda: {"total": 0, "scored": 0, "correct": 0})
+    by_direction: dict[str, dict[str, int]] = defaultdict(
+        lambda: {"total": 0, "scored": 0, "correct": 0}
+    )
     for r in records:
         d = r.get("direction") or "?"
         by_direction[d]["total"] += 1
@@ -90,5 +94,6 @@ def report() -> dict[str, Any]:
 
 if __name__ == "__main__":
     import sys
+
     json.dump(report(), sys.stdout, indent=2, default=str)
     print()

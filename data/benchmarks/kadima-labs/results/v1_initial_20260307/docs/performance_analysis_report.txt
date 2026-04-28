@@ -83,12 +83,12 @@ VRAM FIT CLASSIFICATION:
     - qwen2.5:14b, qwen3:14b, deepseek-r1:14b
     - These models fit entirely in VRAM with headroom
     - Optimal performance, no system RAM offloading
-    
+
   ⚠ NEAR LIMIT (Models 14-15GB):
     - gemma3:27b, qwen2.5:32b
     - Fit within VRAM but with minimal headroom
     - May experience occasional offloading during long contexts
-    
+
   ✗ REQUIRES OFFLOADING (Models >15GB):
     - llama3.3:70b
     - Significant portion offloaded to system RAM
@@ -123,13 +123,13 @@ Sweet Spot Analysis:
     • Use ~10-11.5 GB VRAM
     • Leave headroom for context and KV cache
     • Achieve 23-33 tokens/second
-    
+
   🥈 ACCEPTABLE (Good with Trade-offs):
     • 27-32B parameter models
     • Saturate VRAM at ~15 GB
     • Achieve 11-15 tokens/second
     • Limited context length flexibility
-    
+
   🥉 NOT RECOMMENDED (Poor Efficiency):
     • 70B+ parameter models
     • Heavy offloading required
@@ -350,7 +350,7 @@ FOR CODING / SOFTWARE DEVELOPMENT:
      • 33.1 t/s average (responsive IDE integration)
      • Fits comfortably in VRAM with room for context
      • Low latency for autocomplete scenarios
-     
+
   Alternative: Qwen3:14b if newer features needed (31.2 t/s)
   Avoid: Llama3.3:70b (4.4 t/s - too slow for IDE use)
 
@@ -359,7 +359,7 @@ FOR REASONING / PROBLEM SOLVING:
      • DeepSeek-R1 optimized for reasoning chains
      • Qwen3:14b likely improved reasoning over Qwen2.5
      • Both fit in VRAM with headroom
-     
+
   If speed matters: Qwen2.5:14b (31.8 t/s in reasoning)
   If quality matters most: DeepSeek-R1:32b (but very slow)
 
@@ -368,7 +368,7 @@ FOR CREATIVE WRITING:
      • 30.5 t/s creative writing speed
      • Fast iteration for creative workflows
      • Good balance of speed and coherence
-     
+
   Alternative: Qwen3:14b (29.0 t/s, possibly better creativity)
 
 FOR GENERAL KNOWLEDGE / QA:
@@ -376,7 +376,7 @@ FOR GENERAL KNOWLEDGE / QA:
      • 29.2 t/s general knowledge response
      • Fast factual retrieval
      • Efficient for chatbot applications
-     
+
   Alternative: Qwen2.5:32b for broader knowledge (14.1 t/s)
 
 FOR CONTEXT-HEAVY TASKS (Long Documents):
@@ -384,7 +384,7 @@ FOR CONTEXT-HEAVY TASKS (Long Documents):
      • Larger model better at maintaining context
      • 15.0 GB VRAM usage leaves room for long contexts
      • 14.8 t/s acceptable for document analysis
-     
+
   Budget option: Qwen2.5:14b (33.8 t/s, 33% faster)
 
 🏆 BEST OVERALL PERFORMANCE/EFFICIENCY BALANCE
@@ -429,7 +429,7 @@ UPGRADE PATHS:
    • Need to run 70B models at acceptable speed
    • Working with larger context windows
    • Budget allows (~$1600)
-   
+
    Expected gains:
    - 32B models: +20% speed (no offloading)
    - 70B models: +100% speed (more in VRAM)
@@ -439,7 +439,7 @@ UPGRADE PATHS:
    • Professional AI/ML work
    • Running 70B+ models regularly
    • Need maximum throughput
-   
+
    Options:
    - 2x RTX 5070 Ti (32GB total, but not pooled)
    - 2x RTX 4090 (48GB total, excellent but expensive)

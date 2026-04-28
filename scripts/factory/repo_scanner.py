@@ -186,13 +186,17 @@ def print_summary(report: dict) -> None:
     print("  SAPPHIRE FACTORY — Repo Health Report")
     print(f"  {report['timestamp']}")
     print(f"{'='*60}\n")
-    print(f"  Avg Score: {report['avg_score']}/100  |  Lint: {report['total_lint_errors']}  |  Test Fails: {report['total_test_failures']}")
+    print(
+        f"  Avg Score: {report['avg_score']}/100  |  Lint: {report['total_lint_errors']}  |  Test Fails: {report['total_test_failures']}"
+    )
     print(f"  Repos with issues: {report['repos_with_issues']}/{report['total_repos']}\n")
 
     for r in report["repos"]:
         icon = "🟢" if r["score"] >= 80 else "🟡" if r["score"] >= 50 else "🔴"
         issues_str = ", ".join(r["issues"][:3]) if r["issues"] else "clean"
-        print(f"  {icon} {r['name']:30s} score={r['score']:3d}  branch={r['branch']:20s}  {issues_str}")
+        print(
+            f"  {icon} {r['name']:30s} score={r['score']:3d}  branch={r['branch']:20s}  {issues_str}"
+        )
 
     print(f"\n{'='*60}\n")
 

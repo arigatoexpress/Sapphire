@@ -137,7 +137,9 @@ def test_publish_scout_note_stores_locally_without_external_bridge(monkeypatch, 
 def test_register_scout_maps_payload_for_moltbook(monkeypatch, tmp_path):
     module = _load_forum_module()
     monkeypatch.setenv("SAPPHIRE_FORUM_STORE_PATH", str(tmp_path / "forum.json"))
-    monkeypatch.setenv("SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL", "https://www.moltbook.com/api/v1/agents/register")
+    monkeypatch.setenv(
+        "SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL", "https://www.moltbook.com/api/v1/agents/register"
+    )
     monkeypatch.delenv("SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN", raising=False)
 
     service = module.SapphireForumService()
@@ -173,7 +175,9 @@ def test_register_scout_maps_payload_for_moltbook(monkeypatch, tmp_path):
 def test_register_scout_maps_payload_for_moltbook_root_domain(monkeypatch, tmp_path):
     module = _load_forum_module()
     monkeypatch.setenv("SAPPHIRE_FORUM_STORE_PATH", str(tmp_path / "forum.json"))
-    monkeypatch.setenv("SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL", "https://moltbook.com/api/v1/agents/register")
+    monkeypatch.setenv(
+        "SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL", "https://moltbook.com/api/v1/agents/register"
+    )
     monkeypatch.delenv("SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN", raising=False)
 
     service = module.SapphireForumService()
@@ -400,7 +404,10 @@ def _fake_client_session_factory_sequence(sequence):
             if remaining:
                 status_code, payload = remaining.pop(0)
             else:
-                status_code, payload = (500, {"success": False, "error": "unexpected_empty_sequence"})
+                status_code, payload = (
+                    500,
+                    {"success": False, "error": "unexpected_empty_sequence"},
+                )
             return _FakeResponse(status_code, payload)
 
     return _FakeClientSession
@@ -418,7 +425,9 @@ def test_dispatch_scout_sandbox_routes_gtm_action_to_gtm_endpoint(monkeypatch, t
         status = 200
 
         async def text(self):
-            return json.dumps({"ok": True, "dispatch": {"dispatched": True, "reason": "ok", "status": 200}})
+            return json.dumps(
+                {"ok": True, "dispatch": {"dispatched": True, "reason": "ok", "status": 200}}
+            )
 
         async def __aenter__(self):
             return self
@@ -456,7 +465,9 @@ def test_dispatch_scout_sandbox_routes_gtm_action_to_gtm_endpoint(monkeypatch, t
 
     assert result["dispatched"] is True
     assert captured["url"] == "https://sandbox.example/v1/gtm/outbound"
-    assert captured["payload"]["external_url_hint"] == "https://app.clawgtm.com/api/v1/agents/dispatch"
+    assert (
+        captured["payload"]["external_url_hint"] == "https://app.clawgtm.com/api/v1/agents/dispatch"
+    )
     assert captured["payload"]["outbound_payload"]["company_url"] == "https://example.com"
     assert "action" not in captured["payload"]
 
@@ -541,7 +552,11 @@ def test_dispatch_external_marks_pending_verification(monkeypatch, tmp_path):
                 "success": True,
                 "verification_required": True,
                 "verification": {"code": "abc123", "challenge": "challenge"},
-                "post": {"id": "post-123", "url": "/post/post-123", "verification_status": "pending"},
+                "post": {
+                    "id": "post-123",
+                    "url": "/post/post-123",
+                    "verification_status": "pending",
+                },
             },
         ),
     )
@@ -576,7 +591,10 @@ def test_dispatch_external_auto_verifies_moltbook_challenge(monkeypatch, tmp_pat
                     {
                         "success": True,
                         "verification_required": True,
-                        "verification": {"code": "abc123", "challenge": "what is sixteen plus twenty two?"},
+                        "verification": {
+                            "code": "abc123",
+                            "challenge": "what is sixteen plus twenty two?",
+                        },
                         "post": {
                             "id": "post-123",
                             "url": "/post/post-123",
@@ -646,7 +664,9 @@ def test_dispatch_bridge_skips_fallback_on_provider_constraints(monkeypatch, tmp
 def test_register_scout_treats_already_registered_as_success(monkeypatch, tmp_path):
     module = _load_forum_module()
     monkeypatch.setenv("SAPPHIRE_FORUM_STORE_PATH", str(tmp_path / "forum.json"))
-    monkeypatch.setenv("SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL", "https://www.moltbook.com/api/v1/agents/register")
+    monkeypatch.setenv(
+        "SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL", "https://www.moltbook.com/api/v1/agents/register"
+    )
     service = module.SapphireForumService()
 
     async def fake_dispatch(**kwargs):
@@ -677,7 +697,9 @@ def test_register_scout_treats_already_registered_as_success(monkeypatch, tmp_pa
 def test_register_scout_uses_existing_moltbook_token_without_dispatch(monkeypatch, tmp_path):
     module = _load_forum_module()
     monkeypatch.setenv("SAPPHIRE_FORUM_STORE_PATH", str(tmp_path / "forum.json"))
-    monkeypatch.setenv("SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL", "https://www.moltbook.com/api/v1/agents/register")
+    monkeypatch.setenv(
+        "SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL", "https://www.moltbook.com/api/v1/agents/register"
+    )
     monkeypatch.setenv("SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN", "moltbook_existing_token")
     service = module.SapphireForumService()
 
@@ -704,7 +726,9 @@ def test_register_scout_uses_existing_moltbook_token_without_dispatch(monkeypatc
 def test_scout_status_assumes_registered_when_moltbook_token_present(monkeypatch, tmp_path):
     module = _load_forum_module()
     monkeypatch.setenv("SAPPHIRE_FORUM_STORE_PATH", str(tmp_path / "forum.json"))
-    monkeypatch.setenv("SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL", "https://www.moltbook.com/api/v1/agents/register")
+    monkeypatch.setenv(
+        "SAPPHIRE_SCOUT_EXTERNAL_REGISTER_URL", "https://www.moltbook.com/api/v1/agents/register"
+    )
     monkeypatch.setenv("SAPPHIRE_SCOUT_EXTERNAL_POST_URL", "https://www.moltbook.com/api/v1/posts")
     monkeypatch.setenv("SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN", "moltbook_existing_token")
     monkeypatch.setenv("SAPPHIRE_SCOUT_USERNAME", "sapphire_scout")

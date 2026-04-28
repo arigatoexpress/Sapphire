@@ -91,7 +91,7 @@ class Proposal:
     input_amount: float
     quoted_output: float
     quote_price: float | None
-    status: str                       # PENDING | APPROVED | DENIED | EXECUTED_PAPER
+    status: str  # PENDING | APPROVED | DENIED | EXECUTED_PAPER
     approver: str | None = None
     telegram_code: str | None = None
     reason: str = ""
@@ -137,7 +137,7 @@ class SolanaWallet:
 
     def __init__(self, *, confirmation_firewall: Any | None = None) -> None:
         self._fernet = None
-        self._keypair: tuple[bytes, bytes] | None = None    # (private, public)
+        self._keypair: tuple[bytes, bytes] | None = None  # (private, public)
         self._confirmation_firewall = confirmation_firewall
 
     # ──────────────────────────────────────────────────────────────────
@@ -164,7 +164,9 @@ class SolanaWallet:
 
         priv = Ed25519PrivateKey.generate()
         priv_bytes = priv.private_bytes(
-            Encoding.Raw, PrivateFormat.Raw, NoEncryption(),
+            Encoding.Raw,
+            PrivateFormat.Raw,
+            NoEncryption(),
         )
         pub_bytes = priv.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
         pubkey_b58 = _b58encode(pub_bytes)
@@ -172,26 +174,33 @@ class SolanaWallet:
         # Generate + save fernet key
         key = Fernet.generate_key()
         KEY_PATH.write_bytes(key)
-        os.chmod(KEY_PATH, stat.S_IRUSR | stat.S_IWUSR)       # 0600
+        os.chmod(KEY_PATH, stat.S_IRUSR | stat.S_IWUSR)  # 0600
 
         # Encrypt the keypair
         f = Fernet(key)
-        payload = json.dumps({
-            "priv": base64.b64encode(priv_bytes).decode(),
-            "pub": base64.b64encode(pub_bytes).decode(),
-            "pubkey_b58": pubkey_b58,
-            "created_at": datetime.now(UTC).isoformat(),
-        }).encode()
+        payload = json.dumps(
+            {
+                "priv": base64.b64encode(priv_bytes).decode(),
+                "pub": base64.b64encode(pub_bytes).decode(),
+                "pubkey_b58": pubkey_b58,
+                "created_at": datetime.now(UTC).isoformat(),
+            }
+        ).encode()
         WALLET_PATH.write_bytes(f.encrypt(payload))
-        os.chmod(WALLET_PATH, stat.S_IRUSR | stat.S_IWUSR)    # 0600
+        os.chmod(WALLET_PATH, stat.S_IRUSR | stat.S_IWUSR)  # 0600
 
         # Seed paper ledger
         if not LEDGER_PATH.exists():
             LEDGER_PATH.parent.mkdir(parents=True, exist_ok=True)
-            LEDGER_PATH.write_text(json.dumps({
-                "SOL": PAPER_STARTING_SOL,
-                "USDC": PAPER_STARTING_USDC,
-            }, indent=2))
+            LEDGER_PATH.write_text(
+                json.dumps(
+                    {
+                        "SOL": PAPER_STARTING_SOL,
+                        "USDC": PAPER_STARTING_USDC,
+                    },
+                    indent=2,
+                )
+            )
 
         self._fernet = f
         self._keypair = (priv_bytes, pub_bytes)
@@ -272,7 +281,7 @@ class SolanaWallet:
         decimals = {"SOL": 9, "USDC": 6, "USDT": 6, "JUP": 6, "BONK": 5}
         in_dec = decimals.get(input_token.upper(), 9)
         out_dec = decimals.get(output_token.upper(), 9)
-        atomic = int(amount_in * (10 ** in_dec))
+        atomic = int(amount_in * (10**in_dec))
 
         params = {
             "inputMint": in_mint,
@@ -289,7 +298,7 @@ class SolanaWallet:
             return None
 
         out_atomic = int(raw.get("outAmount", 0))
-        out_amount = out_atomic / (10 ** out_dec)
+        out_amount = out_atomic / (10**out_dec)
         price = (out_amount / amount_in) if amount_in > 0 else None
         return {
             "input": input_token.upper(),
@@ -371,6 +380,7 @@ class SolanaWallet:
         # Fire an event-bus notification regardless of outcome
         try:
             from lib.core.event_bus import get_bus
+
             get_bus().publish(
                 "trade.proposed",
                 asdict(proposal),
@@ -457,6 +467,7 @@ class SolanaWallet:
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
 
 def _cli() -> None:
     import argparse

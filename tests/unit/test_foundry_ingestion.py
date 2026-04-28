@@ -133,10 +133,12 @@ class TestTransformPaperTrades:
         signals_dir = tmp_path / "data" / "signals"
         signals_dir.mkdir(parents=True)
         (signals_dir / "2026-04-10.jsonl").write_text(
-            json.dumps({"pipeline_id": "old", "timestamp": "2026-04-10T00:00:00Z", "symbol": "BTC"}) + "\n"
+            json.dumps({"pipeline_id": "old", "timestamp": "2026-04-10T00:00:00Z", "symbol": "BTC"})
+            + "\n"
         )
         (signals_dir / "2026-04-19.jsonl").write_text(
-            json.dumps({"pipeline_id": "new", "timestamp": "2026-04-19T00:00:00Z", "symbol": "ETH"}) + "\n"
+            json.dumps({"pipeline_id": "new", "timestamp": "2026-04-19T00:00:00Z", "symbol": "ETH"})
+            + "\n"
         )
 
         since = datetime(2026, 4, 15, tzinfo=UTC)
@@ -182,8 +184,10 @@ class TestTransformAlerts:
         events = tmp_path / "data" / "system_events.jsonl"
         events.parent.mkdir(parents=True)
         events.write_text(
-            json.dumps({"type": "info", "message": "routine"}) + "\n" +
-            json.dumps({"type": "security_scan", "message": "vuln found"}) + "\n"
+            json.dumps({"type": "info", "message": "routine"})
+            + "\n"
+            + json.dumps({"type": "security_scan", "message": "vuln found"})
+            + "\n"
         )
         alerts = transform_alerts(tmp_path)
         assert len(alerts) == 1  # only the security one
@@ -191,12 +195,16 @@ class TestTransformAlerts:
     def test_from_security_dir(self, tmp_path):
         sec_dir = tmp_path / "data" / "security"
         sec_dir.mkdir(parents=True)
-        (sec_dir / "scan.json").write_text(json.dumps({
-            "findings": [
-                {"id": "f1", "title": "XSS in endpoint", "severity": "high"},
-                {"id": "f2", "title": "Outdated dep", "severity": "low"},
-            ]
-        }))
+        (sec_dir / "scan.json").write_text(
+            json.dumps(
+                {
+                    "findings": [
+                        {"id": "f1", "title": "XSS in endpoint", "severity": "high"},
+                        {"id": "f2", "title": "Outdated dep", "severity": "low"},
+                    ]
+                }
+            )
+        )
         # Also need system_events.jsonl to exist (or not)
         alerts = transform_alerts(tmp_path)
         assert len(alerts) == 2
@@ -205,10 +213,14 @@ class TestTransformAlerts:
     def test_from_dated_security_subdirectory(self, tmp_path):
         sec_dir = tmp_path / "data" / "security" / "2026-04-25"
         sec_dir.mkdir(parents=True)
-        (sec_dir / "pipeline.json").write_text(json.dumps({
-            "timestamp": "2026-04-25T09:10:29Z",
-            "posture": "needs_attention",
-        }))
+        (sec_dir / "pipeline.json").write_text(
+            json.dumps(
+                {
+                    "timestamp": "2026-04-25T09:10:29Z",
+                    "posture": "needs_attention",
+                }
+            )
+        )
 
         alerts = transform_alerts(tmp_path)
 
@@ -242,11 +254,15 @@ class TestTransformServiceHealth:
 
     def test_from_topology_fallback(self, tmp_path):
         (tmp_path / "data").mkdir(parents=True)
-        (tmp_path / "data" / "device_topology.json").write_text(json.dumps({
-            "devices": [
-                {"name": "mac", "ip": "100.67.171.79", "services": ["dashboard", "proxy"]},
-            ]
-        }))
+        (tmp_path / "data" / "device_topology.json").write_text(
+            json.dumps(
+                {
+                    "devices": [
+                        {"name": "mac", "ip": "100.67.171.79", "services": ["dashboard", "proxy"]},
+                    ]
+                }
+            )
+        )
 
         objs = transform_service_health(tmp_path)
         assert len(objs) == 2
@@ -261,13 +277,16 @@ class TestTransformServiceHealth:
         health_dir = tmp_path / "data" / "health"
         health_dir.mkdir(parents=True)
         (health_dir / "2026-04-19.ndjson").write_text(
-            json.dumps({
-                "service_name": "ollama_windows",
-                "ip": "100.71.10.48",
-                "status": "healthy",
-                "response_ms": 412,
-                "timestamp": "2026-04-19T10:00:00Z",
-            }) + "\n"
+            json.dumps(
+                {
+                    "service_name": "ollama_windows",
+                    "ip": "100.71.10.48",
+                    "status": "healthy",
+                    "response_ms": 412,
+                    "timestamp": "2026-04-19T10:00:00Z",
+                }
+            )
+            + "\n"
         )
         objs = transform_service_health(tmp_path)
         assert len(objs) >= 1
@@ -281,13 +300,16 @@ class TestTransformServiceHealth:
         health_dir = tmp_path / "data" / "health"
         health_dir.mkdir(parents=True)
         (health_dir / "heartbeat.jsonl").write_text(
-            json.dumps({
-                "timestamp": "2026-04-19T10:00:00Z",
-                "services": {
-                    "dashboard": {"status": "healthy", "latency_ms": 12},
-                    "proxy": {"status": "degraded", "latency_ms": 900},
-                },
-            }) + "\n"
+            json.dumps(
+                {
+                    "timestamp": "2026-04-19T10:00:00Z",
+                    "services": {
+                        "dashboard": {"status": "healthy", "latency_ms": 12},
+                        "proxy": {"status": "degraded", "latency_ms": 900},
+                    },
+                }
+            )
+            + "\n"
         )
         objs = transform_service_health(tmp_path)
         names = sorted(o["service"] for o in objs)
@@ -303,7 +325,8 @@ class TestTransformServiceHealth:
         health_dir.mkdir(parents=True)
         (health_dir / "2026-04-19.ndjson").write_text(
             '"just a string"\n'
-            + json.dumps({"service_name": "dashboard", "status": "healthy"}) + "\n"
+            + json.dumps({"service_name": "dashboard", "status": "healthy"})
+            + "\n"
         )
         objs = transform_service_health(tmp_path)
         # Should have captured the valid dict row, skipped the string
@@ -312,18 +335,22 @@ class TestTransformServiceHealth:
     def test_topology_handles_string_services(self, tmp_path):
         """device_topology services may be strings OR dicts OR junk."""
         (tmp_path / "data").mkdir(parents=True)
-        (tmp_path / "data" / "device_topology.json").write_text(json.dumps({
-            "devices": [
+        (tmp_path / "data" / "device_topology.json").write_text(
+            json.dumps(
                 {
-                    "name": "mac",
-                    "services": [
-                        "dashboard",                         # string
-                        {"name": "proxy", "port": 11435},    # dict
-                        42,                                  # junk, must be skipped
-                    ],
-                },
-            ]
-        }))
+                    "devices": [
+                        {
+                            "name": "mac",
+                            "services": [
+                                "dashboard",  # string
+                                {"name": "proxy", "port": 11435},  # dict
+                                42,  # junk, must be skipped
+                            ],
+                        },
+                    ]
+                }
+            )
+        )
         objs = transform_service_health(tmp_path)
         names = [o["service"] for o in objs]
         assert "dashboard" in names
@@ -340,18 +367,22 @@ class TestTransformThreatIntel:
     def test_from_threats_json(self, tmp_path):
         intel_dir = tmp_path / "data" / "intelligence" / "2026-04-19"
         intel_dir.mkdir(parents=True)
-        (intel_dir / "threats.json").write_text(json.dumps({
-            "threats": [
+        (intel_dir / "threats.json").write_text(
+            json.dumps(
                 {
-                    "canonical_id": "t1",
-                    "title": "Critical RCE in libfoo",
-                    "severity": "critical",
-                    "source": "CISA",
-                    "published": "2026-04-19",
-                    "cve_ids": ["CVE-2026-1234"],
-                },
-            ]
-        }))
+                    "threats": [
+                        {
+                            "canonical_id": "t1",
+                            "title": "Critical RCE in libfoo",
+                            "severity": "critical",
+                            "source": "CISA",
+                            "published": "2026-04-19",
+                            "cve_ids": ["CVE-2026-1234"],
+                        },
+                    ]
+                }
+            )
+        )
 
         objs = transform_threat_intel(tmp_path)
         assert len(objs) == 1
@@ -384,13 +415,17 @@ class TestTransformDailyBriefs:
     def test_from_json(self, tmp_path):
         day_dir = tmp_path / "data" / "intelligence" / "2026-04-19"
         day_dir.mkdir(parents=True)
-        (day_dir / "daily_brief.json").write_text(json.dumps({
-            "title": "Morning Brief",
-            "summary": "Markets up, threats low.",
-            "threat_level": "normal",
-            "market_outlook": "bullish",
-            "generated_at": "2026-04-19T08:00:00Z",
-        }))
+        (day_dir / "daily_brief.json").write_text(
+            json.dumps(
+                {
+                    "title": "Morning Brief",
+                    "summary": "Markets up, threats low.",
+                    "threat_level": "normal",
+                    "market_outlook": "bullish",
+                    "generated_at": "2026-04-19T08:00:00Z",
+                }
+            )
+        )
 
         briefs = transform_daily_briefs(tmp_path)
         assert len(briefs) == 1
@@ -410,9 +445,14 @@ class TestTransformDailyBriefs:
         for d in ("2026-04-10", "2026-04-19"):
             day_dir = tmp_path / "data" / "intelligence" / d
             day_dir.mkdir(parents=True)
-            (day_dir / "daily_brief.json").write_text(json.dumps({
-                "title": f"Brief {d}", "summary": "test",
-            }))
+            (day_dir / "daily_brief.json").write_text(
+                json.dumps(
+                    {
+                        "title": f"Brief {d}",
+                        "summary": "test",
+                    }
+                )
+            )
 
         since = datetime(2026, 4, 15, tzinfo=UTC)
         briefs = transform_daily_briefs(tmp_path, since=since)
@@ -514,9 +554,7 @@ class TestTransformRegionalIntel:
             + "\n"
         )
 
-        rows = transform_intel_source_health(
-            tmp_path, since=datetime(2026, 4, 26, tzinfo=UTC)
-        )
+        rows = transform_intel_source_health(tmp_path, since=datetime(2026, 4, 26, tzinfo=UTC))
 
         assert [row["source_key"] for row in rows] == ["new"]
 

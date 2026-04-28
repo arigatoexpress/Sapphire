@@ -95,7 +95,7 @@ rm -rf ~/Library/Caches/BraveSoftware/Brave-Browser/*
 
 # Step 10: Wrap-Up
 echo "Cleanup complete. Key insights:" | tee -a ~/cleanup.log
-echo "- Fixed persistent Errno 13: ACLs/flags often block post-chmod (macOS 13+ trend)." 
+echo "- Fixed persistent Errno 13: ACLs/flags often block post-chmod (macOS 13+ trend)."
 echo "- Data: Quarantine affects 30% downloads (Apple stats); ACL removal boosts success 50%."
 echo "- Lesson: File systems layer perms (Unix) + attrs (xattr) + ACLs/flags—diagnose with ls -leO@."
 echo "- Check ~/cleanup.log for details. Rerun monthly; enable SIP if disabled."

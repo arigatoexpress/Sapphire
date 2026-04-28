@@ -196,7 +196,9 @@ def _county_portal_datatables_payload(*, start: int, length: int) -> dict[str, s
     return payload
 
 
-def _county_portal_row_to_signal(row: dict[str, object], *, source_key: str, county: str) -> ProgressSignal:
+def _county_portal_row_to_signal(
+    row: dict[str, object], *, source_key: str, county: str
+) -> ProgressSignal:
     return ProgressSignal(
         signal_urn=make_urn("signal"),
         source=source_key,
@@ -346,7 +348,9 @@ async def fetch_county_permit_signals(
     return collected
 
 
-def attach_signals_to_properties(store: InMemoryMasterArena, signals: list[ProgressSignal]) -> list[ProgressSignal]:
+def attach_signals_to_properties(
+    store: InMemoryMasterArena, signals: list[ProgressSignal]
+) -> list[ProgressSignal]:
     attached: list[ProgressSignal] = []
     for signal in signals:
         if signal.property_address_hint:

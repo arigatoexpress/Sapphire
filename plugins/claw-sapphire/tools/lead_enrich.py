@@ -5,6 +5,7 @@ Keeps the historical `plugins/claw-sapphire/tools/lead_enrich.py` invocation pat
 working (scheduled tasks, hermes skills, importlib test fixtures) after the
 tool-boundary reorganization.
 """
+
 from __future__ import annotations
 
 from pathlib import Path

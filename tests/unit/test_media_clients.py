@@ -76,7 +76,10 @@ def test_twitter_client_parses_blob_short_keys(monkeypatch):
     _install_tweepy_stub(monkeypatch)
     _install_loguru_stub(monkeypatch)
     twitter_module = _load_module(TWITTER_PATH, "sapphire_twitter")
-    monkeypatch.setenv("SAPPHIRE_TWITTER_API_TOKEN", "Ck ck_value\nSk sk_value\nBear bear_value\naccess token: at_value\naccess token secret: as_value")
+    monkeypatch.setenv(
+        "SAPPHIRE_TWITTER_API_TOKEN",
+        "Ck ck_value\nSk sk_value\nBear bear_value\naccess token: at_value\naccess token secret: as_value",
+    )
     monkeypatch.delenv("SAPPHIRE_TWITTER_API_KEY", raising=False)
     monkeypatch.delenv("SAPPHIRE_TWITTER_API_SECRET", raising=False)
     monkeypatch.delenv("SAPPHIRE_TWITTER_ACCESS_TOKEN", raising=False)

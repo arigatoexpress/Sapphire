@@ -75,10 +75,9 @@ def test_http_ok_success(monkeypatch):
 @pytest.mark.parametrize("status_code", [401, 403, 405])
 def test_http_ok_treats_auth_codes_as_alive(monkeypatch, status_code):
     """401/403/405 means the service is up — it just won't authorize us."""
+
     def raise_http_error(*a, **kw):
-        raise urllib.error.HTTPError(
-            url="http://x", code=status_code, msg="x", hdrs={}, fp=None
-        )
+        raise urllib.error.HTTPError(url="http://x", code=status_code, msg="x", hdrs={}, fp=None)
 
     monkeypatch.setattr(hb.urllib.request, "urlopen", raise_http_error)
 
@@ -91,9 +90,7 @@ def test_http_ok_treats_auth_codes_as_alive(monkeypatch, status_code):
 @pytest.mark.parametrize("status_code", [500, 502, 503, 404])
 def test_http_ok_other_http_errors_fail(monkeypatch, status_code):
     def raise_http_error(*a, **kw):
-        raise urllib.error.HTTPError(
-            url="http://x", code=status_code, msg="x", hdrs={}, fp=None
-        )
+        raise urllib.error.HTTPError(url="http://x", code=status_code, msg="x", hdrs={}, fp=None)
 
     monkeypatch.setattr(hb.urllib.request, "urlopen", raise_http_error)
 
@@ -283,9 +280,7 @@ def test_state_degraded_resets_to_healthy_on_success(monkeypatch):
 
 def test_failed_with_launchctl_heals_to_recovering(monkeypatch):
     monitor = _make_monitor(monkeypatch, dry_run=False)
-    monitor._components = [
-        hb.ComponentStatus(name="hermes", launchctl_label="ai.hermes.gateway")
-    ]
+    monitor._components = [hb.ComponentStatus(name="hermes", launchctl_label="ai.hermes.gateway")]
 
     _patch_check(monkeypatch, ok=False, err="down")
     monkeypatch.setattr(hb, "_attempt_heal", lambda comp: True)
@@ -330,9 +325,7 @@ def test_dry_run_skips_telegram_and_heal(monkeypatch):
     monkeypatch.setattr(hb, "_publish_event", lambda payload: None)
 
     monitor = hb.HeartbeatMonitor(interval=1, dry_run=True)
-    monitor._components = [
-        hb.ComponentStatus(name="hermes", launchctl_label="ai.hermes.gateway")
-    ]
+    monitor._components = [hb.ComponentStatus(name="hermes", launchctl_label="ai.hermes.gateway")]
 
     for _ in range(hb.FAIL_THRESHOLD):
         monitor.run_once()
@@ -425,8 +418,7 @@ def test_publish_summary_overall_nominal_when_all_healthy(monkeypatch):
 
     monitor = hb.HeartbeatMonitor(interval=1, dry_run=True)
     monitor._components = [
-        hb.ComponentStatus(name=f"ok-{i}", state=hb.ComponentState.HEALTHY)
-        for i in range(3)
+        hb.ComponentStatus(name=f"ok-{i}", state=hb.ComponentState.HEALTHY) for i in range(3)
     ]
 
     monitor._publish_summary()
@@ -497,9 +489,7 @@ def test_attempt_heal_kickstart_success(monkeypatch):
     monkeypatch.setattr(
         hb.subprocess,
         "run",
-        lambda *a, **kw: subprocess.CompletedProcess(
-            args=a[0], returncode=0, stdout="", stderr=""
-        ),
+        lambda *a, **kw: subprocess.CompletedProcess(args=a[0], returncode=0, stdout="", stderr=""),
     )
 
     comp = hb.ComponentStatus(name="hermes", launchctl_label="ai.hermes.gateway")
@@ -546,6 +536,7 @@ def test_attempt_heal_subprocess_exception_returns_false(monkeypatch):
 
 def test_send_telegram_swallows_exceptions(monkeypatch):
     """Telegram must never crash the heartbeat sweep."""
+
     def boom(*a, **kw):
         raise OSError("notify tool errored")
 
@@ -558,6 +549,7 @@ def test_send_telegram_swallows_exceptions(monkeypatch):
 
 def test_publish_event_swallows_exceptions(monkeypatch):
     """Event bus failure must never crash the heartbeat sweep."""
+
     def boom(*a, **kw):
         raise RuntimeError("redis is down")
 

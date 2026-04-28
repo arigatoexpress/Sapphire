@@ -57,7 +57,7 @@ def _file_stamp(p: Path) -> str | None:
     stem = p.stem  # strategy_sweep_20260418T171613Z
     for prefix in ("strategy_sweep_", "best_per_symbol_"):
         if stem.startswith(prefix):
-            return stem[len(prefix):]
+            return stem[len(prefix) :]
     return None
 
 
@@ -99,7 +99,14 @@ def load_latest_best() -> dict[str, Any] | None:
     return data
 
 
-_LEADERBOARD_METRICS = {"sortino", "sharpe", "calmar", "total_return_pct", "win_rate", "profit_factor"}
+_LEADERBOARD_METRICS = {
+    "sortino",
+    "sharpe",
+    "calmar",
+    "total_return_pct",
+    "win_rate",
+    "profit_factor",
+}
 
 
 def _metric_key(metric: str):
@@ -108,6 +115,7 @@ def _metric_key(metric: str):
     Returns (1, value) for real numbers and "inf" sentinels so they sort above
     (0, 0.0) which we return for missing / NaN entries.
     """
+
     def key(r):
         v = r.get(metric)
         if v is None:
@@ -115,6 +123,7 @@ def _metric_key(metric: str):
         if isinstance(v, str):
             return (1, float("inf") if v == "inf" else 0.0)
         return (1, float(v))
+
     return key
 
 
@@ -189,20 +198,22 @@ def summary() -> dict[str, Any]:
     best_rows = []
     if best and isinstance(best.get("results"), list):
         for r in best["results"]:
-            best_rows.append({
-                "strategy_cls": r.get("strategy_cls"),
-                "strategy_name": r.get("strategy_name"),
-                "symbol": r.get("symbol"),
-                "params": r.get("params"),
-                "sortino": r.get("sortino"),
-                "sharpe": r.get("sharpe"),
-                "calmar": r.get("calmar"),
-                "total_return_pct": r.get("total_return_pct"),
-                "win_rate": r.get("win_rate"),
-                "profit_factor": r.get("profit_factor"),
-                "max_drawdown_pct": r.get("max_drawdown_pct"),
-                "total_trades": r.get("total_trades"),
-            })
+            best_rows.append(
+                {
+                    "strategy_cls": r.get("strategy_cls"),
+                    "strategy_name": r.get("strategy_name"),
+                    "symbol": r.get("symbol"),
+                    "params": r.get("params"),
+                    "sortino": r.get("sortino"),
+                    "sharpe": r.get("sharpe"),
+                    "calmar": r.get("calmar"),
+                    "total_return_pct": r.get("total_return_pct"),
+                    "win_rate": r.get("win_rate"),
+                    "profit_factor": r.get("profit_factor"),
+                    "max_drawdown_pct": r.get("max_drawdown_pct"),
+                    "total_trades": r.get("total_trades"),
+                }
+            )
 
     total_backtests = (sweep or {}).get("total_backtests") or len((sweep or {}).get("results", []))
     age_hours = None
@@ -225,6 +236,7 @@ def summary() -> dict[str, Any]:
 
 if __name__ == "__main__":
     import sys
+
     sub = sys.argv[1] if len(sys.argv) > 1 else "summary"
     if sub == "summary":
         out = summary()

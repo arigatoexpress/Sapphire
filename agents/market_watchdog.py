@@ -17,6 +17,7 @@ Health endpoint: http://rari1_ip:19001/health
 Usage:
     python3 market_watchdog.py [--config /path/to/watchdog.yaml] [--once]
 """
+
 from __future__ import annotations
 
 import json
@@ -35,6 +36,7 @@ from pathlib import Path
 
 try:
     import yaml
+
     _YAML_AVAILABLE = True
 except ImportError:
     _YAML_AVAILABLE = False
@@ -57,18 +59,29 @@ DEFAULT_CONFIG = {
     "telegram": {"proxy_url": "http://100.67.171.79:11435", "priority": "p1"},
     "indices": [
         {"symbol": "SPY", "name": "S&P 500", "alert_threshold_pct": 2.0},
-        {"symbol": "QQQ", "name": "NASDAQ",   "alert_threshold_pct": 2.5},
-        {"symbol": "VIX", "name": "VIX",
-         "alert_threshold_abs": 25.0, "alert_spike_pct": 20.0},
+        {"symbol": "QQQ", "name": "NASDAQ", "alert_threshold_pct": 2.5},
+        {"symbol": "VIX", "name": "VIX", "alert_threshold_abs": 25.0, "alert_spike_pct": 20.0},
     ],
     "crypto": [
-        {"ticker": "BTC", "coingecko_id": "bitcoin",  "alert_threshold_pct": 5.0,
-         "price_levels": [{"level": 60000, "direction": "down", "label": "BTC fell below $60K"},
-                           {"level": 70000, "direction": "up",   "label": "BTC broke above $70K"}]},
-        {"ticker": "ETH", "coingecko_id": "ethereum", "alert_threshold_pct": 6.0,
-         "price_levels": [{"level": 3000,  "direction": "down", "label": "ETH fell below $3K"},
-                           {"level": 4000,  "direction": "up",   "label": "ETH broke above $4K"}]},
-        {"ticker": "SOL", "coingecko_id": "solana",   "alert_threshold_pct": 8.0},
+        {
+            "ticker": "BTC",
+            "coingecko_id": "bitcoin",
+            "alert_threshold_pct": 5.0,
+            "price_levels": [
+                {"level": 60000, "direction": "down", "label": "BTC fell below $60K"},
+                {"level": 70000, "direction": "up", "label": "BTC broke above $70K"},
+            ],
+        },
+        {
+            "ticker": "ETH",
+            "coingecko_id": "ethereum",
+            "alert_threshold_pct": 6.0,
+            "price_levels": [
+                {"level": 3000, "direction": "down", "label": "ETH fell below $3K"},
+                {"level": 4000, "direction": "up", "label": "ETH broke above $4K"},
+            ],
+        },
+        {"ticker": "SOL", "coingecko_id": "solana", "alert_threshold_pct": 8.0},
     ],
     "cooldown": {"same_alert_seconds": 3600, "max_alerts_per_hour": 10},
     "state": {"path": "/home/rari/sapphire/watchdog_state.json", "save_interval": 60},
@@ -87,6 +100,7 @@ def load_config(path: str | None = None) -> dict:
 
 # ─── HTTP Helpers ─────────────────────────────────────────────────────────────
 
+
 def _get_json(url: str, timeout: int = 8) -> dict | list | None:
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "sapphire-watchdog/1.0"})
@@ -100,7 +114,8 @@ def _post_json(url: str, data: dict, timeout: int = 10) -> dict | None:
     try:
         body = json.dumps(data).encode()
         req = urllib.request.Request(
-            url, data=body,
+            url,
+            data=body,
             headers={"Content-Type": "application/json"},
             method="POST",
         )
@@ -111,6 +126,7 @@ def _post_json(url: str, data: dict, timeout: int = 10) -> dict | None:
 
 
 # ─── Telegram Notifications ───────────────────────────────────────────────────
+
 
 def send_telegram(msg: str, proxy_url: str, priority: str = "p1") -> bool:
     """Send a Telegram alert via the bot API.
@@ -140,6 +156,7 @@ def send_telegram(msg: str, proxy_url: str, priority: str = "p1") -> bool:
 
 # ─── Price Fetchers ───────────────────────────────────────────────────────────
 
+
 def fetch_crypto_prices(coin_ids: list[str]) -> dict[str, dict]:
     """Fetch prices from CoinGecko (direct, no API key needed for basic tier)."""
     ids_str = ",".join(coin_ids)
@@ -163,6 +180,7 @@ def fetch_index_quote(symbol: str, openbb_url: str, timeout: int = 8) -> dict | 
 
 
 # ─── Alert State / Cooldown ───────────────────────────────────────────────────
+
 
 @dataclass
 class AlertState:
@@ -219,6 +237,7 @@ class AlertState:
 
 # ─── Health HTTP Handler ───────────────────────────────────────────────────────
 
+
 class _HealthHandler(BaseHTTPRequestHandler):
     watchdog: MarketWatchdog | None = None
 
@@ -228,8 +247,13 @@ class _HealthHandler(BaseHTTPRequestHandler):
                 "status": "ok",
                 "agent": "market-watchdog",
                 "timestamp": datetime.now(UTC).isoformat(),
-                "uptime_seconds": int(time.time() - (_HealthHandler.watchdog._start_ts if _HealthHandler.watchdog else 0)),
-                "alerts_this_hour": _HealthHandler.watchdog._state.alerts_this_hour if _HealthHandler.watchdog else 0,
+                "uptime_seconds": int(
+                    time.time()
+                    - (_HealthHandler.watchdog._start_ts if _HealthHandler.watchdog else 0)
+                ),
+                "alerts_this_hour": _HealthHandler.watchdog._state.alerts_this_hour
+                if _HealthHandler.watchdog
+                else 0,
             }
             body = json.dumps(status).encode()
             self.send_response(200)
@@ -247,6 +271,7 @@ class _HealthHandler(BaseHTTPRequestHandler):
 
 # ─── Main Agent Class ──────────────────────────────────────────────────────────
 
+
 class MarketWatchdog:
     def __init__(self, config: dict) -> None:
         self._cfg = config
@@ -263,7 +288,9 @@ class MarketWatchdog:
 
         self._openbb_url = config.get("openbb", {}).get("base_url", "http://100.67.171.79:6900")
         self._openbb_timeout = int(config.get("openbb", {}).get("timeout", 10))
-        self._telegram_url = config.get("telegram", {}).get("proxy_url", "http://100.67.171.79:11435")
+        self._telegram_url = config.get("telegram", {}).get(
+            "proxy_url", "http://100.67.171.79:11435"
+        )
         self._telegram_priority = config.get("telegram", {}).get("priority", "p1")
         self._cooldown = int(config.get("cooldown", {}).get("same_alert_seconds", 3600))
         self._max_per_hour = int(config.get("cooldown", {}).get("max_alerts_per_hour", 10))
@@ -271,7 +298,9 @@ class MarketWatchdog:
 
         log.info(
             "MarketWatchdog initialized | health_port=%d | crypto_interval=%ds | market_interval=%ds",
-            self._health_port, self._crypto_interval, self._market_interval,
+            self._health_port,
+            self._crypto_interval,
+            self._market_interval,
         )
 
     def _alert(self, key: str, message: str, icon: str = "⚠️") -> None:
@@ -291,15 +320,15 @@ class MarketWatchdog:
         prices = fetch_crypto_prices(coin_ids)
 
         for crypto in crypto_cfgs:
-            cg_id  = crypto.get("coingecko_id", "")
+            cg_id = crypto.get("coingecko_id", "")
             ticker = crypto.get("ticker", cg_id.upper())
-            data   = prices.get(cg_id, {})
+            data = prices.get(cg_id, {})
             if not data:
                 continue
 
-            price      = float(data.get("usd", 0) or 0)
+            price = float(data.get("usd", 0) or 0)
             change_24h = float(data.get("usd_24h_change", 0) or 0)
-            threshold  = float(crypto.get("alert_threshold_pct", 5.0))
+            threshold = float(crypto.get("alert_threshold_pct", 5.0))
 
             # 24h change alert
             if abs(change_24h) >= threshold:
@@ -313,13 +342,12 @@ class MarketWatchdog:
             # Price level alerts
             prev_price = self._state.last_prices.get(ticker, price)
             for level_cfg in crypto.get("price_levels", []):
-                level     = float(level_cfg["level"])
+                level = float(level_cfg["level"])
                 direction = level_cfg["direction"]
-                label     = level_cfg.get("label", f"{ticker} crossed ${level:,.0f}")
+                label = level_cfg.get("label", f"{ticker} crossed ${level:,.0f}")
 
-                crossed = (
-                    (direction == "down" and prev_price >= level > price) or
-                    (direction == "up"   and prev_price <= level < price)
+                crossed = (direction == "down" and prev_price >= level > price) or (
+                    direction == "up" and prev_price <= level < price
                 )
                 if crossed:
                     self._alert(f"price_level_{ticker}_{level}", label, "🚨")
@@ -333,8 +361,8 @@ class MarketWatchdog:
             return
 
         for idx_cfg in self._cfg.get("indices", []):
-            symbol    = idx_cfg["symbol"]
-            name      = idx_cfg.get("name", symbol)
+            symbol = idx_cfg["symbol"]
+            name = idx_cfg.get("name", symbol)
             threshold = float(idx_cfg.get("alert_threshold_pct", 2.0))
             abs_threshold = float(idx_cfg.get("alert_threshold_abs", 0))
             spike_threshold = float(idx_cfg.get("alert_spike_pct", 0))
@@ -344,7 +372,7 @@ class MarketWatchdog:
                 continue
 
             change_pct = float(q.get("change_percent", 0) or 0)
-            price      = float(q.get("last_price", q.get("price", 0)) or 0)
+            price = float(q.get("last_price", q.get("price", 0)) or 0)
 
             # Daily % move alert
             if threshold > 0 and abs(change_pct) >= threshold:
@@ -358,14 +386,20 @@ class MarketWatchdog:
             # Absolute threshold (e.g. VIX crossing 25)
             prev = self._state.last_prices.get(symbol, price)
             if abs_threshold > 0:
-                crossed_up   = prev < abs_threshold <= price
+                crossed_up = prev < abs_threshold <= price
                 crossed_down = prev > abs_threshold >= price
                 if crossed_up:
-                    self._alert(f"abs_cross_{symbol}_up",
-                                f"{name} crossed above {abs_threshold}: now {price:.2f}", "🚨")
+                    self._alert(
+                        f"abs_cross_{symbol}_up",
+                        f"{name} crossed above {abs_threshold}: now {price:.2f}",
+                        "🚨",
+                    )
                 elif crossed_down:
-                    self._alert(f"abs_cross_{symbol}_dn",
-                                f"{name} dropped below {abs_threshold}: now {price:.2f}", "📉")
+                    self._alert(
+                        f"abs_cross_{symbol}_dn",
+                        f"{name} dropped below {abs_threshold}: now {price:.2f}",
+                        "📉",
+                    )
 
             # Intraday spike (e.g. VIX +20%)
             if spike_threshold > 0 and abs(change_pct) >= spike_threshold:
@@ -397,8 +431,11 @@ class MarketWatchdog:
 
     def run(self) -> None:
         self._running = True
-        log.info("Market Watchdog starting — crypto every %ds, markets every %ds",
-                 self._crypto_interval, self._market_interval)
+        log.info(
+            "Market Watchdog starting — crypto every %ds, markets every %ds",
+            self._crypto_interval,
+            self._market_interval,
+        )
 
         # Health server in background
         threading.Thread(target=self._health_server, daemon=True).start()
@@ -440,8 +477,10 @@ class MarketWatchdog:
 
 # ─── Entry Point ─────────────────────────────────────────────────────────────
 
+
 def main() -> None:
     import argparse
+
     parser = argparse.ArgumentParser(description="Sapphire Market Watchdog")
     parser.add_argument("--config", default=None, help="Path to watchdog.yaml")
     parser.add_argument("--once", action="store_true", help="Run one check cycle and exit")

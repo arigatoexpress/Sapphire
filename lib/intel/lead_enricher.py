@@ -37,17 +37,17 @@ CACHE_DIR = ROOT / "data" / "leads" / ".enrich_cache"
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 CACHE_TTL_SECS = 24 * 3600
-GRADE_A_SCORE = 0.80   # leads at or above this score are "Grade A"
+GRADE_A_SCORE = 0.80  # leads at or above this score are "Grade A"
 
 # Permit-type → estimated property value (rough priors, USD)
 PERMIT_VALUE_PRIORS = {
-    "C2R": 450_000,    # Class 2 subdivision replat — small lot
-    "C2": 600_000,     # Class 2 subdivision plat
-    "C3F": 850_000,    # Class 3 subdivision final plat
-    "C3R": 900_000,    # Class 3 subdivision preliminary replat
+    "C2R": 450_000,  # Class 2 subdivision replat — small lot
+    "C2": 600_000,  # Class 2 subdivision plat
+    "C3F": 850_000,  # Class 3 subdivision final plat
+    "C3R": 900_000,  # Class 3 subdivision preliminary replat
     "C3": 900_000,
-    "COMM": 1_800_000, # commercial
-    "RES": 500_000,    # residential
+    "COMM": 1_800_000,  # commercial
+    "RES": 500_000,  # residential
     "DEFAULT": 500_000,
 }
 
@@ -100,7 +100,7 @@ class EnrichedLead:
     longitude: float | None = None
     geo_source: str | None = None  # "explicit" | "region_centroid" | None
     enriched_at: str = ""
-    enrichment_status: str = "pending"   # pending | ok | partial | failed
+    enrichment_status: str = "pending"  # pending | ok | partial | failed
     notes: list[str] = field(default_factory=list)
 
 
@@ -235,19 +235,16 @@ def _neighborhood_median(lead: dict[str, Any]) -> int | None:
 
 def _extract_builder(lead: dict[str, Any]) -> dict[str, Any]:
     """Extract builder / developer info from applicant fields."""
-    applicant = (
-        lead.get("applicant")
-        or lead.get("owner_name")
-        or lead.get("builder")
-        or ""
-    )
+    applicant = lead.get("applicant") or lead.get("owner_name") or lead.get("builder") or ""
     applicant = str(applicant).strip()
 
     if not applicant:
         # Try to extract from description
         desc = str(lead.get("description") or "")
         # Look for "BY COMPANY NAME" or "LLC" / "INC" patterns
-        match = re.search(r"\b([A-Z][A-Z&\s]{4,40}(?:LLC|INC|CORP|LTD|HOMES|BUILDERS|CONST))\b", desc)
+        match = re.search(
+            r"\b([A-Z][A-Z&\s]{4,40}(?:LLC|INC|CORP|LTD|HOMES|BUILDERS|CONST))\b", desc
+        )
         if match:
             applicant = match.group(1).strip()
 
@@ -294,7 +291,11 @@ def _find_decision_maker(lead: dict[str, Any]) -> tuple[str | None, str | None]:
 
     # Look for "attn: Name" or "c/o Name" patterns in description
     desc = str(lead.get("description") or "") + " " + str(lead.get("name") or "")
-    m = re.search(r"(?:attn(?:ention)?[:.\s]+|c/o\s+|contact[:.\s]+)([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)", desc, re.IGNORECASE)
+    m = re.search(
+        r"(?:attn(?:ention)?[:.\s]+|c/o\s+|contact[:.\s]+)([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)",
+        desc,
+        re.IGNORECASE,
+    )
     if m:
         return m.group(1).strip(), "description_parse"
 
@@ -416,6 +417,7 @@ def enrich_pipeline(pipeline_path: Path, grade_filter: str = "A") -> dict[str, A
     # Publish event
     try:
         from lib.core.event_bus import get_bus
+
         get_bus().publish(
             "lead.enriched",
             {

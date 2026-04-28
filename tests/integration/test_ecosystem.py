@@ -29,10 +29,14 @@ def _load_tho_pin() -> str:
     pin = os.getenv("THO_ADMIN_PIN")
     if pin:
         return pin.strip()
-    path = Path(os.getenv("SAPPHIRE_SECRETS_DIR", str(Path.home() / ".config" / "sapphire-secrets"))) / "tho_admin_pin"
+    path = (
+        Path(os.getenv("SAPPHIRE_SECRETS_DIR", str(Path.home() / ".config" / "sapphire-secrets")))
+        / "tho_admin_pin"
+    )
     if path.is_file():
         return path.read_text().strip()
     return ""
+
 
 passed = 0
 failed = 0
@@ -69,7 +73,9 @@ def http_get(url: str, headers: dict = None, timeout: int = 10) -> tuple:
 def http_post(url: str, data: dict, headers: dict = None, timeout: int = 10) -> tuple:
     try:
         payload = json.dumps(data).encode()
-        req = urllib.request.Request(url, data=payload, headers={**(headers or {}), "Content-Type": "application/json"})
+        req = urllib.request.Request(
+            url, data=payload, headers={**(headers or {}), "Content-Type": "application/json"}
+        )
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return resp.status, json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
@@ -88,15 +94,25 @@ def main():
     # 1. Sapphire Core
     print("1. Sapphire Core")
     check("Sapphire repo exists", (SAPPHIRE_DIR / "CLAUDE.md").exists())
-    check("Plugin tools exist", len(list((SAPPHIRE_DIR / "plugins/claw-sapphire/tools").glob("*.py"))) >= 10,
-          f"Found {len(list((SAPPHIRE_DIR / 'plugins/claw-sapphire/tools').glob('*.py')))}")
-    check("Data directories exist",
-          all((SAPPHIRE_DIR / "data" / d).exists() for d in ["threat_intel", "starred_repos", "market_pulse"]))
+    check(
+        "Plugin tools exist",
+        len(list((SAPPHIRE_DIR / "plugins/claw-sapphire/tools").glob("*.py"))) >= 10,
+        f"Found {len(list((SAPPHIRE_DIR / 'plugins/claw-sapphire/tools').glob('*.py')))}",
+    )
+    check(
+        "Data directories exist",
+        all(
+            (SAPPHIRE_DIR / "data" / d).exists()
+            for d in ["threat_intel", "starred_repos", "market_pulse"]
+        ),
+    )
 
     # 2. THO Production
     print("\n2. THO Production (Cloud Run)")
     status, body = http_get(f"{THO_BASE}/health")
-    check("Health endpoint", status == 200 and body and body.get("status") == "ok", f"HTTP {status}")
+    check(
+        "Health endpoint", status == 200 and body and body.get("status") == "ok", f"HTTP {status}"
+    )
 
     pin = _load_tho_pin()
     if not pin:
@@ -119,7 +135,11 @@ def main():
 
         status, body = http_get(f"{THO_BASE}/api/customers/search?q=garcia", headers=headers)
         results = body.get("total", 0) if body else 0
-        check("Customer search", results > 0 and body.get("source") == "firestore", f"{results} results, source={body.get('source')}")
+        check(
+            "Customer search",
+            results > 0 and body.get("source") == "firestore",
+            f"{results} results, source={body.get('source')}",
+        )
     else:
         skip("Firestore customers", "No auth token")
         skip("PDF templates", "No auth token")
@@ -134,12 +154,18 @@ def main():
     try:
         r = subprocess.run(
             ["python3", str(SAPPHIRE_DIR / "plugins/claw-sapphire/tools/threat_intel.py")],
-            input='{"action":"scan"}', capture_output=True, text=True, timeout=30,
-            env={**os.environ, "PYTHONPATH": str(CTB_DIR / "src")}
+            input='{"action":"scan"}',
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env={**os.environ, "PYTHONPATH": str(CTB_DIR / "src")},
         )
         data = json.loads(r.stdout) if r.stdout else {}
-        check("Threat scan (live)", data.get("success") and data.get("total_signals", 0) > 0,
-              f"{data.get('total_signals', 0)} signals")
+        check(
+            "Threat scan (live)",
+            data.get("success") and data.get("total_signals", 0) > 0,
+            f"{data.get('total_signals', 0)} signals",
+        )
     except Exception as e:
         check("Threat scan (live)", False, str(e)[:80])
 
@@ -184,11 +210,20 @@ def main():
 
     # 7. Repos clean
     print("\n7. Repository Health")
-    for repo_name, repo_path in [("Sapphire", SAPPHIRE_DIR), ("THO", Path.home() / "Code/Project-Go-Forward"),
-                                  ("CTB", CTB_DIR), ("RIW", Path.home() / "Code/regional-intel-workbench")]:
+    for repo_name, repo_path in [
+        ("Sapphire", SAPPHIRE_DIR),
+        ("THO", Path.home() / "Code/Project-Go-Forward"),
+        ("CTB", CTB_DIR),
+        ("RIW", Path.home() / "Code/regional-intel-workbench"),
+    ]:
         try:
-            r = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True,
-                             cwd=str(repo_path), timeout=5)
+            r = subprocess.run(
+                ["git", "status", "--porcelain"],
+                capture_output=True,
+                text=True,
+                cwd=str(repo_path),
+                timeout=5,
+            )
             dirty = len([l for l in r.stdout.strip().split("\n") if l.strip()])
             check(f"{repo_name} git clean", dirty <= 3, f"{dirty} dirty files")
         except Exception:

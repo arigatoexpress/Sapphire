@@ -17,13 +17,13 @@ results = {}
 for model in models:
     print(f"\n{model}:")
     payload = {'model': model, 'prompt': prompt, 'stream': False}
-    
+
     start = time.time()
     try:
-        resp = requests.post('http://localhost:11434/api/generate', 
+        resp = requests.post('http://localhost:11434/api/generate',
                            json=payload, timeout=180)
         duration = time.time() - start
-        
+
         if resp.status_code == 200:
             data = resp.json()
             tokens = data.get('eval_count', 0)

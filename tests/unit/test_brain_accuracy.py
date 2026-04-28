@@ -51,8 +51,10 @@ def test_report_empty():
 def test_record_and_load(tmp_path):
     """Decisions are recorded to JSONL and can be loaded back."""
     decisions_file = tmp_path / "brain_decisions.jsonl"
-    with patch("lib.analytics.brain_accuracy.DECISIONS_FILE", decisions_file), \
-         patch("lib.analytics.brain_accuracy.DECISIONS_DIR", tmp_path):
+    with (
+        patch("lib.analytics.brain_accuracy.DECISIONS_FILE", decisions_file),
+        patch("lib.analytics.brain_accuracy.DECISIONS_DIR", tmp_path),
+    ):
         record_decision(_fake_decision())
         record_decision(_fake_decision(symbol="ETH", decision="WAIT", direction="neutral"))
 
@@ -68,18 +70,42 @@ def test_report_with_scored_decisions(tmp_path):
     """Report computes accuracy from scored decisions."""
     decisions_file = tmp_path / "brain_decisions.jsonl"
     records = [
-        {"symbol": "BTC", "decision": "GO_LONG", "confidence": 0.8,
-         "timestamp": "2026-04-17T12:00:00+00:00", "scored": True,
-         "outcome": "correct", "pnl_pct": 0.02},
-        {"symbol": "BTC", "decision": "GO_LONG", "confidence": 0.7,
-         "timestamp": "2026-04-17T14:00:00+00:00", "scored": True,
-         "outcome": "incorrect", "pnl_pct": -0.01},
-        {"symbol": "ETH", "decision": "WAIT", "confidence": 0.5,
-         "timestamp": "2026-04-17T16:00:00+00:00", "scored": True,
-         "outcome": "correct", "pnl_pct": 0.005},
-        {"symbol": "BTC", "decision": "LEAN_SHORT", "confidence": 0.45,
-         "timestamp": "2026-04-18T10:00:00+00:00", "scored": False,
-         "outcome": None, "pnl_pct": None},
+        {
+            "symbol": "BTC",
+            "decision": "GO_LONG",
+            "confidence": 0.8,
+            "timestamp": "2026-04-17T12:00:00+00:00",
+            "scored": True,
+            "outcome": "correct",
+            "pnl_pct": 0.02,
+        },
+        {
+            "symbol": "BTC",
+            "decision": "GO_LONG",
+            "confidence": 0.7,
+            "timestamp": "2026-04-17T14:00:00+00:00",
+            "scored": True,
+            "outcome": "incorrect",
+            "pnl_pct": -0.01,
+        },
+        {
+            "symbol": "ETH",
+            "decision": "WAIT",
+            "confidence": 0.5,
+            "timestamp": "2026-04-17T16:00:00+00:00",
+            "scored": True,
+            "outcome": "correct",
+            "pnl_pct": 0.005,
+        },
+        {
+            "symbol": "BTC",
+            "decision": "LEAN_SHORT",
+            "confidence": 0.45,
+            "timestamp": "2026-04-18T10:00:00+00:00",
+            "scored": False,
+            "outcome": None,
+            "pnl_pct": None,
+        },
     ]
     with open(decisions_file, "w") as f:
         for r in records:
@@ -110,9 +136,15 @@ def test_brief_summary_with_data(tmp_path):
     """Brief summary produces formatted text with data."""
     decisions_file = tmp_path / "brain_decisions.jsonl"
     records = [
-        {"symbol": "BTC", "decision": "GO_LONG", "confidence": 0.8,
-         "timestamp": "2026-04-17T12:00:00+00:00", "scored": True,
-         "outcome": "correct", "pnl_pct": 0.03},
+        {
+            "symbol": "BTC",
+            "decision": "GO_LONG",
+            "confidence": 0.8,
+            "timestamp": "2026-04-17T12:00:00+00:00",
+            "scored": True,
+            "outcome": "correct",
+            "pnl_pct": 0.03,
+        },
     ]
     with open(decisions_file, "w") as f:
         for r in records:
@@ -128,12 +160,30 @@ def test_confidence_calibration(tmp_path):
     """Report includes confidence calibration buckets."""
     decisions_file = tmp_path / "brain_decisions.jsonl"
     records = [
-        {"symbol": "BTC", "decision": "GO_LONG", "confidence": 0.8, "scored": True,
-         "outcome": "correct", "timestamp": "2026-04-17T12:00:00+00:00"},
-        {"symbol": "BTC", "decision": "GO_LONG", "confidence": 0.85, "scored": True,
-         "outcome": "correct", "timestamp": "2026-04-17T13:00:00+00:00"},
-        {"symbol": "ETH", "decision": "GO_SHORT", "confidence": 0.5, "scored": True,
-         "outcome": "incorrect", "timestamp": "2026-04-17T14:00:00+00:00"},
+        {
+            "symbol": "BTC",
+            "decision": "GO_LONG",
+            "confidence": 0.8,
+            "scored": True,
+            "outcome": "correct",
+            "timestamp": "2026-04-17T12:00:00+00:00",
+        },
+        {
+            "symbol": "BTC",
+            "decision": "GO_LONG",
+            "confidence": 0.85,
+            "scored": True,
+            "outcome": "correct",
+            "timestamp": "2026-04-17T13:00:00+00:00",
+        },
+        {
+            "symbol": "ETH",
+            "decision": "GO_SHORT",
+            "confidence": 0.5,
+            "scored": True,
+            "outcome": "incorrect",
+            "timestamp": "2026-04-17T14:00:00+00:00",
+        },
     ]
     with open(decisions_file, "w") as f:
         for r in records:

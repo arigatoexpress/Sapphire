@@ -33,7 +33,9 @@ def _service():
 
 def sheets_client_status() -> GoogleSheetsClientStatus:
     if build is None or google is None:
-        return GoogleSheetsClientStatus(available=False, auth_ok=False, error="google sheets client libs unavailable")
+        return GoogleSheetsClientStatus(
+            available=False, auth_ok=False, error="google sheets client libs unavailable"
+        )
     try:
         _, project_id = _service()
         return GoogleSheetsClientStatus(available=True, auth_ok=True, project_id=project_id)
@@ -70,7 +72,9 @@ def read_sheet_rows(spreadsheet_id: str, tab_name: str) -> list[dict[str, Any]]:
     return rows
 
 
-def write_sheet_rows(spreadsheet_id: str, tab_name: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
+def write_sheet_rows(
+    spreadsheet_id: str, tab_name: str, rows: list[dict[str, Any]]
+) -> dict[str, Any]:
     service, _ = _service()
     if rows:
         headers: list[str] = []
@@ -111,4 +115,3 @@ def write_sheet_rows(spreadsheet_id: str, tab_name: str, rows: list[dict[str, An
         "updated_cells": resp.get("updatedCells", 0),
         "row_count_written": len(rows),
     }
-

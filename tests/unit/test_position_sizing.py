@@ -268,8 +268,12 @@ class TestComputePositionSize:
 
     def test_high_volatility_reduces_size(self, sizing):
         cfg = sizing.SizingConfig(max_position_pct=0.50)
-        calm = sizing.SizingInput(balance=10000.0, confidence=0.5, volatility=0.01, execution_stage="full_live")
-        volatile = sizing.SizingInput(balance=10000.0, confidence=0.5, volatility=0.06, execution_stage="full_live")
+        calm = sizing.SizingInput(
+            balance=10000.0, confidence=0.5, volatility=0.01, execution_stage="full_live"
+        )
+        volatile = sizing.SizingInput(
+            balance=10000.0, confidence=0.5, volatility=0.06, execution_stage="full_live"
+        )
         result_calm = sizing.compute_position_size(calm, cfg=cfg)
         result_volatile = sizing.compute_position_size(volatile, cfg=cfg)
         assert result_volatile.volatility_mult < result_calm.volatility_mult
@@ -278,8 +282,12 @@ class TestComputePositionSize:
 
     def test_drawdown_reduces_size(self, sizing):
         cfg = sizing.SizingConfig(max_position_pct=0.50)
-        normal = sizing.SizingInput(balance=10000.0, confidence=0.5, drawdown_pct=0.0, execution_stage="full_live")
-        in_dd = sizing.SizingInput(balance=10000.0, confidence=0.5, drawdown_pct=0.12, execution_stage="full_live")
+        normal = sizing.SizingInput(
+            balance=10000.0, confidence=0.5, drawdown_pct=0.0, execution_stage="full_live"
+        )
+        in_dd = sizing.SizingInput(
+            balance=10000.0, confidence=0.5, drawdown_pct=0.12, execution_stage="full_live"
+        )
         result_normal = sizing.compute_position_size(normal, cfg=cfg)
         result_dd = sizing.compute_position_size(in_dd, cfg=cfg)
         assert result_dd.drawdown_mult < result_normal.drawdown_mult
@@ -288,12 +296,16 @@ class TestComputePositionSize:
 
     def test_regime_trending_up_boosts(self, sizing):
         base = sizing.SizingInput(
-            balance=10000.0, confidence=0.5,
-            regime=sizing.MarketRegime.UNKNOWN, execution_stage="full_live",
+            balance=10000.0,
+            confidence=0.5,
+            regime=sizing.MarketRegime.UNKNOWN,
+            execution_stage="full_live",
         )
         trending = sizing.SizingInput(
-            balance=10000.0, confidence=0.5,
-            regime=sizing.MarketRegime.TRENDING_UP, execution_stage="full_live",
+            balance=10000.0,
+            confidence=0.5,
+            regime=sizing.MarketRegime.TRENDING_UP,
+            execution_stage="full_live",
         )
         r_base = sizing.compute_position_size(base)
         r_trend = sizing.compute_position_size(trending)
@@ -301,12 +313,16 @@ class TestComputePositionSize:
 
     def test_regime_volatile_reduces(self, sizing):
         base = sizing.SizingInput(
-            balance=10000.0, confidence=0.5,
-            regime=sizing.MarketRegime.UNKNOWN, execution_stage="full_live",
+            balance=10000.0,
+            confidence=0.5,
+            regime=sizing.MarketRegime.UNKNOWN,
+            execution_stage="full_live",
         )
         vol_regime = sizing.SizingInput(
-            balance=10000.0, confidence=0.5,
-            regime=sizing.MarketRegime.VOLATILE, execution_stage="full_live",
+            balance=10000.0,
+            confidence=0.5,
+            regime=sizing.MarketRegime.VOLATILE,
+            execution_stage="full_live",
         )
         r_base = sizing.compute_position_size(base)
         r_vol = sizing.compute_position_size(vol_regime)
@@ -316,8 +332,10 @@ class TestComputePositionSize:
         """Enormous confidence + trending → still capped at max_position_pct."""
         cfg = sizing.SizingConfig(max_position_pct=0.05)
         inp = sizing.SizingInput(
-            balance=10000.0, confidence=1.0,
-            regime=sizing.MarketRegime.TRENDING_UP, execution_stage="full_live",
+            balance=10000.0,
+            confidence=1.0,
+            regime=sizing.MarketRegime.TRENDING_UP,
+            execution_stage="full_live",
         )
         result = sizing.compute_position_size(inp, cfg=cfg)
         assert result.position_pct <= 0.05
@@ -384,11 +402,16 @@ class TestComputePositionSize:
     def test_custom_win_rate_and_rr(self, sizing):
         """Overriding win rate and RR in input should affect Kelly."""
         default_inp = sizing.SizingInput(
-            balance=10000.0, confidence=0.5, execution_stage="full_live",
+            balance=10000.0,
+            confidence=0.5,
+            execution_stage="full_live",
         )
         custom_inp = sizing.SizingInput(
-            balance=10000.0, confidence=0.5, execution_stage="full_live",
-            win_rate=0.70, rr_ratio=3.0,
+            balance=10000.0,
+            confidence=0.5,
+            execution_stage="full_live",
+            win_rate=0.70,
+            rr_ratio=3.0,
         )
         r_default = sizing.compute_position_size(default_inp)
         r_custom = sizing.compute_position_size(custom_inp)
@@ -397,8 +420,10 @@ class TestComputePositionSize:
 
     def test_result_fields_populated(self, sizing):
         inp = sizing.SizingInput(
-            balance=10000.0, confidence=0.5,
-            volatility=0.04, drawdown_pct=0.06,
+            balance=10000.0,
+            confidence=0.5,
+            volatility=0.04,
+            drawdown_pct=0.06,
             regime=sizing.MarketRegime.TRENDING_UP,
             execution_stage="full_live",
         )

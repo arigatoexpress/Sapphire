@@ -53,15 +53,15 @@ class PerformanceMetrics:
 
     def to_dict(self) -> dict[str, float]:
         return {
-            'total_return': self.total_return,
-            'sharpe_ratio': self.sharpe_ratio,
-            'max_drawdown': self.max_drawdown,
-            'win_rate': self.win_rate,
-            'profit_factor': self.profit_factor,
-            'calmar_ratio': self.calmar_ratio,
-            'sortino_ratio': self.sortino_ratio,
-            'alpha': self.alpha,
-            'beta': self.beta
+            "total_return": self.total_return,
+            "sharpe_ratio": self.sharpe_ratio,
+            "max_drawdown": self.max_drawdown,
+            "win_rate": self.win_rate,
+            "profit_factor": self.profit_factor,
+            "calmar_ratio": self.calmar_ratio,
+            "sortino_ratio": self.sortino_ratio,
+            "alpha": self.alpha,
+            "beta": self.beta,
         }
 
 
@@ -135,18 +135,22 @@ class PerformanceMonitor:
     def add_trade_result(self, prediction: Any, actual_return: float, timestamp: datetime):
         """Add trade result for performance tracking"""
 
-        self.trade_history.append({
-            'timestamp': timestamp,
-            'prediction': prediction,
-            'actual_return': actual_return,
-            'prediction_correct': (prediction > 0 and actual_return > 0) or
-                                (prediction < 0 and actual_return < 0) or
-                                (prediction == 0 and abs(actual_return) < 0.001)
-        })
+        self.trade_history.append(
+            {
+                "timestamp": timestamp,
+                "prediction": prediction,
+                "actual_return": actual_return,
+                "prediction_correct": (prediction > 0 and actual_return > 0)
+                or (prediction < 0 and actual_return < 0)
+                or (prediction == 0 and abs(actual_return) < 0.001),
+            }
+        )
 
         # Keep history manageable
-        if len(self.trade_history) > self.config.performance_window * 10:  # Assume ~10 trades per day
-            self.trade_history = self.trade_history[-self.config.performance_window * 10:]
+        if (
+            len(self.trade_history) > self.config.performance_window * 10
+        ):  # Assume ~10 trades per day
+            self.trade_history = self.trade_history[-self.config.performance_window * 10 :]
 
     def calculate_performance_metrics(self) -> PerformanceMetrics:
         """Calculate comprehensive performance metrics"""
@@ -155,7 +159,7 @@ class PerformanceMonitor:
             return PerformanceMetrics()
 
         # Extract returns
-        returns = [trade['actual_return'] for trade in self.trade_history]
+        returns = [trade["actual_return"] for trade in self.trade_history]
 
         # Basic metrics
         total_return = np.prod([1 + r for r in returns]) - 1
@@ -173,7 +177,7 @@ class PerformanceMonitor:
         max_drawdown = abs(np.min(drawdown))
 
         # Win rate
-        correct_predictions = sum(1 for trade in self.trade_history if trade['prediction_correct'])
+        correct_predictions = sum(1 for trade in self.trade_history if trade["prediction_correct"])
         win_rate = correct_predictions / len(self.trade_history)
 
         # Profit factor
@@ -181,9 +185,11 @@ class PerformanceMonitor:
         losing_trades = [r for r in returns if r < 0]
 
         if losing_trades:
-            profit_factor = (sum(winning_trades) / abs(sum(losing_trades))) if winning_trades else 0.0
+            profit_factor = (
+                (sum(winning_trades) / abs(sum(losing_trades))) if winning_trades else 0.0
+            )
         else:
-            profit_factor = float('inf') if winning_trades else 1.0
+            profit_factor = float("inf") if winning_trades else 1.0
 
         # Calmar ratio
         calmar_ratio = total_return / max_drawdown if max_drawdown > 0 else 0.0
@@ -193,7 +199,7 @@ class PerformanceMonitor:
         if downside_returns:
             sortino_ratio = np.mean(returns) / np.std(downside_returns) * np.sqrt(252)
         else:
-            sortino_ratio = float('inf')
+            sortino_ratio = float("inf")
 
         # Alpha and Beta (simplified - would need benchmark)
         alpha = total_return - 0.05  # Assuming 5% benchmark return
@@ -208,7 +214,7 @@ class PerformanceMonitor:
             calmar_ratio=calmar_ratio,
             sortino_ratio=sortino_ratio,
             alpha=alpha,
-            beta=beta
+            beta=beta,
         )
 
     def detect_performance_decay(self) -> bool:
@@ -223,8 +229,8 @@ class PerformanceMonitor:
         historical_trades = self.trade_history[:split_point]
 
         # Calculate metrics for both periods
-        recent_returns = [t['actual_return'] for t in recent_trades]
-        historical_returns = [t['actual_return'] for t in historical_trades]
+        recent_returns = [t["actual_return"] for t in recent_trades]
+        historical_returns = [t["actual_return"] for t in historical_trades]
 
         if not recent_returns or not historical_returns:
             return False
@@ -253,15 +259,21 @@ class PerformanceMonitor:
 
         # Check individual thresholds
         if current_metrics.sharpe_ratio < self.config.sharpe_threshold:
-            logger.warning(f"Sharpe ratio {current_metrics.sharpe_ratio:.2f} below threshold {self.config.sharpe_threshold}")
+            logger.warning(
+                f"Sharpe ratio {current_metrics.sharpe_ratio:.2f} below threshold {self.config.sharpe_threshold}"
+            )
             return True
 
         if current_metrics.max_drawdown > self.config.max_drawdown_threshold:
-            logger.warning(f"Max drawdown {current_metrics.max_drawdown:.2f} above threshold {self.config.max_drawdown_threshold}")
+            logger.warning(
+                f"Max drawdown {current_metrics.max_drawdown:.2f} above threshold {self.config.max_drawdown_threshold}"
+            )
             return True
 
         if current_metrics.win_rate < self.config.win_rate_threshold:
-            logger.warning(f"Win rate {current_metrics.win_rate:.2f} below threshold {self.config.win_rate_threshold}")
+            logger.warning(
+                f"Win rate {current_metrics.win_rate:.2f} below threshold {self.config.win_rate_threshold}"
+            )
             return True
 
         # Check performance decay
@@ -283,14 +295,14 @@ class ABTestingFramework:
         """Start A/B test between two models"""
 
         test_data = {
-            'test_id': test_id,
-            'model_a': model_a,
-            'model_b': model_b,
-            'start_time': datetime.now(),
-            'end_time': datetime.now() + timedelta(hours=self.config.ab_test_duration),
-            'results_a': [],
-            'results_b': [],
-            'status': 'running'
+            "test_id": test_id,
+            "model_a": model_a,
+            "model_b": model_b,
+            "start_time": datetime.now(),
+            "end_time": datetime.now() + timedelta(hours=self.config.ab_test_duration),
+            "results_a": [],
+            "results_b": [],
+            "status": "running",
         }
 
         self.test_results[test_id] = test_data
@@ -298,8 +310,9 @@ class ABTestingFramework:
 
         return test_id
 
-    def add_test_result(self, test_id: str, model_version: str, prediction: Any,
-                       actual_return: float):
+    def add_test_result(
+        self, test_id: str, model_version: str, prediction: Any, actual_return: float
+    ):
         """Add result to A/B test"""
 
         if test_id not in self.test_results:
@@ -307,10 +320,10 @@ class ABTestingFramework:
 
         test_data = self.test_results[test_id]
 
-        if model_version == 'A':
-            test_data['results_a'].append(actual_return)
-        elif model_version == 'B':
-            test_data['results_b'].append(actual_return)
+        if model_version == "A":
+            test_data["results_a"].append(actual_return)
+        elif model_version == "B":
+            test_data["results_b"].append(actual_return)
 
     def check_test_completion(self, test_id: str) -> dict[str, Any] | None:
         """Check if A/B test is complete and return winner"""
@@ -321,17 +334,19 @@ class ABTestingFramework:
         test_data = self.test_results[test_id]
 
         # Check if test duration has passed
-        if datetime.now() < test_data['end_time']:
+        if datetime.now() < test_data["end_time"]:
             return None
 
         # Check minimum sample size
-        if (len(test_data['results_a']) < self.config.min_sample_size or
-            len(test_data['results_b']) < self.config.min_sample_size):
+        if (
+            len(test_data["results_a"]) < self.config.min_sample_size
+            or len(test_data["results_b"]) < self.config.min_sample_size
+        ):
             return None
 
         # Statistical analysis
-        results_a = np.array(test_data['results_a'])
-        results_b = np.array(test_data['results_b'])
+        results_a = np.array(test_data["results_a"])
+        results_b = np.array(test_data["results_b"])
 
         # T-test
         try:
@@ -341,24 +356,26 @@ class ABTestingFramework:
             mean_a = np.mean(results_a)
             mean_b = np.mean(results_b)
 
-            winner = 'A' if mean_a > mean_b else 'B'
+            winner = "A" if mean_a > mean_b else "B"
             confidence = 1 - p_value
 
             if confidence >= self.config.ab_test_confidence_level:
                 result = {
-                    'winner': winner,
-                    'confidence': confidence,
-                    'mean_a': mean_a,
-                    'mean_b': mean_b,
-                    'p_value': p_value,
-                    'sample_size_a': len(results_a),
-                    'sample_size_b': len(results_b)
+                    "winner": winner,
+                    "confidence": confidence,
+                    "mean_a": mean_a,
+                    "mean_b": mean_b,
+                    "p_value": p_value,
+                    "sample_size_a": len(results_a),
+                    "sample_size_b": len(results_b),
                 }
 
-                test_data['status'] = 'completed'
-                test_data['final_result'] = result
+                test_data["status"] = "completed"
+                test_data["final_result"] = result
 
-                logger.info(f"A/B test {test_id} completed. Winner: {winner} (confidence: {confidence:.3f})")
+                logger.info(
+                    f"A/B test {test_id} completed. Winner: {winner} (confidence: {confidence:.3f})"
+                )
 
                 return result
 
@@ -380,15 +397,15 @@ class HyperparameterOptimizer:
         def objective(trial):
             # Define hyperparameter search space
             params = {
-                'learning_rate': trial.suggest_float('learning_rate', 1e-5, 1e-3, log=True),
-                'batch_size': trial.suggest_categorical('batch_size', [32, 64, 128, 256]),
-                'gamma': trial.suggest_float('gamma', 0.9, 0.999),
-                'gae_lambda': trial.suggest_float('gae_lambda', 0.9, 0.99),
-                'clip_range': trial.suggest_float('clip_range', 0.1, 0.4),
-                'n_epochs': trial.suggest_int('n_epochs', 3, 10),
-                'ent_coef': trial.suggest_float('ent_coef', 0.0, 0.1),
-                'vf_coef': trial.suggest_float('vf_coef', 0.5, 1.0),
-                'max_grad_norm': trial.suggest_float('max_grad_norm', 0.5, 1.0)
+                "learning_rate": trial.suggest_float("learning_rate", 1e-5, 1e-3, log=True),
+                "batch_size": trial.suggest_categorical("batch_size", [32, 64, 128, 256]),
+                "gamma": trial.suggest_float("gamma", 0.9, 0.999),
+                "gae_lambda": trial.suggest_float("gae_lambda", 0.9, 0.99),
+                "clip_range": trial.suggest_float("clip_range", 0.1, 0.4),
+                "n_epochs": trial.suggest_int("n_epochs", 3, 10),
+                "ent_coef": trial.suggest_float("ent_coef", 0.0, 0.1),
+                "vf_coef": trial.suggest_float("vf_coef", 0.5, 1.0),
+                "max_grad_norm": trial.suggest_float("max_grad_norm", 0.5, 1.0),
             }
 
             # Train model with these parameters
@@ -400,12 +417,15 @@ class HyperparameterOptimizer:
 
             except Exception as e:
                 logger.error(f"Hyperparameter evaluation failed: {str(e)}")
-                return -float('inf')
+                return -float("inf")
 
         # Run optimization
-        study = optuna.create_study(direction='maximize')
-        study.optimize(objective, n_trials=self.config.optimization_trials,
-                      timeout=self.config.optimization_timeout)
+        study = optuna.create_study(direction="maximize")
+        study.optimize(
+            objective,
+            n_trials=self.config.optimization_trials,
+            timeout=self.config.optimization_timeout,
+        )
 
         best_params = study.best_params
         logger.info(f"Hyperparameter optimization completed. Best params: {best_params}")
@@ -421,16 +441,16 @@ class HyperparameterOptimizer:
         # Favor certain parameter ranges
         score = 0.0
 
-        if 1e-4 <= params['learning_rate'] <= 5e-4:
+        if 1e-4 <= params["learning_rate"] <= 5e-4:
             score += 0.3
 
-        if params['batch_size'] in [64, 128]:
+        if params["batch_size"] in [64, 128]:
             score += 0.2
 
-        if 0.95 <= params['gamma'] <= 0.99:
+        if 0.95 <= params["gamma"] <= 0.99:
             score += 0.2
 
-        if 0.92 <= params['gae_lambda'] <= 0.97:
+        if 0.92 <= params["gae_lambda"] <= 0.97:
             score += 0.2
 
         # Add some randomness
@@ -470,9 +490,11 @@ class AdaptiveRetrainingSystem:
         self.is_training = False
 
         # GPU setup
-        self.device = torch.device(f'cuda:{self.config.cuda_device}' if
-                                 self.config.gpu_acceleration and torch.cuda.is_available()
-                                 else 'cpu')
+        self.device = torch.device(
+            f"cuda:{self.config.cuda_device}"
+            if self.config.gpu_acceleration and torch.cuda.is_available()
+            else "cpu"
+        )
 
         # Create model directory
         self.model_dir = Path(self.config.model_save_path)
@@ -497,7 +519,9 @@ class AdaptiveRetrainingSystem:
         while True:
             try:
                 # Wait for evaluation interval
-                await asyncio.sleep(self.config.evaluation_interval * 3600)  # Convert hours to seconds
+                await asyncio.sleep(
+                    self.config.evaluation_interval * 3600
+                )  # Convert hours to seconds
 
                 # Check if we have enough data
                 if len(self.performance_monitor.trade_history) < self.config.min_performance_period:
@@ -506,9 +530,11 @@ class AdaptiveRetrainingSystem:
                 # Calculate current performance
                 current_metrics = self.performance_monitor.calculate_performance_metrics()
 
-                logger.info(f"Performance metrics: Sharpe={current_metrics.sharpe_ratio:.2f}, "
-                          f"Win Rate={current_metrics.win_rate:.2f}, "
-                          f"Max DD={current_metrics.max_drawdown:.2f}")
+                logger.info(
+                    f"Performance metrics: Sharpe={current_metrics.sharpe_ratio:.2f}, "
+                    f"Win Rate={current_metrics.win_rate:.2f}, "
+                    f"Max DD={current_metrics.max_drawdown:.2f}"
+                )
 
                 # Check if retraining is needed
                 if self._should_retrain(current_metrics):
@@ -584,7 +610,9 @@ class AdaptiveRetrainingSystem:
 
             # Start A/B test
             if self.current_model:
-                test_id = self.ab_testing.start_ab_test(self.current_model, new_model, version.version_id)
+                test_id = self.ab_testing.start_ab_test(
+                    self.current_model, new_model, version.version_id
+                )
                 self.active_ab_tests[test_id] = version
                 logger.info(f"A/B test started for new model version {version.version_id}")
             else:
@@ -608,13 +636,15 @@ class AdaptiveRetrainingSystem:
 
         # Mock training data
         return {
-            'observations': np.random.randn(10000, 50),
-            'actions': np.random.randint(0, 3, 10000),
-            'rewards': np.random.randn(10000),
-            'dones': np.random.randint(0, 2, 10000)
+            "observations": np.random.randn(10000, 50),
+            "actions": np.random.randint(0, 3, 10000),
+            "rewards": np.random.randn(10000),
+            "dones": np.random.randint(0, 2, 10000),
         }
 
-    async def _train_new_model(self, hyperparameters: dict[str, Any], training_data: Any) -> PPOTradingModel:
+    async def _train_new_model(
+        self, hyperparameters: dict[str, Any], training_data: Any
+    ) -> PPOTradingModel:
         """Train new model with optimized hyperparameters"""
 
         logger.info("Training new model with optimized hyperparameters...")
@@ -627,7 +657,7 @@ class AdaptiveRetrainingSystem:
         model.set_hyperparameters(hyperparameters)
 
         # GPU acceleration
-        if self.device.type == 'cuda':
+        if self.device.type == "cuda":
             model.to_device(self.device)
 
         # Train model
@@ -638,8 +668,9 @@ class AdaptiveRetrainingSystem:
 
         return model
 
-    def _create_model_version(self, model: PPOTradingModel, hyperparameters: dict[str, Any],
-                            training_data: Any) -> ModelVersion:
+    def _create_model_version(
+        self, model: PPOTradingModel, hyperparameters: dict[str, Any], training_data: Any
+    ) -> ModelVersion:
         """Create new model version"""
 
         version_id = f"v_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -652,11 +683,7 @@ class AdaptiveRetrainingSystem:
         model.save(str(model_path))
 
         # Evaluate performance (mock for now)
-        performance_metrics = PerformanceMetrics(
-            sharpe_ratio=1.2,
-            win_rate=0.58,
-            max_drawdown=0.08
-        )
+        performance_metrics = PerformanceMetrics(sharpe_ratio=1.2, win_rate=0.58, max_drawdown=0.08)
 
         version = ModelVersion(
             version_id=version_id,
@@ -664,7 +691,7 @@ class AdaptiveRetrainingSystem:
             performance_metrics=performance_metrics,
             hyperparameters=hyperparameters,
             training_data_hash=data_hash,
-            model_path=str(model_path)
+            model_path=str(model_path),
         )
 
         self.model_versions.append(version)
@@ -688,7 +715,7 @@ class AdaptiveRetrainingSystem:
 
         version.ab_test_results = result
 
-        if result['winner'] == 'B':  # New model won
+        if result["winner"] == "B":  # New model won
             logger.info(f"New model {version.version_id} won A/B test, deploying...")
             await self._deploy_model(version)
         else:
@@ -723,10 +750,13 @@ class AdaptiveRetrainingSystem:
 
         # Simple hash based on data shape and basic statistics
         if isinstance(training_data, dict):
-            data_str = json.dumps({
-                k: str(v.shape) if hasattr(v, 'shape') else str(v)[:100]
-                for k, v in training_data.items()
-            }, sort_keys=True)
+            data_str = json.dumps(
+                {
+                    k: str(v.shape) if hasattr(v, "shape") else str(v)[:100]
+                    for k, v in training_data.items()
+                },
+                sort_keys=True,
+            )
         else:
             data_str = str(training_data)[:1000]
 
@@ -736,16 +766,16 @@ class AdaptiveRetrainingSystem:
         """Save deployment information"""
 
         deployment_info = {
-            'version_id': version.version_id,
-            'timestamp': version.timestamp.isoformat(),
-            'performance_metrics': version.performance_metrics.to_dict(),
-            'hyperparameters': version.hyperparameters,
-            'ab_test_results': version.ab_test_results
+            "version_id": version.version_id,
+            "timestamp": version.timestamp.isoformat(),
+            "performance_metrics": version.performance_metrics.to_dict(),
+            "hyperparameters": version.hyperparameters,
+            "ab_test_results": version.ab_test_results,
         }
 
         deployment_file = self.model_dir / "deployments.jsonl"
-        with open(deployment_file, 'a') as f:
-            f.write(json.dumps(deployment_info) + '\n')
+        with open(deployment_file, "a") as f:
+            f.write(json.dumps(deployment_info) + "\n")
 
     async def emergency_rollback(self):
         """Emergency rollback to previous model version"""
@@ -771,13 +801,17 @@ class AdaptiveRetrainingSystem:
             for test_id, version in list(self.active_ab_tests.items()):
                 metrics = self.ab_testing.get_results(test_id)
                 # Require statistically significant outperformance by at least 5% on Sharpe and win rate
-                if metrics.get('is_significant') and \
-                   metrics.get('sharpe_delta', 0) > 0.05 and \
-                   metrics.get('win_rate_delta', 0) > 0.05:
+                if (
+                    metrics.get("is_significant")
+                    and metrics.get("sharpe_delta", 0) > 0.05
+                    and metrics.get("win_rate_delta", 0) > 0.05
+                ):
                     await self._deploy_model(version)
                     self.ab_testing.stop_ab_test(test_id)
                     del self.active_ab_tests[test_id]
-                    logger.info(f"Promoted model version {version.version_id} after successful A/B test")
+                    logger.info(
+                        f"Promoted model version {version.version_id} after successful A/B test"
+                    )
         except Exception as e:
             logger.error(f"A/B promotion check failed: {e}")
 
@@ -792,12 +826,14 @@ class AdaptiveRetrainingSystem:
         current_metrics = self.performance_monitor.calculate_performance_metrics()
 
         return {
-            'is_training': self.is_training,
-            'active_ab_tests': len(self.active_ab_tests),
-            'model_versions': len(self.model_versions),
-            'current_performance': current_metrics.to_dict(),
-            'last_retraining': self.last_retraining.isoformat() if self.last_retraining else None,
-            'active_model_version': next((v.version_id for v in self.model_versions if v.is_active), None)
+            "is_training": self.is_training,
+            "active_ab_tests": len(self.active_ab_tests),
+            "model_versions": len(self.model_versions),
+            "current_performance": current_metrics.to_dict(),
+            "last_retraining": self.last_retraining.isoformat() if self.last_retraining else None,
+            "active_model_version": next(
+                (v.version_id for v in self.model_versions if v.is_active), None
+            ),
         }
 
 

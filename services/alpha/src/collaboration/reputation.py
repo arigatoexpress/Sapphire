@@ -25,16 +25,16 @@ class BotReputationService:
 
     # Weight factors for composite reputation score
     WEIGHTS = {
-        "accuracy": 0.35,       # How often ideas are correct
+        "accuracy": 0.35,  # How often ideas are correct
         "profitability": 0.30,  # Average P&L of executed ideas
-        "quality": 0.20,        # Forum quality ratings
-        "consistency": 0.15,    # Frequency & reliability of contributions
+        "quality": 0.20,  # Forum quality ratings
+        "consistency": 0.15,  # Frequency & reliability of contributions
     }
 
     # Reputation thresholds
-    BAN_THRESHOLD = -50.0       # Auto-ban below this score
-    TRUSTED_THRESHOLD = 100.0   # Elevated trust above this score
-    DEFAULT_SCORE = 10.0        # Starting reputation for new bots
+    BAN_THRESHOLD = -50.0  # Auto-ban below this score
+    TRUSTED_THRESHOLD = 100.0  # Elevated trust above this score
+    DEFAULT_SCORE = 10.0  # Starting reputation for new bots
 
     # Points for actions
     POINTS = {
@@ -43,10 +43,10 @@ class BotReputationService:
         "idea_inaccurate": -3.0,
         "idea_profitable": 15.0,
         "idea_unprofitable": -5.0,
-        "quality_bonus": 5.0,       # High-quality contribution
-        "quality_penalty": -2.0,    # Low-quality contribution
-        "spam_penalty": -20.0,      # Detected spam/injection
-        "malicious_ban": -100.0,    # Immediate ban for malicious activity
+        "quality_bonus": 5.0,  # High-quality contribution
+        "quality_penalty": -2.0,  # Low-quality contribution
+        "spam_penalty": -20.0,  # Detected spam/injection
+        "malicious_ban": -100.0,  # Immediate ban for malicious activity
     }
 
     def __init__(self, store_path: str = ""):
@@ -107,11 +107,13 @@ class BotReputationService:
     def _record_history(self, bot: dict[str, Any], action: str, points: float) -> None:
         """Append to score history (max 50 entries)."""
         history = bot.setdefault("history", [])
-        history.append({
-            "action": action,
-            "points": points,
-            "timestamp": int(time.time()),
-        })
+        history.append(
+            {
+                "action": action,
+                "points": points,
+                "timestamp": int(time.time()),
+            }
+        )
         if len(history) > 50:
             bot["history"] = history[-50:]
 
@@ -132,7 +134,9 @@ class BotReputationService:
         profit_pct = (profitable / profit_evaluated * 100) if profit_evaluated > 0 else 50.0
 
         quality_count = bot.get("quality_count", 0)
-        avg_quality = (bot.get("quality_sum", 0) / quality_count * 100) if quality_count > 0 else 50.0
+        avg_quality = (
+            (bot.get("quality_sum", 0) / quality_count * 100) if quality_count > 0 else 50.0
+        )
 
         # Consistency: ideas per day since registration
         registered_at = bot.get("registered_at", int(time.time()))
@@ -185,7 +189,11 @@ class BotReputationService:
         with self._lock:
             bot = self._ensure_bot(bot_id)
             if bot.get("status") == "banned":
-                return {"ok": False, "error": "bot_is_banned", "ban_reason": bot.get("ban_reason", "")}
+                return {
+                    "ok": False,
+                    "error": "bot_is_banned",
+                    "ban_reason": bot.get("ban_reason", ""),
+                }
             bot["ideas_submitted"] = bot.get("ideas_submitted", 0) + 1
             bot["score"] = bot.get("score", 0) + self.POINTS["idea_submitted"]
             bot["last_activity_at"] = int(time.time())
@@ -296,15 +304,17 @@ class BotReputationService:
             for key, bot in self._bots.items():
                 if bot.get("status") == "banned":
                     continue
-                entries.append({
-                    "bot_id": key,
-                    "score": bot.get("score", 0),
-                    "composite": self._compute_composite_score(bot),
-                    "ideas_submitted": bot.get("ideas_submitted", 0),
-                    "ideas_accurate": bot.get("ideas_accurate", 0),
-                    "status": bot.get("status", "active"),
-                    "total_pnl": bot.get("total_pnl", 0.0),
-                })
+                entries.append(
+                    {
+                        "bot_id": key,
+                        "score": bot.get("score", 0),
+                        "composite": self._compute_composite_score(bot),
+                        "ideas_submitted": bot.get("ideas_submitted", 0),
+                        "ideas_accurate": bot.get("ideas_accurate", 0),
+                        "status": bot.get("status", "active"),
+                        "total_pnl": bot.get("total_pnl", 0.0),
+                    }
+                )
             entries.sort(key=lambda e: e["composite"], reverse=True)
             return entries[:limit]
 

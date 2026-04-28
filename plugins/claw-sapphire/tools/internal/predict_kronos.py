@@ -94,6 +94,7 @@ def _load_predictor(verbose: bool = False) -> Any:
 
 # ── Data fetching ─────────────────────────────────────────────────────────────
 
+
 def _fetch_openbb(symbol: str, interval: str, bars: int):
     """Try to fetch OHLCV from OpenBB REST API using stdlib only."""
     try:
@@ -104,8 +105,13 @@ def _fetch_openbb(symbol: str, interval: str, bars: int):
 
         # Determine date range
         interval_minutes = {
-            "1m": 1, "5m": 5, "15m": 15, "30m": 30,
-            "1h": 60, "4h": 240, "1d": 1440,
+            "1m": 1,
+            "5m": 5,
+            "15m": 15,
+            "30m": 30,
+            "1h": 60,
+            "4h": 240,
+            "1d": 1440,
         }.get(interval, 60)
 
         end_dt = datetime.now(UTC)
@@ -172,8 +178,13 @@ def _fetch_yfinance(symbol: str, interval: str, bars: int):
 
     # Map interval to yfinance period
     interval_to_period = {
-        "1m": "7d", "5m": "60d", "15m": "60d", "30m": "60d",
-        "1h": "60d", "4h": "60d", "1d": "2y",
+        "1m": "7d",
+        "5m": "60d",
+        "15m": "60d",
+        "30m": "60d",
+        "1h": "60d",
+        "4h": "60d",
+        "1d": "2y",
     }
     period = interval_to_period.get(interval, "60d")
 
@@ -210,13 +221,19 @@ def _get_ohlcv(symbol: str, interval: str, bars: int):
 
 # ── Prediction logic ──────────────────────────────────────────────────────────
 
+
 def _make_timestamps(last_ts: Any, interval: str, n: int):
     """Generate future timestamps for prediction horizon."""
     import pandas as pd
 
     interval_map = {
-        "1m": "1min", "5m": "5min", "15m": "15min", "30m": "30min",
-        "1h": "1h", "4h": "4h", "1d": "1D",
+        "1m": "1min",
+        "5m": "5min",
+        "15m": "15min",
+        "30m": "30min",
+        "1h": "1h",
+        "4h": "4h",
+        "1d": "1D",
     }
     freq = interval_map.get(interval, "1h")
     future = pd.date_range(start=last_ts, periods=n + 1, freq=freq)[1:]
@@ -395,7 +412,8 @@ def action_status() -> dict:
         "model_loaded": _predictor is not None,
         "model_loaded_at": (
             datetime.fromtimestamp(_model_loaded_at, tz=UTC).isoformat()
-            if _model_loaded_at else None
+            if _model_loaded_at
+            else None
         ),
         "models_cached": models_present,
         "kronos_root": str(KRONOS_ROOT),
@@ -435,6 +453,7 @@ def _should_save_snapshot(inp: dict) -> bool:
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
+
 
 def main() -> None:
     raw = sys.stdin.read().strip()

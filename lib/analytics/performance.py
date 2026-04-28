@@ -54,16 +54,18 @@ def _load_trades() -> list[dict[str, Any]]:
                 continue
             outcome = r.get("paper_outcome")
             if outcome in {"win", "loss", "break_even"}:
-                trades.append({
-                    "timestamp": r.get("closed_at") or r.get("timestamp", ""),
-                    "symbol": r.get("symbol", "?"),
-                    "direction": r.get("direction", "?"),
-                    "outcome": outcome,
-                    "pnl_usd": float(r.get("paper_pnl_usd") or 0.0),
-                    "confidence": float(r.get("confidence") or 0.0),
-                    "regime": r.get("regime") or "UNKNOWN",
-                    "position_usd": float(r.get("position_usd") or 0.0),
-                })
+                trades.append(
+                    {
+                        "timestamp": r.get("closed_at") or r.get("timestamp", ""),
+                        "symbol": r.get("symbol", "?"),
+                        "direction": r.get("direction", "?"),
+                        "outcome": outcome,
+                        "pnl_usd": float(r.get("paper_pnl_usd") or 0.0),
+                        "confidence": float(r.get("confidence") or 0.0),
+                        "regime": r.get("regime") or "UNKNOWN",
+                        "position_usd": float(r.get("position_usd") or 0.0),
+                    }
+                )
 
     files = sorted(SIGNALS_DIR.glob("*.jsonl")) if SIGNALS_DIR.exists() else []
     for f in files:
@@ -81,16 +83,18 @@ def _load_trades() -> list[dict[str, Any]]:
                 continue
             outcome = r.get("outcome")
             if outcome in {"win", "loss", "break_even"}:
-                trades.append({
-                    "timestamp": r.get("closed_at") or r.get("timestamp", ""),
-                    "symbol": r.get("symbol", "?"),
-                    "direction": r.get("direction", "?"),
-                    "outcome": outcome,
-                    "pnl_usd": float(r.get("pnl_usd") or 0.0),
-                    "confidence": float(r.get("confidence") or 0.0),
-                    "regime": r.get("regime") or "UNKNOWN",
-                    "position_usd": float(r.get("position_usd") or 0.0),
-                })
+                trades.append(
+                    {
+                        "timestamp": r.get("closed_at") or r.get("timestamp", ""),
+                        "symbol": r.get("symbol", "?"),
+                        "direction": r.get("direction", "?"),
+                        "outcome": outcome,
+                        "pnl_usd": float(r.get("pnl_usd") or 0.0),
+                        "confidence": float(r.get("confidence") or 0.0),
+                        "regime": r.get("regime") or "UNKNOWN",
+                        "position_usd": float(r.get("position_usd") or 0.0),
+                    }
+                )
 
     def _ts_key(t: dict) -> datetime:
         raw = t.get("timestamp") or ""
@@ -120,6 +124,7 @@ def _btc_benchmark_curve(trades: list[dict], bankroll: float) -> list[dict]:
         return []
     try:
         import yfinance as yf  # type: ignore
+
         first = trades[0]["timestamp"]
         last = trades[-1]["timestamp"]
         if not first or not last:
@@ -135,10 +140,12 @@ def _btc_benchmark_curve(trades: list[dict], bankroll: float) -> list[dict]:
         for idx, row in hist.iterrows():
             price = float(row["Close"])
             equity = bankroll * (price / first_price)
-            curve.append({
-                "timestamp": idx.strftime("%Y-%m-%d"),
-                "equity_usd": round(equity, 2),
-            })
+            curve.append(
+                {
+                    "timestamp": idx.strftime("%Y-%m-%d"),
+                    "equity_usd": round(equity, 2),
+                }
+            )
         return curve
     except Exception as e:
         log.debug("btc benchmark fetch failed: %s", e)
@@ -150,7 +157,9 @@ def _btc_benchmark_curve(trades: list[dict], bankroll: float) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def _rolling_sharpe(trades: list[dict], bankroll: float, window: int = ROLLING_WINDOW) -> list[dict]:
+def _rolling_sharpe(
+    trades: list[dict], bankroll: float, window: int = ROLLING_WINDOW
+) -> list[dict]:
     if len(trades) < window:
         return []
     out = []
@@ -163,10 +172,12 @@ def _rolling_sharpe(trades: list[dict], bankroll: float, window: int = ROLLING_W
         if std < 1e-12:
             continue
         sharpe = (mean / std) * math.sqrt(TRADING_DAYS)
-        out.append({
-            "timestamp": w[-1]["timestamp"],
-            "sharpe": round(sharpe, 3),
-        })
+        out.append(
+            {
+                "timestamp": w[-1]["timestamp"],
+                "sharpe": round(sharpe, 3),
+            }
+        )
     return out
 
 
@@ -196,11 +207,13 @@ def _rolling_kelly(trades: list[dict], window: int = ROLLING_WINDOW) -> list[dic
             continue
         kelly = wr - (1.0 - wr) / rr
         quarter = max(0.0, min(0.25, kelly * 0.25))
-        out.append({
-            "timestamp": w[-1]["timestamp"],
-            "kelly_quarter": round(quarter, 4),
-            "kelly_raw": round(max(0.0, kelly), 4),
-        })
+        out.append(
+            {
+                "timestamp": w[-1]["timestamp"],
+                "kelly_quarter": round(quarter, 4),
+                "kelly_raw": round(max(0.0, kelly), 4),
+            }
+        )
     return out
 
 
@@ -280,10 +293,12 @@ def compute_performance(bankroll: float = 10_000.0) -> dict[str, Any]:
     equity_curve = []
     for t in trades:
         equity = round(equity + t["pnl_usd"], 2)
-        equity_curve.append({
-            "timestamp": t["timestamp"],
-            "equity_usd": equity,
-        })
+        equity_curve.append(
+            {
+                "timestamp": t["timestamp"],
+                "equity_usd": equity,
+            }
+        )
 
     return {
         "run_at": datetime.now(UTC).isoformat(),
@@ -304,7 +319,8 @@ def compute_performance(bankroll: float = 10_000.0) -> dict[str, Any]:
                 "symbol": t["symbol"],
                 "timestamp": t["timestamp"],
             }
-            for t in trades if t.get("confidence")
+            for t in trades
+            if t.get("confidence")
         ],
         "extremes": _extreme_trades(trades),
     }
@@ -362,14 +378,29 @@ def build_performance_report(
         "summary_rows": [
             {
                 "symbol": sym,
-                "with_regime": {k: with_r.get(sym, {}).get(k) for k in (
-                    "total_return_pct", "sharpe", "sortino", "max_drawdown_pct", "win_rate",
-                )},
-                "without_regime": {k: without_r.get(sym, {}).get(k) for k in (
-                    "total_return_pct", "sharpe", "sortino", "max_drawdown_pct", "win_rate",
-                )},
+                "with_regime": {
+                    k: with_r.get(sym, {}).get(k)
+                    for k in (
+                        "total_return_pct",
+                        "sharpe",
+                        "sortino",
+                        "max_drawdown_pct",
+                        "win_rate",
+                    )
+                },
+                "without_regime": {
+                    k: without_r.get(sym, {}).get(k)
+                    for k in (
+                        "total_return_pct",
+                        "sharpe",
+                        "sortino",
+                        "max_drawdown_pct",
+                        "win_rate",
+                    )
+                },
             }
-            for sym in symbols if "error" not in with_r.get(sym, {})
+            for sym in symbols
+            if "error" not in with_r.get(sym, {})
         ],
         "signal_quality": [
             {
@@ -386,5 +417,13 @@ def build_performance_report(
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     out = compute_performance()
-    print(json.dumps({k: v if k in {"trades", "bankroll", "final_equity", "run_at"} else f"<len={len(v)}>"
-                      for k, v in out.items()}, indent=2, default=str))
+    print(
+        json.dumps(
+            {
+                k: v if k in {"trades", "bankroll", "final_equity", "run_at"} else f"<len={len(v)}>"
+                for k, v in out.items()
+            },
+            indent=2,
+            default=str,
+        )
+    )

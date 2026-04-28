@@ -99,26 +99,28 @@ def generate_predictions(profiles: dict[str, TechnicalProfile], tv_data: dict) -
             direction = "neutral"
             target = p.price
 
-        predictions.append({
-            "timestamp": p.timestamp,
-            "symbol": symbol,
-            "direction": direction,
-            "confidence": round(confidence, 2),
-            "target_price": target,
-            "entry_price": p.price,
-            "timeframe": "24h",
-            "signals_bullish": p.signal_count_bullish,
-            "signals_bearish": p.signal_count_bearish,
-            "rsi": p.rsi_14,
-            "macd_cross": p.macd_cross,
-            "ma_trend": p.ma_trend,
-            "bb_position": p.bb_position,
-            "volume_signal": p.volume_signal,
-            "volatility": p.volatility_regime,
-            "reasoning": "",  # Will be filled by LLM
-            "actual_price": None,
-            "correct": None,
-        })
+        predictions.append(
+            {
+                "timestamp": p.timestamp,
+                "symbol": symbol,
+                "direction": direction,
+                "confidence": round(confidence, 2),
+                "target_price": target,
+                "entry_price": p.price,
+                "timeframe": "24h",
+                "signals_bullish": p.signal_count_bullish,
+                "signals_bearish": p.signal_count_bearish,
+                "rsi": p.rsi_14,
+                "macd_cross": p.macd_cross,
+                "ma_trend": p.ma_trend,
+                "bb_position": p.bb_position,
+                "volume_signal": p.volume_signal,
+                "volatility": p.volatility_regime,
+                "reasoning": "",  # Will be filled by LLM
+                "actual_price": None,
+                "correct": None,
+            }
+        )
 
     # Use LLM ONLY for narrative reasoning (not numbers)
     if predictions:
@@ -150,7 +152,9 @@ For each symbol, write ONE sentence explaining the key pattern you see. Focus on
 Format: SYMBOL: your one sentence.
 Example: BTC: Bullish MACD cross with neutral RSI and above-average volume suggests momentum building for a breakout above the 20-day MA."""
 
-        result = generate(prompt, model=MODELS.get("analyze", "llama3.2:3b"), timeout=60, max_tokens=300)
+        result = generate(
+            prompt, model=MODELS.get("analyze", "llama3.2:3b"), timeout=60, max_tokens=300
+        )
         if not result.success:
             result = generate(prompt, model="llama3.2:3b", timeout=30, max_tokens=300)
 
@@ -159,10 +163,12 @@ Example: BTC: Bullish MACD cross with neutral RSI and above-average volume sugge
                 sym = pred["symbol"]
                 for line in result.response.splitlines():
                     if line.strip().startswith(f"{sym}:"):
-                        pred["reasoning"] = line.strip()[len(sym) + 1:].strip()[:200]
+                        pred["reasoning"] = line.strip()[len(sym) + 1 :].strip()[:200]
                         break
                 if not pred["reasoning"]:
-                    pred["reasoning"] = f"{pred['direction'].capitalize()} — {pred['signals_bullish']}↑ vs {pred['signals_bearish']}↓ signals"
+                    pred["reasoning"] = (
+                        f"{pred['direction'].capitalize()} — {pred['signals_bullish']}↑ vs {pred['signals_bearish']}↓ signals"
+                    )
 
     return predictions
 
@@ -264,19 +270,28 @@ def get_accuracy_history() -> dict:
         "scored": len(scored),
         "correct": correct,
         "accuracy": round(correct / len(scored) * 100, 1) if scored else 0,
-        "by_symbol": {k: {**v, "accuracy": round(v["correct"] / v["scored"] * 100, 1)} for k, v in by_symbol.items()},
+        "by_symbol": {
+            k: {**v, "accuracy": round(v["correct"] / v["scored"] * 100, 1)}
+            for k, v in by_symbol.items()
+        },
     }
 
 
-def generate_briefing(profiles: dict[str, TechnicalProfile], predictions: list[dict], scores: dict, tv_data: dict) -> str:
+def generate_briefing(
+    profiles: dict[str, TechnicalProfile], predictions: list[dict], scores: dict, tv_data: dict
+) -> str:
     """Generate Telegram morning briefing with REAL data."""
     lines = ["🌅 *Sapphire Research Brief*\n"]
 
     for sym, p in profiles.items():
         arrow = "📈" if p.change_24h_pct > 0 else "📉" if p.change_24h_pct < 0 else "➡️"
-        signal_icon = "🟢" if "bullish" in p.net_signal else "🔴" if "bearish" in p.net_signal else "⚪"
+        signal_icon = (
+            "🟢" if "bullish" in p.net_signal else "🔴" if "bearish" in p.net_signal else "⚪"
+        )
         lines.append(f"{arrow} *{sym}*: ${p.price:,.2f} ({p.change_24h_pct:+.1f}%)")
-        lines.append(f"   {signal_icon} {p.net_signal.upper()} ({p.signal_count_bullish}↑ {p.signal_count_bearish}↓)")
+        lines.append(
+            f"   {signal_icon} {p.net_signal.upper()} ({p.signal_count_bullish}↑ {p.signal_count_bearish}↓)"
+        )
         lines.append(f"   RSI: {p.rsi_14:.0f} | MACD: {p.macd_cross} | Vol: {p.volume_signal}")
 
     if tv_data.get("connected"):
@@ -285,18 +300,30 @@ def generate_briefing(profiles: dict[str, TechnicalProfile], predictions: list[d
     if predictions:
         lines.append("\n*Predictions (24h):*")
         for pred in predictions:
-            icon = "🟢" if pred["direction"] == "bullish" else "🔴" if pred["direction"] == "bearish" else "⚪"
+            icon = (
+                "🟢"
+                if pred["direction"] == "bullish"
+                else "🔴"
+                if pred["direction"] == "bearish"
+                else "⚪"
+            )
             conf = int(pred["confidence"] * 100)
-            lines.append(f"  {icon} {pred['symbol']}: {pred['direction']} ({conf}%) → ${pred['target_price']:,.2f}")
+            lines.append(
+                f"  {icon} {pred['symbol']}: {pred['direction']} ({conf}%) → ${pred['target_price']:,.2f}"
+            )
             if pred.get("reasoning"):
                 lines.append(f"     _{pred['reasoning'][:100]}_")
 
     if scores.get("scored", 0) > 0:
-        lines.append(f"\n*Yesterday:* {scores['correct']}/{scores['scored']} correct ({scores['accuracy']}%)")
+        lines.append(
+            f"\n*Yesterday:* {scores['correct']}/{scores['scored']} correct ({scores['accuracy']}%)"
+        )
 
     history = get_accuracy_history()
     if history["scored"] > 0:
-        lines.append(f"*Lifetime:* {history['correct']}/{history['scored']} ({history['accuracy']}%)")
+        lines.append(
+            f"*Lifetime:* {history['correct']}/{history['scored']} ({history['accuracy']}%)"
+        )
 
     lines.append("\n_Math: RSI/MACD/BB/MA calculated from OHLCV. LLM: narrative only._")
 
@@ -312,12 +339,16 @@ def run_nightly() -> dict:
     print("📊 Running technical analysis...")
     profiles = analyze_all()
     for sym, p in profiles.items():
-        print(f"   {sym}: ${p.price:,.2f} | {p.net_signal} | RSI={p.rsi_14:.0f} | MACD={p.macd_cross}")
+        print(
+            f"   {sym}: ${p.price:,.2f} | {p.net_signal} | RSI={p.rsi_14:.0f} | MACD={p.macd_cross}"
+        )
 
     # Step 2: TradingView data (if connected)
     print("\n📈 Reading TradingView...")
     tv_data = collect_tv_data()
-    print(f"   {'Connected: ' + tv_data.get('symbol', '') if tv_data.get('connected') else 'Not connected'}")
+    print(
+        f"   {'Connected: ' + tv_data.get('symbol', '') if tv_data.get('connected') else 'Not connected'}"
+    )
 
     # Step 3: Score yesterday
     print("\n📊 Scoring yesterday's predictions...")
@@ -328,7 +359,9 @@ def run_nightly() -> dict:
     print("\n🧠 Generating predictions...")
     predictions = generate_predictions(profiles, tv_data)
     for pred in predictions:
-        print(f"   {pred['symbol']}: {pred['direction']} ({pred['confidence']:.0%}) → ${pred['target_price']:,.2f}")
+        print(
+            f"   {pred['symbol']}: {pred['direction']} ({pred['confidence']:.0%}) → ${pred['target_price']:,.2f}"
+        )
         print(f"     {pred.get('reasoning', '')[:80]}")
 
     # Save
@@ -349,6 +382,7 @@ def run_nightly() -> dict:
     try:
         sys.path.insert(0, str(Path(__file__).parent))
         from notify import send_telegram_message
+
         result = send_telegram_message(briefing, priority="p1")
         sent = result.get("ok", False)
     except Exception as e:
@@ -377,6 +411,7 @@ def run_nightly() -> dict:
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--briefing", action="store_true")
     parser.add_argument("--score", action="store_true")
@@ -394,6 +429,7 @@ if __name__ == "__main__":
         preds = generate_predictions(profiles, tv)
         briefing = generate_briefing(profiles, preds, scores, tv)
         from notify import send_telegram_message
+
         send_telegram_message(briefing, priority="p1")
     else:
         run_nightly()

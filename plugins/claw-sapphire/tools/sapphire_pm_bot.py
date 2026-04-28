@@ -257,7 +257,9 @@ def _resolve_default_project_id(db: Any) -> str:
         return override
 
     projects = [_read_doc(doc) for doc in _stream_docs(db.collection("projects"))]
-    active_projects = [p for p in projects if str(p.get("status", "active")).strip().lower() != "archived"]
+    active_projects = [
+        p for p in projects if str(p.get("status", "active")).strip().lower() != "archived"
+    ]
 
     for project in active_projects:
         if str(project.get("github_repo") or "").strip().lower() == "arigatoexpress/sapphire":
@@ -470,9 +472,7 @@ def _handle_pm_list(text: str) -> dict[str, Any]:
                 project_value = str(task.get("project_id") or "").strip()
                 if project_value:
                     project_suffix = f" | project {project_value}"
-            lines.append(
-                f"• {title} ({task_id}) | {priority}{project_suffix}"
-            )
+            lines.append(f"• {title} ({task_id}) | {priority}{project_suffix}")
 
     escaped = "\n".join(escape_markdown_v2(line) for line in lines)
     return _response(escaped, "MarkdownV2")

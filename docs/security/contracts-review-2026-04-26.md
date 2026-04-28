@@ -459,4 +459,3 @@ lightweight CI guard against accidental regression of this PR's changes.
 
 `forge` remains uninstalled in the CI environment, so a runnable Foundry
 suite is still deferred to a follow-up PR.
-

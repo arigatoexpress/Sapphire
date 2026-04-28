@@ -55,4 +55,3 @@ for lane in "${CANDIDATES[@]}"; do
 done
 
 echo "✅ Promotion pipeline artifacts generated."
-

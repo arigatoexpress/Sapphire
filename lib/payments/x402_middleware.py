@@ -60,6 +60,7 @@ if str(_EVT_PATH) not in _sys.path:
     _sys.path.insert(0, str(_EVT_PATH))
 try:
     from event_bus import get_bus as _get_bus
+
     _BUS = _get_bus(source="x402")
 except Exception:  # pragma: no cover — optional
     _BUS = None
@@ -82,15 +83,15 @@ DEFAULT_USDC_CONTRACTS = {
 class PaymentRequirements:
     """A single accepted payment option advertised in the 402 response."""
 
-    scheme: str                  # "exact" — the only scheme we support today
-    network: str                 # "base" or "base-sepolia"
-    max_amount_required: str     # string-encoded integer, atomic units (USDC: 6dp)
-    resource: str                # absolute URL of the resource being paid for
+    scheme: str  # "exact" — the only scheme we support today
+    network: str  # "base" or "base-sepolia"
+    max_amount_required: str  # string-encoded integer, atomic units (USDC: 6dp)
+    resource: str  # absolute URL of the resource being paid for
     description: str
     mime_type: str
-    pay_to: str                  # 0x... recipient address
+    pay_to: str  # 0x... recipient address
     max_timeout_seconds: int
-    asset: str                   # ERC-20 contract address (USDC)
+    asset: str  # ERC-20 contract address (USDC)
     extra: dict[str, Any] = field(default_factory=dict)
 
     def to_wire(self) -> dict[str, Any]:
@@ -303,45 +304,59 @@ class X402Middleware:
             return True, None, None
 
         if not self._configured_ok:
-            body = build_402_response(
-                [], error="x402 is enabled but not configured on this server"
-            )
+            body = build_402_response([], error="x402 is enabled but not configured on this server")
             return False, body, None
 
         reqs = self.build_requirements(resource_url, amount_usd, description)
 
         if not header_value:
-            self._emit("payment.required", {
-                "resource": resource_url,
-                "amount_usd": amount_usd,
-                "network": self.network,
-            })
+            self._emit(
+                "payment.required",
+                {
+                    "resource": resource_url,
+                    "amount_usd": amount_usd,
+                    "network": self.network,
+                },
+            )
             return False, build_402_response([reqs]), None
 
         result = self.verifier.verify(header_value, reqs)
         if not result.ok:
-            self._emit("payment.rejected", {
-                "resource": resource_url,
-                "reason": result.reason,
-                "payer": result.payer,
-            })
-            return False, build_402_response([reqs], error=f"payment invalid: {result.reason}"), result
+            self._emit(
+                "payment.rejected",
+                {
+                    "resource": resource_url,
+                    "reason": result.reason,
+                    "payer": result.payer,
+                },
+            )
+            return (
+                False,
+                build_402_response([reqs], error=f"payment invalid: {result.reason}"),
+                result,
+            )
 
         if result.nonce and self._nonces.seen(result.nonce):
-            self._emit("payment.rejected", {
-                "resource": resource_url,
-                "reason": "nonce replay",
-                "nonce": result.nonce,
-            })
+            self._emit(
+                "payment.rejected",
+                {
+                    "resource": resource_url,
+                    "reason": "nonce replay",
+                    "nonce": result.nonce,
+                },
+            )
             return False, build_402_response([reqs], error="payment nonce already used"), result
 
-        self._emit("payment.received", {
-            "resource": resource_url,
-            "amount_atomic": result.amount_atomic,
-            "payer": result.payer,
-            "tx_hash": result.tx_hash,
-            "network": self.network,
-        })
+        self._emit(
+            "payment.received",
+            {
+                "resource": resource_url,
+                "amount_atomic": result.amount_atomic,
+                "payer": result.payer,
+                "tx_hash": result.tx_hash,
+                "network": self.network,
+            },
+        )
         return True, None, result
 
     # ── Event bus integration ────────────────────────────────────────────────

@@ -225,14 +225,8 @@ def _find_foundry_connector(root: Path) -> dict | None:
     return None
 
 
-def _missing_required_fields(
-    obj: dict[str, Any], required_fields: tuple[str, ...]
-) -> list[str]:
-    return [
-        field
-        for field in required_fields
-        if field not in obj or obj.get(field) is None
-    ]
+def _missing_required_fields(obj: dict[str, Any], required_fields: tuple[str, ...]) -> list[str]:
+    return [field for field in required_fields if field not in obj or obj.get(field) is None]
 
 
 def _sha256_file(path: Path) -> str | None:
@@ -278,8 +272,7 @@ def _audit_regional_manifest_v2(root: Path) -> dict[str, Any]:
     manifest_path = root / _REGIONAL_MANIFEST_FILE
     regional_dir = manifest_path.parent
     export_files_present = any(
-        (regional_dir / f"{object_type}.ndjson").is_file()
-        for object_type in _REGIONAL_OBJECT_TYPES
+        (regional_dir / f"{object_type}.ndjson").is_file() for object_type in _REGIONAL_OBJECT_TYPES
     )
     summary: dict[str, Any] = {
         "path": _REGIONAL_MANIFEST_FILE,
@@ -440,11 +433,14 @@ def _audit_regional_manifest_v2(root: Path) -> dict[str, Any]:
     if not _is_nonnegative_int(total):
         errors.append("dropped_rows.total_invalid")
         total = 0
-    if _count_bucket_total(
-        by_reason,
-        errors=errors,
-        error_prefix="dropped_rows.by_reason",
-    ) != total:
+    if (
+        _count_bucket_total(
+            by_reason,
+            errors=errors,
+            error_prefix="dropped_rows.by_reason",
+        )
+        != total
+    ):
         errors.append("dropped_rows.by_reason_total_mismatch")
     if len(details) != total:
         errors.append("dropped_rows.details_count_mismatch")
@@ -481,9 +477,15 @@ def _audit_regional_manifest_v2(root: Path) -> dict[str, Any]:
         "total_sources": source_health.get("total_sources"),
         "live_pull_sources": source_health.get("live_pull_sources"),
         "total_item_count": source_health.get("total_item_count"),
-        "by_status": source_health.get("by_status") if isinstance(source_health.get("by_status"), dict) else {},
-        "by_category": source_health.get("by_category") if isinstance(source_health.get("by_category"), dict) else {},
-        "by_region": source_health.get("by_region") if isinstance(source_health.get("by_region"), dict) else {},
+        "by_status": source_health.get("by_status")
+        if isinstance(source_health.get("by_status"), dict)
+        else {},
+        "by_category": source_health.get("by_category")
+        if isinstance(source_health.get("by_category"), dict)
+        else {},
+        "by_region": source_health.get("by_region")
+        if isinstance(source_health.get("by_region"), dict)
+        else {},
     }
 
     policy = manifest.get("policy")
@@ -720,21 +722,15 @@ def build_foundry_readiness(root: Path | None = None) -> dict:
         status = "ready"
         badge = "CONNECTED"
         connection_label = "Repo-side Foundry URL and S3-compatible API credentials are configured."
-        next_step = (
-            "Push the first Sapphire operational datasets into Foundry, then back them with Ontology objects."
-        )
+        next_step = "Push the first Sapphire operational datasets into Foundry, then back them with Ontology objects."
     elif connector or total_files:
         auth_mode = "not-configured"
         status = "partial"
         badge = "DATA READY"
         if connector:
-            connection_label = (
-                "Sapphire has a Foundry connector record, but repo-side auth signals are not configured."
-            )
+            connection_label = "Sapphire has a Foundry connector record, but repo-side auth signals are not configured."
         else:
-            connection_label = (
-                "Sapphire artifacts are ready for Foundry, but repo-side auth signals are not configured."
-            )
+            connection_label = "Sapphire artifacts are ready for Foundry, but repo-side auth signals are not configured."
         next_step = (
             "Create a Developer Console custom application, grant project access, and wire one "
             "batch ingestion path before attempting actions or agents."
@@ -744,9 +740,7 @@ def build_foundry_readiness(root: Path | None = None) -> dict:
         status = "planned"
         badge = "PLANNED"
         connection_label = "No repo-side Foundry linkage was detected yet."
-        next_step = (
-            "Register a Foundry custom application first, then start with one dataset sync and one Workshop app."
-        )
+        next_step = "Register a Foundry custom application first, then start with one dataset sync and one Workshop app."
 
     return {
         "status": status,

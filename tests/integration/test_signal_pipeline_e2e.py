@@ -47,15 +47,14 @@ def isolated_signals(tmp_path, monkeypatch):
         class R:
             success = True
             response = "stub assessment"
+
         return R()
 
-    monkeypatch.setitem(sys.modules, "nemotron",
-                        type(sys)("nemotron"))
+    monkeypatch.setitem(sys.modules, "nemotron", type(sys)("nemotron"))
     sys.modules["nemotron"].generate = _stub_generate
     sys.modules["nemotron"].MODELS = {"classify": "stub"}
 
-    monkeypatch.setitem(sys.modules, "notify",
-                        type(sys)("notify"))
+    monkeypatch.setitem(sys.modules, "notify", type(sys)("notify"))
     sys.modules["notify"].send_telegram_message = lambda *a, **k: {"ok": True}
 
     return tmp_path
@@ -65,6 +64,7 @@ def isolated_signals(tmp_path, monkeypatch):
 def client(isolated_signals):
     import signal_logger as sl
     from fastapi.testclient import TestClient
+
     return TestClient(sl.app, client=("127.0.0.1", 50000))
 
 
@@ -132,14 +132,17 @@ def test_signal_post_appends_jsonl(client, isolated_signals):
 
 
 def test_signal_post_appends_system_events(client, isolated_signals):
-    client.post("/api/signals", json={
-        "secret": "test-secret",
-        "symbol": "ETHUSDT",
-        "action": "SELL",
-        "price": 3200.0,
-        "confidence": 0.65,
-        "strategy": "bb_top",
-    })
+    client.post(
+        "/api/signals",
+        json={
+            "secret": "test-secret",
+            "symbol": "ETHUSDT",
+            "action": "SELL",
+            "price": 3200.0,
+            "confidence": 0.65,
+            "strategy": "bb_top",
+        },
+    )
     events_file = isolated_signals / "system_events.jsonl"
     assert events_file.exists()
     events = [json.loads(line) for line in events_file.read_text().strip().splitlines()]
@@ -151,10 +154,16 @@ def test_signal_post_appends_system_events(client, isolated_signals):
 
 def test_recent_signals_returns_reverse_chronological(client, isolated_signals):
     for i, sym in enumerate(["BTCUSDT", "ETHUSDT", "SOLUSDT"]):
-        client.post("/api/signals", json={
-            "secret": "test-secret",
-            "symbol": sym, "action": "BUY", "price": 100.0 + i, "confidence": 0.5,
-        })
+        client.post(
+            "/api/signals",
+            json={
+                "secret": "test-secret",
+                "symbol": sym,
+                "action": "BUY",
+                "price": 100.0 + i,
+                "confidence": 0.5,
+            },
+        )
     r = client.get("/api/signals/recent")
     assert r.status_code == 200
     body = r.json()
@@ -164,16 +173,21 @@ def test_recent_signals_returns_reverse_chronological(client, isolated_signals):
 
 
 def test_invalid_json_rejected(client):
-    r = client.post("/api/signals", data="not-json",
-                    headers={"Content-Type": "application/json"})
+    r = client.post("/api/signals", data="not-json", headers={"Content-Type": "application/json"})
     assert r.status_code == 400
     assert r.json()["error"] == "invalid JSON"
 
 
 def test_legacy_create_route_also_works(client, isolated_signals):
-    r = client.post("/api/signals/create", json={
-        "secret": "test-secret",
-        "symbol": "BTCUSDT", "action": "BUY", "price": 1.0, "confidence": 0.1,
-    })
+    r = client.post(
+        "/api/signals/create",
+        json={
+            "secret": "test-secret",
+            "symbol": "BTCUSDT",
+            "action": "BUY",
+            "price": 1.0,
+            "confidence": 0.1,
+        },
+    )
     assert r.status_code == 200
     assert (isolated_signals / "trading_signals.jsonl").exists()

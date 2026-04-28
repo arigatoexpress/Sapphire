@@ -19,12 +19,12 @@ try {
 # Check if we need to update
 if ($currentVersion -match "0\.17\.[0-4]") {
     Write-Host "`n⚠️  Update required! Need v0.17.5+ for Qwen 3.5" -ForegroundColor Red
-    
+
     # Download latest Ollama
     Write-Host "`nStep 2: Downloading latest Ollama..." -ForegroundColor Yellow
     $downloadUrl = "https://ollama.com/download/OllamaSetup.exe"
     $outputPath = "$env:TEMP\OllamaSetup.exe"
-    
+
     try {
         Invoke-WebRequest -Uri $downloadUrl -OutFile $outputPath -UseBasicParsing
         Write-Host "✓ Downloaded to $outputPath" -ForegroundColor Green
@@ -32,17 +32,17 @@ if ($currentVersion -match "0\.17\.[0-4]") {
         Write-Host "✗ Download failed. Please manually download from https://ollama.com/download" -ForegroundColor Red
         exit 1
     }
-    
+
     # Install
     Write-Host "`nStep 3: Installing Ollama update..." -ForegroundColor Yellow
     Write-Host "Please complete the installation wizard..." -ForegroundColor Cyan
     Start-Process -FilePath $outputPath -Wait
-    
+
     # Verify update
     Write-Host "`nStep 4: Verifying update..." -ForegroundColor Yellow
     $newVersion = ollama --version 2>&1
     Write-Host "New version: $newVersion" -ForegroundColor White
-    
+
     if ($newVersion -match "0\.17\.[5-9]" -or $newVersion -match "0\.1[8-9]") {
         Write-Host "✓ Update successful!" -ForegroundColor Green
     } else {

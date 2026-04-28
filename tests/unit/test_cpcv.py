@@ -51,16 +51,24 @@ def test_cpcv_splits_covers_all_samples_per_split() -> None:
 def test_cpcv_splits_purge_removes_boundary_train_samples() -> None:
     # With a large purge_pct, fewer train samples should survive near boundaries.
     n = 100
-    splits_no_purge = list(cpcv_splits(n, n_groups=5, n_test_groups=1, purge_pct=0.0, embargo_pct=0.0))
-    splits_with_purge = list(cpcv_splits(n, n_groups=5, n_test_groups=1, purge_pct=0.05, embargo_pct=0.0))
+    splits_no_purge = list(
+        cpcv_splits(n, n_groups=5, n_test_groups=1, purge_pct=0.0, embargo_pct=0.0)
+    )
+    splits_with_purge = list(
+        cpcv_splits(n, n_groups=5, n_test_groups=1, purge_pct=0.05, embargo_pct=0.0)
+    )
     for (train_np, _), (train_wp, _) in zip(splits_no_purge, splits_with_purge, strict=False):
         assert len(train_wp) <= len(train_np), "purge should reduce or equal train size"
 
 
 def test_cpcv_splits_embargo_removes_post_test_samples() -> None:
     n = 100
-    splits_no_emb = list(cpcv_splits(n, n_groups=5, n_test_groups=1, purge_pct=0.0, embargo_pct=0.0))
-    splits_with_emb = list(cpcv_splits(n, n_groups=5, n_test_groups=1, purge_pct=0.0, embargo_pct=0.05))
+    splits_no_emb = list(
+        cpcv_splits(n, n_groups=5, n_test_groups=1, purge_pct=0.0, embargo_pct=0.0)
+    )
+    splits_with_emb = list(
+        cpcv_splits(n, n_groups=5, n_test_groups=1, purge_pct=0.0, embargo_pct=0.05)
+    )
     for (train_ne, _), (train_we, _) in zip(splits_no_emb, splits_with_emb, strict=False):
         assert len(train_we) <= len(train_ne), "embargo should reduce or equal train size"
 
@@ -108,8 +116,13 @@ def test_trade_metrics_single_win() -> None:
 
     def always_buy(symbol, bars, i):
         if i == 5:
-            return {"symbol": symbol, "action": "buy", "price": bars[i].close,
-                    "confidence": 0.8, "strategy": "test"}
+            return {
+                "symbol": symbol,
+                "action": "buy",
+                "price": bars[i].close,
+                "confidence": 0.8,
+                "strategy": "test",
+            }
         return None
 
     result = run_backtest("X", bars=bars, signal_fn=always_buy)
@@ -129,11 +142,17 @@ def test_trade_metrics_win_rate_is_fraction() -> None:
 
     def _t(pnl: float) -> Trade:
         return Trade(
-            symbol="X", direction="long",
-            entry_ts="2026-01-01", entry_price=100.0,
-            exit_ts="2026-01-02", exit_price=100.0 + pnl / 10.0,
-            size_usd=1000.0, pnl_usd=pnl, pnl_pct=pnl / 10.0,
-            hold_bars=1, exit_reason="take_profit" if pnl > 0 else "stop_loss",
+            symbol="X",
+            direction="long",
+            entry_ts="2026-01-01",
+            entry_price=100.0,
+            exit_ts="2026-01-02",
+            exit_price=100.0 + pnl / 10.0,
+            size_usd=1000.0,
+            pnl_usd=pnl,
+            pnl_pct=pnl / 10.0,
+            hold_bars=1,
+            exit_reason="take_profit" if pnl > 0 else "stop_loss",
         )
 
     m = _trade_metrics([_t(100.0), _t(-100.0)])
@@ -149,10 +168,15 @@ def _fast_signal(symbol, bars, i):
     if i < 2:
         return None
     if i % 6 == 0:
-        return {"symbol": symbol, "action": "buy", "price": bars[i].close,
-                "confidence": 0.7, "strategy": "cpcv_test",
-                "take_profit": bars[i].close * 1.03,
-                "stop_loss": bars[i].close * 0.97}
+        return {
+            "symbol": symbol,
+            "action": "buy",
+            "price": bars[i].close,
+            "confidence": 0.7,
+            "strategy": "cpcv_test",
+            "take_profit": bars[i].close * 1.03,
+            "stop_loss": bars[i].close * 0.97,
+        }
     return None
 
 
@@ -183,6 +207,7 @@ def test_run_cpcv_backtest_sharpe_cv_finite() -> None:
     bars = _synthetic_bars("CPCV", 120)
     result = run_cpcv_backtest("CPCV", bars=bars, signal_fn=_fast_signal)
     import math
+
     # sharpe_cv is capped to 999.0 for inf cases
     assert math.isfinite(result.sharpe_cv) or result.sharpe_cv == 999.0
 
@@ -212,4 +237,5 @@ def test_run_cpcv_backtest_to_dict_serializable() -> None:
     assert d["n_groups"] == 6
     assert len(d["splits"]) == 15
     import json
+
     json.dumps(d)  # must be JSON-serializable

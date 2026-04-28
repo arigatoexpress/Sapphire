@@ -67,7 +67,7 @@ x = np.arange(len(models))
 means = [analysis[m]['mean'] for m in models]
 stdevs = [analysis[m]['stdev'] for m in models]
 
-bars = ax.bar(x, means, yerr=stdevs, capsize=5, color=colors, 
+bars = ax.bar(x, means, yerr=stdevs, capsize=5, color=colors,
               edgecolor='black', linewidth=2, alpha=0.8)
 
 for i, (bar, mean) in enumerate(zip(bars, means)):
@@ -78,7 +78,7 @@ for i, (bar, mean) in enumerate(zip(bars, means)):
 
 ax.set_ylabel('Tokens per Second', fontsize=13, fontweight='bold')
 ax.set_xlabel('Model Size', fontsize=13, fontweight='bold')
-ax.set_title('Qwen 3.5: Average Generation Speed\n(Error bars show standard deviation)', 
+ax.set_title('Qwen 3.5: Average Generation Speed\n(Error bars show standard deviation)',
              fontsize=15, fontweight='bold', pad=20)
 ax.set_xticks(x)
 ax.set_xticklabels(model_labels, fontsize=12)
@@ -104,12 +104,12 @@ for i, (bar, eff) in enumerate(zip(bars, efficiencies)):
     if i == 0:
         ax.text(bar.get_x() + bar.get_width()/2., height/2,
                 'BEST\nEFFICIENCY',
-                ha='center', va='center', fontsize=10, 
+                ha='center', va='center', fontsize=10,
                 color='white', fontweight='bold')
 
 ax.set_ylabel('Tokens/sec per Billion Parameters', fontsize=13, fontweight='bold')
 ax.set_xlabel('Model Size', fontsize=13, fontweight='bold')
-ax.set_title('Qwen 3.5: Efficiency Comparison\n(Higher is better - shows speed per parameter)', 
+ax.set_title('Qwen 3.5: Efficiency Comparison\n(Higher is better - shows speed per parameter)',
              fontsize=15, fontweight='bold', pad=20)
 ax.set_xticks(x)
 ax.set_xticklabels(model_labels, fontsize=12)
@@ -128,12 +128,12 @@ means = [analysis[m]['mean'] for m in models]
 # Plot ranges
 for i, model in enumerate(models):
     ax.plot([i, i], [mins[i], maxs[i]], 'k-', linewidth=3, alpha=0.3)
-    ax.plot(i, means[i], 'o', markersize=15, color=colors[i], 
+    ax.plot(i, means[i], 'o', markersize=15, color=colors[i],
            label=model_labels[i], markeredgecolor='black', markeredgewidth=2)
 
 ax.set_ylabel('Tokens per Second', fontsize=13, fontweight='bold')
 ax.set_xlabel('Model Size', fontsize=13, fontweight='bold')
-ax.set_title('Qwen 3.5: Speed Range Across Tests\n(Lines show min-max, dots show mean)', 
+ax.set_title('Qwen 3.5: Speed Range Across Tests\n(Lines show min-max, dots show mean)',
              fontsize=15, fontweight='bold', pad=20)
 ax.set_xticks(x)
 ax.set_xticklabels(model_labels, fontsize=12)
@@ -158,14 +158,14 @@ for i, (bar, ttft) in enumerate(zip(bars, ttfts)):
 
 ax.set_ylabel('Time to First Token (milliseconds)', fontsize=13, fontweight='bold')
 ax.set_xlabel('Model Size', fontsize=13, fontweight='bold')
-ax.set_title('Qwen 3.5: Latency (Time to First Token)\n(Lower is better)', 
+ax.set_title('Qwen 3.5: Latency (Time to First Token)\n(Lower is better)',
              fontsize=15, fontweight='bold', pad=20)
 ax.set_xticks(x)
 ax.set_xticklabels(model_labels, fontsize=12)
 ax.grid(axis='y', alpha=0.3)
 
 # Add note about scaling
-ax.text(0.5, 0.95, 'Note: 9B model takes ~13x longer to start than 0.8B', 
+ax.text(0.5, 0.95, 'Note: 9B model takes ~13x longer to start than 0.8B',
         transform=ax.transAxes, ha='center', va='top',
         bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5),
         fontsize=10)
@@ -191,10 +191,10 @@ for model in models:
     eff_norm = min(a['efficiency'] / 50, 1)
     latency_norm = min(1000 / a['ttft_mean'], 1)  # Inverse, lower is better
     consistency_norm = min(50 / (a['stdev'] + 1), 1)
-    
+
     values = [speed_norm, eff_norm, latency_norm, consistency_norm]
     values += values[:1]
-    
+
     ax.plot(angles, values, 'o-', linewidth=2.5, label=model_labels[models.index(model)],
            color=colors[models.index(model)])
     ax.fill(angles, values, alpha=0.25, color=colors[models.index(model)])
@@ -202,7 +202,7 @@ for model in models:
 ax.set_xticks(angles[:-1])
 ax.set_xticklabels(categories, fontsize=12)
 ax.set_ylim(0, 1)
-ax.set_title('Qwen 3.5: Multi-Dimensional Performance\n(Normalized scores)', 
+ax.set_title('Qwen 3.5: Multi-Dimensional Performance\n(Normalized scores)',
              fontsize=15, fontweight='bold', pad=30)
 ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1.0), fontsize=11)
 ax.grid(True)
@@ -220,12 +220,12 @@ means = [analysis[m]['mean'] for m in models]
 # Create bubble chart (bubble size = tests passed)
 tests_passed = [analysis[m]['tests_passed'] * 100 for m in models]
 
-scatter = ax.scatter(sizes, means, s=tests_passed, c=colors, 
+scatter = ax.scatter(sizes, means, s=tests_passed, c=colors,
                     alpha=0.6, edgecolors='black', linewidths=2)
 
 # Add labels
 for i, model in enumerate(models):
-    ax.annotate(model_labels[i], 
+    ax.annotate(model_labels[i],
                (sizes[i], means[i]),
                xytext=(10, 10), textcoords='offset points',
                fontsize=12, fontweight='bold',
@@ -233,7 +233,7 @@ for i, model in enumerate(models):
 
 ax.set_xlabel('Model Size (Billion Parameters)', fontsize=13, fontweight='bold')
 ax.set_ylabel('Average Speed (Tokens/sec)', fontsize=13, fontweight='bold')
-ax.set_title('Qwen 3.5: Size vs Performance\n(Bubble size = number of tests passed)', 
+ax.set_title('Qwen 3.5: Size vs Performance\n(Bubble size = number of tests passed)',
              fontsize=15, fontweight='bold', pad=20)
 ax.set_xscale('log')
 ax.set_yscale('log')
@@ -252,7 +252,7 @@ fig.suptitle('Qwen 3.5 Benchmark Dashboard', fontsize=20, fontweight='bold', y=0
 
 # Speed bars
 ax1 = fig.add_subplot(gs[0, :2])
-bars = ax1.bar(model_labels, [analysis[m]['mean'] for m in models], 
+bars = ax1.bar(model_labels, [analysis[m]['mean'] for m in models],
                color=colors, edgecolor='black', linewidth=2)
 ax1.set_ylabel('Tokens/sec', fontsize=11, fontweight='bold')
 ax1.set_title('Generation Speed', fontsize=13, fontweight='bold')
@@ -262,7 +262,7 @@ for bar, mean in zip(bars, [analysis[m]['mean'] for m in models]):
 
 # Efficiency
 ax2 = fig.add_subplot(gs[0, 2])
-bars = ax2.bar(model_labels, [analysis[m]['efficiency'] for m in models], 
+bars = ax2.bar(model_labels, [analysis[m]['efficiency'] for m in models],
                color=colors, edgecolor='black', linewidth=2)
 ax2.set_ylabel('TPS/B', fontsize=11, fontweight='bold')
 ax2.set_title('Efficiency', fontsize=13, fontweight='bold')
@@ -270,8 +270,8 @@ ax2.set_title('Efficiency', fontsize=13, fontweight='bold')
 # Speed distribution
 ax3 = fig.add_subplot(gs[1, :2])
 for i, model in enumerate(models):
-    ax3.scatter([model_labels[i]] * len(data[model]['speeds']), 
-               data[model]['speeds'], 
+    ax3.scatter([model_labels[i]] * len(data[model]['speeds']),
+               data[model]['speeds'],
                s=100, color=colors[i], alpha=0.6, edgecolors='black', linewidth=1.5)
 ax3.set_ylabel('Tokens/sec', fontsize=11, fontweight='bold')
 ax3.set_title('Speed Distribution (Individual Tests)', fontsize=13, fontweight='bold')
@@ -279,7 +279,7 @@ ax3.grid(axis='y', alpha=0.3)
 
 # TTFT
 ax4 = fig.add_subplot(gs[1, 2])
-bars = ax4.bar(model_labels, [analysis[m]['ttft_mean']/1000 for m in models], 
+bars = ax4.bar(model_labels, [analysis[m]['ttft_mean']/1000 for m in models],
                color=colors, edgecolor='black', linewidth=2)
 ax4.set_ylabel('Seconds', fontsize=11, fontweight='bold')
 ax4.set_title('Time to First Token', fontsize=13, fontweight='bold')
@@ -314,7 +314,7 @@ plt.close()
 print("Visualizations created in qwen35_visualizations/:")
 for i, name in enumerate([
     '01_speed_comparison.png',
-    '02_efficiency.png', 
+    '02_efficiency.png',
     '03_speed_range.png',
     '04_latency.png',
     '05_radar.png',

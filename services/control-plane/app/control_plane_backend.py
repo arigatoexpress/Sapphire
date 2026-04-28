@@ -32,7 +32,9 @@ def _postgres_env_status() -> dict[str, Any]:
     database = str(os.getenv("AGENTIC_CONTROL_PLANE_POSTGRES_DB") or "").strip()
     user = str(os.getenv("AGENTIC_CONTROL_PLANE_POSTGRES_USER") or "").strip()
     host = str(os.getenv("AGENTIC_CONTROL_PLANE_POSTGRES_HOST") or "").strip()
-    sslmode = str(os.getenv("AGENTIC_CONTROL_PLANE_POSTGRES_SSLMODE") or "").strip().lower() or "default"
+    sslmode = (
+        str(os.getenv("AGENTIC_CONTROL_PLANE_POSTGRES_SSLMODE") or "").strip().lower() or "default"
+    )
     password_present = bool(str(os.getenv("AGENTIC_CONTROL_PLANE_POSTGRES_PASSWORD") or "").strip())
     socket_path = f"/cloudsql/{cloudsql_instance}" if cloudsql_instance else ""
     explicit_parts_configured = bool(database and user and (host or socket_path))
@@ -69,7 +71,9 @@ def _postgres_connect_config() -> dict[str, Any]:
     password = str(os.getenv("AGENTIC_CONTROL_PLANE_POSTGRES_PASSWORD") or "").strip()
     host = str(os.getenv("AGENTIC_CONTROL_PLANE_POSTGRES_HOST") or "").strip()
     port = str(os.getenv("AGENTIC_CONTROL_PLANE_POSTGRES_PORT") or "").strip()
-    sslmode = str(os.getenv("AGENTIC_CONTROL_PLANE_POSTGRES_SSLMODE") or "").strip().lower() or "prefer"
+    sslmode = (
+        str(os.getenv("AGENTIC_CONTROL_PLANE_POSTGRES_SSLMODE") or "").strip().lower() or "prefer"
+    )
     cloudsql_instance = str(os.getenv("AGENTIC_CONTROL_PLANE_CLOUDSQL_INSTANCE") or "").strip()
     socket_dir = f"/cloudsql/{cloudsql_instance}" if cloudsql_instance else ""
     return {
@@ -417,7 +421,10 @@ class PostgresControlPlaneBackendAdapter:
                 dbname = str(config.get("database") or "").strip()
                 user = str(config.get("user") or "").strip()
                 password = str(config.get("password") or "").strip()
-                host = str(config.get("host") or "").strip() or str(config.get("socket_dir") or "").strip()
+                host = (
+                    str(config.get("host") or "").strip()
+                    or str(config.get("socket_dir") or "").strip()
+                )
                 port = str(config.get("port") or "").strip()
                 if dbname:
                     kwargs["dbname"] = dbname
@@ -439,8 +446,10 @@ class PostgresControlPlaneBackendAdapter:
             except Exception:
                 pass
             raw = driver.connect(**kwargs)
+
             def cursor_factory(conn):
                 return conn.cursor()
+
             return raw, cursor_factory
 
         if driver_name == "psycopg2":
@@ -452,7 +461,10 @@ class PostgresControlPlaneBackendAdapter:
                 dbname = str(config.get("database") or "").strip()
                 user = str(config.get("user") or "").strip()
                 password = str(config.get("password") or "").strip()
-                host = str(config.get("host") or "").strip() or str(config.get("socket_dir") or "").strip()
+                host = (
+                    str(config.get("host") or "").strip()
+                    or str(config.get("socket_dir") or "").strip()
+                )
                 port = str(config.get("port") or "").strip()
                 if dbname:
                     kwargs["dbname"] = dbname
@@ -473,8 +485,10 @@ class PostgresControlPlaneBackendAdapter:
                 def cursor_factory(conn):
                     return conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             except Exception:
+
                 def cursor_factory(conn):
                     return conn.cursor()
+
             return raw, cursor_factory
 
         raise RuntimeError("Unsupported PostgreSQL driver")

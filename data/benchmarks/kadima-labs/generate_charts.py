@@ -21,7 +21,7 @@ plt.rcParams['axes.labelsize'] = 11
 # Colors
 COLORS = {
     'qwen2.5:14b': '#E74C3C',
-    'qwen2.5-coder:14b': '#3498DB', 
+    'qwen2.5-coder:14b': '#3498DB',
     'qwen3:14b': '#2ECC71',
     'qwen2.5:32b': '#9B59B6'
 }
@@ -49,7 +49,7 @@ ax.grid(axis='y', alpha=0.3)
 # Add medals
 for i, (bar, speed) in enumerate(zip(bars, avg_speeds)):
     if i == 0:
-        ax.text(bar.get_x() + bar.get_width()/2., height/2, '1st', 
+        ax.text(bar.get_x() + bar.get_width()/2., height/2, '1st',
                 ha='center', va='center', fontsize=12, fontweight='bold', color='white')
 
 plt.tight_layout()
@@ -66,7 +66,7 @@ width = 0.2
 for i, model in enumerate(models):
     speeds = [data['models'][model][t] for t in test_names]
     offset = (i - len(models)/2 + 0.5) * width
-    bars = ax.bar(x + offset, speeds, width, label=model, color=COLORS[model], 
+    bars = ax.bar(x + offset, speeds, width, label=model, color=COLORS[model],
                   edgecolor='white', linewidth=1)
 
 ax.set_xlabel('Test Category', fontsize=12, fontweight='bold')
@@ -90,7 +90,7 @@ models_14b = ['qwen2.5:14b', 'qwen2.5-coder:14b', 'qwen3:14b']
 speeds_14b = [data['models'][m]['avg'] for m in models_14b]
 colors_14b = [COLORS[m] for m in models_14b]
 
-bars = ax1.bar([m.replace(':', '\n') for m in models_14b], speeds_14b, 
+bars = ax1.bar([m.replace(':', '\n') for m in models_14b], speeds_14b,
                color=colors_14b, edgecolor='white', linewidth=2)
 for bar, speed in zip(bars, speeds_14b):
     height = bar.get_height()
@@ -107,9 +107,9 @@ ax2.axis('off')
 table_data = [
     ['Model', 'Speed (t/s)', 'vs Qwen2.5'],
     ['Qwen2.5:14b', f"{data['models']['qwen2.5:14b']['avg']:.1f}", 'baseline'],
-    ['Qwen2.5-Coder', f"{data['models']['qwen2.5-coder:14b']['avg']:.1f}", 
+    ['Qwen2.5-Coder', f"{data['models']['qwen2.5-coder:14b']['avg']:.1f}",
      f"+{data['models']['qwen2.5-coder:14b']['avg'] - data['models']['qwen2.5:14b']['avg']:.1f}"],
-    ['Qwen3:14b (NEW)', f"{data['models']['qwen3:14b']['avg']:.1f}", 
+    ['Qwen3:14b (NEW)', f"{data['models']['qwen3:14b']['avg']:.1f}",
      f"{data['models']['qwen3:14b']['avg'] - data['models']['qwen2.5:14b']['avg']:+.1f}"],
 ]
 
@@ -148,7 +148,7 @@ fig = plt.figure(figsize=(16, 10))
 gs = fig.add_gridspec(3, 2, hspace=0.3, wspace=0.3)
 
 # Title
-fig.suptitle('Qwen Model Benchmark Dashboard\nRTX 5070 Ti Performance Analysis', 
+fig.suptitle('Qwen Model Benchmark Dashboard\nRTX 5070 Ti Performance Analysis',
              fontsize=16, fontweight='bold', y=0.98)
 
 # Panel 1: Speed ranking
@@ -157,7 +157,7 @@ sorted_models = sorted(models, key=lambda x: data['models'][x]['avg'], reverse=T
 speeds_sorted = [data['models'][m]['avg'] for m in sorted_models]
 colors_sorted = [COLORS[m] for m in sorted_models]
 
-bars = ax1.barh(range(len(sorted_models)), speeds_sorted, color=colors_sorted, 
+bars = ax1.barh(range(len(sorted_models)), speeds_sorted, color=colors_sorted,
                 edgecolor='white', linewidth=2)
 ax1.set_yticks(range(len(sorted_models)))
 ax1.set_yticklabels([m.replace(':', ' ') for m in sorted_models])
@@ -173,7 +173,7 @@ ax2 = fig.add_subplot(gs[0, 1])
 sizes = [14, 14, 14, 32]  # Parameter counts
 efficiency = [data['models'][m]['avg'] / s for m, s in zip(models, sizes)]
 
-bars = ax2.bar([m.replace(':', '\n') for m in models], efficiency, 
+bars = ax2.bar([m.replace(':', '\n') for m in models], efficiency,
                color=[COLORS[m] for m in models], edgecolor='white', linewidth=2)
 ax2.set_ylabel('Tokens/s per Billion Params', fontsize=10)
 ax2.set_title('Efficiency (Speed/Size)', fontsize=12, fontweight='bold')

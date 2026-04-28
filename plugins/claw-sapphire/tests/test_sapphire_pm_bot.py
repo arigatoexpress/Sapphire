@@ -47,7 +47,9 @@ class FakeCollection:
         return FakeDocumentRef(self._store, self._collection_name, doc_id)
 
     def where(self, field: str, op: str, value: str) -> "FakeCollection":
-        return FakeCollection(self._store, self._collection_name, self._filters + [(field, op, value)])
+        return FakeCollection(
+            self._store, self._collection_name, self._filters + [(field, op, value)]
+        )
 
     def stream(self):
         for doc_id, payload in self._store[self._collection_name].items():
@@ -136,7 +138,11 @@ def test_status_command_happy_path(monkeypatch):
         """,
     )
     monkeypatch.setattr(pm_bot, "_count_signals_today", lambda: 7)
-    monkeypatch.setattr(pm_bot.requests, "get", lambda *args, **kwargs: SimpleNamespace(status_code=200, reason="OK"))
+    monkeypatch.setattr(
+        pm_bot.requests,
+        "get",
+        lambda *args, **kwargs: SimpleNamespace(status_code=200, reason="OK"),
+    )
 
     response = pm_bot.handle_telegram_command(_make_update("/status"))
 

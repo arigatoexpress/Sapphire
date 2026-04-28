@@ -17,7 +17,9 @@ from app.models import NewsItem, NewsSource
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; SapphireAlphaBot/1.0; +https://github.com/arigatoexpress/Sapphire)"
+DEFAULT_USER_AGENT = (
+    "Mozilla/5.0 (compatible; SapphireAlphaBot/1.0; +https://github.com/arigatoexpress/Sapphire)"
+)
 
 
 def _strip_html(raw: str) -> str:

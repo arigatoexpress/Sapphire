@@ -350,7 +350,9 @@ def render_markdown(inventory: dict[str, Any]) -> str:
     )
 
     for project in inventory.get("projects", []):
-        tracked = [service for service in project["enabled_services"] if service in TRACKED_SERVICES]
+        tracked = [
+            service for service in project["enabled_services"] if service in TRACKED_SERVICES
+        ]
         sapphire_tables = project.get("bigquery_tables", {}).get("sapphire", [])
         lines.append(
             "| {project} | {status} | {services} | {datasets} | {tables} |".format(

@@ -30,14 +30,11 @@ def _merge_sent_ids(existing: Sequence[str], new_ids: Sequence[str], *, limit: i
 
 
 class ChatStore(Protocol):
-    def get(self, chat_id: int) -> ChatConfig | None:
-        ...
+    def get(self, chat_id: int) -> ChatConfig | None: ...
 
-    def save(self, chat: ChatConfig) -> None:
-        ...
+    def save(self, chat: ChatConfig) -> None: ...
 
-    def list_subscribed(self) -> list[ChatConfig]:
-        ...
+    def list_subscribed(self) -> list[ChatConfig]: ...
 
 
 def _unique_upper(values: list[str]) -> list[str]:
@@ -145,9 +142,12 @@ class FirestoreChatStore:
             heartbeat_enabled=bool(data.get("heartbeat_enabled", True)),
             heartbeat_interval_minutes=max(
                 5,
-                int(data.get("heartbeat_interval_minutes", self._default_heartbeat_interval_minutes)),
+                int(
+                    data.get("heartbeat_interval_minutes", self._default_heartbeat_interval_minutes)
+                ),
             ),
-            assistant_mode=str(data.get("assistant_mode", "personal")).strip().lower() or "personal",
+            assistant_mode=str(data.get("assistant_mode", "personal")).strip().lower()
+            or "personal",
             focus_project=str(data.get("focus_project", "")).strip(),
             proactive_checkins_enabled=bool(data.get("proactive_checkins_enabled", True)),
             assistant_checkin_interval_minutes=max(
@@ -159,15 +159,21 @@ class FirestoreChatStore:
             lighter_assets=[str(x).upper() for x in data.get("lighter_assets", [])],
             extra_keywords=[str(x).lower() for x in data.get("extra_keywords", [])],
             operator_directive=str(data.get("operator_directive", "")).strip(),
-            preference_tone=str(data.get("preference_tone", "concise")).strip().lower() or "concise",
-            preference_risk=str(data.get("preference_risk", "balanced")).strip().lower() or "balanced",
-            preference_coding_style=str(data.get("preference_coding_style", "pragmatic")).strip().lower()
+            preference_tone=str(data.get("preference_tone", "concise")).strip().lower()
+            or "concise",
+            preference_risk=str(data.get("preference_risk", "balanced")).strip().lower()
+            or "balanced",
+            preference_coding_style=str(data.get("preference_coding_style", "pragmatic"))
+            .strip()
+            .lower()
             or "pragmatic",
             sent_item_ids=[str(x) for x in data.get("sent_item_ids", [])],
             last_digest_sent_at=self._coerce_ts(data.get("last_digest_sent_at")),
             last_heartbeat_sent_at=self._coerce_ts(data.get("last_heartbeat_sent_at")),
             last_assistant_checkin_at=self._coerce_ts(data.get("last_assistant_checkin_at")),
-            last_decision_sla_reminder_at=self._coerce_ts(data.get("last_decision_sla_reminder_at")),
+            last_decision_sla_reminder_at=self._coerce_ts(
+                data.get("last_decision_sla_reminder_at")
+            ),
         )
 
     def save(self, chat: ChatConfig) -> None:
@@ -188,9 +194,15 @@ class FirestoreChatStore:
                     heartbeat_enabled=bool(data.get("heartbeat_enabled", True)),
                     heartbeat_interval_minutes=max(
                         5,
-                        int(data.get("heartbeat_interval_minutes", self._default_heartbeat_interval_minutes)),
+                        int(
+                            data.get(
+                                "heartbeat_interval_minutes",
+                                self._default_heartbeat_interval_minutes,
+                            )
+                        ),
                     ),
-                    assistant_mode=str(data.get("assistant_mode", "personal")).strip().lower() or "personal",
+                    assistant_mode=str(data.get("assistant_mode", "personal")).strip().lower()
+                    or "personal",
                     focus_project=str(data.get("focus_project", "")).strip(),
                     proactive_checkins_enabled=bool(data.get("proactive_checkins_enabled", True)),
                     assistant_checkin_interval_minutes=max(
@@ -202,15 +214,23 @@ class FirestoreChatStore:
                     lighter_assets=[str(x).upper() for x in data.get("lighter_assets", [])],
                     extra_keywords=[str(x).lower() for x in data.get("extra_keywords", [])],
                     operator_directive=str(data.get("operator_directive", "")).strip(),
-                    preference_tone=str(data.get("preference_tone", "concise")).strip().lower() or "concise",
-                    preference_risk=str(data.get("preference_risk", "balanced")).strip().lower() or "balanced",
-                    preference_coding_style=str(data.get("preference_coding_style", "pragmatic")).strip().lower()
+                    preference_tone=str(data.get("preference_tone", "concise")).strip().lower()
+                    or "concise",
+                    preference_risk=str(data.get("preference_risk", "balanced")).strip().lower()
+                    or "balanced",
+                    preference_coding_style=str(data.get("preference_coding_style", "pragmatic"))
+                    .strip()
+                    .lower()
                     or "pragmatic",
                     sent_item_ids=[str(x) for x in data.get("sent_item_ids", [])],
                     last_digest_sent_at=self._coerce_ts(data.get("last_digest_sent_at")),
                     last_heartbeat_sent_at=self._coerce_ts(data.get("last_heartbeat_sent_at")),
-                    last_assistant_checkin_at=self._coerce_ts(data.get("last_assistant_checkin_at")),
-                    last_decision_sla_reminder_at=self._coerce_ts(data.get("last_decision_sla_reminder_at")),
+                    last_assistant_checkin_at=self._coerce_ts(
+                        data.get("last_assistant_checkin_at")
+                    ),
+                    last_decision_sla_reminder_at=self._coerce_ts(
+                        data.get("last_decision_sla_reminder_at")
+                    ),
                 )
             )
         return output

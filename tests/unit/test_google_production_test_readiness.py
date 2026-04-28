@@ -209,7 +209,9 @@ def test_launchagent_retargeting_gate_resolves_default_plists_from_repo_root(
 ) -> None:
     repo_root = tmp_path / "repo"
     dashboard_plist = repo_root / "services/dashboard/launchagent/com.sapphire.dashboard.plist"
-    inference_plist = repo_root / "services/inference-proxy/launchagent/com.sapphire.inference-proxy.plist"
+    inference_plist = (
+        repo_root / "services/inference-proxy/launchagent/com.sapphire.inference-proxy.plist"
+    )
     _write_plist(dashboard_plist, {})
     _write_plist(inference_plist, {})
 

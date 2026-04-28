@@ -78,30 +78,34 @@ def mock_sources(monkeypatch):
 
 
 def test_classify_risk_off_on_extreme_fear():
-    c = chain_mod.classify({
-        "fear_greed": 12,
-        "btc_funding_rate_pct": -0.03,
-        "eth_funding_rate_pct": -0.02,
-        "btc_dominance_24h_change": 2.0,
-        "total_mcap_24h_change_pct": -4.5,
-        "dxy_1d_change_pct": 0.9,
-        "vix": 28.0,
-    })
+    c = chain_mod.classify(
+        {
+            "fear_greed": 12,
+            "btc_funding_rate_pct": -0.03,
+            "eth_funding_rate_pct": -0.02,
+            "btc_dominance_24h_change": 2.0,
+            "total_mcap_24h_change_pct": -4.5,
+            "dxy_1d_change_pct": 0.9,
+            "vix": 28.0,
+        }
+    )
     assert c.regime == Regime.RISK_OFF
     assert c.score < -0.3
     assert c.inputs_ok == 6
 
 
 def test_classify_risk_on_on_greed():
-    c = chain_mod.classify({
-        "fear_greed": 82,
-        "btc_funding_rate_pct": 0.015,
-        "eth_funding_rate_pct": 0.012,
-        "btc_dominance_24h_change": -0.5,
-        "total_mcap_24h_change_pct": 3.0,
-        "dxy_1d_change_pct": -0.3,
-        "vix": 13.0,
-    })
+    c = chain_mod.classify(
+        {
+            "fear_greed": 82,
+            "btc_funding_rate_pct": 0.015,
+            "eth_funding_rate_pct": 0.012,
+            "btc_dominance_24h_change": -0.5,
+            "total_mcap_24h_change_pct": 3.0,
+            "dxy_1d_change_pct": -0.3,
+            "vix": 13.0,
+        }
+    )
     assert c.regime == Regime.RISK_ON
     assert c.score > 0.25
 

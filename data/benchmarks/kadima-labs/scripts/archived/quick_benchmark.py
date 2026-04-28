@@ -24,11 +24,11 @@ def run_model_test(model, prompt, timeout=120):
         )
         duration = time.time() - start
         output = result.stdout if result.returncode == 0 else ""
-        
+
         # Estimate tokens (rough: ~4 chars per token)
         tokens = (len(prompt) + len(output)) // 4
         tps = tokens / duration if duration > 0 else 0
-        
+
         return {
             "success": result.returncode == 0,
             "duration": round(duration, 2),
@@ -47,14 +47,14 @@ def main():
         "deepseek-r1:14b",     # Reasoning model comparison
         "gemma3:27b",          # Google model comparison
     ]
-    
+
     # Shorter test prompts
     tests = {
         "reasoning": "What is 15 + 27? Explain.",
         "coding": "Write a Python function to add two numbers.",
         "knowledge": "What is machine learning in one sentence?"
     }
-    
+
     results = {
         "timestamp": datetime.now().isoformat(),
         "hardware": {
@@ -64,27 +64,27 @@ def main():
         },
         "models": {}
     }
-    
+
     print("="*60)
     print("QUICK AI BENCHMARK")
     print("="*60)
     print(f"Testing {len(models)} models with {len(tests)} prompts each\n")
-    
+
     for model in models:
         print(f"\nTesting: {model}")
         print("-"*40)
         results["models"][model] = {}
-        
+
         for test_name, prompt in tests.items():
             print(f"  {test_name}...", end=" ")
             result = run_model_test(model, prompt)
             results["models"][model][test_name] = result
-            
+
             if result["success"]:
                 print(f"{result['tokens_per_sec']:.1f} t/s, {result['duration']:.1f}s")
             else:
                 print("FAILED")
-        
+
         # Calculate average
         successes = [r for r in results["models"][model].values() if r.get("success")]
         if successes:
@@ -96,21 +96,21 @@ def main():
                 "tests_passed": f"{len(successes)}/{len(tests)}"
             }
             print(f"  Average: {avg_tps:.1f} tokens/sec")
-        
+
         time.sleep(2)  # Cooldown
-    
+
     # Save results
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"quick_benchmark_{timestamp}.json"
-    
+
     with open(filename, 'w') as f:
         json.dump(results, f, indent=2)
-    
+
     # Print summary
     print("\n" + "="*60)
     print("SUMMARY")
     print("="*60)
-    
+
     for model, data in results["models"].items():
         if "summary" in data:
             s = data["summary"]
@@ -118,7 +118,7 @@ def main():
             print(f"  Avg Speed: {s['avg_tokens_per_sec']:.1f} tokens/sec")
             print(f"  Avg Time: {s['avg_duration']:.1f}s")
             print(f"  Tests: {s['tests_passed']}")
-    
+
     print(f"\nResults saved to: {filename}")
     return results
 

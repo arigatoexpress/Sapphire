@@ -20,12 +20,12 @@ except ImportError:
 
 class ComprehensiveBenchmark:
     """Full benchmark suite for Qwen models"""
-    
+
     def __init__(self):
         self.results = []
         self.system_info = self._get_system_info()
         self.gpu_handle = None
-        
+
         if HAS_NVML:
             try:
                 nvml.nvmlInit()
@@ -37,7 +37,7 @@ class ComprehensiveBenchmark:
                 print(f"GPU: {name}")
             except Exception as e:
                 print(f"GPU monitoring not available: {e}")
-    
+
     def _get_system_info(self) -> dict:
         info = {"timestamp": datetime.now().isoformat(), "platform": sys.platform}
         try:
@@ -51,7 +51,7 @@ class ComprehensiveBenchmark:
         except:
             pass
         return info
-    
+
     def _get_gpu_memory(self) -> int:
         if self.gpu_handle:
             try:
@@ -60,26 +60,26 @@ class ComprehensiveBenchmark:
             except:
                 pass
         return 0
-    
+
     def _run_inference(self, model: str, prompt: str, timeout: int = 240) -> dict:
         """Run inference with extended timeout for model loading"""
         mem_before = self._get_gpu_memory()
         start = time.time()
-        
+
         try:
             result = subprocess.run(
                 ["ollama", "run", model, prompt],
                 capture_output=True, text=True, timeout=timeout,
                 encoding='utf-8', errors='ignore'
             )
-            
+
             duration = time.time() - start
             time.sleep(1)  # Brief cooldown
             mem_after = self._get_gpu_memory()
-            
+
             output = result.stdout if result.returncode == 0 else ""
             tokens = (len(prompt) + len(output)) // 4
-            
+
             return {
                 "success": result.returncode == 0,
                 "duration_seconds": round(duration, 2),
@@ -92,13 +92,13 @@ class ComprehensiveBenchmark:
             return {"success": False, "error": "Timeout", "duration_seconds": timeout}
         except Exception as e:
             return {"success": False, "error": str(e), "duration_seconds": 0}
-    
+
     def benchmark_model(self, model: str) -> dict:
         """Run complete benchmark on a single model"""
         print(f"\n{'='*70}")
         print(f"BENCHMARKING: {model}")
         print(f"{'='*70}")
-        
+
         # Warmup (allow time for model loading)
         print("  Loading model and warmup...")
         warmup = self._run_inference(model, "Hello", timeout=300)
@@ -107,7 +107,7 @@ class ComprehensiveBenchmark:
             return {"model": model, "error": "Warmup failed"}
         print(f"  Model loaded ({warmup['duration_seconds']:.1f}s)")
         time.sleep(2)
-        
+
         # Test suite
         tests = {
             "reasoning": "Solve step by step: A farmer has 17 sheep. All but 9 die. How many are left?",
@@ -117,20 +117,20 @@ class ComprehensiveBenchmark:
             "creative": "Write a haiku about artificial intelligence.",
             "context": "Sarah has 3 apples, gives 1 away, buys 5 more. Friend gives her twice as many. How many? Explain."
         }
-        
+
         results = {"model": model, "tests": {}, "timestamp": datetime.now().isoformat()}
-        
+
         for test_name, prompt in tests.items():
             print(f"  Running {test_name}...", end=" ", flush=True)
             result = self._run_inference(model, prompt, timeout=300)
             results["tests"][test_name] = result
-            
+
             if result["success"]:
                 print(f"✓ {result['tokens_per_second']:.1f} t/s")
             else:
                 print(f"✗ {result.get('error', 'Failed')}")
             time.sleep(1)
-        
+
         # Calculate summary
         successful = [t for t in results["tests"].values() if t["success"]]
         if successful:
@@ -144,18 +144,18 @@ class ComprehensiveBenchmark:
                 "total_duration": round(sum(t["duration_seconds"] for t in successful), 2)
             }
             print(f"\n  Summary: {results['summary']['avg_tokens_per_second']:.1f} t/s avg")
-        
+
         return results
-    
+
     def run_benchmarks(self, models: list[str]) -> list[dict]:
         """Run benchmarks on all models"""
         all_results = []
-        
+
         print(f"\n{'='*70}")
         print("QWEN COMPREHENSIVE BENCHMARK SUITE")
         print(f"{'='*70}")
         print(f"Testing {len(models)} models...\n")
-        
+
         for i, model in enumerate(models, 1):
             print(f"\n[{i}/{len(models)}] {model}")
             try:
@@ -164,50 +164,50 @@ class ComprehensiveBenchmark:
             except Exception as e:
                 print(f"Error: {e}")
                 all_results.append({"model": model, "error": str(e)})
-            
+
             if i < len(models):
                 print("\n  Cooldown...")
                 time.sleep(5)
-        
+
         return all_results
-    
+
     def save_results(self, results: list[dict]) -> str:
         """Save results to JSON"""
         filename = f"benchmark_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        
+
         output = {
             "benchmark_date": datetime.now().isoformat(),
             "system_info": self.system_info,
             "models_tested": results
         }
-        
+
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump(output, f, indent=2, ensure_ascii=False)
-        
+
         print(f"\nResults saved to: {filename}")
         return filename
-    
+
     def generate_report(self, results: list[dict]):
         """Generate and print final report"""
         print(f"\n{'='*70}")
         print("BENCHMARK REPORT")
         print(f"{'='*70}\n")
-        
+
         successful = [r for r in results if "summary" in r]
         if not successful:
             print("No successful benchmarks!")
             return
-        
+
         # Speed ranking
         sorted_models = sorted(successful, key=lambda x: x["summary"]["avg_tokens_per_second"], reverse=True)
-        
+
         print("SPEED RANKING:")
         print("-" * 50)
         for i, r in enumerate(sorted_models, 1):
             medal = ["🥇", "🥈", "🥉"][i-1] if i <= 3 else "  "
             s = r["summary"]
             print(f"{medal} {i}. {r['model']:<25} {s['avg_tokens_per_second']:>6.1f} t/s")
-        
+
         print("\n\nDETAILED RESULTS:")
         print("-" * 70)
         for r in sorted_models:
@@ -222,12 +222,12 @@ class ComprehensiveBenchmark:
 def main():
     # Available Qwen models
     models = ["qwen3.5:9b", "qwen3:14b", "qwen2.5-coder:14b", "qwen2.5:32b", "qwen2.5:14b"]
-    
+
     benchmark = ComprehensiveBenchmark()
     results = benchmark.run_benchmarks(models)
     filename = benchmark.save_results(results)
     benchmark.generate_report(results)
-    
+
     print(f"\n\nFull results saved to: {filename}")
 
 

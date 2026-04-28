@@ -20,6 +20,4 @@ def test_root_ops_entrypoints_delegate_to_maintained_scripts() -> None:
         assert os.access(target_path, os.X_OK)
         assert entrypoint.exists()
         assert os.access(entrypoint, os.X_OK)
-        assert f'exec "${{SCRIPT_DIR}}/{target}" "$@"' in entrypoint.read_text(
-            encoding="utf-8"
-        )
+        assert f'exec "${{SCRIPT_DIR}}/{target}" "$@"' in entrypoint.read_text(encoding="utf-8")

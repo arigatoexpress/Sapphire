@@ -71,14 +71,16 @@ def _output_dir(root: Path, *, dry_run: bool) -> Path:
 
 def run_prediction(symbol: str, *, dry_run: bool = False, root: Path | None = None) -> dict:
     root = root or _sapphire_root()
-    payload = json.dumps({
-        "action": "predict",
-        "symbol": symbol,
-        "lookback_bars": LOOKBACK_BARS,
-        "predict_bars": PREDICT_BARS,
-        "interval": INTERVAL,
-        "save_snapshot": not dry_run,
-    })
+    payload = json.dumps(
+        {
+            "action": "predict",
+            "symbol": symbol,
+            "lookback_bars": LOOKBACK_BARS,
+            "predict_bars": PREDICT_BARS,
+            "interval": INTERVAL,
+            "save_snapshot": not dry_run,
+        }
+    )
     env = {
         "PYTHONPATH": str(Path.home() / "Code" / "Kronos"),
         "HOME": str(Path.home()),
@@ -119,7 +121,9 @@ def send_telegram(message: str, *, root: Path | None = None, enabled: bool = Tru
 
 
 def build_summary(results: dict[str, dict]) -> str:
-    lines = ["📊 *Kronos Daily Predictions* — " + datetime.now().strftime("%Y-%m-%d %H:%M") + " CT\n"]
+    lines = [
+        "📊 *Kronos Daily Predictions* — " + datetime.now().strftime("%Y-%m-%d %H:%M") + " CT\n"
+    ]
     for sym, r in results.items():
         if "error" in r:
             lines.append(f"• {sym}: ❌ {r['error'][:60]}")
@@ -164,9 +168,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     dry_run = args.dry_run or _env_flag("SAPPHIRE_KRONOS_DRY_RUN")
     notify_enabled = (
-        not dry_run
-        and not args.no_telegram
-        and _env_flag("SAPPHIRE_KRONOS_NOTIFY", default=True)
+        not dry_run and not args.no_telegram and _env_flag("SAPPHIRE_KRONOS_NOTIFY", default=True)
     )
     root = _sapphire_root()
     watchlist = _watchlist(args.watchlist)
@@ -195,12 +197,8 @@ def main(argv: list[str] | None = None) -> int:
         "source": "kronos-daily LaunchAgent" + (" dry-run" if dry_run else ""),
         "dry_run": dry_run,
         "watchlist": watchlist,
-        "predictions": {
-            sym: r for sym, r in results.items() if "error" not in r
-        },
-        "errors": {
-            sym: r["error"] for sym, r in results.items() if "error" in r
-        },
+        "predictions": {sym: r for sym, r in results.items() if "error" not in r},
+        "errors": {sym: r["error"] for sym, r in results.items() if "error" in r},
     }
     pred_file.write_text(json.dumps(snapshot, indent=2))
     print(f"Saved: {pred_file}")

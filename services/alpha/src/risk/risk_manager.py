@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class RiskMetrics:
     """Real-time risk metrics for the portfolio."""
+
     portfolio_value: float
     total_risk: float  # As percentage of portfolio
     max_drawdown: float
@@ -33,6 +34,7 @@ class RiskMetrics:
 @dataclass
 class PositionRisk:
     """Risk metrics for individual positions."""
+
     symbol: str
     position_size: float
     unrealized_pnl: float
@@ -72,17 +74,22 @@ class RiskManager:
         # Risk state
         self.portfolio_history: list[dict[str, Any]] = []
         self.daily_pnl: list[float] = []
-        self.start_of_day_value: float = settings.initial_capital if hasattr(settings, 'initial_capital') else 10000.0
+        self.start_of_day_value: float = (
+            settings.initial_capital if hasattr(settings, "initial_capital") else 10000.0
+        )
         self.last_reset_date = datetime.now().date()
 
         # Position tracking
         self.active_positions: dict[str, PositionRisk] = {}
         self.stop_loss_orders: dict[str, dict[str, Any]] = {}
 
-        logger.info("RiskManager initialized with conservative Kelly fraction and multi-layered controls")
+        logger.info(
+            "RiskManager initialized with conservative Kelly fraction and multi-layered controls"
+        )
 
-    async def assess_portfolio_risk(self, portfolio_state: PortfolioState,
-                                  market_data: dict[str, pd.DataFrame]) -> RiskMetrics:
+    async def assess_portfolio_risk(
+        self, portfolio_state: PortfolioState, market_data: dict[str, pd.DataFrame]
+    ) -> RiskMetrics:
         """
         Comprehensive portfolio risk assessment.
         Returns detailed risk metrics for decision making.
@@ -104,8 +111,10 @@ class RiskManager:
             correlation_risk = await self._calculate_correlation_risk(market_data)
 
             # Total portfolio risk
-            total_risk = min(self.max_portfolio_risk,
-                           max(var_95, concentration_risk * 0.5, correlation_risk * 0.3))
+            total_risk = min(
+                self.max_portfolio_risk,
+                max(var_95, concentration_risk * 0.5, correlation_risk * 0.3),
+            )
 
             metrics = RiskMetrics(
                 portfolio_value=portfolio_value,
@@ -116,15 +125,17 @@ class RiskManager:
                 var_95=var_95,
                 expected_shortfall=expected_shortfall,
                 concentration_risk=concentration_risk,
-                correlation_risk=correlation_risk
+                correlation_risk=correlation_risk,
             )
 
             # Store for historical analysis
-            self.portfolio_history.append({
-                'timestamp': datetime.now(),
-                'metrics': metrics,
-                'portfolio_state': portfolio_state
-            })
+            self.portfolio_history.append(
+                {
+                    "timestamp": datetime.now(),
+                    "metrics": metrics,
+                    "portfolio_state": portfolio_state,
+                }
+            )
 
             # Keep only last 1000 entries
             if len(self.portfolio_history) > 1000:
@@ -144,13 +155,18 @@ class RiskManager:
                 var_95=0.05,
                 expected_shortfall=0.07,
                 concentration_risk=0.1,
-                correlation_risk=0.5
+                correlation_risk=0.5,
             )
 
-    async def calculate_position_size(self, symbol: str, entry_price: float,
-                                    stop_loss_price: float, market_data: pd.DataFrame,
-                                    portfolio_state: PortfolioState,
-                                    market_regime: MarketRegime) -> PositionRisk:
+    async def calculate_position_size(
+        self,
+        symbol: str,
+        entry_price: float,
+        stop_loss_price: float,
+        market_data: pd.DataFrame,
+        portfolio_state: PortfolioState,
+        market_regime: MarketRegime,
+    ) -> PositionRisk:
         """
         Calculate optimal position size using Kelly Criterion and risk adjustments.
         Returns detailed position risk analysis.
@@ -163,8 +179,7 @@ class RiskManager:
             # Portfolio constraints
             available_capital = portfolio_state.available_balance
             max_position_value = min(
-                available_capital * self.max_single_position_risk,
-                self.max_position_size
+                available_capital * self.max_single_position_risk, self.max_position_size
             )
 
             # Kelly Criterion sizing
@@ -182,7 +197,9 @@ class RiskManager:
             regime_multiplier = self._get_regime_multiplier(market_regime)
 
             # Final position size calculation
-            base_size = kelly_size * volatility_adjustment * correlation_adjustment * regime_multiplier
+            base_size = (
+                kelly_size * volatility_adjustment * correlation_adjustment * regime_multiplier
+            )
             final_size = min(base_size, max_position_value / entry_price)
 
             # Ensure minimum size
@@ -201,15 +218,17 @@ class RiskManager:
                 risk_reward_ratio=2.0,
                 volatility_adjusted_size=volatility_adjustment,
                 correlation_adjusted_size=correlation_adjustment,
-                final_position_size=final_size
+                final_position_size=final_size,
             )
 
             # Store for tracking
             self.active_positions[symbol] = position_risk
 
-            logger.info(f"Position size calculated for {symbol}: "
-                       f"size={final_size:.6f}, kelly={kelly_size:.6f}, "
-                       f"vol_adj={volatility_adjustment:.2f}, corr_adj={correlation_adjustment:.2f}")
+            logger.info(
+                f"Position size calculated for {symbol}: "
+                f"size={final_size:.6f}, kelly={kelly_size:.6f}, "
+                f"vol_adj={volatility_adjustment:.2f}, corr_adj={correlation_adjustment:.2f}"
+            )
 
             return position_risk
 
@@ -225,18 +244,19 @@ class RiskManager:
                 risk_reward_ratio=1.0,
                 volatility_adjusted_size=1.0,
                 correlation_adjusted_size=1.0,
-                final_position_size=0.001
+                final_position_size=0.001,
             )
 
-    def _calculate_kelly_position_size(self, symbol: str, market_data: pd.DataFrame,
-                                     risk_percent: float, regime: MarketRegime) -> float:
+    def _calculate_kelly_position_size(
+        self, symbol: str, market_data: pd.DataFrame, risk_percent: float, regime: MarketRegime
+    ) -> float:
         """Calculate position size using Kelly Criterion."""
         try:
             if len(market_data) < 30:
-                return self.min_position_size / market_data['close'].iloc[-1]
+                return self.min_position_size / market_data["close"].iloc[-1]
 
             # Calculate historical win rate and average win/loss ratio
-            returns = market_data['close'].pct_change().dropna()
+            returns = market_data["close"].pct_change().dropna()
 
             # Simple win rate calculation (positive returns)
             win_rate = (returns > 0).mean()
@@ -267,18 +287,18 @@ class RiskManager:
             portfolio_value = self.start_of_day_value
             risk_amount = portfolio_value * self.max_single_position_risk
             position_value = risk_amount / risk_percent
-            position_size = position_value / market_data['close'].iloc[-1]
+            position_size = position_value / market_data["close"].iloc[-1]
 
             return position_size * kelly_fraction
 
         except Exception as e:
             logger.error(f"Error in Kelly calculation: {e}")
-            return self.min_position_size / market_data['close'].iloc[-1]
+            return self.min_position_size / market_data["close"].iloc[-1]
 
     def _calculate_volatility_adjustment(self, symbol: str, market_data: pd.DataFrame) -> float:
         """Adjust position size based on asset volatility."""
         try:
-            volatility = market_data['close'].pct_change().std() * np.sqrt(365)
+            volatility = market_data["close"].pct_change().std() * np.sqrt(365)
 
             # Inverse relationship: higher volatility = smaller position
             base_volatility = 0.5  # 50% annual volatility as baseline
@@ -290,8 +310,9 @@ class RiskManager:
         except Exception:
             return 1.0
 
-    async def _calculate_correlation_adjustment(self, symbol: str, market_data: pd.DataFrame,
-                                              portfolio_state: PortfolioState) -> float:
+    async def _calculate_correlation_adjustment(
+        self, symbol: str, market_data: pd.DataFrame, portfolio_state: PortfolioState
+    ) -> float:
         """Adjust position size based on correlation with existing positions."""
         try:
             if not portfolio_state.active_positions:
@@ -316,16 +337,17 @@ class RiskManager:
         # Bear-trend deliberately asymmetric (0.8) vs bull (1.1): drawdowns hurt
         # capital compounding more than missed upside (Kelly penalizes variance).
         multipliers = {
-            MarketRegime.LOW_VOLATILITY: 1.2,    # Increase in low vol
-            MarketRegime.HIGH_VOLATILITY: 0.7,   # Decrease in high vol
-            MarketRegime.BULL_TREND: 1.1,        # Slight increase in bull
-            MarketRegime.BEAR_TREND: 0.8,        # Decrease in bear
-            MarketRegime.SIDEWAYS: 1.0           # Neutral
+            MarketRegime.LOW_VOLATILITY: 1.2,  # Increase in low vol
+            MarketRegime.HIGH_VOLATILITY: 0.7,  # Decrease in high vol
+            MarketRegime.BULL_TREND: 1.1,  # Slight increase in bull
+            MarketRegime.BEAR_TREND: 0.8,  # Decrease in bear
+            MarketRegime.SIDEWAYS: 1.0,  # Neutral
         }
         return multipliers.get(regime, 1.0)
 
-    async def check_risk_limits(self, portfolio_state: PortfolioState,
-                               risk_metrics: RiskMetrics) -> list[str]:
+    async def check_risk_limits(
+        self, portfolio_state: PortfolioState, risk_metrics: RiskMetrics
+    ) -> list[str]:
         """
         Check all risk limits and return list of violations.
         Returns empty list if all limits are satisfied.
@@ -334,25 +356,34 @@ class RiskManager:
 
         # Portfolio risk limit
         if risk_metrics.total_risk > self.max_portfolio_risk:
-            violations.append(f"Portfolio risk ({risk_metrics.total_risk:.1%}) exceeds limit ({self.max_portfolio_risk:.1%})")
+            violations.append(
+                f"Portfolio risk ({risk_metrics.total_risk:.1%}) exceeds limit ({self.max_portfolio_risk:.1%})"
+            )
 
         # Drawdown limit
         if risk_metrics.max_drawdown > self.max_drawdown_limit:
-            violations.append(f"Drawdown ({risk_metrics.max_drawdown:.1%}) exceeds limit ({self.max_drawdown_limit:.1%})")
+            violations.append(
+                f"Drawdown ({risk_metrics.max_drawdown:.1%}) exceeds limit ({self.max_drawdown_limit:.1%})"
+            )
 
         # Daily loss limit
         daily_pnl = sum(self.daily_pnl) if self.daily_pnl else 0
         if daily_pnl < -self.max_daily_loss * self.start_of_day_value:
-            violations.append(f"Daily loss ({daily_pnl:.2f}) exceeds limit ({-self.max_daily_loss * self.start_of_day_value:.2f})")
+            violations.append(
+                f"Daily loss ({daily_pnl:.2f}) exceeds limit ({-self.max_daily_loss * self.start_of_day_value:.2f})"
+            )
 
         # Position concentration
         if risk_metrics.concentration_risk > 0.2:  # 20% concentration limit
-            violations.append(f"Position concentration ({risk_metrics.concentration_risk:.1%}) too high")
+            violations.append(
+                f"Position concentration ({risk_metrics.concentration_risk:.1%}) too high"
+            )
 
         return violations
 
-    async def should_stop_trading(self, portfolio_state: PortfolioState,
-                                risk_metrics: RiskMetrics) -> tuple[bool, str]:
+    async def should_stop_trading(
+        self, portfolio_state: PortfolioState, risk_metrics: RiskMetrics
+    ) -> tuple[bool, str]:
         """
         Determine if trading should be stopped due to risk limits.
         Returns (should_stop, reason)
@@ -375,7 +406,7 @@ class RiskManager:
         prev_value = self.start_of_day_value
 
         for entry in self.portfolio_history[-30:]:  # Last 30 entries
-            value = entry['metrics'].portfolio_value
+            value = entry["metrics"].portfolio_value
             daily_return = (value - prev_value) / prev_value
             returns.append(daily_return)
             prev_value = value
@@ -402,14 +433,14 @@ class RiskManager:
 
         # Assuming 3% risk-free rate, annualized
         risk_free_rate = 0.03
-        return (avg_return - risk_free_rate/365) / volatility * np.sqrt(365)
+        return (avg_return - risk_free_rate / 365) / volatility * np.sqrt(365)
 
     def _calculate_max_drawdown(self, current_value: float) -> float:
         """Calculate maximum drawdown from peak."""
         if not self.portfolio_history:
             return 0.0
 
-        peak_value = max(entry['metrics'].portfolio_value for entry in self.portfolio_history)
+        peak_value = max(entry["metrics"].portfolio_value for entry in self.portfolio_history)
         if peak_value == 0:
             return 0.0
 
@@ -445,8 +476,8 @@ class RiskManager:
         for pos_data in portfolio_state.active_positions.values():
             # Assume position data has size and entry_price
             if isinstance(pos_data, dict):
-                size = pos_data.get('size', 0)
-                entry_price = pos_data.get('entry_price', 1)
+                size = pos_data.get("size", 0)
+                entry_price = pos_data.get("entry_price", 1)
                 position_value = size * entry_price
                 max_position_value = max(max_position_value, position_value)
 
@@ -462,7 +493,7 @@ class RiskManager:
             returns_data = {}
             for symbol, df in market_data.items():
                 if len(df) > 1:
-                    returns_data[symbol] = df['close'].pct_change().dropna()
+                    returns_data[symbol] = df["close"].pct_change().dropna()
 
             if len(returns_data) < 2:
                 return 0.5
@@ -479,7 +510,7 @@ class RiskManager:
             total_corr = 0
             count = 0
             for i in range(n):
-                for j in range(i+1, n):
+                for j in range(i + 1, n):
                     total_corr += abs(corr_matrix.iloc[i, j])
                     count += 1
 
@@ -492,7 +523,11 @@ class RiskManager:
     def reset_daily_pnl(self):
         """Reset daily P&L tracking for new trading day."""
         self.daily_pnl = []
-        self.start_of_day_value = self.portfolio_history[-1]['metrics'].portfolio_value if self.portfolio_history else self.start_of_day_value
+        self.start_of_day_value = (
+            self.portfolio_history[-1]["metrics"].portfolio_value
+            if self.portfolio_history
+            else self.start_of_day_value
+        )
         self.last_reset_date = datetime.now().date()
 
     def update_daily_pnl(self, pnl: float):
@@ -505,21 +540,20 @@ class RiskManager:
             return {"error": "No portfolio history available"}
 
         latest = self.portfolio_history[-1]
-        metrics = latest['metrics']
+        metrics = latest["metrics"]
 
         return {
-            'timestamp': datetime.now().isoformat(),
-            'portfolio_value': metrics.portfolio_value,
-            'total_risk': metrics.total_risk,
-            'max_drawdown': metrics.max_drawdown,
-            'sharpe_ratio': metrics.sharpe_ratio,
-            'volatility': metrics.volatility,
-            'var_95': metrics.var_95,
-            'expected_shortfall': metrics.expected_shortfall,
-            'concentration_risk': metrics.concentration_risk,
-            'correlation_risk': metrics.correlation_risk,
-            'active_positions': len(self.active_positions),
-            'daily_pnl': sum(self.daily_pnl),
-            'risk_limits_status': 'OK' if not self.portfolio_history else 'Check Required'
+            "timestamp": datetime.now().isoformat(),
+            "portfolio_value": metrics.portfolio_value,
+            "total_risk": metrics.total_risk,
+            "max_drawdown": metrics.max_drawdown,
+            "sharpe_ratio": metrics.sharpe_ratio,
+            "volatility": metrics.volatility,
+            "var_95": metrics.var_95,
+            "expected_shortfall": metrics.expected_shortfall,
+            "concentration_risk": metrics.concentration_risk,
+            "correlation_risk": metrics.correlation_risk,
+            "active_positions": len(self.active_positions),
+            "daily_pnl": sum(self.daily_pnl),
+            "risk_limits_status": "OK" if not self.portfolio_history else "Check Required",
         }
-

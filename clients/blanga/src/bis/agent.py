@@ -41,11 +41,15 @@ def parse_property_query(text: str) -> ParsedQuery:
     if tenant_match:
         query.tenant_brand = tenant_match.group(1).strip()
 
-    land_psf_match = re.search(r"land\s+(?:is\s+)?(?:less|below)\s+than\s+\$?([0-9]+(?:\.[0-9]+)?)", lowered)
+    land_psf_match = re.search(
+        r"land\s+(?:is\s+)?(?:less|below)\s+than\s+\$?([0-9]+(?:\.[0-9]+)?)", lowered
+    )
     if land_psf_match:
         query.max_land_psf = float(land_psf_match.group(1))
 
-    lease_match = re.search(r"lease\s+exp(?:ires|iration)?\s+(?:within|in)\s+([0-9]+)\s+years?", lowered)
+    lease_match = re.search(
+        r"lease\s+exp(?:ires|iration)?\s+(?:within|in)\s+([0-9]+)\s+years?", lowered
+    )
     if lease_match:
         query.lease_expiring_within_years = int(lease_match.group(1))
 
@@ -53,7 +57,9 @@ def parse_property_query(text: str) -> ParsedQuery:
     if county_match:
         query.county = county_match.group(1)
 
-    corridor_match = re.search(r"\b(burnet road|south lamar|ben white|i-35|pflugerville|manor)\b", lowered)
+    corridor_match = re.search(
+        r"\b(burnet road|south lamar|ben white|i-35|pflugerville|manor)\b", lowered
+    )
     if corridor_match:
         query.corridor = corridor_match.group(1)
 
@@ -79,7 +85,10 @@ def parse_update_command(text: str) -> ParsedCommand | None:
         address_hint=address_hint,
         note_text=note_text,
         mark_redo=("redo" in lowered_note),
-        mark_potential_listing=("potential listing" in lowered_note or "move it to the potential listings" in lowered_note),
+        mark_potential_listing=(
+            "potential listing" in lowered_note
+            or "move it to the potential listings" in lowered_note
+        ),
         mark_dnc=("dnc" in lowered_note or "do not call" in lowered_note),
     )
 
@@ -102,7 +111,9 @@ class BISAgent:
                     "address": prop.address_line1,
                     "city": prop.city,
                     "tenant_brand": prop.tenant_brand,
-                    "lease_expiration": prop.lease_expiration.isoformat() if prop.lease_expiration else None,
+                    "lease_expiration": prop.lease_expiration.isoformat()
+                    if prop.lease_expiration
+                    else None,
                     "land_psf": self._store.sale_price_per_land_sf(prop),
                     "outreach_state": prop.outreach_state.value,
                     "owner_names": [owner.full_name for owner in owners],
@@ -172,6 +183,8 @@ class BISAgent:
             "property_urn": property_asset.property_urn,
             "note_urn": note.note_urn,
             "redo": bool(property_after.redo) if property_after else False,
-            "potential_listing": bool(property_after.potential_listing) if property_after else False,
+            "potential_listing": bool(property_after.potential_listing)
+            if property_after
+            else False,
             "outreach_state": property_after.outreach_state.value if property_after else "active",
         }

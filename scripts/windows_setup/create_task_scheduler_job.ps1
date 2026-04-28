@@ -91,7 +91,7 @@ try {
     Write-Host "  Stop:   Stop-Process -Name python (or stop uvicorn)"
     Write-Host "  View:   Get-ScheduledTask -TaskName '$taskName'"
     Write-Host ""
-    
+
     # Start the task now
     $startNow = Read-Host "Start the agent now? (y/n)"
     if ($startNow -eq 'y' -or $startNow -eq 'Y') {

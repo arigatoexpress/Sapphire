@@ -88,7 +88,7 @@ def _fetch_raw(asset: str) -> dict[str, Any]:
         except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
             last_exc = exc
             if attempt < 2:
-                time.sleep(2 ** attempt)
+                time.sleep(2**attempt)
     raise last_exc or OSError(f"fetch failed for {asset}")
 
 

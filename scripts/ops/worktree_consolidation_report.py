@@ -112,7 +112,9 @@ def parse_worktrees(repo: Path, main_branch: str) -> list[WorktreeRecord]:
             dirty_count = 0
             updated_at = ""
         ahead = rev_count(repo, main_branch, branch) if branch and not branch.startswith("(") else 0
-        behind = rev_count(repo, branch, main_branch) if branch and not branch.startswith("(") else 0
+        behind = (
+            rev_count(repo, branch, main_branch) if branch and not branch.startswith("(") else 0
+        )
         records.append(
             WorktreeRecord(
                 path=str(wt_path),
@@ -141,8 +143,12 @@ def parse_worktrees(repo: Path, main_branch: str) -> list[WorktreeRecord]:
     return records
 
 
-def collect_branches(repo: Path, main_branch: str, worktrees: list[WorktreeRecord]) -> list[BranchRecord]:
-    attached = {wt.branch: wt.path for wt in worktrees if wt.branch and not wt.branch.startswith("(")}
+def collect_branches(
+    repo: Path, main_branch: str, worktrees: list[WorktreeRecord]
+) -> list[BranchRecord]:
+    attached = {
+        wt.branch: wt.path for wt in worktrees if wt.branch and not wt.branch.startswith("(")
+    }
     branches = run_cmd(["git", "for-each-ref", "refs/heads", "--format=%(refname:short)"], repo)
     records: list[BranchRecord] = []
 
@@ -200,7 +206,9 @@ def collect_claude_sessions(repo: Path, projects_root: Path) -> list[ClaudeSessi
     prefix = sanitize_project_prefix(repo)
     sessions: list[ClaudeSessionRecord] = []
     for project_dir in sorted(projects_root.glob(f"{prefix}*")):
-        jsonl_files = sorted(project_dir.glob("*.jsonl"), key=lambda item: item.stat().st_mtime, reverse=True)
+        jsonl_files = sorted(
+            project_dir.glob("*.jsonl"), key=lambda item: item.stat().st_mtime, reverse=True
+        )
         if not jsonl_files:
             continue
         latest = jsonl_files[0]
@@ -231,7 +239,9 @@ def truncate(text: str, limit: int) -> str:
     return text[: limit - 1].rstrip() + "…"
 
 
-def recommend_actions(worktrees: list[WorktreeRecord], branches: list[BranchRecord]) -> dict[str, list[str]]:
+def recommend_actions(
+    worktrees: list[WorktreeRecord], branches: list[BranchRecord]
+) -> dict[str, list[str]]:
     merge_candidates = [
         f"{branch.branch} (ahead {branch.ahead}, behind {branch.behind})"
         for branch in branches
@@ -329,11 +339,7 @@ def build_report(repo: Path, projects_root: Path, main_branch: str) -> dict[str,
     branches = collect_branches(repo, main_branch, worktrees)
     sessions = collect_claude_sessions(repo, projects_root)
     repo_status_count = len(
-        [
-            line
-            for line in run_cmd(["git", "status", "--short"], repo).splitlines()
-            if line.strip()
-        ]
+        [line for line in run_cmd(["git", "status", "--short"], repo).splitlines() if line.strip()]
     )
     recommendations = recommend_actions(worktrees, branches)
     return {

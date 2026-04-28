@@ -56,11 +56,13 @@ def test_partial_exit_history_and_final_outcome_reconcile(trader, monkeypatch) -
     monkeypatch.setattr(
         trader,
         "_record_outcome",
-        lambda pipeline_id, pnl_usd, close_price=0.0: outcome.update({
-            "pipeline_id": pipeline_id,
-            "pnl_usd": pnl_usd,
-            "close_price": close_price,
-        }),
+        lambda pipeline_id, pnl_usd, close_price=0.0: outcome.update(
+            {
+                "pipeline_id": pipeline_id,
+                "pnl_usd": pnl_usd,
+                "close_price": close_price,
+            }
+        ),
     )
     trader.action_execute("BTCUSDT", "BUY", 100.0, atr=10.0, pipeline_id="sig-1")
 

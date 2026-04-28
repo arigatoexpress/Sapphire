@@ -89,7 +89,12 @@ def _score_asset(ctx: Any) -> AssetRisk:
     if abs_funding >= _FUNDING_CRITICAL_8H:
         fund_score = 40.0
     elif abs_funding >= _FUNDING_EXTREME_8H:
-        fund_score = 20.0 + (abs_funding - _FUNDING_EXTREME_8H) / (_FUNDING_CRITICAL_8H - _FUNDING_EXTREME_8H) * 20.0
+        fund_score = (
+            20.0
+            + (abs_funding - _FUNDING_EXTREME_8H)
+            / (_FUNDING_CRITICAL_8H - _FUNDING_EXTREME_8H)
+            * 20.0
+        )
     else:
         fund_score = abs_funding / _FUNDING_EXTREME_8H * 20.0
 
@@ -152,6 +157,7 @@ class CascadeDetector:
             coins = ["BTC", "ETH", "SOL", "LINK", "ARB", "AVAX", "BNB", "MATIC"]
 
         from lib.chain.sources import HyperliquidClient, SourceError
+
         try:
             hl = HyperliquidClient()
             all_ctxs = hl.meta_and_asset_ctxs()

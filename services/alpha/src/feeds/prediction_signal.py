@@ -31,10 +31,11 @@ class PredictionSource(StrEnum):
 
 class SignalRelevance(StrEnum):
     """How relevant a prediction market is to crypto trading."""
-    DIRECT = "direct"        # Directly about crypto prices (e.g., "BTC > $100K")
-    MACRO = "macro"          # Macro events affecting crypto (Fed, CPI, jobs)
+
+    DIRECT = "direct"  # Directly about crypto prices (e.g., "BTC > $100K")
+    MACRO = "macro"  # Macro events affecting crypto (Fed, CPI, jobs)
     REGULATORY = "regulatory"  # Crypto regulation events
-    INDIRECT = "indirect"    # Loosely correlated events
+    INDIRECT = "indirect"  # Loosely correlated events
 
 
 @dataclass
@@ -44,11 +45,11 @@ class PredictionSignal:
     market_id: str
     source: PredictionSource
     question: str
-    probability: float           # 0.0 - 1.0
-    volume_usd: float            # Total traded volume in USD
-    liquidity_usd: float         # Current available liquidity
+    probability: float  # 0.0 - 1.0
+    volume_usd: float  # Total traded volume in USD
+    liquidity_usd: float  # Current available liquidity
     relevance: SignalRelevance
-    symbols: list[str]           # Crypto symbols this market affects
+    symbols: list[str]  # Crypto symbols this market affects
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     # Optional enrichment
@@ -135,9 +136,7 @@ class PredictionSignal:
     @property
     def is_high_conviction(self) -> bool:
         """Signal has enough volume and probability skew to be actionable."""
-        return self.volume_usd >= 50_000 and (
-            self.probability >= 0.70 or self.probability <= 0.30
-        )
+        return self.volume_usd >= 50_000 and (self.probability >= 0.70 or self.probability <= 0.30)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -151,7 +150,9 @@ class PredictionSignal:
             "symbols": self.symbols,
             "sentiment": self.sentiment,
             "momentum": round(self.momentum, 4) if self.momentum is not None else None,
-            "volume_change": round(self.volume_change, 2) if self.volume_change is not None else None,
+            "volume_change": round(self.volume_change, 2)
+            if self.volume_change is not None
+            else None,
             "is_high_conviction": self.is_high_conviction,
             "is_volume_spike": self.is_volume_spike,
             "is_whale_activity": self.is_whale_activity,
@@ -193,17 +194,17 @@ class ArbitrageOpportunity:
     """
 
     id: str
-    market_name: str          # Normalized question/title
-    venue_a: str              # Source A (e.g., "polymarket")
-    price_a: float            # Probability on venue A (0.0-1.0)
+    market_name: str  # Normalized question/title
+    venue_a: str  # Source A (e.g., "polymarket")
+    price_a: float  # Probability on venue A (0.0-1.0)
     signal_a: PredictionSignal
-    venue_b: str              # Source B (e.g., "kalshi")
-    price_b: float            # Probability on venue B (0.0-1.0)
+    venue_b: str  # Source B (e.g., "kalshi")
+    price_b: float  # Probability on venue B (0.0-1.0)
     signal_b: PredictionSignal
-    spread: float             # Absolute difference (0.0-1.0)
-    spread_pct: float         # Spread as percentage (e.g., 5.2)
-    confidence: float         # 0-100, based on volume and data freshness
-    symbols: list[str]        # Affected crypto symbols
+    spread: float  # Absolute difference (0.0-1.0)
+    spread_pct: float  # Spread as percentage (e.g., 5.2)
+    confidence: float  # 0-100, based on volume and data freshness
+    symbols: list[str]  # Affected crypto symbols
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     @property
@@ -262,7 +263,9 @@ class PredictionMarketFeed(ABC):
     async def start(self, session: aiohttp.ClientSession) -> None:
         """Start the polling loop."""
         self.running = True
-        logger.info(f"🔮 {self.source.value} prediction feed starting (interval={self.poll_interval}s)")
+        logger.info(
+            f"🔮 {self.source.value} prediction feed starting (interval={self.poll_interval}s)"
+        )
         while self.running:
             try:
                 signals = await self._fetch_markets(session)
@@ -271,9 +274,7 @@ class PredictionMarketFeed(ABC):
                     self._signals[sig.market_id] = sig
                 self._consecutive_errors = 0
                 self._last_fetch_ts = time.time()
-                logger.debug(
-                    f"🔮 {self.source.value}: fetched {len(signals)} markets"
-                )
+                logger.debug(f"🔮 {self.source.value}: fetched {len(signals)} markets")
             except asyncio.CancelledError:
                 break
             except Exception as exc:

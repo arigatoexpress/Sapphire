@@ -1069,7 +1069,7 @@ class SapphireCtl:
                     stdout=json.dumps(runtime_convergence, default=str, separators=(",", ":")),
                     stderr="runtime_not_converged",
                 )
-            
+
         if primary_disarm_result.ok and deploy.ok and override_apply_result.ok and run_test and test_result.ok:
             if selected_target_host != target_host:
                 lane_health = self._lane_health(

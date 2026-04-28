@@ -28,7 +28,7 @@ log_warning() {
 }
 
 # Check if running as root
-if [ "$EUID" -ne 0 ]; then 
+if [ "$EUID" -ne 0 ]; then
     log_warning "This script needs to run with sudo"
     echo "Please run: sudo ./setup-pi-bridge.sh"
     exit 1

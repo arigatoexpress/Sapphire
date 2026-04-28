@@ -6,14 +6,14 @@ $models = @(
     "qwen3:14b",
     "qwen3:8b",
     "qwen3:4b",
-    
+
     # Qwen2.5 Coder - Specialized for code
     "qwen2.5-coder:14b",
     "qwen2.5-coder:32b",
-    
+
     # QwQ - Reasoning model
     "qwq",
-    
+
     # Qwen3 Embedding models (for RAG tasks)
     "qwen3-embedding:4b",
     "qwen3-embedding:8b"
@@ -29,12 +29,12 @@ $failed = @()
 
 foreach ($model in $models) {
     Write-Host "`n[$($successful.Count + $failed.Count + 1)/$($models.Count)] Pulling $model..." -ForegroundColor Yellow
-    
+
     $startTime = Get-Date
     try {
         $process = Start-Process -FilePath "ollama" -ArgumentList "pull", $model -Wait -PassThru -NoNewWindow
         $duration = (Get-Date) - $startTime
-        
+
         if ($process.ExitCode -eq 0) {
             Write-Host "  ✓ Successfully pulled $model in $($duration.ToString('hh\:mm\:ss'))" -ForegroundColor Green
             $successful += $model
@@ -46,7 +46,7 @@ foreach ($model in $models) {
         Write-Host "  ✗ Error pulling $model : $_" -ForegroundColor Red
         $failed += $model
     }
-    
+
     # Brief pause between pulls
     Start-Sleep -Seconds 2
 }

@@ -19,26 +19,35 @@ import pytest
 
 # Add alpha-engine source to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "services", "alpha-engine"))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "services", "alpha-engine", "src"))
+sys.path.insert(
+    0, os.path.join(os.path.dirname(__file__), "..", "..", "services", "alpha-engine", "src")
+)
 
 from openclaw_dispatch import OpenClawDispatcher
 
 # ── Helper: build properly nested async context managers ─────────────
 
+
 class _FakeResponse:
     """Minimal aiohttp response mock supporting async context manager."""
+
     def __init__(self, status=200, body="ok"):
         self.status = status
         self._body = body
+
     async def text(self):
         return self._body
+
     async def __aenter__(self):
         return self
+
     async def __aexit__(self, *args):
         pass
 
+
 class _FakeSession:
     """Minimal aiohttp ClientSession mock supporting async context manager."""
+
     def __init__(self, response):
         self._response = response
         self.post_calls = []
@@ -49,18 +58,23 @@ class _FakeSession:
 
     async def __aenter__(self):
         return self
+
     async def __aexit__(self, *args):
         pass
 
 
 class _ErrorSession:
     """Session that raises on post."""
+
     def __init__(self, exc):
         self._exc = exc
+
     def post(self, *args, **kwargs):
         raise self._exc
+
     async def __aenter__(self):
         return self
+
     async def __aexit__(self, *args):
         pass
 
@@ -91,10 +105,13 @@ class TestOpenClawDispatcherInit:
         assert d.gateway_url == "http://localhost:18789"
 
     def test_env_var_fallback(self):
-        with patch.dict(os.environ, {
-            "OPENCLAW_GATEWAY_URL": "http://test:9999",
-            "OPENCLAW_GATEWAY_TOKEN": "env-token",
-        }):
+        with patch.dict(
+            os.environ,
+            {
+                "OPENCLAW_GATEWAY_URL": "http://test:9999",
+                "OPENCLAW_GATEWAY_TOKEN": "env-token",
+            },
+        ):
             d = OpenClawDispatcher()
             assert d.gateway_url == "http://test:9999"
             assert d.gateway_token == "env-token"
@@ -209,7 +226,8 @@ class TestDispatchInstruction:
         with patch("openclaw_dispatch.aiohttp.ClientSession", return_value=fake_session):
             with patch("openclaw_dispatch.aiohttp.ClientTimeout"):
                 await d.dispatch_instruction(
-                    "OBSIDIAN", "test",
+                    "OBSIDIAN",
+                    "test",
                     context={"extra": "data"},
                     allow_code_changes=True,
                     trigger="manual",
@@ -375,7 +393,9 @@ class TestMultiAgentRouting:
         with patch("openclaw_dispatch.aiohttp.ClientSession", return_value=fake_session):
             with patch("openclaw_dispatch.aiohttp.ClientTimeout"):
                 for agent in agents:
-                    result = await d.dispatch_instruction(agent, "health ping", trigger="smoke_test")
+                    result = await d.dispatch_instruction(
+                        agent, "health ping", trigger="smoke_test"
+                    )
                     results.append(result)
                 # Let all background tasks complete
                 await asyncio.sleep(0)

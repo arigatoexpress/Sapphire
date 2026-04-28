@@ -240,12 +240,8 @@ def action_predict() -> dict:
     profiles = analyze_all()
     predictions = []
     now = datetime.now(UTC).isoformat()
-    bull_threshold = _resolve_threshold(
-        "SAPPHIRE_PREDICT_BULL_THRESHOLD", DEFAULT_BULL_THRESHOLD
-    )
-    bear_threshold = _resolve_threshold(
-        "SAPPHIRE_PREDICT_BEAR_THRESHOLD", DEFAULT_BEAR_THRESHOLD
-    )
+    bull_threshold = _resolve_threshold("SAPPHIRE_PREDICT_BULL_THRESHOLD", DEFAULT_BULL_THRESHOLD)
+    bear_threshold = _resolve_threshold("SAPPHIRE_PREDICT_BEAR_THRESHOLD", DEFAULT_BEAR_THRESHOLD)
     # Layer A — opt-in chain factors. Default OFF: production behavior is
     # unchanged unless the operator explicitly sets the flag in the LaunchAgent
     # env. See docs/research/bearish-direction-asymmetry-2026-04-26.md §9.
@@ -405,9 +401,16 @@ def action_predict() -> dict:
 
 
 _TIMEFRAME_SECONDS = {
-    "1h": 3600, "2h": 7200, "4h": 14400, "6h": 21600,
-    "12h": 43200, "24h": 86400, "1d": 86400,
-    "3d": 259200, "7d": 604800, "1w": 604800,
+    "1h": 3600,
+    "2h": 7200,
+    "4h": 14400,
+    "6h": 21600,
+    "12h": 43200,
+    "24h": 86400,
+    "1d": 86400,
+    "3d": 259200,
+    "7d": 604800,
+    "1w": 604800,
 }
 
 
@@ -457,7 +460,13 @@ def action_score() -> dict:
         return {"error": "Could not fetch live prices"}
 
     if not PREDICTIONS_FILE.exists():
-        return {"success": True, "newly_scored": 0, "total_scored": 0, "correct": 0, "accuracy": "N/A"}
+        return {
+            "success": True,
+            "newly_scored": 0,
+            "total_scored": 0,
+            "correct": 0,
+            "accuracy": "N/A",
+        }
 
     now = datetime.now(UTC)
     updated: list[str] = []
@@ -497,9 +506,7 @@ def action_score() -> dict:
 
     _atomic_write_lines(PREDICTIONS_FILE, updated)
 
-    total_scored = sum(
-        1 for line in updated if json.loads(line).get("correct") is not None
-    )
+    total_scored = sum(1 for line in updated if json.loads(line).get("correct") is not None)
 
     return {
         "success": True,

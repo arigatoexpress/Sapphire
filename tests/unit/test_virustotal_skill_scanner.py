@@ -77,7 +77,9 @@ def test_verdict_summary_uses_stats_and_code_insight(monkeypatch):
         }
     }
 
-    summary = scanner._build_verdict_summary(file_report=file_report, analysis_report=analysis_report)
+    summary = scanner._build_verdict_summary(
+        file_report=file_report, analysis_report=analysis_report
+    )
     assert summary["base_verdict"] == "benign"
     assert summary["code_insight_verdict"] == "suspicious"
     assert summary["verdict"] == "suspicious"

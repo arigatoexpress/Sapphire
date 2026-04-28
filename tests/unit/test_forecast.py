@@ -87,10 +87,23 @@ class TestLoadTA:
     def test_picks_latest_per_symbol(self, tmp_path, monkeypatch):
         f = tmp_path / "predictions.jsonl"
         now = datetime.now(UTC)
-        self._write(f, [
-            {"timestamp": (now - timedelta(hours=2)).isoformat(), "symbol": "BTC", "direction": "bearish", "confidence": 0.5},
-            {"timestamp": (now - timedelta(hours=1)).isoformat(), "symbol": "BTC", "direction": "bullish", "confidence": 0.9},
-        ])
+        self._write(
+            f,
+            [
+                {
+                    "timestamp": (now - timedelta(hours=2)).isoformat(),
+                    "symbol": "BTC",
+                    "direction": "bearish",
+                    "confidence": 0.5,
+                },
+                {
+                    "timestamp": (now - timedelta(hours=1)).isoformat(),
+                    "symbol": "BTC",
+                    "direction": "bullish",
+                    "confidence": 0.9,
+                },
+            ],
+        )
         monkeypatch.setattr(fc, "TRADING_PREDICTIONS", f)
         got = fc._load_ta_latest_per_symbol()
         assert got["BTC"]["direction"] == "bullish"
@@ -99,9 +112,17 @@ class TestLoadTA:
     def test_skips_stale(self, tmp_path, monkeypatch):
         f = tmp_path / "predictions.jsonl"
         now = datetime.now(UTC)
-        self._write(f, [
-            {"timestamp": (now - timedelta(hours=48)).isoformat(), "symbol": "ETH", "direction": "bullish", "confidence": 0.7},
-        ])
+        self._write(
+            f,
+            [
+                {
+                    "timestamp": (now - timedelta(hours=48)).isoformat(),
+                    "symbol": "ETH",
+                    "direction": "bullish",
+                    "confidence": 0.7,
+                },
+            ],
+        )
         monkeypatch.setattr(fc, "TRADING_PREDICTIONS", f)
         got = fc._load_ta_latest_per_symbol()
         assert "ETH" not in got
@@ -116,34 +137,43 @@ class TestForecastIntegration:
         # Set up Kronos data under data/intelligence/2026-04-19/predictions.json
         idir = tmp_path / "intelligence" / "2026-04-19"
         idir.mkdir(parents=True)
-        (idir / "predictions.json").write_text(json.dumps({
-            "generated_at": "2026-04-19T01:00:00+00:00",
-            "predictions": {
-                "BTC-USD": {
-                    "current_price": 75000,
-                    "direction": "bullish",
-                    "confidence": 0.8,
-                    "predict_bars": 24,
-                    "interval": "1h",
-                    "predictions": [
-                        {"high": 76000, "low": 74500, "close": 75500},
-                        {"high": 76500, "low": 75000, "close": 76000},
-                    ],
-                },
-            },
-        }))
+        (idir / "predictions.json").write_text(
+            json.dumps(
+                {
+                    "generated_at": "2026-04-19T01:00:00+00:00",
+                    "predictions": {
+                        "BTC-USD": {
+                            "current_price": 75000,
+                            "direction": "bullish",
+                            "confidence": 0.8,
+                            "predict_bars": 24,
+                            "interval": "1h",
+                            "predictions": [
+                                {"high": 76000, "low": 74500, "close": 75500},
+                                {"high": 76500, "low": 75000, "close": 76000},
+                            ],
+                        },
+                    },
+                }
+            )
+        )
         # Set up TA data
         now = datetime.now(UTC)
         ta_file = tmp_path / "predictions.jsonl"
-        ta_file.write_text(json.dumps({
-            "timestamp": (now - timedelta(hours=1)).isoformat(),
-            "symbol": "BTC",
-            "direction": "bullish",
-            "confidence": 0.75,
-            "target_price": 77000,
-            "entry_price": 75500,
-            "timeframe": "24h",
-        }) + "\n")
+        ta_file.write_text(
+            json.dumps(
+                {
+                    "timestamp": (now - timedelta(hours=1)).isoformat(),
+                    "symbol": "BTC",
+                    "direction": "bullish",
+                    "confidence": 0.75,
+                    "target_price": 77000,
+                    "entry_price": 75500,
+                    "timeframe": "24h",
+                }
+            )
+            + "\n"
+        )
         monkeypatch.setattr(fc, "INTELLIGENCE_DIR", tmp_path / "intelligence")
         monkeypatch.setattr(fc, "TRADING_PREDICTIONS", ta_file)
         got = fc.forecast()

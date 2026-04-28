@@ -114,7 +114,9 @@ def _block_cloud_routing(result: KillSwitchResult) -> None:
     try:
         _KILL_FLAG.parent.mkdir(parents=True, exist_ok=True)
         _KILL_FLAG.write_text(
-            json.dumps({"engaged_at": datetime.now(UTC).isoformat(), "reason": "security_kill_switch"})
+            json.dumps(
+                {"engaged_at": datetime.now(UTC).isoformat(), "reason": "security_kill_switch"}
+            )
             + "\n"
         )
         result.actions.append(f"Cloud routing kill flag written: {_KILL_FLAG}")
@@ -128,7 +130,9 @@ def _disable_content_engine(result: KillSwitchResult) -> None:
     try:
         subprocess.run(
             ["launchctl", "unload", f"{Path.home()}/Library/LaunchAgents/{plist}.plist"],
-            check=False, capture_output=True, text=True,
+            check=False,
+            capture_output=True,
+            text=True,
         )
         result.actions.append(f"LaunchAgent {plist} unloaded")
     except Exception as exc:
@@ -143,7 +147,8 @@ def _send_telegram_alert(result: KillSwitchResult) -> None:
             "🚨 *SECURITY KILL SWITCH ENGAGED* 🚨\n\n"
             f"Reason: {result.reason}\n"
             f"Time: {result.engaged_at.strftime('%Y-%m-%d %H:%M:%S UTC')}\n\n"
-            "Actions:\n" + "\n".join(f"• {a}" for a in result.actions)
+            "Actions:\n"
+            + "\n".join(f"• {a}" for a in result.actions)
             + "\n\n_All external connections stopped. Review accounts immediately._"
         )
         send_telegram_message(msg, priority="p0")

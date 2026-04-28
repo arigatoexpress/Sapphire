@@ -1772,7 +1772,9 @@ def _render_dashboard_html() -> str:
   </script>
 </body>
 </html>"""
-    return html.replace("__ENV__", escape(settings.environment)).replace("__AUTH__", escape(auth_label))
+    return html.replace("__ENV__", escape(settings.environment)).replace(
+        "__AUTH__", escape(auth_label)
+    )
 
 
 @app.get("/")

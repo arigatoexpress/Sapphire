@@ -26,18 +26,18 @@ def run_test(model: str, prompt: str, test_name: str, timeout: int = 300) -> dic
             'top_p': 0.9
         }
     }
-    
+
     start_time = time.time()
     wall_start = datetime.now().isoformat()
-    
+
     try:
         resp = requests.post(API_URL, json=payload, timeout=timeout)
         wall_end = datetime.now().isoformat()
         total_duration = time.time() - start_time
-        
+
         if resp.status_code == 200:
             data = resp.json()
-            
+
             # Extract all available metrics
             result = {
                 'success': True,
@@ -57,7 +57,7 @@ def run_test(model: str, prompt: str, test_name: str, timeout: int = 300) -> dic
                 'done_reason': data.get('done_reason'),
                 'context_length': len(data.get('context', []))
             }
-            
+
             # Calculate derived metrics
             if result['eval_duration_ns'] > 0:
                 result['tokens_per_second'] = round(
@@ -65,19 +65,19 @@ def run_test(model: str, prompt: str, test_name: str, timeout: int = 300) -> dic
                 )
             else:
                 result['tokens_per_second'] = 0
-                
+
             if result['prompt_eval_duration_ns'] > 0:
                 result['prompt_tokens_per_second'] = round(
                     result['prompt_eval_count'] / (result['prompt_eval_duration_ns'] / 1e9), 2
                 )
             else:
                 result['prompt_tokens_per_second'] = 0
-            
+
             # Time to first token approximation
             result['time_to_first_token_ms'] = round(
                 (result['load_duration_ns'] + result['prompt_eval_duration_ns']) / 1e6, 2
             )
-            
+
             return result
         else:
             return {
@@ -86,7 +86,7 @@ def run_test(model: str, prompt: str, test_name: str, timeout: int = 300) -> dic
                 'error': f'HTTP {resp.status_code}',
                 'response': resp.text[:200]
             }
-            
+
     except requests.Timeout:
         return {
             'success': False,
@@ -107,10 +107,10 @@ def main():
     print("=" * 80)
     print(f"Start Time: {datetime.now().isoformat()}")
     print()
-    
+
     # Models to test (smallest to largest)
     models = ['qwen3.5:0.8b', 'qwen3.5:4b', 'qwen3.5:9b']
-    
+
     # Comprehensive test suite
     test_suite = {
         'arithmetic_simple': 'What is 2+2?',
@@ -129,7 +129,7 @@ def main():
         'comparison': 'Compare Python and JavaScript for web development.',
         'brainstorming': 'List 3 ideas for a mobile app that helps people learn languages.'
     }
-    
+
     all_results = {}
     system_info = {
         'timestamp': datetime.now().isoformat(),
@@ -138,28 +138,28 @@ def main():
         'total_tests': len(test_suite),
         'models_tested': len(models)
     }
-    
+
     # Run tests
     for model in models:
         print(f"\n{'='*80}")
         print(f"MODEL: {model}")
         print(f"{'='*80}")
-        
+
         model_results = []
-        
+
         for idx, (test_name, prompt) in enumerate(test_suite.items(), 1):
             print(f"\n[{idx}/{len(test_suite)}] {test_name}...", end=" ", flush=True)
-            
+
             result = run_test(model, prompt, test_name)
             model_results.append(result)
-            
+
             if result['success']:
                 print(f"OK {result['tokens_per_second']:.1f} t/s "
                       f"({result['total_duration_seconds']:.1f}s, "
                       f"{result['eval_count']} tokens)")
             else:
                 print(f"FAIL {result.get('error', 'Failed')}")
-            
+
             # Adaptive cooldown based on model size
             if '0.8b' in model:
                 time.sleep(1)
@@ -167,9 +167,9 @@ def main():
                 time.sleep(2)
             else:
                 time.sleep(3)
-        
+
         all_results[model] = model_results
-        
+
         # Print model summary
         successful = [r for r in model_results if r['success']]
         if successful:
@@ -178,10 +178,10 @@ def main():
             print(f"\n  Summary: {len(successful)}/{len(test_suite)} tests passed")
             print(f"  Average Speed: {avg_tps:.1f} t/s")
             print(f"  Average Duration: {avg_duration:.1f}s")
-        
+
         # Longer cooldown between models
         time.sleep(10)
-    
+
     # Save all data
     output = {
         'system_info': system_info,
@@ -189,11 +189,11 @@ def main():
         'results': all_results,
         'collection_end': datetime.now().isoformat()
     }
-    
+
     filename = f'qwen35_complete_data_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(output, f, indent=2, ensure_ascii=False)
-    
+
     print(f"\n\n{'='*80}")
     print("DATA COLLECTION COMPLETE")
     print(f"{'='*80}")

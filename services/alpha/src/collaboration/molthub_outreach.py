@@ -170,7 +170,7 @@ class MolthubOutreach:
         # Append custom body if provided (after sanitization)
         if custom_body:
             sanitized_custom = self._sanitize_outbound(
-                str(custom_body)[:self.MAX_CUSTOM_BODY_LENGTH]
+                str(custom_body)[: self.MAX_CUSTOM_BODY_LENGTH]
             )
             if sanitized_custom["blocked"]:
                 return {
@@ -199,9 +199,9 @@ class MolthubOutreach:
             "symbol": symbol_clean,
             "redactions": final_check.get("redactions", 0),
             "composed_at": int(time.time()),
-            "content_hash": hashlib.sha256(
-                f"{title}:{final_check['text']}".encode()
-            ).hexdigest()[:16],
+            "content_hash": hashlib.sha256(f"{title}:{final_check['text']}".encode()).hexdigest()[
+                :16
+            ],
         }
         return post
 
@@ -233,7 +233,7 @@ class MolthubOutreach:
             }
             self._history.append(record)
             if len(self._history) > self.MAX_OUTREACH_HISTORY:
-                self._history = self._history[-self.MAX_OUTREACH_HISTORY:]
+                self._history = self._history[-self.MAX_OUTREACH_HISTORY :]
             self._last_outreach_at = time.time()
 
             logger.info(
@@ -358,8 +358,14 @@ class MolthubOutreach:
         """
         # Whitelist of allowed fields
         allowed_fields = {
-            "symbol", "direction", "confidence", "timeframe",
-            "rationale", "target_price", "stop_loss", "bot_id",
+            "symbol",
+            "direction",
+            "confidence",
+            "timeframe",
+            "rationale",
+            "target_price",
+            "stop_loss",
+            "bot_id",
         }
 
         # Extract only whitelisted fields

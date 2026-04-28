@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS proposals (
     side VARCHAR(10) NOT NULL CHECK (side IN ('buy', 'sell')),
     amount_usd DECIMAL(10,2) NOT NULL,
     confidence DECIMAL(5,4) CHECK (confidence >= 0 AND confidence <= 1),
-    status VARCHAR(20) NOT NULL DEFAULT 'pending' 
+    status VARCHAR(20) NOT NULL DEFAULT 'pending'
         CHECK (status IN ('pending', 'analyzing', 'approved', 'rejected', 'executed', 'failed', 'cancelled')),
     strategy_name VARCHAR(100),
     source VARCHAR(50),
@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS daily_pnl (
 CREATE TABLE IF NOT EXISTS system_events (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     event_type VARCHAR(50) NOT NULL,
-    severity VARCHAR(20) NOT NULL DEFAULT 'info' 
+    severity VARCHAR(20) NOT NULL DEFAULT 'info'
         CHECK (severity IN ('debug', 'info', 'warning', 'error', 'critical')),
     component VARCHAR(50) NOT NULL,
     message TEXT NOT NULL,
@@ -162,7 +162,7 @@ ON CONFLICT (name) DO NOTHING;
 
 -- Create view for open positions with current prices
 CREATE OR REPLACE VIEW open_positions_view AS
-SELECT 
+SELECT
     p.*,
     p.quantity * p.current_price as market_value,
     p.quantity * (p.current_price - p.avg_entry_price) as unrealized_pnl_usd
@@ -171,7 +171,7 @@ WHERE p.quantity != 0;
 
 -- Create view for daily trading summary
 CREATE OR REPLACE VIEW daily_trading_summary AS
-SELECT 
+SELECT
     DATE(p.created_at) as date,
     COUNT(*) as total_proposals,
     COUNT(*) FILTER (WHERE p.status = 'executed') as executed,

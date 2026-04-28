@@ -37,26 +37,26 @@ PROXY_URL = "http://127.0.0.1:11435/metrics"
 # tier key (inference_metrics schema) ← proxy endpoint key
 TIER_MAP = {
     "windows-gpu": "gpu_local",
-    "pi-rari1":    "pi_rpc",
-    "pi-rari2":    "pi_rpc",
-    "mac-local":   "mac_ollama",
-    "kimi-cloud":  "kimi",
-    "proxy":       "proxy",
+    "pi-rari1": "pi_rpc",
+    "pi-rari2": "pi_rpc",
+    "mac-local": "mac_ollama",
+    "kimi-cloud": "kimi",
+    "proxy": "proxy",
 }
 
 # service_name → (host label, host addr, port, path)
 SERVICES = [
-    ("control-plane",    "mac",      "127.0.0.1",      8082,  "/health"),
-    ("dashboard",        "mac",      "127.0.0.1",      8080,  "/"),
-    ("signal-logger",    "mac",      "127.0.0.1",      18081, "/health"),
-    ("inference-proxy",  "mac",      "127.0.0.1",      11435, "/health"),
-    ("openbb-api",       "mac",      "127.0.0.1",      6900,  "/"),
-    ("ollama-mac",       "mac",      "127.0.0.1",      11434, "/api/tags"),
-    ("ollama-windows",   "windows",  "100.71.10.48",   11434, "/api/tags"),
-    ("ollama-rari1",     "rari1",    "100.120.191.1",  11434, "/api/tags"),
-    ("ollama-rari2",     "rari2",    "100.87.225.89",  11434, "/api/tags"),
-    ("regional-intel",   "mac",      "127.0.0.1",      8787,  "/api/health"),
-    ("tho-cloud-run",    "cloud_run","project-go-forward-691674245427.us-central1.run.app", 443, "/"),
+    ("control-plane", "mac", "127.0.0.1", 8082, "/health"),
+    ("dashboard", "mac", "127.0.0.1", 8080, "/"),
+    ("signal-logger", "mac", "127.0.0.1", 18081, "/health"),
+    ("inference-proxy", "mac", "127.0.0.1", 11435, "/health"),
+    ("openbb-api", "mac", "127.0.0.1", 6900, "/"),
+    ("ollama-mac", "mac", "127.0.0.1", 11434, "/api/tags"),
+    ("ollama-windows", "windows", "100.71.10.48", 11434, "/api/tags"),
+    ("ollama-rari1", "rari1", "100.120.191.1", 11434, "/api/tags"),
+    ("ollama-rari2", "rari2", "100.87.225.89", 11434, "/api/tags"),
+    ("regional-intel", "mac", "127.0.0.1", 8787, "/api/health"),
+    ("tho-cloud-run", "cloud_run", "project-go-forward-691674245427.us-central1.run.app", 443, "/"),
 ]
 
 
@@ -97,28 +97,32 @@ def collect_metrics() -> list[dict]:
     for endpoint, m in metrics.items():
         tier = TIER_MAP.get(endpoint, endpoint)
         requests = int(m.get("requests") or 0)
-        success  = int(m.get("success")  or 0)
-        failure  = int(m.get("failure")  or m.get("errors") or 0)
-        avg_ms   = m.get("avg_ms") or 0
-        rows.append({
-            "metric_id":      _stable_id(ts, endpoint),
-            "tier":           tier,
-            "model":          endpoint,
-            "requests":       requests,
-            "success":        success,
-            "errors":         failure,
-            "avg_latency_ms": float(avg_ms) if avg_ms else None,
-            "p95_latency_ms": None,
-            "tokens_in":      None,
-            "tokens_out":     None,
-            "cost_usd":       None,
-            "timestamp":      ts,
-            "ingested_at":    ts,
-        })
+        success = int(m.get("success") or 0)
+        failure = int(m.get("failure") or m.get("errors") or 0)
+        avg_ms = m.get("avg_ms") or 0
+        rows.append(
+            {
+                "metric_id": _stable_id(ts, endpoint),
+                "tier": tier,
+                "model": endpoint,
+                "requests": requests,
+                "success": success,
+                "errors": failure,
+                "avg_latency_ms": float(avg_ms) if avg_ms else None,
+                "p95_latency_ms": None,
+                "tokens_in": None,
+                "tokens_out": None,
+                "cost_usd": None,
+                "timestamp": ts,
+                "ingested_at": ts,
+            }
+        )
     return rows
 
 
-def _probe(host: str, port: int, path: str, timeout: float = 5.0) -> tuple[str, int | None, float | None, str | None]:
+def _probe(
+    host: str, port: int, path: str, timeout: float = 5.0
+) -> tuple[str, int | None, float | None, str | None]:
     """Return (status, http_code, response_ms, error_msg)."""
     scheme = "https" if port == 443 else "http"
     url = f"{scheme}://{host}:{port}{path}" if port not in (80, 443) else f"{scheme}://{host}{path}"
@@ -142,20 +146,22 @@ def collect_health() -> list[dict]:
     rows: list[dict] = []
     for name, host_label, addr, port, path in SERVICES:
         status, code, rtt, err = _probe(addr, port, path)
-        rows.append({
-            "snapshot_id":  _stable_id(ts, name),
-            "service_name": name,
-            "host":         host_label,
-            "status":       status,
-            "response_ms":  rtt,
-            "endpoint":     f"{addr}:{port}{path}",
-            "http_status":  code,
-            "error":        err,
-            "cpu_pct":      None,
-            "memory_pct":   None,
-            "timestamp":    ts,
-            "ingested_at":  ts,
-        })
+        rows.append(
+            {
+                "snapshot_id": _stable_id(ts, name),
+                "service_name": name,
+                "host": host_label,
+                "status": status,
+                "response_ms": rtt,
+                "endpoint": f"{addr}:{port}{path}",
+                "http_status": code,
+                "error": err,
+                "cpu_pct": None,
+                "memory_pct": None,
+                "timestamp": ts,
+                "ingested_at": ts,
+            }
+        )
     return rows
 
 
@@ -173,7 +179,7 @@ def run(emit_metrics: bool = True, emit_health: bool = True) -> dict[str, int]:
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--metrics", action="store_true", help="Only collect inference metrics")
-    p.add_argument("--health",  action="store_true", help="Only collect service health")
+    p.add_argument("--health", action="store_true", help="Only collect service health")
     p.add_argument("-v", "--verbose", action="store_true")
     args = p.parse_args()
     logging.basicConfig(

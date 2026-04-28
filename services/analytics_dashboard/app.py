@@ -100,8 +100,7 @@ def _is_known_probe_path(path: str) -> bool:
 @app.get("/healthz/")
 @app.get("/_ah/health")
 def healthz():
-    return {"ok": True, "project": PROJECT, "dataset": DATASET,
-            "ts": datetime.now(UTC).isoformat()}
+    return {"ok": True, "project": PROJECT, "dataset": DATASET, "ts": datetime.now(UTC).isoformat()}
 
 
 @app.get("/__/hosting/verification")
@@ -137,65 +136,80 @@ def summary():
 @app.get("/api/performance")
 def performance():
     days = int(request.args.get("days", "30"))
-    rows = _rows(f"""
+    rows = _rows(
+        f"""
         SELECT date, symbol, total_signals, wins, losses, win_rate,
                daily_pnl_usd, profit_factor, avg_confidence
         FROM `{PROJECT}.{DATASET}.daily_performance`
         WHERE date >= DATE_SUB(CURRENT_DATE(), INTERVAL @days DAY)
         ORDER BY date DESC, symbol
-    """, params=[bigquery.ScalarQueryParameter("days", "INT64", days)])
+    """,
+        params=[bigquery.ScalarQueryParameter("days", "INT64", days)],
+    )
     return jsonify({"rows": _clean(rows), "days": days})
 
 
 @app.get("/api/regime")
 def regime():
     limit = int(request.args.get("limit", "100"))
-    rows = _rows(f"""
+    rows = _rows(
+        f"""
         SELECT timestamp, regime, score, confidence, btc_price_usd,
                btc_dominance, avg_funding_8h_pct, fear_greed_score, fear_greed_label
         FROM `{PROJECT}.{DATASET}.market_regime`
         ORDER BY timestamp DESC
         LIMIT @limit
-    """, params=[bigquery.ScalarQueryParameter("limit", "INT64", limit)])
+    """,
+        params=[bigquery.ScalarQueryParameter("limit", "INT64", limit)],
+    )
     return jsonify({"rows": _clean(rows)})
 
 
 @app.get("/api/predictions")
 def predictions():
     limit = int(request.args.get("limit", "50"))
-    rows = _rows(f"""
+    rows = _rows(
+        f"""
         SELECT timestamp, symbol, model, direction, confidence,
                current_price, predicted_price_24h, predicted_move_pct,
                accuracy_score
         FROM `{PROJECT}.{DATASET}.predictions`
         ORDER BY timestamp DESC
         LIMIT @limit
-    """, params=[bigquery.ScalarQueryParameter("limit", "INT64", limit)])
+    """,
+        params=[bigquery.ScalarQueryParameter("limit", "INT64", limit)],
+    )
     return jsonify({"rows": _clean(rows)})
 
 
 @app.get("/api/threats")
 def threats():
     days = int(request.args.get("days", "30"))
-    rows = _rows(f"""
+    rows = _rows(
+        f"""
         SELECT date, severity, cves, exploited_cves, kev_cves, avg_cvss
         FROM `{PROJECT}.{DATASET}.daily_threats`
         WHERE date >= DATE_SUB(CURRENT_DATE(), INTERVAL @days DAY)
         ORDER BY date DESC, severity
-    """, params=[bigquery.ScalarQueryParameter("days", "INT64", days)])
+    """,
+        params=[bigquery.ScalarQueryParameter("days", "INT64", days)],
+    )
     return jsonify({"rows": _clean(rows)})
 
 
 @app.get("/api/signals/recent")
 def signals_recent():
     limit = int(request.args.get("limit", "100"))
-    rows = _rows(f"""
+    rows = _rows(
+        f"""
         SELECT timestamp, signal_id, symbol, action, direction, confidence,
                score, source, outcome, pnl_usd, regime
         FROM `{PROJECT}.{DATASET}.trading_signals`
         ORDER BY timestamp DESC
         LIMIT @limit
-    """, params=[bigquery.ScalarQueryParameter("limit", "INT64", limit)])
+    """,
+        params=[bigquery.ScalarQueryParameter("limit", "INT64", limit)],
+    )
     return jsonify({"rows": _clean(rows)})
 
 

@@ -11,6 +11,7 @@ API Endpoints:
 Authentication: EIP-712 signed actions (uses eth_account / local key signing).
 No API key required — wallet private key signs all order actions.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -104,7 +105,9 @@ class HyperliquidClient:
             raise ValueError(f"No mid price for {coin}")
 
         limit_px = mid * (1 + slippage) if is_buy else mid * (1 - slippage)
-        return await self.limit_order(coin, is_buy, sz, limit_px, tif="Ioc", reduce_only=reduce_only)
+        return await self.limit_order(
+            coin, is_buy, sz, limit_px, tif="Ioc", reduce_only=reduce_only
+        )
 
     async def limit_order(
         self,
@@ -128,14 +131,16 @@ class HyperliquidClient:
         """
         action = {
             "type": "order",
-            "orders": [{
-                "a": await self._asset_index(coin),
-                "b": is_buy,
-                "p": self._px_str(limit_px),
-                "s": self._sz_str(sz),
-                "r": reduce_only,
-                "t": {"limit": {"tif": tif}},
-            }],
+            "orders": [
+                {
+                    "a": await self._asset_index(coin),
+                    "b": is_buy,
+                    "p": self._px_str(limit_px),
+                    "s": self._sz_str(sz),
+                    "r": reduce_only,
+                    "t": {"limit": {"tif": tif}},
+                }
+            ],
             "grouping": "na",
         }
         return await self._exchange_action(action)
@@ -182,7 +187,9 @@ class HyperliquidClient:
 
     def _sign_action(self, action: dict[str, Any], nonce: int) -> dict[str, str]:
         """EIP-712 sign an action for Hyperliquid."""
-        payload = json.dumps({"action": action, "nonce": nonce}, sort_keys=True, separators=(",", ":"))
+        payload = json.dumps(
+            {"action": action, "nonce": nonce}, sort_keys=True, separators=(",", ":")
+        )
         msg_hash = hashlib.sha256(payload.encode()).hexdigest()
         signed = eth_account.Account.sign_message(
             eth_account.messages.encode_defunct(hexstr=msg_hash),

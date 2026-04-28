@@ -16,7 +16,10 @@ DEFAULT_OUTPUT = SKILL_ROOT / "output" / "capability-registry.merged.json"
 RISK_ORDER = {"low": 0, "medium": 1, "high": 2}
 ELLIPSIS_RE = re.compile(r"(…|\.{3})$")
 PLAYWRIGHT_WRAPPER_RE = re.compile(r"^'?([a-z][\w\s/#&+.,:-]*)\s+\"(.+?)\"'?:?$", re.IGNORECASE)
-PLAYWRIGHT_ROLE_PREFIX_RE = re.compile(r"^(generic|button|toolbar|tablist|tab|region|searchbox|dialog|menu|menuitem):\s*", re.IGNORECASE)
+PLAYWRIGHT_ROLE_PREFIX_RE = re.compile(
+    r"^(generic|button|toolbar|tablist|tab|region|searchbox|dialog|menu|menuitem):\s*",
+    re.IGNORECASE,
+)
 
 # Canonical alias map for cross-surface clustering.
 # Keep this conservative; do not collapse semantically different actions.
@@ -144,10 +147,16 @@ def max_risk(a: str | None, b: str | None) -> str:
     return "low" if max(ra, rb) == 0 else ("medium" if max(ra, rb) == 1 else "high")
 
 
-def extract_source_capabilities(data: dict[str, Any], path: Path) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:
+def extract_source_capabilities(
+    data: dict[str, Any], path: Path
+) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:
     meta: dict[str, Any] = {"path": str(path)}
 
-    if isinstance(data, dict) and "registry_seed" in data and isinstance(data["registry_seed"], dict):
+    if (
+        isinstance(data, dict)
+        and "registry_seed" in data
+        and isinstance(data["registry_seed"], dict)
+    ):
         reg = data["registry_seed"]
         caps = list(reg.get("capabilities", []) or [])
         meta.update(
@@ -165,9 +174,13 @@ def extract_source_capabilities(data: dict[str, Any], path: Path) -> tuple[str, 
         meta.update(
             {
                 "kind": "web_inventory",
-                "generated_at": ((captures[0] if captures else {}) or {}).get("page", {}).get("timestamp"),
+                "generated_at": ((captures[0] if captures else {}) or {})
+                .get("page", {})
+                .get("timestamp"),
                 "capture_labels": [c.get("label") for c in captures if isinstance(c, dict)],
-                "page_titles": [((c.get("page") or {}).get("title")) for c in captures if isinstance(c, dict)],
+                "page_titles": [
+                    ((c.get("page") or {}).get("title")) for c in captures if isinstance(c, dict)
+                ],
             }
         )
         return "web_inventory", caps, meta
@@ -187,7 +200,9 @@ def extract_source_capabilities(data: dict[str, Any], path: Path) -> tuple[str, 
 
 
 def _json_fingerprint(obj: Any) -> str:
-    return hashlib.sha1(json.dumps(obj, sort_keys=True, default=str).encode("utf-8")).hexdigest()[:12]
+    return hashlib.sha1(json.dumps(obj, sort_keys=True, default=str).encode("utf-8")).hexdigest()[
+        :12
+    ]
 
 
 def _dedupe_list(values: list[Any]) -> list[Any]:
@@ -244,13 +259,21 @@ def _recipe_preference_tuple(record: dict[str, Any]) -> tuple[Any, ...]:
     if not isinstance(recipe, dict):
         return (0, 0, 0, 0, 0, float("-inf"), -1, 0, _json_fingerprint(record))
     timeouts = recipe.get("timeouts") if isinstance(recipe.get("timeouts"), dict) else {}
-    retry_policy = recipe.get("retry_policy") if isinstance(recipe.get("retry_policy"), dict) else {}
-    verification = recipe.get("verification") if isinstance(recipe.get("verification"), dict) else {}
-    assertions = verification.get("assertions") if isinstance(verification.get("assertions"), list) else []
+    retry_policy = (
+        recipe.get("retry_policy") if isinstance(recipe.get("retry_policy"), dict) else {}
+    )
+    verification = (
+        recipe.get("verification") if isinstance(recipe.get("verification"), dict) else {}
+    )
+    assertions = (
+        verification.get("assertions") if isinstance(verification.get("assertions"), list) else []
+    )
     source_dt = _parse_iso_dt(record.get("source_generated_at"))
     source_ts = source_dt.timestamp() if source_dt else float("-inf")
     source_order = int(record.get("source_order") or 0)
-    actions_count = len(recipe.get("actions") or []) if isinstance(recipe.get("actions"), list) else 0
+    actions_count = (
+        len(recipe.get("actions") or []) if isinstance(recipe.get("actions"), list) else 0
+    )
     return (
         1 if (timeouts or retry_policy) else 0,
         1 if timeouts else 0,
@@ -285,7 +308,9 @@ def _select_preferred_action_recipes(records: list[dict[str, Any]]) -> list[Any]
     return [w.get("recipe") for w in winners if w.get("recipe") is not None]
 
 
-def merge_capabilities(inputs: list[tuple[Path, str, list[dict[str, Any]], dict[str, Any]]]) -> dict[str, Any]:
+def merge_capabilities(
+    inputs: list[tuple[Path, str, list[dict[str, Any]], dict[str, Any]]],
+) -> dict[str, Any]:
     merged: dict[str, dict[str, Any]] = {}
     clusters: dict[str, dict[str, Any]] = {}
     provenance: list[dict[str, Any]] = []
@@ -330,19 +355,23 @@ def merge_capabilities(inputs: list[tuple[Path, str, list[dict[str, Any]], dict[
                 merged[surface_key] = node
             elif should_replace_display_label(str(node.get("label") or ""), label):
                 node["label"] = label
-            node["risk_level"] = max_risk(node.get("risk_level"), str(cap.get("risk_level") or "low"))
+            node["risk_level"] = max_risk(
+                node.get("risk_level"), str(cap.get("risk_level") or "low")
+            )
             node["observations"] = int(node.get("observations") or 0) + 1
             if surface not in node["surfaces"]:
                 node["surfaces"].append(surface)
             if cap.get("id") and cap.get("id") not in node["original_ids"]:
                 node["original_ids"].append(cap["id"])
-            node["sources"].append({
-                "input": str(path),
-                "kind": kind,
-                "source": cap.get("source"),
-                "surface": surface,
-                "id": cap.get("id"),
-            })
+            node["sources"].append(
+                {
+                    "input": str(path),
+                    "kind": kind,
+                    "source": cap.get("source"),
+                    "surface": surface,
+                    "id": cap.get("id"),
+                }
+            )
             for t in cap.get("tags", []) or []:
                 if isinstance(t, str) and t not in node["tags"]:
                     node["tags"].append(t)
@@ -385,9 +414,13 @@ def merge_capabilities(inputs: list[tuple[Path, str, list[dict[str, Any]], dict[
             if label not in cluster["aliases"]:
                 cluster["aliases"].append(label)
             # Prefer a cleaner display label when canonicalization simplified a wrapper/menu path.
-            if cluster_norm and (cluster.get("label") == label and cluster_norm != normalize_label(label)):
+            if cluster_norm and (
+                cluster.get("label") == label and cluster_norm != normalize_label(label)
+            ):
                 cluster["label"] = cluster_norm
-            cluster["risk_level"] = max_risk(cluster.get("risk_level"), str(cap.get("risk_level") or "low"))
+            cluster["risk_level"] = max_risk(
+                cluster.get("risk_level"), str(cap.get("risk_level") or "low")
+            )
             cluster["observations"] = int(cluster.get("observations") or 0) + 1
             member_id = node["id"]
             if member_id not in cluster["members"]:
@@ -419,11 +452,15 @@ def merge_capabilities(inputs: list[tuple[Path, str, list[dict[str, Any]], dict[
             node.pop("preconditions", None)
         merged_caps.append(node)
 
-    merged_caps.sort(key=lambda c: (c.get("surface_family", ""), c.get("label_normalized", ""), c.get("id", "")))
+    merged_caps.sort(
+        key=lambda c: (c.get("surface_family", ""), c.get("label_normalized", ""), c.get("id", ""))
+    )
     cluster_list = list(clusters.values())
     for cluster in cluster_list:
         if cluster.get("aliases"):
-            cluster["aliases"] = sorted(cluster["aliases"], key=lambda x: (len(str(x)), str(x).lower()))[:20]
+            cluster["aliases"] = sorted(
+                cluster["aliases"], key=lambda x: (len(str(x)), str(x).lower())
+            )[:20]
     cluster_list.sort(key=lambda c: (-(len(c.get("members", []))), c.get("label_normalized", "")))
 
     return {
@@ -437,7 +474,9 @@ def merge_capabilities(inputs: list[tuple[Path, str, list[dict[str, Any]], dict[
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="Merge TradingView desktop/web capability inventories into a canonical registry")
+    p = argparse.ArgumentParser(
+        description="Merge TradingView desktop/web capability inventories into a canonical registry"
+    )
     p.add_argument("inputs", nargs="+", type=Path, help="Inventory/registry JSON files")
     p.add_argument("--output", type=Path, default=None)
     p.add_argument("--write-default-output", action="store_true", help=f"Write to {DEFAULT_OUTPUT}")
@@ -467,7 +506,11 @@ def main() -> int:
             "merged_capability_count": len(merged.get("capabilities", [])),
             "cluster_count": len(merged.get("clusters", [])),
             "provenance": [
-                {"path": p["path"], "kind": p.get("kind"), "capability_count": p.get("capability_count")}
+                {
+                    "path": p["path"],
+                    "kind": p.get("kind"),
+                    "capability_count": p.get("capability_count"),
+                }
                 for p in merged.get("provenance", [])
             ],
         }

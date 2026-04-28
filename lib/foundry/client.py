@@ -52,6 +52,7 @@ log = logging.getLogger("foundry.client")
 _SSL_CTX = ssl.create_default_context()
 try:
     import certifi
+
     _SSL_CTX.load_verify_locations(certifi.where())
 except ImportError:
     pass
@@ -134,10 +135,14 @@ def _resolve_upsert_action_api_name() -> str:
 
 def _resolve_write_mode() -> str:
     mode = (
-        _first_env(*_WRITE_MODE_ENVS)
-        or _read_secret_file("foundry_write_mode")
-        or _DEFAULT_WRITE_MODE
-    ).strip().lower()
+        (
+            _first_env(*_WRITE_MODE_ENVS)
+            or _read_secret_file("foundry_write_mode")
+            or _DEFAULT_WRITE_MODE
+        )
+        .strip()
+        .lower()
+    )
     if mode not in _VALID_WRITE_MODES:
         known = ", ".join(sorted(_VALID_WRITE_MODES))
         raise FoundryConfigError(f"Invalid Foundry write mode {mode!r}; expected one of: {known}.")
@@ -311,7 +316,7 @@ class FoundryClient:
         self.timeout = timeout
         self.ontology = (ontology or _resolve_ontology_api_name()).strip()
         self.upsert_action = (upsert_action or _resolve_upsert_action_api_name()).strip()
-        self.write_mode = (write_mode.strip().lower() if write_mode else _resolve_write_mode())
+        self.write_mode = write_mode.strip().lower() if write_mode else _resolve_write_mode()
         if self.write_mode not in _VALID_WRITE_MODES:
             known = ", ".join(sorted(_VALID_WRITE_MODES))
             raise FoundryConfigError(
@@ -482,11 +487,15 @@ class FoundryClient:
         try:
             with urllib.request.urlopen(req, timeout=self.timeout, context=_SSL_CTX) as resp:
                 raw = resp.read()
-                return json.loads(raw) if raw else {
-                    "bytes_uploaded": len(data),
-                    "dataset_rid": dataset_rid,
-                    "path": file_path,
-                }
+                return (
+                    json.loads(raw)
+                    if raw
+                    else {
+                        "bytes_uploaded": len(data),
+                        "dataset_rid": dataset_rid,
+                        "path": file_path,
+                    }
+                )
         except urllib.error.HTTPError as exc:
             err_body = ""
             try:
@@ -574,7 +583,9 @@ class FoundryClient:
                 f"is deployed. Visible actions: {known}."
             )
 
-    def validate_dataset_target(self, object_types: list[str] | tuple[str, ...] | None = None) -> None:
+    def validate_dataset_target(
+        self, object_types: list[str] | tuple[str, ...] | None = None
+    ) -> None:
         """Fail fast if dataset-mode writes are missing required resources."""
         self._validate_ontology_exists()
         required = list(object_types or [])
@@ -614,7 +625,9 @@ class FoundryClient:
                     ) from exc
                 raise
 
-    def validate_write_target(self, object_types: list[str] | tuple[str, ...] | None = None) -> None:
+    def validate_write_target(
+        self, object_types: list[str] | tuple[str, ...] | None = None
+    ) -> None:
         """Validate the configured Foundry write target for the active mode."""
         if self.write_mode == "dataset":
             self.validate_dataset_target(object_types)

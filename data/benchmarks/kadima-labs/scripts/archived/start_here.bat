@@ -35,11 +35,11 @@ if errorlevel 1 (
     echo.
     set /p confirm="Continue? (y/n): "
     if /i not "%confirm%"=="y" exit /b 0
-    
+
     echo.
     echo Downloading qwen3.5:9b...
     ollama pull qwen3.5:9b
-    
+
     echo.
     echo Downloading qwen3.5:27b...
     ollama pull qwen3.5:27b

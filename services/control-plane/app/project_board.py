@@ -29,7 +29,12 @@ def _now_iso() -> str:
 
 
 def _verbose_logging_enabled() -> bool:
-    return str(os.getenv("AGENTIC_VERBOSE_LOGGING", "")).strip().lower() in {"1", "true", "yes", "on"}
+    return str(os.getenv("AGENTIC_VERBOSE_LOGGING", "")).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
 
 def _board_log(event_type: str, payload: dict[str, Any]) -> None:
@@ -469,7 +474,11 @@ def list_cards() -> list[dict[str, Any]]:
             }
         )
     focus = [
-        {"id": str(card.get("id") or ""), "status": str(card.get("status") or ""), "updated_at": str(card.get("updated_at") or "")}
+        {
+            "id": str(card.get("id") or ""),
+            "status": str(card.get("status") or ""),
+            "updated_at": str(card.get("updated_at") or ""),
+        }
         for card in normalized
         if str(card.get("id") or "") in _FOCUS_CARD_IDS
     ]
@@ -618,9 +627,16 @@ def _scan_local_repos() -> list[dict[str, Any]]:
 
     repos: list[dict[str, Any]] = []
     for repo_dir in sorted(repo_dirs):
-        branch = _safe_run(["git", "-C", str(repo_dir), "rev-parse", "--abbrev-ref", "HEAD"]) or "unknown"
-        last_commit_date = _safe_run(["git", "-C", str(repo_dir), "log", "-1", "--format=%cs"]) or "unknown"
-        dirty_output = _safe_run(["git", "-C", str(repo_dir), "status", "--porcelain"], timeout_seconds=10)
+        branch = (
+            _safe_run(["git", "-C", str(repo_dir), "rev-parse", "--abbrev-ref", "HEAD"])
+            or "unknown"
+        )
+        last_commit_date = (
+            _safe_run(["git", "-C", str(repo_dir), "log", "-1", "--format=%cs"]) or "unknown"
+        )
+        dirty_output = _safe_run(
+            ["git", "-C", str(repo_dir), "status", "--porcelain"], timeout_seconds=10
+        )
         dirty_files = len([line for line in dirty_output.splitlines() if line.strip()])
         remote = _safe_run(["git", "-C", str(repo_dir), "remote", "get-url", "origin"]) or ""
 
@@ -776,7 +792,9 @@ def _local_path_ref(path_text: str) -> dict[str, Any]:
         return ref
 
     ref["is_git_repo"] = True
-    ref["branch"] = _safe_run(["git", "-C", str(path), "rev-parse", "--abbrev-ref", "HEAD"]) or "unknown"
+    ref["branch"] = (
+        _safe_run(["git", "-C", str(path), "rev-parse", "--abbrev-ref", "HEAD"]) or "unknown"
+    )
     ref["last_commit_date"] = _safe_run(["git", "-C", str(path), "log", "-1", "--format=%cs"]) or ""
     dirty_output = _safe_run(["git", "-C", str(path), "status", "--porcelain"], timeout_seconds=10)
     ref["dirty_files"] = len([line for line in dirty_output.splitlines() if line.strip()])
@@ -784,7 +802,9 @@ def _local_path_ref(path_text: str) -> dict[str, Any]:
     return ref
 
 
-def _github_url_ref(url: str, github_index: dict[str, dict[str, Any]], github_index_ci: dict[str, dict[str, Any]]) -> dict[str, Any]:
+def _github_url_ref(
+    url: str, github_index: dict[str, dict[str, Any]], github_index_ci: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
     owner, name = _parse_repo_slug_from_url(url)
     ref: dict[str, Any] = {
         "url": url,
@@ -836,7 +856,9 @@ def _github_url_unverified_ref(url: str) -> dict[str, Any]:
     }
 
 
-def _build_tracked_projects(github_index: dict[str, dict[str, Any]], *, github_lookup_available: bool = True) -> list[dict[str, Any]]:
+def _build_tracked_projects(
+    github_index: dict[str, dict[str, Any]], *, github_lookup_available: bool = True
+) -> list[dict[str, Any]]:
     payload = _load_tracked_projects_payload()
     raw_rows = payload.get("projects")
     if not isinstance(raw_rows, list):
@@ -878,13 +900,19 @@ def _build_tracked_projects(github_index: dict[str, dict[str, Any]], *, github_l
         if not github_required:
             github_check = "not_required"
             if github_lookup_available:
-                github_refs = [_github_url_ref(url, github_index, github_index_ci) for url in github_urls]
+                github_refs = [
+                    _github_url_ref(url, github_index, github_index_ci) for url in github_urls
+                ]
             else:
                 github_refs = [_github_url_unverified_ref(url) for url in github_urls]
             missing_github = False
         elif github_lookup_available:
-            github_refs = [_github_url_ref(url, github_index, github_index_ci) for url in github_urls]
-            missing_github = len(github_refs) == 0 or not any(bool(ref.get("exists")) for ref in github_refs)
+            github_refs = [
+                _github_url_ref(url, github_index, github_index_ci) for url in github_urls
+            ]
+            missing_github = len(github_refs) == 0 or not any(
+                bool(ref.get("exists")) for ref in github_refs
+            )
         else:
             github_refs = [_github_url_unverified_ref(url) for url in github_urls]
             if github_urls:
@@ -973,7 +1001,9 @@ def _latest_cleanup_manifest() -> tuple[dict[str, Any] | None, str]:
     if not root.exists():
         return None, ""
 
-    candidates = sorted(root.glob("pruned-*/cleanup_manifest.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    candidates = sorted(
+        root.glob("pruned-*/cleanup_manifest.json"), key=lambda p: p.stat().st_mtime, reverse=True
+    )
     if not candidates:
         return None, ""
 
@@ -1017,7 +1047,10 @@ def _cleanup_summary(manifest: dict[str, Any] | None) -> dict[str, Any]:
         by_reason[reason] = by_reason.get(reason, 0) + 1
         size_bytes += _parse_size_bytes(str(move.get("size_before") or "0"))
 
-    reason_rows = [{"reason": reason, "count": count} for reason, count in sorted(by_reason.items(), key=lambda item: (-item[1], item[0]))]
+    reason_rows = [
+        {"reason": reason, "count": count}
+        for reason, count in sorted(by_reason.items(), key=lambda item: (-item[1], item[0]))
+    ]
     recent_moves = moves[-8:]
 
     return {
@@ -1217,7 +1250,9 @@ def _actions_markdown(actions: list[dict[str, Any]], generated_at: str) -> str:
         "",
     ]
     for idx, action in enumerate(actions, start=1):
-        lines.append(f"{idx}. [{action.get('priority', 'medium')}] {action.get('title', 'Untitled action')}")
+        lines.append(
+            f"{idx}. [{action.get('priority', 'medium')}] {action.get('title', 'Untitled action')}"
+        )
         detail = str(action.get("detail") or "").strip()
         target = str(action.get("target") or "").strip()
         if detail:
@@ -1232,7 +1267,9 @@ def _build_roadmap_snapshot(overview: dict[str, Any]) -> dict[str, Any]:
     board = overview.get("board") if isinstance(overview.get("board"), dict) else {}
     cards = board.get("cards") if isinstance(board.get("cards"), list) else []
     counts = board.get("counts") if isinstance(board.get("counts"), dict) else {}
-    next_actions = overview.get("next_actions") if isinstance(overview.get("next_actions"), list) else []
+    next_actions = (
+        overview.get("next_actions") if isinstance(overview.get("next_actions"), list) else []
+    )
 
     now_items: list[dict[str, Any]] = []
     next_items: list[dict[str, Any]] = []
@@ -1328,7 +1365,9 @@ def _build_roadmap_snapshot(overview: dict[str, Any]) -> dict[str, Any]:
 def _roadmap_markdown(snapshot: dict[str, Any]) -> str:
     generated_at = str(snapshot.get("generated_at") or _now_iso())
     runtime_mode = str(snapshot.get("runtime_mode") or "local")
-    board_counts = snapshot.get("board_counts") if isinstance(snapshot.get("board_counts"), dict) else {}
+    board_counts = (
+        snapshot.get("board_counts") if isinstance(snapshot.get("board_counts"), dict) else {}
+    )
     horizons = snapshot.get("horizons") if isinstance(snapshot.get("horizons"), dict) else {}
 
     lines = [
@@ -1394,7 +1433,10 @@ def sync_board_artifacts() -> dict[str, Any]:
     snapshot_path.write_text(json.dumps(snapshot_payload, indent=2), encoding="utf-8")
     next_actions = overview.get("next_actions", [])
     next_actions_path.write_text(
-        _actions_markdown(next_actions if isinstance(next_actions, list) else [], overview.get("generated_at", _now_iso())),
+        _actions_markdown(
+            next_actions if isinstance(next_actions, list) else [],
+            overview.get("generated_at", _now_iso()),
+        ),
         encoding="utf-8",
     )
     roadmap_snapshot = _build_roadmap_snapshot(overview)
@@ -1424,7 +1466,9 @@ def get_projects_overview(force_refresh: bool = False) -> dict[str, Any]:
                 "get_projects_overview_cache_hit",
                 {
                     "force_refresh": bool(force_refresh),
-                    "generated_at": cached_payload.get("generated_at") if isinstance(cached_payload, dict) else "",
+                    "generated_at": cached_payload.get("generated_at")
+                    if isinstance(cached_payload, dict)
+                    else "",
                     "age_seconds": round(now_ts - cached_ts, 2),
                 },
             )
@@ -1434,7 +1478,9 @@ def get_projects_overview(force_refresh: bool = False) -> dict[str, Any]:
     local_repos = _scan_local_repos()
     github_index = _scan_github_repos()
     github_lookup_available = _github_lookup_available(github_index)
-    tracked_projects = _build_tracked_projects(github_index, github_lookup_available=github_lookup_available)
+    tracked_projects = _build_tracked_projects(
+        github_index, github_lookup_available=github_lookup_available
+    )
 
     enriched_repos: list[dict[str, Any]] = []
     for repo in local_repos:
@@ -1457,7 +1503,9 @@ def get_projects_overview(force_refresh: bool = False) -> dict[str, Any]:
         enriched_repos,
         key=lambda row: (row.get("github_archived", False), row.get("name", "")),
     )
-    next_actions = _derive_next_actions(cards, sorted_repos, cleanup, tracked_projects=tracked_projects)
+    next_actions = _derive_next_actions(
+        cards, sorted_repos, cleanup, tracked_projects=tracked_projects
+    )
     runtime_mode = "cloud_run" if _is_cloud_runtime() else "local"
 
     payload = {
@@ -1473,18 +1521,30 @@ def get_projects_overview(force_refresh: bool = False) -> dict[str, Any]:
         "tracked_projects": tracked_projects,
         "summary": {
             "local_repo_count": len(enriched_repos),
-            "local_dirty_repo_count": len([row for row in enriched_repos if int(row.get("dirty_files", 0)) > 0]),
-            "github_archived_visible_count": len([row for row in enriched_repos if row.get("github_archived")]),
+            "local_dirty_repo_count": len(
+                [row for row in enriched_repos if int(row.get("dirty_files", 0)) > 0]
+            ),
+            "github_archived_visible_count": len(
+                [row for row in enriched_repos if row.get("github_archived")]
+            ),
             "board_card_count": len(cards),
             "tracked_project_count": len(tracked_projects),
-            "tracked_missing_local_count": len([row for row in tracked_projects if row.get("missing_local")]),
+            "tracked_missing_local_count": len(
+                [row for row in tracked_projects if row.get("missing_local")]
+            ),
             "tracked_local_not_applicable_count": len(
                 [row for row in tracked_projects if row.get("local_path_check") == "not_applicable"]
             ),
             "tracked_github_not_applicable_count": len(
-                [row for row in tracked_projects if row.get("github_check") in {"not_applicable", "not_required"}]
+                [
+                    row
+                    for row in tracked_projects
+                    if row.get("github_check") in {"not_applicable", "not_required"}
+                ]
             ),
-            "tracked_missing_github_count": len([row for row in tracked_projects if row.get("missing_github")]),
+            "tracked_missing_github_count": len(
+                [row for row in tracked_projects if row.get("missing_github")]
+            ),
             "cleanup_total_moves": cleanup["total_moves"],
             "cleanup_total_size": cleanup["total_size"],
             "cleanup_remote_archived_repos": cleanup["remote_archived_repos"],

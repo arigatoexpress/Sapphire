@@ -28,7 +28,7 @@ class SwarmAggregator:
     """Aggregates trade ideas from bots using reputation-weighted voting."""
 
     # Conviction thresholds
-    HIGH_CONVICTION_THRESHOLD = 0.70   # ≥70% weighted agreement = high conviction
+    HIGH_CONVICTION_THRESHOLD = 0.70  # ≥70% weighted agreement = high conviction
     MODERATE_CONVICTION_THRESHOLD = 0.50
 
     # Idea expiry (seconds)
@@ -86,7 +86,11 @@ class SwarmAggregator:
             symbol = str(symbol or "").strip().upper()
             direction = str(direction or "").strip().upper()
             if direction not in ("LONG", "SHORT"):
-                return {"ok": False, "error": "invalid_direction", "detail": "Must be LONG or SHORT"}
+                return {
+                    "ok": False,
+                    "error": "invalid_direction",
+                    "detail": "Must be LONG or SHORT",
+                }
             if not symbol:
                 return {"ok": False, "error": "missing_symbol"}
 
@@ -206,14 +210,16 @@ class SwarmAggregator:
             # Contributors list
             contributors = []
             for idea in open_ideas:
-                contributors.append({
-                    "bot_id": idea["bot_id"],
-                    "direction": idea["direction"],
-                    "confidence": idea["confidence"],
-                    "reputation_weight": idea["reputation_weight"],
-                    "weighted_score": idea["weighted_score"],
-                    "idea_id": idea["idea_id"],
-                })
+                contributors.append(
+                    {
+                        "bot_id": idea["bot_id"],
+                        "direction": idea["direction"],
+                        "confidence": idea["confidence"],
+                        "reputation_weight": idea["reputation_weight"],
+                        "weighted_score": idea["weighted_score"],
+                        "idea_id": idea["idea_id"],
+                    }
+                )
 
             # Average target/stop across dominant direction
             dominant_ideas = long_ideas if weighted_long >= weighted_short else short_ideas
@@ -236,16 +242,19 @@ class SwarmAggregator:
 
             # Include PM virtual voter in contributors if it contributed
             if pm_adjustment:
-                contributors.append({
-                    "bot_id": "__PREDICTION_MARKET__",
-                    "direction": pm_adjustment["direction"],
-                    "confidence": pm_adjustment["confidence"],
-                    "reputation_weight": self.PM_WEIGHT,
-                    "weighted_score": pm_adjustment.get("long_boost", 0.0) + pm_adjustment.get("short_boost", 0.0),
-                    "idea_id": "pm_virtual_voter",
-                    "source": "prediction_market",
-                    "sentiment": pm_adjustment.get("sentiment", "neutral"),
-                })
+                contributors.append(
+                    {
+                        "bot_id": "__PREDICTION_MARKET__",
+                        "direction": pm_adjustment["direction"],
+                        "confidence": pm_adjustment["confidence"],
+                        "reputation_weight": self.PM_WEIGHT,
+                        "weighted_score": pm_adjustment.get("long_boost", 0.0)
+                        + pm_adjustment.get("short_boost", 0.0),
+                        "idea_id": "pm_virtual_voter",
+                        "source": "prediction_market",
+                        "sentiment": pm_adjustment.get("sentiment", "neutral"),
+                    }
+                )
 
             return {
                 "ok": True,

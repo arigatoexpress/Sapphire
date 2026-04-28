@@ -204,9 +204,7 @@ class PositionReconciler:
                     try:
                         await on_drift(drift_msg)
                     except Exception as cb_exc:
-                        logger.warning(
-                            "PositionReconciler: on_drift callback error: %s", cb_exc
-                        )
+                        logger.warning("PositionReconciler: on_drift callback error: %s", cb_exc)
             except Exception as exc:
                 logger.error("PositionReconciler: unexpected error: %s", exc)
 

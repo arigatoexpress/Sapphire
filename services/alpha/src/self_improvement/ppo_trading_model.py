@@ -32,7 +32,7 @@ class PPOConfig:
     # Model architecture
     actor_hidden_dims: list[int] = field(default_factory=lambda: [512, 256, 128])
     critic_hidden_dims: list[int] = field(default_factory=lambda: [512, 256, 128])
-    activation: str = 'relu'
+    activation: str = "relu"
 
     # Training hyperparameters
     learning_rate: float = 3e-4
@@ -51,7 +51,7 @@ class PPOConfig:
     num_episodes: int = 1000
 
     # GPU optimization
-    device: str = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device: str = "cuda" if torch.cuda.is_available() else "cpu"
     use_tensorrt: bool = True
     mixed_precision: bool = True
     gradient_checkpointing: bool = True
@@ -91,21 +91,22 @@ class TradingActor(nn.Module):
         prev_dim = obs_dim
 
         for hidden_dim in config.actor_hidden_dims:
-            layers.extend([
-                nn.Linear(prev_dim, hidden_dim),
-                self._get_activation(),
-                nn.LayerNorm(hidden_dim),
-                nn.Dropout(0.1)
-            ])
+            layers.extend(
+                [
+                    nn.Linear(prev_dim, hidden_dim),
+                    self._get_activation(),
+                    nn.LayerNorm(hidden_dim),
+                    nn.Dropout(0.1),
+                ]
+            )
             prev_dim = hidden_dim
 
         self.actor_network = nn.Sequential(*layers)
 
         # Action heads (for multi-discrete action space)
-        self.action_heads = nn.ModuleList([
-            nn.Linear(prev_dim, action_space_size)
-            for action_space_size in action_dim
-        ])
+        self.action_heads = nn.ModuleList(
+            [nn.Linear(prev_dim, action_space_size) for action_space_size in action_dim]
+        )
 
         # Initialize weights
         self.apply(self._init_weights)
@@ -115,11 +116,11 @@ class TradingActor(nn.Module):
 
     def _get_activation(self):
         """Get activation function"""
-        if self.config.activation == 'relu':
+        if self.config.activation == "relu":
             return nn.ReLU()
-        elif self.config.activation == 'tanh':
+        elif self.config.activation == "tanh":
             return nn.Tanh()
-        elif self.config.activation == 'gelu':
+        elif self.config.activation == "gelu":
             return nn.GELU()
         else:
             return nn.ReLU()
@@ -202,7 +203,9 @@ class TradingActor(nn.Module):
 
         return actions, log_probs, entropies
 
-    def evaluate_actions(self, obs: torch.Tensor, actions: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def evaluate_actions(
+        self, obs: torch.Tensor, actions: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Evaluate log probabilities and entropy of given actions
 
@@ -249,12 +252,14 @@ class TradingCritic(nn.Module):
         prev_dim = obs_dim
 
         for hidden_dim in config.critic_hidden_dims:
-            layers.extend([
-                nn.Linear(prev_dim, hidden_dim),
-                self._get_activation(),
-                nn.LayerNorm(hidden_dim),
-                nn.Dropout(0.1)
-            ])
+            layers.extend(
+                [
+                    nn.Linear(prev_dim, hidden_dim),
+                    self._get_activation(),
+                    nn.LayerNorm(hidden_dim),
+                    nn.Dropout(0.1),
+                ]
+            )
             prev_dim = hidden_dim
 
         # Value head
@@ -270,11 +275,11 @@ class TradingCritic(nn.Module):
 
     def _get_activation(self):
         """Get activation function"""
-        if self.config.activation == 'relu':
+        if self.config.activation == "relu":
             return nn.ReLU()
-        elif self.config.activation == 'tanh':
+        elif self.config.activation == "tanh":
             return nn.Tanh()
-        elif self.config.activation == 'gelu':
+        elif self.config.activation == "gelu":
             return nn.GELU()
         else:
             return nn.ReLU()
@@ -339,8 +344,15 @@ class PPOMemory:
         self.values.clear()
         self.dones.clear()
 
-    def store(self, state: np.ndarray, action: np.ndarray, log_prob: np.ndarray,
-              reward: float, value: float, done: bool):
+    def store(
+        self,
+        state: np.ndarray,
+        action: np.ndarray,
+        log_prob: np.ndarray,
+        reward: float,
+        value: float,
+        done: bool,
+    ):
         """Store a single experience"""
         self.states.append(state)
         self.actions.append(action)
@@ -387,11 +399,11 @@ class PPOMemory:
         advantages, returns = self.compute_advantages(0.99, 0.95)
 
         return {
-            'states': states,
-            'actions': actions,
-            'log_probs': log_probs,
-            'advantages': advantages,
-            'returns': returns
+            "states": states,
+            "actions": actions,
+            "log_probs": log_probs,
+            "advantages": advantages,
+            "returns": returns,
         }
 
 
@@ -423,10 +435,10 @@ class PPOMostProfitableTrader:
         self.critic = TradingCritic(obs_dim, self.config)
 
         # Initialize optimizer
-        self.optimizer = optim.Adam([
-            {'params': self.actor.parameters()},
-            {'params': self.critic.parameters()}
-        ], lr=self.config.learning_rate)
+        self.optimizer = optim.Adam(
+            [{"params": self.actor.parameters()}, {"params": self.critic.parameters()}],
+            lr=self.config.learning_rate,
+        )
 
         # Learning rate scheduler
         if self.config.adaptive_lr:
@@ -447,7 +459,7 @@ class PPOMostProfitableTrader:
 
         # Self-improving features
         self.performance_history = []
-        self.best_reward = float('-inf')
+        self.best_reward = float("-inf")
         self.patience_counter = 0
 
         logger.info("PPO Most Profitable Trader initialized")
@@ -472,11 +484,11 @@ class PPOMostProfitableTrader:
         logger.info(f"Starting PPO training for {num_episodes} episodes")
 
         training_history = {
-            'rewards': [],
-            'actor_losses': [],
-            'critic_losses': [],
-            'entropies': [],
-            'learning_rates': []
+            "rewards": [],
+            "actor_losses": [],
+            "critic_losses": [],
+            "entropies": [],
+            "learning_rates": [],
         }
 
         for episode in range(num_episodes):
@@ -490,11 +502,11 @@ class PPOMostProfitableTrader:
                 losses = self._update_policy()
 
                 # Record metrics
-                training_history['rewards'].append(episode_reward)
-                training_history['actor_losses'].append(losses['actor_loss'])
-                training_history['critic_losses'].append(losses['critic_loss'])
-                training_history['entropies'].append(losses['entropy'])
-                training_history['learning_rates'].append(self.optimizer.param_groups[0]['lr'])
+                training_history["rewards"].append(episode_reward)
+                training_history["actor_losses"].append(losses["actor_loss"])
+                training_history["critic_losses"].append(losses["critic_loss"])
+                training_history["entropies"].append(losses["entropy"])
+                training_history["learning_rates"].append(self.optimizer.param_groups[0]["lr"])
 
             # Update learning rate
             if self.lr_scheduler:
@@ -505,7 +517,9 @@ class PPOMostProfitableTrader:
 
             # Logging
             if episode % self.config.log_interval == 0:
-                self._log_training_progress(episode, episode_reward, losses if 'losses' in locals() else None)
+                self._log_training_progress(
+                    episode, episode_reward, losses if "losses" in locals() else None
+                )
 
             # Save model
             if episode % self.config.save_interval == 0:
@@ -573,11 +587,11 @@ class PPOMostProfitableTrader:
 
         # Get batch data
         batch = self.memory.get_batch()
-        states = torch.FloatTensor(batch['states']).to(self.config.device)
-        actions = torch.LongTensor(batch['actions']).to(self.config.device)
-        old_log_probs = torch.FloatTensor(batch['log_probs']).to(self.config.device)
-        advantages = torch.FloatTensor(batch['advantages']).to(self.config.device)
-        returns = torch.FloatTensor(batch['returns']).to(self.config.device)
+        states = torch.FloatTensor(batch["states"]).to(self.config.device)
+        actions = torch.LongTensor(batch["actions"]).to(self.config.device)
+        old_log_probs = torch.FloatTensor(batch["log_probs"]).to(self.config.device)
+        advantages = torch.FloatTensor(batch["advantages"]).to(self.config.device)
+        returns = torch.FloatTensor(batch["returns"]).to(self.config.device)
 
         # Training loop
         actor_losses = []
@@ -610,11 +624,17 @@ class PPOMostProfitableTrader:
                     # Compute losses
                     # PPO clipped objective
                     ratio = torch.exp(new_log_probs - mini_old_log_probs)
-                    clipped_ratio = torch.clamp(ratio, 1 - self.config.clip_ratio, 1 + self.config.clip_ratio)
-                    actor_loss = -torch.min(ratio * mini_advantages, clipped_ratio * mini_advantages).mean()
+                    clipped_ratio = torch.clamp(
+                        ratio, 1 - self.config.clip_ratio, 1 + self.config.clip_ratio
+                    )
+                    actor_loss = -torch.min(
+                        ratio * mini_advantages, clipped_ratio * mini_advantages
+                    ).mean()
 
                     # Value loss
-                    critic_loss = self.config.value_loss_coef * ((values - mini_returns) ** 2).mean()
+                    critic_loss = (
+                        self.config.value_loss_coef * ((values - mini_returns) ** 2).mean()
+                    )
 
                     # Entropy bonus
                     entropy_loss = -self.config.entropy_coef * entropy.sum(dim=1).mean()
@@ -628,8 +648,12 @@ class PPOMostProfitableTrader:
                     self.scaler.unscale_(self.optimizer)
 
                     # Gradient clipping
-                    torch.nn.utils.clip_grad_norm_(self.actor.parameters(), self.config.max_grad_norm)
-                    torch.nn.utils.clip_grad_norm_(self.critic.parameters(), self.config.max_grad_norm)
+                    torch.nn.utils.clip_grad_norm_(
+                        self.actor.parameters(), self.config.max_grad_norm
+                    )
+                    torch.nn.utils.clip_grad_norm_(
+                        self.critic.parameters(), self.config.max_grad_norm
+                    )
 
                     self.scaler.step(self.optimizer)
                     self.scaler.update()
@@ -637,8 +661,12 @@ class PPOMostProfitableTrader:
                     total_loss.backward()
 
                     # Gradient clipping
-                    torch.nn.utils.clip_grad_norm_(self.actor.parameters(), self.config.max_grad_norm)
-                    torch.nn.utils.clip_grad_norm_(self.critic.parameters(), self.config.max_grad_norm)
+                    torch.nn.utils.clip_grad_norm_(
+                        self.actor.parameters(), self.config.max_grad_norm
+                    )
+                    torch.nn.utils.clip_grad_norm_(
+                        self.critic.parameters(), self.config.max_grad_norm
+                    )
 
                     self.optimizer.step()
 
@@ -650,10 +678,10 @@ class PPOMostProfitableTrader:
                 entropy_losses.append(entropy_loss.item())
 
         return {
-            'actor_loss': np.mean(actor_losses),
-            'critic_loss': np.mean(critic_losses),
-            'entropy': np.mean(entropy_losses),
-            'total_loss': np.mean(actor_losses) + np.mean(critic_losses) + np.mean(entropy_losses)
+            "actor_loss": np.mean(actor_losses),
+            "critic_loss": np.mean(critic_losses),
+            "entropy": np.mean(entropy_losses),
+            "total_loss": np.mean(actor_losses) + np.mean(critic_losses) + np.mean(entropy_losses),
         }
 
     def _self_improving_adjustments(self, episode_reward: float):
@@ -682,7 +710,7 @@ class PPOMostProfitableTrader:
         else:
             # Not improving, reduce learning rate
             for param_group in self.optimizer.param_groups:
-                param_group['lr'] *= 0.95
+                param_group["lr"] *= 0.95
 
         # Clip entropy coefficient to reasonable bounds
         self.config.entropy_coef = np.clip(self.config.entropy_coef, 0.001, 0.1)
@@ -732,15 +760,18 @@ class PPOMostProfitableTrader:
         model_path = Path("models") / f"{filename}.pth"
         model_path.parent.mkdir(exist_ok=True)
 
-        torch.save({
-            'actor_state_dict': self.actor.state_dict(),
-            'critic_state_dict': self.critic.state_dict(),
-            'optimizer_state_dict': self.optimizer.state_dict(),
-            'config': self.config,
-            'env_config': self.env_config,
-            'metrics': self.metrics.__dict__,
-            'best_reward': self.best_reward
-        }, model_path)
+        torch.save(
+            {
+                "actor_state_dict": self.actor.state_dict(),
+                "critic_state_dict": self.critic.state_dict(),
+                "optimizer_state_dict": self.optimizer.state_dict(),
+                "config": self.config,
+                "env_config": self.env_config,
+                "metrics": self.metrics.__dict__,
+                "best_reward": self.best_reward,
+            },
+            model_path,
+        )
 
         logger.info(f"Model saved to {model_path}")
 
@@ -755,14 +786,14 @@ class PPOMostProfitableTrader:
 
         checkpoint = torch.load(model_path, map_location=self.config.device)
 
-        self.actor.load_state_dict(checkpoint['actor_state_dict'])
-        self.critic.load_state_dict(checkpoint['critic_state_dict'])
-        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        self.actor.load_state_dict(checkpoint["actor_state_dict"])
+        self.critic.load_state_dict(checkpoint["critic_state_dict"])
+        self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 
         # Load additional data
-        self.config = checkpoint.get('config', self.config)
-        self.env_config = checkpoint.get('env_config', self.env_config)
-        self.best_reward = checkpoint.get('best_reward', self.best_reward)
+        self.config = checkpoint.get("config", self.config)
+        self.env_config = checkpoint.get("env_config", self.env_config)
+        self.best_reward = checkpoint.get("best_reward", self.best_reward)
 
         logger.info(f"Model loaded from {model_path}")
 
@@ -776,7 +807,9 @@ class PPOMostProfitableTrader:
 
 
 # Convenience functions
-def create_ppo_trader(config: PPOConfig = None, env_config: TradingConfig = None) -> PPOMostProfitableTrader:
+def create_ppo_trader(
+    config: PPOConfig = None, env_config: TradingConfig = None
+) -> PPOMostProfitableTrader:
     """Create PPO trader instance"""
     return PPOMostProfitableTrader(config, env_config)
 
@@ -785,11 +818,11 @@ def create_volatile_market_ppo() -> PPOMostProfitableTrader:
     """Create PPO optimized for volatile bull market downturns"""
 
     env_config = TradingConfig(
-        reward_function='sortino',  # Focus on downside risk
+        reward_function="sortino",  # Focus on downside risk
         max_drawdown_limit=0.10,
         stop_loss_threshold=0.02,
         take_profit_threshold=0.03,
-        adaptive_reward=True
+        adaptive_reward=True,
     )
 
     ppo_config = PPOConfig(
@@ -799,7 +832,7 @@ def create_volatile_market_ppo() -> PPOMostProfitableTrader:
         value_loss_coef=0.7,  # Higher weight on value function
         entropy_coef=0.02,  # Encourage exploration
         adaptive_lr=True,
-        risk_aware_updates=True
+        risk_aware_updates=True,
     )
 
     return PPOMostProfitableTrader(ppo_config, env_config)
@@ -815,7 +848,7 @@ def create_hft_ppo() -> PPOMostProfitableTrader:
         enable_market_microstructure=True,
         order_book_depth=20,
         maker_fee=0.0001,  # Lower fees for HFT
-        taker_fee=0.0003
+        taker_fee=0.0003,
     )
 
     ppo_config = PPOConfig(
@@ -824,7 +857,7 @@ def create_hft_ppo() -> PPOMostProfitableTrader:
         epochs_per_update=5,  # Faster updates for HFT
         learning_rate=5e-4,  # Higher learning rate
         clip_ratio=0.25,  # More permissive clipping
-        entropy_coef=0.05  # Higher exploration
+        entropy_coef=0.05,  # Higher exploration
     )
 
     return PPOMostProfitableTrader(ppo_config, env_config)

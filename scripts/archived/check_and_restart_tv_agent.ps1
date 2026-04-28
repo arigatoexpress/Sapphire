@@ -31,23 +31,23 @@ Write-Host ""
 if ($found) {
     Write-Host "Found TV Agent at: $found" -ForegroundColor Green
     Write-Host ""
-    
+
     # Check if Python/venv exists
     $venvPath = Join-Path $found "backend\venv\Scripts\activate.bat"
     $mainPath = Join-Path $found "backend\main.py"
-    
+
     if (Test-Path $venvPath) {
         Write-Host "✅ Virtual environment found" -ForegroundColor Green
-        
+
         $choice = Read-Host "Start the TV Agent now? (y/n)"
-        
+
         if ($choice -eq 'y' -or $choice -eq 'Y') {
             Write-Host ""
             Write-Host "Starting TV Agent..." -ForegroundColor Yellow
-            
+
             $backendPath = Join-Path $found "backend"
             Set-Location $backendPath
-            
+
             # Activate and start
             cmd /c "venv\Scripts\activate.bat && uvicorn main:app --host 0.0.0.0 --port 8081"
         }

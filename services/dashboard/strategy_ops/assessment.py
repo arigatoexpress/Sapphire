@@ -44,7 +44,9 @@ def build_strategy_ops_assessment(*, scorecard: dict, reject_tax: dict) -> dict:
     if hard_fail_pct > max_hard_fail:
         reasons.append(f"hard_fail {hard_fail_pct:.1f}% > {max_hard_fail:.1f}%")
 
-    promote_lanes = [row for row in ranked if str((row or {}).get("recommendation", "")).lower() == "promote"]
+    promote_lanes = [
+        row for row in ranked if str((row or {}).get("recommendation", "")).lower() == "promote"
+    ]
     top_promote = promote_lanes[0] if promote_lanes else None
     go = len(reasons) == 0
     return {

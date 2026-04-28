@@ -57,8 +57,10 @@ def test_falls_back_to_secrets_file(monkeypatch, tmp_path, reload_server):
     server = reload_server()
     # Re-patch the module-level _SECRET_PATHS which is bound at import time
     from pathlib import Path as _Path
+
     monkeypatch.setattr(
-        server, "_SECRET_PATHS",
+        server,
+        "_SECRET_PATHS",
         [
             _Path(fake_home) / ".config" / "sapphire-secrets" / "telegram_bot_token",
             _Path(fake_home) / ".config" / "sapphire" / "telegram_bot_token",
@@ -71,9 +73,11 @@ def test_returns_empty_when_nothing_configured(monkeypatch, tmp_path, reload_ser
     monkeypatch.setenv("HOME", str(tmp_path))
     server = reload_server()
     from pathlib import Path as _Path
+
     # Point secret paths at a directory that has no files
     monkeypatch.setattr(
-        server, "_SECRET_PATHS",
+        server,
+        "_SECRET_PATHS",
         [
             _Path(tmp_path) / ".config" / "sapphire-secrets" / "telegram_bot_token",
             _Path(tmp_path) / ".config" / "sapphire" / "telegram_bot_token",
@@ -103,8 +107,10 @@ def test_empty_secrets_file_skipped(monkeypatch, tmp_path, reload_server):
 
     server = reload_server()
     from pathlib import Path as _Path
+
     monkeypatch.setattr(
-        server, "_SECRET_PATHS",
+        server,
+        "_SECRET_PATHS",
         [
             _Path(fake_home) / ".config" / "sapphire-secrets" / "telegram_bot_token",
             _Path(fake_home) / ".config" / "sapphire" / "telegram_bot_token",
@@ -157,6 +163,7 @@ def test_webhook_secret_falls_back_to_secret_file(monkeypatch, tmp_path, reload_
     monkeypatch.setenv("SAPPHIRE_PM_BOT_TOKEN", "test-token")
     server = reload_server()
     from pathlib import Path as _Path
+
     monkeypatch.setattr(
         server,
         "_WEBHOOK_SECRET_PATHS",
@@ -180,6 +187,7 @@ def test_explicit_webhook_secret_wins_over_secret_file(monkeypatch, tmp_path, re
     monkeypatch.setenv("SAPPHIRE_PM_BOT_WEBHOOK_SECRET", "env-webhook-secret")
     server = reload_server()
     from pathlib import Path as _Path
+
     monkeypatch.setattr(
         server,
         "_WEBHOOK_SECRET_PATHS",

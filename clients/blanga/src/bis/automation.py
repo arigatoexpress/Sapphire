@@ -17,7 +17,9 @@ def _iso_day(value: date | None) -> str:
     return value.isoformat() if value else "n/a"
 
 
-def generate_property_summary_doc(store: InMemoryMasterArena, property_urn: str) -> GeneratedDocument:
+def generate_property_summary_doc(
+    store: InMemoryMasterArena, property_urn: str
+) -> GeneratedDocument:
     prop = store.get_property(property_urn)
     if not prop:
         raise KeyError(f"property not found: {property_urn}")
@@ -25,7 +27,9 @@ def generate_property_summary_doc(store: InMemoryMasterArena, property_urn: str)
     owners = store.owners_for_property(property_urn)
     owner_names = ", ".join(owner.full_name for owner in owners) or "Unknown owner"
     days_on_market = store.days_on_market(property_urn)
-    score = compute_propensity_score(prop, store.list_signals(property_urn=property_urn, since_days=365))
+    score = compute_propensity_score(
+        prop, store.list_signals(property_urn=property_urn, since_days=365)
+    )
 
     content = "\n".join(
         [
@@ -63,7 +67,9 @@ def generate_call_brief_doc(store: InMemoryMasterArena, property_urn: str) -> Ge
     signals = store.list_signals(property_urn=property_urn, since_days=120)[:5]
     market_events = store.list_market_events(property_urn=property_urn, since_days=180)[:5]
 
-    notes_lines = [f"- {note.created_at.date().isoformat()}: {note.note_text}" for note in notes] or ["- No notes."]
+    notes_lines = [
+        f"- {note.created_at.date().isoformat()}: {note.note_text}" for note in notes
+    ] or ["- No notes."]
     signal_lines = [
         f"- {signal.observed_at.date().isoformat()} {signal.signal_type.value}: {signal.attributes.get('description', '')}".strip()
         for signal in signals
@@ -137,7 +143,11 @@ def run_automation_tick(
             dom = store.days_on_market(prop.property_urn)
             if dom is not None and dom >= stale_listing_days:
                 marker = f"auto-dom-{dom}"
-                existing = [note for note in store.notes_rollup_for_property(prop.property_urn) if marker in note.tags]
+                existing = [
+                    note
+                    for note in store.notes_rollup_for_property(prop.property_urn)
+                    if marker in note.tags
+                ]
                 if not existing:
                     store.add_note(
                         NoteEntry(

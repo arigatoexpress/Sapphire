@@ -48,6 +48,7 @@ log = logging.getLogger(__name__)
 
 try:
     import redis
+
     _REDIS_AVAILABLE = True
 except ImportError:
     redis = None  # type: ignore[assignment]
@@ -85,9 +86,9 @@ STREAM_MAXLEN = 10_000  # approx-trim per stream
 class Event:
     """A single event on the bus."""
 
-    id: str          # redis stream id OR uuid when using fallback
-    type: str        # e.g. "signal.generated"
-    ts: str          # ISO-8601 UTC timestamp
+    id: str  # redis stream id OR uuid when using fallback
+    type: str  # e.g. "signal.generated"
+    ts: str  # ISO-8601 UTC timestamp
     data: dict[str, Any]
     source: str = "unknown"
 
@@ -120,16 +121,16 @@ class Event:
 class WorldState:
     """Aggregated state across recent events."""
 
-    market_regime: str = "UNKNOWN"            # RISK_ON / RISK_OFF / TRANSITION
+    market_regime: str = "UNKNOWN"  # RISK_ON / RISK_OFF / TRANSITION
     regime_confidence: float = 0.0
     regime_since: datetime | None = None
-    fear_greed: int = -1                       # 0-100, -1 = unknown
-    funding_bias: str = "neutral"              # long / short / neutral
-    correlation_state: str = "normal"          # normal / decorrelated
+    fear_greed: int = -1  # 0-100, -1 = unknown
+    funding_bias: str = "neutral"  # long / short / neutral
+    correlation_state: str = "normal"  # normal / decorrelated
     portfolio_pnl: float = 0.0
     open_positions: int = 0
-    threat_level: str = "low"                  # low / elevated / high / critical
-    infrastructure_health: str = "nominal"     # nominal / degraded / critical
+    threat_level: str = "low"  # low / elevated / high / critical
+    infrastructure_health: str = "nominal"  # nominal / degraded / critical
     active_signals: int = 0
     last_update: datetime = field(default_factory=lambda: datetime.now(UTC))
 
@@ -298,10 +299,15 @@ class EventBus:
                             continue
                         if since and rec.get("ts", "") < since.isoformat():
                             continue
-                        out.append(Event(
-                            id=rec["id"], type=rec["type"], ts=rec["ts"],
-                            source=rec.get("source", "unknown"), data=rec.get("data", {}),
-                        ))
+                        out.append(
+                            Event(
+                                id=rec["id"],
+                                type=rec["type"],
+                                ts=rec["ts"],
+                                source=rec.get("source", "unknown"),
+                                data=rec.get("data", {}),
+                            )
+                        )
                         if len(out) >= limit:
                             break
             except Exception as e:
@@ -415,7 +421,9 @@ class _Subscription:
         return unique
 
     def start(self) -> None:
-        self._thread = threading.Thread(target=self._run, name=f"evtbus-{self._consumer}", daemon=True)
+        self._thread = threading.Thread(
+            target=self._run, name=f"evtbus-{self._consumer}", daemon=True
+        )
         self._thread.start()
 
     def stop(self) -> None:
@@ -442,9 +450,11 @@ class _Subscription:
             try:
                 if self._group:
                     res = self._bus._client.xreadgroup(
-                        self._group, self._consumer,
+                        self._group,
+                        self._consumer,
                         {s: ">" for s in streams},
-                        count=50, block=1000,
+                        count=50,
+                        block=1000,
                     )
                 else:
                     res = self._bus._client.xread(cursor, count=50, block=1000)
@@ -480,7 +490,9 @@ class _Subscription:
                         continue
                     if self._matches(rec.get("type", "")):
                         ev = Event(
-                            id=rec["id"], type=rec["type"], ts=rec["ts"],
+                            id=rec["id"],
+                            type=rec["type"],
+                            ts=rec["ts"],
                             source=rec.get("source", "unknown"),
                             data=rec.get("data", {}),
                         )

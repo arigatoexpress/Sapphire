@@ -41,6 +41,7 @@ if str(_ALPHA_DIR) not in sys.path:
 
 try:
     from signal_pipeline import pipeline as _signal_pipeline
+
     _PIPELINE_AVAILABLE = True
 except ImportError:
     _PIPELINE_AVAILABLE = False
@@ -52,6 +53,7 @@ def _record_outcome(pipeline_id: str, pnl_usd: float, close_price: float = 0.0) 
         return
     outcome = "win" if pnl_usd > 0 else ("break_even" if pnl_usd == 0 else "loss")
     _signal_pipeline.update_signal_outcome(pipeline_id, outcome, pnl_usd, close_price)
+
 
 # Paper trading config
 INITIAL_CAPITAL = 100_000.0  # $100K paper money
@@ -85,9 +87,7 @@ def _normalize_position(pos: dict) -> dict:
         )
         or 0.0
     )
-    remaining_entry_fee = float(
-        pos.get("remaining_entry_fee_usd", estimated_entry_fee) or 0.0
-    )
+    remaining_entry_fee = float(pos.get("remaining_entry_fee_usd", estimated_entry_fee) or 0.0)
 
     pos["estimated_entry_fee_usd"] = _round_money(estimated_entry_fee)
     pos["remaining_entry_fee_usd"] = _round_money(
@@ -110,13 +110,15 @@ def _normalize_portfolio(pf: dict) -> dict:
 def _load_portfolio() -> dict:
     if PORTFOLIO_FILE.exists():
         return _normalize_portfolio(json.loads(PORTFOLIO_FILE.read_text()))
-    return _normalize_portfolio({
-        "capital": INITIAL_CAPITAL,
-        "initial_capital": INITIAL_CAPITAL,
-        "positions": [],  # Open positions
-        "history": [],  # Closed trades
-        "created_at": datetime.now(UTC).isoformat(),
-    })
+    return _normalize_portfolio(
+        {
+            "capital": INITIAL_CAPITAL,
+            "initial_capital": INITIAL_CAPITAL,
+            "positions": [],  # Open positions
+            "history": [],  # Closed trades
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+    )
 
 
 def _save_portfolio(pf: dict):
@@ -129,6 +131,7 @@ def _ssl_ctx() -> ssl.SSLContext:
     """Build an SSL context that uses certifi certs (macOS Python 3.12 fix)."""
     try:
         import certifi
+
         return ssl.create_default_context(cafile=certifi.where())
     except ImportError:
         return ssl.create_default_context()
@@ -229,9 +232,16 @@ def _close_position_slice(
     return trade, remaining_qty == 0.0, pos["realized_pnl_usd"]
 
 
-def action_execute(symbol: str, side: str, price: float, atr: float = None,
-                    confidence: float = 0.5, kelly_size_pct: float = None, edge: float = None,
-                    pipeline_id: str = "") -> dict:
+def action_execute(
+    symbol: str,
+    side: str,
+    price: float,
+    atr: float = None,
+    confidence: float = 0.5,
+    kelly_size_pct: float = None,
+    edge: float = None,
+    pipeline_id: str = "",
+) -> dict:
     """Execute a paper trade with optional Half-Kelly sizing from signal generator."""
     if price <= 0:
         return {"error": "Price must be > 0"}
@@ -278,14 +288,16 @@ def action_execute(symbol: str, side: str, price: float, atr: float = None,
         "original_size_usd": size_usd,
         "stop_loss": round(stop_loss, 2),
         "take_profit": round(take_profit, 2),
-        "partial_tp": round(price + atr * 1.0 if side.upper() == "BUY" else price - atr * 1.0, 2),  # Partial at 1 ATR
+        "partial_tp": round(
+            price + atr * 1.0 if side.upper() == "BUY" else price - atr * 1.0, 2
+        ),  # Partial at 1 ATR
         "peak_price": price,
         "trailing_active": False,
         "partial_taken": False,
         "atr": atr,
         "edge": edge,
         "confidence": confidence,
-        "pipeline_id": pipeline_id,   # links back to signal_pipeline audit JSONL
+        "pipeline_id": pipeline_id,  # links back to signal_pipeline audit JSONL
         "estimated_entry_fee_usd": entry_fee,
         "remaining_entry_fee_usd": entry_fee,
         "realized_pnl_usd": 0.0,
@@ -323,7 +335,9 @@ def action_check_stops() -> dict:
 
         is_long = pos["side"] == "BUY"
         entry = pos["entry_price"]
-        pnl_bps = ((current - entry) / entry * 10000) if is_long else ((entry - current) / entry * 10000)
+        pnl_bps = (
+            ((current - entry) / entry * 10000) if is_long else ((entry - current) / entry * 10000)
+        )
 
         # Update peak price for trailing stop
         if is_long:
@@ -341,10 +355,14 @@ def action_check_stops() -> dict:
                     pf, pos, current, "partial_50pct", qty=half_qty
                 )
                 pos["partial_taken"] = True
-                partial_exits.append({
-                    "symbol": pos["symbol"], "pnl": round(trade["pnl"], 2),
-                    "reason": "partial_50pct", "remaining_qty": pos["qty"]
-                })
+                partial_exits.append(
+                    {
+                        "symbol": pos["symbol"],
+                        "pnl": round(trade["pnl"], 2),
+                        "reason": "partial_50pct",
+                        "remaining_qty": pos["qty"],
+                    }
+                )
 
         # ─── Trailing stop: activate at +60 bps from entry, trail 40 bps from peak ───
         TRAILING_ACTIVATE_BPS = 60
@@ -397,12 +415,14 @@ def action_check_stops() -> dict:
     return {
         "closed": len(closed),
         "partial_exits": len(partial_exits),
-        "details": [{
-            "symbol": t["symbol"], "pnl": f"${t['pnl']:+,.2f}", "reason": t["exit_reason"]
-        } for t in closed],
-        "partials": [{
-            "symbol": p["symbol"], "pnl": f"${p['pnl']:+,.2f}", "remaining": p["remaining_qty"]
-        } for p in partial_exits],
+        "details": [
+            {"symbol": t["symbol"], "pnl": f"${t['pnl']:+,.2f}", "reason": t["exit_reason"]}
+            for t in closed
+        ],
+        "partials": [
+            {"symbol": p["symbol"], "pnl": f"${p['pnl']:+,.2f}", "remaining": p["remaining_qty"]}
+            for p in partial_exits
+        ],
     }
 
 
@@ -431,19 +451,23 @@ def action_monitor() -> dict:
         _normalize_position(pos)
         current = _get_price(pos["symbol"])
         if current is None:
-            rows.append({
-                "symbol": pos["symbol"],
-                "side": pos["side"],
-                "trigger": "no_price",
-                "current": None,
-                "reason": "price feed unavailable",
-            })
+            rows.append(
+                {
+                    "symbol": pos["symbol"],
+                    "side": pos["side"],
+                    "trigger": "no_price",
+                    "current": None,
+                    "reason": "price feed unavailable",
+                }
+            )
             summary["no_price"] += 1
             continue
 
         is_long = pos["side"] == "BUY"
         entry = pos["entry_price"]
-        pnl_bps = ((current - entry) / entry * 10000) if is_long else ((entry - current) / entry * 10000)
+        pnl_bps = (
+            ((current - entry) / entry * 10000) if is_long else ((entry - current) / entry * 10000)
+        )
 
         peak = pos.get("peak_price", entry)
         if is_long:
@@ -491,21 +515,23 @@ def action_monitor() -> dict:
             trigger = "hold"
             summary["no_action"] += 1
 
-        rows.append({
-            "symbol": pos["symbol"],
-            "side": pos["side"],
-            "entry": pos["entry_price"],
-            "current": current,
-            "peak": peak,
-            "stop_loss": pos["stop_loss"],
-            "take_profit": pos["take_profit"],
-            "partial_tp": partial_tp,
-            "partial_taken": partial_taken,
-            "trailing_active": trailing_active,
-            "trail_level": trail_level,
-            "pnl_bps": round(pnl_bps, 2),
-            "trigger": trigger,
-        })
+        rows.append(
+            {
+                "symbol": pos["symbol"],
+                "side": pos["side"],
+                "entry": pos["entry_price"],
+                "current": current,
+                "peak": peak,
+                "stop_loss": pos["stop_loss"],
+                "take_profit": pos["take_profit"],
+                "partial_tp": partial_tp,
+                "partial_taken": partial_taken,
+                "trailing_active": trailing_active,
+                "trail_level": trail_level,
+                "pnl_bps": round(pnl_bps, 2),
+                "trigger": trigger,
+            }
+        )
 
     return {
         "mode": "monitor_dry_run",
@@ -534,17 +560,19 @@ def action_positions() -> dict:
             fees_if_closed = _round_money(pos.get("remaining_entry_fee_usd", 0.0))
         unrealized_total += unrealized
 
-        positions.append({
-            "symbol": pos["symbol"],
-            "side": pos["side"],
-            "entry": f"${pos['entry_price']:,.2f}",
-            "current": f"${current:,.2f}" if current else "?",
-            "unrealized_pnl": f"${unrealized:+,.2f}",
-            "gross_unrealized_pnl": f"${gross_unrealized:+,.2f}",
-            "fees_if_closed_now": f"${fees_if_closed:,.2f}",
-            "stop": f"${pos['stop_loss']:,.2f}",
-            "tp": f"${pos['take_profit']:,.2f}",
-        })
+        positions.append(
+            {
+                "symbol": pos["symbol"],
+                "side": pos["side"],
+                "entry": f"${pos['entry_price']:,.2f}",
+                "current": f"${current:,.2f}" if current else "?",
+                "unrealized_pnl": f"${unrealized:+,.2f}",
+                "gross_unrealized_pnl": f"${gross_unrealized:+,.2f}",
+                "fees_if_closed_now": f"${fees_if_closed:,.2f}",
+                "stop": f"${pos['stop_loss']:,.2f}",
+                "tp": f"${pos['take_profit']:,.2f}",
+            }
+        )
 
     liquidation_value = _round_money(pf["capital"] + unrealized_total)
     return {
@@ -564,9 +592,7 @@ def action_close(symbol: str) -> dict:
 
     for i, pos in enumerate(pf["positions"]):
         if pos["symbol"] == symbol:
-            trade, finalized, total_trade_pnl = _close_position_slice(
-                pf, pos, current, "manual"
-            )
+            trade, finalized, total_trade_pnl = _close_position_slice(pf, pos, current, "manual")
             if finalized:
                 pf["positions"].pop(i)
             _save_portfolio(pf)
@@ -615,7 +641,7 @@ def action_metrics() -> dict:
     # Sortino ratio (downside deviation only)
     neg_pnls = [p for p in pnls if p < 0]
     if neg_pnls and len(pnls) > 1:
-        downside_dev = math.sqrt(sum(p ** 2 for p in neg_pnls) / len(pnls))
+        downside_dev = math.sqrt(sum(p**2 for p in neg_pnls) / len(pnls))
         avg_return = sum(pnls) / len(pnls)
         sortino = avg_return / downside_dev if downside_dev > 0 else 0
     else:
@@ -634,7 +660,9 @@ def action_metrics() -> dict:
         "total_return": f"{(pf['capital']/pf['initial_capital']-1)*100:+.1f}%",
         "max_drawdown": f"{max_dd:.1f}%",
         "sortino_ratio": round(sortino, 2),
-        "profit_factor": f"{abs(sum(t['pnl'] for t in wins))/abs(sum(t['pnl'] for t in losses)):.2f}" if losses and sum(t['pnl'] for t in losses) != 0 else "∞",
+        "profit_factor": f"{abs(sum(t['pnl'] for t in wins))/abs(sum(t['pnl'] for t in losses)):.2f}"
+        if losses and sum(t["pnl"] for t in losses) != 0
+        else "∞",
     }
 
 

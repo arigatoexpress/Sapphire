@@ -40,6 +40,7 @@ if str(_EVENT_BUS_PATH) not in sys.path:
     sys.path.insert(0, str(_EVENT_BUS_PATH))
 try:
     from event_bus import get_bus as _get_event_bus
+
     _EVENT_BUS = _get_event_bus(source="threat_intel")
 except Exception:
     _EVENT_BUS = None
@@ -56,15 +57,18 @@ def _publish_threats(records, *, trigger: str) -> None:
             if not (exploited or score >= 9.0):
                 continue
             level = "critical" if exploited else "high"
-            _EVENT_BUS.publish("threat.detected", {
-                "id": getattr(r, "canonical_id", ""),
-                "title": (getattr(r, "title", "") or "")[:200],
-                "source": getattr(r, "source", ""),
-                "score": score,
-                "exploited": exploited,
-                "level": level,
-                "trigger": trigger,
-            })
+            _EVENT_BUS.publish(
+                "threat.detected",
+                {
+                    "id": getattr(r, "canonical_id", ""),
+                    "title": (getattr(r, "title", "") or "")[:200],
+                    "source": getattr(r, "source", ""),
+                    "score": score,
+                    "exploited": exploited,
+                    "level": level,
+                    "trigger": trigger,
+                },
+            )
     except Exception:
         pass  # telemetry must never break the tool
 
@@ -73,6 +77,7 @@ def _import_ctb():
     """Import cyber-threat-bot modules. Returns None tuple if not installed."""
     try:
         from cyber_threat_bot import briefs, render, scoring, sources
+
         return sources, render, briefs, scoring
     except ImportError:
         return None, None, None, None
@@ -82,7 +87,9 @@ def action_latest(days: int = 7, per_source: int = 8, fmt: str = "markdown") -> 
     """Pull latest threat signals from all sources."""
     sources, render, briefs, scoring = _import_ctb()
     if sources is None:
-        return {"error": "cyber-threat-bot not installed. Run: pip install -e ~/Code/cyber-threat-bot"}
+        return {
+            "error": "cyber-threat-bot not installed. Run: pip install -e ~/Code/cyber-threat-bot"
+        }
 
     records = sources.collect_latest_records(days=days, per_source=per_source)
 

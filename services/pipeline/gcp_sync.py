@@ -148,7 +148,8 @@ def transform_signals(files: list[Path]) -> Iterator[dict]:
                     continue
                 ts = _parse_ts(r.get("timestamp") or r.get("closed_at"))
                 yield {
-                    "signal_id": r.get("pipeline_id") or _stable_id(r.get("symbol"), ts, r.get("action")),
+                    "signal_id": r.get("pipeline_id")
+                    or _stable_id(r.get("symbol"), ts, r.get("action")),
                     "symbol": str(r.get("symbol", "UNKNOWN")).upper(),
                     "action": str(r.get("action", "unknown")).lower(),
                     "direction": r.get("direction"),
@@ -159,7 +160,9 @@ def transform_signals(files: list[Path]) -> Iterator[dict]:
                     "regime_score": r.get("regime_score"),
                     "source": r.get("source"),
                     "price_at_signal": r.get("price") or r.get("price_at_signal"),
-                    "notes": "; ".join(r.get("notes") or []) if isinstance(r.get("notes"), list) else r.get("notes"),
+                    "notes": "; ".join(r.get("notes") or [])
+                    if isinstance(r.get("notes"), list)
+                    else r.get("notes"),
                     "flags": r.get("enhancer_flags") or r.get("flags") or [],
                     "outcome": r.get("outcome"),
                     "pnl_usd": r.get("pnl_usd"),
@@ -246,9 +249,7 @@ def transform_threats(files: list[Path]) -> Iterator[dict]:
             meta = t.get("metadata") or {}
             cvss = meta.get("cvss_v3_score") or meta.get("cvss_score") or t.get("score")
             severity = (
-                meta.get("cvss_v3_severity")
-                or meta.get("severity")
-                or _severity_from_score(cvss)
+                meta.get("cvss_v3_severity") or meta.get("severity") or _severity_from_score(cvss)
             )
             yield {
                 "cve_id": cve,
@@ -261,7 +262,9 @@ def transform_threats(files: list[Path]) -> Iterator[dict]:
                 "affected_products": meta.get("affected_products") or [],
                 "description": (t.get("summary") or "")[:1000],
                 "published_at": _parse_ts(t.get("published_at")) if t.get("published_at") else None,
-                "modified_at": _parse_ts(meta.get("modified_at")) if meta.get("modified_at") else None,
+                "modified_at": _parse_ts(meta.get("modified_at"))
+                if meta.get("modified_at")
+                else None,
                 "timestamp": refreshed,
                 "ingested_at": now,
             }
@@ -272,10 +275,14 @@ def _severity_from_score(score: Any) -> str | None:
         s = float(score)
     except (TypeError, ValueError):
         return None
-    if s >= 9.0: return "CRITICAL"
-    if s >= 7.0: return "HIGH"
-    if s >= 4.0: return "MEDIUM"
-    if s >= 0.1: return "LOW"
+    if s >= 9.0:
+        return "CRITICAL"
+    if s >= 7.0:
+        return "HIGH"
+    if s >= 4.0:
+        return "MEDIUM"
+    if s >= 0.1:
+        return "LOW"
     return None
 
 
@@ -400,18 +407,20 @@ def transform_leads(files: list[Path]) -> Iterator[dict]:
 class Source:
     name: str
     table: str
-    glob: str                      # relative to DATA_DIR
+    glob: str  # relative to DATA_DIR
     transform: Callable[[list[Path]], Iterator[dict]]
 
 
 SOURCES: dict[str, Source] = {
-    "signals":     Source("signals",     "trading_signals",   "signals/*.jsonl",                        transform_signals),
-    "predictions": Source("predictions", "predictions",       "intelligence/*/predictions.json",         transform_predictions),
-    "threats":     Source("threats",     "threat_intel",      "intelligence/*/threats.json",             transform_threats),
-    "regime":      Source("regime",      "market_regime",     "chain/*.json",                            transform_regime),
-    "leads":       Source("leads",       "leads",             "leads/pipeline_*.json",                   transform_leads),
-    "metrics":     Source("metrics",     "inference_metrics", "metrics/*.ndjson",                        transform_metrics),
-    "health":      Source("health",      "service_health",    "health/*.ndjson",                         transform_health),
+    "signals": Source("signals", "trading_signals", "signals/*.jsonl", transform_signals),
+    "predictions": Source(
+        "predictions", "predictions", "intelligence/*/predictions.json", transform_predictions
+    ),
+    "threats": Source("threats", "threat_intel", "intelligence/*/threats.json", transform_threats),
+    "regime": Source("regime", "market_regime", "chain/*.json", transform_regime),
+    "leads": Source("leads", "leads", "leads/pipeline_*.json", transform_leads),
+    "metrics": Source("metrics", "inference_metrics", "metrics/*.ndjson", transform_metrics),
+    "health": Source("health", "service_health", "health/*.ndjson", transform_health),
 }
 
 
@@ -422,10 +431,7 @@ SOURCES: dict[str, Source] = {
 
 def _discover_files(glob: str, since_mtime: float) -> list[Path]:
     """Find files matching glob with mtime > since_mtime."""
-    return sorted(
-        p for p in DATA_DIR.glob(glob)
-        if p.is_file() and p.stat().st_mtime > since_mtime
-    )
+    return sorted(p for p in DATA_DIR.glob(glob) if p.is_file() and p.stat().st_mtime > since_mtime)
 
 
 def _write_ndjson(rows: Iterable[dict], dest: Path) -> int:
@@ -510,8 +516,13 @@ def sync_source(
     # function and inserts every row twice.
     gcs_path = f"raw/{source.name}/{day}/{source.name}_{run_id}.ndjson"
     gcs_uri = _upload_to_gcs(gcs_client, stage, gcs_path)
-    log.info("[%s] uploaded → %s (Cloud Function will load into %s.%s)",
-             source.name, gcs_uri, DATASET, source.table)
+    log.info(
+        "[%s] uploaded → %s (Cloud Function will load into %s.%s)",
+        source.name,
+        gcs_uri,
+        DATASET,
+        source.table,
+    )
 
     # Advance watermark
     new_mtime = max(p.stat().st_mtime for p in files)
@@ -547,8 +558,12 @@ def run_sync(sources: list[str] | None = None, dry_run: bool = False) -> list[Sy
 
 def main() -> int:
     p = argparse.ArgumentParser()
-    p.add_argument("--source", action="append", choices=list(SOURCES),
-                   help="Only sync these sources (repeatable). Default: all.")
+    p.add_argument(
+        "--source",
+        action="append",
+        choices=list(SOURCES),
+        help="Only sync these sources (repeatable). Default: all.",
+    )
     p.add_argument("--dry-run", action="store_true", help="Transform + stage; skip upload/load.")
     p.add_argument("--reset-watermark", action="store_true", help="Ignore watermark, rescan all.")
     p.add_argument("-v", "--verbose", action="store_true")

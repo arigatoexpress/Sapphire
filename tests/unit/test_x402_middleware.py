@@ -26,8 +26,14 @@ NETWORK = "base-sepolia"
 ASSET = DEFAULT_USDC_CONTRACTS[NETWORK]
 
 
-def _pay_header(amount_atomic: int, *, recipient=RECIPIENT, asset=ASSET,
-                network=NETWORK, nonce: str | None = "n-1") -> str:
+def _pay_header(
+    amount_atomic: int,
+    *,
+    recipient=RECIPIENT,
+    asset=ASSET,
+    network=NETWORK,
+    nonce: str | None = "n-1",
+) -> str:
     payload = {
         "payload": {
             "amount": amount_atomic,
@@ -135,9 +141,15 @@ def test_build_requirements_math():
 def test_mock_verifier_direct():
     v = MockVerifier()
     reqs = PaymentRequirements(
-        scheme="exact", network=NETWORK, max_amount_required="10000",
-        resource="http://x/", description="", mime_type="application/json",
-        pay_to=RECIPIENT, max_timeout_seconds=60, asset=ASSET,
+        scheme="exact",
+        network=NETWORK,
+        max_amount_required="10000",
+        resource="http://x/",
+        description="",
+        mime_type="application/json",
+        pay_to=RECIPIENT,
+        max_timeout_seconds=60,
+        asset=ASSET,
     )
     result = v.verify(_pay_header(15_000), reqs)
     assert result.ok
@@ -146,9 +158,15 @@ def test_mock_verifier_direct():
 
 def test_build_402_body_shape():
     req = PaymentRequirements(
-        scheme="exact", network=NETWORK, max_amount_required="10000",
-        resource="http://x/", description="d", mime_type="application/json",
-        pay_to=RECIPIENT, max_timeout_seconds=60, asset=ASSET,
+        scheme="exact",
+        network=NETWORK,
+        max_amount_required="10000",
+        resource="http://x/",
+        description="d",
+        mime_type="application/json",
+        pay_to=RECIPIENT,
+        max_timeout_seconds=60,
+        asset=ASSET,
     )
     body = build_402_response([req])
     assert body["x402Version"] == 1
@@ -212,9 +230,15 @@ def test_invalid_amount_field_rejected(mw: X402Middleware):
 def test_to_wire_shape_matches_x402_protocol():
     """PaymentRequirements.to_wire() emits camelCase field names per spec."""
     req = PaymentRequirements(
-        scheme="exact", network=NETWORK, max_amount_required="42",
-        resource="https://api/example", description="d", mime_type="application/json",
-        pay_to=RECIPIENT, max_timeout_seconds=60, asset=ASSET,
+        scheme="exact",
+        network=NETWORK,
+        max_amount_required="42",
+        resource="https://api/example",
+        description="d",
+        mime_type="application/json",
+        pay_to=RECIPIENT,
+        max_timeout_seconds=60,
+        asset=ASSET,
         extra={"currency": "USDC"},
     )
     wire = req.to_wire()
@@ -232,7 +256,10 @@ def test_to_wire_shape_matches_x402_protocol():
 def test_set_price_and_price_for_roundtrip():
     """set_price/price_for behave as a simple route→amount registry."""
     mw = X402Middleware(
-        recipient_address=RECIPIENT, network=NETWORK, asset=ASSET, enabled=True,
+        recipient_address=RECIPIENT,
+        network=NETWORK,
+        asset=ASSET,
+        enabled=True,
     )
     assert mw.price_for("/x") is None
     mw.set_price("/x", 0.25)
@@ -247,13 +274,17 @@ def test_custom_verifier_injection_short_circuits_mock():
     class AlwaysOK:
         def verify(self, header_value, requirements):
             from lib.payments.x402_middleware import PaymentVerificationResult
+
             return PaymentVerificationResult(
                 ok=True, payer="0xCAFE", amount_atomic=999, nonce="custom-1"
             )
 
     mw = X402Middleware(
-        recipient_address=RECIPIENT, network=NETWORK, asset=ASSET,
-        verifier=AlwaysOK(), enabled=True,
+        recipient_address=RECIPIENT,
+        network=NETWORK,
+        asset=ASSET,
+        verifier=AlwaysOK(),
+        enabled=True,
     )
     allowed, _body, result = mw.gate("http://x/", 0.01, header_value="anything")
     assert allowed
@@ -339,9 +370,15 @@ def test_amount_in_value_field_alias():
     header = base64.b64encode(json.dumps(payload).encode()).decode()
     v = MockVerifier()
     reqs = PaymentRequirements(
-        scheme="exact", network=NETWORK, max_amount_required="10000",
-        resource="http://x/", description="", mime_type="application/json",
-        pay_to=RECIPIENT, max_timeout_seconds=60, asset=ASSET,
+        scheme="exact",
+        network=NETWORK,
+        max_amount_required="10000",
+        resource="http://x/",
+        description="",
+        mime_type="application/json",
+        pay_to=RECIPIENT,
+        max_timeout_seconds=60,
+        asset=ASSET,
     )
     result = v.verify(header, reqs)
     assert result.ok

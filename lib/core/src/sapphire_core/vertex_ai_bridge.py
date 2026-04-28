@@ -13,4 +13,3 @@ def get_vertex_client() -> Any | None:
         return _get_vertex_client()
     except Exception:
         return None
-

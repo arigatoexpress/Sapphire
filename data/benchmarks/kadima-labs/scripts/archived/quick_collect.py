@@ -28,17 +28,17 @@ print("Collecting data...")
 for model in models:
     print(f"\n{model}:")
     model_results = []
-    
+
     for test_name, prompt in tests.items():
         print(f"  {test_name}...", end=" ", flush=True)
-        
+
         payload = {'model': model, 'prompt': prompt, 'stream': False}
         start = time.time()
-        
+
         try:
             resp = requests.post(API_URL, json=payload, timeout=120)
             duration = time.time() - start
-            
+
             if resp.status_code == 200:
                 data = resp.json()
                 result = {
@@ -57,9 +57,9 @@ for model in models:
         except Exception as e:
             model_results.append({'success': False, 'test_name': test_name, 'error': str(e)})
             print("ERROR")
-        
+
         time.sleep(2)
-    
+
     results[model] = model_results
     time.sleep(5)
 

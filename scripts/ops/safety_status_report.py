@@ -170,7 +170,9 @@ def summarize_autonomy_audit(
         "event_counts": dict(Counter(_safe_text(record.get("event_type")) for record in records)),
         "actor_counts": dict(Counter(_safe_text(record.get("actor")) for record in records)),
         "outcome_counts": dict(Counter(_safe_text(record.get("outcome")) for record in records)),
-        "risk_counts": dict(Counter(_safe_text(record.get("risk") or "none") for record in records)),
+        "risk_counts": dict(
+            Counter(_safe_text(record.get("risk") or "none") for record in records)
+        ),
         "recent_events": [_safe_autonomy_event(record) for record in records[-max(0, recent) :]],
     }
 
@@ -279,7 +281,9 @@ def render_markdown(report: dict[str, Any]) -> str:
             f"at `{baseline.get('timestamp') or '-'}`"
         )
     if kill_switch.get("state_source") == "audit_missing":
-        lines.append("- Operator note: missing audit log does not imply inactive; wait for a real transition or explicit operator action.")
+        lines.append(
+            "- Operator note: missing audit log does not imply inactive; wait for a real transition or explicit operator action."
+        )
 
     lines.extend(["", "## Recent Kill-Switch Events", ""])
     if kill_switch["recent_events"]:

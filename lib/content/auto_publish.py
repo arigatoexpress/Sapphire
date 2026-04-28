@@ -272,8 +272,10 @@ def run(
         "run_at": datetime.now().isoformat(timespec="seconds"),
         "telegram_summary": bool(telegram_summary),
         "items": [
-            {"item": {"platform": i.platform, "kind": i.kind, "path": str(i.path)},
-             "result": asdict(r)}
+            {
+                "item": {"platform": i.platform, "kind": i.kind, "path": str(i.path)},
+                "result": asdict(r),
+            }
             for i, r in results
         ],
     }

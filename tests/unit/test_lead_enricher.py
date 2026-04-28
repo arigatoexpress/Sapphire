@@ -21,6 +21,7 @@ if str(ROOT) not in sys.path:
 
 def test_grade_from_score_thresholds():
     from lib.intel.lead_enricher import _grade_from_score
+
     assert _grade_from_score(0.90) == "A"
     assert _grade_from_score(0.80) == "A"
     assert _grade_from_score(0.70) == "B"
@@ -31,12 +32,15 @@ def test_grade_from_score_thresholds():
 
 def test_score_lead_boosts_on_keywords_and_class():
     from lib.intel.lead_enricher import _score_lead
+
     baseline = _score_lead({"name": "generic lot"})
-    boosted = _score_lead({
-        "name": "ENCLAVE ESTATES",
-        "description": "C3F luxury subdivision",
-        "value_usd": 1_500_000,
-    })
+    boosted = _score_lead(
+        {
+            "name": "ENCLAVE ESTATES",
+            "description": "C3F luxury subdivision",
+            "value_usd": 1_500_000,
+        }
+    )
     assert boosted > baseline
     assert boosted <= 0.99
 
@@ -48,27 +52,39 @@ def test_score_lead_boosts_on_keywords_and_class():
 
 def test_estimate_property_value_uses_stated_value():
     from lib.intel.lead_enricher import _estimate_property_value
+
     assert _estimate_property_value({"value_usd": 750_000}) == 750_000
 
 
 def test_estimate_property_value_from_permit_class():
     from lib.intel.lead_enricher import PERMIT_VALUE_PRIORS, _estimate_property_value
-    assert _estimate_property_value({"description": "type C3F final plat"}) == PERMIT_VALUE_PRIORS["C3F"]
-    assert _estimate_property_value({"description": "C2R subdivision"}) == PERMIT_VALUE_PRIORS["C2R"]
+
+    assert (
+        _estimate_property_value({"description": "type C3F final plat"})
+        == PERMIT_VALUE_PRIORS["C3F"]
+    )
+    assert (
+        _estimate_property_value({"description": "C2R subdivision"}) == PERMIT_VALUE_PRIORS["C2R"]
+    )
 
 
 def test_estimate_property_value_commercial():
     from lib.intel.lead_enricher import PERMIT_VALUE_PRIORS, _estimate_property_value
-    assert _estimate_property_value({"category": "commercial office"}) == PERMIT_VALUE_PRIORS["COMM"]
+
+    assert (
+        _estimate_property_value({"category": "commercial office"}) == PERMIT_VALUE_PRIORS["COMM"]
+    )
 
 
 def test_estimate_property_value_default_fallback():
     from lib.intel.lead_enricher import PERMIT_VALUE_PRIORS, _estimate_property_value
+
     assert _estimate_property_value({}) == PERMIT_VALUE_PRIORS["DEFAULT"]
 
 
 def test_estimate_property_value_rejects_bad_stated():
     from lib.intel.lead_enricher import PERMIT_VALUE_PRIORS, _estimate_property_value
+
     # Non-numeric stated value → falls through to class / default
     v = _estimate_property_value({"value_usd": "not-a-number"})
     assert v == PERMIT_VALUE_PRIORS["DEFAULT"]
@@ -81,6 +97,7 @@ def test_estimate_property_value_rejects_bad_stated():
 
 def test_extract_builder_from_applicant_field():
     from lib.intel.lead_enricher import _extract_builder
+
     info = _extract_builder({"applicant": "Lennar Homes LLC"})
     assert info["raw_name"] == "Lennar Homes LLC"
     assert info["entity_type"] == "registered_business"
@@ -89,15 +106,19 @@ def test_extract_builder_from_applicant_field():
 
 def test_extract_builder_from_description_pattern():
     from lib.intel.lead_enricher import _extract_builder
-    info = _extract_builder({
-        "description": "Site work BY TOLL BROTHERS HOMES LLC on 20 acres",
-    })
+
+    info = _extract_builder(
+        {
+            "description": "Site work BY TOLL BROTHERS HOMES LLC on 20 acres",
+        }
+    )
     assert info["raw_name"] is not None
     assert "HOMES" in info["raw_name"].upper()
 
 
 def test_extract_builder_none_when_no_info():
     from lib.intel.lead_enricher import _extract_builder
+
     info = _extract_builder({"description": "vacant parcel"})
     assert info["raw_name"] is None
 
@@ -109,6 +130,7 @@ def test_extract_builder_none_when_no_info():
 
 def test_find_decision_maker_explicit_field():
     from lib.intel.lead_enricher import _find_decision_maker
+
     name, src = _find_decision_maker({"contact_name": "Jane Doe"})
     assert name == "Jane Doe"
     assert src == "contact_name"
@@ -116,6 +138,7 @@ def test_find_decision_maker_explicit_field():
 
 def test_find_decision_maker_from_attn_pattern():
     from lib.intel.lead_enricher import _find_decision_maker
+
     name, src = _find_decision_maker({"description": "Permit attn: Robert Smith at acme"})
     assert name == "Robert Smith"
     assert src == "description_parse"
@@ -123,12 +146,14 @@ def test_find_decision_maker_from_attn_pattern():
 
 def test_find_decision_maker_from_co_pattern():
     from lib.intel.lead_enricher import _find_decision_maker
+
     name, src = _find_decision_maker({"description": "Mail c/o Alice Brown thanks"})
     assert name == "Alice Brown"
 
 
 def test_find_decision_maker_no_match_returns_none():
     from lib.intel.lead_enricher import _find_decision_maker
+
     name, src = _find_decision_maker({"description": "just a permit"})
     assert name is None
     assert src is None
@@ -141,6 +166,7 @@ def test_find_decision_maker_no_match_returns_none():
 
 def test_enrich_lead_populates_all_fields():
     from lib.intel.lead_enricher import enrich_lead
+
     lead = {
         "name": "ENCLAVE AT MANOR",
         "description": "C3F final plat attn: John Foster",
@@ -160,6 +186,7 @@ def test_enrich_lead_populates_all_fields():
 
 def test_enrich_lead_handles_non_numeric_score():
     from lib.intel.lead_enricher import enrich_lead
+
     en = enrich_lead({"score": "not-a-float", "name": "x", "region": "default"})
     assert 0 <= en.score <= 1
     assert en.grade in {"A", "B", "C", "D", "F"}
@@ -189,6 +216,7 @@ def test_cache_expires_past_ttl(tmp_path, monkeypatch):
 
 def test_cache_key_sanitises_path():
     from lib.intel.lead_enricher import _cache_key
+
     p = _cache_key("weird/key:with spaces?and&punct")
     # All unsafe chars replaced with underscores
     assert "/" not in p.name
@@ -208,13 +236,17 @@ def test_enrich_pipeline_filters_by_grade(tmp_path, monkeypatch):
     (tmp_path / "cache").mkdir()
 
     pipeline = tmp_path / "pipeline_test.json"
-    pipeline.write_text(json.dumps({
-        "leads": [
-            {"name": "high", "score": 0.90, "region": "austin_tx", "value_usd": 1_000_000},
-            {"name": "low", "score": 0.40, "region": "austin_tx"},
-            {"name": "grade_b", "score": 0.70, "region": "austin_tx"},
-        ],
-    }))
+    pipeline.write_text(
+        json.dumps(
+            {
+                "leads": [
+                    {"name": "high", "score": 0.90, "region": "austin_tx", "value_usd": 1_000_000},
+                    {"name": "low", "score": 0.40, "region": "austin_tx"},
+                    {"name": "grade_b", "score": 0.70, "region": "austin_tx"},
+                ],
+            }
+        )
+    )
     result = le.enrich_pipeline(pipeline, grade_filter="A")
     assert result["enriched_count"] == 1
     # Verify on-disk rewrite
@@ -227,12 +259,14 @@ def test_enrich_pipeline_filters_by_grade(tmp_path, monkeypatch):
 
 def test_enrich_pipeline_missing_file():
     from lib.intel.lead_enricher import enrich_pipeline
+
     result = enrich_pipeline(Path("/tmp/does_not_exist_pipeline.json"))
     assert "error" in result
 
 
 def test_enrich_pipeline_bad_leads_field(tmp_path):
     from lib.intel.lead_enricher import enrich_pipeline
+
     pipeline = tmp_path / "p.json"
     pipeline.write_text(json.dumps({"leads": "not-a-list"}))
     result = enrich_pipeline(pipeline)
@@ -244,17 +278,21 @@ def test_enrich_pipeline_bad_leads_field(tmp_path):
 
 def test_geocode_explicit_coords_win_over_region():
     from lib.intel.lead_enricher import _geocode_lead
-    lat, lng, src = _geocode_lead({
-        "region": "houston_tx",
-        "latitude": 40.0,
-        "longitude": -80.0,
-    })
+
+    lat, lng, src = _geocode_lead(
+        {
+            "region": "houston_tx",
+            "latitude": 40.0,
+            "longitude": -80.0,
+        }
+    )
     assert (lat, lng) == (40.0, -80.0)
     assert src == "explicit"
 
 
 def test_geocode_region_centroid_fallback():
     from lib.intel.lead_enricher import _geocode_lead
+
     lat, lng, src = _geocode_lead({"region": "austin_tx"})
     assert 30.0 < lat < 31.0
     assert -98.0 < lng < -97.0
@@ -263,6 +301,7 @@ def test_geocode_region_centroid_fallback():
 
 def test_geocode_region_case_insensitive():
     from lib.intel.lead_enricher import _geocode_lead
+
     lat, _, src = _geocode_lead({"region": "DALLAS_TX"})
     assert lat is not None
     assert src == "region_centroid"
@@ -270,6 +309,7 @@ def test_geocode_region_case_insensitive():
 
 def test_geocode_returns_none_when_unknown():
     from lib.intel.lead_enricher import _geocode_lead
+
     lat, lng, src = _geocode_lead({"region": "mars_colony_1"})
     assert lat is None
     assert lng is None
@@ -278,27 +318,34 @@ def test_geocode_returns_none_when_unknown():
 
 def test_geocode_handles_missing_region_silently():
     from lib.intel.lead_enricher import _geocode_lead
+
     assert _geocode_lead({}) == (None, None, None)
 
 
 def test_geocode_bad_coords_falls_through_to_region():
     from lib.intel.lead_enricher import _geocode_lead
-    lat, _, src = _geocode_lead({
-        "region": "miami_fl",
-        "latitude": "garbage",
-        "longitude": "garbage",
-    })
+
+    lat, _, src = _geocode_lead(
+        {
+            "region": "miami_fl",
+            "latitude": "garbage",
+            "longitude": "garbage",
+        }
+    )
     assert lat is not None
     assert src == "region_centroid"
 
 
 def test_enrich_lead_carries_geo_fields():
     from lib.intel.lead_enricher import enrich_lead
-    result = enrich_lead({
-        "name": "Test Subdivision",
-        "region": "houston_tx",
-        "description": "C3F subdivision plat",
-    })
+
+    result = enrich_lead(
+        {
+            "name": "Test Subdivision",
+            "region": "houston_tx",
+            "description": "C3F subdivision plat",
+        }
+    )
     assert result.latitude is not None
     assert result.longitude is not None
     assert result.geo_source == "region_centroid"
@@ -306,17 +353,22 @@ def test_enrich_lead_carries_geo_fields():
 
 def test_enrich_pipeline_merges_geo_into_lead(tmp_path):
     from lib.intel.lead_enricher import enrich_pipeline
+
     pipeline = tmp_path / "p.json"
-    pipeline.write_text(json.dumps({
-        "leads": [
+    pipeline.write_text(
+        json.dumps(
             {
-                "name": "High-grade lead",
-                "region": "dallas_tx",
-                "description": "C3F luxury estates",
-                "score": 0.92,
+                "leads": [
+                    {
+                        "name": "High-grade lead",
+                        "region": "dallas_tx",
+                        "description": "C3F luxury estates",
+                        "score": 0.92,
+                    }
+                ]
             }
-        ]
-    }))
+        )
+    )
     out = enrich_pipeline(pipeline)
     assert out["enriched_count"] == 1
     reloaded = json.loads(pipeline.read_text())

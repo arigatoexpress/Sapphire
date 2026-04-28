@@ -406,9 +406,7 @@ def test_lease_tasks_clamps_limit(tmp_path) -> None:
     too_high = artifacts.lease_tasks(
         plan, agent_id="a", limit=999, artifact_dir=tmp_path, write=False
     )
-    too_low = artifacts.lease_tasks(
-        plan, agent_id="a", limit=0, artifact_dir=tmp_path, write=False
-    )
+    too_low = artifacts.lease_tasks(plan, agent_id="a", limit=0, artifact_dir=tmp_path, write=False)
 
     assert too_high["leased_count"] == 20  # max
     assert too_low["leased_count"] == 1  # min

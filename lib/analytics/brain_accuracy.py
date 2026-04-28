@@ -35,9 +35,9 @@ DECISIONS_FILE = ROOT / "data" / "decisions" / "brain_decisions.jsonl"
 DECISIONS_DIR = ROOT / "data" / "decisions"
 
 SCORING_WINDOW_H = 24
-GO_THRESHOLD = 0.005       # 0.5% for GO signals
-LEAN_THRESHOLD = 0.0025    # 0.25% for LEAN signals
-WAIT_BAND = 0.02           # ±2% for WAIT
+GO_THRESHOLD = 0.005  # 0.5% for GO signals
+LEAN_THRESHOLD = 0.0025  # 0.25% for LEAN signals
+WAIT_BAND = 0.02  # ±2% for WAIT
 
 
 def record_decision(decision: dict[str, Any]) -> Path:
@@ -71,11 +71,14 @@ def record_decision(decision: dict[str, Any]) -> Path:
     try:
         import subprocess
         import sys
+
         tools_dir = ROOT / "plugins" / "claw-sapphire" / "tools"
         r = subprocess.run(
             [sys.executable, str(tools_dir / "market.py")],
             input=json.dumps({"action": "quote", "symbol": record["symbol"]}),
-            capture_output=True, text=True, timeout=15,
+            capture_output=True,
+            text=True,
+            timeout=15,
         )
         if r.stdout.strip():
             quote = json.loads(r.stdout)
@@ -148,11 +151,14 @@ def score_decisions() -> dict[str, Any]:
         try:
             import subprocess
             import sys
+
             tools_dir = ROOT / "plugins" / "claw-sapphire" / "tools"
             result = subprocess.run(
                 [sys.executable, str(tools_dir / "market.py")],
                 input=json.dumps({"action": "quote", "symbol": r["symbol"]}),
-                capture_output=True, text=True, timeout=15,
+                capture_output=True,
+                text=True,
+                timeout=15,
             )
             if result.stdout.strip():
                 quote = json.loads(result.stdout)
@@ -208,10 +214,16 @@ def report() -> dict[str, Any]:
     records = _load_decisions()
     if not records:
         return {
-            "total_decisions": 0, "scored": 0, "pending": 0,
+            "total_decisions": 0,
+            "scored": 0,
+            "pending": 0,
             "overall_accuracy": None,
-            "go_accuracy": None, "lean_accuracy": None, "wait_accuracy": None,
-            "by_symbol": {}, "by_decision": {}, "recent": [],
+            "go_accuracy": None,
+            "lean_accuracy": None,
+            "wait_accuracy": None,
+            "by_symbol": {},
+            "by_decision": {},
+            "recent": [],
             "confidence_calibration": [],
         }
 
@@ -262,24 +274,28 @@ def report() -> dict[str, Any]:
 
     calibration = []
     for bucket, v in sorted(cal_buckets.items()):
-        calibration.append({
-            "bucket": bucket,
-            "decisions": v["total"],
-            "accuracy": round(v["correct"] / v["total"], 4) if v["total"] else None,
-        })
+        calibration.append(
+            {
+                "bucket": bucket,
+                "decisions": v["total"],
+                "accuracy": round(v["correct"] / v["total"], 4) if v["total"] else None,
+            }
+        )
 
     # Recent scored
     recent = sorted(scored, key=lambda r: r.get("timestamp", ""), reverse=True)[:10]
     recent_clean = []
     for r in recent:
-        recent_clean.append({
-            "symbol": r.get("symbol"),
-            "decision": r.get("decision"),
-            "confidence": r.get("confidence"),
-            "outcome": r.get("outcome"),
-            "pnl_pct": r.get("pnl_pct"),
-            "timestamp": r.get("timestamp"),
-        })
+        recent_clean.append(
+            {
+                "symbol": r.get("symbol"),
+                "decision": r.get("decision"),
+                "confidence": r.get("confidence"),
+                "outcome": r.get("outcome"),
+                "pnl_pct": r.get("pnl_pct"),
+                "timestamp": r.get("timestamp"),
+            }
+        )
 
     return {
         "total_decisions": len(records),
@@ -307,9 +323,7 @@ def brief_summary() -> str:
     lines = []
     acc = r["overall_accuracy"]
     acc_str = f"{acc:.0%}" if acc is not None else "—"
-    lines.append(
-        f"  Brain accuracy: `{acc_str}` ({r['scored']} scored, {r['pending']} pending)"
-    )
+    lines.append(f"  Brain accuracy: `{acc_str}` ({r['scored']} scored, {r['pending']} pending)")
 
     # Per-type
     parts = []
@@ -327,6 +341,8 @@ def brief_summary() -> str:
         best = max(r["by_symbol"].items(), key=lambda kv: kv[1].get("accuracy") or 0)
         worst = min(r["by_symbol"].items(), key=lambda kv: kv[1].get("accuracy") or 1)
         if best[1].get("accuracy") is not None:
-            lines.append(f"  Best: {best[0]} {best[1]['accuracy']:.0%} · Worst: {worst[0]} {worst[1]['accuracy']:.0%}")
+            lines.append(
+                f"  Best: {best[0]} {best[1]['accuracy']:.0%} · Worst: {worst[0]} {worst[1]['accuracy']:.0%}"
+            )
 
     return "\n".join(lines)

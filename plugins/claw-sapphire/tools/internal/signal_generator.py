@@ -38,8 +38,11 @@ NOTIFY_TOOL = SAPPHIRE_DIR / "plugins" / "claw-sapphire" / "tools" / "notify.py"
 def _notify(msg: str, priority: str = "p1"):
     """Send Telegram notification."""
     with contextlib.suppress(Exception):
-        subprocess.run(["python3", str(NOTIFY_TOOL), msg, "--priority", priority],
-                      capture_output=True, timeout=15)
+        subprocess.run(
+            ["python3", str(NOTIFY_TOOL), msg, "--priority", priority],
+            capture_output=True,
+            timeout=15,
+        )
 
 
 def _log_signal(signal: dict):
@@ -92,9 +95,13 @@ def scan_for_signals(symbols: list[str] = None) -> dict:
 
         # Factor 2: RSI — contrarian at extremes, confirming in middle
         if profile.rsi_14 < 30:
-            factors.append(("BUY", min(1.0, (30 - profile.rsi_14) / 20), f"RSI{profile.rsi_14:.0f}"))
+            factors.append(
+                ("BUY", min(1.0, (30 - profile.rsi_14) / 20), f"RSI{profile.rsi_14:.0f}")
+            )
         elif profile.rsi_14 > 70:
-            factors.append(("SELL", min(1.0, (profile.rsi_14 - 70) / 20), f"RSI{profile.rsi_14:.0f}"))
+            factors.append(
+                ("SELL", min(1.0, (profile.rsi_14 - 70) / 20), f"RSI{profile.rsi_14:.0f}")
+            )
         elif 40 < profile.rsi_14 < 60:
             pass  # Neutral zone — no factor
         elif profile.rsi_14 <= 40:
@@ -214,15 +221,17 @@ def scan_for_signals(symbols: list[str] = None) -> dict:
 
         _log_signal(signal)
         _log_performance(signal)
-        signals_generated.append({
-            "symbol": f"{sym}USDT",
-            "action": action,
-            "reason": reason,
-            "confidence": confidence,
-            "price": profile.price,
-            "edge": round(edge, 4),
-            "kelly_size": f"{suggested_size_pct}%",
-        })
+        signals_generated.append(
+            {
+                "symbol": f"{sym}USDT",
+                "action": action,
+                "reason": reason,
+                "confidence": confidence,
+                "price": profile.price,
+                "edge": round(edge, 4),
+                "kelly_size": f"{suggested_size_pct}%",
+            }
+        )
 
     # Send Telegram notification if any signals
     if signals_generated:
@@ -245,7 +254,8 @@ def scan_for_signals(symbols: list[str] = None) -> dict:
                 "ma_trend": p.ma_trend,
                 "net_signal": p.net_signal,
             }
-            for sym, p in profiles.items() if p
+            for sym, p in profiles.items()
+            if p
         },
     }
 

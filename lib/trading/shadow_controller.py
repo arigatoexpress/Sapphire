@@ -132,13 +132,13 @@ def build_shadow_trading_report(
     market = market_universe or build_market_universe(fetch_live=fetch_live)
     rows = [row for row in market.get("combined_tokens", []) if isinstance(row, dict)]
     evaluated = [evaluate_market_row(row, active_policy) for row in rows]
-    evaluated.sort(key=lambda item: (item.decision == "candidate_buy", item.confidence), reverse=True)
+    evaluated.sort(
+        key=lambda item: (item.decision == "candidate_buy", item.confidence), reverse=True
+    )
 
-    actionable = [
-        candidate
-        for candidate in evaluated
-        if candidate.decision == "candidate_buy"
-    ][: active_policy.max_open_candidates]
+    actionable = [candidate for candidate in evaluated if candidate.decision == "candidate_buy"][
+        : active_policy.max_open_candidates
+    ]
     watchlist = [
         candidate.to_dict(include_drafts=False)
         for candidate in evaluated

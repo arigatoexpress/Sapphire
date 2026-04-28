@@ -26,9 +26,11 @@ log = logging.getLogger("sapphire.security.models")
 # Data models
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class BlobVerification:
     """Result of verifying a single blob file."""
+
     digest: str
     path: str = ""
     expected_size: int = 0
@@ -41,6 +43,7 @@ class BlobVerification:
 @dataclass
 class ModelVerification:
     """Integrity check result for one Ollama model."""
+
     name: str
     tag: str = "latest"
     manifest_found: bool = True
@@ -54,6 +57,7 @@ class ModelVerification:
 @dataclass
 class TemplateAlert:
     """A suspicious pattern found in a Jinja2 template."""
+
     model: str
     pattern_name: str
     severity: str  # critical / high / medium / low
@@ -65,6 +69,7 @@ class TemplateAlert:
 @dataclass
 class ModelScanResult:
     """Aggregate result of a full model integrity scan."""
+
     timestamp: str = ""
     total_models: int = 0
     verified_count: int = 0
@@ -85,37 +90,37 @@ BACKDOOR_PATTERNS: list[dict[str, str]] = [
     {
         "name": "hidden_system_prompt",
         "pattern": r"(?i)(ignore\s+(all\s+)?previous|disregard\s+(all\s+)?instructions|"
-                   r"you\s+are\s+now\s+(?:DAN|jailbroken|unrestricted))",
+        r"you\s+are\s+now\s+(?:DAN|jailbroken|unrestricted))",
         "severity": "critical",
         "description": "Prompt injection / jailbreak instruction in template",
     },
     {
         "name": "data_exfiltration",
         "pattern": r"(?i)(curl\s+https?://|wget\s+|fetch\(|"
-                   r"requests?\.(get|post)|urllib\.request|"
-                   r"<script[^>]*src\s*=)",
+        r"requests?\.(get|post)|urllib\.request|"
+        r"<script[^>]*src\s*=)",
         "severity": "critical",
         "description": "Potential data exfiltration via network call in template",
     },
     {
         "name": "shell_execution",
         "pattern": r"(?i)(subprocess\.|os\.system\(|os\.popen\(|exec\(|eval\(|"
-                   r"__import__|`[^`]*`)",
+        r"__import__|`[^`]*`)",
         "severity": "critical",
         "description": "Shell/code execution in template",
     },
     {
         "name": "credential_harvest",
         "pattern": r"(?i)(password|api[_-]?key|secret[_-]?key|token|credential|"
-                   r"private[_-]?key|ssh[_-]?key).*(?:send|post|upload|exfil|forward)",
+        r"private[_-]?key|ssh[_-]?key).*(?:send|post|upload|exfil|forward)",
         "severity": "high",
         "description": "Possible credential harvesting instruction",
     },
     {
         "name": "hidden_persona",
         "pattern": r"(?i)(you\s+must\s+always|never\s+reveal|"
-                   r"hidden\s+instruction|secret\s+system\s+prompt|"
-                   r"do\s+not\s+tell\s+the\s+user)",
+        r"hidden\s+instruction|secret\s+system\s+prompt|"
+        r"do\s+not\s+tell\s+the\s+user)",
         "severity": "high",
         "description": "Hidden persona / concealed instructions",
     },
@@ -137,6 +142,7 @@ BACKDOOR_PATTERNS: list[dict[str, str]] = [
 # ---------------------------------------------------------------------------
 # Monitor
 # ---------------------------------------------------------------------------
+
 
 class ModelMonitor:
     """Verifies Ollama model integrity and scans templates for backdoors."""
@@ -285,8 +291,7 @@ class ModelMonitor:
             namespace, name = "library", model_name
 
         manifest_path = (
-            self.ollama_dir / "models" / "manifests"
-            / "registry.ollama.ai" / namespace / name / tag
+            self.ollama_dir / "models" / "manifests" / "registry.ollama.ai" / namespace / name / tag
         )
         if not manifest_path.exists():
             return None
@@ -374,22 +379,32 @@ class ModelMonitor:
             for line_num, line in enumerate(content.splitlines(), 1):
                 for pattern_def in BACKDOOR_PATTERNS:
                     if re.search(pattern_def["pattern"], line):
-                        alerts.append(TemplateAlert(
-                            model=model_name,
-                            pattern_name=pattern_def["name"],
-                            severity=pattern_def["severity"],
-                            matched_text=line.strip()[:120],
-                            line_number=line_num,
-                            description=pattern_def["description"],
-                        ))
+                        alerts.append(
+                            TemplateAlert(
+                                model=model_name,
+                                pattern_name=pattern_def["name"],
+                                severity=pattern_def["severity"],
+                                matched_text=line.strip()[:120],
+                                line_number=line_num,
+                                description=pattern_def["description"],
+                            )
+                        )
         return alerts
 
     @staticmethod
     def _looks_like_template(content: str) -> bool:
         """Heuristic check if content is a Jinja2 template or Modelfile."""
         markers = [
-            "{{", "{%", "TEMPLATE", "SYSTEM", "FROM", "PARAMETER",
-            "<<SYS>>", "[INST]", "<|im_start|>", "<|system|>",
+            "{{",
+            "{%",
+            "TEMPLATE",
+            "SYSTEM",
+            "FROM",
+            "PARAMETER",
+            "<<SYS>>",
+            "[INST]",
+            "<|im_start|>",
+            "<|system|>",
         ]
         return any(m in content for m in markers)
 

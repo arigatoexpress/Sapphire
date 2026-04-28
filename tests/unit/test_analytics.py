@@ -47,6 +47,7 @@ def test_kelly_size_caps_at_25_percent():
 
 def test_kelly_size_rejects_zero_avg_loss():
     from lib.analytics.risk_engine import kelly_size
+
     assert kelly_size(0.7, 100.0, 0.0, 10000.0) == 0.0
 
 
@@ -79,16 +80,29 @@ def test_risk_engine_computes_drawdown(tmp_path, monkeypatch):
     # 3 trades: +$500, +$200, -$400. Equity: 10k→10.5k→10.7k→10.3k
     # Peak = $10,700 at step 2, trough = $10,300 → DD = 400/10700 = 3.74%
     trades = [
-        {"symbol": "BTC", "direction": "long", "outcome": "win",
-         "pnl_usd": 500.0, "closed_at": "2026-04-10T10:00:00+00:00"},
-        {"symbol": "BTC", "direction": "long", "outcome": "win",
-         "pnl_usd": 200.0, "closed_at": "2026-04-11T10:00:00+00:00"},
-        {"symbol": "BTC", "direction": "short", "outcome": "loss",
-         "pnl_usd": -400.0, "closed_at": "2026-04-12T10:00:00+00:00"},
+        {
+            "symbol": "BTC",
+            "direction": "long",
+            "outcome": "win",
+            "pnl_usd": 500.0,
+            "closed_at": "2026-04-10T10:00:00+00:00",
+        },
+        {
+            "symbol": "BTC",
+            "direction": "long",
+            "outcome": "win",
+            "pnl_usd": 200.0,
+            "closed_at": "2026-04-11T10:00:00+00:00",
+        },
+        {
+            "symbol": "BTC",
+            "direction": "short",
+            "outcome": "loss",
+            "pnl_usd": -400.0,
+            "closed_at": "2026-04-12T10:00:00+00:00",
+        },
     ]
-    (signals_dir / "2026-04-10.jsonl").write_text(
-        "\n".join(json.dumps(t) for t in trades) + "\n"
-    )
+    (signals_dir / "2026-04-10.jsonl").write_text("\n".join(json.dumps(t) for t in trades) + "\n")
     monkeypatch.setattr(re_mod, "SIGNALS_DIR", signals_dir)
     monkeypatch.setattr(re_mod, "PAPER_LOG", tmp_path / "paper.jsonl")
 
@@ -177,8 +191,7 @@ def test_signal_enhancer_flags_decorrelation():
         "regime_confidence": 0.0,
         "funding": {},
         "decorrelations": [
-            {"pair": ["BTC", "SPY"], "severity": "moderate",
-             "note": "BTC↔SPY decoupled"},
+            {"pair": ["BTC", "SPY"], "severity": "moderate", "note": "BTC↔SPY decoupled"},
         ],
     }
     eng._state_ts = 1e12
@@ -236,8 +249,14 @@ def test_correlation_fetch_merges_stale_cache_for_yfinance_failures(monkeypatch)
 
     monkeypatch.setattr(corr, "_load_cache", _load_cache)
     monkeypatch.setattr(corr, "_save_cache", saved.append)
-    monkeypatch.setattr(corr, "_fetch_prices_openbb", lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("down")))
-    monkeypatch.setattr(corr, "_publish_refresh_warning", lambda kind, **payload: warnings.append((kind, payload)))
+    monkeypatch.setattr(
+        corr,
+        "_fetch_prices_openbb",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("down")),
+    )
+    monkeypatch.setattr(
+        corr, "_publish_refresh_warning", lambda kind, **payload: warnings.append((kind, payload))
+    )
     monkeypatch.setitem(sys.modules, "yfinance", SimpleNamespace(download=_download))
 
     result = corr._fetch_prices({"BTC": "BTC-USD", "ETH": "ETH-USD"})
@@ -272,7 +291,11 @@ def test_correlation_fetch_does_not_overwrite_full_cache_with_partial(monkeypatc
     saved: list[pd.DataFrame] = []
     monkeypatch.setattr(corr, "_load_cache", _load_cache)
     monkeypatch.setattr(corr, "_save_cache", saved.append)
-    monkeypatch.setattr(corr, "_fetch_prices_openbb", lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("down")))
+    monkeypatch.setattr(
+        corr,
+        "_fetch_prices_openbb",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("down")),
+    )
     monkeypatch.setitem(sys.modules, "yfinance", SimpleNamespace(download=_download))
 
     result = corr._fetch_prices({"BTC": "BTC-USD", "ETH": "ETH-USD", "SOL": "SOL-USD"})

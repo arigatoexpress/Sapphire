@@ -10,7 +10,7 @@ index 33336081..62839749 100644
 +                "message": message_text[:16000],
              }
              await self.hooks.emit("agent:start", hook_ctx)
- 
+
 +            # Silently drop messages from relay-only bots — hooks already fired
 +            # above so the kimi-relay-writer hook can capture the response.
 +            # This prevents hermes from LLM-responding to @rarikimibot and

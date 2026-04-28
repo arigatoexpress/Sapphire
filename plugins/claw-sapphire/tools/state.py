@@ -81,12 +81,14 @@ def record_attempt(issue_id: str, tier: str, result: str, reason: str = "") -> d
         return {"error": f"Issue {issue_id} not found"}
 
     issue = state["issues"][issue_id]
-    issue["attempts"].append({
-        "timestamp": datetime.now(UTC).isoformat(),
-        "tier": tier,
-        "result": result,
-        "reason": reason[:200],
-    })
+    issue["attempts"].append(
+        {
+            "timestamp": datetime.now(UTC).isoformat(),
+            "tier": tier,
+            "result": result,
+            "reason": reason[:200],
+        }
+    )
 
     if result == "fixed":
         issue["status"] = "fixed"
@@ -122,7 +124,11 @@ def should_skip(issue_id: str) -> dict:
     if issue.get("backoff_until"):
         backoff = datetime.fromisoformat(issue["backoff_until"])
         if datetime.now(UTC) < backoff:
-            return {"skip": True, "reason": f"in backoff until {issue['backoff_until']}", "attempts": len(issue["attempts"])}
+            return {
+                "skip": True,
+                "reason": f"in backoff until {issue['backoff_until']}",
+                "attempts": len(issue["attempts"]),
+            }
 
     return {"skip": False, "reason": "ready for retry", "attempts": len(issue["attempts"])}
 
@@ -131,13 +137,18 @@ def get_metrics() -> dict:
     """Get daily metrics summary."""
     state = _load()
     today = _today()
-    today_metrics = state["metrics"].get(today, {"scanned": 0, "fixed": 0, "failed": 0, "skipped": 0})
+    today_metrics = state["metrics"].get(
+        today, {"scanned": 0, "fixed": 0, "failed": 0, "skipped": 0}
+    )
 
     total_issues = len(state["issues"])
     open_issues = sum(1 for i in state["issues"].values() if i["status"] == "open")
     fixed_issues = sum(1 for i in state["issues"].values() if i["status"] == "fixed")
-    in_backoff = sum(1 for i in state["issues"].values() if i.get("backoff_until") and
-                     datetime.fromisoformat(i["backoff_until"]) > datetime.now(UTC))
+    in_backoff = sum(
+        1
+        for i in state["issues"].values()
+        if i.get("backoff_until") and datetime.fromisoformat(i["backoff_until"]) > datetime.now(UTC)
+    )
 
     return {
         "today": today_metrics,
@@ -160,14 +171,18 @@ def main():
         print(json.dumps(_load(), indent=2))
     elif action == "record_issue":
         result = record_issue(
-            input_data["repo"], input_data["type"],
-            input_data.get("file", ""), input_data.get("description", ""),
+            input_data["repo"],
+            input_data["type"],
+            input_data.get("file", ""),
+            input_data.get("description", ""),
         )
         print(json.dumps(result, indent=2))
     elif action == "record_attempt":
         result = record_attempt(
-            input_data["issue_id"], input_data["tier"],
-            input_data["result"], input_data.get("reason", ""),
+            input_data["issue_id"],
+            input_data["tier"],
+            input_data["result"],
+            input_data.get("reason", ""),
         )
         print(json.dumps(result, indent=2))
     elif action == "should_skip":

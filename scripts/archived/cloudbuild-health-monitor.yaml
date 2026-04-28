@@ -11,13 +11,13 @@ steps:
       - '-f'
       - 'Dockerfile.health-monitor'
       - '.'
-  
+
   # Push container
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
       - 'gcr.io/sapphire-479610/sapphire-health-monitor:latest'
-  
+
   # Deploy as Cloud Run job
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud

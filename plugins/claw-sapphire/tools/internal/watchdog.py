@@ -30,7 +30,10 @@ def _run_health_check() -> dict:
     try:
         r = subprocess.run(
             ["python3", str(HEALTH_TOOL)],
-            input="{}", capture_output=True, text=True, timeout=45,
+            input="{}",
+            capture_output=True,
+            text=True,
+            timeout=45,
         )
         return json.loads(r.stdout) if r.stdout else {}
     except Exception as e:
@@ -42,7 +45,8 @@ def _send_alert(message: str, priority: str = "p0"):
     with contextlib.suppress(Exception):
         subprocess.run(
             ["python3", str(NOTIFY_TOOL), message, "--priority", priority],
-            capture_output=True, timeout=15,
+            capture_output=True,
+            timeout=15,
         )
 
 
@@ -97,12 +101,14 @@ def check_and_alert(force: bool = False) -> dict:
         _send_alert(f"{header}\n{body}", priority="p0" if current_reds else "p1")
 
     # Save state
-    _save_state({
-        "timestamp": datetime.now().isoformat(),
-        "overall": health.get("overall"),
-        "red_items": current_reds,
-        "summary": health.get("summary"),
-    })
+    _save_state(
+        {
+            "timestamp": datetime.now().isoformat(),
+            "overall": health.get("overall"),
+            "red_items": current_reds,
+            "summary": health.get("summary"),
+        }
+    )
 
     return {
         "overall": health.get("overall"),

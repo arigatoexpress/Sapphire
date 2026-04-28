@@ -35,6 +35,7 @@ def _ssl_ctx() -> ssl.SSLContext:
     """Build an SSL context that uses certifi certs (macOS Python 3.12 fix)."""
     try:
         import certifi
+
         return ssl.create_default_context(cafile=certifi.where())
     except ImportError:
         return ssl.create_default_context()
@@ -78,15 +79,17 @@ def action_paper() -> dict:
             unrealized = 0
             pnl_pct = 0
 
-        positions.append({
-            "symbol": pos["symbol"],
-            "side": pos["side"],
-            "entry": pos["entry_price"],
-            "current": current,
-            "qty": pos["qty"],
-            "unrealized": round(unrealized, 2),
-            "pnl_pct": round(pnl_pct, 2),
-        })
+        positions.append(
+            {
+                "symbol": pos["symbol"],
+                "side": pos["side"],
+                "entry": pos["entry_price"],
+                "current": current,
+                "qty": pos["qty"],
+                "unrealized": round(unrealized, 2),
+                "pnl_pct": round(pnl_pct, 2),
+            }
+        )
 
     total_realized = sum(t.get("pnl", 0) for t in pf.get("history", []))
     equity = pf["capital"] + total_unrealized
@@ -122,7 +125,9 @@ def action_balance() -> dict:
     try:
         r = subprocess.run(
             [sys.executable, "-m", "src.main", "balance"],
-            capture_output=True, text=True, timeout=15,
+            capture_output=True,
+            text=True,
+            timeout=15,
             cwd=str(COINTRACKER_DIR),
         )
         if r.returncode == 0:

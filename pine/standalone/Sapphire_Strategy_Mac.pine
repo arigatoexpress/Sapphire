@@ -4,9 +4,9 @@
 // ═══════════════════════════════════════════════════════════════
 
 //@version=5
-strategy("Sapphire AI Mac", overlay=true, 
-     initial_capital=1000, 
-     default_qty_type=strategy.percent_of_equity, 
+strategy("Sapphire AI Mac", overlay=true,
+     initial_capital=1000,
+     default_qty_type=strategy.percent_of_equity,
      default_qty_value=10,
      commission_type=strategy.commission.percent,
      commission_value=0.05)
@@ -59,7 +59,7 @@ if long_cond
     alert_message = '{"symbol": "' + syminfo.ticker + '", "action": "entry_long", "price": ' + str.tostring(close) + ', "size": 0.01, "strategy": "SapphireAI"}'
     alert(alert_message, alert.freq_once_per_bar_close)
 
-// Entry Short  
+// Entry Short
 if short_cond
     strategy.entry("Short", strategy.short, comment="Entry Short")
     alert_message = '{"symbol": "' + syminfo.ticker + '", "action": "entry_short", "price": ' + str.tostring(close) + ', "size": 0.01, "strategy": "SapphireAI"}'
@@ -80,8 +80,8 @@ if exit_short and strategy.position_size < 0
 // ═══════════════════════════════════════════════════════════════
 // INFO PANEL
 // ═══════════════════════════════════════════════════════════════
-var table info = table.new(position.top_right, 2, 7, 
-    bgcolor=color.new(color.black, 80), 
+var table info = table.new(position.top_right, 2, 7,
+    bgcolor=color.new(color.black, 80),
     frame_width=1,
     frame_color=color.gray)
 
@@ -93,10 +93,10 @@ if barstate.islast
     table.cell(info, 0, 2, "Price", text_color=color.gray)
     table.cell(info, 1, 2, str.tostring(close, format.mintick), text_color=color.yellow)
     table.cell(info, 0, 3, "RSI", text_color=color.gray)
-    table.cell(info, 1, 3, str.tostring(rsi, "#."), 
+    table.cell(info, 1, 3, str.tostring(rsi, "#."),
        text_color=rsi > 70 ? color.red : rsi < 30 ? color.green : color.white)
     table.cell(info, 0, 4, "MACD", text_color=color.gray)
-    table.cell(info, 1, 4, str.tostring(macd_line, "#.##"), 
+    table.cell(info, 1, 4, str.tostring(macd_line, "#.##"),
        text_color=macd_line > 0 ? color.green : color.red)
     table.cell(info, 0, 5, "Position", text_color=color.gray)
     pos_text = strategy.position_size > 0 ? "LONG 🟢" : strategy.position_size < 0 ? "SHORT 🔴" : "FLAT ⚪"
@@ -104,7 +104,7 @@ if barstate.islast
     table.cell(info, 1, 5, pos_text, text_color=pos_color)
     table.cell(info, 0, 6, "PnL", text_color=color.gray)
     pnl = strategy.openprofit
-    table.cell(info, 1, 6, str.tostring(pnl, "#.##"), 
+    table.cell(info, 1, 6, str.tostring(pnl, "#.##"),
        text_color=pnl > 0 ? color.green : pnl < 0 ? color.red : color.white)
 
 // Background color for signals

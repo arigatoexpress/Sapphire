@@ -33,19 +33,25 @@ def test_enrich_produces_required_fields(enrich) -> None:
 
 def test_intent_matching_word_boundary(enrich) -> None:
     # "raised" contains "ai" as a substring, but we should NOT match ai_adoption.
-    out = enrich.enrich_one({
-        "name": "Some Corp", "category": "finance",
-        "description": "raised Series A round",
-    })
+    out = enrich.enrich_one(
+        {
+            "name": "Some Corp",
+            "category": "finance",
+            "description": "raised Series A round",
+        }
+    )
     assert "ai_adoption" not in out["intent_signals"]
     assert "funding_event" in out["intent_signals"]
 
 
 def test_intent_explicit_ai(enrich) -> None:
-    out = enrich.enrich_one({
-        "name": "AI Labs", "category": "tech",
-        "description": "machine learning platform",
-    })
+    out = enrich.enrich_one(
+        {
+            "name": "AI Labs",
+            "category": "tech",
+            "description": "machine learning platform",
+        }
+    )
     assert "ai_adoption" in out["intent_signals"]
 
 
@@ -77,7 +83,11 @@ def test_empty_name_scores_low(enrich) -> None:
 def test_action_score_sorts_desc(enrich) -> None:
     leads = [
         {"name": "Weak", "category": ""},
-        {"name": "Strong Corp", "category": "tech", "description": "now hiring and expanding team, raised Series B"},
+        {
+            "name": "Strong Corp",
+            "category": "tech",
+            "description": "now hiring and expanding team, raised Series B",
+        },
     ]
     result = enrich.action_score(leads)
     assert result["leads"][0]["name"] == "Strong Corp"
@@ -85,9 +95,7 @@ def test_action_score_sorts_desc(enrich) -> None:
 
 
 def test_tier_distribution_counts_correctly(enrich) -> None:
-    leads = [
-        {"name": f"Lead {i}", "category": "tech"} for i in range(5)
-    ]
+    leads = [{"name": f"Lead {i}", "category": "tech"} for i in range(5)]
     result = enrich.action_score(leads)
     total = sum(result["tiers"].values())
     assert total == 5

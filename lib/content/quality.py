@@ -58,9 +58,7 @@ SHORT_FORM_MIN_WORDS = 18
 
 _NUM_RE = re.compile(r"(?<!\w)(\$?\-?\d[\d,]*(?:\.\d+)?%?)")
 _SENT_SPLIT_RE = re.compile(r"(?:[.!?]+\s+|\n+)")
-_PATH_CITATION_RE = re.compile(
-    r"(?:(?:data|docs|benchmarks|lib|services|infra)/[A-Za-z0-9_./-]+)"
-)
+_PATH_CITATION_RE = re.compile(r"(?:(?:data|docs|benchmarks|lib|services|infra)/[A-Za-z0-9_./-]+)")
 _URL_CITATION_RE = re.compile(r"https?://[^\s)]+")
 _TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9_-]*")
 _PERFORMANCE_CLAIM_PATTERNS: tuple[re.Pattern[str], ...] = (
@@ -302,13 +300,10 @@ def originality(text: str) -> float:
 
     sents = _sentences(text)
     normalized_sents = [
-        re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", "", s.lower())).strip()
-        for s in sents
+        re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", "", s.lower())).strip() for s in sents
     ]
     repeated_sentences = len(normalized_sents) - len(set(normalized_sents))
-    sentence_repeat_ratio = (
-        repeated_sentences / len(normalized_sents) if normalized_sents else 0.0
-    )
+    sentence_repeat_ratio = repeated_sentences / len(normalized_sents) if normalized_sents else 0.0
     cliche_ratio = len(count_banned(text)) / max(1, len(sents))
 
     penalty = min(1.0, trigram_repeat_ratio + sentence_repeat_ratio + cliche_ratio)
@@ -366,9 +361,7 @@ def check(
         reasons.append(f"too_many_banned_phrases ({len(hits)}>{MAX_BANNED}): {hits}")
     if nums < MIN_NUMBERS:
         reasons.append(f"data_density_low ({nums}<{MIN_NUMBERS} numbers)")
-    short_form_exception = (
-        words >= SHORT_FORM_MIN_WORDS and density >= (MIN_EVIDENCE_DENSITY * 2)
-    )
+    short_form_exception = words >= SHORT_FORM_MIN_WORDS and density >= (MIN_EVIDENCE_DENSITY * 2)
     if words < MIN_WORDS and not short_form_exception:
         reasons.append(f"too_short ({words}<{MIN_WORDS} words)")
     if avg_sent > MAX_AVG_SENTENCE_WORDS:
@@ -382,25 +375,17 @@ def check(
             f"evidence_coverage_low ({coverage}<{MIN_EVIDENCE_COVERAGE} evidence-backed sentences)"
         )
     if words >= LONG_FORM_WORDS and citation_score < MIN_CITATION_QUALITY:
-        reasons.append(
-            f"citation_quality_low ({citation_score}<{MIN_CITATION_QUALITY})"
-        )
+        reasons.append(f"citation_quality_low ({citation_score}<{MIN_CITATION_QUALITY})")
     if coherence_score < min_coherence:
-        reasons.append(
-            f"argument_coherence_low ({coherence_score}<{min_coherence})"
-        )
+        reasons.append(f"argument_coherence_low ({coherence_score}<{min_coherence})")
     if originality_score < MIN_ORIGINALITY_SCORE:
-        reasons.append(
-            f"originality_low ({originality_score}<{MIN_ORIGINALITY_SCORE})"
-        )
+        reasons.append(f"originality_low ({originality_score}<{MIN_ORIGINALITY_SCORE})")
     if unsupported:
         reasons.append(f"unsupported_conclusions ({len(unsupported)})")
     if overreach:
         reasons.append(f"logical_overreach ({len(overreach)})")
     if performance_claim_violations:
-        reasons.append(
-            f"performance_claim_sample_too_small ({len(performance_claim_violations)})"
-        )
+        reasons.append(f"performance_claim_sample_too_small ({len(performance_claim_violations)})")
 
     return QualityReport(
         passed=not reasons,

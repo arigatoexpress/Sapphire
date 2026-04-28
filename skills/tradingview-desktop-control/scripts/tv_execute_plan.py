@@ -69,7 +69,9 @@ def _json_or_none(text: str) -> Any:
         return None
 
 
-def _run_command(cmd: list[str], *, cwd: Path | None = None, timeout_seconds: float | None = None) -> dict[str, Any]:
+def _run_command(
+    cmd: list[str], *, cwd: Path | None = None, timeout_seconds: float | None = None
+) -> dict[str, Any]:
     started = time.time()
     try:
         proc = subprocess.run(
@@ -96,8 +98,16 @@ def _run_command(cmd: list[str], *, cwd: Path | None = None, timeout_seconds: fl
         }
     except subprocess.TimeoutExpired as e:
         elapsed = round(time.time() - started, 3)
-        stdout = ((e.stdout or "") if isinstance(e.stdout, str) else (e.stdout or b"").decode(errors="replace")).strip()
-        stderr = ((e.stderr or "") if isinstance(e.stderr, str) else (e.stderr or b"").decode(errors="replace")).strip()
+        stdout = (
+            (e.stdout or "")
+            if isinstance(e.stdout, str)
+            else (e.stdout or b"").decode(errors="replace")
+        ).strip()
+        stderr = (
+            (e.stderr or "")
+            if isinstance(e.stderr, str)
+            else (e.stderr or b"").decode(errors="replace")
+        ).strip()
         if not stderr:
             stderr = f"Command timed out after {timeout_seconds}s"
         return {
@@ -115,7 +125,9 @@ def _run_command(cmd: list[str], *, cwd: Path | None = None, timeout_seconds: fl
 
 
 def _risk_allowed(selected: str, allowed: str) -> bool:
-    return RISK_ORDER.get((selected or "low").lower(), 0) <= RISK_ORDER.get((allowed or "high").lower(), 2)
+    return RISK_ORDER.get((selected or "low").lower(), 0) <= RISK_ORDER.get(
+        (allowed or "high").lower(), 2
+    )
 
 
 def _as_positive_float(value: Any) -> float | None:
@@ -311,7 +323,10 @@ def _persist_failed_web_attempt_artifacts(
     actions_path: Path | None = None,
 ) -> dict[str, Any]:
     root = SKILL_ROOT / "output" / "executor-debug" / _slug_token(run_id, max_len=64)
-    attempt_dir = root / f"{_slug_token(phase, max_len=12)}-attempt{int(attempt_no):02d}-{_slug_token(session_name, max_len=18)}"
+    attempt_dir = (
+        root
+        / f"{_slug_token(phase, max_len=12)}-attempt{int(attempt_no):02d}-{_slug_token(session_name, max_len=18)}"
+    )
     attempt_dir.mkdir(parents=True, exist_ok=True)
 
     out: dict[str, Any] = {
@@ -339,7 +354,9 @@ def _persist_failed_web_attempt_artifacts(
             except Exception as e:  # noqa: BLE001
                 out["inventory_parse_error"] = str(e)
 
-        snapshot_paths = _collect_web_inventory_snapshot_paths(inventory_data or {}) if inventory_data else []
+        snapshot_paths = (
+            _collect_web_inventory_snapshot_paths(inventory_data or {}) if inventory_data else []
+        )
         out["snapshot_source_paths"] = snapshot_paths
         if snapshot_paths:
             snap_dir = attempt_dir / "snapshots"
@@ -441,7 +458,9 @@ def _dedupe_ordered(items: list[str]) -> list[str]:
     return out
 
 
-def _text_matches(hay: str | None, needle: str, *, match: str = "contains", case_sensitive: bool = False) -> bool:
+def _text_matches(
+    hay: str | None, needle: str, *, match: str = "contains", case_sensitive: bool = False
+) -> bool:
     if hay is None:
         return False
     left = hay if case_sensitive else hay.lower()
@@ -494,8 +513,12 @@ def _verification_needs_web_baseline(recipe: dict[str, Any]) -> bool:
     return False
 
 
-def _verify_web_inventory_capture(recipe: dict[str, Any], full: dict[str, Any], *, baseline_full: dict[str, Any] | None = None) -> dict[str, Any]:
-    verification = recipe.get("verification") if isinstance(recipe.get("verification"), dict) else {}
+def _verify_web_inventory_capture(
+    recipe: dict[str, Any], full: dict[str, Any], *, baseline_full: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    verification = (
+        recipe.get("verification") if isinstance(recipe.get("verification"), dict) else {}
+    )
     captures = full.get("captures") or []
     first_capture = (captures[0] if captures else {}) or {}
     page = first_capture.get("page") or {}
@@ -503,9 +526,15 @@ def _verify_web_inventory_capture(recipe: dict[str, Any], full: dict[str, Any], 
     dom_labels = _collect_dom_labels(first_capture)
     all_capture_labels = snapshot_labels + dom_labels
     plan_execution = full.get("plan_execution") or []
-    baseline_capture = (((baseline_full or {}).get("captures") or [{}])[0] if isinstance(baseline_full, dict) else {}) or {}
+    baseline_capture = (
+        ((baseline_full or {}).get("captures") or [{}])[0]
+        if isinstance(baseline_full, dict)
+        else {}
+    ) or {}
     baseline_page = baseline_capture.get("page") or {}
-    baseline_snapshot_labels = _collect_snapshot_labels(baseline_capture) if baseline_capture else []
+    baseline_snapshot_labels = (
+        _collect_snapshot_labels(baseline_capture) if baseline_capture else []
+    )
     baseline_dom_labels = _collect_dom_labels(baseline_capture) if baseline_capture else []
     baseline_all_capture_labels = baseline_snapshot_labels + baseline_dom_labels
 
@@ -530,29 +559,54 @@ def _verify_web_inventory_capture(recipe: dict[str, Any], full: dict[str, Any], 
             needle = str(raw.get("value") or "")
             actual = str(page.get("title") or "")
             match = str(raw.get("match") or "contains")
-            rec.update({"expected": needle, "actual": actual, "match": match, "ok": _text_matches(actual, needle, match=match)})
+            rec.update(
+                {
+                    "expected": needle,
+                    "actual": actual,
+                    "match": match,
+                    "ok": _text_matches(actual, needle, match=match),
+                }
+            )
         elif kind == "page_href_contains":
             needle = str(raw.get("value") or "")
             actual = str(page.get("href") or "")
             match = str(raw.get("match") or "contains")
-            rec.update({"expected": needle, "actual": actual, "match": match, "ok": _text_matches(actual, needle, match=match)})
+            rec.update(
+                {
+                    "expected": needle,
+                    "actual": actual,
+                    "match": match,
+                    "ok": _text_matches(actual, needle, match=match),
+                }
+            )
         elif kind == "page_title_changed":
             before = str(baseline_page.get("title") or "")
             after = str(page.get("title") or "")
-            rec.update({"before": before, "after": after, "ok": bool(before and after and before != after)})
+            rec.update(
+                {"before": before, "after": after, "ok": bool(before and after and before != after)}
+            )
         elif kind == "page_href_changed":
             before = str(baseline_page.get("href") or "")
             after = str(page.get("href") or "")
-            rec.update({"before": before, "after": after, "ok": bool(before and after and before != after)})
+            rec.update(
+                {"before": before, "after": after, "ok": bool(before and after and before != after)}
+            )
         elif kind in {"snapshot_label_any", "snapshot_label_all"}:
             vals = [str(v) for v in (raw.get("values") or []) if str(v).strip()]
             match = str(raw.get("match") or "contains")
             case_sensitive = bool(raw.get("case_sensitive", False))
             checks = []
             for val in vals:
-                found = any(_text_matches(lbl, val, match=match, case_sensitive=case_sensitive) for lbl in snapshot_labels)
+                found = any(
+                    _text_matches(lbl, val, match=match, case_sensitive=case_sensitive)
+                    for lbl in snapshot_labels
+                )
                 checks.append({"value": val, "found": found})
-            ok = any(c["found"] for c in checks) if kind == "snapshot_label_any" else all(c["found"] for c in checks)
+            ok = (
+                any(c["found"] for c in checks)
+                if kind == "snapshot_label_any"
+                else all(c["found"] for c in checks)
+            )
             rec.update({"values": vals, "match": match, "checks": checks, "ok": ok})
         elif kind in {"dom_label_any", "dom_label_all"}:
             vals = [str(v) for v in (raw.get("values") or []) if str(v).strip()]
@@ -560,9 +614,16 @@ def _verify_web_inventory_capture(recipe: dict[str, Any], full: dict[str, Any], 
             case_sensitive = bool(raw.get("case_sensitive", False))
             checks = []
             for val in vals:
-                found = any(_text_matches(lbl, val, match=match, case_sensitive=case_sensitive) for lbl in dom_labels)
+                found = any(
+                    _text_matches(lbl, val, match=match, case_sensitive=case_sensitive)
+                    for lbl in dom_labels
+                )
                 checks.append({"value": val, "found": found})
-            ok = any(c["found"] for c in checks) if kind == "dom_label_any" else all(c["found"] for c in checks)
+            ok = (
+                any(c["found"] for c in checks)
+                if kind == "dom_label_any"
+                else all(c["found"] for c in checks)
+            )
             rec.update({"values": vals, "match": match, "checks": checks, "ok": ok})
         elif kind in {"capture_text_any", "capture_text_all"}:
             vals = [str(v) for v in (raw.get("values") or []) if str(v).strip()]
@@ -570,9 +631,16 @@ def _verify_web_inventory_capture(recipe: dict[str, Any], full: dict[str, Any], 
             case_sensitive = bool(raw.get("case_sensitive", False))
             checks = []
             for val in vals:
-                found = any(_text_matches(lbl, val, match=match, case_sensitive=case_sensitive) for lbl in all_capture_labels)
+                found = any(
+                    _text_matches(lbl, val, match=match, case_sensitive=case_sensitive)
+                    for lbl in all_capture_labels
+                )
                 checks.append({"value": val, "found": found})
-            ok = any(c["found"] for c in checks) if kind == "capture_text_any" else all(c["found"] for c in checks)
+            ok = (
+                any(c["found"] for c in checks)
+                if kind == "capture_text_any"
+                else all(c["found"] for c in checks)
+            )
             rec.update({"values": vals, "match": match, "checks": checks, "ok": ok})
         elif kind in {
             "snapshot_label_appears_any",
@@ -585,14 +653,31 @@ def _verify_web_inventory_capture(recipe: dict[str, Any], full: dict[str, Any], 
             case_sensitive = bool(raw.get("case_sensitive", False))
             checks = []
             for val in vals:
-                before_found = any(_text_matches(lbl, val, match=match, case_sensitive=case_sensitive) for lbl in baseline_snapshot_labels)
-                after_found = any(_text_matches(lbl, val, match=match, case_sensitive=case_sensitive) for lbl in snapshot_labels)
+                before_found = any(
+                    _text_matches(lbl, val, match=match, case_sensitive=case_sensitive)
+                    for lbl in baseline_snapshot_labels
+                )
+                after_found = any(
+                    _text_matches(lbl, val, match=match, case_sensitive=case_sensitive)
+                    for lbl in snapshot_labels
+                )
                 if "appears" in kind:
                     ok_val = (not before_found) and after_found
                 else:
                     ok_val = before_found and (not after_found)
-                checks.append({"value": val, "before_found": before_found, "after_found": after_found, "ok": ok_val})
-            ok = any(c["ok"] for c in checks) if kind.endswith("_any") else all(c["ok"] for c in checks)
+                checks.append(
+                    {
+                        "value": val,
+                        "before_found": before_found,
+                        "after_found": after_found,
+                        "ok": ok_val,
+                    }
+                )
+            ok = (
+                any(c["ok"] for c in checks)
+                if kind.endswith("_any")
+                else all(c["ok"] for c in checks)
+            )
             rec.update({"values": vals, "match": match, "checks": checks, "ok": ok})
         elif kind in {
             "dom_label_appears_any",
@@ -605,14 +690,31 @@ def _verify_web_inventory_capture(recipe: dict[str, Any], full: dict[str, Any], 
             case_sensitive = bool(raw.get("case_sensitive", False))
             checks = []
             for val in vals:
-                before_found = any(_text_matches(lbl, val, match=match, case_sensitive=case_sensitive) for lbl in baseline_dom_labels)
-                after_found = any(_text_matches(lbl, val, match=match, case_sensitive=case_sensitive) for lbl in dom_labels)
+                before_found = any(
+                    _text_matches(lbl, val, match=match, case_sensitive=case_sensitive)
+                    for lbl in baseline_dom_labels
+                )
+                after_found = any(
+                    _text_matches(lbl, val, match=match, case_sensitive=case_sensitive)
+                    for lbl in dom_labels
+                )
                 if "appears" in kind:
                     ok_val = (not before_found) and after_found
                 else:
                     ok_val = before_found and (not after_found)
-                checks.append({"value": val, "before_found": before_found, "after_found": after_found, "ok": ok_val})
-            ok = any(c["ok"] for c in checks) if kind.endswith("_any") else all(c["ok"] for c in checks)
+                checks.append(
+                    {
+                        "value": val,
+                        "before_found": before_found,
+                        "after_found": after_found,
+                        "ok": ok_val,
+                    }
+                )
+            ok = (
+                any(c["ok"] for c in checks)
+                if kind.endswith("_any")
+                else all(c["ok"] for c in checks)
+            )
             rec.update({"values": vals, "match": match, "checks": checks, "ok": ok})
         elif kind in {
             "capture_text_appears_any",
@@ -625,20 +727,49 @@ def _verify_web_inventory_capture(recipe: dict[str, Any], full: dict[str, Any], 
             case_sensitive = bool(raw.get("case_sensitive", False))
             checks = []
             for val in vals:
-                before_found = any(_text_matches(lbl, val, match=match, case_sensitive=case_sensitive) for lbl in baseline_all_capture_labels)
-                after_found = any(_text_matches(lbl, val, match=match, case_sensitive=case_sensitive) for lbl in all_capture_labels)
+                before_found = any(
+                    _text_matches(lbl, val, match=match, case_sensitive=case_sensitive)
+                    for lbl in baseline_all_capture_labels
+                )
+                after_found = any(
+                    _text_matches(lbl, val, match=match, case_sensitive=case_sensitive)
+                    for lbl in all_capture_labels
+                )
                 if "appears" in kind:
                     ok_val = (not before_found) and after_found
                 else:
                     ok_val = before_found and (not after_found)
-                checks.append({"value": val, "before_found": before_found, "after_found": after_found, "ok": ok_val})
-            ok = any(c["ok"] for c in checks) if kind.endswith("_any") else all(c["ok"] for c in checks)
+                checks.append(
+                    {
+                        "value": val,
+                        "before_found": before_found,
+                        "after_found": after_found,
+                        "ok": ok_val,
+                    }
+                )
+            ok = (
+                any(c["ok"] for c in checks)
+                if kind.endswith("_any")
+                else all(c["ok"] for c in checks)
+            )
             rec.update({"values": vals, "match": match, "checks": checks, "ok": ok})
         elif kind == "plan_action_executed":
             action = str(raw.get("action") or "")
             min_count = int(raw.get("min_count") or 1)
-            matched = [step for step in plan_execution if isinstance(step, dict) and (not action or str(step.get("action") or "") == action)]
-            rec.update({"action": action or None, "min_count": min_count, "count": len(matched), "ok": len(matched) >= min_count})
+            matched = [
+                step
+                for step in plan_execution
+                if isinstance(step, dict)
+                and (not action or str(step.get("action") or "") == action)
+            ]
+            rec.update(
+                {
+                    "action": action or None,
+                    "min_count": min_count,
+                    "count": len(matched),
+                    "ok": len(matched) >= min_count,
+                }
+            )
         else:
             rec.update({"error": f"unsupported assertion kind: {kind}"})
         results.append(rec)
@@ -682,7 +813,9 @@ def _ensure_ready_plan(plan: dict[str, Any]) -> tuple[bool, str]:
     return True, "ready"
 
 
-def _execute_tvctl_recipe(recipe: dict[str, Any], *, command_timeout_seconds: float | None) -> dict[str, Any]:
+def _execute_tvctl_recipe(
+    recipe: dict[str, Any], *, command_timeout_seconds: float | None
+) -> dict[str, Any]:
     subcommand = str(recipe.get("subcommand") or "").strip()
     if not subcommand:
         raise ValueError("tvctl recipe missing subcommand")
@@ -803,7 +936,9 @@ def _execute_tv_web_inventory_recipe(
                 cmd.append("--no-close")
             return cmd
 
-        def _capture_baseline_with_retry(start_session: str) -> tuple[dict[str, Any], dict[str, Any] | None, str]:
+        def _capture_baseline_with_retry(
+            start_session: str,
+        ) -> tuple[dict[str, Any], dict[str, Any] | None, str]:
             attempts_total = max(1, int(baseline_attempts))
             delay = max(0.0, float(retry_backoff_seconds or 0))
             mult = float(retry_backoff_multiplier or 1.0)
@@ -813,10 +948,20 @@ def _execute_tv_web_inventory_recipe(
             for attempt_no in range(1, attempts_total + 1):
                 if baseline_output_path.exists():
                     baseline_output_path.unlink()
-                res = _run_command(_baseline_cmd_for(current_session), timeout_seconds=baseline_timeout)
+                res = _run_command(
+                    _baseline_cmd_for(current_session), timeout_seconds=baseline_timeout
+                )
                 retryable = _is_retryable_web_inventory_error(res)
-                rotate_session = retryable and _should_rotate_web_session_on_retry(res) and attempt_no < attempts_total
-                next_session = _retry_web_session_name(current_session, "b", attempt_no + 1) if rotate_session else current_session
+                rotate_session = (
+                    retryable
+                    and _should_rotate_web_session_on_retry(res)
+                    and attempt_no < attempts_total
+                )
+                next_session = (
+                    _retry_web_session_name(current_session, "b", attempt_no + 1)
+                    if rotate_session
+                    else current_session
+                )
                 hist_row = {
                     "attempt": attempt_no,
                     "phase": "baseline",
@@ -832,9 +977,8 @@ def _execute_tv_web_inventory_recipe(
                 err_blob = str(res.get("stderr") or "").strip()
                 if err_blob:
                     hist_row["stderr_first_line"] = err_blob.splitlines()[0][:240]
-                should_capture_debug = (
-                    debug_artifacts_mode == "always"
-                    or (debug_artifacts_mode == "on-failure" and int(res.get("returncode") or 0) != 0)
+                should_capture_debug = debug_artifacts_mode == "always" or (
+                    debug_artifacts_mode == "on-failure" and int(res.get("returncode") or 0) != 0
                 )
                 if should_capture_debug:
                     hist_row["debug_artifacts"] = _persist_failed_web_attempt_artifacts(
@@ -882,8 +1026,12 @@ def _execute_tv_web_inventory_recipe(
         final_exec_res: dict[str, Any] | None = None
 
         for exec_attempt_no in range(1, exec_attempts_total + 1):
-            if needs_baseline and (baseline_full is None or baseline_session_used != current_session):
-                baseline_res, baseline_data, baseline_session = _capture_baseline_with_retry(current_session)
+            if needs_baseline and (
+                baseline_full is None or baseline_session_used != current_session
+            ):
+                baseline_res, baseline_data, baseline_session = _capture_baseline_with_retry(
+                    current_session
+                )
                 baseline_capture_runs.append(
                     {
                         "attempt_group": len(baseline_capture_runs) + 1,
@@ -913,7 +1061,9 @@ def _execute_tv_web_inventory_recipe(
                     msg = (
                         "Failed to capture web baseline for delta assertions: "
                         + f"after {attempts_used}/{attempts_max} attempt(s): "
-                        + str((baseline_res.get("stderr") or baseline_res.get("stdout") or "").strip())
+                        + str(
+                            (baseline_res.get("stderr") or baseline_res.get("stdout") or "").strip()
+                        )
                     )
                     partial_exec_info = {
                         "phase": "baseline",
@@ -965,8 +1115,16 @@ def _execute_tv_web_inventory_recipe(
                 output_path.unlink()
             res = _run_command(_exec_cmd_for(current_session), timeout_seconds=exec_timeout)
             retryable = _is_retryable_web_inventory_error(res)
-            rotate_session = retryable and _should_rotate_web_session_on_retry(res) and exec_attempt_no < exec_attempts_total
-            next_session = _retry_web_session_name(current_session, "e", exec_attempt_no + 1) if rotate_session else current_session
+            rotate_session = (
+                retryable
+                and _should_rotate_web_session_on_retry(res)
+                and exec_attempt_no < exec_attempts_total
+            )
+            next_session = (
+                _retry_web_session_name(current_session, "e", exec_attempt_no + 1)
+                if rotate_session
+                else current_session
+            )
             hist_row = {
                 "attempt": exec_attempt_no,
                 "phase": "execution",
@@ -982,9 +1140,8 @@ def _execute_tv_web_inventory_recipe(
             err_blob = str(res.get("stderr") or "").strip()
             if err_blob:
                 hist_row["stderr_first_line"] = err_blob.splitlines()[0][:240]
-            should_capture_debug = (
-                debug_artifacts_mode == "always"
-                or (debug_artifacts_mode == "on-failure" and int(res.get("returncode") or 0) != 0)
+            should_capture_debug = debug_artifacts_mode == "always" or (
+                debug_artifacts_mode == "on-failure" and int(res.get("returncode") or 0) != 0
             )
             if should_capture_debug:
                 hist_row["debug_artifacts"] = _persist_failed_web_attempt_artifacts(
@@ -1046,7 +1203,9 @@ def _execute_tv_web_inventory_recipe(
             "temporary": True,
             "actions_file_name": actions_path.name,
             "inventory_output_name": output_path.name,
-            "baseline_inventory_output_name": baseline_output_path.name if baseline_full is not None else None,
+            "baseline_inventory_output_name": baseline_output_path.name
+            if baseline_full is not None
+            else None,
         }
         if baseline_full is not None:
             exec_info["baseline_summary"] = {
@@ -1070,7 +1229,9 @@ def _execute_tv_web_inventory_recipe(
                 "snapshot_ref_count": ((first_cap.get("snapshot") or {}).get("ref_count")),
                 "dom_control_count": len(first_cap.get("dom_controls", []) or []),
             }
-            exec_info["verification_result"] = _verify_web_inventory_capture(recipe, full, baseline_full=baseline_full)
+            exec_info["verification_result"] = _verify_web_inventory_capture(
+                recipe, full, baseline_full=baseline_full
+            )
         return exec_info
 
 
@@ -1142,9 +1303,13 @@ def format_result_text(result: dict[str, Any]) -> str:
             f"Risk gate: selected={rg.get('selected')} allowed={rg.get('allowed_max')} allowed={rg.get('allowed')}"
         )
     if result.get("pre_hooks"):
-        lines.append(f"Pre-hooks: {', '.join(h.get('hook','?') for h in result.get('pre_hooks') or [])}")
+        lines.append(
+            f"Pre-hooks: {', '.join(h.get('hook','?') for h in result.get('pre_hooks') or [])}"
+        )
     if result.get("post_hooks"):
-        lines.append(f"Post-hooks: {', '.join(h.get('hook','?') for h in result.get('post_hooks') or [])}")
+        lines.append(
+            f"Post-hooks: {', '.join(h.get('hook','?') for h in result.get('post_hooks') or [])}"
+        )
     exec_res = result.get("execution")
     if isinstance(exec_res, dict):
         lines.append(
@@ -1185,7 +1350,9 @@ def format_result_text(result: dict[str, Any]) -> str:
                 for p in debug_dirs:
                     if p not in seen_dbg:
                         seen_dbg.append(p)
-                lines.append(f"Debug artifacts: {seen_dbg[0]}{f' (+{len(seen_dbg)-1} more)' if len(seen_dbg) > 1 else ''}")
+                lines.append(
+                    f"Debug artifacts: {seen_dbg[0]}{f' (+{len(seen_dbg)-1} more)' if len(seen_dbg) > 1 else ''}"
+                )
         if exec_res.get("web_inventory_summary"):
             wis = exec_res["web_inventory_summary"]
             lines.append(
@@ -1197,7 +1364,11 @@ def format_result_text(result: dict[str, Any]) -> str:
                 f"Recipe verification: ok={vr.get('ok')} assertions={vr.get('assertion_count')} capture={vr.get('capture_label')}"
             )
             if not bool(vr.get("ok")):
-                failed = [a for a in (vr.get("assertions") or []) if isinstance(a, dict) and not a.get("ok")]
+                failed = [
+                    a
+                    for a in (vr.get("assertions") or [])
+                    if isinstance(a, dict) and not a.get("ok")
+                ]
                 if failed:
                     details = []
                     for a in failed[:3]:
@@ -1212,24 +1383,75 @@ def format_result_text(result: dict[str, Any]) -> str:
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="Execute a TradingView planner result with risk gates and verification hooks")
-    p.add_argument("intent", nargs="?", help="Natural-language intent (omit when using --plan-file)")
-    p.add_argument("--plan-file", type=Path, default=None, help="Existing tv_plan_intent.py JSON output")
+    p = argparse.ArgumentParser(
+        description="Execute a TradingView planner result with risk gates and verification hooks"
+    )
+    p.add_argument(
+        "intent", nargs="?", help="Natural-language intent (omit when using --plan-file)"
+    )
+    p.add_argument(
+        "--plan-file", type=Path, default=None, help="Existing tv_plan_intent.py JSON output"
+    )
     p.add_argument("--registry", type=Path, default=DEFAULT_REGISTRY)
     p.add_argument("--search-top", type=int, default=20)
     p.add_argument("--min-score", type=float, default=0.0)
     p.add_argument("--prefer-surface-family", choices=["desktop_ui", "web_ui"], default=None)
-    p.add_argument("--max-risk", choices=["low", "medium", "high"], default="medium", help="Planning + execution risk threshold")
-    p.add_argument("--allow-risk", choices=["low", "medium", "high"], default=None, help="Execution-only risk threshold (defaults to --max-risk)")
-    p.add_argument("--yes", action="store_true", help="Execute the selected recipe (otherwise dry-run/plan-only)")
+    p.add_argument(
+        "--max-risk",
+        choices=["low", "medium", "high"],
+        default="medium",
+        help="Planning + execution risk threshold",
+    )
+    p.add_argument(
+        "--allow-risk",
+        choices=["low", "medium", "high"],
+        default=None,
+        help="Execution-only risk threshold (defaults to --max-risk)",
+    )
+    p.add_argument(
+        "--yes",
+        action="store_true",
+        help="Execute the selected recipe (otherwise dry-run/plan-only)",
+    )
     p.add_argument("--dry-run", action="store_true", help="Force dry-run (do not execute)")
-    p.add_argument("--pre-hook", action="append", default=[], choices=HOOK_CHOICES, help="Run a verification hook before execution")
-    p.add_argument("--post-hook", action="append", default=[], choices=HOOK_CHOICES, help="Run a verification hook after execution")
-    p.add_argument("--no-auto-hooks", action="store_true", help="Disable default runner-specific hooks (e.g. status pre/post for tvctl)")
-    p.add_argument("--web-session", default=None, help="Override Playwright session name for web recipe execution")
-    p.add_argument("--web-headed", action="store_true", help="Force headed mode for web recipe execution")
-    p.add_argument("--web-keep-open", action="store_true", help="Do not close Playwright browser/session after web execution")
-    p.add_argument("--web-cwd", type=Path, default=None, help="Working dir for playwright-cli artifacts when executing web recipes")
+    p.add_argument(
+        "--pre-hook",
+        action="append",
+        default=[],
+        choices=HOOK_CHOICES,
+        help="Run a verification hook before execution",
+    )
+    p.add_argument(
+        "--post-hook",
+        action="append",
+        default=[],
+        choices=HOOK_CHOICES,
+        help="Run a verification hook after execution",
+    )
+    p.add_argument(
+        "--no-auto-hooks",
+        action="store_true",
+        help="Disable default runner-specific hooks (e.g. status pre/post for tvctl)",
+    )
+    p.add_argument(
+        "--web-session",
+        default=None,
+        help="Override Playwright session name for web recipe execution",
+    )
+    p.add_argument(
+        "--web-headed", action="store_true", help="Force headed mode for web recipe execution"
+    )
+    p.add_argument(
+        "--web-keep-open",
+        action="store_true",
+        help="Do not close Playwright browser/session after web execution",
+    )
+    p.add_argument(
+        "--web-cwd",
+        type=Path,
+        default=None,
+        help="Working dir for playwright-cli artifacts when executing web recipes",
+    )
     p.add_argument(
         "--debug-artifacts",
         choices=["on-failure", "always", "off"],
@@ -1312,7 +1534,9 @@ def main() -> int:
     out["risk_gate"] = {"selected": selected_risk, "allowed_max": allowed_risk, "allowed": risk_ok}
     if not risk_ok:
         out["status"] = "blocked_risk"
-        out["message"] = f"Selected action risk '{selected_risk}' exceeds allowed execution risk '{allowed_risk}'"
+        out["message"] = (
+            f"Selected action risk '{selected_risk}' exceeds allowed execution risk '{allowed_risk}'"
+        )
         if args.json:
             print(json.dumps(out, indent=2))
         else:
@@ -1352,14 +1576,19 @@ def main() -> int:
             web_keep_open=bool(args.web_keep_open),
             web_cwd=args.web_cwd,
             command_timeout_seconds=(
-                None if args.command_timeout_seconds is None or args.command_timeout_seconds <= 0 else float(args.command_timeout_seconds)
+                None
+                if args.command_timeout_seconds is None or args.command_timeout_seconds <= 0
+                else float(args.command_timeout_seconds)
             ),
             web_exec_timeout_seconds=(
-                None if args.web_exec_timeout_seconds is None or args.web_exec_timeout_seconds <= 0 else float(args.web_exec_timeout_seconds)
+                None
+                if args.web_exec_timeout_seconds is None or args.web_exec_timeout_seconds <= 0
+                else float(args.web_exec_timeout_seconds)
             ),
             web_baseline_timeout_seconds=(
                 None
-                if args.web_baseline_timeout_seconds is None or args.web_baseline_timeout_seconds <= 0
+                if args.web_baseline_timeout_seconds is None
+                or args.web_baseline_timeout_seconds <= 0
                 else float(args.web_baseline_timeout_seconds)
             ),
             debug_artifacts_mode=str(args.debug_artifacts or "on-failure"),
@@ -1387,7 +1616,9 @@ def main() -> int:
 
     if int(exec_result.get("returncode") or 0) != 0:
         out["status"] = "execution_failed"
-    elif isinstance(exec_result.get("verification_result"), dict) and not bool(exec_result["verification_result"].get("ok")):
+    elif isinstance(exec_result.get("verification_result"), dict) and not bool(
+        exec_result["verification_result"].get("ok")
+    ):
         out["status"] = "verification_failed"
     else:
         out["status"] = "executed"

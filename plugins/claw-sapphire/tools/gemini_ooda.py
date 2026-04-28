@@ -5,6 +5,7 @@ Keeps the standard `plugins/claw-sapphire/tools/<name>.py` invocation path
 working (scheduled tasks, hermes skills, importlib test fixtures) while the
 implementation lives alongside the rest of the internal tools.
 """
+
 from __future__ import annotations
 
 from pathlib import Path

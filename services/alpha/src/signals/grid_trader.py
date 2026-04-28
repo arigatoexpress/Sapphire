@@ -48,6 +48,7 @@ def _env_float(name: str, default: float, minimum: float = 0.0, maximum: float =
 
 def _parse_symbols(raw: str) -> list[str]:
     import re as _re
+
     tokens = _re.split(r"[,;|\s]+", str(raw or "").strip())
     seen = set()
     result: list[str] = []
@@ -99,19 +100,37 @@ class GridSignalPlanner:
         self._enabled = enabled or _env_flag("SAPPHIRE_GRID_TRADER_ENABLED", default=False)
         self._interval = _env_int("SAPPHIRE_GRID_INTERVAL_SECONDS", 10, minimum=3, maximum=600)
         self._levels = _env_int("SAPPHIRE_GRID_LEVELS", 4, minimum=1, maximum=20)
-        self._spacing_pct = _env_float("SAPPHIRE_GRID_SPACING_PCT", 0.35, minimum=0.01, maximum=20.0)
+        self._spacing_pct = _env_float(
+            "SAPPHIRE_GRID_SPACING_PCT", 0.35, minimum=0.01, maximum=20.0
+        )
         self._rearm_pct = _env_float("SAPPHIRE_GRID_REARM_PCT", 0.15, minimum=0.01, maximum=10.0)
-        self._recenter_pct = _env_float("SAPPHIRE_GRID_RECENTER_PCT", 2.5, minimum=0.5, maximum=25.0)
-        self._max_signals_per_cycle = _env_int("SAPPHIRE_GRID_MAX_SIGNALS_PER_CYCLE", 4, minimum=1, maximum=50)
-        self._level_cooldown = _env_int("SAPPHIRE_GRID_LEVEL_COOLDOWN_SECONDS", 60, minimum=5, maximum=3600)
-        self._symbol_cooldown = _env_int("SAPPHIRE_GRID_SYMBOL_COOLDOWN_SECONDS", 10, minimum=1, maximum=600)
-        self._min_price_age = _env_int("SAPPHIRE_GRID_MAX_PRICE_AGE_SECONDS", 120, minimum=10, maximum=1200)
+        self._recenter_pct = _env_float(
+            "SAPPHIRE_GRID_RECENTER_PCT", 2.5, minimum=0.5, maximum=25.0
+        )
+        self._max_signals_per_cycle = _env_int(
+            "SAPPHIRE_GRID_MAX_SIGNALS_PER_CYCLE", 4, minimum=1, maximum=50
+        )
+        self._level_cooldown = _env_int(
+            "SAPPHIRE_GRID_LEVEL_COOLDOWN_SECONDS", 60, minimum=5, maximum=3600
+        )
+        self._symbol_cooldown = _env_int(
+            "SAPPHIRE_GRID_SYMBOL_COOLDOWN_SECONDS", 10, minimum=1, maximum=600
+        )
+        self._min_price_age = _env_int(
+            "SAPPHIRE_GRID_MAX_PRICE_AGE_SECONDS", 120, minimum=10, maximum=1200
+        )
         self._allow_paper = _env_flag("SAPPHIRE_GRID_ALLOW_PAPER", default=False)
-        self._target_mode = str(os.getenv("SAPPHIRE_GRID_TARGET_MODE", "best")).strip().lower() or "best"
+        self._target_mode = (
+            str(os.getenv("SAPPHIRE_GRID_TARGET_MODE", "best")).strip().lower() or "best"
+        )
         self._target_venues = _parse_venues(os.getenv("SAPPHIRE_GRID_TARGET_VENUES", ""))
-        self._base_quantity = _env_float("SAPPHIRE_GRID_BASE_QUANTITY", 0.0, minimum=0.0, maximum=1000.0)
+        self._base_quantity = _env_float(
+            "SAPPHIRE_GRID_BASE_QUANTITY", 0.0, minimum=0.0, maximum=1000.0
+        )
         self._leverage = _env_float("SAPPHIRE_GRID_LEVERAGE", 5.0, minimum=1.0, maximum=125.0)
-        self._mode = str(os.getenv("SAPPHIRE_GRID_MODE", "long_only")).strip().lower() or "long_only"
+        self._mode = (
+            str(os.getenv("SAPPHIRE_GRID_MODE", "long_only")).strip().lower() or "long_only"
+        )
         self._running = False
 
         preferred = symbols or _parse_symbols(
@@ -225,7 +244,11 @@ class GridSignalPlanner:
                     break
 
                 # BUY trigger
-                if level.buy_armed and price <= level.buy_price and (now - level.last_buy_at) >= self._level_cooldown:
+                if (
+                    level.buy_armed
+                    and price <= level.buy_price
+                    and (now - level.last_buy_at) >= self._level_cooldown
+                ):
                     payload = self._build_signal(
                         symbol=symbol,
                         action="BUY",
@@ -242,7 +265,11 @@ class GridSignalPlanner:
                     continue
 
                 # SELL trigger
-                if level.sell_armed and price >= level.sell_price and (now - level.last_sell_at) >= self._level_cooldown:
+                if (
+                    level.sell_armed
+                    and price >= level.sell_price
+                    and (now - level.last_sell_at) >= self._level_cooldown
+                ):
                     payload = self._build_signal(
                         symbol=symbol,
                         action="SELL",
@@ -261,7 +288,9 @@ class GridSignalPlanner:
                 # Rearm logic
                 if not level.buy_armed and price >= level.buy_price * (1 + self._rearm_pct / 100.0):
                     level.buy_armed = True
-                if not level.sell_armed and price <= level.sell_price * (1 - self._rearm_pct / 100.0):
+                if not level.sell_armed and price <= level.sell_price * (
+                    1 - self._rearm_pct / 100.0
+                ):
                     level.sell_armed = True
 
         return signals

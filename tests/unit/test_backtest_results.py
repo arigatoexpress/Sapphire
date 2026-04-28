@@ -53,11 +53,15 @@ class TestLeaderboard:
         d = tmp_path / "data" / "backtests" / "strategies"
         d.mkdir(parents=True)
         f = d / "strategy_sweep_20260418T000000Z.json"
-        f.write_text(json.dumps({
-            "computed_at": "2026-04-18T00:00:00+00:00",
-            "total_backtests": len(rows),
-            "results": rows,
-        }))
+        f.write_text(
+            json.dumps(
+                {
+                    "computed_at": "2026-04-18T00:00:00+00:00",
+                    "total_backtests": len(rows),
+                    "results": rows,
+                }
+            )
+        )
         return d
 
     def test_empty_when_no_files(self, tmp_path, monkeypatch):
@@ -67,11 +71,14 @@ class TestLeaderboard:
         assert "note" in r
 
     def test_ranks_by_metric(self, tmp_path, monkeypatch):
-        d = self._write_sweep(tmp_path, [
-            {"strategy_cls": "A", "symbol": "BTC", "sortino": 2.0, "total_trades": 10},
-            {"strategy_cls": "B", "symbol": "ETH", "sortino": 5.0, "total_trades": 10},
-            {"strategy_cls": "C", "symbol": "SOL", "sortino": 1.0, "total_trades": 10},
-        ])
+        d = self._write_sweep(
+            tmp_path,
+            [
+                {"strategy_cls": "A", "symbol": "BTC", "sortino": 2.0, "total_trades": 10},
+                {"strategy_cls": "B", "symbol": "ETH", "sortino": 5.0, "total_trades": 10},
+                {"strategy_cls": "C", "symbol": "SOL", "sortino": 1.0, "total_trades": 10},
+            ],
+        )
         monkeypatch.setattr(br, "BACKTESTS_DIR", d)
         r = br.leaderboard(metric="sortino", limit=2)
         assert len(r["rows"]) == 2
@@ -79,10 +86,13 @@ class TestLeaderboard:
         assert r["rows"][1]["strategy_cls"] == "A"
 
     def test_filters_low_trade_count(self, tmp_path, monkeypatch):
-        d = self._write_sweep(tmp_path, [
-            {"strategy_cls": "HighVol", "sortino": 5.0, "total_trades": 10},
-            {"strategy_cls": "LowVol", "sortino": 999.0, "total_trades": 1},
-        ])
+        d = self._write_sweep(
+            tmp_path,
+            [
+                {"strategy_cls": "HighVol", "sortino": 5.0, "total_trades": 10},
+                {"strategy_cls": "LowVol", "sortino": 999.0, "total_trades": 1},
+            ],
+        )
         monkeypatch.setattr(br, "BACKTESTS_DIR", d)
         r = br.leaderboard()
         # LowVol filtered out due to <5 trades
@@ -90,9 +100,12 @@ class TestLeaderboard:
         assert r["rows"][0]["strategy_cls"] == "HighVol"
 
     def test_include_minimal_trades(self, tmp_path, monkeypatch):
-        d = self._write_sweep(tmp_path, [
-            {"strategy_cls": "Low", "sortino": 999.0, "total_trades": 1},
-        ])
+        d = self._write_sweep(
+            tmp_path,
+            [
+                {"strategy_cls": "Low", "sortino": 999.0, "total_trades": 1},
+            ],
+        )
         monkeypatch.setattr(br, "BACKTESTS_DIR", d)
         r = br.leaderboard(include_minimal_trades=True)
         assert len(r["rows"]) == 1
@@ -114,17 +127,30 @@ class TestSummary:
     def test_reads_best_per_symbol(self, tmp_path, monkeypatch):
         d = tmp_path / "data" / "backtests" / "strategies"
         d.mkdir(parents=True)
-        (d / "best_per_symbol_20260418T000000Z.json").write_text(json.dumps({
-            "computed_at": "2026-04-18T00:00:00+00:00",
-            "results": [
-                {"strategy_cls": "Sapphire", "symbol": "ETH-USD", "sortino": 101, "total_trades": 7},
-            ],
-        }))
-        (d / "strategy_sweep_20260418T000000Z.json").write_text(json.dumps({
-            "computed_at": "2026-04-18T00:00:00+00:00",
-            "total_backtests": 756,
-            "results": [],
-        }))
+        (d / "best_per_symbol_20260418T000000Z.json").write_text(
+            json.dumps(
+                {
+                    "computed_at": "2026-04-18T00:00:00+00:00",
+                    "results": [
+                        {
+                            "strategy_cls": "Sapphire",
+                            "symbol": "ETH-USD",
+                            "sortino": 101,
+                            "total_trades": 7,
+                        },
+                    ],
+                }
+            )
+        )
+        (d / "strategy_sweep_20260418T000000Z.json").write_text(
+            json.dumps(
+                {
+                    "computed_at": "2026-04-18T00:00:00+00:00",
+                    "total_backtests": 756,
+                    "results": [],
+                }
+            )
+        )
         monkeypatch.setattr(br, "BACKTESTS_DIR", d)
         r = br.summary()
         assert r["have_results"] is True
@@ -139,7 +165,9 @@ class TestSummary:
         (d / "best_per_symbol_20260418T000000Z.json").write_text(
             '{"computed_at":"2026-04-18T00:00:00+00:00","results":[{"strategy_cls":"X","symbol":"BTC","profit_factor":Infinity,"total_trades":8}]}'
         )
-        (d / "strategy_sweep_20260418T000000Z.json").write_text('{"computed_at":"2026-04-18T00:00:00+00:00","total_backtests":1,"results":[]}')
+        (d / "strategy_sweep_20260418T000000Z.json").write_text(
+            '{"computed_at":"2026-04-18T00:00:00+00:00","total_backtests":1,"results":[]}'
+        )
         monkeypatch.setattr(br, "BACKTESTS_DIR", d)
         r = br.summary()
         assert r["best_per_symbol"][0]["profit_factor"] == "inf"

@@ -54,7 +54,9 @@ def _tv_cmd(args: list[str], timeout: int = 10) -> dict:
     try:
         result = subprocess.run(
             [TV_BIN] + args,
-            capture_output=True, text=True, timeout=timeout,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
         )
         if result.stdout.strip():
             return json.loads(result.stdout)
@@ -66,6 +68,7 @@ def _tv_cmd(args: list[str], timeout: int = 10) -> dict:
 
 
 # ── Equity Data (via OpenBB) ──────────────────────────────────────
+
 
 def equity_quote(symbol: str, provider: str = "yfinance") -> MarketQuote | dict:
     """Get real-time equity quote."""
@@ -87,14 +90,21 @@ def equity_quote(symbol: str, provider: str = "yfinance") -> MarketQuote | dict:
 
 def equity_historical(symbol: str, start_date: str, provider: str = "yfinance") -> list[OHLCVBar]:
     """Get historical OHLCV bars."""
-    data = _openbb_get("/equity/price/historical", {
-        "symbol": symbol, "provider": provider, "start_date": start_date,
-    })
+    data = _openbb_get(
+        "/equity/price/historical",
+        {
+            "symbol": symbol,
+            "provider": provider,
+            "start_date": start_date,
+        },
+    )
     return [
         OHLCVBar(
             date=r["date"][:10],
-            open=r.get("open", 0), high=r.get("high", 0),
-            low=r.get("low", 0), close=r.get("close", 0),
+            open=r.get("open", 0),
+            high=r.get("high", 0),
+            low=r.get("low", 0),
+            close=r.get("close", 0),
             volume=r.get("volume", 0),
         )
         for r in data.get("results", [])
@@ -103,16 +113,24 @@ def equity_historical(symbol: str, start_date: str, provider: str = "yfinance") 
 
 # ── Crypto Data (via OpenBB) ─────────────────────────────────────
 
+
 def crypto_historical(symbol: str, start_date: str, provider: str = "yfinance") -> list[OHLCVBar]:
     """Get historical crypto OHLCV bars."""
-    data = _openbb_get("/crypto/price/historical", {
-        "symbol": symbol, "provider": provider, "start_date": start_date,
-    })
+    data = _openbb_get(
+        "/crypto/price/historical",
+        {
+            "symbol": symbol,
+            "provider": provider,
+            "start_date": start_date,
+        },
+    )
     return [
         OHLCVBar(
             date=r["date"][:10],
-            open=r.get("open", 0), high=r.get("high", 0),
-            low=r.get("low", 0), close=r.get("close", 0),
+            open=r.get("open", 0),
+            high=r.get("high", 0),
+            low=r.get("low", 0),
+            close=r.get("close", 0),
             volume=r.get("volume", 0),
         )
         for r in data.get("results", [])
@@ -120,6 +138,7 @@ def crypto_historical(symbol: str, start_date: str, provider: str = "yfinance") 
 
 
 # ── Macro / Economic Data (via OpenBB) ───────────────────────────
+
 
 def fred_series(series_id: str, start_date: str | None = None) -> list[dict]:
     """Get FRED economic data series."""
@@ -140,6 +159,7 @@ def news(query: str = "", provider: str = "benzinga", limit: int = 10) -> list[d
 
 
 # ── TradingView Live Data ────────────────────────────────────────
+
 
 def tv_quote() -> dict:
     """Get real-time quote from active TradingView chart."""
@@ -179,6 +199,7 @@ def tv_strategy_results() -> dict:
 
 # ── Pine Script Operations ───────────────────────────────────────
 
+
 def pine_compile() -> dict:
     """Compile the current Pine Script in the editor."""
     return _tv_cmd(["pine", "compile"], timeout=30)
@@ -189,9 +210,16 @@ def pine_set(script: str) -> dict:
     try:
         result = subprocess.run(
             [TV_BIN, "pine", "set"],
-            input=script, capture_output=True, text=True, timeout=10,
+            input=script,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
-        return json.loads(result.stdout) if result.stdout.strip() else {"success": result.returncode == 0}
+        return (
+            json.loads(result.stdout)
+            if result.stdout.strip()
+            else {"success": result.returncode == 0}
+        )
     except Exception as e:
         return {"error": str(e)}
 
@@ -201,9 +229,14 @@ def pine_analyze(script: str) -> dict:
     try:
         result = subprocess.run(
             [TV_BIN, "pine", "analyze"],
-            input=script, capture_output=True, text=True, timeout=10,
+            input=script,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
-        return json.loads(result.stdout) if result.stdout.strip() else {"raw": result.stderr.strip()}
+        return (
+            json.loads(result.stdout) if result.stdout.strip() else {"raw": result.stderr.strip()}
+        )
     except Exception as e:
         return {"error": str(e)}
 
@@ -211,6 +244,7 @@ def pine_analyze(script: str) -> dict:
 def pine_ci(script_path: str) -> dict:
     """Full Pine CI pipeline: analyze → set → compile → read errors."""
     from pathlib import Path
+
     script = Path(script_path).read_text()
 
     # Step 1: Static analysis
@@ -233,16 +267,22 @@ def pine_ci(script_path: str) -> dict:
 
 # ── Convenience: Multi-Symbol Snapshot ───────────────────────────
 
+
 def portfolio_snapshot(symbols: list[str], provider: str = "yfinance") -> list[dict]:
     """Get quick snapshot of multiple symbols."""
     results = []
     for sym in symbols:
         q = equity_quote(sym, provider)
         if isinstance(q, MarketQuote):
-            results.append({
-                "symbol": q.symbol, "price": q.price,
-                "high": q.high, "low": q.low, "volume": q.volume,
-            })
+            results.append(
+                {
+                    "symbol": q.symbol,
+                    "price": q.price,
+                    "high": q.high,
+                    "low": q.low,
+                    "volume": q.volume,
+                }
+            )
         else:
             results.append({"symbol": sym, "error": q.get("error", "unknown")})
     return results

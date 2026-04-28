@@ -14,7 +14,7 @@ def monitor_gpu(duration=30):
     print("-" * 60)
     print(f"{'Time':<8} {'GPU%':<8} {'Mem%':<8} {'VRAM Used':<12} {'Status'}")
     print("-" * 60)
-    
+
     start = time.time()
     try:
         while time.time() - start < duration:
@@ -25,7 +25,7 @@ def monitor_gpu(duration=30):
             )
             gpu_pct, mem_pct, vram = result.stdout.strip().split(", ")
             elapsed = time.time() - start
-            
+
             status = "🟢 HIGH" if float(gpu_pct) > 70 else ("🟡 MED" if float(gpu_pct) > 30 else "🔴 LOW")
             print(f"{elapsed:<8.1f} {gpu_pct.strip():<8} {mem_pct.strip():<8} {vram.strip():<12} MB {status}")
             time.sleep(2)
@@ -39,17 +39,17 @@ def test_model(model_name="qwen2.5:14b"):
     print(f"GPU Verification Test: {model_name}")
     print(f"{'='*60}")
     print("\n1. Starting GPU monitor in background...")
-    
+
     # Start GPU monitoring in separate process
     import threading
     monitor_thread = threading.Thread(target=monitor_gpu, args=(60,))
     monitor_thread.daemon = True
-    
+
     print("\n2. Running inference test...")
     print("   Prompt: 'What is 2+2? Answer in one word.'")
     print("   (Watch GPU utilization above)")
     print("-" * 60)
-    
+
     start = time.time()
     try:
         result = subprocess.run(
@@ -58,12 +58,12 @@ def test_model(model_name="qwen2.5:14b"):
             encoding='utf-8', errors='ignore'
         )
         duration = time.time() - start
-        
+
         print("\n3. Results:")
         print(f"   Duration: {duration:.1f}s")
         print(f"   Return code: {result.returncode}")
         print(f"   Output: {result.stdout.strip()[:100]}")
-        
+
         if result.returncode == 0:
             print("\n   ✓ Model responded successfully!")
             tokens = len(result.stdout) // 4
@@ -71,7 +71,7 @@ def test_model(model_name="qwen2.5:14b"):
             print(f"   ✓ Speed: ~{tps:.1f} tokens/sec")
         else:
             print(f"\n   ✗ Error: {result.stderr[:200]}")
-            
+
     except subprocess.TimeoutExpired:
         print("\n   ✗ TIMEOUT - Model took too long to respond")
         print("   This may indicate GPU loading issues")

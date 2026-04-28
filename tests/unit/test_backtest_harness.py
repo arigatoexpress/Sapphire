@@ -233,9 +233,9 @@ def test_cpcv_embargo_is_respected_no_train_test_overlap() -> None:
                 # Either j is a test index in another group, or it must be absent from train
                 if j in test_set:
                     continue
-                assert j not in train_set, (
-                    f"embargo violated: train idx {j} within {embargo_window} of test"
-                )
+                assert (
+                    j not in train_set
+                ), f"embargo violated: train idx {j} within {embargo_window} of test"
 
 
 # ── 4. Graceful failure when no historical data is present ───────────────────

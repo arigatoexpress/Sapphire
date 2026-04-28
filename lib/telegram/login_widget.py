@@ -76,9 +76,7 @@ def verify_telegram_login(
         return None
 
     # Build the check string: sorted key=value pairs (excluding hash)
-    check_items = sorted(
-        f"{k}={v}" for k, v in data.items() if k != "hash"
-    )
+    check_items = sorted(f"{k}={v}" for k, v in data.items() if k != "hash")
     check_string = "\n".join(check_items)
 
     secret = hashlib.sha256(token.encode()).digest()

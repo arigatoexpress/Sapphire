@@ -34,25 +34,58 @@ REPORT_FILE = DATA_DIR / "synergy_report.md"
 OUR_REPOS = {
     "Sapphire": {
         "path": "~/Code/Sapphire",
-        "domains": ["trading", "ai-agents", "automation", "telegram", "monitoring", "pine-script", "technical-analysis"],
+        "domains": [
+            "trading",
+            "ai-agents",
+            "automation",
+            "telegram",
+            "monitoring",
+            "pine-script",
+            "technical-analysis",
+        ],
         "languages": ["python", "typescript", "swift", "rust"],
-        "needs": ["execution-engine", "backtesting", "portfolio-management", "risk-management", "ml-models"],
+        "needs": [
+            "execution-engine",
+            "backtesting",
+            "portfolio-management",
+            "risk-management",
+            "ml-models",
+        ],
     },
     "Project-Go-Forward": {
         "path": "~/Code/Project-Go-Forward",
-        "domains": ["real-estate", "document-generation", "crm", "pdf", "ai-chat", "customer-management"],
+        "domains": [
+            "real-estate",
+            "document-generation",
+            "crm",
+            "pdf",
+            "ai-chat",
+            "customer-management",
+        ],
         "languages": ["python", "javascript", "react"],
         "needs": ["ocr", "document-ai", "email-automation", "sms", "scheduling"],
     },
     "cyber-threat-bot": {
         "path": "~/Code/cyber-threat-bot",
-        "domains": ["cybersecurity", "threat-intelligence", "cve", "mitre-attack", "revenue-synthesis"],
+        "domains": [
+            "cybersecurity",
+            "threat-intelligence",
+            "cve",
+            "mitre-attack",
+            "revenue-synthesis",
+        ],
         "languages": ["python"],
         "needs": ["osint", "vulnerability-scanning", "network-monitoring", "siem-integration"],
     },
     "regional-intel-workbench": {
         "path": "~/Code/regional-intel-workbench",
-        "domains": ["business-intelligence", "geospatial", "permits", "news-aggregation", "lead-generation"],
+        "domains": [
+            "business-intelligence",
+            "geospatial",
+            "permits",
+            "news-aggregation",
+            "lead-generation",
+        ],
         "languages": ["python", "javascript"],
         "needs": ["mapping", "data-enrichment", "nlp", "entity-resolution"],
     },
@@ -72,11 +105,50 @@ OUR_REPOS = {
 
 # Keyword → domain mapping for classification
 DOMAIN_KEYWORDS = {
-    "trading": ["trading", "trade", "exchange", "market", "finance", "quant", "backtest", "strategy", "freqtrade", "tensortrade"],
-    "ai-agents": ["agent", "llm", "gpt", "claude", "eliza", "flowise", "langchain", "autogen", "crew", "swarm"],
+    "trading": [
+        "trading",
+        "trade",
+        "exchange",
+        "market",
+        "finance",
+        "quant",
+        "backtest",
+        "strategy",
+        "freqtrade",
+        "tensortrade",
+    ],
+    "ai-agents": [
+        "agent",
+        "llm",
+        "gpt",
+        "claude",
+        "eliza",
+        "flowise",
+        "langchain",
+        "autogen",
+        "crew",
+        "swarm",
+    ],
     "crypto": ["crypto", "blockchain", "defi", "sui", "solana", "ethereum", "web3", "nft", "token"],
-    "cybersecurity": ["security", "vulnerability", "cve", "osint", "pentest", "scanner", "sherlock", "exploit"],
-    "ml-research": ["ml", "machine-learning", "deep-learning", "papers", "research", "model", "training"],
+    "cybersecurity": [
+        "security",
+        "vulnerability",
+        "cve",
+        "osint",
+        "pentest",
+        "scanner",
+        "sherlock",
+        "exploit",
+    ],
+    "ml-research": [
+        "ml",
+        "machine-learning",
+        "deep-learning",
+        "papers",
+        "research",
+        "model",
+        "training",
+    ],
     "infrastructure": ["infra", "devops", "docker", "kubernetes", "ci-cd", "monitoring", "ipfs"],
     "data": ["data", "analytics", "scraping", "etl", "pipeline", "database"],
     "real-estate": ["real-estate", "property", "home", "housing", "mortgage"],
@@ -86,8 +158,7 @@ DOMAIN_KEYWORDS = {
 def gh_api(endpoint: str) -> list | dict:
     """Call GitHub API via gh CLI."""
     result = subprocess.run(
-        ["gh", "api", endpoint, "--paginate"],
-        capture_output=True, text=True, timeout=30
+        ["gh", "api", endpoint, "--paginate"], capture_output=True, text=True, timeout=30
     )
     if result.returncode != 0:
         raise RuntimeError(f"gh api failed: {result.stderr}")
@@ -97,9 +168,17 @@ def gh_api(endpoint: str) -> list | dict:
 def sync_stars() -> dict:
     """Fetch all starred repos and save metadata."""
     raw = subprocess.run(
-        ["gh", "api", "user/starred", "--paginate", "--jq",
-         '[.[] | {full_name, description, language, topics, html_url, stargazers_count, updated_at, archived}]'],
-        capture_output=True, text=True, timeout=60
+        [
+            "gh",
+            "api",
+            "user/starred",
+            "--paginate",
+            "--jq",
+            "[.[] | {full_name, description, language, topics, html_url, stargazers_count, updated_at, archived}]",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
     )
     if raw.returncode != 0:
         return {"error": f"gh api failed: {raw.stderr}"}
@@ -128,12 +207,14 @@ def sync_stars() -> dict:
 
 def classify_repo(repo: dict) -> list[str]:
     """Classify a repo into domains based on name, description, topics, and language."""
-    searchable = " ".join([
-        (repo.get("full_name") or "").lower(),
-        (repo.get("description") or "").lower(),
-        " ".join(repo.get("topics") or []),
-        (repo.get("language") or "").lower(),
-    ])
+    searchable = " ".join(
+        [
+            (repo.get("full_name") or "").lower(),
+            (repo.get("description") or "").lower(),
+            " ".join(repo.get("topics") or []),
+            (repo.get("language") or "").lower(),
+        ]
+    )
 
     domains = []
     for domain, keywords in DOMAIN_KEYWORDS.items():
@@ -163,11 +244,13 @@ def find_synergies() -> dict:
             domain_overlap = set(domains) & set(our_info["domains"])
             # Check if it addresses a need
             needs_match = []
-            searchable = " ".join([
-                (repo.get("full_name") or "").lower(),
-                (repo.get("description") or "").lower(),
-                " ".join(repo.get("topics") or []),
-            ])
+            searchable = " ".join(
+                [
+                    (repo.get("full_name") or "").lower(),
+                    (repo.get("description") or "").lower(),
+                    " ".join(repo.get("topics") or []),
+                ]
+            )
             for need in our_info["needs"]:
                 if need.replace("-", " ") in searchable or need.replace("-", "") in searchable:
                     needs_match.append(need)
@@ -178,25 +261,29 @@ def find_synergies() -> dict:
 
             if domain_overlap or needs_match:
                 score = len(domain_overlap) * 2 + len(needs_match) * 3 + (1 if lang_match else 0)
-                matches.append({
-                    "our_repo": our_name,
-                    "domain_overlap": list(domain_overlap),
-                    "needs_addressed": needs_match,
-                    "language_compatible": lang_match,
-                    "score": score,
-                })
+                matches.append(
+                    {
+                        "our_repo": our_name,
+                        "domain_overlap": list(domain_overlap),
+                        "needs_addressed": needs_match,
+                        "language_compatible": lang_match,
+                        "score": score,
+                    }
+                )
 
         if matches:
             matches.sort(key=lambda m: m["score"], reverse=True)
-            synergies.append({
-                "repo": repo["full_name"],
-                "description": repo.get("description", ""),
-                "language": repo.get("language"),
-                "url": repo.get("html_url"),
-                "domains": domains,
-                "matches": matches,
-                "top_score": matches[0]["score"],
-            })
+            synergies.append(
+                {
+                    "repo": repo["full_name"],
+                    "description": repo.get("description", ""),
+                    "language": repo.get("language"),
+                    "url": repo.get("html_url"),
+                    "domains": domains,
+                    "matches": matches,
+                    "top_score": matches[0]["score"],
+                }
+            )
 
     synergies.sort(key=lambda s: s["top_score"], reverse=True)
     SYNERGY_FILE.write_text(json.dumps(synergies, indent=2))
@@ -241,7 +328,9 @@ def generate_report() -> dict:
             lines.append(f"- **Domain overlap**: {', '.join(best['domain_overlap'])}")
         if best.get("needs_addressed"):
             lines.append(f"- **Addresses needs**: {', '.join(best['needs_addressed'])}")
-        lines.append(f"- **Integration idea**: Investigate how {s['repo'].split('/')[-1]} can enhance {best['our_repo']}")
+        lines.append(
+            f"- **Integration idea**: Investigate how {s['repo'].split('/')[-1]} can enhance {best['our_repo']}"
+        )
         lines.append("")
 
     # Unmatched repos
@@ -251,7 +340,9 @@ def generate_report() -> dict:
         lines.append("## Unmatched Stars (no clear synergy)")
         lines.append("")
         for r in unmatched:
-            lines.append(f"- **{r['full_name']}** ({r.get('language', 'N/A')}): {(r.get('description') or 'No description')[:100]}")
+            lines.append(
+                f"- **{r['full_name']}** ({r.get('language', 'N/A')}): {(r.get('description') or 'No description')[:100]}"
+            )
         lines.append("")
 
     report = "\n".join(lines)
@@ -289,9 +380,21 @@ def discover_trending() -> dict:
     for query in domains_to_search:
         try:
             result = subprocess.run(
-                ["gh", "search", "repos", query, "--sort", "stars",
-                 "--limit", "5", "--json", "fullName,description,language,url,stargazersCount,updatedAt"],
-                capture_output=True, text=True, timeout=15
+                [
+                    "gh",
+                    "search",
+                    "repos",
+                    query,
+                    "--sort",
+                    "stars",
+                    "--limit",
+                    "5",
+                    "--json",
+                    "fullName,description,language,url,stargazersCount,updatedAt",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=15,
             )
             if result.returncode == 0:
                 repos = json.loads(result.stdout)
@@ -299,16 +402,18 @@ def discover_trending() -> dict:
                     name = r.get("fullName", "")
                     if name and name not in seen:
                         seen.add(name)
-                        all_trending.append({
-                            "full_name": name,
-                            "description": r.get("description", ""),
-                            "language": r.get("language", ""),
-                            "html_url": r.get("url", ""),
-                            "stargazers_count": r.get("stargazersCount", 0),
-                            "updated_at": r.get("updatedAt", ""),
-                            "search_query": query,
-                            "topics": [],
-                        })
+                        all_trending.append(
+                            {
+                                "full_name": name,
+                                "description": r.get("description", ""),
+                                "language": r.get("language", ""),
+                                "html_url": r.get("url", ""),
+                                "stargazers_count": r.get("stargazersCount", 0),
+                                "updated_at": r.get("updatedAt", ""),
+                                "search_query": query,
+                                "topics": [],
+                            }
+                        )
         except Exception:
             continue
 
@@ -320,33 +425,43 @@ def discover_trending() -> dict:
         for our_name, our_info in OUR_REPOS.items():
             domain_overlap = set(domains) & set(our_info["domains"])
             needs_match = []
-            searchable = " ".join([
-                (repo.get("full_name") or "").lower(),
-                (repo.get("description") or "").lower(),
-            ])
+            searchable = " ".join(
+                [
+                    (repo.get("full_name") or "").lower(),
+                    (repo.get("description") or "").lower(),
+                ]
+            )
             for need in our_info["needs"]:
                 if need.replace("-", " ") in searchable or need.replace("-", "") in searchable:
                     needs_match.append(need)
             if domain_overlap or needs_match:
-                score = len(domain_overlap) * 2 + len(needs_match) * 3 + (1 if (repo.get("language") or "").lower() in our_info["languages"] else 0)
-                matches.append({
-                    "our_repo": our_name,
-                    "domain_overlap": list(domain_overlap),
-                    "needs_addressed": needs_match,
-                    "score": score,
-                })
+                score = (
+                    len(domain_overlap) * 2
+                    + len(needs_match) * 3
+                    + (1 if (repo.get("language") or "").lower() in our_info["languages"] else 0)
+                )
+                matches.append(
+                    {
+                        "our_repo": our_name,
+                        "domain_overlap": list(domain_overlap),
+                        "needs_addressed": needs_match,
+                        "score": score,
+                    }
+                )
         if matches:
             matches.sort(key=lambda m: m["score"], reverse=True)
-            synergies.append({
-                "repo": repo["full_name"],
-                "description": repo.get("description", ""),
-                "stars": repo.get("stargazers_count", 0),
-                "language": repo.get("language"),
-                "url": repo.get("html_url"),
-                "search_query": repo.get("search_query"),
-                "matches": matches,
-                "top_score": matches[0]["score"],
-            })
+            synergies.append(
+                {
+                    "repo": repo["full_name"],
+                    "description": repo.get("description", ""),
+                    "stars": repo.get("stargazers_count", 0),
+                    "language": repo.get("language"),
+                    "url": repo.get("html_url"),
+                    "search_query": repo.get("search_query"),
+                    "matches": matches,
+                    "top_score": matches[0]["score"],
+                }
+            )
 
     synergies.sort(key=lambda s: s["top_score"] * 1000 + s.get("stars", 0), reverse=True)
     TRENDING_FILE.write_text(json.dumps(synergies, indent=2))
@@ -379,7 +494,12 @@ def discover_trending() -> dict:
         "synergies_found": len(synergies),
         "report_path": str(trend_report_path),
         "top_5": [
-            {"repo": s["repo"], "stars": s.get("stars", 0), "match": s["matches"][0]["our_repo"], "score": s["top_score"]}
+            {
+                "repo": s["repo"],
+                "stars": s.get("stars", 0),
+                "match": s["matches"][0]["our_repo"],
+                "score": s["top_score"],
+            }
             for s in synergies[:5]
         ],
     }

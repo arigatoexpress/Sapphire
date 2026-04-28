@@ -11,7 +11,9 @@ TOOLS = Path(__file__).parent.parent / "tools"
 sys.path.insert(0, str(TOOLS))
 sys.path.insert(0, str(TOOLS.parent / "lib"))
 
-_spec = importlib.util.spec_from_file_location("trading_brain", TOOLS / "internal" / "trading_brain.py")
+_spec = importlib.util.spec_from_file_location(
+    "trading_brain", TOOLS / "internal" / "trading_brain.py"
+)
 tb = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(tb)
 
@@ -43,9 +45,15 @@ def test_action_decide_uses_canonical_kronos_tool(monkeypatch):
     )
 
     monkeypatch.setattr(tb, "_run_tool", fake_run_tool)
-    monkeypatch.setattr(tb, "_get_macro_sentiment", lambda: {"sentiment": "neutral", "score": 0, "reasons": []})
-    monkeypatch.setattr(tb, "_get_paper_track_record", lambda: {"modifier": 0, "reason": "no track record"})
-    monkeypatch.setitem(sys.modules, "technical_analysis", SimpleNamespace(analyze=lambda symbol: fake_profile))
+    monkeypatch.setattr(
+        tb, "_get_macro_sentiment", lambda: {"sentiment": "neutral", "score": 0, "reasons": []}
+    )
+    monkeypatch.setattr(
+        tb, "_get_paper_track_record", lambda: {"modifier": 0, "reason": "no track record"}
+    )
+    monkeypatch.setitem(
+        sys.modules, "technical_analysis", SimpleNamespace(analyze=lambda symbol: fake_profile)
+    )
 
     got = tb.action_decide("BTC")
 

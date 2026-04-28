@@ -25,7 +25,10 @@ REPOS = {
     "claw-code": Path.home() / "Code" / "claw-code",
 }
 
-ENV = {**os.environ, "PATH": f"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:{os.environ.get('PATH', '')}"}
+ENV = {
+    **os.environ,
+    "PATH": f"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:{os.environ.get('PATH', '')}",
+}
 
 
 def run_cmd(cmd: list[str], cwd: str, timeout: int = 120) -> tuple[str, int]:
@@ -65,7 +68,8 @@ def verify_repo(repo_name: str, lint_only: bool = False) -> dict:
     if (path / "pyproject.toml").exists() or list(path.glob("*.py"))[:1]:
         lint_out, lint_code = run_cmd(
             ["python3", "-m", "ruff", "check", "--select", "E,F,I", "--statistics", "."],
-            cwd, timeout=60,
+            cwd,
+            timeout=60,
         )
         total_errors = 0
         for line in lint_out.splitlines():
@@ -89,7 +93,8 @@ def verify_repo(repo_name: str, lint_only: bool = False) -> dict:
     if any(d.exists() for d in test_dirs):
         test_out, test_code = run_cmd(
             ["python3", "-m", "pytest", "--tb=no", "-q", "--no-header", "."],
-            cwd, timeout=120,
+            cwd,
+            timeout=120,
         )
         for line in test_out.splitlines():
             if "passed" in line or "failed" in line or "error" in line:
@@ -105,7 +110,9 @@ def verify_repo(repo_name: str, lint_only: bool = False) -> dict:
                         with contextlib.suppress(ValueError):
                             result["tests"]["errors"] = int(parts[i - 1])
 
-        result["tests"]["total"] = result["tests"]["passed"] + result["tests"]["failed"] + result["tests"]["errors"]
+        result["tests"]["total"] = (
+            result["tests"]["passed"] + result["tests"]["failed"] + result["tests"]["errors"]
+        )
 
     # Safe to commit?
     lint_ok = result["lint"]["errors"] <= 0  # -1 means no lint check, 0 means clean

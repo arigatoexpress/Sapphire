@@ -81,12 +81,16 @@ ALLOWED_USERS = _load_allowed_users(CHAT_ID)
 _SSL_CTX = ssl.create_default_context()
 try:
     import certifi
+
     _SSL_CTX.load_verify_locations(certifi.where())
 except ImportError:
     _SSL_CTX.check_hostname = False
     _SSL_CTX.verify_mode = ssl.CERT_NONE
 
-ENV = {**os.environ, "PATH": f"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:{os.environ.get('PATH', '')}"}
+ENV = {
+    **os.environ,
+    "PATH": f"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:{os.environ.get('PATH', '')}",
+}
 
 # Command → claw-code prompt mapping
 # Each command becomes a claw-code session that uses Sapphire plugin tools
@@ -108,7 +112,9 @@ def tg_api(method: str, data: dict | None = None) -> dict:
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/{method}"
     if data:
         payload = json.dumps(data).encode()
-        req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+        req = urllib.request.Request(
+            url, data=payload, headers={"Content-Type": "application/json"}
+        )
     else:
         req = urllib.request.Request(url)
     with urllib.request.urlopen(req, timeout=30, context=_SSL_CTX) as resp:
@@ -134,12 +140,15 @@ def send_message(text: str, chat_id: str | None = None) -> dict:
         }
     if not BOT_TOKEN:
         return {"ok": False, "error": "missing_bot_token"}
-    return tg_api("sendMessage", {
-        "chat_id": chat_id,
-        "text": text,
-        "parse_mode": "Markdown",
-        "disable_web_page_preview": True,
-    })
+    return tg_api(
+        "sendMessage",
+        {
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": "Markdown",
+            "disable_web_page_preview": True,
+        },
+    )
 
 
 def run_claw(prompt: str, cwd: str | None = None, timeout: int = 120) -> str:
@@ -149,8 +158,11 @@ def run_claw(prompt: str, cwd: str | None = None, timeout: int = 120) -> str:
     try:
         proc = subprocess.run(
             [str(CLAW_BIN), "prompt", prompt],
-            capture_output=True, text=True,
-            cwd=work_dir, timeout=timeout, env=ENV,
+            capture_output=True,
+            text=True,
+            cwd=work_dir,
+            timeout=timeout,
+            env=ENV,
         )
         return proc.stdout.strip() or proc.stderr.strip() or "No output"
     except subprocess.TimeoutExpired:
@@ -171,8 +183,11 @@ def run_tool_direct(tool_script: str, input_data: dict | None = None) -> str:
         proc = subprocess.run(
             ["python3", str(tool_path)],
             input=json.dumps(input_data or {}),
-            capture_output=True, text=True,
-            timeout=60, env=ENV, cwd=str(SAPPHIRE_DIR),
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=ENV,
+            cwd=str(SAPPHIRE_DIR),
         )
         return proc.stdout.strip() or proc.stderr.strip()
     except Exception as e:
@@ -205,7 +220,9 @@ def handle_command(
         sym = args.strip().upper()
         return run_tool_direct("market.py", {"action": "quote", "symbol": sym})
     elif cmd == "/btc":
-        return run_tool_direct("market.py", {"action": "crypto", "symbol": "BTC-USD", "start_date": "2026-03-28"})
+        return run_tool_direct(
+            "market.py", {"action": "crypto", "symbol": "BTC-USD", "start_date": "2026-03-28"}
+        )
     elif cmd == "/chart":
         return run_tool_direct("market.py", {"action": "tv_quote"})
     elif cmd == "/levels":
@@ -234,7 +251,13 @@ def handle_command(
             return result
     elif cmd == "/offers":
         sender("💰 Analyzing threat revenue opportunities...", chat_id)
-        result = run_tool_direct("threat_intel.py", {"action": "offers", "profile": str(Path.home() / "Code/cyber-threat-bot/profiles/kadima-digital.json")})
+        result = run_tool_direct(
+            "threat_intel.py",
+            {
+                "action": "offers",
+                "profile": str(Path.home() / "Code/cyber-threat-bot/profiles/kadima-digital.json"),
+            },
+        )
         try:
             data = json.loads(result)
             return data.get("output", result)[:4000]
@@ -250,7 +273,9 @@ def handle_command(
             lines = [f"*{data['overall']}* — {data['summary']}\n"]
             for section in ["services", "repos", "data_freshness", "inference"]:
                 for name, info in data.get(section, {}).items():
-                    icon = {"green": "🟢", "yellow": "🟡", "red": "🔴"}.get(info.get("status"), "⚪")
+                    icon = {"green": "🟢", "yellow": "🟡", "red": "🔴"}.get(
+                        info.get("status"), "⚪"
+                    )
                     lines.append(f"{icon} `{name}`: {info.get('detail', '')[:50]}")
             return "\n".join(lines)
         except Exception:
@@ -268,7 +293,11 @@ def handle_command(
         sender("🔧 Running auto-fixer...", chat_id)
         result = subprocess.run(
             ["python3", "-m", "ruff", "check", "--fix", "--select", "E,F,I", "."],
-            capture_output=True, text=True, cwd=str(SAPPHIRE_DIR), env=ENV, timeout=60,
+            capture_output=True,
+            text=True,
+            cwd=str(SAPPHIRE_DIR),
+            env=ENV,
+            timeout=60,
         )
         return result.stdout.strip() or "No fixable errors"
     elif cmd == "/events":
@@ -290,6 +319,7 @@ def handle_command(
     elif cmd == "/ask" and args:
         sender("🧠 Thinking...", chat_id)
         from lib.nemotron import MODELS, generate
+
         result = generate(args, model=MODELS["classify"], timeout=30)
         if result.success and result.response:
             return f"{result.response}\n\n_({result.endpoint} • {result.model} • {result.eval_tokens} tokens • {result.tokens_per_second} t/s)_"
@@ -297,6 +327,7 @@ def handle_command(
     elif cmd == "/think" and args:
         sender("🧠 Deep thinking with nemotron-cascade-2...", chat_id)
         from lib.nemotron import MODELS, generate
+
         result = generate(args, model=MODELS["analyze"], timeout=120, max_tokens=1024)
         if result.success and result.response:
             return f"{result.response}\n\n_({result.endpoint} • {result.model} • {result.eval_tokens} tokens • {result.tokens_per_second} t/s)_"
@@ -423,12 +454,14 @@ def chat_with_hermes(user_text: str, chat_id: str) -> str:
 
     for ep_name, base_url in endpoints:
         try:
-            payload = json.dumps({
-                "model": "hermes3:8b",
-                "messages": messages,
-                "stream": False,
-                "options": {"temperature": 0.7, "num_predict": 512},
-            }).encode()
+            payload = json.dumps(
+                {
+                    "model": "hermes3:8b",
+                    "messages": messages,
+                    "stream": False,
+                    "options": {"temperature": 0.7, "num_predict": 512},
+                }
+            ).encode()
 
             req = urllib.request.Request(
                 f"{base_url}/api/chat",
@@ -462,6 +495,7 @@ def chat_with_hermes(user_text: str, chat_id: str) -> str:
 def poll_loop() -> None:
     """Long-polling mode for development."""
     import time
+
     print("🤖 NemotronRariBot (polling mode)")
     print(f"   Allowed users: {ALLOWED_USERS}")
 

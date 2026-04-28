@@ -27,14 +27,23 @@ def _isolate_secrets(tmp_path_factory, monkeypatch):
     empty = tmp_path_factory.mktemp("empty-secrets")
     monkeypatch.setenv("SAPPHIRE_SECRETS_DIR", str(empty))
     for v in (
-        "PALANTIR_FOUNDRY_URL", "FOUNDRY_URL",
-        "PALANTIR_FOUNDRY_TOKEN", "FOUNDRY_TOKEN", "FOUNDRY_API_TOKEN",
-        "PALANTIR_FOUNDRY_CLIENT_ID", "FOUNDRY_CLIENT_ID",
-        "PALANTIR_FOUNDRY_CLIENT_SECRET", "FOUNDRY_CLIENT_SECRET",
-        "PALANTIR_FOUNDRY_ONTOLOGY", "FOUNDRY_ONTOLOGY",
-        "PALANTIR_FOUNDRY_UPSERT_ACTION", "FOUNDRY_UPSERT_ACTION",
-        "PALANTIR_FOUNDRY_WRITE_MODE", "FOUNDRY_WRITE_MODE",
-        "PALANTIR_FOUNDRY_DATASET_MAP", "FOUNDRY_DATASET_MAP",
+        "PALANTIR_FOUNDRY_URL",
+        "FOUNDRY_URL",
+        "PALANTIR_FOUNDRY_TOKEN",
+        "FOUNDRY_TOKEN",
+        "FOUNDRY_API_TOKEN",
+        "PALANTIR_FOUNDRY_CLIENT_ID",
+        "FOUNDRY_CLIENT_ID",
+        "PALANTIR_FOUNDRY_CLIENT_SECRET",
+        "FOUNDRY_CLIENT_SECRET",
+        "PALANTIR_FOUNDRY_ONTOLOGY",
+        "FOUNDRY_ONTOLOGY",
+        "PALANTIR_FOUNDRY_UPSERT_ACTION",
+        "FOUNDRY_UPSERT_ACTION",
+        "PALANTIR_FOUNDRY_WRITE_MODE",
+        "FOUNDRY_WRITE_MODE",
+        "PALANTIR_FOUNDRY_DATASET_MAP",
+        "FOUNDRY_DATASET_MAP",
     ):
         monkeypatch.delenv(v, raising=False)
 
@@ -117,37 +126,29 @@ class TestRepoRoot:
 class TestDetectChanges:
     def test_new_file(self):
         state = SyncState(files={})
-        current = {
-            "data/signals/2026-04-19.jsonl": {"mtime": 1000, "hash": "abc", "size": 100}
-        }
+        current = {"data/signals/2026-04-19.jsonl": {"mtime": 1000, "hash": "abc", "size": 100}}
         changes = detect_changes(state, current)
         assert "PaperTrade" in changes
         assert "data/signals/2026-04-19.jsonl" in changes["PaperTrade"]
 
     def test_changed_hash(self):
-        state = SyncState(files={
-            "data/signals/2026-04-19.jsonl": {"mtime": 1000, "hash": "old", "size": 100}
-        })
-        current = {
-            "data/signals/2026-04-19.jsonl": {"mtime": 1000, "hash": "new", "size": 150}
-        }
+        state = SyncState(
+            files={"data/signals/2026-04-19.jsonl": {"mtime": 1000, "hash": "old", "size": 100}}
+        )
+        current = {"data/signals/2026-04-19.jsonl": {"mtime": 1000, "hash": "new", "size": 150}}
         changes = detect_changes(state, current)
         assert "PaperTrade" in changes
 
     def test_changed_mtime(self):
-        state = SyncState(files={
-            "data/signals/2026-04-19.jsonl": {"mtime": 1000, "hash": "abc", "size": 100}
-        })
-        current = {
-            "data/signals/2026-04-19.jsonl": {"mtime": 2000, "hash": "abc", "size": 100}
-        }
+        state = SyncState(
+            files={"data/signals/2026-04-19.jsonl": {"mtime": 1000, "hash": "abc", "size": 100}}
+        )
+        current = {"data/signals/2026-04-19.jsonl": {"mtime": 2000, "hash": "abc", "size": 100}}
         changes = detect_changes(state, current)
         assert "PaperTrade" in changes
 
     def test_no_changes(self):
-        files = {
-            "data/signals/2026-04-19.jsonl": {"mtime": 1000, "hash": "abc", "size": 100}
-        }
+        files = {"data/signals/2026-04-19.jsonl": {"mtime": 1000, "hash": "abc", "size": 100}}
         state = SyncState(files=files)
         changes = detect_changes(state, files)
         assert changes == {}
@@ -162,9 +163,7 @@ class TestDetectChanges:
 
     def test_alert_change(self):
         state = SyncState(files={})
-        current = {
-            "data/system_events.jsonl": {"mtime": 1000, "hash": "xyz", "size": 50}
-        }
+        current = {"data/system_events.jsonl": {"mtime": 1000, "hash": "xyz", "size": 50}}
         changes = detect_changes(state, current)
         assert "Alert" in changes
 
@@ -178,9 +177,7 @@ class TestDetectChanges:
             }
         }
         changes = detect_changes(state, current)
-        assert changes == {
-            "IntelItem": ["data/foundry/regional-intel/IntelItem.ndjson"]
-        }
+        assert changes == {"IntelItem": ["data/foundry/regional-intel/IntelItem.ndjson"]}
 
 
 # ---------------------------------------------------------------------------
@@ -259,7 +256,8 @@ class TestRunSyncDryRun:
         signals_dir = tmp_path / "data" / "signals"
         signals_dir.mkdir(parents=True)
         (signals_dir / "2026-04-19.jsonl").write_text(
-            json.dumps({"pipeline_id": "t1", "symbol": "BTC", "timestamp": "2026-04-19T10:00:00Z"}) + "\n"
+            json.dumps({"pipeline_id": "t1", "symbol": "BTC", "timestamp": "2026-04-19T10:00:00Z"})
+            + "\n"
         )
         result = run_sync(tmp_path, dry_run=True, force=True)
         assert result.ok is True
@@ -344,9 +342,7 @@ class TestRunSyncGracefulDegradation:
         state = json.loads(state_path.read_text())
         assert state["last_status"] == "not_configured"
 
-    def test_foundry_preflight_config_error_exits_ok_and_skipped(
-        self, tmp_path, monkeypatch
-    ):
+    def test_foundry_preflight_config_error_exits_ok_and_skipped(self, tmp_path, monkeypatch):
         """Missing ontology/action config is a setup gap, not a per-object error."""
         monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
         monkeypatch.setenv("PALANTIR_FOUNDRY_TOKEN", "ok-tok")
@@ -359,10 +355,13 @@ class TestRunSyncGracefulDegradation:
 
         from lib.foundry.client import FoundryConfigError
 
-        with mock.patch(
-            "lib.foundry.client.FoundryClient.validate_write_target",
-            side_effect=FoundryConfigError("Configured Foundry ontology missing"),
-        ), mock.patch("lib.foundry.sync._send_telegram_alert") as tg:
+        with (
+            mock.patch(
+                "lib.foundry.client.FoundryClient.validate_write_target",
+                side_effect=FoundryConfigError("Configured Foundry ontology missing"),
+            ),
+            mock.patch("lib.foundry.sync._send_telegram_alert") as tg,
+        ):
             result = run_sync(tmp_path, dry_run=False, force=True)
 
         assert tg.call_count == 0
@@ -372,9 +371,7 @@ class TestRunSyncGracefulDegradation:
         state = json.loads(state_path.read_text())
         assert state["last_status"] == "not_configured"
 
-    def test_auth_failure_before_first_success_does_not_telegram(
-        self, tmp_path, monkeypatch
-    ):
+    def test_auth_failure_before_first_success_does_not_telegram(self, tmp_path, monkeypatch):
         """Auth error with no prior success → warn once, no Telegram spam."""
         monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
         monkeypatch.setenv("PALANTIR_FOUNDRY_TOKEN", "bad-tok")
@@ -387,13 +384,17 @@ class TestRunSyncGracefulDegradation:
 
         from lib.foundry.client import FoundryAuthError
 
-        with mock.patch(
-            "lib.foundry.client.FoundryClient.validate_write_target",
-            return_value=None,
-        ), mock.patch(
-            "lib.foundry.client.FoundryClient.upsert_objects",
-            side_effect=FoundryAuthError("401 unauthorized"),
-        ), mock.patch("lib.foundry.sync._send_telegram_alert") as tg:
+        with (
+            mock.patch(
+                "lib.foundry.client.FoundryClient.validate_write_target",
+                return_value=None,
+            ),
+            mock.patch(
+                "lib.foundry.client.FoundryClient.upsert_objects",
+                side_effect=FoundryAuthError("401 unauthorized"),
+            ),
+            mock.patch("lib.foundry.sync._send_telegram_alert") as tg,
+        ):
             result = run_sync(tmp_path, dry_run=False, force=True)
 
         assert tg.call_count == 0, "must not page on first-time auth failure"
@@ -403,9 +404,7 @@ class TestRunSyncGracefulDegradation:
         assert state["first_success_at"] is None
         assert state["last_auth_warning_at"] is not None
 
-    def test_alert_fires_after_first_success_then_failure(
-        self, tmp_path, monkeypatch
-    ):
+    def test_alert_fires_after_first_success_then_failure(self, tmp_path, monkeypatch):
         """Real upload failure after prior success → Telegram alert fires."""
         monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
         monkeypatch.setenv("PALANTIR_FOUNDRY_TOKEN", "ok-tok")
@@ -413,14 +412,18 @@ class TestRunSyncGracefulDegradation:
         # Pre-seed state with a prior successful sync
         state_path = tmp_path / "data" / "foundry_sync_state.json"
         state_path.parent.mkdir(parents=True, exist_ok=True)
-        state_path.write_text(json.dumps({
-            "files": {},
-            "last_sync": "2026-04-18T00:00:00+00:00",
-            "last_status": "ok",
-            "sync_count": 3,
-            "first_success_at": "2026-04-18T00:00:00+00:00",
-            "last_auth_warning_at": None,
-        }))
+        state_path.write_text(
+            json.dumps(
+                {
+                    "files": {},
+                    "last_sync": "2026-04-18T00:00:00+00:00",
+                    "last_status": "ok",
+                    "sync_count": 3,
+                    "first_success_at": "2026-04-18T00:00:00+00:00",
+                    "last_auth_warning_at": None,
+                }
+            )
+        )
 
         signals_dir = tmp_path / "data" / "signals"
         signals_dir.mkdir(parents=True)
@@ -430,13 +433,17 @@ class TestRunSyncGracefulDegradation:
 
         from lib.foundry.client import FoundryAPIError
 
-        with mock.patch(
-            "lib.foundry.client.FoundryClient.validate_write_target",
-            return_value=None,
-        ), mock.patch(
-            "lib.foundry.client.FoundryClient.upsert_objects",
-            side_effect=FoundryAPIError("500 Internal", status=500),
-        ), mock.patch("lib.foundry.sync._send_telegram_alert") as tg:
+        with (
+            mock.patch(
+                "lib.foundry.client.FoundryClient.validate_write_target",
+                return_value=None,
+            ),
+            mock.patch(
+                "lib.foundry.client.FoundryClient.upsert_objects",
+                side_effect=FoundryAPIError("500 Internal", status=500),
+            ),
+            mock.patch("lib.foundry.sync._send_telegram_alert") as tg,
+        ):
             result = run_sync(tmp_path, dry_run=False, force=True)
 
         assert result.ok is False
@@ -461,17 +468,20 @@ class TestRunSyncGracefulDegradation:
 
         from lib.foundry.client import FoundryAPIError
 
-        with mock.patch(
-            "lib.foundry.client.FoundryClient.validate_write_target",
-            return_value=None,
-        ), mock.patch(
-            "lib.foundry.client.FoundryClient.upsert_objects",
-            side_effect=FoundryAPIError(
-                "Foundry API POST /api/v2/ontologies/ontology/actions/sapphire-upsert/apply → 404",
-                status=404,
+        with (
+            mock.patch(
+                "lib.foundry.client.FoundryClient.validate_write_target",
+                return_value=None,
             ),
-        ), mock.patch("lib.foundry.sync._send_telegram_alert") as tg, caplog.at_level(
-            "INFO"
+            mock.patch(
+                "lib.foundry.client.FoundryClient.upsert_objects",
+                side_effect=FoundryAPIError(
+                    "Foundry API POST /api/v2/ontologies/ontology/actions/sapphire-upsert/apply → 404",
+                    status=404,
+                ),
+            ),
+            mock.patch("lib.foundry.sync._send_telegram_alert") as tg,
+            caplog.at_level("INFO"),
         ):
             result = run_sync(tmp_path, dry_run=False, force=True)
 
@@ -484,16 +494,14 @@ class TestRunSyncGracefulDegradation:
         # Confirm the INFO line fired and no ERROR for the same 404
         info_msgs = [r.getMessage() for r in caplog.records if r.levelname == "INFO"]
         error_msgs = [r.getMessage() for r in caplog.records if r.levelname == "ERROR"]
-        assert any("skipped" in m and "404" in m for m in info_msgs), (
-            f"expected INFO log like 'Upload ... skipped (... 404) ...', got {info_msgs!r}"
-        )
-        assert not any("404" in m for m in error_msgs), (
-            "404 must be INFO, not ERROR, while ontology is unprovisioned"
-        )
+        assert any(
+            "skipped" in m and "404" in m for m in info_msgs
+        ), f"expected INFO log like 'Upload ... skipped (... 404) ...', got {info_msgs!r}"
+        assert not any(
+            "404" in m for m in error_msgs
+        ), "404 must be INFO, not ERROR, while ontology is unprovisioned"
 
-    def test_404_mixed_with_non_404_failure_does_not_demote(
-        self, tmp_path, monkeypatch, caplog
-    ):
+    def test_404_mixed_with_non_404_failure_does_not_demote(self, tmp_path, monkeypatch, caplog):
         """Codex review #106 P1 follow-up (r3117240955): if the batch mixes a
         pre-success 404 with any other failure (e.g. 500), the run is a real
         failure and must alert — not be silently demoted to not_configured.
@@ -514,39 +522,41 @@ class TestRunSyncGracefulDegradation:
             FoundryAPIError("not deployed → 404", status=404),
             FoundryAPIError("server exploded → 500", status=500),
         ]
-        with mock.patch.dict(
-            "lib.foundry.ingestion.ALL_TRANSFORMS",
-            {"TypeA": lambda r: [{"id": "a1"}], "TypeB": lambda r: [{"id": "b1"}]},
-            clear=True,
-        ), mock.patch(
-            "lib.foundry.client.FoundryClient.validate_write_target",
-            return_value=None,
-        ), mock.patch(
-            "lib.foundry.client.FoundryClient.upsert_objects",
-            side_effect=side_effects,
-        ), mock.patch(
-            "lib.foundry.sync._send_telegram_alert"
-        ), caplog.at_level("INFO"):
+        with (
+            mock.patch.dict(
+                "lib.foundry.ingestion.ALL_TRANSFORMS",
+                {"TypeA": lambda r: [{"id": "a1"}], "TypeB": lambda r: [{"id": "b1"}]},
+                clear=True,
+            ),
+            mock.patch(
+                "lib.foundry.client.FoundryClient.validate_write_target",
+                return_value=None,
+            ),
+            mock.patch(
+                "lib.foundry.client.FoundryClient.upsert_objects",
+                side_effect=side_effects,
+            ),
+            mock.patch("lib.foundry.sync._send_telegram_alert"),
+            caplog.at_level("INFO"),
+        ):
             result = run_sync(tmp_path, dry_run=False, force=True)
 
         # The mixed-error case must NOT be demoted to not_configured —
         # the 500 is a real failure that deserves visibility.
-        assert result.skipped is False, (
-            "mixed 404+500 must not silently demote to skipped/not_configured"
-        )
+        assert (
+            result.skipped is False
+        ), "mixed 404+500 must not silently demote to skipped/not_configured"
         assert result.ok is False
         state_path = tmp_path / "data" / "foundry_sync_state.json"
         state = json.loads(state_path.read_text())
         assert state["last_status"] == "error"
         # The 500 ERROR log must be present.
         error_msgs = [r.getMessage() for r in caplog.records if r.levelname == "ERROR"]
-        assert any("500" in m for m in error_msgs), (
-            f"expected an ERROR log for the 500; got {error_msgs!r}"
-        )
+        assert any(
+            "500" in m for m in error_msgs
+        ), f"expected an ERROR log for the 500; got {error_msgs!r}"
 
-    def test_404_after_first_success_pages_as_regression(
-        self, tmp_path, monkeypatch, caplog
-    ):
+    def test_404_after_first_success_pages_as_regression(self, tmp_path, monkeypatch, caplog):
         """Codex review #106 P1: once the sync has ever succeeded, a 404 is
         a regression (action deleted / renamed / perms revoked), not a fresh
         setup gap. Must page + stay at ERROR, not be silently demoted to
@@ -558,14 +568,18 @@ class TestRunSyncGracefulDegradation:
         # Pre-seed state as if we've synced successfully before
         state_path = tmp_path / "data" / "foundry_sync_state.json"
         state_path.parent.mkdir(parents=True, exist_ok=True)
-        state_path.write_text(json.dumps({
-            "files": {},
-            "last_sync": "2026-04-18T00:00:00+00:00",
-            "last_status": "ok",
-            "sync_count": 3,
-            "first_success_at": "2026-04-18T00:00:00+00:00",
-            "last_auth_warning_at": None,
-        }))
+        state_path.write_text(
+            json.dumps(
+                {
+                    "files": {},
+                    "last_sync": "2026-04-18T00:00:00+00:00",
+                    "last_status": "ok",
+                    "sync_count": 3,
+                    "first_success_at": "2026-04-18T00:00:00+00:00",
+                    "last_auth_warning_at": None,
+                }
+            )
+        )
 
         signals_dir = tmp_path / "data" / "signals"
         signals_dir.mkdir(parents=True)
@@ -575,17 +589,20 @@ class TestRunSyncGracefulDegradation:
 
         from lib.foundry.client import FoundryAPIError
 
-        with mock.patch(
-            "lib.foundry.client.FoundryClient.validate_write_target",
-            return_value=None,
-        ), mock.patch(
-            "lib.foundry.client.FoundryClient.upsert_objects",
-            side_effect=FoundryAPIError(
-                "Foundry API POST /api/v2/ontologies/ontology/actions/sapphire-upsert/apply → 404",
-                status=404,
+        with (
+            mock.patch(
+                "lib.foundry.client.FoundryClient.validate_write_target",
+                return_value=None,
             ),
-        ), mock.patch("lib.foundry.sync._send_telegram_alert") as tg, caplog.at_level(
-            "INFO"
+            mock.patch(
+                "lib.foundry.client.FoundryClient.upsert_objects",
+                side_effect=FoundryAPIError(
+                    "Foundry API POST /api/v2/ontologies/ontology/actions/sapphire-upsert/apply → 404",
+                    status=404,
+                ),
+            ),
+            mock.patch("lib.foundry.sync._send_telegram_alert") as tg,
+            caplog.at_level("INFO"),
         ):
             result = run_sync(tmp_path, dry_run=False, force=True)
 
@@ -596,13 +613,11 @@ class TestRunSyncGracefulDegradation:
         assert state["last_status"] == "error", "status must reflect the regression"
         # ERROR path, not INFO
         error_msgs = [r.getMessage() for r in caplog.records if r.levelname == "ERROR"]
-        assert any("404" in m for m in error_msgs), (
-            f"expected ERROR carrying 404 once first_success_at is set; got ERRORs={error_msgs!r}"
-        )
+        assert any(
+            "404" in m for m in error_msgs
+        ), f"expected ERROR carrying 404 once first_success_at is set; got ERRORs={error_msgs!r}"
 
-    def test_dataset_mode_uploads_dataset_snapshot(
-        self, tmp_path, monkeypatch
-    ):
+    def test_dataset_mode_uploads_dataset_snapshot(self, tmp_path, monkeypatch):
         """Dataset write mode uploads JSONL snapshots and does not require an action."""
         monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
         monkeypatch.setenv("PALANTIR_FOUNDRY_TOKEN", "ok-tok")
@@ -618,13 +633,17 @@ class TestRunSyncGracefulDegradation:
             json.dumps({"pipeline_id": "t1", "symbol": "BTC"}) + "\n"
         )
 
-        with mock.patch(
-            "lib.foundry.client.FoundryClient.validate_write_target",
-            return_value=None,
-        ) as validate, mock.patch(
-            "lib.foundry.client.FoundryClient.upload_dataset_objects",
-            return_value={"objects_uploaded": 1},
-        ) as upload, mock.patch("lib.foundry.sync._send_telegram_alert") as tg:
+        with (
+            mock.patch(
+                "lib.foundry.client.FoundryClient.validate_write_target",
+                return_value=None,
+            ) as validate,
+            mock.patch(
+                "lib.foundry.client.FoundryClient.upload_dataset_objects",
+                return_value={"objects_uploaded": 1},
+            ) as upload,
+            mock.patch("lib.foundry.sync._send_telegram_alert") as tg,
+        ):
             result = run_sync(tmp_path, dry_run=False, force=True)
 
         assert tg.call_count == 0
@@ -635,9 +654,7 @@ class TestRunSyncGracefulDegradation:
         upload.assert_called_once()
         assert upload.call_args.args[0] == "PaperTrade"
 
-    def test_dataset_mode_404_is_not_demoted(
-        self, tmp_path, monkeypatch
-    ):
+    def test_dataset_mode_404_is_not_demoted(self, tmp_path, monkeypatch):
         """Dataset upload 404s are real write failures, not missing action setup."""
         monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
         monkeypatch.setenv("PALANTIR_FOUNDRY_TOKEN", "ok-tok")
@@ -655,13 +672,17 @@ class TestRunSyncGracefulDegradation:
 
         from lib.foundry.client import FoundryAPIError
 
-        with mock.patch(
-            "lib.foundry.client.FoundryClient.validate_write_target",
-            return_value=None,
-        ), mock.patch(
-            "lib.foundry.client.FoundryClient.upload_dataset_objects",
-            side_effect=FoundryAPIError("dataset missing", status=404),
-        ), mock.patch("lib.foundry.sync._send_telegram_alert") as tg:
+        with (
+            mock.patch(
+                "lib.foundry.client.FoundryClient.validate_write_target",
+                return_value=None,
+            ),
+            mock.patch(
+                "lib.foundry.client.FoundryClient.upload_dataset_objects",
+                side_effect=FoundryAPIError("dataset missing", status=404),
+            ),
+            mock.patch("lib.foundry.sync._send_telegram_alert") as tg,
+        ):
             result = run_sync(tmp_path, dry_run=False, force=True)
 
         assert tg.call_count == 0
@@ -677,13 +698,19 @@ class TestAuthWarningFresh:
         assert _auth_warning_fresh(None, "2026-04-19T00:00:00+00:00") is False
 
     def test_within_24h(self):
-        assert _auth_warning_fresh(
-            "2026-04-19T00:00:00+00:00",
-            "2026-04-19T10:00:00+00:00",
-        ) is True
+        assert (
+            _auth_warning_fresh(
+                "2026-04-19T00:00:00+00:00",
+                "2026-04-19T10:00:00+00:00",
+            )
+            is True
+        )
 
     def test_beyond_24h(self):
-        assert _auth_warning_fresh(
-            "2026-04-17T00:00:00+00:00",
-            "2026-04-19T00:00:00+00:00",
-        ) is False
+        assert (
+            _auth_warning_fresh(
+                "2026-04-17T00:00:00+00:00",
+                "2026-04-19T00:00:00+00:00",
+            )
+            is False
+        )

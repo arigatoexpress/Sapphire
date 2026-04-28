@@ -77,4 +77,3 @@ def load_snapshot_from_gcs(settings: BISSettings) -> dict[str, Any] | None:
         return None
     data = blob.download_as_bytes(client=client)
     return json.loads(data.decode("utf-8"))
-

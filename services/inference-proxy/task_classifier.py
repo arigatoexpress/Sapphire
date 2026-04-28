@@ -12,6 +12,7 @@ Routing map (benchmark-calibrated 2026-04-14, RTX 5070 Ti):
   CREATIVE  → balanced  (hermes3:8b)        118 tok/s — writing, brainstorming
   CHAT      → balanced  (hermes3:8b)        118 tok/s — conversation, general Q&A (default)
 """
+
 from __future__ import annotations
 
 import logging
@@ -25,17 +26,17 @@ __all__ = ["TaskCategory", "ClassifierResult", "classify_messages", "classify_te
 
 
 class TaskCategory(StrEnum):
-    FACTUAL   = "factual"
-    CODE      = "code"
+    FACTUAL = "factual"
+    CODE = "code"
     REASONING = "reasoning"
-    RESEARCH  = "research"
-    CREATIVE  = "creative"
-    CHAT      = "chat"
+    RESEARCH = "research"
+    CREATIVE = "creative"
+    CHAT = "chat"
 
 
 class ClassifierResult(NamedTuple):
-    category:  TaskCategory
-    model:     str   # model alias to pass through MODEL_TIERS
+    category: TaskCategory
+    model: str  # model alias to pass through MODEL_TIERS
     confidence: float  # 0.0–1.0
 
 
@@ -61,7 +62,7 @@ _CODE_PATTERNS = re.compile(
 )
 
 _CODE_SIGNALS = re.compile(
-    r'```|`[^`]+`|\bfunction\s*\(|\bdef\s+\w+|\bclass\s+\w+\b|\bimport\s+\w|\bconst\s+\w|\blet\s+\w|\bvar\s+\w',
+    r"```|`[^`]+`|\bfunction\s*\(|\bdef\s+\w+|\bclass\s+\w+\b|\bimport\s+\w|\bconst\s+\w|\blet\s+\w|\bvar\s+\w",
     re.IGNORECASE,
 )
 
@@ -141,13 +142,14 @@ _CREATIVE_PATTERNS = re.compile(
 
 # ─── Scorer ───────────────────────────────────────────────────────────────────
 
+
 def _score_text(text: str) -> dict[TaskCategory, float]:
     """Return unnormalized match scores for each category."""
     scores: dict[TaskCategory, float] = {cat: 0.0 for cat in TaskCategory}
 
     # Code: weight by signal count (code snippets are strong evidence)
-    code_matches   = len(_CODE_PATTERNS.findall(text))
-    code_signals   = len(_CODE_SIGNALS.findall(text))
+    code_matches = len(_CODE_PATTERNS.findall(text))
+    code_signals = len(_CODE_SIGNALS.findall(text))
     scores[TaskCategory.CODE] = code_matches * 2.0 + code_signals * 1.5
 
     # Reasoning: multi-step or analytical language
@@ -223,12 +225,12 @@ def classify_messages(messages: list[dict]) -> ClassifierResult:
 # Maps to MODEL_TIERS aliases (not raw model names).
 
 _CATEGORY_TO_MODEL: dict[TaskCategory, str] = {
-    TaskCategory.FACTUAL:   "fast",        # nemotron-mini:4b — instant
-    TaskCategory.CODE:      "code",        # gemma4:latest (supersedes qwen2.5-coder:14b)
-    TaskCategory.REASONING: "reason",      # deepseek-r1:14b
-    TaskCategory.RESEARCH:  "kimi-cloud",  # Kimi Cloud (sensitivity-gated by proxy)
-    TaskCategory.CREATIVE:  "balanced",    # hermes3:8b
-    TaskCategory.CHAT:      "balanced",    # hermes3:8b (default)
+    TaskCategory.FACTUAL: "fast",  # nemotron-mini:4b — instant
+    TaskCategory.CODE: "code",  # gemma4:latest (supersedes qwen2.5-coder:14b)
+    TaskCategory.REASONING: "reason",  # deepseek-r1:14b
+    TaskCategory.RESEARCH: "kimi-cloud",  # Kimi Cloud (sensitivity-gated by proxy)
+    TaskCategory.CREATIVE: "balanced",  # hermes3:8b
+    TaskCategory.CHAT: "balanced",  # hermes3:8b (default)
 }
 
 
@@ -251,7 +253,9 @@ if __name__ == "__main__":
         ]
         for t in test_cases:
             r = classify_text(t)
-            print(f"  [{r.category.value:10s}] model={r.model:15s} conf={r.confidence:.2f}  {t[:60]}")
+            print(
+                f"  [{r.category.value:10s}] model={r.model:15s} conf={r.confidence:.2f}  {t[:60]}"
+            )
         sys.exit(0)
 
     query = " ".join(sys.argv[1:])

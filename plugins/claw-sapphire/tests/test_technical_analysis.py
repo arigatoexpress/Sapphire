@@ -61,9 +61,11 @@ def test_rsi_all_down():
 
 def test_rsi_range():
     """RSI should always be 0-100."""
-    for data in [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-                  [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1],
-                  [100] * 20]:
+    for data in [
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+        [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1],
+        [100] * 20,
+    ]:
         rsi = _rsi(data)
         assert 0 <= rsi <= 100, f"RSI {rsi} out of range for {data[:5]}..."
 

@@ -39,6 +39,7 @@ TIMEOUT = 20.0
 
 # ── HTTP helpers ──────────────────────────────────────────────────────────────
 
+
 def _get_json(url: str, timeout: float = TIMEOUT) -> dict:
     try:
         req = urllib.request.Request(url, headers={"Accept": "application/json"})
@@ -60,6 +61,7 @@ def _fmt(value, digits: int = 2) -> str:
 
 # ── Fetch functions ───────────────────────────────────────────────────────────
 
+
 def _fetch_all(base: str, days: int, hours: int, lib_limit: int) -> tuple[dict, dict, dict]:
     base = base.rstrip("/")
     strategy_ops = _get_json(
@@ -77,6 +79,7 @@ def _fetch_all(base: str, days: int, hours: int, lib_limit: int) -> tuple[dict, 
 
 # ── Formatters ────────────────────────────────────────────────────────────────
 
+
 def _fmt_briefing(brief: dict, kpis: dict, blockers: list, actions: list) -> list[str]:
     lines = [
         "## Operator Snapshot",
@@ -91,7 +94,7 @@ def _fmt_briefing(brief: dict, kpis: dict, blockers: list, actions: list) -> lis
         "## Hard Blockers",
         "",
     ]
-    for row in (blockers[:8] or ["None"]):
+    for row in blockers[:8] or ["None"]:
         lines.append(f"- {row}")
     lines += ["", "## Top Actions", ""]
     if actions:
@@ -151,8 +154,9 @@ def _fmt_librarian(lib: list) -> list[str]:
     return lines
 
 
-def _fmt_prompt(brief: dict, kpis: dict, blockers: list, actions: list,
-                lanes: list, intel: list, lib: list) -> list[str]:
+def _fmt_prompt(
+    brief: dict, kpis: dict, blockers: list, actions: list, lanes: list, intel: list, lib: list
+) -> list[str]:
     return [
         "## Prompt For Deep Analysis",
         "",
@@ -185,6 +189,7 @@ def _fmt_prompt(brief: dict, kpis: dict, blockers: list, actions: list,
 
 # ── Action handlers ───────────────────────────────────────────────────────────
 
+
 def _action_pack(inp: dict) -> dict:
     base = inp.get("base_url", DEFAULT_BASE_URL)
     days = int(inp.get("days", DEFAULT_DAYS))
@@ -193,12 +198,16 @@ def _action_pack(inp: dict) -> dict:
 
     strategy_ops, intel_summary, librarian = _fetch_all(base, days, hours, lib_limit)
 
-    brief = (strategy_ops.get("operator_brief") or {}) if isinstance(strategy_ops.get("operator_brief"), dict) else {}
+    brief = (
+        (strategy_ops.get("operator_brief") or {})
+        if isinstance(strategy_ops.get("operator_brief"), dict)
+        else {}
+    )
     kpis = brief.get("kpis") or {}
     blockers = brief.get("hard_blockers") or []
     actions = brief.get("top_actions") or []
     lanes = ((strategy_ops.get("scorecard") or {}).get("ranked") or [])[:5]
-    intel = ((intel_summary.get("intel") or {}).get("top_items") or [])
+    intel = (intel_summary.get("intel") or {}).get("top_items") or []
     lib = (librarian.get("selected") or [])[:6]
 
     now_iso = datetime.now(UTC).isoformat()
@@ -255,7 +264,11 @@ def _action_briefing(inp: dict) -> dict:
         f"?days={max(1, min(days, 30))}&refresh=true"
     )
 
-    brief = (strategy_ops.get("operator_brief") or {}) if isinstance(strategy_ops.get("operator_brief"), dict) else {}
+    brief = (
+        (strategy_ops.get("operator_brief") or {})
+        if isinstance(strategy_ops.get("operator_brief"), dict)
+        else {}
+    )
     kpis = brief.get("kpis") or {}
     blockers = brief.get("hard_blockers") or []
     actions = brief.get("top_actions") or []
@@ -292,7 +305,7 @@ def _action_intel(inp: dict) -> dict:
         f"{base.rstrip('/')}/api/platform/intel-summary"
         f"?hours={max(4, min(hours, 168))}&limit=60"
     )
-    intel = ((intel_summary.get("intel") or {}).get("top_items") or [])
+    intel = (intel_summary.get("intel") or {}).get("top_items") or []
 
     return {
         "action": "intel",
@@ -340,6 +353,7 @@ def _action_lanes(inp: dict) -> dict:
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+
 def main():
     try:
         inp = json.loads(sys.stdin.read().strip() or "{}")
@@ -350,17 +364,21 @@ def main():
     action = inp.get("action", "briefing")
 
     handlers = {
-        "pack":     _action_pack,
+        "pack": _action_pack,
         "briefing": _action_briefing,
-        "intel":    _action_intel,
-        "lanes":    _action_lanes,
+        "intel": _action_intel,
+        "lanes": _action_lanes,
     }
     fn = handlers.get(action)
     if fn is None:
-        print(json.dumps({
-            "error": f"Unknown action: {action!r}",
-            "valid_actions": list(handlers),
-        }))
+        print(
+            json.dumps(
+                {
+                    "error": f"Unknown action: {action!r}",
+                    "valid_actions": list(handlers),
+                }
+            )
+        )
         sys.exit(1)
 
     result = fn(inp)

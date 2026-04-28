@@ -24,6 +24,7 @@ from pathlib import Path
 _SSL_CTX = ssl.create_default_context()
 try:
     import certifi
+
     _SSL_CTX.load_verify_locations(certifi.where())
 except ImportError:
     pass
@@ -59,14 +60,18 @@ def get_bot_token() -> str | None:
 
 def get_chat_id() -> str | None:
     """Resolve the target Telegram chat ID."""
-    chat_id = os.environ.get("TELEGRAM_CHAT_ID") or os.environ.get(
-        "ALLOWED_TELEGRAM_CHAT_IDS", ""
-    ).split(",")[0].strip()
+    chat_id = (
+        os.environ.get("TELEGRAM_CHAT_ID")
+        or os.environ.get("ALLOWED_TELEGRAM_CHAT_IDS", "").split(",")[0].strip()
+    )
     if chat_id:
         return chat_id
 
     # Check secrets
-    for prefix in [Path.home() / ".config" / "sapphire-secrets", Path.home() / ".config" / "sapphire"]:
+    for prefix in [
+        Path.home() / ".config" / "sapphire-secrets",
+        Path.home() / ".config" / "sapphire",
+    ]:
         path = prefix / "telegram_chat_id"
         if path.exists():
             return path.read_text().strip()

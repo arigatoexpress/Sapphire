@@ -48,11 +48,19 @@ def _runtime_policy_firestore_project() -> str:
 
 
 def _runtime_policy_firestore_collection() -> str:
-    return str(os.getenv("AGENTIC_RUNTIME_POLICY_FIRESTORE_COLLECTION") or "agentic_runtime_meta").strip() or "agentic_runtime_meta"
+    return (
+        str(
+            os.getenv("AGENTIC_RUNTIME_POLICY_FIRESTORE_COLLECTION") or "agentic_runtime_meta"
+        ).strip()
+        or "agentic_runtime_meta"
+    )
 
 
 def _runtime_policy_firestore_document() -> str:
-    return str(os.getenv("AGENTIC_RUNTIME_POLICY_FIRESTORE_DOCUMENT") or "executor_policy").strip() or "executor_policy"
+    return (
+        str(os.getenv("AGENTIC_RUNTIME_POLICY_FIRESTORE_DOCUMENT") or "executor_policy").strip()
+        or "executor_policy"
+    )
 
 
 def _runtime_policy_cache_key() -> str:
@@ -71,7 +79,11 @@ def _firestore_runtime_policy_load() -> dict[str, Any] | None:
     except Exception:
         return None
     client = firestore.Client(project=project)
-    doc = client.collection(_runtime_policy_firestore_collection()).document(_runtime_policy_firestore_document()).get()
+    doc = (
+        client.collection(_runtime_policy_firestore_collection())
+        .document(_runtime_policy_firestore_document())
+        .get()
+    )
     if not getattr(doc, "exists", False):
         return None
     data = doc.to_dict() or {}
@@ -81,13 +93,17 @@ def _firestore_runtime_policy_load() -> dict[str, Any] | None:
 def _firestore_runtime_policy_save(payload: dict[str, Any]) -> None:
     project = _runtime_policy_firestore_project()
     if not project:
-        raise RuntimeError("firestore runtime policy backend requires GOOGLE_CLOUD_PROJECT or AGENTIC_RUNTIME_POLICY_FIRESTORE_PROJECT")
+        raise RuntimeError(
+            "firestore runtime policy backend requires GOOGLE_CLOUD_PROJECT or AGENTIC_RUNTIME_POLICY_FIRESTORE_PROJECT"
+        )
     try:
         from google.cloud import firestore  # type: ignore
     except Exception as exc:
         raise RuntimeError("google-cloud-firestore is not available") from exc
     client = firestore.Client(project=project)
-    client.collection(_runtime_policy_firestore_collection()).document(_runtime_policy_firestore_document()).set(dict(payload))
+    client.collection(_runtime_policy_firestore_collection()).document(
+        _runtime_policy_firestore_document()
+    ).set(dict(payload))
 
 
 def _sanitize_values(values: list[str] | None) -> list[str]:
@@ -133,8 +149,12 @@ def _normalize_policy_payload(payload: dict[str, Any] | None) -> dict[str, Any]:
     normalized["updated_at"] = str(payload.get("updated_at") or _now_iso())
     normalized["mode"] = str(payload.get("mode") or "open").strip().lower() or "open"
     normalized["description"] = str(payload.get("description") or "").strip() or base["description"]
-    normalized["allowed_executor_agent_ids"] = _sanitize_values(payload.get("allowed_executor_agent_ids"))
-    normalized["allowed_executor_membership_ids"] = _sanitize_values(payload.get("allowed_executor_membership_ids"))
+    normalized["allowed_executor_agent_ids"] = _sanitize_values(
+        payload.get("allowed_executor_agent_ids")
+    )
+    normalized["allowed_executor_membership_ids"] = _sanitize_values(
+        payload.get("allowed_executor_membership_ids")
+    )
     normalized["updated_by"] = str(payload.get("updated_by") or "system").strip() or "system"
     return normalized
 
@@ -166,10 +186,18 @@ def _apply_env_overrides(payload: dict[str, Any]) -> dict[str, Any]:
 def _expected_executor_policy_from_env() -> dict[str, Any]:
     mode = str(os.getenv("AGENTIC_EXPECTED_EXECUTOR_POLICY_MODE") or "").strip().lower()
     agent_ids = _sanitize_values(
-        [item for item in str(os.getenv("AGENTIC_EXPECTED_EXECUTOR_AGENT_IDS") or "").split(",") if item.strip()]
+        [
+            item
+            for item in str(os.getenv("AGENTIC_EXPECTED_EXECUTOR_AGENT_IDS") or "").split(",")
+            if item.strip()
+        ]
     )
     membership_ids = _sanitize_values(
-        [item for item in str(os.getenv("AGENTIC_EXPECTED_EXECUTOR_MEMBERSHIP_IDS") or "").split(",") if item.strip()]
+        [
+            item
+            for item in str(os.getenv("AGENTIC_EXPECTED_EXECUTOR_MEMBERSHIP_IDS") or "").split(",")
+            if item.strip()
+        ]
     )
     enabled = bool(mode or agent_ids or membership_ids)
     return {
@@ -210,7 +238,8 @@ def _apply_expected_policy_overlay(payload: dict[str, Any]) -> dict[str, Any]:
     normalized["effective_observed_updated_by"] = str(payload.get("updated_by") or "")
     if str(normalized.get("description") or "").strip():
         normalized["description"] = (
-            str(normalized.get("description") or "").strip() + " (effective expected-policy lock overlay applied)"
+            str(normalized.get("description") or "").strip()
+            + " (effective expected-policy lock overlay applied)"
         )
     return normalized
 
@@ -246,7 +275,9 @@ def load_runtime_policy_observed(force_refresh: bool = False) -> dict[str, Any]:
     if not path.exists():
         payload = _default_policy_payload()
         path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-        _CACHE.update({"key": cache_key, "mtime": path.stat().st_mtime, "ts": time.time(), "payload": payload})
+        _CACHE.update(
+            {"key": cache_key, "mtime": path.stat().st_mtime, "ts": time.time(), "payload": payload}
+        )
         return _apply_env_overrides(payload)
 
     try:

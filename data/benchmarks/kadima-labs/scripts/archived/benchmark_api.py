@@ -21,12 +21,12 @@ except ImportError:
 
 class OllamaAPIBenchmark:
     """Benchmark using Ollama REST API for reliable GPU inference"""
-    
+
     def __init__(self):
         self.results = []
         self.system_info = self._get_system_info()
         self.gpu_handle = None
-        
+
         if HAS_NVML:
             try:
                 nvml.nvmlInit()
@@ -37,7 +37,7 @@ class OllamaAPIBenchmark:
                 print(f"GPU: {name}")
             except Exception as e:
                 print(f"GPU monitoring: {e}")
-    
+
     def _get_system_info(self) -> dict:
         info = {"timestamp": datetime.now().isoformat(), "platform": sys.platform}
         try:
@@ -51,7 +51,7 @@ class OllamaAPIBenchmark:
         except:
             pass
         return info
-    
+
     def _get_gpu_memory(self) -> int:
         if self.gpu_handle:
             try:
@@ -60,17 +60,17 @@ class OllamaAPIBenchmark:
             except:
                 pass
         return 0
-    
+
     def _run_inference(self, model: str, prompt: str, timeout: int = 120) -> dict:
         """Run inference via Ollama API"""
         mem_before = self._get_gpu_memory()
-        
+
         payload = {
             "model": model,
             "prompt": prompt,
             "stream": False
         }
-        
+
         start = time.time()
         try:
             result = subprocess.run(
@@ -80,13 +80,13 @@ class OllamaAPIBenchmark:
                 capture_output=True, text=True, timeout=timeout
             )
             duration = time.time() - start
-            
+
             if result.returncode != 0:
                 return {"success": False, "error": result.stderr, "duration": duration}
-            
+
             response = json.loads(result.stdout)
             mem_after = self._get_gpu_memory()
-            
+
             return {
                 "success": True,
                 "duration": round(duration, 2),
@@ -104,13 +104,13 @@ class OllamaAPIBenchmark:
             return {"success": False, "error": "Timeout", "duration": timeout}
         except Exception as e:
             return {"success": False, "error": str(e), "duration": 0}
-    
+
     def benchmark_model(self, model: str) -> dict:
         """Run comprehensive benchmark on a model"""
         print(f"\n{'='*70}")
         print(f"BENCHMARKING: {model}")
         print(f"{'='*70}")
-        
+
         # Warmup
         print("  Warmup...", end=" ")
         warmup = self._run_inference(model, "Hello", timeout=60)
@@ -119,7 +119,7 @@ class OllamaAPIBenchmark:
             return {"model": model, "error": warmup.get('error')}
         print(f"OK ({warmup['duration']:.1f}s, {warmup['tokens_per_sec']:.1f} t/s)")
         time.sleep(2)
-        
+
         # Test suite
         tests = {
             "reasoning": "A farmer has 17 sheep. All but 9 die. How many are left? Explain.",
@@ -129,19 +129,19 @@ class OllamaAPIBenchmark:
             "creative": "Write a haiku about artificial intelligence.",
             "context": "Sarah has 3 apples, gives 1 away, buys 5 more. Friend gives her twice as many. How many?"
         }
-        
+
         results = {"model": model, "tests": {}, "timestamp": datetime.now().isoformat()}
-        
+
         for test_name, prompt in tests.items():
             print(f"  {test_name}...", end=" ", flush=True)
             result = self._run_inference(model, prompt, timeout=120)
             results["tests"][test_name] = result
-            
+
             if result["success"]:
                 print(f"{result['tokens_per_sec']:.1f} t/s, {result['duration']:.1f}s")
             else:
                 print(f"FAILED - {result.get('error', 'Unknown')}")
-        
+
         # Summary
         successful = [t for t in results["tests"].values() if t["success"]]
         if successful:
@@ -157,9 +157,9 @@ class OllamaAPIBenchmark:
             }
             print(f"\n  Summary: {results['summary']['avg_tokens_per_sec']:.1f} t/s avg | "
                   f"{results['summary']['successful_tests']}/{results['summary']['total_tests']} tests")
-        
+
         return results
-    
+
     def run_all(self, models: list[str]) -> list[dict]:
         """Run benchmarks on all models"""
         print(f"\n{'='*70}")
@@ -167,19 +167,19 @@ class OllamaAPIBenchmark:
         print(f"{'='*70}")
         print(f"Testing {len(models)} models...")
         print("Models: " + ", ".join(models) + "\n")
-        
+
         all_results = []
         for i, model in enumerate(models, 1):
             print(f"[{i}/{len(models)}] Starting {model}...")
             result = self.benchmark_model(model)
             all_results.append(result)
-            
+
             if i < len(models):
                 print("\n  Cooldown...")
                 time.sleep(5)
-        
+
         return all_results
-    
+
     def save_results(self, results: list[dict]) -> str:
         filename = f"benchmark_api_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         output = {
@@ -191,25 +191,25 @@ class OllamaAPIBenchmark:
             json.dump(output, f, indent=2, ensure_ascii=False)
         print(f"\nResults saved to: {filename}")
         return filename
-    
+
     def print_report(self, results: list[dict]):
         print(f"\n{'='*70}")
         print("BENCHMARK REPORT")
         print(f"{'='*70}\n")
-        
+
         successful = [r for r in results if "summary" in r]
         if not successful:
             print("No successful benchmarks!")
             return
-        
+
         sorted_models = sorted(successful, key=lambda x: x["summary"]["avg_tokens_per_sec"], reverse=True)
-        
+
         print("SPEED RANKING:")
         print("-" * 50)
         for i, r in enumerate(sorted_models, 1):
             s = r["summary"]
             print(f"{i}. {r['model']:<25} {s['avg_tokens_per_sec']:>6.1f} t/s")
-        
+
         print("\n\nDETAILED RESULTS:")
         print("-" * 70)
         for r in sorted_models:
@@ -222,12 +222,12 @@ class OllamaAPIBenchmark:
 
 def main():
     models = ["qwen3:14b", "qwen2.5-coder:14b", "qwen2.5:32b", "qwen2.5:14b"]
-    
+
     benchmark = OllamaAPIBenchmark()
     results = benchmark.run_all(models)
     filename = benchmark.save_results(results)
     benchmark.print_report(results)
-    
+
     print(f"\n\nFull results saved to: {filename}")
 
 

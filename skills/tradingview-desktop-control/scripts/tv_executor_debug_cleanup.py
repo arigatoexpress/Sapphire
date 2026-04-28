@@ -66,7 +66,9 @@ def _list_run_dirs(root: Path) -> list[dict[str, Any]]:
                 "file_count": int(file_count),
             }
         )
-    runs.sort(key=lambda r: (float(r.get("mtime_epoch") or 0.0), str(r.get("name") or "")), reverse=True)
+    runs.sort(
+        key=lambda r: (float(r.get("mtime_epoch") or 0.0), str(r.get("name") or "")), reverse=True
+    )
     return runs
 
 
@@ -79,7 +81,9 @@ def _annotate_age(records: list[dict[str, Any]], now_epoch: float) -> None:
         age_seconds = max(0.0, now_epoch - float(r.get("mtime_epoch") or now_epoch))
         r["age_seconds"] = round(age_seconds, 3)
         r["age_days"] = round(age_seconds / 86400.0, 6)
-        r["mtime_iso"] = dt.datetime.fromtimestamp(float(r.get("mtime_epoch") or 0.0), tz=dt.UTC).isoformat()
+        r["mtime_iso"] = dt.datetime.fromtimestamp(
+            float(r.get("mtime_epoch") or 0.0), tz=dt.UTC
+        ).isoformat()
 
 
 def _plan_cleanup(
@@ -104,7 +108,14 @@ def _plan_cleanup(
                 continue
             if float(r.get("age_seconds") or 0.0) > age_limit_seconds:
                 delete_by_age.add(path)
-                decisions.append({"path": path, "reason": "age", "age_days": r.get("age_days"), "size_bytes": r.get("size_bytes")})
+                decisions.append(
+                    {
+                        "path": path,
+                        "reason": "age",
+                        "age_days": r.get("age_days"),
+                        "size_bytes": r.get("size_bytes"),
+                    }
+                )
 
     remaining = [r for r in records_sorted if str(r.get("path")) not in delete_by_age]
     total_after_age = sum(int(r.get("size_bytes") or 0) for r in remaining)
@@ -112,7 +123,9 @@ def _plan_cleanup(
     if max_total_bytes is not None and max_total_bytes >= 0 and total_after_age > max_total_bytes:
         current_total = total_after_age
         # Oldest first for size pruning.
-        for r in sorted(remaining, key=lambda x: (float(x.get("mtime_epoch") or 0.0), str(x.get("name") or ""))):
+        for r in sorted(
+            remaining, key=lambda x: (float(x.get("mtime_epoch") or 0.0), str(x.get("name") or ""))
+        ):
             path = str(r.get("path"))
             if path in protected_paths:
                 continue
@@ -205,24 +218,42 @@ def _format_text(report: dict[str, Any]) -> str:
     apply_results = report.get("apply_results") or []
     if apply_results:
         failed = [r for r in apply_results if not r.get("deleted")]
-        lines.append(f"Apply results: deleted={len(apply_results)-len(failed)} failed={len(failed)}")
+        lines.append(
+            f"Apply results: deleted={len(apply_results)-len(failed)} failed={len(failed)}"
+        )
         for r in failed[:5]:
             lines.append(f"- failed {r.get('name')}: {r.get('error')}")
     return "\n".join(lines)
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="Cleanup TradingView executor debug artifacts (age/size retention)")
-    p.add_argument("--root", type=Path, default=DEFAULT_DEBUG_ROOT, help=f"Debug artifact root (default: {DEFAULT_DEBUG_ROOT})")
-    p.add_argument("--keep-last", type=int, default=5, help="Always keep this many newest run directories")
-    p.add_argument("--max-age-days", type=float, default=7.0, help="Delete dirs older than this age (days); <0 disables age pruning")
+    p = argparse.ArgumentParser(
+        description="Cleanup TradingView executor debug artifacts (age/size retention)"
+    )
+    p.add_argument(
+        "--root",
+        type=Path,
+        default=DEFAULT_DEBUG_ROOT,
+        help=f"Debug artifact root (default: {DEFAULT_DEBUG_ROOT})",
+    )
+    p.add_argument(
+        "--keep-last", type=int, default=5, help="Always keep this many newest run directories"
+    )
+    p.add_argument(
+        "--max-age-days",
+        type=float,
+        default=7.0,
+        help="Delete dirs older than this age (days); <0 disables age pruning",
+    )
     p.add_argument(
         "--max-total-mb",
         type=float,
         default=512.0,
         help="After age pruning, prune oldest dirs until total size <= this MB; <0 disables size pruning",
     )
-    p.add_argument("--dry-run", action="store_true", help="Plan only (default if --apply is not set)")
+    p.add_argument(
+        "--dry-run", action="store_true", help="Plan only (default if --apply is not set)"
+    )
     p.add_argument("--apply", action="store_true", help="Delete the selected directories")
     p.add_argument("--json", action="store_true", help="Emit JSON report")
     args = p.parse_args()
@@ -238,8 +269,14 @@ def main() -> int:
     now = _now_epoch()
     _annotate_age(records, now)
 
-    max_age_days = None if args.max_age_days is None or args.max_age_days < 0 else float(args.max_age_days)
-    max_total_bytes = None if args.max_total_mb is None or args.max_total_mb < 0 else int(float(args.max_total_mb) * 1024 * 1024)
+    max_age_days = (
+        None if args.max_age_days is None or args.max_age_days < 0 else float(args.max_age_days)
+    )
+    max_total_bytes = (
+        None
+        if args.max_total_mb is None or args.max_total_mb < 0
+        else int(float(args.max_total_mb) * 1024 * 1024)
+    )
     plan = _plan_cleanup(
         records,
         keep_last=max(0, int(args.keep_last)),

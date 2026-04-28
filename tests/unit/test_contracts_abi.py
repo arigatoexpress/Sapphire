@@ -88,16 +88,16 @@ def test_set_monthly_subscription_rejects_zero(payment_gate_src: str) -> None:
 
 def test_signal_verifier_has_pending_operator(signal_verifier_src: str) -> None:
     """Two-step transfer requires a `pendingOperator` storage slot."""
-    assert re.search(r"address\s+public\s+pendingOperator\s*;", signal_verifier_src), (
-        "missing `address public pendingOperator;` storage slot"
-    )
+    assert re.search(
+        r"address\s+public\s+pendingOperator\s*;", signal_verifier_src
+    ), "missing `address public pendingOperator;` storage slot"
 
 
 def test_signal_verifier_has_accept_operator(signal_verifier_src: str) -> None:
     """Two-step transfer requires an `acceptOperator()` function."""
-    assert re.search(r"function\s+acceptOperator\s*\(\s*\)\s+external", signal_verifier_src), (
-        "missing `function acceptOperator() external` declaration"
-    )
+    assert re.search(
+        r"function\s+acceptOperator\s*\(\s*\)\s+external", signal_verifier_src
+    ), "missing `function acceptOperator() external` declaration"
 
 
 def test_signal_verifier_transfer_operator_emits_started(signal_verifier_src: str) -> None:
@@ -137,16 +137,16 @@ def test_signal_verifier_events_declared(signal_verifier_src: str) -> None:
 
 def test_payment_gate_has_pending_treasury(payment_gate_src: str) -> None:
     """Two-step transfer requires a `pendingTreasury` storage slot."""
-    assert re.search(r"address\s+public\s+pendingTreasury\s*;", payment_gate_src), (
-        "missing `address public pendingTreasury;` storage slot"
-    )
+    assert re.search(
+        r"address\s+public\s+pendingTreasury\s*;", payment_gate_src
+    ), "missing `address public pendingTreasury;` storage slot"
 
 
 def test_payment_gate_has_accept_treasury(payment_gate_src: str) -> None:
     """Two-step transfer requires an `acceptTreasury()` function."""
-    assert re.search(r"function\s+acceptTreasury\s*\(\s*\)\s+external", payment_gate_src), (
-        "missing `function acceptTreasury() external` declaration"
-    )
+    assert re.search(
+        r"function\s+acceptTreasury\s*\(\s*\)\s+external", payment_gate_src
+    ), "missing `function acceptTreasury() external` declaration"
 
 
 def test_payment_gate_transfer_treasury_emits_started(payment_gate_src: str) -> None:

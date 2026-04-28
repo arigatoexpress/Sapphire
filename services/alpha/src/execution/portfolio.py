@@ -99,7 +99,9 @@ class PortfolioTracker:
         symbol = self._normalize_symbol(venue, str(fill.get("symbol") or ""))
         raw_side = str(fill.get("side") or "").strip().upper()
         metadata = fill.get("metadata") or {}
-        is_reduce_only = bool(fill.get("reduce_only") or (isinstance(metadata, dict) and metadata.get("reduce_only")))
+        is_reduce_only = bool(
+            fill.get("reduce_only") or (isinstance(metadata, dict) and metadata.get("reduce_only"))
+        )
         qty = float(fill.get("filled_quantity") or fill.get("quantity") or 0)
         price = float(fill.get("avg_price") or fill.get("price") or 0)
 
@@ -242,7 +244,7 @@ class PortfolioTracker:
 
         self._closed_trades.append(closed)
         if len(self._closed_trades) > self._max_closed:
-            self._closed_trades = self._closed_trades[-self._max_closed:]
+            self._closed_trades = self._closed_trades[-self._max_closed :]
 
         logger.info(
             f"📊 Position closed: {existing.venue} {existing.side} "
@@ -289,17 +291,19 @@ class PortfolioTracker:
         for pos in self._positions.values():
             total_unrealized += pos.unrealized_pnl
             total_notional += pos.notional
-            positions.append({
-                "venue": pos.venue,
-                "symbol": pos.symbol,
-                "side": pos.side,
-                "quantity": round(pos.quantity, 6),
-                "entry_price": round(pos.entry_price, 6),
-                "current_price": round(pos.current_price, 6),
-                "unrealized_pnl": round(pos.unrealized_pnl, 4),
-                "notional": round(pos.notional, 2),
-                "age_seconds": int(time.time() - pos.opened_at) if pos.opened_at else 0,
-            })
+            positions.append(
+                {
+                    "venue": pos.venue,
+                    "symbol": pos.symbol,
+                    "side": pos.side,
+                    "quantity": round(pos.quantity, 6),
+                    "entry_price": round(pos.entry_price, 6),
+                    "current_price": round(pos.current_price, 6),
+                    "unrealized_pnl": round(pos.unrealized_pnl, 4),
+                    "notional": round(pos.notional, 2),
+                    "age_seconds": int(time.time() - pos.opened_at) if pos.opened_at else 0,
+                }
+            )
 
         closed_count = self._wins + self._losses
         win_rate = (self._wins / closed_count * 100) if closed_count > 0 else 0

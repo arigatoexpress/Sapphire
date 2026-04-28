@@ -173,7 +173,9 @@ def _macd(closes: list[float]) -> tuple[float, float, float]:
     return macd_line, signal, histogram
 
 
-def _bollinger(closes: list[float], period: int = 20, std_dev: float = 2.0) -> tuple[float, float, float]:
+def _bollinger(
+    closes: list[float], period: int = 20, std_dev: float = 2.0
+) -> tuple[float, float, float]:
     """Bollinger Bands."""
     if len(closes) < period:
         mid = closes[-1] if closes else 0
@@ -181,7 +183,7 @@ def _bollinger(closes: list[float], period: int = 20, std_dev: float = 2.0) -> t
     window = closes[-period:]
     mid = sum(window) / period
     variance = sum((x - mid) ** 2 for x in window) / period
-    std = variance ** 0.5
+    std = variance**0.5
     return mid + std_dev * std, mid, mid - std_dev * std
 
 
@@ -299,18 +301,39 @@ def analyze(symbol: str) -> TechnicalProfile | None:
         net = "neutral"
 
     return TechnicalProfile(
-        symbol=symbol, price=round(price, 2), timestamp=ts,
-        change_24h_pct=round(change_24h, 2), change_7d_pct=round(change_7d, 2),
-        high_7d=round(high_7d, 2), low_7d=round(low_7d, 2), range_position=round(range_pos, 2),
-        sma_7=round(sma7, 2), sma_20=round(sma20, 2), sma_50=round(sma50, 2) if sma50 else None,
-        above_sma_7=price > sma7, above_sma_20=price > sma20, ma_trend=ma_trend,
-        rsi_14=round(rsi, 1), rsi_zone=rsi_zone,
-        atr_14=round(atr, 2), atr_pct=round(atr_pct, 2), volatility_regime=vol_regime,
-        volume_avg_7d=round(vol_avg, 0), volume_ratio=round(vol_ratio, 2), volume_signal=vol_signal,
-        macd_line=round(macd_line, 2), macd_signal=round(macd_sig, 2),
-        macd_histogram=round(macd_hist, 2), macd_cross=macd_cross,
-        bb_upper=round(bb_up, 2), bb_middle=round(bb_mid, 2), bb_lower=round(bb_low, 2), bb_position=bb_pos,
-        signal_count_bullish=bullish, signal_count_bearish=bearish, net_signal=net,
+        symbol=symbol,
+        price=round(price, 2),
+        timestamp=ts,
+        change_24h_pct=round(change_24h, 2),
+        change_7d_pct=round(change_7d, 2),
+        high_7d=round(high_7d, 2),
+        low_7d=round(low_7d, 2),
+        range_position=round(range_pos, 2),
+        sma_7=round(sma7, 2),
+        sma_20=round(sma20, 2),
+        sma_50=round(sma50, 2) if sma50 else None,
+        above_sma_7=price > sma7,
+        above_sma_20=price > sma20,
+        ma_trend=ma_trend,
+        rsi_14=round(rsi, 1),
+        rsi_zone=rsi_zone,
+        atr_14=round(atr, 2),
+        atr_pct=round(atr_pct, 2),
+        volatility_regime=vol_regime,
+        volume_avg_7d=round(vol_avg, 0),
+        volume_ratio=round(vol_ratio, 2),
+        volume_signal=vol_signal,
+        macd_line=round(macd_line, 2),
+        macd_signal=round(macd_sig, 2),
+        macd_histogram=round(macd_hist, 2),
+        macd_cross=macd_cross,
+        bb_upper=round(bb_up, 2),
+        bb_middle=round(bb_mid, 2),
+        bb_lower=round(bb_low, 2),
+        bb_position=bb_pos,
+        signal_count_bullish=bullish,
+        signal_count_bearish=bearish,
+        net_signal=net,
     )
 
 

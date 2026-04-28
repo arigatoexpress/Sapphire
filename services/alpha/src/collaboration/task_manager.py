@@ -45,9 +45,7 @@ class TaskManager:
 
     def __init__(self, store_path: str = ""):
         self._lock = threading.Lock()
-        self._store_path = store_path or os.getenv(
-            "SAPPHIRE_TASK_STORE_PATH", ""
-        )
+        self._store_path = store_path or os.getenv("SAPPHIRE_TASK_STORE_PATH", "")
         self._tasks: dict[str, dict[str, Any]] = {}
         self._task_counter = 0
         self._milestones: dict[str, dict[str, Any]] = {}  # milestone_id → milestone
@@ -84,7 +82,7 @@ class TaskManager:
             Created task dict or error.
         """
         with self._lock:
-            title_clean = str(title or "").strip()[:self.MAX_TITLE_LENGTH]
+            title_clean = str(title or "").strip()[: self.MAX_TITLE_LENGTH]
             if not title_clean:
                 return {"ok": False, "error": "Title is required."}
 
@@ -97,7 +95,7 @@ class TaskManager:
                 priority_clean = "medium"
 
             phase_clean = str(phase or "").strip().lower()[:50]
-            description_clean = str(description or "").strip()[:self.MAX_DESCRIPTION_LENGTH]
+            description_clean = str(description or "").strip()[: self.MAX_DESCRIPTION_LENGTH]
             tags_clean = [str(t).strip().lower()[:30] for t in (tags or []) if str(t).strip()][:10]
 
             self._task_counter += 1
@@ -187,10 +185,10 @@ class TaskManager:
                     task["agent"] = agent_clean
 
             if title:
-                task["title"] = str(title).strip()[:self.MAX_TITLE_LENGTH]
+                task["title"] = str(title).strip()[: self.MAX_TITLE_LENGTH]
 
             if description:
-                task["description"] = str(description).strip()[:self.MAX_DESCRIPTION_LENGTH]
+                task["description"] = str(description).strip()[: self.MAX_DESCRIPTION_LENGTH]
 
             if tags is not None:
                 task["tags"] = [str(t).strip().lower()[:30] for t in tags if str(t).strip()][:10]
@@ -268,7 +266,7 @@ class TaskManager:
             priority_weight = {"critical": 0, "high": 1, "medium": 2, "low": 3}
             tasks.sort(key=lambda t: (priority_weight.get(t["priority"], 2), t["created_at"]))
 
-            limited = tasks[:max(1, min(limit, 200))]
+            limited = tasks[: max(1, min(limit, 200))]
             return {
                 "ok": True,
                 "tasks": limited,
@@ -305,7 +303,7 @@ class TaskManager:
             if len(task.get("milestones", [])) >= self.MAX_MILESTONES_PER_TASK:
                 return {"ok": False, "error": "Maximum milestones reached for this task."}
 
-            title_clean = str(title or "").strip()[:self.MAX_TITLE_LENGTH]
+            title_clean = str(title or "").strip()[: self.MAX_TITLE_LENGTH]
             if not title_clean:
                 return {"ok": False, "error": "Milestone title is required."}
 
@@ -317,7 +315,7 @@ class TaskManager:
                 "task_id": task_id_clean,
                 "title": title_clean,
                 "target_date": str(target_date or "").strip()[:10],
-                "description": str(description or "").strip()[:self.MAX_DESCRIPTION_LENGTH],
+                "description": str(description or "").strip()[: self.MAX_DESCRIPTION_LENGTH],
                 "completed": False,
                 "completed_at": None,
                 "created_at": int(time.time()),
@@ -382,7 +380,7 @@ class TaskManager:
             if len(task.get("deliverables", [])) >= self.MAX_DELIVERABLES_PER_TASK:
                 return {"ok": False, "error": "Maximum deliverables reached for this task."}
 
-            title_clean = str(title or "").strip()[:self.MAX_TITLE_LENGTH]
+            title_clean = str(title or "").strip()[: self.MAX_TITLE_LENGTH]
             if not title_clean:
                 return {"ok": False, "error": "Deliverable title is required."}
 
@@ -399,7 +397,7 @@ class TaskManager:
                 "task_id": task_id_clean,
                 "title": title_clean,
                 "type": type_clean,
-                "description": str(description or "").strip()[:self.MAX_DESCRIPTION_LENGTH],
+                "description": str(description or "").strip()[: self.MAX_DESCRIPTION_LENGTH],
                 "reference": str(reference or "").strip()[:500],
                 "verified": False,
                 "verified_at": None,
@@ -436,9 +434,7 @@ class TaskManager:
 
     # ── Notes ─────────────────────────────────────────────────────
 
-    def add_note(
-        self, task_id: str, text: str, author: str = "SYSTEM"
-    ) -> dict[str, Any]:
+    def add_note(self, task_id: str, text: str, author: str = "SYSTEM") -> dict[str, Any]:
         """Add a note/comment to a task.
 
         Args:
@@ -455,7 +451,7 @@ class TaskManager:
             if not task:
                 return {"ok": False, "error": f"Task not found: {task_id_clean}"}
 
-            text_clean = str(text or "").strip()[:self.MAX_NOTES_LENGTH]
+            text_clean = str(text or "").strip()[: self.MAX_NOTES_LENGTH]
             if not text_clean:
                 return {"ok": False, "error": "Note text is required."}
 
@@ -482,9 +478,7 @@ class TaskManager:
 
     # ── Progress Reports ──────────────────────────────────────────
 
-    def progress_report(
-        self, phase: str = "", agent: str = ""
-    ) -> dict[str, Any]:
+    def progress_report(self, phase: str = "", agent: str = "") -> dict[str, Any]:
         """Generate a progress report.
 
         Args:
@@ -549,7 +543,8 @@ class TaskManager:
                 all_milestone_ids.extend(t.get("milestones", []))
             ms_total = len(all_milestone_ids)
             ms_completed = sum(
-                1 for mid in all_milestone_ids
+                1
+                for mid in all_milestone_ids
                 if self._milestones.get(mid, {}).get("completed", False)
             )
 
@@ -559,7 +554,8 @@ class TaskManager:
                 all_deliverable_ids.extend(t.get("deliverables", []))
             dlv_total = len(all_deliverable_ids)
             dlv_verified = sum(
-                1 for did in all_deliverable_ids
+                1
+                for did in all_deliverable_ids
                 if self._deliverables.get(did, {}).get("verified", False)
             )
 
@@ -625,7 +621,13 @@ class TaskManager:
             blocked = sum(1 for t in tasks if t["status"] == "blocked")
 
             # Sort by priority then status
-            status_weight = {"blocked": 0, "in_progress": 1, "pending": 2, "completed": 3, "cancelled": 4}
+            status_weight = {
+                "blocked": 0,
+                "in_progress": 1,
+                "pending": 2,
+                "completed": 3,
+                "cancelled": 4,
+            }
             priority_weight = {"critical": 0, "high": 1, "medium": 2, "low": 3}
             tasks.sort(
                 key=lambda t: (
@@ -642,12 +644,14 @@ class TaskManager:
                     "priority": t["priority"],
                     "phase": t["phase"],
                     "milestones_done": sum(
-                        1 for mid in t.get("milestones", [])
+                        1
+                        for mid in t.get("milestones", [])
                         if self._milestones.get(mid, {}).get("completed", False)
                     ),
                     "milestones_total": len(t.get("milestones", [])),
                     "deliverables_done": sum(
-                        1 for did in t.get("deliverables", [])
+                        1
+                        for did in t.get("deliverables", [])
                         if self._deliverables.get(did, {}).get("verified", False)
                     ),
                     "deliverables_total": len(t.get("deliverables", [])),
@@ -701,9 +705,7 @@ class TaskManager:
 
     # ── Batch Operations ──────────────────────────────────────────
 
-    def bulk_create_from_phase(
-        self, phase: str, items: list[dict[str, str]]
-    ) -> dict[str, Any]:
+    def bulk_create_from_phase(self, phase: str, items: list[dict[str, str]]) -> dict[str, Any]:
         """Create multiple tasks for a phase at once.
 
         Args:
@@ -753,8 +755,7 @@ class TaskManager:
             return
         # Remove oldest completed tasks first
         completed = [
-            (tid, t) for tid, t in self._tasks.items()
-            if t["status"] in ("completed", "cancelled")
+            (tid, t) for tid, t in self._tasks.items() if t["status"] in ("completed", "cancelled")
         ]
         completed.sort(key=lambda x: x[1].get("completed_at") or x[1]["created_at"])
         while len(self._tasks) > self.MAX_TASKS and completed:
@@ -889,11 +890,13 @@ class RoadmapParser:
                 if not title:
                     continue
                 agent = self._infer_agent(current_phase, title)
-                items.append({
-                    "title": title[:200],
-                    "phase": self._normalize_phase(current_phase),
-                    "agent": agent,
-                })
+                items.append(
+                    {
+                        "title": title[:200],
+                        "phase": self._normalize_phase(current_phase),
+                        "agent": agent,
+                    }
+                )
 
         return items
 
@@ -937,7 +940,9 @@ class RoadmapParser:
             else:
                 skipped += 1
 
-        logger.info(f"RoadmapParser: {created} tasks created, {skipped} skipped, {len(items)} items found")
+        logger.info(
+            f"RoadmapParser: {created} tasks created, {skipped} skipped, {len(items)} items found"
+        )
         return {
             "ok": True,
             "created": created,

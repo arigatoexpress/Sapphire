@@ -25,83 +25,92 @@ from dataclasses import dataclass
 
 _GROUPS: list[tuple[str, list[str]]] = [
     # Auth / credentials
-    ("credentials", [
-        r"\bapi[_\-]?key\b",
-        r"\bpassword\b",
-        r"\bsecret\b",
-        r"\btoken[=:\s\"']",
-        r"bearer\s+\S",
-        r"private[_\-\s]?key",
-        r"ssh[_\-]?key",
-        r"auth[_\-]?key",
-        r"hmac[_\-]?secret",
-        r"\bsign(?:ing)?[_\-]?secret\b",
-    ]),
-
+    (
+        "credentials",
+        [
+            r"\bapi[_\-]?key\b",
+            r"\bpassword\b",
+            r"\bsecret\b",
+            r"\btoken[=:\s\"']",
+            r"bearer\s+\S",
+            r"private[_\-\s]?key",
+            r"ssh[_\-]?key",
+            r"auth[_\-]?key",
+            r"hmac[_\-]?secret",
+            r"\bsign(?:ing)?[_\-]?secret\b",
+        ],
+    ),
     # Financial / trading (internal)
     # Blocks our own P&L / strategy state from leaking to Kimi Cloud — an
     # over-aggressive match here is fine (false positive = local inference).
-    ("financial", [
-        r"\bportfolio\b",
-        r"\bposition[s]?\b",
-        r"\bpnl\b",
-        r"p&l\b",
-        r"trading signal",
-        r"wallet.{0,10}address",
-        r"seed phrase",           # wallet recovery phrase — never externalize
-        r"private.{0,10}wallet",
-        r"\bbalance[=:\s]\s*\$",
-        r"\$\s*\d[\d,]+[kKmM]?\b",  # catches "$12,500" / "$5k" — position sizes
-        r"\bdrawdown\b.*\d",      # numeric drawdown → reveals account health
-        r"account.{0,20}balance",
-    ]),
-
+    (
+        "financial",
+        [
+            r"\bportfolio\b",
+            r"\bposition[s]?\b",
+            r"\bpnl\b",
+            r"p&l\b",
+            r"trading signal",
+            r"wallet.{0,10}address",
+            r"seed phrase",  # wallet recovery phrase — never externalize
+            r"private.{0,10}wallet",
+            r"\bbalance[=:\s]\s*\$",
+            r"\$\s*\d[\d,]+[kKmM]?\b",  # catches "$12,500" / "$5k" — position sizes
+            r"\bdrawdown\b.*\d",  # numeric drawdown → reveals account health
+            r"account.{0,20}balance",
+        ],
+    ),
     # Personal / customer data (THO + general)
-    ("personal", [
-        r"\bpin\b.{0,10}\d{4}",
-        r"social security",
-        r"ssn\b",
-        r"\bcustomer.{0,20}name\b",
-        r"\baccount.{0,20}id\b",
-        r"tho.{0,10}customer",
-        r"tho.{0,10}lead",
-        r"firestore.{0,10}customer",
-        r"enrolled.{0,20}customer",
-        r"\b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b",   # US phone pattern
-        r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b",  # email
-    ]),
-
+    (
+        "personal",
+        [
+            r"\bpin\b.{0,10}\d{4}",
+            r"social security",
+            r"ssn\b",
+            r"\bcustomer.{0,20}name\b",
+            r"\baccount.{0,20}id\b",
+            r"tho.{0,10}customer",
+            r"tho.{0,10}lead",
+            r"firestore.{0,10}customer",
+            r"enrolled.{0,20}customer",
+            r"\b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b",  # US phone pattern
+            r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b",  # email
+        ],
+    ),
     # System internals (Tailscale mesh, API endpoints, service configs)
     # Hides the private topology of the mesh — node IPs + env var names can
     # be used together to target the Mac/Windows/Pi nodes from outside.
-    ("system_internals", [
-        r"100\.\d{1,3}\.\d{1,3}\.\d{1,3}",   # Tailscale CGNAT = our private mesh
-        r"MOONSHOT_API_KEY",
-        r"OPENAI_API_KEY",
-        r"TELEGRAM_BOT_TOKEN",
-        r"OPENROUTER_API_KEY",
-        r"com\.sapphire\.",                    # LaunchAgent IDs reveal service layout
-        r"launchagents",
-        r"tailscale\s+(?:up|down|status)",
-    ]),
+    (
+        "system_internals",
+        [
+            r"100\.\d{1,3}\.\d{1,3}\.\d{1,3}",  # Tailscale CGNAT = our private mesh
+            r"MOONSHOT_API_KEY",
+            r"OPENAI_API_KEY",
+            r"TELEGRAM_BOT_TOKEN",
+            r"OPENROUTER_API_KEY",
+            r"com\.sapphire\.",  # LaunchAgent IDs reveal service layout
+            r"launchagents",
+            r"tailscale\s+(?:up|down|status)",
+        ],
+    ),
 ]
 
 # Compile each group into a single pattern
 _COMPILED: list[tuple[str, re.Pattern]] = [
-    (group, re.compile("|".join(patterns), re.IGNORECASE))
-    for group, patterns in _GROUPS
+    (group, re.compile("|".join(patterns), re.IGNORECASE)) for group, patterns in _GROUPS
 ]
 
 
 # ─── Public API ───────────────────────────────────────────────────────────────
+
 
 @dataclass
 class SensitivityResult:
     """Result of a sensitivity classification."""
 
     safe: bool
-    reason: str = ""          # non-empty if sensitive, e.g. "credentials: api_key"
-    matched_group: str = ""   # group name that triggered, e.g. "credentials"
+    reason: str = ""  # non-empty if sensitive, e.g. "credentials: api_key"
+    matched_group: str = ""  # group name that triggered, e.g. "credentials"
 
     @property
     def sensitive(self) -> bool:
@@ -117,7 +126,9 @@ def classify(text: str) -> SensitivityResult:
         m = pattern.search(text)
         if m:
             snippet = m.group(0)[:40].strip()
-            return SensitivityResult(safe=False, reason=f"{group}: {snippet!r}", matched_group=group)
+            return SensitivityResult(
+                safe=False, reason=f"{group}: {snippet!r}", matched_group=group
+            )
     return SensitivityResult(safe=True)
 
 
@@ -152,6 +163,7 @@ def is_sensitive(text_or_messages: str | list) -> SensitivityResult:
 
 # ─── Convenience helpers ──────────────────────────────────────────────────────
 
+
 def safe_for_cloud(messages: list) -> bool:
     """Return True if messages are safe to route to Kimi Cloud / any external API."""
     return is_sensitive(messages).safe
@@ -171,7 +183,6 @@ if __name__ == "__main__":
         ("What is a moving average?", True),
         ("Summarize the Sapphire architecture", True),
         ("Write a function to parse JSON in Python", True),
-
         # Should be SENSITIVE
         ("My MOONSHOT_API_KEY is sk-abc123", False),
         ("The customer PIN is 4832", False),
@@ -195,6 +206,8 @@ if __name__ == "__main__":
             passed += 1
         else:
             failed += 1
-        print(f"{status} {'SAFE' if result.safe else f'SENSITIVE ({result.reason})':<50}  {text[:60]}")
+        print(
+            f"{status} {'SAFE' if result.safe else f'SENSITIVE ({result.reason})':<50}  {text[:60]}"
+        )
 
     print(f"\n{passed}/{passed+failed} passed")

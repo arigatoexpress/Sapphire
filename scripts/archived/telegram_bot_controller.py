@@ -6,7 +6,7 @@ Handles incoming Telegram commands and controls the trading daemon.
 
 Usage:
     python3 telegram_bot_controller.py
-    
+
 Commands:
     /start - Show welcome message
     /status - Check trading system status
@@ -82,7 +82,7 @@ def get_bot_updates(offset: int = None) -> list[dict]:
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates"
     if offset:
         url += f"?offset={offset}"
-    
+
     try:
         req = urllib.request.Request(url)
         with urllib.request.urlopen(req, timeout=30) as resp:
@@ -102,7 +102,7 @@ def send_message(chat_id: str, text: str, parse_mode: str | None = "HTML") -> di
     }
     if parse_mode:
         data["parse_mode"] = parse_mode
-    
+
     try:
         req = urllib.request.Request(
             url,
@@ -210,16 +210,16 @@ def handle_command(message: dict) -> str:
     """Handle a Telegram command."""
     text = message.get("text", "").strip()
     chat_id = message["chat"]["id"]
-    
+
     if not text.startswith("/"):
         return None
-    
+
     parts = text.split()
     command = parts[0].lower()
     args = parts[1:]
-    
+
     state = get_daemon_state()
-    
+
     if command == "/start":
         return (
             "🤖 <b>Autonomous Trading Bot</b>\n\n"
@@ -236,7 +236,7 @@ def handle_command(message: dict) -> str:
             "/help - Show this help\n\n"
             "Send plain text to chat with Kimi."
         )
-    
+
     elif command == "/help":
         return (
             "<b>Available Commands:</b>\n\n"
@@ -252,12 +252,12 @@ def handle_command(message: dict) -> str:
             "💬 <b>plain text</b> - Ask Kimi directly\n"
             "❓ <b>/help</b> - Show this message"
         )
-    
+
     elif command == "/status":
         running = "✅ Running" if state.get("running") else "❌ Stopped"
         paused = "⏸️ Paused" if state.get("paused") else "▶️ Active"
         mode = state.get("settings", {}).get("trading_mode", "unknown")
-        
+
         return (
             f"📊 <b>System Status</b>\n\n"
             f"Status: {running}\n"
@@ -267,22 +267,22 @@ def handle_command(message: dict) -> str:
             f"Total Trades: {state.get('total_trades', 0)}\n"
             f"Started: {state.get('started_at', 'N/A')[:19] if state.get('started_at') else 'N/A'}"
         )
-    
+
     elif command == "/pause":
         if update_daemon_state({"paused": True}):
             return "⏸️ <b>Trading Paused</b>\n\nNo new trades will be executed."
         return "❌ Failed to pause trading"
-    
+
     elif command == "/resume":
         if update_daemon_state({"paused": False}):
             return "▶️ <b>Trading Resumed</b>\n\nTrades will now be executed!"
         return "❌ Failed to resume trading"
-    
+
     elif command == "/mode":
         mode = state.get("settings", {}).get("trading_mode", "unknown")
         emoji = "🚀" if mode == "live" else "📄"
         return f"{emoji} <b>Trading Mode:</b> {mode.upper()}"
-    
+
     elif command == "/stats":
         return (
             f"📈 <b>Trading Statistics</b>\n\n"
@@ -292,7 +292,7 @@ def handle_command(message: dict) -> str:
             f"Trades Today: {state.get('trades_today', 0)}\n"
             f"Last Trade: {state.get('last_trade_at', 'N/A')[:19] if state.get('last_trade_at') else 'N/A'}"
         )
-    
+
     elif command == "/trade":
         if len(args) < 3:
             return (
@@ -355,7 +355,7 @@ def handle_command(message: dict) -> str:
             if isinstance(detail, dict) and detail.get("detail"):
                 detail_text = f"\nDetail: {str(detail.get('detail'))[:220]}"
             return f"❌ <b>Trade Dispatch Failed</b>\n\nError: {error[:200]}{detail_text}"
-    
+
     else:
         return f"❓ Unknown command: {command}\nUse /help for available commands"
 
@@ -368,27 +368,27 @@ def main():
     print("Monitoring for commands...")
     print("Press Ctrl+C to stop")
     print("=" * 60)
-    
+
     offset = None
-    
+
     try:
         while True:
             updates = get_bot_updates(offset)
-            
+
             for update in updates:
                 # Update offset
                 offset = update["update_id"] + 1
-                
+
                 # Process message
                 if "message" in update:
                     message = update["message"]
                     chat_id = message["chat"]["id"]
                     message_text = message.get("text", "").strip()
-                    
+
                     # Check if it's a command
                     if message_text.startswith("/"):
                         response = handle_command(message)
-                        
+
                         if response:
                             send_message(chat_id, response)
                             print(f"[{datetime.now().isoformat()}] Command from {chat_id}: {message_text}")
@@ -397,9 +397,9 @@ def main():
                         response = query_kimi(message_text)
                         send_message(chat_id, response, parse_mode=None)
                         print(f"[{datetime.now().isoformat()}] Kimi chat from {chat_id}: {message_text[:80]}")
-            
+
             time.sleep(1)
-            
+
     except KeyboardInterrupt:
         print("\nStopping bot controller...")
 

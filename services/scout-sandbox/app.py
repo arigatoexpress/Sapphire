@@ -18,6 +18,7 @@ from typing import Any
 # Configuration
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class SandboxConfig:
     gtm_enabled: bool = False
@@ -28,16 +29,20 @@ class SandboxConfig:
     @classmethod
     def from_env(cls) -> SandboxConfig:
         return cls(
-            gtm_enabled=os.getenv("SCOUT_SANDBOX_GTM_ENABLED", "false").lower() in ("true", "1", "yes"),
-            gtm_require_token=os.getenv("SCOUT_SANDBOX_GTM_REQUIRE_TOKEN", "true").lower() in ("true", "1", "yes"),
+            gtm_enabled=os.getenv("SCOUT_SANDBOX_GTM_ENABLED", "false").lower()
+            in ("true", "1", "yes"),
+            gtm_require_token=os.getenv("SCOUT_SANDBOX_GTM_REQUIRE_TOKEN", "true").lower()
+            in ("true", "1", "yes"),
             gtm_api_token=os.getenv("SCOUT_SANDBOX_GTM_API_TOKEN", ""),
-            scrapling_enabled=os.getenv("SCOUT_SANDBOX_SCRAPLING_ENABLED", "false").lower() in ("true", "1", "yes"),
+            scrapling_enabled=os.getenv("SCOUT_SANDBOX_SCRAPLING_ENABLED", "false").lower()
+            in ("true", "1", "yes"),
         )
 
 
 # ---------------------------------------------------------------------------
 # Dispatch request model
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class DispatchRequest:

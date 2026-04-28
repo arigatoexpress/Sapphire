@@ -109,7 +109,9 @@ def test_record_task_result_write_is_opt_in(tmp_path) -> None:
         artifact_dir=tmp_path,
         write=True,
     )
-    rows = [json.loads(line) for line in (tmp_path / artifacts.RESULT_FILE).read_text().splitlines()]
+    rows = [
+        json.loads(line) for line in (tmp_path / artifacts.RESULT_FILE).read_text().splitlines()
+    ]
     assert written["write_enabled"] is True
     assert rows[0]["status"] == "blocked"
 
@@ -131,16 +133,21 @@ def test_cli_preview_commands_do_not_write(capsys, tmp_path, monkeypatch) -> Non
     assert snapshot["write_enabled"] is False
     assert snapshot["records"] >= 10
 
-    assert artifacts.cli([
-        "lease",
-        "--agent-id",
-        "windows-gpu",
-        "--target-runtime",
-        "windows-gpu",
-        "--capability",
-        "reason",
-        "--pretty",
-    ]) == 0
+    assert (
+        artifacts.cli(
+            [
+                "lease",
+                "--agent-id",
+                "windows-gpu",
+                "--target-runtime",
+                "windows-gpu",
+                "--capability",
+                "reason",
+                "--pretty",
+            ]
+        )
+        == 0
+    )
     lease = json.loads(capsys.readouterr().out)
     assert lease["write_enabled"] is False
     assert lease["safety"]["dry_run_dispatch_only"] is True

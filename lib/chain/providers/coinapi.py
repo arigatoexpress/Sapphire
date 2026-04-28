@@ -26,9 +26,7 @@ class CoinAPIClient:
     def exchanges(self) -> Any:
         return http_get(f"{self._BASE}/exchanges", headers=self._headers())
 
-    def ohlcv_latest(
-        self, symbol_id: str, period: str = "1HRS", limit: int = 100
-    ) -> Any:
+    def ohlcv_latest(self, symbol_id: str, period: str = "1HRS", limit: int = 100) -> Any:
         """Latest OHLCV for a symbol_id like ``BITSTAMP_SPOT_BTC_USD``."""
         return http_get(
             f"{self._BASE}/ohlcv/{symbol_id}/latest",

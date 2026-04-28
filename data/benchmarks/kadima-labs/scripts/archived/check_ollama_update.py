@@ -19,22 +19,22 @@ def check_ollama_version():
         )
         version_output = result.stdout + result.stderr
         print(f"Ollama version output: {version_output.strip()}")
-        
+
         # Extract version number
         match = re.search(r'(\d+)\.(\d+)\.(\d+)', version_output)
         if match:
             major = int(match.group(1))
             minor = int(match.group(2))
             patch = int(match.group(3))
-            
+
             version_tuple = (major, minor, patch)
             print(f"Detected version: {major}.{minor}.{patch}")
-            
+
             return version_tuple
     except Exception as e:
         print(f"Error checking version: {e}")
         return None
-    
+
     return None
 
 
@@ -42,9 +42,9 @@ def check_qwen35_support(version_tuple):
     """Check if version supports Qwen 3.5"""
     if not version_tuple:
         return False
-    
+
     major, minor, patch = version_tuple
-    
+
     # Qwen 3.5 requires Ollama 0.17.5+
     if major > 0:
         return True
@@ -52,7 +52,7 @@ def check_qwen35_support(version_tuple):
         return True
     if major == 0 and minor == 17 and patch >= 5:
         return True
-    
+
     return False
 
 
@@ -61,13 +61,13 @@ def main():
     print("Ollama Version & Qwen 3.5 Support Checker")
     print("=" * 60)
     print()
-    
+
     version = check_ollama_version()
-    
+
     if version:
         major, minor, patch = version
         print(f"Current version: {major}.{minor}.{patch}")
-        
+
         if check_qwen35_support(version):
             print()
             print("[SUCCESS] Qwen 3.5 is SUPPORTED!")

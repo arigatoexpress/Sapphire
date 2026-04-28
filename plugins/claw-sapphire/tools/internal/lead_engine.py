@@ -44,15 +44,18 @@ def _fetch_json(url: str, timeout: int = 10) -> dict | None:
 def _infer_with_ollama(prompt: str, model: str = "hermes3:8b") -> str:
     """Quick inference via the proxy for lead analysis."""
     try:
-        payload = json.dumps({
-            "model": model,
-            "messages": [{"role": "user", "content": prompt}],
-            "stream": False,
-            "options": {"temperature": 0.3, "num_predict": 500},
-        }).encode()
+        payload = json.dumps(
+            {
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "stream": False,
+                "options": {"temperature": 0.3, "num_predict": 500},
+            }
+        ).encode()
         req = urllib.request.Request(
             "http://127.0.0.1:11435/v1/chat/completions",
-            data=payload, headers={"Content-Type": "application/json"},
+            data=payload,
+            headers={"Content-Type": "application/json"},
         )
         with urllib.request.urlopen(req, timeout=60) as r:
             data = json.loads(r.read())
@@ -107,8 +110,9 @@ Return a JSON object with: business_name, industry, services, target_customers, 
     return {"success": True, "icp": icp, "source": url or "description"}
 
 
-def action_discover(industry: str = None, region: str = "houston_tx",
-                    keywords: list = None, limit: int = 20) -> dict:
+def action_discover(
+    industry: str = None, region: str = "houston_tx", keywords: list = None, limit: int = 20
+) -> dict:
     """Find matching businesses from Regional Intel data."""
     leads = []
 
@@ -138,14 +142,16 @@ def action_discover(industry: str = None, region: str = "houston_tx",
 
             # No filter = return all; with filter = only matches
             if match or (not industry and not keywords):
-                leads.append({
-                    "type": "business",
-                    "name": name,
-                    "category": category or biz.get("categories", ""),
-                    "address": biz.get("address", ""),
-                    "source": "regional-intel",
-                    "region": region,
-                })
+                leads.append(
+                    {
+                        "type": "business",
+                        "name": name,
+                        "category": category or biz.get("categories", ""),
+                        "address": biz.get("address", ""),
+                        "source": "regional-intel",
+                        "region": region,
+                    }
+                )
 
         # Check permits — search ALL text fields against ALL keywords
         all_terms = [t.lower() for t in (keywords or [])]
@@ -157,43 +163,58 @@ def action_discover(industry: str = None, region: str = "houston_tx",
         for permit in permits:
             searchable = " ".join(str(v) for v in permit.values()).lower()
             if not all_terms or any(t in searchable for t in all_terms):
-                leads.append({
-                    "type": "permit",
-                    "name": permit.get("applicant", permit.get("contractor", permit.get("address", "Unknown"))),
-                    "category": permit.get("permit_type", permit.get("work_type", "construction")),
-                    "description": permit.get("description", permit.get("address", ""))[:120],
-                    "source": "permits",
-                    "region": region,
-                })
+                leads.append(
+                    {
+                        "type": "permit",
+                        "name": permit.get(
+                            "applicant", permit.get("contractor", permit.get("address", "Unknown"))
+                        ),
+                        "category": permit.get(
+                            "permit_type", permit.get("work_type", "construction")
+                        ),
+                        "description": permit.get("description", permit.get("address", ""))[:120],
+                        "source": "permits",
+                        "region": region,
+                    }
+                )
 
         # Organizations — search broadly
         for org in orgs:
-            searchable = " ".join(filter(None, [
-                org.get("name", ""),
-                str(org.get("categories", "")),
-                org.get("description", ""),
-                org.get("address", ""),
-            ])).lower()
+            searchable = " ".join(
+                filter(
+                    None,
+                    [
+                        org.get("name", ""),
+                        str(org.get("categories", "")),
+                        org.get("description", ""),
+                        org.get("address", ""),
+                    ],
+                )
+            ).lower()
             if not all_terms or any(t in searchable for t in all_terms):
-                leads.append({
-                    "type": "organization",
-                    "name": org.get("name", "Unknown"),
-                    "category": str(org.get("categories", ""))[:50],
-                    "source": "regional-intel",
-                    "region": region,
-                })
+                leads.append(
+                    {
+                        "type": "organization",
+                        "name": org.get("name", "Unknown"),
+                        "category": str(org.get("categories", ""))[:50],
+                        "source": "regional-intel",
+                        "region": region,
+                    }
+                )
 
         # Contacts (potential decision makers)
         for contact in contacts:
             searchable = " ".join(str(v) for v in contact.values()).lower()
             if not all_terms or any(t in searchable for t in all_terms):
-                leads.append({
-                    "type": "contact",
-                    "name": contact.get("name", "Unknown"),
-                    "category": contact.get("title", contact.get("organization", "")),
-                    "source": "regional-intel",
-                    "region": region,
-                })
+                leads.append(
+                    {
+                        "type": "contact",
+                        "name": contact.get("name", "Unknown"),
+                        "category": contact.get("title", contact.get("organization", "")),
+                        "source": "regional-intel",
+                        "region": region,
+                    }
+                )
 
     return {
         "success": True,
@@ -221,17 +242,20 @@ Goal: Introduce our services and schedule a brief call.
 Tone: Professional, warm, concise. No fluff. Reference something specific about them."""
 
         msg = _infer_with_ollama(prompt, model="hermes3:8b")  # Reliable model for outreach drafts
-        messages.append({
-            "lead": name,
-            "category": category,
-            "message": msg.strip(),
-        })
+        messages.append(
+            {
+                "lead": name,
+                "category": category,
+                "message": msg.strip(),
+            }
+        )
 
     return {"success": True, "messages": messages}
 
 
-def action_pipeline(url: str = None, description: str = None,
-                    region: str = "houston_tx", limit: int = 10) -> dict:
+def action_pipeline(
+    url: str = None, description: str = None, region: str = "houston_tx", limit: int = 10
+) -> dict:
     """Full pipeline: analyze → discover → outreach."""
     # Step 1: Analyze
     analysis = action_analyze(url=url, description=description)
@@ -243,8 +267,9 @@ def action_pipeline(url: str = None, description: str = None,
     if isinstance(keywords, str):
         keywords = [keywords]
 
-    discovery = action_discover(industry=industry, region=region,
-                               keywords=keywords[:5], limit=limit)
+    discovery = action_discover(
+        industry=industry, region=region, keywords=keywords[:5], limit=limit
+    )
 
     # Step 3: Outreach (top 3 leads only)
     top_leads = discovery.get("leads", [])[:3]

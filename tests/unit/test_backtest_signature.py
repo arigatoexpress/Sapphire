@@ -1,4 +1,5 @@
 """Regression tests for backtest constructor compatibility and short sweeps."""
+
 from __future__ import annotations
 
 import json
@@ -22,14 +23,16 @@ def _wave_bars(n: int = 150, start: float = 100.0) -> list[dict]:
     for i in range(n):
         drift = 1.2 if (i // 20) % 2 == 0 else -1.0
         price = max(10.0, price + drift + (0.4 if i % 3 == 0 else -0.2))
-        bars.append({
-            "date": f"2026-02-{(i % 28) + 1:02d}",
-            "open": price * 0.999,
-            "high": price * 1.01,
-            "low": price * 0.99,
-            "close": price,
-            "volume": 1_000_000,
-        })
+        bars.append(
+            {
+                "date": f"2026-02-{(i % 28) + 1:02d}",
+                "open": price * 0.999,
+                "high": price * 1.01,
+                "low": price * 0.99,
+                "close": price,
+                "volume": 1_000_000,
+            }
+        )
     return bars
 
 
@@ -78,11 +81,16 @@ def _rising_bars(n: int = 30, start: float = 100.0) -> list:
     price = start
     for i in range(n):
         nxt = price * 1.01
-        bars.append(Bar(
-            ts=base_ts + timedelta(days=i),
-            open=price, high=nxt * 1.001, low=price * 0.999,
-            close=nxt, volume=1_000_000,
-        ))
+        bars.append(
+            Bar(
+                ts=base_ts + timedelta(days=i),
+                open=price,
+                high=nxt * 1.001,
+                low=price * 0.999,
+                close=nxt,
+                volume=1_000_000,
+            )
+        )
         price = nxt
     return bars
 
@@ -118,14 +126,16 @@ def test_backtest_engine_run_returns_fraction_units():
     )
     # max_drawdown_pct: same fraction contract. Rising bars → essentially zero
     # drawdown, but cap at 1.0 to catch percent-scale leaks.
-    assert 0.0 <= report.max_drawdown_pct < 1.0, (
-        f"max_drawdown_pct must be fraction, got {report.max_drawdown_pct}"
-    )
+    assert (
+        0.0 <= report.max_drawdown_pct < 1.0
+    ), f"max_drawdown_pct must be fraction, got {report.max_drawdown_pct}"
 
 
 def test_run_strategies_days_7_still_writes_artifact(tmp_path, monkeypatch):
     out_dir = tmp_path / "data" / "backtests" / "strategies"
-    monkeypatch.setattr(run_strategies, "load_yfinance_ohlcv", lambda symbol, days: _synthetic_bars(symbol, days))
+    monkeypatch.setattr(
+        run_strategies, "load_yfinance_ohlcv", lambda symbol, days: _synthetic_bars(symbol, days)
+    )
     monkeypatch.setattr(run_strategies, "_ROOT", tmp_path)
     monkeypatch.setattr(strategies_mod, "RESULTS_DIR", out_dir)
     monkeypatch.setenv("GITHUB_SHA", "abc123")

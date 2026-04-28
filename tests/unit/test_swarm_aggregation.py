@@ -324,8 +324,12 @@ def test_max_ideas_per_symbol(swarm):
 
 def test_aggregate_target_and_stop(swarm):
     """Average target and stop should be weighted by reputation."""
-    swarm.submit_idea("BOT_A", "BTC", "LONG", confidence=0.8, target_price=50000.0, stop_loss=45000.0)
-    swarm.submit_idea("BOT_B", "BTC", "LONG", confidence=0.6, target_price=52000.0, stop_loss=44000.0)
+    swarm.submit_idea(
+        "BOT_A", "BTC", "LONG", confidence=0.8, target_price=50000.0, stop_loss=45000.0
+    )
+    swarm.submit_idea(
+        "BOT_B", "BTC", "LONG", confidence=0.6, target_price=52000.0, stop_loss=44000.0
+    )
     result = swarm.aggregate("BTC")
     # Both bots same default rep → target/stop should be between the two values
     assert 49000 < result["avg_target_price"] < 53000

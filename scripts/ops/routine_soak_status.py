@@ -83,9 +83,7 @@ def build_report(
             ),
             "collecting": sum(1 for row in rows if row["gate_state"] == "collecting"),
             "blocked": sum(1 for row in rows if row["gate_state"] == "blocked"),
-            "external_disabled": sum(
-                1 for row in rows if row["gate_state"] == "external_disabled"
-            ),
+            "external_disabled": sum(1 for row in rows if row["gate_state"] == "external_disabled"),
         },
         "routines": rows,
     }
@@ -185,7 +183,9 @@ def sanitize_run(run: dict[str, Any]) -> dict[str, Any]:
 
 def summarize_runs(runs: list[dict[str, Any]], *, started_at: datetime | None) -> dict[str, Any]:
     runs_since_start = [
-        run for run in runs if started_at is None or parse_github_time(run["created_at"]) >= started_at
+        run
+        for run in runs
+        if started_at is None or parse_github_time(run["created_at"]) >= started_at
     ]
     by_event = Counter(run["event"] or "unknown" for run in runs_since_start)
     by_conclusion = Counter(run["conclusion"] or "unknown" for run in runs_since_start)
@@ -195,7 +195,9 @@ def summarize_runs(runs: list[dict[str, Any]], *, started_at: datetime | None) -
     return {
         "total_since_start": len(runs_since_start),
         "scheduled_total_since_start": len(scheduled),
-        "scheduled_success_since_start": sum(1 for run in scheduled if run["conclusion"] == "success"),
+        "scheduled_success_since_start": sum(
+            1 for run in scheduled if run["conclusion"] == "success"
+        ),
         "manual_total_since_start": len(manual),
         "manual_success_since_start": sum(1 for run in manual if run["conclusion"] == "success"),
         "by_event": dict(sorted(by_event.items())),

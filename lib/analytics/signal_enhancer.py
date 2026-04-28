@@ -36,11 +36,11 @@ class EnhancedSignal:
     """Wraps a raw signal with regime-aware adjustments."""
 
     symbol: str
-    action: str          # buy | sell | long | short | close
-    direction: str       # long | short | flat
+    action: str  # buy | sell | long | short | close
+    direction: str  # long | short | flat
     original_confidence: float
     adjusted_confidence: float
-    regime: str          # RISK_ON | RISK_OFF | TRANSITION | UNKNOWN
+    regime: str  # RISK_ON | RISK_OFF | TRANSITION | UNKNOWN
     regime_score: float
     regime_confidence: float
 
@@ -70,11 +70,11 @@ class EnhancedSignal:
     kronos_confidence: float | None = None
 
     # GMM regime (complementary to chain intelligence — ML-derived)
-    gmm_regime: str | None = None          # trend | mean_reverting | crisis | unknown
-    gmm_regime_prob: float | None = None   # probability of the current GMM state
+    gmm_regime: str | None = None  # trend | mean_reverting | crisis | unknown
+    gmm_regime_prob: float | None = None  # probability of the current GMM state
 
     # VPIN flow toxicity
-    vpin: float | None = None              # 0–1; > 0.7 = high informed-trading risk
+    vpin: float | None = None  # 0–1; > 0.7 = high informed-trading risk
 
 
 # ---------------------------------------------------------------------------
@@ -86,8 +86,8 @@ class SignalEnhancer:
     """Applies regime, funding, and correlation-aware adjustments to signals."""
 
     # Confidence adjustment factors
-    REGIME_PENALTY = 0.80        # 20% reduction when signal contradicts regime
-    REGIME_BOOST = 1.05          # small boost when signal aligns with strong regime
+    REGIME_PENALTY = 0.80  # 20% reduction when signal contradicts regime
+    REGIME_BOOST = 1.05  # small boost when signal aligns with strong regime
     MIN_CONFIDENCE = 0.05
     MAX_CONFIDENCE = 0.99
 
@@ -123,6 +123,7 @@ class SignalEnhancer:
             chain_snap = None
             try:
                 from lib.chain import ChainIntelligence
+
                 ci = ChainIntelligence()
                 chain_snap = ci.snapshot()
                 regime = chain_snap.get("regime", {})
@@ -147,12 +148,12 @@ class SignalEnhancer:
             # Correlation (decorrelation events + BTC↔SPY pair snapshot)
             try:
                 from lib.analytics.correlation import CorrelationEngine
+
                 eng = CorrelationEngine()
                 matrix = eng.build_matrix(window_days=30)
                 events = eng.detect_decorrelations(matrix)
                 state["decorrelations"] = [
-                    {"pair": list(e.pair), "severity": e.severity, "note": e.note}
-                    for e in events
+                    {"pair": list(e.pair), "severity": e.severity, "note": e.note} for e in events
                 ]
                 idx = {s: i for i, s in enumerate(matrix.symbols)}
                 if "BTC" in idx and "SPY" in idx:
@@ -165,6 +166,7 @@ class SignalEnhancer:
             # Fear & Greed composite (reuses the chain snapshot — free if loaded)
             try:
                 from lib.analytics.sentiment import compute_sentiment
+
                 s = compute_sentiment(chain_snapshot=chain_snap)
                 state["fear_greed"] = int(s.score)
             except Exception as e:
@@ -173,6 +175,7 @@ class SignalEnhancer:
             # Market intelligence (stablecoins, econ calendar, liquidation, order flow)
             try:
                 from lib.intel.market_intelligence import load_latest_snapshot
+
                 state["market_intel"] = load_latest_snapshot() or {}
             except Exception as e:
                 log.debug("market intelligence unavailable: %s", e)
@@ -181,6 +184,7 @@ class SignalEnhancer:
             # GMM regime detection (sklearn-based, complements chain intelligence)
             try:
                 from lib.analytics.regime import get_detector
+
                 detector = get_detector(n_components=3)
                 if detector is not None:
                     pred = detector.get_regime("BTC-USD", days=90)
@@ -195,6 +199,7 @@ class SignalEnhancer:
             # VPIN flow toxicity for BTC (market proxy — cached separately per symbol)
             try:
                 from lib.analytics.vpin import get_vpin_cache
+
                 vpin_reading = get_vpin_cache().get("BTC")
                 state["btc_vpin"] = vpin_reading
             except Exception as e:
@@ -204,7 +209,16 @@ class SignalEnhancer:
             try:
                 import json
                 from pathlib import Path as _P
-                pred_path = _P.home() / "Code" / "Sapphire" / "data" / "intelligence" / "latest" / "predictions.json"
+
+                pred_path = (
+                    _P.home()
+                    / "Code"
+                    / "Sapphire"
+                    / "data"
+                    / "intelligence"
+                    / "latest"
+                    / "predictions.json"
+                )
                 if pred_path.exists():
                     data = json.loads(pred_path.read_text())
                     predictions = data.get("predictions") if isinstance(data, dict) else data
@@ -238,9 +252,9 @@ class SignalEnhancer:
     # ADX thresholds (Wilder convention)
     ADX_TRENDING_MIN = 25.0
     ADX_RANGING_MAX = 20.0
-    ADX_TRANSITION_PENALTY = 0.85   # 15% reduction in transition zone
-    ADX_TREND_BOOST = 1.10          # 10% boost when trend + direction align
-    ADX_MEANREV_PENALTY = 0.80      # 20% penalty for momentum-style longs in ranging regime
+    ADX_TRANSITION_PENALTY = 0.85  # 15% reduction in transition zone
+    ADX_TREND_BOOST = 1.10  # 10% boost when trend + direction align
+    ADX_MEANREV_PENALTY = 0.80  # 20% penalty for momentum-style longs in ranging regime
 
     def enhance(
         self,
@@ -283,18 +297,26 @@ class SignalEnhancer:
             if regime == "RISK_OFF":
                 adjusted *= self.REGIME_PENALTY
                 flags.append("regime_contradiction")
-                reasons.append(f"long in RISK_OFF (score {rscore:+.2f}) — confidence ×{self.REGIME_PENALTY}")
+                reasons.append(
+                    f"long in RISK_OFF (score {rscore:+.2f}) — confidence ×{self.REGIME_PENALTY}"
+                )
             elif regime == "RISK_ON" and rconf >= 0.5:
                 adjusted *= self.REGIME_BOOST
-                reasons.append(f"long aligned with RISK_ON (conf {rconf:.0%}) — confidence ×{self.REGIME_BOOST}")
+                reasons.append(
+                    f"long aligned with RISK_ON (conf {rconf:.0%}) — confidence ×{self.REGIME_BOOST}"
+                )
         elif direction == "short":
             if regime == "RISK_ON":
                 adjusted *= self.REGIME_PENALTY
                 flags.append("regime_contradiction")
-                reasons.append(f"short in RISK_ON (score {rscore:+.2f}) — confidence ×{self.REGIME_PENALTY}")
+                reasons.append(
+                    f"short in RISK_ON (score {rscore:+.2f}) — confidence ×{self.REGIME_PENALTY}"
+                )
             elif regime == "RISK_OFF" and rconf >= 0.5:
                 adjusted *= self.REGIME_BOOST
-                reasons.append(f"short aligned with RISK_OFF (conf {rconf:.0%}) — confidence ×{self.REGIME_BOOST}")
+                reasons.append(
+                    f"short aligned with RISK_OFF (conf {rconf:.0%}) — confidence ×{self.REGIME_BOOST}"
+                )
 
         # --- Funding extremes ------------------------------------------------
         funding_rate: float | None = None
@@ -394,9 +416,7 @@ class SignalEnhancer:
             if direction == "long":
                 adjusted *= 0.88
                 flags.append("gmm_crisis_regime")
-                reasons.append(
-                    f"GMM detects crisis regime (prob {gmm_prob:.0%}) — penalising long"
-                )
+                reasons.append(f"GMM detects crisis regime (prob {gmm_prob:.0%}) — penalising long")
             elif direction == "short" and "regime_contradiction" not in flags:
                 adjusted *= 1.03
                 reasons.append(f"GMM crisis regime (prob {gmm_prob:.0%}) aligns with short")
@@ -446,6 +466,7 @@ class SignalEnhancer:
         if bars:
             try:
                 from lib.analytics.indicators import classify_adx_regime, compute_adx
+
                 highs = bars.get("highs") or bars.get("high") or []
                 lows = bars.get("lows") or bars.get("low") or []
                 closes = bars.get("closes") or bars.get("close") or []
@@ -520,7 +541,8 @@ class SignalEnhancer:
             kronos_confidence=round(kronos_conf, 3) if kronos_conf is not None else None,
             gmm_regime=state.get("gmm_regime"),
             gmm_regime_prob=round(float(state["gmm_regime_prob"]), 3)
-                if state.get("gmm_regime_prob") is not None else None,
+            if state.get("gmm_regime_prob") is not None
+            else None,
             vpin=round(vpin_score, 4) if vpin_score is not None else None,
         )
 

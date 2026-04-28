@@ -82,11 +82,11 @@ def _crypto_angle() -> tuple[str, list[str]]:
             f"{port['open_positions']} open."
         )
     else:
-        tracked = ", ".join(sorted(preds["by_symbol"])) if preds["by_symbol"] else "our live markets"
+        tracked = (
+            ", ".join(sorted(preds["by_symbol"])) if preds["by_symbol"] else "our live markets"
+        )
         line = (
-            small_sample_accuracy_notice(
-                preds, subject="Sapphire's 6-factor TA model"
-            )
+            small_sample_accuracy_notice(preds, subject="Sapphire's 6-factor TA model")
             + f" Coverage is live across {tracked}. "
             f"Paper book at {port['pnl_pct']:+.2f}% on $100K, "
             f"{port['open_positions']} open."
@@ -143,13 +143,15 @@ SUBJECT_BY_ANGLE = {
 def build_bd_message(lead: Lead, angle: AngleKind = "crypto_perf") -> OutreachDraft:
     data_line, sources = ANGLE_BUILDERS[angle]()
     ask = ASK_BY_ANGLE[angle]
-    body = "\n\n".join([
-        _salutation(lead),
-        _context_line(lead),
-        data_line,
-        ask,
-        "— Sapphire",
-    ])
+    body = "\n\n".join(
+        [
+            _salutation(lead),
+            _context_line(lead),
+            data_line,
+            ask,
+            "— Sapphire",
+        ]
+    )
     return OutreachDraft(
         lead=lead,
         angle=angle,

@@ -20,6 +20,7 @@ Usage:
     # Check for regime shifts as a standalone pass:
     alerts = eng.scan_alerts()
 """
+
 from __future__ import annotations
 
 import json
@@ -49,16 +50,16 @@ DEFAULT_STATE_PATH = Path("data/decisions/_last_regime.json")
 class Decision:
     """Outcome of evaluating a signal against world state."""
 
-    signal_id:            str
-    symbol:               str
-    direction:            str
-    original_confidence:  float
-    adjusted_confidence:  float
-    verdict:              str            # ALLOW | REDUCE | BLOCK | ALERT_ONLY
-    reasons:              list[str] = field(default_factory=list)
-    rules_fired:          list[str] = field(default_factory=list)
-    world_snapshot:       dict     = field(default_factory=dict)
-    timestamp:            str      = ""
+    signal_id: str
+    symbol: str
+    direction: str
+    original_confidence: float
+    adjusted_confidence: float
+    verdict: str  # ALLOW | REDUCE | BLOCK | ALERT_ONLY
+    reasons: list[str] = field(default_factory=list)
+    rules_fired: list[str] = field(default_factory=list)
+    world_snapshot: dict = field(default_factory=dict)
+    timestamp: str = ""
 
     def __post_init__(self) -> None:
         if not self.timestamp:
@@ -69,11 +70,11 @@ class Decision:
 class Alert:
     """Macro alert — regime shift, funding spike, etc."""
 
-    kind:       str                      # regime_shift | funding_extreme | fear_extreme
-    severity:   str                      # info | warn | critical
-    message:    str
-    data:       dict = field(default_factory=dict)
-    timestamp:  str  = ""
+    kind: str  # regime_shift | funding_extreme | fear_extreme
+    severity: str  # info | warn | critical
+    message: str
+    data: dict = field(default_factory=dict)
+    timestamp: str = ""
 
     def __post_init__(self) -> None:
         if not self.timestamp:
@@ -81,6 +82,7 @@ class Alert:
 
 
 # ─── Rule protocol ────────────────────────────────────────────────────────────
+
 
 class Rule(Protocol):
     name: str
@@ -91,6 +93,7 @@ class Rule(Protocol):
 
 # ─── Built-in rules ───────────────────────────────────────────────────────────
 
+
 class RegimePenaltyRule:
     name = "regime_penalty"
 
@@ -100,13 +103,11 @@ class RegimePenaltyRule:
         if regime == "UNKNOWN" or direction not in {"long", "short"}:
             return None
         # Opposed: long in TREND_DOWN / RISK_OFF, short in TREND_UP / RISK_ON
-        opposed = (
-            (direction == "long"  and regime in {"TREND_DOWN", "RISK_OFF"}) or
-            (direction == "short" and regime in {"TREND_UP",   "RISK_ON"})
+        opposed = (direction == "long" and regime in {"TREND_DOWN", "RISK_OFF"}) or (
+            direction == "short" and regime in {"TREND_UP", "RISK_ON"}
         )
-        aligned = (
-            (direction == "long"  and regime in {"TREND_UP",   "RISK_ON"}) or
-            (direction == "short" and regime in {"TREND_DOWN", "RISK_OFF"})
+        aligned = (direction == "long" and regime in {"TREND_UP", "RISK_ON"}) or (
+            direction == "short" and regime in {"TREND_DOWN", "RISK_OFF"}
         )
         if opposed:
             return -0.15, f"regime_penalty: {direction} fights {regime}"
@@ -137,14 +138,17 @@ class FundingCrowdingRule:
         if funding_apr > self.EXTREME_APR and direction == "short":
             return +0.05, f"funding_contrarian: fade crowded longs ({funding_apr*100:.1f}% APR)"
         if funding_apr < -self.EXTREME_APR and direction == "long":
-            return +0.05, f"funding_contrarian: fade crowded shorts ({abs(funding_apr)*100:.1f}% APR)"
+            return (
+                +0.05,
+                f"funding_contrarian: fade crowded shorts ({abs(funding_apr)*100:.1f}% APR)",
+            )
         return None
 
 
 class FearContrarianRule:
     name = "fear_contrarian"
-    EXTREME_FEAR   = 20
-    EXTREME_GREED  = 80
+    EXTREME_FEAR = 20
+    EXTREME_GREED = 80
 
     def evaluate(self, signal: dict, world: dict) -> tuple[float, str] | None:
         fg = world.get("fear_greed")
@@ -165,6 +169,7 @@ class FearContrarianRule:
 
 
 # ─── State loader ─────────────────────────────────────────────────────────────
+
 
 class StateLoader:
     """Reads world snapshot from chain.json; falls back to env-provided root."""
@@ -202,7 +207,9 @@ def _normalize_world(raw: dict) -> dict[str, Any]:
     # Regime (current chain.json stores it under multiple keys historically)
     regime_block = raw.get("regime") or raw.get("market_regime") or {}
     if isinstance(regime_block, dict):
-        out["regime"] = str(regime_block.get("state") or regime_block.get("label") or "UNKNOWN").upper()
+        out["regime"] = str(
+            regime_block.get("state") or regime_block.get("label") or "UNKNOWN"
+        ).upper()
         rs = regime_block.get("score")
         if rs is not None:
             out["regime_score"] = float(rs)
@@ -243,6 +250,7 @@ def _normalize_world(raw: dict) -> dict[str, Any]:
 
 
 # ─── Decision engine ──────────────────────────────────────────────────────────
+
 
 class DecisionEngine:
     """Evaluate signals against macro state and log every decision."""
@@ -303,15 +311,15 @@ class DecisionEngine:
             verdict = "ALLOW"
 
         decision = Decision(
-            signal_id           = str(signal.get("signal_id") or signal.get("id") or ""),
-            symbol              = str(signal.get("symbol", "")).upper(),
-            direction           = str(signal.get("direction", "")).lower(),
-            original_confidence = original,
-            adjusted_confidence = round(adjusted, 4),
-            verdict             = verdict,
-            reasons             = reasons,
-            rules_fired         = fired,
-            world_snapshot      = world,
+            signal_id=str(signal.get("signal_id") or signal.get("id") or ""),
+            symbol=str(signal.get("symbol", "")).upper(),
+            direction=str(signal.get("direction", "")).lower(),
+            original_confidence=original,
+            adjusted_confidence=round(adjusted, 4),
+            verdict=verdict,
+            reasons=reasons,
+            rules_fired=fired,
+            world_snapshot=world,
         )
         self._log(decision)
         self._audit_decision(decision, world)
@@ -328,42 +336,50 @@ class DecisionEngine:
         regime = str(world.get("regime", "UNKNOWN")).upper()
         prev = self._read_last_regime()
         if regime != "UNKNOWN" and prev and prev != regime:
-            alerts.append(Alert(
-                kind="regime_shift",
-                severity="warn",
-                message=f"Regime: {prev} → {regime}",
-                data={"from": prev, "to": regime},
-            ))
+            alerts.append(
+                Alert(
+                    kind="regime_shift",
+                    severity="warn",
+                    message=f"Regime: {prev} → {regime}",
+                    data={"from": prev, "to": regime},
+                )
+            )
         if regime != "UNKNOWN":
             self._write_last_regime(regime)
 
         # Funding extreme
         fap = world.get("funding_apr")
         if fap is not None and abs(float(fap)) >= FundingCrowdingRule.EXTREME_APR:
-            alerts.append(Alert(
-                kind="funding_extreme",
-                severity="warn" if abs(float(fap)) < 0.60 else "critical",
-                message=f"Funding APR {float(fap)*100:+.1f}%",
-                data={"apr": float(fap)},
-            ))
+            alerts.append(
+                Alert(
+                    kind="funding_extreme",
+                    severity="warn" if abs(float(fap)) < 0.60 else "critical",
+                    message=f"Funding APR {float(fap)*100:+.1f}%",
+                    data={"apr": float(fap)},
+                )
+            )
 
         # F&G extremes
         fg = world.get("fear_greed")
         if fg is not None:
             if int(fg) <= FearContrarianRule.EXTREME_FEAR:
-                alerts.append(Alert(
-                    kind="fear_extreme",
-                    severity="info",
-                    message=f"Extreme fear: F&G {fg}",
-                    data={"fear_greed": int(fg)},
-                ))
+                alerts.append(
+                    Alert(
+                        kind="fear_extreme",
+                        severity="info",
+                        message=f"Extreme fear: F&G {fg}",
+                        data={"fear_greed": int(fg)},
+                    )
+                )
             elif int(fg) >= FearContrarianRule.EXTREME_GREED:
-                alerts.append(Alert(
-                    kind="fear_extreme",
-                    severity="info",
-                    message=f"Extreme greed: F&G {fg}",
-                    data={"fear_greed": int(fg)},
-                ))
+                alerts.append(
+                    Alert(
+                        kind="fear_extreme",
+                        severity="info",
+                        message=f"Extreme greed: F&G {fg}",
+                        data={"fear_greed": int(fg)},
+                    )
+                )
 
         self._audit_alerts(alerts, world)
         return alerts
@@ -387,7 +403,9 @@ class DecisionEngine:
 
     # ── Background polling (optional) ─────────────────────────────────────────
 
-    def poll_forever(self, interval_sec: float = 300.0, emit: Callable[[Alert], None] | None = None) -> None:
+    def poll_forever(
+        self, interval_sec: float = 300.0, emit: Callable[[Alert], None] | None = None
+    ) -> None:
         """Simple polling loop — alternative to event bus for lightweight deployments."""
         while True:
             try:
@@ -466,15 +484,20 @@ class DecisionEngine:
     def _write_last_regime(self, regime: str) -> None:
         try:
             self.state_path.parent.mkdir(parents=True, exist_ok=True)
-            self.state_path.write_text(json.dumps({
-                "regime": regime,
-                "ts": datetime.now(UTC).isoformat(),
-            }))
+            self.state_path.write_text(
+                json.dumps(
+                    {
+                        "regime": regime,
+                        "ts": datetime.now(UTC).isoformat(),
+                    }
+                )
+            )
         except OSError as e:
             log.warning("last-regime write failed: %s", e)
 
 
 # ─── CLI entrypoint ───────────────────────────────────────────────────────────
+
 
 def main() -> int:
     import argparse
@@ -499,6 +522,7 @@ def main() -> int:
 
     if args.signal:
         import sys
+
         raw = sys.stdin.read() if args.signal == "-" else args.signal
         decision = eng.evaluate(json.loads(raw))
         print(json.dumps(asdict(decision), indent=2, default=str))

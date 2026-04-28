@@ -69,7 +69,9 @@ def test_git_and_ci_surfaces_are_pass_when_clean_and_latest_ci_passes(tmp_path: 
 
 def test_summarize_surfaces_ignores_launchagent_manual_gate_as_hard_blocker() -> None:
     surfaces = [
-        matrix.surface("google_launchagent_retargeting", "google-gcp", "blocked", "token", "rotate"),
+        matrix.surface(
+            "google_launchagent_retargeting", "google-gcp", "blocked", "token", "rotate"
+        ),
         matrix.surface("media_factory_status", "media", "warn", "none", "dry run"),
         matrix.surface("local_ci_latest", "repo", "pass", "green", "keep"),
     ]

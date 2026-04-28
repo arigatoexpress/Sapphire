@@ -193,7 +193,7 @@
                 window.platformApi.getOrganization(),
                 window.platformApi.getProjects()
             ]);
-            
+
             renderDepartments(org);
             renderProjects(projects);
             updateKPIs(org, projects);
@@ -205,7 +205,7 @@
     function renderDepartments(org) {
         const container = document.getElementById('departments');
         const depts = org.model?.departments || [];
-        
+
         if (!depts.length) {
             container.innerHTML = '<div class="empty-state">No department data available</div>';
             return;
@@ -229,9 +229,9 @@
     function renderProjects(data) {
         const container = document.getElementById('projects-list');
         const projects = data.projects || [];
-        
+
         document.getElementById('programs-count').textContent = `${projects.length} programs`;
-        
+
         if (!projects.length) {
             container.innerHTML = '<div class="empty-state">No active programs</div>';
             return;
@@ -254,13 +254,13 @@
     function updateKPIs(org, projects) {
         const summary = org.summary || {};
         const projectList = projects.projects || [];
-        
+
         document.getElementById('org-workspaces').textContent = summary.workspaces || 0;
         document.getElementById('org-programs').textContent = projectList.length;
-        
+
         const active = projectList.filter(p => ['active', 'in_progress'].includes(String(p.status).toLowerCase())).length;
         const blocked = projectList.filter(p => String(p.status).toLowerCase() === 'blocked').length;
-        
+
         document.getElementById('org-active').textContent = active;
         document.getElementById('org-blocked').textContent = blocked;
     }

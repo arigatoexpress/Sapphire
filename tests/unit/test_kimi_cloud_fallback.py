@@ -41,7 +41,15 @@ def _fake_response(label: str) -> dict[str, Any]:
 
 
 def test_kimi_aliases_route_to_cloud_tier() -> None:
-    for alias in ("kimi", "kimi-fast", "kimi-large", "kimi-cloud", "kimi-code", "cloud", "research"):
+    for alias in (
+        "kimi",
+        "kimi-fast",
+        "kimi-large",
+        "kimi-cloud",
+        "kimi-code",
+        "cloud",
+        "research",
+    ):
         assert proxy_app.MODEL_TIERS[alias] == "kimi-cloud"
 
 

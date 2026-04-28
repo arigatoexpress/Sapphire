@@ -88,8 +88,13 @@ def run_backtest(
             print(f"📝 Loading {pine_script}...")
             _tv(["ui", "panel", "pine-editor", "open"])
             time.sleep(2)
-            subprocess.run(["tv", "pine", "set"], input=script_path.read_text(),
-                           capture_output=True, text=True, timeout=10)
+            subprocess.run(
+                ["tv", "pine", "set"],
+                input=script_path.read_text(),
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
             compile_result = _tv(["pine", "compile"], timeout=30)
             if compile_result.get("errors"):
                 errors = [e for e in compile_result["errors"] if e.get("severity", 0) >= 8]
@@ -162,6 +167,7 @@ def show_history() -> None:
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser(description="Pine Script Backtesting Loop")
     parser.add_argument("--symbols", help="Comma-separated symbols")
     parser.add_argument("--pine", help="Pine script filename in pine/standalone/")

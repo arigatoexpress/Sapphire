@@ -19,18 +19,18 @@ results = {}
 for model in models:
     print(f'Testing {model}...')
     results[model] = {}
-    
+
     # Warmup
-    subprocess.run(['curl', '-s', 'http://localhost:11434/api/generate', 
-                   '-H', 'Content-Type: application/json', 
-                   '-d', json.dumps({'model': model, 'prompt': 'Hi', 'stream': False})], 
+    subprocess.run(['curl', '-s', 'http://localhost:11434/api/generate',
+                   '-H', 'Content-Type: application/json',
+                   '-d', json.dumps({'model': model, 'prompt': 'Hi', 'stream': False})],
                   capture_output=True, timeout=60)
     time.sleep(2)
-    
+
     for test_name, prompt in prompts.items():
         try:
             result = subprocess.run(
-                ['curl', '-s', 'http://localhost:11434/api/generate', 
+                ['curl', '-s', 'http://localhost:11434/api/generate',
                  '-H', 'Content-Type: application/json',
                  '-d', json.dumps({'model': model, 'prompt': prompt, 'stream': False})],
                 capture_output=True, timeout=90
@@ -43,7 +43,7 @@ for model in models:
             results[model][test_name] = 0
             print(f'  {test_name}: FAILED - {e}')
         time.sleep(1)
-    
+
     # Calculate avg
     speeds = [v for v in results[model].values() if isinstance(v, (int, float)) and v > 0]
     if speeds:

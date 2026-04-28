@@ -59,9 +59,9 @@ class MarketDataAggregator:
         self._aster_last_issue = ""
         self._aster_last_issue_ts = 0.0
 
-        self._lighter_market_symbol = str(
-            os.getenv("LIGHTER_MARKET_SYMBOL", "SOL")
-        ).strip().upper() or "SOL"
+        self._lighter_market_symbol = (
+            str(os.getenv("LIGHTER_MARKET_SYMBOL", "SOL")).strip().upper() or "SOL"
+        )
         self._lighter_market_id = str(os.getenv("LIGHTER_MARKET_ID", "2")).strip() or "2"
         self._lighter_market_ids = self._parse_lighter_market_ids()
         self._lighter_logs_url = str(
@@ -79,7 +79,9 @@ class MarketDataAggregator:
         self._lighter_ws_retry_seconds = self._env_float(
             "LIGHTER_WS_RETRY_SECONDS", 3.0, minimum=1.0
         )
-        self._lighter_ws_enabled = str(os.getenv("LIGHTER_WS_ENABLED", "false")).strip().lower() in {
+        self._lighter_ws_enabled = str(
+            os.getenv("LIGHTER_WS_ENABLED", "false")
+        ).strip().lower() in {
             "1",
             "true",
             "yes",
@@ -118,7 +120,10 @@ class MarketDataAggregator:
     def _parse_extra_symbols() -> list[str]:
         """Parse SAPPHIRE_PREFERRED_SYMBOLS for multi-symbol feeds."""
         import re as _re
-        raw = os.getenv("SAPPHIRE_PREFERRED_SYMBOLS", "BTC,ETH,SOL,BCH,ZEC,XMR,PENGU,MON,LIT,ASTER,MEGAETH")
+
+        raw = os.getenv(
+            "SAPPHIRE_PREFERRED_SYMBOLS", "BTC,ETH,SOL,BCH,ZEC,XMR,PENGU,MON,LIT,ASTER,MEGAETH"
+        )
         tokens = _re.split(r"[,;|\s]+", str(raw or "").strip())
         seen: set[str] = set()
         result: list[str] = []
@@ -190,7 +195,8 @@ class MarketDataAggregator:
             logger.info(
                 "📊 Multi-symbol feeds enabled for {} symbols: {}",
                 len(self._extra_symbols),
-                ", ".join(self._extra_symbols[:6]) + ("..." if len(self._extra_symbols) > 6 else ""),
+                ", ".join(self._extra_symbols[:6])
+                + ("..." if len(self._extra_symbols) > 6 else ""),
             )
 
     async def stop(self):
@@ -434,7 +440,10 @@ class MarketDataAggregator:
         return True
 
     def _extract_lighter_ticks_from_logs(
-        self, payload: Any, *, market_id_override: str | None = None,
+        self,
+        payload: Any,
+        *,
+        market_id_override: str | None = None,
     ) -> list[tuple[float, float, float]]:
         entries: list[Any]
         if isinstance(payload, list):
@@ -636,13 +645,18 @@ class MarketDataAggregator:
                             if _resp.status == 200:
                                 _payload = await _resp.json(content_type=None)
                                 _ticks = self._extract_lighter_ticks_from_logs(
-                                    _payload, market_id_override=sym_market_id,
+                                    _payload,
+                                    market_id_override=sym_market_id,
                                 )
                                 for _ts, _p, _v in _ticks:
-                                    self._record_tick("LIGHTER", symbol_key, _p, volume=_v, timestamp=_ts)
+                                    self._record_tick(
+                                        "LIGHTER", symbol_key, _p, volume=_v, timestamp=_ts
+                                    )
                                 if _ticks:
                                     candles = self._aggregate_samples(
-                                        _ticks, interval_seconds=interval_seconds, limit=bar_limit,
+                                        _ticks,
+                                        interval_seconds=interval_seconds,
+                                        limit=bar_limit,
                                     )
                                     source = "lighter_logs"
                 except Exception:
@@ -843,9 +857,13 @@ class MarketDataAggregator:
                                     self._clear_lighter_issue()
                                 else:
                                     # Only warn if Lighter has no price at all (not just dedup-filtered)
-                                    current = self.prices.get("LIGHTER", {}).get(self._chart_symbol, 0)
+                                    current = self.prices.get("LIGHTER", {}).get(
+                                        self._chart_symbol, 0
+                                    )
                                     if current <= 0:
-                                        self._log_lighter_issue("Lighter REST poll returned no usable price.")
+                                        self._log_lighter_issue(
+                                            "Lighter REST poll returned no usable price."
+                                        )
                 except Exception as exc:
                     self._log_lighter_issue(f"Lighter REST poll error: {exc}")
 
@@ -968,7 +986,11 @@ class MarketDataAggregator:
                                         price = self._coerce_price(item.get("price"))
                                         if price is not None and price > 0:
                                             # Store under base symbol (strip USDT)
-                                            base = sym.replace("USDT", "").replace("USDC", "").replace("USD", "")
+                                            base = (
+                                                sym.replace("USDT", "")
+                                                .replace("USDC", "")
+                                                .replace("USD", "")
+                                            )
                                             self._record_tick("ASTER", base, price)
                 except Exception as exc:
                     logger.debug(f"Aster multi-symbol poll error: {exc}")
@@ -992,7 +1014,8 @@ class MarketDataAggregator:
                             if response.status == 200:
                                 payload = await response.json(content_type=None)
                                 ticks = self._extract_lighter_ticks_from_logs(
-                                    payload, market_id_override=sym_market_id,
+                                    payload,
+                                    market_id_override=sym_market_id,
                                 )
                                 if ticks:
                                     for ts, price, volume in ticks:
@@ -1021,9 +1044,9 @@ class MarketDataAggregator:
                 age = int(max(0.0, now - last_ts)) if last_ts > 0 else None
                 venue_data[symbol] = {
                     "price": float(price) if price > 0 else 0.0,
-                    "status": "healthy" if price > 0 and age is not None and age <= 120 else (
-                        "degraded" if price > 0 else "offline"
-                    ),
+                    "status": "healthy"
+                    if price > 0 and age is not None and age <= 120
+                    else ("degraded" if price > 0 else "offline"),
                     "age_seconds": age,
                 }
             result[venue] = venue_data

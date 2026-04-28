@@ -142,7 +142,7 @@ class ThesisEngine:
         regime: str | None = None,
     ) -> list[Thesis]:
         pred_map: dict[str, dict] = {}
-        for p in (predictions or []):
+        for p in predictions or []:
             sym = p.get("symbol", "")
             if sym not in pred_map:
                 pred_map[sym] = p

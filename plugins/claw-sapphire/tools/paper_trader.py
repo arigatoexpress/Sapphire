@@ -5,6 +5,7 @@ Keeps the historical `plugins/claw-sapphire/tools/paper_trader.py` invocation pa
 working (scheduled tasks, hermes skills, importlib test fixtures) after the
 tool-boundary reorganization.
 """
+
 from __future__ import annotations
 
 from pathlib import Path

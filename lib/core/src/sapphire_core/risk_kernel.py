@@ -195,25 +195,16 @@ class HardRiskKernel:
         if self.max_daily_loss_pct > 0 and day_loss_pct >= self.max_daily_loss_pct:
             return self._activate_hold(
                 ts,
-                (
-                    f"daily_loss_pct {day_loss_pct:.2f}% >= "
-                    f"{self.max_daily_loss_pct:.2f}%"
-                ),
+                (f"daily_loss_pct {day_loss_pct:.2f}% >= " f"{self.max_daily_loss_pct:.2f}%"),
                 metrics,
             )
         if self.max_daily_loss_usd > 0 and day_loss_usd >= self.max_daily_loss_usd:
             return self._activate_hold(
                 ts,
-                (
-                    f"daily_loss_usd {day_loss_usd:.2f} >= "
-                    f"{self.max_daily_loss_usd:.2f}"
-                ),
+                (f"daily_loss_usd {day_loss_usd:.2f} >= " f"{self.max_daily_loss_usd:.2f}"),
                 metrics,
             )
-        if (
-            self.max_intraday_drawdown_pct > 0
-            and intraday_dd_pct >= self.max_intraday_drawdown_pct
-        ):
+        if self.max_intraday_drawdown_pct > 0 and intraday_dd_pct >= self.max_intraday_drawdown_pct:
             return self._activate_hold(
                 ts,
                 (
@@ -244,7 +235,13 @@ class HardRiskKernel:
 
         if outcome_key == "hard_failed":
             self.consecutive_hard_fails += 1
-        elif outcome_key in {"filled_success", "accepted_no_fill", "noop", "policy_noop", "policy_reject"}:
+        elif outcome_key in {
+            "filled_success",
+            "accepted_no_fill",
+            "noop",
+            "policy_noop",
+            "policy_reject",
+        }:
             self.consecutive_hard_fails = 0
 
         if outcome_key == "filled_success" and equity_estimate > 0:

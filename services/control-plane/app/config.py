@@ -64,7 +64,9 @@ class Settings:
     zkpass_allowed_validator_addresses: list[str] = field(default_factory=list)
     zkpass_max_age_seconds: int = 86400
     zkpass_verify_signatures: bool = False
-    zkpass_allocator_message_template: str = "I am allocator and I have allocated task {taskId} with uHash {uHash}"
+    zkpass_allocator_message_template: str = (
+        "I am allocator and I have allocated task {taskId} with uHash {uHash}"
+    )
     zkpass_validator_message_template: str = "I am validator and I have validated task {taskId}"
     zkpass_breakglass_enabled: bool = False
     zkpass_breakglass_token: str = ""
@@ -98,9 +100,13 @@ def get_settings() -> Settings:
         heartbeat_directive_max_chars=int(os.getenv("HEARTBEAT_DIRECTIVE_MAX_CHARS", "600")),
         timezone=os.getenv("TIMEZONE", "UTC"),
         # Aster Shield: tokenized equities + commodities perps (USDT-margined).
-        default_aster_assets=_split_csv(os.getenv("DEFAULT_ASTER_ASSETS", "AAPL,TSLA,NVDA,GOLD,SILVER")),
+        default_aster_assets=_split_csv(
+            os.getenv("DEFAULT_ASTER_ASSETS", "AAPL,TSLA,NVDA,GOLD,SILVER")
+        ),
         # Lighter: crypto perps (WETH/WBTC-style symbols).
-        default_lighter_assets=_split_csv(os.getenv("DEFAULT_LIGHTER_ASSETS", "WETH,WBTC,SOL,LINK,UNI")),
+        default_lighter_assets=_split_csv(
+            os.getenv("DEFAULT_LIGHTER_ASSETS", "WETH,WBTC,SOL,LINK,UNI")
+        ),
         default_macro_keywords=_split_csv(
             os.getenv(
                 "DEFAULT_MACRO_KEYWORDS",
@@ -111,12 +117,16 @@ def get_settings() -> Settings:
         use_in_memory_store=_as_bool(os.getenv("USE_IN_MEMORY_STORE"), default=(not on_cloud_run)),
         job_shared_token=os.getenv("JOB_SHARED_TOKEN", ""),
         control_plane_shared_token=os.getenv("CONTROL_PLANE_SHARED_TOKEN", ""),
-        startup_register_webhook=_as_bool(os.getenv("STARTUP_REGISTER_WEBHOOK", "false"), default=False),
+        startup_register_webhook=_as_bool(
+            os.getenv("STARTUP_REGISTER_WEBHOOK", "false"), default=False
+        ),
         public_base_url=os.getenv("PUBLIC_BASE_URL", "").rstrip("/"),
         allowed_telegram_user_ids=_split_csv_int(os.getenv("ALLOWED_TELEGRAM_USER_IDS", "")),
         allowed_telegram_chat_ids=_split_csv_int(os.getenv("ALLOWED_TELEGRAM_CHAT_IDS", "")),
         snippet_cache_ttl_seconds=float(os.getenv("SNIPPET_CACHE_TTL_SECONDS", str(6 * 3600))),
-        snippet_fetch_timeout_seconds=float(os.getenv("SNIPPET_FETCH_TIMEOUT_SECONDS", str(request_timeout_seconds))),
+        snippet_fetch_timeout_seconds=float(
+            os.getenv("SNIPPET_FETCH_TIMEOUT_SECONDS", str(request_timeout_seconds))
+        ),
         snippet_fetch_max_concurrency=int(os.getenv("SNIPPET_FETCH_MAX_CONCURRENCY", "3")),
         sent_item_id_buffer_size=int(os.getenv("SENT_ITEM_ID_BUFFER_SIZE", "2500")),
         zkpass_enabled=_as_bool(os.getenv("ZKPASS_ENABLED", "false"), default=False),
@@ -129,10 +139,16 @@ def get_settings() -> Settings:
         ),
         zkpass_allowed_schema_ids=_split_csv(os.getenv("ZKPASS_ALLOWED_SCHEMA_IDS", "")),
         zkpass_allowed_recipients=_split_csv(os.getenv("ZKPASS_ALLOWED_RECIPIENTS", "")),
-        zkpass_allowed_allocator_addresses=_split_csv(os.getenv("ZKPASS_ALLOWED_ALLOCATOR_ADDRESSES", "")),
-        zkpass_allowed_validator_addresses=_split_csv(os.getenv("ZKPASS_ALLOWED_VALIDATOR_ADDRESSES", "")),
+        zkpass_allowed_allocator_addresses=_split_csv(
+            os.getenv("ZKPASS_ALLOWED_ALLOCATOR_ADDRESSES", "")
+        ),
+        zkpass_allowed_validator_addresses=_split_csv(
+            os.getenv("ZKPASS_ALLOWED_VALIDATOR_ADDRESSES", "")
+        ),
         zkpass_max_age_seconds=int(os.getenv("ZKPASS_MAX_AGE_SECONDS", "86400")),
-        zkpass_verify_signatures=_as_bool(os.getenv("ZKPASS_VERIFY_SIGNATURES", "false"), default=False),
+        zkpass_verify_signatures=_as_bool(
+            os.getenv("ZKPASS_VERIFY_SIGNATURES", "false"), default=False
+        ),
         zkpass_allocator_message_template=os.getenv(
             "ZKPASS_ALLOCATOR_MESSAGE_TEMPLATE",
             "I am allocator and I have allocated task {taskId} with uHash {uHash}",
@@ -141,9 +157,17 @@ def get_settings() -> Settings:
             "ZKPASS_VALIDATOR_MESSAGE_TEMPLATE",
             "I am validator and I have validated task {taskId}",
         ),
-        zkpass_breakglass_enabled=_as_bool(os.getenv("ZKPASS_BREAKGLASS_ENABLED", "false"), default=False),
+        zkpass_breakglass_enabled=_as_bool(
+            os.getenv("ZKPASS_BREAKGLASS_ENABLED", "false"), default=False
+        ),
         zkpass_breakglass_token=os.getenv("ZKPASS_BREAKGLASS_TOKEN", ""),
-        zkpass_breakglass_allowed_actions=_split_csv(os.getenv("ZKPASS_BREAKGLASS_ALLOWED_ACTIONS", "")),
-        zkpass_breakglass_allowed_actors=_split_csv(os.getenv("ZKPASS_BREAKGLASS_ALLOWED_ACTORS", "")),
-        zkpass_breakglass_require_reason=_as_bool(os.getenv("ZKPASS_BREAKGLASS_REQUIRE_REASON", "true"), default=True),
+        zkpass_breakglass_allowed_actions=_split_csv(
+            os.getenv("ZKPASS_BREAKGLASS_ALLOWED_ACTIONS", "")
+        ),
+        zkpass_breakglass_allowed_actors=_split_csv(
+            os.getenv("ZKPASS_BREAKGLASS_ALLOWED_ACTORS", "")
+        ),
+        zkpass_breakglass_require_reason=_as_bool(
+            os.getenv("ZKPASS_BREAKGLASS_REQUIRE_REASON", "true"), default=True
+        ),
     )

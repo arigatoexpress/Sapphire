@@ -53,10 +53,17 @@ class EnsembleConfig:
     """Configuration for ensemble system"""
 
     # Model selection
-    enabled_models: list[str] = field(default_factory=lambda: [
-        'ppo', 'trend_following', 'mean_reversion', 'volatility',
-        'order_flow', 'ml_classifier', 'vpin_based'
-    ])
+    enabled_models: list[str] = field(
+        default_factory=lambda: [
+            "ppo",
+            "trend_following",
+            "mean_reversion",
+            "volatility",
+            "order_flow",
+            "ml_classifier",
+            "vpin_based",
+        ]
+    )
 
     # Ensemble settings
     dynamic_weighting: bool = True
@@ -98,10 +105,12 @@ class MetaLearner(nn.Module):
             nn.Linear(hidden_dim, hidden_dim // 2),
             nn.ReLU(),
             nn.Linear(hidden_dim // 2, num_models),
-            nn.Softmax(dim=-1)
+            nn.Softmax(dim=-1),
         )
 
-    def forward(self, model_predictions: torch.Tensor, model_confidences: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, model_predictions: torch.Tensor, model_confidences: torch.Tensor
+    ) -> torch.Tensor:
         """Compute optimal weights for model combination"""
         x = torch.cat([model_predictions, model_confidences], dim=-1)
         weights = self.network(x)
@@ -132,9 +141,11 @@ class EnsembleTradingSystem:
         self.correlation_matrix = {}
 
         # GPU setup
-        self.device = torch.device(f'cuda:{self.config.cuda_device}' if
-                                 self.config.gpu_acceleration and torch.cuda.is_available()
-                                 else 'cpu')
+        self.device = torch.device(
+            f"cuda:{self.config.cuda_device}"
+            if self.config.gpu_acceleration and torch.cuda.is_available()
+            else "cpu"
+        )
 
         # Initialize meta-learner
         if self.config.dynamic_weighting:
@@ -152,26 +163,26 @@ class EnsembleTradingSystem:
 
         enabled_models = self.config.enabled_models
 
-        if 'ppo' in enabled_models:
-            self.models['ppo'] = PPOTradingModel()
+        if "ppo" in enabled_models:
+            self.models["ppo"] = PPOTradingModel()
 
-        if 'trend_following' in enabled_models:
-            self.models['trend_following'] = TrendFollowingModel()
+        if "trend_following" in enabled_models:
+            self.models["trend_following"] = TrendFollowingModel()
 
-        if 'mean_reversion' in enabled_models:
-            self.models['mean_reversion'] = MeanReversionModel()
+        if "mean_reversion" in enabled_models:
+            self.models["mean_reversion"] = MeanReversionModel()
 
-        if 'volatility' in enabled_models:
-            self.models['volatility'] = VolatilityModel()
+        if "volatility" in enabled_models:
+            self.models["volatility"] = VolatilityModel()
 
-        if 'order_flow' in enabled_models:
-            self.models['order_flow'] = OrderFlowModel()
+        if "order_flow" in enabled_models:
+            self.models["order_flow"] = OrderFlowModel()
 
-        if 'ml_classifier' in enabled_models:
-            self.models['ml_classifier'] = MLTradingClassifier()
+        if "ml_classifier" in enabled_models:
+            self.models["ml_classifier"] = MLTradingClassifier()
 
-        if 'vpin_based' in enabled_models:
-            self.models['vpin_based'] = VPINBasedModel()
+        if "vpin_based" in enabled_models:
+            self.models["vpin_based"] = VPINBasedModel()
 
     def _initialize_meta_learner(self):
         """Initialize meta-learner for dynamic weighting"""
@@ -202,8 +213,8 @@ class EnsembleTradingSystem:
             for model_name, model in self.models.items():
                 try:
                     prediction = await self._get_model_prediction(model, market_data, symbol)
-                    model_predictions[model_name] = prediction['direction']
-                    model_confidences[model_name] = prediction['confidence']
+                    model_predictions[model_name] = prediction["direction"]
+                    model_confidences[model_name] = prediction["confidence"]
                     model_features[model_name] = prediction
                 except Exception as e:
                     logger.warning(f"Model {model_name} failed: {str(e)}")
@@ -230,12 +241,12 @@ class EnsembleTradingSystem:
                 timestamp=datetime.now(),
                 direction=ensemble_direction,
                 confidence=ensemble_confidence,
-                volatility=risk_metrics['volatility'],
-                stop_loss=risk_metrics['stop_loss'],
-                take_profit=risk_metrics['take_profit'],
+                volatility=risk_metrics["volatility"],
+                stop_loss=risk_metrics["stop_loss"],
+                take_profit=risk_metrics["take_profit"],
                 models_used=list(model_predictions.keys()),
                 model_weights=weights,
-                risk_score=risk_metrics['risk_score']
+                risk_score=risk_metrics["risk_score"],
             )
 
             # Store for performance tracking
@@ -256,25 +267,25 @@ class EnsembleTradingSystem:
                 take_profit=0.0,
                 models_used=[],
                 model_weights={},
-                risk_score=1.0
+                risk_score=1.0,
             )
 
-    async def _get_model_prediction(self, model, market_data: dict[str, Any], symbol: str) -> dict[str, float]:
+    async def _get_model_prediction(
+        self, model, market_data: dict[str, Any], symbol: str
+    ) -> dict[str, float]:
         """Get prediction from individual model"""
 
-        if hasattr(model, 'predict_async'):
+        if hasattr(model, "predict_async"):
             return await model.predict_async(market_data)
-        elif hasattr(model, 'predict'):
+        elif hasattr(model, "predict"):
             return model.predict(market_data)
         else:
             # Default prediction logic
-            return {
-                'direction': 0.0,
-                'confidence': 0.5
-            }
+            return {"direction": 0.0, "confidence": 0.5}
 
-    def _compute_dynamic_weights(self, predictions: dict[str, float],
-                               confidences: dict[str, float]) -> dict[str, float]:
+    def _compute_dynamic_weights(
+        self, predictions: dict[str, float], confidences: dict[str, float]
+    ) -> dict[str, float]:
         """Compute dynamic weights using meta-learner"""
 
         # Prepare input tensors
@@ -292,8 +303,12 @@ class EnsembleTradingSystem:
 
         return weights_dict
 
-    def _combine_predictions(self, predictions: dict[str, float], confidences: dict[str, float],
-                           weights: dict[str, float]) -> tuple[float, float]:
+    def _combine_predictions(
+        self,
+        predictions: dict[str, float],
+        confidences: dict[str, float],
+        weights: dict[str, float],
+    ) -> tuple[float, float]:
         """Combine predictions using weighted average"""
 
         # Apply correlation filtering
@@ -346,8 +361,10 @@ class EnsembleTradingSystem:
         for model_name in model_names:
             correlated = False
             for used_model in used_models:
-                if (model_name in self.correlation_matrix and
-                    used_model in self.correlation_matrix[model_name]):
+                if (
+                    model_name in self.correlation_matrix
+                    and used_model in self.correlation_matrix[model_name]
+                ):
                     corr = abs(self.correlation_matrix[model_name][used_model])
                     if corr > self.config.correlation_threshold:
                         correlated = True
@@ -383,10 +400,18 @@ class EnsembleTradingSystem:
 
         for i, model1 in enumerate(model_names):
             self.correlation_matrix[model1] = {}
-            for model2 in model_names[i+1:]:
+            for model2 in model_names[i + 1 :]:
                 # Calculate correlation of model weights over time
-                weights1 = [p.model_weights.get(model1, 0) for p in recent_predictions if model1 in p.model_weights]
-                weights2 = [p.model_weights.get(model2, 0) for p in recent_predictions if model2 in p.model_weights]
+                weights1 = [
+                    p.model_weights.get(model1, 0)
+                    for p in recent_predictions
+                    if model1 in p.model_weights
+                ]
+                weights2 = [
+                    p.model_weights.get(model2, 0)
+                    for p in recent_predictions
+                    if model2 in p.model_weights
+                ]
 
                 if len(weights1) > 1 and len(weights2) > 1:
                     try:
@@ -397,35 +422,38 @@ class EnsembleTradingSystem:
                     except:
                         pass
 
-    def _calculate_risk_metrics(self, market_data: dict[str, Any], direction: float) -> dict[str, float]:
+    def _calculate_risk_metrics(
+        self, market_data: dict[str, Any], direction: float
+    ) -> dict[str, float]:
         """Calculate risk metrics for the prediction"""
 
         # Extract market data
-        close_prices = market_data.get('close', [])
-        high_prices = market_data.get('high', [])
-        low_prices = market_data.get('low', [])
-        volume = market_data.get('volume', [])
+        close_prices = market_data.get("close", [])
+        high_prices = market_data.get("high", [])
+        low_prices = market_data.get("low", [])
+        volume = market_data.get("volume", [])
 
         if not close_prices:
-            return {
-                'volatility': 0.0,
-                'stop_loss': 0.0,
-                'take_profit': 0.0,
-                'risk_score': 1.0
-            }
+            return {"volatility": 0.0, "stop_loss": 0.0, "take_profit": 0.0, "risk_score": 1.0}
 
         # Calculate volatility (ATR-like)
         if len(high_prices) >= 14 and len(low_prices) >= 14 and len(close_prices) >= 14:
             tr = []
             for i in range(1, min(14, len(close_prices))):
-                tr.append(max(
-                    high_prices[-i] - low_prices[-i],
-                    abs(high_prices[-i] - close_prices[-i-1]),
-                    abs(low_prices[-i] - close_prices[-i-1])
-                ))
+                tr.append(
+                    max(
+                        high_prices[-i] - low_prices[-i],
+                        abs(high_prices[-i] - close_prices[-i - 1]),
+                        abs(low_prices[-i] - close_prices[-i - 1]),
+                    )
+                )
             volatility = np.mean(tr) / close_prices[-1] if close_prices[-1] > 0 else 0.0
         else:
-            volatility = np.std(close_prices[-20:]) / np.mean(close_prices[-20:]) if len(close_prices) >= 20 else 0.0
+            volatility = (
+                np.std(close_prices[-20:]) / np.mean(close_prices[-20:])
+                if len(close_prices) >= 20
+                else 0.0
+            )
 
         current_price = close_prices[-1]
 
@@ -448,10 +476,10 @@ class EnsembleTradingSystem:
         risk_score = min(1.0, (volume_risk + price_risk + direction_risk) / 3.0)
 
         return {
-            'volatility': volatility,
-            'stop_loss': stop_loss,
-            'take_profit': take_profit,
-            'risk_score': risk_score
+            "volatility": volatility,
+            "stop_loss": stop_loss,
+            "take_profit": take_profit,
+            "risk_score": risk_score,
         }
 
     async def update_performance(self, actual_return: float, prediction: EnsemblePrediction):
@@ -466,10 +494,10 @@ class EnsembleTradingSystem:
 
         # Keep history manageable
         if len(self.actual_returns) > self.config.performance_window:
-            self.actual_returns = self.actual_returns[-self.config.performance_window:]
+            self.actual_returns = self.actual_returns[-self.config.performance_window :]
 
         if len(self.prediction_history) > self.config.performance_window:
-            self.prediction_history = self.prediction_history[-self.config.performance_window:]
+            self.prediction_history = self.prediction_history[-self.config.performance_window :]
 
     async def _adapt_model_weights(self):
         """Adapt model weights based on recent performance"""
@@ -495,7 +523,9 @@ class EnsembleTradingSystem:
         for i, pred in enumerate(recent_predictions):
             if len(pred.model_weights) == num_models:
                 pred_values = [pred.model_weights.get(name, 0) for name in model_names]
-                conf_values = [pred.model_weights.get(name, 0) for name in model_names]  # Approximation
+                conf_values = [
+                    pred.model_weights.get(name, 0) for name in model_names
+                ]  # Approximation
 
                 train_predictions.append(pred_values)
                 train_confidences.append(conf_values)
@@ -528,8 +558,9 @@ class EnsembleTradingSystem:
 
         logger.debug(f"Meta-learner adaptation completed, loss: {loss.item():.4f}")
 
-    async def get_portfolio_allocation(self, predictions: dict[str, EnsemblePrediction],
-                                     total_capital: float) -> dict[str, float]:
+    async def get_portfolio_allocation(
+        self, predictions: dict[str, EnsemblePrediction], total_capital: float
+    ) -> dict[str, float]:
         """Calculate optimal portfolio allocation based on ensemble predictions"""
 
         allocations = {}
@@ -576,12 +607,12 @@ class EnsembleTradingSystem:
         risk_scores = [p.risk_score for p in self.prediction_history[-100:]]
 
         metrics = {
-            'avg_direction': np.mean(np.abs(directions)),
-            'avg_confidence': np.mean(confidences),
-            'avg_risk_score': np.mean(risk_scores),
-            'models_active': len(self.models),
-            'predictions_made': len(self.prediction_history),
-            'correlation_filtered': len(self.correlation_matrix) > 0
+            "avg_direction": np.mean(np.abs(directions)),
+            "avg_confidence": np.mean(confidences),
+            "avg_risk_score": np.mean(risk_scores),
+            "models_active": len(self.models),
+            "predictions_made": len(self.prediction_history),
+            "correlation_filtered": len(self.correlation_matrix) > 0,
         }
 
         return metrics
@@ -594,9 +625,9 @@ class TrendFollowingModel:
     def predict(self, market_data: dict[str, Any]) -> dict[str, float]:
         """Generate trend-following prediction"""
 
-        close = market_data.get('close', [])
+        close = market_data.get("close", [])
         if len(close) < 50:
-            return {'direction': 0.0, 'confidence': 0.0}
+            return {"direction": 0.0, "confidence": 0.0}
 
         # Calculate moving averages
         sma_20 = np.mean(close[-20:])
@@ -615,7 +646,7 @@ class TrendFollowingModel:
         direction = (trend_signal + macd_signal) / 2.0
         confidence = min(abs(direction), 1.0)
 
-        return {'direction': direction, 'confidence': confidence}
+        return {"direction": direction, "confidence": confidence}
 
     def _ema(self, data: list[float], period: int) -> float:
         """Calculate exponential moving average"""
@@ -637,9 +668,9 @@ class MeanReversionModel:
     def predict(self, market_data: dict[str, Any]) -> dict[str, float]:
         """Generate mean reversion prediction"""
 
-        close = market_data.get('close', [])
+        close = market_data.get("close", [])
         if len(close) < 20:
-            return {'direction': 0.0, 'confidence': 0.0}
+            return {"direction": 0.0, "confidence": 0.0}
 
         # Calculate Bollinger Bands
         sma = np.mean(close[-20:])
@@ -656,18 +687,18 @@ class MeanReversionModel:
         if current_price > upper_band:
             bb_signal = -1  # Overbought
         elif current_price < lower_band:
-            bb_signal = 1   # Oversold
+            bb_signal = 1  # Oversold
 
         rsi_signal = 0
         if rsi > 70:
             rsi_signal = -1  # Overbought
         elif rsi < 30:
-            rsi_signal = 1   # Oversold
+            rsi_signal = 1  # Oversold
 
         direction = (bb_signal + rsi_signal) / 2.0
         confidence = min(abs(direction) * 1.2, 1.0)  # Boost confidence for mean reversion
 
-        return {'direction': direction, 'confidence': confidence}
+        return {"direction": direction, "confidence": confidence}
 
     def _rsi(self, prices: list[float], period: int = 14) -> float:
         """Calculate RSI"""
@@ -678,7 +709,7 @@ class MeanReversionModel:
         losses = []
 
         for i in range(1, len(prices)):
-            change = prices[i] - prices[i-1]
+            change = prices[i] - prices[i - 1]
             if change > 0:
                 gains.append(change)
                 losses.append(0)
@@ -704,11 +735,11 @@ class VolatilityModel:
     def predict(self, market_data: dict[str, Any]) -> dict[str, float]:
         """Generate volatility-based prediction"""
 
-        close = market_data.get('close', [])
-        volume = market_data.get('volume', [])
+        close = market_data.get("close", [])
+        volume = market_data.get("volume", [])
 
         if len(close) < 20 or len(volume) < 20:
-            return {'direction': 0.0, 'confidence': 0.0}
+            return {"direction": 0.0, "confidence": 0.0}
 
         # Calculate volatility metrics
         returns = np.diff(np.log(close))
@@ -735,7 +766,7 @@ class VolatilityModel:
             direction = -1.0 if close[-1] > np.mean(close[-10:]) else 1.0
             confidence = 0.5
 
-        return {'direction': direction, 'confidence': confidence}
+        return {"direction": direction, "confidence": confidence}
 
 
 class OrderFlowModel:
@@ -745,11 +776,11 @@ class OrderFlowModel:
         """Generate order flow-based prediction"""
 
         # This would use order book data, but for now use volume profile
-        volume = market_data.get('volume', [])
-        close = market_data.get('close', [])
+        volume = market_data.get("volume", [])
+        close = market_data.get("close", [])
 
         if len(volume) < 20 or len(close) < 20:
-            return {'direction': 0.0, 'confidence': 0.0}
+            return {"direction": 0.0, "confidence": 0.0}
 
         # Simple order flow analysis using volume and price
         volume_sma = np.mean(volume[-10:])
@@ -766,7 +797,7 @@ class OrderFlowModel:
             direction = 0.0
             confidence = 0.4
 
-        return {'direction': direction, 'confidence': confidence}
+        return {"direction": direction, "confidence": confidence}
 
 
 class MLTradingClassifier:
@@ -782,12 +813,12 @@ class MLTradingClassifier:
 
         if not self.is_trained:
             # Return neutral if not trained
-            return {'direction': 0.0, 'confidence': 0.5}
+            return {"direction": 0.0, "confidence": 0.5}
 
         # Extract features
         features = self._extract_features(market_data)
         if not features:
-            return {'direction': 0.0, 'confidence': 0.0}
+            return {"direction": 0.0, "confidence": 0.0}
 
         # Scale features
         features_scaled = self.scaler.transform([features])
@@ -806,13 +837,13 @@ class MLTradingClassifier:
             direction = 0.0
             confidence = max(prediction)
 
-        return {'direction': direction, 'confidence': confidence}
+        return {"direction": direction, "confidence": confidence}
 
     def _extract_features(self, market_data: dict[str, Any]) -> list[float]:
         """Extract features for ML model"""
 
-        close = market_data.get('close', [])
-        volume = market_data.get('volume', [])
+        close = market_data.get("close", [])
+        volume = market_data.get("volume", [])
 
         if len(close) < 20 or len(volume) < 20:
             return []
@@ -843,7 +874,7 @@ class MLTradingClassifier:
             macd,  # MACD
             volume_ratio,  # Volume ratio
             np.skew(returns[-20:]),  # Return skewness
-            np.kurtosis(returns[-20:])  # Return kurtosis
+            np.kurtosis(returns[-20:]),  # Return kurtosis
         ]
 
     def _calculate_rsi(self, prices: list[float], period: int) -> float:
@@ -855,7 +886,7 @@ class MLTradingClassifier:
         losses = []
 
         for i in range(1, len(prices)):
-            change = prices[i] - prices[i-1]
+            change = prices[i] - prices[i - 1]
             if change > 0:
                 gains.append(change)
                 losses.append(0)
@@ -897,7 +928,7 @@ class VPINBasedModel:
 
         # This would use actual VPIN calculation
         # For now, return neutral
-        return {'direction': 0.0, 'confidence': 0.4}
+        return {"direction": 0.0, "confidence": 0.4}
 
 
 # Convenience functions
@@ -906,9 +937,9 @@ def create_ensemble_system(config: EnsembleConfig = None) -> EnsembleTradingSyst
     return EnsembleTradingSystem(config)
 
 
-async def get_ensemble_prediction(system: EnsembleTradingSystem,
-                                market_data: dict[str, Any],
-                                symbol: str) -> EnsemblePrediction:
+async def get_ensemble_prediction(
+    system: EnsembleTradingSystem, market_data: dict[str, Any], symbol: str
+) -> EnsemblePrediction:
     """Get ensemble prediction for symbol"""
     return await system.predict(market_data, symbol)
 
