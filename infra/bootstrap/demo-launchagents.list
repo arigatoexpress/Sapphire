@@ -1,0 +1,9 @@
+# LaunchAgents safe to copy on a fresh demo Mac.
+# bootstrap_fresh_mac.sh rewrites each copied plist to RunAtLoad=false.
+services/dashboard/launchagent/com.sapphire.dashboard.plist
+services/inference-proxy/launchagent/com.sapphire.inference-proxy.plist
+services/pm_bot/launchagent/com.sapphire.pm-bot.plist
+services/service_supervisor/launchagent/com.sapphire.service-supervisor.plist
+infra/launchagents/com.sapphire.control-plane.plist
+infra/launchagents/com.sapphire.signal-logger.plist
+infra/launchagents/com.sapphire.trading-shadow-controller.plist
