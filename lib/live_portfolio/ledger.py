@@ -9,10 +9,11 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from lib.core.provenance import ProvenanceEnvelope
 from lib.security.pii_redactor import per_tenant_hash, redact_text
@@ -164,7 +165,7 @@ class LiveTradeRecord:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, payload: dict[str, Any]) -> "LiveTradeRecord":
+    def from_dict(cls, payload: dict[str, Any]) -> LiveTradeRecord:
         if not isinstance(payload, dict):
             raise ValueError("trade record must be a JSON object")
         data = dict(payload)
@@ -191,7 +192,7 @@ class LiveTradeRecord:
         generator: str = "live_portfolio.ledger",
         source_paths: tuple[str | Path, ...] = (),
         metadata: dict[str, Any] | None = None,
-    ) -> "LiveTradeRecord":
+    ) -> LiveTradeRecord:
         """Build a record and stamp it with a provenance envelope."""
 
         data = dict(payload)

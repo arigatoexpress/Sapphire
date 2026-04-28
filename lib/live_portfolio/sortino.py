@@ -8,8 +8,9 @@ reasons instead of quietly inventing a ratio.
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
-from typing import Any, Iterable
+from typing import Any
 
 
 @dataclass(frozen=True)

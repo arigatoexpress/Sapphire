@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import pytest
 
-from lib.live_portfolio.seed import provenance_for_operator_fill, record_from_operator_fill, seed_record
+from lib.live_portfolio.seed import (
+    provenance_for_operator_fill,
+    record_from_operator_fill,
+    seed_record,
+)
 
 
 def fill_payload() -> dict:
