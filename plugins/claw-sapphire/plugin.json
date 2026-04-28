@@ -18,6 +18,7 @@
     {
       "name": "sapphire_dispatch",
       "description": "Route a development task to the optimal inference tier (T0=Nemotron free, T1=Kimi subscription, T3=Claude expensive). Classifies task complexity via Nemotron, checks token budget, executes on cheapest capable tier.",
+      "inputSchema": {"type": "object", "additionalProperties": true},
       "command": "python3",
       "args": ["plugins/claw-sapphire/tools/dispatch.py"],
       "requiredPermission": "workspace-write"
@@ -25,6 +26,7 @@
     {
       "name": "sapphire_verify",
       "description": "Run lint (ruff) and tests (pytest) on a repo. Returns pass/fail status and whether it's safe to commit. Use after making code changes.",
+      "inputSchema": {"type": "object", "additionalProperties": true},
       "command": "python3",
       "args": ["plugins/claw-sapphire/tools/verify.py"],
       "requiredPermission": "read-only"
@@ -32,6 +34,7 @@
     {
       "name": "sapphire_budget",
       "description": "Show token usage per inference tier for today. Shows T0 (Nemotron/free), T1 (Kimi), T3 (Claude) with budget bars and call counts.",
+      "inputSchema": {"type": "object", "additionalProperties": true},
       "command": "python3",
       "args": ["plugins/claw-sapphire/tools/budget.py"],
       "requiredPermission": "read-only"
@@ -39,6 +42,7 @@
     {
       "name": "sapphire_state",
       "description": "Read/write persistent factory state. Tracks known issues, fix attempts, backoff timers. Prevents re-attempting failed fixes.",
+      "inputSchema": {"type": "object", "additionalProperties": true},
       "command": "python3",
       "args": ["plugins/claw-sapphire/tools/state.py"],
       "requiredPermission": "workspace-write"
@@ -46,6 +50,7 @@
     {
       "name": "sapphire_status",
       "description": "Query Sapphire mesh status — Tailscale devices, Ollama models on GPU and local.",
+      "inputSchema": {"type": "object", "additionalProperties": true},
       "command": "python3",
       "args": ["plugins/claw-sapphire/tools/status.py"],
       "requiredPermission": "read-only"
@@ -53,6 +58,7 @@
     {
       "name": "sapphire_notify",
       "description": "Send a Telegram notification via NemotronRariBot. Priority: p0=urgent, p1=normal, p2=low.",
+      "inputSchema": {"type": "object", "additionalProperties": true},
       "command": "python3",
       "args": ["plugins/claw-sapphire/tools/notify.py"],
       "requiredPermission": "read-only"
@@ -60,6 +66,7 @@
     {
       "name": "sapphire_health_check",
       "description": "Run Sapphire's unified health check across services, repos, data freshness, and inference endpoints. Supports brief and full profiles.",
+      "inputSchema": {"type": "object", "additionalProperties": true},
       "command": "python3",
       "args": ["plugins/claw-sapphire/tools/health_check.py"],
       "requiredPermission": "read-only"
@@ -67,6 +74,7 @@
     {
       "name": "sapphire_market",
       "description": "Unified market data — equity quotes, crypto OHLCV, FRED macro, news via OpenBB (32 providers) + TradingView live chart data, Pine Script CI. Actions: quote, crypto, historical, fred, news, snapshot, tv_quote, tv_ohlcv, tv_levels, tv_strategy, pine_ci.",
+      "inputSchema": {"type": "object", "additionalProperties": true},
       "command": "python3",
       "args": ["plugins/claw-sapphire/tools/market.py"],
       "requiredPermission": "read-only"
@@ -74,6 +82,7 @@
     {
       "name": "sapphire_predict_kronos",
       "description": "Kronos foundation-model forecasting for candles and market direction. Actions: predict, batch, status. Successful predict/batch calls also refresh `data/intelligence/YYYY-MM-DD/predictions.json`.",
+      "inputSchema": {"type": "object", "additionalProperties": true},
       "command": "python3",
       "args": ["plugins/claw-sapphire/tools/predict_kronos.py"],
       "requiredPermission": "workspace-write"
@@ -81,6 +90,7 @@
     {
       "name": "sapphire_threat_intel",
       "description": "Threat intelligence via cyber-threat-bot. Actions: latest, brief, offers, scan. Persists markdown outputs under `data/threat_intel/` and may emit threat.detected events.",
+      "inputSchema": {"type": "object", "additionalProperties": true},
       "command": "python3",
       "args": ["plugins/claw-sapphire/tools/threat_intel.py"],
       "requiredPermission": "workspace-write"
@@ -88,6 +98,7 @@
     {
       "name": "sapphire_lumo_research",
       "description": "Security-focused research through the local Proton Lumo bridge. Actions: ask, security_brief, status. Redacts common secret patterns before sending prompts.",
+      "inputSchema": {"type": "object", "additionalProperties": true},
       "command": "python3",
       "args": ["plugins/claw-sapphire/tools/lumo_research.py"],
       "requiredPermission": "read-only"
@@ -95,6 +106,7 @@
     {
       "name": "sapphire_starred_repos",
       "description": "GitHub starred-repo sync and synergy analysis. Actions: sync, analyze, report, trending. Persists outputs under `data/starred_repos/`.",
+      "inputSchema": {"type": "object", "additionalProperties": true},
       "command": "python3",
       "args": ["plugins/claw-sapphire/tools/starred_repos.py"],
       "requiredPermission": "workspace-write"
@@ -102,6 +114,7 @@
     {
       "name": "sapphire_macro_data",
       "description": "FRED macro-economic indicators: GDP, CPI, unemployment, rates, housing. Actions: dashboard, rates, housing, series. Feeds trading_brain macro sentiment. Graceful fallback if FRED API key missing.",
+      "inputSchema": {"type": "object", "additionalProperties": true},
       "command": "python3",
       "args": ["plugins/claw-sapphire/tools/macro_data.py"],
       "requiredPermission": "read-only"
@@ -109,6 +122,7 @@
     {
       "name": "sapphire_lead_engine",
       "description": "AI-powered outbound lead generation. Analyze websites to extract ICP, discover matching businesses from Regional Intel data, generate personalized outreach. Actions: analyze, discover, outreach, pipeline.",
+      "inputSchema": {"type": "object", "additionalProperties": true},
       "command": "python3",
       "args": ["plugins/claw-sapphire/tools/lead_engine.py"],
       "requiredPermission": "workspace-write"
@@ -116,6 +130,7 @@
     {
       "name": "sapphire_trading_brain",
       "description": "Unified trading decision engine combining TA, ensemble signals, Kronos, macro, and paper track record. Produces GO/LEAN/WAIT decisions with confidence. Actions: decide, dashboard. Decisions logged for accuracy tracking.",
+      "inputSchema": {"type": "object", "additionalProperties": true},
       "command": "python3",
       "args": ["plugins/claw-sapphire/tools/trading_brain.py"],
       "requiredPermission": "read-only"
