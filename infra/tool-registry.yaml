@@ -328,6 +328,14 @@ tools:
     consumers: []
     description: Vertex/Gemini eval harness. Benchmarks Gemini OODA outputs against the local 4-tier inference mesh and a deterministic mock baseline using a reproducible rubric (structural_validity, actionability, citation_density). Dry-run by default; live mode requires SAPPHIRE_GEMINI_LIVE=1 plus a key plus the sensitivity gate, and applies the same per-hour and per-month caps as gemini_ooda plus a per-run prompt cap.
 
+  # Intel — BigQuery vector retrieval over the Sapphire intel corpus
+  - name: intel_search
+    path: plugins/claw-sapphire/tools/internal/intel_search.py
+    status: internal
+    owner: sapphire
+    consumers: []
+    description: Semantic retrieval over the Sapphire intel corpus (sovereign-thesis / convergence-watchlist / threat-intel). Mock-by-default in-memory cosine store with provenance-stamped hits; live BigQuery path is gated on SAPPHIRE_BQ_LIVE=1 + GOOGLE_APPLICATION_CREDENTIALS + SAPPHIRE_BQ_PROJECT match. Actions, search/index/stats/models. Caps, k≤50, batch≤5000, live≤2/hour.
+
   # ── deprecated / sunset window ───────────────────────────────────────────
   - name: kronos_predict
     path: plugins/claw-sapphire/tools/_deprecated/kronos_predict.py
