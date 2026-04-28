@@ -37,6 +37,7 @@ def test_readme_inventory_check_allows_small_undercount(tmp_path: Path) -> None:
     readme.write_text(
         "\n".join(
             [
+                "[![Tests](https://img.shields.io/badge/tests-3%2C550%2B%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)",
                 "| Passing tests | **3,550+** | 3,420+ unit · 130 plugin (`pytest`) |",
                 "| Test files | **185+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |",
             ]
@@ -56,6 +57,7 @@ def test_readme_inventory_check_allows_small_undercount(tmp_path: Path) -> None:
 
     assert result["ok"] is True
     assert result["deltas"]["total"] == 1
+    assert result["deltas"]["badge_total"] == 1
     assert result["deltas"]["files"] == 3
 
 
@@ -64,6 +66,7 @@ def test_readme_inventory_check_rejects_overclaim(tmp_path: Path) -> None:
     readme.write_text(
         "\n".join(
             [
+                "[![Tests](https://img.shields.io/badge/tests-3%2C550%2B%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)",
                 "| Passing tests | **3,600+** | 3,420+ unit · 130 plugin (`pytest`) |",
                 "| Test files | **185+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |",
             ]
@@ -90,6 +93,7 @@ def test_readme_inventory_check_rejects_file_count_overclaim(tmp_path: Path) -> 
     readme.write_text(
         "\n".join(
             [
+                "[![Tests](https://img.shields.io/badge/tests-3%2C550%2B%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)",
                 "| Passing tests | **3,550+** | 3,420+ unit · 130 plugin (`pytest`) |",
                 "| Test files | **200+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |",
             ]
@@ -109,3 +113,30 @@ def test_readme_inventory_check_rejects_file_count_overclaim(tmp_path: Path) -> 
 
     assert result["ok"] is False
     assert result["overclaims"] == {"files": -13}
+
+
+def test_readme_inventory_check_rejects_badge_overclaim(tmp_path: Path) -> None:
+    readme = tmp_path / "README.md"
+    readme.write_text(
+        "\n".join(
+            [
+                "[![Tests](https://img.shields.io/badge/tests-3%2C600%2B%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)",
+                "| Passing tests | **3,550+** | 3,420+ unit · 130 plugin (`pytest`) |",
+                "| Test files | **185+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    inventory = test_inventory.Inventory(
+        schema_version=1,
+        generated_at="2026-04-28T00:00:00+00:00",
+        suites=[
+            test_inventory.SuiteInventory("unit", ["tests/unit"], 3420, 170, 1),
+            test_inventory.SuiteInventory("plugin", ["plugins/claw-sapphire/tests"], 130, 17, 1),
+        ],
+    )
+
+    result = test_inventory.check_readme_inventory(inventory, readme_path=readme, max_drift=50)
+
+    assert result["ok"] is False
+    assert result["overclaims"] == {"badge_total": -50}
