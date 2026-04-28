@@ -358,6 +358,13 @@ tools:
     consumers: []
     description: Sapphire Signal Correlation Engine 0.1.0. Cross-source fusion across the 8 signal feeds (TradingView / Telegram intel / Hyperliquid public feed / threat-intel / convergence-watchlist / sovereign-thesis / Kronos forecast / TA scanner) into a unified edge_score, consensus label, and corroborated_by/divergent_sources arrays per (symbol, timeframe). Read-only consumer of disk snapshots, never writes back. Caps, ≤16 sources/correlation, ≤1200 correlations/hour, 24h freshness hard limit. Actions, correlate-once/latest/status/weights. Tunable via ~/.sapphire/correlator_weights.yaml.
 
+  - name: event_impact
+    path: plugins/claw-sapphire/tools/internal/event_impact.py
+    status: internal
+    owner: sapphire
+    consumers: []
+    description: Historical Event-Impact Modeling 0.1.0. Curated cited corpus plus empirical reaction-window lookup for macro, ETF, exchange-hack, enforcement, and broad macro-shock events across BTC/ETH/SOL/SPY/GLD. Dry-run by default; rebuild requires SAPPHIRE_EVENT_IMPACT_REBUILD=1 and writes provenance-stamped model artifacts. Actions, lookup/corpus/rebuild/accuracy-audit.
+
   # ── deprecated / sunset window ───────────────────────────────────────────
   - name: kronos_predict
     path: plugins/claw-sapphire/tools/_deprecated/kronos_predict.py
