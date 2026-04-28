@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>SEC Current Events</title>
+  <id>https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent</id>
+  <entry>
+    <title>SEC Charges Coinbase With Operating as an Unregistered Securities Exchange</title>
+    <link href="https://www.sec.gov/news/press-release/2026-20" />
+    <id>sec-2026-20</id>
+    <updated>2026-02-12T14:00:00Z</updated>
+    <summary>SEC enforcement action alleges unregistered broker and exchange activity.</summary>
+  </entry>
+  <entry>
+    <title>SEC Approves Spot Bitcoin ETF Rule Change</title>
+    <link href="https://www.sec.gov/news/press-release/2026-21" />
+    <id>sec-2026-21</id>
+    <updated>2026-02-13T14:00:00Z</updated>
+    <summary>The Commission approved a proposed rule change for a Bitcoin exchange-traded product.</summary>
+  </entry>
+</feed>

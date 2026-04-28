@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>CFTC Press Releases</title>
+    <link>https://www.cftc.gov/PressRoom/PressReleases.rss</link>
+    <item>
+      <title>CFTC Charges Crypto Exchange With Fraud and Market Manipulation</title>
+      <link>https://www.cftc.gov/PressRoom/PressReleases/9000-26</link>
+      <guid>cftc-9000-26</guid>
+      <pubDate>Tue, 10 Feb 2026 15:30:00 GMT</pubDate>
+      <description>The enforcement action seeks civil monetary penalties and trading bans.</description>
+    </item>
+    <item>
+      <title>CFTC Announces Settlement With Digital Asset Trading Platform</title>
+      <link>https://www.cftc.gov/PressRoom/PressReleases/9001-26</link>
+      <guid>cftc-9001-26</guid>
+      <pubDate>Wed, 11 Feb 2026 15:30:00 GMT</pubDate>
+      <description>The order resolves registration and compliance failures.</description>
+    </item>
+  </channel>
+</rss>

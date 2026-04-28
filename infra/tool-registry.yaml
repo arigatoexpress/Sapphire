@@ -198,6 +198,16 @@ tools:
       - hermes-agent.macro-data
     description: FRED macro dashboard (CPI, unemployment, rates, housing). Graceful fallback when FRED_API_KEY unset.
 
+  - name: macro_intel
+    path: plugins/claw-sapphire/tools/internal/macro_intel.py
+    status: internal
+    owner: sapphire
+    consumers:
+      - services.macro-intel
+      - scheduled-tasks.market-pulse
+      - hermes-agent.macro-data
+    description: Official regulatory and macro intelligence daemon/tool. Pulls Fed/FOMC, CFTC, SEC, Treasury, BLS, ECB, and BIS sources with dry-run defaults, source citations, cache counters, calendar windows, and heuristic classification.
+
   # Intelligence & ops
   - name: threat_intel
     path: plugins/claw-sapphire/tools/internal/threat_intel.py

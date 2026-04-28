@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>BIS Press Releases</title>
+    <link>https://www.bis.org/list/press_releases/index.rss</link>
+    <item>
+      <title>BIS warns that crypto leverage can amplify systemic liquidity stress</title>
+      <link>https://www.bis.org/press/p260215.htm</link>
+      <guid>bis-2026-02-15</guid>
+      <pubDate>Sun, 15 Feb 2026 11:00:00 GMT</pubDate>
+      <description>Central bank cooperation remains important during market stress.</description>
+    </item>
+    <item>
+      <title>BIS publishes Basel Committee consultation on digital asset exposures</title>
+      <link>https://www.bis.org/press/p260216.htm</link>
+      <guid>bis-2026-02-16</guid>
+      <pubDate>Mon, 16 Feb 2026 11:00:00 GMT</pubDate>
+      <description>The consultation covers bank capital treatment of tokenized assets.</description>
+    </item>
+  </channel>
+</rss>
