@@ -60,6 +60,17 @@ def reset_health_and_metrics(app_module):
             v["success"] = 0
             v["failure"] = 0
             v["total_ms"] = 0
+    with app_module._tenant_usage_lock:
+        app_module._tenant_usage.clear()
+    with app_module._prompt_cache_lock:
+        app_module._prompt_cache.clear()
+        for key in app_module._prompt_cache_stats:
+            app_module._prompt_cache_stats[key] = 0
+    app_module._REQUIRE_API_KEY = False
+    app_module._quota_config = {
+        "default": app_module._default_tenant_policy(),
+        "keys": {},
+    }
     yield
 
 
@@ -318,6 +329,185 @@ class TestMetrics:
             app_module._record(f"filler-{i}", True, 1)
         app_module._record("overflow-tier", True, 1)
         assert "overflow-tier" not in app_module._metrics
+
+
+# ─── Tenant quotas + prompt cache ─────────────────────────────────────────────
+
+
+class TestTenantQuotasAndCache:
+    def test_known_api_key_resolves_to_configured_tenant(self, app_module):
+        key_hash = app_module._hash_api_key("tenant-secret")
+        app_module._quota_config = {
+            "default": app_module._default_tenant_policy(),
+            "keys": {
+                key_hash: {
+                    "tenant_id": "ops",
+                    "requests_per_day": 2,
+                    "tokens_per_day": 100,
+                    "cache_ttl_seconds": 30,
+                }
+            },
+        }
+
+        policy, err = app_module._tenant_context({"X-API-Key": "tenant-secret"})
+
+        assert err is None
+        assert policy["tenant_id"] == "ops"
+        assert "tenant-secret" not in json.dumps(policy)
+
+    def test_require_api_key_fails_closed(self, app_module):
+        app_module._REQUIRE_API_KEY = True
+
+        policy, err = app_module._tenant_context({})
+
+        assert policy is None
+        assert err["code"] == "api_key_required"
+
+    def test_reserve_quota_blocks_over_limit(self, app_module):
+        policy = {
+            "tenant_id": "tiny",
+            "requests_per_day": 1,
+            "tokens_per_day": 10,
+            "cache_ttl_seconds": 0,
+        }
+
+        assert app_module._reserve_quota("tiny", policy, 3) is None
+        err = app_module._reserve_quota("tiny", policy, 3)
+
+        assert err["code"] == "quota_exceeded"
+        assert err["limit"] == "requests_per_day"
+
+    def test_quota_endpoint_redacts_api_key(self, app_module):
+        key_hash = app_module._hash_api_key("tenant-secret")
+        app_module._quota_config = {
+            "default": app_module._default_tenant_policy(),
+            "keys": {
+                key_hash: {
+                    "tenant_id": "research",
+                    "requests_per_day": 7,
+                    "tokens_per_day": 700,
+                    "cache_ttl_seconds": 5,
+                }
+            },
+        }
+        handler = _make_handler(
+            app_module,
+            path="/v1/quota",
+            body=b"",
+            headers={"X-API-Key": "tenant-secret"},
+            method="GET",
+        )
+
+        handler.do_GET()
+
+        assert handler._captured_status == 200
+        payload = _response_payload(handler)
+        assert payload["tenant"] == "research"
+        assert payload["policy"]["requests_per_day"] == 7
+        assert "tenant-secret" not in json.dumps(payload)
+
+    def test_cache_stats_endpoint_shape(self, app_module):
+        app_module._cache_set(
+            "cache-key",
+            tenant_id="ops",
+            ttl_seconds=60,
+            response={"ok": True},
+            tier="windows-gpu",
+        )
+        handler = _make_handler(app_module, path="/v1/cache-stats", body=b"", method="GET")
+
+        handler.do_GET()
+
+        assert handler._captured_status == 200
+        payload = _response_payload(handler)
+        assert payload["entries"] == 1
+        assert payload["by_tenant"] == {"ops": 1}
+        assert payload["stats"]["writes"] == 1
+
+    def test_exceeded_quota_returns_429_before_routing(self, app_module, monkeypatch):
+        app_module._quota_config = {
+            "default": {
+                "tenant_id": "anonymous",
+                "requests_per_day": 0,
+                "tokens_per_day": 1000,
+                "cache_ttl_seconds": 0,
+            },
+            "keys": {},
+        }
+
+        def boom(*_args, **_kwargs):
+            raise AssertionError("routing should not run after quota failure")
+
+        monkeypatch.setattr(app_module, "_try_ollama_native", boom)
+        body = json.dumps(
+            {
+                "model": "balanced",
+                "messages": [{"role": "user", "content": "hello"}],
+            }
+        ).encode()
+        handler = _make_handler(app_module, path="/v1/chat/completions", body=body)
+
+        handler.do_POST()
+
+        assert handler._captured_status == 429
+        payload = _response_payload(handler)
+        assert payload["code"] == "quota_exceeded"
+        assert payload["limit"] == "requests_per_day"
+
+    def test_negative_max_tokens_rejected_before_quota(self, app_module):
+        body = json.dumps(
+            {
+                "model": "balanced",
+                "messages": [{"role": "user", "content": "hello"}],
+                "max_tokens": -1,
+            }
+        ).encode()
+        handler = _make_handler(app_module, path="/v1/chat/completions", body=body)
+
+        handler.do_POST()
+
+        assert handler._captured_status == 400
+        assert _response_payload(handler)["code"] == "invalid_request"
+        assert app_module._tenant_usage == {}
+
+    def test_prompt_cache_hit_avoids_second_model_call(self, app_module, monkeypatch):
+        calls = {"n": 0}
+
+        def fake_ollama(*_args, **_kwargs):
+            calls["n"] += 1
+            return {
+                "id": "chatcmpl-test",
+                "object": "chat.completion",
+                "created": 1,
+                "model": "hermes3:8b",
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "content": "cached answer"},
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+            }
+
+        monkeypatch.setattr(app_module, "_probe_endpoint", lambda *a, **kw: True)
+        monkeypatch.setattr(app_module, "_try_ollama_native", fake_ollama)
+        body = json.dumps(
+            {
+                "model": "balanced",
+                "messages": [{"role": "user", "content": "cache me"}],
+            }
+        ).encode()
+
+        first = _make_handler(app_module, path="/v1/chat/completions", body=body)
+        first.do_POST()
+        second = _make_handler(app_module, path="/v1/chat/completions", body=body)
+        second.do_POST()
+
+        assert first._captured_status == 200
+        assert second._captured_status == 200
+        assert calls["n"] == 1
+        assert dict(second._captured_headers)["X-Inference-Cache"] == "hit"
 
 
 # ─── Outbound HTTP wrappers ───────────────────────────────────────────────────
