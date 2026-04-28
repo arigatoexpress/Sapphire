@@ -11,6 +11,9 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
     "pytest-cov>=5.0",
+    # Parallel test execution for the slowest unit modules. Used opportunistically
+    # via `pytest -n auto`; the suite still works without it.
+    "pytest-xdist>=3.6",
     # Keep this aligned with requirements-test.txt so bare `pytest` collection
     # has the optional service deps the unit suite imports.
     "aiohttp==3.13.5",
@@ -93,6 +96,7 @@ markers = [
     "integration: hits live services / network",
     "gpu: requires the Windows GPU tier",
     "asyncio: pytest-asyncio marker — kept registered so --strict-markers doesn't reject it",
+    "xdist_group: pytest-xdist serialization tag (group of tests pinned to one worker)",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning:aiohttp.*",
