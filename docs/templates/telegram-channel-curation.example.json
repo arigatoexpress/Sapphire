@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "run_id": "telegram-curation-YYYY-MM-DD",
+  "candidates": [
+    {
+      "candidate_id": "security-feed-alpha",
+      "source_ref": "local-alias-only",
+      "category": "security",
+      "min_quality_score": 0.45,
+      "operator_notes": "Public research feed; representative samples only.",
+      "known_risks": [
+        "Occasional promotional sponsor posts; require source-link checks."
+      ],
+      "sample_messages": [
+        {
+          "message_id": "sample-001",
+          "published_at": "2026-04-28T15:00:00+00:00",
+          "author_ref": "analyst-a",
+          "text": "CVE-2026-0001 exploit activity observed against edge VPN devices; vendor mitigation and IOCs published by the security team."
+        },
+        {
+          "message_id": "sample-002",
+          "published_at": "2026-04-28T15:05:00+00:00",
+          "author_ref": "analyst-a",
+          "text": "Ransomware leak site lists a new manufacturing victim; attribution remains unconfirmed pending independent reporting."
+        },
+        {
+          "message_id": "sample-003",
+          "published_at": "2026-04-28T15:10:00+00:00",
+          "author_ref": "analyst-b",
+          "text": "Cloud provider outage investigation notes elevated API latency and recommends monitoring retry queues until recovery is confirmed."
+        }
+      ]
+    }
+  ],
+  "bot_pump_reviews": [
+    {
+      "review_id": "review-001",
+      "candidate_id": "market-feed-beta",
+      "finding": {
+        "rule_id": "coordinated_pump_burst",
+        "severity": "high",
+        "summary": "Detector saw pump-like messages in a short burst."
+      },
+      "operator_review": {
+        "decision": "needs_review",
+        "evidence": {
+          "independent_sources": [],
+          "no_profit_claim": false,
+          "no_coordination_burst": false,
+          "no_bot_execution_language": false,
+          "sample_message_ids": []
+        }
+      }
+    }
+  ]
+}
