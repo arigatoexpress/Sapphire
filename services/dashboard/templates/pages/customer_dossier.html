@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block title %}Customer_Dossier{% endblock %}
+
+{% block extra_css %}
+<style>
+.cd-section {
+    border: 1px solid var(--border-dim);
+    background: rgba(0, 0, 0, 0.5);
+    padding: var(--space-md);
+    margin-bottom: var(--space-lg);
+}
+
+.cd-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: var(--space-sm);
+    margin-bottom: var(--space-md);
+}
+
+.cd-stat {
+    border: 1px dashed var(--border-dim);
+    padding: var(--space-sm);
+    text-align: center;
+}
+
+.cd-stat-value {
+    font-size: 1.6rem;
+    color: var(--text-green);
+    font-family: var(--font-header);
+}
+
+.cd-stat-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.cd-status-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    margin-top: var(--space-sm);
+}
+
+.cd-status-pill {
+    padding: 0.15rem 0.6rem;
+    border: 1px solid var(--border-dim);
+    border-radius: 12px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.cd-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.cd-table th, .cd-table td {
+    text-align: left;
+    padding: var(--space-xs) var(--space-sm);
+    border-bottom: 1px dotted rgba(98, 255, 64, 0.15);
+}
+
+.cd-table th {
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+}
+
+.empty {
+    color: var(--text-muted);
+    padding: var(--space-md);
+    border: 1px dashed var(--border-dim);
+    text-align: center;
+}
+
+.cd-meta {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-bottom: var(--space-sm);
+}
+
+.cd-safety-banner {
+    background: rgba(105, 214, 255, 0.06);
+    border-left: 2px solid var(--cyan);
+    padding: var(--space-sm) var(--space-md);
+    margin-bottom: var(--space-md);
+    font-size: 0.8rem;
+}
+
+.cd-safety-banner strong {
+    color: var(--cyan);
+}
+
+.cd-redacted {
+    font-family: var(--font-terminal);
+    color: var(--text-muted);
+    background: rgba(0, 0, 0, 0.4);
+    padding: 1px 4px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section>
+    <h2>Customer_Dossier // Buyer-Facing Surface</h2>
+    <div class="cd-safety-banner">
+        <strong>PII redaction is mandatory on this surface.</strong>
+        Names map to <code>customer_&lt;6charhash&gt;</code>; phones reduce to <code>***-***-NNNN</code>;
+        emails reduce to <code>&lt;first2&gt;***@&lt;domain&gt;</code>; addresses collapse to <code>&lt;city&gt;, &lt;state&gt;</code>.
+        SSN, DOB, credit-card, and PIN fields are dropped entirely. Source:
+        <code>data/tho_intel/dossier_*.json</code> — local snapshots only, no live network calls.
+    </div>
+    <div id="cd-meta" class="cd-meta">Loading…</div>
+
+    <div id="cd-summary" class="cd-summary-grid"></div>
+    <div id="cd-status-row" class="cd-status-row"></div>
+
+    <div class="cd-section">
+        <h3>Recent Deals (Anonymized)</h3>
+        <div id="cd-deals"><div class="empty">Loading deals…</div></div>
+    </div>
+</section>
+
+<script>
+(async function() {
+    const meta = document.getElementById('cd-meta');
+    const summary = document.getElementById('cd-summary');
+    const statusRow = document.getElementById('cd-status-row');
+    const deals = document.getElementById('cd-deals');
+
+    const escape = (s) => String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+    function renderTable(rows, columns) {
+        if (!rows || !rows.length) {
+            return '<div class="empty">No deals in current snapshot.</div>';
+        }
+        const head = columns.map(c => `<th>${escape(c.label)}</th>`).join('');
+        const body = rows.map(r => {
+            const cells = columns.map(c => {
+                if (c.cell) return `<td>${c.cell(r)}</td>`;
+                return `<td>${escape(r[c.key] || '')}</td>`;
+            }).join('');
+            return `<tr>${cells}</tr>`;
+        }).join('');
+        return `<table class="cd-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+    }
+
+    try {
+        const res = await fetch('/api/customer-dossier');
+        const payload = await res.json();
+        if (!payload.available) {
+            meta.textContent = `No recent snapshot — ${payload.error || 'unavailable'}`;
+            summary.innerHTML = '';
+            statusRow.innerHTML = '';
+            deals.innerHTML = '<div class="empty">No data. Snapshots are produced under <code>data/tho_intel/</code>.</div>';
+            return;
+        }
+
+        meta.textContent = `Snapshot ${payload.snapshot_at || payload.snapshot_path_basename || ''}`;
+
+        const s = payload.summary || {};
+        const stats = [
+            ['customers', s.total_customers],
+            ['document templates', s.document_templates],
+            ['recent deals', s.deals_recent],
+        ];
+        summary.innerHTML = stats.map(([label, value]) =>
+            `<div class="cd-stat"><div class="cd-stat-value">${escape(value || 0)}</div><div class="cd-stat-label">${escape(label)}</div></div>`
+        ).join('');
+
+        const byStatus = s.by_status || {};
+        statusRow.innerHTML = Object.keys(byStatus).map(k =>
+            `<span class="cd-status-pill">${escape(k)} <strong>${escape(byStatus[k])}</strong></span>`
+        ).join('') || '<span class="cd-status-pill">No status breakdown</span>';
+
+        const dealColumns = [
+            { label: 'Deal ID', cell: r => `<span class="cd-redacted">${escape(r.deal_id || r.id || '—')}</span>` },
+            { label: 'Customer', cell: r => `<span class="cd-redacted">${escape(r.customer_name || r.name || '—')}</span>` },
+            { label: 'Status', key: 'status' },
+            { label: 'Stage', key: 'stage' },
+            { label: 'Locality', cell: r => escape(r.address || r.city_state || '—') },
+            { label: 'Updated', cell: r => escape(r.updated_at || r.updated || r.created_at || '—') },
+        ];
+        deals.innerHTML = renderTable(payload.recent_deals || [], dealColumns);
+    } catch (e) {
+        meta.textContent = 'Failed to load customer-dossier API.';
+    }
+})();
+</script>
+{% endblock %}

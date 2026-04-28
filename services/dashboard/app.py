@@ -3146,6 +3146,378 @@ def api_gemini_ooda():
         ), 200
 
 
+# ── Product surfaces: /threat-intel and /customer-dossier ────────────
+#
+# These read-only pages productize the existing threat_intel and tho_intel
+# plugin tools as buyer-facing dashboard surfaces. Both routes:
+#
+# * are GET-only,
+# * inherit the dashboard's basic-auth via @requires_auth,
+# * read from local JSON snapshots — never make live network calls,
+# * render an empty state if the snapshot is missing,
+# * apply paste-safe redaction for any field that could contain PII.
+
+
+_THREAT_INTEL_INTELLIGENCE_DIR = _DASHBOARD_REPO_ROOT / "data" / "intelligence"
+_THREAT_INTEL_LATEST_SYMLINK = _THREAT_INTEL_INTELLIGENCE_DIR / "latest"
+_TARGET_THREAT_INTEL_DAYS = 7
+
+
+def _safe_threats_payload(error: str | None = None) -> dict[str, Any]:
+    """Emit the canonical empty-state envelope for /api/threat-intel."""
+    return {
+        "mode": "threat_intel_product_dashboard",
+        "available": False,
+        "snapshot_date": None,
+        "refreshed_at": None,
+        "error": error,
+        "summary": {
+            "total_threats": 0,
+            "exploited": 0,
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0,
+        },
+        "kev_top": [],
+        "nvd_critical": [],
+        "mitre_techniques": [],
+        "safety": {
+            "execution_enabled": False,
+            "live_trading_enabled": False,
+            "writes_by_default": False,
+            "telegram_sends_enabled": False,
+            "guards": [
+                "read_only_endpoint",
+                "no_live_network_calls",
+                "snapshot_only_read",
+            ],
+        },
+        "last_updated": time.time(),
+    }
+
+
+def _select_latest_threat_snapshot() -> tuple[Path | None, str | None]:
+    """Resolve the most recent threats.json snapshot in data/intelligence/.
+
+    Returns (path, snapshot_date_iso) or (None, None) if no usable snapshot
+    is on disk. Prefers the ``latest`` symlink when it exists; falls back
+    to the lexicographically newest dated directory containing threats.json.
+    """
+    if not _THREAT_INTEL_INTELLIGENCE_DIR.exists():
+        return None, None
+    # Prefer the symlink — the refresh job updates it atomically.
+    candidate = _THREAT_INTEL_LATEST_SYMLINK / "threats.json"
+    if candidate.is_file():
+        try:
+            target = (
+                _THREAT_INTEL_LATEST_SYMLINK.resolve(strict=True)
+                if _THREAT_INTEL_LATEST_SYMLINK.is_symlink()
+                else _THREAT_INTEL_LATEST_SYMLINK
+            )
+            return candidate, target.name
+        except OSError:
+            pass
+    # Fall back: scan dated subdirs.
+    candidates = sorted(
+        (
+            p for p in _THREAT_INTEL_INTELLIGENCE_DIR.iterdir()
+            if p.is_dir() and (p / "threats.json").is_file()
+        ),
+        reverse=True,
+    )
+    for d in candidates:
+        return d / "threats.json", d.name
+    return None, None
+
+
+def _classify_threat_severity(score: float, exploited: bool) -> str:
+    if exploited and score >= 9.0:
+        return "critical"
+    if exploited or score >= 9.0:
+        return "high"
+    if score >= 7.0:
+        return "medium"
+    return "low"
+
+
+def _build_threat_intel_payload(*, snapshot_path: Path | None, snapshot_date: str | None) -> dict[str, Any]:
+    if snapshot_path is None:
+        payload = _safe_threats_payload(error="no_snapshot_available")
+        return payload
+    try:
+        raw = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return _safe_threats_payload(error=f"snapshot_unreadable: {type(exc).__name__}")
+
+    threats = raw.get("threats") or []
+    refreshed_at = raw.get("refreshed_at")
+    summary = {
+        "total_threats": len(threats),
+        "exploited": sum(1 for t in threats if t.get("exploited")),
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+    }
+
+    kev_rows: list[dict[str, Any]] = []
+    nvd_rows: list[dict[str, Any]] = []
+    technique_counts: dict[str, dict[str, Any]] = {}
+
+    for t in threats:
+        score = float(t.get("score") or 0.0)
+        exploited = bool(t.get("exploited"))
+        sev = _classify_threat_severity(score, exploited)
+        summary[sev] = summary.get(sev, 0) + 1
+
+        sources = t.get("source") or ""
+        canonical_id = t.get("canonical_id") or ""
+
+        # KEV bucket: anything tagged as KEV / sourced from cisa-kev.
+        is_kev = "kev" in str(sources).lower() or "kev" in [
+            tag.lower() for tag in (t.get("tags") or [])
+        ]
+        title = (t.get("title") or "").strip()[:200]
+
+        row = {
+            "canonical_id": str(canonical_id)[:64],
+            "title": title,
+            "severity": sev,
+            "score": round(score, 2),
+            "exploited": exploited,
+            "published_at": t.get("published_at"),
+            "vendor_project": (t.get("metadata") or {}).get("vendor_project") or "",
+            "product": (t.get("metadata") or {}).get("product") or "",
+            "due_date": (t.get("metadata") or {}).get("due_date") or None,
+            "url": t.get("url") or "",
+        }
+
+        if is_kev:
+            kev_rows.append(row)
+        if score >= 9.0:
+            nvd_rows.append(row)
+
+        # MITRE ATT&CK techniques live in source_type=technique or in tags
+        # like T1234. We aggregate counts.
+        if t.get("source_type") == "technique" or t.get("source") == "mitre-attack":
+            tid = canonical_id or title
+            entry = technique_counts.setdefault(
+                str(tid)[:32],
+                {"id": str(tid)[:32], "title": title, "citations": 0, "severity": sev},
+            )
+            entry["citations"] += 1
+        for tag in t.get("tags") or []:
+            tag_str = str(tag)
+            if tag_str.startswith("T") and len(tag_str) >= 5 and tag_str[1:].split(".")[0].isdigit():
+                entry = technique_counts.setdefault(
+                    tag_str[:32],
+                    {"id": tag_str[:32], "title": "", "citations": 0, "severity": sev},
+                )
+                entry["citations"] += 1
+
+    kev_rows.sort(key=lambda r: (r.get("score") or 0.0), reverse=True)
+    nvd_rows.sort(key=lambda r: (r.get("score") or 0.0), reverse=True)
+    technique_rows = sorted(
+        technique_counts.values(), key=lambda r: r.get("citations", 0), reverse=True
+    )
+
+    return {
+        "mode": "threat_intel_product_dashboard",
+        "available": True,
+        "snapshot_date": snapshot_date,
+        "refreshed_at": refreshed_at,
+        "error": None,
+        "summary": summary,
+        "kev_top": kev_rows[:10],
+        "nvd_critical": nvd_rows[:10],
+        "mitre_techniques": technique_rows[:10],
+        "safety": {
+            "execution_enabled": False,
+            "live_trading_enabled": False,
+            "writes_by_default": False,
+            "telegram_sends_enabled": False,
+            "guards": [
+                "read_only_endpoint",
+                "no_live_network_calls",
+                "snapshot_only_read",
+            ],
+        },
+        "last_updated": time.time(),
+    }
+
+
+@app.route("/threat-intel")
+@requires_auth
+def threat_intel_page():
+    """Buyer-facing threat intelligence dashboard (read-only, paste-safe)."""
+    return render_template(
+        "pages/threat_intel.html",
+        current_page="threat-intel",
+        page_title="Threat Intelligence",
+    )
+
+
+@app.route("/api/threat-intel")
+@requires_auth
+def api_threat_intel():
+    """JSON envelope for /threat-intel — reads the latest threats.json snapshot."""
+    try:
+        snapshot_path, snapshot_date = _select_latest_threat_snapshot()
+        payload = _build_threat_intel_payload(
+            snapshot_path=snapshot_path, snapshot_date=snapshot_date
+        )
+        return jsonify(payload)
+    except Exception as e:
+        log.warning("threat-intel API error: %s", e)
+        return jsonify(_safe_threats_payload(error=str(e))), 200
+
+
+# ── Customer dossier ─────────────────────────────────────────────────
+
+
+_TARGET_TH_INTEL_DIR = _DASHBOARD_REPO_ROOT / "data" / "tho_intel"
+
+
+def _safe_dossier_payload(error: str | None = None) -> dict[str, Any]:
+    """Empty-state envelope for /api/customer-dossier."""
+    return {
+        "mode": "customer_dossier_product_dashboard",
+        "available": False,
+        "snapshot_at": None,
+        "error": error,
+        "summary": {
+            "total_customers": 0,
+            "by_status": {},
+            "document_templates": 0,
+            "deals_recent": 0,
+        },
+        "recent_deals": [],
+        "safety": {
+            "execution_enabled": False,
+            "live_trading_enabled": False,
+            "writes_by_default": False,
+            "telegram_sends_enabled": False,
+            "pii_redaction": "applied_to_every_leaf",
+            "guards": [
+                "read_only_endpoint",
+                "no_live_network_calls",
+                "snapshot_only_read",
+                "pii_redaction_required",
+            ],
+        },
+        "last_updated": time.time(),
+    }
+
+
+def _select_latest_dossier_snapshot() -> Path | None:
+    """Resolve the latest paste-safe customer dossier snapshot.
+
+    The plugin tool writes ``data/tho_intel/dossier_*.json`` (or the legacy
+    ``latest_*.md`` for human consumption). The dashboard surface only reads
+    JSON — markdown is for human triage, not for buyer-facing dashboards.
+    """
+    if not _TARGET_TH_INTEL_DIR.exists():
+        return None
+    candidates = sorted(_TARGET_TH_INTEL_DIR.glob("dossier_*.json"), reverse=True)
+    if candidates:
+        return candidates[0]
+    # Fall back to a "latest.json" if the operator pinned one explicitly.
+    pinned = _TARGET_TH_INTEL_DIR / "latest.json"
+    if pinned.is_file():
+        return pinned
+    return None
+
+
+def _build_dossier_payload(snapshot_path: Path | None) -> dict[str, Any]:
+    """Construct the redacted customer-dossier envelope.
+
+    Non-negotiable contract: every string leaf passes through
+    ``lib.security.pii_redactor.redact_record`` before it is encoded into the
+    JSON response. The redactor is pure (no I/O), so this is safe to call
+    inside the request path.
+    """
+    try:
+        from lib.security.pii_redactor import redact_record
+    except Exception as exc:  # pragma: no cover — defensive
+        return _safe_dossier_payload(error=f"redactor_unavailable: {exc}")
+
+    if snapshot_path is None:
+        return _safe_dossier_payload(error="no_snapshot_available")
+    try:
+        raw = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return _safe_dossier_payload(error=f"snapshot_unreadable: {type(exc).__name__}")
+
+    # Compute summary counters from the raw payload, but DO NOT echo any
+    # raw string back; the redactor handles every string leaf.
+    customers = raw.get("customers") or []
+    by_status: dict[str, int] = {}
+    for c in customers:
+        status = str(c.get("status") or "UNKNOWN").upper()[:32]
+        by_status[status] = by_status.get(status, 0) + 1
+
+    deals = (raw.get("deals") or [])[:10]
+    summary = {
+        "total_customers": len(customers),
+        "by_status": by_status,
+        "document_templates": int(raw.get("document_template_count") or 0),
+        "deals_recent": len(deals),
+    }
+
+    redacted_deals = redact_record(deals)
+    redacted_meta = redact_record(raw.get("metadata") or {})
+
+    return {
+        "mode": "customer_dossier_product_dashboard",
+        "available": True,
+        "snapshot_at": raw.get("snapshot_at") or raw.get("generated_at"),
+        "snapshot_path_basename": snapshot_path.name,
+        "error": None,
+        "summary": summary,
+        "recent_deals": redacted_deals,
+        "metadata": redacted_meta,
+        "safety": {
+            "execution_enabled": False,
+            "live_trading_enabled": False,
+            "writes_by_default": False,
+            "telegram_sends_enabled": False,
+            "pii_redaction": "applied_to_every_leaf",
+            "guards": [
+                "read_only_endpoint",
+                "no_live_network_calls",
+                "snapshot_only_read",
+                "pii_redaction_required",
+            ],
+        },
+        "last_updated": time.time(),
+    }
+
+
+@app.route("/customer-dossier")
+@requires_auth
+def customer_dossier_page():
+    """Buyer-facing customer dossier dashboard (PII-redacted, read-only)."""
+    return render_template(
+        "pages/customer_dossier.html",
+        current_page="customer-dossier",
+        page_title="Customer Dossier",
+    )
+
+
+@app.route("/api/customer-dossier")
+@requires_auth
+def api_customer_dossier():
+    """JSON envelope for /customer-dossier — reads the latest dossier snapshot."""
+    try:
+        snapshot_path = _select_latest_dossier_snapshot()
+        payload = _build_dossier_payload(snapshot_path)
+        return jsonify(payload)
+    except Exception as e:
+        log.warning("customer-dossier API error: %s", e)
+        return jsonify(_safe_dossier_payload(error=str(e))), 200
+
+
 @app.route("/api/autonomy/continuous-intelligence/artifacts")
 @requires_auth
 def api_autonomy_continuous_intelligence_artifacts():

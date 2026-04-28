@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block title %}Threat_Intel{% endblock %}
+
+{% block extra_css %}
+<style>
+.ti-section {
+    border: 1px solid var(--border-dim);
+    background: rgba(0, 0, 0, 0.5);
+    padding: var(--space-md);
+    margin-bottom: var(--space-lg);
+}
+
+.ti-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: var(--space-sm);
+    margin-bottom: var(--space-md);
+}
+
+.ti-stat {
+    border: 1px dashed var(--border-dim);
+    padding: var(--space-sm);
+    text-align: center;
+}
+
+.ti-stat-value {
+    font-size: 1.6rem;
+    color: var(--text-green);
+    font-family: var(--font-header);
+}
+
+.ti-stat-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.ti-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.ti-table th, .ti-table td {
+    text-align: left;
+    padding: var(--space-xs) var(--space-sm);
+    border-bottom: 1px dotted rgba(98, 255, 64, 0.15);
+}
+
+.ti-table th {
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+}
+
+.sev-critical { color: #ff6f9e; font-weight: bold; }
+.sev-high     { color: #ffb86c; }
+.sev-medium   { color: #69d6ff; }
+.sev-low      { color: var(--text-muted); }
+
+.empty {
+    color: var(--text-muted);
+    padding: var(--space-md);
+    border: 1px dashed var(--border-dim);
+    text-align: center;
+}
+
+.ti-meta {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-bottom: var(--space-sm);
+}
+
+.ti-safety-banner {
+    background: rgba(105, 214, 255, 0.06);
+    border-left: 2px solid var(--cyan);
+    padding: var(--space-sm) var(--space-md);
+    margin-bottom: var(--space-md);
+    font-size: 0.8rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section>
+    <h2>Threat_Intel // Buyer-Facing Surface</h2>
+    <div class="ti-safety-banner">
+        Read-only paste-safe view. Source: <code>data/intelligence/&lt;date&gt;/threats.json</code>.
+        No live network calls — every cell is rendered from the latest local snapshot.
+        Refresh schedule: <code>services/dashboard/refresh_threats.py</code> (every 4h via LaunchAgent).
+    </div>
+    <div id="ti-meta" class="ti-meta">Loading…</div>
+
+    <div id="ti-summary" class="ti-summary-grid"></div>
+
+    <div class="ti-section">
+        <h3>CISA KEV — Top Exploited (Last {{ '7 days' }})</h3>
+        <div id="ti-kev"><div class="empty">Loading KEV entries…</div></div>
+    </div>
+
+    <div class="ti-section">
+        <h3>NVD — Critical CVEs (CVSS &ge; 9.0)</h3>
+        <div id="ti-nvd"><div class="empty">Loading critical CVEs…</div></div>
+    </div>
+
+    <div class="ti-section">
+        <h3>MITRE ATT&amp;CK — Most-Cited Techniques</h3>
+        <div id="ti-mitre"><div class="empty">Loading techniques…</div></div>
+    </div>
+</section>
+
+<script>
+(async function() {
+    const meta = document.getElementById('ti-meta');
+    const summary = document.getElementById('ti-summary');
+    const kev = document.getElementById('ti-kev');
+    const nvd = document.getElementById('ti-nvd');
+    const mitre = document.getElementById('ti-mitre');
+
+    const escape = (s) => String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+    function renderTable(rows, columns) {
+        if (!rows || !rows.length) {
+            return '<div class="empty">No entries in current snapshot.</div>';
+        }
+        const head = columns.map(c => `<th>${escape(c.label)}</th>`).join('');
+        const body = rows.map(r => {
+            const cells = columns.map(c => {
+                if (c.cell) return `<td>${c.cell(r)}</td>`;
+                return `<td>${escape(r[c.key] || '')}</td>`;
+            }).join('');
+            return `<tr>${cells}</tr>`;
+        }).join('');
+        return `<table class="ti-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+    }
+
+    function sevCell(r) {
+        return `<span class="sev-${escape(r.severity || 'low')}">${escape((r.severity || '').toUpperCase())}</span>`;
+    }
+
+    try {
+        const res = await fetch('/api/threat-intel');
+        const payload = await res.json();
+        if (!payload.available) {
+            meta.textContent = `No recent snapshot — ${payload.error || 'unavailable'}`;
+            summary.innerHTML = '';
+            kev.innerHTML = '<div class="empty">No data — run <code>python3 services/dashboard/refresh_threats.py</code>.</div>';
+            nvd.innerHTML = '<div class="empty">No data.</div>';
+            mitre.innerHTML = '<div class="empty">No data.</div>';
+            return;
+        }
+
+        meta.textContent = `Snapshot ${payload.snapshot_date} — refreshed ${payload.refreshed_at}`;
+
+        const s = payload.summary || {};
+        const stats = [
+            ['total', s.total_threats],
+            ['exploited', s.exploited],
+            ['critical', s.critical],
+            ['high', s.high],
+            ['medium', s.medium],
+            ['low', s.low],
+        ];
+        summary.innerHTML = stats.map(([label, value]) =>
+            `<div class="ti-stat"><div class="ti-stat-value">${escape(value || 0)}</div><div class="ti-stat-label">${escape(label)}</div></div>`
+        ).join('');
+
+        const kevColumns = [
+            { label: 'CVE', key: 'canonical_id' },
+            { label: 'Severity', cell: sevCell },
+            { label: 'Score', cell: r => escape(r.score) },
+            { label: 'Vendor', key: 'vendor_project' },
+            { label: 'Title', key: 'title' },
+            { label: 'Due', key: 'due_date' },
+        ];
+        kev.innerHTML = renderTable(payload.kev_top || [], kevColumns);
+
+        const nvdColumns = [
+            { label: 'CVE', key: 'canonical_id' },
+            { label: 'Severity', cell: sevCell },
+            { label: 'Score', cell: r => escape(r.score) },
+            { label: 'Product', key: 'product' },
+            { label: 'Title', key: 'title' },
+        ];
+        nvd.innerHTML = renderTable(payload.nvd_critical || [], nvdColumns);
+
+        const mitreColumns = [
+            { label: 'Technique', key: 'id' },
+            { label: 'Citations', cell: r => escape(r.citations) },
+            { label: 'Severity', cell: sevCell },
+            { label: 'Title', key: 'title' },
+        ];
+        mitre.innerHTML = renderTable(payload.mitre_techniques || [], mitreColumns);
+    } catch (e) {
+        meta.textContent = 'Failed to load threat-intel API.';
+    }
+})();
+</script>
+{% endblock %}
