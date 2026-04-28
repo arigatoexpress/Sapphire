@@ -64,6 +64,7 @@ def test_run_once_writes_publishable_jsonl_and_envelope(isolated) -> None:
     row = json.loads(path.read_text().splitlines()[0])
     assert row["symbol"] == "BTC"
     assert row["rubric"]["publishable"] is True
+    assert row["source_signal"]["tranche4_context"]["schema_version"] == 1
 
 
 def test_run_once_skips_when_edge_delta_is_small(isolated) -> None:

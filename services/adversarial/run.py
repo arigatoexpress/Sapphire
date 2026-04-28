@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from lib.intelligence import TRANCHE4_EVENT_TOPICS  # noqa: E402
 from lib.security.adversarial_detectors import (  # noqa: E402
     BotPumpedChannelDetector,
     DetectorReport,
@@ -31,6 +32,16 @@ from lib.security.adversarial_detectors import (  # noqa: E402
 from lib.security.adversarial_telemetry import emit_report  # noqa: E402
 
 DEFAULT_QUARANTINE_DIR = ROOT / "data" / "security" / "adversarial" / "quarantine"
+TRANCHE4_TOPIC_TO_KIND = {
+    "narrative.thesis.generated": "prompt",
+    "regime.shift.detected": "oracle",
+    "correlation.breakdown": "oracle",
+    "macro.event.detected": "threat-intel",
+    "macro.calendar.window_opening": "threat-intel",
+    "onchain.snapshot.updated": "oracle",
+    "event.expected_reaction.published": "prompt",
+    "counterparty.smart_money.move": "trades",
+}
 
 DETECTOR_FACTORIES = {
     "trades": WashTradeDetector,
@@ -39,6 +50,11 @@ DETECTOR_FACTORIES = {
     "prompt": PromptInjectionDetector,
     "threat-intel": FalseFlagThreatIntelDetector,
 }
+
+
+def subscribed_event_topics() -> tuple[str, ...]:
+    """Event-bus topics this service is expected to scan in Tranche 4."""
+    return TRANCHE4_EVENT_TOPICS
 
 
 def _now_key() -> str:
@@ -83,6 +99,42 @@ def scan_records(kind: str, records: list[dict[str, Any] | str]) -> DetectorRepo
     return detector.analyze(records)  # type: ignore[arg-type]
 
 
+def scan_event_payload(
+    topic: str,
+    payload: dict[str, Any] | str,
+    *,
+    emit: bool = False,
+    publisher: Any = None,
+    run_id: str = "",
+) -> dict[str, Any]:
+    """Scan a single event-bus payload from a subscribed Tranche 4 topic."""
+    kind = TRANCHE4_TOPIC_TO_KIND.get(topic)
+    if kind is None:
+        raise ValueError(f"unsupported topic: {topic}")
+    records: list[dict[str, Any] | str]
+    if isinstance(payload, str):
+        records = [payload]
+    else:
+        records = [payload]
+    report = scan_records(kind, records)
+    emitted = []
+    if emit and report.findings:
+        emitted = emit_report(
+            report,
+            publisher=publisher,
+            source="adversarial-defense",
+            run_id=run_id,
+            dry_run=False,
+        )
+    return {
+        "ok": report.clean,
+        "topic": topic,
+        "kind": kind,
+        "telemetry_emitted": len(emitted),
+        "report": report.to_dict(),
+    }
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -123,6 +175,8 @@ def status() -> dict[str, Any]:
         "ok": True,
         "service": "adversarial-defense",
         "detectors": sorted(DETECTOR_FACTORIES),
+        "subscribed_topics": list(subscribed_event_topics()),
+        "topic_detector_map": dict(sorted(TRANCHE4_TOPIC_TO_KIND.items())),
         "event_type": "adversarial.detection",
         "quarantine_enabled": quarantine_enabled(),
         "safety": {

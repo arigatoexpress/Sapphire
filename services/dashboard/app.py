@@ -5239,6 +5239,13 @@ def _build_observability_launchagents() -> dict[str, Any]:
     return redact_record(build_launchagents_only())
 
 
+def _build_observability_tranche4_feeds() -> dict[str, Any]:
+    from lib.intelligence import feed_status_from_artifacts
+    from lib.security.pii_redactor import redact_record
+
+    return redact_record(feed_status_from_artifacts())
+
+
 @app.route("/api/observability-system-summary")
 @requires_auth
 def api_observability_system_summary():
@@ -5286,6 +5293,23 @@ def api_observability_launchagents():
                 "status": "unknown",
                 "error": f"{exc.__class__.__name__}: {exc}"[:200],
                 "launchagents": [],
+            }
+        ), 200
+
+
+@app.route("/api/observability-tranche4-feeds")
+@requires_auth
+def api_observability_tranche4_feeds():
+    try:
+        return jsonify(_build_observability_tranche4_feeds())
+    except Exception as exc:
+        log.warning("observability tranche4 feeds error: %s", exc)
+        return jsonify(
+            {
+                "mode": "read_only_tranche4_feed_status",
+                "status": "unknown",
+                "error": f"{exc.__class__.__name__}: {exc}"[:200],
+                "feeds": [],
             }
         ), 200
 

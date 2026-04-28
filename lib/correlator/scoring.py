@@ -46,14 +46,16 @@ SCORING_VERSION = "0.1.0"
 
 # Per-source weight defaults. Tuned against the source-fidelity ranking
 # the operator articulated in `docs/products/signal-correlator-0.1.0.md`:
-# Kronos > TA scanner > TradingView webhook > Hyperliquid public feed >
-# Telegram intel > convergence-watchlist > sovereign-thesis > threat-intel.
+# Kronos > TA scanner > TradingView webhook > cross-asset regime >
+# Hyperliquid public feed > Telegram intel > convergence-watchlist >
+# sovereign-thesis > threat-intel.
 # Each weight contributes proportionally; raise/lower in the YAML config
 # without touching code.
 DEFAULT_SOURCE_WEIGHTS: dict[str, float] = {
     "kronos_forecast": 1.30,
     "ta_scanner": 1.15,
     "tradingview": 1.00,
+    "cross_asset_regime": 0.95,
     "hyperliquid_public_feed": 0.85,
     "telegram_intel": 0.70,
     "convergence_watchlist": 0.55,
