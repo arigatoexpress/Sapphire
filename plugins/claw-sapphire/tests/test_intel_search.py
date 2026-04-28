@@ -102,6 +102,39 @@ def test_models_action_lists_mock_and_placeholders(isolated_store):
     assert out["dims"] == 64
 
 
+def test_build_store_does_not_warm_up_live_capable_embedder(isolated_store, monkeypatch):
+    class SpyEmbedder:
+        name = "vertex-gecko"
+        dims = 64
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def embed(self, text: str) -> list[float]:
+            self.calls += 1
+            return [0.0] * self.dims
+
+        def embed_batch(self, texts: list[str]) -> list[list[float]]:
+            return [self.embed(text) for text in texts]
+
+    class Registry:
+        def __init__(self, embedder: SpyEmbedder) -> None:
+            self.embedder = embedder
+
+        def get(self, name: str) -> SpyEmbedder:
+            if name != "vertex-gecko":
+                raise KeyError(name)
+            return self.embedder
+
+    spy = SpyEmbedder()
+    monkeypatch.setattr(intel_search, "default_registry", lambda *, dims: Registry(spy))
+
+    store = intel_search._build_store({"embedder": "vertex-gecko", "dims": 64})
+
+    assert store.embedder is spy
+    assert spy.calls == 0
+
+
 def test_stats_action_reports_mock_mode_and_caps(isolated_store):
     out = intel_search.handle({"action": "stats", "dims": 64})
     assert out["mode"] == "mock"

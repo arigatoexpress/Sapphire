@@ -14,6 +14,7 @@ import pytest
 from lib.intel.embedders import (
     EMBEDDING_DIMS_HARD,
     HashEmbedder,
+    VertexGeckoEmbedder,
     default_registry,
     normalize_text,
     tokenize,
@@ -88,14 +89,22 @@ def test_default_registry_lists_mock_and_placeholders():
     assert "openai-ada-002" in names
     described = {row["name"]: row for row in registry.describe()}
     assert described["mock-hash"]["dims"] == 128
-    assert described["vertex-gecko"]["kind"].startswith("_Placeholder")
+    assert described["vertex-gecko"]["kind"] == "VertexGeckoEmbedder"
 
 
-def test_placeholder_embedder_fails_closed():
+def test_future_placeholder_embedder_fails_closed():
     registry = default_registry(dims=64)
-    placeholder = registry.get("vertex-gecko")
+    placeholder = registry.get("openai-ada-002")
     with pytest.raises(NotImplementedError):
         placeholder.embed("anything")
+
+
+def test_vertex_registry_entry_defaults_to_dry_run():
+    registry = default_registry(dims=64)
+    vertex = registry.get("vertex-gecko")
+    assert isinstance(vertex, VertexGeckoEmbedder)
+    assert vertex.metadata["mode_actual"] == "dry-run"
+    assert len(vertex.embed("anything")) == 64
 
 
 def test_embed_batch_matches_embed():

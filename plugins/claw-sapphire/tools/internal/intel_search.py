@@ -130,6 +130,7 @@ KNOWN_SOURCES = _BQ.KNOWN_SOURCES
 MAX_INDEX_RECORDS_PER_RUN = _BQ.MAX_INDEX_RECORDS_PER_RUN
 MAX_QUERY_K = _BQ.MAX_QUERY_K
 evaluate_live_gate = _BQ.evaluate_live_gate
+describe_embedder_models = _BQ.describe_embedder_models
 EMBEDDING_DIMS_HARD = _EMB.EMBEDDING_DIMS_HARD
 HashEmbedder = _EMB.HashEmbedder
 default_registry = _EMB.default_registry
@@ -167,15 +168,16 @@ def _build_store(payload: dict[str, Any]) -> BQVectorStore:
     if embedder_name == "mock-hash":
         embedder = registry.get("mock-hash")
     else:
-        # Other entries are placeholders that fail closed if used. Surface
-        # the configured name but always swap in the mock so the tool
-        # still produces a deterministic answer.
         try:
             embedder = registry.get(embedder_name)
-            # Touch the API to surface NotImplementedError eagerly.
-            embedder.embed("warmup")
-        except (KeyError, NotImplementedError):
+        except KeyError:
             embedder = HashEmbedder(dims=dims)
+        else:
+            # Future providers are placeholders that fail closed if used.
+            # Keep the Vertex entry lazy so model selection never spends a
+            # warmup call before the real query/index operation.
+            if type(embedder).__name__ == "_PlaceholderEmbedder":
+                embedder = HashEmbedder(dims=dims)
     if getattr(embedder, "dims", dims) != dims:
         embedder = HashEmbedder(dims=dims)
     mock = not bool(payload.get("live"))
@@ -530,14 +532,13 @@ def stats(payload: dict[str, Any]) -> dict[str, Any]:
 
 def models(payload: dict[str, Any]) -> dict[str, Any]:
     dims = _coerce_int(payload.get("dims"), DEFAULT_DIMS, lo=8, hi=EMBEDDING_DIMS_HARD)
-    registry = default_registry(dims=dims)
     return {
         "default": "mock-hash",
         "dims": dims,
-        "embedders": registry.describe(),
+        "embedders": describe_embedder_models(dims=dims),
         "swap_in_note": (
-            "Real embedders are placeholder. Wiring vertex-gecko / openai-ada-002 "
-            "is the next tranche; see docs/products/bq-vector-retrieval-0.1.0.md."
+            "vertex-gecko is live-capable but dry-run by default. Other real "
+            "providers remain placeholders; see docs/ops/intel-search-runbook.md."
         ),
     }
 

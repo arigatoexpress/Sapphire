@@ -17,7 +17,7 @@ first if you need the design rationale or the schema.
 | `search`| Semantic similarity query over the indexed corpus; returns top-k hits     |
 | `index` | Index a corpus snapshot from local JSON snapshots; never touches network  |
 | `stats` | Reports record counts per source, last index timestamp, mode, rate state  |
-| `models`| Lists embedder modes (mock + placeholder names)                           |
+| `models`| Lists embedder modes (mock, guarded Vertex, placeholder names)             |
 
 Mock-by-default. The library mirrors the same caps the tool advertises
 (`MAX_QUERY_K=50`, `MAX_INDEX_RECORDS_PER_RUN=5_000`,
@@ -38,9 +38,10 @@ echo '{"action":"models"}' | python3 plugins/claw-sapphire/tools/intel_search.py
 echo '{"action":"stats"}'  | python3 plugins/claw-sapphire/tools/intel_search.py
 ```
 
-The first should list `mock-hash` plus the placeholder embedder names
-(`vertex-gecko`, `openai-ada-002`, `anthropic-titan`). The second should
-report `mode: mock` and `total_records: 0` until you index something.
+The first should list `mock-hash`, the guarded `vertex-gecko` embedder, and
+the remaining placeholder names (`openai-ada-002`, `anthropic-titan`). The
+second should report `mode: mock` and `total_records: 0` until you index
+something.
 
 ## `search` — Day-To-Day Query
 
@@ -127,16 +128,16 @@ returned from a refused or rate-limited live call.
 echo '{"action":"models"}' | python3 plugins/claw-sapphire/tools/intel_search.py
 ```
 
-The default is `mock-hash`; the others (`vertex-gecko`, `openai-ada-002`,
-`anthropic-titan`) are *placeholder names only* — calling `.embed()` on
-any of them raises `NotImplementedError`. They exist so callers can plan
-a swap-in without code drift.
+The default is `mock-hash`. `vertex-gecko` is implemented by
+`lib.intel.embedders.VertexGeckoEmbedder` and stays dry-run unless every
+Vertex live gate passes. `openai-ada-002` and `anthropic-titan` remain
+placeholder names only.
 
-**Embeddings are placeholder.** The mock embedder is enough to test
-ingestion, storage, ranking, and the provenance contract end-to-end, but
-it is not a real semantic embedding. The next-tranche follow-up swaps in
-a real embedder behind the same `live` gate; until then, treat search
-results as deterministic but not semantically meaningful.
+**Dry-run embeddings are placeholders.** The mock embedder is enough to test
+ingestion, storage, ranking, and the provenance contract end-to-end, but it is
+not a real semantic embedding. To run the Vertex-backed embedder manually,
+instantiate `VertexGeckoEmbedder` with `SAPPHIRE_VERTEX_EMBEDDER_LIVE=1` and a
+`GEMINI_API_KEY` or `GOOGLE_API_KEY` entry in `~/.sapphire/secrets.env`.
 
 ## Mock vs Live
 
@@ -146,6 +147,26 @@ results as deterministic but not semantically meaningful.
 * Backed by `~/.cache/sapphire/bq_vector_mock.jsonl`.
 * No external services contacted.
 * CI uses this path exclusively.
+
+### Vertex Gecko Embedder
+
+`VertexGeckoEmbedder` wraps `text-embedding-gecko@003` with a no-spend default:
+
+1. If `SAPPHIRE_VERTEX_EMBEDDER_LIVE` is not `1`, it returns the deterministic
+   local mock and reports `mode_actual: dry-run`.
+2. If the live flag is set but `~/.sapphire/secrets.env` lacks
+   `GEMINI_API_KEY` or `GOOGLE_API_KEY`, it returns the mock and reports
+   `mode_actual: dry-run-safety`.
+3. Live calls are capped at `MAX_EMBED_CALLS_PER_HOUR = 100` and
+   `MAX_EMBED_TOKENS_PER_MONTH = 1_000_000`.
+4. Counters and live-result cache files live under
+   `~/.cache/sapphire/vertex_embedder/`.
+5. Cache keys include the model name, requested dimension, and
+   `sha256(input)`, so repeat calls short-circuit before any SDK call.
+6. Any SDK error or returned-vector dimension mismatch falls back to the local
+   mock; mismatches report `mode_actual: dry-run-dim-mismatch`.
+
+Tests mock `google.generativeai.embed_content`; CI never calls Vertex.
 
 ### Live
 
@@ -186,6 +207,8 @@ response includes a clear `gate.reason`.
 | `truncating batch from N to 5000`                    | Indexing batch too large                         | Split the snapshot or accept the cap                       |
 | `live gate refused: SAPPHIRE_BQ_LIVE != 1`           | Live mode requested without the env flag         | Set the three live env vars or stay in mock mode           |
 | `live index rate limit hit: 2/2 in the last hour`    | Two live indexes already happened this hour      | Wait, or audit the caller — 2/hour is intentional          |
+| `mode_actual: dry-run-safety` on `vertex-gecko`      | Live flag set without a key in `secrets.env`     | Add the key to `~/.sapphire/secrets.env` or stay dry-run   |
+| `mode_actual: dry-run-dim-mismatch` on `vertex-gecko`| Provider returned a vector with the wrong length | Keep mock fallback; inspect SDK/model settings             |
 | Mock backend returns 0 records after restart        | JSONL file missing or in a different `mock_path` | Confirm `~/.cache/sapphire/bq_vector_mock.jsonl` exists    |
 
 ## Cap State
@@ -196,14 +219,19 @@ response includes a clear `gate.reason`.
 | `MAX_INDEX_RECORDS_PER_RUN = 5000` | `lib.intel.bq_vector_store.MAX_INDEX_RECORDS_PER_RUN` |
 | `MAX_LIVE_INDEX_PER_HOUR = 2` | `lib.intel.bq_vector_store.MAX_LIVE_INDEX_PER_HOUR`  |
 | `EMBEDDING_DIMS_HARD = 1536` | `lib.intel.embedders.EMBEDDING_DIMS_HARD`    |
+| `MAX_EMBED_CALLS_PER_HOUR = 100` | `lib.intel.embedders.MAX_EMBED_CALLS_PER_HOUR` |
+| `MAX_EMBED_TOKENS_PER_MONTH = 1_000_000` | `lib.intel.embedders.MAX_EMBED_TOKENS_PER_MONTH` |
 
 The library, the tool, this runbook, and the product doc all reference
 these constants directly so they cannot drift.
 
 ## Soak Posture
 
-* This feature is mock-only in 0.1.0; there is nothing to soak in
-  production yet.
+* The default `intel_search` tool path remains mock-only unless an operator
+  explicitly wires `VertexGeckoEmbedder` into a local experiment.
+* The Vertex embedder's safe soak is repeat-call cache validation: run one
+  mocked or live-gated call, rerun the same input, confirm the cache hit, then
+  inspect counters under `~/.cache/sapphire/vertex_embedder/`.
 * When 0.2.0 wires the live writer:
   * Run with `SAPPHIRE_BQ_LIVE=1` for a one-shot index from a
     representative snapshot, watch the per-hour counter, confirm

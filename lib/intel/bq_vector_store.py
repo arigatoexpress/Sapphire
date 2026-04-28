@@ -55,6 +55,7 @@ from lib.intel.embedders import (
     EMBEDDING_DIMS_HARD,
     EmbedderProtocol,
     HashEmbedder,
+    default_registry,
 )
 
 # ---------------------------------------------------------------------------
@@ -218,6 +219,11 @@ def _stable_id(text: str, source: str, salt: str = "") -> str:
     """Derive a stable record ID from text + source when one is missing."""
     digest = hashlib.sha256(f"{salt}|{source}|{text}".encode()).hexdigest()
     return f"{source}:{digest[:16]}"
+
+
+def describe_embedder_models(*, dims: int = DEFAULT_DIMS) -> list[dict[str, object]]:
+    """Return the embedder model inventory exposed by the intel-search tool."""
+    return default_registry(dims=dims).describe()
 
 
 def _validate_records(
@@ -755,5 +761,6 @@ __all__ = [
     "UpsertResult",
     "VectorRecord",
     "cosine_similarity",
+    "describe_embedder_models",
     "evaluate_live_gate",
 ]
