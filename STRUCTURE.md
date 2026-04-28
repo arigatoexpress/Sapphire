@@ -54,6 +54,8 @@ policy, and a rule for what must not drift into it.
   Retention: git; caches ignored.
 - `tools/` — source for standalone tools. Retention: git source only; build
   directories are generated artifacts.
+- `web/` — static microsites and browser-only operator surfaces. Retention: git
+  for source; generated screenshots and build artifacts stay outside git.
 <!-- canonical-top-level-dirs:end -->
 
 ## Canonical Top-Level Files
