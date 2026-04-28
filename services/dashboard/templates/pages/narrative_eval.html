@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+
+{% block title %}Narrative Eval{% endblock %}
+
+{% block extra_css %}
+.ne-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    margin-bottom: 20px;
+}
+.ne-metric {
+    background: var(--bg-card);
+    padding: 14px 16px;
+    min-height: 74px;
+}
+.ne-label {
+    color: var(--text-muted);
+    font-size: 10px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+.ne-value {
+    margin-top: 7px;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 23px;
+}
+.ne-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(320px, .9fr);
+    gap: 20px;
+}
+.ne-toolbar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+.ne-select {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 12px;
+}
+.ne-chip {
+    display: inline-block;
+    padding: 3px 6px;
+    border-radius: 4px;
+    background: rgba(255,255,255,.05);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 11px;
+}
+.ne-table td,
+.ne-table th {
+    vertical-align: top;
+}
+@media (max-width: 1040px) {
+    .ne-metrics,
+    .ne-grid {
+        grid-template-columns: 1fr;
+    }
+}
+{% endblock %}
+
+{% block content %}
+<div class="ne-metrics">
+    <div class="ne-metric">
+        <div class="ne-label">Scored</div>
+        <div class="ne-value" id="ne-scored">--</div>
+    </div>
+    <div class="ne-metric">
+        <div class="ne-label">Accuracy</div>
+        <div class="ne-value" id="ne-accuracy">--</div>
+    </div>
+    <div class="ne-metric">
+        <div class="ne-label">False positives</div>
+        <div class="ne-value" id="ne-fp">--</div>
+    </div>
+    <div class="ne-metric">
+        <div class="ne-label">Calibration error</div>
+        <div class="ne-value" id="ne-cal">--</div>
+    </div>
+</div>
+
+<div class="ne-grid">
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Aggregates</span>
+            <div class="ne-toolbar">
+                <select class="ne-select" id="ne-group">
+                    <option value="symbol">Symbol</option>
+                    <option value="timeframe">Timeframe</option>
+                    <option value="edge_bucket">Edge bucket</option>
+                    <option value="source_mix">Source mix</option>
+                    <option value="regime">Regime</option>
+                </select>
+            </div>
+        </div>
+        <div class="card-body no-pad">
+            <table class="data-table ne-table">
+                <thead><tr><th>Bucket</th><th>Scored</th><th>Accuracy</th><th>FP rate</th></tr></thead>
+                <tbody id="ne-aggregates"><tr><td colspan="4" class="muted">loading</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:20px">
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Diagnostics</span>
+                <span class="muted mono" style="font-size:11px" id="ne-generated">--</span>
+            </div>
+            <div class="card-body no-pad">
+                <table class="data-table ne-table">
+                    <thead><tr><th>Thesis</th><th>Issue</th></tr></thead>
+                    <tbody id="ne-diagnostics"><tr><td colspan="2" class="muted">loading</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Recent scores</span>
+            </div>
+            <div class="card-body no-pad">
+                <table class="data-table ne-table">
+                    <thead><tr><th>Pair</th><th>Pos</th><th>Status</th></tr></thead>
+                    <tbody id="ne-recent"><tr><td colspan="3" class="muted">loading</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const pct = (v) => v === null || v === undefined ? '--' : `${(Number(v) * 100).toFixed(1)}%`;
+const num = (v) => v === null || v === undefined ? '--' : Number(v).toFixed(3);
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+async function fetchJson(url) {
+    const res = await fetch(url, {credentials: 'same-origin'});
+    return res.json();
+}
+
+function renderSummary(payload) {
+    const overall = payload.overall || {};
+    document.getElementById('ne-scored').textContent = overall.scored ?? 0;
+    document.getElementById('ne-accuracy').textContent = pct(overall.accuracy);
+    document.getElementById('ne-fp').textContent = pct(overall.false_positive_rate);
+    document.getElementById('ne-cal').textContent = num(overall.avg_calibration_error);
+    const recent = payload.recent || [];
+    document.getElementById('ne-recent').innerHTML = recent.length ? recent.map(row => `
+        <tr>
+            <td><span class="ne-chip">${esc(row.symbol)}/${esc(row.timeframe)}</span></td>
+            <td>${esc(row.implied_position)}</td>
+            <td>${esc(row.status)}</td>
+        </tr>
+    `).join('') : '<tr><td colspan="3" class="muted">no scores yet</td></tr>';
+}
+
+function renderAggregates(payload) {
+    const groups = payload.groups || {};
+    const rows = Object.values(groups);
+    document.getElementById('ne-aggregates').innerHTML = rows.length ? rows.map(row => `
+        <tr>
+            <td><span class="ne-chip">${esc(row.key)}</span></td>
+            <td>${row.scored ?? 0}</td>
+            <td>${pct(row.accuracy)}</td>
+            <td>${pct(row.false_positive_rate)}</td>
+        </tr>
+    `).join('') : '<tr><td colspan="4" class="muted">no aggregate rows</td></tr>';
+}
+
+function renderDiagnostics(payload) {
+    document.getElementById('ne-generated').textContent = payload.generated_at || '--';
+    const rows = [...(payload.false_positives || []), ...(payload.overconfident_misses || []), ...(payload.unscored || [])].slice(0, 12);
+    document.getElementById('ne-diagnostics').innerHTML = rows.length ? rows.map(row => `
+        <tr>
+            <td><span class="ne-chip">${esc(row.symbol)}/${esc(row.timeframe)}</span></td>
+            <td>${esc((row.diagnostics || [row.status]).join(', '))}</td>
+        </tr>
+    `).join('') : '<tr><td colspan="2" class="muted">no diagnostics</td></tr>';
+}
+
+async function refresh() {
+    const groupBy = document.getElementById('ne-group').value;
+    const [summary, aggregates, diagnostics] = await Promise.all([
+        fetchJson('/api/narrative-eval-summary'),
+        fetchJson(`/api/narrative-eval-aggregates?group_by=${encodeURIComponent(groupBy)}`),
+        fetchJson('/api/narrative-eval-aggregates?view=diagnostics')
+    ]);
+    renderSummary(summary);
+    renderAggregates(aggregates);
+    renderDiagnostics(diagnostics);
+}
+
+document.getElementById('ne-group').addEventListener('change', refresh);
+refresh();
+setInterval(refresh, 60000);
+</script>
+{% endblock %}

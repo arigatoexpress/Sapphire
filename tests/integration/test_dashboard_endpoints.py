@@ -518,6 +518,30 @@ def test_gemini_ooda_endpoint_accepts_topic_override(app_client):
     assert body["context_summary_chars"] == len("paste-safe context block")
 
 
+def test_narrative_eval_page_and_endpoints_render_empty_state(app_client):
+    _, client = app_client
+    page = client.get("/narrative-eval", headers={"Authorization": _AUTH})
+    assert page.status_code == 200
+    html = page.get_data(as_text=True)
+    assert "Narrative Eval" in html
+    assert "/api/narrative-eval-summary" in html
+    assert "/api/narrative-eval-aggregates" in html
+
+    summary = client.get("/api/narrative-eval-summary", headers={"Authorization": _AUTH})
+    assert summary.status_code == 200
+    body = summary.get_json()
+    assert body["ok"] is True
+    assert body["overall"]["scored"] == 0
+
+    aggregates = client.get("/api/narrative-eval-aggregates?group_by=symbol", headers={"Authorization": _AUTH})
+    assert aggregates.status_code == 200
+    assert aggregates.get_json()["groups"] == {}
+
+    diagnostics = client.get("/api/narrative-eval-aggregates?view=diagnostics", headers={"Authorization": _AUTH})
+    assert diagnostics.status_code == 200
+    assert diagnostics.get_json()["false_positives"] == []
+
+
 def test_gemini_ooda_endpoint_can_return_daily_diff(app_client, tmp_path, monkeypatch):
     dash_app, client = app_client
     packet_dir = tmp_path / "gemini-ooda"
