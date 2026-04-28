@@ -10,6 +10,7 @@ from loguru import logger
 
 # ── Per-Venue Rate Limiter ───────────────────────────────────────────
 
+
 class VenueRateLimiter:
     """Token-bucket rate limiter per venue.
 
@@ -61,6 +62,7 @@ class VenueRateLimiter:
 
 # ── Dead-Letter Tracker ──────────────────────────────────────────────
 
+
 class UnconfirmedFillTracker:
     """Track dispatched commands that timed out without fill confirmation.
 
@@ -80,18 +82,20 @@ class UnconfirmedFillTracker:
         attempt: int,
         retries: int,
     ) -> None:
-        self._entries.append({
-            "venue": venue,
-            "symbol": symbol,
-            "side": command.get("side") or command.get("action", "UNKNOWN"),
-            "quantity": command.get("quantity"),
-            "dispatched_at": time.time(),
-            "timeout_seconds": timeout_seconds,
-            "attempt": attempt,
-            "retries": retries,
-            "reconciled": False,
-            "reconciled_at": None,
-        })
+        self._entries.append(
+            {
+                "venue": venue,
+                "symbol": symbol,
+                "side": command.get("side") or command.get("action", "UNKNOWN"),
+                "quantity": command.get("quantity"),
+                "dispatched_at": time.time(),
+                "timeout_seconds": timeout_seconds,
+                "attempt": attempt,
+                "retries": retries,
+                "reconciled": False,
+                "reconciled_at": None,
+            }
+        )
         logger.warning(
             f"📋 DEAD LETTER: {venue} {symbol} {command.get('side', '?')} — "
             f"fill not confirmed after {timeout_seconds}s (attempt {attempt}/{retries})"
@@ -100,11 +104,7 @@ class UnconfirmedFillTracker:
     def reconcile(self, venue: str, symbol: str) -> bool:
         """Mark the most recent unreconciled entry as resolved."""
         for entry in reversed(self._entries):
-            if (
-                entry["venue"] == venue
-                and entry["symbol"] == symbol
-                and not entry["reconciled"]
-            ):
+            if entry["venue"] == venue and entry["symbol"] == symbol and not entry["reconciled"]:
                 entry["reconciled"] = True
                 entry["reconciled_at"] = time.time()
                 return True
@@ -350,9 +350,7 @@ class ExecutionDispatcher:
 
         # Per-venue rate limiting
         if not self._rate_limiter.check(normalized_venue):
-            logger.warning(
-                f"🚫 Rate-limited: {normalized_venue} exceeded dispatch limit"
-            )
+            logger.warning(f"🚫 Rate-limited: {normalized_venue} exceeded dispatch limit")
             self._record_dispatch_error(normalized_venue, "rate_limited")
             return False
 
@@ -381,7 +379,9 @@ class ExecutionDispatcher:
         max_retries = 3
         for attempt in range(1, max_retries + 1):
             try:
-                async with self.session.post(full_url, json=command_payload, headers=auth_headers) as val:
+                async with self.session.post(
+                    full_url, json=command_payload, headers=auth_headers
+                ) as val:
                     if val.status == 200:
                         self._last_dispatch_errors.pop(normalized_venue, None)
                         logger.info(f"✅ Command Sent to {normalized_venue}: {command_payload}")
@@ -391,7 +391,9 @@ class ExecutionDispatcher:
                         logger.error(
                             f"🚫 Permission Denied (403): Ensure Hub service account has 'run.invoker' on {normalized_venue} | {body[:240]}"
                         )
-                        self._record_dispatch_error(normalized_venue, "permission_denied", status=403, body=body)
+                        self._record_dispatch_error(
+                            normalized_venue, "permission_denied", status=403, body=body
+                        )
                         return False
                     elif val.status >= 500 and attempt < max_retries:
                         body = await val.text()
@@ -421,7 +423,9 @@ class ExecutionDispatcher:
                     )
                     await asyncio.sleep(delay)
                     continue
-                logger.error(f"Dispatch Error ({normalized_venue}) after {max_retries} attempts: {e}")
+                logger.error(
+                    f"Dispatch Error ({normalized_venue}) after {max_retries} attempts: {e}"
+                )
                 self._record_dispatch_error(normalized_venue, "dispatch_exception", body=str(e))
                 return False
             except Exception as e:
@@ -471,9 +475,7 @@ class ExecutionDispatcher:
 
             try:
                 fill_data = await asyncio.wait_for(future, timeout=timeout_seconds)
-                logger.info(
-                    f"✅ Fill confirmed for {confirm_key} in {timeout_seconds}s window"
-                )
+                logger.info(f"✅ Fill confirmed for {confirm_key} in {timeout_seconds}s window")
                 return fill_data
             except TimeoutError:
                 if attempt < retries:
@@ -481,9 +483,7 @@ class ExecutionDispatcher:
                         f"⏳ Fill timeout for {confirm_key} (attempt {attempt}/{retries}), retrying..."
                     )
                 else:
-                    logger.warning(
-                        f"⏳ Fill timeout for {confirm_key} after {retries} attempt(s)"
-                    )
+                    logger.warning(f"⏳ Fill timeout for {confirm_key} after {retries} attempt(s)")
                     # Record to dead-letter queue for reconciliation
                     self._dead_letters.record(
                         venue=normalized_venue,

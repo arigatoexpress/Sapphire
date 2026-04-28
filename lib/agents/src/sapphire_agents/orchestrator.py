@@ -45,8 +45,12 @@ from app.storage import ChatStore, default_chat_config
 from app.telegram_api import TelegramClient
 
 logger = logging.getLogger(__name__)
-_TELEGRAM_RUNTIME_PROMPT_PATH = Path(__file__).resolve().parent / "data" / "crypton_telegram_agent_prompt.md"
-_TELEGRAM_ARCHITECTURE_POLICY_PATH = Path(__file__).resolve().parent / "data" / "crypton_architecture_policy.md"
+_TELEGRAM_RUNTIME_PROMPT_PATH = (
+    Path(__file__).resolve().parent / "data" / "crypton_telegram_agent_prompt.md"
+)
+_TELEGRAM_ARCHITECTURE_POLICY_PATH = (
+    Path(__file__).resolve().parent / "data" / "crypton_architecture_policy.md"
+)
 
 
 def _load_telegram_runtime_prompt(path: Path = _TELEGRAM_RUNTIME_PROMPT_PATH) -> dict[str, str]:
@@ -269,7 +273,13 @@ def _infer_text_command(raw_text: str) -> tuple[str, str]:
             return "/setsla", parts[1].strip()
 
     if lowered.startswith("checkin every "):
-        value = text[len("checkin every ") :].strip().replace("minutes", "").replace("minute", "").strip()
+        value = (
+            text[len("checkin every ") :]
+            .strip()
+            .replace("minutes", "")
+            .replace("minute", "")
+            .strip()
+        )
         return "/setcheckin", value
 
     return "", ""
@@ -325,6 +335,7 @@ def _legacy_item_id(source_key: str, url: str, title: str) -> str:
     digest = hashlib.sha256(f"{source_key}|{url}|{title}".encode()).hexdigest()
     return digest[:20]
 
+
 def _url_item_id(url: str) -> str:
     """
     Cross-source stable id based only on the normalized URL.
@@ -373,7 +384,9 @@ def _extract_article_text(page_html: str) -> str:
     """
     html_in = page_html or ""
     # Prefer <article> tag content if present.
-    article_match = re.search(r"<article[^>]*>(.*?)</article>", html_in, flags=re.IGNORECASE | re.DOTALL)
+    article_match = re.search(
+        r"<article[^>]*>(.*?)</article>", html_in, flags=re.IGNORECASE | re.DOTALL
+    )
     scope = article_match.group(1) if article_match else html_in
 
     paras = re.findall(r"<p[^>]*>(.*?)</p>", scope, flags=re.IGNORECASE | re.DOTALL)
@@ -442,7 +455,9 @@ class AlphaBotOrchestrator:
         self._allowed_user_ids = set(settings.allowed_telegram_user_ids)
         self._allowed_chat_ids = set(settings.allowed_telegram_chat_ids)
         self._telegram_runtime_prompt = _load_telegram_runtime_prompt()
-        self._telegram_prompt_profile = str(self._telegram_runtime_prompt.get("profile") or "Crypton PM Commander v3")
+        self._telegram_prompt_profile = str(
+            self._telegram_runtime_prompt.get("profile") or "Crypton PM Commander v3"
+        )
         self._architecture_policy = _load_architecture_policy()
         self._architecture_cache: dict[str, Any] = {"ts": 0.0, "payload": None}
         self._architecture_cache_ttl_seconds = 20.0
@@ -503,11 +518,15 @@ class AlphaBotOrchestrator:
             lines.append("")
         return lines
 
-    def _steering_question_blocks(self, questions: Sequence[dict[str, Any]], *, limit: int = 2) -> list[str]:
+    def _steering_question_blocks(
+        self, questions: Sequence[dict[str, Any]], *, limit: int = 2
+    ) -> list[str]:
         lines: list[str] = []
         for item in questions[: max(0, limit)]:
             question_id = html.escape(str(item.get("question_id") or "question"))
-            project_name = html.escape(str(item.get("project_name") or item.get("project_id") or "project"))
+            project_name = html.escape(
+                str(item.get("project_name") or item.get("project_id") or "project")
+            )
             question = html.escape(str(item.get("question") or "No question provided."))
             why = html.escape(str(item.get("why") or ""))
             recommended = html.escape(str(item.get("recommended") or ""))
@@ -548,6 +567,7 @@ class AlphaBotOrchestrator:
             if not research_dir.exists():
                 return {"available": False, "dir_exists": False, "today_exists": False}
             from datetime import date
+
             today = date.today().isoformat()
             today_report = research_dir / f"{today}.md"
             today_prompt = research_dir / f"{today}.prompt.md"
@@ -570,13 +590,25 @@ class AlphaBotOrchestrator:
         skills = catalog.get("skills") if isinstance(catalog.get("skills"), list) else []
 
         total = int(summary.get("total_skills", len(skills)))
-        source_counts = summary.get("source_counts") if isinstance(summary.get("source_counts"), dict) else {}
+        source_counts = (
+            summary.get("source_counts") if isinstance(summary.get("source_counts"), dict) else {}
+        )
         global_count = int(source_counts.get("global", 0))
         project_count = int(source_counts.get("project", 0))
-        bins = summary.get("required_bins") if isinstance(summary.get("required_bins"), list) else []
-        env_vars = summary.get("required_env_vars") if isinstance(summary.get("required_env_vars"), list) else []
-        integrations = catalog.get("integrations") if isinstance(catalog.get("integrations"), dict) else {}
-        clawhub = integrations.get("clawhub") if isinstance(integrations.get("clawhub"), dict) else {}
+        bins = (
+            summary.get("required_bins") if isinstance(summary.get("required_bins"), list) else []
+        )
+        env_vars = (
+            summary.get("required_env_vars")
+            if isinstance(summary.get("required_env_vars"), list)
+            else []
+        )
+        integrations = (
+            catalog.get("integrations") if isinstance(catalog.get("integrations"), dict) else {}
+        )
+        clawhub = (
+            integrations.get("clawhub") if isinstance(integrations.get("clawhub"), dict) else {}
+        )
         clawhub_lock_exists = bool(clawhub.get("lock_exists"))
         clawhub_skill_count = int(clawhub.get("installed_skill_count", 0))
 
@@ -623,7 +655,11 @@ class AlphaBotOrchestrator:
         now_ts = time.time()
         cached_payload = self._architecture_cache.get("payload")
         cached_ts = float(self._architecture_cache.get("ts") or 0)
-        if not refresh and isinstance(cached_payload, dict) and (now_ts - cached_ts) < self._architecture_cache_ttl_seconds:
+        if (
+            not refresh
+            and isinstance(cached_payload, dict)
+            and (now_ts - cached_ts) < self._architecture_cache_ttl_seconds
+        ):
             return cached_payload
 
         try:
@@ -646,7 +682,9 @@ class AlphaBotOrchestrator:
 
     def _architecture_message(self, *, refresh: bool = False) -> str:
         snapshot = self._architecture_snapshot(refresh=refresh)
-        generated_at = str(snapshot.get("generated_at") or "").replace("T", " ").replace("+00:00", " UTC")
+        generated_at = (
+            str(snapshot.get("generated_at") or "").replace("T", " ").replace("+00:00", " UTC")
+        )
         if str(snapshot.get("status") or "").lower() != "ok":
             error = html.escape(str(snapshot.get("error") or "unknown error"))
             return (
@@ -656,20 +694,37 @@ class AlphaBotOrchestrator:
             )[:3900]
 
         stats = snapshot.get("stats") if isinstance(snapshot.get("stats"), dict) else {}
-        policy = snapshot.get("executor_policy") if isinstance(snapshot.get("executor_policy"), dict) else {}
+        policy = (
+            snapshot.get("executor_policy")
+            if isinstance(snapshot.get("executor_policy"), dict)
+            else {}
+        )
         topology = snapshot.get("topology") if isinstance(snapshot.get("topology"), dict) else {}
-        fleet_nodes = topology.get("fleet_nodes") if isinstance(topology.get("fleet_nodes"), list) else []
+        fleet_nodes = (
+            topology.get("fleet_nodes") if isinstance(topology.get("fleet_nodes"), list) else []
+        )
         logs = snapshot.get("logs") if isinstance(snapshot.get("logs"), list) else []
-        charts_path = html.escape(str(snapshot.get("project_charts_markdown_path") or "memory/PROJECT_ARCHITECTURE_CHARTS_LATEST.md"))
+        charts_path = html.escape(
+            str(
+                snapshot.get("project_charts_markdown_path")
+                or "memory/PROJECT_ARCHITECTURE_CHARTS_LATEST.md"
+            )
+        )
 
         policy_mode = html.escape(str(policy.get("mode") or "open"))
-        policy_agents = policy.get("allowed_executor_agent_ids") if isinstance(policy.get("allowed_executor_agent_ids"), list) else []
+        policy_agents = (
+            policy.get("allowed_executor_agent_ids")
+            if isinstance(policy.get("allowed_executor_agent_ids"), list)
+            else []
+        )
         policy_memberships = (
             policy.get("allowed_executor_membership_ids")
             if isinstance(policy.get("allowed_executor_membership_ids"), list)
             else []
         )
-        policy_agents_text = html.escape(", ".join([str(item) for item in policy_agents]) if policy_agents else "none")
+        policy_agents_text = html.escape(
+            ", ".join([str(item) for item in policy_agents]) if policy_agents else "none"
+        )
         policy_memberships_text = html.escape(
             ", ".join([str(item) for item in policy_memberships]) if policy_memberships else "none"
         )
@@ -746,7 +801,9 @@ class AlphaBotOrchestrator:
 
     def _agents_message(self, *, stale_after_seconds: int = 3600) -> str:
         try:
-            agents = ControlPlaneStore().list_agents(heartbeat_ttl_seconds=180, include_disabled=True)
+            agents = ControlPlaneStore().list_agents(
+                heartbeat_ttl_seconds=180, include_disabled=True
+            )
         except Exception as exc:
             return f"<b>{html.escape(self._telegram_prompt_profile)} - /agents</b>\nError loading agents: {html.escape(str(exc))}"[
                 :3900
@@ -768,7 +825,9 @@ class AlphaBotOrchestrator:
             if status == "disabled":
                 disabled_count += 1
 
-            capabilities = item.get("capabilities") if isinstance(item.get("capabilities"), list) else []
+            capabilities = (
+                item.get("capabilities") if isinstance(item.get("capabilities"), list) else []
+            )
             memberships = self._extract_membership_ids(capabilities)
             age_seconds = int(item.get("heartbeat_age_seconds") or 0)
             agent_id = str(item.get("agent_id") or "").strip().lower()
@@ -776,7 +835,11 @@ class AlphaBotOrchestrator:
                 (agent_id and agent_id in allowed_agents)
                 or any(membership in allowed_memberships for membership in memberships)
             )
-            if status != "disabled" and age_seconds >= max(300, stale_after_seconds) and not protected:
+            if (
+                status != "disabled"
+                and age_seconds >= max(300, stale_after_seconds)
+                and not protected
+            ):
                 stale_candidates += 1
             rows.append(
                 {
@@ -805,8 +868,12 @@ class AlphaBotOrchestrator:
         ]
         if rows:
             for row in rows[:8]:
-                memberships = row.get("memberships") if isinstance(row.get("memberships"), list) else []
-                memberships_text = ", ".join([str(item) for item in memberships]) if memberships else "none"
+                memberships = (
+                    row.get("memberships") if isinstance(row.get("memberships"), list) else []
+                )
+                memberships_text = (
+                    ", ".join([str(item) for item in memberships]) if memberships else "none"
+                )
                 state = "online" if row.get("online") else row.get("status", "offline")
                 lines.append(
                     f"- {html.escape(str(row.get('agent_id') or 'unknown'))}: "
@@ -819,7 +886,9 @@ class AlphaBotOrchestrator:
         lines.append("Tip: /cleanupagents dry (preview) or /cleanupagents apply")
         return "\n".join(lines)[:3900]
 
-    def _cleanup_stale_agents(self, *, stale_after_seconds: int, dry_run: bool, actor: str) -> dict[str, Any]:
+    def _cleanup_stale_agents(
+        self, *, stale_after_seconds: int, dry_run: bool, actor: str
+    ) -> dict[str, Any]:
         keep_agents = sorted(allowed_executor_agent_ids())
         keep_memberships = sorted(allowed_executor_membership_ids())
         result = ControlPlaneStore().cleanup_stale_agents(
@@ -852,7 +921,9 @@ class AlphaBotOrchestrator:
             for row in candidates[:6]:
                 if not isinstance(row, dict):
                     continue
-                memberships = row.get("memberships") if isinstance(row.get("memberships"), list) else []
+                memberships = (
+                    row.get("memberships") if isinstance(row.get("memberships"), list) else []
+                )
                 lines.append(
                     f"- {html.escape(str(row.get('agent_id') or 'unknown'))} | "
                     f"age={int(row.get('heartbeat_age_seconds', 0))}s | "
@@ -863,8 +934,12 @@ class AlphaBotOrchestrator:
         return "\n".join(lines)[:3900]
 
     def _enforce_rari_policy_message(self, *, actor: str) -> str:
-        expected_mode = str(os.getenv("AGENTIC_EXPECTED_EXECUTOR_POLICY_MODE") or "").strip().lower()
-        strict_lock = str(os.getenv("AGENTIC_ENFORCE_EXPECTED_EXECUTOR_POLICY") or "").strip().lower() in {
+        expected_mode = (
+            str(os.getenv("AGENTIC_EXPECTED_EXECUTOR_POLICY_MODE") or "").strip().lower()
+        )
+        strict_lock = str(
+            os.getenv("AGENTIC_ENFORCE_EXPECTED_EXECUTOR_POLICY") or ""
+        ).strip().lower() in {
             "1",
             "true",
             "yes",
@@ -993,7 +1068,11 @@ class AlphaBotOrchestrator:
 
         tasks_overview = control.get("tasks") if isinstance(control.get("tasks"), dict) else {}
         proposals_snapshot = load_autonomy_proposals()
-        proposals = proposals_snapshot.get("proposals") if isinstance(proposals_snapshot.get("proposals"), list) else []
+        proposals = (
+            proposals_snapshot.get("proposals")
+            if isinstance(proposals_snapshot.get("proposals"), list)
+            else []
+        )
         steering_questions = (
             proposals_snapshot.get("steering_questions")
             if isinstance(proposals_snapshot.get("steering_questions"), list)
@@ -1055,7 +1134,9 @@ class AlphaBotOrchestrator:
         if steering_questions:
             for item in steering_questions[:2]:
                 question_id = html.escape(str(item.get("question_id") or "question"))
-                project_name = html.escape(str(item.get("project_name") or item.get("project_id") or "project"))
+                project_name = html.escape(
+                    str(item.get("project_name") or item.get("project_id") or "project")
+                )
                 lines.append(f"- {question_id} ({project_name})")
                 lines.append(f"  Reply: /decide {question_id} 1")
         else:
@@ -1118,9 +1199,13 @@ class AlphaBotOrchestrator:
 
         for item in steering_questions[:4]:
             question_id = str(item.get("question_id") or "").strip()
-            project_name = html.escape(str(item.get("project_name") or item.get("project_id") or "project"))
+            project_name = html.escape(
+                str(item.get("project_name") or item.get("project_id") or "project")
+            )
             question_text = html.escape(str(item.get("question") or "Steering question"))
-            lines.append(f"- {html.escape(question_id or 'question')} ({project_name}): {question_text}")
+            lines.append(
+                f"- {html.escape(question_id or 'question')} ({project_name}): {question_text}"
+            )
             options = item.get("options") if isinstance(item.get("options"), list) else []
             for idx, option in enumerate(options[:3], start=1):
                 lines.append(f"  {idx}. {html.escape(str(option))}")
@@ -1219,7 +1304,9 @@ class AlphaBotOrchestrator:
         )
         return task
 
-    def _queue_quick_task_from_text(self, *, chat_id: int, chat: ChatConfig, task_text: str) -> dict[str, Any]:
+    def _queue_quick_task_from_text(
+        self, *, chat_id: int, chat: ChatConfig, task_text: str
+    ) -> dict[str, Any]:
         project = chat.focus_project.strip() or "ai-project-management-system"
         cleaned_task = re.sub(r"\s+", " ", task_text).strip()
         task = ControlPlaneStore().create_task(
@@ -1282,7 +1369,9 @@ class AlphaBotOrchestrator:
         directive = chat.operator_directive.strip() or "none"
         state = self._decision_inbox_state(now=ref_now)
         proposals = state["proposals"] if isinstance(state.get("proposals"), list) else []
-        steering = state["steering_questions"] if isinstance(state.get("steering_questions"), list) else []
+        steering = (
+            state["steering_questions"] if isinstance(state.get("steering_questions"), list) else []
+        )
         open_count = int(state.get("open_count", 0))
         age_minutes = int(state.get("age_minutes", 0))
         sla_minutes = max(30, int(chat.decision_sla_minutes or 180))
@@ -1320,11 +1409,11 @@ class AlphaBotOrchestrator:
                 f"failed={int(tasks_overview.get('failed', 0))}"
             )
 
-        lines.append(
-            f"Decision inbox: open={open_count} | age={age_minutes}m | sla={sla_minutes}m"
-        )
+        lines.append(f"Decision inbox: open={open_count} | age={age_minutes}m | sla={sla_minutes}m")
         if sla_breached:
-            lines.append("SLA alert: decision backlog exceeded threshold; steer now to avoid stall.")
+            lines.append(
+                "SLA alert: decision backlog exceeded threshold; steer now to avoid stall."
+            )
 
         lines.append("What I need from you:")
         if proposals:
@@ -1399,7 +1488,9 @@ class AlphaBotOrchestrator:
             else:
                 chat.last_assistant_checkin_at = ts
         except Exception as exc:
-            logger.warning("failed setting last_assistant_checkin_at for chat=%s: %s", chat.chat_id, exc)
+            logger.warning(
+                "failed setting last_assistant_checkin_at for chat=%s: %s", chat.chat_id, exc
+            )
 
         if sla_reminder:
             try:
@@ -1460,7 +1551,9 @@ class AlphaBotOrchestrator:
         projects = get_projects_overview(force_refresh=True)
         board = projects.get("board") if isinstance(projects.get("board"), dict) else {}
         counts = board.get("counts") if isinstance(board.get("counts"), dict) else {}
-        next_actions = projects.get("next_actions") if isinstance(projects.get("next_actions"), list) else []
+        next_actions = (
+            projects.get("next_actions") if isinstance(projects.get("next_actions"), list) else []
+        )
 
         control_store: ControlPlaneStore | None = None
         control = {"agents_online": 0, "tasks": {"queued": 0, "leased": 0, "failed": 0}}
@@ -1489,7 +1582,11 @@ class AlphaBotOrchestrator:
             proposals_snapshot = load_autonomy_proposals()
         except Exception:
             proposals_snapshot = {"proposals": []}
-        proposals = proposals_snapshot.get("proposals") if isinstance(proposals_snapshot.get("proposals"), list) else []
+        proposals = (
+            proposals_snapshot.get("proposals")
+            if isinstance(proposals_snapshot.get("proposals"), list)
+            else []
+        )
         steering_questions = (
             proposals_snapshot.get("steering_questions")
             if isinstance(proposals_snapshot.get("steering_questions"), list)
@@ -1514,12 +1611,16 @@ class AlphaBotOrchestrator:
         if tasks_queued > 0 and agents_online <= 0:
             blockers.append("Queued tasks are waiting because no agents are online.")
         if tasks_failed > 0:
-            blockers.append(f"{tasks_failed} failed task(s) need root-cause triage and safe retry handling.")
+            blockers.append(
+                f"{tasks_failed} failed task(s) need root-cause triage and safe retry handling."
+            )
         unavailable = int(router_summary.get("membership_unavailable_count", 0))
         if memberships_ready <= 0:
             blockers.append("Router reports zero ready memberships for task execution.")
         elif unavailable > 0:
-            blockers.append(f"{unavailable} memberships are unavailable and reduce routing resilience.")
+            blockers.append(
+                f"{unavailable} memberships are unavailable and reduce routing resilience."
+            )
         if board_blocked > 0:
             blockers.append(f"Board has {board_blocked} blocked card(s) needing owner action.")
         if not blockers:
@@ -1572,13 +1673,21 @@ class AlphaBotOrchestrator:
         return "\n".join(lines)[:3900]
 
     def _autonomy_cycle_message(self, report: dict[str, Any]) -> str:
-        generated_at = str(report.get("generated_at") or "").replace("T", " ").replace("+00:00", " UTC")
-        created = report.get("created_tasks") if isinstance(report.get("created_tasks"), list) else []
+        generated_at = (
+            str(report.get("generated_at") or "").replace("T", " ").replace("+00:00", " UTC")
+        )
+        created = (
+            report.get("created_tasks") if isinstance(report.get("created_tasks"), list) else []
+        )
         proposals = report.get("proposals") if isinstance(report.get("proposals"), list) else []
         steering_questions = (
-            report.get("steering_questions") if isinstance(report.get("steering_questions"), list) else []
+            report.get("steering_questions")
+            if isinstance(report.get("steering_questions"), list)
+            else []
         )
-        observations = report.get("observations") if isinstance(report.get("observations"), list) else []
+        observations = (
+            report.get("observations") if isinstance(report.get("observations"), list) else []
+        )
         metrics = report.get("metrics") if isinstance(report.get("metrics"), dict) else {}
 
         agents_online = int(metrics.get("agents_online", 0))
@@ -1742,7 +1851,9 @@ class AlphaBotOrchestrator:
             if not body:
                 await self._send(chat_id, "Quick task format: task: <what to do>")
                 return {"status": "ok", "chat_id": chat_id, "command": "quick-task-help"}
-            task = await asyncio.to_thread(self._queue_quick_task_from_text, chat_id=chat_id, chat=chat, task_text=body)
+            task = await asyncio.to_thread(
+                self._queue_quick_task_from_text, chat_id=chat_id, chat=chat, task_text=body
+            )
             await self._send(
                 chat_id,
                 (
@@ -1761,20 +1872,32 @@ class AlphaBotOrchestrator:
                 return {"status": "ok", "chat_id": chat_id, "command": "focus-help"}
             chat.focus_project = focus_value[:120]
             await asyncio.to_thread(self._save_chat, chat)
-            await self._send(chat_id, f"Focus project updated to: <b>{html.escape(chat.focus_project)}</b>")
+            await self._send(
+                chat_id, f"Focus project updated to: <b>{html.escape(chat.focus_project)}</b>"
+            )
             return {"status": "ok", "chat_id": chat_id, "command": "focus-text"}
 
         if lowered.startswith("prefs:") or lowered.startswith("preferences:"):
             raw_pairs = cleaned.split(":", maxsplit=1)[1].strip()
-            matches = re.findall(r"(tone|risk|coding|coding_style)\s*=\s*([a-zA-Z_-]+)", raw_pairs, flags=re.IGNORECASE)
+            matches = re.findall(
+                r"(tone|risk|coding|coding_style)\s*=\s*([a-zA-Z_-]+)",
+                raw_pairs,
+                flags=re.IGNORECASE,
+            )
             if not matches:
-                await self._send(chat_id, "Preferences format: prefs: tone=concise risk=balanced coding=pragmatic")
+                await self._send(
+                    chat_id,
+                    "Preferences format: prefs: tone=concise risk=balanced coding=pragmatic",
+                )
                 return {"status": "ok", "chat_id": chat_id, "command": "prefs-help"}
             pairs = {str(k).strip().lower(): str(v).strip().lower() for k, v in matches}
             changed = self._set_preferences_from_pairs(chat, pairs)
             if changed:
                 await asyncio.to_thread(self._save_chat, chat)
-            await self._send(chat_id, f"Preferences updated: <b>{html.escape(self._preferences_summary(chat))}</b>")
+            await self._send(
+                chat_id,
+                f"Preferences updated: <b>{html.escape(self._preferences_summary(chat))}</b>",
+            )
             return {"status": "ok", "chat_id": chat_id, "command": "prefs-text"}
 
         inline_decision = _extract_inline_decision_choice(cleaned)
@@ -1792,7 +1915,9 @@ class AlphaBotOrchestrator:
             assert item is not None
             await self._save_directive(
                 chat,
-                f"{chat.operator_directive} | decision:{decision_id} => {selected_option}".strip(" |"),
+                f"{chat.operator_directive} | decision:{decision_id} => {selected_option}".strip(
+                    " |"
+                ),
             )
             apply_task = await asyncio.to_thread(
                 self._queue_decision_apply_task,
@@ -1817,7 +1942,11 @@ class AlphaBotOrchestrator:
         inferred_command, inferred_args = _infer_text_command(cleaned)
         if inferred_command:
             await self._execute_command(chat_id, inferred_command, inferred_args)
-            return {"status": "ok", "chat_id": chat_id, "command": f"text-{inferred_command.lstrip('/')}"}
+            return {
+                "status": "ok",
+                "chat_id": chat_id,
+                "command": f"text-{inferred_command.lstrip('/')}",
+            }
 
         saved = await self._record_operator_directive(chat_id, cleaned)
         if saved:
@@ -1903,12 +2032,12 @@ class AlphaBotOrchestrator:
                 "- task: <what to do> (queue quick task)\n"
                 "- focus project: <project>\n\n"
                 "Natural language shortcuts:\n"
-                "- \"what next\" / \"next steps\" -> /brief\n"
-                "- \"status\" / \"overview\" -> /overview\n"
-                "- \"decisions\" / \"question inbox\" -> /inbox\n"
-                "- \"assistant check-in\" -> /checkin\n"
-                "- \"deep research: <topic>\" -> /deepresearch <topic>\n"
-                "- \"decide <id> <1|2|3>\" -> decision + apply task\n\n"
+                '- "what next" / "next steps" -> /brief\n'
+                '- "status" / "overview" -> /overview\n'
+                '- "decisions" / "question inbox" -> /inbox\n'
+                '- "assistant check-in" -> /checkin\n'
+                '- "deep research: <topic>" -> /deepresearch <topic>\n'
+                '- "decide <id> <1|2|3>" -> decision + apply task\n\n'
                 "Policy:\n"
                 "- Daily research: memory/kimi-deep-research/YYYY-MM-DD.md\n"
                 "- Tool catalog: app/data/kimi_tools_catalog.json\n"
@@ -1978,7 +2107,9 @@ class AlphaBotOrchestrator:
             changed = self._set_preferences_from_pairs(chat, pairs)
             if changed:
                 await asyncio.to_thread(self._save_chat, chat)
-            await self._send(chat_id, f"Preferences now: <b>{html.escape(self._preferences_summary(chat))}</b>")
+            await self._send(
+                chat_id, f"Preferences now: <b>{html.escape(self._preferences_summary(chat))}</b>"
+            )
             return
 
         if command == "/mode":
@@ -1995,14 +2126,18 @@ class AlphaBotOrchestrator:
                 return
             chat.assistant_mode = _normalize_assistant_mode(requested)
             await asyncio.to_thread(self._save_chat, chat)
-            await self._send(chat_id, f"Assistant mode updated to <b>{html.escape(chat.assistant_mode)}</b>.")
+            await self._send(
+                chat_id, f"Assistant mode updated to <b>{html.escape(chat.assistant_mode)}</b>."
+            )
             return
 
         if command == "/focus":
             focus_value = re.sub(r"\s+", " ", args).strip()
             if not focus_value:
                 current_focus = chat.focus_project.strip() or "none"
-                await self._send(chat_id, f"Current focus project: <b>{html.escape(current_focus)}</b>")
+                await self._send(
+                    chat_id, f"Current focus project: <b>{html.escape(current_focus)}</b>"
+                )
                 return
             if focus_value.lower() in {"clear", "none", "off"}:
                 chat.focus_project = ""
@@ -2011,7 +2146,9 @@ class AlphaBotOrchestrator:
                 return
             chat.focus_project = focus_value[:120]
             await asyncio.to_thread(self._save_chat, chat)
-            await self._send(chat_id, f"Focus project set to <b>{html.escape(chat.focus_project)}</b>.")
+            await self._send(
+                chat_id, f"Focus project set to <b>{html.escape(chat.focus_project)}</b>."
+            )
             return
 
         if command == "/setaster":
@@ -2049,7 +2186,9 @@ class AlphaBotOrchestrator:
                 await self._send(chat_id, "Usage: /setdirective focus on macro risk and BTC trend")
                 return
             await self._save_directive(chat, args)
-            await self._send(chat_id, "Directive saved and will be reflected in heartbeats and digests.")
+            await self._send(
+                chat_id, "Directive saved and will be reflected in heartbeats and digests."
+            )
             return
 
         if command == "/setheartbeat":
@@ -2078,7 +2217,10 @@ class AlphaBotOrchestrator:
             if chat.heartbeat_interval_minutes < 5:
                 chat.heartbeat_interval_minutes = self._default_heartbeat_interval_minutes
             await asyncio.to_thread(self._save_chat, chat)
-            await self._send(chat_id, f"Scheduled heartbeats enabled every {chat.heartbeat_interval_minutes} minutes.")
+            await self._send(
+                chat_id,
+                f"Scheduled heartbeats enabled every {chat.heartbeat_interval_minutes} minutes.",
+            )
             return
 
         if command == "/setcheckin":
@@ -2167,7 +2309,11 @@ class AlphaBotOrchestrator:
                 await self._send(chat_id, "Usage: /cleanupagents dry OR /cleanupagents apply")
                 return
             dry_run = mode not in {"apply", "run", "force", "yes"}
-            action_text = "Previewing stale agent cleanup..." if dry_run else "Applying stale agent cleanup..."
+            action_text = (
+                "Previewing stale agent cleanup..."
+                if dry_run
+                else "Applying stale agent cleanup..."
+            )
             await self._send(chat_id, action_text)
             result = await asyncio.to_thread(
                 self._cleanup_stale_agents,
@@ -2187,7 +2333,9 @@ class AlphaBotOrchestrator:
                 return
             if subcommand in {"enforce", "apply", "on"}:
                 await self._send(chat_id, "Enforcing dual-Pi executor policy...")
-                message = await asyncio.to_thread(self._enforce_rari_policy_message, actor=f"telegram:{chat_id}")
+                message = await asyncio.to_thread(
+                    self._enforce_rari_policy_message, actor=f"telegram:{chat_id}"
+                )
                 await self._send(chat_id, message)
                 return
             await self._send(chat_id, "Usage: /rari status OR /rari enforce")
@@ -2209,7 +2357,9 @@ class AlphaBotOrchestrator:
                 include_full_control=True,
             )
             await self._send(chat_id, message)
-            await self._persist_assistant_checkin_timestamps(chat, ts=now, sla_reminder=sla_breached)
+            await self._persist_assistant_checkin_timestamps(
+                chat, ts=now, sla_reminder=sla_breached
+            )
             return
 
         if command in {"/inbox", "/questions"}:
@@ -2231,14 +2381,21 @@ class AlphaBotOrchestrator:
                 await self._send(chat_id, message)
                 return
             await self._send(chat_id, "Queueing deep-research run...")
-            queued = await asyncio.to_thread(self._queue_deep_research_task, arg, f"telegram:{chat_id}")
+            queued = await asyncio.to_thread(
+                self._queue_deep_research_task, arg, f"telegram:{chat_id}"
+            )
             if not queued.get("ok"):
-                await self._send(chat_id, f"Could not queue deep research: {html.escape(str(queued.get('error') or 'unknown error'))}")
+                await self._send(
+                    chat_id,
+                    f"Could not queue deep research: {html.escape(str(queued.get('error') or 'unknown error'))}",
+                )
                 return
             task = queued.get("task") if isinstance(queued.get("task"), dict) else {}
             task_id = html.escape(str(task.get("task_id") or "n/a"))
             title = html.escape(str(task.get("title") or "Run deep research cycle"))
-            command_text = html.escape(str(queued.get("command") or "./scripts/kimi_daily_research.sh"))
+            command_text = html.escape(
+                str(queued.get("command") or "./scripts/kimi_daily_research.sh")
+            )
             await self._send(
                 chat_id,
                 (
@@ -2276,7 +2433,9 @@ class AlphaBotOrchestrator:
             assert item is not None
             await self._save_directive(
                 chat,
-                f"{chat.operator_directive} | decision:{decision_id} => {selected_option}".strip(" |"),
+                f"{chat.operator_directive} | decision:{decision_id} => {selected_option}".strip(
+                    " |"
+                ),
             )
             apply_task = await asyncio.to_thread(
                 self._queue_decision_apply_task,
@@ -2307,7 +2466,9 @@ class AlphaBotOrchestrator:
         chat = await asyncio.to_thread(self._load_chat, chat_id)
         await self._save_directive(chat, cleaned)
         safe = html.escape(chat.operator_directive)
-        await self._send(chat_id, f"Directive updated from message text.\n<b>Now focusing on:</b> {safe}")
+        await self._send(
+            chat_id, f"Directive updated from message text.\n<b>Now focusing on:</b> {safe}"
+        )
         return True
 
     async def _save_directive(self, chat: ChatConfig, raw_text: str) -> None:
@@ -2315,7 +2476,9 @@ class AlphaBotOrchestrator:
         chat.operator_directive = cleaned[: self._heartbeat_directive_max_chars]
         await asyncio.to_thread(self._save_chat, chat)
 
-    def _heartbeat_message(self, chat: ChatConfig, scored_top: Sequence, now: datetime, total_scored: int) -> str:
+    def _heartbeat_message(
+        self, chat: ChatConfig, scored_top: Sequence, now: datetime, total_scored: int
+    ) -> str:
         watchlist = format_watchlist_message(chat).replace("<b>Current watchlist</b>\n", "")
         focus_project = chat.focus_project.strip() or "none"
         lines = [
@@ -2362,9 +2525,15 @@ class AlphaBotOrchestrator:
         top_k: int | None = None,
     ) -> int:
         now = datetime.now(tz=UTC)
-        news = list(cached_news) if cached_news is not None else await self._news.fetch(REPUTABLE_NEWS_SOURCES)
+        news = (
+            list(cached_news)
+            if cached_news is not None
+            else await self._news.fetch(REPUTABLE_NEWS_SOURCES)
+        )
         scored = self._score_for_chat(chat, news)
-        safe_top_k = max(1, min(int(top_k if top_k is not None else self._settings.digest_top_k), 15))
+        safe_top_k = max(
+            1, min(int(top_k if top_k is not None else self._settings.digest_top_k), 15)
+        )
         alpha_stream = build_alpha_stream_payload(
             scored_news=scored,
             chat_config=chat,
@@ -2438,7 +2607,11 @@ class AlphaBotOrchestrator:
         suppress_if_no_new: bool = False,
     ) -> int:
         now = datetime.now(tz=UTC)
-        if suppress_if_no_new and self._min_digest_interval_minutes > 0 and chat.last_digest_sent_at:
+        if (
+            suppress_if_no_new
+            and self._min_digest_interval_minutes > 0
+            and chat.last_digest_sent_at
+        ):
             last = chat.last_digest_sent_at
             if last.tzinfo is None:
                 last = last.replace(tzinfo=UTC)
@@ -2446,7 +2619,11 @@ class AlphaBotOrchestrator:
                 # Throttle scheduled digests to reduce spam/resource usage.
                 return 0
 
-        news = list(cached_news) if cached_news is not None else await self._news.fetch(REPUTABLE_NEWS_SOURCES)
+        news = (
+            list(cached_news)
+            if cached_news is not None
+            else await self._news.fetch(REPUTABLE_NEWS_SOURCES)
+        )
         scored_all = self._score_for_chat(chat, news)
 
         # De-dupe: only send items that haven't been sent recently to this chat.
@@ -2477,7 +2654,9 @@ class AlphaBotOrchestrator:
             candidate_ids: list[str] = []
             for scored in top_items:
                 candidate_ids.append(scored.item.id)
-                candidate_ids.append(_legacy_item_id(scored.item.source.key, scored.item.url, scored.item.title))
+                candidate_ids.append(
+                    _legacy_item_id(scored.item.source.key, scored.item.url, scored.item.title)
+                )
                 candidate_ids.append(_url_item_id(scored.item.url))
             try:
                 added, merged = await asyncio.to_thread(
@@ -2490,7 +2669,9 @@ class AlphaBotOrchestrator:
                     # Another instance beat us to it.
                     if suppress_if_no_new:
                         return 0
-                    await self._send(chat.chat_id, "No new high-alpha headlines since the last digest.")
+                    await self._send(
+                        chat.chat_id, "No new high-alpha headlines since the last digest."
+                    )
                     return 0
                 reserved_via_store = True
                 chat.sent_item_ids = merged
@@ -2525,7 +2706,9 @@ class AlphaBotOrchestrator:
                         summary_overrides[item_id] = snippet
                         self._put_cached_snippet(url, snippet)
 
-                await asyncio.gather(*[_worker(item_id, url) for item_id, url in to_fetch], return_exceptions=True)
+                await asyncio.gather(
+                    *[_worker(item_id, url) for item_id, url in to_fetch], return_exceptions=True
+                )
 
         message = format_digest_message(
             chat_config=chat,
@@ -2549,7 +2732,9 @@ class AlphaBotOrchestrator:
                     chat.last_digest_sent_at = now
                     await asyncio.to_thread(self._save_chat, chat)
             except Exception as exc:
-                logger.warning("failed persisting last_digest_sent_at for chat=%s: %s", chat.chat_id, exc)
+                logger.warning(
+                    "failed persisting last_digest_sent_at for chat=%s: %s", chat.chat_id, exc
+                )
 
         # Persist sent ids (only items actually included in the message).
         if not reserved_via_store:
@@ -2575,7 +2760,9 @@ class AlphaBotOrchestrator:
         suppress_if_too_soon: bool = True,
     ) -> int:
         now = datetime.now(tz=UTC)
-        interval = max(5, int(chat.heartbeat_interval_minutes or self._default_heartbeat_interval_minutes))
+        interval = max(
+            5, int(chat.heartbeat_interval_minutes or self._default_heartbeat_interval_minutes)
+        )
         if suppress_if_too_soon and chat.last_heartbeat_sent_at:
             last = chat.last_heartbeat_sent_at
             if last.tzinfo is None:
@@ -2583,10 +2770,16 @@ class AlphaBotOrchestrator:
             if (now - last).total_seconds() < (interval * 60):
                 return 0
 
-        news = list(cached_news) if cached_news is not None else await self._news.fetch(REPUTABLE_NEWS_SOURCES)
+        news = (
+            list(cached_news)
+            if cached_news is not None
+            else await self._news.fetch(REPUTABLE_NEWS_SOURCES)
+        )
         scored = self._score_for_chat(chat, news)
         top = scored[:3]
-        message = self._heartbeat_message(chat=chat, scored_top=top, now=now, total_scored=len(scored))
+        message = self._heartbeat_message(
+            chat=chat, scored_top=top, now=now, total_scored=len(scored)
+        )
         await self._send(chat.chat_id, message)
 
         try:
@@ -2600,7 +2793,9 @@ class AlphaBotOrchestrator:
                 chat.last_heartbeat_sent_at = now
                 await asyncio.to_thread(self._save_chat, chat)
         except Exception as exc:
-            logger.warning("failed persisting last_heartbeat_sent_at for chat=%s: %s", chat.chat_id, exc)
+            logger.warning(
+                "failed persisting last_heartbeat_sent_at for chat=%s: %s", chat.chat_id, exc
+            )
 
         return 1
 
@@ -2617,7 +2812,9 @@ class AlphaBotOrchestrator:
         sent = 0
         for chat in chats:
             try:
-                count = await self.send_digest_to_chat(chat, cached_news=news, suppress_if_no_new=True)
+                count = await self.send_digest_to_chat(
+                    chat, cached_news=news, suppress_if_no_new=True
+                )
                 if count > 0:
                     sent += 1
             except Exception as exc:
@@ -2645,7 +2842,9 @@ class AlphaBotOrchestrator:
                 continue
             eligible += 1
             try:
-                count = await self.send_heartbeat_to_chat(chat, cached_news=news, suppress_if_too_soon=True)
+                count = await self.send_heartbeat_to_chat(
+                    chat, cached_news=news, suppress_if_too_soon=True
+                )
                 if count > 0:
                     sent += 1
             except Exception as exc:
@@ -2685,7 +2884,9 @@ class AlphaBotOrchestrator:
                 try:
                     existing = await asyncio.to_thread(self._store.get, parsed)
                 except Exception as exc:
-                    logger.warning("assistant check-in could not load chat_id=%s from store: %s", parsed, exc)
+                    logger.warning(
+                        "assistant check-in could not load chat_id=%s from store: %s", parsed, exc
+                    )
                     existing = None
                 chat_map[parsed] = existing or default_chat_config(parsed, self._settings)
 
@@ -2699,7 +2900,9 @@ class AlphaBotOrchestrator:
             try:
                 existing = await asyncio.to_thread(self._store.get, parsed)
             except Exception as exc:
-                logger.warning("assistant check-in fallback could not load chat_id=%s: %s", parsed, exc)
+                logger.warning(
+                    "assistant check-in fallback could not load chat_id=%s: %s", parsed, exc
+                )
                 existing = None
             chat_map[parsed] = existing or default_chat_config(parsed, self._settings)
 
@@ -2738,7 +2941,9 @@ class AlphaBotOrchestrator:
             last_checkin = chat.last_assistant_checkin_at
             if last_checkin and last_checkin.tzinfo is None:
                 last_checkin = last_checkin.replace(tzinfo=UTC)
-            interval_due = (last_checkin is None) or ((now - last_checkin).total_seconds() >= interval_minutes * 60)
+            interval_due = (last_checkin is None) or (
+                (now - last_checkin).total_seconds() >= interval_minutes * 60
+            )
 
             last_sla = chat.last_decision_sla_reminder_at
             if last_sla and last_sla.tzinfo is None:
@@ -2754,7 +2959,9 @@ class AlphaBotOrchestrator:
 
             eligible += 1
             try:
-                message, detected_sla_breach = self._assistant_checkin_message(chat, now=now, include_full_control=False)
+                message, detected_sla_breach = self._assistant_checkin_message(
+                    chat, now=now, include_full_control=False
+                )
                 await self._send(chat.chat_id, message)
                 await self._persist_assistant_checkin_timestamps(
                     chat,

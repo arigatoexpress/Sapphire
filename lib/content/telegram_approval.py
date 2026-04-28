@@ -113,9 +113,7 @@ def request_approval(
     )
 
 
-def _answer_callback(
-    callback_id: str, text: str, *, bot_token: str | None = None
-) -> dict:
+def _answer_callback(callback_id: str, text: str, *, bot_token: str | None = None) -> dict:
     """POST /answerCallbackQuery so the button stops spinning in the client."""
     ss = _safe_send()
     token = ss.get_bot_token(bot_token)
@@ -240,7 +238,13 @@ def handle_callback(
             _answer_callback(callback_id, "Approved", bot_token=bot_token)
         if chat_id is not None and message_id is not None:
             _edit_message(chat_id, message_id, f"{outcome}\n{ready.name}", bot_token=bot_token)
-        return {"ok": True, "action": action, "slug": slug, "status": "approved", "path": str(ready)}
+        return {
+            "ok": True,
+            "action": action,
+            "slug": slug,
+            "status": "approved",
+            "path": str(ready),
+        }
 
     # reject
     rejected = _move_pending(pending, _REJECTED_DIR)

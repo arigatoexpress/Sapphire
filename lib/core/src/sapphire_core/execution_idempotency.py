@@ -94,12 +94,8 @@ class ExecutionIdempotency:
         if self._db is None:
             return
         try:
-            doc_ref = self._db.collection(_COLLECTION).document(
-                self._doc_id(signal_id)
-            )
-            await doc_ref.update(
-                {"status": "executed", "order_id": order_id}
-            )
+            doc_ref = self._db.collection(_COLLECTION).document(self._doc_id(signal_id))
+            await doc_ref.update({"status": "executed", "order_id": order_id})
         except Exception as exc:
             logger.debug(
                 "Idempotency[%s]: could not mark executed (%s): %s",
@@ -115,9 +111,7 @@ class ExecutionIdempotency:
         if self._db is None:
             return
         try:
-            doc_ref = self._db.collection(_COLLECTION).document(
-                self._doc_id(signal_id)
-            )
+            doc_ref = self._db.collection(_COLLECTION).document(self._doc_id(signal_id))
             await doc_ref.update({"status": "failed", "error": error[:500]})
         except Exception as exc:
             logger.debug(
@@ -141,6 +135,7 @@ class ExecutionIdempotency:
             # positional-argument deprecation warnings; fall back for older SDKs.
             try:
                 from google.cloud.firestore_v1.base_query import FieldFilter as _FF
+
                 query = (
                     self._db.collection(_COLLECTION)
                     .where(filter=_FF("platform", "==", self.platform))

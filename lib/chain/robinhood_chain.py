@@ -9,6 +9,7 @@ Usage:
     client.publish_signal("ultra_v3", "BTC-USD", "long", 0.75)
     status = client.get_chain_status()
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -203,6 +204,7 @@ class RobinhoodChainClient:
 
         if self._private_key:
             from eth_account import Account  # type: ignore[import]
+
             self._account = Account.from_key(self._private_key)
 
         self._load_deployments()
@@ -347,11 +349,17 @@ class RobinhoodChainClient:
 
         try:
             from web3 import Web3  # type: ignore[import]
+
             addr = Web3.to_checksum_address(address)
             has_access = self._payment_contract.functions.hasAccess(addr).call()
             is_sub = self._payment_contract.functions.isSubscribed(addr).call()
             cr = self._payment_contract.functions.credits(addr).call()
-            return {"address": address, "has_access": has_access, "subscribed": is_sub, "credits": cr}
+            return {
+                "address": address,
+                "has_access": has_access,
+                "subscribed": is_sub,
+                "credits": cr,
+            }
         except Exception as exc:
             log.warning("check_payment failed: %s", exc)
             return {"error": str(exc)}
@@ -394,6 +402,7 @@ class RobinhoodChainClient:
 
         try:
             from web3 import Web3  # type: ignore[import]
+
             price_per_signal_wei = self._payment_contract.functions.pricePerSignal().call()
             monthly_wei = self._payment_contract.functions.monthlySubscription().call()
             return {

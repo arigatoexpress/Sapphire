@@ -29,7 +29,10 @@ def dispatch(task: str, tier: str | None = None, repo: str | None = None) -> dic
 
     # Step 2: Policy check
     if repo and not is_repo_allowed(repo):
-        return {"error": f"Repo '{repo}' is blocked by runtime policy", "classification": classification.__dict__}
+        return {
+            "error": f"Repo '{repo}' is blocked by runtime policy",
+            "classification": classification.__dict__,
+        }
 
     if classification.complexity > max_complexity(target):
         # Escalate to higher tier

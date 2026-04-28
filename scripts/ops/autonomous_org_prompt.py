@@ -53,13 +53,11 @@ SOURCE_LINKS = (
     ),
     (
         "GitHub self-hosted runners",
-        "https://docs.github.com/en/actions/hosting-your-own-runners/"
-        "about-self-hosted-runners",
+        "https://docs.github.com/en/actions/hosting-your-own-runners/about-self-hosted-runners",
     ),
     (
         "GitHub skip workflow runs",
-        "https://docs.github.com/en/actions/how-tos/manage-workflow-runs/"
-        "skip-workflow-runs",
+        "https://docs.github.com/en/actions/how-tos/manage-workflow-runs/skip-workflow-runs",
     ),
     (
         "Palantir OSDK",
@@ -129,9 +127,7 @@ def load_manifest(path: Path = DEFAULT_MANIFEST) -> dict[str, Any]:
 
 def build_prompt(manifest: dict[str, Any], status: dict[str, Any]) -> str:
     repos = [repo for repo in manifest.get("repos", []) if isinstance(repo, dict)]
-    upstream_repos = [
-        repo for repo in manifest.get("upstream_repos", []) if isinstance(repo, dict)
-    ]
+    upstream_repos = [repo for repo in manifest.get("upstream_repos", []) if isinstance(repo, dict)]
     repo_count = status.get("summary", {}).get("repo_count", len(repos))
     upstream_count = status.get("summary", {}).get("upstream_repo_count", len(upstream_repos))
     lines = [

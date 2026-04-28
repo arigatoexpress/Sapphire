@@ -187,9 +187,7 @@ def test_public_source_clients_construct_official_urls(monkeypatch):
     assert intel.SecEdgarClient(user_agent="ua").submissions("320193") == {"ok": True}
     assert intel.SecEdgarClient(user_agent="ua").companyfacts("320193") == {"ok": True}
     assert intel.FredClient(api_key="fred-key").series_observations("DGS10") == {"ok": True}
-    assert intel.EiaClient(api_key="eia-key").route_data("electricity/retail-sales") == {
-        "ok": True
-    }
+    assert intel.EiaClient(api_key="eia-key").route_data("electricity/retail-sales") == {"ok": True}
 
     assert calls[0]["url"].endswith("/submissions/CIK0000320193.json")
     assert calls[1]["url"].endswith("/api/xbrl/companyfacts/CIK0000320193.json")

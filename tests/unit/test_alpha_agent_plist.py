@@ -14,10 +14,7 @@ PLIST_PATH = ROOT / "infra" / "launchagents" / "com.sapphire.alpha-agent.plist"
 # The plist hard-codes the operator's Mac paths. Skip the host-filesystem
 # assertions on CI / non-macOS environments, where /usr/local/bin/python3
 # and /Users/aribs/Code/Sapphire do not exist.
-_ON_HOST = (
-    os.getenv("CI") is None
-    and Path("/Users/aribs/Code/Sapphire").is_dir()
-)
+_ON_HOST = os.getenv("CI") is None and Path("/Users/aribs/Code/Sapphire").is_dir()
 
 
 def _load_plist() -> dict:

@@ -167,7 +167,11 @@ class InMemoryMasterArena:
                     "field_name": field_name,
                     "value": value,
                 }
-                for (entity_type, entity_urn, field_name), value in self.canonical_field_values.items()
+                for (
+                    entity_type,
+                    entity_urn,
+                    field_name,
+                ), value in self.canonical_field_values.items()
             ],
         }
 
@@ -212,23 +216,35 @@ class InMemoryMasterArena:
                 asset_type=str(row.get("asset_type", "stnl_retail")),
                 tenant_brand=str(row.get("tenant_brand", "")),
                 occupancy_status=str(row.get("occupancy_status", "")),
-                building_sqft=float(row["building_sqft"]) if row.get("building_sqft") is not None else None,
+                building_sqft=float(row["building_sqft"])
+                if row.get("building_sqft") is not None
+                else None,
                 land_acres=float(row["land_acres"]) if row.get("land_acres") is not None else None,
                 year_built=int(row["year_built"]) if row.get("year_built") is not None else None,
-                asking_price=float(row["asking_price"]) if row.get("asking_price") is not None else None,
+                asking_price=float(row["asking_price"])
+                if row.get("asking_price") is not None
+                else None,
                 noi=float(row["noi"]) if row.get("noi") is not None else None,
                 cap_rate=float(row["cap_rate"]) if row.get("cap_rate") is not None else None,
-                current_rent_psf=float(row["current_rent_psf"]) if row.get("current_rent_psf") is not None else None,
+                current_rent_psf=float(row["current_rent_psf"])
+                if row.get("current_rent_psf") is not None
+                else None,
                 submarket_avg_rent_psf=(
-                    float(row["submarket_avg_rent_psf"]) if row.get("submarket_avg_rent_psf") is not None else None
+                    float(row["submarket_avg_rent_psf"])
+                    if row.get("submarket_avg_rent_psf") is not None
+                    else None
                 ),
                 lease_expiration=_decode_snapshot_date(row.get("lease_expiration")),
                 ownership_start=_decode_snapshot_date(row.get("ownership_start")),
                 owner_llc_urns=[str(v) for v in row.get("owner_llc_urns", [])],
-                listing_status=_decode_snapshot_enum(row.get("listing_status", ListingStatus.DRAFT.value), ListingStatus),
+                listing_status=_decode_snapshot_enum(
+                    row.get("listing_status", ListingStatus.DRAFT.value), ListingStatus
+                ),
                 listed_at=_decode_snapshot_date(row.get("listed_at")),
                 sold_at=_decode_snapshot_date(row.get("sold_at")),
-                close_price=float(row["close_price"]) if row.get("close_price") is not None else None,
+                close_price=float(row["close_price"])
+                if row.get("close_price") is not None
+                else None,
                 listing_broker=str(row.get("listing_broker", "")),
                 redo=bool(row.get("redo", False)),
                 potential_listing=bool(row.get("potential_listing", False)),
@@ -245,7 +261,9 @@ class InMemoryMasterArena:
             note = NoteEntry(
                 note_urn=str(row["note_urn"]),
                 note_text=str(row["note_text"]),
-                owner_person_urn=str(row["owner_person_urn"]) if row.get("owner_person_urn") else None,
+                owner_person_urn=str(row["owner_person_urn"])
+                if row.get("owner_person_urn")
+                else None,
                 property_urn=str(row["property_urn"]) if row.get("property_urn") else None,
                 tags=[str(v) for v in row.get("tags", [])],
                 created_by=str(row.get("created_by", "broker")),
@@ -257,11 +275,15 @@ class InMemoryMasterArena:
             signal = ProgressSignal(
                 signal_urn=str(row["signal_urn"]),
                 source=str(row.get("source", "")),
-                signal_type=_decode_snapshot_enum(row.get("signal_type", SignalType.NEW_PERMIT.value), SignalType),
+                signal_type=_decode_snapshot_enum(
+                    row.get("signal_type", SignalType.NEW_PERMIT.value), SignalType
+                ),
                 observed_at=_decode_snapshot_datetime(row.get("observed_at")) or _now(),
                 property_urn=str(row["property_urn"]) if row.get("property_urn") else None,
                 property_address_hint=str(row.get("property_address_hint", "")),
-                value_delta=float(row["value_delta"]) if row.get("value_delta") is not None else None,
+                value_delta=float(row["value_delta"])
+                if row.get("value_delta") is not None
+                else None,
                 attributes={str(k): str(v) for k, v in row.get("attributes", {}).items()},
             )
             self.signals[signal.signal_urn] = signal
@@ -284,8 +306,12 @@ class InMemoryMasterArena:
                 title=str(row.get("title", "")),
                 content=str(row.get("content", "")),
                 property_urn=str(row["property_urn"]) if row.get("property_urn") else None,
-                owner_person_urn=str(row["owner_person_urn"]) if row.get("owner_person_urn") else None,
-                source_event_urn=str(row["source_event_urn"]) if row.get("source_event_urn") else None,
+                owner_person_urn=str(row["owner_person_urn"])
+                if row.get("owner_person_urn")
+                else None,
+                source_event_urn=str(row["source_event_urn"])
+                if row.get("source_event_urn")
+                else None,
                 created_at=_decode_snapshot_datetime(row.get("created_at")) or _now(),
             )
             self.documents[document.document_urn] = document
@@ -298,7 +324,9 @@ class InMemoryMasterArena:
                 observed_at=_decode_snapshot_datetime(row.get("observed_at")) or _now(),
                 property_urn=str(row["property_urn"]) if row.get("property_urn") else None,
                 property_address_hint=str(row.get("property_address_hint", "")),
-                owner_person_urn=str(row["owner_person_urn"]) if row.get("owner_person_urn") else None,
+                owner_person_urn=str(row["owner_person_urn"])
+                if row.get("owner_person_urn")
+                else None,
                 company_name=str(row.get("company_name", "")),
                 source_url=str(row.get("source_url", "")),
                 summary=str(row.get("summary", "")),
@@ -329,7 +357,9 @@ class InMemoryMasterArena:
                 entity_type=str(row.get("entity_type", "")),
                 entity_urn=str(row.get("entity_urn", "")),
                 field_name=str(row.get("field_name", "")),
-                status=_decode_snapshot_enum(row.get("status", ReviewStatus.PENDING.value), ReviewStatus),
+                status=_decode_snapshot_enum(
+                    row.get("status", ReviewStatus.PENDING.value), ReviewStatus
+                ),
                 created_at=_decode_snapshot_datetime(row.get("created_at")) or _now(),
                 reviewed_at=_decode_snapshot_datetime(row.get("reviewed_at")),
                 reviewed_by=str(row.get("reviewed_by", "")),
@@ -338,7 +368,11 @@ class InMemoryMasterArena:
             self.review_tasks[task.review_urn] = task
 
         for row in payload.get("canonical_field_values", []):
-            key = (str(row.get("entity_type", "")), str(row.get("entity_urn", "")), str(row.get("field_name", "")))
+            key = (
+                str(row.get("entity_type", "")),
+                str(row.get("entity_urn", "")),
+                str(row.get("field_name", "")),
+            )
             self.canonical_field_values[key] = str(row.get("value", ""))
 
         self._rebuild_indexes()
@@ -385,7 +419,9 @@ class InMemoryMasterArena:
         property_asset.updated_at = _now()
         property_asset.owner_llc_urns = list(dict.fromkeys(property_asset.owner_llc_urns))
         self.properties[property_asset.property_urn] = property_asset
-        self._address_to_property_urn[_norm(property_asset.address_line1)] = property_asset.property_urn
+        self._address_to_property_urn[_norm(property_asset.address_line1)] = (
+            property_asset.property_urn
+        )
         self._sync_property_compliance(property_asset.property_urn)
         return property_asset
 
@@ -432,7 +468,9 @@ class InMemoryMasterArena:
         docs.sort(key=lambda doc: doc.created_at, reverse=True)
         return docs
 
-    def latest_document_for_property(self, *, property_urn: str, doc_type: str = "") -> GeneratedDocument | None:
+    def latest_document_for_property(
+        self, *, property_urn: str, doc_type: str = ""
+    ) -> GeneratedDocument | None:
         docs = self.list_documents(property_urn=property_urn, doc_type=doc_type)
         return docs[0] if docs else None
 
@@ -474,7 +512,9 @@ class InMemoryMasterArena:
     def get_field_observation(self, observation_urn: str) -> FieldObservation | None:
         return self.field_observations.get(observation_urn)
 
-    def approve_review_task(self, *, review_urn: str, reviewed_by: str, review_note: str = "") -> ReviewTask:
+    def approve_review_task(
+        self, *, review_urn: str, reviewed_by: str, review_note: str = ""
+    ) -> ReviewTask:
         task = self.review_tasks.get(review_urn)
         if not task:
             raise KeyError(f"review task not found: {review_urn}")
@@ -489,7 +529,9 @@ class InMemoryMasterArena:
         self._apply_observation(observation)
         return task
 
-    def reject_review_task(self, *, review_urn: str, reviewed_by: str, review_note: str = "") -> ReviewTask:
+    def reject_review_task(
+        self, *, review_urn: str, reviewed_by: str, review_note: str = ""
+    ) -> ReviewTask:
         task = self.review_tasks.get(review_urn)
         if not task:
             raise KeyError(f"review task not found: {review_urn}")
@@ -536,7 +578,9 @@ class InMemoryMasterArena:
     def list_properties(self) -> list[PropertyAsset]:
         return list(self.properties.values())
 
-    def list_signals(self, *, property_urn: str | None = None, since_days: int | None = None) -> list[ProgressSignal]:
+    def list_signals(
+        self, *, property_urn: str | None = None, since_days: int | None = None
+    ) -> list[ProgressSignal]:
         items = list(self.signals.values())
         if property_urn:
             items = [item for item in items if item.property_urn == property_urn]
@@ -613,7 +657,9 @@ class InMemoryMasterArena:
         person.updated_at = _now()
         self._sync_property_compliance_for_person(person_urn)
 
-    def mark_listed(self, *, property_urn: str, listed_at: date | None = None, list_price: float | None = None) -> None:
+    def mark_listed(
+        self, *, property_urn: str, listed_at: date | None = None, list_price: float | None = None
+    ) -> None:
         prop = self.properties.get(property_urn)
         if not prop:
             raise KeyError(f"property not found: {property_urn}")
@@ -631,7 +677,9 @@ class InMemoryMasterArena:
         prop.listing_status = ListingStatus.UNDER_CONTRACT
         prop.updated_at = _now()
 
-    def mark_sold(self, *, property_urn: str, sold_at: date | None = None, close_price: float | None = None) -> None:
+    def mark_sold(
+        self, *, property_urn: str, sold_at: date | None = None, close_price: float | None = None
+    ) -> None:
         prop = self.properties.get(property_urn)
         if not prop:
             raise KeyError(f"property not found: {property_urn}")
@@ -703,7 +751,9 @@ class InMemoryMasterArena:
                     if "vacant" not in prop_occ:
                         continue
                 elif occupancy_status == "leased":
-                    inferred_leased = prop_occ in {"leased", "occupied"} or (not prop_occ and bool(item.tenant_brand))
+                    inferred_leased = prop_occ in {"leased", "occupied"} or (
+                        not prop_occ and bool(item.tenant_brand)
+                    )
                     if not inferred_leased:
                         continue
                 elif occupancy_status not in prop_occ:
@@ -802,7 +852,9 @@ class InMemoryMasterArena:
                 list_price = float(raw) if raw else None
             except ValueError:
                 list_price = None
-            self.mark_listed(property_urn=event.property_urn, listed_at=listed_date, list_price=list_price)
+            self.mark_listed(
+                property_urn=event.property_urn, listed_at=listed_date, list_price=list_price
+            )
             return
 
         if event.event_type == MarketEventType.SOLD:
@@ -813,7 +865,9 @@ class InMemoryMasterArena:
                 close_price = float(raw) if raw else None
             except ValueError:
                 close_price = None
-            self.mark_sold(property_urn=event.property_urn, sold_at=sold_date, close_price=close_price)
+            self.mark_sold(
+                property_urn=event.property_urn, sold_at=sold_date, close_price=close_price
+            )
 
     def _apply_observation(self, observation: FieldObservation) -> None:
         key = (observation.entity_type, observation.entity_urn, observation.field_name)

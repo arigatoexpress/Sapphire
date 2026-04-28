@@ -55,18 +55,18 @@ def _fmt_usd(n: float | None, digits: int = 2) -> str:
     abs_n = abs(n)
     sign = "-" if n < 0 else ""
     if abs_n >= 1e9:
-        return f"{sign}${abs_n/1e9:.{digits}f}B"
+        return f"{sign}${abs_n / 1e9:.{digits}f}B"
     if abs_n >= 1e6:
-        return f"{sign}${abs_n/1e6:.{digits}f}M"
+        return f"{sign}${abs_n / 1e6:.{digits}f}M"
     if abs_n >= 1e3:
-        return f"{sign}${abs_n/1e3:.{digits}f}k"
+        return f"{sign}${abs_n / 1e3:.{digits}f}k"
     return f"{sign}${abs_n:.{digits}f}"
 
 
 def _fmt_pct(n: float | None, digits: int = 1) -> str:
     if n is None:
         return "—"
-    return f"{n*100:+.{digits}f}%"
+    return f"{n * 100:+.{digits}f}%"
 
 
 def _regime_narrative(state: str, score: float, confidence: float, snap: dict) -> str:
@@ -85,8 +85,15 @@ def _regime_narrative(state: str, score: float, confidence: float, snap: dict) -
     # Sentence 1: F&G + total mcap context
     if fg is not None:
         fg_label = (
-            "extreme fear" if fg < 20 else "fear" if fg < 40 else
-            "neutral" if fg < 60 else "greed" if fg < 80 else "extreme greed"
+            "extreme fear"
+            if fg < 20
+            else "fear"
+            if fg < 40
+            else "neutral"
+            if fg < 60
+            else "greed"
+            if fg < 80
+            else "extreme greed"
         )
         s1 = f"F&G {fg} ({fg_label})"
         if mcap_chg is not None:
@@ -174,6 +181,7 @@ def _section_correlation() -> dict:
     """Correlation snapshot + decorrelation events."""
     try:
         from lib.analytics.correlation import CorrelationEngine
+
         eng = CorrelationEngine()
         matrix = eng.build_matrix(window_days=30)
         events = eng.detect_decorrelations(matrix)
@@ -219,6 +227,7 @@ def _section_portfolio() -> dict:
     """Portfolio risk metrics."""
     try:
         from lib.analytics.risk_engine import RiskEngine
+
         m = RiskEngine(bankroll=10000.0).compute()
     except Exception as e:
         log.warning("risk engine unavailable: %s", e)
@@ -226,18 +235,26 @@ def _section_portfolio() -> dict:
 
     lines = []
     pnl_emoji = "🟢" if m.total_pnl_usd >= 0 else "🔴"
-    lines.append(f"{pnl_emoji} *Portfolio:* {_fmt_usd(m.total_pnl_usd)}  "
-                 f"({m.total_trades} trades · {m.wins}W/{m.losses}L)")
+    lines.append(
+        f"{pnl_emoji} *Portfolio:* {_fmt_usd(m.total_pnl_usd)}  "
+        f"({m.total_trades} trades · {m.wins}W/{m.losses}L)"
+    )
     if m.win_rate is not None:
-        lines.append(f"  Win rate `{m.win_rate:.0%}` · "
-                     f"PF `{m.profit_factor if m.profit_factor and m.profit_factor != float('inf') else '∞'}`")
+        lines.append(
+            f"  Win rate `{m.win_rate:.0%}` · "
+            f"PF `{m.profit_factor if m.profit_factor and m.profit_factor != float('inf') else '∞'}`"
+        )
     if m.sharpe is not None:
         lines.append(f"  Sharpe `{m.sharpe}` · Sortino `{m.sortino}` · Calmar `{m.calmar}`")
     if m.max_drawdown_pct > 0:
-        lines.append(f"  Max DD `{m.max_drawdown_pct:.1%}` "
-                     f"({_fmt_usd(m.max_drawdown_usd)}, {m.max_drawdown_duration_days}d)")
-    lines.append(f"  Recommended size: {_fmt_usd(m.recommended_size_usd)}  "
-                 f"(¼-Kelly · bankroll ${m.bankroll:,.0f})")
+        lines.append(
+            f"  Max DD `{m.max_drawdown_pct:.1%}` "
+            f"({_fmt_usd(m.max_drawdown_usd)}, {m.max_drawdown_duration_days}d)"
+        )
+    lines.append(
+        f"  Recommended size: {_fmt_usd(m.recommended_size_usd)}  "
+        f"(¼-Kelly · bankroll ${m.bankroll:,.0f})"
+    )
 
     return {
         "status": "ok",
@@ -254,6 +271,7 @@ def _section_sentiment(
     """Fear & Greed composite — publishes sentiment.update to the event bus."""
     try:
         from lib.analytics.sentiment import compute_sentiment
+
         s = compute_sentiment(
             chain_snapshot=chain_snapshot,
             correlation_events=correlation_events,
@@ -265,6 +283,7 @@ def _section_sentiment(
     # Publish to event bus so dashboard world-state / other modules can react.
     try:
         from lib.core.event_bus import get_bus
+
         get_bus().publish(
             "sentiment.update",
             {
@@ -354,6 +373,7 @@ def _section_health() -> dict:
         return {"status": "unavailable", "text": f"  (health tool not found: {health_tool})"}
     try:
         import subprocess
+
         r = subprocess.run(
             [sys.executable, str(health_tool)],
             input=json.dumps({"profile": "brief"}),
@@ -362,7 +382,10 @@ def _section_health() -> dict:
             timeout=10,
         )
         if r.returncode != 0:
-            return {"status": "error", "text": f"  Health check exit {r.returncode}: {r.stderr[:80]}"}
+            return {
+                "status": "error",
+                "text": f"  Health check exit {r.returncode}: {r.stderr[:80]}",
+            }
         report = json.loads(r.stdout)
     except Exception as e:
         return {"status": "error", "text": f"  Health check failed: {e}"}
@@ -390,6 +413,7 @@ def _section_health() -> dict:
     # Publish service.health so the event bus reflects reality.
     try:
         from lib.core.event_bus import get_bus
+
         status = "critical" if fail_n else "degraded" if warn_n else "nominal"
         get_bus().publish(
             "service.health",
@@ -408,7 +432,13 @@ def _section_health() -> dict:
         safe_name = name.replace("_", r"\_")
         safe_detail = detail[:60].replace("_", r"\_")
         lines.append(f"  🔴 {safe_name}: {safe_detail}")
-    return {"status": "ok", "pass": pass_n, "warn": warn_n, "fail": fail_n, "text": "\n".join(lines)}
+    return {
+        "status": "ok",
+        "pass": pass_n,
+        "warn": warn_n,
+        "fail": fail_n,
+        "text": "\n".join(lines),
+    }
 
 
 def _section_kronos() -> dict:
@@ -456,7 +486,10 @@ def _section_market_intel() -> dict:
     """Market intelligence: stablecoins, econ calendar, political signals, liquidation, order flow."""
     snap_path = ROOT / "data" / "intelligence" / "latest" / "market_intel.json"
     if not snap_path.exists():
-        return {"status": "missing", "text": "  Market intel not yet collected (run market_intelligence.py)."}
+        return {
+            "status": "missing",
+            "text": "  Market intel not yet collected (run market_intelligence.py).",
+        }
     try:
         data = json.loads(snap_path.read_text())
     except (OSError, json.JSONDecodeError) as e:
@@ -471,10 +504,12 @@ def _section_market_intel() -> dict:
         total = stable.get("total_usd") or 0.0
         delta = stable.get("delta_24h_usd")
         sig_emoji = {
-            "mint_large": "🟢↑", "mint_moderate": "🟡↑",
-            "burn_large": "🔴↓", "burn_moderate": "🟡↓",
+            "mint_large": "🟢↑",
+            "mint_moderate": "🟡↑",
+            "burn_large": "🔴↓",
+            "burn_moderate": "🟡↓",
         }.get(signal, "⚪")
-        line = f"{sig_emoji} Stablecoins `${total/1e9:.2f}B`"
+        line = f"{sig_emoji} Stablecoins `${total / 1e9:.2f}B`"
         if delta is not None:
             line += f"  (Δ24h {'+' if delta >= 0 else ''}{_fmt_usd(delta)})"
         lines.append(f"  {line}")
@@ -529,6 +564,7 @@ def _section_cascade() -> dict:
     """Liquidation cascade risk across major perps."""
     try:
         from lib.analytics.liquidation import get_detector
+
         det = get_detector()
         report = det.assess_all(coins=["BTC", "ETH", "SOL", "AVAX", "LINK", "ARB"])
     except Exception as e:
@@ -546,7 +582,9 @@ def _section_cascade() -> dict:
         lines.append("🟢 No cascade risk detected across majors.")
     elif label == "MODERATE":
         moderate = [a.coin for a in report.assets if a.risk_label != "LOW"]
-        lines.append(f"🟡 Moderate cascade risk: {', '.join(moderate) if moderate else 'elevated broadly'}")
+        lines.append(
+            f"🟡 Moderate cascade risk: {', '.join(moderate) if moderate else 'elevated broadly'}"
+        )
         for a in [x for x in report.assets if x.risk_label == "MODERATE"][:2]:
             lines.append(f"  🟡 {a.coin}: score `{a.risk_score:.1f}` — {a.detail}")
     elif label == "HIGH":
@@ -574,9 +612,13 @@ def _section_robinhood() -> dict:
     """Robinhood Crypto portfolio snapshot (if credentials configured)."""
     try:
         from lib.portfolio.robinhood import get_reader
+
         reader = get_reader()
         if not reader.is_configured():
-            return {"status": "disabled", "text": "  Robinhood: not configured (set ROBINHOOD_API_KEY)."}
+            return {
+                "status": "disabled",
+                "text": "  Robinhood: not configured (set ROBINHOOD_API_KEY).",
+            }
         snap = reader.get_daily_snapshot()
     except Exception as e:
         log.warning("robinhood reader unavailable: %s", e)
@@ -597,7 +639,7 @@ def _section_robinhood() -> dict:
         f"  Holdings: {_fmt_usd(snap.get('holdings_value_usd'))} · Cash: {_fmt_usd(snap.get('cash_usd'))}"
     )
     if pnl_available and pnl_pct is not None:
-        lines.append(f"  Unrealised P&L: {_fmt_usd(pnl)}  ({pnl_pct*100:+.2f}%)")
+        lines.append(f"  Unrealised P&L: {_fmt_usd(pnl)}  ({pnl_pct * 100:+.2f}%)")
     else:
         lines.append("  Unrealised P&L: unavailable (reconstructing cost basis)")
 
@@ -607,12 +649,12 @@ def _section_robinhood() -> dict:
         top_g = max(positions_with_pnl, key=lambda p: p["unrealized_pnl_pct"])
         top_l = min(positions_with_pnl, key=lambda p: p["unrealized_pnl_pct"])
         lines.append(
-            f"  ↑ Best: *{top_g['asset']}* {top_g['unrealized_pnl_pct']*100:+.1f}%"
-            f"   ↓ Worst: *{top_l['asset']}* {top_l['unrealized_pnl_pct']*100:+.1f}%"
+            f"  ↑ Best: *{top_g['asset']}* {top_g['unrealized_pnl_pct'] * 100:+.1f}%"
+            f"   ↓ Worst: *{top_l['asset']}* {top_l['unrealized_pnl_pct'] * 100:+.1f}%"
         )
     elif len(positions_with_pnl) == 1:
         p = positions_with_pnl[0]
-        lines.append(f"  ↑ *{p['asset']}* {p['unrealized_pnl_pct']*100:+.1f}%")
+        lines.append(f"  ↑ *{p['asset']}* {p['unrealized_pnl_pct'] * 100:+.1f}%")
 
     for pos in positions[:3]:
         pos_pnl = pos.get("unrealized_pnl_usd")
@@ -621,14 +663,18 @@ def _section_robinhood() -> dict:
             em = "↑" if pos_pnl >= 0 else "↓"
             lines.append(
                 f"  {em} {pos['asset']:6}  {_fmt_usd(pos.get('market_value_usd'))}  "
-                f"({pos_pct*100:+.1f}%)"
+                f"({pos_pct * 100:+.1f}%)"
             )
         else:
             lines.append(
                 f"  • {pos['asset']:6}  {_fmt_usd(pos.get('market_value_usd'))}  "
                 f"@ {_fmt_usd(pos.get('current_price_usd'))}"
             )
-    return {"status": "ok", "portfolio_value": snap.get("portfolio_value_usd"), "text": "\n".join(lines)}
+    return {
+        "status": "ok",
+        "portfolio_value": snap.get("portfolio_value_usd"),
+        "text": "\n".join(lines),
+    }
 
 
 def _section_recommendation(
@@ -672,7 +718,8 @@ def _section_recommendation(
         preds = kronos.get("predictions") or []
         if isinstance(preds, list):
             strong = [
-                p for p in preds
+                p
+                for p in preds
                 if isinstance(p, dict)
                 and (p.get("confidence") or 0) >= 0.70
                 and p.get("direction") in {"bullish", "bearish"}
@@ -689,9 +736,7 @@ def _section_recommendation(
 
     # KEV-exploited CVEs: surface immediate security context.
     if isinstance(threats, dict) and threats.get("kev", 0) > 0:
-        lines.append(
-            f"  🛡️ `{threats['kev']}` KEV-exploited CVEs active — patch infra before EOD."
-        )
+        lines.append(f"  🛡️ `{threats['kev']}` KEV-exploited CVEs active — patch infra before EOD.")
 
     return "\n".join(lines)
 
@@ -711,6 +756,7 @@ def build_brief() -> str:
     chain_snap: dict | None = None
     try:
         from lib.chain import ChainIntelligence
+
         chain_snap = ChainIntelligence().snapshot()
     except Exception:
         chain_snap = None
@@ -735,6 +781,7 @@ def build_brief() -> str:
     brain_text = ""
     try:
         from lib.analytics.brain_accuracy import brief_summary
+
         brain_text = brief_summary()
     except Exception as e:
         brain_text = f"  (brain accuracy unavailable: {e})"
@@ -822,9 +869,13 @@ def main() -> int:
 
 if __name__ == "__main__":
     import argparse
+
     p = argparse.ArgumentParser()
-    p.add_argument("--dry-run", action="store_true",
-                   help="Print the brief to stdout without sending to Telegram")
+    p.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print the brief to stdout without sending to Telegram",
+    )
     args = p.parse_args()
 
     if args.dry_run:

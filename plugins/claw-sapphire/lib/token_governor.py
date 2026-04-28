@@ -64,8 +64,11 @@ def record(tier: str, prompt_tokens: int, eval_tokens: int, task: str = "") -> d
         data[today] = {}
     if budget_key not in data[today]:
         data[today][budget_key] = {
-            "prompt_tokens": 0, "eval_tokens": 0, "total_tokens": 0,
-            "calls": 0, "tasks": [],
+            "prompt_tokens": 0,
+            "eval_tokens": 0,
+            "total_tokens": 0,
+            "calls": 0,
+            "tasks": [],
         }
 
     entry = data[today][budget_key]

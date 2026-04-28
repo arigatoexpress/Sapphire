@@ -17,9 +17,7 @@ TOOLS = Path(__file__).parent.parent / "tools"
 sys.path.insert(0, str(TOOLS))
 sys.path.insert(0, str(TOOLS.parent / "lib"))
 
-_spec = importlib.util.spec_from_file_location(
-    "predict", TOOLS / "internal" / "predict.py"
-)
+_spec = importlib.util.spec_from_file_location("predict", TOOLS / "internal" / "predict.py")
 predict = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(predict)
 
@@ -50,24 +48,16 @@ def test_classify_direction_asymmetric_bear_threshold_suppresses_marginal_bear()
     # because MA↓ alone contributes 2.0. A bear threshold of 2.5
     # converts those calls to neutral while keeping bull behavior intact.
     assert predict.classify_direction(-2.0) == "bearish"
-    assert (
-        predict.classify_direction(-2.0, bear_threshold=2.5) == "neutral"
-    )
-    assert (
-        predict.classify_direction(-3.5, bear_threshold=2.5) == "bearish"
-    )
+    assert predict.classify_direction(-2.0, bear_threshold=2.5) == "neutral"
+    assert predict.classify_direction(-3.5, bear_threshold=2.5) == "bearish"
     # Bull side is unaffected by raising the bear threshold.
-    assert (
-        predict.classify_direction(2.0, bear_threshold=2.5) == "bullish"
-    )
+    assert predict.classify_direction(2.0, bear_threshold=2.5) == "bullish"
 
 
 def test_classify_direction_lowered_bull_threshold_raises_bull_calls():
     """Lowering the bull threshold makes bull calls easier — symmetric sanity."""
     assert predict.classify_direction(1.0) == "neutral"
-    assert (
-        predict.classify_direction(1.0, bull_threshold=0.5) == "bullish"
-    )
+    assert predict.classify_direction(1.0, bull_threshold=0.5) == "bullish"
 
 
 # --- _resolve_threshold -----------------------------------------------------
@@ -75,47 +65,29 @@ def test_classify_direction_lowered_bull_threshold_raises_bull_calls():
 
 def test_resolve_threshold_returns_default_when_env_unset(monkeypatch):
     monkeypatch.delenv("SAPPHIRE_PREDICT_BEAR_THRESHOLD", raising=False)
-    assert (
-        predict._resolve_threshold("SAPPHIRE_PREDICT_BEAR_THRESHOLD", 1.5)
-        == 1.5
-    )
+    assert predict._resolve_threshold("SAPPHIRE_PREDICT_BEAR_THRESHOLD", 1.5) == 1.5
 
 
 def test_resolve_threshold_returns_default_when_env_blank(monkeypatch):
     monkeypatch.setenv("SAPPHIRE_PREDICT_BEAR_THRESHOLD", "")
-    assert (
-        predict._resolve_threshold("SAPPHIRE_PREDICT_BEAR_THRESHOLD", 1.5)
-        == 1.5
-    )
+    assert predict._resolve_threshold("SAPPHIRE_PREDICT_BEAR_THRESHOLD", 1.5) == 1.5
 
 
 def test_resolve_threshold_returns_default_when_env_invalid(monkeypatch):
     monkeypatch.setenv("SAPPHIRE_PREDICT_BEAR_THRESHOLD", "not-a-number")
-    assert (
-        predict._resolve_threshold("SAPPHIRE_PREDICT_BEAR_THRESHOLD", 1.5)
-        == 1.5
-    )
+    assert predict._resolve_threshold("SAPPHIRE_PREDICT_BEAR_THRESHOLD", 1.5) == 1.5
 
 
 def test_resolve_threshold_returns_default_when_env_non_positive(monkeypatch):
     monkeypatch.setenv("SAPPHIRE_PREDICT_BEAR_THRESHOLD", "-3")
-    assert (
-        predict._resolve_threshold("SAPPHIRE_PREDICT_BEAR_THRESHOLD", 1.5)
-        == 1.5
-    )
+    assert predict._resolve_threshold("SAPPHIRE_PREDICT_BEAR_THRESHOLD", 1.5) == 1.5
     monkeypatch.setenv("SAPPHIRE_PREDICT_BEAR_THRESHOLD", "0")
-    assert (
-        predict._resolve_threshold("SAPPHIRE_PREDICT_BEAR_THRESHOLD", 1.5)
-        == 1.5
-    )
+    assert predict._resolve_threshold("SAPPHIRE_PREDICT_BEAR_THRESHOLD", 1.5) == 1.5
 
 
 def test_resolve_threshold_uses_env_when_valid(monkeypatch):
     monkeypatch.setenv("SAPPHIRE_PREDICT_BEAR_THRESHOLD", "2.75")
-    assert (
-        predict._resolve_threshold("SAPPHIRE_PREDICT_BEAR_THRESHOLD", 1.5)
-        == 2.75
-    )
+    assert predict._resolve_threshold("SAPPHIRE_PREDICT_BEAR_THRESHOLD", 1.5) == 2.75
 
 
 def test_default_thresholds_are_legacy_symmetric():

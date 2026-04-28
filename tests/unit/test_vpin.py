@@ -25,7 +25,9 @@ from lib.analytics.vpin import (  # noqa: E402
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 
-def _make_bar(close: float, high: float, low: float, volume: float, prev_close: float | None = None) -> Bar:
+def _make_bar(
+    close: float, high: float, low: float, volume: float, prev_close: float | None = None
+) -> Bar:
     return Bar(
         ts=datetime.now(UTC),
         open=prev_close or close,
@@ -42,14 +44,16 @@ def _make_bars(n: int, trend: float = 0.0) -> list[Bar]:
     price = 100.0
     for i in range(n):
         price_next = price * (1 + trend + 0.001 * (i % 3 - 1))
-        bars.append(Bar(
-            ts=datetime.now(UTC),
-            open=price,
-            high=max(price, price_next) * 1.005,
-            low=min(price, price_next) * 0.995,
-            close=price_next,
-            volume=1_000_000.0,
-        ))
+        bars.append(
+            Bar(
+                ts=datetime.now(UTC),
+                open=price,
+                high=max(price, price_next) * 1.005,
+                low=min(price, price_next) * 0.995,
+                close=price_next,
+                volume=1_000_000.0,
+            )
+        )
         price = price_next
     return bars
 
@@ -120,8 +124,9 @@ def test_compute_vpin_insufficient_bars_returns_zero() -> None:
 
 def test_compute_vpin_extreme_imbalance() -> None:
     # All bars have close == high → pure buy pressure → VPIN should be high
-    bars = [_make_bar(close=100.0 + i, high=100.0 + i, low=99.0 + i, volume=1000.0)
-            for i in range(60)]
+    bars = [
+        _make_bar(close=100.0 + i, high=100.0 + i, low=99.0 + i, volume=1000.0) for i in range(60)
+    ]
     score = compute_vpin(bars)
     # All volume classified as buy → |buy-sell|/total = 1.0 for every bar
     assert score >= 0.95, f"pure-buy VPIN should be ~1.0, got {score}"
@@ -130,8 +135,7 @@ def test_compute_vpin_extreme_imbalance() -> None:
 def test_compute_vpin_balanced_flow_low_score() -> None:
     # Alternating close == high and close == low → VPIN close to 1.0 per bar
     # but we want to test the midpoint case → low VPIN
-    bars = [_make_bar(close=105.0, high=110.0, low=100.0, volume=1000.0)
-            for _ in range(60)]
+    bars = [_make_bar(close=105.0, high=110.0, low=100.0, volume=1000.0) for _ in range(60)]
     score = compute_vpin(bars)
     # All at midpoint → 50/50 buy/sell → imbalance = 0
     assert score < 0.05, f"balanced flow VPIN should be near 0, got {score}"

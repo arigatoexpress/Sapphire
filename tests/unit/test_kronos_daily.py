@@ -85,15 +85,27 @@ def test_predict_kronos_can_skip_snapshot(monkeypatch, capsys):
         "action_predict",
         lambda **kwargs: {"symbol": kwargs["symbol"], "direction": "neutral"},
     )
-    monkeypatch.setattr(predict, "_save_intelligence_snapshot", lambda result, symbol: saved.append((result, symbol)))
+    monkeypatch.setattr(
+        predict,
+        "_save_intelligence_snapshot",
+        lambda result, symbol: saved.append((result, symbol)),
+    )
     monkeypatch.setattr(
         predict.sys,
         "stdin",
-        type("FakeStdin", (), {"read": lambda self: json.dumps({
-            "action": "predict",
-            "symbol": "SPY",
-            "save_snapshot": False,
-        })})(),
+        type(
+            "FakeStdin",
+            (),
+            {
+                "read": lambda self: json.dumps(
+                    {
+                        "action": "predict",
+                        "symbol": "SPY",
+                        "save_snapshot": False,
+                    }
+                )
+            },
+        )(),
     )
 
     predict.main()

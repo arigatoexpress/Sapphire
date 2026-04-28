@@ -5,6 +5,7 @@ and does NOT block innocuous content (false positive check).
 
 Run: /usr/local/bin/python3 -m pytest tests/unit/test_sensitivity_filter.py -v
 """
+
 from __future__ import annotations
 
 import sys
@@ -23,6 +24,7 @@ def msgs(content: str) -> list[dict]:
 
 
 # ─── True positives — should be detected ──────────────────────────────────────
+
 
 class TestSensitiveDetected:
     def test_api_key_field(self):
@@ -95,21 +97,24 @@ class TestSensitiveDetected:
 
 # ─── Multi-part content blocks (list format) ──────────────────────────────────
 
+
 class TestContentListFormat:
     def test_sensitive_in_list_block(self):
-        messages = [{"role": "user", "content": [
-            {"type": "text", "text": "api_key=secret123"}
-        ]}]
+        messages = [{"role": "user", "content": [{"type": "text", "text": "api_key=secret123"}]}]
         assert _is_sensitive(messages)
 
     def test_clean_in_list_block(self):
-        messages = [{"role": "user", "content": [
-            {"type": "text", "text": "What is the capital of France?"}
-        ]}]
+        messages = [
+            {
+                "role": "user",
+                "content": [{"type": "text", "text": "What is the capital of France?"}],
+            }
+        ]
         assert not _is_sensitive(messages)
 
 
 # ─── True negatives — should NOT be detected ──────────────────────────────────
+
 
 class TestNotSensitive:
     def test_normal_question(self):
@@ -140,6 +145,7 @@ class TestNotSensitive:
 
 
 # ─── Multi-message conversations ──────────────────────────────────────────────
+
 
 class TestMultiMessage:
     def test_sensitive_in_last_message(self):

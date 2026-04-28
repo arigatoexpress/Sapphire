@@ -818,9 +818,7 @@ class TestKimiRelayFallback:
         monkeypatch.setenv("KIMI_RELAY_CHAT_ID", "-100")
         monkeypatch.delenv("KIMI_CLAW_BOT_TOKEN", raising=False)
 
-        result = app_module._call_kimi_cloud(
-            [{"role": "user", "content": "summarize readiness"}]
-        )
+        result = app_module._call_kimi_cloud([{"role": "user", "content": "summarize readiness"}])
 
         assert result is not None
         assert result["model"] == "kimi-relay"

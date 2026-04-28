@@ -20,9 +20,10 @@ from enum import StrEnum
 
 class TaskDiscipline(StrEnum):
     """Discipline mode — controls which principles are emphasized."""
-    FULL = "full"          # All 4 principles (non-trivial features, architecture)
+
+    FULL = "full"  # All 4 principles (non-trivial features, architecture)
     SURGICAL = "surgical"  # Principles 3+4 (bug fixes, targeted edits)
-    MINIMAL = "minimal"    # Just principle 4 goals (trivial tasks)
+    MINIMAL = "minimal"  # Just principle 4 goals (trivial tasks)
 
 
 _PREAMBLE_FULL = """Before implementing, apply these 4 coding discipline principles:
@@ -104,13 +105,32 @@ def infer_discipline(task: str) -> TaskDiscipline:
 
     # Surgical indicators
     surgical_keywords = [
-        "fix", "bug", "off-by-one", "typo", "rename", "move", "delete",
-        "remove", "update", "patch", "line ", "crash", "error"
+        "fix",
+        "bug",
+        "off-by-one",
+        "typo",
+        "rename",
+        "move",
+        "delete",
+        "remove",
+        "update",
+        "patch",
+        "line ",
+        "crash",
+        "error",
     ]
     # Full discipline indicators
     full_keywords = [
-        "add", "create", "build", "implement", "feature", "new",
-        "refactor", "redesign", "architecture", "system"
+        "add",
+        "create",
+        "build",
+        "implement",
+        "feature",
+        "new",
+        "refactor",
+        "redesign",
+        "architecture",
+        "system",
     ]
 
     if any(k in task_lower for k in surgical_keywords):

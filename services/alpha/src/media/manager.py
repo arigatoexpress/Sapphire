@@ -26,7 +26,9 @@ class MediaManager:
         # Configuration
         self.mode = self._normalize_mode(os.getenv("SAPPHIRE_MEDIA_MODE", "owner_approval"))
         self.max_attempts = max(1, int(os.getenv("SAPPHIRE_MEDIA_MAX_ATTEMPTS", "4")))
-        self.retry_base_seconds = max(10, int(os.getenv("SAPPHIRE_MEDIA_RETRY_BASE_SECONDS", "120")))
+        self.retry_base_seconds = max(
+            10, int(os.getenv("SAPPHIRE_MEDIA_RETRY_BASE_SECONDS", "120"))
+        )
         self.poll_seconds = max(5, int(os.getenv("SAPPHIRE_MEDIA_POLL_SECONDS", "20")))
 
         # State
@@ -51,7 +53,7 @@ class MediaManager:
         await self.twitter.start()
         await self.substack.start()
         await self.linkedin.start()
-        
+
         self.running = True
         self._loop_task = asyncio.create_task(self._publish_loop())
         logger.info(f"📢 MediaManager started. Mode: {self.mode}")
@@ -79,7 +81,7 @@ class MediaManager:
             if item.get("next_attempt_at", 0) > now:
                 self.queue.append(item)
                 continue
-            
+
             await self._execute_publish(item)
 
     async def _execute_publish(self, item: dict[str, Any]):
@@ -87,7 +89,7 @@ class MediaManager:
         item["attempts"] = item.get("attempts", 0) + 1
         item["updated_at"] = int(time.time())
         targets = item.get("targets", [])
-        
+
         results = {}
         failed_targets = []
         retryable = False
@@ -100,7 +102,7 @@ class MediaManager:
                     text = item.get("title", "")
                     if item.get("body"):
                         text += f"\n\n{item['body']}"
-                    
+
                     post_id = await self.twitter.post(text)
                     results["twitter"] = {"ok": True, "id": post_id}
                 else:
@@ -153,14 +155,14 @@ class MediaManager:
 
         # Outcome handling
         success_targets = [k for k, v in results.items() if v.get("ok")]
-        
+
         if not failed_targets:
             # Success
             self._record_result(item, "success", results)
             if self.telegram:
                 await self.telegram.send_message(
                     f"✅ Media publish completed.\nRequest: `{item['request_id']}`\nTargets: `{', '.join(success_targets)}`",
-                    priority="high"
+                    priority="high",
                 )
         else:
             # Failure or Partial
@@ -171,9 +173,9 @@ class MediaManager:
                 item["status"] = "queued"
                 self.queue.append(item)
                 if self.telegram:
-                     await self.telegram.send_message(
+                    await self.telegram.send_message(
                         f"⚠️ Media retry scheduled.\nRequest: `{item['request_id']}`\nFailed: `{', '.join(failed_targets)}`\nRetry in {delay}s",
-                        priority="medium"
+                        priority="medium",
                     )
             else:
                 # Final Failure
@@ -181,10 +183,12 @@ class MediaManager:
                 if self.telegram:
                     await self.telegram.send_message(
                         f"❌ Media publish failed.\nRequest: `{item['request_id']}`\nFailed: `{', '.join(failed_targets)}`",
-                        priority="high"
+                        priority="high",
                     )
 
-    def request_publish(self, topic: str, title: str, body: str, targets: list[str], source: str = "manual") -> dict[str, Any]:
+    def request_publish(
+        self, topic: str, title: str, body: str, targets: list[str], source: str = "manual"
+    ) -> dict[str, Any]:
         """Enqueue a new publish request."""
         request_id = self._next_id()
         item = {
@@ -197,7 +201,7 @@ class MediaManager:
             "status": "pending_approval" if self.mode == "owner_approval" else "queued",
             "created_at": int(time.time()),
             "attempts": 0,
-            "next_attempt_at": 0
+            "next_attempt_at": 0,
         }
 
         if self.mode == "draft_only":
@@ -208,7 +212,7 @@ class MediaManager:
             self.pending_approvals[request_id] = item
         else:
             self.queue.append(item)
-            
+
         return item
 
     def approve_request(self, request_id: str) -> bool:
@@ -228,7 +232,7 @@ class MediaManager:
             del self.pending_approvals[request_id]
             return True
         return False
-        
+
     def set_mode(self, mode: str) -> str:
         self.mode = self._normalize_mode(mode)
         return self.mode
@@ -242,7 +246,7 @@ class MediaManager:
             "linkedin_ready": self.linkedin.ready,
             "queue_depth": len(self.queue),
             "pending_approvals": len(self.pending_approvals),
-            "running": self.running
+            "running": self.running,
         }
 
     def get_status_report(self) -> str:
@@ -255,7 +259,7 @@ class MediaManager:
             f"LinkedIn: `{'READY' if self.linkedin.ready else 'NOT_READY'}`",
             f"Queue: pending `{len(self.pending_approvals)}` | queued `{len(self.queue)}`",
             "",
-            "Commands: `/media mode`, `/media publish`, `/media approve`"
+            "Commands: `/media mode`, `/media publish`, `/media approve`",
         ]
         return "\n".join(lines)
 
@@ -274,23 +278,29 @@ class MediaManager:
         self.last_publish = {
             "req_id": item["request_id"],
             "status": status,
-            "timestamp": int(time.time())
+            "timestamp": int(time.time()),
         }
         self.recent_results.append(self.last_publish)
 
     def _normalize_mode(self, mode: str) -> str:
         mode = mode.lower()
-        if "auto" in mode: return "auto_post"
-        if "draft" in mode: return "draft_only"
+        if "auto" in mode:
+            return "auto_post"
+        if "draft" in mode:
+            return "draft_only"
         return "owner_approval"
-        
+
     def _normalize_targets(self, targets: list[str]) -> list[str]:
         # Simplified normalization
         clean = []
         for t in targets:
             t = t.lower()
-            if t in ["x", "twitter"]: clean.append("twitter")
-            if t in ["substack"]: clean.append("substack")
-            if t in ["linkedin", "li"]: clean.append("linkedin")
-        if not clean: clean = ["twitter"]
+            if t in ["x", "twitter"]:
+                clean.append("twitter")
+            if t in ["substack"]:
+                clean.append("substack")
+            if t in ["linkedin", "li"]:
+                clean.append("linkedin")
+        if not clean:
+            clean = ["twitter"]
         return list(set(clean))

@@ -199,29 +199,61 @@ def _default_task_contract(*, kind: str, title: str, task_type: str) -> dict[str
     }
     if normalized_kind == "trading":
         base["inputs"] = ["venue", "action", "symbol(optional)", "size(optional)"]
-        base["steps"] = ["preflight.gateway_status", "preflight.risk_check", "execute_or_dry_run", "record_result"]
-        base["success_criteria"] = ["risk checks pass", "venue response captured", "result persisted to control plane"]
-        base["validation"] = ["payload.trading.action present", "gateway reachable", "no auth errors"]
+        base["steps"] = [
+            "preflight.gateway_status",
+            "preflight.risk_check",
+            "execute_or_dry_run",
+            "record_result",
+        ]
+        base["success_criteria"] = [
+            "risk checks pass",
+            "venue response captured",
+            "result persisted to control plane",
+        ]
+        base["validation"] = [
+            "payload.trading.action present",
+            "gateway reachable",
+            "no auth errors",
+        ]
         base["artifacts"] = ["task.result", "execution log excerpt"]
         base["rollback"] = ["cancel open orders if any", "revert policy changes if applied"]
     elif normalized_kind == "deploy":
         base["inputs"] = ["service/repo", "target environment", "release reference"]
         base["steps"] = ["build", "deploy", "post-deploy health check", "report"]
-        base["success_criteria"] = ["new revision ready", "health endpoint 200", "rollback path known"]
-        base["validation"] = ["deterministic checks pass", "service reachable", "no critical alerts"]
+        base["success_criteria"] = [
+            "new revision ready",
+            "health endpoint 200",
+            "rollback path known",
+        ]
+        base["validation"] = [
+            "deterministic checks pass",
+            "service reachable",
+            "no critical alerts",
+        ]
         base["artifacts"] = ["revision id", "deploy logs", "health check output"]
-        base["rollback"] = ["pin previous stable revision", "notify operator with rollback evidence"]
+        base["rollback"] = [
+            "pin previous stable revision",
+            "notify operator with rollback evidence",
+        ]
     elif normalized_kind == "research":
         base["inputs"] = ["topic", "scope", "evidence sources"]
         base["steps"] = ["collect evidence", "synthesize findings", "propose decision options"]
-        base["success_criteria"] = ["sources cited", "clear recommendation", "operator decision-ready output"]
+        base["success_criteria"] = [
+            "sources cited",
+            "clear recommendation",
+            "operator decision-ready output",
+        ]
         base["validation"] = ["source coverage >1", "claims traceable", "output concise"]
         base["artifacts"] = ["research summary", "decision options"]
         base["rollback"] = ["mark findings stale if contradicted", "re-run with tightened scope"]
     else:
         base["inputs"] = ["target files/modules", "acceptance criteria"]
         base["steps"] = ["implement", "run deterministic checks", "summarize diff and risk"]
-        base["success_criteria"] = ["checks pass", "no regressions in touched surface", "clear next steps"]
+        base["success_criteria"] = [
+            "checks pass",
+            "no regressions in touched surface",
+            "clear next steps",
+        ]
         base["validation"] = ["unit/integration checks", "lint/static checks where applicable"]
         base["artifacts"] = ["changed files", "test output summary"]
         base["rollback"] = ["revert commit or patch", "document regression trigger"]
@@ -264,7 +296,9 @@ def _normalize_task_payload(*, payload: dict[str, Any] | None, title: str) -> di
         merged_contract[str(key)] = value
     merged_contract["version"] = str(merged_contract.get("version") or _TASK_CONTRACT_VERSION)
     merged_contract["kind"] = str(merged_contract.get("kind") or kind).strip().lower() or kind
-    merged_contract["task_type"] = str(merged_contract.get("task_type") or task_type).strip().lower() or task_type
+    merged_contract["task_type"] = (
+        str(merged_contract.get("task_type") or task_type).strip().lower() or task_type
+    )
     if not str(merged_contract.get("objective") or "").strip():
         merged_contract["objective"] = str(title or "").strip()
     for list_key in ("inputs", "steps", "success_criteria", "validation", "artifacts", "rollback"):
@@ -404,7 +438,14 @@ def _error_indicates_quota_exhaustion(error_text: str, error_code: str = "") -> 
     return any(pattern in text for pattern in _QUOTA_EXHAUSTION_PATTERNS)
 
 
-def _is_ambiguous_failure(*, error_text: str, error_code: str, deadlock_error: bool, quota_exhausted: bool, failover_target: str) -> bool:
+def _is_ambiguous_failure(
+    *,
+    error_text: str,
+    error_code: str,
+    deadlock_error: bool,
+    quota_exhausted: bool,
+    failover_target: str,
+) -> bool:
     if quota_exhausted or deadlock_error or bool(str(failover_target or "").strip()):
         return False
     normalized_code = str(error_code or "").strip().lower()
@@ -468,7 +509,9 @@ def _normalized_title_fingerprint(title: str) -> str:
     return text
 
 
-def _extract_membership_queue_blocked_membership(*, title: str, task_payload: dict[str, Any]) -> str:
+def _extract_membership_queue_blocked_membership(
+    *, title: str, task_payload: dict[str, Any]
+) -> str:
     metadata = task_payload.get("metadata")
     if isinstance(metadata, dict):
         for key in ("blocked_membership_id", "membership_id", "required_membership_id"):
@@ -477,7 +520,11 @@ def _extract_membership_queue_blocked_membership(*, title: str, task_payload: di
                 return value
     routing = task_payload.get("routing")
     if isinstance(routing, dict):
-        for key in ("queue_blocked_membership_id", "required_membership_id", "recommended_membership_id"):
+        for key in (
+            "queue_blocked_membership_id",
+            "required_membership_id",
+            "recommended_membership_id",
+        ):
             value = str(routing.get(key) or "").strip().lower()
             if value:
                 return value
@@ -505,7 +552,10 @@ def _membership_queue_recovery_dedupe_key(*, title: str, task_payload: dict[str,
     )
     if not is_membership_queue_recovery:
         return ""
-    blocked_membership = _extract_membership_queue_blocked_membership(title=title, task_payload=task_payload) or "unknown"
+    blocked_membership = (
+        _extract_membership_queue_blocked_membership(title=title, task_payload=task_payload)
+        or "unknown"
+    )
     return f"membership_queue_recovery:{blocked_membership}:{title_fingerprint}"
 
 
@@ -532,11 +582,17 @@ def _apply_membership_failover(
 
     allowed_set: set[str] | None = None
     if allowed_membership_ids is not None:
-        allowed_set = {str(item).strip().lower() for item in allowed_membership_ids if str(item).strip()}
+        allowed_set = {
+            str(item).strip().lower() for item in allowed_membership_ids if str(item).strip()
+        }
 
     next_membership = ""
     for candidate in fallback_ids:
-        if candidate and candidate not in {exhausted, current_membership} and (allowed_set is None or candidate in allowed_set):
+        if (
+            candidate
+            and candidate not in {exhausted, current_membership}
+            and (allowed_set is None or candidate in allowed_set)
+        ):
             next_membership = candidate
             break
     if not next_membership:
@@ -558,9 +614,15 @@ def _apply_membership_failover(
     routing["last_failover_at"] = _utc_iso_now()
     routing["previous_membership_ids"] = previous_ids
     routing["exhausted_membership_ids"] = exhausted_ids
-    routing["fallback_membership_ids"] = [item for item in fallback_ids if item not in {next_membership, exhausted}]
+    routing["fallback_membership_ids"] = [
+        item for item in fallback_ids if item not in {next_membership, exhausted}
+    ]
 
-    capability_set = [cap for cap in _normalize_capabilities(required_capabilities) if not cap.startswith("membership:")]
+    capability_set = [
+        cap
+        for cap in _normalize_capabilities(required_capabilities)
+        if not cap.startswith("membership:")
+    ]
     capability_set.append(f"membership:{next_membership}")
     return task_payload, _normalize_capabilities(capability_set), next_membership
 
@@ -581,12 +643,16 @@ def _control_plane_store_postgres_env() -> dict[str, Any]:
     dsn = str(os.getenv("AGENTIC_CONTROL_PLANE_POSTGRES_DSN") or "").strip()
     cloudsql_instance = str(os.getenv("AGENTIC_CONTROL_PLANE_CLOUDSQL_INSTANCE") or "").strip()
     cloudsql_project = str(
-        os.getenv("AGENTIC_CONTROL_PLANE_CLOUDSQL_PROJECT") or os.getenv("GOOGLE_CLOUD_PROJECT") or ""
+        os.getenv("AGENTIC_CONTROL_PLANE_CLOUDSQL_PROJECT")
+        or os.getenv("GOOGLE_CLOUD_PROJECT")
+        or ""
     ).strip()
     database = str(os.getenv("AGENTIC_CONTROL_PLANE_POSTGRES_DB") or "").strip()
     user = str(os.getenv("AGENTIC_CONTROL_PLANE_POSTGRES_USER") or "").strip()
     host = str(os.getenv("AGENTIC_CONTROL_PLANE_POSTGRES_HOST") or "").strip()
-    sslmode = str(os.getenv("AGENTIC_CONTROL_PLANE_POSTGRES_SSLMODE") or "").strip().lower() or "default"
+    sslmode = (
+        str(os.getenv("AGENTIC_CONTROL_PLANE_POSTGRES_SSLMODE") or "").strip().lower() or "default"
+    )
     password_present = bool(str(os.getenv("AGENTIC_CONTROL_PLANE_POSTGRES_PASSWORD") or "").strip())
     socket_path = f"/cloudsql/{cloudsql_instance}" if cloudsql_instance else ""
     explicit_parts_configured = bool(database and user and (host or socket_path))
@@ -747,10 +813,18 @@ class ControlPlaneStore:
                 )
                 """
             )
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_agents_last_heartbeat ON agents(last_heartbeat_unix)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_status_priority ON tasks(status, priority, created_at)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_lease_expiry ON tasks(lease_expires_unix)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_events_created ON task_events(created_at_unix DESC)")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_agents_last_heartbeat ON agents(last_heartbeat_unix)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_tasks_status_priority ON tasks(status, priority, created_at)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_tasks_lease_expiry ON tasks(lease_expires_unix)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_events_created ON task_events(created_at_unix DESC)"
+            )
             conn.commit()
 
     def _record_event(
@@ -806,7 +880,9 @@ class ControlPlaneStore:
             payload=payload,
         )
 
-    def _available_membership_ids(self, conn: sqlite3.Connection, *, heartbeat_ttl_seconds: int) -> set[str]:
+    def _available_membership_ids(
+        self, conn: sqlite3.Connection, *, heartbeat_ttl_seconds: int
+    ) -> set[str]:
         now_unix = _utc_epoch_now()
         rows = self._execute(conn, "SELECT * FROM agents WHERE status != 'disabled'").fetchall()
         allowed_agent_ids = allowed_executor_agent_ids()
@@ -969,13 +1045,17 @@ class ControlPlaneStore:
             next_labels = _decode_json(row["labels_json"], {})
             if metadata_update:
                 next_metadata.update(metadata_update)
-                heartbeat_membership = str(
-                    metadata_update.get("worker_membership_id")
-                    or metadata_update.get("membership_id")
-                    or metadata_update.get("router_membership")
-                    or metadata_update.get("model_membership")
-                    or ""
-                ).strip().lower()
+                heartbeat_membership = (
+                    str(
+                        metadata_update.get("worker_membership_id")
+                        or metadata_update.get("membership_id")
+                        or metadata_update.get("router_membership")
+                        or metadata_update.get("model_membership")
+                        or ""
+                    )
+                    .strip()
+                    .lower()
+                )
                 if heartbeat_membership:
                     next_labels["membership_id"] = heartbeat_membership
                     next_labels.setdefault("model_membership", heartbeat_membership)
@@ -1033,7 +1113,9 @@ class ControlPlaneStore:
 
         return self._row_to_agent(updated, heartbeat_ttl_seconds=120)
 
-    def list_agents(self, *, heartbeat_ttl_seconds: int = 120, include_disabled: bool = True) -> list[dict[str, Any]]:
+    def list_agents(
+        self, *, heartbeat_ttl_seconds: int = 120, include_disabled: bool = True
+    ) -> list[dict[str, Any]]:
         with self._connect() as conn:
             if include_disabled:
                 rows = self._execute(
@@ -1045,7 +1127,9 @@ class ControlPlaneStore:
                     conn,
                     "SELECT * FROM agents WHERE status != 'disabled' ORDER BY last_heartbeat_unix DESC, agent_id ASC",
                 ).fetchall()
-        return [self._row_to_agent(row, heartbeat_ttl_seconds=heartbeat_ttl_seconds) for row in rows]
+        return [
+            self._row_to_agent(row, heartbeat_ttl_seconds=heartbeat_ttl_seconds) for row in rows
+        ]
 
     def cleanup_stale_agents(
         self,
@@ -1091,14 +1175,28 @@ class ControlPlaneStore:
                 if agent_id in keep_agents:
                     skipped.append({"agent_id": agent_id, "reason": "keep_agent_id"})
                     continue
-                if keep_memberships and any(membership in keep_memberships for membership in memberships):
-                    skipped.append({"agent_id": agent_id, "reason": "keep_membership_id", "memberships": memberships})
+                if keep_memberships and any(
+                    membership in keep_memberships for membership in memberships
+                ):
+                    skipped.append(
+                        {
+                            "agent_id": agent_id,
+                            "reason": "keep_membership_id",
+                            "memberships": memberships,
+                        }
+                    )
                     continue
                 if status == "disabled":
                     skipped.append({"agent_id": agent_id, "reason": "already_disabled"})
                     continue
                 if age_seconds < threshold_seconds:
-                    skipped.append({"agent_id": agent_id, "reason": "fresh_heartbeat", "age_seconds": age_seconds})
+                    skipped.append(
+                        {
+                            "agent_id": agent_id,
+                            "reason": "fresh_heartbeat",
+                            "age_seconds": age_seconds,
+                        }
+                    )
                     continue
 
                 candidate_rows.append((row, age_seconds, capabilities, memberships))
@@ -1145,7 +1243,9 @@ class ControlPlaneStore:
                         (agent_id,),
                     ).fetchone()
                     if refreshed:
-                        disabled_agents.append(self._row_to_agent(refreshed, heartbeat_ttl_seconds=threshold_seconds))
+                        disabled_agents.append(
+                            self._row_to_agent(refreshed, heartbeat_ttl_seconds=threshold_seconds)
+                        )
                 conn.commit()
 
         candidates: list[dict[str, Any]] = []
@@ -1191,7 +1291,9 @@ class ControlPlaneStore:
         now_iso = _utc_iso_now()
         task_id = f"task-{uuid.uuid4().hex}"
         normalized_payload = _normalize_task_payload(payload=payload, title=cleaned_title)
-        dedupe_key = _membership_queue_recovery_dedupe_key(title=cleaned_title, task_payload=normalized_payload)
+        dedupe_key = _membership_queue_recovery_dedupe_key(
+            title=cleaned_title, task_payload=normalized_payload
+        )
         normalized_required_capabilities = _normalize_capabilities(required_capabilities)
         normalized_priority = max(0, min(priority, 1000))
         normalized_max_attempts = max(1, max_attempts)
@@ -1204,7 +1306,7 @@ class ControlPlaneStore:
                     WHERE status IN ('queued', 'leased', 'blocked_review')
                     ORDER BY created_at ASC
                     LIMIT 500
-                    """
+                    """,
                 ).fetchall()
                 for existing_row in active_rows:
                     existing_payload = _decode_json(existing_row["payload_json"], {})
@@ -1469,7 +1571,7 @@ class ControlPlaneStore:
                 f"""
                 UPDATE tasks
                 SET status = 'queued', lease_owner = NULL, lease_expires_unix = NULL, updated_at = ?
-                WHERE task_id IN ({','.join(['?'] * len(retry_task_ids))})
+                WHERE task_id IN ({",".join(["?"] * len(retry_task_ids))})
                 """,
                 (now_iso, *retry_task_ids),
             )
@@ -1526,7 +1628,11 @@ class ControlPlaneStore:
                 action="expired_lease_exhausted",
                 message=f"{task_id} lease expired and exhausted retry budget",
                 category="stale_lease_watchdog",
-                metadata={"attempts": attempts, "max_attempts": max_attempts, "resolution": "task marked failed"},
+                metadata={
+                    "attempts": attempts,
+                    "max_attempts": max_attempts,
+                    "resolution": "task marked failed",
+                },
             )
         return len(retry_task_ids) + len(exhausted_rows)
 
@@ -1540,7 +1646,7 @@ class ControlPlaneStore:
             WHERE status = 'queued' AND attempts >= max_attempts
             ORDER BY priority ASC, created_at ASC
             LIMIT 500
-            """
+            """,
         ).fetchall()
         if not rows:
             return 0
@@ -1560,12 +1666,18 @@ class ControlPlaneStore:
                 # Preserve freshly rerouted tasks for a short grace window so the
                 # fallback membership can take one execution pass.
                 failover_at = str(routing.get("last_failover_at") or "").strip()
-                active_membership = str(
-                    routing.get("active_membership_id")
-                    or routing.get("required_membership_id")
-                    or ""
-                ).strip().lower()
-                last_failed_membership = str(routing.get("last_failed_membership_id") or "").strip().lower()
+                active_membership = (
+                    str(
+                        routing.get("active_membership_id")
+                        or routing.get("required_membership_id")
+                        or ""
+                    )
+                    .strip()
+                    .lower()
+                )
+                last_failed_membership = (
+                    str(routing.get("last_failed_membership_id") or "").strip().lower()
+                )
                 if (
                     failover_at
                     and active_membership
@@ -1625,7 +1737,7 @@ class ControlPlaneStore:
             WHERE status = 'leased' AND attempts >= max_attempts
             ORDER BY created_at ASC
             LIMIT 500
-            """
+            """,
         ).fetchall()
         if not rows:
             return 0
@@ -1674,14 +1786,22 @@ class ControlPlaneStore:
                 action="stale_leased_retry_budget_exhausted",
                 message=f"{task_id} stale leased task exceeded retry budget",
                 category="stale_lease_watchdog",
-                metadata={"attempts": attempts, "max_attempts": max_attempts, "age_seconds": age_seconds},
+                metadata={
+                    "attempts": attempts,
+                    "max_attempts": max_attempts,
+                    "age_seconds": age_seconds,
+                },
             )
             failed_count += 1
         return failed_count
 
-    def _recover_queue_blocked_memberships(self, conn: sqlite3.Connection, *, heartbeat_ttl_seconds: int) -> int:
+    def _recover_queue_blocked_memberships(
+        self, conn: sqlite3.Connection, *, heartbeat_ttl_seconds: int
+    ) -> int:
         now_iso = _utc_iso_now()
-        available_memberships = self._available_membership_ids(conn, heartbeat_ttl_seconds=heartbeat_ttl_seconds)
+        available_memberships = self._available_membership_ids(
+            conn, heartbeat_ttl_seconds=heartbeat_ttl_seconds
+        )
         queued_rows = self._execute(
             conn,
             """
@@ -1690,7 +1810,7 @@ class ControlPlaneStore:
             WHERE status = 'queued'
             ORDER BY priority ASC, created_at ASC
             LIMIT 500
-            """
+            """,
         ).fetchall()
 
         recovered_count = 0
@@ -1734,7 +1854,9 @@ class ControlPlaneStore:
                     """,
                     (
                         json.dumps(task_payload, separators=(",", ":")),
-                        json.dumps(_normalize_capabilities(required_capabilities), separators=(",", ":")),
+                        json.dumps(
+                            _normalize_capabilities(required_capabilities), separators=(",", ":")
+                        ),
                         now_iso,
                         task_id,
                     ),
@@ -1811,7 +1933,7 @@ class ControlPlaneStore:
             WHERE status = 'queued'
             ORDER BY priority ASC, created_at ASC
             LIMIT 500
-            """
+            """,
         ).fetchall()
 
         updated_count = 0
@@ -1885,7 +2007,9 @@ class ControlPlaneStore:
                 reasons.append("membership_alignment")
             if dropped_research_tools:
                 reasons.append("research_tool_downgrade")
-            if is_trading_task and (dropped_trading_baseline_caps or required != normalized_required):
+            if is_trading_task and (
+                dropped_trading_baseline_caps or required != normalized_required
+            ):
                 reasons.append("trading_capability_preserved")
             if reasons:
                 routing["single_agent_normalization_reason"] = ",".join(reasons)
@@ -1945,7 +2069,7 @@ class ControlPlaneStore:
             WHERE status IN ('queued', 'failed')
             ORDER BY updated_at ASC, created_at ASC
             LIMIT 500
-            """
+            """,
         ).fetchall()
         if not rows:
             return 0
@@ -1983,7 +2107,9 @@ class ControlPlaneStore:
             if not low_signal:
                 continue
 
-            updated_dt = _parse_iso_datetime(str(row["updated_at"] or "")) or _parse_iso_datetime(str(row["created_at"] or ""))
+            updated_dt = _parse_iso_datetime(str(row["updated_at"] or "")) or _parse_iso_datetime(
+                str(row["created_at"] or "")
+            )
             age_seconds = int((now_dt - updated_dt).total_seconds()) if updated_dt else 0
             if age_seconds < min_age_seconds:
                 continue
@@ -2031,11 +2157,15 @@ class ControlPlaneStore:
 
         return cancelled_count
 
-    def _run_watchdog_recovery(self, conn: sqlite3.Connection, *, heartbeat_ttl_seconds: int = 180) -> dict[str, int]:
+    def _run_watchdog_recovery(
+        self, conn: sqlite3.Connection, *, heartbeat_ttl_seconds: int = 180
+    ) -> dict[str, int]:
         stale_requeued = self._requeue_expired_leases(conn)
         stale_leased_failed = self._fail_stale_leased_tasks(conn)
         queued_exhausted_failed = self._fail_exhausted_queued_tasks(conn)
-        queue_unblocked = self._recover_queue_blocked_memberships(conn, heartbeat_ttl_seconds=heartbeat_ttl_seconds)
+        queue_unblocked = self._recover_queue_blocked_memberships(
+            conn, heartbeat_ttl_seconds=heartbeat_ttl_seconds
+        )
         single_agent_normalized = self._recover_single_agent_queue_constraints(conn)
         low_signal_cancelled = self._auto_cancel_low_signal_tasks(conn)
         return {
@@ -2121,7 +2251,13 @@ class ControlPlaneStore:
                         updated_at = ?
                     WHERE agent_id = ?
                     """,
-                    (now_iso, now_unix, json.dumps(metadata, separators=(",", ":")), now_iso, cleaned_agent_id),
+                    (
+                        now_iso,
+                        now_unix,
+                        json.dumps(metadata, separators=(",", ":")),
+                        now_iso,
+                        cleaned_agent_id,
+                    ),
                 )
                 if emit_event:
                     self._record_event(
@@ -2152,7 +2288,13 @@ class ControlPlaneStore:
                         updated_at = ?
                     WHERE agent_id = ?
                     """,
-                    (now_iso, now_unix, json.dumps(metadata, separators=(",", ":")), now_iso, cleaned_agent_id),
+                    (
+                        now_iso,
+                        now_unix,
+                        json.dumps(metadata, separators=(",", ":")),
+                        now_iso,
+                        cleaned_agent_id,
+                    ),
                 )
                 if emit_event:
                     self._record_event(
@@ -2176,7 +2318,7 @@ class ControlPlaneStore:
                 WHERE status = 'queued'
                 ORDER BY priority ASC, created_at ASC
                 LIMIT 200
-                """
+                """,
             ).fetchall()
 
             active_lock_keys: set[str] = set()
@@ -2186,7 +2328,7 @@ class ControlPlaneStore:
                 SELECT task_id, payload_json
                 FROM tasks
                 WHERE status = 'leased'
-                """
+                """,
             ).fetchall()
             for leased_row in leased_rows_for_locks:
                 leased_payload = _decode_json(leased_row["payload_json"], {})
@@ -2204,12 +2346,20 @@ class ControlPlaneStore:
                 task_payload = _decode_json(row["payload_json"], {})
                 if not isinstance(task_payload, dict):
                     task_payload = {}
-                membership_id, enforce_membership = _task_membership_requirement(task_payload if isinstance(task_payload, dict) else {})
-                if enforce_membership and membership_id and membership_id not in worker_membership_ids:
+                membership_id, enforce_membership = _task_membership_requirement(
+                    task_payload if isinstance(task_payload, dict) else {}
+                )
+                if (
+                    enforce_membership
+                    and membership_id
+                    and membership_id not in worker_membership_ids
+                ):
                     continue
 
                 lock_keys = _task_exclusive_lock_keys(task_payload)
-                if lock_keys and any(key in active_lock_keys or key in selected_lock_keys for key in lock_keys):
+                if lock_keys and any(
+                    key in active_lock_keys or key in selected_lock_keys for key in lock_keys
+                ):
                     continue
 
                 selected_task_ids.append(row["task_id"])
@@ -2264,7 +2414,9 @@ class ControlPlaneStore:
 
         return [self._row_to_task(row) for row in leased_rows]
 
-    def extend_task_lease(self, *, task_id: str, agent_id: str, lease_seconds: int) -> dict[str, Any]:
+    def extend_task_lease(
+        self, *, task_id: str, agent_id: str, lease_seconds: int
+    ) -> dict[str, Any]:
         cleaned_task_id = task_id.strip()
         cleaned_agent_id = agent_id.strip()
         if not cleaned_task_id or not cleaned_agent_id:
@@ -2311,7 +2463,9 @@ class ControlPlaneStore:
 
         return self._row_to_task(updated)
 
-    def complete_task(self, *, task_id: str, agent_id: str, result: dict[str, Any] | None) -> dict[str, Any]:
+    def complete_task(
+        self, *, task_id: str, agent_id: str, result: dict[str, Any] | None
+    ) -> dict[str, Any]:
         cleaned_task_id = task_id.strip()
         cleaned_agent_id = agent_id.strip()
         if not cleaned_task_id or not cleaned_agent_id:
@@ -2393,13 +2547,19 @@ class ControlPlaneStore:
             required_capabilities = _decode_json(row["required_capabilities_json"], [])
             if not isinstance(required_capabilities, list):
                 required_capabilities = []
-            available_membership_ids = self._available_membership_ids(conn, heartbeat_ttl_seconds=180)
+            available_membership_ids = self._available_membership_ids(
+                conn, heartbeat_ttl_seconds=180
+            )
 
             cleaned_error = error_text.strip()
             current_membership_before_failover, _ = _task_membership_requirement(task_payload)
-            reported_membership = membership_id.strip().lower() or _extract_membership_from_error(cleaned_error)
+            reported_membership = membership_id.strip().lower() or _extract_membership_from_error(
+                cleaned_error
+            )
             exhausted = reported_membership or current_membership_before_failover
-            quota_exhausted = _error_indicates_quota_exhaustion(cleaned_error, error_code=error_code)
+            quota_exhausted = _error_indicates_quota_exhaustion(
+                cleaned_error, error_code=error_code
+            )
             deadlock_error = _error_indicates_deadlock(cleaned_error, error_code=error_code)
             task_type = _task_type_from_payload(task_payload)
             failover_target = ""
@@ -2428,7 +2588,9 @@ class ControlPlaneStore:
             if not isinstance(escalation_policy, dict):
                 escalation_policy = {}
             escalation_enabled = bool(escalation_policy.get("enabled", False))
-            escalation_target = str(escalation_policy.get("target_membership_id") or "claude_code").strip().lower()
+            escalation_target = (
+                str(escalation_policy.get("target_membership_id") or "claude_code").strip().lower()
+            )
             allowed_task_types = {
                 str(item).strip().lower()
                 for item in escalation_policy.get("allowed_task_types", [])
@@ -2502,7 +2664,9 @@ class ControlPlaneStore:
                     next_status,
                     cleaned_error,
                     json.dumps(task_payload, separators=(",", ":")),
-                    json.dumps(_normalize_capabilities(required_capabilities), separators=(",", ":")),
+                    json.dumps(
+                        _normalize_capabilities(required_capabilities), separators=(",", ":")
+                    ),
                     now_iso,
                     cleaned_task_id,
                 ),
@@ -2576,7 +2740,11 @@ class ControlPlaneStore:
             existing_error = str(row["error_text"] or "").strip()
             note = reason.strip()
             if note:
-                next_error = f"{existing_error} | cancelled: {note}" if existing_error else f"cancelled: {note}"
+                next_error = (
+                    f"{existing_error} | cancelled: {note}"
+                    if existing_error
+                    else f"cancelled: {note}"
+                )
             else:
                 next_error = existing_error
 
@@ -2691,7 +2859,7 @@ class ControlPlaneStore:
                 """
                 SELECT status, payload_json
                 FROM tasks
-                """
+                """,
             ).fetchall()
             agent_rows = self._execute(conn, "SELECT * FROM agents").fetchall()
             event_rows = self._execute(
@@ -2707,8 +2875,22 @@ class ControlPlaneStore:
             ).fetchall()
             conn.commit()
 
-        counts = {"queued": 0, "leased": 0, "completed": 0, "failed": 0, "cancelled": 0, "blocked_review": 0}
-        kpi_counts = {"queued": 0, "leased": 0, "completed": 0, "failed": 0, "cancelled": 0, "blocked_review": 0}
+        counts = {
+            "queued": 0,
+            "leased": 0,
+            "completed": 0,
+            "failed": 0,
+            "cancelled": 0,
+            "blocked_review": 0,
+        }
+        kpi_counts = {
+            "queued": 0,
+            "leased": 0,
+            "completed": 0,
+            "failed": 0,
+            "cancelled": 0,
+            "blocked_review": 0,
+        }
         excluded_low_signal = 0
         for row in task_rows:
             status = str(row["status"] or "").strip()
@@ -2743,7 +2925,11 @@ class ControlPlaneStore:
                 created_count += 1
             elif event_type == "task_completed":
                 completed_count += 1
-            elif event_type in {"task_leased", "task_lease_extended", "task_lease_expired_requeued"}:
+            elif event_type in {
+                "task_leased",
+                "task_lease_extended",
+                "task_lease_expired_requeued",
+            }:
                 lease_count += 1
                 if event_type == "task_lease_expired_requeued":
                     stale_lease_count += 1
@@ -2754,8 +2940,15 @@ class ControlPlaneStore:
             elif event_type == "task_auto_cancelled_low_signal":
                 autocancel_count += 1
 
-        agents = [self._row_to_agent(row, heartbeat_ttl_seconds=heartbeat_ttl_seconds) for row in agent_rows]
-        active_agents = [agent for agent in agents if str(agent.get("status") or "").strip().lower() != "disabled"]
+        agents = [
+            self._row_to_agent(row, heartbeat_ttl_seconds=heartbeat_ttl_seconds)
+            for row in agent_rows
+        ]
+        active_agents = [
+            agent
+            for agent in agents
+            if str(agent.get("status") or "").strip().lower() != "disabled"
+        ]
         online_active_agents = [agent for agent in active_agents if bool(agent.get("online"))]
         online_agents = len(online_active_agents)
 
@@ -2769,7 +2962,9 @@ class ControlPlaneStore:
                 agent_id = str(agent.get("agent_id") or "").strip().lower()
                 if not agent_id:
                     continue
-                caps = agent.get("capabilities") if isinstance(agent.get("capabilities"), list) else []
+                caps = (
+                    agent.get("capabilities") if isinstance(agent.get("capabilities"), list) else []
+                )
                 memberships = {
                     str(cap).split(":", 1)[1].strip().lower()
                     for cap in caps
@@ -2781,7 +2976,9 @@ class ControlPlaneStore:
                     if value:
                         memberships.add(value)
                 matches_agent = (agent_id in allowed_agent_ids) if allowed_agent_ids else True
-                matches_membership = bool(memberships & allowed_membership_ids) if allowed_membership_ids else True
+                matches_membership = (
+                    bool(memberships & allowed_membership_ids) if allowed_membership_ids else True
+                )
                 if matches_agent and matches_membership:
                     filtered.append(agent)
             executor_candidates = filtered
@@ -2790,7 +2987,9 @@ class ControlPlaneStore:
         nonexecutor_online = max(0, online_agents - executor_online)
 
         queue_depth = int(kpi_counts.get("queued", 0)) + int(kpi_counts.get("leased", 0))
-        completion_rate_per_second = (completed_count / float(window_seconds)) if window_seconds > 0 else 0.0
+        completion_rate_per_second = (
+            (completed_count / float(window_seconds)) if window_seconds > 0 else 0.0
+        )
         if queue_depth <= 0:
             queue_drain_seconds: float | None = 0.0
         elif completion_rate_per_second <= 0:
@@ -2860,7 +3059,9 @@ class ControlPlaneStore:
             "slo": {
                 "status": slo_status,
                 "window_seconds": window_seconds,
-                "queue_drain_time_seconds": (None if queue_drain_seconds is None else int(queue_drain_seconds)),
+                "queue_drain_time_seconds": (
+                    None if queue_drain_seconds is None else int(queue_drain_seconds)
+                ),
                 "stale_lease_rate": round(stale_lease_rate, 4),
                 "autocancel_rate": round(autocancel_rate, 4),
                 "alerts": slo_alerts,

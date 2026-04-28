@@ -2,6 +2,7 @@
 
 Run: /usr/local/bin/python3 -m pytest tests/unit/test_signal_pipeline.py -v
 """
+
 from __future__ import annotations
 
 import json
@@ -21,6 +22,7 @@ from signal_pipeline import SignalPipeline  # type: ignore
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def signals_dir(tmp_path):
     d = tmp_path / "signals"
@@ -32,7 +34,9 @@ def signals_dir(tmp_path):
 def pipeline(signals_dir, monkeypatch):
     """SignalPipeline with all externals mocked out."""
     monkeypatch.setattr("signal_pipeline.SIGNALS_DIR", signals_dir)
-    monkeypatch.setattr("signal_pipeline.PAPER_TRADING_LOG", signals_dir.parent / "paper_trading.jsonl")
+    monkeypatch.setattr(
+        "signal_pipeline.PAPER_TRADING_LOG", signals_dir.parent / "paper_trading.jsonl"
+    )
     monkeypatch.setattr("signal_pipeline._NOTIFY_AVAILABLE", False)
     monkeypatch.setattr("signal_pipeline._KERNEL_AVAILABLE", False)
     monkeypatch.setattr("signal_pipeline._FIREWALL_AVAILABLE", False)
@@ -64,6 +68,7 @@ def _raw(
 
 # ─── Safety defaults ───────────────────────────────────────────────────────────
 
+
 @pytest.mark.parametrize(
     ("value", "expected"),
     [
@@ -93,6 +98,7 @@ def test_paper_trading_log_redirected_in_tests(pipeline):
 
 
 # ─── Scoring tests ─────────────────────────────────────────────────────────────
+
 
 class TestScoring:
     def test_process_returns_processed_signal(self, pipeline):
@@ -152,6 +158,7 @@ class TestScoring:
 
 # ─── JSONL audit trail ────────────────────────────────────────────────────────
 
+
 class TestAuditTrail:
     def test_writes_jsonl_record(self, pipeline):
         pl, sig_dir = pipeline
@@ -184,6 +191,7 @@ class TestAuditTrail:
 
 
 # ─── Outcome writeback ────────────────────────────────────────────────────────
+
 
 class TestOutcomeWriteback:
     def test_update_win(self, pipeline):
@@ -246,6 +254,7 @@ class TestOutcomeWriteback:
         pid2 = r2.scored.pipeline_id
 
         errors = []
+
         def update1():
             try:
                 pl.update_signal_outcome(pid1, "win", 100.0)
@@ -282,6 +291,7 @@ class TestOutcomeWriteback:
 
 # ─── Active signals index ─────────────────────────────────────────────────────
 
+
 class TestActiveSignals:
     def test_buy_adds_to_active(self, pipeline):
         pl, _ = pipeline
@@ -299,6 +309,7 @@ class TestActiveSignals:
 
     def test_close_without_open_logs_warning(self, pipeline, caplog):
         import logging
+
         pl, _ = pipeline
         with caplog.at_level(logging.WARNING):
             pl.process(_raw(action="close", symbol="MISSING"))
@@ -328,6 +339,7 @@ class TestActiveSignals:
             pl.process(_raw(symbol=f"TOKEN{i}"))
 
         errors = []
+
         def read_active():
             try:
                 result = pl.active_signals()
@@ -344,6 +356,7 @@ class TestActiveSignals:
 
 
 # ─── Signal stats ─────────────────────────────────────────────────────────────
+
 
 class TestSignalStats:
     def test_empty_stats(self, pipeline):
@@ -368,7 +381,7 @@ class TestSignalStats:
         stats = pl.signal_stats()
         assert stats["wins"] == 2
         assert stats["losses"] == 1
-        assert stats["win_rate"] == pytest.approx(2/3, abs=0.01)
+        assert stats["win_rate"] == pytest.approx(2 / 3, abs=0.01)
         assert stats["total_pnl_usd"] == pytest.approx(120.0, abs=0.01)
 
     def test_stats_handles_corrupt_file(self, pipeline):
@@ -395,12 +408,16 @@ class TestSignalStats:
 
 # ─── Decision Engine Wiring ────────────────────────────────────────────────────
 
+
 class TestDecisionEngineWiring:
     """Verify the decision engine gate in _score works correctly."""
 
     _RAW = {
-        "symbol": "BTC", "action": "buy", "price": 50000.0,
-        "confidence": 0.70, "strategy": "test",
+        "symbol": "BTC",
+        "action": "buy",
+        "price": 50000.0,
+        "confidence": 0.70,
+        "strategy": "test",
     }
 
     def test_decision_engine_block_overrides_routing(self, pipeline, monkeypatch):
@@ -408,6 +425,7 @@ class TestDecisionEngineWiring:
         from unittest.mock import MagicMock
 
         import signal_pipeline as sp  # type: ignore
+
         fake_dec = MagicMock()
         fake_dec.verdict = "BLOCK"
         fake_dec.adjusted_confidence = 0.10
@@ -425,6 +443,7 @@ class TestDecisionEngineWiring:
         from unittest.mock import MagicMock
 
         import signal_pipeline as sp  # type: ignore
+
         fake_dec = MagicMock()
         fake_dec.verdict = "REDUCE"
         fake_dec.adjusted_confidence = 0.45  # below MEDIUM_CONF → LOG_ONLY
@@ -442,6 +461,7 @@ class TestDecisionEngineWiring:
         from unittest.mock import MagicMock
 
         import signal_pipeline as sp  # type: ignore
+
         fake_engine = MagicMock()
         fake_engine.evaluate.side_effect = RuntimeError("chain data unavailable")
         monkeypatch.setattr(sp, "_DECISION_ENGINE_AVAILABLE", True)
@@ -453,6 +473,7 @@ class TestDecisionEngineWiring:
     def test_decision_engine_unavailable_does_not_block(self, pipeline, monkeypatch):
         pl, _ = pipeline
         import signal_pipeline as sp  # type: ignore
+
         monkeypatch.setattr(sp, "_DECISION_ENGINE_AVAILABLE", False)
         monkeypatch.setattr(sp, "_DECISION_ENGINE", None)
         result = pl.process(self._RAW)

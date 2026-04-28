@@ -140,7 +140,7 @@ Focus on liquidity, slippage risk, and platform-specific factors."""
         """
         # Pre-execution reasoning
         pre_prompt = f"""You are about to execute: {request.side} {request.quantity} {request.symbol}
-Consensus reasoning: {request.reasoning or 'No reasoning provided'}
+Consensus reasoning: {request.reasoning or "No reasoning provided"}
 
 Any concerns before execution?"""
 

@@ -20,6 +20,7 @@ from lib.security.dependency_scanner import (
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def scanner():
     return DependencyScanner(check_outdated=False, check_vulns=False)
@@ -32,6 +33,7 @@ def full_scanner():
 
 class _FakeMeta:
     """Dict-like metadata that supports both .get() and ['key'] access."""
+
     def __init__(self, data):
         self._data = data
 
@@ -44,13 +46,15 @@ class _FakeMeta:
 
 def _make_dist(name: str, version: str, author: str = "Test Author"):
     """Create a mock distribution object."""
-    meta = _FakeMeta({
-        "Name": name,
-        "Version": version,
-        "Author": author,
-        "Author-email": f"{author}@test.com" if author else "",
-        "License": "MIT",
-    })
+    meta = _FakeMeta(
+        {
+            "Name": name,
+            "Version": version,
+            "Author": author,
+            "Author-email": f"{author}@test.com" if author else "",
+            "License": "MIT",
+        }
+    )
     dist = MagicMock()
     dist.metadata = meta
     return dist
@@ -59,6 +63,7 @@ def _make_dist(name: str, version: str, author: str = "Test Author"):
 # ---------------------------------------------------------------------------
 # Tests — PackageInfo / ScanResult data models
 # ---------------------------------------------------------------------------
+
 
 class TestDataModels:
     def test_vulnerability_fields(self):
@@ -90,6 +95,7 @@ class TestDataModels:
 # ---------------------------------------------------------------------------
 # Tests — Package enumeration
 # ---------------------------------------------------------------------------
+
 
 class TestEnumeration:
     @patch("importlib.metadata.distributions")
@@ -127,6 +133,7 @@ class TestEnumeration:
 # Tests — Quick scan
 # ---------------------------------------------------------------------------
 
+
 class TestQuickScan:
     @patch("importlib.metadata.distributions")
     def test_quick_scan_no_network(self, mock_dists, scanner):
@@ -153,6 +160,7 @@ class TestQuickScan:
 # Tests — SBOM generation
 # ---------------------------------------------------------------------------
 
+
 class TestSBOM:
     def test_sbom_structure(self, scanner):
         pkgs = [
@@ -168,13 +176,18 @@ class TestSBOM:
 
     def test_sbom_includes_vulns(self, scanner):
         vuln = Vulnerability(
-            id="CVE-2024-0001", package="requests",
-            installed_version="2.28.0", severity="high",
+            id="CVE-2024-0001",
+            package="requests",
+            installed_version="2.28.0",
+            severity="high",
         )
-        pkgs = [PackageInfo(
-            name="requests", version="2.28.0",
-            vulnerabilities=[vuln],
-        )]
+        pkgs = [
+            PackageInfo(
+                name="requests",
+                version="2.28.0",
+                vulnerabilities=[vuln],
+            )
+        ]
         sbom = scanner._generate_sbom(pkgs)
         assert "vulnerabilities" in sbom
         assert sbom["vulnerabilities"][0]["id"] == "CVE-2024-0001"
@@ -189,17 +202,20 @@ class TestSBOM:
 # Tests — OSV query
 # ---------------------------------------------------------------------------
 
+
 class TestOSVQuery:
     @patch("urllib.request.urlopen")
     def test_osv_query_with_vulns(self, mock_urlopen, full_scanner):
         response_data = {
-            "vulns": [{
-                "id": "GHSA-xxxx-yyyy",
-                "summary": "Test vulnerability",
-                "severity": [{"score": "8.5"}],
-                "affected": [{"ranges": [{"events": [{"fixed": "2.32.0"}]}]}],
-                "references": [{"url": "https://example.com/advisory"}],
-            }]
+            "vulns": [
+                {
+                    "id": "GHSA-xxxx-yyyy",
+                    "summary": "Test vulnerability",
+                    "severity": [{"score": "8.5"}],
+                    "affected": [{"ranges": [{"events": [{"fixed": "2.32.0"}]}]}],
+                    "references": [{"url": "https://example.com/advisory"}],
+                }
+            ]
         }
         mock_resp = MagicMock()
         mock_resp.read.return_value = json.dumps(response_data).encode()
@@ -233,6 +249,7 @@ class TestOSVQuery:
 # ---------------------------------------------------------------------------
 # Tests — Scoring
 # ---------------------------------------------------------------------------
+
 
 class TestScoring:
     def test_perfect_score(self, scanner):

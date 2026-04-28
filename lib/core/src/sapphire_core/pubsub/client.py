@@ -345,7 +345,9 @@ class PubSubClient:
                     (
                         self._serialize_datetimes(v)
                         if isinstance(v, dict)
-                        else v.isoformat() if isinstance(v, datetime) else v
+                        else v.isoformat()
+                        if isinstance(v, datetime)
+                        else v
                     )
                     for v in value
                 ]
@@ -370,6 +372,7 @@ def get_pubsub_client() -> PubSubClient:
         redis_url = (os.getenv("REDIS_URL") or "").strip()
         if redis_url:
             from sapphire_core.pubsub.redis_client import RedisPubSubClient
+
             _client = RedisPubSubClient(redis_url)  # type: ignore[assignment]
         else:
             _client = PubSubClient()

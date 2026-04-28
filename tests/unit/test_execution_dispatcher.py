@@ -192,14 +192,16 @@ def test_resolve_fill_returns_false_without_pending():
     dispatcher_module = _load_module(DISPATCHER_PATH, "alpha_engine_dispatcher_no_pending")
     disp = dispatcher_module.ExecutionDispatcher()
 
-    result = disp.resolve_fill({
-        "platform": "ASTER",
-        "symbol": "SOLUSDT",
-        "side": "BUY",
-        "filled_quantity": 1.0,
-        "avg_price": 150.0,
-        "success": True,
-    })
+    result = disp.resolve_fill(
+        {
+            "platform": "ASTER",
+            "symbol": "SOLUSDT",
+            "side": "BUY",
+            "filled_quantity": 1.0,
+            "avg_price": 150.0,
+            "success": True,
+        }
+    )
 
     assert result is False
     assert disp.pending_confirmation_count == 0
@@ -277,8 +279,9 @@ async def _fake_auth_header(url: str):
     return {}
 
 
-def _make_dispatcher(monkeypatch, venue="ASTER", url="https://example.run.app",
-                     status=200, body="", allocation=1.0):
+def _make_dispatcher(
+    monkeypatch, venue="ASTER", url="https://example.run.app", status=200, body="", allocation=1.0
+):
     """Helper to create a configured dispatcher with fake session."""
     mod = _load_module(DISPATCHER_PATH, f"disp_{id(monkeypatch)}")
     disp = mod.ExecutionDispatcher()
@@ -340,6 +343,7 @@ def test_venue_pause_unknown_raises():
     disp.bot_urls = {"ASTER": "https://example.run.app"}
 
     import pytest
+
     with pytest.raises(ValueError, match="Unknown venue"):
         disp.pause_venue("NONEXISTENT")
 
@@ -394,9 +398,7 @@ def test_send_command_no_session(monkeypatch):
     disp.bot_urls = {"ASTER": "https://example.run.app"}
     disp.session = None  # Not started
 
-    result = asyncio.run(
-        disp.send_command("ASTER", {"action": "BUY", "symbol": "SOL"})
-    )
+    result = asyncio.run(disp.send_command("ASTER", {"action": "BUY", "symbol": "SOL"}))
     assert result is False
     err = disp.get_last_dispatch_error("ASTER")
     assert err["reason"] == "dispatcher_not_started"
@@ -408,9 +410,7 @@ def test_send_command_unknown_venue(monkeypatch):
     disp.bot_urls = {"ASTER": "https://example.run.app"}
     disp.session = _FakeSession(status=200)
 
-    result = asyncio.run(
-        disp.send_command("NONEXISTENT", {"action": "BUY", "symbol": "SOL"})
-    )
+    result = asyncio.run(disp.send_command("NONEXISTENT", {"action": "BUY", "symbol": "SOL"}))
     assert result is False
 
 
@@ -442,12 +442,14 @@ def test_resolve_fill_strips_quote_currency():
     future = loop.create_future()
     disp._pending_confirmations[("ASTER", "SOL")] = future
 
-    result = disp.resolve_fill({
-        "platform": "ASTER",
-        "symbol": "SOLUSDT",
-        "side": "BUY",
-        "success": True,
-    })
+    result = disp.resolve_fill(
+        {
+            "platform": "ASTER",
+            "symbol": "SOLUSDT",
+            "side": "BUY",
+            "success": True,
+        }
+    )
     assert result is True
     assert future.done()
     assert disp.pending_confirmation_count == 0
@@ -463,12 +465,14 @@ def test_resolve_fill_venue_from_venue_key():
     future = loop.create_future()
     disp._pending_confirmations[("LIGHTER", "ETH")] = future
 
-    result = disp.resolve_fill({
-        "venue": "LIGHTER",
-        "symbol": "ETH",
-        "side": "SELL",
-        "success": True,
-    })
+    result = disp.resolve_fill(
+        {
+            "venue": "LIGHTER",
+            "symbol": "ETH",
+            "side": "SELL",
+            "success": True,
+        }
+    )
     assert result is True
     assert future.done()
     loop.close()
@@ -511,6 +515,7 @@ def test_pending_confirmation_count():
 
 def test_resume_expired_venues():
     import time
+
     mod = _load_module(DISPATCHER_PATH, "disp_resume_expired")
     disp = mod.ExecutionDispatcher()
     disp.bot_urls = {"ASTER": "https://example.run.app", "LIGHTER": "https://example2.run.app"}
@@ -683,6 +688,7 @@ class TestUnconfirmedFillTracker:
 
     def test_reconcile_sets_timestamp(self):
         import time as _time
+
         tracker = self._tracker_cls()(max_entries=100)
         tracker.record("ASTER", "SOL", {"side": "BUY"}, 30.0, 1, 1)
         before = _time.time()
@@ -715,10 +721,19 @@ def test_send_command_blocked_by_rate_limiter(monkeypatch):
     disp._rate_limiter = mod.VenueRateLimiter(default_per_minute=2)
 
     # First two succeed
-    assert asyncio.run(disp.send_command("ASTER", {"action": "BUY", "symbol": "SOL", "quantity": 1.0})) is True
-    assert asyncio.run(disp.send_command("ASTER", {"action": "BUY", "symbol": "SOL", "quantity": 1.0})) is True
+    assert (
+        asyncio.run(disp.send_command("ASTER", {"action": "BUY", "symbol": "SOL", "quantity": 1.0}))
+        is True
+    )
+    assert (
+        asyncio.run(disp.send_command("ASTER", {"action": "BUY", "symbol": "SOL", "quantity": 1.0}))
+        is True
+    )
     # Third is blocked
-    assert asyncio.run(disp.send_command("ASTER", {"action": "BUY", "symbol": "SOL", "quantity": 1.0})) is False
+    assert (
+        asyncio.run(disp.send_command("ASTER", {"action": "BUY", "symbol": "SOL", "quantity": 1.0}))
+        is False
+    )
     err = disp.get_last_dispatch_error("ASTER")
     assert err["reason"] == "rate_limited"
 
@@ -735,10 +750,21 @@ def test_rate_limit_does_not_affect_other_venues(monkeypatch):
 
     disp._rate_limiter = mod.VenueRateLimiter(default_per_minute=1)
 
-    assert asyncio.run(disp.send_command("ASTER", {"action": "BUY", "symbol": "SOL", "quantity": 1.0})) is True
-    assert asyncio.run(disp.send_command("ASTER", {"action": "BUY", "symbol": "SOL", "quantity": 1.0})) is False
+    assert (
+        asyncio.run(disp.send_command("ASTER", {"action": "BUY", "symbol": "SOL", "quantity": 1.0}))
+        is True
+    )
+    assert (
+        asyncio.run(disp.send_command("ASTER", {"action": "BUY", "symbol": "SOL", "quantity": 1.0}))
+        is False
+    )
     # LIGHTER still works
-    assert asyncio.run(disp.send_command("LIGHTER", {"action": "BUY", "symbol": "SOL", "quantity": 1.0})) is True
+    assert (
+        asyncio.run(
+            disp.send_command("LIGHTER", {"action": "BUY", "symbol": "SOL", "quantity": 1.0})
+        )
+        is True
+    )
 
 
 # ── Dead-Letter Integration with send_and_confirm ────────────────
@@ -803,12 +829,14 @@ def test_resolve_fill_reconciles_dead_letter():
     assert disp._dead_letters.unreconciled_count == 1
 
     # resolve_fill with no pending confirmation
-    resolved = disp.resolve_fill({
-        "platform": "ASTER",
-        "symbol": "SOLUSDT",  # Should strip to SOL
-        "side": "BUY",
-        "success": True,
-    })
+    resolved = disp.resolve_fill(
+        {
+            "platform": "ASTER",
+            "symbol": "SOLUSDT",  # Should strip to SOL
+            "side": "BUY",
+            "success": True,
+        }
+    )
     assert resolved is False  # No Future resolved
     assert disp._dead_letters.unreconciled_count == 0  # But dead-letter reconciled
 
@@ -834,6 +862,7 @@ def test_successful_confirm_does_not_create_dead_letter(monkeypatch):
         async def _delayed_resolve():
             await asyncio.sleep(0.02)
             disp.resolve_fill(fill_data)
+
         asyncio.create_task(_delayed_resolve())
         return await disp.send_and_confirm(
             "ASTER",

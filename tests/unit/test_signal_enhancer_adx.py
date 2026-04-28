@@ -58,6 +58,7 @@ def _trending_down_bars(n: int = 60):
 def _ranging_bars(n: int = 80):
     """Tightly mean-reverting bars — ADX should sit below 20."""
     import random
+
     random.seed(42)
     closes = [100.0]
     for _ in range(n - 1):

@@ -174,8 +174,12 @@ def _trade_metrics(
 
     if not trades:
         return {
-            "sharpe": 0.0, "sortino": 0.0, "max_drawdown_pct": 0.0,
-            "win_rate": 0.0, "profit_factor": 0.0, "n_trades": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "max_drawdown_pct": 0.0,
+            "win_rate": 0.0,
+            "profit_factor": 0.0,
+            "n_trades": 0.0,
         }
 
     capital = initial_capital
@@ -256,23 +260,28 @@ def run_cpcv_backtest(
     if n_bars < min_bars:
         log.warning(
             "CPCV: only %d bars for %d groups (need %d) — returning empty result",
-            n_bars, n_groups, min_bars,
+            n_bars,
+            n_groups,
+            min_bars,
         )
         return CPCVResult(
-            symbol=symbol, n_groups=n_groups, n_test_groups=n_test_groups, n_splits=0,
+            symbol=symbol,
+            n_groups=n_groups,
+            n_test_groups=n_test_groups,
+            n_splits=0,
         )
 
     # Single full backtest — trades contain entry timestamps we'll filter by split
     full_result = run_backtest(
-        symbol, bars=bars, signal_fn=signal_fn,
+        symbol,
+        bars=bars,
+        signal_fn=signal_fn,
         initial_capital=initial_capital,
         position_size_pct=position_size_pct,
     )
 
     # Map ISO date string → bar index for O(1) trade-to-split assignment
-    date_to_idx: dict[str, int] = {
-        bar.ts.isoformat()[:10]: i for i, bar in enumerate(bars)
-    }
+    date_to_idx: dict[str, int] = {bar.ts.isoformat()[:10]: i for i, bar in enumerate(bars)}
 
     bounds = _group_bounds(n_bars, n_groups)
     purge_window = max(1, int(n_bars * purge_pct))
@@ -296,23 +305,24 @@ def run_cpcv_backtest(
 
         # Filter trades whose entry bar falls in this test period
         test_trades = [
-            t for t in full_result.trades
-            if date_to_idx.get(str(t.entry_ts)[:10]) in test_set
+            t for t in full_result.trades if date_to_idx.get(str(t.entry_ts)[:10]) in test_set
         ]
 
         m = _trade_metrics(test_trades, initial_capital)
-        split_results.append(CPCVSplitMetrics(
-            split_idx=split_idx,
-            test_groups=test_combo,
-            n_test_bars=len(test_set),
-            n_train_bars=len(train_set),
-            n_trades=int(m["n_trades"]),
-            sharpe=round(m["sharpe"], 3),
-            sortino=round(m["sortino"], 3),
-            max_drawdown_pct=round(m["max_drawdown_pct"], 3),
-            win_rate=round(m["win_rate"], 4),
-            profit_factor=round(min(m["profit_factor"], 999.0), 3),
-        ))
+        split_results.append(
+            CPCVSplitMetrics(
+                split_idx=split_idx,
+                test_groups=test_combo,
+                n_test_bars=len(test_set),
+                n_train_bars=len(train_set),
+                n_trades=int(m["n_trades"]),
+                sharpe=round(m["sharpe"], 3),
+                sortino=round(m["sortino"], 3),
+                max_drawdown_pct=round(m["max_drawdown_pct"], 3),
+                win_rate=round(m["win_rate"], 4),
+                profit_factor=round(min(m["profit_factor"], 999.0), 3),
+            )
+        )
 
     # Aggregate across splits that had at least one trade
     active = [s for s in split_results if s.n_trades > 0] or split_results

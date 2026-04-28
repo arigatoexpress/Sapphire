@@ -79,9 +79,7 @@ def publish(report: Report, platforms: list[str] | None = None) -> dict:
     per-platform path + quality result.
     """
     if platforms is None:
-        platforms = scheduler.TARGET_PLATFORMS.get(
-            report.kind, ["linkedin", "substack", "x"]
-        )
+        platforms = scheduler.TARGET_PLATFORMS.get(report.kind, ["linkedin", "substack", "x"])
 
     stamp = _stamp()
     renderings: dict[str, dict] = {}

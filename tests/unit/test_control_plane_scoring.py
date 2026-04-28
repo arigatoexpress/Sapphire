@@ -32,10 +32,7 @@ def _control_plane_app_namespace():
     state to avoid breaking unrelated tests like
     ``test_sensitivity_filter.py``.
     """
-    saved = {
-        name: sys.modules.pop(name, None)
-        for name in ("app", "app.models", "app.scoring")
-    }
+    saved = {name: sys.modules.pop(name, None) for name in ("app", "app.models", "app.scoring")}
     sys.path.insert(0, str(CP_ROOT))
     try:
         importlib.invalidate_caches()
@@ -95,8 +92,12 @@ def _item(
     )
 
 
-def _config(*, aster: list[str] | None = None, lighter: list[str] | None = None,
-            extra: list[str] | None = None) -> ChatConfig:
+def _config(
+    *,
+    aster: list[str] | None = None,
+    lighter: list[str] | None = None,
+    extra: list[str] | None = None,
+) -> ChatConfig:
     return ChatConfig(
         chat_id=1,
         aster_assets=list(aster or []),
@@ -343,9 +344,7 @@ def test_score_news_rationale_includes_asset_macro_sentiment():
     config = _config(aster=["BTC"])
     items = [_item("Bitcoin rally", summary="bullish growth")]
 
-    scored = score_news(
-        items, config, ["fed"], min_alpha_score=0, max_news_age_hours=24, now=NOW
-    )
+    scored = score_news(items, config, ["fed"], min_alpha_score=0, max_news_age_hours=24, now=NOW)
 
     rationale = scored[0].rationale
     assert "assets:" in rationale
@@ -404,8 +403,9 @@ def test_score_news_blank_keywords_dropped():
     config = _config(extra=["", "  "])
     items = [_item("Bitcoin rally", summary="growth")]
 
-    scored = score_news(items, config, ["", "  ", "rally"],
-                        min_alpha_score=0, max_news_age_hours=24, now=NOW)
+    scored = score_news(
+        items, config, ["", "  ", "rally"], min_alpha_score=0, max_news_age_hours=24, now=NOW
+    )
 
     # Only "rally" is a real keyword
     assert "rally" in scored[0].keyword_hits or scored == []  # may be filtered if score too low

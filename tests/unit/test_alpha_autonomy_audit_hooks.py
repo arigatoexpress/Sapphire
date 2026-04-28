@@ -171,7 +171,10 @@ def test_alpha_engine_session_decision_path_calls_audit_hook() -> None:
     tree = ast.parse((ALPHA_ROOT / "src" / "main.py").read_text(encoding="utf-8"))
     target_method: ast.AsyncFunctionDef | None = None
     for node in ast.walk(tree):
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_apply_autonomy_session_decision":
+        if (
+            isinstance(node, ast.AsyncFunctionDef)
+            and node.name == "_apply_autonomy_session_decision"
+        ):
             target_method = node
             break
 

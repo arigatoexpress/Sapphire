@@ -274,7 +274,9 @@ class GeminiGuard:
 
         # Sanitize the untrusted Telegram message before prompt interpolation
         safe_message, detection = sanitize_for_prompt(
-            message, max_length=1000, wrap_boundary=True,
+            message,
+            max_length=1000,
+            wrap_boundary=True,
         )
         if detection.is_suspicious:
             log_injection_attempt("telegram_chat", detection, agent_id="gemini_guard")
@@ -306,9 +308,7 @@ class GeminiGuard:
 
         try:
             loop = asyncio.get_running_loop()
-            response = await loop.run_in_executor(
-                None, lambda: model.generate_content(prompt)
-            )
+            response = await loop.run_in_executor(None, lambda: model.generate_content(prompt))
             text = (response.text or "").strip() if response else None
             return text[:800] if text else None
         except Exception as e:
@@ -323,12 +323,10 @@ class GeminiGuard:
         model = self.flash_model or self.pro_model
         if not model:
             return None
-            
+
         try:
             loop = asyncio.get_running_loop()
-            response = await loop.run_in_executor(
-                None, lambda: model.generate_content(prompt)
-            )
+            response = await loop.run_in_executor(None, lambda: model.generate_content(prompt))
             return (response.text or "").strip() if response else None
         except Exception as e:
             logger.error(f"Intent classification generation failed: {e}")

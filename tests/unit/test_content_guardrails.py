@@ -44,19 +44,21 @@ def test_small_sample_notice_mentions_threshold() -> None:
 
 
 def test_render_crypto_brief_suppresses_numeric_accuracy_breakdown() -> None:
-    body = rg._render_crypto_brief({
-        "predictions": _small_sample_predictions(),
-        "latest_forecasts": [],
-        "portfolio": {
-            "capital": 103500.0,
-            "initial_capital": 100000.0,
-            "pnl_pct": 3.5,
-            "open_positions": 1,
-            "symbols": ["BTC"],
-            "positions": [],
-        },
-        "signal_pipeline": {"count": 4, "sources": {}, "symbols": {"BTC": 4}},
-    })
+    body = rg._render_crypto_brief(
+        {
+            "predictions": _small_sample_predictions(),
+            "latest_forecasts": [],
+            "portfolio": {
+                "capital": 103500.0,
+                "initial_capital": 100000.0,
+                "pnl_pct": 3.5,
+                "open_positions": 1,
+                "symbols": ["BTC"],
+                "positions": [],
+            },
+            "signal_pipeline": {"count": 4, "sources": {}, "symbols": {"BTC": 4}},
+        }
+    )
     assert "58.3%" not in body
     assert "14/24" not in body
     assert "8/12" not in body
@@ -64,13 +66,21 @@ def test_render_crypto_brief_suppresses_numeric_accuracy_breakdown() -> None:
 
 
 def test_render_market_pulse_suppresses_numeric_accuracy_breakdown() -> None:
-    body = rg._render_market_pulse({
-        "predictions": _small_sample_predictions(),
-        "forecasts": [
-            {"symbol": "BTC", "direction": "UP", "target_price": 70000, "confidence": 0.62, "timeframe": "24h"}
-        ],
-        "portfolio": {"pnl_pct": 1.2, "open_positions": 2, "total_value": 101200},
-    })
+    body = rg._render_market_pulse(
+        {
+            "predictions": _small_sample_predictions(),
+            "forecasts": [
+                {
+                    "symbol": "BTC",
+                    "direction": "UP",
+                    "target_price": 70000,
+                    "confidence": 0.62,
+                    "timeframe": "24h",
+                }
+            ],
+            "portfolio": {"pnl_pct": 1.2, "open_positions": 2, "total_value": 101200},
+        }
+    )
     assert "58.3%" not in body
     assert "14/24" not in body
     assert "100-call threshold" in body

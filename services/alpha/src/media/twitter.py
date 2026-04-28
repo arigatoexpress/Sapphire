@@ -67,6 +67,7 @@ class TwitterClient:
     def _parse_credential_blob(self, blob: str) -> dict[str, str]:
         """Parse JSON or loose key-value credential blob."""
         out: dict[str, str] = {}
+
         def normalize_key(raw: str) -> str:
             return re.sub(r"[^a-z0-9]+", "_", str(raw or "").strip().lower()).strip("_")
 
@@ -108,9 +109,21 @@ class TwitterClient:
         mapped: dict[str, str] = {}
         aliases = {
             "api_key": ["api_key", "consumer_key", "twitter_api_key", "ck", "x_consumer_key"],
-            "api_secret": ["api_secret", "consumer_secret", "twitter_api_secret", "sk", "x_consumer_secret"],
+            "api_secret": [
+                "api_secret",
+                "consumer_secret",
+                "twitter_api_secret",
+                "sk",
+                "x_consumer_secret",
+            ],
             "access_token": ["access_token", "twitter_access_token", "oauth_token", "token"],
-            "access_secret": ["access_secret", "access_token_secret", "twitter_access_secret", "oauth_token_secret", "token_secret"],
+            "access_secret": [
+                "access_secret",
+                "access_token_secret",
+                "twitter_access_secret",
+                "oauth_token_secret",
+                "token_secret",
+            ],
             "bearer_token": ["bearer_token", "bear", "twitter_bearer_token"],
         }
         for target, keys in aliases.items():
@@ -703,13 +716,11 @@ class TwitterClient:
                 content = entry.get("content", {}) or {}
 
                 if entry_id.startswith("cursor-bottom-"):
-                    next_cursor = content.get("value") or content.get("itemContent", {}).get("value")
+                    next_cursor = content.get("value") or content.get("itemContent", {}).get(
+                        "value"
+                    )
 
-                result = (
-                    content.get("itemContent", {})
-                    .get("user_results", {})
-                    .get("result", {})
-                )
+                result = content.get("itemContent", {}).get("user_results", {}).get("result", {})
                 if not isinstance(result, dict) or result.get("__typename") != "User":
                     continue
 
@@ -746,7 +757,9 @@ class TwitterClient:
 
         return users
 
-    def _create_web_session_and_headers(self, cookiejar: Any, ct0: str) -> tuple[requests.Session, dict[str, str]]:
+    def _create_web_session_and_headers(
+        self, cookiejar: Any, ct0: str
+    ) -> tuple[requests.Session, dict[str, str]]:
         session = requests.Session()
         session.cookies.update(cookiejar)
         headers = {

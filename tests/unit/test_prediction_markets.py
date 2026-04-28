@@ -134,6 +134,7 @@ class TestPredictionSignal:
 
 # ── PredictionMarketFeed Base ────────────────────────────────────────
 
+
 class TestPredictionMarketFeed:
     def test_get_signals_empty(self):
         class DummyFeed(PredictionMarketFeed):
@@ -266,7 +267,10 @@ class TestPolymarketRelevance:
 
     def test_regulatory_sec(self):
         # "SEC crypto" matches DIRECT first (has "crypto" keyword), so use SEC-only
-        assert _classify_relevance("SEC enforcement action against exchange", "") == SignalRelevance.REGULATORY
+        assert (
+            _classify_relevance("SEC enforcement action against exchange", "")
+            == SignalRelevance.REGULATORY
+        )
 
     def test_irrelevant(self):
         assert _classify_relevance("Will it rain tomorrow?", "Weather") is None
@@ -344,10 +348,14 @@ class TestPolymarketClientParsing:
         assert sig is None
 
     def test_extract_probability_from_outcome_prices(self):
-        assert PolymarketClient._extract_probability({"outcomePrices": ["0.65", "0.35"]}) == pytest.approx(0.65)
+        assert PolymarketClient._extract_probability(
+            {"outcomePrices": ["0.65", "0.35"]}
+        ) == pytest.approx(0.65)
 
     def test_extract_probability_from_last_trade_price(self):
-        assert PolymarketClient._extract_probability({"lastTradePrice": 0.82}) == pytest.approx(0.82)
+        assert PolymarketClient._extract_probability({"lastTradePrice": 0.82}) == pytest.approx(
+            0.82
+        )
 
     def test_extract_probability_from_bid_ask(self):
         result = PolymarketClient._extract_probability({"bestBid": 0.70, "bestAsk": 0.74})
@@ -409,10 +417,16 @@ from src.feeds.kalshi_client import (
 
 class TestKalshiRelevance:
     def test_crypto_direct(self):
-        assert _classify_kalshi_relevance("Bitcoin price above $100K", "Crypto") == SignalRelevance.DIRECT
+        assert (
+            _classify_kalshi_relevance("Bitcoin price above $100K", "Crypto")
+            == SignalRelevance.DIRECT
+        )
 
     def test_macro_fed(self):
-        assert _classify_kalshi_relevance("Fed rate cut in March", "Economics") == SignalRelevance.MACRO
+        assert (
+            _classify_kalshi_relevance("Fed rate cut in March", "Economics")
+            == SignalRelevance.MACRO
+        )
 
     def test_macro_cpi(self):
         assert _classify_kalshi_relevance("CPI above 3%", "Inflation") == SignalRelevance.MACRO
@@ -421,7 +435,10 @@ class TestKalshiRelevance:
         assert _classify_kalshi_relevance("World Cup winner", "Sports") is None
 
     def test_relevant_via_category(self):
-        assert _classify_kalshi_relevance("Some generic question", "Economics") == SignalRelevance.MACRO
+        assert (
+            _classify_kalshi_relevance("Some generic question", "Economics")
+            == SignalRelevance.MACRO
+        )
 
 
 class TestKalshiClientParsing:
@@ -488,7 +505,9 @@ class TestKalshiClientParsing:
         assert sig is None
 
     def test_extract_probability_midpoint(self):
-        assert KalshiClient._extract_probability({"yes_bid": 70, "yes_ask": 80}) == pytest.approx(0.75)
+        assert KalshiClient._extract_probability({"yes_bid": 70, "yes_ask": 80}) == pytest.approx(
+            0.75
+        )
 
     def test_extract_probability_last_price(self):
         assert KalshiClient._extract_probability({"last_price": 65}) == pytest.approx(0.65)
@@ -557,8 +576,12 @@ class TestPredictionAggregator:
 
     def test_get_all_signals_combined(self):
         agg = self._make_aggregator()
-        poly_sig = _make_signal(market_id="poly_1", source=PredictionSource.POLYMARKET, volume_usd=100_000)
-        kalshi_sig = _make_signal(market_id="kalshi_1", source=PredictionSource.KALSHI, volume_usd=50_000)
+        poly_sig = _make_signal(
+            market_id="poly_1", source=PredictionSource.POLYMARKET, volume_usd=100_000
+        )
+        kalshi_sig = _make_signal(
+            market_id="kalshi_1", source=PredictionSource.KALSHI, volume_usd=50_000
+        )
         self._inject_signals(agg, [poly_sig, kalshi_sig])
         all_sigs = agg.get_all_signals()
         assert len(all_sigs) == 2
@@ -587,8 +610,11 @@ class TestPredictionAggregator:
         agg = self._make_aggregator()
         sig1 = _make_signal(market_id="p1", symbols=["BTC"], probability=0.75, volume_usd=500_000)
         sig2 = _make_signal(
-            market_id="k1", source=PredictionSource.KALSHI,
-            symbols=["BTC"], probability=0.70, volume_usd=200_000,
+            market_id="k1",
+            source=PredictionSource.KALSHI,
+            symbols=["BTC"],
+            probability=0.70,
+            volume_usd=200_000,
         )
         self._inject_signals(agg, [sig1, sig2])
         sent = agg.get_symbol_sentiment("BTC")
@@ -620,10 +646,12 @@ class TestPredictionAggregator:
     def test_get_macro_context(self):
         agg = self._make_aggregator()
         macro_sig = _make_signal(
-            market_id="macro1", symbols=["BTC"],
+            market_id="macro1",
+            symbols=["BTC"],
             relevance=SignalRelevance.MACRO,
             question="Fed rate cut probability",
-            probability=0.60, volume_usd=200_000,
+            probability=0.60,
+            volume_usd=200_000,
         )
         self._inject_signals(agg, [macro_sig])
         ctx = agg.get_macro_context()
@@ -641,7 +669,9 @@ class TestPredictionAggregator:
         agg = self._make_aggregator()
         agg._last_forum_post_ts = 0  # Never posted
         sig = _make_signal(
-            market_id="p1", volume_usd=100_000, probability=0.80,
+            market_id="p1",
+            volume_usd=100_000,
+            probability=0.80,
             question="BTC above $100K?",
         )
         self._inject_signals(agg, [sig])
@@ -691,10 +721,15 @@ class TestPredictionAggregator:
     def test_symbol_sentiment_volume_weighted(self):
         agg = self._make_aggregator()
         # High-volume bullish + low-volume bearish → should still be bullish
-        bull = _make_signal(market_id="bull", symbols=["BTC"], probability=0.80, volume_usd=1_000_000)
+        bull = _make_signal(
+            market_id="bull", symbols=["BTC"], probability=0.80, volume_usd=1_000_000
+        )
         bear = _make_signal(
-            market_id="bear", source=PredictionSource.KALSHI,
-            symbols=["BTC"], probability=0.30, volume_usd=10_000,
+            market_id="bear",
+            source=PredictionSource.KALSHI,
+            symbols=["BTC"],
+            probability=0.30,
+            volume_usd=10_000,
         )
         self._inject_signals(agg, [bull, bear])
         sent = agg.get_symbol_sentiment("BTC")
@@ -800,13 +835,19 @@ class TestFuzzyNameNormalization:
     """Tests for cross-venue market name matching — ported from TheOddsDesk."""
 
     def test_strips_noise_words(self):
-        assert _normalize_market_name("Will the price go above 100") == _normalize_market_name("price above 100")
+        assert _normalize_market_name("Will the price go above 100") == _normalize_market_name(
+            "price above 100"
+        )
 
     def test_case_insensitive(self):
-        assert _normalize_market_name("Bitcoin Price $100K") == _normalize_market_name("bitcoin price $100k")
+        assert _normalize_market_name("Bitcoin Price $100K") == _normalize_market_name(
+            "bitcoin price $100k"
+        )
 
     def test_strips_punctuation(self):
-        assert _normalize_market_name("Bitcoin > $100,000?") == _normalize_market_name("Bitcoin 100000")
+        assert _normalize_market_name("Bitcoin > $100,000?") == _normalize_market_name(
+            "Bitcoin 100000"
+        )
 
     def test_identical_events_different_phrasing(self):
         poly = "Will Bitcoin exceed $100K by end of year?"
@@ -875,8 +916,20 @@ class TestArbitrageOpportunity:
     def test_to_dict_has_required_keys(self):
         arb = self._make_arb()
         d = arb.to_dict()
-        required_keys = {"id", "market_name", "venue_a", "price_a", "venue_b", "price_b",
-                         "spread", "spread_pct", "confidence", "direction", "symbols", "timestamp"}
+        required_keys = {
+            "id",
+            "market_name",
+            "venue_a",
+            "price_a",
+            "venue_b",
+            "price_b",
+            "spread",
+            "spread_pct",
+            "confidence",
+            "direction",
+            "symbols",
+            "timestamp",
+        }
         assert required_keys == set(d.keys())
 
     def test_to_dict_values(self):
@@ -923,24 +976,50 @@ class TestArbitrageDetection:
 
     def test_single_venue_no_arb(self):
         agg = self._make_aggregator()
-        self._inject_signals(agg, [
-            _make_signal(market_id="poly_1", source=PredictionSource.POLYMARKET,
-                         question="Bitcoin above 100K", probability=0.72, volume_usd=100_000),
-            _make_signal(market_id="poly_2", source=PredictionSource.POLYMARKET,
-                         question="Bitcoin above 100K", probability=0.70, volume_usd=80_000),
-        ])
+        self._inject_signals(
+            agg,
+            [
+                _make_signal(
+                    market_id="poly_1",
+                    source=PredictionSource.POLYMARKET,
+                    question="Bitcoin above 100K",
+                    probability=0.72,
+                    volume_usd=100_000,
+                ),
+                _make_signal(
+                    market_id="poly_2",
+                    source=PredictionSource.POLYMARKET,
+                    question="Bitcoin above 100K",
+                    probability=0.70,
+                    volume_usd=80_000,
+                ),
+            ],
+        )
         # Same venue — should not detect arb
         arbs = agg.find_arbitrage_opportunities()
         assert len(arbs) == 0
 
     def test_cross_venue_spread_detected(self):
         agg = self._make_aggregator()
-        self._inject_signals(agg, [
-            _make_signal(market_id="poly_btc100k", source=PredictionSource.POLYMARKET,
-                         question="Bitcoin above 100K", probability=0.72, volume_usd=200_000),
-            _make_signal(market_id="kalshi_btc100k", source=PredictionSource.KALSHI,
-                         question="Bitcoin above 100K", probability=0.60, volume_usd=100_000),
-        ])
+        self._inject_signals(
+            agg,
+            [
+                _make_signal(
+                    market_id="poly_btc100k",
+                    source=PredictionSource.POLYMARKET,
+                    question="Bitcoin above 100K",
+                    probability=0.72,
+                    volume_usd=200_000,
+                ),
+                _make_signal(
+                    market_id="kalshi_btc100k",
+                    source=PredictionSource.KALSHI,
+                    question="Bitcoin above 100K",
+                    probability=0.60,
+                    volume_usd=100_000,
+                ),
+            ],
+        )
         arbs = agg.find_arbitrage_opportunities()
         assert len(arbs) == 1
         assert arbs[0].spread_pct == pytest.approx(12.0, abs=0.1)
@@ -949,77 +1028,163 @@ class TestArbitrageDetection:
 
     def test_below_min_spread_filtered(self):
         agg = self._make_aggregator()
-        self._inject_signals(agg, [
-            _make_signal(market_id="poly_1", source=PredictionSource.POLYMARKET,
-                         question="Bitcoin above 100K", probability=0.72, volume_usd=200_000),
-            _make_signal(market_id="kalshi_1", source=PredictionSource.KALSHI,
-                         question="Bitcoin above 100K", probability=0.71, volume_usd=100_000),
-        ])
+        self._inject_signals(
+            agg,
+            [
+                _make_signal(
+                    market_id="poly_1",
+                    source=PredictionSource.POLYMARKET,
+                    question="Bitcoin above 100K",
+                    probability=0.72,
+                    volume_usd=200_000,
+                ),
+                _make_signal(
+                    market_id="kalshi_1",
+                    source=PredictionSource.KALSHI,
+                    question="Bitcoin above 100K",
+                    probability=0.71,
+                    volume_usd=100_000,
+                ),
+            ],
+        )
         # 1% spread < default 2% threshold
         arbs = agg.find_arbitrage_opportunities()
         assert len(arbs) == 0
 
     def test_custom_min_spread(self):
         agg = self._make_aggregator()
-        self._inject_signals(agg, [
-            _make_signal(market_id="poly_1", source=PredictionSource.POLYMARKET,
-                         question="Bitcoin above 100K", probability=0.72, volume_usd=200_000),
-            _make_signal(market_id="kalshi_1", source=PredictionSource.KALSHI,
-                         question="Bitcoin above 100K", probability=0.71, volume_usd=100_000),
-        ])
+        self._inject_signals(
+            agg,
+            [
+                _make_signal(
+                    market_id="poly_1",
+                    source=PredictionSource.POLYMARKET,
+                    question="Bitcoin above 100K",
+                    probability=0.72,
+                    volume_usd=200_000,
+                ),
+                _make_signal(
+                    market_id="kalshi_1",
+                    source=PredictionSource.KALSHI,
+                    question="Bitcoin above 100K",
+                    probability=0.71,
+                    volume_usd=100_000,
+                ),
+            ],
+        )
         # Lower threshold to 0.5%
         arbs = agg.find_arbitrage_opportunities(min_spread=0.005)
         assert len(arbs) == 1
 
     def test_fuzzy_matching_across_venues(self):
         agg = self._make_aggregator()
-        self._inject_signals(agg, [
-            _make_signal(market_id="poly_btc", source=PredictionSource.POLYMARKET,
-                         question="Will Bitcoin exceed $100K by end of year?",
-                         probability=0.75, volume_usd=300_000),
-            _make_signal(market_id="kalshi_btc", source=PredictionSource.KALSHI,
-                         question="Bitcoin to exceed $100K by year end",
-                         probability=0.62, volume_usd=150_000),
-        ])
+        self._inject_signals(
+            agg,
+            [
+                _make_signal(
+                    market_id="poly_btc",
+                    source=PredictionSource.POLYMARKET,
+                    question="Will Bitcoin exceed $100K by end of year?",
+                    probability=0.75,
+                    volume_usd=300_000,
+                ),
+                _make_signal(
+                    market_id="kalshi_btc",
+                    source=PredictionSource.KALSHI,
+                    question="Bitcoin to exceed $100K by year end",
+                    probability=0.62,
+                    volume_usd=150_000,
+                ),
+            ],
+        )
         arbs = agg.find_arbitrage_opportunities()
         assert len(arbs) == 1
         assert arbs[0].spread_pct == pytest.approx(13.0, abs=0.1)
 
     def test_different_markets_not_matched(self):
         agg = self._make_aggregator()
-        self._inject_signals(agg, [
-            _make_signal(market_id="poly_btc", source=PredictionSource.POLYMARKET,
-                         question="Bitcoin above 100K", probability=0.75, volume_usd=300_000),
-            _make_signal(market_id="kalshi_eth", source=PredictionSource.KALSHI,
-                         question="Ethereum above 5K", probability=0.50, volume_usd=150_000),
-        ])
+        self._inject_signals(
+            agg,
+            [
+                _make_signal(
+                    market_id="poly_btc",
+                    source=PredictionSource.POLYMARKET,
+                    question="Bitcoin above 100K",
+                    probability=0.75,
+                    volume_usd=300_000,
+                ),
+                _make_signal(
+                    market_id="kalshi_eth",
+                    source=PredictionSource.KALSHI,
+                    question="Ethereum above 5K",
+                    probability=0.50,
+                    volume_usd=150_000,
+                ),
+            ],
+        )
         arbs = agg.find_arbitrage_opportunities()
         assert len(arbs) == 0
 
     def test_sorted_by_spread_descending(self):
         agg = self._make_aggregator()
-        self._inject_signals(agg, [
-            _make_signal(market_id="poly_btc", source=PredictionSource.POLYMARKET,
-                         question="Bitcoin 100K", probability=0.72, volume_usd=200_000),
-            _make_signal(market_id="kalshi_btc", source=PredictionSource.KALSHI,
-                         question="Bitcoin 100K", probability=0.65, volume_usd=100_000),
-            _make_signal(market_id="poly_eth", source=PredictionSource.POLYMARKET,
-                         question="Ethereum 5K", probability=0.80, volume_usd=200_000),
-            _make_signal(market_id="kalshi_eth", source=PredictionSource.KALSHI,
-                         question="Ethereum 5K", probability=0.55, volume_usd=100_000),
-        ])
+        self._inject_signals(
+            agg,
+            [
+                _make_signal(
+                    market_id="poly_btc",
+                    source=PredictionSource.POLYMARKET,
+                    question="Bitcoin 100K",
+                    probability=0.72,
+                    volume_usd=200_000,
+                ),
+                _make_signal(
+                    market_id="kalshi_btc",
+                    source=PredictionSource.KALSHI,
+                    question="Bitcoin 100K",
+                    probability=0.65,
+                    volume_usd=100_000,
+                ),
+                _make_signal(
+                    market_id="poly_eth",
+                    source=PredictionSource.POLYMARKET,
+                    question="Ethereum 5K",
+                    probability=0.80,
+                    volume_usd=200_000,
+                ),
+                _make_signal(
+                    market_id="kalshi_eth",
+                    source=PredictionSource.KALSHI,
+                    question="Ethereum 5K",
+                    probability=0.55,
+                    volume_usd=100_000,
+                ),
+            ],
+        )
         arbs = agg.find_arbitrage_opportunities()
         assert len(arbs) == 2
         assert arbs[0].spread >= arbs[1].spread
 
     def test_confidence_high_volume(self):
         agg = self._make_aggregator()
-        self._inject_signals(agg, [
-            _make_signal(market_id="poly_1", source=PredictionSource.POLYMARKET,
-                         question="Bitcoin 100K", probability=0.80, volume_usd=800_000),
-            _make_signal(market_id="kalshi_1", source=PredictionSource.KALSHI,
-                         question="Bitcoin 100K", probability=0.65, volume_usd=600_000),
-        ])
+        self._inject_signals(
+            agg,
+            [
+                _make_signal(
+                    market_id="poly_1",
+                    source=PredictionSource.POLYMARKET,
+                    question="Bitcoin 100K",
+                    probability=0.80,
+                    volume_usd=800_000,
+                ),
+                _make_signal(
+                    market_id="kalshi_1",
+                    source=PredictionSource.KALSHI,
+                    question="Bitcoin 100K",
+                    probability=0.65,
+                    volume_usd=600_000,
+                ),
+            ],
+        )
         arbs = agg.find_arbitrage_opportunities()
         assert len(arbs) == 1
         # Total volume > $1M → base 90 + bonuses
@@ -1027,12 +1192,25 @@ class TestArbitrageDetection:
 
     def test_confidence_low_volume(self):
         agg = self._make_aggregator()
-        self._inject_signals(agg, [
-            _make_signal(market_id="poly_1", source=PredictionSource.POLYMARKET,
-                         question="Bitcoin 100K", probability=0.80, volume_usd=3_000),
-            _make_signal(market_id="kalshi_1", source=PredictionSource.KALSHI,
-                         question="Bitcoin 100K", probability=0.65, volume_usd=2_000),
-        ])
+        self._inject_signals(
+            agg,
+            [
+                _make_signal(
+                    market_id="poly_1",
+                    source=PredictionSource.POLYMARKET,
+                    question="Bitcoin 100K",
+                    probability=0.80,
+                    volume_usd=3_000,
+                ),
+                _make_signal(
+                    market_id="kalshi_1",
+                    source=PredictionSource.KALSHI,
+                    question="Bitcoin 100K",
+                    probability=0.65,
+                    volume_usd=2_000,
+                ),
+            ],
+        )
         arbs = agg.find_arbitrage_opportunities()
         assert len(arbs) == 1
         # Low volume + min_vol penalty
@@ -1040,25 +1218,51 @@ class TestArbitrageDetection:
 
     def test_min_confidence_filter(self):
         agg = self._make_aggregator()
-        self._inject_signals(agg, [
-            _make_signal(market_id="poly_1", source=PredictionSource.POLYMARKET,
-                         question="Bitcoin 100K", probability=0.80, volume_usd=3_000),
-            _make_signal(market_id="kalshi_1", source=PredictionSource.KALSHI,
-                         question="Bitcoin 100K", probability=0.60, volume_usd=2_000),
-        ])
+        self._inject_signals(
+            agg,
+            [
+                _make_signal(
+                    market_id="poly_1",
+                    source=PredictionSource.POLYMARKET,
+                    question="Bitcoin 100K",
+                    probability=0.80,
+                    volume_usd=3_000,
+                ),
+                _make_signal(
+                    market_id="kalshi_1",
+                    source=PredictionSource.KALSHI,
+                    question="Bitcoin 100K",
+                    probability=0.60,
+                    volume_usd=2_000,
+                ),
+            ],
+        )
         arbs = agg.find_arbitrage_opportunities(min_confidence=50.0)
         assert len(arbs) == 0
 
     def test_symbols_merged_from_both_signals(self):
         agg = self._make_aggregator()
-        self._inject_signals(agg, [
-            _make_signal(market_id="poly_1", source=PredictionSource.POLYMARKET,
-                         question="Bitcoin 100K", probability=0.80, volume_usd=200_000,
-                         symbols=["BTC"]),
-            _make_signal(market_id="kalshi_1", source=PredictionSource.KALSHI,
-                         question="Bitcoin 100K", probability=0.65, volume_usd=100_000,
-                         symbols=["BTC", "ETH"]),
-        ])
+        self._inject_signals(
+            agg,
+            [
+                _make_signal(
+                    market_id="poly_1",
+                    source=PredictionSource.POLYMARKET,
+                    question="Bitcoin 100K",
+                    probability=0.80,
+                    volume_usd=200_000,
+                    symbols=["BTC"],
+                ),
+                _make_signal(
+                    market_id="kalshi_1",
+                    source=PredictionSource.KALSHI,
+                    question="Bitcoin 100K",
+                    probability=0.65,
+                    volume_usd=100_000,
+                    symbols=["BTC", "ETH"],
+                ),
+            ],
+        )
         arbs = agg.find_arbitrage_opportunities()
         assert len(arbs) == 1
         assert "BTC" in arbs[0].symbols
@@ -1066,12 +1270,25 @@ class TestArbitrageDetection:
 
     def test_arb_id_format(self):
         agg = self._make_aggregator()
-        self._inject_signals(agg, [
-            _make_signal(market_id="poly_x", source=PredictionSource.POLYMARKET,
-                         question="Bitcoin 100K", probability=0.80, volume_usd=200_000),
-            _make_signal(market_id="kalshi_y", source=PredictionSource.KALSHI,
-                         question="Bitcoin 100K", probability=0.65, volume_usd=100_000),
-        ])
+        self._inject_signals(
+            agg,
+            [
+                _make_signal(
+                    market_id="poly_x",
+                    source=PredictionSource.POLYMARKET,
+                    question="Bitcoin 100K",
+                    probability=0.80,
+                    volume_usd=200_000,
+                ),
+                _make_signal(
+                    market_id="kalshi_y",
+                    source=PredictionSource.KALSHI,
+                    question="Bitcoin 100K",
+                    probability=0.65,
+                    volume_usd=100_000,
+                ),
+            ],
+        )
         arbs = agg.find_arbitrage_opportunities()
         assert arbs[0].id == "arb-poly_x-kalshi_y"
 
@@ -1103,12 +1320,25 @@ class TestArbitrageFormatting:
 
     def test_get_arbitrage_context_with_arbs(self):
         agg = self._make_aggregator()
-        self._inject_signals(agg, [
-            _make_signal(market_id="poly_1", source=PredictionSource.POLYMARKET,
-                         question="Bitcoin 100K", probability=0.80, volume_usd=200_000),
-            _make_signal(market_id="kalshi_1", source=PredictionSource.KALSHI,
-                         question="Bitcoin 100K", probability=0.65, volume_usd=100_000),
-        ])
+        self._inject_signals(
+            agg,
+            [
+                _make_signal(
+                    market_id="poly_1",
+                    source=PredictionSource.POLYMARKET,
+                    question="Bitcoin 100K",
+                    probability=0.80,
+                    volume_usd=200_000,
+                ),
+                _make_signal(
+                    market_id="kalshi_1",
+                    source=PredictionSource.KALSHI,
+                    question="Bitcoin 100K",
+                    probability=0.65,
+                    volume_usd=100_000,
+                ),
+            ],
+        )
         ctx = agg.get_arbitrage_context()
         assert "Cross-Venue Arbitrage" in ctx
         assert "[ARB]" in ctx
@@ -1126,26 +1356,52 @@ class TestArbitrageFormatting:
 
     def test_format_telegram_arbitrage_with_arbs(self):
         agg = self._make_aggregator()
-        self._inject_signals(agg, [
-            _make_signal(market_id="poly_1", source=PredictionSource.POLYMARKET,
-                         question="Bitcoin 100K", probability=0.80, volume_usd=200_000),
-            _make_signal(market_id="kalshi_1", source=PredictionSource.KALSHI,
-                         question="Bitcoin 100K", probability=0.65, volume_usd=100_000),
-        ])
+        self._inject_signals(
+            agg,
+            [
+                _make_signal(
+                    market_id="poly_1",
+                    source=PredictionSource.POLYMARKET,
+                    question="Bitcoin 100K",
+                    probability=0.80,
+                    volume_usd=200_000,
+                ),
+                _make_signal(
+                    market_id="kalshi_1",
+                    source=PredictionSource.KALSHI,
+                    question="Bitcoin 100K",
+                    probability=0.65,
+                    volume_usd=100_000,
+                ),
+            ],
+        )
         msg = agg.format_telegram_arbitrage()
         assert "Cross-Venue Arbitrage" in msg
         assert "Spread:" in msg
 
     def test_cognition_context_includes_arb(self):
         agg = self._make_aggregator()
-        self._inject_signals(agg, [
-            _make_signal(market_id="poly_1", source=PredictionSource.POLYMARKET,
-                         question="Bitcoin 100K", probability=0.80, volume_usd=200_000,
-                         symbols=["BTC"]),
-            _make_signal(market_id="kalshi_1", source=PredictionSource.KALSHI,
-                         question="Bitcoin 100K", probability=0.65, volume_usd=100_000,
-                         symbols=["BTC"]),
-        ])
+        self._inject_signals(
+            agg,
+            [
+                _make_signal(
+                    market_id="poly_1",
+                    source=PredictionSource.POLYMARKET,
+                    question="Bitcoin 100K",
+                    probability=0.80,
+                    volume_usd=200_000,
+                    symbols=["BTC"],
+                ),
+                _make_signal(
+                    market_id="kalshi_1",
+                    source=PredictionSource.KALSHI,
+                    question="Bitcoin 100K",
+                    probability=0.65,
+                    volume_usd=100_000,
+                    symbols=["BTC"],
+                ),
+            ],
+        )
         ctx = agg.get_cognition_context("BTC")
         assert "Arbitrage" in ctx
         assert "[ARB]" in ctx
@@ -1153,26 +1409,52 @@ class TestArbitrageFormatting:
     def test_forum_summary_includes_arb(self):
         agg = self._make_aggregator()
         agg._last_forum_post_ts = 0  # Allow posting
-        self._inject_signals(agg, [
-            _make_signal(market_id="poly_1", source=PredictionSource.POLYMARKET,
-                         question="Bitcoin 100K", probability=0.80, volume_usd=200_000,
-                         symbols=["BTC"]),
-            _make_signal(market_id="kalshi_1", source=PredictionSource.KALSHI,
-                         question="Bitcoin 100K", probability=0.65, volume_usd=100_000,
-                         symbols=["BTC"]),
-        ])
+        self._inject_signals(
+            agg,
+            [
+                _make_signal(
+                    market_id="poly_1",
+                    source=PredictionSource.POLYMARKET,
+                    question="Bitcoin 100K",
+                    probability=0.80,
+                    volume_usd=200_000,
+                    symbols=["BTC"],
+                ),
+                _make_signal(
+                    market_id="kalshi_1",
+                    source=PredictionSource.KALSHI,
+                    question="Bitcoin 100K",
+                    probability=0.65,
+                    volume_usd=100_000,
+                    symbols=["BTC"],
+                ),
+            ],
+        )
         summary = agg.generate_forum_summary()
         assert summary is not None
         assert "Cross-Venue Arbitrage" in summary["body"]
 
     def test_status_includes_arb_count(self):
         agg = self._make_aggregator()
-        self._inject_signals(agg, [
-            _make_signal(market_id="poly_1", source=PredictionSource.POLYMARKET,
-                         question="Bitcoin 100K", probability=0.80, volume_usd=200_000),
-            _make_signal(market_id="kalshi_1", source=PredictionSource.KALSHI,
-                         question="Bitcoin 100K", probability=0.65, volume_usd=100_000),
-        ])
+        self._inject_signals(
+            agg,
+            [
+                _make_signal(
+                    market_id="poly_1",
+                    source=PredictionSource.POLYMARKET,
+                    question="Bitcoin 100K",
+                    probability=0.80,
+                    volume_usd=200_000,
+                ),
+                _make_signal(
+                    market_id="kalshi_1",
+                    source=PredictionSource.KALSHI,
+                    question="Bitcoin 100K",
+                    probability=0.65,
+                    volume_usd=100_000,
+                ),
+            ],
+        )
         status = agg.get_status()
         assert "arbitrage_opportunities" in status
         assert status["arbitrage_opportunities"] >= 1
@@ -1302,12 +1584,14 @@ class TestSwarmPMIntegration:
         assert swarm._prediction_aggregator is None
 
     def test_pm_adjustment_bullish(self):
-        swarm, _, pm_agg = self._make_swarm_with_pm({
-            "sentiment": "bullish",
-            "confidence": 0.8,
-            "weighted_probability": 0.65,
-            "signal_count": 3,
-        })
+        swarm, _, pm_agg = self._make_swarm_with_pm(
+            {
+                "sentiment": "bullish",
+                "confidence": 0.8,
+                "weighted_probability": 0.65,
+                "signal_count": 3,
+            }
+        )
         adj = swarm._get_pm_adjustment("BTC")
         assert adj is not None
         assert adj["direction"] == "LONG"
@@ -1315,24 +1599,28 @@ class TestSwarmPMIntegration:
         assert adj["short_boost"] == 0.0
 
     def test_pm_adjustment_strongly_bullish(self):
-        swarm, _, pm_agg = self._make_swarm_with_pm({
-            "sentiment": "strongly_bullish",
-            "confidence": 0.9,
-            "weighted_probability": 0.85,
-            "signal_count": 5,
-        })
+        swarm, _, pm_agg = self._make_swarm_with_pm(
+            {
+                "sentiment": "strongly_bullish",
+                "confidence": 0.9,
+                "weighted_probability": 0.85,
+                "signal_count": 5,
+            }
+        )
         adj = swarm._get_pm_adjustment("BTC")
         assert adj["direction"] == "LONG"
         # strength = (0.85 - 0.5) * 2 = 0.7, boost = 0.25 * 0.7 * 0.9 = 0.1575
         assert adj["long_boost"] == pytest.approx(0.1575, abs=0.01)
 
     def test_pm_adjustment_bearish(self):
-        swarm, _, pm_agg = self._make_swarm_with_pm({
-            "sentiment": "bearish",
-            "confidence": 0.7,
-            "weighted_probability": 0.35,
-            "signal_count": 2,
-        })
+        swarm, _, pm_agg = self._make_swarm_with_pm(
+            {
+                "sentiment": "bearish",
+                "confidence": 0.7,
+                "weighted_probability": 0.35,
+                "signal_count": 2,
+            }
+        )
         adj = swarm._get_pm_adjustment("ETH")
         assert adj is not None
         assert adj["direction"] == "SHORT"
@@ -1340,34 +1628,40 @@ class TestSwarmPMIntegration:
         assert adj["long_boost"] == 0.0
 
     def test_pm_adjustment_strongly_bearish(self):
-        swarm, _, pm_agg = self._make_swarm_with_pm({
-            "sentiment": "strongly_bearish",
-            "confidence": 0.85,
-            "weighted_probability": 0.15,
-            "signal_count": 4,
-        })
+        swarm, _, pm_agg = self._make_swarm_with_pm(
+            {
+                "sentiment": "strongly_bearish",
+                "confidence": 0.85,
+                "weighted_probability": 0.15,
+                "signal_count": 4,
+            }
+        )
         adj = swarm._get_pm_adjustment("SOL")
         assert adj["direction"] == "SHORT"
         # strength = (0.5 - 0.15) * 2 = 0.7, boost = 0.25 * 0.7 * 0.85 = 0.14875
         assert adj["short_boost"] == pytest.approx(0.1488, abs=0.01)
 
     def test_pm_adjustment_neutral_returns_none(self):
-        swarm, _, pm_agg = self._make_swarm_with_pm({
-            "sentiment": "neutral",
-            "confidence": 0.5,
-            "weighted_probability": 0.50,
-            "signal_count": 2,
-        })
+        swarm, _, pm_agg = self._make_swarm_with_pm(
+            {
+                "sentiment": "neutral",
+                "confidence": 0.5,
+                "weighted_probability": 0.50,
+                "signal_count": 2,
+            }
+        )
         adj = swarm._get_pm_adjustment("BTC")
         assert adj is None
 
     def test_pm_adjustment_no_signals_returns_none(self):
-        swarm, _, pm_agg = self._make_swarm_with_pm({
-            "sentiment": "neutral",
-            "confidence": 0.0,
-            "weighted_probability": 0.5,
-            "signal_count": 0,
-        })
+        swarm, _, pm_agg = self._make_swarm_with_pm(
+            {
+                "sentiment": "neutral",
+                "confidence": 0.0,
+                "weighted_probability": 0.5,
+                "signal_count": 0,
+            }
+        )
         adj = swarm._get_pm_adjustment("BTC")
         assert adj is None
 
@@ -1392,12 +1686,14 @@ class TestSwarmPMIntegration:
         assert adj is None
 
     def test_aggregate_includes_pm_boost_long(self):
-        swarm, rep, pm_agg = self._make_swarm_with_pm({
-            "sentiment": "bullish",
-            "confidence": 0.8,
-            "weighted_probability": 0.65,
-            "signal_count": 3,
-        })
+        swarm, rep, pm_agg = self._make_swarm_with_pm(
+            {
+                "sentiment": "bullish",
+                "confidence": 0.8,
+                "weighted_probability": 0.65,
+                "signal_count": 3,
+            }
+        )
         # Submit two LONG ideas
         swarm.submit_idea("BOT_A", "BTC", "LONG", confidence=0.7)
         swarm.submit_idea("BOT_B", "BTC", "LONG", confidence=0.6)
@@ -1412,12 +1708,14 @@ class TestSwarmPMIntegration:
         assert pm_voters[0]["direction"] == "LONG"
 
     def test_aggregate_includes_pm_boost_short(self):
-        swarm, rep, pm_agg = self._make_swarm_with_pm({
-            "sentiment": "bearish",
-            "confidence": 0.75,
-            "weighted_probability": 0.30,
-            "signal_count": 2,
-        })
+        swarm, rep, pm_agg = self._make_swarm_with_pm(
+            {
+                "sentiment": "bearish",
+                "confidence": 0.75,
+                "weighted_probability": 0.30,
+                "signal_count": 2,
+            }
+        )
         swarm.submit_idea("BOT_A", "ETH", "SHORT", confidence=0.8)
 
         result = swarm.aggregate("ETH")
@@ -1427,12 +1725,14 @@ class TestSwarmPMIntegration:
         assert result["weighted_short"] > 0
 
     def test_aggregate_no_pm_when_neutral(self):
-        swarm, rep, pm_agg = self._make_swarm_with_pm({
-            "sentiment": "neutral",
-            "confidence": 0.5,
-            "weighted_probability": 0.50,
-            "signal_count": 2,
-        })
+        swarm, rep, pm_agg = self._make_swarm_with_pm(
+            {
+                "sentiment": "neutral",
+                "confidence": 0.5,
+                "weighted_probability": 0.50,
+                "signal_count": 2,
+            }
+        )
         swarm.submit_idea("BOT_A", "BTC", "LONG", confidence=0.6)
         result = swarm.aggregate("BTC")
         assert result["pm_adjustment"] is None
@@ -1442,6 +1742,7 @@ class TestSwarmPMIntegration:
 
 
 # ── Prediction Accuracy Tracker ─────────────────────────────────────
+
 
 class TestPredictionAccuracyTracker:
     """Test prediction accuracy tracking and Brier score calculation."""
@@ -1531,8 +1832,12 @@ class TestPredictionAccuracyTracker:
 
     def test_accuracy_stats_per_source(self):
         tracker = PredictionAccuracyTracker()
-        sig_poly = _make_signal(market_id="poly1", source=PredictionSource.POLYMARKET, probability=0.80)
-        sig_kalshi = _make_signal(market_id="kalshi1", source=PredictionSource.KALSHI, probability=0.30)
+        sig_poly = _make_signal(
+            market_id="poly1", source=PredictionSource.POLYMARKET, probability=0.80
+        )
+        sig_kalshi = _make_signal(
+            market_id="kalshi1", source=PredictionSource.KALSHI, probability=0.30
+        )
         tracker.record_signal(sig_poly)
         tracker.record_signal(sig_kalshi)
         tracker.record_outcome("poly1", outcome=True)
@@ -1641,22 +1946,26 @@ class TestPredictionAccuracyTracker:
 
 # ── Aggregator Accuracy Integration ─────────────────────────────────
 
+
 class TestAggregatorAccuracyIntegration:
     """Test accuracy tracker integration in PredictionAggregator."""
 
     def test_aggregator_has_accuracy_tracker(self):
         from src.feeds.prediction_aggregator import PredictionAggregator
+
         agg = PredictionAggregator()
         assert agg._accuracy_tracker is not None
         assert isinstance(agg._accuracy_tracker, PredictionAccuracyTracker)
 
     def test_aggregator_accuracy_tracker_property(self):
         from src.feeds.prediction_aggregator import PredictionAggregator
+
         agg = PredictionAggregator()
         assert agg.accuracy_tracker is agg._accuracy_tracker
 
     def test_record_signals_for_accuracy(self):
         from src.feeds.prediction_aggregator import PredictionAggregator
+
         agg = PredictionAggregator()
         # Mock the feeds to return signals
         sig1 = _make_signal(market_id="rec1")
@@ -1670,6 +1979,7 @@ class TestAggregatorAccuracyIntegration:
 
     def test_record_signals_dedup(self):
         from src.feeds.prediction_aggregator import PredictionAggregator
+
         agg = PredictionAggregator()
         sig1 = _make_signal(market_id="dup1")
         agg._polymarket.get_signals = MagicMock(return_value=[sig1])
@@ -1680,12 +1990,14 @@ class TestAggregatorAccuracyIntegration:
 
     def test_format_telegram_accuracy(self):
         from src.feeds.prediction_aggregator import PredictionAggregator
+
         agg = PredictionAggregator()
         text = agg.format_telegram_accuracy()
         assert "Prediction Accuracy" in text
 
     def test_status_includes_accuracy(self):
         from src.feeds.prediction_aggregator import PredictionAggregator
+
         agg = PredictionAggregator()
         status = agg.get_status()
         assert "accuracy_tracked" in status
@@ -1693,6 +2005,7 @@ class TestAggregatorAccuracyIntegration:
 
     def test_format_telegram_status_includes_accuracy(self):
         from src.feeds.prediction_aggregator import PredictionAggregator
+
         with patch.dict(os.environ, {"SAPPHIRE_PREDICTION_MARKET_ENABLED": "true"}):
             agg = PredictionAggregator()
         text = agg.format_telegram_status()
@@ -1700,6 +2013,7 @@ class TestAggregatorAccuracyIntegration:
 
     def test_dashboard_data_structure(self):
         from src.feeds.prediction_aggregator import PredictionAggregator
+
         agg = PredictionAggregator()
         agg._polymarket.get_signals = MagicMock(return_value=[])
         agg._kalshi.get_signals = MagicMock(return_value=[])
@@ -1714,6 +2028,7 @@ class TestAggregatorAccuracyIntegration:
 
     def test_dashboard_data_with_signals(self):
         from src.feeds.prediction_aggregator import PredictionAggregator
+
         agg = PredictionAggregator()
         sig = _make_signal(market_id="dash1", volume_usd=100_000)
         agg._polymarket.get_signals = MagicMock(return_value=[sig])
@@ -1727,6 +2042,7 @@ class TestAggregatorAccuracyIntegration:
 # ── Telegram Accuracy Command ───────────────────────────────────────
 
 # ── Whale Activity & Manipulation Detection ─────────────────────────
+
 
 class TestWhaleActivityDetection:
     """Test whale activity and volume spike detection on PredictionSignal."""
@@ -1757,22 +2073,28 @@ class TestWhaleActivityDetection:
 
     def test_whale_activity_big_volume_big_move(self):
         sig = _make_signal(
-            probability=0.80, probability_1h_ago=0.70,
-            volume_usd=300_000, volume_1h_ago=100_000,
+            probability=0.80,
+            probability_1h_ago=0.70,
+            volume_usd=300_000,
+            volume_1h_ago=100_000,
         )
         assert sig.is_whale_activity is True  # 3x vol, 10% move
 
     def test_whale_activity_big_volume_small_move(self):
         sig = _make_signal(
-            probability=0.72, probability_1h_ago=0.70,
-            volume_usd=300_000, volume_1h_ago=100_000,
+            probability=0.72,
+            probability_1h_ago=0.70,
+            volume_usd=300_000,
+            volume_1h_ago=100_000,
         )
         assert sig.is_whale_activity is False  # 2% move < 5% threshold
 
     def test_whale_activity_small_volume(self):
         sig = _make_signal(
-            probability=0.80, probability_1h_ago=0.70,
-            volume_usd=150_000, volume_1h_ago=100_000,
+            probability=0.80,
+            probability_1h_ago=0.70,
+            volume_usd=150_000,
+            volume_1h_ago=100_000,
         )
         assert sig.is_whale_activity is False  # 1.5x vol < 2x threshold
 
@@ -1786,24 +2108,30 @@ class TestManipulationRisk:
 
     def test_clean_market(self):
         sig = _make_signal(
-            probability=0.72, probability_1h_ago=0.70,
-            volume_usd=200_000, volume_1h_ago=150_000,
+            probability=0.72,
+            probability_1h_ago=0.70,
+            volume_usd=200_000,
+            volume_1h_ago=150_000,
             liquidity_usd=120_000,
         )
         assert sig.manipulation_risk == "clean"
 
     def test_wash_trading_volume_spike_no_price_move(self):
         sig = _make_signal(
-            probability=0.72, probability_1h_ago=0.72,
-            volume_usd=400_000, volume_1h_ago=100_000,
+            probability=0.72,
+            probability_1h_ago=0.72,
+            volume_usd=400_000,
+            volume_1h_ago=100_000,
             liquidity_usd=120_000,
         )
         assert sig.manipulation_risk == "wash_trading"
 
     def test_wash_trading_tiny_move(self):
         sig = _make_signal(
-            probability=0.725, probability_1h_ago=0.72,
-            volume_usd=500_000, volume_1h_ago=100_000,
+            probability=0.725,
+            probability_1h_ago=0.72,
+            volume_usd=500_000,
+            volume_1h_ago=100_000,
             liquidity_usd=120_000,
         )
         assert sig.manipulation_risk == "wash_trading"  # 0.5% move < 1% threshold
@@ -1825,8 +2153,10 @@ class TestManipulationRisk:
 
     def test_insider_pattern_big_jump_no_volume(self):
         sig = _make_signal(
-            probability=0.85, probability_1h_ago=0.65,
-            volume_usd=100_000, volume_1h_ago=80_000,
+            probability=0.85,
+            probability_1h_ago=0.65,
+            volume_usd=100_000,
+            volume_1h_ago=80_000,
             liquidity_usd=120_000,
         )
         # 20% prob jump, only 1.25x volume = suspicious
@@ -1834,8 +2164,10 @@ class TestManipulationRisk:
 
     def test_insider_pattern_not_triggered_with_volume(self):
         sig = _make_signal(
-            probability=0.85, probability_1h_ago=0.65,
-            volume_usd=200_000, volume_1h_ago=80_000,
+            probability=0.85,
+            probability_1h_ago=0.65,
+            volume_usd=200_000,
+            volume_1h_ago=80_000,
             liquidity_usd=120_000,
         )
         # 20% jump but 2.5x volume (catalyst-driven, not insider)
@@ -1851,23 +2183,28 @@ class TestSignalContextStringFlags:
 
     def test_context_whale_flag(self):
         sig = _make_signal(
-            probability=0.80, probability_1h_ago=0.70,
-            volume_usd=300_000, volume_1h_ago=100_000,
+            probability=0.80,
+            probability_1h_ago=0.70,
+            volume_usd=300_000,
+            volume_1h_ago=100_000,
         )
         ctx = sig.context_string()
         assert "WHALE" in ctx
 
     def test_context_spike_flag(self):
         sig = _make_signal(
-            volume_usd=400_000, volume_1h_ago=100_000,
+            volume_usd=400_000,
+            volume_1h_ago=100_000,
         )
         ctx = sig.context_string()
         assert "SPIKE" in ctx
 
     def test_context_wash_trading_flag(self):
         sig = _make_signal(
-            probability=0.72, probability_1h_ago=0.72,
-            volume_usd=400_000, volume_1h_ago=100_000,
+            probability=0.72,
+            probability_1h_ago=0.72,
+            volume_usd=400_000,
+            volume_1h_ago=100_000,
         )
         ctx = sig.context_string()
         assert "WASH_TRADING" in ctx
@@ -1881,8 +2218,10 @@ class TestSignalContextStringFlags:
 
     def test_to_dict_includes_manipulation_fields(self):
         sig = _make_signal(
-            probability=0.80, probability_1h_ago=0.70,
-            volume_usd=300_000, volume_1h_ago=100_000,
+            probability=0.80,
+            probability_1h_ago=0.70,
+            volume_usd=300_000,
+            volume_1h_ago=100_000,
         )
         d = sig.to_dict()
         assert "is_volume_spike" in d
@@ -1897,12 +2236,15 @@ class TestAggregatorWhaleDetection:
 
     def test_detect_whale_with_signals(self):
         from src.feeds.prediction_aggregator import PredictionAggregator
+
         agg = PredictionAggregator()
         # Create a whale signal
         whale_sig = _make_signal(
             market_id="whale1",
-            probability=0.80, probability_1h_ago=0.65,
-            volume_usd=500_000, volume_1h_ago=100_000,
+            probability=0.80,
+            probability_1h_ago=0.65,
+            volume_usd=500_000,
+            volume_1h_ago=100_000,
         )
         agg._polymarket.get_signals = MagicMock(return_value=[whale_sig])
         agg._kalshi.get_signals = MagicMock(return_value=[])
@@ -1913,11 +2255,14 @@ class TestAggregatorWhaleDetection:
 
     def test_detect_wash_trading(self):
         from src.feeds.prediction_aggregator import PredictionAggregator
+
         agg = PredictionAggregator()
         wash_sig = _make_signal(
             market_id="wash1",
-            probability=0.72, probability_1h_ago=0.72,
-            volume_usd=600_000, volume_1h_ago=100_000,
+            probability=0.72,
+            probability_1h_ago=0.72,
+            volume_usd=600_000,
+            volume_1h_ago=100_000,
         )
         agg._polymarket.get_signals = MagicMock(return_value=[wash_sig])
         agg._kalshi.get_signals = MagicMock(return_value=[])
@@ -1927,6 +2272,7 @@ class TestAggregatorWhaleDetection:
 
     def test_detect_no_alerts_clean(self):
         from src.feeds.prediction_aggregator import PredictionAggregator
+
         agg = PredictionAggregator()
         clean_sig = _make_signal(market_id="clean1")
         agg._polymarket.get_signals = MagicMock(return_value=[clean_sig])
@@ -1937,6 +2283,7 @@ class TestAggregatorWhaleDetection:
 
     def test_format_telegram_whale_alerts_empty(self):
         from src.feeds.prediction_aggregator import PredictionAggregator
+
         with patch.dict(os.environ, {"SAPPHIRE_PREDICTION_MARKET_ENABLED": "true"}):
             agg = PredictionAggregator()
         agg._polymarket.get_signals = MagicMock(return_value=[])
@@ -1946,12 +2293,15 @@ class TestAggregatorWhaleDetection:
 
     def test_format_telegram_whale_alerts_with_data(self):
         from src.feeds.prediction_aggregator import PredictionAggregator
+
         with patch.dict(os.environ, {"SAPPHIRE_PREDICTION_MARKET_ENABLED": "true"}):
             agg = PredictionAggregator()
         whale_sig = _make_signal(
             market_id="whale_fmt",
-            probability=0.80, probability_1h_ago=0.65,
-            volume_usd=500_000, volume_1h_ago=100_000,
+            probability=0.80,
+            probability_1h_ago=0.65,
+            volume_usd=500_000,
+            volume_1h_ago=100_000,
         )
         agg._polymarket.get_signals = MagicMock(return_value=[whale_sig])
         agg._kalshi.get_signals = MagicMock(return_value=[])
@@ -1961,6 +2311,7 @@ class TestAggregatorWhaleDetection:
 
     def test_dashboard_includes_whale_alerts(self):
         from src.feeds.prediction_aggregator import PredictionAggregator
+
         agg = PredictionAggregator()
         agg._polymarket.get_signals = MagicMock(return_value=[])
         agg._kalshi.get_signals = MagicMock(return_value=[])
@@ -1969,12 +2320,15 @@ class TestAggregatorWhaleDetection:
 
     def test_cognition_context_includes_whale_alerts(self):
         from src.feeds.prediction_aggregator import PredictionAggregator
+
         with patch.dict(os.environ, {"SAPPHIRE_PREDICTION_MARKET_ENABLED": "true"}):
             agg = PredictionAggregator()
         whale_sig = _make_signal(
             market_id="cog_whale",
-            probability=0.80, probability_1h_ago=0.65,
-            volume_usd=500_000, volume_1h_ago=100_000,
+            probability=0.80,
+            probability_1h_ago=0.65,
+            volume_usd=500_000,
+            volume_1h_ago=100_000,
         )
         agg._polymarket.get_signals = MagicMock(return_value=[whale_sig])
         agg._kalshi.get_signals = MagicMock(return_value=[])
@@ -1992,6 +2346,7 @@ class TestTelegramWhaleCommand:
         engine.telegram.send_message = AsyncMock()
 
         from src.telegram_handlers import handle_prediction_commands
+
         result = await handle_prediction_commands(engine, "", "PM_WHALE", 0.0)
         assert result is True
         engine.telegram.send_message.assert_called_once()
@@ -2004,6 +2359,7 @@ class TestTelegramWhaleCommand:
         engine.telegram.send_message = AsyncMock()
 
         from src.telegram_handlers import handle_prediction_commands
+
         result = await handle_prediction_commands(engine, "", "PM_MANIPULATION", 0.0)
         assert result is True
 
@@ -2013,18 +2369,21 @@ class TestVolumeHistoryTracking:
 
     def test_feed_has_volume_history(self):
         from src.feeds.prediction_signal import PredictionMarketFeed
+
         # Can't instantiate ABC, so test the init attributes
         class FakeFeed(PredictionMarketFeed):
             async def _fetch_markets(self, session):
                 return []
+
         feed = FakeFeed(source=PredictionSource.POLYMARKET)
-        assert hasattr(feed, '_volume_history')
+        assert hasattr(feed, "_volume_history")
         assert feed._volume_history == {}
 
     def test_update_history_tracks_volume(self):
         class FakeFeed(PredictionMarketFeed):
             async def _fetch_markets(self, session):
                 return []
+
         feed = FakeFeed(source=PredictionSource.POLYMARKET)
         sig = _make_signal(market_id="vol_test", volume_usd=100_000)
         feed._update_history(sig)
@@ -2035,6 +2394,7 @@ class TestVolumeHistoryTracking:
         class FakeFeed(PredictionMarketFeed):
             async def _fetch_markets(self, session):
                 return []
+
         feed = FakeFeed(source=PredictionSource.POLYMARKET)
         # Simulate 60 data points (indices 0-59)
         for i in range(60):
@@ -2057,6 +2417,7 @@ class TestTelegramAccuracyCommand:
         engine.telegram.send_message = AsyncMock()
 
         from src.telegram_handlers import handle_prediction_commands
+
         result = await handle_prediction_commands(engine, "", "PM_ACCURACY", 0.0)
         assert result is True
         engine.telegram.send_message.assert_called_once()
@@ -2069,11 +2430,13 @@ class TestTelegramAccuracyCommand:
         engine.telegram.send_message = AsyncMock()
 
         from src.telegram_handlers import handle_prediction_commands
+
         result = await handle_prediction_commands(engine, "", "PREDICTION_ACCURACY", 0.0)
         assert result is True
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
+
 
 class AsyncContextManager:
     """Helper to mock aiohttp context managers."""

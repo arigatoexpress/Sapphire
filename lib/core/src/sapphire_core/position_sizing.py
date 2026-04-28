@@ -25,6 +25,7 @@ from enum import StrEnum
 # Configuration — every parameter is env-overridable
 # ---------------------------------------------------------------------------
 
+
 def _env_float(name: str, default: float) -> float:
     try:
         return float(os.getenv(name, str(default)))
@@ -66,11 +67,13 @@ class SizingConfig:
     moderate_dd_multiplier: float = _env_float("SIZING_MOD_DD_MULT", 0.75)
 
     # Stage multipliers (paper → staged → full_live)
-    stage_multipliers: dict[str, float] = field(default_factory=lambda: {
-        "paper": _env_float("SIZING_STAGE_PAPER", 0.0),
-        "staged_live": _env_float("SIZING_STAGE_STAGED", 0.25),
-        "full_live": _env_float("SIZING_STAGE_FULL", 1.0),
-    })
+    stage_multipliers: dict[str, float] = field(
+        default_factory=lambda: {
+            "paper": _env_float("SIZING_STAGE_PAPER", 0.0),
+            "staged_live": _env_float("SIZING_STAGE_STAGED", 0.25),
+            "full_live": _env_float("SIZING_STAGE_FULL", 1.0),
+        }
+    )
 
 
 # Singleton config — parsed once
@@ -80,6 +83,7 @@ DEFAULT_CONFIG = SizingConfig()
 # ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------
+
 
 class SizingMethod(StrEnum):
     KELLY = "kelly"
@@ -110,6 +114,7 @@ REGIME_MULTIPLIERS: dict[MarketRegime, float] = {
 # ---------------------------------------------------------------------------
 # Data classes
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class SizingInput:
@@ -146,6 +151,7 @@ class SizingResult:
 # ---------------------------------------------------------------------------
 # Core sizing functions
 # ---------------------------------------------------------------------------
+
 
 def compute_kelly(
     win_rate: float,
@@ -208,11 +214,16 @@ def compute_position_size(
     balance = max(0.0, inp.balance)
     if balance <= 0:
         return SizingResult(
-            position_usd=0.0, position_pct=0.0,
-            kelly_raw=0.0, kelly_capped=0.0,
-            volatility_mult=1.0, drawdown_mult=1.0,
-            regime_mult=1.0, stage_mult=0.0,
-            confidence_mult=0.0, method=method.value,
+            position_usd=0.0,
+            position_pct=0.0,
+            kelly_raw=0.0,
+            kelly_capped=0.0,
+            volatility_mult=1.0,
+            drawdown_mult=1.0,
+            regime_mult=1.0,
+            stage_mult=0.0,
+            confidence_mult=0.0,
+            method=method.value,
             capped_reason="zero_balance",
         )
 

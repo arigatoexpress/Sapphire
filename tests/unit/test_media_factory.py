@@ -118,13 +118,13 @@ def test_run_media_factory_writes_readiness_artifacts_and_status(tmp_path):
         "\n"
         "Style:\n"
         "{\n"
-        "  \"avoid\": [\n"
-        "    \"fake charts\"\n"
+        '  "avoid": [\n'
+        '    "fake charts"\n'
         "  ],\n"
-        "  \"palette\": [\n"
-        "    \"charcoal\",\n"
-        "    \"amber\",\n"
-        "    \"cool white\"\n"
+        '  "palette": [\n'
+        '    "charcoal",\n'
+        '    "amber",\n'
+        '    "cool white"\n'
         "  ]\n"
         "}\n"
         "\n"

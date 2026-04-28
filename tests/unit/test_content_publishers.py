@@ -80,9 +80,12 @@ def test_linkedin_post_builds_ugc_body(monkeypatch):
     assert result.ok
     assert result.remote_id == "urn:li:share:7000"
     assert captured["body"]["author"] == "urn:li:person:abc"
-    assert captured["body"]["specificContent"]["com.linkedin.ugc.ShareContent"][
-        "shareCommentary"
-    ]["text"] == "Hello world"
+    assert (
+        captured["body"]["specificContent"]["com.linkedin.ugc.ShareContent"]["shareCommentary"][
+            "text"
+        ]
+        == "Hello world"
+    )
 
 
 def test_linkedin_requires_author_urn(monkeypatch):
@@ -148,9 +151,7 @@ def test_substack_sends_via_resend(monkeypatch):
         return 200, {"id": "resend-email-id-9"}
 
     monkeypatch.setattr(SubstackClient, "_http_json", fake)
-    result = SubstackClient().publish(
-        title="Weekly Signal", body_html="<p>hi</p>", body_text="hi"
-    )
+    result = SubstackClient().publish(title="Weekly Signal", body_html="<p>hi</p>", body_text="hi")
     assert result.ok
     assert result.remote_id == "resend-email-id-9"
     assert captured["body"]["to"] == ["post@kadima.substack.com"]
@@ -286,7 +287,9 @@ def test_run_telegram_summary_requires_explicit_enable(fake_ready, monkeypatch):
     monkeypatch.setenv("SAPPHIRE_CONTENT_TELEGRAM_SUMMARY", "1")
     monkeypatch.setattr(auto_publish, "_emit_event", lambda *a, **k: None)
     called: list[int] = []
-    monkeypatch.setattr(auto_publish, "_telegram_summary", lambda results: called.append(len(results)))
+    monkeypatch.setattr(
+        auto_publish, "_telegram_summary", lambda results: called.append(len(results))
+    )
 
     out = auto_publish.run()
 

@@ -105,25 +105,33 @@ THRESHOLD_MODERATE = 0.50
 
 @dataclass
 class VPINReading:
-    score: float                 # VPIN in [0, 1]
-    toxicity: str                # normal | moderate | high | extreme
-    flag: str | None             # None | high_flow_toxicity | extreme_flow_toxicity
+    score: float  # VPIN in [0, 1]
+    toxicity: str  # normal | moderate | high | extreme
+    flag: str | None  # None | high_flow_toxicity | extreme_flow_toxicity
     n_bars_used: int
 
 
 def classify_vpin(score: float, n_bars_used: int = 0) -> VPINReading:
     """Translate raw VPIN score into a structured toxicity reading."""
     if score >= 0.85:
-        return VPINReading(score=round(score, 4), toxicity="extreme",
-                           flag="extreme_flow_toxicity", n_bars_used=n_bars_used)
+        return VPINReading(
+            score=round(score, 4),
+            toxicity="extreme",
+            flag="extreme_flow_toxicity",
+            n_bars_used=n_bars_used,
+        )
     if score >= THRESHOLD_HIGH:
-        return VPINReading(score=round(score, 4), toxicity="high",
-                           flag="high_flow_toxicity", n_bars_used=n_bars_used)
+        return VPINReading(
+            score=round(score, 4),
+            toxicity="high",
+            flag="high_flow_toxicity",
+            n_bars_used=n_bars_used,
+        )
     if score >= THRESHOLD_MODERATE:
-        return VPINReading(score=round(score, 4), toxicity="moderate",
-                           flag=None, n_bars_used=n_bars_used)
-    return VPINReading(score=round(score, 4), toxicity="normal",
-                       flag=None, n_bars_used=n_bars_used)
+        return VPINReading(
+            score=round(score, 4), toxicity="moderate", flag=None, n_bars_used=n_bars_used
+        )
+    return VPINReading(score=round(score, 4), toxicity="normal", flag=None, n_bars_used=n_bars_used)
 
 
 def vpin_reading(bars: list[Bar], n_buckets: int = 50) -> VPINReading:

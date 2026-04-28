@@ -15,7 +15,9 @@ import pytest
 
 # Add alpha-engine source to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "services", "alpha-engine"))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "services", "alpha-engine", "src"))
+sys.path.insert(
+    0, os.path.join(os.path.dirname(__file__), "..", "..", "services", "alpha-engine", "src")
+)
 
 from src.ai.chat_intent import ChatIntentEngine, IntentType
 
@@ -23,7 +25,9 @@ from src.ai.chat_intent import ChatIntentEngine, IntentType
 @pytest.fixture
 def mock_guard():
     guard = MagicMock()
-    guard.classify_intent = AsyncMock(return_value='{"intent": "general_chat", "parameters": {"reply": "Hello!"}}')
+    guard.classify_intent = AsyncMock(
+        return_value='{"intent": "general_chat", "parameters": {"reply": "Hello!"}}'
+    )
     return guard
 
 
@@ -38,9 +42,14 @@ def engine(mock_guard):
 class TestIntentType:
     def test_has_all_intent_types(self):
         expected = {
-            "status_report", "control_trading", "media_publish",
-            "media_status", "operations", "agent_question",
-            "general_chat", "unknown",
+            "status_report",
+            "control_trading",
+            "media_publish",
+            "media_status",
+            "operations",
+            "agent_question",
+            "general_chat",
+            "unknown",
         }
         actual = {e.value for e in IntentType}
         assert expected == actual
@@ -63,24 +72,27 @@ class TestFastClassify:
 
     # ── Status patterns ──
 
-    @pytest.mark.parametrize("msg", [
-        "how are we doing?",
-        "how's it going",
-        "status",
-        "report",
-        "give me an update",
-        "what's the status?",
-        "sitrep",
-        "quick check",
-        "morning update",
-        "evening report",
-        "daily brief",
-        "where do we stand",
-        "catch me up",
-        "how's the portfolio",
-        "how's trading?",
-        "how's the P&L",
-    ])
+    @pytest.mark.parametrize(
+        "msg",
+        [
+            "how are we doing?",
+            "how's it going",
+            "status",
+            "report",
+            "give me an update",
+            "what's the status?",
+            "sitrep",
+            "quick check",
+            "morning update",
+            "evening report",
+            "daily brief",
+            "where do we stand",
+            "catch me up",
+            "how's the portfolio",
+            "how's trading?",
+            "how's the P&L",
+        ],
+    )
     def test_status_patterns(self, engine, msg):
         result = engine._fast_classify(msg)
         assert result is not None
@@ -88,14 +100,17 @@ class TestFastClassify:
 
     # ── Kill/halt patterns ──
 
-    @pytest.mark.parametrize("msg", [
-        "kill",
-        "halt",
-        "stop everything",
-        "emergency stop",
-        "shut it down",
-        "panic",
-    ])
+    @pytest.mark.parametrize(
+        "msg",
+        [
+            "kill",
+            "halt",
+            "stop everything",
+            "emergency stop",
+            "shut it down",
+            "panic",
+        ],
+    )
     def test_kill_patterns(self, engine, msg):
         result = engine._fast_classify(msg)
         assert result is not None
@@ -105,14 +120,17 @@ class TestFastClassify:
 
     # ── Resume patterns ──
 
-    @pytest.mark.parametrize("msg", [
-        "resume",
-        "restart",
-        "start trading",
-        "bring it back",
-        "go live",
-        "turn it on",
-    ])
+    @pytest.mark.parametrize(
+        "msg",
+        [
+            "resume",
+            "restart",
+            "start trading",
+            "bring it back",
+            "go live",
+            "turn it on",
+        ],
+    )
     def test_resume_patterns(self, engine, msg):
         result = engine._fast_classify(msg)
         assert result is not None
@@ -122,16 +140,19 @@ class TestFastClassify:
 
     # ── Health patterns ──
 
-    @pytest.mark.parametrize("msg", [
-        "health check",
-        "health",
-        "check health",
-        "run a diagnostic",
-        "diagnostics",
-        "is everything ok?",
-        "anything broken?",
-        "any issues?",
-    ])
+    @pytest.mark.parametrize(
+        "msg",
+        [
+            "health check",
+            "health",
+            "check health",
+            "run a diagnostic",
+            "diagnostics",
+            "is everything ok?",
+            "anything broken?",
+            "any issues?",
+        ],
+    )
     def test_health_patterns(self, engine, msg):
         result = engine._fast_classify(msg)
         assert result is not None
@@ -140,15 +161,18 @@ class TestFastClassify:
 
     # ── Proposals patterns ──
 
-    @pytest.mark.parametrize("msg", [
-        "show proposals",
-        "show me the proposals",
-        "pending code",
-        "any proposals?",
-        "what needs my approval?",
-        "what's pending?",
-        "anything to review?",
-    ])
+    @pytest.mark.parametrize(
+        "msg",
+        [
+            "show proposals",
+            "show me the proposals",
+            "pending code",
+            "any proposals?",
+            "what needs my approval?",
+            "what's pending?",
+            "anything to review?",
+        ],
+    )
     def test_proposals_patterns(self, engine, msg):
         result = engine._fast_classify(msg)
         assert result is not None
@@ -157,14 +181,17 @@ class TestFastClassify:
 
     # ── Agent status patterns ──
 
-    @pytest.mark.parametrize("msg", [
-        "agents",
-        "agent status",
-        "agent stats",
-        "who's working?",
-        "dispatch status",
-        "what are the agents doing?",
-    ])
+    @pytest.mark.parametrize(
+        "msg",
+        [
+            "agents",
+            "agent status",
+            "agent stats",
+            "who's working?",
+            "dispatch status",
+            "what are the agents doing?",
+        ],
+    )
     def test_agents_patterns(self, engine, msg):
         result = engine._fast_classify(msg)
         assert result is not None
@@ -189,13 +216,16 @@ class TestFastClassify:
 
     # ── Non-matching messages fall through ──
 
-    @pytest.mark.parametrize("msg", [
-        "draft a tweet about BTC",
-        "what do you think about ETH?",
-        "approve proposal abc123",
-        "hello there",
-        "this is a complex multi-sentence message that shouldn't match any fast pattern",
-    ])
+    @pytest.mark.parametrize(
+        "msg",
+        [
+            "draft a tweet about BTC",
+            "what do you think about ETH?",
+            "approve proposal abc123",
+            "hello there",
+            "this is a complex multi-sentence message that shouldn't match any fast pattern",
+        ],
+    )
     def test_non_matching_returns_none(self, engine, msg):
         result = engine._fast_classify(msg)
         assert result is None

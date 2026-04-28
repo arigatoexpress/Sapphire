@@ -94,7 +94,7 @@ def _rolling_skew(log_rets: list[float], window: int) -> list[float | None]:
             m2 = sum((r - mean) ** 2 for r in chunk) / n
             m3 = sum((r - mean) ** 3 for r in chunk) / n
             if m2 > 0:
-                out.append(m3 / (m2 ** 1.5))
+                out.append(m3 / (m2**1.5))
             else:
                 out.append(0.0)
     return out
@@ -138,11 +138,11 @@ def extract_features(bars: list[Bar]) -> list[list[float]]:
 
 @dataclass
 class RegimePrediction:
-    state: str                          # trend | mean_reverting | crisis
-    prob: float                         # probability of the current state (0–1)
+    state: str  # trend | mean_reverting | crisis
+    prob: float  # probability of the current state (0–1)
     trend_prob: float
     mean_reverting_prob: float
-    crisis_prob: float | None = None    # only populated for 3-state model
+    crisis_prob: float | None = None  # only populated for 3-state model
     n_components: int = 2
 
 
@@ -258,6 +258,7 @@ class GMMRegimeDetector:
 
         try:
             from lib.analytics.backtest_engine import fetch_ohlcv
+
             bars = fetch_ohlcv(symbol, days=days)
             pred = self.fit_predict(bars)
             with self._lock:

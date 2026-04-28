@@ -63,13 +63,10 @@ class AlphaSignalScanner:
         self.prediction_aggregator = prediction_aggregator
         self.intel_feed = intel_feed
 
-        self._enabled = enabled or _env_flag(
-            "SAPPHIRE_ALPHA_SCANNER_ENABLED", default=False
-        )
+        self._enabled = enabled or _env_flag("SAPPHIRE_ALPHA_SCANNER_ENABLED", default=False)
         self._scan_interval = max(
             60,
-            scan_interval_seconds
-            or int(os.getenv("SAPPHIRE_ALPHA_SCAN_INTERVAL_SECONDS", "300")),
+            scan_interval_seconds or int(os.getenv("SAPPHIRE_ALPHA_SCAN_INTERVAL_SECONDS", "300")),
         )
         self._scan_symbols = scan_symbols or _parse_symbols(
             os.getenv(
@@ -90,7 +87,11 @@ class AlphaSignalScanner:
         )
         self._symbol_cooldown = max(
             60,
-            int(os.getenv("SAPPHIRE_ALPHA_SYMBOL_COOLDOWN_SECONDS", str(self.SYMBOL_COOLDOWN_SECONDS))),
+            int(
+                os.getenv(
+                    "SAPPHIRE_ALPHA_SYMBOL_COOLDOWN_SECONDS", str(self.SYMBOL_COOLDOWN_SECONDS)
+                )
+            ),
         )
 
         # State
@@ -192,12 +193,14 @@ class AlphaSignalScanner:
                 signals.append(signal)
                 self._last_signal_at[symbol] = now
                 self._pending_count += 1
-                self._signal_history.append({
-                    "symbol": symbol,
-                    "action": signal.get("action", ""),
-                    "confidence": signal.get("_confidence", 0),
-                    "timestamp": int(now),
-                })
+                self._signal_history.append(
+                    {
+                        "symbol": symbol,
+                        "action": signal.get("action", ""),
+                        "confidence": signal.get("_confidence", 0),
+                        "timestamp": int(now),
+                    }
+                )
 
         return signals
 

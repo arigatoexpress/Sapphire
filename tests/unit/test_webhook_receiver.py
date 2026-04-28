@@ -90,61 +90,73 @@ def test_validate_payload_accepts_uppercase_action(receiver):
 
 
 def test_from_webhook_canonicalizes_exchange_prefixed_symbol(receiver):
-    alert = receiver.TradingViewAlert.from_webhook({
-        "symbol": "BINANCE:BTCUSDT",
-        "action": "buy",
-        "price": 65000.0,
-    })
+    alert = receiver.TradingViewAlert.from_webhook(
+        {
+            "symbol": "BINANCE:BTCUSDT",
+            "action": "buy",
+            "price": 65000.0,
+        }
+    )
     assert alert.symbol == "BTCUSDT"
     assert alert.exchange == ""
 
 
 def test_from_webhook_uppercases_symbol(receiver):
-    alert = receiver.TradingViewAlert.from_webhook({
-        "symbol": "btcusdt",
-        "action": "buy",
-        "price": 65000.0,
-    })
+    alert = receiver.TradingViewAlert.from_webhook(
+        {
+            "symbol": "btcusdt",
+            "action": "buy",
+            "price": 65000.0,
+        }
+    )
     assert alert.symbol == "BTCUSDT"
 
 
 def test_from_webhook_applies_symbol_map_alias(receiver):
-    alert = receiver.TradingViewAlert.from_webhook({
-        "symbol": "HYPERUSDT",
-        "action": "buy",
-        "price": 1.0,
-    })
+    alert = receiver.TradingViewAlert.from_webhook(
+        {
+            "symbol": "HYPERUSDT",
+            "action": "buy",
+            "price": 1.0,
+        }
+    )
     assert alert.symbol == "HYPEUSDT"
 
 
 def test_from_webhook_lowercases_action(receiver):
-    alert = receiver.TradingViewAlert.from_webhook({
-        "symbol": "BTC",
-        "action": "BUY",
-        "price": 65000.0,
-    })
+    alert = receiver.TradingViewAlert.from_webhook(
+        {
+            "symbol": "BTC",
+            "action": "BUY",
+            "price": 65000.0,
+        }
+    )
     assert alert.action == "buy"
 
 
 def test_from_webhook_falls_back_to_now_when_time_missing(receiver):
-    alert = receiver.TradingViewAlert.from_webhook({
-        "symbol": "BTC",
-        "action": "buy",
-        "price": 65000.0,
-    })
+    alert = receiver.TradingViewAlert.from_webhook(
+        {
+            "symbol": "BTC",
+            "action": "buy",
+            "price": 65000.0,
+        }
+    )
     assert alert.timestamp  # non-empty ISO string
 
 
 def test_from_webhook_parses_optional_numeric_fields(receiver):
-    alert = receiver.TradingViewAlert.from_webhook({
-        "symbol": "BTC",
-        "action": "buy",
-        "price": 65000.0,
-        "z_score": "1.5",
-        "confidence": "0.82",
-        "regime_score": "0.4",
-        "quantity": "0.01",
-    })
+    alert = receiver.TradingViewAlert.from_webhook(
+        {
+            "symbol": "BTC",
+            "action": "buy",
+            "price": 65000.0,
+            "z_score": "1.5",
+            "confidence": "0.82",
+            "regime_score": "0.4",
+            "quantity": "0.01",
+        }
+    )
     assert alert.z_score == 1.5
     assert alert.confidence == 0.82
     assert alert.regime_score == 0.4
@@ -152,11 +164,13 @@ def test_from_webhook_parses_optional_numeric_fields(receiver):
 
 
 def test_from_webhook_leaves_optional_fields_none_when_absent(receiver):
-    alert = receiver.TradingViewAlert.from_webhook({
-        "symbol": "BTC",
-        "action": "buy",
-        "price": 65000.0,
-    })
+    alert = receiver.TradingViewAlert.from_webhook(
+        {
+            "symbol": "BTC",
+            "action": "buy",
+            "price": 65000.0,
+        }
+    )
     assert alert.z_score is None
     assert alert.confidence is None
     assert alert.regime_score is None
@@ -164,10 +178,12 @@ def test_from_webhook_leaves_optional_fields_none_when_absent(receiver):
 
 
 def test_from_webhook_defaults_missing_price_to_zero(receiver):
-    alert = receiver.TradingViewAlert.from_webhook({
-        "symbol": "BTC",
-        "action": "buy",
-    })
+    alert = receiver.TradingViewAlert.from_webhook(
+        {
+            "symbol": "BTC",
+            "action": "buy",
+        }
+    )
     assert alert.price == 0.0
 
 
@@ -315,15 +331,22 @@ def _install_stub_client(monkeypatch, receiver, response_factory):
 
 
 @pytest.mark.asyncio
-async def test_publish_signal_records_success_when_first_target_returns_200(
-    monkeypatch, receiver
-):
-    monkeypatch.setattr(receiver, "stats", {
-        "total": 0, "published": 0, "errors": 0, "ai_enriched": 0,
-        "pubsub_success": 0, "gateway_fallback": 0,
-    })
+async def test_publish_signal_records_success_when_first_target_returns_200(monkeypatch, receiver):
+    monkeypatch.setattr(
+        receiver,
+        "stats",
+        {
+            "total": 0,
+            "published": 0,
+            "errors": 0,
+            "ai_enriched": 0,
+            "pubsub_success": 0,
+            "gateway_fallback": 0,
+        },
+    )
     stub = _install_stub_client(
-        monkeypatch, receiver,
+        monkeypatch,
+        receiver,
         response_factory=lambda url: _StubResponse(200),
     )
     result = await receiver.publish_signal({"signal_id": "s1", "side": "BUY", "symbol": "BTC"})
@@ -337,15 +360,22 @@ async def test_publish_signal_records_success_when_first_target_returns_200(
 
 
 @pytest.mark.asyncio
-async def test_publish_signal_marks_error_when_every_target_fails(
-    monkeypatch, receiver
-):
-    monkeypatch.setattr(receiver, "stats", {
-        "total": 0, "published": 0, "errors": 0, "ai_enriched": 0,
-        "pubsub_success": 0, "gateway_fallback": 0,
-    })
+async def test_publish_signal_marks_error_when_every_target_fails(monkeypatch, receiver):
+    monkeypatch.setattr(
+        receiver,
+        "stats",
+        {
+            "total": 0,
+            "published": 0,
+            "errors": 0,
+            "ai_enriched": 0,
+            "pubsub_success": 0,
+            "gateway_fallback": 0,
+        },
+    )
     _install_stub_client(
-        monkeypatch, receiver,
+        monkeypatch,
+        receiver,
         response_factory=lambda url: _StubResponse(500),
     )
     result = await receiver.publish_signal({"signal_id": "s2", "side": "BUY", "symbol": "BTC"})
@@ -356,16 +386,23 @@ async def test_publish_signal_marks_error_when_every_target_fails(
 
 
 @pytest.mark.asyncio
-async def test_publish_signal_attaches_control_token_header_when_set(
-    monkeypatch, receiver
-):
+async def test_publish_signal_attaches_control_token_header_when_set(monkeypatch, receiver):
     monkeypatch.setattr(receiver, "SAPPHIRE_CONTROL_TOKEN", "secret-token")
-    monkeypatch.setattr(receiver, "stats", {
-        "total": 0, "published": 0, "errors": 0, "ai_enriched": 0,
-        "pubsub_success": 0, "gateway_fallback": 0,
-    })
+    monkeypatch.setattr(
+        receiver,
+        "stats",
+        {
+            "total": 0,
+            "published": 0,
+            "errors": 0,
+            "ai_enriched": 0,
+            "pubsub_success": 0,
+            "gateway_fallback": 0,
+        },
+    )
     stub = _install_stub_client(
-        monkeypatch, receiver,
+        monkeypatch,
+        receiver,
         response_factory=lambda url: _StubResponse(200),
     )
     await receiver.publish_signal({"signal_id": "s3", "side": "BUY", "symbol": "BTC"})
@@ -374,16 +411,23 @@ async def test_publish_signal_attaches_control_token_header_when_set(
 
 
 @pytest.mark.asyncio
-async def test_publish_signal_omits_control_header_when_token_blank(
-    monkeypatch, receiver
-):
+async def test_publish_signal_omits_control_header_when_token_blank(monkeypatch, receiver):
     monkeypatch.setattr(receiver, "SAPPHIRE_CONTROL_TOKEN", "")
-    monkeypatch.setattr(receiver, "stats", {
-        "total": 0, "published": 0, "errors": 0, "ai_enriched": 0,
-        "pubsub_success": 0, "gateway_fallback": 0,
-    })
+    monkeypatch.setattr(
+        receiver,
+        "stats",
+        {
+            "total": 0,
+            "published": 0,
+            "errors": 0,
+            "ai_enriched": 0,
+            "pubsub_success": 0,
+            "gateway_fallback": 0,
+        },
+    )
     stub = _install_stub_client(
-        monkeypatch, receiver,
+        monkeypatch,
+        receiver,
         response_factory=lambda url: _StubResponse(200),
     )
     await receiver.publish_signal({"signal_id": "s4", "side": "BUY", "symbol": "BTC"})
@@ -393,12 +437,21 @@ async def test_publish_signal_omits_control_header_when_token_blank(
 
 @pytest.mark.asyncio
 async def test_publish_signal_treats_4xx_as_failure(monkeypatch, receiver):
-    monkeypatch.setattr(receiver, "stats", {
-        "total": 0, "published": 0, "errors": 0, "ai_enriched": 0,
-        "pubsub_success": 0, "gateway_fallback": 0,
-    })
+    monkeypatch.setattr(
+        receiver,
+        "stats",
+        {
+            "total": 0,
+            "published": 0,
+            "errors": 0,
+            "ai_enriched": 0,
+            "pubsub_success": 0,
+            "gateway_fallback": 0,
+        },
+    )
     _install_stub_client(
-        monkeypatch, receiver,
+        monkeypatch,
+        receiver,
         response_factory=lambda url: _StubResponse(403),
     )
     result = await receiver.publish_signal({"signal_id": "s5", "side": "BUY", "symbol": "BTC"})
@@ -407,10 +460,18 @@ async def test_publish_signal_treats_4xx_as_failure(monkeypatch, receiver):
 
 @pytest.mark.asyncio
 async def test_publish_signal_records_partial_success(monkeypatch, receiver):
-    monkeypatch.setattr(receiver, "stats", {
-        "total": 0, "published": 0, "errors": 0, "ai_enriched": 0,
-        "pubsub_success": 0, "gateway_fallback": 0,
-    })
+    monkeypatch.setattr(
+        receiver,
+        "stats",
+        {
+            "total": 0,
+            "published": 0,
+            "errors": 0,
+            "ai_enriched": 0,
+            "pubsub_success": 0,
+            "gateway_fallback": 0,
+        },
+    )
 
     def _per_url(url: str) -> _StubResponse:
         # Mac succeeds, Pis fail

@@ -121,7 +121,7 @@ class ACTSOrchestrator:
   🔭 Scouts: {len(self.scouts)}
   🎯 Snipers: {len(self.snipers)}
   🔮 Oracles: {len(self.oracles)}
-  ⚡ Executors: {', '.join(self.executors.keys())}"""
+  ⚡ Executors: {", ".join(self.executors.keys())}"""
         )
 
     async def start(self):

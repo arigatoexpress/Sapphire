@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 
 class ShieldStatus(Enum):
     """Shield execution status"""
+
     PENDING = "pending"
     ENTRY_EXECUTED = "entry_executed"
     SL_PLACED = "sl_placed"
@@ -48,6 +49,7 @@ class ShieldStatus(Enum):
 @dataclass
 class ShieldTradeResult:
     """Result of a shield trade execution"""
+
     status: ShieldStatus
     entry_order_id: str | None = None
     sl_order_id: str | None = None
@@ -102,11 +104,13 @@ class AsterShieldStrategy:
             "total_shields": 0,
             "successful_shields": 0,
             "avg_sl_latency_ms": 0.0,
-            "fastest_sl_ms": float('inf'),
+            "fastest_sl_ms": float("inf"),
             "slowest_sl_ms": 0.0,
         }
 
-        logger.info(f"🛡️ AsterShieldStrategy initialized | Max leverage: BTC {self.ASSET_MAX_LEVERAGE['btc']}x, ETH {self.ASSET_MAX_LEVERAGE['eth']}x")
+        logger.info(
+            f"🛡️ AsterShieldStrategy initialized | Max leverage: BTC {self.ASSET_MAX_LEVERAGE['btc']}x, ETH {self.ASSET_MAX_LEVERAGE['eth']}x"
+        )
 
     def get_asset_base_name(self, symbol: str) -> str:
         """
@@ -118,7 +122,14 @@ class AsterShieldStrategy:
         - SOL/USD → sol
         """
         # Remove common suffixes and delimiters
-        base = symbol.upper().split('-')[0].split('/')[0].replace('USDT', '').replace('USD', '').replace('PERP', '')
+        base = (
+            symbol.upper()
+            .split("-")[0]
+            .split("/")[0]
+            .replace("USDT", "")
+            .replace("USD", "")
+            .replace("PERP", "")
+        )
         return base.lower()
 
     def calculate_intelligent_leverage(
@@ -127,7 +138,7 @@ class AsterShieldStrategy:
         confidence: float,
         signal_strength: float,
         volatility: float,
-        portfolio_leverage: float = 0.0
+        portfolio_leverage: float = 0.0,
     ) -> float:
         """
         Calculate optimal leverage for shield trade
@@ -150,7 +161,9 @@ class AsterShieldStrategy:
         base_asset = self.get_asset_base_name(symbol)
 
         # Get base and max leverage for asset
-        base_leverage = self.ASSET_BASE_LEVERAGE.get(base_asset, self.ASSET_BASE_LEVERAGE["default"])
+        base_leverage = self.ASSET_BASE_LEVERAGE.get(
+            base_asset, self.ASSET_BASE_LEVERAGE["default"]
+        )
         max_leverage = self.ASSET_MAX_LEVERAGE.get(base_asset, self.ASSET_MAX_LEVERAGE["default"])
 
         # Confidence adjustment (0.3-1.0)
@@ -184,11 +197,7 @@ class AsterShieldStrategy:
         return leverage
 
     def calculate_shield_sl(
-        self,
-        entry_price: float,
-        leverage: float,
-        volatility: float,
-        side: str = "LONG"
+        self, entry_price: float, leverage: float, volatility: float, side: str = "LONG"
     ) -> float:
         """
         Calculate shield stop-loss price
@@ -234,7 +243,7 @@ class AsterShieldStrategy:
         side: str = "LONG",
         volatility: float = 0.02,
         portfolio_leverage: float = 0.0,
-        quantity: float | None = None
+        quantity: float | None = None,
     ) -> ShieldTradeResult:
         """
         Execute a shield-protected trade with rapid SL placement
@@ -283,11 +292,7 @@ class AsterShieldStrategy:
             # 4. Execute entry order
             time.time()
             entry_order = await self.aster_client.place_order(
-                symbol=symbol,
-                side=side,
-                quantity=quantity,
-                leverage=leverage,
-                order_type="MARKET"
+                symbol=symbol, side=side, quantity=quantity, leverage=leverage, order_type="MARKET"
             )
             result.entry_timestamp = time.time()
             result.entry_order_id = entry_order.get("orderId")
@@ -307,7 +312,7 @@ class AsterShieldStrategy:
                 quantity=quantity,
                 price=sl_price,
                 order_type="STOP_LOSS",
-                reduce_only=True
+                reduce_only=True,
             )
             sl_end = time.time()
 
@@ -357,10 +362,7 @@ class AsterShieldStrategy:
             return result
 
     async def update_trailing_stop(
-        self,
-        symbol: str,
-        current_price: float,
-        trailing_distance_pct: float = 0.02
+        self, symbol: str, current_price: float, trailing_distance_pct: float = 0.02
     ) -> bool:
         """
         Update trailing stop for active shield position
@@ -399,7 +401,7 @@ class AsterShieldStrategy:
                         quantity=shield["quantity"],
                         price=new_sl,
                         order_type="STOP_LOSS",
-                        reduce_only=True
+                        reduce_only=True,
                     )
 
                     shield["sl_price"] = new_sl
@@ -430,7 +432,7 @@ class AsterShieldStrategy:
                         quantity=shield["quantity"],
                         price=new_sl,
                         order_type="STOP_LOSS",
-                        reduce_only=True
+                        reduce_only=True,
                     )
 
                     shield["sl_price"] = new_sl
@@ -465,12 +467,8 @@ class AsterShieldStrategy:
         self.shield_stats["avg_sl_latency_ms"] = new_avg
 
         # Update min/max
-        self.shield_stats["fastest_sl_ms"] = min(
-            self.shield_stats["fastest_sl_ms"], latency_ms
-        )
-        self.shield_stats["slowest_sl_ms"] = max(
-            self.shield_stats["slowest_sl_ms"], latency_ms
-        )
+        self.shield_stats["fastest_sl_ms"] = min(self.shield_stats["fastest_sl_ms"], latency_ms)
+        self.shield_stats["slowest_sl_ms"] = max(self.shield_stats["slowest_sl_ms"], latency_ms)
 
     def get_stats(self) -> dict[str, Any]:
         """Get shield strategy statistics"""

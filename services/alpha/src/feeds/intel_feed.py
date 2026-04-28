@@ -88,13 +88,11 @@ class IntelFeedAggregator:
         )
         self._max_items = max(40, int(os.getenv("SAPPHIRE_INTEL_FEED_MAX_ITEMS", "240")))
         self._glint_scrape_enabled = _env_flag("SAPPHIRE_GLINT_SCRAPE_ENABLED", default=False)
-        self._glint_sandbox_only = _env_flag(
-            "SAPPHIRE_GLINT_SCRAPE_SANDBOX_ONLY", default=True
+        self._glint_sandbox_only = _env_flag("SAPPHIRE_GLINT_SCRAPE_SANDBOX_ONLY", default=True)
+        self._glint_use_scout_sandbox = _env_flag("SAPPHIRE_GLINT_USE_SCOUT_SANDBOX", default=True)
+        self._scout_sandbox_url = (
+            str(os.getenv("SAPPHIRE_SCOUT_SANDBOX_URL", "")).strip().rstrip("/")
         )
-        self._glint_use_scout_sandbox = _env_flag(
-            "SAPPHIRE_GLINT_USE_SCOUT_SANDBOX", default=True
-        )
-        self._scout_sandbox_url = str(os.getenv("SAPPHIRE_SCOUT_SANDBOX_URL", "")).strip().rstrip("/")
         self._scout_sandbox_token = str(os.getenv("SAPPHIRE_SCOUT_SANDBOX_TOKEN", "")).strip()
         self._glint_source_url = str(
             os.getenv("SAPPHIRE_GLINT_SOURCE_URL", "https://glint.trade/feed")
@@ -106,9 +104,7 @@ class IntelFeedAggregator:
         self._glint_sandbox_timeout_seconds = max(
             5, min(int(os.getenv("SAPPHIRE_GLINT_SANDBOX_TIMEOUT_SECONDS", "14")), 30)
         )
-        self._scrapling_intel_enabled = _env_flag(
-            "SAPPHIRE_SCRAPLING_INTEL_ENABLED", default=False
-        )
+        self._scrapling_intel_enabled = _env_flag("SAPPHIRE_SCRAPLING_INTEL_ENABLED", default=False)
         self._scrapling_source_url = str(
             os.getenv("SAPPHIRE_SCRAPLING_INTEL_SOURCE_URL", "https://news.ycombinator.com/")
         ).strip()
@@ -137,21 +133,21 @@ class IntelFeedAggregator:
         self._coingecko_trending_limit = max(
             3, min(int(os.getenv("SAPPHIRE_INTEL_COINGECKO_TRENDING_LIMIT", "10")), 20)
         )
-        self._coingecko_api_base = str(
-            os.getenv("SAPPHIRE_INTEL_COINGECKO_API_BASE", "https://api.coingecko.com/api/v3")
-        ).strip().rstrip("/")
-        self._fear_greed_enabled = _env_flag(
-            "SAPPHIRE_INTEL_FEAR_GREED_ENABLED", default=True
+        self._coingecko_api_base = (
+            str(os.getenv("SAPPHIRE_INTEL_COINGECKO_API_BASE", "https://api.coingecko.com/api/v3"))
+            .strip()
+            .rstrip("/")
         )
+        self._fear_greed_enabled = _env_flag("SAPPHIRE_INTEL_FEAR_GREED_ENABLED", default=True)
         self._fear_greed_api = str(
             os.getenv("SAPPHIRE_INTEL_FEAR_GREED_API", "https://api.alternative.me/fng/")
         ).strip()
         self._fear_greed_items = max(
             1, min(int(os.getenv("SAPPHIRE_INTEL_FEAR_GREED_ITEMS", "3")), 10)
         )
-        self._runtime_env = str(
-            os.getenv("SAPPHIRE_ENV", os.getenv("ENVIRONMENT", "production"))
-        ).strip().lower()
+        self._runtime_env = (
+            str(os.getenv("SAPPHIRE_ENV", os.getenv("ENVIRONMENT", "production"))).strip().lower()
+        )
 
         self._session: aiohttp.ClientSession | None = None
         self._loop_task: asyncio.Task[Any] | None = None
@@ -265,7 +261,10 @@ class IntelFeedAggregator:
                 deduped[item["id"]] = item
             ordered = sorted(
                 deduped.values(),
-                key=lambda row: (_parse_ts(row.get("published_at")) or datetime.min.replace(tzinfo=UTC), float(row.get("score", 0))),
+                key=lambda row: (
+                    _parse_ts(row.get("published_at")) or datetime.min.replace(tzinfo=UTC),
+                    float(row.get("score", 0)),
+                ),
                 reverse=True,
             )
             self._items = ordered[: self._max_items]
@@ -273,13 +272,9 @@ class IntelFeedAggregator:
         self._last_refresh_ts = time.time()
         return self.get_status()
 
-    async def _execute_source_job(
-        self, source_name: str, job_factory: Any
-    ) -> list[dict[str, Any]]:
+    async def _execute_source_job(self, source_name: str, job_factory: Any) -> list[dict[str, Any]]:
         started = time.time()
-        status = self._source_status.setdefault(
-            source_name, self._blank_source_status(source_name)
-        )
+        status = self._source_status.setdefault(source_name, self._blank_source_status(source_name))
         status["running"] = True
         try:
             items = await job_factory()
@@ -377,10 +372,7 @@ class IntelFeedAggregator:
 
     async def _pull_hn(self, query: str, category: str) -> list[dict[str, Any]]:
         q = quote_plus(query)
-        url = (
-            "https://hn.algolia.com/api/v1/search_by_date"
-            f"?query={q}&tags=story&hitsPerPage=20"
-        )
+        url = f"https://hn.algolia.com/api/v1/search_by_date?query={q}&tags=story&hitsPerPage=20"
         payload = await self._fetch_json(url)
         hits = payload.get("hits", []) if isinstance(payload.get("hits"), list) else []
         items: list[dict[str, Any]] = []
@@ -708,7 +700,9 @@ class IntelFeedAggregator:
                     category="market",
                     title=f"{symbol} trending on CoinGecko",
                     summary=f"{name}{rank_text} · trending index {idx + 1}",
-                    url=f"https://www.coingecko.com/en/coins/{coin_id}" if coin_id else "https://www.coingecko.com/",
+                    url=f"https://www.coingecko.com/en/coins/{coin_id}"
+                    if coin_id
+                    else "https://www.coingecko.com/",
                     published_at=_now_utc(),
                     tags=["market", "trending", "coingecko", symbol.lower()],
                     confidence=confidence,
@@ -872,7 +866,9 @@ class IntelFeedAggregator:
             "glint_scout_configured": bool(self._scout_sandbox_url and self._scout_sandbox_token),
             "glint_source_url": self._glint_source_url,
             "scrapling_intel_enabled": self._scrapling_intel_enabled,
-            "scrapling_scout_configured": bool(self._scout_sandbox_url and self._scout_sandbox_token),
+            "scrapling_scout_configured": bool(
+                self._scout_sandbox_url and self._scout_sandbox_token
+            ),
             "scrapling_source_url": self._scrapling_source_url,
             "coingecko_trending_enabled": self._coingecko_trending_enabled,
             "coingecko_trending_limit": self._coingecko_trending_limit,

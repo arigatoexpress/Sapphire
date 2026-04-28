@@ -47,6 +47,7 @@ SNAPSHOT_FILE = DATA_DIR / "market_intel.json"
 
 try:
     import certifi
+
     _SSL_CTX = ssl.create_default_context(cafile=certifi.where())
 except ImportError:
     _SSL_CTX = ssl.create_default_context()
@@ -68,9 +69,7 @@ def _http_get_text(url: str, timeout: int = 15) -> str:
 
 
 def _http_get_json(url: str, timeout: int = 15) -> Any:
-    req = urllib.request.Request(
-        url, headers={"User-Agent": _UA, "Accept": "application/json"}
-    )
+    req = urllib.request.Request(url, headers={"User-Agent": _UA, "Accept": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=timeout, context=_SSL_CTX) as r:
             return json.loads(r.read())
@@ -145,7 +144,7 @@ class LiquidationBand:
     long_liq_estimate: float
     short_liq_estimate: float
     funding_rate_8h: float
-    long_proximity_pct: float   # fraction from mark to long liq zone
+    long_proximity_pct: float  # fraction from mark to long liq zone
     short_proximity_pct: float
     # cascade_risk_long | cascade_risk_short | monitor_long | monitor_short | neutral
     flag: str
@@ -163,7 +162,7 @@ class LiquidationEstimator:
 class FundingVelocity:
     coin: str
     current_rate_8h: float
-    velocity: float    # change per hour
+    velocity: float  # change per hour
     # accelerating_long | accelerating_short | decelerating | stable
     direction: str
     # extreme_positioning | crowding | normalizing | neutral
@@ -200,13 +199,23 @@ FF_NEXTWEEK = "https://nfs.faireconomy.media/ff_calendar_nextweek.json"
 # Update annually from https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm
 FOMC_DATES = [
     # 2025
-    "2025-01-29", "2025-03-19", "2025-05-07",
-    "2025-06-18", "2025-07-30", "2025-09-17",
-    "2025-10-29", "2025-12-10",
+    "2025-01-29",
+    "2025-03-19",
+    "2025-05-07",
+    "2025-06-18",
+    "2025-07-30",
+    "2025-09-17",
+    "2025-10-29",
+    "2025-12-10",
     # 2026 — UPDATE WHEN PUBLISHED by Fed
-    "2026-01-28", "2026-03-18", "2026-05-06",
-    "2026-06-17", "2026-07-29", "2026-09-16",
-    "2026-11-04", "2026-12-09",
+    "2026-01-28",
+    "2026-03-18",
+    "2026-05-06",
+    "2026-06-17",
+    "2026-07-29",
+    "2026-09-16",
+    "2026-11-04",
+    "2026-12-09",
 ]
 
 RSS_FEEDS: dict[str, str] = {
@@ -216,27 +225,75 @@ RSS_FEEDS: dict[str, str] = {
 }
 
 CRYPTO_KEYWORDS = {
-    "bitcoin", "btc", "ethereum", "eth", "crypto", "cryptocurrency",
-    "digital asset", "stablecoin", "defi", "blockchain", "token", "nft",
-    "cbdc", "digital currency", "virtual currency", "exchange", "binance",
-    "coinbase", "kraken", "solana", "ripple", "xrp",
+    "bitcoin",
+    "btc",
+    "ethereum",
+    "eth",
+    "crypto",
+    "cryptocurrency",
+    "digital asset",
+    "stablecoin",
+    "defi",
+    "blockchain",
+    "token",
+    "nft",
+    "cbdc",
+    "digital currency",
+    "virtual currency",
+    "exchange",
+    "binance",
+    "coinbase",
+    "kraken",
+    "solana",
+    "ripple",
+    "xrp",
 }
 
 MARKET_KEYWORDS = {
-    "tariff", "interest rate", "federal reserve", "inflation", "cpi",
-    "gdp", "employment", "monetary policy", "sanctions", "trade war",
-    "executive order", "treasury", "tax", "regulation", "enforcement",
-    "securities", "commodity", "derivatives", "margin", "leverage",
+    "tariff",
+    "interest rate",
+    "federal reserve",
+    "inflation",
+    "cpi",
+    "gdp",
+    "employment",
+    "monetary policy",
+    "sanctions",
+    "trade war",
+    "executive order",
+    "treasury",
+    "tax",
+    "regulation",
+    "enforcement",
+    "securities",
+    "commodity",
+    "derivatives",
+    "margin",
+    "leverage",
 }
 
 # Liquidation estimator
-TRACKED_COINS = ["BTC", "ETH", "SOL", "BNB", "AVAX", "DOGE", "XRP", "ARB", "OP", "LINK", "ONDO", "ASTER", "LIT"]
+TRACKED_COINS = [
+    "BTC",
+    "ETH",
+    "SOL",
+    "BNB",
+    "AVAX",
+    "DOGE",
+    "XRP",
+    "ARB",
+    "OP",
+    "LINK",
+    "ONDO",
+    "ASTER",
+    "LIT",
+]
 # Funding history lookback for velocity: 6 hours
 VELOCITY_LOOKBACK_MS = 6 * 60 * 60 * 1000
 
 # Stablecoin signal thresholds
-MINT_LARGE_USD = 2_000_000_000   # $2B
-MINT_MOD_USD = 500_000_000       # $500M
+MINT_LARGE_USD = 2_000_000_000  # $2B
+MINT_MOD_USD = 500_000_000  # $500M
 
 # Liquidation proximity thresholds
 CASCADE_PROXIMITY = 0.08  # flag cascade if within 8% of estimated liquidation
@@ -253,7 +310,7 @@ def _fetch_stablecoins(prev_snapshot: dict | None) -> StablecoinIssuance:
 
     prev_total: float | None = None
     if prev_snapshot:
-        prev_data = (prev_snapshot.get("stablecoins") or {})
+        prev_data = prev_snapshot.get("stablecoins") or {}
         pt = prev_data.get("total_usd")
         prev_ts = prev_data.get("timestamp")
         if pt and prev_ts:
@@ -275,23 +332,23 @@ def _fetch_stablecoins(prev_snapshot: dict | None) -> StablecoinIssuance:
 
     signal = "neutral"
     detail = (
-        f"Total ${sc.total_usd/1e9:.2f}B "
-        f"(USDT ${sc.tether_usd/1e9:.2f}B · USDC ${sc.usdc_usd/1e9:.2f}B)"
+        f"Total ${sc.total_usd / 1e9:.2f}B "
+        f"(USDT ${sc.tether_usd / 1e9:.2f}B · USDC ${sc.usdc_usd / 1e9:.2f}B)"
     )
     if delta is not None:
         abs_d = abs(delta)
         if delta >= MINT_LARGE_USD:
             signal = "mint_large"
-            detail += f" | +${abs_d/1e9:.2f}B minted (large inflow)"
+            detail += f" | +${abs_d / 1e9:.2f}B minted (large inflow)"
         elif delta >= MINT_MOD_USD:
             signal = "mint_moderate"
-            detail += f" | +${abs_d/1e6:.0f}M minted"
+            detail += f" | +${abs_d / 1e6:.0f}M minted"
         elif delta <= -MINT_LARGE_USD:
             signal = "burn_large"
-            detail += f" | -${abs_d/1e9:.2f}B burned (large outflow)"
+            detail += f" | -${abs_d / 1e9:.2f}B burned (large outflow)"
         elif delta <= -MINT_MOD_USD:
             signal = "burn_moderate"
-            detail += f" | -${abs_d/1e6:.0f}M burned"
+            detail += f" | -${abs_d / 1e6:.0f}M burned"
 
     return StablecoinIssuance(
         timestamp=datetime.now(UTC).isoformat(),
@@ -357,14 +414,16 @@ def _fetch_econ_calendar() -> EconCalendar:
                 if key in seen:
                     continue
                 seen.add(key)
-                events.append(EconEvent(
-                    date=dt.strftime("%Y-%m-%d"),
-                    time=dt.strftime("%H:%M") if dt.hour or dt.minute else "TBD",
-                    title=title,
-                    country="USD",
-                    impact=impact,
-                    days_until=days_until,
-                ))
+                events.append(
+                    EconEvent(
+                        date=dt.strftime("%Y-%m-%d"),
+                        time=dt.strftime("%H:%M") if dt.hour or dt.minute else "TBD",
+                        title=title,
+                        country="USD",
+                        impact=impact,
+                        days_until=days_until,
+                    )
+                )
         except Exception as e:
             log.debug("ForexFactory %s failed: %s", url, e)
 
@@ -380,14 +439,16 @@ def _fetch_econ_calendar() -> EconCalendar:
         key = (fomc_date, "FOMC Rate Decision")
         if key not in seen and days <= 14:
             seen.add(key)
-            events.append(EconEvent(
-                date=fomc_date,
-                time="14:00",  # FOMC announcement typically 2 PM ET
-                title="FOMC Rate Decision",
-                country="USD",
-                impact="High",
-                days_until=days,
-            ))
+            events.append(
+                EconEvent(
+                    date=fomc_date,
+                    time="14:00",  # FOMC announcement typically 2 PM ET
+                    title="FOMC Rate Decision",
+                    country="USD",
+                    impact="High",
+                    days_until=days,
+                )
+            )
         break  # only need the next one
 
     events.sort(key=lambda e: (e.days_until, e.date, e.title))
@@ -423,23 +484,27 @@ def _parse_rss_items(xml_text: str, source: str) -> list[dict]:
 
     if tag == "rss":
         for item in root.iter("item"):
-            items.append({
-                "title": (item.findtext("title") or "").strip(),
-                "description": (item.findtext("description") or "").strip(),
-                "link": (item.findtext("link") or "").strip(),
-                "pubdate": (item.findtext("pubDate") or "").strip(),
-            })
+            items.append(
+                {
+                    "title": (item.findtext("title") or "").strip(),
+                    "description": (item.findtext("description") or "").strip(),
+                    "link": (item.findtext("link") or "").strip(),
+                    "pubdate": (item.findtext("pubDate") or "").strip(),
+                }
+            )
     elif tag == "feed":
         # Atom — strip namespace prefixes
         ns = {"a": "http://www.w3.org/2005/Atom"}
         for entry in root.findall("a:entry", ns):
             link_el = entry.find("a:link", ns)
-            items.append({
-                "title": (entry.findtext("a:title", "", ns) or "").strip(),
-                "description": (entry.findtext("a:summary", "", ns) or "").strip(),
-                "link": link_el.get("href", "") if link_el is not None else "",
-                "pubdate": (entry.findtext("a:updated", "", ns) or "").strip(),
-            })
+            items.append(
+                {
+                    "title": (entry.findtext("a:title", "", ns) or "").strip(),
+                    "description": (entry.findtext("a:summary", "", ns) or "").strip(),
+                    "link": link_el.get("href", "") if link_el is not None else "",
+                    "pubdate": (entry.findtext("a:updated", "", ns) or "").strip(),
+                }
+            )
 
     return items
 
@@ -472,24 +537,24 @@ def _fetch_political() -> PoliticalMonitor:
                 score, keywords = _score_text(combined)
                 if score < 0.05:
                     continue  # below noise floor
-                signals.append(PoliticalSignal(
-                    timestamp=now_ts,
-                    source=source,
-                    title=item["title"][:120],
-                    published=item["pubdate"][:30],
-                    relevance_score=score,
-                    keywords=keywords,
-                    url=item["link"][:200],
-                ))
+                signals.append(
+                    PoliticalSignal(
+                        timestamp=now_ts,
+                        source=source,
+                        title=item["title"][:120],
+                        published=item["pubdate"][:30],
+                        relevance_score=score,
+                        keywords=keywords,
+                        url=item["link"][:200],
+                    )
+                )
         except Exception as e:
             log.debug("Political RSS %s failed: %s", source, e)
 
     signals.sort(key=lambda s: -s.relevance_score)
     high_rel = [s for s in signals if s.relevance_score >= 0.5]
     crypto_flag = any(
-        kw in s.keywords for s in signals
-        for kw in CRYPTO_KEYWORDS
-        if s.relevance_score >= 0.3
+        kw in s.keywords for s in signals for kw in CRYPTO_KEYWORDS if s.relevance_score >= 0.3
     )
 
     return PoliticalMonitor(
@@ -505,8 +570,7 @@ def _fetch_political() -> PoliticalMonitor:
 # ---------------------------------------------------------------------------
 
 
-def _estimate_liq_band(coin: str, mark: float, oi_coins: float,
-                       funding: float) -> LiquidationBand:
+def _estimate_liq_band(coin: str, mark: float, oi_coins: float, funding: float) -> LiquidationBand:
     """Estimate long/short liquidation zones from funding rate magnitude.
 
     Higher absolute funding → more leveraged positioning → tighter liquidation zone.
@@ -514,22 +578,22 @@ def _estimate_liq_band(coin: str, mark: float, oi_coins: float,
     oi_usd = oi_coins * mark
     abs_rate = abs(funding)
 
-    if abs_rate >= 0.001:        # >0.1%/8h — very crowded, high leverage
+    if abs_rate >= 0.001:  # >0.1%/8h — very crowded, high leverage
         liq_dist = 0.06
-    elif abs_rate >= 0.0003:     # 0.03–0.1%/8h — crowded
+    elif abs_rate >= 0.0003:  # 0.03–0.1%/8h — crowded
         liq_dist = 0.10
-    elif abs_rate >= 0.0001:     # 0.01–0.03%/8h — moderate
+    elif abs_rate >= 0.0001:  # 0.01–0.03%/8h — moderate
         liq_dist = 0.15
-    else:                        # low funding, low leverage
+    else:  # low funding, low leverage
         liq_dist = 0.22
 
     long_liq = mark * (1 - liq_dist)
     short_liq = mark * (1 + liq_dist)
-    long_prox = (mark - long_liq) / mark    # > 0 when price above liq zone
+    long_prox = (mark - long_liq) / mark  # > 0 when price above liq zone
     short_prox = (short_liq - mark) / mark  # > 0 when price below liq zone
 
     flag = "neutral"
-    detail = f"OI ${oi_usd/1e6:.0f}M | funding {funding*100:+.4f}%/8h"
+    detail = f"OI ${oi_usd / 1e6:.0f}M | funding {funding * 100:+.4f}%/8h"
 
     if funding > 0.0001:  # longs dominant
         if long_prox <= CASCADE_PROXIMITY:
@@ -567,9 +631,7 @@ def _fetch_liquidation() -> LiquidationEstimator:
     bands: list[LiquidationBand] = []
     for ctx in relevant:
         try:
-            band = _estimate_liq_band(
-                ctx.coin, ctx.mark_px, ctx.open_interest, ctx.funding_rate
-            )
+            band = _estimate_liq_band(ctx.coin, ctx.mark_px, ctx.open_interest, ctx.funding_rate)
             bands.append(band)
         except Exception as e:
             log.debug("liq estimate failed for %s: %s", ctx.coin, e)
@@ -631,13 +693,15 @@ def _fetch_order_flow(current_ctxs: list | None = None) -> OrderFlowProxy:
                 direction = "stable"
                 signal = "neutral"
 
-            velocities.append(FundingVelocity(
-                coin=coin,
-                current_rate_8h=round(curr, 8),
-                velocity=round(velocity, 10),
-                direction=direction,
-                signal=signal,
-            ))
+            velocities.append(
+                FundingVelocity(
+                    coin=coin,
+                    current_rate_8h=round(curr, 8),
+                    velocity=round(velocity, 10),
+                    direction=direction,
+                    signal=signal,
+                )
+            )
         except Exception as e:
             log.debug("funding velocity failed for %s: %s", coin, e)
 
@@ -701,12 +765,21 @@ class MarketIntelligence:
             threading.Thread(target=run, args=("stablecoins", lambda: _fetch_stablecoins(prev))),
             threading.Thread(target=run, args=("econ_calendar", _fetch_econ_calendar)),
             threading.Thread(target=run, args=("political", _fetch_political)),
-            threading.Thread(target=run, args=("liquidation",
-                lambda ctxs=hl_ctxs: _fetch_liquidation() if ctxs is None else
-                    _fetch_liquidation_from_ctxs(ctxs)), kwargs={"fallback_to_previous": True}),
-            threading.Thread(target=run, args=("order_flow",
-                lambda ctxs=hl_ctxs: _fetch_order_flow(ctxs)),
-                kwargs={"fallback_to_previous": True}),
+            threading.Thread(
+                target=run,
+                args=(
+                    "liquidation",
+                    lambda ctxs=hl_ctxs: (
+                        _fetch_liquidation() if ctxs is None else _fetch_liquidation_from_ctxs(ctxs)
+                    ),
+                ),
+                kwargs={"fallback_to_previous": True},
+            ),
+            threading.Thread(
+                target=run,
+                args=("order_flow", lambda ctxs=hl_ctxs: _fetch_order_flow(ctxs)),
+                kwargs={"fallback_to_previous": True},
+            ),
         ]
 
         for t in threads:
@@ -739,9 +812,9 @@ def _fetch_liquidation_from_ctxs(ctxs: list) -> LiquidationEstimator:
     bands: list[LiquidationBand] = []
     for ctx in relevant:
         try:
-            bands.append(_estimate_liq_band(
-                ctx.coin, ctx.mark_px, ctx.open_interest, ctx.funding_rate
-            ))
+            bands.append(
+                _estimate_liq_band(ctx.coin, ctx.mark_px, ctx.open_interest, ctx.funding_rate)
+            )
         except Exception as e:
             log.debug("liq estimate failed for %s: %s", ctx.coin, e)
 
@@ -760,6 +833,7 @@ def _fetch_liquidation_from_ctxs(ctxs: list) -> LiquidationEstimator:
 
 def _snap_to_dict(snap: MarketIntelSnapshot) -> dict:
     """Convert snapshot to JSON-serialisable dict."""
+
     def _conv(obj):
         if obj is None:
             return None
@@ -852,7 +926,7 @@ def load_latest_snapshot() -> dict | None:
     liq = raw.get("liquidation") or {}
     cascade_coins: list[str] = []
     liq_dirs: dict[str, str] = {}
-    for band in (liq.get("bands") or []):
+    for band in liq.get("bands") or []:
         flag = band.get("flag", "")
         coin = band.get("coin", "")
         if "cascade_risk_long" in flag:
@@ -867,7 +941,7 @@ def load_latest_snapshot() -> dict | None:
     # Order flow velocity
     of = raw.get("order_flow") or {}
     of_sigs: dict[str, str] = {}
-    for v in (of.get("velocities") or []):
+    for v in of.get("velocities") or []:
         coin = v.get("coin", "")
         if coin:
             of_sigs[coin] = v.get("signal", "neutral")
@@ -907,7 +981,7 @@ if __name__ == "__main__":
         print("\n=== Feed 1: Stablecoins ===")
         try:
             r = _fetch_stablecoins(None)
-            print(f"  signal={r.signal}  total=${r.total_usd/1e9:.2f}B")
+            print(f"  signal={r.signal}  total=${r.total_usd / 1e9:.2f}B")
             print(f"  {r.detail}")
         except Exception as e:
             print(f"  FAILED: {e}")
@@ -925,7 +999,9 @@ if __name__ == "__main__":
         print("\n=== Feed 3: Political Signals ===")
         try:
             r = _fetch_political()
-            print(f"  {len(r.signals)} signals, {r.high_relevance_count} high-relevance, crypto_flag={r.crypto_flag}")
+            print(
+                f"  {len(r.signals)} signals, {r.high_relevance_count} high-relevance, crypto_flag={r.crypto_flag}"
+            )
             for s in r.signals[:3]:
                 print(f"  [{s.source}] score={s.relevance_score:.2f} — {s.title[:60]}")
         except Exception as e:
@@ -945,7 +1021,9 @@ if __name__ == "__main__":
             r = _fetch_order_flow()
             print(f"  {len(r.velocities)} coins tracked, crowding: {r.crowding_alerts or 'none'}")
             for v in r.velocities:
-                print(f"  {v.coin}: rate={v.current_rate_8h*100:+.4f}%/8h  vel={v.velocity:.2e}/h  {v.signal}")
+                print(
+                    f"  {v.coin}: rate={v.current_rate_8h * 100:+.4f}%/8h  vel={v.velocity:.2e}/h  {v.signal}"
+                )
         except Exception as e:
             print(f"  FAILED: {e}")
 

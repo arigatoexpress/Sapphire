@@ -36,10 +36,11 @@ GCP_NUMBER = "691674245427"
 
 # -- Config ----------------------------------------------------------------
 
+
 @dataclasses.dataclass
 class Routine:
     name: str
-    kind: str                    # launchagent_always, launchagent_scheduled, gcp_scheduled_query
+    kind: str  # launchagent_always, launchagent_scheduled, gcp_scheduled_query
     artifact: str | None = None  # absolute path or glob; None = process-only
     max_age_secs: int | None = None
     launchagent: str | None = None
@@ -48,60 +49,95 @@ class Routine:
 
 ROUTINES: list[Routine] = [
     # Always-on services
-    Routine("inference-proxy",   "launchagent_always", launchagent="com.sapphire.inference-proxy"),
-    Routine("control-plane",     "launchagent_always", launchagent="com.sapphire.control-plane"),
-    Routine("dashboard",         "launchagent_always", launchagent="com.sapphire.dashboard"),
-    Routine("signal-logger",     "launchagent_always", launchagent="com.sapphire.signal-logger"),
-    Routine("openbb-api",        "launchagent_always", launchagent="com.sapphire.openbb-api"),
-    Routine("regional-intel",    "launchagent_always", launchagent="com.sapphire.regional-intel"),
-    Routine("hermes-agent",      "launchagent_always", launchagent="ai.hermes.gateway"),
-
+    Routine("inference-proxy", "launchagent_always", launchagent="com.sapphire.inference-proxy"),
+    Routine("control-plane", "launchagent_always", launchagent="com.sapphire.control-plane"),
+    Routine("dashboard", "launchagent_always", launchagent="com.sapphire.dashboard"),
+    Routine("signal-logger", "launchagent_always", launchagent="com.sapphire.signal-logger"),
+    Routine("openbb-api", "launchagent_always", launchagent="com.sapphire.openbb-api"),
+    Routine("regional-intel", "launchagent_always", launchagent="com.sapphire.regional-intel"),
+    Routine("hermes-agent", "launchagent_always", launchagent="ai.hermes.gateway"),
     # Scheduled Mac jobs
-    Routine("chain-refresh",      "launchagent_scheduled",
-            launchagent="com.sapphire.chain-refresh",
-            artifact=str(DATA / "intelligence" / "latest" / "chain.json"),
-            max_age_secs=30 * 60),         # 15 min + buffer
-    Routine("correlation-refresh", "launchagent_scheduled",
-            launchagent="com.sapphire.correlation-refresh",
-            artifact=str(DATA / "intelligence" / "latest" / "correlations.json"),
-            max_age_secs=2 * 60 * 60),     # 1 h + buffer
-    Routine("trading-shadow-controller", "launchagent_scheduled",
-            launchagent="com.sapphire.trading-shadow-controller",
-            artifact=str(DATA / "trading" / "shadow-controller-latest.json"),
-            max_age_secs=2 * 60 * 60),     # 30 min + buffer
-    Routine("gcp-sync",            "launchagent_scheduled",
-            launchagent="com.sapphire.gcp-sync",
-            artifact=str(DATA / ".gcp_sync_state.json"),
-            max_age_secs=2 * 60 * 60),
-    Routine("kronos-daily",        "launchagent_scheduled",
-            launchagent="com.sapphire.kronos-daily",
-            artifact=str(DATA / "intelligence" / "latest" / "predictions.json"),
-            max_age_secs=36 * 60 * 60),    # daily, 36h window
-    Routine("threat-refresh",      "launchagent_scheduled",
-            launchagent="com.sapphire.threat-refresh",
-            artifact=str(DATA / "intelligence" / "latest" / "threats.json"),
-            max_age_secs=6 * 60 * 60),     # every 4h + buffer
-    Routine("morning-brief",       "launchagent_scheduled",
-            launchagent="com.sapphire.morning-brief",
-            artifact=str(DATA / "intelligence" / "latest" / "daily_brief.md"),
-            max_age_secs=36 * 60 * 60),
-    Routine("logrotate",           "launchagent_scheduled",
-            launchagent="com.sapphire.logrotate",
-            max_age_secs=None),
-
+    Routine(
+        "chain-refresh",
+        "launchagent_scheduled",
+        launchagent="com.sapphire.chain-refresh",
+        artifact=str(DATA / "intelligence" / "latest" / "chain.json"),
+        max_age_secs=30 * 60,
+    ),  # 15 min + buffer
+    Routine(
+        "correlation-refresh",
+        "launchagent_scheduled",
+        launchagent="com.sapphire.correlation-refresh",
+        artifact=str(DATA / "intelligence" / "latest" / "correlations.json"),
+        max_age_secs=2 * 60 * 60,
+    ),  # 1 h + buffer
+    Routine(
+        "trading-shadow-controller",
+        "launchagent_scheduled",
+        launchagent="com.sapphire.trading-shadow-controller",
+        artifact=str(DATA / "trading" / "shadow-controller-latest.json"),
+        max_age_secs=2 * 60 * 60,
+    ),  # 30 min + buffer
+    Routine(
+        "gcp-sync",
+        "launchagent_scheduled",
+        launchagent="com.sapphire.gcp-sync",
+        artifact=str(DATA / ".gcp_sync_state.json"),
+        max_age_secs=2 * 60 * 60,
+    ),
+    Routine(
+        "kronos-daily",
+        "launchagent_scheduled",
+        launchagent="com.sapphire.kronos-daily",
+        artifact=str(DATA / "intelligence" / "latest" / "predictions.json"),
+        max_age_secs=36 * 60 * 60,
+    ),  # daily, 36h window
+    Routine(
+        "threat-refresh",
+        "launchagent_scheduled",
+        launchagent="com.sapphire.threat-refresh",
+        artifact=str(DATA / "intelligence" / "latest" / "threats.json"),
+        max_age_secs=6 * 60 * 60,
+    ),  # every 4h + buffer
+    Routine(
+        "morning-brief",
+        "launchagent_scheduled",
+        launchagent="com.sapphire.morning-brief",
+        artifact=str(DATA / "intelligence" / "latest" / "daily_brief.md"),
+        max_age_secs=36 * 60 * 60,
+    ),
+    Routine(
+        "logrotate",
+        "launchagent_scheduled",
+        launchagent="com.sapphire.logrotate",
+        max_age_secs=None,
+    ),
     # GCP scheduled queries
-    Routine("bq.daily_performance",   "gcp_scheduled_query",
-            transfer_config_id="69f08739-0000-2ef4-a18c-5c337bc73dfb"),
-    Routine("bq.weekly_regime",       "gcp_scheduled_query",
-            transfer_config_id="6a171c83-0000-2292-8ab5-3c286d46cb7e"),
-    Routine("bq.daily_threats",       "gcp_scheduled_query",
-            transfer_config_id="6a2d0d4e-0000-28ed-abae-5c337bc5e7c7"),
-    Routine("bq.prediction_accuracy", "gcp_scheduled_query",
-            transfer_config_id="6a3b11c0-0000-2ed7-be8a-2405888140a4"),
+    Routine(
+        "bq.daily_performance",
+        "gcp_scheduled_query",
+        transfer_config_id="69f08739-0000-2ef4-a18c-5c337bc73dfb",
+    ),
+    Routine(
+        "bq.weekly_regime",
+        "gcp_scheduled_query",
+        transfer_config_id="6a171c83-0000-2292-8ab5-3c286d46cb7e",
+    ),
+    Routine(
+        "bq.daily_threats",
+        "gcp_scheduled_query",
+        transfer_config_id="6a2d0d4e-0000-28ed-abae-5c337bc5e7c7",
+    ),
+    Routine(
+        "bq.prediction_accuracy",
+        "gcp_scheduled_query",
+        transfer_config_id="6a3b11c0-0000-2ed7-be8a-2405888140a4",
+    ),
 ]
 
 
 # -- Checks ----------------------------------------------------------------
+
 
 def _launchctl_list() -> dict[str, dict]:
     """Map label -> {pid, status} from `launchctl list`."""
@@ -134,9 +170,17 @@ def _gcp_query_state(cfg_id: str) -> tuple[str, str | None]:
     """Return (state, error_msg) of the latest run of a BQ scheduled query."""
     try:
         out = subprocess.run(
-            ["bq", "ls", "--transfer_run", "--run_attempt=LATEST", "--format=json",
-             f"projects/{GCP_NUMBER}/locations/us/transferConfigs/{cfg_id}"],
-            capture_output=True, text=True, timeout=30,
+            [
+                "bq",
+                "ls",
+                "--transfer_run",
+                "--run_attempt=LATEST",
+                "--format=json",
+                f"projects/{GCP_NUMBER}/locations/us/transferConfigs/{cfg_id}",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired) as e:
         return "UNKNOWN", f"bq error: {e}"
@@ -153,6 +197,7 @@ def _gcp_query_state(cfg_id: str) -> tuple[str, str | None]:
 
 
 # -- Dispatcher ------------------------------------------------------------
+
 
 def check(routine: Routine, agents: dict[str, dict]) -> dict:
     row: dict = {"name": routine.name, "kind": routine.kind, "ok": True, "detail": ""}
@@ -208,6 +253,7 @@ def check(routine: Routine, agents: dict[str, dict]) -> dict:
 
 # -- Main ------------------------------------------------------------------
 
+
 def run() -> tuple[list[dict], int]:
     agents = _launchctl_list()
     rows = [check(r, agents) for r in ROUTINES]
@@ -235,14 +281,20 @@ def main() -> int:
     rows, failures = run()
 
     if args.json:
-        print(json.dumps({"rows": rows, "failures": failures,
-                          "generated_at": datetime.now(UTC).isoformat()}, indent=2))
+        print(
+            json.dumps(
+                {"rows": rows, "failures": failures, "generated_at": datetime.now(UTC).isoformat()},
+                indent=2,
+            )
+        )
     else:
         print("=== Sapphire Routines — Health Check ===")
         for r in rows:
             print(_fmt_row(r))
-        print(f"\n{'PASS' if failures == 0 else 'FAIL'}: {len(rows) - failures}/{len(rows)} healthy"
-              + (f" — {failures} failure(s)" if failures else ""))
+        print(
+            f"\n{'PASS' if failures == 0 else 'FAIL'}: {len(rows) - failures}/{len(rows)} healthy"
+            + (f" — {failures} failure(s)" if failures else "")
+        )
 
     return 0 if failures == 0 else 1
 

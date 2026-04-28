@@ -273,6 +273,7 @@ def test_run_forever_continues_through_exception_in_cycle(caplog):
 
 def test_baseagent_exposes_action_and_result_in__all__():
     import lib.agents.base as base_module
+
     assert "Action" in base_module.__all__
     assert "Result" in base_module.__all__
     assert "BaseAgent" in base_module.__all__

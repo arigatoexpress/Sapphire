@@ -49,7 +49,11 @@ def _config() -> dict:
                 "venue_symbols": {"tradingview": "BINANCE:BTCUSDT"},
                 "evidence_sources": ["coingecko:market_data"],
                 "invalidation_triggers": [
-                    {"id": "custody_capture", "condition": "custodial claims dominate", "severity": "high"}
+                    {
+                        "id": "custody_capture",
+                        "condition": "custodial claims dominate",
+                        "severity": "high",
+                    }
                 ],
             },
             {
@@ -112,7 +116,10 @@ def test_build_sovereign_thesis_report_ranks_assets_and_gaps(tmp_path) -> None:
     assert report["materialization_plan"]["total_rows"] > len(report["assets"])
     assert report["ops_queue"][0]["safe_mode"] == "read_only"
     assert report["invalidation_queue"][0]["symbol"] == "BTC"
-    assert {row["id"] for row in report["source_requirements"]} >= {"coingecko:market_data", "fred:M2SL"}
+    assert {row["id"] for row in report["source_requirements"]} >= {
+        "coingecko:market_data",
+        "fred:M2SL",
+    }
 
 
 def test_default_sovereign_thesis_report_covers_ari_universe() -> None:

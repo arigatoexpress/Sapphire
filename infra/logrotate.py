@@ -35,7 +35,9 @@ def rotate_file(path: Path) -> bool:
 
     # Truncate (not delete) so the running process can keep writing
     path.write_bytes(b"")
-    print(f"  rotated: {path.name} → {rotated.name} ({rotated.stat().st_size // 1024}KB compressed)")
+    print(
+        f"  rotated: {path.name} → {rotated.name} ({rotated.stat().st_size // 1024}KB compressed)"
+    )
     return True
 
 

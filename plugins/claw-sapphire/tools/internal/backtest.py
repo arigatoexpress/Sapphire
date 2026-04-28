@@ -88,8 +88,13 @@ def run_backtest(
             print(f"📝 Loading {pine_script}...")
             _tv(["ui", "panel", "pine-editor", "open"])
             time.sleep(2)
-            subprocess.run(["tv", "pine", "set"], input=script_path.read_text(),
-                           capture_output=True, text=True, timeout=10)
+            subprocess.run(
+                ["tv", "pine", "set"],
+                input=script_path.read_text(),
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
             compile_result = _tv(["pine", "compile"], timeout=30)
             if compile_result.get("errors"):
                 errors = [e for e in compile_result["errors"] if e.get("severity", 0) >= 8]
@@ -145,9 +150,9 @@ def show_history() -> None:
         return
 
     lines = BACKTEST_PATH.read_text().strip().splitlines()
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  BACKTEST HISTORY ({len(lines)} runs)")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     for line in lines[-20:]:
         r = json.loads(line)
@@ -162,6 +167,7 @@ def show_history() -> None:
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser(description="Pine Script Backtesting Loop")
     parser.add_argument("--symbols", help="Comma-separated symbols")
     parser.add_argument("--pine", help="Pine script filename in pine/standalone/")

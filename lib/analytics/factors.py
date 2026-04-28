@@ -145,6 +145,7 @@ def _fetch_market_data(coin_id: str) -> dict | None:
 
     try:
         from lib.chain.sources import _http_get
+
         # Market chart: 35 days at daily resolution
         chart = _http_get(
             f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
@@ -207,7 +208,11 @@ class CrossSectionalFactors:
 
             # Volume z-score: today vs 30d avg
             if volumes and len(volumes) >= 8:
-                vol_30d_avg = sum(volumes[-31:-1]) / len(volumes[-31:-1]) if len(volumes) > 31 else sum(volumes[:-1]) / max(len(volumes) - 1, 1)
+                vol_30d_avg = (
+                    sum(volumes[-31:-1]) / len(volumes[-31:-1])
+                    if len(volumes) > 31
+                    else sum(volumes[:-1]) / max(len(volumes) - 1, 1)
+                )
                 today_vol = volumes[-1]
                 raw_factors[sym]["Volume Score"] = (
                     (today_vol - vol_30d_avg) / vol_30d_avg * 100.0 if vol_30d_avg > 0 else 0.0
@@ -215,7 +220,7 @@ class CrossSectionalFactors:
             else:
                 raw_factors[sym]["Volume Score"] = None
 
-            market_data = (detail.get("market_data") or {})
+            market_data = detail.get("market_data") or {}
             mcap = (market_data.get("market_cap") or {}).get("usd")
             raw_factors[sym]["Market Cap"] = math.log10(mcap) if mcap and mcap > 0 else None
 
@@ -226,12 +231,16 @@ class CrossSectionalFactors:
                 raw_factors[sym]["Liquidity"] = None
 
         # Validate fetch coverage before computing z-scores
-        fetched_ok = [sym for sym in symbols if any(v is not None for v in raw_factors.get(sym, {}).values())]
+        fetched_ok = [
+            sym for sym in symbols if any(v is not None for v in raw_factors.get(sym, {}).values())
+        ]
         if len(fetched_ok) < len(symbols):
             missing = sorted(set(symbols) - set(fetched_ok))
             log.warning(
                 "factors: %d/%d assets have data (missing: %s) — z-scores will use 0.0 fill",
-                len(fetched_ok), len(symbols), ", ".join(missing),
+                len(fetched_ok),
+                len(symbols),
+                ", ".join(missing),
             )
         else:
             log.info("factors: all %d assets fetched from CoinGecko", len(symbols))

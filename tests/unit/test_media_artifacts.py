@@ -81,9 +81,14 @@ def test_write_manifest_records_inputs_outputs_and_loads(tmp_path):
     assert manifest["inputs"][0]["path"] == "transcript.txt"
     assert manifest["outputs"][0]["path"] == "episode.mp3"
     assert manifest["metadata"] == {"operator": "local-test"}
-    assert manifest["manifest_path"] == "manifests/20260427_podcast_episode_regional_intelligence_pilot.json"
+    assert (
+        manifest["manifest_path"]
+        == "manifests/20260427_podcast_episode_regional_intelligence_pilot.json"
+    )
 
-    loaded = load_manifest(manifest_root / "20260427_podcast_episode_regional_intelligence_pilot.json")
+    loaded = load_manifest(
+        manifest_root / "20260427_podcast_episode_regional_intelligence_pilot.json"
+    )
     assert loaded["run_id"] == manifest["run_id"]
     assert "manifest_path" not in loaded
 

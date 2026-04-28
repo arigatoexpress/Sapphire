@@ -1,4 +1,5 @@
 """Unit tests — lib.analytics.backtest."""
+
 from __future__ import annotations
 
 import math
@@ -32,14 +33,16 @@ def _synthetic_bars(n: int = 120, start: float = 100.0, trend: float = 0.5) -> l
         price += trend + (0.5 if i % 3 == 0 else -0.3)
         high = price * 1.01
         low = price * 0.99
-        bars.append({
-            "date": f"2026-01-{(i % 28) + 1:02d}",
-            "open": price * 0.999,
-            "high": high,
-            "low":  low,
-            "close": price,
-            "volume": 1_000_000,
-        })
+        bars.append(
+            {
+                "date": f"2026-01-{(i % 28) + 1:02d}",
+                "open": price * 0.999,
+                "high": high,
+                "low": low,
+                "close": price,
+                "volume": 1_000_000,
+            }
+        )
     return bars
 
 
@@ -176,7 +179,7 @@ class TestSimulation:
         for s in signals:
             s["symbol"] = "SYN"
         t_off, _ = _simulate(bars, signals, cfg, with_regime=False)
-        t_on, _  = _simulate(bars, signals, cfg, with_regime=True)
+        t_on, _ = _simulate(bars, signals, cfg, with_regime=True)
         # Same signal input; regime filter may reduce entries.
         assert len(t_on) <= len(t_off)
 
@@ -192,7 +195,7 @@ class TestMetrics:
         curve = [100_000, 101_000, 102_000, 103_000]
         trades = [
             Trade("X", "long", "d1", 100, "d2", 110, 10.0, 10.0, 1, 80, 0.7, "TREND_UP", "tp"),
-            Trade("X", "long", "d3", 100, "d4", 105,  5.0,  5.0, 1, 70, 0.6, "TREND_UP", "tp"),
+            Trade("X", "long", "d3", 100, "d4", 105, 5.0, 5.0, 1, 70, 0.6, "TREND_UP", "tp"),
         ]
         m = _metrics(curve, trades, 100_000)
         assert m["win_rate"] == 1.0
@@ -264,6 +267,7 @@ class TestErrors:
             def download(*_args, **_kwargs):
                 class _DF:
                     empty = True
+
                 return _DF()
 
         monkeypatch.setitem(sys.modules, "yfinance", _EmptyYF)

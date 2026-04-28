@@ -153,6 +153,7 @@ class TestFetchMarketData:
         f._cache_set("cg_market_bitcoin", {"chart": {"prices": []}, "detail": {}})
         # Ensure we don't import sources network path
         import lib.chain.sources as sources_mod
+
         monkeypatch.setattr(sources_mod, "_http_get", fake_http_get)
         out = f._fetch_market_data("bitcoin")
         assert out == {"chart": {"prices": []}, "detail": {}}
@@ -174,6 +175,7 @@ class TestFetchMarketData:
         responses = iter([chart, detail])
 
         import lib.chain.sources as sources_mod
+
         monkeypatch.setattr(sources_mod, "_http_get", lambda _url: next(responses))
         out = f._fetch_market_data("bitcoin")
         assert out is not None
@@ -281,11 +283,17 @@ class TestCompute:
         high_vol_prices[-1][1] = 110.0
 
         low_data = {
-            "chart": {"prices": low_vol_prices, "total_volumes": [[p[0], 1e9] for p in low_vol_prices]},
+            "chart": {
+                "prices": low_vol_prices,
+                "total_volumes": [[p[0], 1e9] for p in low_vol_prices],
+            },
             "detail": {"market_data": {"market_cap": {"usd": 1e12}, "total_volume": {"usd": 5e8}}},
         }
         high_data = {
-            "chart": {"prices": high_vol_prices, "total_volumes": [[p[0], 1e9] for p in high_vol_prices]},
+            "chart": {
+                "prices": high_vol_prices,
+                "total_volumes": [[p[0], 1e9] for p in high_vol_prices],
+            },
             "detail": {"market_data": {"market_cap": {"usd": 1e12}, "total_volume": {"usd": 5e8}}},
         }
 
@@ -295,7 +303,9 @@ class TestCompute:
         monkeypatch.setattr(f, "_fetch_market_data", fake_fetch)
         report = f.CrossSectionalFactors().compute(symbols=["BTC", "ETH"])
         # BTC (low vol) should have HIGHER volatility z-score than ETH (high vol)
-        assert report.factor_matrix["BTC"]["Volatility"] >= report.factor_matrix["ETH"]["Volatility"]
+        assert (
+            report.factor_matrix["BTC"]["Volatility"] >= report.factor_matrix["ETH"]["Volatility"]
+        )
 
     def test_compute_caches_full_universe(self, monkeypatch):
         # When called with no symbols arg, the report cache key fires.
@@ -315,9 +325,7 @@ class TestCompute:
         assert r1 is r2
 
     def test_compute_single_asset_dispersion_zero(self, monkeypatch):
-        monkeypatch.setattr(
-            f, "_fetch_market_data", lambda _id: _make_market_data(final_pct=10.0)
-        )
+        monkeypatch.setattr(f, "_fetch_market_data", lambda _id: _make_market_data(final_pct=10.0))
         report = f.CrossSectionalFactors().compute(symbols=["BTC"])
         # Single asset: dispersion = 0, strongest == weakest
         assert report.dispersion == 0.0
@@ -333,9 +341,7 @@ class TestToDict:
         f._CACHE.clear()
 
     def test_to_dict_shape(self, monkeypatch):
-        monkeypatch.setattr(
-            f, "_fetch_market_data", lambda _id: _make_market_data(final_pct=10.0)
-        )
+        monkeypatch.setattr(f, "_fetch_market_data", lambda _id: _make_market_data(final_pct=10.0))
         report = f.CrossSectionalFactors().compute(symbols=["BTC", "ETH"])
         d = f.to_dict(report)
 

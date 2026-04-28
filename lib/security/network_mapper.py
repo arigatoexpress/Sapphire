@@ -23,9 +23,11 @@ log = logging.getLogger("sapphire.security.network")
 # Data models
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ServicePort:
     """A listening port on a node."""
+
     port: int
     protocol: str = "tcp"
     service: str = ""  # human-readable name
@@ -37,6 +39,7 @@ class ServicePort:
 @dataclass
 class NetworkNode:
     """A single node in the Sapphire mesh."""
+
     hostname: str
     ip: str
     tailscale_ip: str = ""
@@ -52,6 +55,7 @@ class NetworkNode:
 @dataclass
 class TrustZone:
     """A trust zone grouping nodes by security posture."""
+
     name: str
     description: str
     nodes: list[str] = field(default_factory=list)  # hostnames
@@ -61,6 +65,7 @@ class TrustZone:
 @dataclass
 class NetworkScanResult:
     """Aggregate result of a network topology scan."""
+
     timestamp: str = ""
     total_nodes: int = 0
     online_nodes: int = 0
@@ -130,6 +135,7 @@ KNOWN_NODES: dict[str, dict[str, Any]] = {
 # Mapper
 # ---------------------------------------------------------------------------
 
+
 class NetworkMapper:
     """Maps the Sapphire mesh network and computes attack surface scores."""
 
@@ -166,12 +172,9 @@ class NetworkMapper:
         result.nodes = nodes
         result.total_nodes = len(nodes)
         result.online_nodes = sum(1 for n in nodes if n.online)
-        result.total_open_ports = sum(
-            sum(1 for p in n.ports if p.status == "open") for n in nodes
-        )
+        result.total_open_ports = sum(sum(1 for p in n.ports if p.status == "open") for n in nodes)
         result.unauthenticated_ports = sum(
-            sum(1 for p in n.ports if p.status == "open" and not p.authenticated)
-            for n in nodes
+            sum(1 for p in n.ports if p.status == "open" and not p.authenticated) for n in nodes
         )
         result.trust_zones = self._build_trust_zones(nodes)
         result.score = self._compute_aggregate_score(result)
@@ -203,11 +206,13 @@ class NetworkMapper:
                 trust_zone=info.get("trust_zone", "untrusted"),
             )
             for port_info in info.get("expected_ports", []):
-                node.ports.append(ServicePort(
-                    port=port_info["port"],
-                    service=port_info.get("service", ""),
-                    authenticated=port_info.get("authenticated", False),
-                ))
+                node.ports.append(
+                    ServicePort(
+                        port=port_info["port"],
+                        service=port_info.get("service", ""),
+                        authenticated=port_info.get("authenticated", False),
+                    )
+                )
             nodes.append(node)
         return nodes
 
@@ -216,7 +221,9 @@ class NetworkMapper:
         try:
             proc = subprocess.run(
                 ["tailscale", "status", "--json"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             if proc.returncode != 0:
                 return []
@@ -225,28 +232,30 @@ class NetworkMapper:
             # Self node
             myself = data.get("Self", {})
             if myself:
-                peers.append({
-                    "ip": (myself.get("TailscaleIPs") or [""])[0],
-                    "hostname": myself.get("HostName", ""),
-                    "os": myself.get("OS", ""),
-                    "online": True,
-                })
+                peers.append(
+                    {
+                        "ip": (myself.get("TailscaleIPs") or [""])[0],
+                        "hostname": myself.get("HostName", ""),
+                        "os": myself.get("OS", ""),
+                        "online": True,
+                    }
+                )
             # Peer nodes
             for _key, peer in data.get("Peer", {}).items():
-                peers.append({
-                    "ip": (peer.get("TailscaleIPs") or [""])[0],
-                    "hostname": peer.get("HostName", ""),
-                    "os": peer.get("OS", ""),
-                    "online": peer.get("Online", False),
-                })
+                peers.append(
+                    {
+                        "ip": (peer.get("TailscaleIPs") or [""])[0],
+                        "hostname": peer.get("HostName", ""),
+                        "os": peer.get("OS", ""),
+                        "online": peer.get("Online", False),
+                    }
+                )
             return peers
         except (subprocess.TimeoutExpired, FileNotFoundError, json.JSONDecodeError) as exc:
             log.debug("Tailscale status failed: %s", exc)
             return []
 
-    def _merge_tailscale(
-        self, nodes: list[NetworkNode], peers: list[dict[str, str]]
-    ) -> None:
+    def _merge_tailscale(self, nodes: list[NetworkNode], peers: list[dict[str, str]]) -> None:
         """Merge Tailscale live status into known nodes, add unknown peers."""
         known_ips = {n.ip for n in nodes}
         for peer in peers:
@@ -261,16 +270,18 @@ class NetworkMapper:
                     break
             if not matched and ip and ip not in known_ips:
                 # Unknown node on the tailnet — flag it
-                nodes.append(NetworkNode(
-                    hostname=peer.get("hostname", f"unknown-{ip}"),
-                    ip=ip,
-                    tailscale_ip=ip,
-                    os=peer.get("os", ""),
-                    online=peer.get("online", False),
-                    trust_zone="untrusted",
-                    role="unknown",
-                    tags=["discovered", "unverified"],
-                ))
+                nodes.append(
+                    NetworkNode(
+                        hostname=peer.get("hostname", f"unknown-{ip}"),
+                        ip=ip,
+                        tailscale_ip=ip,
+                        os=peer.get("os", ""),
+                        online=peer.get("online", False),
+                        trust_zone="untrusted",
+                        role="unknown",
+                        tags=["discovered", "unverified"],
+                    )
+                )
                 known_ips.add(ip)
 
     # ------------------------------------------------------------------

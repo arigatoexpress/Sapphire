@@ -1,4 +1,3 @@
-
 import json
 import logging
 import re
@@ -158,9 +157,7 @@ class ChatIntentEngine:
             }
 
         # Pause/resume with venue name
-        pause_match = re.match(
-            r"^pause\s+(aster|lighter|all)\s*$", cleaned, re.IGNORECASE
-        )
+        pause_match = re.match(r"^pause\s+(aster|lighter|all)\s*$", cleaned, re.IGNORECASE)
         if pause_match:
             return {
                 "intent": "control_trading",
@@ -170,9 +167,7 @@ class ChatIntentEngine:
                 },
             }
 
-        resume_match = re.match(
-            r"^resume\s+(aster|lighter|all)\s*$", cleaned, re.IGNORECASE
-        )
+        resume_match = re.match(r"^resume\s+(aster|lighter|all)\s*$", cleaned, re.IGNORECASE)
         if resume_match:
             return {
                 "intent": "control_trading",

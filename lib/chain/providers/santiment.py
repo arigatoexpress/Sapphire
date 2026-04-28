@@ -30,9 +30,7 @@ class SantimentClient:
             payload["variables"] = variables
         return http_post_json(self._ENDPOINT, payload, headers=self._headers())
 
-    def social_volume(
-        self, slug: str = "bitcoin", from_iso: str = "", to_iso: str = ""
-    ) -> Any:
+    def social_volume(self, slug: str = "bitcoin", from_iso: str = "", to_iso: str = "") -> Any:
         gql = """
         query($slug:String!, $from:DateTime!, $to:DateTime!) {
           getMetric(metric:"social_volume_total") {
@@ -44,9 +42,7 @@ class SantimentClient:
         """
         return self.query(gql, {"slug": slug, "from": from_iso, "to": to_iso})
 
-    def dev_activity(
-        self, slug: str = "bitcoin", from_iso: str = "", to_iso: str = ""
-    ) -> Any:
+    def dev_activity(self, slug: str = "bitcoin", from_iso: str = "", to_iso: str = "") -> Any:
         gql = """
         query($slug:String!, $from:DateTime!, $to:DateTime!) {
           getMetric(metric:"dev_activity") {

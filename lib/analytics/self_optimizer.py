@@ -76,7 +76,9 @@ def optimize_symbol(
     results: list[tuple[ParamCell, BacktestResult]] = []
     for cell in _grid():
         r = run_backtest(
-            symbol, bars=bars, days=days,
+            symbol,
+            bars=bars,
+            days=days,
             signal_fn=default_rsi_signal,
             position_size_pct=cell.position_size_pct,
             score_min=cell.score_min,
@@ -84,7 +86,9 @@ def optimize_symbol(
         results.append((cell, r))
 
     base_r = run_backtest(
-        symbol, bars=bars, days=days,
+        symbol,
+        bars=bars,
+        days=days,
         signal_fn=default_rsi_signal,
         position_size_pct=current.position_size_pct,
         score_min=current.score_min,
@@ -114,10 +118,12 @@ def optimize_symbol(
             "score_min": current.score_min,
             "position_size_pct": current.position_size_pct,
             "metrics": {
-                "sharpe": base_r.sharpe, "sortino": base_r.sortino,
+                "sharpe": base_r.sharpe,
+                "sortino": base_r.sortino,
                 "total_return_pct": base_r.total_return_pct,
                 "max_drawdown_pct": base_r.max_drawdown_pct,
-                "win_rate": base_r.win_rate, "trades": len(base_r.trades),
+                "win_rate": base_r.win_rate,
+                "trades": len(base_r.trades),
             },
         },
         recommended={
@@ -125,10 +131,12 @@ def optimize_symbol(
             "position_size_pct": best_cell.position_size_pct,
         },
         recommended_metrics={
-            "sharpe": best_r.sharpe, "sortino": best_r.sortino,
+            "sharpe": best_r.sharpe,
+            "sortino": best_r.sortino,
             "total_return_pct": best_r.total_return_pct,
             "max_drawdown_pct": best_r.max_drawdown_pct,
-            "win_rate": best_r.win_rate, "trades": len(best_r.trades),
+            "win_rate": best_r.win_rate,
+            "trades": len(best_r.trades),
         },
         delta={
             "sharpe": round(best_r.sharpe - base_r.sharpe, 3),
@@ -137,9 +145,12 @@ def optimize_symbol(
         },
         grid_results=[
             {
-                "score_min": c.score_min, "position_size_pct": c.position_size_pct,
-                "sharpe": r.sharpe, "return_pct": r.total_return_pct,
-                "dd_pct": r.max_drawdown_pct, "trades": len(r.trades),
+                "score_min": c.score_min,
+                "position_size_pct": c.position_size_pct,
+                "sharpe": r.sharpe,
+                "return_pct": r.total_return_pct,
+                "dd_pct": r.max_drawdown_pct,
+                "trades": len(r.trades),
             }
             for c, r in results
         ],
@@ -191,13 +202,18 @@ def load_recent_proposals(limit: int = 20, path: Path | None = None) -> list[dic
 
 
 __all__ = [
-    "ParamCell", "Proposal",
-    "optimize_symbol", "save_proposal", "run_sweep", "load_recent_proposals",
+    "ParamCell",
+    "Proposal",
+    "optimize_symbol",
+    "save_proposal",
+    "run_sweep",
+    "load_recent_proposals",
 ]
 
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--symbols", default="BTC-USD,ETH-USD,SOL-USD")
     parser.add_argument("--days", type=int, default=90)
@@ -205,7 +221,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     proposals = run_sweep(
-        args.symbols.split(","), days=args.days, persist=not args.dry_run,
+        args.symbols.split(","),
+        days=args.days,
+        persist=not args.dry_run,
     )
     for p in proposals:
         print(f"\n{p.symbol}:")

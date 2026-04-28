@@ -56,12 +56,8 @@ class ContentGenerator:
 
     def __init__(self, gemini_guard: Any = None):
         self.gemini = gemini_guard
-        self.quality_threshold = float(
-            os.getenv("SAPPHIRE_MEDIA_QUALITY_THRESHOLD", "0.6")
-        )
-        self.min_post_interval = int(
-            os.getenv("SAPPHIRE_MEDIA_MIN_INTERVAL_SECONDS", "3600")
-        )
+        self.quality_threshold = float(os.getenv("SAPPHIRE_MEDIA_QUALITY_THRESHOLD", "0.6"))
+        self.min_post_interval = int(os.getenv("SAPPHIRE_MEDIA_MIN_INTERVAL_SECONDS", "3600"))
         self.last_generation: dict[str, float] = {}
         self._generation_count = 0
 
@@ -191,9 +187,7 @@ class ContentGenerator:
             "generation_count": self._generation_count,
             "quality_threshold": self.quality_threshold,
             "min_post_interval_seconds": self.min_post_interval,
-            "last_generation": {
-                k: int(v) for k, v in self.last_generation.items()
-            },
+            "last_generation": {k: int(v) for k, v in self.last_generation.items()},
         }
 
     # ── Quality scoring ─────────────────────────────────────────
@@ -211,9 +205,7 @@ class ContentGenerator:
             issues.append(f"slop_phrases:{slop_count}")
 
         # 2. Emoji density
-        emoji_count = len(re.findall(
-            r"[\U0001f300-\U0001f9ff\u2600-\u26ff\u2700-\u27bf]", text
-        ))
+        emoji_count = len(re.findall(r"[\U0001f300-\U0001f9ff\u2600-\u26ff\u2700-\u27bf]", text))
         text_len = max(1, len(text))
         density = (emoji_count / text_len) * 100
         if density > _MAX_EMOJI_DENSITY:

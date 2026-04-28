@@ -40,8 +40,8 @@ WEIGHTS_FILE = SAPPHIRE_ROOT / "data" / "enhancer_weights.json"
 EVENTS_LOG = SAPPHIRE_ROOT / "data" / "system_events.jsonl"
 
 LOOKBACK_DAYS = 30
-MIN_SAMPLES = 10                # minimum decisive trades to act on
-LEARNING_RATE = 0.25            # damping factor when adjusting weights
+MIN_SAMPLES = 10  # minimum decisive trades to act on
+LEARNING_RATE = 0.25  # damping factor when adjusting weights
 REGIME_PENALTY_BOUNDS = (0.50, 0.95)
 REGIME_BOOST_BOUNDS = (1.00, 1.20)
 
@@ -214,7 +214,9 @@ def _save_weights(weights: dict) -> None:
     WEIGHTS_FILE.write_text(json.dumps(weights, indent=2))
 
 
-def _adjust_weights(current: dict, importance: dict, baseline: float | None) -> tuple[dict, list[str]]:
+def _adjust_weights(
+    current: dict, importance: dict, baseline: float | None
+) -> tuple[dict, list[str]]:
     """Move weights toward the observed outcome of flagged signals.
 
     Logic:
@@ -248,8 +250,7 @@ def _adjust_weights(current: dict, importance: dict, baseline: float | None) -> 
         )
     else:
         notes.append(
-            f"regime_penalty unchanged — insufficient contradiction samples "
-            f"(n={contra_n})"
+            f"regime_penalty unchanged — insufficient contradiction samples (n={contra_n})"
         )
 
     # --- REGIME_BOOST ---------------------------------------------------
@@ -263,7 +264,7 @@ def _adjust_weights(current: dict, importance: dict, baseline: float | None) -> 
     aligned_wr = (aligned_wins / aligned_decisive) if aligned_decisive > 0 else None
 
     if baseline is not None and aligned_wr is not None and aligned_decisive >= 5:
-        uplift = aligned_wr - baseline        # +0.05 means 5pp better than baseline
+        uplift = aligned_wr - baseline  # +0.05 means 5pp better than baseline
         target = 1.0 + max(0.0, uplift) * 2.0  # 5pp uplift → +10% boost (capped by bounds)
         old = current["regime_boost"]
         new_val = old + (target - old) * LEARNING_RATE
@@ -276,8 +277,7 @@ def _adjust_weights(current: dict, importance: dict, baseline: float | None) -> 
         )
     else:
         notes.append(
-            f"regime_boost unchanged — insufficient aligned samples "
-            f"(n={aligned_decisive})"
+            f"regime_boost unchanged — insufficient aligned samples (n={aligned_decisive})"
         )
 
     return new, notes
@@ -305,6 +305,7 @@ def _publish_event(report: OptimizationReport) -> None:
     # Event bus (Redis or JSONL fallback)
     try:
         from lib.core.event_bus import get_bus
+
         get_bus().publish("optimization.completed", payload, source="optimize")
     except Exception as e:
         log.warning("event bus publish failed: %s", e)
@@ -350,9 +351,7 @@ def run(dry_run: bool = False) -> OptimizationReport:
     applied = False
 
     if decisive < MIN_SAMPLES:
-        notes.append(
-            f"skipped — only {decisive} decisive trades (need >= {MIN_SAMPLES})"
-        )
+        notes.append(f"skipped — only {decisive} decisive trades (need >= {MIN_SAMPLES})")
     else:
         new_weights, adjust_notes = _adjust_weights(current, importance, baseline)
         notes.extend(adjust_notes)
@@ -386,7 +385,9 @@ def run(dry_run: bool = False) -> OptimizationReport:
 
     log.info(
         "optimization complete — applied=%s trades=%s changes=%s",
-        applied, decisive, changes,
+        applied,
+        decisive,
+        changes,
     )
     return report
 

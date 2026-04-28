@@ -90,9 +90,7 @@ class PredictionAggregator:
         self._session: aiohttp.ClientSession | None = None
         self._feed_tasks: list[asyncio.Task] = []
         self._last_forum_post_ts = 0.0
-        self._forum_post_interval = max(
-            300, int(os.getenv("SAPPHIRE_PM_FORUM_INTERVAL", "3600"))
-        )
+        self._forum_post_interval = max(300, int(os.getenv("SAPPHIRE_PM_FORUM_INTERVAL", "3600")))
         self._accuracy_tracker = PredictionAccuracyTracker(max_snapshots=500)
 
     @property
@@ -181,9 +179,7 @@ class PredictionAggregator:
         if total_volume == 0:
             weighted_prob = sum(s.probability for s in signals) / len(signals)
         else:
-            weighted_prob = sum(
-                s.probability * s.volume_usd for s in signals
-            ) / total_volume
+            weighted_prob = sum(s.probability * s.volume_usd for s in signals) / total_volume
 
         # Determine consensus sentiment
         if weighted_prob >= 0.75:
@@ -198,9 +194,11 @@ class PredictionAggregator:
             sentiment = "neutral"
 
         # Confidence based on agreement and volume
-        agreement = 1.0 - (
-            max(s.probability for s in signals) - min(s.probability for s in signals)
-        ) if len(signals) > 1 else 0.5
+        agreement = (
+            1.0 - (max(s.probability for s in signals) - min(s.probability for s in signals))
+            if len(signals) > 1
+            else 0.5
+        )
         volume_factor = min(1.0, total_volume / 1_000_000)
         confidence = round((agreement * 0.6 + volume_factor * 0.4), 3)
 
@@ -604,17 +602,23 @@ class PredictionAggregator:
         lines = ["🔮 **Prediction Market Intelligence**\n"]
 
         for source, feed_status in status["feeds"].items():
-            emoji = "🟢" if feed_status["running"] and feed_status["consecutive_errors"] == 0 else "🟡" if feed_status["running"] else "🔴"
-            lines.append(
-                f"{emoji} {source}: {feed_status['market_count']} markets"
+            emoji = (
+                "🟢"
+                if feed_status["running"] and feed_status["consecutive_errors"] == 0
+                else "🟡"
+                if feed_status["running"]
+                else "🔴"
             )
+            lines.append(f"{emoji} {source}: {feed_status['market_count']} markets")
             if feed_status["consecutive_errors"] > 0:
                 lines.append(f"  ⚠️ {feed_status['consecutive_errors']} errors")
 
         lines.append(f"\nTotal signals: {status['total_signals']}")
         lines.append(f"High conviction: {status['high_conviction_signals']}")
         lines.append(f"Arbitrage opportunities: {status['arbitrage_opportunities']}")
-        lines.append(f"Accuracy tracked: {status['accuracy_tracked']} ({status['accuracy_resolved']} resolved)")
+        lines.append(
+            f"Accuracy tracked: {status['accuracy_tracked']} ({status['accuracy_resolved']} resolved)"
+        )
 
         return "\n".join(lines)
 
@@ -649,10 +653,7 @@ class PredictionAggregator:
 
         if symbol:
             sent = self.get_symbol_sentiment(symbol)
-            lines.append(
-                f"\n📊 Consensus: {sent['sentiment']} "
-                f"(conf={sent['confidence']:.2f})"
-            )
+            lines.append(f"\n📊 Consensus: {sent['sentiment']} (conf={sent['confidence']:.2f})")
 
         return "\n".join(lines)
 

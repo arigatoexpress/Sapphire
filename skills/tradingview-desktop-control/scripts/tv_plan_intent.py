@@ -121,7 +121,9 @@ def _strip_noise_for_placeholder(text: str, placeholder: str) -> str:
     return t.strip()
 
 
-def infer_parameter_values(intent: str, cap: dict[str, Any], recipe: dict[str, Any]) -> dict[str, str]:
+def infer_parameter_values(
+    intent: str, cap: dict[str, Any], recipe: dict[str, Any]
+) -> dict[str, str]:
     values: dict[str, str] = {}
     quoted = extract_quoted_values(intent)
     symbols = extract_symbol_candidates(intent)
@@ -138,7 +140,11 @@ def infer_parameter_values(intent: str, cap: dict[str, Any], recipe: dict[str, A
                 val = symbols[0]
             elif quoted:
                 val = quoted[0]
-        elif lname in {"query", "indicator", "indicator_query", "text"} or lname in {"layout_name", "layout"} or lname in {"alert_name", "name"}:
+        elif (
+            lname in {"query", "indicator", "indicator_query", "text"}
+            or lname in {"layout_name", "layout"}
+            or lname in {"alert_name", "name"}
+        ):
             if quoted:
                 val = quoted[0]
                 used_quote = True
@@ -178,6 +184,7 @@ def infer_parameter_values(intent: str, cap: dict[str, Any], recipe: dict[str, A
 
 def render_template_value(v: Any, values: dict[str, str]) -> Any:
     if isinstance(v, str):
+
         def repl(m: re.Match[str]) -> str:
             name = m.group(1)
             return str(values.get(name, m.group(0)))
@@ -190,7 +197,9 @@ def render_template_value(v: Any, values: dict[str, str]) -> Any:
     return v
 
 
-def materialize_recipe(recipe: dict[str, Any], values: dict[str, str]) -> tuple[dict[str, Any], list[str]]:
+def materialize_recipe(
+    recipe: dict[str, Any], values: dict[str, str]
+) -> tuple[dict[str, Any], list[str]]:
     materialized = json.loads(json.dumps(recipe))
     missing: list[str] = []
     placeholders = recipe_parameter_names(recipe)
@@ -226,7 +235,9 @@ def build_command_preview(recipe: dict[str, Any]) -> str | None:
 
 
 def max_risk_allowed(level: str, max_risk: str) -> bool:
-    return RISK_ORDER.get((level or "low").lower(), 0) <= RISK_ORDER.get((max_risk or "high").lower(), 2)
+    return RISK_ORDER.get((level or "low").lower(), 0) <= RISK_ORDER.get(
+        (max_risk or "high").lower(), 2
+    )
 
 
 def pick_actionable_match(
@@ -289,9 +300,13 @@ def build_plan(
         only_actionable=True,
     )
 
-    chosen_actionable, actionable_considered = pick_actionable_match(actionable_rows, cap_index, max_risk=max_risk)
+    chosen_actionable, actionable_considered = pick_actionable_match(
+        actionable_rows, cap_index, max_risk=max_risk
+    )
     top_match = all_rows[0] if all_rows else None
-    strongest_blocked = next((c for c in actionable_considered if bool(c.get("blocked_risk"))), None)
+    strongest_blocked = next(
+        (c for c in actionable_considered if bool(c.get("blocked_risk"))), None
+    )
 
     if strongest_blocked and chosen_actionable:
         blocked_base = float((strongest_blocked.get("row") or {}).get("score") or 0)
@@ -322,12 +337,18 @@ def build_plan(
     }
 
     if not chosen_actionable:
-        if actionable_considered and all(bool(c.get("blocked_risk")) for c in actionable_considered):
+        if actionable_considered and all(
+            bool(c.get("blocked_risk")) for c in actionable_considered
+        ):
             out["status"] = "blocked_risk"
-            out["message"] = "Actionable matches were found, but all exceed the configured max risk."
+            out["message"] = (
+                "Actionable matches were found, but all exceed the configured max risk."
+            )
         else:
             out["status"] = "no_actionable_match"
-            out["message"] = "No actionable capability matched the intent within the current risk threshold."
+            out["message"] = (
+                "No actionable capability matched the intent within the current risk threshold."
+            )
         return out
 
     row = chosen_actionable["row"]
@@ -371,14 +392,20 @@ def build_plan(
         }
     )
     if status == "blocked_risk":
-        out["message"] = f"Selected action exceeds max risk '{max_risk}'. Increase --max-risk to allow planning this action."
+        out["message"] = (
+            f"Selected action exceeds max risk '{max_risk}'. Increase --max-risk to allow planning this action."
+        )
     elif missing:
         out["message"] = f"Need values for: {', '.join(missing)}"
     return out
 
 
 def format_plan_text(plan: dict[str, Any], registry_path: Path) -> str:
-    lines = [f"Intent: {plan.get('intent')}", f"Registry: {registry_path}", f"Status: {plan.get('status')}"]
+    lines = [
+        f"Intent: {plan.get('intent')}",
+        f"Registry: {registry_path}",
+        f"Status: {plan.get('status')}",
+    ]
     msg = plan.get("message")
     if msg:
         lines.append(f"Note: {msg}")
@@ -391,7 +418,9 @@ def format_plan_text(plan: dict[str, Any], registry_path: Path) -> str:
         )
         lines.append(f"id: {sel.get('id')}")
         if sel.get("preconditions"):
-            lines.append(f"preconditions: {', '.join(str(x) for x in sel.get('preconditions') or [])}")
+            lines.append(
+                f"preconditions: {', '.join(str(x) for x in sel.get('preconditions') or [])}"
+            )
         if sel.get("reasons"):
             lines.append(f"resolver_reasons: {', '.join(str(x) for x in sel.get('reasons')[:8])}")
 
@@ -402,7 +431,9 @@ def format_plan_text(plan: dict[str, Any], registry_path: Path) -> str:
     if plan.get("command_preview"):
         lines.append(f"Command preview: {plan.get('command_preview')}")
     if plan.get("missing_parameters"):
-        lines.append(f"Missing parameters: {', '.join(str(x) for x in plan.get('missing_parameters') or [])}")
+        lines.append(
+            f"Missing parameters: {', '.join(str(x) for x in plan.get('missing_parameters') or [])}"
+        )
 
     alts = plan.get("alternatives") or []
     if isinstance(alts, list) and alts:
@@ -419,10 +450,17 @@ def format_plan_text(plan: dict[str, Any], registry_path: Path) -> str:
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="Plan an executable TradingView action from a natural-language intent")
-    p.add_argument("intent", help='Intent text, e.g. \'set chart symbol "AAPL"\'')
+    p = argparse.ArgumentParser(
+        description="Plan an executable TradingView action from a natural-language intent"
+    )
+    p.add_argument("intent", help="Intent text, e.g. 'set chart symbol \"AAPL\"'")
     p.add_argument("--registry", type=Path, default=DEFAULT_REGISTRY)
-    p.add_argument("--search-top", type=int, default=20, help="Number of resolver candidates to inspect before choosing an action")
+    p.add_argument(
+        "--search-top",
+        type=int,
+        default=20,
+        help="Number of resolver candidates to inspect before choosing an action",
+    )
     p.add_argument("--min-score", type=float, default=0.0)
     p.add_argument("--prefer-surface-family", choices=["desktop_ui", "web_ui"], default=None)
     p.add_argument("--max-risk", choices=["low", "medium", "high"], default="medium")

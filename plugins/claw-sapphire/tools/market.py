@@ -56,9 +56,13 @@ def main():
         result = equity_quote(symbol, input_data.get("provider", "yfinance"))
         result = asdict(result) if isinstance(result, MarketQuote) else result
     elif action == "historical":
-        result = [asdict(b) for b in equity_historical(symbol, input_data.get("start_date", "2026-03-01"))]
+        result = [
+            asdict(b) for b in equity_historical(symbol, input_data.get("start_date", "2026-03-01"))
+        ]
     elif action == "crypto":
-        result = [asdict(b) for b in crypto_historical(symbol, input_data.get("start_date", "2026-03-01"))]
+        result = [
+            asdict(b) for b in crypto_historical(symbol, input_data.get("start_date", "2026-03-01"))
+        ]
     elif action == "fred":
         result = fred_series(symbol, input_data.get("start_date"))
     elif action == "news":

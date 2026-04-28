@@ -4,6 +4,7 @@
 Runs cyber-threat-bot and writes output to data/intelligence/YYYY-MM-DD/threats.json
 so the /api/soc/threats endpoint can consume it. Runs every 4 hours via LaunchAgent.
 """
+
 from __future__ import annotations
 
 import json
@@ -169,7 +170,11 @@ def _fetch_cisa_kev(*, days: int, limit: int) -> list[dict]:
                 "summary": summary,
                 "score": None,
                 "exploited": True,
-                "tags": [tag for tag in ["kev", vendor.lower(), product.lower(), *_keyword_tags(summary)] if tag],
+                "tags": [
+                    tag
+                    for tag in ["kev", vendor.lower(), product.lower(), *_keyword_tags(summary)]
+                    if tag
+                ],
                 "evidence": [
                     {
                         "label": "CISA Known Exploited Vulnerabilities",
@@ -272,7 +277,11 @@ def _fetch_darkreading(*, limit: int) -> list[dict]:
         link = _clean_text(item.findtext("link"))
         description = _clean_text(item.findtext("description"))
         published_at = _parse_rfc822_datetime(item.findtext("pubDate"))
-        categories = [_clean_text(category.text) for category in item.findall("category") if _clean_text(category.text)]
+        categories = [
+            _clean_text(category.text)
+            for category in item.findall("category")
+            if _clean_text(category.text)
+        ]
         slug = link.rstrip("/").rsplit("/", 1)[-1]
         records.append(
             {
@@ -328,7 +337,10 @@ def _merge_records(records: list[dict]) -> list[dict]:
             if tag not in current.setdefault("tags", []):
                 current["tags"].append(tag)
         for item in record.get("evidence") or []:
-            if all(existing.get("url") != item.get("url") for existing in current.setdefault("evidence", [])):
+            if all(
+                existing.get("url") != item.get("url")
+                for existing in current.setdefault("evidence", [])
+            ):
                 current["evidence"].append(item)
         for key_name, value in (record.get("metadata") or {}).items():
             current["metadata"].setdefault(key_name, value)
@@ -401,17 +413,30 @@ def _extract_references(cve: dict, limit: int = 5) -> list[str]:
 def _keyword_tags(text: str) -> list[str]:
     lowered = text.lower()
     lookup = {
-        "memory-corruption": ("overflow", "memory corruption", "use-after-free", "heap", "out-of-bounds"),
+        "memory-corruption": (
+            "overflow",
+            "memory corruption",
+            "use-after-free",
+            "heap",
+            "out-of-bounds",
+        ),
         "injection": ("injection", "sql", "command", "prompt", "template"),
         "auth": ("authentication", "authorization", "bypass", "session", "token"),
         "path-traversal": ("path traversal", "../", "directory traversal"),
         "deserialization": ("deserialization", "serialize", "pickle", "marshal"),
-        "rce": ("remote code execution", "arbitrary code", "execute arbitrary", "command execution"),
+        "rce": (
+            "remote code execution",
+            "arbitrary code",
+            "execute arbitrary",
+            "command execution",
+        ),
         "xss": ("cross-site scripting", "xss", "script injection"),
         "supply-chain": ("dependency", "package", "supply chain", "artifact", "plugin"),
         "ai": ("llm", "ai ", "model", "prompt injection", "agent"),
     }
-    return [label for label, needles in lookup.items() if any(needle in lowered for needle in needles)]
+    return [
+        label for label, needles in lookup.items() if any(needle in lowered for needle in needles)
+    ]
 
 
 def _record_priority(record: dict) -> float:
@@ -446,7 +471,9 @@ def _prefer_title(incoming: dict, current: dict) -> bool:
     incoming_generic = incoming_title.upper().startswith(current_id)
     if current_generic and not incoming_generic:
         return True
-    return len(incoming_title) > len(current_title) and not (not current_generic and incoming_generic)
+    return len(incoming_title) > len(current_title) and not (
+        not current_generic and incoming_generic
+    )
 
 
 if __name__ == "__main__":

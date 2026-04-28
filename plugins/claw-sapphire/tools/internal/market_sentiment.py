@@ -28,11 +28,13 @@ sys.path.insert(0, str(ROOT))
 
 def _regime_snapshot() -> dict:
     from lib.chain.intelligence import ChainIntelligence
+
     return ChainIntelligence().snapshot()
 
 
 def _funding_only() -> dict:
     from lib.chain.intelligence import _fetch_binance_funding
+
     btc = _fetch_binance_funding("BTCUSDT")
     eth = _fetch_binance_funding("ETHUSDT")
     sol = _fetch_binance_funding("SOLUSDT")
@@ -93,14 +95,18 @@ def _full_report() -> dict:
 
     c = regime.get("classification", {})
     lines = []
-    lines.append(f"*Regime*: {c.get('regime', 'UNKNOWN')} (score {c.get('score', 0):+.2f}, "
-                 f"{c.get('inputs_ok', 0)}/{c.get('inputs_total', 0)} inputs)")
+    lines.append(
+        f"*Regime*: {c.get('regime', 'UNKNOWN')} (score {c.get('score', 0):+.2f}, "
+        f"{c.get('inputs_ok', 0)}/{c.get('inputs_total', 0)} inputs)"
+    )
     if regime.get("fear_greed") is not None:
         lines.append(f"*Fear & Greed*: {regime['fear_greed']} ({regime.get('fear_greed_label')})")
-    lines.append(f"*Funding 8h*: BTC={funding.get('btc_funding_rate_pct_8h')} "
-                 f"ETH={funding.get('eth_funding_rate_pct_8h')} "
-                 f"SOL={funding.get('sol_funding_rate_pct_8h')} — "
-                 f"{funding.get('interpretation', '')}")
+    lines.append(
+        f"*Funding 8h*: BTC={funding.get('btc_funding_rate_pct_8h')} "
+        f"ETH={funding.get('eth_funding_rate_pct_8h')} "
+        f"SOL={funding.get('sol_funding_rate_pct_8h')} — "
+        f"{funding.get('interpretation', '')}"
+    )
 
     if isinstance(decor.get("decorrelation_events"), list) and decor["decorrelation_events"]:
         top = decor["decorrelation_events"][:3]
@@ -110,12 +116,16 @@ def _full_report() -> dict:
     elif "error" in decor:
         lines.append(f"*Decorrelation*: unavailable — {decor['error']}")
     else:
-        lines.append(f"*Decorrelation*: none above threshold ({decor.get('sample_count', 0)} samples)")
+        lines.append(
+            f"*Decorrelation*: none above threshold ({decor.get('sample_count', 0)} samples)"
+        )
 
     if regime.get("regime_shift"):
         shift = regime["regime_shift"]
-        lines.append(f"🚨 *Regime shift*: {shift['from']} → {shift['to']} "
-                     f"(score {shift['from_score']:+.2f} → {shift['to_score']:+.2f})")
+        lines.append(
+            f"🚨 *Regime shift*: {shift['from']} → {shift['to']} "
+            f"(score {shift['from_score']:+.2f} → {shift['to_score']:+.2f})"
+        )
 
     return {
         "summary_markdown": "\n".join(lines),

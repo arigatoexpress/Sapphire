@@ -136,7 +136,9 @@ def append_alpha_dispatch_evaluation_audit(
 
 
 def _decision_outcome(decision: str, dispatched: bool) -> str:
-    prefix = "approved" if decision == "APPROVE" else "rejected" if decision == "REJECT" else "unknown"
+    prefix = (
+        "approved" if decision == "APPROVE" else "rejected" if decision == "REJECT" else "unknown"
+    )
     suffix = "dispatched" if dispatched else "not_dispatched"
     return f"{prefix}_{suffix}"
 

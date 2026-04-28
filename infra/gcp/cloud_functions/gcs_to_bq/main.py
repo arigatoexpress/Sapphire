@@ -28,13 +28,13 @@ PROJECT = os.environ.get("GCP_PROJECT", "tho-ai-agent")
 DATASET = os.environ.get("BQ_DATASET", "sapphire")
 
 SOURCE_TO_TABLE: dict[str, str] = {
-    "signals":     "trading_signals",
+    "signals": "trading_signals",
     "predictions": "predictions",
-    "threats":     "threat_intel",
-    "regime":      "market_regime",
-    "leads":       "leads",
-    "metrics":     "inference_metrics",
-    "health":      "service_health",
+    "threats": "threat_intel",
+    "regime": "market_regime",
+    "leads": "leads",
+    "metrics": "inference_metrics",
+    "health": "service_health",
 }
 
 log = logging.getLogger(__name__)
@@ -86,5 +86,4 @@ def parse_and_load(cloud_event: Any) -> None:
         log.error("BQ load errors on %s: %s", gcs_uri, job.errors)
         raise RuntimeError(f"BQ load errors: {job.errors}")
 
-    log.info("loaded %d rows: %s -> %s.%s",
-             job.output_rows or 0, gcs_uri, DATASET, table)
+    log.info("loaded %d rows: %s -> %s.%s", job.output_rows or 0, gcs_uri, DATASET, table)

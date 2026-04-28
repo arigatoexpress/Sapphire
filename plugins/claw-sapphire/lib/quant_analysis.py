@@ -83,7 +83,9 @@ class QuantProfile:
     mtf_signal: MultiTimeframeSignal | None
 
 
-def find_support_resistance(bars: list[OHLCV], lookback: int = 5, tolerance_pct: float = 1.5) -> tuple[list[SupportResistance], list[SupportResistance]]:
+def find_support_resistance(
+    bars: list[OHLCV], lookback: int = 5, tolerance_pct: float = 1.5
+) -> tuple[list[SupportResistance], list[SupportResistance]]:
     """Find support and resistance levels from price pivots.
 
     A pivot high is a high that's higher than `lookback` bars on either side.
@@ -98,12 +100,16 @@ def find_support_resistance(bars: list[OHLCV], lookback: int = 5, tolerance_pct:
 
     for i in range(lookback, len(bars) - lookback):
         # Check for pivot high
-        is_pivot_high = all(bars[i].high >= bars[i + j].high for j in range(-lookback, lookback + 1) if j != 0)
+        is_pivot_high = all(
+            bars[i].high >= bars[i + j].high for j in range(-lookback, lookback + 1) if j != 0
+        )
         if is_pivot_high:
             pivot_highs.append((bars[i].high, bars[i].date))
 
         # Check for pivot low
-        is_pivot_low = all(bars[i].low <= bars[i + j].low for j in range(-lookback, lookback + 1) if j != 0)
+        is_pivot_low = all(
+            bars[i].low <= bars[i + j].low for j in range(-lookback, lookback + 1) if j != 0
+        )
         if is_pivot_low:
             pivot_lows.append((bars[i].low, bars[i].date))
 
@@ -122,22 +128,26 @@ def find_support_resistance(bars: list[OHLCV], lookback: int = 5, tolerance_pct:
                 current_cluster.append(pivots[i])
             else:
                 avg_price = sum(p for p, _ in current_cluster) / len(current_cluster)
-                clusters.append(SupportResistance(
-                    price=round(avg_price, 2),
-                    strength=len(current_cluster),
-                    type=level_type,
-                    last_tested=current_cluster[-1][1],
-                ))
+                clusters.append(
+                    SupportResistance(
+                        price=round(avg_price, 2),
+                        strength=len(current_cluster),
+                        type=level_type,
+                        last_tested=current_cluster[-1][1],
+                    )
+                )
                 current_cluster = [pivots[i]]
 
         if current_cluster:
             avg_price = sum(p for p, _ in current_cluster) / len(current_cluster)
-            clusters.append(SupportResistance(
-                price=round(avg_price, 2),
-                strength=len(current_cluster),
-                type=level_type,
-                last_tested=current_cluster[-1][1],
-            ))
+            clusters.append(
+                SupportResistance(
+                    price=round(avg_price, 2),
+                    strength=len(current_cluster),
+                    type=level_type,
+                    last_tested=current_cluster[-1][1],
+                )
+            )
 
         return sorted(clusters, key=lambda x: -x.strength)[:5]
 
@@ -304,7 +314,6 @@ def correlation_matrix() -> list[CorrelationPair]:
 
 
 if __name__ == "__main__":
-
     print("=" * 60)
     print("  SAPPHIRE QUANT ANALYSIS")
     print("=" * 60)
@@ -315,19 +324,29 @@ if __name__ == "__main__":
             print(f"\n  {symbol}: No data")
             continue
 
-        print(f"\n  {'='*50}")
-        print(f"  {symbol}: ${profile.price:,.2f} | Trend: {profile.trend_direction} ({profile.trend_strength:.0f}/100)")
-        print(f"  Support: ${profile.nearest_support:,.2f} | Resistance: ${profile.nearest_resistance:,.2f} | R:R = {profile.risk_reward:.1f}")
+        print(f"\n  {'=' * 50}")
+        print(
+            f"  {symbol}: ${profile.price:,.2f} | Trend: {profile.trend_direction} ({profile.trend_strength:.0f}/100)"
+        )
+        print(
+            f"  Support: ${profile.nearest_support:,.2f} | Resistance: ${profile.nearest_resistance:,.2f} | R:R = {profile.risk_reward:.1f}"
+        )
 
         if profile.support_levels:
-            print(f"  Support levels: {', '.join(f'${s.price:,.2f} (x{s.strength})' for s in profile.support_levels[:3])}")
+            print(
+                f"  Support levels: {', '.join(f'${s.price:,.2f} (x{s.strength})' for s in profile.support_levels[:3])}"
+            )
         if profile.resistance_levels:
-            print(f"  Resistance levels: {', '.join(f'${r.price:,.2f} (x{r.strength})' for r in profile.resistance_levels[:3])}")
+            print(
+                f"  Resistance levels: {', '.join(f'${r.price:,.2f} (x{r.strength})' for r in profile.resistance_levels[:3])}"
+            )
 
-    print(f"\n  {'='*50}")
+    print(f"\n  {'=' * 50}")
     print("  CORRELATION MATRIX")
-    print(f"  {'='*50}")
+    print(f"  {'=' * 50}")
 
     for pair in correlation_matrix():
         icon = "🟢" if pair.correlation > 0.5 else "🔴" if pair.correlation < -0.5 else "⚪"
-        print(f"  {icon} {pair.asset_a}/{pair.asset_b}: {pair.correlation:+.3f} ({pair.interpretation})")
+        print(
+            f"  {icon} {pair.asset_a}/{pair.asset_b}: {pair.correlation:+.3f} ({pair.interpretation})"
+        )

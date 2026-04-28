@@ -18,9 +18,9 @@ from datetime import datetime
 
 # Weekday values match datetime.weekday(): Mon=0, Tue=1, ..., Sun=6
 WEEKLY_CALENDAR: dict[int, list[str]] = {
-    0: ["weekly_crypto_brief"],   # Monday
-    2: ["ai_intel"],              # Wednesday
-    4: ["security_digest"],       # Friday
+    0: ["weekly_crypto_brief"],  # Monday
+    2: ["ai_intel"],  # Wednesday
+    4: ["security_digest"],  # Friday
 }
 
 DAILY_SLOTS: list[str] = ["market_pulse"]

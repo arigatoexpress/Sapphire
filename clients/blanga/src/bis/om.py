@@ -31,7 +31,9 @@ def _confidence(raw: str | None, numeric: bool = False) -> float:
     return 0.0
 
 
-def extract_om_fields(*, source_name: str, document_text: str, property_urn: str | None = None) -> OMExtractionRecord:
+def extract_om_fields(
+    *, source_name: str, document_text: str, property_urn: str | None = None
+) -> OMExtractionRecord:
     text = document_text or ""
 
     extracted: dict[str, str] = {}
@@ -41,7 +43,10 @@ def extract_om_fields(*, source_name: str, document_text: str, property_urn: str
     cap_rate_raw = _search(r"\bCap(?:italization)?\s*Rate\b[^\d]*([\d.]+%?)", text)
     ask_raw = _search(r"\b(?:Asking\s*Price|List\s*Price)\b[^\d$]*([$\d,]+(?:\.\d+)?)", text)
     tenant_raw = _search(r"\bTenant\b\s*[:\-]?\s*([A-Za-z0-9& .,'-]{2,})", text)
-    lease_term_raw = _search(r"\b(?:Lease\s*(?:Term|Expiration|Expires?)|Remaining\s*Term)\b[^\d]*(\d+(?:\.\d+)?)\s*(?:years?|yrs?)", text)
+    lease_term_raw = _search(
+        r"\b(?:Lease\s*(?:Term|Expiration|Expires?)|Remaining\s*Term)\b[^\d]*(\d+(?:\.\d+)?)\s*(?:years?|yrs?)",
+        text,
+    )
     rsf_raw = _search(r"\b(?:RSF|Rentable\s*SF|Building\s*Area)\b[^\d]*([\d,]+(?:\.\d+)?)", text)
     land_acres_raw = _search(r"\b(?:Land\s*Acreage|Acreage|Land\s*Area)\b[^\d]*([\d.]+)", text)
     year_built_raw = _search(r"\b(?:Year\s*Built|Built\s*in)\b[^\d]*(19\d{2}|20\d{2})", text)

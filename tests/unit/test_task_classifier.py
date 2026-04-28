@@ -5,6 +5,7 @@ for different input types, and handles edge cases gracefully.
 
 Run: /usr/local/bin/python3 -m pytest tests/unit/test_task_classifier.py -v
 """
+
 from __future__ import annotations
 
 import sys
@@ -32,6 +33,7 @@ def sys_user(system: str, user: str) -> list[dict]:
 
 # ─── Edge cases ───────────────────────────────────────────────────────────────
 
+
 class TestEdgeCases:
     def test_empty_messages_returns_balanced(self):
         result = classify_messages([])
@@ -54,6 +56,7 @@ class TestEdgeCases:
 
 # ─── Code category ────────────────────────────────────────────────────────────
 
+
 class TestCodeRouting:
     def test_write_function(self):
         result = classify_messages(user_msg("Write a function to sort a list in Python"))
@@ -65,7 +68,9 @@ class TestCodeRouting:
         assert result.category == TaskCategory.CODE
 
     def test_code_snippet(self):
-        result = classify_messages(user_msg("What does this do? ```python\ndef foo(): return 42\n```"))
+        result = classify_messages(
+            user_msg("What does this do? ```python\ndef foo(): return 42\n```")
+        )
         assert result.category == TaskCategory.CODE
 
     def test_create_class(self):
@@ -78,6 +83,7 @@ class TestCodeRouting:
 
 
 # ─── Reasoning category ───────────────────────────────────────────────────────
+
 
 class TestReasoningRouting:
     def test_step_by_step(self):
@@ -99,6 +105,7 @@ class TestReasoningRouting:
 
 # ─── Research category ────────────────────────────────────────────────────────
 
+
 class TestResearchRouting:
     def test_market_analysis(self):
         result = classify_messages(user_msg("Give me a comprehensive market analysis of crypto"))
@@ -114,6 +121,7 @@ class TestResearchRouting:
 
 
 # ─── Factual category ─────────────────────────────────────────────────────────
+
 
 class TestFactualRouting:
     def test_what_is_capital(self):
@@ -132,6 +140,7 @@ class TestFactualRouting:
 
 # ─── Creative category ────────────────────────────────────────────────────────
 
+
 class TestCreativeRouting:
     def test_write_poem(self):
         result = classify_messages(user_msg("Write a poem about Bitcoin"))
@@ -144,6 +153,7 @@ class TestCreativeRouting:
 
 # ─── Chat fallback ────────────────────────────────────────────────────────────
 
+
 class TestChatFallback:
     def test_generic_greeting_balanced(self):
         result = classify_messages(user_msg("Hey, how are you?"))
@@ -155,6 +165,7 @@ class TestChatFallback:
 
 
 # ─── Multi-message context ────────────────────────────────────────────────────
+
 
 class TestMultiMessage:
     def test_last_user_message_wins(self):
@@ -187,6 +198,7 @@ class TestMultiMessage:
 
 
 # ─── classify_text direct ─────────────────────────────────────────────────────
+
 
 class TestClassifyText:
     def test_classify_text_code(self):

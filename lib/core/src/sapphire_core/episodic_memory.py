@@ -114,8 +114,8 @@ class MarketEpisode:
         return f"""Episode: {self.name}
 Regime: {self.regime}
 Duration: {duration:.1f}h
-PnL: ${self.total_pnl:+,.2f} ({self.win_rate*100:.0f}% win rate)
-Lesson: {self.lesson or 'None extracted yet'}"""
+PnL: ${self.total_pnl:+,.2f} ({self.win_rate * 100:.0f}% win rate)
+Lesson: {self.lesson or "None extracted yet"}"""
 
 
 class EpisodicMemoryBank:
@@ -241,7 +241,7 @@ class EpisodicMemoryBank:
 Trades taken:
 {json.dumps(episode.trades[:10], indent=2)}  # Limit for token budget
 
-Key events: {', '.join(episode.key_events[:5])}
+Key events: {", ".join(episode.key_events[:5])}
 
 Extract ONE concise lesson (max 2 sentences) that would help in similar future situations.
 Focus on actionable insights, not obvious statements.

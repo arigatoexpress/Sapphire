@@ -31,6 +31,7 @@ def _fetch_ohlcv(symbol: str, days: int = 60) -> list[dict]:
     """Fetch OHLCV from OpenBB."""
     yf_symbol = SYMBOLS.get(symbol, f"{symbol}-USD")
     from datetime import timedelta
+
     start = (datetime.now(UTC) - timedelta(days=days)).strftime("%Y-%m-%d")
     url = f"{OPENBB_BASE}/crypto/price/historical?symbol={yf_symbol}&provider=yfinance&start_date={start}"
     try:
@@ -61,38 +62,47 @@ def action_forecast(symbol: str = "BTC", horizon: int = 24) -> dict:
             return {"error": f"No OHLCV data for {symbol}"}
 
         df = pd.DataFrame(raw)
-        df['date'] = pd.to_datetime(df['date'])
+        df["date"] = pd.to_datetime(df["date"])
 
         # Kronos expects: open, high, low, close, volume, amount
         ohlcv = df[["open", "high", "low", "close", "volume"]].tail(400).copy()
         ohlcv["amount"] = ohlcv["volume"] * ohlcv["close"]  # Approximate amount
 
         # Timestamps for Kronos
-        dates = df['date'].tail(400 + min(horizon, 120))
-        x_timestamp = dates.iloc[:len(ohlcv)]
-        y_timestamp = dates.iloc[len(ohlcv):len(ohlcv) + min(horizon, 120)]
+        dates = df["date"].tail(400 + min(horizon, 120))
+        x_timestamp = dates.iloc[: len(ohlcv)]
+        y_timestamp = dates.iloc[len(ohlcv) : len(ohlcv) + min(horizon, 120)]
 
         # If we don't have enough future timestamps, generate them
         if len(y_timestamp) < min(horizon, 120):
             from datetime import timedelta
+
             last_date = x_timestamp.iloc[-1]
-            freq = x_timestamp.iloc[-1] - x_timestamp.iloc[-2] if len(x_timestamp) > 1 else timedelta(days=1)
+            freq = (
+                x_timestamp.iloc[-1] - x_timestamp.iloc[-2]
+                if len(x_timestamp) > 1
+                else timedelta(days=1)
+            )
             y_dates = [last_date + freq * (i + 1) for i in range(min(horizon, 120))]
             y_timestamp = pd.Series(y_dates)
 
         # Run prediction
-        pred_df = predictor.predict(ohlcv, x_timestamp=x_timestamp, y_timestamp=y_timestamp, pred_len=min(horizon, 120))
+        pred_df = predictor.predict(
+            ohlcv, x_timestamp=x_timestamp, y_timestamp=y_timestamp, pred_len=min(horizon, 120)
+        )
 
         # Extract predictions
         predictions = []
         for _, row in pred_df.iterrows():
-            predictions.append({
-                "open": round(float(row["open"]), 2),
-                "high": round(float(row["high"]), 2),
-                "low": round(float(row["low"]), 2),
-                "close": round(float(row["close"]), 2),
-                "volume": round(float(row.get("volume", 0)), 0),
-            })
+            predictions.append(
+                {
+                    "open": round(float(row["open"]), 2),
+                    "high": round(float(row["high"]), 2),
+                    "low": round(float(row["low"]), 2),
+                    "close": round(float(row["close"]), 2),
+                    "volume": round(float(row.get("volume", 0)), 0),
+                }
+            )
 
         current_price = float(ohlcv.iloc[-1]["close"])
         predicted_close = predictions[-1]["close"] if predictions else current_price
@@ -112,7 +122,9 @@ def action_forecast(symbol: str = "BTC", horizon: int = 24) -> dict:
         }
 
     except ImportError as e:
-        return {"error": f"Kronos not available: {e}. Run: pip install torch einops huggingface_hub safetensors"}
+        return {
+            "error": f"Kronos not available: {e}. Run: pip install torch einops huggingface_hub safetensors"
+        }
     except Exception as e:
         return {"error": str(e)[:200]}
 
@@ -127,11 +139,13 @@ def action_compare(symbol: str = "BTC") -> dict:
     try:
         sys.path.insert(0, str(SAPPHIRE_DIR / "plugins" / "claw-sapphire" / "lib"))
         from technical_analysis import analyze
+
         profile = analyze(symbol)
         if profile:
             ta_result = {
                 "direction": profile.net_signal,
-                "confidence": 0.5 + abs(profile.signal_count_bullish - profile.signal_count_bearish) * 0.05,
+                "confidence": 0.5
+                + abs(profile.signal_count_bullish - profile.signal_count_bearish) * 0.05,
                 "rsi": profile.rsi_14,
                 "ma_trend": profile.ma_trend,
             }

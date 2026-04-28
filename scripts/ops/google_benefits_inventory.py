@@ -204,17 +204,29 @@ def _membership_notes(memberships: list[str]) -> list[str]:
             "No membership flags were asserted; treating benefits as unverified until Ari confirms exact plan names in Google dashboards."
         ]
     if "google_developer_premium" in selected:
-        notes.append("Prioritize redeemable Cloud/GenAI credits for bounded Vertex/Gemini experiments.")
+        notes.append(
+            "Prioritize redeemable Cloud/GenAI credits for bounded Vertex/Gemini experiments."
+        )
     elif "google_developer_standard" in selected:
-        notes.append("Use free developer tooling and Skills credits; do not assume paid Cloud credits.")
+        notes.append(
+            "Use free developer tooling and Skills credits; do not assume paid Cloud credits."
+        )
     if "google_ai_plus" in selected:
-        notes.append("Use AI Plus consumer benefits for manual research and non-secret storage; verify API entitlements separately.")
+        notes.append(
+            "Use AI Plus consumer benefits for manual research and non-secret storage; verify API entitlements separately."
+        )
     if "google_ai_pro" in selected or "google_ai_ultra" in selected:
-        notes.append("Use AI plan storage and AI credits for human-driven media/research; production API use still needs budget gates.")
+        notes.append(
+            "Use AI plan storage and AI credits for human-driven media/research; production API use still needs budget gates."
+        )
     if "google_ai_ultra" in selected:
-        notes.append("YouTube Premium may be included by plan/region, but Sapphire should treat it as manual research convenience only.")
+        notes.append(
+            "YouTube Premium may be included by plan/region, but Sapphire should treat it as manual research convenience only."
+        )
     if "youtube_premium" in selected:
-        notes.append("YouTube Premium is useful for manual research ergonomics, not autonomous production capability.")
+        notes.append(
+            "YouTube Premium is useful for manual research ergonomics, not autonomous production capability."
+        )
     return notes
 
 
@@ -232,7 +244,9 @@ def _account_summary(runner: Runner) -> dict[str, Any]:
 
 
 def _buckets(project: str, runner: Runner) -> dict[str, Any]:
-    result = runner(["gcloud", "storage", "buckets", "list", f"--project={project}", "--format=json"])
+    result = runner(
+        ["gcloud", "storage", "buckets", "list", f"--project={project}", "--format=json"]
+    )
     if not result.ok:
         return {"available": False, "error": result.error, "count": 0, "names": []}
 

@@ -72,15 +72,27 @@ def run_qa(report: Report) -> QAResult:
 
     if "min_numbers" in overrides:
         min_n = overrides["min_numbers"]
-        reasons = [r for r in reasons if not r.startswith("data_density_low") or _q.count_numbers(qa_text) < min_n]
+        reasons = [
+            r
+            for r in reasons
+            if not r.startswith("data_density_low") or _q.count_numbers(qa_text) < min_n
+        ]
 
     if "min_coherence" in overrides:
         floor = overrides["min_coherence"]
-        reasons = [r for r in reasons if not r.startswith("argument_coherence_low") or result.coherence_score < floor]
+        reasons = [
+            r
+            for r in reasons
+            if not r.startswith("argument_coherence_low") or result.coherence_score < floor
+        ]
 
     if "min_originality_score" in overrides:
         floor = overrides["min_originality_score"]
-        reasons = [r for r in reasons if not r.startswith("originality_low") or result.originality_score < floor]
+        reasons = [
+            r
+            for r in reasons
+            if not r.startswith("originality_low") or result.originality_score < floor
+        ]
 
     return QAResult(
         passed=len(reasons) == 0,

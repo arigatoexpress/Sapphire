@@ -31,31 +31,29 @@ _WS_PUSH_INTERVAL: float = 5.0  # seconds between push broadcasts
 
 async def _check_control_token(request: web.Request) -> web.Response | None:
     """Validate X-Sapphire-Control-Token header for mutable endpoints.
-    
+
     Returns None if valid or token not configured, Response if invalid.
     """
     # Skip for safe methods
     if request.method in {"GET", "HEAD", "OPTIONS"}:
         return None
-    
+
     # If token not configured, warn but allow (dev mode only)
     if not _CONTROL_TOKEN:
         logger.warning("⚠️  SAPPHIRE_CONTROL_API_TOKEN not set — mutable endpoint unprotected!")
         return None
-    
+
     # Check header
     received_token = request.headers.get("X-Sapphire-Control-Token", "")
     if not received_token:
         return web.Response(
             text='{"error": "X-Sapphire-Control-Token header required"}',
             status=401,
-            content_type="application/json"
+            content_type="application/json",
         )
     if received_token != _CONTROL_TOKEN:
         return web.Response(
-            text='{"error": "Invalid control token"}',
-            status=403,
-            content_type="application/json"
+            text='{"error": "Invalid control token"}', status=403, content_type="application/json"
         )
     return None
 
@@ -114,11 +112,14 @@ async def cors_middleware(request: web.Request, handler: Callable) -> web.Respon
 # WebSocket dashboard
 # ---------------------------------------------------------------------------
 
+
 async def _build_dashboard_snapshot(app: web.Application) -> dict[str, Any]:
     """Build a snapshot dict from registered handler callbacks."""
     snapshot: dict[str, Any] = {"timestamp": time.time()}
     for key in ("control", "performance", "platforms"):
-        handler_key = f"{key}_status_handler" if key != "performance" else "performance_stats_handler"
+        handler_key = (
+            f"{key}_status_handler" if key != "performance" else "performance_stats_handler"
+        )
         if key == "control":
             handler_key = "control_status_handler"
         elif key == "platforms":
@@ -213,6 +214,7 @@ async def _stop_ws_push(app: web.Application) -> None:
 # Forum API handlers (CORS + token guarded)
 # ---------------------------------------------------------------------------
 
+
 def _is_authorized(request: web.Request) -> bool:
     """Check if request is authorized via CORS origin or control token."""
     origin = request.headers.get("Origin", "")
@@ -237,7 +239,9 @@ def _is_authorized(request: web.Request) -> bool:
 async def forum_topics(request: web.Request) -> web.Response:
     """GET /api/v2/forum/topics — list forum topics."""
     if not _is_authorized(request):
-        return web.Response(text='{"error":"forbidden"}', status=403, content_type="application/json")
+        return web.Response(
+            text='{"error":"forbidden"}', status=403, content_type="application/json"
+        )
     handler = request.app.get("forum_topics_handler")
     if handler is None:
         return web.json_response({"error": "not configured"}, status=501)
@@ -248,7 +252,9 @@ async def forum_topics(request: web.Request) -> web.Response:
 async def forum_topic_detail(request: web.Request) -> web.Response:
     """GET /api/v2/forum/topics/{topic_id} — get single topic."""
     if not _is_authorized(request):
-        return web.Response(text='{"error":"forbidden"}', status=403, content_type="application/json")
+        return web.Response(
+            text='{"error":"forbidden"}', status=403, content_type="application/json"
+        )
     handler = request.app.get("forum_topic_detail_handler")
     if handler is None:
         return web.json_response({"error": "not configured"}, status=501)
@@ -300,7 +306,7 @@ async def start_health_server(
     app.router.add_get("/health", health_check)
     app.router.add_get("/readiness", readiness_check)
     app.router.add_get("/status", health_check)
-    
+
     if telegram_update_handler is not None:
         app["telegram_update_handler"] = telegram_update_handler
         app["telegram_webhook_secret"] = (telegram_webhook_secret or "").strip()
@@ -309,7 +315,7 @@ async def start_health_server(
     # Add API routes if handlers provided
     # The handlers are bound methods on the engine, so they already have access to self
     # We just need to adapt from aiohttp Request to the handler signature
-    
+
     async def adapt_get(handler, request: web.Request) -> web.Response:
         """Adapt GET request to handler(engine, query_dict)."""
         if handler is None:
@@ -321,7 +327,7 @@ async def start_health_server(
         except Exception as exc:
             logger.error(f"Handler error: {exc}")
             return web.json_response({"error": str(exc)}, status=500)
-    
+
     async def adapt_post(handler, request: web.Request) -> web.Response:
         """Adapt POST request to handler(engine, payload_dict)."""
         if handler is None:
@@ -333,56 +339,70 @@ async def start_health_server(
         except Exception as exc:
             logger.error(f"Handler error: {exc}")
             return web.json_response({"error": str(exc)}, status=500)
-    
+
     # Market Data (GET)
     if market_ohlc_handler:
         app.router.add_get("/market/ohlc", lambda r: adapt_get(market_ohlc_handler, r))
-    
+
     # Platform Status (GET)
     if platform_status_handler:
         app.router.add_get("/platforms/status", lambda r: adapt_get(platform_status_handler, r))
-    
+
     # Routing Info (GET)
     if routing_info_handler:
         app.router.add_get("/routing", lambda r: adapt_get(routing_info_handler, r))
-    
+
     # Performance Stats (GET)
     if performance_stats_handler:
         app.router.add_get("/performance/stats", lambda r: adapt_get(performance_stats_handler, r))
-    
+
     # System Logs (POST - mutable, requires token)
     if system_logs_handler:
         app.router.add_post("/system/logs", lambda r: adapt_post(system_logs_handler, r))
-    
+
     # Control Status (GET)
     if control_status_handler:
         app.router.add_get("/control/status", lambda r: adapt_get(control_status_handler, r))
-    
+
     # Security Skills (GET + POST)
     if security_skills_status_handler:
-        app.router.add_get("/security/skills/status", lambda r: adapt_get(security_skills_status_handler, r))
+        app.router.add_get(
+            "/security/skills/status", lambda r: adapt_get(security_skills_status_handler, r)
+        )
     if security_skills_scan_handler:
-        app.router.add_post("/security/skills/scan", lambda r: adapt_post(security_skills_scan_handler, r))
-    
+        app.router.add_post(
+            "/security/skills/scan", lambda r: adapt_post(security_skills_scan_handler, r)
+        )
+
     # Forum (GET + POST endpoints)
     if forum_topics_handler:
         app.router.add_get("/forum/topics", lambda r: adapt_get(forum_topics_handler, r))
     if forum_create_topic_handler:
         app.router.add_post("/forum/topics", lambda r: adapt_post(forum_create_topic_handler, r))
     if forum_topic_detail_handler:
-        app.router.add_get("/forum/topics/{topic_id}", lambda r: adapt_get(forum_topic_detail_handler, r))
+        app.router.add_get(
+            "/forum/topics/{topic_id}", lambda r: adapt_get(forum_topic_detail_handler, r)
+        )
     if forum_replies_handler:
         app.router.add_post("/forum/replies", lambda r: adapt_post(forum_replies_handler, r))
     if forum_scout_status_handler:
-        app.router.add_get("/forum/scout/status", lambda r: adapt_get(forum_scout_status_handler, r))
+        app.router.add_get(
+            "/forum/scout/status", lambda r: adapt_get(forum_scout_status_handler, r)
+        )
     if forum_scout_register_handler:
-        app.router.add_post("/forum/scout/register", lambda r: adapt_post(forum_scout_register_handler, r))
+        app.router.add_post(
+            "/forum/scout/register", lambda r: adapt_post(forum_scout_register_handler, r)
+        )
     if forum_scout_publish_handler:
-        app.router.add_post("/forum/scout/publish", lambda r: adapt_post(forum_scout_publish_handler, r))
-    
+        app.router.add_post(
+            "/forum/scout/publish", lambda r: adapt_post(forum_scout_publish_handler, r)
+        )
+
     # Prediction Dashboard (GET)
     if prediction_dashboard_handler:
-        app.router.add_get("/prediction/dashboard", lambda r: adapt_get(prediction_dashboard_handler, r))
+        app.router.add_get(
+            "/prediction/dashboard", lambda r: adapt_get(prediction_dashboard_handler, r)
+        )
 
     # Intel Feed (GET)
     if intel_feed_handler:

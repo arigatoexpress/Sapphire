@@ -209,7 +209,9 @@ def test_load_snapshot_from_gcs_returns_none_when_missing(monkeypatch: pytest.Mo
     assert blob.exists_client is client
 
 
-def test_load_snapshot_from_gcs_downloads_existing_snapshot(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_load_snapshot_from_gcs_downloads_existing_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     settings_cls, gcs_persistence = _load_blanga_gcs(monkeypatch)
     blob = FakeBlob(exists=True, downloaded={"status": "warm"})
     client = _install_fake_storage(monkeypatch, gcs_persistence, blob)

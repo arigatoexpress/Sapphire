@@ -43,6 +43,7 @@ def test_extract_features_insufficient_bars() -> None:
 
 def test_extract_features_values_finite() -> None:
     import math
+
     bars = _synthetic_bars("BTC", 90)
     rows = extract_features(bars)
     assert rows, "should produce at least some feature rows"

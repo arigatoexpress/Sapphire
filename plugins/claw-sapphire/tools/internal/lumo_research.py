@@ -46,13 +46,13 @@ DEFAULT_TIMEOUT = 90  # Lumo can be slow on first call; DOM polling takes ~10s
 # Strip patterns that should never leave the local mesh even to Lumo
 
 _SENSITIVE_PATTERNS = [
-    re.compile(r'(?i)(api[_-]?key|apikey)\s*[:=]\s*\S+'),
-    re.compile(r'(?i)(password|passwd|secret)\s*[:=]\s*\S+'),
-    re.compile(r'(?i)bearer\s+[A-Za-z0-9\-._~+/]+=*'),
-    re.compile(r'-----BEGIN [A-Z ]+-----'),
-    re.compile(r'\b\d{3}-\d{2}-\d{4}\b'),                    # SSN
-    re.compile(r'\b4[0-9]{12}(?:[0-9]{3})?\b'),              # Visa
-    re.compile(r'\b5[1-5][0-9]{14}\b'),                      # MC
+    re.compile(r"(?i)(api[_-]?key|apikey)\s*[:=]\s*\S+"),
+    re.compile(r"(?i)(password|passwd|secret)\s*[:=]\s*\S+"),
+    re.compile(r"(?i)bearer\s+[A-Za-z0-9\-._~+/]+=*"),
+    re.compile(r"-----BEGIN [A-Z ]+-----"),
+    re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),  # SSN
+    re.compile(r"\b4[0-9]{12}(?:[0-9]{3})?\b"),  # Visa
+    re.compile(r"\b5[1-5][0-9]{14}\b"),  # MC
 ]
 
 
@@ -65,12 +65,15 @@ def _sanitize(text: str) -> str:
 
 # ── HTTP client ────────────────────────────────────────────────────────────────
 
+
 def _post_lumo(prompt: str, web_search: bool = False, timeout: int = DEFAULT_TIMEOUT) -> str:
     """POST to Lumo API server. Returns plain-text response."""
-    payload = json.dumps({
-        "prompt": prompt,
-        "webSearch": web_search,
-    }).encode("utf-8")
+    payload = json.dumps(
+        {
+            "prompt": prompt,
+            "webSearch": web_search,
+        }
+    ).encode("utf-8")
 
     req = Request(
         LUMO_URL,
@@ -86,6 +89,7 @@ def _post_lumo(prompt: str, web_search: bool = False, timeout: int = DEFAULT_TIM
 def _is_online(timeout: int = 3) -> bool:
     """Quick TCP check — doesn't POST, just checks port."""
     import socket
+
     try:
         s = socket.create_connection((LUMO_HOST, LUMO_PORT), timeout=timeout)
         s.close()
@@ -95,6 +99,7 @@ def _is_online(timeout: int = 3) -> bool:
 
 
 # ── Actions ───────────────────────────────────────────────────────────────────
+
 
 def action_status() -> dict:
     """Check if Lumo API server is reachable."""
@@ -111,11 +116,13 @@ def action_status() -> dict:
         "setup_needed": not auth_exists,
         "message": (
             "Lumo API is running and ready"
-            if online else
-            "Lumo API offline. Start with: cd ~/Code/lumo-api && node lumo.js"
+            if online
+            else "Lumo API offline. Start with: cd ~/Code/lumo-api && node lumo.js"
         ),
         "setup_steps": (
-            [] if auth_exists else [
+            []
+            if auth_exists
+            else [
                 "cd ~/Code/lumo-api",
                 "node generate_auth.js   # opens Proton login",
                 "node lumo.js            # start the API server",
@@ -251,6 +258,7 @@ def action_security_brief(
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+
 def main() -> None:
     raw = sys.stdin.read().strip()
     if not raw:
@@ -285,10 +293,14 @@ def main() -> None:
         print(json.dumps(result, indent=2))
 
     else:
-        print(json.dumps({
-            "error": f"Unknown action: {action}",
-            "valid_actions": ["ask", "security_brief", "status"],
-        }))
+        print(
+            json.dumps(
+                {
+                    "error": f"Unknown action: {action}",
+                    "valid_actions": ["ask", "security_brief", "status"],
+                }
+            )
+        )
 
 
 if __name__ == "__main__":

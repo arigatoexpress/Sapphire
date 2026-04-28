@@ -128,8 +128,14 @@ def _load_plist(path: Path) -> dict[str, Any]:
 
 def _launchagent_summary(path: Path, runtime_path: Path) -> dict[str, Any]:
     data = _load_plist(path)
-    env = data.get("EnvironmentVariables") if isinstance(data.get("EnvironmentVariables"), dict) else {}
-    program_args = data.get("ProgramArguments") if isinstance(data.get("ProgramArguments"), list) else []
+    env = (
+        data.get("EnvironmentVariables")
+        if isinstance(data.get("EnvironmentVariables"), dict)
+        else {}
+    )
+    program_args = (
+        data.get("ProgramArguments") if isinstance(data.get("ProgramArguments"), list) else []
+    )
     working_directory = str(data.get("WorkingDirectory") or "")
     runtime_str = str(runtime_path)
     return {
@@ -215,7 +221,10 @@ def collect_readiness(
         status = "warn"
         next_action = "Add or repair Sapphire CommandGuard quick-exec coverage before expanding Hermes production commands."
 
-    if quick_commands["production_adjacent_exec_count"] and not required["runtime_quick_exec_command_guard"]:
+    if (
+        quick_commands["production_adjacent_exec_count"]
+        and not required["runtime_quick_exec_command_guard"]
+    ):
         status = "warn"
     if not launchagent["exists"] or not runtime["exists"]:
         status = "fail"

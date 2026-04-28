@@ -28,145 +28,153 @@ class Capability(Enum):
     """Atomic permissions that an agent can hold."""
 
     # ── Execution ──
-    TRADE_EXECUTE = auto()       # Send trade commands to venues
-    TRADE_READ = auto()          # Read trade history and fill data
-    PORTFOLIO_READ = auto()      # Read open positions and P&L
-    PORTFOLIO_WRITE = auto()     # Modify portfolio (close positions, reset)
-    VENUE_CONTROL = auto()       # Pause/resume/allocate venues
-    KILL_SWITCH = auto()         # Activate emergency halt
+    TRADE_EXECUTE = auto()  # Send trade commands to venues
+    TRADE_READ = auto()  # Read trade history and fill data
+    PORTFOLIO_READ = auto()  # Read open positions and P&L
+    PORTFOLIO_WRITE = auto()  # Modify portfolio (close positions, reset)
+    VENUE_CONTROL = auto()  # Pause/resume/allocate venues
+    KILL_SWITCH = auto()  # Activate emergency halt
 
     # ── Intelligence ──
-    COGNITION_READ = auto()      # Read cognition state and metrics
-    COGNITION_WRITE = auto()     # Trigger cognition evaluations
-    MEMORY_READ = auto()         # Read episodic memory
-    MEMORY_WRITE = auto()        # Record to episodic memory
-    MARKET_DATA_READ = auto()    # Read live market prices
+    COGNITION_READ = auto()  # Read cognition state and metrics
+    COGNITION_WRITE = auto()  # Trigger cognition evaluations
+    MEMORY_READ = auto()  # Read episodic memory
+    MEMORY_WRITE = auto()  # Record to episodic memory
+    MARKET_DATA_READ = auto()  # Read live market prices
 
     # ── Forum / Communication ──
-    FORUM_READ = auto()          # Read forum posts and topics
-    FORUM_WRITE = auto()         # Create forum posts and comments
-    FORUM_MODERATE = auto()      # Delete/edit any forum content
+    FORUM_READ = auto()  # Read forum posts and topics
+    FORUM_WRITE = auto()  # Create forum posts and comments
+    FORUM_MODERATE = auto()  # Delete/edit any forum content
 
     # ── External ──
-    EXTERNAL_API_CALL = auto()   # Make HTTP calls to external services
-    MOLTBOOK_READ = auto()       # Read from Moltbook/Molthub
-    MOLTBOOK_WRITE = auto()      # Post to Moltbook/Molthub
+    EXTERNAL_API_CALL = auto()  # Make HTTP calls to external services
+    MOLTBOOK_READ = auto()  # Read from Moltbook/Molthub
+    MOLTBOOK_WRITE = auto()  # Post to Moltbook/Molthub
 
     # ── System ──
-    SECRET_ACCESS = auto()       # Access env vars containing secrets
-    SYSTEM_CONFIG = auto()       # Modify runtime configuration
-    AUTONOMY_DISPATCH = auto()   # Dispatch autonomy cycles
-    TELEGRAM_SEND = auto()       # Send messages to Telegram
-    SKILL_AUDIT = auto()         # Run security audits on skills
-    AI_PROMPT = auto()           # Send prompts to LLM (Gemini)
+    SECRET_ACCESS = auto()  # Access env vars containing secrets
+    SYSTEM_CONFIG = auto()  # Modify runtime configuration
+    AUTONOMY_DISPATCH = auto()  # Dispatch autonomy cycles
+    TELEGRAM_SEND = auto()  # Send messages to Telegram
+    SKILL_AUDIT = auto()  # Run security audits on skills
+    AI_PROMPT = auto()  # Send prompts to LLM (Gemini)
 
     # ── Media ──
-    MEDIA_PUBLISH = auto()       # Publish media content
+    MEDIA_PUBLISH = auto()  # Publish media content
 
     # ── Reputation ──
-    REPUTATION_READ = auto()     # Read bot reputation data / leaderboard
-    REPUTATION_ADMIN = auto()    # Ban, penalize, reward bots
+    REPUTATION_READ = auto()  # Read bot reputation data / leaderboard
+    REPUTATION_ADMIN = auto()  # Ban, penalize, reward bots
 
     # ── Code & Infrastructure (Full Autonomy) ──
-    CODE_READ = auto()           # Read source code files
-    CODE_WRITE = auto()          # Create or modify source code
-    CODE_DEPLOY = auto()         # Trigger build + deploy pipeline
-    CODE_REVIEW = auto()         # Review and approve code changes
+    CODE_READ = auto()  # Read source code files
+    CODE_WRITE = auto()  # Create or modify source code
+    CODE_DEPLOY = auto()  # Trigger build + deploy pipeline
+    CODE_REVIEW = auto()  # Review and approve code changes
     INFRASTRUCTURE_MODIFY = auto()  # Modify GCP resources (Cloud Run, secrets, scheduler)
-    CI_CD_TRIGGER = auto()       # Trigger CI/CD pipeline runs
-    HEALTH_MONITOR = auto()      # Proactively monitor and diagnose system health
+    CI_CD_TRIGGER = auto()  # Trigger CI/CD pipeline runs
+    HEALTH_MONITOR = auto()  # Proactively monitor and diagnose system health
 
 
 # ── Agent Role Definitions ──────────────────────────────────────────
 
 # Sapphire 💎: Trading & execution ops — full access to execution and market
-SAPPHIRE_CAPABILITIES: frozenset[Capability] = frozenset({
-    Capability.TRADE_EXECUTE,
-    Capability.TRADE_READ,
-    Capability.PORTFOLIO_READ,
-    Capability.PORTFOLIO_WRITE,
-    Capability.VENUE_CONTROL,
-    Capability.KILL_SWITCH,
-    Capability.COGNITION_READ,
-    Capability.COGNITION_WRITE,
-    Capability.MEMORY_READ,
-    Capability.MEMORY_WRITE,
-    Capability.MARKET_DATA_READ,
-    Capability.FORUM_READ,
-    Capability.FORUM_WRITE,
-    Capability.SECRET_ACCESS,
-    Capability.SYSTEM_CONFIG,
-    Capability.AUTONOMY_DISPATCH,
-    Capability.TELEGRAM_SEND,
-    Capability.AI_PROMPT,
-    Capability.MEDIA_PUBLISH,
-    Capability.REPUTATION_READ,
-    Capability.REPUTATION_ADMIN,
-    Capability.CODE_READ,
-    Capability.CODE_REVIEW,
-    Capability.HEALTH_MONITOR,
-})
+SAPPHIRE_CAPABILITIES: frozenset[Capability] = frozenset(
+    {
+        Capability.TRADE_EXECUTE,
+        Capability.TRADE_READ,
+        Capability.PORTFOLIO_READ,
+        Capability.PORTFOLIO_WRITE,
+        Capability.VENUE_CONTROL,
+        Capability.KILL_SWITCH,
+        Capability.COGNITION_READ,
+        Capability.COGNITION_WRITE,
+        Capability.MEMORY_READ,
+        Capability.MEMORY_WRITE,
+        Capability.MARKET_DATA_READ,
+        Capability.FORUM_READ,
+        Capability.FORUM_WRITE,
+        Capability.SECRET_ACCESS,
+        Capability.SYSTEM_CONFIG,
+        Capability.AUTONOMY_DISPATCH,
+        Capability.TELEGRAM_SEND,
+        Capability.AI_PROMPT,
+        Capability.MEDIA_PUBLISH,
+        Capability.REPUTATION_READ,
+        Capability.REPUTATION_ADMIN,
+        Capability.CODE_READ,
+        Capability.CODE_REVIEW,
+        Capability.HEALTH_MONITOR,
+    }
+)
 
 # Obsidian 🖤: Infrastructure & deployments — system control, no direct trading
-OBSIDIAN_CAPABILITIES: frozenset[Capability] = frozenset({
-    Capability.TRADE_READ,
-    Capability.PORTFOLIO_READ,
-    Capability.VENUE_CONTROL,
-    Capability.KILL_SWITCH,
-    Capability.COGNITION_READ,
-    Capability.MEMORY_READ,
-    Capability.MARKET_DATA_READ,
-    Capability.FORUM_READ,
-    Capability.FORUM_WRITE,
-    Capability.SECRET_ACCESS,
-    Capability.SYSTEM_CONFIG,
-    Capability.AUTONOMY_DISPATCH,
-    Capability.TELEGRAM_SEND,
-    Capability.AI_PROMPT,
-    Capability.REPUTATION_READ,
-    Capability.CODE_READ,
-    Capability.CODE_WRITE,
-    Capability.CODE_DEPLOY,
-    Capability.INFRASTRUCTURE_MODIFY,
-    Capability.CI_CD_TRIGGER,
-    Capability.HEALTH_MONITOR,
-})
+OBSIDIAN_CAPABILITIES: frozenset[Capability] = frozenset(
+    {
+        Capability.TRADE_READ,
+        Capability.PORTFOLIO_READ,
+        Capability.VENUE_CONTROL,
+        Capability.KILL_SWITCH,
+        Capability.COGNITION_READ,
+        Capability.MEMORY_READ,
+        Capability.MARKET_DATA_READ,
+        Capability.FORUM_READ,
+        Capability.FORUM_WRITE,
+        Capability.SECRET_ACCESS,
+        Capability.SYSTEM_CONFIG,
+        Capability.AUTONOMY_DISPATCH,
+        Capability.TELEGRAM_SEND,
+        Capability.AI_PROMPT,
+        Capability.REPUTATION_READ,
+        Capability.CODE_READ,
+        Capability.CODE_WRITE,
+        Capability.CODE_DEPLOY,
+        Capability.INFRASTRUCTURE_MODIFY,
+        Capability.CI_CD_TRIGGER,
+        Capability.HEALTH_MONITOR,
+    }
+)
 
 # Emerald 💚: Strategy & improvement — cognition, memory, auditing, no secrets
-EMERALD_CAPABILITIES: frozenset[Capability] = frozenset({
-    Capability.TRADE_READ,
-    Capability.PORTFOLIO_READ,
-    Capability.COGNITION_READ,
-    Capability.COGNITION_WRITE,
-    Capability.MEMORY_READ,
-    Capability.MEMORY_WRITE,
-    Capability.MARKET_DATA_READ,
-    Capability.FORUM_READ,
-    Capability.FORUM_WRITE,
-    Capability.FORUM_MODERATE,
-    Capability.SKILL_AUDIT,
-    Capability.AUTONOMY_DISPATCH,
-    Capability.TELEGRAM_SEND,
-    Capability.AI_PROMPT,
-    Capability.REPUTATION_READ,
-    Capability.REPUTATION_ADMIN,
-    Capability.CODE_READ,
-    Capability.CODE_WRITE,
-    Capability.CODE_REVIEW,
-    Capability.HEALTH_MONITOR,
-})
+EMERALD_CAPABILITIES: frozenset[Capability] = frozenset(
+    {
+        Capability.TRADE_READ,
+        Capability.PORTFOLIO_READ,
+        Capability.COGNITION_READ,
+        Capability.COGNITION_WRITE,
+        Capability.MEMORY_READ,
+        Capability.MEMORY_WRITE,
+        Capability.MARKET_DATA_READ,
+        Capability.FORUM_READ,
+        Capability.FORUM_WRITE,
+        Capability.FORUM_MODERATE,
+        Capability.SKILL_AUDIT,
+        Capability.AUTONOMY_DISPATCH,
+        Capability.TELEGRAM_SEND,
+        Capability.AI_PROMPT,
+        Capability.REPUTATION_READ,
+        Capability.REPUTATION_ADMIN,
+        Capability.CODE_READ,
+        Capability.CODE_WRITE,
+        Capability.CODE_REVIEW,
+        Capability.HEALTH_MONITOR,
+    }
+)
 
 # Scout 🔍: External-facing — MOST RESTRICTED, Forum-only communication
-SCOUT_CAPABILITIES: frozenset[Capability] = frozenset({
-    Capability.FORUM_READ,
-    Capability.FORUM_WRITE,
-    Capability.MOLTBOOK_READ,
-    Capability.MOLTBOOK_WRITE,
-    Capability.EXTERNAL_API_CALL,
-    Capability.SKILL_AUDIT,
-    # Scout explicitly CANNOT: access secrets, execute trades, read portfolio,
-    # control venues, send Telegram messages, access AI prompts, or modify system config.
-})
+SCOUT_CAPABILITIES: frozenset[Capability] = frozenset(
+    {
+        Capability.FORUM_READ,
+        Capability.FORUM_WRITE,
+        Capability.MOLTBOOK_READ,
+        Capability.MOLTBOOK_WRITE,
+        Capability.EXTERNAL_API_CALL,
+        Capability.SKILL_AUDIT,
+        # Scout explicitly CANNOT: access secrets, execute trades, read portfolio,
+        # control venues, send Telegram messages, access AI prompts, or modify system config.
+    }
+)
 
 # Mapping from agent ID to capabilities
 AGENT_CAPABILITY_MAP: dict[str, frozenset[Capability]] = {
@@ -263,6 +271,7 @@ class PermissionDenied(Exception):
 @dataclass
 class PermissionCheckRecord:
     """Audit log entry for a permission check."""
+
     agent_id: str
     capability: str
     granted: bool
@@ -352,7 +361,7 @@ class AgentGate:
             )
         )
         if len(self._audit_log) > self._max_audit_log:
-            self._audit_log = self._audit_log[-self._max_audit_log:]
+            self._audit_log = self._audit_log[-self._max_audit_log :]
 
 
 # Singleton gate

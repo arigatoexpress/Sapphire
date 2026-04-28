@@ -22,7 +22,14 @@ from typing import Any
 from dev_pulse import DEFAULT_LAUNCHAGENT_LABELS, ServiceStatus, collect_service_statuses
 from notify import send_alert
 
-STATE_FILE = Path.home() / "Library" / "Application Support" / "sapphire" / "service_supervisor" / "state.json"
+STATE_FILE = (
+    Path.home()
+    / "Library"
+    / "Application Support"
+    / "sapphire"
+    / "service_supervisor"
+    / "state.json"
+)
 
 
 def _now() -> datetime:
@@ -457,7 +464,9 @@ def supervise_once(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run the Sapphire LaunchAgent supervisor once")
-    parser.add_argument("--label", action="append", dest="labels", help="Restrict to one monitored label")
+    parser.add_argument(
+        "--label", action="append", dest="labels", help="Restrict to one monitored label"
+    )
     parser.add_argument("--dry-run", action="store_true", help="Preview actions without restarting")
     parser.add_argument("--restart-cooldown-seconds", type=int, default=300)
     parser.add_argument("--max-restarts-per-hour", type=int, default=4)

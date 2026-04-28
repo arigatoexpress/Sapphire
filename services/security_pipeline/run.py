@@ -77,14 +77,16 @@ def scan_secrets() -> list[dict]:
                 for match in re.finditer(pattern, content):
                     # Skip test files and comments
                     line_start = content.rfind("\n", 0, match.start()) + 1
-                    line = content[line_start:content.find("\n", match.end())]
+                    line = content[line_start : content.find("\n", match.end())]
                     if line.lstrip().startswith("#"):
                         continue
-                    findings.append({
-                        "file": str(py_file.relative_to(ROOT)),
-                        "type": label,
-                        "line_preview": line.strip()[:80] + "...",
-                    })
+                    findings.append(
+                        {
+                            "file": str(py_file.relative_to(ROOT)),
+                            "type": label,
+                            "line_preview": line.strip()[:80] + "...",
+                        }
+                    )
     return findings
 
 
@@ -94,7 +96,9 @@ def scan_dependencies() -> dict:
     try:
         r = subprocess.run(
             [sys.executable, "-m", "pip_audit", "--format=json", "--desc"],
-            capture_output=True, text=True, timeout=120,
+            capture_output=True,
+            text=True,
+            timeout=120,
         )
         if r.stdout.strip():
             vulns = json.loads(r.stdout)
@@ -117,7 +121,9 @@ def refresh_threat_intel() -> dict:
         r = subprocess.run(
             [sys.executable, str(tool)],
             input=json.dumps({"action": "latest"}),
-            capture_output=True, text=True, timeout=60,
+            capture_output=True,
+            text=True,
+            timeout=60,
         )
         if r.stdout.strip():
             return json.loads(r.stdout)
@@ -137,10 +143,15 @@ def compute_score(secrets_count: int, vuln_count: int, threat_count: int) -> dic
     score -= min(threat_count * 2, 20)
 
     grade = (
-        "A" if score >= 90 else
-        "B" if score >= 75 else
-        "C" if score >= 60 else
-        "D" if score >= 40 else "F"
+        "A"
+        if score >= 90
+        else "B"
+        if score >= 75
+        else "C"
+        if score >= 60
+        else "D"
+        if score >= 40
+        else "F"
     )
     return {"score": max(0, score), "grade": grade}
 
@@ -185,12 +196,17 @@ def main() -> int:
     # 6. Publish event
     try:
         from lib.core.event_bus import get_bus
-        get_bus().publish("security.pipeline.completed", {
-            "date": TODAY,
-            "posture": posture,
-            "secrets_found": len(secrets_found),
-            "vulnerabilities": vuln_count,
-        }, source="security-pipeline")
+
+        get_bus().publish(
+            "security.pipeline.completed",
+            {
+                "date": TODAY,
+                "posture": posture,
+                "secrets_found": len(secrets_found),
+                "vulnerabilities": vuln_count,
+            },
+            source="security-pipeline",
+        )
     except Exception as e:
         log.debug("Event publish failed: %s", e)
 
@@ -207,13 +223,14 @@ def main() -> int:
             subprocess.run(
                 [sys.executable, str(notify_tool)],
                 input=json.dumps({"message": msg, "priority": "p1"}),
-                capture_output=True, text=True, timeout=15,
+                capture_output=True,
+                text=True,
+                timeout=15,
             )
         except Exception:
             pass
 
-    log.info("Security pipeline complete. Grade: %s (%d/100)",
-             posture["grade"], posture["score"])
+    log.info("Security pipeline complete. Grade: %s (%d/100)", posture["grade"], posture["score"])
     return 0
 
 

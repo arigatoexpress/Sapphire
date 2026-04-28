@@ -20,8 +20,12 @@ from datetime import datetime
 from pathlib import Path
 
 SAPPHIRE_DIR = Path.home() / "Code" / "Sapphire"
-SECRETS_DIR = Path(os.getenv("SAPPHIRE_SECRETS_DIR", str(Path.home() / ".config" / "sapphire-secrets")))
-THO_BASE_URL = os.getenv("THO_BASE_URL", "https://project-go-forward-691674245427.us-central1.run.app")
+SECRETS_DIR = Path(
+    os.getenv("SAPPHIRE_SECRETS_DIR", str(Path.home() / ".config" / "sapphire-secrets"))
+)
+THO_BASE_URL = os.getenv(
+    "THO_BASE_URL", "https://project-go-forward-691674245427.us-central1.run.app"
+)
 
 
 def _load_tho_pin() -> str | None:
@@ -42,8 +46,10 @@ def _check_url(url: str, timeout: int = 5) -> tuple[bool, str]:
     import ssl
     import urllib.error
     import urllib.request
+
     try:
         import certifi
+
         ctx = ssl.create_default_context(cafile=certifi.where())
     except ImportError:
         ctx = ssl.create_default_context()
@@ -82,6 +88,7 @@ def check_tho_deep(timeout: int = 15) -> dict:
 
     try:
         import certifi
+
         ctx = ssl.create_default_context(cafile=certifi.where())
     except ImportError:
         ctx = ssl.create_default_context()
@@ -100,7 +107,10 @@ def check_tho_deep(timeout: int = 15) -> dict:
             body = json.loads(resp.read())
         token = (body or {}).get("token", "")
         if len(token) > 20:
-            results["tho-deep:auth"] = {"status": "green", "detail": f"JWT issued ({len(token)} chars)"}
+            results["tho-deep:auth"] = {
+                "status": "green",
+                "detail": f"JWT issued ({len(token)} chars)",
+            }
         else:
             results["tho-deep:auth"] = {"status": "red", "detail": "verify returned no token"}
     except urllib.error.HTTPError as e:
@@ -123,7 +133,10 @@ def check_tho_deep(timeout: int = 15) -> dict:
             body = json.loads(resp.read())
         total = (body or {}).get("total", 0)
         if total > 0:
-            results["tho-deep:firestore"] = {"status": "green", "detail": f"{total:,} customers readable"}
+            results["tho-deep:firestore"] = {
+                "status": "green",
+                "detail": f"{total:,} customers readable",
+            }
         else:
             results["tho-deep:firestore"] = {"status": "yellow", "detail": "reachable but count=0"}
     except urllib.error.HTTPError as e:
@@ -138,7 +151,10 @@ def check_tho_deep(timeout: int = 15) -> dict:
             body = json.loads(resp.read())
         templates = (body or {}).get("templates", [])
         if len(templates) >= 1:
-            results["tho-deep:templates"] = {"status": "green", "detail": f"{len(templates)} templates listed"}
+            results["tho-deep:templates"] = {
+                "status": "green",
+                "detail": f"{len(templates)} templates listed",
+            }
         else:
             results["tho-deep:templates"] = {"status": "yellow", "detail": "reachable but empty"}
     except urllib.error.HTTPError as e:
@@ -162,12 +178,21 @@ def check_services(profile: str = "full") -> dict:
     """Check all running services."""
     services = {
         "control-plane:8082": ("http://127.0.0.1:8082/health", "com.sapphire.control-plane"),
-        "dashboard:8080": ("http://127.0.0.1:8080/", "com.sapphire.dashboard"),  # 401 = running (auth required)
+        "dashboard:8080": (
+            "http://127.0.0.1:8080/",
+            "com.sapphire.dashboard",
+        ),  # 401 = running (auth required)
         "signal-logger:18081": ("http://127.0.0.1:18081/health", "com.sapphire.signal-logger"),
-        "openbb:6900": ("http://127.0.0.1:6900/api/v1/equity/price/quote?symbol=AAPL&provider=yfinance", "com.sapphire.openbb-api"),
+        "openbb:6900": (
+            "http://127.0.0.1:6900/api/v1/equity/price/quote?symbol=AAPL&provider=yfinance",
+            "com.sapphire.openbb-api",
+        ),
         "redis:6379": (None, "homebrew.mxcl.redis"),
         "regional-intel:8787": ("http://127.0.0.1:8787/", "com.sapphire.regional-intel"),
-        "tho-cloud-run": ("https://project-go-forward-691674245427.us-central1.run.app/health", None),  # 10s for cold start
+        "tho-cloud-run": (
+            "https://project-go-forward-691674245427.us-central1.run.app/health",
+            None,
+        ),  # 10s for cold start
     }
     if profile == "brief":
         services.pop("tho-cloud-run", None)
@@ -195,10 +220,7 @@ def check_services(profile: str = "full") -> dict:
 
     results = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(6, len(services) or 1)) as pool:
-        futures = [
-            pool.submit(_check, name, url, agent)
-            for name, (url, agent) in services.items()
-        ]
+        futures = [pool.submit(_check, name, url, agent) for name, (url, agent) in services.items()]
         for future in concurrent.futures.as_completed(futures):
             name, payload = future.result()
             results[name] = payload
@@ -221,13 +243,23 @@ def check_repos() -> dict:
             return name, {"status": "red", "detail": "Directory not found"}
         try:
             # Check for uncommitted changes
-            r = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True,
-                             cwd=str(path), timeout=5)
+            r = subprocess.run(
+                ["git", "status", "--porcelain"],
+                capture_output=True,
+                text=True,
+                cwd=str(path),
+                timeout=5,
+            )
             dirty = len(r.stdout.strip().split("\n")) if r.stdout.strip() else 0
 
             # Check ahead/behind
-            r2 = subprocess.run(["git", "log", "--oneline", "-1", "--format=%h %s"],
-                              capture_output=True, text=True, cwd=str(path), timeout=5)
+            r2 = subprocess.run(
+                ["git", "log", "--oneline", "-1", "--format=%h %s"],
+                capture_output=True,
+                text=True,
+                cwd=str(path),
+                timeout=5,
+            )
             last_commit = r2.stdout.strip()
 
             status = "green" if dirty == 0 else "yellow"

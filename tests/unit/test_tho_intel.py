@@ -30,6 +30,7 @@ _tho_spec.loader.exec_module(tho)
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
+
 def _make_macro_housing(mortgage_rate: float):
     return {
         "housing": {
@@ -66,8 +67,10 @@ def _mock_action_market(
             "tho_conversion": tho_conversion,
             "tho_recent_leads": 5,
             "market_sentiment": (
-                "bullish — rates dropping, demand should increase" if mortgage_rate < 6
-                else "bearish — high rates suppressing demand" if mortgage_rate > 7
+                "bullish — rates dropping, demand should increase"
+                if mortgage_rate < 6
+                else "bearish — high rates suppressing demand"
+                if mortgage_rate > 7
                 else "neutral — rates stable, steady demand"
             ),
         },
@@ -75,6 +78,7 @@ def _mock_action_market(
 
 
 # ── action_market ─────────────────────────────────────────────────────────────
+
 
 class TestActionMarket:
     def _run(self, housing_resp, rates_resp, permits_data=None, tho_token="", tho_stats=None):
@@ -101,6 +105,7 @@ class TestActionMarket:
             elif "analytics/customers" in url:
                 stats = tho_stats or {"total": 100, "conversion_rate": 50}
                 import json
+
                 resp.read.return_value = json.dumps(stats).encode()
             return resp.__enter__.return_value if hasattr(resp, "__enter__") else resp
 
@@ -112,8 +117,10 @@ class TestActionMarket:
 
     def test_returns_success_true(self):
         result = self._run(
-            _make_macro_housing(6.5), {},
-            tho_token="tok", tho_stats={"total": 80, "conversion_rate": 45},
+            _make_macro_housing(6.5),
+            {},
+            tho_token="tok",
+            tho_stats={"total": 80, "conversion_rate": 45},
         )
         assert result["success"] is True
 
@@ -172,6 +179,7 @@ class TestActionMarket:
 
 
 # ── action_buyers ─────────────────────────────────────────────────────────────
+
 
 class TestActionBuyers:
     def _run_buyers(self, mortgage_rate, permits_count=0, tho_conversion=0):

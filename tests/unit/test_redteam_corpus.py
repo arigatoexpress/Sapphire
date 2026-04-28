@@ -93,11 +93,8 @@ def test_model_monitor(probe: dict) -> None:
 
     if expected is None:
         # Negative probe: nothing should fire.
-        assert hits == [], (
-            f"{probe['id']}: benign template unexpectedly triggered {hits!r}"
-        )
+        assert hits == [], f"{probe['id']}: benign template unexpectedly triggered {hits!r}"
     else:
         assert expected in hits, (
-            f"{probe['id']}: expected pattern {expected!r} to fire, "
-            f"got hits={hits!r}"
+            f"{probe['id']}: expected pattern {expected!r} to fire, got hits={hits!r}"
         )

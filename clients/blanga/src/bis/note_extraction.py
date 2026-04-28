@@ -28,7 +28,9 @@ def _add_years_safe(source: date, years: int) -> date:
         return source + timedelta(days=365 * years)
 
 
-def extract_field_suggestions(note_text: str, *, today: date | None = None) -> list[NoteFieldSuggestion]:
+def extract_field_suggestions(
+    note_text: str, *, today: date | None = None
+) -> list[NoteFieldSuggestion]:
     text = (note_text or "").strip()
     lowered = text.lower()
     today = today or date.today()
@@ -36,7 +38,9 @@ def extract_field_suggestions(note_text: str, *, today: date | None = None) -> l
 
     lease_years_match = re.search(r"\b(\d{1,2})\s+years?\s+left\s+on\s+the\s+lease\b", lowered)
     if not lease_years_match:
-        lease_years_match = re.search(r"\blease\s+(?:expires?|expiration)\s+in\s+(\d{1,2})\s+years?\b", lowered)
+        lease_years_match = re.search(
+            r"\blease\s+(?:expires?|expiration)\s+in\s+(\d{1,2})\s+years?\b", lowered
+        )
     if lease_years_match:
         years_left = int(lease_years_match.group(1))
         lease_exp = _add_years_safe(today, years_left)
@@ -73,7 +77,9 @@ def extract_field_suggestions(note_text: str, *, today: date | None = None) -> l
     return suggestions
 
 
-def extract_follow_up_suggestions(note_text: str, *, today: date | None = None) -> list[FollowUpSuggestion]:
+def extract_follow_up_suggestions(
+    note_text: str, *, today: date | None = None
+) -> list[FollowUpSuggestion]:
     text = (note_text or "").strip()
     lowered = text.lower()
     today = today or date.today()

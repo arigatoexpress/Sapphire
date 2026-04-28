@@ -433,10 +433,12 @@ class TestSendAndConfirm:
             nonlocal attempt_count
             # Monkey-patch send_command to count
             original = d.send_command
+
             async def counting_send(*a, **kw):
                 nonlocal attempt_count
                 attempt_count += 1
                 return await original(*a, **kw)
+
             d.send_command = counting_send
 
         await count_dispatches()

@@ -316,8 +316,12 @@ def test_get_top_topics_sorted_by_score(forum):
 
 
 def test_get_top_topics_filter_by_category(forum):
-    _create_topic(forum, title="Trade idea topic", body="A trade idea body here", category="trade_idea")
-    _create_topic(forum, title="Strategy topic", body="A strategy body content", category="strategy")
+    _create_topic(
+        forum, title="Trade idea topic", body="A trade idea body here", category="trade_idea"
+    )
+    _create_topic(
+        forum, title="Strategy topic", body="A strategy body content", category="strategy"
+    )
     trade_topics = forum.get_top_topics(limit=10, category="trade_idea")
     # Should only return trade_idea topics
     for _t in trade_topics:

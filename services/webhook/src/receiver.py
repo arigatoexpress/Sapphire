@@ -40,11 +40,11 @@ _FIRESTORE_AVAILABLE = False
 
 SYSTEM_LOGS_COLLECTION = "system_logs"
 
-WEBHOOK_SECRET  = os.getenv("WEBHOOK_SECRET", "")  # Must match Pine Script alert body
-OLLAMA_URL      = os.getenv("OLLAMA_URL", "http://localhost:11434")   # Local Ollama (RTX 5070 Ti)
-WEBHOOK_PORT    = int(os.getenv("WEBHOOK_PORT", "9090"))
-LOG_FILE        = os.getenv("WEBHOOK_LOG_FILE", "C:/sapphire/webhook.log")
-MAX_HISTORY     = 200
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")  # Must match Pine Script alert body
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")  # Local Ollama (RTX 5070 Ti)
+WEBHOOK_PORT = int(os.getenv("WEBHOOK_PORT", "9090"))
+LOG_FILE = os.getenv("WEBHOOK_LOG_FILE", "C:/sapphire/webhook.log")
+MAX_HISTORY = 200
 
 # On-prem signal routing — api-gateway endpoints over Tailscale
 # POST /api/signals/create with X-Sapphire-Control-Token header
@@ -57,23 +57,32 @@ SAPPHIRE_CONTROL_TOKEN = os.getenv("SAPPHIRE_CONTROL_API_TOKEN", "")
 # Legacy GCP vars — kept for reference, no longer used
 EDGE_CAPABILITIES_COLLECTION = "edge_capabilities"
 SYSTEM_LOGS_COLLECTION = "system_logs"
-CAPABILITY_SYNC_INTERVAL_SECONDS = int(
-    os.getenv("CAPABILITY_SYNC_INTERVAL_SECONDS", "180")
-)
-LOCAL_SERVICE_PROBE_TIMEOUT_SECONDS = float(
-    os.getenv("LOCAL_SERVICE_PROBE_TIMEOUT_SECONDS", "5.0")
-)
+CAPABILITY_SYNC_INTERVAL_SECONDS = int(os.getenv("CAPABILITY_SYNC_INTERVAL_SECONDS", "180"))
+LOCAL_SERVICE_PROBE_TIMEOUT_SECONDS = float(os.getenv("LOCAL_SERVICE_PROBE_TIMEOUT_SECONDS", "5.0"))
 
 # Supported symbols → canonical Sapphire format
 SYMBOL_MAP = {
-    "ETHBTC":   "ETHBTC",   "SOLBTC":  "SOLBTC",  "ZECBTC": "ZECBTC",
-    "BTCUSDT":  "BTCUSDT",  "ETHUSDT": "ETHUSDT", "HYPEUSDT": "HYPEUSDT",
-    "SOLUSDT":  "SOLUSDT",  "HYPERUSDT": "HYPEUSDT",
+    "ETHBTC": "ETHBTC",
+    "SOLBTC": "SOLBTC",
+    "ZECBTC": "ZECBTC",
+    "BTCUSDT": "BTCUSDT",
+    "ETHUSDT": "ETHUSDT",
+    "HYPEUSDT": "HYPEUSDT",
+    "SOLUSDT": "SOLUSDT",
+    "HYPERUSDT": "HYPEUSDT",
 }
 
 VALID_ACTIONS = [
-    "buy", "sell", "long", "short", "exit", "close",
-    "entry_long", "entry_short", "exit_long", "exit_short",
+    "buy",
+    "sell",
+    "long",
+    "short",
+    "exit",
+    "close",
+    "entry_long",
+    "entry_short",
+    "exit_long",
+    "exit_short",
 ]
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
@@ -93,6 +102,7 @@ logging.basicConfig(
 log = logging.getLogger("sapphire-webhook")
 
 # ─── Data Models ──────────────────────────────────────────────────────────────
+
 
 @dataclass
 class TradingViewAlert:
@@ -135,8 +145,14 @@ class TradingViewAlert:
 # ─── In-memory state ──────────────────────────────────────────────────────────
 
 alert_history: list[dict] = []
-stats = {"total": 0, "published": 0, "errors": 0, "ai_enriched": 0,
-         "pubsub_success": 0, "gateway_fallback": 0}
+stats = {
+    "total": 0,
+    "published": 0,
+    "errors": 0,
+    "ai_enriched": 0,
+    "pubsub_success": 0,
+    "gateway_fallback": 0,
+}
 
 
 # ─── Pub/Sub singleton ────────────────────────────────────────────────────────
@@ -166,7 +182,11 @@ async def _fetch_ollama_models() -> list[dict]:
             response = await client.get(f"{OLLAMA_URL}/api/tags")
             if response.status_code != 200:
                 return []
-            payload = response.json() if response.headers.get("content-type", "").startswith("application/json") else {}
+            payload = (
+                response.json()
+                if response.headers.get("content-type", "").startswith("application/json")
+                else {}
+            )
             models = payload.get("models", []) if isinstance(payload, dict) else []
             rows: list[dict] = []
             for item in models:
@@ -206,7 +226,9 @@ def _detect_gpu_inventory() -> list[dict]:
         rows.append(
             {
                 "name": parts[0],
-                "memory_total_mb": float(parts[1]) if parts[1].replace(".", "", 1).isdigit() else parts[1],
+                "memory_total_mb": float(parts[1])
+                if parts[1].replace(".", "", 1).isdigit()
+                else parts[1],
                 "driver_version": parts[2],
             }
         )
@@ -275,9 +297,7 @@ async def _collect_windows_lab_snapshot() -> dict:
         },
         "source": "windows_webhook_receiver",
     }
-    snapshot["collection_latency_ms"] = int(
-        (datetime.now(UTC) - started).total_seconds() * 1000
-    )
+    snapshot["collection_latency_ms"] = int((datetime.now(UTC) - started).total_seconds() * 1000)
     return snapshot
 
 
@@ -287,7 +307,9 @@ def _write_windows_capabilities(snapshot: dict):
     if client is None:
         return
     try:
-        client.collection(EDGE_CAPABILITIES_COLLECTION).document("windows_lab").set(snapshot, merge=True)
+        client.collection(EDGE_CAPABILITIES_COLLECTION).document("windows_lab").set(
+            snapshot, merge=True
+        )
     except Exception as exc:
         log.warning("Windows capabilities Firestore write failed: %s", exc)
 
@@ -345,6 +367,7 @@ def write_system_log(
 
 # ─── Signal mapping ───────────────────────────────────────────────────────────
 
+
 def map_signal(action: str) -> tuple[str, str]:
     """Map TradingView action → (TradeSide, SignalType) strings."""
     a = action.lower()
@@ -375,7 +398,7 @@ def build_trade_signal(alert: TradingViewAlert) -> dict:
         "signal_type": signal_type,
         "confidence": alert.confidence if alert.confidence is not None else 0.5,
         "source": "tradingview-workbench",
-        "target_platforms": [],       # empty = all platforms consume
+        "target_platforms": [],  # empty = all platforms consume
         "entry_price": alert.price,
         "stop_loss": None,
         "take_profit": None,
@@ -398,6 +421,7 @@ def build_trade_signal(alert: TradingViewAlert) -> dict:
 
 
 # ─── Pub/Sub publish ──────────────────────────────────────────────────────────
+
 
 async def publish_signal(signal: dict) -> dict:
     """
@@ -424,7 +448,13 @@ async def publish_signal(signal: dict) -> dict:
                 if ok:
                     any_ok = True
                     stats["pubsub_success"] += 1
-                log.info("📤 Signal → %s HTTP %d | %s %s", name, r.status_code, signal["side"], signal["symbol"])
+                log.info(
+                    "📤 Signal → %s HTTP %d | %s %s",
+                    name,
+                    r.status_code,
+                    signal["side"],
+                    signal["symbol"],
+                )
                 results.append({"target": name, "ok": ok, "http_status": r.status_code})
             except Exception as e:
                 log.warning("⚠️  Signal → %s failed: %s", name, e)
@@ -445,6 +475,7 @@ async def forward_to_gateway(signal: dict) -> dict:
 
 # ─── Ollama enrichment ────────────────────────────────────────────────────────
 
+
 async def ollama_enrich(alert: TradingViewAlert) -> str | None:
     """Ask local Ollama (gemma3:27b) for a one-sentence signal verdict."""
     prompt = (
@@ -454,7 +485,7 @@ async def ollama_enrich(alert: TradingViewAlert) -> str | None:
         + (f"Confidence: {alert.confidence:.0%}. " if alert.confidence else "")
         + (f"Regime: {alert.regime_score:.2f}. " if alert.regime_score else "")
         + "In one sentence: is this signal high quality? "
-          "Answer with CONFIRM, CAUTION, or REJECT and one reason."
+        "Answer with CONFIRM, CAUTION, or REJECT and one reason."
     )
     try:
         async with httpx.AsyncClient(timeout=8.0) as client:
@@ -473,6 +504,7 @@ async def ollama_enrich(alert: TradingViewAlert) -> str | None:
 
 
 # ─── App lifecycle ────────────────────────────────────────────────────────────
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -500,6 +532,7 @@ app = FastAPI(
 
 # ─── Validation ───────────────────────────────────────────────────────────────
 
+
 def validate_payload(data: dict) -> bool:
     if "symbol" not in data or "action" not in data:
         return False
@@ -508,12 +541,13 @@ def validate_payload(data: dict) -> bool:
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
 
+
 @app.get("/", response_class=HTMLResponse)
 async def dashboard():
     def _row(h: dict) -> str:
-        color   = "#00ff88" if h.get("published") else "#666"
+        color = "#00ff88" if h.get("published") else "#666"
         channel = h.get("channel", "")
-        tick    = ("✓ " + channel) if h.get("published") else "–"
+        tick = ("✓ " + channel) if h.get("published") else "–"
         verdict = (h["alert"].get("ai_verdict") or "–")[:80]
         return (
             "<tr>"
@@ -526,11 +560,12 @@ async def dashboard():
             f"<td style='color:{color}'>{tick}</td>"
             "</tr>"
         )
+
     history_rows = "".join(_row(h) for h in reversed(alert_history[-20:]))
     pubsub_badge = (
         "<span style='color:#00ff88'>● Pub/Sub live</span>"
-        if _PUBSUB_AVAILABLE else
-        "<span style='color:#ff6600'>● Gateway fallback mode</span>"
+        if _PUBSUB_AVAILABLE
+        else "<span style='color:#ff6600'>● Gateway fallback mode</span>"
     )
     return f"""
     <html><head><title>Sapphire Webhook</title>
@@ -547,17 +582,17 @@ async def dashboard():
     <h1>🔷 Sapphire Webhook Receiver v2</h1>
     <p>{pubsub_badge}</p>
     <p>
-      <span class='stat'>Total <span>{stats['total']}</span></span>
-      <span class='stat'>Published <span>{stats['published']}</span></span>
-      <span class='stat'>Pub/Sub <span>{stats['pubsub_success']}</span></span>
-      <span class='stat'>Gateway <span>{stats['gateway_fallback']}</span></span>
-      <span class='stat'>AI-enriched <span>{stats['ai_enriched']}</span></span>
-      <span class='stat'>Errors <span>{stats['errors']}</span></span>
+      <span class='stat'>Total <span>{stats["total"]}</span></span>
+      <span class='stat'>Published <span>{stats["published"]}</span></span>
+      <span class='stat'>Pub/Sub <span>{stats["pubsub_success"]}</span></span>
+      <span class='stat'>Gateway <span>{stats["gateway_fallback"]}</span></span>
+      <span class='stat'>AI-enriched <span>{stats["ai_enriched"]}</span></span>
+      <span class='stat'>Errors <span>{stats["errors"]}</span></span>
     </p>
     <table>
       <tr><th>Time</th><th>Action</th><th>Symbol</th><th>Price</th>
           <th>Conf</th><th>AI Verdict</th><th>Published</th></tr>
-      {history_rows or '<tr><td colspan=7>No alerts yet</td></tr>'}
+      {history_rows or "<tr><td colspan=7>No alerts yet</td></tr>"}
     </table>
     </body></html>
     """
@@ -578,7 +613,9 @@ async def status():
         "services": services,
         "capabilities": {
             "ollama_model_count": capabilities.get("ollama_model_count", 0),
-            "gpu_count": ((_capability_snapshot or {}).get("hardware", {}) or {}).get("gpu_count", 0),
+            "gpu_count": ((_capability_snapshot or {}).get("hardware", {}) or {}).get(
+                "gpu_count", 0
+            ),
             "last_sync": (_capability_snapshot or {}).get("updated_at"),
         },
         "supported_actions": VALID_ACTIONS,
@@ -610,8 +647,12 @@ async def webhook_health():
         "capabilities": {
             "last_sync": (_capability_snapshot or {}).get("updated_at"),
             "available": bool((_capability_snapshot or {}).get("available")),
-            "ollama_model_count": ((_capability_snapshot or {}).get("models", {}) or {}).get("ollama_model_count", 0),
-            "gpu_count": ((_capability_snapshot or {}).get("hardware", {}) or {}).get("gpu_count", 0),
+            "ollama_model_count": ((_capability_snapshot or {}).get("models", {}) or {}).get(
+                "ollama_model_count", 0
+            ),
+            "gpu_count": ((_capability_snapshot or {}).get("hardware", {}) or {}).get(
+                "gpu_count", 0
+            ),
         },
     }
 
@@ -648,9 +689,14 @@ async def receive_tradingview(request: Request, background_tasks: BackgroundTask
 
     alert = TradingViewAlert.from_webhook(data)
     stats["total"] += 1
-    log.info("📨 %s %s @ $%s  conf=%s  z=%s",
-             alert.action.upper(), alert.symbol, alert.price,
-             alert.confidence, alert.z_score)
+    log.info(
+        "📨 %s %s @ $%s  conf=%s  z=%s",
+        alert.action.upper(),
+        alert.symbol,
+        alert.price,
+        alert.confidence,
+        alert.z_score,
+    )
 
     # Step 1 — Ollama enrichment (non-blocking but we await it here;
     #           it has an 8s timeout so won't delay the response much)
@@ -721,17 +767,19 @@ async def receive_tradingview(request: Request, background_tasks: BackgroundTask
     if len(alert_history) > MAX_HISTORY:
         alert_history.pop(0)
 
-    return JSONResponse({
-        "status": "ok",
-        "alert_id": stats["total"],
-        "signal_id": signal["signal_id"],
-        "symbol": alert.symbol,
-        "action": alert.action,
-        "side": signal["side"],
-        "signal_type": signal["signal_type"],
-        "ai_verdict": alert.ai_verdict,
-        "publish": pub_result,
-    })
+    return JSONResponse(
+        {
+            "status": "ok",
+            "alert_id": stats["total"],
+            "signal_id": signal["signal_id"],
+            "symbol": alert.symbol,
+            "action": alert.action,
+            "side": signal["side"],
+            "signal_type": signal["signal_type"],
+            "ai_verdict": alert.ai_verdict,
+            "publish": pub_result,
+        }
+    )
 
 
 # ─── Entry point ──────────────────────────────────────────────────────────────

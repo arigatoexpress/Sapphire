@@ -215,10 +215,7 @@ def compare_manifest_sets(
     common_kinds = sorted(local_kinds & remote_kinds)
     missing_in_local = sorted(remote_kinds - local_kinds)
     missing_in_remote = sorted(local_kinds - remote_kinds)
-    kind_diffs = [
-        compare_kind(kind, local[kind], remote[kind])
-        for kind in common_kinds
-    ]
+    kind_diffs = [compare_kind(kind, local[kind], remote[kind]) for kind in common_kinds]
     counts = {
         PASS: sum(1 for row in kind_diffs if row["verdict"] == PASS),
         WARN: sum(1 for row in kind_diffs if row["verdict"] == WARN),
@@ -275,12 +272,14 @@ def compare_title(local: DraftManifest, remote: DraftManifest) -> list[dict[str,
     local_norm = normalize_title(local.title)
     remote_norm = normalize_title(remote.title)
     status = PASS if local_norm == remote_norm else WARN
-    return [{
-        "field": "title",
-        "local": local.title,
-        "remote": remote.title,
-        "status": status,
-    }]
+    return [
+        {
+            "field": "title",
+            "local": local.title,
+            "remote": remote.title,
+            "status": status,
+        }
+    ]
 
 
 def normalize_title(value: str) -> str:
@@ -292,13 +291,15 @@ def compare_list_field(field: str, local: list[str], remote: list[str]) -> list[
     remote_set = set(remote)
     symmetric = sorted(local_set ^ remote_set)
     status = PASS if not symmetric else WARN
-    return [{
-        "field": field,
-        "local": sorted(local_set),
-        "remote": sorted(remote_set),
-        "symmetric_diff": symmetric,
-        "status": status,
-    }]
+    return [
+        {
+            "field": field,
+            "local": sorted(local_set),
+            "remote": sorted(remote_set),
+            "symmetric_diff": symmetric,
+            "status": status,
+        }
+    ]
 
 
 def compare_body(local: DraftManifest, remote: DraftManifest) -> list[dict[str, Any]]:
@@ -311,13 +312,15 @@ def compare_body(local: DraftManifest, remote: DraftManifest) -> list[dict[str, 
         largest = max(local_len, remote_len, 1)
         delta_ratio = abs(local_len - remote_len) / largest
         status = WARN if delta_ratio <= 0.5 else FAIL
-    return [{
-        "field": "body",
-        "local_chars": local_len,
-        "remote_chars": remote_len,
-        "char_delta_ratio": round(delta_ratio, 4),
-        "status": status,
-    }]
+    return [
+        {
+            "field": "body",
+            "local_chars": local_len,
+            "remote_chars": remote_len,
+            "char_delta_ratio": round(delta_ratio, 4),
+            "status": status,
+        }
+    ]
 
 
 def compare_renderings(local: DraftManifest, remote: DraftManifest) -> list[dict[str, Any]]:
@@ -325,13 +328,15 @@ def compare_renderings(local: DraftManifest, remote: DraftManifest) -> list[dict
     local_platforms = set(local.renderings)
     remote_platforms = set(remote.renderings)
     missing_platforms = sorted(local_platforms ^ remote_platforms)
-    diffs.append({
-        "field": "rendering_platforms",
-        "local": sorted(local_platforms),
-        "remote": sorted(remote_platforms),
-        "symmetric_diff": missing_platforms,
-        "status": PASS if not missing_platforms else FAIL,
-    })
+    diffs.append(
+        {
+            "field": "rendering_platforms",
+            "local": sorted(local_platforms),
+            "remote": sorted(remote_platforms),
+            "symmetric_diff": missing_platforms,
+            "status": PASS if not missing_platforms else FAIL,
+        }
+    )
     for platform in sorted(local_platforms & remote_platforms):
         diffs.extend(compare_rendering(platform, local, remote))
     return diffs
@@ -343,9 +348,13 @@ def compare_rendering(
     remote: DraftManifest,
 ) -> list[dict[str, Any]]:
     local_rendering = local.renderings.get(platform) if isinstance(local.renderings, dict) else {}
-    remote_rendering = remote.renderings.get(platform) if isinstance(remote.renderings, dict) else {}
+    remote_rendering = (
+        remote.renderings.get(platform) if isinstance(remote.renderings, dict) else {}
+    )
     local_quality = local_rendering.get("quality", {}) if isinstance(local_rendering, dict) else {}
-    remote_quality = remote_rendering.get("quality", {}) if isinstance(remote_rendering, dict) else {}
+    remote_quality = (
+        remote_rendering.get("quality", {}) if isinstance(remote_rendering, dict) else {}
+    )
     local_passed = bool(local_quality.get("passed"))
     remote_passed = bool(remote_quality.get("passed"))
     if local_passed and remote_passed:
@@ -355,19 +364,23 @@ def compare_rendering(
     else:
         quality_status = WARN
 
-    diffs = [{
-        "field": f"{platform}.quality",
-        "local_passed": local_passed,
-        "remote_passed": remote_passed,
-        "local_reasons": local_quality.get("reasons") or [],
-        "remote_reasons": remote_quality.get("reasons") or [],
-        "status": quality_status,
-    }]
+    diffs = [
+        {
+            "field": f"{platform}.quality",
+            "local_passed": local_passed,
+            "remote_passed": remote_passed,
+            "local_reasons": local_quality.get("reasons") or [],
+            "remote_reasons": remote_quality.get("reasons") or [],
+            "status": quality_status,
+        }
+    ]
     diffs.append(compare_rendered_file(platform, local, remote))
     return diffs
 
 
-def compare_rendered_file(platform: str, local: DraftManifest, remote: DraftManifest) -> dict[str, Any]:
+def compare_rendered_file(
+    platform: str, local: DraftManifest, remote: DraftManifest
+) -> dict[str, Any]:
     local_path = rendering_path(local, platform)
     remote_path = rendering_path(remote, platform)
     if local_path is None or remote_path is None:
@@ -408,7 +421,9 @@ def rendering_path(manifest: DraftManifest, platform: str) -> Path | None:
     path = Path(str(raw_path))
     candidates = [
         manifest.root / path,
-        manifest.path.parents[3] / path if len(manifest.path.parents) >= 4 else manifest.root / path,
+        manifest.path.parents[3] / path
+        if len(manifest.path.parents) >= 4
+        else manifest.root / path,
     ]
     for candidate in candidates:
         if candidate.exists():
@@ -488,13 +503,15 @@ def render_markdown(report: dict[str, Any]) -> str:
         notes = ", ".join(diff["field"] for diff in row["metric_diffs"]) or "-"
         lines.append(f"| {row['kind']} | {row['verdict']} | {notes} |")
     if summary["missing_in_local"] or summary["missing_in_remote"]:
-        lines.extend([
-            "",
-            "## Missing Kinds",
-            "",
-            f"- Missing in local: {', '.join(summary['missing_in_local']) or '-'}",
-            f"- Missing in remote: {', '.join(summary['missing_in_remote']) or '-'}",
-        ])
+        lines.extend(
+            [
+                "",
+                "## Missing Kinds",
+                "",
+                f"- Missing in local: {', '.join(summary['missing_in_local']) or '-'}",
+                f"- Missing in remote: {', '.join(summary['missing_in_remote']) or '-'}",
+            ]
+        )
     lines.append("")
     return "\n".join(lines)
 

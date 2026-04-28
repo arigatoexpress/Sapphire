@@ -60,7 +60,7 @@ def validate_config(
         )
         sys.exit(1)
 
-    for var in (warn_if_missing or []):
+    for var in warn_if_missing or []:
         if not os.environ.get(var, "").strip():
             logger.warning(
                 "⚠️  [%s] Optional env var not set — feature may be degraded: %s",

@@ -1,4 +1,5 @@
 """Unit tests — lib.core.decision_engine."""
+
 from __future__ import annotations
 
 import json
@@ -110,11 +111,13 @@ class TestFearContrarianRule:
 
 class TestNormalizeWorld:
     def test_flattens_nested_regime_block(self):
-        w = _normalize_world({
-            "regime": {"state": "trend_up", "score": 0.8, "confidence": 0.7},
-            "funding": {"apr": 0.4},
-            "sentiment": {"fear_greed": 18},
-        })
+        w = _normalize_world(
+            {
+                "regime": {"state": "trend_up", "score": 0.8, "confidence": 0.7},
+                "funding": {"apr": 0.4},
+                "sentiment": {"fear_greed": 18},
+            }
+        )
         assert w["regime"] == "TREND_UP"
         assert w["regime_score"] == 0.8
         assert w["funding_apr"] == 0.4
@@ -133,11 +136,14 @@ class TestNormalizeWorld:
 
 class TestDecisionEngine:
     def test_allow_verdict_when_no_rules_fire(self, tmp_engine):
-        d = tmp_engine.evaluate({
-            "symbol": "BTC",
-            "direction": "long",
-            "confidence": 0.70,
-        }, world={})
+        d = tmp_engine.evaluate(
+            {
+                "symbol": "BTC",
+                "direction": "long",
+                "confidence": 0.70,
+            },
+            world={},
+        )
         assert d.verdict == "ALLOW"
         assert d.adjusted_confidence == 0.70
         assert d.rules_fired == []
@@ -200,6 +206,7 @@ class TestDecisionEngine:
     def test_rule_exception_does_not_abort(self, tmp_engine):
         class BadRule:
             name = "bad"
+
             def evaluate(self, signal, world):
                 raise RuntimeError("boom")
 
@@ -239,11 +246,13 @@ class TestScanAlerts:
         assert "fear_extreme" in kinds
 
     def test_no_alerts_in_normal_state(self, tmp_engine):
-        alerts = tmp_engine.scan_alerts({
-            "regime": "RANGE",
-            "funding_apr": 0.05,
-            "fear_greed": 55,
-        })
+        alerts = tmp_engine.scan_alerts(
+            {
+                "regime": "RANGE",
+                "funding_apr": 0.05,
+                "fear_greed": 55,
+            }
+        )
         # Possibly an initial regime baseline entry, but nothing flagged.
         flagged = [a for a in alerts if a.severity in {"warn", "critical"}]
         assert flagged == []
@@ -251,9 +260,14 @@ class TestScanAlerts:
 
 class TestOnEvent:
     def test_signal_event_returns_decision(self, tmp_engine):
-        out = tmp_engine.on_event("signal.emitted", {
-            "symbol": "BTC", "direction": "long", "confidence": 0.70,
-        })
+        out = tmp_engine.on_event(
+            "signal.emitted",
+            {
+                "symbol": "BTC",
+                "direction": "long",
+                "confidence": 0.70,
+            },
+        )
         assert len(out) == 1
         assert isinstance(out[0], Decision)
 

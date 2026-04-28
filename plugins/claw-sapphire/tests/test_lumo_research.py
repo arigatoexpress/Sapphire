@@ -10,7 +10,9 @@ TOOLS = Path(__file__).parent.parent / "tools"
 sys.path.insert(0, str(TOOLS))
 sys.path.insert(0, str(TOOLS.parent / "lib"))
 
-_spec = importlib.util.spec_from_file_location("lumo_research", TOOLS / "internal" / "lumo_research.py")
+_spec = importlib.util.spec_from_file_location(
+    "lumo_research", TOOLS / "internal" / "lumo_research.py"
+)
 lr = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(lr)
 
@@ -38,11 +40,12 @@ def test_action_security_brief_redacts_sensitive_input(monkeypatch):
 
     monkeypatch.setattr(lr, "_post_lumo", fake_post)
 
-    got = lr.action_security_brief("api_key=supersecret CVE-2026-1340", depth="deep", web_search=False)
+    got = lr.action_security_brief(
+        "api_key=supersecret CVE-2026-1340", depth="deep", web_search=False
+    )
 
     assert got["status"] == "ok"
     assert got["brief"] == "Structured brief"
     assert sent["web_search"] is False
     assert "[REDACTED]" in str(sent["prompt"])
     assert "supersecret" not in str(sent["prompt"])
-

@@ -31,7 +31,13 @@ def _write_plist(path: Path, *, runtime: Path, sapphire_env: bool) -> None:
             {
                 "Label": "ai.hermes.gateway",
                 "WorkingDirectory": str(runtime),
-                "ProgramArguments": [str(runtime / "venv" / "bin" / "python"), "-m", "hermes_cli.main", "gateway", "run"],
+                "ProgramArguments": [
+                    str(runtime / "venv" / "bin" / "python"),
+                    "-m",
+                    "hermes_cli.main",
+                    "gateway",
+                    "run",
+                ],
                 "EnvironmentVariables": env,
             }
         )
@@ -79,7 +85,9 @@ quick_commands:
     assert report["required_runtime_controls"]["launchagent_sapphire_repo_path_env"] is True
 
 
-def test_dev_guard_without_runtime_guard_is_warn_and_never_prints_command_body(tmp_path: Path) -> None:
+def test_dev_guard_without_runtime_guard_is_warn_and_never_prints_command_body(
+    tmp_path: Path,
+) -> None:
     runtime = tmp_path / "runtime"
     dev = tmp_path / "dev"
     plist = tmp_path / "LaunchAgents" / "ai.hermes.gateway.plist"

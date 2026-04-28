@@ -79,11 +79,7 @@ class LinkedInClient(PublisherClient):
 
         ok = 200 <= status < 300
         remote_id = resp.get("id") if isinstance(resp, dict) else None
-        url = (
-            f"https://www.linkedin.com/feed/update/{remote_id}/"
-            if ok and remote_id
-            else None
-        )
+        url = f"https://www.linkedin.com/feed/update/{remote_id}/" if ok and remote_id else None
         return PublishResult(
             platform=self.platform,
             ok=ok,

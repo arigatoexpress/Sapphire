@@ -44,7 +44,7 @@ SKIP = "SKIP"
 @dataclass
 class ProbeResult:
     name: str
-    status: str                     # PASS | FAIL | SKIP
+    status: str  # PASS | FAIL | SKIP
     detail: str = ""
     elapsed_ms: int = 0
     extras: dict = field(default_factory=dict)
@@ -53,6 +53,7 @@ class ProbeResult:
 # --------------------------------------------------------------------------
 # .env.integrations auto-load (only if the key is not already in os.environ)
 # --------------------------------------------------------------------------
+
 
 def _load_env_file(path: str) -> int:
     """Populate os.environ from a KEY=VALUE dotenv file. Returns count loaded."""
@@ -79,6 +80,7 @@ def _load_env_file(path: str) -> int:
 # Probes — each returns ProbeResult
 # --------------------------------------------------------------------------
 
+
 def _timed(fn: Callable[[], ProbeResult]) -> ProbeResult:
     t0 = time.perf_counter()
     try:
@@ -100,6 +102,7 @@ def _skip_if_missing(name: str, *env_vars: str) -> ProbeResult | None:
 def _http_get(url: str, *, headers: dict | None = None, timeout: int = 15) -> tuple[int, dict]:
     import urllib.error
     import urllib.request
+
     hdrs = {"User-Agent": "sapphire-smoke/1.0", "Accept": "application/json"}
     if headers:
         hdrs.update(headers)
@@ -120,6 +123,7 @@ def _http_get(url: str, *, headers: dict | None = None, timeout: int = 15) -> tu
 
 
 # -- Publishing platforms --------------------------------------------------
+
 
 def probe_linkedin() -> ProbeResult:
     skip = _skip_if_missing("linkedin", "LINKEDIN_ACCESS_TOKEN")
@@ -174,7 +178,8 @@ def probe_x() -> ProbeResult:
         # would duplicate XClient's logic. Just confirm the quartet is set;
         # real validation happens on first publish.
         return ProbeResult(
-            "x", PASS,
+            "x",
+            PASS,
             "OAuth 1.0a keys present (live validation deferred; posts cost credits)",
         )
 
@@ -221,14 +226,18 @@ def probe_substack() -> ProbeResult:
     if "@" not in post_email or "substack.com" not in post_email:
         return ProbeResult("substack", FAIL, f"SUBSTACK_POST_EMAIL looks wrong: {post_email}")
     return ProbeResult(
-        "substack", PASS,
+        "substack",
+        PASS,
         f"post-email configured ({post_email}); relies on Resend",
     )
 
 
 # -- Chain data providers --------------------------------------------------
 
-def _probe_chain(name: str, env_var: str, importer: Callable[[], Callable[[], object]]) -> ProbeResult:
+
+def _probe_chain(
+    name: str, env_var: str, importer: Callable[[], Callable[[], object]]
+) -> ProbeResult:
     """Run a chain-provider probe, deferring import until after the cred check.
 
     ``importer`` is a thunk that returns the actual call to make — that
@@ -253,14 +262,18 @@ def _probe_chain(name: str, env_var: str, importer: Callable[[], Callable[[], ob
 def probe_bgeometrics() -> ProbeResult:
     def _importer():
         from lib.chain.providers.bgeometrics import BGeometricsClient
+
         return lambda: BGeometricsClient().mvrv_z_score()
+
     return _probe_chain("bgeometrics", "BGEOMETRICS_API_KEY", _importer)
 
 
 def probe_santiment() -> ProbeResult:
     def _importer():
         from lib.chain.providers.santiment import SantimentClient
+
         return lambda: SantimentClient().query("{ currentUser { id } }")
+
     return _probe_chain("santiment", "SANTIMENT_API_KEY", _importer)
 
 
@@ -279,7 +292,9 @@ def probe_dune() -> ProbeResult:
 def probe_whale_alert() -> ProbeResult:
     def _importer():
         from lib.chain.providers.whale_alert import WhaleAlertClient
+
         return lambda: WhaleAlertClient().status()
+
     return _probe_chain("whale_alert", "WHALE_ALERT_API_KEY", _importer)
 
 
@@ -287,7 +302,9 @@ def probe_coinapi() -> ProbeResult:
     # exchanges() returns ~hundreds of rows; cache will dedup across runs.
     def _importer():
         from lib.chain.providers.coinapi import CoinAPIClient
+
         return lambda: CoinAPIClient().exchanges()
+
     return _probe_chain("coinapi", "COINAPI_KEY", _importer)
 
 
@@ -307,6 +324,7 @@ def probe_coinglass() -> ProbeResult:
 
 
 # -- Infrastructure --------------------------------------------------------
+
 
 def probe_cloudflare() -> ProbeResult:
     skip = _skip_if_missing("cloudflare", "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID")
@@ -329,12 +347,16 @@ def probe_gcp() -> ProbeResult:
     """Light check: gcloud on PATH + ADC project resolves."""
     import shutil
     import subprocess
+
     if not shutil.which("gcloud"):
         return ProbeResult("gcp", SKIP, "gcloud not on PATH")
     try:
         proj = subprocess.run(
             ["gcloud", "config", "get-value", "project"],
-            check=False, capture_output=True, text=True, timeout=5,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         current = (proj.stdout or "").strip()
         if not current or current.lower() == "(unset)":
@@ -349,19 +371,19 @@ def probe_gcp() -> ProbeResult:
 # --------------------------------------------------------------------------
 
 PROBES: dict[str, Callable[[], ProbeResult]] = {
-    "linkedin":    probe_linkedin,
-    "typefully":   probe_typefully,
-    "x":           probe_x,
-    "resend":      probe_resend,
-    "substack":    probe_substack,
+    "linkedin": probe_linkedin,
+    "typefully": probe_typefully,
+    "x": probe_x,
+    "resend": probe_resend,
+    "substack": probe_substack,
     "bgeometrics": probe_bgeometrics,
-    "santiment":   probe_santiment,
-    "dune":        probe_dune,
+    "santiment": probe_santiment,
+    "dune": probe_dune,
     "whale_alert": probe_whale_alert,
-    "coinapi":     probe_coinapi,
-    "coinglass":   probe_coinglass,
-    "cloudflare":  probe_cloudflare,
-    "gcp":         probe_gcp,
+    "coinapi": probe_coinapi,
+    "coinglass": probe_coinglass,
+    "cloudflare": probe_cloudflare,
+    "gcp": probe_gcp,
 }
 
 
@@ -378,20 +400,26 @@ def _paint(s: str, colour: str) -> str:
 def _print_table(results: list[ProbeResult]) -> None:
     w_name = max(len(r.name) for r in results)
     for r in results:
-        badge = {PASS: _paint("PASS", "green"),
-                 FAIL: _paint("FAIL", "red"),
-                 SKIP: _paint("SKIP", "grey")}[r.status]
+        badge = {
+            PASS: _paint("PASS", "green"),
+            FAIL: _paint("FAIL", "red"),
+            SKIP: _paint("SKIP", "grey"),
+        }[r.status]
         ms = f"{r.elapsed_ms:>5}ms"
         print(f"  {r.name:<{w_name}}  {badge}  {ms}  {r.detail}")
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("filter", nargs="?", default="",
-                    help="comma-separated probe names (default: all)")
+    ap.add_argument(
+        "filter", nargs="?", default="", help="comma-separated probe names (default: all)"
+    )
     ap.add_argument("--json", action="store_true", help="emit JSON instead of a table")
-    ap.add_argument("--env-file", default=os.path.join(REPO_ROOT, ".env.integrations"),
-                    help=".env.integrations path (default: repo root)")
+    ap.add_argument(
+        "--env-file",
+        default=os.path.join(REPO_ROOT, ".env.integrations"),
+        help=".env.integrations path (default: repo root)",
+    )
     args = ap.parse_args(argv)
 
     loaded = _load_env_file(args.env_file)
@@ -404,8 +432,10 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if not args.json:
-        print(f"Sapphire integrations smoke test — {len(selected)} probe(s), "
-              f"loaded {loaded} vars from {args.env_file}")
+        print(
+            f"Sapphire integrations smoke test — {len(selected)} probe(s), "
+            f"loaded {loaded} vars from {args.env_file}"
+        )
         print()
 
     results: list[ProbeResult] = []
@@ -422,8 +452,7 @@ def main(argv: list[str] | None = None) -> int:
         counts = {PASS: 0, FAIL: 0, SKIP: 0}
         for r in results:
             counts[r.status] += 1
-        print(f"  summary: {counts[PASS]} passed, "
-              f"{counts[FAIL]} failed, {counts[SKIP]} skipped")
+        print(f"  summary: {counts[PASS]} passed, {counts[FAIL]} failed, {counts[SKIP]} skipped")
 
     return 1 if any(r.status == FAIL for r in results) else 0
 

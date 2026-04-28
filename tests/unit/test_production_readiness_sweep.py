@@ -21,9 +21,7 @@ SPEC.loader.exec_module(sweep)
 def test_parse_json_from_mixed_output_handles_cli_warnings() -> None:
     output = 'Warning: terminal\n{"response": "SAPPHIRE_GEMINI_PROBE_OK"}\n'
 
-    assert sweep.parse_json_from_mixed_output(output) == {
-        "response": "SAPPHIRE_GEMINI_PROBE_OK"
-    }
+    assert sweep.parse_json_from_mixed_output(output) == {"response": "SAPPHIRE_GEMINI_PROBE_OK"}
 
 
 def test_gemini_live_probe_uses_vertex_without_tools(monkeypatch) -> None:

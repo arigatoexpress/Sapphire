@@ -15,7 +15,9 @@ import pytest
 
 # Add alpha-engine source to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "services", "alpha-engine"))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "services", "alpha-engine", "src"))
+sys.path.insert(
+    0, os.path.join(os.path.dirname(__file__), "..", "..", "services", "alpha-engine", "src")
+)
 
 from collaboration.task_manager import RoadmapParser, TaskManager
 

@@ -83,8 +83,11 @@ def test_backtest_with_custom_strategy() -> None:
     def one_shot(symbol, bars, i):
         if i == 0:
             return {
-                "symbol": symbol, "action": "buy", "price": bars[0].close,
-                "confidence": 0.9, "strategy": "one_shot",
+                "symbol": symbol,
+                "action": "buy",
+                "price": bars[0].close,
+                "confidence": 0.9,
+                "strategy": "one_shot",
             }
         return None
 
@@ -100,10 +103,13 @@ def test_backtest_tp_sl_exit() -> None:
         if i == 0:
             p = bars[0].close
             return {
-                "symbol": symbol, "action": "buy", "price": p,
+                "symbol": symbol,
+                "action": "buy",
+                "price": p,
                 "take_profit": p * 1.001,  # 0.1% TP — almost guaranteed to hit
-                "stop_loss":   p * 0.5,     # far SL so we don't hit it
-                "confidence": 0.9, "strategy": "tight_tp",
+                "stop_loss": p * 0.5,  # far SL so we don't hit it
+                "confidence": 0.9,
+                "strategy": "tight_tp",
             }
         return None
 
@@ -172,10 +178,16 @@ def test_win_rate_is_fraction_not_percent() -> None:
     move_prices = [100.0, 110.0, 100.0, 90.0, 100.0, 110.0, 100.0, 90.0]
     prices = flat_prices + move_prices
     for i, c in enumerate(prices):
-        bars.append(Bar(
-            ts=base + timedelta(days=i), open=c, high=c * 1.01, low=c * 0.99,
-            close=c, volume=1000.0,
-        ))
+        bars.append(
+            Bar(
+                ts=base + timedelta(days=i),
+                open=c,
+                high=c * 1.01,
+                low=c * 0.99,
+                close=c,
+                volume=1000.0,
+            )
+        )
 
     entry_indices = {flat_count + k for k in (0, 2, 4, 6)}
 
@@ -183,9 +195,13 @@ def test_win_rate_is_fraction_not_percent() -> None:
         if i in entry_indices:
             p = bars[i].close
             return {
-                "symbol": symbol, "action": "buy", "price": p,
-                "take_profit": p * 1.05, "stop_loss": p * 0.95,
-                "confidence": 0.5, "strategy": "alt",
+                "symbol": symbol,
+                "action": "buy",
+                "price": p,
+                "take_profit": p * 1.05,
+                "stop_loss": p * 0.95,
+                "confidence": 0.5,
+                "strategy": "alt",
             }
         return None
 

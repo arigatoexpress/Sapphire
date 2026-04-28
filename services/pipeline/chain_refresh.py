@@ -32,7 +32,7 @@ from lib.chain.intelligence import ChainIntelligence  # noqa: E402
 
 log = logging.getLogger("chain_refresh")
 
-CHAIN_DIR  = ROOT / "data" / "chain"
+CHAIN_DIR = ROOT / "data" / "chain"
 LATEST_DIR = ROOT / "data" / "intelligence" / "latest"
 
 
@@ -119,7 +119,7 @@ def run() -> dict:
     ts = snap.get("generated_at") or datetime.now(UTC).isoformat()
     snap["timestamp"] = ts
 
-    fname = f"chain_{ts.replace(':','-')}.json"
+    fname = f"chain_{ts.replace(':', '-')}.json"
     per_run = CHAIN_DIR / fname
     per_run.write_text(json.dumps(snap, indent=2, default=str))
 

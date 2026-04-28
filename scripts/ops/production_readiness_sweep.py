@@ -241,7 +241,11 @@ def probe_satellite_ci_no_spend_gates(manifest_path: Path = ORG_REPOS_MANIFEST) 
             continue
 
         workflow_dir = local_path / ".github" / "workflows"
-        workflows = sorted([*workflow_dir.glob("*.yml"), *workflow_dir.glob("*.yaml")]) if workflow_dir.exists() else []
+        workflows = (
+            sorted([*workflow_dir.glob("*.yml"), *workflow_dir.glob("*.yaml")])
+            if workflow_dir.exists()
+            else []
+        )
         checked_repos += 1
         if not workflows:
             no_workflow_repos.append(repo_id)
@@ -299,8 +303,7 @@ def probe_satellite_merge_posture(
     repos = [
         repo
         for repo in manifest_check
-        if str(repo.get("ci_strategy") or "") in NO_SPEND_CI_STRATEGIES
-        and repo.get("github")
+        if str(repo.get("ci_strategy") or "") in NO_SPEND_CI_STRATEGIES and repo.get("github")
     ]
 
     details: list[str] = []

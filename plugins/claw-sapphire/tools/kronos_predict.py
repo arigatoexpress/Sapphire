@@ -4,14 +4,14 @@
 Real implementation is retained at `tools/_deprecated/kronos_predict.py` for
 the sunset window. Removal target: v0.5.0 (see `infra/tool-registry.yaml`).
 """
+
 from __future__ import annotations
 
 import warnings
 from pathlib import Path
 
 warnings.warn(
-    "kronos_predict is deprecated. Use predict_kronos instead. "
-    "Will be removed in v0.5.0.",
+    "kronos_predict is deprecated. Use predict_kronos instead. Will be removed in v0.5.0.",
     DeprecationWarning,
     stacklevel=2,
 )

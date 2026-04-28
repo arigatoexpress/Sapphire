@@ -10,4 +10,3 @@ def kelly_fraction(win_prob: float, win_loss_ratio: float) -> float:
 
 def fractional_kelly(win_prob: float, win_loss_ratio: float, fraction: float = 0.5) -> float:
     return kelly_fraction(win_prob, win_loss_ratio) * max(0.0, min(fraction, 1.0))
-

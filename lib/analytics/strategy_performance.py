@@ -259,12 +259,21 @@ def _avg_hold_hours(trades: list[dict[str, Any]]) -> float | None:
 def _stats_for(trades: list[dict[str, Any]]) -> dict[str, Any]:
     if not trades:
         return {
-            "trades": 0, "wins": 0, "losses": 0, "win_rate": None,
-            "total_pnl_usd": 0.0, "avg_pnl_usd": None,
-            "best": None, "worst": None,
-            "profit_factor": None, "sortino": None, "sharpe": None,
-            "avg_roi_pct": None, "total_position_usd": 0.0,
-            "portfolio_roi_pct": None, "avg_hold_hours": None,
+            "trades": 0,
+            "wins": 0,
+            "losses": 0,
+            "win_rate": None,
+            "total_pnl_usd": 0.0,
+            "avg_pnl_usd": None,
+            "best": None,
+            "worst": None,
+            "profit_factor": None,
+            "sortino": None,
+            "sharpe": None,
+            "avg_roi_pct": None,
+            "total_position_usd": 0.0,
+            "portfolio_roi_pct": None,
+            "avg_hold_hours": None,
             "expectancy_usd": None,
         }
     wins = [t for t in trades if t["outcome"] == "win"]
@@ -286,10 +295,7 @@ def _stats_for(trades: list[dict[str, Any]]) -> dict[str, Any]:
     avg_win = (win_pnl / len(wins)) if wins else 0.0
     avg_loss = (loss_pnl / len(losses)) if losses else 0.0  # loss_pnl is negative already
     # Expectancy: E[trade PnL] under observed win rate
-    expectancy = (
-        win_rate * avg_win + (1 - win_rate) * avg_loss
-        if win_rate is not None else None
-    )
+    expectancy = win_rate * avg_win + (1 - win_rate) * avg_loss if win_rate is not None else None
     hold_avg = _avg_hold_hours(trades)
     sortino = _sortino(pnls)
     sharpe = _sharpe(rois) if rois else None
@@ -453,16 +459,20 @@ def timeseries(
             peak = running
         dd_pct = (running - peak) / peak if peak > 0 else 0.0
         ts_iso = ts.isoformat()
-        equity_curve.append({
-            "ts": ts_iso,
-            "equity_usd": round(running, 2),
-            "pnl_usd": round(t["pnl_usd"], 2),
-        })
-        drawdown_series.append({
-            "ts": ts_iso,
-            "dd_pct": round(dd_pct, 6),
-            "equity_usd": round(running, 2),
-        })
+        equity_curve.append(
+            {
+                "ts": ts_iso,
+                "equity_usd": round(running, 2),
+                "pnl_usd": round(t["pnl_usd"], 2),
+            }
+        )
+        drawdown_series.append(
+            {
+                "ts": ts_iso,
+                "dd_pct": round(dd_pct, 6),
+                "equity_usd": round(running, 2),
+            }
+        )
         if dd_pct < max_dd["pct"]:
             max_dd = {"pct": round(dd_pct, 6), "ts": ts_iso, "equity_usd": round(running, 2)}
 
@@ -485,13 +495,15 @@ def timeseries(
     for (year, month), v in sorted(monthly_bucket.items()):
         start_eq = v["equity_at_start"]
         ret_pct = (v["pnl_usd"] / start_eq * 100) if start_eq > 0 else 0.0
-        monthly_returns.append({
-            "year": year,
-            "month": month,
-            "pnl_usd": round(v["pnl_usd"], 2),
-            "return_pct": round(ret_pct, 3),
-            "trades": v["trades"],
-        })
+        monthly_returns.append(
+            {
+                "year": year,
+                "month": month,
+                "pnl_usd": round(v["pnl_usd"], 2),
+                "return_pct": round(ret_pct, 3),
+                "trades": v["trades"],
+            }
+        )
 
     total_pnl = running - capital
     return {
@@ -509,5 +521,6 @@ def timeseries(
 
 if __name__ == "__main__":
     import sys
+
     json.dump(report(), sys.stdout, indent=2, default=str)
     print()
