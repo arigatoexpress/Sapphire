@@ -380,6 +380,13 @@ tools:
     consumers: [services.research_notes]
     description: Research Notes Pipeline 0.1.0. Offline composer and PDF renderer for buyer-readable strategy notes from local backtest sweep, closed-trade performance, and context artifacts. Writes provenance-stamped PDFs under data/research_notes. No live data calls, no Telegram sends, no customer data, no trade execution. Actions, compose/render/latest/aggregate-summary/build.
 
+  - name: pine_generation
+    path: plugins/claw-sapphire/tools/internal/pine_generation.py
+    status: internal
+    owner: sapphire
+    consumers: [services.pine_generation]
+    description: Pine Strategy Generation Pipeline 0.1.0. Translates the 7 Sapphire strategy classes (RegimeAwareRSI, FundingRateContrarian, CorrelationBreakout, MultiTFMomentum, SapphireComposite, BaseStrategy, StrategyParams) into Pine Script v5 source and persists under pine/generated/<date>/. Pure offline generation; built-in heuristic Pine v5 lint (balanced parens, version directive, well-formed strategy() decl, no `var <type> ?` ambiguity, request.security shape, body presence, no unsubstituted templates). TradingView push is operator-gated by SAPPHIRE_PINE_TV_PUSH_LIVE=1 + payload confirm=true. No live trading, no secrets, no Telegram sends. Actions, generate/latest/validate/build/push-to-tv/status.
+
   # Intel — BigQuery vector retrieval over the Sapphire intel corpus
   - name: intel_search
     path: plugins/claw-sapphire/tools/internal/intel_search.py
