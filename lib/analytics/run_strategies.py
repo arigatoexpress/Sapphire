@@ -216,7 +216,11 @@ def _print_strategy_summary(all_best: list[SweepResult]) -> None:
         )
 
 
-def run(days: int = 90, bankroll: float = 10_000.0) -> list[SweepResult]:
+def run(
+    days: int = 90,
+    bankroll: float = 10_000.0,
+    output_dir: Path | None = None,
+) -> list[SweepResult]:
     t0 = time.time()
     print(f"\n{'═' * 70}")
     print(f"  Sapphire Strategy Sweep — {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}")
@@ -330,8 +334,12 @@ def run(days: int = 90, bankroll: float = 10_000.0) -> list[SweepResult]:
     )
 
     # ── 3. Save full sweep ───────────────────────────────────────────────────
-    save_path = save_results(all_results, metadata=metadata)
-    print(f"\nFull sweep ({len(all_results)} backtests) saved → {save_path.relative_to(_ROOT)}")
+    save_path = save_results(all_results, metadata=metadata, output_dir=output_dir)
+    try:
+        rel = save_path.relative_to(_ROOT)
+    except ValueError:
+        rel = save_path
+    print(f"\nFull sweep ({len(all_results)} backtests) saved → {rel}")
 
     # ── 4. Best params per (strategy, symbol) ───────────────────────────────
     best = compare(best_per_symbol(all_results))
@@ -346,7 +354,11 @@ def run(days: int = 90, bankroll: float = 10_000.0) -> list[SweepResult]:
         "results": [r.to_dict(include_report=True) for r in best],
     }
     best_path.write_text(json.dumps(best_payload, indent=2))
-    print(f"Best params ({len(best)} rows) saved → {best_path.relative_to(_ROOT)}")
+    try:
+        best_rel = best_path.relative_to(_ROOT)
+    except ValueError:
+        best_rel = best_path
+    print(f"Best params ({len(best)} rows) saved → {best_rel}")
 
     # ── 5. Comparison table ──────────────────────────────────────────────────
     print("\n")
@@ -371,5 +383,14 @@ if __name__ == "__main__":
     p.add_argument(
         "--bankroll", type=float, default=10_000.0, help="Starting capital (default: 10000)"
     )
+    p.add_argument(
+        "--output-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Directory to write strategy_sweep_*.json and best_per_symbol_*.json into. "
+            "Defaults to data/backtests/strategies/."
+        ),
+    )
     args = p.parse_args()
-    run(days=args.days, bankroll=args.bankroll)
+    run(days=args.days, bankroll=args.bankroll, output_dir=args.output_dir)
