@@ -39,7 +39,7 @@ def _repo_relative(path: Path) -> str:
     try:
         return str(path.resolve().relative_to(REPO_ROOT.resolve()))
     except ValueError:
-        return str(path)
+        return f"[outside-repo]/{path.name}"
 
 
 def load_manifest(path: Path = DEFAULT_MANIFEST) -> dict[str, Any]:
@@ -248,8 +248,8 @@ def build_report(
             encoding="utf-8",
         )
         report["written"] = {
-            "plan": str(plan_path),
-            "redaction_report": str(report_path),
+            "plan": _repo_relative(plan_path),
+            "redaction_report": _repo_relative(report_path),
         }
     return report
 

@@ -42,7 +42,7 @@
     {
       "name": "bearer_token",
       "pattern": "(?i)\\bbearer\\s+[a-z0-9._~+/=-]{8,}",
-      "replacement": "Bearer [redacted]"
+      "replacement": "[bearer-token-redacted]"
     },
     {
       "name": "basic_auth_url",
