@@ -102,6 +102,9 @@
 <div class="obs-header">
     <h1>Observability</h1>
     <p class="text-muted">Single-pane-of-glass system state — heartbeat, inference proxy, signal streams, provenance, pause controls, event bus.</p>
+    {% if buyer_safe %}
+    <p style="color: var(--amber); font-size: 0.82rem; margin-top: var(--space-sm);">Buyer-safe profile: operational identifiers are redacted.</p>
+    {% endif %}
 </div>
 
 <script type="application/json" id="routine-pause-seed">{{ routine_pause_summary | tojson }}</script>
@@ -216,6 +219,8 @@
 </div>
 
 <script>
+const buyerSafeQuery = new URLSearchParams(window.location.search).get('profile') === 'buyer' ? '?profile=buyer' : '';
+
 function esc(value) {
     return String(value ?? '').replace(/[&<>"']/g, ch => ({
         '&': '&amp;',
@@ -249,7 +254,7 @@ function renderPauseStatus(payload) {
 }
 
 function refreshPauseStatus() {
-    fetch(`${window.location.origin}/api/routine-pause-status`)
+    fetch(`${window.location.origin}/api/routine-pause-status${buyerSafeQuery}`)
         .then(response => response.json())
         .then(renderPauseStatus)
         .catch(() => {});
@@ -406,7 +411,7 @@ function renderTranche4Feeds(payload) {
 }
 
 function refreshSystemSummary() {
-    fetch(`${window.location.origin}/api/observability-system-summary`)
+    fetch(`${window.location.origin}/api/observability-system-summary${buyerSafeQuery}`)
         .then(response => response.json())
         .then(payload => {
             renderHeartbeat(payload);
@@ -426,7 +431,7 @@ function refreshSystemSummary() {
 }
 
 function refreshTranche4Feeds() {
-    fetch(`${window.location.origin}/api/observability-tranche4-feeds`)
+    fetch(`${window.location.origin}/api/observability-tranche4-feeds${buyerSafeQuery}`)
         .then(response => response.json())
         .then(renderTranche4Feeds)
         .catch(() => {});

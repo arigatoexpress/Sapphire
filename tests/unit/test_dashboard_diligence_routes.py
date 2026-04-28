@@ -71,6 +71,17 @@ def test_diligence_page_includes_all_fetch_endpoints(client):
     assert 'method: "POST"' not in html
 
 
+def test_diligence_page_buyer_profile_fetches_buyer_safe_endpoints(client):
+    response = client.get("/diligence?profile=buyer", headers=_auth_header())
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "Buyer-safe profile" in html
+    assert "/api/diligence-summary${buyerSafeQuery}" in html
+    assert "profile=buyer" in html
+    assert "/Users/aribs" not in html
+
+
 def test_diligence_summary_api_requires_auth(client):
     response = client.get("/api/diligence-summary")
 
@@ -267,6 +278,45 @@ def test_launchagent_summary_api_reports_labels_and_last_exit(client, monkeypatc
     assert by_label["ai.hermes.gateway"]["status_label"] == "exited"
     assert by_label["ai.hermes.gateway"]["last_exit"] == -15
     assert by_label["com.sapphire.missing"]["status_label"] == "not_loaded"
+
+
+def test_launchagent_summary_buyer_profile_redacts_operational_identifiers(
+    client, monkeypatch
+):
+    monkeypatch.setattr(
+        dashboard_app,
+        "_dashboard_launchagent_labels",
+        lambda: ["ai.hermes.gateway", "com.sapphire.dashboard"],
+    )
+
+    def fake_run(*args, **kwargs):
+        assert args[0] == ["launchctl", "list"]
+        return subprocess.CompletedProcess(
+            args[0],
+            0,
+            stdout=(
+                "PID\tStatus\tLabel\n"
+                "123\t0\tcom.sapphire.dashboard\n"
+                "-\t-15\tai.hermes.gateway\n"
+            ),
+            stderr="",
+        )
+
+    monkeypatch.setattr(dashboard_app.subprocess, "run", fake_run)
+
+    response = client.get("/api/launchagent-summary?profile=buyer", headers=_auth_header())
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    serialized = json.dumps(payload)
+    assert payload["audience"] == "buyer_safe"
+    assert payload["redaction"]["applied"] is True
+    assert payload["totals"]["labels"] == 2
+    assert payload["launchagents"][0]["status_label"] in {"running", "exited"}
+    assert "com.sapphire.dashboard" not in serialized
+    assert "ai.hermes.gateway" not in serialized
+    assert '"pid": 123' not in serialized
+    assert '"last_exit": -15' not in serialized
 
 
 def test_new_diligence_routes_are_get_only():

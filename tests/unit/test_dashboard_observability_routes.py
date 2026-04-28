@@ -398,6 +398,21 @@ def test_observability_page_includes_new_panels_and_endpoint_polling(client, mon
     assert "/api/observability-tranche4-feeds" in html
 
 
+def test_observability_page_buyer_profile_fetches_buyer_safe_endpoints(
+    client, monkeypatch, tmp_path
+):
+    monkeypatch.setattr(dashboard_app, "_ROUTINE_PAUSE_DIR", tmp_path / "pause")
+
+    response = client.get("/observability?profile=buyer", headers=_auth_header())
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "Buyer-safe profile" in html
+    assert "/api/observability-system-summary${buyerSafeQuery}" in html
+    assert "/api/observability-tranche4-feeds${buyerSafeQuery}" in html
+    assert "profile=buyer" in html
+
+
 def test_build_observability_system_summary_redacts_pii(monkeypatch):
     def fake_snapshot():
         class _Stub:
@@ -422,3 +437,32 @@ def test_build_observability_system_summary_redacts_pii(monkeypatch):
     # Non-PII fields stay intact.
     assert payload["endpoint"] == "100.71.10.48:11434"
     assert payload["label"] == "com.sapphire.demo"
+
+
+def test_observability_system_summary_buyer_profile_redacts_operational_identifiers(
+    client, monkeypatch
+):
+    monkeypatch.setattr(
+        dashboard_app,
+        "_build_observability_system_summary",
+        _stub_snapshot_payload,
+    )
+
+    response = client.get(
+        "/api/observability-system-summary?profile=buyer",
+        headers=_auth_header(),
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    serialized = json.dumps(payload)
+    assert payload["audience"] == "buyer_safe"
+    assert payload["redaction"]["applied"] is True
+    assert payload["heartbeat"]["totals"]["running"] == 1
+    assert payload["inference_proxy"]["tiers"][0]["endpoint"] == "[buyer-safe redacted]"
+    assert payload["signal_streams"][0]["rate_24h"] == 21
+    assert "100.71.10.48:11434" not in serialized
+    assert "com.sapphire.demo" not in serialized
+    assert "~/.cache/sapphire" not in serialized
+    assert "data/signals" not in serialized
+    assert '"pid": 999' not in serialized
