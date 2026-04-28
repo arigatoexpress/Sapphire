@@ -11,6 +11,7 @@ import json
 import os
 import sys
 import zipfile
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -33,12 +34,8 @@ def app_client(tmp_path, monkeypatch):
     import app as dash_app  # type: ignore
 
     # Point stale-data endpoints at tmp JSONL to isolate fixtures
-    monkeypatch.setattr(
-        dash_app, "_cache", {}
-    )
-    monkeypatch.setattr(
-        dash_app, "_cache_time", {}
-    )
+    monkeypatch.setattr(dash_app, "_cache", {})
+    monkeypatch.setattr(dash_app, "_cache_time", {})
 
     client = dash_app.app.test_client()
     return dash_app, client
@@ -68,17 +65,35 @@ def test_opportunities_reads_signals_jsonl(app_client, tmp_path, monkeypatch):
     # Redirect the Sapphire data root for this test
     fake_signals = tmp_path / "trading_signals.jsonl"
     fake_signals.parent.mkdir(exist_ok=True)
-    fake_signals.write_text(json.dumps({
-        "timestamp": "2026-04-17T10:00:00+00:00",
-        "symbol": "BTCUSDT", "action": "BUY", "price": 68000.0,
-        "confidence": 0.82, "strategy": "ensemble",
-        "raw": {"reason": "3F ensemble: MA↑ MACD↑ Vol↑",
-                "edge": 0.03, "kelly_size_pct": 1.5},
-    }) + "\n" + json.dumps({
-        "timestamp": "2026-04-17T10:30:00+00:00",
-        "symbol": "ETHUSDT", "action": "SELL", "price": 3100.0,
-        "confidence": 0.35, "strategy": "rsi_top",  # below threshold
-    }) + "\n")
+    fake_signals.write_text(
+        json.dumps(
+            {
+                "timestamp": "2026-04-17T10:00:00+00:00",
+                "symbol": "BTCUSDT",
+                "action": "BUY",
+                "price": 68000.0,
+                "confidence": 0.82,
+                "strategy": "ensemble",
+                "raw": {
+                    "reason": "3F ensemble: MA↑ MACD↑ Vol↑",
+                    "edge": 0.03,
+                    "kelly_size_pct": 1.5,
+                },
+            }
+        )
+        + "\n"
+        + json.dumps(
+            {
+                "timestamp": "2026-04-17T10:30:00+00:00",
+                "symbol": "ETHUSDT",
+                "action": "SELL",
+                "price": 3100.0,
+                "confidence": 0.35,
+                "strategy": "rsi_top",  # below threshold
+            }
+        )
+        + "\n"
+    )
 
     # Monkeypatch Path.home so the endpoint's os-agnostic lookup hits our tmp
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
@@ -156,28 +171,35 @@ def test_logs_filter_by_level_and_service(app_client, tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
     data_dir = tmp_path / "Code" / "Sapphire" / "data"
     data_dir.mkdir(parents=True)
-    (data_dir / "system_events.jsonl").write_text("\n".join([
-        json.dumps({
-            "timestamp": "2099-01-01T00:00:00+00:00",  # always in-window
-            "type": "signal.received",
-            "message": "BUY BTC",
-            "tags": ["type:trading", "priority:p1"],
-        }),
-        json.dumps({
-            "timestamp": "2099-01-01T00:00:00+00:00",
-            "type": "heartbeat",
-            "message": "ok",
-            "tags": ["priority:p2"],
-        }),
-    ]) + "\n")
+    (data_dir / "system_events.jsonl").write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "timestamp": "2099-01-01T00:00:00+00:00",  # always in-window
+                        "type": "signal.received",
+                        "message": "BUY BTC",
+                        "tags": ["type:trading", "priority:p1"],
+                    }
+                ),
+                json.dumps(
+                    {
+                        "timestamp": "2099-01-01T00:00:00+00:00",
+                        "type": "heartbeat",
+                        "message": "ok",
+                        "tags": ["priority:p2"],
+                    }
+                ),
+            ]
+        )
+        + "\n"
+    )
 
-    r = client.get("/api/logs?hours=168&level=WARN",
-                   headers={"Authorization": _AUTH})
+    r = client.get("/api/logs?hours=168&level=WARN", headers={"Authorization": _AUTH})
     body = r.get_json()
     assert all(e["level"] == "WARN" for e in body["logs"])
 
-    r = client.get("/api/logs?hours=168&service=signal",
-                   headers={"Authorization": _AUTH})
+    r = client.get("/api/logs?hours=168&service=signal", headers={"Authorization": _AUTH})
     body = r.get_json()
     assert all("signal" in e["type"] for e in body["logs"])
 
@@ -333,7 +355,9 @@ def test_sovereign_thesis_endpoint_is_research_only(app_client):
     assert rows["BTC"]["fit"] == "aligned"
     assert "hard_money" in rows["BTC"]["aligned_lenses"]
     assert "eth_economic_zone" in rows["ETH"]["aligned_lenses"]
-    assert "ethereum:privacy_cluster" in {row["source_id"] for row in rows["ETH"]["evidence_ledger"]}
+    assert "ethereum:privacy_cluster" in {
+        row["source_id"] for row in rows["ETH"]["evidence_ledger"]
+    }
     assert rows["BTC"]["evidence_ledger"]
     assert "BWXT" in rows
     assert {"AAVE", "UNI", "ENS", "ARB", "OP"} <= set(rows)
@@ -363,7 +387,9 @@ def test_continuous_intelligence_endpoint_is_dry_run(app_client):
 
 def test_continuous_intelligence_artifacts_endpoint_is_read_only(app_client):
     _, client = app_client
-    r = client.get("/api/autonomy/continuous-intelligence/artifacts", headers={"Authorization": _AUTH})
+    r = client.get(
+        "/api/autonomy/continuous-intelligence/artifacts", headers={"Authorization": _AUTH}
+    )
     assert r.status_code == 200
     body = r.get_json()
     assert body["mode"] == "continuous_intelligence_artifact_status"
@@ -411,6 +437,7 @@ def test_sovereign_thesis_page_renders(app_client):
     assert "/api/autonomy/continuous-intelligence/lease-preview" in html
     assert "Gemini OODA (dry-run)" in html
     assert "/api/gemini-ooda" in html
+    assert "Daily Delta" in html
 
 
 def test_gemini_ooda_endpoint_is_dry_run_dashboard(app_client):
@@ -450,3 +477,42 @@ def test_gemini_ooda_endpoint_accepts_topic_override(app_client):
     body = r.get_json()
     assert body["topic"] == "Probe OODA override"
     assert body["context_summary_chars"] == len("paste-safe context block")
+
+
+def test_gemini_ooda_endpoint_can_return_daily_diff(app_client, tmp_path, monkeypatch):
+    dash_app, client = app_client
+    packet_dir = tmp_path / "gemini-ooda"
+    packet_dir.mkdir()
+    today = datetime.now(UTC).date()
+    yesterday = today - timedelta(days=1)
+    (packet_dir / f"{yesterday.isoformat()}.json").write_text(
+        json.dumps(
+            {
+                "topic": "Sapphire daily thesis OODA snapshot",
+                "context_summary": {"totals": {"assets": 2}},
+                "tool_response": {"ooda": {"decide": "hold"}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (packet_dir / f"{today.isoformat()}.json").write_text(
+        json.dumps(
+            {
+                "topic": "Sapphire daily thesis OODA snapshot",
+                "context_summary": {"totals": {"assets": 3}},
+                "tool_response": {"ooda": {"decide": "watch deltas"}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(dash_app, "_GEMINI_OODA_DAILY_DIR", packet_dir)
+
+    r = client.get("/api/gemini-ooda?diff=1", headers={"Authorization": _AUTH})
+
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["daily_diff"]["available"] is True
+    mutated = {row["key"]: row for row in body["daily_diff"]["mutated"]}
+    assert mutated["context_summary.totals.assets"]["before"] == "2"
+    assert mutated["context_summary.totals.assets"]["after"] == "3"
+    assert mutated["tool_response.ooda.decide"]["after"] == "watch deltas"

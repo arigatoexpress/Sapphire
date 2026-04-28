@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -68,8 +69,8 @@ def test_slow_overview_routes_use_explicit_caches() -> None:
     assert "CASCADE_CACHE_DURATION = 30" in source
     assert "STRATEGY_PERFORMANCE_CACHE_DURATION = 30" in source
 
-    assert "'chain_overview'," in source
+    assert re.search(r"""["']chain_overview["'],""", source)
     assert "snapshot(alert_on_shift=False)" in source
-    assert "'portfolio_snapshot'," in source
-    assert "'cascade_risk'," in source
-    assert "'strategy_performance'," in source
+    assert re.search(r"""["']portfolio_snapshot["'],""", source)
+    assert re.search(r"""["']cascade_risk["'],""", source)
+    assert re.search(r"""["']strategy_performance["'],""", source)
