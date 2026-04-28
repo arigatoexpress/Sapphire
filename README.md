@@ -608,7 +608,7 @@ python3 -m lib.content publish
 ## 12. Testing & QA
 
 ```bash
-# Unit tests — 3,458 passing
+# Unit tests — 3,462 passing
 /usr/local/bin/python3 -m pytest tests/unit/ --tb=short -q
 
 # Plugin tests — 78 passing
