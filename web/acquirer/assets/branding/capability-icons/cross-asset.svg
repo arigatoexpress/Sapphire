@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <title>Cross-asset correlation</title>
+  <!-- two correlation curves crossing on a grid -->
+  <path d="M4 6 v22 h24"/>
+  <path d="M4 6 h24" opacity="0.35"/>
+  <path d="M16 6 v22" opacity="0.35"/>
+  <path d="M6 24 q5 -2 10 -8 t10 -10"/>
+  <path d="M6 10 q5 2 10 8 t10 6"/>
+  <circle cx="16" cy="16" r="1.5"/>
+</svg>

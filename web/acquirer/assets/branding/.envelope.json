@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "generator": "feat/acquirer-microsite-brand-assets",
+  "head_sha": "1bcf221aa9e7719363102ac1c6d55b55840eedfe",
+  "created_at": "2026-04-27",
+  "skill": "anthropic-skills:canvas-design",
+  "notes": [
+    "SVGs were authored directly as code (deterministic vector primitives).",
+    "PNGs were rendered with PIL (Pillow) using the same palette tokens declared in web/acquirer/assets/styles.css.",
+    "All assets use the existing site palette; no third-party fonts or copyrighted glyphs were embedded.",
+    "Per-asset prompts below summarize the design intent; the canvas-design skill provided the philosophy ('Geometric Silence / Signal Topology'), and the visuals were executed with hand-coded primitives so each output is XML-valid and pixel-deterministic."
+  ],
+  "assets": [
+    {
+      "path": "logo.svg",
+      "prompt": "Sapphire OS wordmark for light backgrounds. Octahedral monogram (sapphire cross-section: rhombus + facet + cross-hairs + center node) followed by a sans-serif wordmark. Wordmark uses dark sapphire #0b1220 with the OS suffix in electric blue #1565C0 to imply duality without breaking the palette.",
+      "skill": "anthropic-skills:canvas-design"
+    },
+    {
+      "path": "logo.png",
+      "prompt": "256x64 raster export of logo.svg, rendered with Pillow primitives.",
+      "skill": "anthropic-skills:canvas-design"
+    },
+    {
+      "path": "logo-dark-bg.svg",
+      "prompt": "Same construction as logo.svg, recolored for the dark sapphire background. Wordmark in off-white #e6ecff with the OS suffix in #8edcff.",
+      "skill": "anthropic-skills:canvas-design"
+    },
+    {
+      "path": "logo-dark-bg.png",
+      "prompt": "256x64 raster export of logo-dark-bg.svg.",
+      "skill": "anthropic-skills:canvas-design"
+    },
+    {
+      "path": "favicon.svg",
+      "prompt": "32x32 monogram-only mark on a 6px-radius rounded square, deep sapphire base with #8edcff stroke and a translucent #6da5ff facet fill.",
+      "skill": "anthropic-skills:canvas-design"
+    },
+    {
+      "path": "favicon.ico",
+      "prompt": "Multi-resolution ICO container (32x32 + 16x16) generated from the favicon design with Pillow.",
+      "skill": "anthropic-skills:canvas-design"
+    },
+    {
+      "path": "og-image.png",
+      "prompt": "1200x630 share-preview composition. Sapphire OS logo top-left, headline 'Sapphire OS / Multi-modal Intelligence Platform' centered-left in display weight (second line in #8edcff). Subhead 'Built for acquirers, ready for production diligence.' Five thin signal curves converge from the left edge into a central octahedral correlation hub with concentric ambient rings. Subtle 40px grid; deep sapphire #0b1220 base.",
+      "skill": "anthropic-skills:canvas-design"
+    },
+    {
+      "path": "hero-illustration.svg",
+      "prompt": "Abstract signal-flow visualization. Five upstream sources (TradingView, Telegram intel, Hyperliquid, Threat intel, Cross-asset) converge on a central correlation hub (octahedral monogram echo) which emits a three-line narrative-thesis stream to a labeled output node. Vector-clean stroke style, sapphire palette, 960x360 viewBox, preserveAspectRatio responsive.",
+      "skill": "anthropic-skills:canvas-design"
+    },
+    {
+      "path": "capability-icons/signal-correlator.svg",
+      "prompt": "Two waves crossing into a node. 32x32 stroke icon, currentColor.",
+      "skill": "anthropic-skills:canvas-design"
+    },
+    {
+      "path": "capability-icons/narrative-synthesis.svg",
+      "prompt": "Three input lines merging into a quote-mark output. 32x32 stroke icon.",
+      "skill": "anthropic-skills:canvas-design"
+    },
+    {
+      "path": "capability-icons/cross-asset.svg",
+      "prompt": "Two correlation curves crossing on a faint grid. 32x32 stroke icon.",
+      "skill": "anthropic-skills:canvas-design"
+    },
+    {
+      "path": "capability-icons/macro-intel.svg",
+      "prompt": "Stylized globe with longitudes. 32x32 stroke icon.",
+      "skill": "anthropic-skills:canvas-design"
+    },
+    {
+      "path": "capability-icons/onchain-depth.svg",
+      "prompt": "Stacked layers / chain-block depth. 32x32 stroke icon.",
+      "skill": "anthropic-skills:canvas-design"
+    },
+    {
+      "path": "capability-icons/event-impact.svg",
+      "prompt": "Impulse spike radiating outward over a soft ring. 32x32 stroke icon.",
+      "skill": "anthropic-skills:canvas-design"
+    },
+    {
+      "path": "capability-icons/counterparty.svg",
+      "prompt": "Two connected nodes with a directional flow line. 32x32 stroke icon.",
+      "skill": "anthropic-skills:canvas-design"
+    },
+    {
+      "path": "capability-icons/adversarial-defense.svg",
+      "prompt": "Shield with central check / signal. 32x32 stroke icon.",
+      "skill": "anthropic-skills:canvas-design"
+    },
+    {
+      "path": "capability-icons/provenance.svg",
+      "prompt": "Document with a wax-style center seal and ribbon. 32x32 stroke icon.",
+      "skill": "anthropic-skills:canvas-design"
+    },
+    {
+      "path": "brand-guidelines.md",
+      "prompt": "Brand guidelines covering palette, typography, logo usage, iconography, OG image template, voice and tone, accessibility floor.",
+      "skill": "anthropic-skills:canvas-design"
+    }
+  ]
+}

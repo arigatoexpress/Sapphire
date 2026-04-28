@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <title>Provenance</title>
+  <!-- document with seal -->
+  <path d="M8 4 h12 l4 4 v18 a2 2 0 0 1 -2 2 h-14 a2 2 0 0 1 -2 -2 v-20 a2 2 0 0 1 2 -2 z"/>
+  <path d="M20 4 v4 h4"/>
+  <circle cx="16" cy="20" r="3.2"/>
+  <path d="M14 22.8 l-1.6 4 l3.6 -2 l3.6 2 l-1.6 -4"/>
+</svg>

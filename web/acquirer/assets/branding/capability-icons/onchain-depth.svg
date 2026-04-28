@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <title>On-chain depth</title>
+  <!-- stacked layers / chain -->
+  <path d="M16 4 l11 5 l-11 5 l-11 -5 z"/>
+  <path d="M5 14 l11 5 l11 -5"/>
+  <path d="M5 20 l11 5 l11 -5"/>
+</svg>

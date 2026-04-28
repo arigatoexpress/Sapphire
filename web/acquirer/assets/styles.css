@@ -91,7 +91,7 @@ code {
 }
 .brand-mark {
   display: inline-block;
-  font-family: ui-monospace, monospace;
+  vertical-align: middle;
   color: var(--accent-2);
 }
 .brand-version {
@@ -149,6 +149,40 @@ h3 {
 }
 .lede {
   font-size: 1.1rem;
+}
+
+/* ---- Hero illustration ---- */
+.hero-illustration {
+  margin: 0 0 1.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-elev);
+  overflow: hidden;
+  display: block;
+}
+.hero-illustration svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* ---- Capability icon ---- */
+.capability-icon {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  color: var(--accent-2);
+  vertical-align: middle;
+}
+.card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex: 1;
+  min-width: 0;
+}
+.card-title-row h3 {
+  margin: 0;
 }
 
 /* ---- Capabilities cards ---- */

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 64" width="256" height="64" role="img" aria-label="Sapphire OS">
+  <title>Sapphire OS</title>
+  <desc>Sapphire OS wordmark with monogram for dark backgrounds.</desc>
+  <g transform="translate(8 8)">
+    <g transform="translate(24 24)">
+      <path d="M0,-20 L20,0 L0,20 L-20,0 Z" fill="none" stroke="#e6ecff" stroke-width="2.25" stroke-linejoin="miter"/>
+      <path d="M0,-20 L0,20 M-20,0 L20,0" fill="none" stroke="#8edcff" stroke-width="1.25" opacity="0.55"/>
+      <path d="M-20,0 L0,-8 L20,0 L0,8 Z" fill="#6da5ff" opacity="0.22"/>
+      <circle r="2.4" fill="#8edcff"/>
+    </g>
+  </g>
+  <g transform="translate(72 0)" fill="#e6ecff" font-family="-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Helvetica, Arial, sans-serif">
+    <text x="0" y="40" font-size="26" font-weight="600" letter-spacing="-0.5">Sapphire</text>
+    <text x="124" y="40" font-size="26" font-weight="300" letter-spacing="2" fill="#8edcff">OS</text>
+  </g>
+</svg>

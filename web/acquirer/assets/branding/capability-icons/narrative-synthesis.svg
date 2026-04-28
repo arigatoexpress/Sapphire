@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <title>Narrative synthesis</title>
+  <!-- three input lines merging into one quote-like output -->
+  <path d="M4 8 h8"/>
+  <path d="M4 16 h6"/>
+  <path d="M4 24 h8"/>
+  <path d="M12 8 q6 0 8 8 q-2 8 -8 8"/>
+  <path d="M10 16 q4 0 10 0"/>
+  <path d="M22 12 v8"/>
+  <path d="M26 10 v12"/>
+</svg>
