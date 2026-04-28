@@ -216,7 +216,7 @@ def parse_launchctl_list(output: str) -> dict[str, tuple[str, str]]:
 
 def probe_local_endpoints(env: dict[str, str]) -> list[Check]:
     checks = [
-        http_check("local", "inference_proxy_health", "http://127.0.0.1:11435/health"),
+        inference_proxy_health_check(),
         http_check("local", "inference_proxy_metrics", "http://127.0.0.1:11435/metrics"),
         http_check("local", "dashboard_health", "http://127.0.0.1:8080/health"),
         http_check("local", "control_plane_health", "http://127.0.0.1:8082/health"),
@@ -239,6 +239,56 @@ def probe_local_endpoints(env: dict[str, str]) -> list[Check]:
     else:
         checks.append(Check("local", "dashboard_authenticated_root", "WARN", "AUTH_PASSWORD not available to probe"))
     return checks
+
+
+def inference_proxy_health_check() -> Check:
+    started = time.perf_counter()
+    url = "http://127.0.0.1:11435/health"
+    try:
+        with urllib.request.urlopen(url, timeout=5) as response:
+            status_code = response.status
+            body = response.read(1024 * 1024)
+    except urllib.error.HTTPError as exc:
+        return Check(
+            "local",
+            "inference_proxy_health",
+            "FAIL",
+            f"http={exc.code}",
+            int((time.perf_counter() - started) * 1000),
+        )
+    except Exception as exc:
+        return Check(
+            "local",
+            "inference_proxy_health",
+            "FAIL",
+            exc.__class__.__name__,
+            int((time.perf_counter() - started) * 1000),
+        )
+
+    status = "PASS" if 200 <= status_code < 300 else "FAIL"
+    evidence = f"http={status_code}"
+    with contextlib_suppress():
+        parsed = json.loads(body)
+        if isinstance(parsed, dict):
+            if parsed.get("status"):
+                evidence += f"; status={parsed.get('status')}"
+            endpoints = parsed.get("endpoints")
+            if isinstance(endpoints, dict):
+                degraded = sorted(
+                    str(name)
+                    for name, value in endpoints.items()
+                    if str(value).lower() not in {"healthy", "ok", "available"}
+                )
+                if degraded and status == "PASS":
+                    status = "WARN"
+                    evidence += f"; degraded_tiers={','.join(degraded)}"
+    return Check(
+        "local",
+        "inference_proxy_health",
+        status,
+        evidence,
+        int((time.perf_counter() - started) * 1000),
+    )
 
 
 def probe_safety() -> list[Check]:

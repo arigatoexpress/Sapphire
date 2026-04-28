@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -88,3 +89,64 @@ def test_gemini_probe_converts_google_manual_gate_to_pass() -> None:
 
     assert google_gate.status == "PASS"
     assert "Vertex Gemini live probe succeeded" in google_gate.evidence
+
+
+class _FakeHTTPResponse:
+    def __init__(self, status: int, payload: dict) -> None:
+        self.status = status
+        self._body = json.dumps(payload).encode()
+
+    def __enter__(self) -> "_FakeHTTPResponse":
+        return self
+
+    def __exit__(self, *_exc: object) -> bool:
+        return False
+
+    def read(self, _limit: int) -> bytes:
+        return self._body
+
+
+def test_inference_health_warns_on_degraded_tiers(monkeypatch) -> None:
+    def fake_urlopen(_request: object, timeout: int) -> _FakeHTTPResponse:
+        assert timeout == 5
+        return _FakeHTTPResponse(
+            200,
+            {
+                "status": "ok",
+                "endpoints": {
+                    "windows-gpu": "healthy",
+                    "pi-rari1": "failed",
+                    "mac-local": "healthy",
+                },
+            },
+        )
+
+    monkeypatch.setattr(sweep.urllib.request, "urlopen", fake_urlopen)
+
+    check = sweep.inference_proxy_health_check()
+
+    assert check.status == "WARN"
+    assert "status=ok" in check.evidence
+    assert "degraded_tiers=pi-rari1" in check.evidence
+
+
+def test_inference_health_passes_when_all_tiers_healthy(monkeypatch) -> None:
+    def fake_urlopen(_request: object, timeout: int) -> _FakeHTTPResponse:
+        assert timeout == 5
+        return _FakeHTTPResponse(
+            200,
+            {
+                "status": "ok",
+                "endpoints": {
+                    "windows-gpu": "healthy",
+                    "mac-local": "healthy",
+                },
+            },
+        )
+
+    monkeypatch.setattr(sweep.urllib.request, "urlopen", fake_urlopen)
+
+    check = sweep.inference_proxy_health_check()
+
+    assert check.status == "PASS"
+    assert "degraded_tiers" not in check.evidence
