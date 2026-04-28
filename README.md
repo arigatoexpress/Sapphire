@@ -133,7 +133,7 @@ flowchart LR
 
 | Surface | Count | Detail |
 |---|---:|---|
-| Passing tests | **5,357+** | 4,981+ unit · 376 plugin (`python scripts/ops/test_inventory.py --check-readme`) |
+| Passing tests | **5,357+** | 4,979+ unit · 378 plugin (`python scripts/ops/test_inventory.py --check-readme`) |
 | Test files | **290+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
 | Dashboard pages | **38** | Flask + SSE, basic-auth, observability, cross-asset, diligence, threat-intel, dossier pages |
 | Quant strategies | **7** | `lib/analytics/strategies.py` |
@@ -704,10 +704,10 @@ python3 -m lib.content publish
 ## 12. Testing & QA
 
 ```bash
-# Unit tests — 4,981 collected; latest full run: 4,958 passed, 1 skipped, 21 xfailed
+# Unit tests — 4,979 collected; latest full run: 4,958 passed, 1 skipped, 21 xfailed
 /usr/local/bin/python3 -m pytest tests/unit/ --tb=short -q
 
-# Plugin tests — 376 collected; latest full run: 376 passed
+# Plugin tests — 378 collected; latest full run: 378 passed
 /usr/local/bin/python3 -m pytest plugins/claw-sapphire/tests/ -q
 
 # Lint
@@ -781,6 +781,7 @@ The `docs/` directory holds 400 K+ words of cross-validated architecture, audit,
 | [`docs/products/macro-intel-0.1.0.md`](docs/products/macro-intel-0.1.0.md) | Regulatory and macro intelligence daemon |
 | [`docs/products/onchain-intelligence-0.2.0.md`](docs/products/onchain-intelligence-0.2.0.md) | Glassnode, Santiment, ETH, and SOL provider deepening |
 | [`docs/products/event-impact-modeling-0.1.0.md`](docs/products/event-impact-modeling-0.1.0.md) | Historical event-impact lookup table |
+| [`docs/ops/event-impact-runbook.md`](docs/ops/event-impact-runbook.md) | Operator corpus, rebuild, and post-corpus audit workflow |
 | [`docs/products/counterparty-intel-0.1.0.md`](docs/products/counterparty-intel-0.1.0.md) | Hyperliquid public counter-party intelligence |
 | [`docs/products/adversarial-defense-0.1.0.md`](docs/products/adversarial-defense-0.1.0.md) | Adversarial signal-defense layer |
 | [`docs/competitive/landscape-2026-04-28.md`](docs/competitive/landscape-2026-04-28.md) | Primary-source competitive landscape memo |
