@@ -20,7 +20,7 @@ help:  ## Show this help
 
 # ---------- setup ----------
 
-.PHONY: install install-hooks install-test
+.PHONY: install install-hooks install-test sapphire-on-fresh-mac sapphire-demo-up sapphire-demo-down sapphire-demo-reset
 install:  ## Install dev tooling (ruff, pytest, pre-commit)
 	$(PY) -m pip install -e '.[dev]'
 
@@ -30,6 +30,17 @@ install-test:  ## Install the pinned CI test dep set (matches requirements-test.
 install-hooks:  ## Install pre-commit + commit-msg hooks
 	pre-commit install
 	pre-commit install --hook-type commit-msg
+
+sapphire-on-fresh-mac:  ## Bootstrap a demo-safe fresh Mac checkout
+	bash scripts/ops/bootstrap_fresh_mac.sh
+
+sapphire-demo-up: sapphire-on-fresh-mac  ## Prepare demo-safe local files and LaunchAgents
+
+sapphire-demo-down:  ## Remove demo LaunchAgents and fresh-mac venv, preserving secrets
+	bash scripts/ops/teardown_fresh_mac.sh
+
+sapphire-demo-reset:  ## Remove demo LaunchAgents, venv, and placeholder secrets only
+	SAPPHIRE_BOOTSTRAP_RESET_SECRETS=1 bash scripts/ops/teardown_fresh_mac.sh
 
 # ---------- quality ----------
 
