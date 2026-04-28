@@ -7,11 +7,18 @@ Nemotron side effects are stubbed.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import sys
 from pathlib import Path
 
 import pytest
+
+pytestmark = pytest.mark.skipif(
+    importlib.util.find_spec("fastapi") is None
+    or importlib.util.find_spec("fastapi.testclient") is None,
+    reason="signal pipeline E2E tests require FastAPI TestClient",
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 ALPHA_SRC = ROOT / "services" / "alpha" / "src"
