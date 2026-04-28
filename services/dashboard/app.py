@@ -3909,6 +3909,113 @@ def api_threat_intel():
 
 _TARGET_TH_INTEL_DIR = _DASHBOARD_REPO_ROOT / "data" / "tho_intel"
 
+# Customer-dossier 0.2.0 — per-tenant hash + cell-suppression
+#
+# 0.2.0 closes two follow-ups from 0.1.0:
+#   1. Per-tenant hash isolation. The 0.1.0 surface used a single global salt
+#      for ``customer_<6charhash>`` redaction. A multi-tenant buyer can now
+#      configure ``SAPPHIRE_DOSSIER_HASH_SALT_<TENANT_ID>`` in
+#      ``~/.sapphire/secrets.env`` and the dashboard will mix that salt into
+#      an HMAC-SHA256 derived id of the form ``tenant_<id>_<16hex>``. When the
+#      env var is missing we fall back to a deterministic-but-randomized
+#      default — so a tenant without configured salt continues to get a stable
+#      hash (no breaking change vs 0.1.0).
+#   2. Cell-suppression on small status buckets. Any ``by_status`` count below
+#      ``_DOSSIER_CELL_SUPPRESSION_THRESHOLD`` (5) is reported as the literal
+#      string ``"<5"`` instead of the exact integer. Buckets at the threshold
+#      or above pass through with the exact integer.
+_DOSSIER_DEFAULT_TENANT_ID = "default"
+_DOSSIER_TENANT_SALT_ENV_PREFIX = "SAPPHIRE_DOSSIER_HASH_SALT_"
+_DOSSIER_CELL_SUPPRESSION_THRESHOLD = 5
+_DOSSIER_SECRETS_PATH = Path.home() / ".sapphire" / "secrets.env"
+
+
+def _normalize_dossier_tenant_id(tenant_id: str | None) -> str:
+    """Normalize a tenant id for env lookup + hash scoping.
+
+    Reduces to ASCII alnum + underscore so ``acme corp`` becomes ``ACME_CORP``
+    on the env side and ``acme corp`` on the canonical-lower side.
+    """
+    raw = (tenant_id or "").strip()
+    if not raw:
+        return _DOSSIER_DEFAULT_TENANT_ID
+    safe = re.sub(r"[^A-Za-z0-9_]", "_", raw)
+    safe = safe.strip("_") or _DOSSIER_DEFAULT_TENANT_ID
+    return safe[:64]
+
+
+def _load_dossier_tenant_salt(
+    tenant_id: str,
+    *,
+    secrets_path: Path | None = None,
+) -> str | None:
+    """Load the per-tenant salt for ``tenant_id`` from the operator secrets.
+
+    Looks first at the live process environment (``SAPPHIRE_DOSSIER_HASH_SALT_<TENANT>``).
+    If the env var is unset we parse ``~/.sapphire/secrets.env`` (or the
+    explicit ``secrets_path`` for tests) for a matching ``KEY=value`` line.
+    Returns ``None`` when nothing is configured — the caller falls back to
+    the deterministic-but-randomized default in :func:`per_tenant_hash`.
+
+    The secrets file is only read here; we never log its contents and we
+    only return the matching value (no broadcasts, no aggregation).
+    """
+    env_key = _DOSSIER_TENANT_SALT_ENV_PREFIX + _normalize_dossier_tenant_id(tenant_id).upper()
+    env_value = os.environ.get(env_key)
+    if env_value:
+        cleaned = env_value.strip().strip('"').strip("'")
+        if cleaned:
+            return cleaned
+    path = secrets_path if secrets_path is not None else _DOSSIER_SECRETS_PATH
+    try:
+        if not path.is_file():
+            return None
+        with path.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#"):
+                    continue
+                if stripped.startswith("export "):
+                    stripped = stripped[len("export "):].lstrip()
+                if "=" not in stripped:
+                    continue
+                k, _, v = stripped.partition("=")
+                if k.strip() != env_key:
+                    continue
+                value = v.strip().strip('"').strip("'")
+                return value or None
+    except OSError:
+        return None
+    return None
+
+
+def _suppress_small_buckets(
+    by_status: dict[str, int],
+    *,
+    threshold: int = _DOSSIER_CELL_SUPPRESSION_THRESHOLD,
+) -> dict[str, int | str]:
+    """Apply cell-suppression to status buckets.
+
+    Buckets with count strictly less than ``threshold`` are reported as the
+    literal string ``"<{threshold}"`` (default ``"<5"``); buckets at or above
+    the threshold pass through with the exact integer count. Empty input
+    returns an empty dict. Negative counts are coerced to ``0`` defensively.
+    """
+    suppressed: dict[str, int | str] = {}
+    marker = f"<{threshold}"
+    for status, count in (by_status or {}).items():
+        try:
+            n = int(count)
+        except (TypeError, ValueError):
+            n = 0
+        if n < 0:
+            n = 0
+        if n < threshold:
+            suppressed[status] = marker
+        else:
+            suppressed[status] = n
+    return suppressed
+
 
 def _safe_dossier_payload(error: str | None = None) -> dict[str, Any]:
     """Empty-state envelope for /api/customer-dossier."""
@@ -3960,16 +4067,28 @@ def _select_latest_dossier_snapshot() -> Path | None:
     return None
 
 
-def _build_dossier_payload(snapshot_path: Path | None) -> dict[str, Any]:
+def _build_dossier_payload(
+    snapshot_path: Path | None,
+    *,
+    tenant_id: str | None = None,
+) -> dict[str, Any]:
     """Construct the redacted customer-dossier envelope.
 
     Non-negotiable contract: every string leaf passes through
     ``lib.security.pii_redactor.redact_record`` before it is encoded into the
     JSON response. The redactor is pure (no I/O), so this is safe to call
     inside the request path.
+
+    0.2.0 additions:
+      * Per-tenant hash is mixed into the response under
+        ``customers[*].per_tenant_hash`` so tenants can correlate their own
+        records across snapshots without exposing the underlying PII.
+      * ``summary.by_status`` runs through cell-suppression: buckets with
+        count <5 are reported as the literal ``"<5"`` to discourage
+        re-identification of small cohorts.
     """
     try:
-        from lib.security.pii_redactor import redact_record
+        from lib.security.pii_redactor import per_tenant_hash, redact_record
     except Exception as exc:  # pragma: no cover — defensive
         return _safe_dossier_payload(error=f"redactor_unavailable: {exc}")
 
@@ -3980,21 +4099,49 @@ def _build_dossier_payload(snapshot_path: Path | None) -> dict[str, Any]:
     except (OSError, json.JSONDecodeError) as exc:
         return _safe_dossier_payload(error=f"snapshot_unreadable: {type(exc).__name__}")
 
+    norm_tenant = _normalize_dossier_tenant_id(tenant_id)
+    tenant_salt = _load_dossier_tenant_salt(norm_tenant)
+    salt_source = "configured" if tenant_salt is not None else "default_fallback"
+
     # Compute summary counters from the raw payload, but DO NOT echo any
     # raw string back; the redactor handles every string leaf.
     customers = raw.get("customers") or []
-    by_status: dict[str, int] = {}
+    by_status_counts: dict[str, int] = {}
+    customer_hashes: list[dict[str, Any]] = []
     for c in customers:
         status = str(c.get("status") or "UNKNOWN").upper()[:32]
-        by_status[status] = by_status.get(status, 0) + 1
+        by_status_counts[status] = by_status_counts.get(status, 0) + 1
+        # Per-tenant hash uses the most identifying field available — name,
+        # falling back to email (also PII), then to the customer id. We never
+        # echo the original value.
+        anchor = c.get("customer_name") or c.get("email") or c.get("id") or c.get("customer_id")
+        if anchor is None:
+            continue
+        customer_hashes.append(
+            {
+                "per_tenant_hash": per_tenant_hash(str(anchor), norm_tenant, salt=tenant_salt),
+                "status": status,
+            }
+        )
 
     deals = (raw.get("deals") or [])[:10]
     summary = {
         "total_customers": len(customers),
-        "by_status": by_status,
+        "by_status": _suppress_small_buckets(by_status_counts),
+        "by_status_exact": by_status_counts if False else None,  # never emit exact counts
         "document_templates": int(raw.get("document_template_count") or 0),
         "deals_recent": len(deals),
+        "cell_suppression": {
+            "applied": True,
+            "threshold": _DOSSIER_CELL_SUPPRESSION_THRESHOLD,
+            "marker": f"<{_DOSSIER_CELL_SUPPRESSION_THRESHOLD}",
+        },
     }
+    # Drop the never-emitted-exact-counts placeholder so the payload stays
+    # tight. We keep the assignment above to make it obvious that the exact
+    # counts are intentionally NOT exposed even when the operator queries
+    # the route directly.
+    summary.pop("by_status_exact", None)
 
     redacted_deals = redact_record(deals)
     redacted_meta = redact_record(raw.get("metadata") or {})
@@ -4006,6 +4153,12 @@ def _build_dossier_payload(snapshot_path: Path | None) -> dict[str, Any]:
         "snapshot_path_basename": snapshot_path.name,
         "error": None,
         "summary": summary,
+        "tenant": {
+            "id": norm_tenant,
+            "salt_source": salt_source,
+            "hash_algorithm": "HMAC-SHA256",
+        },
+        "customer_hashes": customer_hashes,
         "recent_deals": redacted_deals,
         "metadata": redacted_meta,
         "safety": {
@@ -4014,11 +4167,15 @@ def _build_dossier_payload(snapshot_path: Path | None) -> dict[str, Any]:
             "writes_by_default": False,
             "telegram_sends_enabled": False,
             "pii_redaction": "applied_to_every_leaf",
+            "cell_suppression": "applied",
+            "per_tenant_hash": "applied",
             "guards": [
                 "read_only_endpoint",
                 "no_live_network_calls",
                 "snapshot_only_read",
                 "pii_redaction_required",
+                "cell_suppression_lt_5",
+                "per_tenant_hmac_sha256",
             ],
         },
         "last_updated": time.time(),
@@ -4042,7 +4199,11 @@ def api_customer_dossier():
     """JSON envelope for /customer-dossier — reads the latest dossier snapshot."""
     try:
         snapshot_path = _select_latest_dossier_snapshot()
-        payload = _build_dossier_payload(snapshot_path)
+        # 0.2.0 — accept ?tenant=<id> for per-tenant hash isolation. Default
+        # tenant ("default") still gets a deterministic hash via the
+        # fallback salt path, so 0.1.0 callers continue to work unchanged.
+        tenant_id = request.args.get("tenant") or _DOSSIER_DEFAULT_TENANT_ID
+        payload = _build_dossier_payload(snapshot_path, tenant_id=tenant_id)
         return jsonify(payload)
     except Exception as e:
         log.warning("customer-dossier API error: %s", e)
