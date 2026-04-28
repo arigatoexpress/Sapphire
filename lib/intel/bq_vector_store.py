@@ -11,9 +11,9 @@ Two backends share one API:
 
 * **mock** (default): an in-memory cosine-similarity store, persisted to
   ``~/.cache/sapphire/bq_vector_mock.jsonl``. Deterministic, dependency-free,
-  CI-safe, and the only path exercised by the test suite.
-* **live**: a real BigQuery-backed store that uses ``VECTOR_SEARCH`` (or a
-  bounded Python-side cosine fallback) over a fixed-schema table. Refuses
+  CI-safe, and the default path for Sapphire callers.
+* **live**: a real BigQuery-backed store that uses ``VECTOR_SEARCH`` over
+  a fixed-schema table. Refuses
   to perform any live operation unless **all three** of these gates are
   satisfied at call time:
 
@@ -40,11 +40,15 @@ not drifted since indexing.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import importlib
 import json
 import math
 import os
+import re
 import time
+import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -69,6 +73,27 @@ DEFAULT_DIMS = 768
 
 DEFAULT_MOCK_PATH = Path.home() / ".cache" / "sapphire" / "bq_vector_mock.jsonl"
 DEFAULT_RATE_PATH = Path.home() / ".cache" / "sapphire" / "bq_vector_live_rate.json"
+BIGQUERY_IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
+LIVE_VECTOR_SEARCH_SQL_TEMPLATE = """
+SELECT
+  result.base.id AS id,
+  result.base.text AS text,
+  result.base.source AS source,
+  result.base.metadata AS metadata,
+  result.base.created_at AS created_at,
+  result.distance AS distance
+FROM VECTOR_SEARCH(
+  TABLE {table_sql_name},
+  'embedding',
+  (SELECT @query_embedding AS embedding),
+  top_k => @top_k,
+  distance_type => 'COSINE'
+) AS result
+WHERE (@source_filter IS NULL OR result.base.source = @source_filter)
+ORDER BY result.distance ASC, result.base.id ASC
+LIMIT @top_k
+""".strip()
 
 KNOWN_SOURCES = (
     "sovereign_thesis",
@@ -423,6 +448,65 @@ def _prune_calls(calls: list[float], *, now: float) -> list[float]:
 
 
 # ---------------------------------------------------------------------------
+# Live BigQuery helpers
+# ---------------------------------------------------------------------------
+
+
+def _load_bigquery_module() -> Any:
+    """Lazy import ``google.cloud.bigquery`` only after the live gate passes."""
+    try:
+        return importlib.import_module("google.cloud.bigquery")
+    except ImportError as exc:
+        raise RuntimeError(
+            "google-cloud-bigquery is required for live BigQuery vector operations"
+        ) from exc
+
+
+def _quote_bigquery_table(project: str, dataset: str, table: str) -> str:
+    """Return a backtick-quoted table FQN after validating identifier parts."""
+    for label, value in (
+        ("project", project),
+        ("dataset", dataset),
+        ("table", table),
+    ):
+        if not BIGQUERY_IDENTIFIER_RE.fullmatch(value):
+            raise ValueError(f"invalid BigQuery {label} identifier: {value!r}")
+    return f"`{project}.{dataset}.{table}`"
+
+
+def _row_value(row: Any, key: str, default: Any = None) -> Any:
+    if isinstance(row, dict):
+        return row.get(key, default)
+    try:
+        return row[key]
+    except (KeyError, TypeError, IndexError):
+        return getattr(row, key, default)
+
+
+def _metadata_from_row(value: Any) -> dict[str, Any]:
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        return dict(value)
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return {"raw": value}
+        if isinstance(parsed, dict):
+            return parsed
+    return {}
+
+
+def _created_at_to_iso(value: Any) -> str:
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if value:
+        return str(value)
+    return _now_iso()
+
+
+# ---------------------------------------------------------------------------
 # Public store
 # ---------------------------------------------------------------------------
 
@@ -536,6 +620,166 @@ class BQVectorStore:
         )
         return envelope.to_dict()
 
+    def _bigquery_schema(self, bigquery: Any) -> list[Any]:
+        return [
+            bigquery.SchemaField("id", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("text", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("embedding", "FLOAT64", mode="REPEATED"),
+            bigquery.SchemaField("source", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("metadata", "JSON", mode="NULLABLE"),
+            bigquery.SchemaField("created_at", "TIMESTAMP", mode="REQUIRED"),
+        ]
+
+    def _ensure_live_table(self, client: Any, bigquery: Any) -> None:
+        table = bigquery.Table(self.table_fqn, schema=self._bigquery_schema(bigquery))
+        client.create_table(table, exists_ok=True)
+
+    def _record_to_bq_row(self, record: VectorRecord) -> dict[str, Any]:
+        created = record.created_at or _now()
+        return {
+            "id": record.id,
+            "text": record.text,
+            "embedding": [float(value) for value in record.embedding],
+            "source": record.source,
+            "metadata": dict(record.metadata),
+            "created_at": created.isoformat(),
+        }
+
+    def _staging_table_name(self) -> str:
+        table_prefix = re.sub(r"[^A-Za-z0-9_]", "_", self.table)
+        return f"_{table_prefix}_stage_{uuid.uuid4().hex[:16]}"
+
+    def _merge_sql(self, *, staging_table: str) -> str:
+        target_sql = _quote_bigquery_table(self.project, self.dataset, self.table)
+        staging_sql = _quote_bigquery_table(self.project, self.dataset, staging_table)
+        return f"""
+MERGE {target_sql} AS T
+USING {staging_sql} AS S
+ON T.id = S.id
+WHEN MATCHED THEN
+  UPDATE SET
+    text = S.text,
+    embedding = S.embedding,
+    source = S.source,
+    metadata = S.metadata,
+    created_at = S.created_at
+WHEN NOT MATCHED THEN
+  INSERT (id, text, embedding, source, metadata, created_at)
+  VALUES (S.id, S.text, S.embedding, S.source, S.metadata, S.created_at)
+""".strip()
+
+    def _live_upsert(self, records: list[VectorRecord]) -> tuple[int, int]:
+        bigquery = _load_bigquery_module()
+        client = bigquery.Client(project=self.project)
+        schema = self._bigquery_schema(bigquery)
+        self._ensure_live_table(client, bigquery)
+        if not records:
+            return 0, 0
+
+        staging_table = self._staging_table_name()
+        staging_fqn = f"{self.project}.{self.dataset}.{staging_table}"
+        rows = [self._record_to_bq_row(record) for record in records]
+        staging = bigquery.Table(staging_fqn, schema=schema)
+        client.create_table(staging, exists_ok=True)
+        try:
+            write_disposition = getattr(
+                getattr(bigquery, "WriteDisposition", object()),
+                "WRITE_TRUNCATE",
+                "WRITE_TRUNCATE",
+            )
+            load_config = bigquery.LoadJobConfig(
+                schema=schema,
+                write_disposition=write_disposition,
+            )
+            load_job = client.load_table_from_json(
+                rows,
+                staging_fqn,
+                job_config=load_config,
+            )
+            load_job.result()
+            merge_job = client.query(self._merge_sql(staging_table=staging_table))
+            merge_job.result()
+            dml_stats = getattr(merge_job, "dml_stats", None)
+            inserted = int(getattr(dml_stats, "inserted_row_count", 0) or 0)
+            updated = int(getattr(dml_stats, "updated_row_count", 0) or 0)
+            if inserted == 0 and updated == 0:
+                inserted = len(records)
+            return inserted, updated
+        finally:
+            with contextlib.suppress(Exception):
+                client.delete_table(staging_fqn, not_found_ok=True)
+
+    def _live_query(
+        self,
+        *,
+        query_vec: list[float],
+        k: int,
+        filters: dict[str, Any] | None,
+    ) -> list[QueryHit]:
+        bigquery = _load_bigquery_module()
+        client = bigquery.Client(project=self.project)
+
+        filter_source = None
+        meta_filters: dict[str, Any] = {}
+        if filters:
+            for key, value in filters.items():
+                if key == "source":
+                    filter_source = value
+                else:
+                    meta_filters[key] = value
+
+        query_parameters = [
+            bigquery.ArrayQueryParameter("query_embedding", "FLOAT64", query_vec),
+            bigquery.ScalarQueryParameter("top_k", "INT64", k),
+            bigquery.ScalarQueryParameter(
+                "source_filter",
+                "STRING",
+                str(filter_source) if filter_source is not None else None,
+            ),
+        ]
+        job_config = bigquery.QueryJobConfig(query_parameters=query_parameters)
+        sql = LIVE_VECTOR_SEARCH_SQL_TEMPLATE.format(
+            table_sql_name=_quote_bigquery_table(self.project, self.dataset, self.table)
+        )
+        rows = client.query(sql, job_config=job_config).result()
+
+        hits: list[QueryHit] = []
+        for row in rows:
+            metadata = _metadata_from_row(_row_value(row, "metadata"))
+            if meta_filters:
+                matched = True
+                for key, expected in meta_filters.items():
+                    if metadata.get(key) != expected:
+                        matched = False
+                        break
+                if not matched:
+                    continue
+            record = VectorRecord(
+                id=str(_row_value(row, "id", "")),
+                text=str(_row_value(row, "text", "")),
+                embedding=[],
+                source=str(_row_value(row, "source", "ad_hoc")),
+                metadata=metadata,
+            )
+            distance = _row_value(row, "distance", 1.0)
+            try:
+                score = 1.0 - float(distance)
+            except (TypeError, ValueError):
+                score = 0.0
+            hits.append(
+                QueryHit(
+                    id=record.id,
+                    text=record.text,
+                    score=score,
+                    source=record.source,
+                    metadata=metadata,
+                    created_at=_created_at_to_iso(_row_value(row, "created_at")),
+                    provenance=self._build_provenance(record),
+                )
+            )
+        hits.sort(key=lambda h: (-h.score, h.id))
+        return hits[:k]
+
     # -- public API -------------------------------------------------------
 
     def upsert(
@@ -587,21 +831,27 @@ class BQVectorStore:
                     table=self.table_fqn,
                 )
             mode = "live"
-            # Live path is intentionally not implemented in this tranche;
-            # we record the call attempt for rate-limit accounting but fail
-            # closed with a clear marker so callers can see what happened.
+            try:
+                inserted, updated = self._live_upsert(cleaned)
+            except Exception as exc:  # BigQuery auth/import/client failures.
+                self._record_live_call(calls)
+                return UpsertResult(
+                    ok=False,
+                    inserted=0,
+                    updated=0,
+                    skipped=skipped_validation + len(cleaned),
+                    errors=errors + [f"live BigQuery upsert failed: {exc}"],
+                    mode="live-error",
+                    table=self.table_fqn,
+                )
             self._record_live_call(calls)
-            errors.append(
-                "live BigQuery upsert is not yet wired; record attempt logged "
-                "for rate accounting"
-            )
             return UpsertResult(
-                ok=False,
-                inserted=0,
-                updated=0,
-                skipped=skipped_validation + len(cleaned),
+                ok=True,
+                inserted=inserted,
+                updated=updated,
+                skipped=skipped_validation,
                 errors=errors,
-                mode="live-not-implemented",
+                mode=mode,
                 table=self.table_fqn,
             )
 
@@ -651,6 +901,13 @@ class BQVectorStore:
             return []
         k = min(k, MAX_QUERY_K)
         query_vec = self._embed_query(text, embedding)
+
+        if not self.mock:
+            gate = self._live_allowed()
+            if not gate.allowed:
+                return []
+            return self._live_query(query_vec=query_vec, k=k, filters=filters)
+
         self._ensure_loaded()
 
         filter_source = None
@@ -753,6 +1010,7 @@ __all__ = [
     "EMBEDDING_DIMS_HARD",
     "KNOWN_SOURCES",
     "LiveGateResult",
+    "LIVE_VECTOR_SEARCH_SQL_TEMPLATE",
     "MAX_INDEX_RECORDS_PER_RUN",
     "MAX_LIVE_INDEX_PER_HOUR",
     "MAX_QUERY_K",

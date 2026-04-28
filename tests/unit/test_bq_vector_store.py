@@ -364,19 +364,23 @@ def test_upsert_refuses_live_when_gate_fails(tmp_path, monkeypatch):
     assert not (tmp_path / "mock.jsonl").exists()
 
 
-def test_upsert_records_live_attempt_for_rate_accounting(tmp_path, monkeypatch):
+def test_upsert_records_failed_live_attempt_for_rate_accounting(tmp_path, monkeypatch):
     creds = tmp_path / "creds.json"
     creds.write_text("{}", encoding="utf-8")
     monkeypatch.setenv("SAPPHIRE_BQ_LIVE", "1")
     monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(creds))
     monkeypatch.setenv("SAPPHIRE_BQ_PROJECT", "sapphire-test")
+    monkeypatch.setattr(
+        "lib.intel.bq_vector_store._load_bigquery_module",
+        lambda: (_ for _ in ()).throw(RuntimeError("mock auth failure")),
+    )
     store = _make_store(tmp_path, mock=False)
     rec = _record(store, "would-be-live", "sovereign_thesis")
     result = store.upsert([rec])
-    # Live path is intentionally not implemented in this tranche; record the
-    # attempt for rate accounting and fail closed with a clear marker.
+    # Failed live attempts still count toward the local rate guard, which
+    # prevents a broken caller from hammering BigQuery/auth repeatedly.
     assert result.ok is False
-    assert result.mode == "live-not-implemented"
+    assert result.mode == "live-error"
     rate = json.loads((tmp_path / "rate.json").read_text(encoding="utf-8"))
     assert len(rate["calls"]) == 1
 
