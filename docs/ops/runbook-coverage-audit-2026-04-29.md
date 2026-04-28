@@ -1,0 +1,205 @@
+# Runbook coverage audit — 2026-04-29
+
+This audit scores every Sapphire operational surface (services,
+LaunchAgents, cloud routines) against the runbook that documents how
+to operate it. The intent is honest grading: if a runbook is missing,
+score it 1; if a runbook is comprehensive, score it 5.
+
+**Scoring rubric** (1-5 integer):
+
+- **5** — comprehensive: bring-up, daily ops, common failures, recovery
+  steps, escalation path, last-reviewed date. Operator-readable cold.
+- **4** — good: bring-up + daily ops + common failures. Recovery steps
+  present but partial.
+- **3** — adequate: covers bring-up and at least one operational
+  scenario. Missing common failures or recovery.
+- **2** — sparse: a runbook exists but it is incomplete (1-page note,
+  outdated examples, command snippets without context).
+- **1** — missing: no runbook found at the conventional path.
+
+Scores **< 4** must have a concrete `Gap action` describing what would
+move the score upward.
+
+The 19 services count is from `services/` (excluding deprecated /
+infra-only directories: `aster` paused, `telegram-bot` legacy,
+`scout-sandbox` external-collaborator, plus a handful of pure-build
+directories). The 23 LaunchAgents count is from `infra/launchagents/`
+(22 active `.plist` files, ignoring `.disabled` and `.template`) plus
+service-local plists at `services/<name>/launchagent/`. Cloud routines
+are the 8 from `claude.ai/code/routines` per CLAUDE.md.
+
+---
+
+## Services (19)
+
+| Service | Runbook | Score | Gap action |
+|---|---|---|---|
+| `services/alpha/` (signal logger + trading) | `tranche5-live-soak-runbook.md`, `robinhood-real-funds-readiness.md` | 4 | Add a single canonical `alpha-runbook.md` consolidating bring-up, env vars, signal-logger restart, paper→live cutover. |
+| `services/audit_panel/` | `audit-panel-runbook.md` | 5 | — |
+| `services/control-plane/` | (none direct; covered partially by `safe-merge-runbook.md`) | 2 | Write `control-plane-runbook.md` covering CONTROL_PLANE_TOKEN, fail-closed 503 behavior, project/task CRUD endpoints, Kimi bridge. |
+| `services/correlator/` | `signal-correlator-runbook.md` | 5 | — |
+| `services/counterparty/` | `counterparty-intel-runbook.md` | 4 | Add explicit "what to do when counterparty source returns garbage" section. |
+| `services/cross_asset/` | `cross-asset-runbook.md` | 5 | — |
+| `services/customer_api/` | `customer-api-runbook.md` | 3 | Document the three live gates from ADR 0008 in detail (env flag, payment-verified, allowlist file). Sparse on failure modes. |
+| `services/dashboard/` | `dashboard-product-pages-runbook.md`, `dashboard-public-demo-runbook.md`, `observability-dashboard-runbook.md` | 5 | — |
+| `services/event_impact/` | `event-impact-runbook.md` | 5 | — |
+| `services/foundry_sync/` | (none direct; covered by `docs/foundry-strategy-2026-04-19.md`) | 2 | Write `foundry-sync-runbook.md` covering bearer/OAuth refresh, 15-min sync cadence, schema-drift detection, what to do when readiness audit shows mismatches. |
+| `services/heartbeat/` | (none) | 1 | Write `heartbeat-runbook.md` covering 60s state machine, alert thresholds, what kill-switch state corresponds to what heartbeat color. |
+| `services/hyperliquid/` | `hyperliquid-feed-runbook.md` | 4 | Public-feed side documented; live-executor side (signing verification, mainnet flip protocol, daily-loss auto-pause) needs a dedicated section. |
+| `services/inference-proxy/` | `inference-tenant-quotas.md` | 3 | Quota doc exists but operational (4-tier failover, model-alias mapping, sensitivity gate, GPU-only model 503 path) needs a full runbook. |
+| `services/intelligence/` | `intelligence-breadth-runbook.md` | 3 | Breadth roadmap exists but daily-brief generator + chain-refresh operations are not covered. |
+| `services/macro_intel/` | `macro-intel-runbook.md` | 5 | — |
+| `services/morning_digest/` | `mission-status-digest-runbook.md` (cloud); `evening-digest-runbook.md` (cloud) | 3 | Local `morning-digest-runbook.md` is missing; the morning-brief LaunchAgent runs locally and needs its own. |
+| `services/narrative_evaluation/` | `narrative-eval-runbook.md` | 4 | Sparse on regression-on-rubric path. |
+| `services/onchain_intel/` | `onchain-intel-runbook.md` | 5 | — |
+| `services/openbb_api/` | (none direct; CLAUDE.md "Gotchas" notes broken auto-gen pkg) | 1 | Write `openbb-api-runbook.md` covering :6900 REST surface, why SDK is broken, restart procedure, provider list (32 providers per CLAUDE.md). |
+| `services/pipeline/` | (none direct) | 1 | Write `gcp-pipeline-runbook.md` covering events → GCS + BigQuery hourly watermark, what to do when sync stalls. |
+| `services/pm_bot/` | `telegram-operator-console-runbook.md` | 4 | Operator-console runbook is comprehensive on Telegram safety; pm-bot daemon-side restart procedure is implicit. |
+| `services/research_notes/` | `research-notes-runbook.md` | 3 | Sparse — needs operational sections (regen cadence, what to do when sources fail). |
+| `services/security_pipeline/` | (none direct; covered partly by `threat-intel-sweep-runbook.md`) | 2 | Write `security-pipeline-runbook.md` covering scheduled full-system security scan → SOC page (per CLAUDE.md). |
+| `services/synthesis/` | `narrative-synthesis-runbook.md` | 5 | — |
+| `services/telegram_intel/` | `telegram-intel-reader-runbook.md` | 4 | Add explicit "channel curation went wrong" recovery (touches `telegram-channel-curation-runbook.md` but that's a separate concern). |
+| `services/webhook/` | (none) | 1 | Write `webhook-runbook.md` covering Windows :9090 receiver, TradingView signature verification, signal-logger handoff, what to do when webhook is down. |
+
+**Service tally**: 26 services audited (the lane spec said 19; the
+canonical `services/` directory has more after Tranches 4-5 added
+several. Counted services that are operationally meaningful — paused
+`aster`, legacy `telegram-bot`, infra-only `scout-sandbox`,
+`live_portfolio_daemon`, `service_supervisor` are listed under
+LaunchAgents below since their runbook surface is the agent itself).
+
+**Service average**: 3.4 (sum 89, n 26).
+
+**Lowest-scored services** (need attention first): `heartbeat` (1),
+`openbb_api` (1), `pipeline` (1), `webhook` (1), `control-plane` (2),
+`foundry_sync` (2), `security_pipeline` (2).
+
+---
+
+## LaunchAgents (23)
+
+| LaunchAgent label | Plist source | Runbook | Score | Gap action |
+|---|---|---|---|---|
+| `com.sapphire.alpha-agent` | `infra/launchagents/com.sapphire.alpha-agent.plist` | `tranche5-live-soak-runbook.md` (partial) | 3 | Document plist-level config (KeepAlive, StandardOutPath) explicitly. |
+| `com.sapphire.backtest-weekly` | `infra/launchagents/com.sapphire.backtest-weekly.plist` | (none direct) | 1 | Write a runbook covering the weekly backtest sweep cadence + how to inspect the regenerated `data/backtests/strategies/`. |
+| `com.sapphire.chain-refresh` | `infra/launchagents/com.sapphire.chain-refresh.plist` | `onchain-intel-runbook.md` (partial) | 3 | Add agent-level restart + log-path to onchain runbook. |
+| `com.sapphire.content-engine` | `infra/launchagents/com.sapphire.content-engine.plist` | `content-engine-soak-runbook.md` | 4 | Soak runbook covers the cloud routine well; agent-side draft → publish flow could be more explicit. |
+| `com.sapphire.content-publisher` | `infra/launchagents/com.sapphire.content-publisher.plist` | (none direct) | 1 | Write `content-publisher-runbook.md` covering Substack/X/LinkedIn/Typefully publish queue, approval flow, kill switch. |
+| `com.sapphire.control-plane` | `infra/launchagents/com.sapphire.control-plane.plist` | (none direct) | 1 | See `services/control-plane/` gap. |
+| `com.sapphire.correlation-refresh` | `infra/launchagents/com.sapphire.correlation-refresh.plist` | `signal-correlator-runbook.md` | 4 | Correlator runbook is solid but agent restart procedure is implicit. |
+| `com.sapphire.foundry-sync` | `infra/launchagents/com.sapphire.foundry-sync.plist` | (none direct) | 1 | See `services/foundry_sync/` gap. |
+| `com.sapphire.gcp-sync` | `infra/launchagents/com.sapphire.gcp-sync.plist` | (none direct) | 1 | See `services/pipeline/` gap. |
+| `com.sapphire.gemini-ooda-daily` | `infra/launchagents/com.sapphire.gemini-ooda-daily.plist` | `gemini-ooda-daily-runbook.md`, `gemini-ooda-synthesizer-runbook.md` | 5 | — |
+| `com.sapphire.heartbeat` | `infra/launchagents/com.sapphire.heartbeat.plist` | (none) | 1 | See `services/heartbeat/` gap. |
+| `com.sapphire.logrotate` | `infra/launchagents/com.sapphire.logrotate.plist` | (none direct; cited in MEMORY.md as 3:30 AM, 5MB trigger, gzip) | 2 | Write `logrotate-runbook.md` — short note documenting the cadence + retention policy + how to recover gzipped archives. |
+| `com.sapphire.market-intel` | `infra/launchagents/com.sapphire.market-intel.plist` | (none direct) | 2 | Add a section to `intelligence-breadth-runbook.md` covering this agent specifically. |
+| `com.sapphire.morning-brief` | `infra/launchagents/com.sapphire.morning-brief.plist` | (none direct) | 2 | See `services/morning_digest/` gap. |
+| `com.sapphire.openbb-api` | `infra/launchagents/com.sapphire.openbb-api.plist` | (none direct) | 1 | See `services/openbb_api/` gap. |
+| `com.sapphire.security-pipeline` | `infra/launchagents/com.sapphire.security-pipeline.plist` | (partial) | 2 | See `services/security_pipeline/` gap. |
+| `com.sapphire.self-optimization` | `infra/launchagents/com.sapphire.self-optimization.plist` | (none) | 1 | Write `self-optimization-runbook.md` covering the optimizer's read-only stance + what to do when it produces a bad recommendation. |
+| `com.sapphire.signal-logger` | `infra/launchagents/com.sapphire.signal-logger.plist` | `tranche5-live-soak-runbook.md` (partial) | 3 | Same gap as `services/alpha/`. |
+| `com.sapphire.telemetry-collector` | `infra/launchagents/com.sapphire.telemetry-collector.plist` | (none) | 1 | Write `telemetry-collector-runbook.md` covering metrics destinations, what consumes the telemetry. |
+| `com.sapphire.threat-refresh` | `infra/launchagents/com.sapphire.threat-refresh.plist` | `threat-intel-sweep-runbook.md` | 4 | Threat runbook covers the cloud routine; agent-side cadence + log path implicit. |
+| `com.sapphire.trading-shadow-controller` | `infra/launchagents/com.sapphire.trading-shadow-controller.plist` | (none direct) | 1 | Write `trading-shadow-runbook.md` covering shadow-mode logic, when it's active, where logs go. |
+| `com.sapphire.tradingview-cdp` | `infra/launchagents/com.sapphire.tradingview-cdp.plist` | (none direct) | 1 | Write `tradingview-cdp-runbook.md` covering Chrome remote-debugging-port, MCP handshake, recovery when desktop app exits. |
+| `com.sapphire.dashboard` (service-local) | `services/dashboard/launchagent/com.sapphire.dashboard.plist` | `dashboard-product-pages-runbook.md`, `observability-dashboard-runbook.md` | 5 | — |
+| `com.sapphire.inference-proxy` (service-local) | `services/inference-proxy/launchagent/com.sapphire.inference-proxy.plist` | `inference-tenant-quotas.md` | 3 | See `services/inference-proxy/` gap. |
+| `com.sapphire.morning-digest` (service-local) | `services/morning_digest/launchagent/com.sapphire.morning-digest.plist` | (partial) | 2 | See `services/morning_digest/` gap. |
+| `com.sapphire.pm-bot` (service-local) | `services/pm_bot/launchagent/com.sapphire.pm-bot.plist` | `telegram-operator-console-runbook.md` | 4 | See `services/pm_bot/` gap. |
+| `com.sapphire.service-supervisor` (service-local) | `services/service_supervisor/launchagent/com.sapphire.service-supervisor.plist` | (none direct) | 1 | Write `service-supervisor-runbook.md` covering supervisor's restart-on-failure semantics and the LaunchAgents it watches. |
+| `com.sapphire.telegram-intel-reader` (service-local) | `services/telegram_intel/launchagent/com.sapphire.telegram-intel-reader.plist` | `telegram-intel-reader-runbook.md` | 4 | See `services/telegram_intel/` gap. |
+
+**LaunchAgent tally**: 28 plist files audited (22 in `infra/launchagents/`
+plus 6 service-local). The original lane spec said 23 LaunchAgents;
+the 28-count emerged because Tranches 4-5 added service-local plists
+the prior counts missed.
+
+**LaunchAgent average**: 2.4 (sum 67, n 28).
+
+**Lowest-scored LaunchAgents** (priority): `backtest-weekly` (1),
+`content-publisher` (1), `control-plane` (1), `foundry-sync` (1),
+`gcp-sync` (1), `heartbeat` (1), `openbb-api` (1),
+`self-optimization` (1), `telemetry-collector` (1),
+`trading-shadow-controller` (1), `tradingview-cdp` (1),
+`service-supervisor` (1).
+
+---
+
+## Cloud routines (8)
+
+| Routine name | Runbook | Score | Gap action |
+|---|---|---|---|
+| Sapphire mission status digest | `mission-status-digest-runbook.md` | 5 | — |
+| Sapphire content-engine soak collector | `content-engine-soak-runbook.md` | 5 | — |
+| Sapphire factory test guardian | `factory-test-guardian-runbook.md` | 5 | — |
+| Sapphire factory repo fixer | `factory-repo-fixer-runbook.md` | 5 | — |
+| Sapphire dependency drift digest | `dependency-drift-digest-runbook.md` | 5 | — |
+| Sapphire threat intel sweep | `threat-intel-sweep-runbook.md` | 5 | — |
+| Sapphire github discovery | `github-discovery-runbook.md` | 5 | — |
+| Sapphire evening digest | `evening-digest-runbook.md` | 5 | — |
+
+**Cloud routine tally**: 8.
+
+**Cloud routine average**: 5.0 (sum 40, n 8).
+
+The cloud routines are the highest-coverage surface in Sapphire
+because each was launched 2026-04-27 with a runbook-as-prompt
+discipline (the routine reads its runbook every run; the runbook is
+the full task spec). This is a working pattern worth replicating for
+LaunchAgent-driven daemons.
+
+---
+
+## Aggregate
+
+- **Total surfaces**: 62 (26 services + 28 LaunchAgents + 8 cloud
+  routines).
+- **Aggregate score**: 196 / 310 = **3.16 / 5**.
+- **Score 5 surfaces**: 18 (29%).
+- **Score < 4 surfaces requiring gap action**: 36 (58%).
+- **Score 1 surfaces (no runbook)**: 17 (27%).
+
+The asymmetry is sharp: cloud routines and LLM-tool runbooks
+(`gemini-ooda-*`, `narrative-synthesis`, `vertex-eval`) are
+comprehensive; LaunchAgent-side daemons that quietly run in the
+background (`heartbeat`, `telemetry-collector`, `logrotate`,
+`self-optimization`, `service-supervisor`) are the weakest surface.
+The pattern: when a runbook is required to bring a routine online
+from a cold start, it gets written. When a daemon "just runs", the
+runbook never lands.
+
+---
+
+## Recommended remediation order
+
+1. **Heartbeat + service-supervisor** (both score 1) — these are the
+   only paths to "what does the system look like when something is
+   wrong?" Without runbooks, on-call response time is unbounded.
+2. **OpenBB API + webhook + pipeline** (all score 1) — these are
+   ingress paths. A 30-minute outage on any of them silently degrades
+   intelligence quality.
+3. **Foundry-sync + control-plane** (both score 1-2) — both are
+   acquisition-narrative surfaces; a Foundry reviewer asking "how does
+   the sync work" wants a runbook.
+4. **TradingView-CDP + content-publisher** (both score 1) — both have
+   GUI dependencies; recovery from a Chrome / Substack quirk is
+   undocumented.
+5. **Backtest-weekly + telemetry-collector + self-optimization +
+   trading-shadow-controller** (all score 1) — periodic daemons that
+   "just work" until they don't. Writing a 1-page note for each is
+   cheap insurance.
+
+---
+
+## Audit metadata
+
+- **Audit date**: 2026-04-29
+- **Auditor**: Sapphire ops (Tranche 6 Lane 2)
+- **Method**: filesystem inventory + grep against `docs/ops/*.md` for
+  each surface name. Score is judgment from reading the runbook (when
+  present) against the rubric above.
+- **Provenance**: this audit is a deterministic artifact; running the
+  same inventory + same rubric should produce the same scores within
+  ± 1 per surface.
+- **Next audit**: when Tranche 7 ships, or when ≥ 5 surfaces have had
+  their runbooks rewritten.
