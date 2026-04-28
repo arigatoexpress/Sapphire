@@ -66,6 +66,7 @@ def main(argv: list[str] | None = None) -> int:
     env = load_secret_env(args.secret_env)
     checks.extend(probe_repo())
     checks.append(probe_satellite_ci_no_spend_gates())
+    checks.append(probe_satellite_merge_posture(no_external=args.no_external))
     checks.extend(probe_launchagents())
     checks.extend(probe_local_endpoints(env))
     checks.extend(probe_safety())
@@ -281,6 +282,164 @@ def probe_satellite_ci_no_spend_gates(manifest_path: Path = ORG_REPOS_MANIFEST) 
         "; ".join(evidence_parts),
         int((time.perf_counter() - started) * 1000),
     )
+
+
+def probe_satellite_merge_posture(
+    *,
+    no_external: bool,
+    manifest_path: Path = ORG_REPOS_MANIFEST,
+) -> Check:
+    started = time.perf_counter()
+    if no_external:
+        return Check("org", "satellite_merge_posture", "SKIP", "--no-external")
+    manifest_check = load_org_repos(manifest_path)
+    if isinstance(manifest_check, Check):
+        manifest_check.name = "satellite_merge_posture"
+        return manifest_check
+    repos = [
+        repo
+        for repo in manifest_check
+        if str(repo.get("ci_strategy") or "") in NO_SPEND_CI_STRATEGIES
+        and repo.get("github")
+    ]
+
+    details: list[str] = []
+    api_errors: list[str] = []
+    auto_merge_false: list[str] = []
+    critical: list[str] = []
+
+    for repo in repos:
+        repo_id = str(repo.get("id") or repo.get("name") or "unknown")
+        github = str(repo.get("github"))
+        settings = github_repo_merge_settings(github)
+        if settings is None:
+            api_errors.append(repo_id)
+            details.append(f"{repo_id}(api=unavailable)")
+            continue
+
+        allow_auto = bool(settings.get("allow_auto_merge"))
+        allow_squash = bool(settings.get("allow_squash_merge"))
+        delete_branch = bool(settings.get("delete_branch_on_merge"))
+        runner_gate = repo_runner_gate_state(repo)
+        details.append(
+            f"{repo_id}(auto={str(allow_auto).lower()},"
+            f"squash={str(allow_squash).lower()},"
+            f"delete={str(delete_branch).lower()},"
+            f"runner_gate={runner_gate})"
+        )
+        if not allow_auto:
+            auto_merge_false.append(repo_id)
+        if not allow_squash:
+            critical.append(f"{repo_id}:allow_squash_merge=false")
+        if not delete_branch:
+            critical.append(f"{repo_id}:delete_branch_on_merge=false")
+        if runner_gate != "pass":
+            critical.append(f"{repo_id}:runner_gate={runner_gate}")
+
+    status = "PASS"
+    if critical:
+        status = "FAIL"
+    elif api_errors or auto_merge_false:
+        status = "WARN"
+
+    evidence_parts = [f"checked_repos={len(repos)}"]
+    if auto_merge_false:
+        evidence_parts.append(f"auto_merge_false={','.join(auto_merge_false)}")
+    if api_errors:
+        evidence_parts.append(f"api_errors={','.join(api_errors)}")
+    if critical:
+        evidence_parts.append(f"violations={','.join(critical[:8])}")
+        if len(critical) > 8:
+            evidence_parts.append(f"violations_omitted={len(critical) - 8}")
+    if details:
+        evidence_parts.append(f"details={';'.join(details)}")
+    return Check(
+        "org",
+        "satellite_merge_posture",
+        status,
+        "; ".join(evidence_parts),
+        int((time.perf_counter() - started) * 1000),
+    )
+
+
+def load_org_repos(manifest_path: Path) -> list[dict[str, Any]] | Check:
+    started = time.perf_counter()
+    if not manifest_path.exists():
+        return Check(
+            "org",
+            "org_repos_manifest",
+            "WARN",
+            f"manifest_missing={manifest_path}",
+            int((time.perf_counter() - started) * 1000),
+        )
+    try:
+        manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+    except Exception as exc:
+        return Check(
+            "org",
+            "org_repos_manifest",
+            "WARN",
+            f"manifest_parse_error={exc.__class__.__name__}",
+            int((time.perf_counter() - started) * 1000),
+        )
+    repos = manifest.get("repos") if isinstance(manifest, dict) else []
+    if not isinstance(repos, list):
+        return Check(
+            "org",
+            "org_repos_manifest",
+            "WARN",
+            "manifest repos is not a list",
+            int((time.perf_counter() - started) * 1000),
+        )
+    return [repo for repo in repos if isinstance(repo, dict)]
+
+
+def github_repo_merge_settings(repo_full_name: str) -> dict[str, Any] | None:
+    result = run(
+        [
+            "gh",
+            "api",
+            f"repos/{repo_full_name}",
+            "--jq",
+            (
+                "{allow_auto_merge,allow_squash_merge,"
+                "delete_branch_on_merge,allow_merge_commit,allow_rebase_merge}"
+            ),
+        ],
+        cwd=ROOT,
+        timeout=30,
+    )
+    if not result.ok:
+        return None
+    try:
+        payload = json.loads(result.stdout or "{}")
+    except json.JSONDecodeError:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def repo_runner_gate_state(repo: dict[str, Any]) -> str:
+    repo_id = str(repo.get("id") or repo.get("name") or "unknown")
+    local_path = Path(str(repo.get("local_path") or ""))
+    if not local_path.exists():
+        return "missing_local"
+    workflow_dir = local_path / ".github" / "workflows"
+    workflows = (
+        sorted([*workflow_dir.glob("*.yml"), *workflow_dir.glob("*.yaml")])
+        if workflow_dir.exists()
+        else []
+    )
+    if not workflows:
+        return "no_workflows"
+    violations: list[str] = []
+    jobs = 0
+    for workflow in workflows:
+        found, job_count = workflow_no_spend_gate_violations(repo_id, workflow)
+        violations.extend(found)
+        jobs += job_count
+    if violations:
+        return f"fail:{len(violations)}"
+    return "pass" if jobs else "no_jobs"
 
 
 def workflow_no_spend_gate_violations(repo_id: str, workflow: Path) -> tuple[list[str], int]:

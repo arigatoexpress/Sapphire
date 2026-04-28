@@ -217,3 +217,118 @@ repos:
 
     assert check.status == "FAIL"
     assert "violations=satellite:ci.yml:test" in check.evidence
+
+
+def test_satellite_merge_posture_reports_auto_merge_without_failing_hard_gates(
+    tmp_path: Path, monkeypatch
+) -> None:
+    repo = tmp_path / "satellite"
+    workflows = repo / ".github" / "workflows"
+    workflows.mkdir(parents=True)
+    (workflows / "ci.yml").write_text(
+        """
+jobs:
+  test:
+    if: ${{ vars.SAPPHIRE_RUNNER != '' }}
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
+    steps:
+      - run: echo ok
+""",
+        encoding="utf-8",
+    )
+    manifest = tmp_path / "org-repos.yaml"
+    manifest.write_text(
+        f"""
+repos:
+  - id: satellite
+    local_path: {repo}
+    github: arigatoexpress/satellite
+    ci_strategy: local_evidence_skip_ci_bootstrap
+""",
+        encoding="utf-8",
+    )
+
+    def fake_run(
+        cmd: list[str],
+        *,
+        cwd: Path | None = None,
+        timeout: int = 20,
+        env: dict[str, str] | None = None,
+    ) -> sweep.RunResult:
+        del cwd, timeout, env
+        assert cmd[:3] == ["gh", "api", "repos/arigatoexpress/satellite"]
+        return sweep.RunResult(
+            0,
+            json.dumps(
+                {
+                    "allow_auto_merge": False,
+                    "allow_squash_merge": True,
+                    "delete_branch_on_merge": True,
+                }
+            ),
+            "",
+            7,
+        )
+
+    monkeypatch.setattr(sweep, "run", fake_run)
+
+    check = sweep.probe_satellite_merge_posture(no_external=False, manifest_path=manifest)
+
+    assert check.status == "WARN"
+    assert "auto_merge_false=satellite" in check.evidence
+    assert "satellite(auto=false,squash=true,delete=true,runner_gate=pass)" in check.evidence
+
+
+def test_satellite_merge_posture_fails_for_missing_delete_branch_or_runner_gate(
+    tmp_path: Path, monkeypatch
+) -> None:
+    repo = tmp_path / "satellite"
+    workflows = repo / ".github" / "workflows"
+    workflows.mkdir(parents=True)
+    (workflows / "ci.yml").write_text(
+        """
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo paid
+""",
+        encoding="utf-8",
+    )
+    manifest = tmp_path / "org-repos.yaml"
+    manifest.write_text(
+        f"""
+repos:
+  - id: satellite
+    local_path: {repo}
+    github: arigatoexpress/satellite
+    ci_strategy: local_evidence_skip_ci_bootstrap
+""",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        sweep,
+        "github_repo_merge_settings",
+        lambda _repo: {
+            "allow_auto_merge": True,
+            "allow_squash_merge": True,
+            "delete_branch_on_merge": False,
+        },
+    )
+
+    check = sweep.probe_satellite_merge_posture(no_external=False, manifest_path=manifest)
+
+    assert check.status == "FAIL"
+    assert "satellite:delete_branch_on_merge=false" in check.evidence
+    assert "satellite:runner_gate=fail:1" in check.evidence
+
+
+def test_satellite_merge_posture_skips_external_calls_when_disabled(tmp_path: Path) -> None:
+    manifest = tmp_path / "org-repos.yaml"
+    manifest.write_text("repos: []\n", encoding="utf-8")
+
+    check = sweep.probe_satellite_merge_posture(no_external=True, manifest_path=manifest)
+
+    assert check.status == "SKIP"
+    assert check.evidence == "--no-external"
