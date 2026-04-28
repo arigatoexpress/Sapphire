@@ -142,8 +142,6 @@ class ServiceMonitor:
         print(f"Time: {alert['timestamp']}")
         print(f"{'='*60}\n")
         
-        # TODO: Send to Telegram bot, email, etc.
-    
     async def check_all(self):
         """Check all services"""
         tasks = [

@@ -185,10 +185,10 @@ Generated: 2026-04-18 (post-consolidation session)
 
 ### TODOs Found
 ```
-lib/chain/providers/dune.py        # TODO: paginate results for large queries
-lib/content/auto_publish.py        # TODO: approval webhook before posting to X
-lib/content/publishers/substack.py # TODO: switch to Substack API when available
-lib/analytics/cpcv.py              # TODO: add embargo period param
+lib/chain/providers/dune.py        # TODO: paginate results for large queries (resolved 2026-04-26)
+lib/content/auto_publish.py        # TODO: approval webhook before posting to X (resolved 2026-04-26)
+lib/content/publishers/substack.py # TODO: switch to Substack API when available (resolved 2026-04-26)
+lib/analytics/cpcv.py              # TODO: add embargo period param (resolved 2026-04-26)
 ```
 
 ---
