@@ -340,6 +340,48 @@ def test_observability_launchagents_handles_exception(client, monkeypatch):
     assert response.get_json()["status"] == "unknown"
 
 
+def test_observability_tranche4_feeds_requires_auth(client):
+    response = client.get("/api/observability-tranche4-feeds")
+    assert response.status_code == 401
+
+
+def test_observability_tranche4_feeds_returns_rows(client, monkeypatch):
+    monkeypatch.setattr(
+        dashboard_app,
+        "_build_observability_tranche4_feeds",
+        lambda: {
+            "mode": "read_only_tranche4_feed_status",
+            "status": "pass",
+            "totals": {"feeds": 6, "with_events": 6, "events_seen": 12},
+            "feeds": [
+                {
+                    "feed": "narrative_synthesis",
+                    "topics": ["narrative.thesis.generated"],
+                    "events_seen": 2,
+                    "last_event_at": "2026-04-28T12:00:00+00:00",
+                }
+            ],
+        },
+    )
+
+    response = client.get("/api/observability-tranche4-feeds", headers=_auth_header())
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["mode"] == "read_only_tranche4_feed_status"
+    assert payload["feeds"][0]["feed"] == "narrative_synthesis"
+
+
+def test_observability_tranche4_feeds_handles_exception(client, monkeypatch):
+    def boom():
+        raise RuntimeError("tranche4 unavailable")
+
+    monkeypatch.setattr(dashboard_app, "_build_observability_tranche4_feeds", boom)
+    response = client.get("/api/observability-tranche4-feeds", headers=_auth_header())
+    assert response.status_code == 200
+    assert response.get_json()["status"] == "unknown"
+
+
 def test_observability_page_includes_new_panels_and_endpoint_polling(client, monkeypatch, tmp_path):
     monkeypatch.setattr(dashboard_app, "_ROUTINE_PAUSE_DIR", tmp_path / "pause")
     response = client.get("/observability", headers=_auth_header())
@@ -351,7 +393,9 @@ def test_observability_page_includes_new_panels_and_endpoint_polling(client, mon
     assert "Signal Streams" in html
     assert "Provenance Coverage" in html
     assert "Event Bus" in html
+    assert "Tranche 4 Feed Health" in html
     assert "/api/observability-system-summary" in html
+    assert "/api/observability-tranche4-feeds" in html
 
 
 def test_build_observability_system_summary_redacts_pii(monkeypatch):

@@ -26,6 +26,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from lib.core.provenance import write_envelope_sidecar  # noqa: E402
+from lib.intelligence import enrich_signal_for_narrative  # noqa: E402
 from lib.synthesis import (  # noqa: E402
     MIN_RUBRIC_SCORE_TO_PUBLISH,
     score_narrative,
@@ -209,8 +210,9 @@ def run_once(
     publishable: list[dict[str, Any]] = []
     dropped: list[dict[str, Any]] = []
     for signal in selected:
-        thesis = synthesize_thesis(signal, mode=mode, now=now)
-        rubric = score_narrative(thesis, signal=signal)
+        enriched_signal = enrich_signal_for_narrative(signal, generated_at=now)
+        thesis = synthesize_thesis(enriched_signal, mode=mode, now=now)
+        rubric = score_narrative(thesis, signal=enriched_signal)
         row = {
             "symbol": thesis.symbol,
             "timeframe": thesis.timeframe,
@@ -219,9 +221,10 @@ def run_once(
             "thesis": thesis.to_dict(),
             "rubric": rubric.to_dict(),
             "source_signal": {
-                "edge_score": signal.get("edge_score"),
-                "consensus": signal.get("consensus"),
-                "generated_at": signal.get("generated_at"),
+                "edge_score": enriched_signal.get("edge_score"),
+                "consensus": enriched_signal.get("consensus"),
+                "generated_at": enriched_signal.get("generated_at"),
+                "tranche4_context": enriched_signal.get("tranche4_context"),
             },
             "service": {"generator": GENERATOR, "version": VERSION},
         }

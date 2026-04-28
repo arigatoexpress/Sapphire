@@ -13,6 +13,7 @@ import pytest
 
 from lib.correlator.sources import (
     ConvergenceWatchlistSource,
+    CrossAssetRegimeSource,
     HyperliquidSource,
     KronosForecastSource,
     SourceSignal,
@@ -30,17 +31,18 @@ def _iso(now: datetime) -> str:
     return now.isoformat()
 
 
-def test_available_sources_lists_eight_classes() -> None:
+def test_available_sources_lists_nine_classes() -> None:
     classes = available_sources()
-    assert len(classes) == 8
+    assert len(classes) == 9
     names = {c.__name__ for c in classes}
     assert "TradingViewSource" in names
     assert "KronosForecastSource" in names
+    assert "CrossAssetRegimeSource" in names
 
 
-def test_build_default_sources_returns_eight_instances() -> None:
+def test_build_default_sources_returns_nine_instances() -> None:
     instances = build_default_sources()
-    assert len(instances) == 8
+    assert len(instances) == 9
     assert {type(s).__name__ for s in instances} == {c.__name__ for c in available_sources()}
 
 
@@ -214,6 +216,37 @@ def test_hyperliquid_source_unknown_kind_is_neutral(tmp_path) -> None:
     sig = src.latest_for("BTC", "1h")
     assert sig is not None
     assert sig.direction == "neutral"
+
+
+# ---------------------------------------------------------------------------
+# Cross-asset regime
+# ---------------------------------------------------------------------------
+
+
+def test_cross_asset_regime_source_reads_crisis_regime(tmp_path) -> None:
+    base = tmp_path / "cross_asset" / "2026-04-28"
+    base.mkdir(parents=True)
+    (base / "regimes.jsonl").write_text(
+        json.dumps(
+            {
+                "label": "crisis_correlation_spike",
+                "timestamp": _iso(datetime.now(UTC)),
+                "confidence": 0.86,
+                "metrics": {"average_abs_correlation": 0.91},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    src = CrossAssetRegimeSource(base_dir=tmp_path / "cross_asset")
+
+    sig = src.latest_for("BTC", "1h")
+
+    assert sig is not None
+    assert sig.source == "cross_asset_regime"
+    assert sig.direction == "bear"
+    assert sig.confidence == pytest.approx(0.86)
+    assert sig.raw["label"] == "crisis_correlation_spike"
 
 
 # ---------------------------------------------------------------------------

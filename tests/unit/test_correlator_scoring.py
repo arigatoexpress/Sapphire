@@ -193,11 +193,12 @@ def test_default_weights_match_advertised_caps() -> None:
     assert DEFAULT_AGREEMENT_BONUS_PER_EXTRA == pytest.approx(0.10)
     assert DEFAULT_MAX_AGREEMENT_MULTIPLIER == pytest.approx(1.40)
     assert SCORING_VERSION == "0.1.0"
-    # Eight known sources.
+    # Nine known sources, including the Tranche 4 cross-asset regime feed.
     assert set(DEFAULT_SOURCE_WEIGHTS) == {
         "tradingview",
         "telegram_intel",
         "hyperliquid_public_feed",
+        "cross_asset_regime",
         "threat_intel",
         "convergence_watchlist",
         "sovereign_thesis",

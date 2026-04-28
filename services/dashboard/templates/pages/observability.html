@@ -158,6 +158,16 @@
         </div>
         <div id="obs-eb-table"></div>
     </section>
+
+    <section class="obs-panel">
+        <h2>Tranche 4 Feed Health</h2>
+        <div class="obs-stats">
+            <div class="obs-stat"><div class="label">Feeds</div><div class="value" id="obs-t4-feeds">0</div></div>
+            <div class="obs-stat"><div class="label">Active</div><div class="value" id="obs-t4-active">0</div></div>
+            <div class="obs-stat"><div class="label">Events</div><div class="value" id="obs-t4-events">0</div></div>
+        </div>
+        <div id="obs-t4-table"></div>
+    </section>
 </div>
 
 <div class="obs-grid" style="margin-top: var(--space-lg);">
@@ -369,6 +379,32 @@ function renderEventBus(payload) {
     `;
 }
 
+function renderTranche4Feeds(payload) {
+    const totals = (payload && payload.totals) || {};
+    const feeds = (payload && payload.feeds) || [];
+    document.getElementById('obs-t4-feeds').textContent = totals.feeds || feeds.length || 0;
+    document.getElementById('obs-t4-active').textContent = totals.with_events || 0;
+    document.getElementById('obs-t4-events').textContent = totals.events_seen || 0;
+    const target = document.getElementById('obs-t4-table');
+    if (!feeds.length) {
+        target.innerHTML = '<div class="obs-empty">No Tranche 4 feed artifacts discovered</div>';
+        return;
+    }
+    target.innerHTML = `
+        <table class="obs-table">
+            <thead><tr><th>Feed</th><th>Topics</th><th>Events</th><th>Latest</th></tr></thead>
+            <tbody>
+                ${feeds.map(feed => `<tr>
+                    <td>${esc(feed.feed)}</td>
+                    <td>${esc((feed.topics || []).join(', '))}</td>
+                    <td>${feed.events_seen || 0}</td>
+                    <td>${esc(feed.last_event_at || '--')}</td>
+                </tr>`).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
 function refreshSystemSummary() {
     fetch(`${window.location.origin}/api/observability-system-summary`)
         .then(response => response.json())
@@ -389,9 +425,18 @@ function refreshSystemSummary() {
         .catch(() => {});
 }
 
+function refreshTranche4Feeds() {
+    fetch(`${window.location.origin}/api/observability-tranche4-feeds`)
+        .then(response => response.json())
+        .then(renderTranche4Feeds)
+        .catch(() => {});
+}
+
 renderPauseStatus(JSON.parse(document.getElementById('routine-pause-seed').textContent || '{}'));
 refreshSystemSummary();
+refreshTranche4Feeds();
 setInterval(refreshPauseStatus, 15000);
 setInterval(refreshSystemSummary, 15000);
+setInterval(refreshTranche4Feeds, 30000);
 </script>
 {% endblock %}

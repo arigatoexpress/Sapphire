@@ -26,6 +26,7 @@ Adapters covered
 - :class:`SovereignThesisSource`     — sovereign-thesis snapshots (data/sovereign-thesis/latest.json)
 - :class:`KronosForecastSource`      — Kronos predictions (data/intelligence/<date>/predictions.json)
 - :class:`TAScannerSource`           — TA scanner predictions (data/trading_predictions.jsonl)
+- :class:`CrossAssetRegimeSource`    — cross-asset regime labels (data/cross_asset/<date>/regimes.jsonl)
 
 Each adapter normalizes its source's wire format into a
 :class:`SourceSignal` dataclass with a stable schema:
@@ -588,6 +589,62 @@ class TAScannerSource:
 
 
 # ---------------------------------------------------------------------------
+# 9. Cross-asset regime
+# ---------------------------------------------------------------------------
+
+
+_REGIME_TO_SIGNAL: dict[str, tuple[str, float]] = {
+    "crisis_correlation_spike": ("bear", 0.90),
+    "risk_off_flight_to_dollar": ("bear", 0.75),
+    "risk_on_correlated": ("bull", 0.70),
+    "risk_on_decorrelated": ("neutral", 0.45),
+    "regime_uncertain": ("neutral", 0.15),
+}
+
+
+@dataclass
+class CrossAssetRegimeSource:
+    name: str = "cross_asset_regime"
+    base_dir: Path = field(default_factory=lambda: REPO_ROOT / "data" / "cross_asset")
+
+    def _candidate_files(self, max_days_back: int = 30) -> list[Path]:
+        if not self.base_dir.exists():
+            return []
+        files = sorted(self.base_dir.glob("*/regimes.jsonl"))
+        return list(reversed(files[-max_days_back:]))
+
+    def latest_for(self, symbol: str, timeframe: str) -> SourceSignal | None:
+        target = _canonical_symbol(symbol)
+        now = datetime.now(UTC)
+        for path in self._candidate_files():
+            for entry in _iter_jsonl(path, limit=500):
+                label = str(entry.get("label") or entry.get("regime_label") or "").strip()
+                if not label:
+                    continue
+                direction, default_confidence = _REGIME_TO_SIGNAL.get(label, ("neutral", 0.20))
+                ts = _parse_iso(
+                    entry.get("timestamp")
+                    or entry.get("generated_at")
+                    or entry.get("as_of")
+                )
+                return SourceSignal(
+                    source=self.name,
+                    symbol=target,
+                    timeframe=timeframe,
+                    direction=direction,
+                    confidence=_coerce_confidence(entry.get("confidence"), default=default_confidence),
+                    age_seconds=_age_seconds(ts, now=now),
+                    timestamp_iso=ts.isoformat() if ts else "",
+                    raw={
+                        "label": label,
+                        "source_file": str(path),
+                        "metrics": entry.get("metrics") or entry.get("evidence"),
+                    },
+                )
+        return None
+
+
+# ---------------------------------------------------------------------------
 # Builder
 # ---------------------------------------------------------------------------
 
@@ -603,6 +660,7 @@ def available_sources() -> tuple[type, ...]:
         SovereignThesisSource,
         KronosForecastSource,
         TAScannerSource,
+        CrossAssetRegimeSource,
     )
 
 
@@ -617,11 +675,13 @@ def build_default_sources() -> list[SignalSource]:
         SovereignThesisSource(),
         KronosForecastSource(),
         TAScannerSource(),
+        CrossAssetRegimeSource(),
     ]
 
 
 __all__ = [
     "ConvergenceWatchlistSource",
+    "CrossAssetRegimeSource",
     "HyperliquidSource",
     "KronosForecastSource",
     "SignalSource",
