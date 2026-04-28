@@ -77,7 +77,7 @@ inference-proxy:  ## Start inference-proxy :11435 (with x402)
 
 .PHONY: content-generate content-publish heartbeat-status alpha-agent-status
 .PHONY: google-readiness google-readiness-offline google-readiness-cost google-readiness-artifact
-.PHONY: production-readiness production-readiness-offline production-readiness-artifact
+.PHONY: production-readiness production-readiness-offline production-readiness-artifact hermes-runtime-readiness
 content-generate:  ## Generate weekly report draft
 	$(PY) -m lib.content generate
 
@@ -132,6 +132,9 @@ production-readiness-artifact:  ## Write ignored full-system readiness matrix
 		$(GOOGLE_MEMBERSHIP_ARGS) \
 		--include-cost \
 		--output $(PRODUCTION_READINESS_OUT)
+
+hermes-runtime-readiness:  ## Print read-only Hermes runtime guard readiness
+	$(PY) scripts/ops/hermes_runtime_readiness.py --format markdown
 
 heartbeat-status:  ## Print heartbeat daemon last known state
 	cat data/heartbeat_state.json 2>/dev/null | $(PY) -m json.tool || echo "no heartbeat state yet"
