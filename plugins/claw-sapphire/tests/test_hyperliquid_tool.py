@@ -65,7 +65,7 @@ def test_unknown_action_returns_error():
     result = hyperliquid.handle({"action": "trade"})
 
     assert "unknown action" in result["error"]
-    assert result["valid_actions"] == ["status", "latest", "subscribe-test"]
+    assert result["valid_actions"] == ["status", "latest", "subscribe-test", "live-status"]
 
 
 def test_run_returns_json_string(monkeypatch):
