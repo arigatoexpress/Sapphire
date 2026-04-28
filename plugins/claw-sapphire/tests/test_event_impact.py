@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 TOOL_PATH = Path(__file__).resolve().parents[1] / "tools" / "internal" / "event_impact.py"
@@ -109,9 +110,106 @@ def test_accuracy_audit_handles_unscored_rows():
     assert out["accuracy"] is None
 
 
+def test_post_corpus_audit_action_runs_offline_fixture(tmp_path: Path):
+    base = datetime(2024, 1, 1, tzinfo=UTC)
+    model_path = tmp_path / "model.json"
+    events_path = tmp_path / "events.jsonl"
+    bars_path = tmp_path / "bars.json"
+    model_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1.0",
+                "generated_at": base.isoformat(),
+                "horizons_hours": [6],
+                "metadata": {},
+                "profiles": [
+                    {
+                        "category": "fomc_decision",
+                        "sub_category": "rate_hike",
+                        "asset": "BTC",
+                        "horizon_hours": 6,
+                        "mean_return_pct": 2.0,
+                        "median_return_pct": 2.0,
+                        "n": 8,
+                        "stdev": 1.0,
+                        "confidence_interval_95": [-1.0, 5.0],
+                        "direction_consensus": 0.75,
+                    }
+                ],
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    event_ts = base + timedelta(days=1)
+    events_path.write_text(
+        json.dumps(
+            {
+                "event_id": "plugin_post_hike",
+                "timestamp": event_ts.isoformat(),
+                "category": "fomc_decision",
+                "sub_category": "rate_hike",
+                "title": "Plugin fixture FOMC hike",
+                "assets": ["BTC"],
+                "metadata": {"source_url": "https://www.federalreserve.gov/example"},
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    bars_path.write_text(
+        json.dumps(
+            {
+                "BTC": [
+                    {"timestamp": event_ts.isoformat(), "close": 100.0},
+                    {"timestamp": (event_ts + timedelta(hours=6)).isoformat(), "close": 103.0},
+                ]
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+
+    out = _tool().post_corpus_audit_action(
+        {
+            "model_path": str(model_path),
+            "events_path": str(events_path),
+            "bars_json": str(bars_path),
+            "horizons_hours": [6],
+        }
+    )
+    assert out["ok"] is True
+    assert out["mode"] == "offline"
+    assert out["audit"]["summary"]["sign_accuracy"] == 1.0
+    assert out["audit"]["rows"][0]["event_id"] == "plugin_post_hike"
+
+
+def test_post_corpus_audit_action_reports_missing_inputs(tmp_path: Path):
+    missing_bars = _tool().post_corpus_audit_action(
+        {
+            "model_path": str(tmp_path / "model.json"),
+            "events_path": str(tmp_path / "events.jsonl"),
+        }
+    )
+    assert missing_bars["ok"] is False
+    assert "bars_json or bars_path is required" in missing_bars["error"]
+
+    out = _tool().post_corpus_audit_action(
+        {
+            "model_path": str(tmp_path / "missing-model.json"),
+            "events_path": str(tmp_path / "missing-events.jsonl"),
+            "bars_json": str(tmp_path / "missing-bars.json"),
+        }
+    )
+    assert out["ok"] is False
+    assert out["action"] == "post-corpus-audit"
+
+
 def test_handle_unknown_action_lists_valid_actions():
     out = _tool().handle({"action": "bogus"})
     assert "valid_actions" in out
+    assert "post-corpus-audit" in out["valid_actions"]
 
 
 def test_main_rejects_invalid_json(capsys):
