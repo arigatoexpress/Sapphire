@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sapphire.local/schemas/telegram-channel-curation.schema.json",
+  "title": "Sapphire Telegram Channel Curation Dry-Run Packet",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "candidates"],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Paste-safe operator run label; do not include private handles."
+    },
+    "candidates": {
+      "type": "array",
+      "description": "Candidate channels to score from local, paste-safe samples only.",
+      "items": {
+        "$ref": "#/$defs/candidate"
+      }
+    },
+    "bot_pump_reviews": {
+      "type": "array",
+      "description": "Optional queue of prior bot-pumped findings for false-positive review.",
+      "items": {
+        "$ref": "#/$defs/bot_pump_review"
+      }
+    }
+  },
+  "$defs": {
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate_id", "category", "sample_messages"],
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Local alias, not a private Telegram handle."
+        },
+        "source_ref": {
+          "type": "string",
+          "description": "Optional local-only source reference. The dry-run reporter redacts handles."
+        },
+        "category": {
+          "enum": ["crypto", "macro", "ai", "security", "trading", "governance"]
+        },
+        "min_quality_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.45
+        },
+        "operator_notes": {
+          "type": "string",
+          "description": "Paste-safe rationale only; no secrets, invite links, phone numbers, or private handles."
+        },
+        "known_risks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sample_messages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/sample_message"
+          }
+        }
+      }
+    },
+    "sample_message": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message_id", "text"],
+      "properties": {
+        "message_id": {
+          "type": "string"
+        },
+        "published_at": {
+          "type": "string",
+          "description": "ISO-8601 timestamp when available."
+        },
+        "author_ref": {
+          "type": "string",
+          "description": "Paste-safe alias only."
+        },
+        "text": {
+          "type": "string",
+          "description": "Representative excerpt. Redact private handles, invite links, phone numbers, and secrets before committing."
+        }
+      }
+    },
+    "bot_pump_review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["review_id", "candidate_id", "finding", "operator_review"],
+      "properties": {
+        "review_id": {
+          "type": "string"
+        },
+        "candidate_id": {
+          "type": "string"
+        },
+        "finding": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["rule_id", "severity", "summary"],
+          "properties": {
+            "rule_id": {
+              "type": "string"
+            },
+            "severity": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            }
+          }
+        },
+        "operator_review": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["decision", "evidence"],
+          "properties": {
+            "decision": {
+              "enum": ["needs_review", "dismiss_false_positive", "quarantine", "uphold"]
+            },
+            "evidence": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "independent_sources": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "no_profit_claim": {
+                  "type": "boolean"
+                },
+                "no_coordination_burst": {
+                  "type": "boolean"
+                },
+                "no_bot_execution_language": {
+                  "type": "boolean"
+                },
+                "sample_message_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
