@@ -14,10 +14,6 @@ on:
 
 permissions:
   contents: read
-  security-events: write
-  # codeql-action/upload-sarif@v4 reads workflow-run metadata (telemetry +
-  # the Get-a-workflow-run API) and fails hard without actions:read.
-  # v3 tolerated the missing permission; v4 does not.
   actions: read
 
 env:
@@ -27,6 +23,9 @@ env:
   RUNNER_TOOL_CACHE: /Users/aribs/.github-runners/toolcache
 
 jobs:
+  # Ari's self-hosted Sapphire runner jobs share local runner state. Keep the
+  # heavyweight scanners serialized so they do not cancel or clean each other's
+  # workspaces/caches while producing SARIF.
   osv-scanner:
     name: osv-scanner (CVE lookup)
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
@@ -59,25 +58,21 @@ jobs:
           echo "$install_dir" >> "$GITHUB_PATH"
       - name: Scan
         # Non-blocking: report findings, don't fail the workflow. The
-        # security-events upload below is what makes them actionable.
+        # artifact upload below is the always-on evidence path.
         run: |
           osv-scanner --recursive --skip-git --format=sarif --output=osv.sarif ./ || true
-      - uses: github/codeql-action/upload-sarif@v4
+      - uses: actions/upload-artifact@v4
         if: ${{ always() && hashFiles('osv.sarif') != '' }}
-        # Soft-fail until Code Scanning is enabled in repo Settings →
-        # Code security → Code scanning. Without that repo-level toggle,
-        # SARIF upload errors with "Code scanning is not enabled for this
-        # repository", which would mask actual scanner findings in the
-        # daily cron. The SARIF file is still generated and retained as
-        # a step artifact for manual inspection.
-        continue-on-error: true
         with:
-          sarif_file: osv.sarif
-          category: osv-scanner
+          name: osv-scanner-sarif
+          path: osv.sarif
+          if-no-files-found: ignore
+          retention-days: 14
 
   trivy-fs:
     name: trivy (filesystem)
-    if: ${{ vars.SAPPHIRE_RUNNER != '' }}
+    needs: osv-scanner
+    if: ${{ always() && vars.SAPPHIRE_RUNNER != '' }}
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     timeout-minutes: 35
     steps:
@@ -92,22 +87,18 @@ jobs:
           severity: "CRITICAL,HIGH"
           ignore-unfixed: true
           timeout: "20m"
-      - uses: github/codeql-action/upload-sarif@v4
+      - uses: actions/upload-artifact@v4
         if: ${{ always() && hashFiles('trivy-fs.sarif') != '' }}
-        # Soft-fail until Code Scanning is enabled in repo Settings →
-        # Code security → Code scanning. Without that repo-level toggle,
-        # SARIF upload errors with "Code scanning is not enabled for this
-        # repository", which would mask actual scanner findings in the
-        # daily cron. The SARIF file is still generated and retained as
-        # a step artifact for manual inspection.
-        continue-on-error: true
         with:
-          sarif_file: trivy-fs.sarif
-          category: trivy-fs
+          name: trivy-fs-sarif
+          path: trivy-fs.sarif
+          if-no-files-found: ignore
+          retention-days: 14
 
   bandit:
     name: bandit (python SAST)
-    if: ${{ vars.SAPPHIRE_RUNNER != '' }}
+    needs: trivy-fs
+    if: ${{ always() && vars.SAPPHIRE_RUNNER != '' }}
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     timeout-minutes: 15
     steps:
