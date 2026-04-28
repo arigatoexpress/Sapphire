@@ -25,7 +25,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[2]
+ORG_REPOS_MANIFEST = ROOT / "infra" / "org-repos.yaml"
 DEFAULT_PROJECT = "tho-ai-agent"
 DEFAULT_REGION = "us-central1"
 DEFAULT_BUCKET = "sapphire-data-lake"
@@ -36,6 +39,14 @@ DEFAULT_SECRET_ENV = Path.home() / ".sapphire" / "secrets.env"
 SAPPHIRE_SECRETS_DIR = Path.home() / ".config" / "sapphire-secrets"
 GEMINI_PROBE_PROMPT = "Return exactly SAPPHIRE_GEMINI_PROBE_OK and nothing else."
 GEMINI_PROBE_RESPONSE = "SAPPHIRE_GEMINI_PROBE_OK"
+NO_SPEND_CI_STRATEGIES = {
+    "local_evidence_skip_ci_bootstrap",
+    "sapphire_self_hosted_gate",
+}
+NO_SPEND_CI_EXCEPTION_REASONS = {
+    "draft_auto_deploy": "Cloud Run deploy path intentionally stays on hosted Actions",
+    "upstream_fork_local_only": "Upstream/fork work uses local evidence rather than Ari-owned hosted CI",
+}
 
 
 @dataclass
@@ -54,6 +65,7 @@ def main(argv: list[str] | None = None) -> int:
 
     env = load_secret_env(args.secret_env)
     checks.extend(probe_repo())
+    checks.append(probe_satellite_ci_no_spend_gates())
     checks.extend(probe_launchagents())
     checks.extend(probe_local_endpoints(env))
     checks.extend(probe_safety())
@@ -164,6 +176,125 @@ def probe_repo() -> list[Check]:
         )
     )
     return checks
+
+
+def probe_satellite_ci_no_spend_gates(manifest_path: Path = ORG_REPOS_MANIFEST) -> Check:
+    started = time.perf_counter()
+    if not manifest_path.exists():
+        return Check(
+            "org",
+            "satellite_ci_no_spend_gates",
+            "WARN",
+            f"manifest_missing={manifest_path}",
+            int((time.perf_counter() - started) * 1000),
+        )
+    try:
+        manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+    except Exception as exc:
+        return Check(
+            "org",
+            "satellite_ci_no_spend_gates",
+            "WARN",
+            f"manifest_parse_error={exc.__class__.__name__}",
+            int((time.perf_counter() - started) * 1000),
+        )
+
+    repos = manifest.get("repos") if isinstance(manifest, dict) else []
+    if not isinstance(repos, list):
+        return Check(
+            "org",
+            "satellite_ci_no_spend_gates",
+            "WARN",
+            "manifest repos is not a list",
+            int((time.perf_counter() - started) * 1000),
+        )
+
+    violations: list[str] = []
+    missing_local: list[str] = []
+    checked_repos = 0
+    checked_workflows = 0
+    checked_jobs = 0
+    no_workflow_repos: list[str] = []
+    skipped: list[str] = []
+    exceptions: list[str] = []
+
+    for repo in repos:
+        if not isinstance(repo, dict):
+            continue
+        repo_id = str(repo.get("id") or repo.get("name") or "unknown")
+        strategy = str(repo.get("ci_strategy") or "")
+        local_path = Path(str(repo.get("local_path") or ""))
+        if strategy not in NO_SPEND_CI_STRATEGIES:
+            if strategy in NO_SPEND_CI_EXCEPTION_REASONS:
+                exceptions.append(f"{repo_id}:{strategy}")
+            else:
+                skipped.append(f"{repo_id}:{strategy or 'no_ci_strategy'}")
+            continue
+        if not local_path.exists():
+            missing_local.append(repo_id)
+            continue
+
+        workflow_dir = local_path / ".github" / "workflows"
+        workflows = sorted([*workflow_dir.glob("*.yml"), *workflow_dir.glob("*.yaml")]) if workflow_dir.exists() else []
+        checked_repos += 1
+        if not workflows:
+            no_workflow_repos.append(repo_id)
+            continue
+        for workflow in workflows:
+            checked_workflows += 1
+            job_violations, job_count = workflow_no_spend_gate_violations(repo_id, workflow)
+            checked_jobs += job_count
+            violations.extend(job_violations)
+
+    status = "PASS"
+    if violations:
+        status = "FAIL"
+    elif missing_local:
+        status = "WARN"
+
+    evidence_parts = [
+        f"checked_repos={checked_repos}",
+        f"workflows={checked_workflows}",
+        f"jobs={checked_jobs}",
+    ]
+    if violations:
+        evidence_parts.append(f"violations={','.join(violations[:8])}")
+        if len(violations) > 8:
+            evidence_parts.append(f"violations_omitted={len(violations) - 8}")
+    if missing_local:
+        evidence_parts.append(f"missing_local={','.join(missing_local)}")
+    if no_workflow_repos:
+        evidence_parts.append(f"no_workflows={','.join(no_workflow_repos)}")
+    if exceptions:
+        evidence_parts.append(f"exceptions={','.join(exceptions)}")
+    if skipped:
+        evidence_parts.append(f"skipped={len(skipped)}")
+    return Check(
+        "org",
+        "satellite_ci_no_spend_gates",
+        status,
+        "; ".join(evidence_parts),
+        int((time.perf_counter() - started) * 1000),
+    )
+
+
+def workflow_no_spend_gate_violations(repo_id: str, workflow: Path) -> tuple[list[str], int]:
+    try:
+        data = yaml.safe_load(workflow.read_text(encoding="utf-8")) or {}
+    except Exception as exc:
+        return [f"{repo_id}:{workflow.name}:parse_error:{exc.__class__.__name__}"], 0
+    jobs = data.get("jobs") if isinstance(data, dict) else {}
+    if not isinstance(jobs, dict):
+        return [], 0
+    violations: list[str] = []
+    for job_name, job in jobs.items():
+        if not isinstance(job, dict):
+            continue
+        if_text = str(job.get("if") or "")
+        runs_on = str(job.get("runs-on") or "")
+        if "vars.SAPPHIRE_RUNNER" not in if_text or "vars.SAPPHIRE_RUNNER" not in runs_on:
+            violations.append(f"{repo_id}:{workflow.name}:{job_name}")
+    return violations, len(jobs)
 
 
 def probe_launchagents() -> list[Check]:
