@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+from datetime import UTC, datetime
 from pathlib import Path
 from types import ModuleType
 from uuid import uuid4
@@ -92,6 +94,145 @@ def test_handle_command_uses_injected_sender(monkeypatch, tmp_path):
 
     assert result == "done"
     assert calls == [("🏭 Dispatching...", "123")]
+
+
+def test_health_command_uses_live_brief_profile(monkeypatch, tmp_path):
+    app = _load_app(monkeypatch, tmp_path)
+    calls = []
+
+    def sender(text: str, chat_id: str | None = None):
+        calls.append((text, chat_id))
+        return {"ok": True}
+
+    requested = []
+
+    def fake_run_tool(tool_script: str, input_data: dict | None = None) -> str:
+        requested.append((tool_script, input_data))
+        return json.dumps(
+            {
+                "overall": "RED",
+                "summary": "1 green, 0 yellow, 1 red out of 2 checks",
+                "services": {"dashboard:8080": {"status": "green", "detail": "401 auth"}},
+                "data_freshness": {
+                    "trading_signals": {"status": "red", "detail": "243h old"}
+                },
+                "inference": {"mac_ollama": {"status": "green", "detail": "200 OK"}},
+            }
+        )
+
+    monkeypatch.setattr(app, "run_tool_direct", fake_run_tool)
+
+    result = app.handle_command("/health", "", "123", sender=sender)
+
+    assert requested == [("health_check.py", {"profile": "brief"})]
+    assert calls == [("🔬 Running live health check...", "123")]
+    assert "trading_signals" in result
+    assert "243h old" in result
+
+
+def test_btc_command_uses_rolling_start_date(monkeypatch, tmp_path):
+    app = _load_app(monkeypatch, tmp_path)
+    calls = []
+    recent_start_date = app._recent_start_date
+
+    monkeypatch.setattr(
+        app,
+        "_recent_start_date",
+        lambda: recent_start_date(now=datetime(2026, 4, 28, tzinfo=UTC)),
+    )
+    monkeypatch.setattr(
+        app,
+        "run_tool_direct",
+        lambda tool, payload=None: calls.append((tool, payload)) or "bars",
+    )
+
+    assert app.handle_command("/btc", "", "123") == "bars"
+    assert calls == [
+        (
+            "market.py",
+            {"action": "crypto", "symbol": "BTC-USD", "start_date": "2026-03-28"},
+        )
+    ]
+
+
+def test_live_system_prompt_summarizes_stale_data_and_models(monkeypatch, tmp_path):
+    app = _load_app(monkeypatch, tmp_path)
+
+    def fake_run_tool(tool_script: str, input_data: dict | None = None) -> str:
+        if tool_script == "health_check.py":
+            assert input_data == {"profile": "brief"}
+            return json.dumps(
+                {
+                    "overall": "RED",
+                    "summary": "8 green, 0 yellow, 3 red out of 11 checks",
+                    "services": {"dashboard:8080": {"status": "green", "detail": "401 auth"}},
+                    "data_freshness": {
+                        "trading_predictions": {"status": "red", "detail": "83h old"}
+                    },
+                    "inference": {"mac_ollama": {"status": "green", "detail": "200 OK"}},
+                }
+            )
+        if tool_script == "status.py":
+            return json.dumps(
+                {
+                    "inference": {
+                        "proxy_health": {"mac-local": "healthy", "windows-gpu": "degraded"},
+                        "local_models": ["hermes3:8b", "nemotron-mini:4b"],
+                        "gpu_models": [],
+                    }
+                }
+            )
+        raise AssertionError(tool_script)
+
+    monkeypatch.setattr(app, "run_tool_direct", fake_run_tool)
+
+    prompt = app.build_live_system_prompt()
+
+    assert "Use the live context below as the only current operational truth" in prompt
+    assert "trading_predictions" in prompt
+    assert "83h old" in prompt
+    assert "mac-local=healthy" in prompt
+    assert "1,211" not in prompt
+    assert "67%" not in prompt
+
+
+def test_chat_with_hermes_sends_live_context_to_model(monkeypatch, tmp_path):
+    app = _load_app(monkeypatch, tmp_path)
+    captured = {}
+
+    monkeypatch.setattr(app, "build_live_system_prompt", lambda: "LIVE SNAPSHOT: stale=false")
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return json.dumps(
+                {
+                    "message": {"content": "Fresh answer"},
+                    "eval_count": 12,
+                    "eval_duration": 1_000_000_000,
+                }
+            ).encode()
+
+    def fake_urlopen(req, timeout: int, context=None):
+        captured["url"] = req.full_url
+        captured["payload"] = json.loads(req.data.decode())
+        return FakeResponse()
+
+    monkeypatch.setattr(app.urllib.request, "urlopen", fake_urlopen)
+
+    result = app.chat_with_hermes("How is the system?", "123")
+
+    assert captured["url"] == "http://100.71.10.48:11434/api/chat"
+    assert captured["payload"]["messages"][0] == {
+        "role": "system",
+        "content": "LIVE SNAPSHOT: stale=false",
+    }
+    assert "Fresh answer" in result
 
 
 def test_handle_message_unauthorized_uses_injected_sender(monkeypatch, tmp_path):
