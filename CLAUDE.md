@@ -214,7 +214,7 @@ Prediction accuracy: 61.1% overall, BTC 83.3% (n=36 scored of 42)
 - Killswitch: `~/.sapphire/hyperliquid_trading_pause` (drop file → blocks every order, mirrors routine-pause from #392).
 - Gates: `HYPERLIQUID_TRADING_ENABLED=0` (default → all orders dry-run-logged), `HYPERLIQUID_TESTNET=1` (default → testnet).
 - Key: macOS keychain `security -a sapphire-hyperliquid -s sapphire -w` first, env `HYPERLIQUID_PRIVATE_KEY` fallback.
-- Mainnet refused until `HyperliquidLivePolicy.signing_verified=True`. The current `client.py:_sign_action` does sha256→`encode_defunct` instead of full EIP-712 — known broken, fix tracked separately. Verify on testnet before flipping the policy field.
+- Mainnet refused until `HyperliquidLivePolicy.signing_verified=True`. Signing now follows the canonical Hyperliquid scheme (`hyperliquid_bot/signing.py`: msgpack(action) || nonce || vault || expiry → keccak256 → phantom Agent → EIP-712 typed-data, domain `Exchange/1/1337/0x0…0`, mainnet/testnet encoded in `source` `"a"`/`"b"`). Verify with `python3 scripts/ops/verify_hyperliquid_signing.py [--info | --testnet-order]` before flipping the policy field.
 - Audit: every `execute_signal` appends to `data/hyperliquid_trades.jsonl`; daily realized loss tally at `data/hyperliquid_daily_pnl.json`.
 - Read-only status: `echo '{"action":"live-status"}' | python3 plugins/claw-sapphire/tools/hyperliquid.py`.
 

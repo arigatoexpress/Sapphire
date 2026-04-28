@@ -9,22 +9,23 @@ API Endpoints:
   WS:       wss://api.hyperliquid.xyz/ws
 
 Authentication: EIP-712 signed actions (uses eth_account / local key signing).
-No API key required — wallet private key signs all order actions.
+No API key required — wallet private key signs all order actions. See
+``signing.py`` for the L1 action signing scheme (msgpack action || nonce ||
+vault || expiry → keccak256 → phantom Agent → typed-data sign).
 """
 
 from __future__ import annotations
 
-import hashlib
-import json
 import logging
 import os
 import time
-from decimal import Decimal
 from typing import Any
 
 import eth_account
 import httpx
 from eth_account.signers.local import LocalAccount
+
+from .signing import float_to_wire, sign_l1_action
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ class HyperliquidClient:
     def __init__(self, private_key: str, *, testnet: bool = False) -> None:
         self._account: LocalAccount = eth_account.Account.from_key(private_key)
         self.address = self._account.address
+        self.testnet = testnet
         self.base_url = TESTNET_URL if testnet else BASE_URL
         self._http: httpx.AsyncClient | None = None
 
@@ -176,26 +178,31 @@ class HyperliquidClient:
         r.raise_for_status()
         return r.json()
 
-    async def _exchange_action(self, action: dict[str, Any]) -> dict[str, Any]:
+    async def _exchange_action(
+        self,
+        action: dict[str, Any],
+        *,
+        vault_address: str | None = None,
+        expires_after: int | None = None,
+    ) -> dict[str, Any]:
         assert self._http, "Use as async context manager"
         nonce = int(time.time() * 1000)
-        signature = self._sign_action(action, nonce)
-        body = {"action": action, "nonce": nonce, "signature": signature}
+        signature = sign_l1_action(
+            self._account,
+            action,
+            vault_address=vault_address,
+            nonce=nonce,
+            expires_after=expires_after,
+            is_mainnet=not self.testnet,
+        )
+        body: dict[str, Any] = {"action": action, "nonce": nonce, "signature": signature}
+        if vault_address is not None:
+            body["vaultAddress"] = vault_address
+        if expires_after is not None:
+            body["expiresAfter"] = expires_after
         r = await self._http.post("/exchange", json=body)
         r.raise_for_status()
         return r.json()
-
-    def _sign_action(self, action: dict[str, Any], nonce: int) -> dict[str, str]:
-        """EIP-712 sign an action for Hyperliquid."""
-        payload = json.dumps(
-            {"action": action, "nonce": nonce}, sort_keys=True, separators=(",", ":")
-        )
-        msg_hash = hashlib.sha256(payload.encode()).hexdigest()
-        signed = eth_account.Account.sign_message(
-            eth_account.messages.encode_defunct(hexstr=msg_hash),
-            private_key=self._account.key,
-        )
-        return {"r": hex(signed.r), "s": hex(signed.s), "v": signed.v}
 
     async def _asset_index(self, coin: str) -> int:
         """Return the numeric asset index for a coin symbol."""
@@ -207,8 +214,8 @@ class HyperliquidClient:
 
     @staticmethod
     def _px_str(price: float) -> str:
-        return f"{Decimal(str(price)):.6g}"
+        return float_to_wire(price)
 
     @staticmethod
     def _sz_str(size: float) -> str:
-        return f"{Decimal(str(size)):.6g}"
+        return float_to_wire(size)
