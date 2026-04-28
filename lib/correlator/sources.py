@@ -27,6 +27,11 @@ Adapters covered
 - :class:`KronosForecastSource`      — Kronos predictions (data/intelligence/<date>/predictions.json)
 - :class:`TAScannerSource`           — TA scanner predictions (data/trading_predictions.jsonl)
 - :class:`CrossAssetRegimeSource`    — cross-asset regime labels (data/cross_asset/<date>/regimes.jsonl)
+- :class:`DeFiLlamaSource`           — cache-first TVL/revenue fundamentals
+- :class:`DuneNamedQuerySource`      — operator-named Dune query signals
+- :class:`XSentimentSource`          — X API v2 handle sentiment
+- :class:`NewsAPISource`             — NewsAPI category headlines
+- :class:`LaborSource`               — BLS/USAJOBS/career-sitemap labor pressure
 
 Each adapter normalizes its source's wire format into a
 :class:`SourceSignal` dataclass with a stable schema:
@@ -651,6 +656,14 @@ class CrossAssetRegimeSource:
 
 def available_sources() -> tuple[type, ...]:
     """All shipped adapter classes (for introspection / docs)."""
+    from lib.sources import (
+        DeFiLlamaSource,
+        DuneNamedQuerySource,
+        LaborSource,
+        NewsAPISource,
+        XSentimentSource,
+    )
+
     return (
         TradingViewSource,
         TelegramIntelSource,
@@ -661,11 +674,24 @@ def available_sources() -> tuple[type, ...]:
         KronosForecastSource,
         TAScannerSource,
         CrossAssetRegimeSource,
+        DeFiLlamaSource,
+        DuneNamedQuerySource,
+        XSentimentSource,
+        NewsAPISource,
+        LaborSource,
     )
 
 
 def build_default_sources() -> list[SignalSource]:
     """Construct one of each adapter at default paths."""
+    from lib.sources import (
+        DeFiLlamaSource,
+        DuneNamedQuerySource,
+        LaborSource,
+        NewsAPISource,
+        XSentimentSource,
+    )
+
     return [
         TradingViewSource(),
         TelegramIntelSource(),
@@ -676,6 +702,11 @@ def build_default_sources() -> list[SignalSource]:
         KronosForecastSource(),
         TAScannerSource(),
         CrossAssetRegimeSource(),
+        DeFiLlamaSource(),
+        DuneNamedQuerySource(),
+        XSentimentSource(),
+        NewsAPISource(),
+        LaborSource(),
     ]
 
 

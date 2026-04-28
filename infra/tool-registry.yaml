@@ -396,6 +396,41 @@ tools:
     consumers: [services.cross-asset, services.dashboard]
     description: Cross-Asset Correlation Matrix + Regime Detection 0.1.0. Cache-first/dry-run-default rolling Pearson, Spearman, and Kendall matrices across crypto, equities, gold, dollar/forex, VIX, and Hyperliquid-derived assets; deterministic regime labels, breakdown events, and lead/lag analysis. Live source pulls require SAPPHIRE_CROSS_ASSET_LIVE=1. Caps, ≤24 assets, ≤365 days, ≥30 observations for long windows. Actions, matrix/regime/breakdowns/lead-lag/status.
 
+  - name: defillama_source
+    path: lib/sources/defillama.py
+    status: internal
+    owner: sapphire
+    consumers: [signal_correlator, services.intelligence]
+    description: DeFiLlama TVL/revenue signal adapter. Dry-run cache by default; live pulls require SAPPHIRE_DEFILLAMA_LIVE=1 and write only to ~/.cache/sapphire/defillama/.
+
+  - name: dune_named_query_source
+    path: lib/sources/dune.py
+    status: internal
+    owner: sapphire
+    consumers: [signal_correlator, services.intelligence]
+    description: Dune named-query signal adapter from operator config. Dry-run cache by default; live pulls require SAPPHIRE_DUNE_LIVE=1 plus DUNE_API_KEY from ~/.sapphire/secrets.env and use a 1h cache under ~/.cache/sapphire/dune/.
+
+  - name: x_sentiment_source
+    path: lib/sources/x_sentiment.py
+    status: internal
+    owner: sapphire
+    consumers: [signal_correlator, services.intelligence]
+    description: X API v2 handle-sentiment adapter. Empty handle config emits no signal; live pulls require SAPPHIRE_X_SENTIMENT_LIVE=1 plus X_BEARER_TOKEN from ~/.sapphire/secrets.env and cache under ~/.cache/sapphire/x_sentiment/.
+
+  - name: newsapi_source
+    path: lib/sources/news.py
+    status: internal
+    owner: sapphire
+    consumers: [signal_correlator, services.intelligence]
+    description: NewsAPI category-headline signal adapter. Dry-run cache by default; live pulls require SAPPHIRE_NEWSAPI_LIVE=1 plus NEWSAPI_KEY from ~/.sapphire/secrets.env and cache under ~/.cache/sapphire/newsapi/.
+
+  - name: labor_source
+    path: lib/sources/labor.py
+    status: internal
+    owner: sapphire
+    consumers: [signal_correlator, services.intelligence]
+    description: Labor breadth adapter using BLS RSS, USAJOBS API, and operator-supplied career sitemaps only. Dry-run cache by default; live pulls require SAPPHIRE_LABOR_LIVE=1 and cache under ~/.cache/sapphire/labor/. No LinkedIn/Indeed scraping.
+
   # On-chain intelligence 0.2.0
   - name: onchain_intel
     path: plugins/claw-sapphire/tools/internal/onchain_intel.py
