@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.sapphire.onchain-intel</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/python3</string>
+    <string>/Users/aribs/Code/Sapphire/services/onchain_intel/run.py</string>
+    <string>daemon</string>
+    <string>--poll-interval-seconds</string>
+    <string>1800</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/aribs/Code/Sapphire</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <false/>
+  <key>StandardOutPath</key>
+  <string>/Users/aribs/Library/Logs/sapphire/onchain-intel.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/aribs/Library/Logs/sapphire/onchain-intel.err.log</string>
+</dict>
+</plist>

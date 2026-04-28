@@ -22,14 +22,20 @@ from .bgeometrics import BGeometricsClient
 from .coinapi import CoinAPIClient
 from .coinglass import CoinglassClient
 from .dune import DuneClient
+from .eth_node import EthNodeClient
+from .glassnode import GlassnodeClient
 from .santiment import SantimentClient
+from .sol_node import SolNodeClient
 from .whale_alert import WhaleAlertClient
 
 __all__ = [
     "BGeometricsClient",
-    "SantimentClient",
-    "DuneClient",
-    "WhaleAlertClient",
     "CoinAPIClient",
     "CoinglassClient",
+    "DuneClient",
+    "EthNodeClient",
+    "GlassnodeClient",
+    "SantimentClient",
+    "SolNodeClient",
+    "WhaleAlertClient",
 ]
