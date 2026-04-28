@@ -57,6 +57,10 @@ The lab canonicalizes venue symbols before routing:
 - `scripts/ops/robinhood_live_readiness.py --live-read-only` may load local
   Robinhood credentials and call read-only API endpoints, but still redacts
   account identifiers and cannot submit orders.
+- `scripts/ops/robinhood_manual_order.py` is the only manual live-order utility;
+  it defaults to dry-run, enforces the pilot cap, requires a typed confirmation
+  token for `--execute`, and is not wired into dashboard, scheduler, Telegram, or
+  TradingView paths.
 - Hyperliquid order drafts model the exchange action shape but omit nonce and
   signature by design.
 - Robinhood Chain integration targets testnet chain id `46630` only.
