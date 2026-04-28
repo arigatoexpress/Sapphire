@@ -85,3 +85,94 @@ def test_partial_exit_history_and_final_outcome_reconcile(trader, monkeypatch) -
         "pnl_usd": 418.0,
         "close_price": 100.0,
     }
+
+
+def test_check_stops_closes_long_position_on_hard_stop_loss(trader, monkeypatch) -> None:
+    trader.action_execute("BTCUSDT", "BUY", 100.0, atr=10.0)
+    pf = trader._load_portfolio()
+    sl = pf["positions"][0]["stop_loss"]
+    monkeypatch.setattr(trader, "_get_price", lambda symbol: sl - 0.01)
+
+    result = trader.action_check_stops()
+
+    assert result["closed"] == 1
+    assert result["details"][0]["reason"] == "stop_loss"
+    pf_after = trader._load_portfolio()
+    assert pf_after["positions"] == []
+    assert any(row["exit_reason"] == "stop_loss" for row in pf_after["history"])
+
+
+def test_check_stops_closes_long_position_on_take_profit(trader, monkeypatch) -> None:
+    trader.action_execute("BTCUSDT", "BUY", 100.0, atr=10.0)
+    pf = trader._load_portfolio()
+    tp = pf["positions"][0]["take_profit"]
+    monkeypatch.setattr(trader, "_get_price", lambda symbol: tp + 0.01)
+
+    result = trader.action_check_stops()
+
+    assert result["closed"] == 1
+    assert result["details"][0]["reason"] == "take_profit"
+    pf_after = trader._load_portfolio()
+    assert pf_after["positions"] == []
+
+
+def test_check_stops_closes_short_position_on_hard_stop_loss(trader, monkeypatch) -> None:
+    trader.action_execute("BTCUSDT", "SELL", 100.0, atr=10.0)
+    pf = trader._load_portfolio()
+    sl = pf["positions"][0]["stop_loss"]
+    # For shorts, stop_loss is above entry; hit when price >= stop_loss.
+    monkeypatch.setattr(trader, "_get_price", lambda symbol: sl + 0.01)
+
+    result = trader.action_check_stops()
+
+    assert result["closed"] == 1
+    assert result["details"][0]["reason"] == "stop_loss"
+
+
+def test_monitor_action_is_read_only_preview(trader, monkeypatch) -> None:
+    trader.action_execute("BTCUSDT", "BUY", 100.0, atr=10.0)
+    pf = trader._load_portfolio()
+    sl = pf["positions"][0]["stop_loss"]
+    monkeypatch.setattr(trader, "_get_price", lambda symbol: sl - 0.01)
+
+    monitor = trader.action_monitor()
+
+    assert monitor["writes"] is False
+    assert monitor["mode"] == "monitor_dry_run"
+    assert monitor["open_positions"] == 1
+    assert monitor["summary"]["would_close"] == 1
+    assert monitor["rows"][0]["trigger"] == "stop_loss"
+
+    # Critically, no state mutation: position still open after monitor.
+    pf_after = trader._load_portfolio()
+    assert len(pf_after["positions"]) == 1
+    assert pf_after["history"] == []
+
+
+def test_monitor_handles_missing_price_feed(trader, monkeypatch) -> None:
+    trader.action_execute("BTCUSDT", "BUY", 100.0, atr=10.0)
+    monkeypatch.setattr(trader, "_get_price", lambda symbol: None)
+
+    monitor = trader.action_monitor()
+
+    assert monitor["summary"]["no_price"] == 1
+    assert monitor["rows"][0]["trigger"] == "no_price"
+    assert monitor["rows"][0]["current"] is None
+
+
+def test_monitor_flags_trailing_breach_without_closing(trader, monkeypatch) -> None:
+    trader.action_execute("BTCUSDT", "BUY", 100.0, atr=10.0)
+    pf = trader._load_portfolio()
+    pos = pf["positions"][0]
+    pos["trailing_active"] = True
+    pos["peak_price"] = 110.0
+    trader._save_portfolio(pf)
+    # 110 * (1 - 40bps) = 109.56; price below that triggers trailing breach.
+    monkeypatch.setattr(trader, "_get_price", lambda symbol: 109.0)
+
+    monitor = trader.action_monitor()
+
+    assert monitor["rows"][0]["trigger"] == "trailing_stop"
+    assert monitor["summary"]["would_trail"] == 1
+    pf_after = trader._load_portfolio()
+    assert len(pf_after["positions"]) == 1  # still no mutation
