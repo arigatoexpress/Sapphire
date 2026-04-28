@@ -121,18 +121,20 @@ flowchart LR
 
 | Surface | Count | Detail |
 |---|---:|---|
-| Passing tests | **2,287** | 2,209 unit · 78 plugin |
-| Test files | **112** | `tests/unit/` |
-| Dashboard pages | **32** | Flask + SSE, basic-auth |
+| Passing tests | **3,380+** | 3,260+ unit · 130 plugin (`pytest tests/unit/ && pytest plugins/claw-sapphire/tests/`) |
+| Test files | **120+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
+| Dashboard pages | **32** | Flask + SSE, basic-auth, Gemini OODA panel on `/sovereign-thesis` |
 | Quant strategies | **7** | `lib/analytics/strategies.py` |
 | Pine strategies | **5** | `pine/standalone/` |
-| Plugin tools (registered · internal · deprecated) | **15 · 25 · 2** | `plugins/claw-sapphire/` |
-| LaunchAgents | **20** | `infra/launchagents/` |
+| Plugin tools (registered · internal · deprecated) | **15 · 26 · 2** | `plugins/claw-sapphire/`, includes the bounded `gemini_ooda` AI complement |
+| LaunchAgents | **20** | `infra/launchagents/` plus `ai.hermes.gateway` runtime |
 | Claude scheduled tasks | **21** | `~/.claude/scheduled-tasks/` |
+| Hermes Telegram skills | **16** | `~/.hermes/skills/sapphire/`, audited in `infra/hermes-sapphire-skills.yaml` |
 | Smart contracts | **2** | `contracts/*.sol` |
-| Inference tiers | **4** | GPU · Pi · Mac · Kimi Cloud |
+| Inference tiers | **4 + 1** | GPU · Pi · Mac · Kimi Cloud, plus the bounded Gemini OODA lane (dry-run-default) |
 | Content publishers | **4** | Substack · X · LinkedIn · Typefully |
 | Data providers wired | **13** | see §5 |
+| Production-readiness sweep | `scripts/ops/production_readiness_sweep.py` | self-hosted CI runner, no-spend posture, 49 pass / 3 warn / 0 fail external mode |
 
 ---
 
@@ -312,6 +314,30 @@ flowchart TD
 **Model aliases** — `fast` → nemotron-mini · `balanced` → hermes3:8b · `code` → gemma4 · `reason` → deepseek-r1:14b · `qwen-reason` → qwen3.5:9b · `deep` → qwen3:14b · `qwen3.6` → qwen3.6:27b · `cascade`/`moe` → nemotron-cascade-2 · `large` → qwen2.5:32b · `kimi` → kimi-cloud.
 
 **Sensitivity classifier** ([`plugins/claw-sapphire/lib/sensitivity_classifier.py`](plugins/claw-sapphire/lib/sensitivity_classifier.py)) blocks API keys, JWTs, SSNs, credit-card patterns, and known secret formats before any T4 egress.
+
+### 4.1 Bounded Gemini OODA lane (AI complement)
+
+The 4-tier mesh handles every routine inference. For the small set of prompts where a managed model adds value, the [`gemini_ooda`](plugins/claw-sapphire/tools/gemini_ooda.py) plugin tool is the audited door — *complement, not replace*.
+
+| Layer | Default | Live gate | Cap |
+|---|---|---|---|
+| Mode | `dry-run` (deterministic mock) | `SAPPHIRE_GEMINI_LIVE=1` env flag | n/a |
+| Sensitivity | passes the same regex classifier as T4 Kimi | identical `is_sensitive` block | n/a |
+| API key | not read | `GEMINI_API_KEY` from `~/.sapphire/secrets.env` | not echoed |
+| Per-call output | n/a | `MAX_OUTPUT_TOKENS_HARD = 4_096` | hard fail-closed |
+| Per-hour calls | n/a | `MAX_CALLS_PER_HOUR = 8` | hard fail-closed |
+| Per-month tokens | n/a | `MAX_TOKENS_PER_MONTH = 500_000` | hard fail-closed |
+| Cache | TTL configurable | `~/.cache/sapphire/gemini_ooda/` | yes |
+
+The dashboard surfaces a read-only OODA preview at [`/api/gemini-ooda`](services/dashboard/app.py) and renders an Observe / Orient / Decide / Act panel on `/sovereign-thesis`. Operator-side use is documented in [`docs/ops/gemini-ooda-synthesizer-runbook.md`](docs/ops/gemini-ooda-synthesizer-runbook.md). Hermes-side use is documented in `~/.hermes/skills/sapphire/gemini-ooda/SKILL.md` and registered in [`infra/hermes-sapphire-skills.yaml`](infra/hermes-sapphire-skills.yaml).
+
+### 4.2 Production-readiness posture
+
+Sapphire is operated under a strict "no-spend, local-CI-as-merge-evidence" posture:
+
+- **Self-hosted GitHub runner.** Hosted Actions are gated behind `vars.SAPPHIRE_RUNNER`; commits intentionally land with `[skip ci]` so the GitHub-paid runners never fire. The full local CI (`scripts/ops/local_ci_verify.py --verbose`) is the merge gate.
+- **Production-readiness sweep.** [`scripts/ops/production_readiness_sweep.py`](scripts/ops/production_readiness_sweep.py) probes repo state, all 20 LaunchAgents, local HTTP endpoints, the kill switch, autonomy-audit redaction, routine soaks, GitHub PR/issue queues, GCP/Vertex inventory, the Workspace threat-hygiene template, the Telegram bot, the Gemini live readiness probe, and bounded GCS/BigQuery write probes. The latest run (external mode) is `49 pass / 3 warn / 0 fail`; the three warnings are the routine soak gates and the manual Gemini-live live-call gate.
+- **Hermes runtime guard.** The Sapphire runtime quick-exec command guard is promoted to the live `ai.hermes.gateway` LaunchAgent with `SAPPHIRE_REPO_PATH` set; readiness is verified by [`scripts/ops/hermes_runtime_readiness.py`](scripts/ops/hermes_runtime_readiness.py).
 
 ---
 
@@ -568,6 +594,9 @@ curl -s http://127.0.0.1:18081/health
 # 5. Plugin tools (stdin JSON)
 echo '{"action":"quote","symbol":"BTC/USDT"}' | python3 plugins/claw-sapphire/tools/market.py
 echo '{"action":"predict"}'                    | python3 plugins/claw-sapphire/tools/internal/predict.py
+echo '{"action":"monitor"}'                    | python3 plugins/claw-sapphire/tools/internal/paper_trader.py   # read-only SL/TP preview
+echo '{"action":"synthesize","topic":"BTC regime","mode":"dry-run"}' \
+                                               | python3 plugins/claw-sapphire/tools/gemini_ooda.py             # bounded Gemini OODA, dry-run by default
 
 # 6. Content engine
 python3 -m lib.content generate
