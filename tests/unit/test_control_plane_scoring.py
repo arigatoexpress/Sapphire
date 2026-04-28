@@ -389,11 +389,31 @@ def test_score_news_empty_input_returns_empty():
 
 def test_score_news_now_defaults_to_current_time(monkeypatch):
     """If no `now` is passed, score_news uses the current UTC time."""
+    with _control_plane_app_namespace():
+        from app.scoring import NewsItem as _NewsItem  # noqa: F401
+        import app.scoring as scoring_mod
+
+    fixed_now = datetime(2026, 4, 28, 12, 0, 0, tzinfo=UTC)
+
+    class _FrozenDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return fixed_now if tz is None else fixed_now.astimezone(tz)
+
+    monkeypatch.setattr(scoring_mod, "datetime", _FrozenDatetime)
+
     config = _config(aster=["BTC"])
-    items = [_item("Bitcoin rally", age_hours=0.001)]
+    fresh_item = NewsItem(
+        id="n1",
+        title="Bitcoin rally",
+        url="https://example.test/n1",
+        summary="",
+        published_at=fixed_now - timedelta(seconds=3),
+        source=_source(reliability=0.8),
+    )
 
     # Should not raise and should produce a scored result for a fresh item.
-    scored = score_news(items, config, [], min_alpha_score=0, max_news_age_hours=24)
+    scored = score_news([fresh_item], config, [], min_alpha_score=0, max_news_age_hours=24)
 
     assert len(scored) == 1
 
