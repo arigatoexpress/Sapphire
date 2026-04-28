@@ -24,3 +24,8 @@
 /lib/portfolio/robinhood.py @arigatoexpress
 /lib/trading/ @arigatoexpress
 /services/alpha/ @arigatoexpress
+
+# Telegram operator console — fail-closed safety surface, second reviewer required.
+/plugins/claw-sapphire/tools/internal/_telegram_safety.py @arigatoexpress
+/plugins/claw-sapphire/tools/internal/sapphire_pm_bot.py @arigatoexpress
+/plugins/claw-sapphire/tools/sapphire_pm_bot.py @arigatoexpress

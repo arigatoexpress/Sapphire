@@ -8,7 +8,7 @@
 
 [![CI](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
 [![Security](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml)
-[![Tests](https://img.shields.io/badge/tests-3%2C570%2B%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-4%2C045%2B%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3776ab?logo=python&logoColor=white)](https://www.python.org/)
 [![Solidity](https://img.shields.io/badge/solidity-0.8.x-363636?logo=solidity&logoColor=white)](contracts/)
 [![Mesh](https://img.shields.io/badge/mesh-tailscale-242424?logo=tailscale&logoColor=white)](infra/tailscale-acl.json)
@@ -121,8 +121,8 @@ flowchart LR
 
 | Surface | Count | Detail |
 |---|---:|---|
-| Passing tests | **3,570+** | 3,440+ unit · 130 plugin (`python scripts/ops/test_inventory.py --check-readme`) |
-| Test files | **195+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
+| Passing tests | **4,045+** | 3,775+ unit · 270 plugin (`python scripts/ops/test_inventory.py --check-readme`) |
+| Test files | **211+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
 | Dashboard pages | **32** | Flask + SSE, basic-auth, Gemini OODA panel on `/sovereign-thesis` |
 | Quant strategies | **7** | `lib/analytics/strategies.py` |
 | Pine strategies | **5** | `pine/standalone/` |
@@ -608,10 +608,10 @@ python3 -m lib.content publish
 ## 12. Testing & QA
 
 ```bash
-# Unit tests — 3,462 passing
+# Unit tests — 3,754 passing
 /usr/local/bin/python3 -m pytest tests/unit/ --tb=short -q
 
-# Plugin tests — 78 passing
+# Plugin tests — 270 passing
 /usr/local/bin/python3 -m pytest plugins/claw-sapphire/tests/ -q
 
 # Lint
