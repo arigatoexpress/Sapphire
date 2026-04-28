@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "name": "dashboard_public_demo_redactions",
+  "description": "Buyer-safe redaction and export-readiness manifest for Sapphire dashboard public-demo artifacts.",
+  "safe_routes": [
+    {"path": "/", "label": "Overview", "filename": "overview.html"},
+    {"path": "/architecture", "label": "Operations", "filename": "architecture.html"},
+    {"path": "/production-readiness", "label": "Production Readiness", "filename": "production-readiness.html"},
+    {"path": "/diligence", "label": "Diligence Packet", "filename": "diligence.html"},
+    {"path": "/sovereign-thesis", "label": "Sovereign Thesis", "filename": "sovereign-thesis.html"},
+    {"path": "/threat-intel", "label": "Threat Intel", "filename": "threat-intel.html"},
+    {"path": "/observability", "label": "Observability", "filename": "observability.html"}
+  ],
+  "scan_sources": [
+    "web/acquirer/index.html",
+    "docs/diligence/00-executive-summary.md",
+    "docs/diligence/01-architecture.md",
+    "docs/diligence/02-product-surfaces.md",
+    "docs/diligence/03-security-posture.md",
+    "docs/diligence/04-data-and-models.md",
+    "docs/diligence/05-operations.md",
+    "docs/diligence/06-financials-and-spend.md",
+    "docs/diligence/07-roadmap.md",
+    "docs/diligence/08-incidents-and-postmortems.md",
+    "docs/diligence/09-team-and-process.md",
+    "docs/diligence/screenshots/README.md"
+  ],
+  "placeholder_screenshot_dirs": [
+    "web/acquirer/assets/screenshots"
+  ],
+  "sensitive_patterns": [
+    {
+      "name": "absolute_user_path",
+      "pattern": "/Users/[^\\s)\\]\"'`]+",
+      "replacement": "~"
+    },
+    {
+      "name": "secret_assignment",
+      "pattern": "(?i)\\b(api[_-]?key|token|secret|password|private[_-]?key|auth[_-]?password)\\b\\s*[:=]\\s*[^,\\s;\\n]+",
+      "replacement": "\\1=[redacted]"
+    },
+    {
+      "name": "bearer_token",
+      "pattern": "(?i)\\bbearer\\s+[a-z0-9._~+/=-]{8,}",
+      "replacement": "Bearer [redacted]"
+    },
+    {
+      "name": "basic_auth_url",
+      "pattern": "(https?://)[^/@\\s:]+:[^/@\\s]+@",
+      "replacement": "\\1[redacted]@"
+    },
+    {
+      "name": "private_email",
+      "pattern": "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b",
+      "replacement": "[email-redacted]"
+    },
+    {
+      "name": "operator_possessive",
+      "pattern": "\\bAri's\\b",
+      "replacement": "the operator's"
+    },
+    {
+      "name": "operator_name",
+      "pattern": "\\bAri\\b",
+      "replacement": "the operator"
+    }
+  ],
+  "forbidden_after_redaction": [
+    "MOONSHOT_API_KEY=",
+    "KIMI_CLAW_BOT_TOKEN=",
+    "AUTH_PASSWORD=",
+    "TELEGRAM_BOT_TOKEN=",
+    "Bearer ",
+    "gho_"
+  ],
+  "output_files": {
+    "plan": "dashboard-public-demo-plan.json",
+    "redaction_report": "dashboard-public-demo-redaction-report.json"
+  }
+}
