@@ -38,9 +38,20 @@ def check_priority(priority: dict) -> dict:
         # Test if dashboard / returns 200
         try:
             r = subprocess.run(
-                ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "-u", "sapphire:sapphire",
-                 "http://127.0.0.1:8080/"],
-                capture_output=True, text=True, timeout=5,
+                [
+                    "curl",
+                    "-s",
+                    "-o",
+                    "/dev/null",
+                    "-w",
+                    "%{http_code}",
+                    "-u",
+                    "sapphire:sapphire",
+                    "http://127.0.0.1:8080/",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             code = r.stdout.strip()
             result["status"] = "fixed" if code == "200" else f"still_broken (HTTP {code})"
@@ -54,9 +65,18 @@ def check_priority(priority: dict) -> dict:
         port = 8050 if "cointracker" in service else 8060
         try:
             r = subprocess.run(
-                ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
-                 f"http://127.0.0.1:{port}/"],
-                capture_output=True, text=True, timeout=5,
+                [
+                    "curl",
+                    "-s",
+                    "-o",
+                    "/dev/null",
+                    "-w",
+                    "%{http_code}",
+                    f"http://127.0.0.1:{port}/",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             code = r.stdout.strip()
             result["status"] = "needs_auth" if code == "200" else f"has_auth ({code})"
@@ -71,9 +91,18 @@ def check_priority(priority: dict) -> dict:
         if "Regional" in action:
             try:
                 r = subprocess.run(
-                    ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
-                     "http://127.0.0.1:8060/"],
-                    capture_output=True, text=True, timeout=5,
+                    [
+                        "curl",
+                        "-s",
+                        "-o",
+                        "/dev/null",
+                        "-w",
+                        "%{http_code}",
+                        "http://127.0.0.1:8060/",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
                 )
                 result["status"] = "running" if r.stdout.strip() == "200" else "not_running"
             except Exception:
@@ -92,13 +121,19 @@ def run_qa_check() -> dict:
     priorities = report.get("global_priorities", [])
     results = []
 
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"  QA PRIORITY CHECK — {datetime.now(UTC).strftime('%Y-%m-%d')}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     for p in priorities:
         check = check_priority(p)
-        icon = "✅" if check["status"] in ("fixed", "running", "has_auth") else "❌" if "broken" in check["status"] or "needs" in check["status"] else "⚠️"
+        icon = (
+            "✅"
+            if check["status"] in ("fixed", "running", "has_auth")
+            else "❌"
+            if "broken" in check["status"] or "needs" in check["status"]
+            else "⚠️"
+        )
         print(f"  {icon} [{p.get('impact', '?')}] {p['action']}")
         print(f"     Status: {check['status']}")
         results.append({**p, "check": check})
@@ -128,6 +163,7 @@ def update_qa_report(results: dict) -> None:
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--verify", action="store_true")
     parser.add_argument("--update", action="store_true")

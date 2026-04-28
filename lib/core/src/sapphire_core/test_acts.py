@@ -385,8 +385,8 @@ async def run_all_tests():
     ════════════════════════════════════════════════════
     📊 TEST RESULTS
     ════════════════════════════════════════════════════
-    ✅ Passed: {results['passed']}
-    ❌ Failed: {results['failed']}
+    ✅ Passed: {results["passed"]}
+    ❌ Failed: {results["failed"]}
     ⏱️  Duration: {duration:.2f}s
     ════════════════════════════════════════════════════
     """

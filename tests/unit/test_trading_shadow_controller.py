@@ -42,13 +42,12 @@ def test_shadow_controller_promotes_only_paper_manual_candidates():
     assert report["candidates"][0]["manual_order_candidate"]["execute_flag_included"] is False
     assert "--execute" not in report["candidates"][0]["manual_order_candidate"]["command"]
     assert all(
-        draft["execution_enabled"] is False
-        for draft in report["candidates"][0]["order_drafts"]
+        draft["execution_enabled"] is False for draft in report["candidates"][0]["order_drafts"]
     )
-    assert {
-        action["surface"]
-        for action in report["blocked_live_actions"]
-    } >= {"scheduler_live_submit", "tradingview_webhook_live_submit"}
+    assert {action["surface"] for action in report["blocked_live_actions"]} >= {
+        "scheduler_live_submit",
+        "tradingview_webhook_live_submit",
+    }
 
 
 def test_shadow_controller_blocks_missing_robinhood_or_live_market_data():

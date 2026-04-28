@@ -37,9 +37,9 @@ POLICY_FILE = Path(__file__).parent / "sandbox_policy.json"
 
 
 class GuardAction(Enum):
-    ALLOW    = "allow"
-    BLOCK    = "block"     # Always denied — dangerous command
-    CONFIRM  = "confirm"   # Allowed after confirmation
+    ALLOW = "allow"
+    BLOCK = "block"  # Always denied — dangerous command
+    CONFIRM = "confirm"  # Allowed after confirmation
 
 
 @dataclass
@@ -79,11 +79,12 @@ def _normalize_command(cmd: str) -> str:
     Also collapses backtick command substitution markers.
     """
     import re as _re
+
     # Remove ${VAR} and $VAR style shell variable references
-    cmd = _re.sub(r'\$\{[^}]*\}', ' ', cmd)
-    cmd = _re.sub(r'\$[A-Za-z_][A-Za-z0-9_]*', ' ', cmd)
+    cmd = _re.sub(r"\$\{[^}]*\}", " ", cmd)
+    cmd = _re.sub(r"\$[A-Za-z_][A-Za-z0-9_]*", " ", cmd)
     # Remove backtick command substitution delimiters
-    cmd = cmd.replace('`', ' ')
+    cmd = cmd.replace("`", " ")
     return " ".join(cmd.strip().split()).lower()
 
 
@@ -144,8 +145,8 @@ class CommandGuard:
             return GuardResult(GuardAction.ALLOW, command, "allow_all in policy")
 
         normalized = _normalize_command(command)
-        dangerous  = self._policy.get("dangerous_commands", [])
-        confirm    = self._policy.get("requires_confirmation", [])
+        dangerous = self._policy.get("dangerous_commands", [])
+        confirm = self._policy.get("requires_confirmation", [])
 
         # ── Block check (hard deny) ───────────────────────────────────────────
         for pattern in dangerous:
@@ -207,9 +208,7 @@ class CommandGuard:
                 )
             approved = confirm_fn(command, result)
             if not approved:
-                raise PermissionError(
-                    f"[sandbox] Command not approved: {command!r}"
-                )
+                raise PermissionError(f"[sandbox] Command not approved: {command!r}")
 
         log.debug("CommandGuard[%s] executing: %s", self.component, command)
         return subprocess.run(
@@ -223,24 +222,25 @@ class CommandGuard:
     def audit_commands(self, commands: list[str]) -> dict:
         """Audit a list of commands and return a summary report."""
         results = self.check_batch(commands)
-        blocked  = [r for r in results if r.blocked]
-        confirm  = [r for r in results if r.requires_confirmation]
-        allowed  = [r for r in results if r.allowed]
+        blocked = [r for r in results if r.blocked]
+        confirm = [r for r in results if r.requires_confirmation]
+        allowed = [r for r in results if r.allowed]
 
         return {
-            "component":    self.component,
-            "total":        len(results),
-            "allowed":      len(allowed),
+            "component": self.component,
+            "total": len(results),
+            "allowed": len(allowed),
             "requires_confirmation": len(confirm),
-            "blocked":      len(blocked),
-            "blocked_commands":  [(r.command, r.matched_rule) for r in blocked],
-            "confirm_commands":  [(r.command, r.matched_rule) for r in confirm],
+            "blocked": len(blocked),
+            "blocked_commands": [(r.command, r.matched_rule) for r in blocked],
+            "confirm_commands": [(r.command, r.matched_rule) for r in confirm],
         }
 
 
 # ─── Module-level convenience ─────────────────────────────────────────────────
 
 _guards: dict[str, CommandGuard] = {}
+
 
 def get_guard(component: str) -> CommandGuard:
     """Get or create a singleton CommandGuard for a component."""

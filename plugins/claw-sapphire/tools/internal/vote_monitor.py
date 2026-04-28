@@ -64,7 +64,9 @@ def _call_cli(args: list[str]) -> str | None:
     try:
         result = subprocess.run(
             ["uv", "run", "python", "-m", "app.cli"] + args,
-            capture_output=True, text=True, timeout=30,
+            capture_output=True,
+            text=True,
+            timeout=30,
             cwd=str(RIW_DIR),
         )
         return result.stdout if result.returncode == 0 else result.stderr
@@ -119,7 +121,12 @@ def action_digest(profile: str = "conservative", **balances) -> dict:
         path = VOTE_DATA_DIR / f"digest_{profile}_{ts}.md"
         text = data.get("text", data.get("digest", json.dumps(data, indent=2)))
         path.write_text(text if isinstance(text, str) else json.dumps(text, indent=2))
-        return {"success": True, "profile": profile, "saved_to": str(path), "preview": str(text)[:1000]}
+        return {
+            "success": True,
+            "profile": profile,
+            "saved_to": str(path),
+            "preview": str(text)[:1000],
+        }
     return {"success": False, "error": data.get("error", "Unknown") if data else "API unreachable"}
 
 
@@ -150,7 +157,9 @@ def main():
 
     action = params.get("action", "snapshot")
     profile = params.get("profile", "conservative")
-    balances = {k: params.get(k, DEFAULT_BALANCES.get(k)) for k in ["blackhole", "supernova", "fullsail"]}
+    balances = {
+        k: params.get(k, DEFAULT_BALANCES.get(k)) for k in ["blackhole", "supernova", "fullsail"]
+    }
 
     if action == "snapshot":
         result = action_snapshot()

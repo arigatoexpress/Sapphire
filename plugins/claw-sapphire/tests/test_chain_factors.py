@@ -26,9 +26,7 @@ TOOLS = Path(__file__).parent.parent / "tools"
 sys.path.insert(0, str(TOOLS))
 sys.path.insert(0, str(TOOLS.parent / "lib"))
 
-_spec = importlib.util.spec_from_file_location(
-    "predict", TOOLS / "internal" / "predict.py"
-)
+_spec = importlib.util.spec_from_file_location("predict", TOOLS / "internal" / "predict.py")
 predict = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(predict)
 
@@ -40,9 +38,7 @@ _spec.loader.exec_module(predict)
 
 def test_chain_factor_deltas_high_positive_funding_z_adds_bear():
     """Crowded longs (funding_z >> 0) bias toward bear."""
-    bull, bear, factors = predict.chain_factor_deltas(
-        "BTC", funding_z=2.5, oi_change_pct=None
-    )
+    bull, bear, factors = predict.chain_factor_deltas("BTC", funding_z=2.5, oi_change_pct=None)
     assert bull == 0.0
     assert bear == 0.5
     assert any("FundZ" in f for f in factors)
@@ -51,9 +47,7 @@ def test_chain_factor_deltas_high_positive_funding_z_adds_bear():
 
 def test_chain_factor_deltas_high_negative_funding_z_adds_bull():
     """Crowded shorts (funding_z << 0) bias toward bull."""
-    bull, bear, factors = predict.chain_factor_deltas(
-        "ETH", funding_z=-2.0, oi_change_pct=None
-    )
+    bull, bear, factors = predict.chain_factor_deltas("ETH", funding_z=-2.0, oi_change_pct=None)
     assert bull == 0.5
     assert bear == 0.0
     assert any("FundZ" in f for f in factors)
@@ -62,9 +56,7 @@ def test_chain_factor_deltas_high_negative_funding_z_adds_bull():
 
 def test_chain_factor_deltas_small_funding_z_returns_zero():
     """|z| under 1.5 is treated as noise — no contribution."""
-    bull, bear, factors = predict.chain_factor_deltas(
-        "BTC", funding_z=0.8, oi_change_pct=None
-    )
+    bull, bear, factors = predict.chain_factor_deltas("BTC", funding_z=0.8, oi_change_pct=None)
     assert bull == 0.0
     assert bear == 0.0
     assert factors == []
@@ -72,23 +64,17 @@ def test_chain_factor_deltas_small_funding_z_returns_zero():
 
 def test_chain_factor_deltas_funding_z_at_threshold_is_noise():
     """Strict greater-than at the |z|=1.5 boundary — exactly 1.5 contributes nothing."""
-    bull, bear, _ = predict.chain_factor_deltas(
-        "BTC", funding_z=1.5, oi_change_pct=None
-    )
+    bull, bear, _ = predict.chain_factor_deltas("BTC", funding_z=1.5, oi_change_pct=None)
     assert bull == 0.0
     assert bear == 0.0
-    bull, bear, _ = predict.chain_factor_deltas(
-        "BTC", funding_z=-1.5, oi_change_pct=None
-    )
+    bull, bear, _ = predict.chain_factor_deltas("BTC", funding_z=-1.5, oi_change_pct=None)
     assert bull == 0.0
     assert bear == 0.0
 
 
 def test_chain_factor_deltas_oi_amplifies_bear_when_funding_is_bearish():
     """Rising OI in a crowded-long context = late-cycle long crowding -> bear."""
-    bull, bear, factors = predict.chain_factor_deltas(
-        "SOL", funding_z=2.0, oi_change_pct=8.0
-    )
+    bull, bear, factors = predict.chain_factor_deltas("SOL", funding_z=2.0, oi_change_pct=8.0)
     # funding (+0.5 bear) + OI amplifying bear (+0.5) = 1.0 bear.
     assert bull == 0.0
     assert bear == 1.0
@@ -98,9 +84,7 @@ def test_chain_factor_deltas_oi_amplifies_bear_when_funding_is_bearish():
 
 def test_chain_factor_deltas_oi_amplifies_bull_when_funding_is_bullish():
     """Rising OI in a crowded-short context amplifies bull."""
-    bull, bear, factors = predict.chain_factor_deltas(
-        "SOL", funding_z=-2.0, oi_change_pct=8.0
-    )
+    bull, bear, factors = predict.chain_factor_deltas("SOL", funding_z=-2.0, oi_change_pct=8.0)
     assert bull == 1.0
     assert bear == 0.0
     assert any("OI" in f for f in factors)
@@ -108,9 +92,7 @@ def test_chain_factor_deltas_oi_amplifies_bull_when_funding_is_bullish():
 
 def test_chain_factor_deltas_oi_alone_without_dominant_context_does_nothing():
     """OI is amplification-only — with no funding lean it adds zero."""
-    bull, bear, factors = predict.chain_factor_deltas(
-        "BTC", funding_z=None, oi_change_pct=12.0
-    )
+    bull, bear, factors = predict.chain_factor_deltas("BTC", funding_z=None, oi_change_pct=12.0)
     assert bull == 0.0
     assert bear == 0.0
     assert factors == []
@@ -118,9 +100,7 @@ def test_chain_factor_deltas_oi_alone_without_dominant_context_does_nothing():
 
 def test_chain_factor_deltas_oi_below_threshold_does_nothing():
     """OI under +5% does not amplify."""
-    bull, bear, factors = predict.chain_factor_deltas(
-        "BTC", funding_z=2.0, oi_change_pct=2.0
-    )
+    bull, bear, factors = predict.chain_factor_deltas("BTC", funding_z=2.0, oi_change_pct=2.0)
     # Only the funding contribution survives.
     assert bull == 0.0
     assert bear == 0.5
@@ -128,9 +108,7 @@ def test_chain_factor_deltas_oi_below_threshold_does_nothing():
 
 
 def test_chain_factor_deltas_both_none_returns_zero():
-    bull, bear, factors = predict.chain_factor_deltas(
-        "BTC", funding_z=None, oi_change_pct=None
-    )
+    bull, bear, factors = predict.chain_factor_deltas("BTC", funding_z=None, oi_change_pct=None)
     assert bull == 0.0
     assert bear == 0.0
     assert factors == []
@@ -138,13 +116,9 @@ def test_chain_factor_deltas_both_none_returns_zero():
 
 def test_chain_factor_deltas_caps_each_contribution_at_half():
     """Funding cap is 0.5 even at extreme z — no single factor can flip a direction."""
-    bull, bear, _ = predict.chain_factor_deltas(
-        "BTC", funding_z=99.0, oi_change_pct=None
-    )
+    bull, bear, _ = predict.chain_factor_deltas("BTC", funding_z=99.0, oi_change_pct=None)
     assert bear == 0.5
-    bull, bear, _ = predict.chain_factor_deltas(
-        "BTC", funding_z=-99.0, oi_change_pct=None
-    )
+    bull, bear, _ = predict.chain_factor_deltas("BTC", funding_z=-99.0, oi_change_pct=None)
     assert bull == 0.5
 
 
@@ -167,25 +141,35 @@ def test_read_chain_features_returns_none_on_malformed_json(tmp_path, monkeypatc
 
 def test_read_chain_features_returns_none_when_symbol_absent(tmp_path, monkeypatch):
     f = tmp_path / "chain.json"
-    f.write_text(json.dumps({
-        "funding": {"perps": [
-            {"coin": "ETH", "funding_z": 2.0, "oi_change_pct": 3.0},
-        ]}
-    }))
+    f.write_text(
+        json.dumps(
+            {
+                "funding": {
+                    "perps": [
+                        {"coin": "ETH", "funding_z": 2.0, "oi_change_pct": 3.0},
+                    ]
+                }
+            }
+        )
+    )
     monkeypatch.setattr(predict, "CHAIN_LATEST_FILE", f)
     assert predict._read_chain_features("BTC") == (None, None)
 
 
-def test_read_chain_features_extracts_values_from_funding_perps_shape(
-    tmp_path, monkeypatch
-):
+def test_read_chain_features_extracts_values_from_funding_perps_shape(tmp_path, monkeypatch):
     f = tmp_path / "chain.json"
-    f.write_text(json.dumps({
-        "funding": {"perps": [
-            {"coin": "BTC", "funding_z": 1.8, "oi_change_pct": 7.2},
-            {"coin": "ETH", "funding_z": -0.3, "oi_change_pct": 1.0},
-        ]}
-    }))
+    f.write_text(
+        json.dumps(
+            {
+                "funding": {
+                    "perps": [
+                        {"coin": "BTC", "funding_z": 1.8, "oi_change_pct": 7.2},
+                        {"coin": "ETH", "funding_z": -0.3, "oi_change_pct": 1.0},
+                    ]
+                }
+            }
+        )
+    )
     monkeypatch.setattr(predict, "CHAIN_LATEST_FILE", f)
     assert predict._read_chain_features("BTC") == (1.8, 7.2)
     assert predict._read_chain_features("ETH") == (-0.3, 1.0)
@@ -194,11 +178,15 @@ def test_read_chain_features_extracts_values_from_funding_perps_shape(
 def test_read_chain_features_extracts_from_per_symbol_shape(tmp_path, monkeypatch):
     """Future-proof: adapter accepts a ``per_symbol`` keyed dict too."""
     f = tmp_path / "chain.json"
-    f.write_text(json.dumps({
-        "per_symbol": {
-            "SOL": {"funding_z": 2.4, "oi_change_pct": 9.0},
-        }
-    }))
+    f.write_text(
+        json.dumps(
+            {
+                "per_symbol": {
+                    "SOL": {"funding_z": 2.4, "oi_change_pct": 9.0},
+                }
+            }
+        )
+    )
     monkeypatch.setattr(predict, "CHAIN_LATEST_FILE", f)
     assert predict._read_chain_features("SOL") == (2.4, 9.0)
 
@@ -221,11 +209,17 @@ def test_read_chain_features_never_raises(tmp_path, monkeypatch):
 def test_read_chain_features_tolerates_non_numeric_values(tmp_path, monkeypatch):
     """String/null funding values are skipped, not crashed on."""
     f = tmp_path / "chain.json"
-    f.write_text(json.dumps({
-        "funding": {"perps": [
-            {"coin": "BTC", "funding_z": "not-a-number", "oi_change_pct": None},
-        ]}
-    }))
+    f.write_text(
+        json.dumps(
+            {
+                "funding": {
+                    "perps": [
+                        {"coin": "BTC", "funding_z": "not-a-number", "oi_change_pct": None},
+                    ]
+                }
+            }
+        )
+    )
     monkeypatch.setattr(predict, "CHAIN_LATEST_FILE", f)
     assert predict._read_chain_features("BTC") == (None, None)
 
@@ -301,9 +295,7 @@ def _read_records(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
-def test_action_predict_default_off_unchanged_record(
-    isolated_predictions_file, monkeypatch
-):
+def test_action_predict_default_off_unchanged_record(isolated_predictions_file, monkeypatch):
     """With the flag unset, action_predict must produce the same record as legacy.
 
     We assert bull_score / bear_score / factor list show no chain-factor entries
@@ -351,9 +343,7 @@ def test_action_predict_flag_on_chain_features_present_applies_deltas(
     threshold contract. We only assert on the score deltas and the factor list.
     """
     monkeypatch.setenv("SAPPHIRE_PREDICT_USE_CHAIN_FACTORS", "1")
-    monkeypatch.setattr(
-        predict, "_read_chain_features", lambda sym: (2.5, 8.0)
-    )
+    monkeypatch.setattr(predict, "_read_chain_features", lambda sym: (2.5, 8.0))
 
     fake_profiles = {"BTC": _FakeProfile(symbol="BTC")}
     fake_module = type(sys)("technical_analysis")
@@ -416,9 +406,7 @@ def test_action_predict_flag_only_one_chain_value_skips_deltas(
     assert "OI" not in rec["reasoning"]
 
 
-def test_action_predict_env_flag_zero_explicit(
-    isolated_predictions_file, monkeypatch
-):
+def test_action_predict_env_flag_zero_explicit(isolated_predictions_file, monkeypatch):
     """Explicit ``0`` is identical to the unset case."""
     monkeypatch.setenv("SAPPHIRE_PREDICT_USE_CHAIN_FACTORS", "0")
     monkeypatch.setattr(
@@ -437,9 +425,7 @@ def test_action_predict_env_flag_zero_explicit(
     assert "Bear=2.0" in rec["reasoning"]
 
 
-def test_action_predict_baseline_record_matches_with_and_without_flag(
-    tmp_path, monkeypatch
-):
+def test_action_predict_baseline_record_matches_with_and_without_flag(tmp_path, monkeypatch):
     """End-to-end equivalence: same inputs, two writes, only the flag differs.
 
     Compares the two records' bull/bear/factors-derived state. Skips the

@@ -110,9 +110,14 @@ def action_rates() -> dict:
         return {"success": False, "rates": {}, "error": _NO_KEY_MSG}
     rates = {}
     for label, sid in [
-        ("Fed Funds", "FEDFUNDS"), ("3M Treasury", "DTB3"), ("2Y Treasury", "DGS2"),
-        ("5Y Treasury", "DGS5"), ("10Y Treasury", "DGS10"), ("30Y Treasury", "DGS30"),
-        ("30Y Mortgage", "MORTGAGE30US"), ("Prime Rate", "DPRIME"),
+        ("Fed Funds", "FEDFUNDS"),
+        ("3M Treasury", "DTB3"),
+        ("2Y Treasury", "DGS2"),
+        ("5Y Treasury", "DGS5"),
+        ("10Y Treasury", "DGS10"),
+        ("30Y Treasury", "DGS30"),
+        ("30Y Mortgage", "MORTGAGE30US"),
+        ("Prime Rate", "DPRIME"),
     ]:
         data = _latest(sid, fred)
         rates[label] = f"{data.get('value')}%" if data.get("value") is not None else "N/A"
@@ -126,14 +131,21 @@ def action_housing() -> dict:
         return {"success": False, "housing": {}, "error": _NO_KEY_MSG}
     metrics = {}
     for label, sid in [
-        ("Housing Starts (K)", "HOUST"), ("Building Permits (K)", "PERMIT"),
-        ("New Home Sales (K)", "HSN1F"), ("Existing Home Sales (M)", "EXHOSLUSM495S"),
-        ("Median Home Price", "MSPUS"), ("30Y Mortgage %", "MORTGAGE30US"),
+        ("Housing Starts (K)", "HOUST"),
+        ("Building Permits (K)", "PERMIT"),
+        ("New Home Sales (K)", "HSN1F"),
+        ("Existing Home Sales (M)", "EXHOSLUSM495S"),
+        ("Median Home Price", "MSPUS"),
+        ("30Y Mortgage %", "MORTGAGE30US"),
         ("Case-Shiller Index", "CSUSHPINSA"),
     ]:
         data = _latest(sid, fred)
         metrics[label] = {"value": data.get("value"), "date": data.get("date")}
-    return {"success": True, "housing": metrics, "note": "Key housing indicators for Texas Home Outlet market analysis"}
+    return {
+        "success": True,
+        "housing": metrics,
+        "note": "Key housing indicators for Texas Home Outlet market analysis",
+    }
 
 
 def action_series(series_id: str, periods: int = 12) -> dict:
@@ -150,7 +162,10 @@ def action_series(series_id: str, periods: int = 12) -> dict:
             "title": info.get("title", series_id),
             "frequency": info.get("frequency", "?"),
             "units": info.get("units", "?"),
-            "data": [{"date": idx.strftime("%Y-%m-%d"), "value": round(float(v), 4)} for idx, v in s.items()],
+            "data": [
+                {"date": idx.strftime("%Y-%m-%d"), "value": round(float(v), 4)}
+                for idx, v in s.items()
+            ],
         }
     except Exception as e:
         return {"error": str(e)[:200]}

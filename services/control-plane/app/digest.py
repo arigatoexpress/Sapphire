@@ -72,7 +72,7 @@ def format_digest_message(
         safe_summary = html.escape(_trim(summary, 240)) if summary else ""
         mentions = _mentions_line(chat_config, f"{item.title} {summary or ''}")
 
-        lines.append(f"{idx}. <a href=\"{safe_url}\">{safe_title}</a>")
+        lines.append(f'{idx}. <a href="{safe_url}">{safe_title}</a>')
         lines.append(
             f"   {safe_source} | Alpha {scored.alpha_score}/100 | {scored.bias} ({scored.confidence})"
         )
@@ -105,7 +105,9 @@ def format_alpha_stream_message(
     if isinstance(generated_at, str) and generated_at.strip():
         stamp = f"<i>{html.escape(generated_at.replace('T', ' ').replace('+00:00', ' UTC'))}</i>"
     watchlist = html.escape(_render_watchlist(chat_config))
-    summary = alpha_stream.get("summary") if isinstance(alpha_stream.get("summary"), Mapping) else {}
+    summary = (
+        alpha_stream.get("summary") if isinstance(alpha_stream.get("summary"), Mapping) else {}
+    )
     items = alpha_stream.get("items") if isinstance(alpha_stream.get("items"), Sequence) else []
     routes = alpha_stream.get("routes") if isinstance(alpha_stream.get("routes"), Mapping) else {}
 
@@ -135,7 +137,7 @@ def format_alpha_stream_message(
         watch_hits = [str(a) for a in (raw.get("watchlist_asset_hits") or []) if str(a).strip()]
         actionability = html.escape(str(raw.get("actionability") or "monitor"))
         targets = [str(s) for s in (raw.get("target_streams") or []) if str(s).strip()]
-        lines.append(f"{idx}. <a href=\"{safe_url}\">{safe_title}</a>")
+        lines.append(f'{idx}. <a href="{safe_url}">{safe_title}</a>')
         lines.append(f"   {safe_source} | Alpha {score}/100 | {bias} ({confidence})")
         if assets:
             lines.append(f"   Assets: {html.escape(', '.join(assets[:6]))}")

@@ -40,6 +40,7 @@ if str(_EVT_PATH) not in _sys.path:
     _sys.path.insert(0, str(_EVT_PATH))
 try:
     from event_bus import get_bus as _get_event_bus
+
     _EVENT_BUS = _get_event_bus(source="correlation")
 except Exception:
     _EVENT_BUS = None
@@ -48,23 +49,23 @@ except Exception:
 # Note: HYPE and PENGU are not available on yfinance; they are covered by watchdog.yaml
 DEFAULT_SYMBOLS = {
     # Crypto
-    "BTC":  "BTC-USD",
-    "ETH":  "ETH-USD",
-    "SOL":  "SOL-USD",
-    "ZEC":  "ZEC-USD",
+    "BTC": "BTC-USD",
+    "ETH": "ETH-USD",
+    "SOL": "SOL-USD",
+    "ZEC": "ZEC-USD",
     # Equities
-    "SPY":  "SPY",
-    "QQQ":  "QQQ",
+    "SPY": "SPY",
+    "QQQ": "QQQ",
     # Commodities
-    "GLD":  "GLD",
-    "SLV":  "SLV",
-    "USO":  "USO",
-    "URA":  "URA",
+    "GLD": "GLD",
+    "SLV": "SLV",
+    "USO": "USO",
+    "URA": "URA",
     "COPX": "COPX",
     # Macro
-    "DXY":  "DX-Y.NYB",
-    "VIX":  "^VIX",
-    "TNX":  "^TNX",
+    "DXY": "DX-Y.NYB",
+    "VIX": "^VIX",
+    "TNX": "^TNX",
 }
 
 
@@ -239,6 +240,7 @@ def _fetch_prices(symbols: dict[str, str], days: int = 180) -> pd.DataFrame:
     failures: dict[str, str] = {}
     try:
         import yfinance as yf
+
         logging.getLogger("yfinance").setLevel(logging.CRITICAL)
     except Exception:
         yf = None
@@ -271,7 +273,9 @@ def _fetch_prices(symbols: dict[str, str], days: int = 180) -> pd.DataFrame:
             openbb = _fetch_prices_openbb(missing, days=days)
             for label in missing:
                 if label in openbb.columns:
-                    frames[label] = pd.to_numeric(openbb[label], errors="coerce").dropna().rename(label)
+                    frames[label] = (
+                        pd.to_numeric(openbb[label], errors="coerce").dropna().rename(label)
+                    )
             missing = {label: ticker for label, ticker in symbols.items() if label not in frames}
         except Exception as exc:
             _publish_refresh_warning(
@@ -283,9 +287,13 @@ def _fetch_prices(symbols: dict[str, str], days: int = 180) -> pd.DataFrame:
     if missing and stale_cached is not None:
         stale_available = [label for label in missing if label in stale_cached.columns]
         for label in stale_available:
-            frames[label] = pd.to_numeric(stale_cached[label], errors="coerce").dropna().rename(label)
+            frames[label] = (
+                pd.to_numeric(stale_cached[label], errors="coerce").dropna().rename(label)
+            )
         if stale_available:
-            age_hours = (time.time() - CACHE_FILE.stat().st_mtime) / 3600 if CACHE_FILE.exists() else None
+            age_hours = (
+                (time.time() - CACHE_FILE.stat().st_mtime) / 3600 if CACHE_FILE.exists() else None
+            )
             _publish_refresh_warning(
                 "using_stale_price_cache",
                 stale_symbols=sorted(stale_available),
@@ -360,7 +368,8 @@ class CorrelationEngine:
             log.warning(
                 "correlation window has only %d samples (< MIN_SAMPLES=%d); "
                 "results are statistically unreliable and emitted as None.",
-                len(recent), self.MIN_SAMPLES,
+                len(recent),
+                self.MIN_SAMPLES,
             )
         corr = recent.corr(method="pearson").round(3)
         syms = list(corr.columns)
@@ -414,13 +423,15 @@ class CorrelationEngine:
                 f"{a}↔{b}: {curr:+.2f} vs baseline {baseline:+.2f} "
                 f"({'weakening' if abs(curr) < abs(baseline) else 'strengthening'})"
             )
-            events.append(DecorrelationEvent(
-                pair=(a, b),
-                current=float(curr),
-                baseline=baseline,
-                severity=sev,
-                note=note,
-            ))
+            events.append(
+                DecorrelationEvent(
+                    pair=(a, b),
+                    current=float(curr),
+                    baseline=baseline,
+                    severity=sev,
+                    note=note,
+                )
+            )
         events.sort(key=lambda e: -abs(e.current - e.baseline))
         return events
 
@@ -480,7 +491,10 @@ class CorrelationEngine:
                 timestamp=datetime.now(UTC).isoformat(),
                 window_days=len(subset),
                 symbols=syms,
-                matrix=[[float(x) if not (isinstance(x, float) and np.isnan(x)) else 0.0 for x in row] for row in corr.values.tolist()],
+                matrix=[
+                    [float(x) if not (isinstance(x, float) and np.isnan(x)) else 0.0 for x in row]
+                    for row in corr.values.tolist()
+                ],
                 sample_count=len(subset),
             )
 
@@ -504,27 +518,35 @@ class CorrelationEngine:
         # Persist for daily brief
         try:
             with HISTORY_FILE.open("a") as f:
-                f.write(json.dumps({
-                    "timestamp": report.timestamp,
-                    "window_days": window_days,
-                    "matrix": matrix.matrix,
-                    "symbols": matrix.symbols,
-                    "events": [asdict(e) for e in events],
-                }) + "\n")
+                f.write(
+                    json.dumps(
+                        {
+                            "timestamp": report.timestamp,
+                            "window_days": window_days,
+                            "matrix": matrix.matrix,
+                            "symbols": matrix.symbols,
+                            "events": [asdict(e) for e in events],
+                        }
+                    )
+                    + "\n"
+                )
         except OSError:
             pass
 
         if _EVENT_BUS is not None:
             try:
                 for ev in events:
-                    _EVENT_BUS.publish("correlation.broken", {
-                        "pair": list(ev.pair),
-                        "current": ev.current,
-                        "baseline": ev.baseline,
-                        "severity": ev.severity,
-                        "state": "decorrelated",
-                        "note": ev.note,
-                    })
+                    _EVENT_BUS.publish(
+                        "correlation.broken",
+                        {
+                            "pair": list(ev.pair),
+                            "current": ev.current,
+                            "baseline": ev.baseline,
+                            "severity": ev.severity,
+                            "state": "decorrelated",
+                            "note": ev.note,
+                        },
+                    )
             except Exception as e:
                 log.warning("event bus publish failed: %s", e)
 

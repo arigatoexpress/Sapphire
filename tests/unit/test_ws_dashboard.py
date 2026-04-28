@@ -19,7 +19,9 @@ from unittest.mock import patch
 import pytest
 
 # Add sapphire_core to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "lib", "core", "src", "sapphire_core"))
+sys.path.insert(
+    0, os.path.join(os.path.dirname(__file__), "..", "..", "lib", "core", "src", "sapphire_core")
+)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "lib", "core", "src"))
 
 import contextlib
@@ -29,6 +31,7 @@ from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
 # ── Helpers ──────────────────────────────────────────────────────────
+
 
 def _make_app(
     cors_origins: str = "http://localhost:5173",
@@ -126,13 +129,17 @@ async def test_ws_origin_rejected():
     """Connections from disallowed origins are rejected."""
     app = _make_app(cors_origins="https://sapphire-479610.web.app")
     async with TestClient(TestServer(app)) as client:
-        resp = await client.request("GET", "/ws", headers={
-            "Origin": "https://evil.example.com",
-            "Connection": "Upgrade",
-            "Upgrade": "websocket",
-            "Sec-WebSocket-Version": "13",
-            "Sec-WebSocket-Key": "dGhlIHNhbXBsZSBub25jZQ==",
-        })
+        resp = await client.request(
+            "GET",
+            "/ws",
+            headers={
+                "Origin": "https://evil.example.com",
+                "Connection": "Upgrade",
+                "Upgrade": "websocket",
+                "Sec-WebSocket-Version": "13",
+                "Sec-WebSocket-Key": "dGhlIHNhbXBsZSBub25jZQ==",
+            },
+        )
         assert resp.status == 403
 
 
@@ -153,7 +160,7 @@ async def test_ws_max_clients_enforced():
     app = _make_app(control_handler=_mock_control_handler)
 
     # Override max clients to a small number for testing
-    with patch.object(health, '_WS_MAX_CLIENTS', 2):
+    with patch.object(health, "_WS_MAX_CLIENTS", 2):
         async with TestClient(TestServer(app)) as client:
             ws1 = await client.ws_connect("/ws", headers={"Origin": "http://localhost:5173"})
             _ = await ws1.receive_json()
@@ -161,13 +168,17 @@ async def test_ws_max_clients_enforced():
             _ = await ws2.receive_json()
 
             # Third connection should be rejected
-            resp = await client.request("GET", "/ws", headers={
-                "Origin": "http://localhost:5173",
-                "Connection": "Upgrade",
-                "Upgrade": "websocket",
-                "Sec-WebSocket-Version": "13",
-                "Sec-WebSocket-Key": "dGhlIHNhbXBsZSBub25jZQ==",
-            })
+            resp = await client.request(
+                "GET",
+                "/ws",
+                headers={
+                    "Origin": "http://localhost:5173",
+                    "Connection": "Upgrade",
+                    "Upgrade": "websocket",
+                    "Sec-WebSocket-Version": "13",
+                    "Sec-WebSocket-Key": "dGhlIHNhbXBsZSBub25jZQ==",
+                },
+            )
             assert resp.status == 503
 
             await ws1.close()
@@ -191,6 +202,7 @@ async def test_ws_client_cleanup_on_disconnect():
 @pytest.mark.asyncio
 async def test_build_dashboard_snapshot_handler_failure():
     """Snapshot builder handles handler failures gracefully."""
+
     async def _failing_handler(_payload):
         raise RuntimeError("Database unavailable")
 
@@ -227,7 +239,7 @@ async def test_ws_push_loop_sends_snapshots():
     )
 
     # Override push interval to be very fast for testing
-    with patch.object(health, '_WS_PUSH_INTERVAL', 0.1):
+    with patch.object(health, "_WS_PUSH_INTERVAL", 0.1):
         async with TestClient(TestServer(app)) as client:
             ws = await client.ws_connect("/ws", headers={"Origin": "http://localhost:5173"})
             init_msg = await ws.receive_json()
@@ -253,7 +265,7 @@ async def test_ws_multiple_clients_receive_broadcast():
     """Multiple connected clients all receive the same broadcast."""
     app = _make_app(control_handler=_mock_control_handler)
 
-    with patch.object(health, '_WS_PUSH_INTERVAL', 0.1):
+    with patch.object(health, "_WS_PUSH_INTERVAL", 0.1):
         async with TestClient(TestServer(app)) as client:
             ws1 = await client.ws_connect("/ws", headers={"Origin": "http://localhost:5173"})
             ws2 = await client.ws_connect("/ws", headers={"Origin": "http://localhost:5173"})

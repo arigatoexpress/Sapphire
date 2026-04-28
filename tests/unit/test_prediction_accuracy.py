@@ -21,11 +21,29 @@ class TestReport:
 
     def test_computes_overall_accuracy(self, tmp_path, monkeypatch):
         f = tmp_path / "p.jsonl"
-        _write(f, [
-            {"symbol": "BTC", "direction": "bullish", "correct": True, "timestamp": "2026-04-18T00:00:00+00:00"},
-            {"symbol": "BTC", "direction": "bullish", "correct": False, "timestamp": "2026-04-18T01:00:00+00:00"},
-            {"symbol": "BTC", "direction": "bearish", "correct": True, "timestamp": "2026-04-18T02:00:00+00:00"},
-        ])
+        _write(
+            f,
+            [
+                {
+                    "symbol": "BTC",
+                    "direction": "bullish",
+                    "correct": True,
+                    "timestamp": "2026-04-18T00:00:00+00:00",
+                },
+                {
+                    "symbol": "BTC",
+                    "direction": "bullish",
+                    "correct": False,
+                    "timestamp": "2026-04-18T01:00:00+00:00",
+                },
+                {
+                    "symbol": "BTC",
+                    "direction": "bearish",
+                    "correct": True,
+                    "timestamp": "2026-04-18T02:00:00+00:00",
+                },
+            ],
+        )
         monkeypatch.setattr(pa, "PREDICTIONS_FILE", f)
         r = pa.report()
         assert r["total"] == 3
@@ -35,11 +53,24 @@ class TestReport:
 
     def test_counts_open_predictions(self, tmp_path, monkeypatch):
         f = tmp_path / "p.jsonl"
-        _write(f, [
-            {"symbol": "BTC", "direction": "bullish", "correct": True, "timestamp": "2026-04-18T00:00:00+00:00"},
-            {"symbol": "ETH", "direction": "bullish", "correct": None, "timestamp": "2026-04-19T00:00:00+00:00"},
-            {"symbol": "SOL", "direction": "bullish", "timestamp": "2026-04-19T00:00:00+00:00"},
-        ])
+        _write(
+            f,
+            [
+                {
+                    "symbol": "BTC",
+                    "direction": "bullish",
+                    "correct": True,
+                    "timestamp": "2026-04-18T00:00:00+00:00",
+                },
+                {
+                    "symbol": "ETH",
+                    "direction": "bullish",
+                    "correct": None,
+                    "timestamp": "2026-04-19T00:00:00+00:00",
+                },
+                {"symbol": "SOL", "direction": "bullish", "timestamp": "2026-04-19T00:00:00+00:00"},
+            ],
+        )
         monkeypatch.setattr(pa, "PREDICTIONS_FILE", f)
         r = pa.report()
         assert r["total"] == 3
@@ -48,11 +79,29 @@ class TestReport:
 
     def test_per_symbol_and_direction(self, tmp_path, monkeypatch):
         f = tmp_path / "p.jsonl"
-        _write(f, [
-            {"symbol": "BTC", "direction": "bullish", "correct": True, "timestamp": "2026-04-18T00:00:00+00:00"},
-            {"symbol": "BTC", "direction": "bullish", "correct": True, "timestamp": "2026-04-18T01:00:00+00:00"},
-            {"symbol": "ETH", "direction": "bearish", "correct": False, "timestamp": "2026-04-18T02:00:00+00:00"},
-        ])
+        _write(
+            f,
+            [
+                {
+                    "symbol": "BTC",
+                    "direction": "bullish",
+                    "correct": True,
+                    "timestamp": "2026-04-18T00:00:00+00:00",
+                },
+                {
+                    "symbol": "BTC",
+                    "direction": "bullish",
+                    "correct": True,
+                    "timestamp": "2026-04-18T01:00:00+00:00",
+                },
+                {
+                    "symbol": "ETH",
+                    "direction": "bearish",
+                    "correct": False,
+                    "timestamp": "2026-04-18T02:00:00+00:00",
+                },
+            ],
+        )
         monkeypatch.setattr(pa, "PREDICTIONS_FILE", f)
         r = pa.report()
         assert r["by_symbol"]["BTC"]["accuracy"] == 1.0
@@ -62,11 +111,14 @@ class TestReport:
 
     def test_recent_sorted_desc(self, tmp_path, monkeypatch):
         f = tmp_path / "p.jsonl"
-        _write(f, [
-            {"symbol": "A", "timestamp": "2026-04-01T00:00:00+00:00"},
-            {"symbol": "C", "timestamp": "2026-04-03T00:00:00+00:00"},
-            {"symbol": "B", "timestamp": "2026-04-02T00:00:00+00:00"},
-        ])
+        _write(
+            f,
+            [
+                {"symbol": "A", "timestamp": "2026-04-01T00:00:00+00:00"},
+                {"symbol": "C", "timestamp": "2026-04-03T00:00:00+00:00"},
+                {"symbol": "B", "timestamp": "2026-04-02T00:00:00+00:00"},
+            ],
+        )
         monkeypatch.setattr(pa, "PREDICTIONS_FILE", f)
         r = pa.report()
         assert [x["symbol"] for x in r["recent"]] == ["C", "B", "A"]

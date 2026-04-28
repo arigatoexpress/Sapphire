@@ -9,6 +9,7 @@ Critical paths:
   - record_success resets failure count
   - on_open / on_close callbacks fire at the right moments
 """
+
 import os
 import sys
 import time
@@ -19,6 +20,7 @@ from circuit_breaker import CircuitBreaker, CircuitBreakerOpen
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
+
 def _open_breaker(cb: CircuitBreaker) -> None:
     """Force a breaker from CLOSED to OPEN by recording fail_max failures."""
     for _ in range(cb.fail_max):
@@ -27,6 +29,7 @@ def _open_breaker(cb: CircuitBreaker) -> None:
 
 
 # ── State machine ─────────────────────────────────────────────────────────────
+
 
 class TestCircuitBreakerStates:
     def test_initial_state_is_closed(self):
@@ -89,7 +92,9 @@ class TestCircuitBreakerStates:
     def test_does_not_open_twice(self):
         """Recording extra failures while already OPEN should not re-notify."""
         notifications = []
-        cb = CircuitBreaker("test", fail_max=2, reset_timeout=60, on_open=lambda n: notifications.append(n))
+        cb = CircuitBreaker(
+            "test", fail_max=2, reset_timeout=60, on_open=lambda n: notifications.append(n)
+        )
         _open_breaker(cb)
         cb.record_failure()  # extra failure while already OPEN
         assert len(notifications) == 1  # on_open called exactly once
@@ -104,17 +109,22 @@ class TestCircuitBreakerStates:
 
 # ── Callbacks ─────────────────────────────────────────────────────────────────
 
+
 class TestCircuitBreakerCallbacks:
     def test_on_open_fires_when_breaker_opens(self):
         events = []
-        cb = CircuitBreaker("cb1", fail_max=2, reset_timeout=60, on_open=lambda n: events.append(("open", n)))
+        cb = CircuitBreaker(
+            "cb1", fail_max=2, reset_timeout=60, on_open=lambda n: events.append(("open", n))
+        )
         _open_breaker(cb)
         assert events == [("open", "cb1")]
 
     def test_on_close_fires_on_recovery_from_open(self, monkeypatch):
         events = []
         cb = CircuitBreaker(
-            "cb2", fail_max=2, reset_timeout=1,
+            "cb2",
+            fail_max=2,
+            reset_timeout=1,
             on_open=lambda n: None,
             on_close=lambda n: events.append(("close", n)),
         )
@@ -126,7 +136,9 @@ class TestCircuitBreakerCallbacks:
 
     def test_on_close_not_fired_on_normal_success(self):
         events = []
-        cb = CircuitBreaker("cb3", fail_max=3, reset_timeout=60, on_close=lambda n: events.append(n))
+        cb = CircuitBreaker(
+            "cb3", fail_max=3, reset_timeout=60, on_close=lambda n: events.append(n)
+        )
         cb.record_success()
         assert events == []
 
@@ -140,6 +152,7 @@ class TestCircuitBreakerCallbacks:
 
 
 # ── Status / repr ─────────────────────────────────────────────────────────────
+
 
 class TestCircuitBreakerIntrospection:
     def test_status_returns_dict(self):

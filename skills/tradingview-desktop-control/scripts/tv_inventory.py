@@ -43,9 +43,9 @@ def _apple_quote(text: str) -> str:
 
 
 def _menu_expr(top_menu: str, parent_chain: list[str]) -> str:
-    expr = f'menu {_apple_quote(top_menu)} of menu bar item {_apple_quote(top_menu)} of menu bar 1'
+    expr = f"menu {_apple_quote(top_menu)} of menu bar item {_apple_quote(top_menu)} of menu bar 1"
     for name in parent_chain:
-        expr = f'menu 1 of menu item {_apple_quote(name)} of {expr}'
+        expr = f"menu 1 of menu item {_apple_quote(name)} of {expr}"
     return expr
 
 
@@ -57,43 +57,43 @@ def list_menu_items(top_menu: str, parent_chain: list[str]) -> list[dict[str, An
             f'  tell process "{tvctl.PROCESS_NAME}"',
             f"    set m to {menu_expr}",
             "    set sep to ASCII character 31",
-            "    set outText to \"\"",
+            '    set outText to ""',
             "    repeat with i from 1 to (count of menu items of m)",
             "      set mi to menu item i of m",
             "      try",
             "        set n to name of mi as text",
             "      on error",
-            "        set n to \"\"",
+            '        set n to ""',
             "      end try",
             "      try",
             "        set en to enabled of mi as text",
             "      on error",
-            "        set en to \"\"",
+            '        set en to ""',
             "      end try",
             "      try",
             "        set hs to (exists menu 1 of mi) as text",
             "      on error",
-            "        set hs to \"false\"",
+            '        set hs to "false"',
             "      end try",
             "      try",
-            "        set c to value of attribute \"AXMenuItemCmdChar\" of mi as text",
+            '        set c to value of attribute "AXMenuItemCmdChar" of mi as text',
             "      on error",
-            "        set c to \"\"",
+            '        set c to ""',
             "      end try",
             "      try",
-            "        set mods to value of attribute \"AXMenuItemCmdModifiers\" of mi as text",
+            '        set mods to value of attribute "AXMenuItemCmdModifiers" of mi as text',
             "      on error",
-            "        set mods to \"\"",
+            '        set mods to ""',
             "      end try",
             "      try",
-            "        set glyph to value of attribute \"AXMenuItemCmdGlyph\" of mi as text",
+            '        set glyph to value of attribute "AXMenuItemCmdGlyph" of mi as text',
             "      on error",
-            "        set glyph to \"\"",
+            '        set glyph to ""',
             "      end try",
             "      try",
-            "        set markChar to value of attribute \"AXMenuItemMarkChar\" of mi as text",
+            '        set markChar to value of attribute "AXMenuItemMarkChar" of mi as text',
             "      on error",
-            "        set markChar to \"\"",
+            '        set markChar to ""',
             "      end try",
             "      set outText to outText & (i as text) & sep & n & sep & en & sep & hs & sep & c & sep & mods & sep & glyph & sep & markChar & linefeed",
             "    end repeat",
@@ -202,7 +202,9 @@ def flatten_menu_leaves(tree: dict[str, Any]) -> list[dict[str, Any]]:
     return out
 
 
-def build_capability_candidates(desktop_inventory: dict[str, Any], config_data: dict[str, Any] | None) -> list[dict[str, Any]]:
+def build_capability_candidates(
+    desktop_inventory: dict[str, Any], config_data: dict[str, Any] | None
+) -> list[dict[str, Any]]:
     caps: list[dict[str, Any]] = []
     seen: set[str] = set()
 
@@ -226,7 +228,9 @@ def build_capability_candidates(desktop_inventory: dict[str, Any], config_data: 
                 "subcommand": "set-symbol",
                 "args_template": ["{{symbol}}"],
                 "timeouts": {"command_timeout_seconds": 45},
-                "parameters": [{"name": "symbol", "required": True, "description": "Ticker/symbol to open"}],
+                "parameters": [
+                    {"name": "symbol", "required": True, "description": "Ticker/symbol to open"}
+                ],
             },
         ),
         (
@@ -240,13 +244,43 @@ def build_capability_candidates(desktop_inventory: dict[str, Any], config_data: 
                 "subcommand": "add-indicator",
                 "args_template": ["{{query}}"],
                 "timeouts": {"command_timeout_seconds": 60},
-                "parameters": [{"name": "query", "required": True, "description": "Indicator search query"}],
+                "parameters": [
+                    {"name": "query", "required": True, "description": "Indicator search query"}
+                ],
             },
         ),
-        ("watchlist.open_symbol", "Open symbol via watchlist", ["watchlist"], "low", ["watchlist calibrated"], None),
-        ("watchlist.add_symbol", "Add symbol to watchlist", ["watchlist"], "low", ["watchlist calibrated"], None),
-        ("watchlist.remove_row", "Remove watchlist row", ["watchlist"], "medium", ["watchlist calibrated"], None),
-        ("watchlist.reorder_rows", "Reorder watchlist rows", ["watchlist"], "low", ["watchlist calibrated"], None),
+        (
+            "watchlist.open_symbol",
+            "Open symbol via watchlist",
+            ["watchlist"],
+            "low",
+            ["watchlist calibrated"],
+            None,
+        ),
+        (
+            "watchlist.add_symbol",
+            "Add symbol to watchlist",
+            ["watchlist"],
+            "low",
+            ["watchlist calibrated"],
+            None,
+        ),
+        (
+            "watchlist.remove_row",
+            "Remove watchlist row",
+            ["watchlist"],
+            "medium",
+            ["watchlist calibrated"],
+            None,
+        ),
+        (
+            "watchlist.reorder_rows",
+            "Reorder watchlist rows",
+            ["watchlist"],
+            "low",
+            ["watchlist calibrated"],
+            None,
+        ),
     ]
     for cid, label, tags, risk, preconds, action_recipe in curated:
         cap = {
@@ -323,16 +357,42 @@ def build_capability_candidates(desktop_inventory: dict[str, Any], config_data: 
                 }
             )
         for cid, label, subcommand, risk in [
-            ("watchlist.open_symbol.config", "Open symbol via calibrated watchlist", "watchlist-open-config", "low"),
-            ("watchlist.add_symbol.config", "Add symbol via calibrated watchlist", "watchlist-add-config", "low"),
-            ("watchlist.remove_row.config", "Remove watchlist row via calibrated points", "watchlist-remove-config", "medium"),
-            ("watchlist.reorder_rows.config", "Reorder watchlist rows via calibrated points", "watchlist-reorder-config", "low"),
+            (
+                "watchlist.open_symbol.config",
+                "Open symbol via calibrated watchlist",
+                "watchlist-open-config",
+                "low",
+            ),
+            (
+                "watchlist.add_symbol.config",
+                "Add symbol via calibrated watchlist",
+                "watchlist-add-config",
+                "low",
+            ),
+            (
+                "watchlist.remove_row.config",
+                "Remove watchlist row via calibrated points",
+                "watchlist-remove-config",
+                "medium",
+            ),
+            (
+                "watchlist.reorder_rows.config",
+                "Reorder watchlist rows via calibrated points",
+                "watchlist-reorder-config",
+                "low",
+            ),
         ]:
             args_template: list[Any] = [cfg_path]
             parameters: list[dict[str, Any]] = []
             if subcommand in {"watchlist-open-config", "watchlist-add-config"}:
                 args_template.append("{{symbol}}")
-                parameters.append({"name": "symbol", "required": True, "description": "Symbol to open/add in the watchlist"})
+                parameters.append(
+                    {
+                        "name": "symbol",
+                        "required": True,
+                        "description": "Symbol to open/add in the watchlist",
+                    }
+                )
             add(
                 {
                     "id": cid,
@@ -340,13 +400,18 @@ def build_capability_candidates(desktop_inventory: dict[str, Any], config_data: 
                     "surface": "desktop",
                     "source": "layout-config",
                     "risk_level": risk,
-                    "preconditions": ["TradingView desktop app running", "watchlist points calibrated"],
+                    "preconditions": [
+                        "TradingView desktop app running",
+                        "watchlist points calibrated",
+                    ],
                     "action_recipe": {
                         "runner": "tvctl.py",
                         "subcommand": subcommand,
                         "args_template": args_template,
                         "timeouts": {
-                            "command_timeout_seconds": 60 if subcommand in {"watchlist-remove-config", "watchlist-reorder-config"} else 45
+                            "command_timeout_seconds": 60
+                            if subcommand in {"watchlist-remove-config", "watchlist-reorder-config"}
+                            else 45
                         },
                         "parameters": parameters,
                     },
@@ -385,7 +450,9 @@ def load_config_if_present(path: Path | None) -> dict[str, Any] | None:
     return cfg
 
 
-def export_inventory(config_path: Path | None, include_menus: bool, menu_max_depth: int, activate: bool) -> dict[str, Any]:
+def export_inventory(
+    config_path: Path | None, include_menus: bool, menu_max_depth: int, activate: bool
+) -> dict[str, Any]:
     if activate:
         with contextlib.suppress(Exception):
             tvctl.activate_app(launch=False, delay=0.2)
@@ -424,12 +491,20 @@ def export_inventory(config_path: Path | None, include_menus: bool, menu_max_dep
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="Export TradingView desktop/config inventory and seed capability registry")
+    p = argparse.ArgumentParser(
+        description="Export TradingView desktop/config inventory and seed capability registry"
+    )
     p.add_argument("--config", type=Path, default=DEFAULT_CONFIG, help="Layout config JSON path")
     p.add_argument("--no-config", action="store_true", help="Skip loading a layout config")
-    p.add_argument("--no-menus", action="store_true", help="Skip recursive desktop menu enumeration")
+    p.add_argument(
+        "--no-menus", action="store_true", help="Skip recursive desktop menu enumeration"
+    )
     p.add_argument("--menu-max-depth", type=int, default=5)
-    p.add_argument("--no-activate", action="store_true", help="Do not bring TradingView to front before inspection")
+    p.add_argument(
+        "--no-activate",
+        action="store_true",
+        help="Do not bring TradingView to front before inspection",
+    )
     p.add_argument("--output", type=Path, default=None, help="Write full inventory JSON to a file")
     p.add_argument(
         "--registry-output",

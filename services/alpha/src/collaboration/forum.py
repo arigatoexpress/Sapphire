@@ -36,11 +36,11 @@ class SapphireForumService:
 
     # ── Phase 3: Categories, Scoring, Agent Profiles ───────────────
     VALID_CATEGORIES = {
-        "trade_idea",       # Actionable trade setups
-        "strategy",         # Strategy design & backtesting
+        "trade_idea",  # Actionable trade setups
+        "strategy",  # Strategy design & backtesting
         "market_analysis",  # Market structure, sentiment, macro
-        "platform",         # Infrastructure, venues, deployment
-        "general",          # Default catch-all
+        "platform",  # Infrastructure, venues, deployment
+        "general",  # Default catch-all
     }
 
     AGENT_PROFILES = {
@@ -539,7 +539,9 @@ class SapphireForumService:
         summary["redactions"] = topic["redactions"]
         return summary
 
-    def _add_reply_locked(self, topic_id: str, payload: dict[str, Any], persist: bool = True) -> dict[str, Any]:
+    def _add_reply_locked(
+        self, topic_id: str, payload: dict[str, Any], persist: bool = True
+    ) -> dict[str, Any]:
         topic = next((item for item in self._topics if item.get("topic_id") == topic_id), None)
         if not topic:
             raise ValueError("topic_not_found")
@@ -631,7 +633,12 @@ class SapphireForumService:
             topic.setdefault("voters", []).append(voter)
             topic["score"] = float(topic.get("upvotes", 0)) - float(topic.get("downvotes", 0))
             self._save_locked()
-            return {"ok": True, "score": topic["score"], "upvotes": topic["upvotes"], "downvotes": topic["downvotes"]}
+            return {
+                "ok": True,
+                "score": topic["score"],
+                "upvotes": topic["upvotes"],
+                "downvotes": topic["downvotes"],
+            }
 
     def vote_reply(self, reply_id: str, voter_id: str, direction: str) -> dict[str, Any]:
         """Upvote or downvote a reply."""
@@ -646,16 +653,24 @@ class SapphireForumService:
                         else:
                             return {"ok": False, "error": "invalid_direction"}
                         self._save_locked()
-                        return {"ok": True, "upvotes": reply.get("upvotes", 0), "downvotes": reply.get("downvotes", 0)}
+                        return {
+                            "ok": True,
+                            "upvotes": reply.get("upvotes", 0),
+                            "downvotes": reply.get("downvotes", 0),
+                        }
             return {"ok": False, "error": "reply_not_found"}
 
-    def rate_reply_quality(self, reply_id: str, rater_id: str, helpfulness: float, accuracy: float) -> dict[str, Any]:
+    def rate_reply_quality(
+        self, reply_id: str, rater_id: str, helpfulness: float, accuracy: float
+    ) -> dict[str, Any]:
         """Rate a reply's quality (0.0–1.0 scale). Rolling average."""
         with self._lock:
             for bucket in self._replies.values():
                 for reply in bucket:
                     if reply.get("reply_id") == reply_id:
-                        q = reply.setdefault("quality", {"helpfulness": 0.0, "accuracy": 0.0, "ratings_count": 0})
+                        q = reply.setdefault(
+                            "quality", {"helpfulness": 0.0, "accuracy": 0.0, "ratings_count": 0}
+                        )
                         n = q.get("ratings_count", 0)
                         h = max(0.0, min(1.0, float(helpfulness)))
                         a = max(0.0, min(1.0, float(accuracy)))
@@ -803,16 +818,18 @@ class SapphireForumService:
             for t in self._topics:
                 approval = t.get("approval")
                 if approval and approval.get("status") == "pending":
-                    results.append({
-                        "topic_id": t.get("topic_id", ""),
-                        "title": t.get("title", ""),
-                        "session_key": approval.get("session_key", ""),
-                        "score": float(t.get("score", 0)),
-                        "upvotes": int(t.get("upvotes", 0)),
-                        "downvotes": int(t.get("downvotes", 0)),
-                        "voters": t.get("voters", []),
-                        "created_at": approval.get("created_at", ""),
-                    })
+                    results.append(
+                        {
+                            "topic_id": t.get("topic_id", ""),
+                            "title": t.get("title", ""),
+                            "session_key": approval.get("session_key", ""),
+                            "score": float(t.get("score", 0)),
+                            "upvotes": int(t.get("upvotes", 0)),
+                            "downvotes": int(t.get("downvotes", 0)),
+                            "voters": t.get("voters", []),
+                            "created_at": approval.get("created_at", ""),
+                        }
+                    )
             return results
 
     def add_reply(self, topic_id: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -842,7 +859,9 @@ class SapphireForumService:
             ],
         }
 
-    async def _dispatch_external(self, url: str, payload: dict[str, Any], token: str = "") -> dict[str, Any]:
+    async def _dispatch_external(
+        self, url: str, payload: dict[str, Any], token: str = ""
+    ) -> dict[str, Any]:
         if not url:
             return {"dispatched": False, "reason": "external_url_not_configured"}
 
@@ -890,11 +909,15 @@ class SapphireForumService:
                             if isinstance(parsed.get("agent"), dict):
                                 agent_obj = parsed.get("agent", {})
                                 metadata["agent_name"] = str(agent_obj.get("name", "")).strip()
-                                metadata["claim_url"] = str(agent_obj.get("claim_url", "")).strip()[:220]
-                                metadata["verification_code"] = (
-                                    str(agent_obj.get("verification_code", "")).strip()[:80]
+                                metadata["claim_url"] = str(agent_obj.get("claim_url", "")).strip()[
+                                    :220
+                                ]
+                                metadata["verification_code"] = str(
+                                    agent_obj.get("verification_code", "")
+                                ).strip()[:80]
+                                metadata["api_key_present"] = bool(
+                                    str(agent_obj.get("api_key", "")).strip()
                                 )
-                                metadata["api_key_present"] = bool(str(agent_obj.get("api_key", "")).strip())
                             if isinstance(parsed.get("error"), str):
                                 metadata["api_error"] = str(parsed.get("error", ""))[:160]
                             if isinstance(parsed.get("hint"), str):
@@ -922,12 +945,12 @@ class SapphireForumService:
                                 verification_obj = parsed.get("verification", {})
                                 if verification_obj:
                                     metadata["verification_required"] = True
-                                    metadata["verification_code"] = (
-                                        str(verification_obj.get("code", "")).strip()[:80]
-                                    )
-                                    metadata["verification_challenge"] = (
-                                        str(verification_obj.get("challenge", "")).strip()[:220]
-                                    )
+                                    metadata["verification_code"] = str(
+                                        verification_obj.get("code", "")
+                                    ).strip()[:80]
+                                    metadata["verification_challenge"] = str(
+                                        verification_obj.get("challenge", "")
+                                    ).strip()[:220]
                                     metadata["verification_code_present"] = bool(
                                         metadata.get("verification_code", "")
                                     )
@@ -938,27 +961,29 @@ class SapphireForumService:
                                 post_obj = parsed.get("post", {})
                                 metadata["post_id"] = str(post_obj.get("id", "")).strip()[:100]
                                 metadata["post_url"] = str(post_obj.get("url", "")).strip()[:180]
-                                metadata["post_verification_status"] = (
-                                    str(post_obj.get("verification_status", "")).strip()[:40]
-                                )
+                                metadata["post_verification_status"] = str(
+                                    post_obj.get("verification_status", "")
+                                ).strip()[:40]
 
                         reason = "ok" if ok else ("api_error" if parsed else "http_error")
                         api_error_lower = str(metadata.get("api_error", "")).lower()
                         if ok and metadata.get("verification_required"):
                             reason = "ok_pending_verification"
-                            auto_verify_enabled = (
-                                str(os.getenv("SAPPHIRE_SCOUT_AUTO_VERIFY_ENABLED", "true")).strip().lower()
-                                in {"1", "true", "yes", "on"}
-                            )
+                            auto_verify_enabled = str(
+                                os.getenv("SAPPHIRE_SCOUT_AUTO_VERIFY_ENABLED", "true")
+                            ).strip().lower() in {"1", "true", "yes", "on"}
                             metadata["verification_auto_enabled"] = auto_verify_enabled
                             if is_moltbook_api and auto_verify_enabled:
-                                verification_code = str(metadata.get("verification_code", "")).strip()
-                                verification_challenge = str(metadata.get("verification_challenge", "")).strip()
+                                verification_code = str(
+                                    metadata.get("verification_code", "")
+                                ).strip()
+                                verification_challenge = str(
+                                    metadata.get("verification_challenge", "")
+                                ).strip()
                                 if verification_code and verification_challenge:
-                                    verify_url = (
-                                        str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_VERIFY_URL", "")).strip()
-                                        or self._derive_moltbook_verify_url(url)
-                                    )
+                                    verify_url = str(
+                                        os.getenv("SAPPHIRE_SCOUT_EXTERNAL_VERIFY_URL", "")
+                                    ).strip() or self._derive_moltbook_verify_url(url)
                                     verify_result = await self._verify_moltbook_challenge(
                                         verify_url=verify_url,
                                         verification_code=verification_code,
@@ -975,7 +1000,9 @@ class SapphireForumService:
                                             verify_result.get("answer", "")
                                         ).strip()[:40]
                                     if isinstance(verify_result.get("status"), int):
-                                        metadata["verification_http_status"] = int(verify_result.get("status", 0))
+                                        metadata["verification_http_status"] = int(
+                                            verify_result.get("status", 0)
+                                        )
                                     if verify_result.get("response_excerpt"):
                                         metadata["verification_response_excerpt"] = str(
                                             verify_result.get("response_excerpt", "")
@@ -997,7 +1024,10 @@ class SapphireForumService:
                                 or "comment again in" in api_error_lower
                             ):
                                 reason = "moltbook_rate_limited"
-                            elif "pending_claim" in api_error_lower or "pending claim" in api_error_lower:
+                            elif (
+                                "pending_claim" in api_error_lower
+                                or "pending claim" in api_error_lower
+                            ):
                                 reason = "moltbook_pending_claim"
                             elif (
                                 "already registered" in api_error_lower
@@ -1021,14 +1051,20 @@ class SapphireForumService:
                         retryable_http = (
                             int(response.status) >= 500 or int(response.status) in {408, 429}
                         ) and reason != "moltbook_rate_limited"
-                        retryable_api = result["reason"] == "api_error" and metadata.get("api_error") in {
+                        retryable_api = result["reason"] == "api_error" and metadata.get(
+                            "api_error"
+                        ) in {
                             "Failed to fetch posts",
                             "Internal Server Error",
                         }
                         if not (retryable_http or retryable_api) or attempt >= max_retries:
                             return result
             except Exception as exc:
-                last_result = {"dispatched": False, "reason": f"request_failed:{exc}", "attempt": attempt}
+                last_result = {
+                    "dispatched": False,
+                    "reason": f"request_failed:{exc}",
+                    "attempt": attempt,
+                }
                 if attempt >= max_retries:
                     return last_result
 
@@ -1071,15 +1107,52 @@ class SapphireForumService:
         return None
 
     _ALL_NUMBER_WORDS = {
-        "zero", "one", "two", "three", "four", "five", "six", "seven",
-        "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen",
-        "fifteen", "sixteen", "seventeen", "eighteen", "nineteen",
-        "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty",
-        "ninety", "hundred", "thousand", "point", "and",
+        "zero",
+        "one",
+        "two",
+        "three",
+        "four",
+        "five",
+        "six",
+        "seven",
+        "eight",
+        "nine",
+        "ten",
+        "eleven",
+        "twelve",
+        "thirteen",
+        "fourteen",
+        "fifteen",
+        "sixteen",
+        "seventeen",
+        "eighteen",
+        "nineteen",
+        "twenty",
+        "thirty",
+        "forty",
+        "fifty",
+        "sixty",
+        "seventy",
+        "eighty",
+        "ninety",
+        "hundred",
+        "thousand",
+        "point",
+        "and",
     }
     _ALL_OPERATOR_WORDS = {
-        "plus", "minus", "times", "add", "subtract", "over", "divide",
-        "divided", "multiplied", "another", "nother", "x",
+        "plus",
+        "minus",
+        "times",
+        "add",
+        "subtract",
+        "over",
+        "divide",
+        "divided",
+        "multiplied",
+        "another",
+        "nother",
+        "x",
     }
     _ALL_KNOWN_WORDS = _ALL_NUMBER_WORDS | _ALL_OPERATOR_WORDS
 
@@ -1248,7 +1321,10 @@ class SapphireForumService:
 
         raw_tokens = re.findall(r"[a-z]+|\d+(?:\.\d+)?|[+\-*/]", cleaned)
         # Normalize tokens: try as-is first, only dedup repeated chars as fallback
-        tokens = [cls._normalize_word_token_safe(token) if token.isalpha() else token for token in raw_tokens]
+        tokens = [
+            cls._normalize_word_token_safe(token) if token.isalpha() else token
+            for token in raw_tokens
+        ]
         if not tokens:
             return None
 
@@ -1340,13 +1416,19 @@ class SapphireForumService:
             left = parsed_tokens[offset]
             operator = parsed_tokens[offset + 1]
             right = parsed_tokens[offset + 2]
-            if isinstance(left, (int, float)) and isinstance(operator, str) and isinstance(right, (int, float)):
+            if (
+                isinstance(left, (int, float))
+                and isinstance(operator, str)
+                and isinstance(right, (int, float))
+            ):
                 result = cls._compute_challenge_result(float(left), operator, float(right))
                 if result is not None:
                     return f"{result:.2f}"
 
         numeric_terms = [float(item) for item in parsed_tokens if isinstance(item, (int, float))]
-        operators = [item for item in parsed_tokens if isinstance(item, str) and item in {"+", "-", "*", "/"}]
+        operators = [
+            item for item in parsed_tokens if isinstance(item, str) and item in {"+", "-", "*", "/"}
+        ]
         if len(numeric_terms) >= 2 and not operators:
             return f"{sum(numeric_terms):.2f}"
 
@@ -1394,9 +1476,10 @@ class SapphireForumService:
                     verified = bool(parsed.get("verified"))
                     if not verified and isinstance(parsed.get("verification"), dict):
                         verification_obj = parsed.get("verification", {})
-                        verified = (
-                            str(verification_obj.get("status", "")).strip().lower() in {"verified", "complete"}
-                        )
+                        verified = str(verification_obj.get("status", "")).strip().lower() in {
+                            "verified",
+                            "complete",
+                        }
                     if (
                         not verified
                         and 200 <= int(response.status) < 300
@@ -1536,11 +1619,23 @@ class SapphireForumService:
         agent_id = config["agent_id"]
 
         if not hook_url:
-            return {"dispatched": False, "reason": "fallback_hook_url_missing", "mode": "openclaw_hook"}
+            return {
+                "dispatched": False,
+                "reason": "fallback_hook_url_missing",
+                "mode": "openclaw_hook",
+            }
         if not hook_token:
-            return {"dispatched": False, "reason": "fallback_hook_token_missing", "mode": "openclaw_hook"}
+            return {
+                "dispatched": False,
+                "reason": "fallback_hook_token_missing",
+                "mode": "openclaw_hook",
+            }
         if not chat_id:
-            return {"dispatched": False, "reason": "fallback_chat_id_missing", "mode": "openclaw_hook"}
+            return {
+                "dispatched": False,
+                "reason": "fallback_chat_id_missing",
+                "mode": "openclaw_hook",
+            }
 
         session_key = f"hook:scout:{action}:{int(time.time() * 1000)}"
         hook_payload = {
@@ -1591,10 +1686,9 @@ class SapphireForumService:
     def _scout_sandbox_config() -> dict[str, Any]:
         sandbox_url = str(os.getenv("SAPPHIRE_SCOUT_SANDBOX_URL", "")).strip()
         sandbox_token = str(os.getenv("SAPPHIRE_SCOUT_SANDBOX_TOKEN", "")).strip()
-        sandbox_enforce = (
-            str(os.getenv("SAPPHIRE_SCOUT_SANDBOX_ENFORCE", "false")).strip().lower()
-            in {"1", "true", "yes", "on"}
-        )
+        sandbox_enforce = str(
+            os.getenv("SAPPHIRE_SCOUT_SANDBOX_ENFORCE", "false")
+        ).strip().lower() in {"1", "true", "yes", "on"}
         return {
             "url": sandbox_url,
             "token": sandbox_token,
@@ -1663,17 +1757,25 @@ class SapphireForumService:
                             "response_excerpt": self._sanitize_text(body, max_len=320)["text"],
                         }
 
-                    dispatch = parsed.get("dispatch", {}) if isinstance(parsed.get("dispatch"), dict) else {}
+                    dispatch = (
+                        parsed.get("dispatch", {})
+                        if isinstance(parsed.get("dispatch"), dict)
+                        else {}
+                    )
                     result = {
                         "dispatched": bool(dispatch.get("dispatched", parsed.get("ok", False))),
-                        "reason": str(dispatch.get("reason", "sandbox_dispatch_unknown")).strip()[:120],
+                        "reason": str(dispatch.get("reason", "sandbox_dispatch_unknown")).strip()[
+                            :120
+                        ],
                         "status": dispatch.get("status"),
                         "mode": "scout_sandbox",
                     }
                     if dispatch:
                         result["metadata"] = dispatch.get("metadata", {})
                         if dispatch.get("response_excerpt"):
-                            result["response_excerpt"] = str(dispatch.get("response_excerpt", ""))[:320]
+                            result["response_excerpt"] = str(dispatch.get("response_excerpt", ""))[
+                                :320
+                            ]
                     return result
         except Exception as exc:
             return {
@@ -1775,8 +1877,19 @@ class SapphireForumService:
             fallback.get("hook_url") and fallback.get("hook_token") and fallback.get("chat_id")
         )
         external_ready = bool(external_register_url and external_post_url and external_token_set)
-        dispatch_mode = "scout_sandbox" if sandbox.get("url") else ("external_http" if external_register_url or external_post_url else "openclaw_hook")
-        if sandbox_enforce and not sandbox_ready or dispatch_mode == "openclaw_hook" and not fallback_ready:
+        dispatch_mode = (
+            "scout_sandbox"
+            if sandbox.get("url")
+            else (
+                "external_http" if external_register_url or external_post_url else "openclaw_hook"
+            )
+        )
+        if (
+            sandbox_enforce
+            and not sandbox_ready
+            or dispatch_mode == "openclaw_hook"
+            and not fallback_ready
+        ):
             dispatch_mode = "none"
         provider = (
             "moltbook"
@@ -1801,7 +1914,8 @@ class SapphireForumService:
                     )
                 if not str(registration.get("display_name", "")).strip():
                     registration["display_name"] = (
-                        str(os.getenv("SAPPHIRE_SCOUT_DISPLAY_NAME", "")).strip() or "Sapphire Scout"
+                        str(os.getenv("SAPPHIRE_SCOUT_DISPLAY_NAME", "")).strip()
+                        or "Sapphire Scout"
                     )
             else:
                 registration["registered_source"] = "runtime_state"
@@ -1830,15 +1944,17 @@ class SapphireForumService:
                 )
             elif provider == "moltbook" and not external_token_set:
                 provider_state = "missing_api_token"
-                operator_hint = "Add SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN so external publish can execute."
+                operator_hint = (
+                    "Add SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN so external publish can execute."
+                )
             elif effective_registered:
                 provider_state = "registered_active"
-                operator_hint = (
-                    "Scout bridge is active. Use /scout publish to send sanitized external summaries."
-                )
+                operator_hint = "Scout bridge is active. Use /scout publish to send sanitized external summaries."
             else:
                 provider_state = "registration_required"
-                operator_hint = "Run /scout register <username> to activate least-privilege scout identity."
+                operator_hint = (
+                    "Run /scout register <username> to activate least-privilege scout identity."
+                )
 
             return {
                 "profile": self._scout_profile(),
@@ -1866,7 +1982,9 @@ class SapphireForumService:
 
     async def register_scout_account(self, payload: dict[str, Any]) -> dict[str, Any]:
         username = str(payload.get("username", "")).strip()
-        display_name = str(payload.get("display_name", "Sapphire Scout")).strip() or "Sapphire Scout"
+        display_name = (
+            str(payload.get("display_name", "Sapphire Scout")).strip() or "Sapphire Scout"
+        )
         bio_safe = self._sanitize_text(payload.get("bio", ""), max_len=1000)
 
         if not re.fullmatch(r"[A-Za-z0-9_\-]{3,32}", username):
@@ -1936,7 +2054,10 @@ class SapphireForumService:
                 external_token=token_for_dispatch,
                 note=note,
             )
-        if not dispatch_result.get("dispatched") and dispatch_result.get("reason") == "moltbook_already_registered":
+        if (
+            not dispatch_result.get("dispatched")
+            and dispatch_result.get("reason") == "moltbook_already_registered"
+        ):
             dispatch_result = dict(dispatch_result)
             dispatch_result["dispatched"] = True
             metadata = dispatch_result.get("metadata", {})
@@ -1955,7 +2076,9 @@ class SapphireForumService:
                 }
             )
 
-            metadata = dispatch_result.get("metadata", {}) if isinstance(dispatch_result, dict) else {}
+            metadata = (
+                dispatch_result.get("metadata", {}) if isinstance(dispatch_result, dict) else {}
+            )
             claim_url = str(metadata.get("claim_url", "")).strip()
             verification_code = str(metadata.get("verification_code", "")).strip()
             topic_body = (
@@ -1997,7 +2120,9 @@ class SapphireForumService:
     async def publish_scout_note(self, payload: dict[str, Any]) -> dict[str, Any]:
         topic_id = str(payload.get("topic_id", "")).strip()
         external_post_id = str(
-            payload.get("post_id", payload.get("external_post_id", payload.get("moltbook_post_id", "")))
+            payload.get(
+                "post_id", payload.get("external_post_id", payload.get("moltbook_post_id", ""))
+            )
         ).strip()
         external_post_id = re.sub(r"[^A-Za-z0-9_\-]", "", external_post_id)[:80]
         title_safe = self._sanitize_text(payload.get("title", ""), max_len=120)
@@ -2060,9 +2185,9 @@ class SapphireForumService:
         token = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_API_TOKEN", "")).strip()
         gtm_outbound_url = str(os.getenv("SAPPHIRE_SCOUT_GTM_OUTBOUND_URL", "")).strip()
         gtm_api_token = str(os.getenv("SAPPHIRE_SCOUT_GTM_API_TOKEN", "")).strip()
-        dispatch_channel = str(
-            payload.get("dispatch_channel", payload.get("channel", ""))
-        ).strip().lower()
+        dispatch_channel = (
+            str(payload.get("dispatch_channel", payload.get("channel", ""))).strip().lower()
+        )
         dispatch_action = "publish"
         dispatch_url = post_url
         if dispatch_channel == "gtm":
@@ -2086,7 +2211,9 @@ class SapphireForumService:
                     outbound_payload[str(key)] = value
         elif self._is_moltbook_api_url(post_url):
             if external_post_id:
-                configured_comment_url = str(os.getenv("SAPPHIRE_SCOUT_EXTERNAL_COMMENT_URL", "")).strip()
+                configured_comment_url = str(
+                    os.getenv("SAPPHIRE_SCOUT_EXTERNAL_COMMENT_URL", "")
+                ).strip()
                 if configured_comment_url:
                     if "{post_id}" in configured_comment_url:
                         dispatch_url = configured_comment_url.replace("{post_id}", external_post_id)
@@ -2105,7 +2232,9 @@ class SapphireForumService:
             else:
                 outbound_payload = {
                     "submolt": (
-                        str(payload.get("submolt", payload.get("community", "general"))).strip().lower()
+                        str(payload.get("submolt", payload.get("community", "general")))
+                        .strip()
+                        .lower()
                         or "general"
                     ),
                     "title": title_safe["text"] or f"Sapphire Scout Update ({topic_id})",

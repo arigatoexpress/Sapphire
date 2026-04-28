@@ -32,6 +32,7 @@ _tb_spec.loader.exec_module(tb)
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
+
 def _make_votes(bull: float, bear: float, neutral: float):
     """Return a minimal vote list that produces the requested weight split."""
     return [
@@ -50,6 +51,7 @@ def _aggregate(votes):
 
 
 # ── decision logic ────────────────────────────────────────────────────────────
+
 
 class TestDecisionLogic:
     """Verify GO/LEAN/WAIT thresholds match the documented decision table."""
@@ -137,32 +139,37 @@ class TestDecisionLogic:
 
 # ── macro sentiment ───────────────────────────────────────────────────────────
 
+
 class TestMacroSentiment:
     def _call(self, macro_output):
         with patch.object(tb, "_run_tool", return_value=macro_output):
             return tb._get_macro_sentiment()
 
     def test_bullish_when_vix_low_and_curve_healthy(self):
-        result = self._call({
-            "indicators": {
-                "VIX": {"value": 12.0},
-                "Fed Funds Rate %": {"value": 2.5},
-                "10Y Treasury %": {"value": 3.5},
-                "2Y Treasury %": {"value": 2.8},
+        result = self._call(
+            {
+                "indicators": {
+                    "VIX": {"value": 12.0},
+                    "Fed Funds Rate %": {"value": 2.5},
+                    "10Y Treasury %": {"value": 3.5},
+                    "2Y Treasury %": {"value": 2.8},
+                }
             }
-        })
+        )
         assert result["sentiment"] == "bullish"
         assert result["score"] > 0
 
     def test_bearish_when_vix_high_and_inverted_curve(self):
-        result = self._call({
-            "indicators": {
-                "VIX": {"value": 30.0},
-                "Fed Funds Rate %": {"value": 5.5},
-                "10Y Treasury %": {"value": 3.8},
-                "2Y Treasury %": {"value": 4.5},
+        result = self._call(
+            {
+                "indicators": {
+                    "VIX": {"value": 30.0},
+                    "Fed Funds Rate %": {"value": 5.5},
+                    "10Y Treasury %": {"value": 3.8},
+                    "2Y Treasury %": {"value": 4.5},
+                }
             }
-        })
+        )
         assert result["sentiment"] == "bearish"
         assert result["score"] < 0
 
@@ -173,13 +180,12 @@ class TestMacroSentiment:
         assert "unavailable" in result["reason"]
 
     def test_reasons_populated_on_vix_signal(self):
-        result = self._call({
-            "indicators": {"VIX": {"value": 10.0}}
-        })
+        result = self._call({"indicators": {"VIX": {"value": 10.0}}})
         assert any("VIX" in r for r in result.get("reasons", []))
 
 
 # ── track record modifier ─────────────────────────────────────────────────────
+
 
 class TestTrackRecord:
     def _call(self, metrics_output):
@@ -210,21 +216,39 @@ class TestTrackRecord:
 
 # ── action_decide integration ─────────────────────────────────────────────────
 
+
 class TestActionDecide:
     """action_decide should return the documented shape without calling live tools."""
 
     def _mock_decide(self, symbol="BTC"):
         with (
-            patch.object(tb, "_run_tool", return_value={"signals": 0, "details": [], "success": False}),
-            patch.object(tb, "_get_macro_sentiment", return_value={"sentiment": "neutral", "score": 0, "reasons": []}),
-            patch.object(tb, "_get_paper_track_record", return_value={"modifier": 0.0, "reason": "test"}),
+            patch.object(
+                tb, "_run_tool", return_value={"signals": 0, "details": [], "success": False}
+            ),
+            patch.object(
+                tb,
+                "_get_macro_sentiment",
+                return_value={"sentiment": "neutral", "score": 0, "reasons": []},
+            ),
+            patch.object(
+                tb, "_get_paper_track_record", return_value={"modifier": 0.0, "reason": "test"}
+            ),
         ):
             # technical_analysis import will fail gracefully in test env → neutral vote
             return tb.action_decide(symbol)
 
     def test_returns_required_keys(self):
         result = self._mock_decide("BTC")
-        for key in ("symbol", "decision", "direction", "confidence", "timestamp", "votes", "aggregation", "track_record"):
+        for key in (
+            "symbol",
+            "decision",
+            "direction",
+            "confidence",
+            "timestamp",
+            "votes",
+            "aggregation",
+            "track_record",
+        ):
             assert key in result, f"Missing key: {key}"
 
     def test_symbol_echoed(self):
@@ -262,12 +286,21 @@ class TestActionDecide:
 
 # ── action_dashboard ──────────────────────────────────────────────────────────
 
+
 class TestActionDashboard:
     def test_covers_three_symbols(self):
         with (
-            patch.object(tb, "_run_tool", return_value={"signals": 0, "details": [], "success": False}),
-            patch.object(tb, "_get_macro_sentiment", return_value={"sentiment": "neutral", "score": 0, "reasons": []}),
-            patch.object(tb, "_get_paper_track_record", return_value={"modifier": 0.0, "reason": "test"}),
+            patch.object(
+                tb, "_run_tool", return_value={"signals": 0, "details": [], "success": False}
+            ),
+            patch.object(
+                tb,
+                "_get_macro_sentiment",
+                return_value={"sentiment": "neutral", "score": 0, "reasons": []},
+            ),
+            patch.object(
+                tb, "_get_paper_track_record", return_value={"modifier": 0.0, "reason": "test"}
+            ),
         ):
             result = tb.action_dashboard()
 
@@ -277,9 +310,17 @@ class TestActionDashboard:
 
     def test_each_decision_has_confidence(self):
         with (
-            patch.object(tb, "_run_tool", return_value={"signals": 0, "details": [], "success": False}),
-            patch.object(tb, "_get_macro_sentiment", return_value={"sentiment": "neutral", "score": 0, "reasons": []}),
-            patch.object(tb, "_get_paper_track_record", return_value={"modifier": 0.0, "reason": "test"}),
+            patch.object(
+                tb, "_run_tool", return_value={"signals": 0, "details": [], "success": False}
+            ),
+            patch.object(
+                tb,
+                "_get_macro_sentiment",
+                return_value={"sentiment": "neutral", "score": 0, "reasons": []},
+            ),
+            patch.object(
+                tb, "_get_paper_track_record", return_value={"modifier": 0.0, "reason": "test"}
+            ),
         ):
             result = tb.action_dashboard()
 

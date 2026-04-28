@@ -287,7 +287,9 @@ def test_route_category_collapses_probe_paths_without_query_values():
     assert cost_report.route_category("https://example.invalid/terraform.tfstate") == "public_probe"
     assert cost_report.route_category("https://example.invalid/weird-backup.zip") == "public_probe"
     assert cost_report.route_category("https://example.invalid/composer.json") == "public_probe"
-    assert cost_report.route_category("https://example.invalid/docker-compose.yml") == "public_probe"
+    assert (
+        cost_report.route_category("https://example.invalid/docker-compose.yml") == "public_probe"
+    )
     assert cost_report.route_category("https://example.invalid/openapi.json") == "public_probe"
     assert cost_report.route_category("https://example.invalid/server.js") == "public_probe"
     assert cost_report.route_category("https://example.invalid/docs/page") == "/docs/*"

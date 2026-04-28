@@ -29,10 +29,7 @@ def _control_plane_app_namespace():
     swap it in only for the scope of these imports and restore the prior
     state to avoid breaking unrelated tests.
     """
-    saved = {
-        name: sys.modules.pop(name, None)
-        for name in ("app", "app.models", "app.digest")
-    }
+    saved = {name: sys.modules.pop(name, None) for name in ("app", "app.models", "app.digest")}
     sys.path.insert(0, str(CP_ROOT))
     try:
         importlib.invalidate_caches()
@@ -456,10 +453,7 @@ def test_format_alpha_stream_renders_items_with_assets_and_action():
 def test_format_alpha_stream_caps_at_10_items():
     cfg = _config()
     payload = {
-        "items": [
-            {"title": f"Item {i}", "url": f"https://x.test/{i}"}
-            for i in range(20)
-        ],
+        "items": [{"title": f"Item {i}", "url": f"https://x.test/{i}"} for i in range(20)],
     }
 
     msg = format_alpha_stream_message(cfg, payload)
@@ -528,10 +522,7 @@ def test_format_alpha_stream_uses_routes_or_defaults():
 
 def test_format_alpha_stream_truncates_to_max_chars():
     cfg = _config()
-    items = [
-        {"title": "Item " + ("X" * 300), "url": "https://x.test/" + str(i)}
-        for i in range(20)
-    ]
+    items = [{"title": "Item " + ("X" * 300), "url": "https://x.test/" + str(i)} for i in range(20)]
     payload = {"items": items}
 
     msg = format_alpha_stream_message(cfg, payload, max_chars=500)

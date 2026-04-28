@@ -46,7 +46,9 @@ class SubstackClient(PublisherClient):
             os.getenv(var) for var in ("RESEND_API_KEY", "SUBSTACK_POST_EMAIL", "RESEND_FROM_EMAIL")
         )
 
-    def _publish(self, *, title: str, body_html: str, body_text: str | None = None) -> PublishResult:
+    def _publish(
+        self, *, title: str, body_html: str, body_text: str | None = None
+    ) -> PublishResult:
         to_addr = os.getenv("SUBSTACK_POST_EMAIL", "")
         from_addr = os.getenv("RESEND_FROM_EMAIL", "")
         token = os.getenv("RESEND_API_KEY", "")

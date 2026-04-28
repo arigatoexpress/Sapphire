@@ -25,12 +25,13 @@ from loguru import logger
 
 # ── Threat Categories ─────────────────────────────────────────────
 
+
 class ThreatSeverity(Enum):
-    CRITICAL = "critical"   # Active credential theft / code execution
-    HIGH = "high"           # Suspicious data access or egress patterns
-    MEDIUM = "medium"       # Missing security controls / unsigned
-    LOW = "low"             # Cosmetic or informational
-    CLEAN = "clean"         # No threats detected
+    CRITICAL = "critical"  # Active credential theft / code execution
+    HIGH = "high"  # Suspicious data access or egress patterns
+    MEDIUM = "medium"  # Missing security controls / unsigned
+    LOW = "low"  # Cosmetic or informational
+    CLEAN = "clean"  # No threats detected
 
 
 class ThreatCategory(Enum):
@@ -69,7 +70,11 @@ CREDENTIAL_PATTERNS = [
 
 # Data exfiltration: sending data to external endpoints
 EXFIL_PATTERNS = [
-    (r"webhook\.site", "Sends data to webhook.site (known exfil endpoint)", ThreatSeverity.CRITICAL),
+    (
+        r"webhook\.site",
+        "Sends data to webhook.site (known exfil endpoint)",
+        ThreatSeverity.CRITICAL,
+    ),
     (r"pastebin\.com", "Sends data to pastebin (potential exfil)", ThreatSeverity.HIGH),
     (r"requestbin\.", "Sends data to requestbin (known exfil)", ThreatSeverity.CRITICAL),
     (r"pipedream\.net", "Sends data to pipedream (potential exfil)", ThreatSeverity.HIGH),
@@ -85,33 +90,93 @@ EXFIL_PATTERNS = [
 # Instruction injection: hidden prompts trying to override agent behavior
 INJECTION_PATTERNS = [
     # Role override / instruction hijacking (comprehensive)
-    (r"ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|rules?|context|prompts?|directives?)", "Instruction override attempt", ThreatSeverity.CRITICAL),
-    (r"disregard\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|rules?)", "Instruction disregard attempt", ThreatSeverity.CRITICAL),
-    (r"forget\s+(everything|all)\s+(you|that)\s+(know|were\s+told|learned)", "Memory wipe injection", ThreatSeverity.CRITICAL),
+    (
+        r"ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|rules?|context|prompts?|directives?)",
+        "Instruction override attempt",
+        ThreatSeverity.CRITICAL,
+    ),
+    (
+        r"disregard\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|rules?)",
+        "Instruction disregard attempt",
+        ThreatSeverity.CRITICAL,
+    ),
+    (
+        r"forget\s+(everything|all)\s+(you|that)\s+(know|were\s+told|learned)",
+        "Memory wipe injection",
+        ThreatSeverity.CRITICAL,
+    ),
     (r"you\s+are\s+now\s+(a|an|my)\s+", "Role reassignment injection", ThreatSeverity.CRITICAL),
-    (r"new\s+(instructions?|rules?|directives?)\s*:", "New instruction injection", ThreatSeverity.CRITICAL),
-    (r"system\s*:\s*you\s+(are|must|should|will)", "System prompt injection", ThreatSeverity.CRITICAL),
-    (r"<<\s*(system|override|admin|root)\s*>>", "Admin override tag injection", ThreatSeverity.CRITICAL),
+    (
+        r"new\s+(instructions?|rules?|directives?)\s*:",
+        "New instruction injection",
+        ThreatSeverity.CRITICAL,
+    ),
+    (
+        r"system\s*:\s*you\s+(are|must|should|will)",
+        "System prompt injection",
+        ThreatSeverity.CRITICAL,
+    ),
+    (
+        r"<<\s*(system|override|admin|root)\s*>>",
+        "Admin override tag injection",
+        ThreatSeverity.CRITICAL,
+    ),
     (r"\[INST\]|\[/INST\]|\[SYSTEM\]", "Model instruction tag injection", ThreatSeverity.CRITICAL),
-    (r"from\s+now\s+on\s*,?\s*(you|your|act|behave|respond)", "Behavioral override injection", ThreatSeverity.CRITICAL),
-    (r"pretend\s+(you\s+are|to\s+be|that)\s+", "Social engineering via pretending", ThreatSeverity.HIGH),
-    (r"act\s+as\s+(if\s+you\s+are|a|an|my)\s+", "Role impersonation injection", ThreatSeverity.HIGH),
-    (r"switch\s+(to|into)\s+(a\s+)?(different|new)\s+(mode|role|persona)", "Mode switch injection", ThreatSeverity.HIGH),
-    (r"enter\s+(developer|debug|admin|god|sudo|root|jailbreak)\s+mode", "Privilege escalation injection", ThreatSeverity.CRITICAL),
+    (
+        r"from\s+now\s+on\s*,?\s*(you|your|act|behave|respond)",
+        "Behavioral override injection",
+        ThreatSeverity.CRITICAL,
+    ),
+    (
+        r"pretend\s+(you\s+are|to\s+be|that)\s+",
+        "Social engineering via pretending",
+        ThreatSeverity.HIGH,
+    ),
+    (
+        r"act\s+as\s+(if\s+you\s+are|a|an|my)\s+",
+        "Role impersonation injection",
+        ThreatSeverity.HIGH,
+    ),
+    (
+        r"switch\s+(to|into)\s+(a\s+)?(different|new)\s+(mode|role|persona)",
+        "Mode switch injection",
+        ThreatSeverity.HIGH,
+    ),
+    (
+        r"enter\s+(developer|debug|admin|god|sudo|root|jailbreak)\s+mode",
+        "Privilege escalation injection",
+        ThreatSeverity.CRITICAL,
+    ),
     # Boundary / delimiter attacks
     (r"```\s*(system|assistant|user)\s*\n", "Code block delimiter attack", ThreatSeverity.CRITICAL),
-    (r"<\|?(system|im_start|im_end|endoftext)\|?>", "Model delimiter injection", ThreatSeverity.CRITICAL),
+    (
+        r"<\|?(system|im_start|im_end|endoftext)\|?>",
+        "Model delimiter injection",
+        ThreatSeverity.CRITICAL,
+    ),
     (r"human\s*:\s*\n|assistant\s*:\s*\n", "Conversation boundary injection", ThreatSeverity.HIGH),
     # Hidden content
     (r"<\s*hidden\s*>|display:\s*none|visibility:\s*hidden", "Hidden content", ThreatSeverity.HIGH),
-    (r"base64\.\s*(encode|decode)", "Base64 encoding (potential obfuscation)", ThreatSeverity.MEDIUM),
+    (
+        r"base64\.\s*(encode|decode)",
+        "Base64 encoding (potential obfuscation)",
+        ThreatSeverity.MEDIUM,
+    ),
     # Code execution
     (r"eval\s*\(", "Dynamic code evaluation", ThreatSeverity.HIGH),
     (r"exec\s*\(", "Dynamic code execution", ThreatSeverity.HIGH),
     (r"Function\s*\(", "Dynamic function creation (JS)", ThreatSeverity.HIGH),
     (r"import\s+os\b|import\s+subprocess", "Python OS/subprocess import", ThreatSeverity.HIGH),
-    (r"__import__\s*\(|os\.system\s*\(|os\.popen\s*\(", "Python dangerous import/exec", ThreatSeverity.CRITICAL),
-    (r"subprocess\.(call|run|Popen|check_output)", "Python subprocess execution", ThreatSeverity.HIGH),
+    (
+        r"__import__\s*\(|os\.system\s*\(|os\.popen\s*\(",
+        "Python dangerous import/exec",
+        ThreatSeverity.CRITICAL,
+    ),
+    (
+        r"subprocess\.(call|run|Popen|check_output)",
+        "Python subprocess execution",
+        ThreatSeverity.HIGH,
+    ),
 ]
 
 # Excessive filesystem access
@@ -128,6 +193,7 @@ FILESYSTEM_PATTERNS = [
 
 # ── Data Structures ───────────────────────────────────────────────
 
+
 @dataclass
 class ThreatFinding:
     """A single detected threat in a skill."""
@@ -135,7 +201,7 @@ class ThreatFinding:
     category: ThreatCategory
     severity: ThreatSeverity
     description: str
-    evidence: str         # The matched text/line
+    evidence: str  # The matched text/line
     line_number: int = 0  # Line where found (0 = unknown)
 
     def to_dict(self) -> dict[str, Any]:
@@ -153,9 +219,9 @@ class IsnadLink:
     """A link in the provenance (isnad) chain."""
 
     agent_id: str
-    role: str       # author, auditor, voucher
+    role: str  # author, auditor, voucher
     timestamp: float
-    verdict: str    # clean, suspicious, malicious
+    verdict: str  # clean, suspicious, malicious
     confidence: float
     notes: str = ""
 
@@ -175,7 +241,7 @@ class SkillAuditReport:
     """Complete audit report for a skill."""
 
     skill_name: str
-    skill_hash: str             # SHA256 of content
+    skill_hash: str  # SHA256 of content
     findings: list[ThreatFinding] = field(default_factory=list)
     isnad_chain: list[IsnadLink] = field(default_factory=list)
     overall_severity: ThreatSeverity = ThreatSeverity.CLEAN
@@ -233,14 +299,14 @@ class SkillAuditReport:
             lines.append(f"  Isnad chain: {len(self.isnad_chain)} links")
             for link in self.isnad_chain[-3:]:
                 lines.append(
-                    f"    {link.role}: {link.agent_id} → {link.verdict} "
-                    f"({link.confidence:.0%})"
+                    f"    {link.role}: {link.agent_id} → {link.verdict} ({link.confidence:.0%})"
                 )
 
         return "\n".join(lines)
 
 
 # ── Skill Auditor ─────────────────────────────────────────────────
+
 
 class SkillAuditor:
     """
@@ -274,9 +340,7 @@ class SkillAuditor:
             for pattern, description, severity in pattern_list:
                 try:
                     compiled = re.compile(pattern, re.IGNORECASE)
-                    self._compiled_patterns.append(
-                        (compiled, description, severity, category)
-                    )
+                    self._compiled_patterns.append((compiled, description, severity, category))
                 except re.error as e:
                     logger.warning(f"Bad pattern '{pattern}': {e}")
 
@@ -312,13 +376,15 @@ class SkillAuditor:
         if existing_isnad:
             report.isnad_chain.extend(existing_isnad)
         if author_id:
-            report.isnad_chain.append(IsnadLink(
-                agent_id=author_id,
-                role="author",
-                timestamp=time.time(),
-                verdict="unverified",
-                confidence=0.0,
-            ))
+            report.isnad_chain.append(
+                IsnadLink(
+                    agent_id=author_id,
+                    role="author",
+                    timestamp=time.time(),
+                    verdict="unverified",
+                    confidence=0.0,
+                )
+            )
 
         # Run pattern matching line by line
         lines = content.split("\n")
@@ -330,13 +396,15 @@ class SkillAuditor:
             for compiled, description, severity, category in self._compiled_patterns:
                 match = compiled.search(stripped)
                 if match:
-                    report.findings.append(ThreatFinding(
-                        category=category,
-                        severity=severity,
-                        description=description,
-                        evidence=stripped[:200],
-                        line_number=line_num,
-                    ))
+                    report.findings.append(
+                        ThreatFinding(
+                            category=category,
+                            severity=severity,
+                            description=description,
+                            evidence=stripped[:200],
+                            line_number=line_num,
+                        )
+                    )
 
         # Detect permission requirements
         report.permission_manifest = self._extract_permissions(content)
@@ -348,19 +416,21 @@ class SkillAuditor:
         report.overall_severity = self._compute_overall_severity(report.findings)
 
         # Add auditor's isnad link
-        report.isnad_chain.append(IsnadLink(
-            agent_id=self.auditor_id,
-            role="auditor",
-            timestamp=time.time(),
-            verdict=report.overall_severity.value,
-            confidence=self._compute_confidence(report),
-            notes=f"{len(report.findings)} findings across {len(set(f.category for f in report.findings))} categories",
-        ))
+        report.isnad_chain.append(
+            IsnadLink(
+                agent_id=self.auditor_id,
+                role="auditor",
+                timestamp=time.time(),
+                verdict=report.overall_severity.value,
+                confidence=self._compute_confidence(report),
+                notes=f"{len(report.findings)} findings across {len(set(f.category for f in report.findings))} categories",
+            )
+        )
 
         # Record in history
         self._audit_history.append(report)
         if len(self._audit_history) > self._max_history:
-            self._audit_history = self._audit_history[-self._max_history:]
+            self._audit_history = self._audit_history[-self._max_history :]
 
         logger.info(
             f"🔍 Skill audit: {skill_name} → {report.overall_severity.value} "
@@ -385,32 +455,43 @@ class SkillAuditor:
         # Base64 encoded strings longer than 40 chars
         b64_matches = re.findall(r"[A-Za-z0-9+/=]{40,}", content)
         if len(b64_matches) > 2:
-            report.findings.append(ThreatFinding(
-                category=ThreatCategory.OBFUSCATED_CODE,
-                severity=ThreatSeverity.HIGH,
-                description=f"Contains {len(b64_matches)} base64-like encoded strings",
-                evidence=f"Found {len(b64_matches)} long encoded strings",
-            ))
+            report.findings.append(
+                ThreatFinding(
+                    category=ThreatCategory.OBFUSCATED_CODE,
+                    severity=ThreatSeverity.HIGH,
+                    description=f"Contains {len(b64_matches)} base64-like encoded strings",
+                    evidence=f"Found {len(b64_matches)} long encoded strings",
+                )
+            )
 
         # Unicode homoglyph attacks (e.g., using Cyrillic 'а' instead of Latin 'a')
         non_ascii = sum(1 for c in content if ord(c) > 127 and not c.isspace())
         if non_ascii > 10:
-            report.findings.append(ThreatFinding(
-                category=ThreatCategory.OBFUSCATED_CODE,
-                severity=ThreatSeverity.MEDIUM,
-                description=f"Contains {non_ascii} non-ASCII characters (possible homoglyph attack)",
-                evidence=f"{non_ascii} non-ASCII chars detected",
-            ))
+            report.findings.append(
+                ThreatFinding(
+                    category=ThreatCategory.OBFUSCATED_CODE,
+                    severity=ThreatSeverity.MEDIUM,
+                    description=f"Contains {non_ascii} non-ASCII characters (possible homoglyph attack)",
+                    evidence=f"{non_ascii} non-ASCII chars detected",
+                )
+            )
 
         # Excessive whitespace or zero-width chars (hidden content)
-        zwc = content.count("\u200b") + content.count("\u200c") + content.count("\u200d") + content.count("\ufeff")
+        zwc = (
+            content.count("\u200b")
+            + content.count("\u200c")
+            + content.count("\u200d")
+            + content.count("\ufeff")
+        )
         if zwc > 0:
-            report.findings.append(ThreatFinding(
-                category=ThreatCategory.OBFUSCATED_CODE,
-                severity=ThreatSeverity.HIGH,
-                description=f"Contains {zwc} zero-width characters (hidden content)",
-                evidence=f"{zwc} zero-width chars found",
-            ))
+            report.findings.append(
+                ThreatFinding(
+                    category=ThreatCategory.OBFUSCATED_CODE,
+                    severity=ThreatSeverity.HIGH,
+                    description=f"Contains {zwc} zero-width characters (hidden content)",
+                    evidence=f"{zwc} zero-width chars found",
+                )
+            )
 
     def _compute_overall_severity(self, findings: list[ThreatFinding]) -> ThreatSeverity:
         """Determine overall severity from individual findings."""
@@ -466,7 +547,8 @@ class SkillAuditor:
             "severity_breakdown": severity_counts,
             "category_breakdown": category_counts,
             "critical_skills": [
-                r.skill_name for r in self._audit_history
+                r.skill_name
+                for r in self._audit_history
                 if r.overall_severity == ThreatSeverity.CRITICAL
             ],
         }

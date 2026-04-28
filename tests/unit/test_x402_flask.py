@@ -25,10 +25,16 @@ ASSET = DEFAULT_USDC_CONTRACTS[NETWORK]
 
 
 def _header(amount: int, nonce: str = "t1") -> str:
-    payload = {"payload": {
-        "amount": amount, "payTo": RECIPIENT, "asset": ASSET,
-        "network": NETWORK, "from": "0xpayer", "nonce": nonce,
-    }}
+    payload = {
+        "payload": {
+            "amount": amount,
+            "payTo": RECIPIENT,
+            "asset": ASSET,
+            "network": NETWORK,
+            "from": "0xpayer",
+            "nonce": nonce,
+        }
+    }
     return base64.b64encode(json.dumps(payload).encode()).decode()
 
 
@@ -38,7 +44,10 @@ def app():
     app = flask.Flask(__name__)
 
     mw = X402Middleware(
-        recipient_address=RECIPIENT, network=NETWORK, asset=ASSET, enabled=True,
+        recipient_address=RECIPIENT,
+        network=NETWORK,
+        asset=ASSET,
+        enabled=True,
     )
 
     @app.route("/free")

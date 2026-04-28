@@ -2,6 +2,7 @@
 
 Run: /usr/local/bin/python3 -m pytest tests/unit/test_confirmation_firewall.py -v
 """
+
 from __future__ import annotations
 
 import json
@@ -342,12 +343,15 @@ class TestConfirmationAudit:
 
         monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
 
-        assert fw_module._send_confirmation_request(
-            "ABC123",
-            "post token=sample-token to webhook",
-            ActionRisk.EXTERNAL_SEND,
-            "token=sample-details-token bearer sample-bearer",
-        ) is True
+        assert (
+            fw_module._send_confirmation_request(
+                "ABC123",
+                "post token=sample-token to webhook",
+                ActionRisk.EXTERNAL_SEND,
+                "token=sample-details-token bearer sample-bearer",
+            )
+            is True
+        )
 
         text = captured["payload"]["text"]
         assert "sample-token" not in text
@@ -618,9 +622,7 @@ class TestEnvOverrides:
 
     def test_audit_path_resolves_from_env(self, monkeypatch, tmp_path):
         env_target = tmp_path / "env-firewall.jsonl"
-        monkeypatch.setenv(
-            "SAPPHIRE_CONFIRMATION_FIREWALL_AUDIT_LOG", str(env_target)
-        )
+        monkeypatch.setenv("SAPPHIRE_CONFIRMATION_FIREWALL_AUDIT_LOG", str(env_target))
         fw = ConfirmationFirewall()  # no explicit path
         fw.request_confirmation(
             "health check",
@@ -737,9 +739,7 @@ class TestPendingFileEdgeCases:
 
     def test_list_pending_skips_corrupt_files(self):
         fw_module.PENDING_DIR.mkdir(parents=True, exist_ok=True)
-        good = fw_module._write_pending(
-            "GOODONE1", "paper trade SOL", ActionRisk.FINANCIAL, ""
-        )
+        good = fw_module._write_pending("GOODONE1", "paper trade SOL", ActionRisk.FINANCIAL, "")
         bad = fw_module.PENDING_DIR / "BADJSON1.json"
         bad.write_text("{")
         fw = ConfirmationFirewall(audit_path=False)

@@ -47,6 +47,7 @@ RESULTS_DIR = ROOT / "data" / "backtests" / "strategies"
 # Standalone indicators (no soft deps)
 # ---------------------------------------------------------------------------
 
+
 def _rsi(closes: list[float], period: int = 14) -> float | None:
     if len(closes) < period + 1:
         return None
@@ -92,29 +93,30 @@ def _pearson(a: list[float], b: list[float]) -> float:
 # StrategyParams — shared across all strategies; grid keys are the 3 swept dims
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class StrategyParams:
     # ── swept dimensions ──────────────────────────────────────────────────
-    rsi_period: int   = 14
-    sl_pct:     float = 0.05
-    tp_pct:     float = 0.10
+    rsi_period: int = 14
+    sl_pct: float = 0.05
+    tp_pct: float = 0.10
 
     # ── regime (RegimeAwareRSI, SapphireComposite) ────────────────────────
-    regime_period:        int   = 20
-    regime_on_threshold:  float =  0.05   # BTC 20d return > +5% → RISK_ON
-    regime_off_threshold: float = -0.05   # BTC 20d return < -5% → RISK_OFF
+    regime_period: int = 20
+    regime_on_threshold: float = 0.05  # BTC 20d return > +5% → RISK_ON
+    regime_off_threshold: float = -0.05  # BTC 20d return < -5% → RISK_OFF
 
     # ── funding proxy (FundingRateContrarian, SapphireComposite) ─────────
-    funding_high: float =  0.020   # 3d momentum > +2% → high funding → short
-    funding_low:  float = -0.015   # 3d momentum < -1.5% → neg funding → long
+    funding_high: float = 0.020  # 3d momentum > +2% → high funding → short
+    funding_low: float = -0.015  # 3d momentum < -1.5% → neg funding → long
 
     # ── correlation (CorrelationBreakout, SapphireComposite) ──────────────
-    corr_period:    int   = 20
-    corr_threshold: float = 0.30   # corr below this = crypto decoupled from SPY
+    corr_period: int = 20
+    corr_threshold: float = 0.30  # corr below this = crypto decoupled from SPY
 
     # ── multi-TF (MultiTFMomentum, SapphireComposite) ─────────────────────
-    tf_fast: int = 7     # short RSI period (4H proxy)
-    tf_slow: int = 5     # weekly bar count
+    tf_fast: int = 7  # short RSI period (4H proxy)
+    tf_slow: int = 5  # weekly bar count
 
     # ── composite gate ────────────────────────────────────────────────────
     # 55 is viable in RISK_OFF + correlated market (regime=0, no corr pts, need
@@ -124,8 +126,8 @@ class StrategyParams:
 
 PARAM_GRID: dict[str, list] = {
     "rsi_period": [7, 14, 21],
-    "sl_pct":     [0.02, 0.05, 0.08],
-    "tp_pct":     [0.05, 0.10, 0.15],
+    "sl_pct": [0.02, 0.05, 0.08],
+    "tp_pct": [0.05, 0.10, 0.15],
 }
 
 # Additional dim for SapphireComposite (not in PARAM_GRID to avoid 4D explosion;
@@ -136,6 +138,7 @@ COMPOSITE_THRESHOLDS = [45.0, 55.0, 65.0]
 # ---------------------------------------------------------------------------
 # Strategy ABC
 # ---------------------------------------------------------------------------
+
 
 class Strategy(abc.ABC):
     """Abstract base for all Sapphire backtesting strategies.
@@ -170,6 +173,7 @@ class Strategy(abc.ABC):
 # ---------------------------------------------------------------------------
 # Strategy 1: Regime-Aware RSI
 # ---------------------------------------------------------------------------
+
 
 class RegimeAwareRSI(Strategy):
     """RSI mean-reversion gated by simulated BTC market regime.
@@ -219,8 +223,7 @@ class RegimeAwareRSI(Strategy):
         threshold = 30.0 if regime == "RISK_ON" else 25.0
 
         if rsi < threshold:
-            return Decision(direction="long", size=0.5,
-                            stop_pct=p.sl_pct, tp_pct=p.tp_pct)
+            return Decision(direction="long", size=0.5, stop_pct=p.sl_pct, tp_pct=p.tp_pct)
         if rsi > 70.0:
             return Decision(direction="flat")
         return None
@@ -229,6 +232,7 @@ class RegimeAwareRSI(Strategy):
 # ---------------------------------------------------------------------------
 # Strategy 2: Funding Rate Contrarian
 # ---------------------------------------------------------------------------
+
 
 class FundingRateContrarian(Strategy):
     """Contrarian entries using 3-day price momentum as a funding-rate proxy.
@@ -256,18 +260,17 @@ class FundingRateContrarian(Strategy):
 
         if mom_3d > p.funding_high:
             # High simulated funding → crowded long → contrarian short
-            return Decision(direction="short", size=0.4,
-                            stop_pct=p.sl_pct, tp_pct=p.tp_pct)
+            return Decision(direction="short", size=0.4, stop_pct=p.sl_pct, tp_pct=p.tp_pct)
         if mom_3d < p.funding_low:
             # Negative funding → crowded short → contrarian long
-            return Decision(direction="long", size=0.4,
-                            stop_pct=p.sl_pct, tp_pct=p.tp_pct)
+            return Decision(direction="long", size=0.4, stop_pct=p.sl_pct, tp_pct=p.tp_pct)
         return None
 
 
 # ---------------------------------------------------------------------------
 # Strategy 3: Correlation Breakout
 # ---------------------------------------------------------------------------
+
 
 class CorrelationBreakout(Strategy):
     """Long when BTC↔SPY rolling correlation drops below corr_threshold.
@@ -292,8 +295,8 @@ class CorrelationBreakout(Strategy):
         if len(spy_bars) < n + 1:
             return None
 
-        sym_rets = _daily_returns(window[-(n + 1):])[-n:]
-        spy_rets = _daily_returns(spy_bars[-(n + 1):])[-n:]
+        sym_rets = _daily_returns(window[-(n + 1) :])[-n:]
+        spy_rets = _daily_returns(spy_bars[-(n + 1) :])[-n:]
         if len(sym_rets) < n or len(spy_rets) < n:
             return None
 
@@ -306,8 +309,7 @@ class CorrelationBreakout(Strategy):
         if corr < p.corr_threshold:
             if rsi < 45.0:
                 # Decoupled + oversold → high-quality long setup
-                return Decision(direction="long", size=0.6,
-                                stop_pct=p.sl_pct, tp_pct=p.tp_pct)
+                return Decision(direction="long", size=0.6, stop_pct=p.sl_pct, tp_pct=p.tp_pct)
             if rsi > 65.0:
                 return Decision(direction="flat")
         return None
@@ -316,6 +318,7 @@ class CorrelationBreakout(Strategy):
 # ---------------------------------------------------------------------------
 # Strategy 4: Multi-TF Momentum
 # ---------------------------------------------------------------------------
+
 
 class MultiTFMomentum(Strategy):
     """All three timeframe proxies must agree before entering.
@@ -355,8 +358,7 @@ class MultiTFMomentum(Strategy):
         bear = rsi_fast > 65.0 and closes[-1] > sma20 * 1.02 and weekly_ret > 0.02
 
         if bull:
-            return Decision(direction="long", size=0.5,
-                            stop_pct=p.sl_pct, tp_pct=p.tp_pct)
+            return Decision(direction="long", size=0.5, stop_pct=p.sl_pct, tp_pct=p.tp_pct)
         if bear:
             return Decision(direction="flat")
         return None
@@ -365,6 +367,7 @@ class MultiTFMomentum(Strategy):
 # ---------------------------------------------------------------------------
 # Strategy 5: Sapphire Composite
 # ---------------------------------------------------------------------------
+
 
 class SapphireComposite(Strategy):
     """Composite signal scored 0–100. Only trade when score > composite_threshold.
@@ -434,8 +437,8 @@ class SapphireComposite(Strategy):
         spy_bars = aux.get("spy") or []
         n = p.corr_period
         if len(spy_bars) >= n + 1 and len(window) >= n + 2:
-            sym_rets = _daily_returns(window[-(n + 1):])[-n:]
-            spy_rets = _daily_returns(spy_bars[-(n + 1):])[-n:]
+            sym_rets = _daily_returns(window[-(n + 1) :])[-n:]
+            spy_rets = _daily_returns(spy_bars[-(n + 1) :])[-n:]
             if len(sym_rets) >= n and len(spy_rets) >= n:
                 corr = _pearson(sym_rets, spy_rets)
                 if corr < p.corr_threshold:
@@ -491,6 +494,7 @@ ALL_STRATEGIES: list[type[Strategy]] = [
 # BacktestEngine
 # ---------------------------------------------------------------------------
 
+
 class BacktestEngine:
     """Drives Strategy instances through the backtest_engine runner.
 
@@ -511,7 +515,9 @@ class BacktestEngine:
             fee_bps=float(fee_bps),
         )
         self.bankroll = self.backtest_config.initial_capital
-        self.fee_bps = self.backtest_config.fee_bps  # kept for API compat; run_backtest applies no fees
+        self.fee_bps = (
+            self.backtest_config.fee_bps
+        )  # kept for API compat; run_backtest applies no fees
 
     def run(
         self,
@@ -551,9 +557,17 @@ class BacktestEngine:
             }
             # Translate Decision stop/tp percents into absolute levels
             if getattr(decision, "stop_pct", 0.0):
-                out["stop_loss"] = price * (1 - decision.stop_pct) if direction == "long" else price * (1 + decision.stop_pct)
+                out["stop_loss"] = (
+                    price * (1 - decision.stop_pct)
+                    if direction == "long"
+                    else price * (1 + decision.stop_pct)
+                )
             if getattr(decision, "tp_pct", 0.0):
-                out["take_profit"] = price * (1 + decision.tp_pct) if direction == "long" else price * (1 - decision.tp_pct)
+                out["take_profit"] = (
+                    price * (1 + decision.tp_pct)
+                    if direction == "long"
+                    else price * (1 - decision.tp_pct)
+                )
             return out
 
         result = run_backtest(
@@ -576,6 +590,7 @@ class BacktestEngine:
         # Previous version of this projection divided win_rate by 100 too, which
         # double-divided after #102 landed (50% → 0.005 instead of 0.5).
         from types import SimpleNamespace
+
         return SimpleNamespace(
             sortino=result.sortino,
             sharpe=result.sharpe,
@@ -599,6 +614,7 @@ class BacktestEngine:
         not Bar instances. This helper handles both cases so strategies work
         whether the caller passes Bar dataclasses or raw yfinance dicts.
         """
+
         def _key(bar):
             if isinstance(bar, dict):
                 return bar.get("date") or bar.get("ts")
@@ -625,27 +641,28 @@ class BacktestEngine:
 # Sweep & compare
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class SweepResult:
-    strategy_cls:    str
-    strategy_name:   str
-    symbol:          str
-    rsi_period:      int
-    sl_pct:          float
-    tp_pct:          float
-    sortino:         float | None
-    sharpe:          float | None
+    strategy_cls: str
+    strategy_name: str
+    symbol: str
+    rsi_period: int
+    sl_pct: float
+    tp_pct: float
+    sortino: float | None
+    sharpe: float | None
     total_return_pct: float
-    win_rate:        float | None
-    profit_factor:   float | None
+    win_rate: float | None
+    profit_factor: float | None
     max_drawdown_pct: float
-    calmar:          float | None
-    total_trades:    int
+    calmar: float | None
+    total_trades: int
     report: BacktestReport = field(repr=False)
 
     def to_dict(self, include_report: bool = False) -> dict[str, Any]:
         d: dict[str, Any] = {
-            "strategy_cls":  self.strategy_cls,
+            "strategy_cls": self.strategy_cls,
             "strategy_name": self.strategy_name,
             "symbol": self.symbol,
             "params": {
@@ -653,14 +670,14 @@ class SweepResult:
                 "sl_pct": self.sl_pct,
                 "tp_pct": self.tp_pct,
             },
-            "sortino":          self.sortino,
-            "sharpe":           self.sharpe,
+            "sortino": self.sortino,
+            "sharpe": self.sharpe,
             "total_return_pct": self.total_return_pct,
-            "win_rate":         self.win_rate,
-            "profit_factor":    self.profit_factor,
+            "win_rate": self.win_rate,
+            "profit_factor": self.profit_factor,
             "max_drawdown_pct": self.max_drawdown_pct,
-            "calmar":           self.calmar,
-            "total_trades":     self.total_trades,
+            "calmar": self.calmar,
+            "total_trades": self.total_trades,
         }
         if include_report and self.report is not None:
             # .report may be a dataclass (old BacktestReport), a dict
@@ -703,23 +720,25 @@ def sweep_params(
             if not bars:
                 continue
             report = engine.run(bars, strat, sym, aux_map.get(sym, {}))
-            results.append(SweepResult(
-                strategy_cls=strategy_cls.__name__,
-                strategy_name=strat.name,
-                symbol=sym,
-                rsi_period=params.rsi_period,
-                sl_pct=params.sl_pct,
-                tp_pct=params.tp_pct,
-                sortino=report.sortino,
-                sharpe=report.sharpe,
-                total_return_pct=report.total_return_pct,
-                win_rate=report.win_rate,
-                profit_factor=report.profit_factor,
-                max_drawdown_pct=report.max_drawdown_pct,
-                calmar=report.calmar,
-                total_trades=report.total_trades,
-                report=report,
-            ))
+            results.append(
+                SweepResult(
+                    strategy_cls=strategy_cls.__name__,
+                    strategy_name=strat.name,
+                    symbol=sym,
+                    rsi_period=params.rsi_period,
+                    sl_pct=params.sl_pct,
+                    tp_pct=params.tp_pct,
+                    sortino=report.sortino,
+                    sharpe=report.sharpe,
+                    total_return_pct=report.total_return_pct,
+                    win_rate=report.win_rate,
+                    profit_factor=report.profit_factor,
+                    max_drawdown_pct=report.max_drawdown_pct,
+                    calmar=report.calmar,
+                    total_trades=report.total_trades,
+                    report=report,
+                )
+            )
 
     return results
 
@@ -738,8 +757,7 @@ def best_per_symbol(results: list[SweepResult]) -> list[SweepResult]:
 
 def compare(results: list[SweepResult]) -> list[SweepResult]:
     """Sort results by Sortino descending."""
-    return sorted(results, key=lambda r: r.sortino if r.sortino is not None else -1e9,
-                  reverse=True)
+    return sorted(results, key=lambda r: r.sortino if r.sortino is not None else -1e9, reverse=True)
 
 
 def format_table(results: list[SweepResult], title: str = "", top_n: int = 60) -> str:
@@ -759,9 +777,9 @@ def format_table(results: list[SweepResult], title: str = "", top_n: int = 60) -
         srt = f"{r.sortino:>7.2f}" if r.sortino is not None else "    n/a"
         shr = f"{r.sharpe:>7.2f}" if r.sharpe is not None else "    n/a"
         ret = f"{r.total_return_pct:>+8.2%}"
-        wr  = f"{r.win_rate:>5.1%}" if r.win_rate is not None else "  n/a"
-        pf  = f"{r.profit_factor:>5.2f}" if r.profit_factor is not None else "  n/a"
-        dd  = f"{r.max_drawdown_pct:>6.2%}"
+        wr = f"{r.win_rate:>5.1%}" if r.win_rate is not None else "  n/a"
+        pf = f"{r.profit_factor:>5.2f}" if r.profit_factor is not None else "  n/a"
+        dd = f"{r.max_drawdown_pct:>6.2%}"
         par = f"rsi={r.rsi_period} sl={r.sl_pct:.0%} tp={r.tp_pct:.0%}"
         lines.append(
             f"{r.strategy_cls[:28]:<28} {r.symbol:<8} "

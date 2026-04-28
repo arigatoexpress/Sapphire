@@ -11,6 +11,7 @@ if not hasattr(datetime, "UTC"):
     datetime.UTC = datetime.timezone.utc  # noqa: UP017
 
 if not hasattr(enum, "StrEnum"):
+
     class _StrEnum(str, enum.Enum):  # noqa: UP042
         """Minimal StrEnum backport for Python <3.11."""
 

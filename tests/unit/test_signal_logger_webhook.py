@@ -17,9 +17,7 @@ import pytest
 from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 
-SIGNAL_LOGGER_DIR = (
-    Path(__file__).resolve().parents[2] / "services" / "alpha" / "src"
-)
+SIGNAL_LOGGER_DIR = Path(__file__).resolve().parents[2] / "services" / "alpha" / "src"
 
 
 @pytest.fixture
@@ -55,9 +53,7 @@ def client(signal_logger, monkeypatch):
     async def _passthrough(self, request, call_next):  # noqa: ARG001
         return await call_next(request)
 
-    monkeypatch.setattr(
-        signal_logger._TailscaleOnlyMiddleware, "dispatch", _passthrough
-    )
+    monkeypatch.setattr(signal_logger._TailscaleOnlyMiddleware, "dispatch", _passthrough)
     return TestClient(signal_logger.app)
 
 
@@ -250,14 +246,10 @@ def test_signals_misconfigured_returns_503(signal_logger, monkeypatch):
     async def _passthrough(self, request, call_next):  # noqa: ARG001
         return await call_next(request)
 
-    monkeypatch.setattr(
-        signal_logger._TailscaleOnlyMiddleware, "dispatch", _passthrough
-    )
+    monkeypatch.setattr(signal_logger._TailscaleOnlyMiddleware, "dispatch", _passthrough)
     test_client = TestClient(signal_logger.app)
 
-    response = test_client.post(
-        "/api/signals", json={"secret": "anything", "symbol": "BTC"}
-    )
+    response = test_client.post("/api/signals", json={"secret": "anything", "symbol": "BTC"})
 
     assert response.status_code == 503
     assert "WEBHOOK_SECRET" in response.json()["error"]

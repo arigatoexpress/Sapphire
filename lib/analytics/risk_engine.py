@@ -45,10 +45,10 @@ class Trade:
     timestamp: str
     symbol: str
     direction: str
-    outcome: str       # win | loss | break_even
+    outcome: str  # win | loss | break_even
     pnl_usd: float
     position_usd: float
-    source: str        # "signals" | "paper"
+    source: str  # "signals" | "paper"
 
 
 @dataclass
@@ -65,7 +65,7 @@ class PortfolioMetrics:
     profit_factor: float | None
     avg_win: float
     avg_loss: float
-    expectancy: float        # average $ per trade (signed)
+    expectancy: float  # average $ per trade (signed)
 
     # Risk-adjusted returns (annualized)
     sharpe: float | None
@@ -79,8 +79,8 @@ class PortfolioMetrics:
     current_drawdown_pct: float
 
     # Position sizing
-    kelly_fraction: float    # raw Kelly
-    kelly_quarter: float     # quarter-Kelly (conservative default)
+    kelly_fraction: float  # raw Kelly
+    kelly_quarter: float  # quarter-Kelly (conservative default)
     recommended_size_usd: float
 
     # Equity curve for chart rendering
@@ -162,15 +162,17 @@ class RiskEngine:
                     continue
                 outcome = r.get("paper_outcome")
                 if outcome in {"win", "loss", "break_even"}:
-                    trades.append(Trade(
-                        timestamp=r.get("closed_at") or r.get("timestamp", ""),
-                        symbol=r.get("symbol", "?"),
-                        direction=r.get("direction", "?"),
-                        outcome=outcome,
-                        pnl_usd=float(r.get("paper_pnl_usd") or 0.0),
-                        position_usd=float(r.get("position_usd") or 0.0),
-                        source="paper",
-                    ))
+                    trades.append(
+                        Trade(
+                            timestamp=r.get("closed_at") or r.get("timestamp", ""),
+                            symbol=r.get("symbol", "?"),
+                            direction=r.get("direction", "?"),
+                            outcome=outcome,
+                            pnl_usd=float(r.get("paper_pnl_usd") or 0.0),
+                            position_usd=float(r.get("position_usd") or 0.0),
+                            source="paper",
+                        )
+                    )
 
         # Signal audit files — closed positions have outcome + pnl_usd
         files = sorted(SIGNALS_DIR.glob("*.jsonl")) if SIGNALS_DIR.exists() else []
@@ -189,15 +191,17 @@ class RiskEngine:
                     continue
                 outcome = r.get("outcome")
                 if outcome in {"win", "loss", "break_even"}:
-                    trades.append(Trade(
-                        timestamp=r.get("closed_at") or r.get("timestamp", ""),
-                        symbol=r.get("symbol", "?"),
-                        direction=r.get("direction", "?"),
-                        outcome=outcome,
-                        pnl_usd=float(r.get("pnl_usd") or 0.0),
-                        position_usd=float(r.get("position_usd") or 0.0),
-                        source="signals",
-                    ))
+                    trades.append(
+                        Trade(
+                            timestamp=r.get("closed_at") or r.get("timestamp", ""),
+                            symbol=r.get("symbol", "?"),
+                            direction=r.get("direction", "?"),
+                            outcome=outcome,
+                            pnl_usd=float(r.get("pnl_usd") or 0.0),
+                            position_usd=float(r.get("position_usd") or 0.0),
+                            source="signals",
+                        )
+                    )
 
         # Parse timestamps for a stable chronological sort. Lexicographic sort
         # breaks when inputs mix "...+00:00" and "...Z" suffixes (the latter
@@ -280,12 +284,14 @@ class RiskEngine:
                 max_dd_pct = dd_pct
                 max_dd_usd = dd_usd
                 max_dd_duration = duration
-            equity_curve.append({
-                "timestamp": t.timestamp,
-                "equity_usd": equity,
-                "pnl_usd": round(t.pnl_usd, 2),
-                "drawdown_pct": round(dd_pct, 4),
-            })
+            equity_curve.append(
+                {
+                    "timestamp": t.timestamp,
+                    "equity_usd": equity,
+                    "pnl_usd": round(t.pnl_usd, 2),
+                    "drawdown_pct": round(dd_pct, 4),
+                }
+            )
             current_dd_pct = dd_pct
 
         # Sharpe / Sortino — from per-trade returns as % of bankroll
@@ -364,7 +370,8 @@ class RiskEngine:
             equity_curve=equity_curve,
             bankroll=self.bankroll,
             computed_at=datetime.now(UTC).isoformat(),
-            source_files=1 + (len(list(SIGNALS_DIR.glob("*.jsonl"))) if SIGNALS_DIR.exists() else 0),
+            source_files=1
+            + (len(list(SIGNALS_DIR.glob("*.jsonl"))) if SIGNALS_DIR.exists() else 0),
         )
 
     # ------------------------------------------------------------------
@@ -401,8 +408,10 @@ if __name__ == "__main__":
     print(f"Sortino:        {m.sortino}")
     print(f"Calmar:         {m.calmar}")
     print()
-    print(f"Max drawdown:   {m.max_drawdown_pct:.2%}  (-${m.max_drawdown_usd:,.2f}, "
-          f"{m.max_drawdown_duration_days}d)")
+    print(
+        f"Max drawdown:   {m.max_drawdown_pct:.2%}  (-${m.max_drawdown_usd:,.2f}, "
+        f"{m.max_drawdown_duration_days}d)"
+    )
     print(f"Current DD:     {m.current_drawdown_pct:.2%}")
     print()
     print(f"Kelly raw:      {m.kelly_fraction:.4f}")

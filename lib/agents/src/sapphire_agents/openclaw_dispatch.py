@@ -49,9 +49,7 @@ class OpenClawDispatcher:
         gateway_token: str = "",
     ):
         self.gateway_url = (
-            gateway_url
-            or os.getenv("OPENCLAW_GATEWAY_URL", "")
-            or _DEFAULT_GATEWAY_URL
+            gateway_url or os.getenv("OPENCLAW_GATEWAY_URL", "") or _DEFAULT_GATEWAY_URL
         ).rstrip("/")
         self.gateway_token = gateway_token or os.getenv("OPENCLAW_GATEWAY_TOKEN", "")
         self.enabled = bool(self.gateway_url and self.gateway_token)
@@ -63,9 +61,7 @@ class OpenClawDispatcher:
         self.allowed_repo_scope: set = {
             os.getenv("OPENCLAW_ALLOWED_REPO", "arigatoexpress/Sapphire")
         }
-        self.allowed_project_scope: set = {
-            os.getenv("OPENCLAW_ALLOWED_PROJECT", "sapphire-479610")
-        }
+        self.allowed_project_scope: set = {os.getenv("OPENCLAW_ALLOWED_PROJECT", "sapphire-479610")}
 
     # ── helpers ──────────────────────────────────────────────────────────
 
@@ -125,7 +121,11 @@ class OpenClawDispatcher:
         ).hexdigest()[:16]
 
         system_ctx = self._build_system_context(
-            agent_id, context, allow_code_changes, allow_gcloud_changes, trigger,
+            agent_id,
+            context,
+            allow_code_changes,
+            allow_gcloud_changes,
+            trigger,
         )
         payload = {
             "model": "openclaw",
@@ -137,9 +137,7 @@ class OpenClawDispatcher:
         }
 
         # Fire the dispatch in a background task — don't block the caller.
-        asyncio.create_task(
-            self._do_dispatch(agent_id, session_key, payload, trigger)
-        )
+        asyncio.create_task(self._do_dispatch(agent_id, session_key, payload, trigger))
 
         self._last_dispatch_at = time.time()
         self._dispatch_count += 1

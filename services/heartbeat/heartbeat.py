@@ -52,6 +52,7 @@ _prev_status: dict[str, str] = {}
 def _check_http(url: str, timeout: int = 5) -> bool:
     import urllib.error
     import urllib.request
+
     try:
         with urllib.request.urlopen(url, timeout=timeout) as r:
             return r.status < 500
@@ -67,7 +68,9 @@ def _check_redis() -> bool:
     try:
         r = subprocess.run(
             ["redis-cli", "ping"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         return r.stdout.strip() == "PONG"
     except Exception:
@@ -80,7 +83,9 @@ def _notify(message: str, priority: str = "p2") -> None:
         r = subprocess.run(
             [sys.executable, str(NOTIFY_DIR / "notify.py")],
             input=json.dumps({"message": message, "priority": priority}),
-            capture_output=True, text=True, timeout=15,
+            capture_output=True,
+            text=True,
+            timeout=15,
         )
         if r.returncode != 0:
             log.warning("notify failed: %s", r.stderr[:100])
@@ -92,6 +97,7 @@ def _publish_event(status: dict) -> None:
     """Publish heartbeat event to event bus."""
     try:
         from lib.core.event_bus import get_bus
+
         get_bus().publish("service.heartbeat", status, source="heartbeat")
     except Exception:
         pass

@@ -98,19 +98,37 @@ class AlphaStrategyEngine:
         # --- Quantity guards (kept for TradingView signal dispatch) ------------
         self.min_notional = max(
             0.0,
-            float(os.getenv("SAPPHIRE_MIN_NOTIONAL", os.getenv("SAPPHIRE_INTERNAL_ARB_MIN_NOTIONAL", "5.0"))),
+            float(
+                os.getenv(
+                    "SAPPHIRE_MIN_NOTIONAL", os.getenv("SAPPHIRE_INTERNAL_ARB_MIN_NOTIONAL", "5.0")
+                )
+            ),
         )
         self.notional_buffer_pct = max(
             0.0,
-            float(os.getenv("SAPPHIRE_NOTIONAL_BUFFER_PCT", os.getenv("SAPPHIRE_INTERNAL_ARB_NOTIONAL_BUFFER_PCT", "0.05"))),
+            float(
+                os.getenv(
+                    "SAPPHIRE_NOTIONAL_BUFFER_PCT",
+                    os.getenv("SAPPHIRE_INTERNAL_ARB_NOTIONAL_BUFFER_PCT", "0.05"),
+                )
+            ),
         )
         self.max_quantity = max(
             0.0,
-            float(os.getenv("SAPPHIRE_MAX_QUANTITY", os.getenv("SAPPHIRE_INTERNAL_ARB_MAX_QUANTITY", "0.25"))),
+            float(
+                os.getenv(
+                    "SAPPHIRE_MAX_QUANTITY", os.getenv("SAPPHIRE_INTERNAL_ARB_MAX_QUANTITY", "0.25")
+                )
+            ),
         )
         self.default_quantity = max(
             0.0,
-            float(os.getenv("SAPPHIRE_DEFAULT_QUANTITY", os.getenv("INTERNAL_ARB_EXECUTION_QUANTITY", "0.02"))),
+            float(
+                os.getenv(
+                    "SAPPHIRE_DEFAULT_QUANTITY",
+                    os.getenv("INTERNAL_ARB_EXECUTION_QUANTITY", "0.02"),
+                )
+            ),
         )
 
         # --- Venue profiles & preferred symbols (immutable after init) --------
@@ -222,17 +240,34 @@ class AlphaStrategyEngine:
     # Quantity resolution (used by TradingView signal dispatch)
     # ------------------------------------------------------------------
 
-    def _resolve_dispatch_quantity(self, reference_price: float, baseline_quantity: float) -> dict[str, Any]:
+    def _resolve_dispatch_quantity(
+        self, reference_price: float, baseline_quantity: float
+    ) -> dict[str, Any]:
         quantity = max(0.0, float(baseline_quantity))
         if quantity <= 0:
-            return {"quantity": 0.0, "adjusted": False, "blocked": False, "reason": "non_positive_quantity"}
+            return {
+                "quantity": 0.0,
+                "adjusted": False,
+                "blocked": False,
+                "reason": "non_positive_quantity",
+            }
         if reference_price <= 0 or self.min_notional <= 0:
-            return {"quantity": quantity, "adjusted": False, "blocked": False, "reason": "no_notional_check"}
+            return {
+                "quantity": quantity,
+                "adjusted": False,
+                "blocked": False,
+                "reason": "no_notional_check",
+            }
 
         target_notional = self.min_notional * (1.0 + self.notional_buffer_pct)
         required_quantity = target_notional / reference_price
         if required_quantity <= quantity:
-            return {"quantity": quantity, "adjusted": False, "blocked": False, "reason": "baseline_satisfies_notional"}
+            return {
+                "quantity": quantity,
+                "adjusted": False,
+                "blocked": False,
+                "reason": "baseline_satisfies_notional",
+            }
 
         if self.max_quantity > 0 and required_quantity > self.max_quantity:
             return {
@@ -263,7 +298,8 @@ class AlphaStrategyEngine:
             "🧠 Alpha Strategy Engine Started | stage={} multiplier={} preferred_symbols={}",
             state["dex_execution_stage"],
             state["stage_multiplier"],
-            ",".join(self.preferred_symbols[:5]) + ("..." if len(self.preferred_symbols) > 5 else ""),
+            ",".join(self.preferred_symbols[:5])
+            + ("..." if len(self.preferred_symbols) > 5 else ""),
         )
         for venue, profile in self.venue_profiles.items():
             logger.info("  └─ {} → {}", venue, profile["role"])

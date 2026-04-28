@@ -52,7 +52,7 @@ class Trade:
     opened_at: str
     closed_at: str
     symbol: str
-    side: str                # BUY | SELL
+    side: str  # BUY | SELL
     entry_price: float
     exit_price: float
     qty: float
@@ -98,20 +98,22 @@ def _load_closed_trades() -> list[Trade]:
                 entry = float(t.get("entry_price") or 0.0)
                 exit_p = float(t.get("exit_price") or 0.0)
                 qty = float(t.get("qty") or 0.0)
-                trades.append(Trade(
-                    opened_at=str(t.get("opened_at") or ""),
-                    closed_at=str(t.get("closed_at") or ""),
-                    symbol=str(t.get("symbol") or "?"),
-                    side=str(t.get("side") or "BUY").upper(),
-                    entry_price=entry,
-                    exit_price=exit_p,
-                    qty=qty,
-                    size_usd=float(t.get("size_usd") or entry * qty),
-                    pnl=float(t.get("pnl") or 0.0),
-                    confidence=float(t.get("confidence") or 0.0),
-                    exit_reason=str(t.get("exit_reason") or "?"),
-                    source="paper",
-                ))
+                trades.append(
+                    Trade(
+                        opened_at=str(t.get("opened_at") or ""),
+                        closed_at=str(t.get("closed_at") or ""),
+                        symbol=str(t.get("symbol") or "?"),
+                        side=str(t.get("side") or "BUY").upper(),
+                        entry_price=entry,
+                        exit_price=exit_p,
+                        qty=qty,
+                        size_usd=float(t.get("size_usd") or entry * qty),
+                        pnl=float(t.get("pnl") or 0.0),
+                        confidence=float(t.get("confidence") or 0.0),
+                        exit_reason=str(t.get("exit_reason") or "?"),
+                        source="paper",
+                    )
+                )
         except (OSError, json.JSONDecodeError):
             pass
 
@@ -132,30 +134,34 @@ def _load_closed_trades() -> list[Trade]:
                     entry = float(r.get("price") or 0.0)
                     exit_p = float(r.get("close_price") or 0.0)
                     pnl = float(r.get("pnl_usd") or 0.0)
-                    trades.append(Trade(
-                        opened_at=str(r.get("timestamp") or ""),
-                        closed_at=str(r.get("closed_at") or ""),
-                        symbol=str(r.get("symbol") or "?"),
-                        side=("BUY" if str(r.get("direction") or "").lower() == "long" else "SELL"),
-                        entry_price=entry,
-                        exit_price=exit_p,
-                        qty=(float(r.get("position_usd") or 0.0) / entry) if entry > 0 else 0.0,
-                        size_usd=float(r.get("position_usd") or 0.0),
-                        pnl=pnl,
-                        confidence=float(r.get("confidence") or r.get("original_confidence") or 0.0),
-                        exit_reason=str(r.get("exit_reason") or "signal_close"),
-                        regime=str(r.get("regime") or "UNKNOWN"),
-                        source="signals",
-                        enhancer_flags=list(r.get("enhancer_flags") or []),
-                    ))
+                    trades.append(
+                        Trade(
+                            opened_at=str(r.get("timestamp") or ""),
+                            closed_at=str(r.get("closed_at") or ""),
+                            symbol=str(r.get("symbol") or "?"),
+                            side=(
+                                "BUY" if str(r.get("direction") or "").lower() == "long" else "SELL"
+                            ),
+                            entry_price=entry,
+                            exit_price=exit_p,
+                            qty=(float(r.get("position_usd") or 0.0) / entry) if entry > 0 else 0.0,
+                            size_usd=float(r.get("position_usd") or 0.0),
+                            pnl=pnl,
+                            confidence=float(
+                                r.get("confidence") or r.get("original_confidence") or 0.0
+                            ),
+                            exit_reason=str(r.get("exit_reason") or "signal_close"),
+                            regime=str(r.get("regime") or "UNKNOWN"),
+                            source="signals",
+                            enhancer_flags=list(r.get("enhancer_flags") or []),
+                        )
+                    )
             except OSError:
                 continue
 
     # Sort chronologically by close timestamp (fallback to open)
     def _sort_key(t: Trade) -> datetime:
-        return (t.closed_dt
-                or _parse_ts(t.opened_at)
-                or datetime.min.replace(tzinfo=UTC))
+        return t.closed_dt or _parse_ts(t.opened_at) or datetime.min.replace(tzinfo=UTC)
 
     trades.sort(key=_sort_key)
     return trades
@@ -260,12 +266,14 @@ def _equity_curve(trades: list[Trade]) -> list[dict]:
     curve = [{"t": None, "equity": round(equity, 2)}]
     for tr in trades:
         equity += tr.pnl
-        curve.append({
-            "t": tr.closed_at or tr.opened_at,
-            "equity": round(equity, 2),
-            "pnl": round(tr.pnl, 2),
-            "symbol": tr.symbol,
-        })
+        curve.append(
+            {
+                "t": tr.closed_at or tr.opened_at,
+                "equity": round(equity, 2),
+                "pnl": round(tr.pnl, 2),
+                "symbol": tr.symbol,
+            }
+        )
     return curve
 
 
@@ -276,8 +284,7 @@ def _btc_benchmark(trades: list[Trade]) -> list[dict]:
         return []
 
     # Anchor at the earliest trade timestamp (or first BTC sample, whichever is earlier)
-    first_trade_ts = (_parse_ts(trades[0].opened_at)
-                      or _parse_ts(trades[0].closed_at))
+    first_trade_ts = _parse_ts(trades[0].opened_at) or _parse_ts(trades[0].closed_at)
     if first_trade_ts is None:
         first_trade_ts = samples[0][0]
 
@@ -294,11 +301,13 @@ def _btc_benchmark(trades: list[Trade]) -> list[dict]:
         price = _btc_price_at(samples, ts)
         if price is None:
             continue
-        out.append({
-            "t": tr.closed_at or tr.opened_at,
-            "equity": round(btc_qty * price, 2),
-            "btc_price": round(price, 2),
-        })
+        out.append(
+            {
+                "t": tr.closed_at or tr.opened_at,
+                "equity": round(btc_qty * price, 2),
+                "btc_price": round(price, 2),
+            }
+        )
     return out
 
 
@@ -340,16 +349,18 @@ def _rolling_sharpe(trades: list[Trade], window_days: int = ROLLING_WINDOW_DAYS)
 
     out: list[dict] = []
     for i in range(window_days - 1, len(returns)):
-        window = returns[i - window_days + 1: i + 1]
+        window = returns[i - window_days + 1 : i + 1]
         n = len(window)
         mean = sum(window) / n
         var = sum((r - mean) ** 2 for r in window) / (n - 1) if n > 1 else 0.0
         std = math.sqrt(var)
         sharpe = (mean / std) * annualise if std > 0 else 0.0
-        out.append({
-            "t": all_days[i][0],
-            "sharpe": round(sharpe, 3),
-        })
+        out.append(
+            {
+                "t": all_days[i][0],
+                "sharpe": round(sharpe, 3),
+            }
+        )
     return out
 
 
@@ -360,14 +371,16 @@ def _signal_scatter(trades: list[Trade]) -> list[dict]:
         if tr.confidence <= 0:
             continue
         outcome = "win" if tr.pnl > 0 else ("loss" if tr.pnl < 0 else "break_even")
-        out.append({
-            "confidence": round(tr.confidence, 3),
-            "pnl_pct": round(tr.pnl_pct * 100, 3),
-            "pnl_usd": round(tr.pnl, 2),
-            "outcome": outcome,
-            "symbol": tr.symbol,
-            "t": tr.closed_at,
-        })
+        out.append(
+            {
+                "confidence": round(tr.confidence, 3),
+                "pnl_pct": round(tr.pnl_pct * 100, 3),
+                "pnl_usd": round(tr.pnl, 2),
+                "outcome": outcome,
+                "symbol": tr.symbol,
+                "t": tr.closed_at,
+            }
+        )
     return out
 
 
@@ -422,9 +435,7 @@ def _best_worst(trades: list[Trade], k: int = 5) -> tuple[list[dict], list[dict]
 
 def _monthly_returns(trades: list[Trade]) -> list[dict]:
     """Monthly PnL aggregated for the calendar heatmap."""
-    buckets: dict[tuple[int, int], dict] = defaultdict(
-        lambda: {"pnl": 0.0, "trades": 0, "wins": 0}
-    )
+    buckets: dict[tuple[int, int], dict] = defaultdict(lambda: {"pnl": 0.0, "trades": 0, "wins": 0})
     for tr in trades:
         dt = tr.closed_dt or _parse_ts(tr.opened_at)
         if not dt:
@@ -439,14 +450,16 @@ def _monthly_returns(trades: list[Trade]) -> list[dict]:
 
     out = []
     for (yr, mo), b in sorted(buckets.items()):
-        out.append({
-            "year": yr,
-            "month": mo,
-            "pnl": round(b["pnl"], 2),
-            "pct": round(b["pnl"] / INITIAL_CAPITAL * 100, 3),
-            "trades": b["trades"],
-            "wins": b["wins"],
-        })
+        out.append(
+            {
+                "year": yr,
+                "month": mo,
+                "pnl": round(b["pnl"], 2),
+                "pct": round(b["pnl"] / INITIAL_CAPITAL * 100, 3),
+                "trades": b["trades"],
+                "wins": b["wins"],
+            }
+        )
     return out
 
 
@@ -459,7 +472,9 @@ def _summary(trades: list[Trade], equity: list[dict], btc: list[dict]) -> dict:
     total_pnl = round(sum(t.pnl for t in trades), 2)
     final_equity = equity[-1]["equity"] if equity else INITIAL_CAPITAL
 
-    return_pct = ((final_equity - INITIAL_CAPITAL) / INITIAL_CAPITAL * 100) if INITIAL_CAPITAL else 0.0
+    return_pct = (
+        ((final_equity - INITIAL_CAPITAL) / INITIAL_CAPITAL * 100) if INITIAL_CAPITAL else 0.0
+    )
 
     btc_final = btc[-1]["equity"] if btc else None
     btc_return_pct = None

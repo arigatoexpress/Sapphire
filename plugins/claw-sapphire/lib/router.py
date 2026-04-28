@@ -104,14 +104,37 @@ def _keyword_classify(task: str) -> Classification:
     t = task.lower()
 
     # T3 keywords — complex, high-stakes
-    t3_words = ["refactor", "architect", "security", "trading", "redesign", "plan",
-                 "migrate", "restructure", "rewrite", "multi-file", "breaking change"]
+    t3_words = [
+        "refactor",
+        "architect",
+        "security",
+        "trading",
+        "redesign",
+        "plan",
+        "migrate",
+        "restructure",
+        "rewrite",
+        "multi-file",
+        "breaking change",
+    ]
     if any(w in t for w in t3_words):
         return Classification("t3", "keyword: complex/high-stakes", 4, "keyword")
 
     # T0 keywords — read-only
-    t0_words = ["explain", "analyze", "summarize", "review", "status", "list",
-                 "describe", "what is", "how does", "show me", "report", "scan"]
+    t0_words = [
+        "explain",
+        "analyze",
+        "summarize",
+        "review",
+        "status",
+        "list",
+        "describe",
+        "what is",
+        "how does",
+        "show me",
+        "report",
+        "scan",
+    ]
     if any(w in t for w in t0_words):
         return Classification("t0", "keyword: read-only/analysis", 1, "keyword")
 
@@ -127,7 +150,10 @@ def execute_t0(task: str, repo: str | None = None) -> ExecutionResult:
         if repo_path.exists():
             files = subprocess.run(
                 ["find", ".", "-maxdepth", "2", "-name", "*.py", "-o", "-name", "*.ts"],
-                capture_output=True, text=True, cwd=str(repo_path), timeout=5,
+                capture_output=True,
+                text=True,
+                cwd=str(repo_path),
+                timeout=5,
             ).stdout[:2000]
             context = f"\n\nRepo: {repo}\nKey files:\n{files}"
 
@@ -161,12 +187,14 @@ def _kimi_http(task: str, repo: str | None = None) -> ExecutionResult | None:
     ]
 
     def _post(base: str, model: str, api_key: str, extra_headers: dict | None = None) -> dict:
-        payload = json.dumps({
-            "model": model,
-            "messages": messages,
-            "max_tokens": 4096,
-            "temperature": 0.2,
-        }).encode()
+        payload = json.dumps(
+            {
+                "model": model,
+                "messages": messages,
+                "max_tokens": 4096,
+                "temperature": 0.2,
+            }
+        ).encode()
         headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
         if extra_headers:
             headers.update(extra_headers)
@@ -183,7 +211,8 @@ def _kimi_http(task: str, repo: str | None = None) -> ExecutionResult | None:
             usage = resp.get("usage", {})
             latency = int((time.time() - t0) * 1000)
             return ExecutionResult(
-                tier="t1", agent=f"kimi/moonshot-direct ({latency}ms)",
+                tier="t1",
+                agent=f"kimi/moonshot-direct ({latency}ms)",
                 output=content,
                 prompt_tokens=usage.get("prompt_tokens", 0),
                 eval_tokens=usage.get("completion_tokens", 0),
@@ -198,14 +227,20 @@ def _kimi_http(task: str, repo: str | None = None) -> ExecutionResult | None:
         try:
             t0 = time.time()
             resp = _post(
-                OPENROUTER_BASE, "moonshotai/kimi-k2.5", OPENROUTER_API_KEY,
-                extra_headers={"HTTP-Referer": "https://sapphire.kadima.io", "X-Title": "Sapphire OS"},
+                OPENROUTER_BASE,
+                "moonshotai/kimi-k2.5",
+                OPENROUTER_API_KEY,
+                extra_headers={
+                    "HTTP-Referer": "https://sapphire.kadima.io",
+                    "X-Title": "Sapphire OS",
+                },
             )
             content = resp["choices"][0]["message"]["content"]
             usage = resp.get("usage", {})
             latency = int((time.time() - t0) * 1000)
             return ExecutionResult(
-                tier="t1", agent=f"kimi/openrouter ({latency}ms)",
+                tier="t1",
+                agent=f"kimi/openrouter ({latency}ms)",
                 output=content,
                 prompt_tokens=usage.get("prompt_tokens", 0),
                 eval_tokens=usage.get("completion_tokens", 0),
@@ -227,21 +262,36 @@ def execute_t1(task: str, repo: str | None = None) -> ExecutionResult:
 
     # Legacy fallback: Kimi CLI binary (requires `kimi login` every ~1h)
     if not KIMI_BIN.exists():
-        return ExecutionResult("t1", "kimi", "", 0, 0, 0, False,
-                               "Kimi unavailable: no API keys (MOONSHOT_API_KEY/OPENROUTER_API_KEY) and CLI binary not found")
+        return ExecutionResult(
+            "t1",
+            "kimi",
+            "",
+            0,
+            0,
+            0,
+            False,
+            "Kimi unavailable: no API keys (MOONSHOT_API_KEY/OPENROUTER_API_KEY) and CLI binary not found",
+        )
 
     cwd = str(Path.home() / "Code" / repo) if repo else str(Path.home() / "Code" / "Sapphire")
-    env = {**os.environ, "PATH": f"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:{os.environ.get('PATH', '')}"}
+    env = {
+        **os.environ,
+        "PATH": f"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:{os.environ.get('PATH', '')}",
+    }
 
     try:
         proc = subprocess.run(
             [str(KIMI_BIN), "--print", "--prompt", task, "--work-dir", cwd],
-            capture_output=True, text=True, timeout=180, env=env,
+            capture_output=True,
+            text=True,
+            timeout=180,
+            env=env,
         )
         output = proc.stdout.strip()
         prompt_tokens, eval_tokens = _parse_kimi_tokens(output)
         return ExecutionResult(
-            tier="t1", agent="kimi/cli-legacy",
+            tier="t1",
+            agent="kimi/cli-legacy",
             output=output,
             prompt_tokens=prompt_tokens,
             eval_tokens=eval_tokens,
@@ -260,12 +310,19 @@ def execute_t3(task: str, repo: str | None = None) -> ExecutionResult:
         return ExecutionResult("t3", "claw", "", 0, 0, 0, False, "Claw binary not found")
 
     cwd = str(Path.home() / "Code" / repo) if repo else str(Path.home() / "Code" / "Sapphire")
-    env = {**os.environ, "PATH": f"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:{os.environ.get('PATH', '')}"}
+    env = {
+        **os.environ,
+        "PATH": f"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:{os.environ.get('PATH', '')}",
+    }
 
     try:
         proc = subprocess.run(
             [str(CLAW_BIN), "prompt", task],
-            capture_output=True, text=True, cwd=cwd, timeout=300, env=env,
+            capture_output=True,
+            text=True,
+            cwd=cwd,
+            timeout=300,
+            env=env,
         )
         output = proc.stdout.strip()
         # Rough estimate for Claude — claw doesn't expose token counts in stdout yet

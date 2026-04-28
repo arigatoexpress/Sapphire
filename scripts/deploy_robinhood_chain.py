@@ -18,6 +18,7 @@ Modes:
     --dry-run   Compile contracts only (requires py-solc-x). No deploy.
     (default)   Full deploy: compile + broadcast + save deployment record.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -56,8 +57,7 @@ def _load_private_key() -> str:
         if key:
             return key
     raise RuntimeError(
-        "No deploy key found. Set $ROBINHOOD_DEPLOY_KEY or create "
-        f"{SECRETS_FILE} (chmod 0600)."
+        f"No deploy key found. Set $ROBINHOOD_DEPLOY_KEY or create {SECRETS_FILE} (chmod 0600)."
     )
 
 
@@ -208,7 +208,9 @@ def _preflight() -> int:
         log.error(
             "[FAIL] deploy key could not be parsed (%s: %s). "
             "Expected a 32-byte hex private key in $ROBINHOOD_DEPLOY_KEY or %s.",
-            type(exc).__name__, exc, SECRETS_FILE,
+            type(exc).__name__,
+            exc,
+            SECRETS_FILE,
         )
         return 1
     log.info("[ OK ] deploy key loaded: %s", account.address)
@@ -219,11 +221,14 @@ def _preflight() -> int:
     if balance_eth < MIN_DEPLOY_BALANCE_ETH:
         log.error(
             "[FAIL] deployer balance %.6f ETH < %.4f ETH minimum — fund via testnet faucet",
-            balance_eth, MIN_DEPLOY_BALANCE_ETH,
+            balance_eth,
+            MIN_DEPLOY_BALANCE_ETH,
         )
         status = 1
     else:
-        log.info("[ OK ] deployer balance: %.6f ETH (min %.4f)", balance_eth, MIN_DEPLOY_BALANCE_ETH)
+        log.info(
+            "[ OK ] deployer balance: %.6f ETH (min %.4f)", balance_eth, MIN_DEPLOY_BALANCE_ETH
+        )
 
     # 5. Existing deployment?
     if DEPLOYMENTS_FILE.exists():
@@ -242,7 +247,9 @@ def _preflight() -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--check", action="store_true", help="Read-only preflight; no compile, no deploy")
+    parser.add_argument(
+        "--check", action="store_true", help="Read-only preflight; no compile, no deploy"
+    )
     parser.add_argument("--dry-run", action="store_true", help="Compile only, skip deployment")
     parser.add_argument("--verify", action="store_true", help="Attempt block explorer verification")
     args = parser.parse_args()

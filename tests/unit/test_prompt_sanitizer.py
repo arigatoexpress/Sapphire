@@ -131,9 +131,7 @@ def test_clean_content_passes():
 
 
 def test_clean_trading_message():
-    result = detect_injection(
-        "Signal: BUY SOLUSDT confidence=0.85 timeframe=1H"
-    )
+    result = detect_injection("Signal: BUY SOLUSDT confidence=0.85 timeframe=1H")
     assert result.is_suspicious is False
 
 

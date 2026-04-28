@@ -129,8 +129,7 @@ def _write_foundry_fixture(root):
             "rows": len(rows),
             "file_sha256": sha256(content.encode()).hexdigest(),
             "row_hashes": [
-                sha256(json.dumps(row, sort_keys=True).encode()).hexdigest()
-                for row in rows
+                sha256(json.dumps(row, sort_keys=True).encode()).hexdigest() for row in rows
             ],
         }
     (regional_dir / "manifest.json").write_text(

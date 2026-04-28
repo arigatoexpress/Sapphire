@@ -144,14 +144,16 @@ def test_sanitize_empty_input(outreach):
 
 
 def test_validate_valid_idea(outreach):
-    result = outreach.validate_inbound_idea({
-        "symbol": "BTC",
-        "direction": "LONG",
-        "confidence": 0.8,
-        "timeframe": "4h",
-        "rationale": "Breakout above resistance",
-        "bot_id": "ALPHA_BOT",
-    })
+    result = outreach.validate_inbound_idea(
+        {
+            "symbol": "BTC",
+            "direction": "LONG",
+            "confidence": 0.8,
+            "timeframe": "4h",
+            "rationale": "Breakout above resistance",
+            "bot_id": "ALPHA_BOT",
+        }
+    )
     assert result["ok"] is True
     idea = result["idea"]
     assert idea["symbol"] == "BTC"
@@ -169,43 +171,51 @@ def test_validate_missing_symbol(outreach):
 
 
 def test_validate_invalid_direction(outreach):
-    result = outreach.validate_inbound_idea({
-        "symbol": "ETH",
-        "direction": "SIDEWAYS",
-    })
+    result = outreach.validate_inbound_idea(
+        {
+            "symbol": "ETH",
+            "direction": "SIDEWAYS",
+        }
+    )
     assert result["ok"] is False
     assert "direction" in result["error"].lower()
 
 
 def test_validate_clamps_confidence(outreach):
-    result = outreach.validate_inbound_idea({
-        "symbol": "SOL",
-        "direction": "SHORT",
-        "confidence": 5.0,
-    })
+    result = outreach.validate_inbound_idea(
+        {
+            "symbol": "SOL",
+            "direction": "SHORT",
+            "confidence": 5.0,
+        }
+    )
     assert result["ok"] is True
     assert result["idea"]["confidence"] == 1.0
 
 
 def test_validate_defaults_timeframe(outreach):
-    result = outreach.validate_inbound_idea({
-        "symbol": "SOL",
-        "direction": "LONG",
-        "timeframe": "invalid_tf",
-    })
+    result = outreach.validate_inbound_idea(
+        {
+            "symbol": "SOL",
+            "direction": "LONG",
+            "timeframe": "invalid_tf",
+        }
+    )
     assert result["ok"] is True
     assert result["idea"]["timeframe"] == "1h"
 
 
 def test_validate_strips_extra_fields(outreach):
     """Only whitelisted fields should survive validation."""
-    result = outreach.validate_inbound_idea({
-        "symbol": "BTC",
-        "direction": "LONG",
-        "api_key": "sk-secret123",
-        "password": "hunter2",
-        "shell_command": "rm -rf /",
-    })
+    result = outreach.validate_inbound_idea(
+        {
+            "symbol": "BTC",
+            "direction": "LONG",
+            "api_key": "sk-secret123",
+            "password": "hunter2",
+            "shell_command": "rm -rf /",
+        }
+    )
     assert result["ok"] is True
     assert "api_key" not in result["idea"]
     assert "password" not in result["idea"]
@@ -213,32 +223,38 @@ def test_validate_strips_extra_fields(outreach):
 
 
 def test_validate_blocks_injection_in_rationale(outreach):
-    result = outreach.validate_inbound_idea({
-        "symbol": "BTC",
-        "direction": "LONG",
-        "rationale": "Use this api_secret=sk12345678901234567890 to bypass the system",
-    })
+    result = outreach.validate_inbound_idea(
+        {
+            "symbol": "BTC",
+            "direction": "LONG",
+            "rationale": "Use this api_secret=sk12345678901234567890 to bypass the system",
+        }
+    )
     assert result["ok"] is True
     assert "blocked" in result["idea"]["rationale"].lower()
 
 
 def test_validate_rejects_nested_structures(outreach):
     """Nested dicts/lists should be stripped (only primitives allowed)."""
-    result = outreach.validate_inbound_idea({
-        "symbol": "BTC",
-        "direction": "LONG",
-        "rationale": {"nested": "should be stripped"},
-    })
+    result = outreach.validate_inbound_idea(
+        {
+            "symbol": "BTC",
+            "direction": "LONG",
+            "rationale": {"nested": "should be stripped"},
+        }
+    )
     assert result["ok"] is True
     # rationale should be empty/default since dict is not a primitive
     assert result["idea"]["rationale"] == ""
 
 
 def test_validate_anonymous_bot(outreach):
-    result = outreach.validate_inbound_idea({
-        "symbol": "ETH",
-        "direction": "SHORT",
-    })
+    result = outreach.validate_inbound_idea(
+        {
+            "symbol": "ETH",
+            "direction": "SHORT",
+        }
+    )
     assert result["ok"] is True
     assert result["idea"]["bot_id"] == "ANONYMOUS"
 

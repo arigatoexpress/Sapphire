@@ -29,8 +29,8 @@ log = logging.getLogger(__name__)
 
 @dataclass
 class SentimentScore:
-    score: int                              # 0-100
-    label: str                              # extreme_fear | fear | neutral | greed | extreme_greed
+    score: int  # 0-100
+    label: str  # extreme_fear | fear | neutral | greed | extreme_greed
     components: dict[str, float] = field(default_factory=dict)
     explanations: dict[str, str] = field(default_factory=dict)
     timestamp: str = ""
@@ -139,20 +139,24 @@ def _score_regime(regime: dict) -> tuple[float, str]:
 
 
 WEIGHTS = {
-    "funding":      0.25,
-    "stablecoins":  0.15,
-    "dominance":    0.15,
-    "oi":           0.15,
-    "correlation":  0.10,
-    "regime":       0.20,
+    "funding": 0.25,
+    "stablecoins": 0.15,
+    "dominance": 0.15,
+    "oi": 0.15,
+    "correlation": 0.10,
+    "regime": 0.20,
 }
 
 
 def _label_for(score: int) -> str:
-    if score < 20:  return "extreme_fear"
-    if score < 40:  return "fear"
-    if score < 60:  return "neutral"
-    if score < 80:  return "greed"
+    if score < 20:
+        return "extreme_fear"
+    if score < 40:
+        return "fear"
+    if score < 60:
+        return "neutral"
+    if score < 80:
+        return "greed"
     return "extreme_greed"
 
 
@@ -168,6 +172,7 @@ def compute_sentiment(
     if chain_snapshot is None:
         try:
             from lib.chain import ChainIntelligence
+
             chain_snapshot = ChainIntelligence().snapshot()
         except Exception as e:
             log.warning("chain snapshot unavailable: %s", e)
@@ -176,11 +181,10 @@ def compute_sentiment(
     if correlation_events is None:
         try:
             from lib.analytics.correlation import CorrelationEngine
+
             eng = CorrelationEngine()
             m = eng.build_matrix(window_days=30)
-            correlation_events = [
-                {"severity": e.severity} for e in eng.detect_decorrelations(m)
-            ]
+            correlation_events = [{"severity": e.severity} for e in eng.detect_decorrelations(m)]
         except Exception as e:
             log.warning("correlation unavailable: %s", e)
             correlation_events = []
@@ -233,7 +237,7 @@ def compute_sentiment(
 
 if __name__ == "__main__":
     s = compute_sentiment()
-    print(f"=== Fear & Greed: {s.score}/100 ({s.label.replace('_',' ').upper()}) ===")
+    print(f"=== Fear & Greed: {s.score}/100 ({s.label.replace('_', ' ').upper()}) ===")
     for k, v in s.components.items():
         w = WEIGHTS.get(k, 0) * 100
         print(f"  {k:12} {v:5.1f}/100  (w={w:.0f}%)  — {s.explanations.get(k, '')}")

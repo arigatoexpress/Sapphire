@@ -109,7 +109,9 @@ def _walk_safety_flags(value: Any, *, path: str = "$") -> list[dict[str, str]]:
             flag = _flag_key(key)
             child_path = f"{path}.{key}"
             if flag in _BLOCKED_TRUE_FLAGS and child is True:
-                issues.append(_issue(child_path, "live, publishing, or Telegram flag must be false"))
+                issues.append(
+                    _issue(child_path, "live, publishing, or Telegram flag must be false")
+                )
             if flag == "dry_run" and child is False and child_path != "$.dry_run":
                 issues.append(_issue(child_path, "dry_run must remain true for media factory runs"))
             if (
@@ -197,7 +199,9 @@ def _rendering_warnings(work_order: dict[str, Any]) -> list[dict[str, str]]:
         if rendering.get("exists") is False:
             warnings.append(_issue(f"$.renderings[{index}].exists", "rendering file was missing"))
         if quality and quality.get("passed") is False:
-            warnings.append(_issue(f"$.renderings[{index}].quality", "rendering quality did not pass"))
+            warnings.append(
+                _issue(f"$.renderings[{index}].quality", "rendering quality did not pass")
+            )
     return warnings
 
 
@@ -371,7 +375,9 @@ def _video_readiness(
     return readiness, storyboard_artifact
 
 
-def _manifest_inputs(work_order: dict[str, Any], work_order_path: Path, *, root: Path) -> list[Path]:
+def _manifest_inputs(
+    work_order: dict[str, Any], work_order_path: Path, *, root: Path
+) -> list[Path]:
     paths: list[Path] = [work_order_path]
     seen = {work_order_path.resolve()}
     for source_path in [work_order.get("source_draft"), *work_order.get("source_paths", [])]:

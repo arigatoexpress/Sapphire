@@ -16,6 +16,7 @@ Usage (as a module, called from signal_logger.py):
 Usage (standalone CLI for testing):
     python3 signal_pipeline.py '{"symbol":"BTC","action":"buy","price":65000,"confidence":0.8}'
 """
+
 from __future__ import annotations
 
 import json
@@ -33,10 +34,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 # ─── Path Setup ────────────────────────────────────────────────────────────────
-_ROOT       = Path.home() / "Code" / "Sapphire"
-_CORE_SRC   = _ROOT / "lib" / "core" / "src"
-_CORE_LIB   = _ROOT / "lib" / "core"
-_TOOLS      = _ROOT / "plugins" / "claw-sapphire" / "tools"
+_ROOT = Path.home() / "Code" / "Sapphire"
+_CORE_SRC = _ROOT / "lib" / "core" / "src"
+_CORE_LIB = _ROOT / "lib" / "core"
+_TOOLS = _ROOT / "plugins" / "claw-sapphire" / "tools"
 _PLUGIN_LIB = _ROOT / "plugins" / "claw-sapphire" / "lib"
 
 for _p in [str(_CORE_SRC), str(_CORE_LIB), str(_TOOLS), str(_PLUGIN_LIB)]:
@@ -47,6 +48,7 @@ for _p in [str(_CORE_SRC), str(_CORE_LIB), str(_TOOLS), str(_PLUGIN_LIB)]:
 
 try:
     from sapphire_core.risk_kernel import HardRiskKernel
+
     _KERNEL_AVAILABLE = True
 except ImportError:
     _KERNEL_AVAILABLE = False
@@ -58,18 +60,21 @@ try:
         SizingMethod,
         compute_position_size,
     )
+
     _SIZING_AVAILABLE = True
 except ImportError:
     _SIZING_AVAILABLE = False
 
 try:
     from confirmation_firewall import ConfirmationFirewall
+
     _FIREWALL_AVAILABLE = True
 except ImportError:
     _FIREWALL_AVAILABLE = False
 
 try:
     from notify import send_telegram_message
+
     _NOTIFY_AVAILABLE = True
 except ImportError:
     _NOTIFY_AVAILABLE = False
@@ -78,6 +83,7 @@ try:
     if str(_ROOT) not in sys.path:
         sys.path.insert(0, str(_ROOT))
     from services.pipeline.pubsub_publisher import publish_signal
+
     _PUBSUB_AVAILABLE = True
 except Exception:
     _PUBSUB_AVAILABLE = False
@@ -88,6 +94,7 @@ try:
     if str(_SAPPHIRE_ROOT) not in sys.path:
         sys.path.insert(0, str(_SAPPHIRE_ROOT))
     from lib.analytics.signal_enhancer import get_enhancer
+
     _ENHANCER_AVAILABLE = True
 except ImportError:
     _ENHANCER_AVAILABLE = False
@@ -95,6 +102,7 @@ except ImportError:
 # Decision engine — world-state-aware confidence gate (regime/funding/fear-greed).
 try:
     from lib.core.decision_engine import DecisionEngine as _DecisionEngine
+
     _DECISION_ENGINE: _DecisionEngine | None = _DecisionEngine()
     _DECISION_ENGINE_AVAILABLE = True
 except Exception:
@@ -104,6 +112,7 @@ except Exception:
 # Event bus — central nervous system. Degrades to JSONL fallback if Redis down.
 try:
     from event_bus import get_bus as _get_event_bus
+
     _EVENT_BUS = _get_event_bus(source="signal_pipeline")
 except Exception as e:  # pragma: no cover — import guard
     log.warning("event_bus unavailable: %s", e)
@@ -131,7 +140,7 @@ def _paper_trading_env_enabled() -> bool:
     return True
 
 
-SIGNALS_DIR   = _ROOT / "data" / "signals"
+SIGNALS_DIR = _ROOT / "data" / "signals"
 SIGNALS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Paper trading — defaults on. Explicitly set PAPER_TRADING=0/false only after
@@ -140,8 +149,8 @@ PAPER_TRADING = _paper_trading_env_enabled()
 PAPER_TRADING_LOG = _ROOT / "data" / "paper_trading.jsonl"
 
 # Confidence thresholds
-HIGH_CONF    = float(os.getenv("SIGNAL_HIGH_CONF",    "0.75"))  # requires confirmation
-MEDIUM_CONF  = float(os.getenv("SIGNAL_MEDIUM_CONF",  "0.50"))  # notify with details
+HIGH_CONF = float(os.getenv("SIGNAL_HIGH_CONF", "0.75"))  # requires confirmation
+MEDIUM_CONF = float(os.getenv("SIGNAL_MEDIUM_CONF", "0.50"))  # notify with details
 # below MEDIUM_CONF → logged only
 
 # Default paper portfolio balance for position sizing
@@ -156,79 +165,81 @@ ENHANCER_ENABLED = os.getenv("SIGNAL_ENHANCER", "1") == "1"
 
 # ─── Data Classes ─────────────────────────────────────────────────────────────
 
+
 @dataclass
 class ScoredSignal:
     """A raw signal enriched with risk scoring and position sizing."""
 
     # Identity
-    pipeline_id:  str
-    timestamp:    str
-    symbol:       str
-    action:       str        # buy | sell | long | short | close
-    direction:    str        # long | short | flat
-    strategy:     str
-    price:        float
-    source:       str
+    pipeline_id: str
+    timestamp: str
+    symbol: str
+    action: str  # buy | sell | long | short | close
+    direction: str  # long | short | flat
+    strategy: str
+    price: float
+    source: str
 
     # Raw signal confidence (0–1, from Pine alert or webhook)
-    confidence:   float
+    confidence: float
 
     # Risk kernel gate
-    kernel_ok:    bool
+    kernel_ok: bool
     kernel_reason: str
 
     # Position sizing
-    position_usd:  float
-    position_pct:  float
-    kelly_raw:     float
-    kelly_capped:  float
+    position_usd: float
+    position_pct: float
+    kelly_raw: float
+    kelly_capped: float
     sizing_method: str
     sizing_reason: str
 
     # Composite score (0–100)
-    score:         float
+    score: float
 
     # Routing decision
-    routing:       str       # CONFIRMATION_REQUIRED | NOTIFY | LOG_ONLY | BLOCKED
+    routing: str  # CONFIRMATION_REQUIRED | NOTIFY | LOG_ONLY | BLOCKED
 
     # Risk/reward from signal (if provided)
-    take_profit:   float = 0.0
-    stop_loss:     float = 0.0
-    rr_ratio:      float = 0.0
+    take_profit: float = 0.0
+    stop_loss: float = 0.0
+    rr_ratio: float = 0.0
 
     # Regime-aware enhancement (optional — populated if lib.analytics available)
-    original_confidence:  float = 0.0
-    regime:               str = "UNKNOWN"
-    regime_score:         float = 0.0
-    regime_confidence:    float = 0.0
-    enhancer_flags:       list[str] = field(default_factory=list)
-    enhancer_reasons:     list[str] = field(default_factory=list)
+    original_confidence: float = 0.0
+    regime: str = "UNKNOWN"
+    regime_score: float = 0.0
+    regime_confidence: float = 0.0
+    enhancer_flags: list[str] = field(default_factory=list)
+    enhancer_reasons: list[str] = field(default_factory=list)
 
     # Full market context at the time the signal landed (for backtesting).
-    funding_rate:          float | None = None
-    funding_flag:          str | None = None
-    correlation_btc_spy:   float | None = None
-    fear_greed:            int | None = None
-    kronos_direction:      str | None = None
-    kronos_confidence:     float | None = None
+    funding_rate: float | None = None
+    funding_flag: str | None = None
+    correlation_btc_spy: float | None = None
+    fear_greed: int | None = None
+    kronos_direction: str | None = None
+    kronos_confidence: float | None = None
 
     # Audit
-    raw:           dict = field(default_factory=dict)
-    notes:         list[str] = field(default_factory=list)
+    raw: dict = field(default_factory=dict)
+    notes: list[str] = field(default_factory=list)
 
 
 @dataclass
 class ProcessedSignal:
     """Final result returned by pipeline.process()."""
 
-    scored:         ScoredSignal
-    telegram_sent:  bool
-    confirmation_code: str   # non-empty if confirmation was requested
-    audit_path:     str      # where the JSONL record was written
-    elapsed_ms:     int
+    scored: ScoredSignal
+    telegram_sent: bool
+    confirmation_code: str  # non-empty if confirmation was requested
+    audit_path: str  # where the JSONL record was written
+    elapsed_ms: int
 
 
 # ─── Signal Pipeline ──────────────────────────────────────────────────────────
+
 
 class SignalPipeline:
     """
@@ -310,27 +321,28 @@ class SignalPipeline:
         # produces a fake $0 P&L event.
         is_close_action = scored.action.lower() in {"close", "flat", "exit"}
         is_live_entry = (
-            not is_close_action
-            and scored.routing != "BLOCKED"
-            and scored.position_usd > 0
+            not is_close_action and scored.routing != "BLOCKED" and scored.position_usd > 0
         )
 
         # Record signal in performance tracker (lazy import — never blocks tests)
         if is_live_entry:
             try:
                 from lib.analytics.performance_tracker import PerformanceTracker
-                PerformanceTracker().record_signal({
-                    "signal_id": scored.pipeline_id,
-                    "symbol": scored.symbol,
-                    "direction": scored.direction,
-                    "confidence": scored.confidence,
-                    "regime": scored.regime,
-                    "entry_price": scored.price,
-                    "tp_price": scored.take_profit or None,
-                    "sl_price": scored.stop_loss or None,
-                    "source": scored.source,
-                    "enhancer_flags": scored.enhancer_flags,
-                })
+
+                PerformanceTracker().record_signal(
+                    {
+                        "signal_id": scored.pipeline_id,
+                        "symbol": scored.symbol,
+                        "direction": scored.direction,
+                        "confidence": scored.confidence,
+                        "regime": scored.regime,
+                        "entry_price": scored.price,
+                        "tp_price": scored.take_profit or None,
+                        "sl_price": scored.stop_loss or None,
+                        "source": scored.source,
+                        "enhancer_flags": scored.enhancer_flags,
+                    }
+                )
             except Exception as _e:
                 log.debug("performance tracker record_signal failed: %s", _e)
         with self._active_lock:
@@ -350,17 +362,20 @@ class SignalPipeline:
         # signal.closed.
         if _EVENT_BUS is not None and is_live_entry:
             try:
-                _EVENT_BUS.publish("signal.generated", {
-                    "pipeline_id": scored.pipeline_id,
-                    "symbol": scored.symbol,
-                    "action": scored.action,
-                    "direction": scored.direction,
-                    "strategy": scored.strategy,
-                    "price": scored.price,
-                    "confidence": scored.confidence,
-                    "routing": scored.routing,
-                    "position_usd": scored.position_usd,
-                })
+                _EVENT_BUS.publish(
+                    "signal.generated",
+                    {
+                        "pipeline_id": scored.pipeline_id,
+                        "symbol": scored.symbol,
+                        "action": scored.action,
+                        "direction": scored.direction,
+                        "strategy": scored.strategy,
+                        "price": scored.price,
+                        "confidence": scored.confidence,
+                        "routing": scored.routing,
+                        "position_usd": scored.position_usd,
+                    },
+                )
             except Exception as e:
                 log.warning("event bus publish failed: %s", e)
 
@@ -405,20 +420,27 @@ class SignalPipeline:
 
         log.info(
             "-> closed %s | entry=%.4f exit=%.4f pnl=%.2f USD (%s)",
-            open_signal.symbol, entry, close_price, pnl_usd, outcome,
+            open_signal.symbol,
+            entry,
+            close_price,
+            pnl_usd,
+            outcome,
         )
 
         if _EVENT_BUS is not None:
             try:
-                _EVENT_BUS.publish("signal.closed", {
-                    "pipeline_id": open_signal.pipeline_id,
-                    "symbol": open_signal.symbol,
-                    "direction": open_signal.direction,
-                    "entry_price": entry,
-                    "close_price": close_price,
-                    "pnl_usd": pnl_usd,
-                    "outcome": outcome,
-                })
+                _EVENT_BUS.publish(
+                    "signal.closed",
+                    {
+                        "pipeline_id": open_signal.pipeline_id,
+                        "symbol": open_signal.symbol,
+                        "direction": open_signal.direction,
+                        "entry_price": entry,
+                        "close_price": close_price,
+                        "pnl_usd": pnl_usd,
+                        "outcome": outcome,
+                    },
+                )
             except Exception as e:
                 log.warning("event bus publish failed: %s", e)
 
@@ -430,10 +452,12 @@ class SignalPipeline:
             except Exception as e:
                 log.warning(
                     "Failed to write outcome for pipeline_id=%s: %s",
-                    open_signal.pipeline_id, e,
+                    open_signal.pipeline_id,
+                    e,
                 )
             try:
                 from lib.analytics.performance_tracker import PerformanceTracker
+
                 entry_px = open_signal.price
                 pnl_pct = (close_price - entry_px) / entry_px if entry_px else None
                 PerformanceTracker().record_outcome(
@@ -503,6 +527,7 @@ class SignalPipeline:
         if not updated:
             return False
         import tempfile
+
         tmp_path = None
         try:
             with tempfile.NamedTemporaryFile(
@@ -521,7 +546,7 @@ class SignalPipeline:
     def update_signal_outcome(
         self,
         pipeline_id: str,
-        outcome: str,       # "win" | "loss" | "break_even"
+        outcome: str,  # "win" | "loss" | "break_even"
         pnl_usd: float,
         close_price: float = 0.0,
     ) -> bool:
@@ -564,6 +589,7 @@ class SignalPipeline:
                 new_lines.append(line)
             if updated:
                 import tempfile
+
                 tmp_path = None
                 try:
                     with tempfile.NamedTemporaryFile(
@@ -583,14 +609,11 @@ class SignalPipeline:
                 # Mirror the outcome into paper_trading.jsonl so paper_stats()
                 # reflects the close (not stuck at paper_status=open forever).
                 if PAPER_TRADING:
-                    self._update_paper_outcome(
-                        pipeline_id, outcome, pnl_usd, close_price
-                    )
+                    self._update_paper_outcome(pipeline_id, outcome, pnl_usd, close_price)
                 # Remove from in-memory active index (keyed by symbol)
                 with self._active_lock:
                     to_remove = [
-                        sym for sym, sig in self._active.items()
-                        if sig.pipeline_id == pipeline_id
+                        sym for sym, sig in self._active.items() if sig.pipeline_id == pipeline_id
                     ]
                     for sym in to_remove:
                         self._active.pop(sym, None)
@@ -598,36 +621,39 @@ class SignalPipeline:
                 # v_signals_latest picks the most-recent per signal_id).
                 if _PUBSUB_AVAILABLE:
                     try:
-                        publish_signal({
-                            "signal_id":     pipeline_id,
-                            "symbol":        record.get("symbol", "UNKNOWN"),
-                            "action":        "close",
-                            "direction":     record.get("direction"),
-                            "outcome":       outcome,
-                            "pnl_usd":       round(pnl_usd, 2),
-                            "closed_at":     record.get("closed_at"),
-                            # Publish the actual close price (or null if missing).
-                            # Falling back to the entry price silently corrupted
-                            # BQ with close rows that matched the open row.
-                            "price_at_signal": close_price,
-                            "score":         record.get("score"),
-                            "confidence":    record.get("confidence"),
-                            "timestamp":     record.get("closed_at"),
-                        })
+                        publish_signal(
+                            {
+                                "signal_id": pipeline_id,
+                                "symbol": record.get("symbol", "UNKNOWN"),
+                                "action": "close",
+                                "direction": record.get("direction"),
+                                "outcome": outcome,
+                                "pnl_usd": round(pnl_usd, 2),
+                                "closed_at": record.get("closed_at"),
+                                # Publish the actual close price (or null if missing).
+                                # Falling back to the entry price silently corrupted
+                                # BQ with close rows that matched the open row.
+                                "price_at_signal": close_price,
+                                "score": record.get("score"),
+                                "confidence": record.get("confidence"),
+                                "timestamp": record.get("closed_at"),
+                            }
+                        )
                     except Exception as e:
                         log.warning("pubsub close publish skipped: %s", e)
 
                 # Event bus — signal.closed so world-state PnL tracks live.
                 try:
                     from lib.core.event_bus import get_bus
+
                     get_bus().publish(
                         "signal.closed",
                         {
                             "signal_id": pipeline_id,
-                            "symbol":    record.get("symbol", "UNKNOWN"),
+                            "symbol": record.get("symbol", "UNKNOWN"),
                             "direction": record.get("direction"),
-                            "outcome":   outcome,
-                            "pnl_usd":   round(pnl_usd, 2),
+                            "outcome": outcome,
+                            "pnl_usd": round(pnl_usd, 2),
                             "entry_price": record.get("price"),
                             "close_price": close_price,
                             "closed_at": record.get("closed_at"),
@@ -677,14 +703,14 @@ class SignalPipeline:
         """Build a ScoredSignal from a raw dict."""
         notes: list[str] = []
 
-        symbol     = str(raw.get("symbol", "UNKNOWN")).upper()
+        symbol = str(raw.get("symbol", "UNKNOWN")).upper()
         action_raw = str(raw.get("action", raw.get("side", "UNKNOWN"))).lower()
-        strategy   = str(raw.get("strategy", "unknown"))
-        price      = float(raw.get("price", 0) or 0)
+        strategy = str(raw.get("strategy", "unknown"))
+        price = float(raw.get("price", 0) or 0)
         confidence = float(raw.get("confidence", 0.5) or 0.5)
         original_confidence = confidence
-        tp         = float(raw.get("take_profit", raw.get("tp", 0)) or 0)
-        sl         = float(raw.get("stop_loss",   raw.get("sl", 0)) or 0)
+        tp = float(raw.get("take_profit", raw.get("tp", 0)) or 0)
+        sl = float(raw.get("stop_loss", raw.get("sl", 0)) or 0)
 
         # Normalize direction
         if action_raw in {"buy", "long", "entry_long"}:
@@ -733,7 +759,7 @@ class SignalPipeline:
         rr_ratio = 0.0
         if tp > 0 and sl > 0 and price > 0:
             reward = abs(tp - price)
-            risk   = abs(price - sl)
+            risk = abs(price - sl)
             if risk > 0:
                 rr_ratio = round(reward / risk, 2)
 
@@ -750,7 +776,7 @@ class SignalPipeline:
         # ── Position Sizing ───────────────────────────────────────────────────
         position_usd = 0.0
         position_pct = 0.0
-        kelly_raw    = 0.0
+        kelly_raw = 0.0
         kelly_capped = 0.0
         sizing_method = "unavailable"
         sizing_reason = ""
@@ -762,17 +788,17 @@ class SignalPipeline:
                     confidence=min(1.0, max(0.0, confidence)),
                     volatility=DEFAULT_VOLATILITY,
                     drawdown_pct=0.0,
-                    win_rate=0.0,      # uses default 0.55
+                    win_rate=0.0,  # uses default 0.55
                     rr_ratio=rr_ratio if rr_ratio > 0 else 0.0,
                     regime=MarketRegime.UNKNOWN,
                     execution_stage="full_live",
                     current_exposure=0.0,
                 )
                 result = compute_position_size(inp, SizingMethod.KELLY)
-                position_usd  = result.position_usd
-                position_pct  = result.position_pct
-                kelly_raw     = result.kelly_raw
-                kelly_capped  = result.kelly_capped
+                position_usd = result.position_usd
+                position_pct = result.position_pct
+                kelly_raw = result.kelly_raw
+                kelly_capped = result.kelly_capped
                 sizing_method = result.method
                 sizing_reason = result.capped_reason
             except Exception as e:
@@ -786,26 +812,28 @@ class SignalPipeline:
         # so it caps at 25; R:R and size are quality-of-setup modifiers.
         # Clamp confidence_pts to [0, 40] — bad-input confidence > 1.0 must not
         # overflow the composite; < 0 must not subtract from other factors.
-        conf_pts  = min(40.0, max(0.0, confidence * 40))
-        kern_pts  = 25 if kernel_ok else 0
+        conf_pts = min(40.0, max(0.0, confidence * 40))
+        kern_pts = 25 if kernel_ok else 0
         # Missing R:R should score LOWER than a valid 1:1 (7 pts), not higher.
         # Prior default of 10 rewarded ignorance — lower it below any real R:R.
         # The 7x multiplier means R:R=2.85 saturates at 20 (matches our target setup).
-        rr_pts    = min(20, rr_ratio * 7) if rr_ratio > 0 else 5
+        rr_pts = min(20, rr_ratio * 7) if rr_ratio > 0 else 5
         # Scales linearly to max position (10% of balance = full 15 pts); Kelly
         # below the cap produces a proportional haircut on the composite.
-        pos_pts   = min(15, (position_pct / 0.10) * 15)
-        score     = round(conf_pts + kern_pts + rr_pts + pos_pts, 1)
+        pos_pts = min(15, (position_pct / 0.10) * 15)
+        score = round(conf_pts + kern_pts + rr_pts + pos_pts, 1)
 
         # ── Decision Engine Gate ──────────────────────────────────────────────
         decision_verdict = "ALLOW"
         if _DECISION_ENGINE_AVAILABLE and _DECISION_ENGINE and direction != "flat" and kernel_ok:
             try:
-                dec = _DECISION_ENGINE.evaluate({
-                    "symbol": symbol,
-                    "direction": direction,
-                    "confidence": confidence,
-                })
+                dec = _DECISION_ENGINE.evaluate(
+                    {
+                        "symbol": symbol,
+                        "direction": direction,
+                        "confidence": confidence,
+                    }
+                )
                 decision_verdict = dec.verdict
                 if dec.adjusted_confidence != confidence:
                     notes.append(
@@ -828,42 +856,42 @@ class SignalPipeline:
             routing = "LOG_ONLY"
 
         return ScoredSignal(
-            pipeline_id  = str(uuid.uuid4())[:8],
-            timestamp    = datetime.now(UTC).isoformat(),
-            symbol       = symbol,
-            action       = action_raw,
-            direction    = direction,
-            strategy     = strategy,
-            price        = price,
-            source       = str(raw.get("source", "webhook")),
-            confidence   = round(confidence, 3),
-            kernel_ok    = kernel_ok,
-            kernel_reason= kernel_reason,
-            position_usd = position_usd,
-            position_pct = position_pct,
-            kelly_raw    = kelly_raw,
-            kelly_capped = kelly_capped,
-            sizing_method= sizing_method,
-            sizing_reason= sizing_reason,
-            score        = score,
-            routing      = routing,
-            take_profit  = tp,
-            stop_loss    = sl,
-            rr_ratio     = rr_ratio,
-            original_confidence = round(original_confidence, 3),
-            regime       = regime,
-            regime_score = regime_score,
-            regime_confidence = regime_confidence,
-            enhancer_flags = enhancer_flags,
-            enhancer_reasons = enhancer_reasons,
-            funding_rate = funding_rate,
-            funding_flag = funding_flag,
-            correlation_btc_spy = correlation_btc_spy,
-            fear_greed = fear_greed,
-            kronos_direction = kronos_direction,
-            kronos_confidence = kronos_confidence,
-            raw          = raw,
-            notes        = notes,
+            pipeline_id=str(uuid.uuid4())[:8],
+            timestamp=datetime.now(UTC).isoformat(),
+            symbol=symbol,
+            action=action_raw,
+            direction=direction,
+            strategy=strategy,
+            price=price,
+            source=str(raw.get("source", "webhook")),
+            confidence=round(confidence, 3),
+            kernel_ok=kernel_ok,
+            kernel_reason=kernel_reason,
+            position_usd=position_usd,
+            position_pct=position_pct,
+            kelly_raw=kelly_raw,
+            kelly_capped=kelly_capped,
+            sizing_method=sizing_method,
+            sizing_reason=sizing_reason,
+            score=score,
+            routing=routing,
+            take_profit=tp,
+            stop_loss=sl,
+            rr_ratio=rr_ratio,
+            original_confidence=round(original_confidence, 3),
+            regime=regime,
+            regime_score=regime_score,
+            regime_confidence=regime_confidence,
+            enhancer_flags=enhancer_flags,
+            enhancer_reasons=enhancer_reasons,
+            funding_rate=funding_rate,
+            funding_flag=funding_flag,
+            correlation_btc_spy=correlation_btc_spy,
+            fear_greed=fear_greed,
+            kronos_direction=kronos_direction,
+            kronos_confidence=kronos_confidence,
+            raw=raw,
+            notes=notes,
         )
 
     def _send_signal_telegram(self, s: ScoredSignal, execution_status: str) -> None:
@@ -874,9 +902,9 @@ class SignalPipeline:
             icon = "🟢" if s.direction == "long" else "🔴" if s.direction == "short" else "⬜"
             routing_note = {
                 "CONFIRMATION_REQUIRED": "⚠️ _Awaiting confirmation_",
-                "AUTO-APPROVED":         "✅ _Auto-approved (within limits)_",
-                "NOTIFICATION":          "📊 _Signal logged_",
-                "NOTIFICATION-ONLY":     "📊 _Signal logged (firewall fallback)_",
+                "AUTO-APPROVED": "✅ _Auto-approved (within limits)_",
+                "NOTIFICATION": "📊 _Signal logged_",
+                "NOTIFICATION-ONLY": "📊 _Signal logged (firewall fallback)_",
             }.get(execution_status, f"_Status: {execution_status}_")
 
             paper_prefix = "*[PAPER]* " if PAPER_TRADING else ""
@@ -899,7 +927,9 @@ class SignalPipeline:
             if not s.kernel_ok:
                 lines.append(f"🛑 Risk kernel: `{s.kernel_reason}`")
 
-            priority = "p0" if execution_status in {"CONFIRMATION_REQUIRED", "AUTO-APPROVED"} else "p1"
+            priority = (
+                "p0" if execution_status in {"CONFIRMATION_REQUIRED", "AUTO-APPROVED"} else "p1"
+            )
             send_telegram_message("\n".join(lines), priority=priority)
         except Exception:
             pass
@@ -956,7 +986,7 @@ class SignalPipeline:
         with a ``paper_status: open`` marker so P&L can be tracked separately.
         """
         today = datetime.now(UTC).strftime("%Y-%m-%d")
-        path  = SIGNALS_DIR / f"{today}.jsonl"
+        path = SIGNALS_DIR / f"{today}.jsonl"
         record = asdict(s)
         record.pop("raw", None)  # raw is noisy; already in signal_logger's log
         if PAPER_TRADING:
@@ -974,25 +1004,27 @@ class SignalPipeline:
         # hourly gcp_sync also backfills from this JSONL if the publish is dropped.
         if _PUBSUB_AVAILABLE:
             try:
-                publish_signal({
-                    "signal_id":           s.pipeline_id,
-                    "symbol":              s.symbol,
-                    "action":              s.action,
-                    "direction":           s.direction,
-                    "score":               s.score,
-                    "confidence":          s.confidence,
-                    "original_confidence": s.original_confidence,
-                    "regime":              s.regime,
-                    "regime_score":        s.regime_score,
-                    "source":              s.source,
-                    "price_at_signal":     s.price,
-                    "notes":               "; ".join(s.notes) if s.notes else None,
-                    "flags":               list(s.enhancer_flags or []),
-                    "outcome":             None,
-                    "pnl_usd":             None,
-                    "closed_at":           None,
-                    "timestamp":           s.timestamp,
-                })
+                publish_signal(
+                    {
+                        "signal_id": s.pipeline_id,
+                        "symbol": s.symbol,
+                        "action": s.action,
+                        "direction": s.direction,
+                        "score": s.score,
+                        "confidence": s.confidence,
+                        "original_confidence": s.original_confidence,
+                        "regime": s.regime,
+                        "regime_score": s.regime_score,
+                        "source": s.source,
+                        "price_at_signal": s.price,
+                        "notes": "; ".join(s.notes) if s.notes else None,
+                        "flags": list(s.enhancer_flags or []),
+                        "outcome": None,
+                        "pnl_usd": None,
+                        "closed_at": None,
+                        "timestamp": s.timestamp,
+                    }
+                )
             except Exception as e:
                 log.warning("pubsub publish_signal skipped: %s", e)
 
@@ -1000,28 +1032,29 @@ class SignalPipeline:
         # subscriber (dashboard, strategy agents, watchdog) can react in-process.
         try:
             from lib.core.event_bus import get_bus
+
             get_bus().publish(
                 "signal.generated",
                 {
-                    "signal_id":           s.pipeline_id,
-                    "symbol":              s.symbol,
-                    "action":              s.action,
-                    "direction":           s.direction,
-                    "price":               s.price,
-                    "score":               s.score,
-                    "confidence":          s.confidence,
+                    "signal_id": s.pipeline_id,
+                    "symbol": s.symbol,
+                    "action": s.action,
+                    "direction": s.direction,
+                    "price": s.price,
+                    "score": s.score,
+                    "confidence": s.confidence,
                     "original_confidence": s.original_confidence,
-                    "routing":             s.routing,
-                    "regime":              s.regime,
-                    "regime_score":        s.regime_score,
-                    "funding_rate":        s.funding_rate,
-                    "funding_flag":        s.funding_flag,
+                    "routing": s.routing,
+                    "regime": s.regime,
+                    "regime_score": s.regime_score,
+                    "funding_rate": s.funding_rate,
+                    "funding_flag": s.funding_flag,
                     "correlation_btc_spy": s.correlation_btc_spy,
-                    "fear_greed":          s.fear_greed,
-                    "kronos_direction":    s.kronos_direction,
-                    "kronos_confidence":   s.kronos_confidence,
-                    "enhancer_flags":      list(s.enhancer_flags or []),
-                    "position_usd":        s.position_usd,
+                    "fear_greed": s.fear_greed,
+                    "kronos_direction": s.kronos_direction,
+                    "kronos_confidence": s.kronos_confidence,
+                    "enhancer_flags": list(s.enhancer_flags or []),
+                    "position_usd": s.position_usd,
                 },
                 source="signal_pipeline",
             )
@@ -1029,8 +1062,14 @@ class SignalPipeline:
             log.debug("event bus signal.generated publish skipped: %s", e)
 
         # Paper trading secondary log
-        if PAPER_TRADING and s.action.lower() in {"buy", "sell", "long", "short",
-                                                   "entry_long", "entry_short"}:
+        if PAPER_TRADING and s.action.lower() in {
+            "buy",
+            "sell",
+            "long",
+            "short",
+            "entry_long",
+            "entry_short",
+        }:
             paper_record = {
                 "pipeline_id": s.pipeline_id,
                 "timestamp": s.timestamp,
@@ -1061,8 +1100,15 @@ class SignalPipeline:
     def paper_stats(self) -> dict:
         """Return paper trading statistics from paper_trading.jsonl."""
         if not PAPER_TRADING_LOG.exists():
-            return {"paper_trading": PAPER_TRADING, "total": 0, "open": 0,
-                    "wins": 0, "losses": 0, "win_rate": None, "total_pnl_usd": 0.0}
+            return {
+                "paper_trading": PAPER_TRADING,
+                "total": 0,
+                "open": 0,
+                "wins": 0,
+                "losses": 0,
+                "win_rate": None,
+                "total_pnl_usd": 0.0,
+            }
         total = open_count = wins = losses = 0
         total_pnl = 0.0
         for line in PAPER_TRADING_LOG.read_text().strip().splitlines():
@@ -1122,7 +1168,9 @@ if __name__ == "__main__":
             raw = json.loads(sys.argv[1])
         except json.JSONDecodeError:
             print("Usage: python3 signal_pipeline.py '<json>'")
-            print("Example: python3 signal_pipeline.py '{\"symbol\":\"BTC\",\"action\":\"buy\",\"price\":65000,\"confidence\":0.8}'")
+            print(
+                'Example: python3 signal_pipeline.py \'{"symbol":"BTC","action":"buy","price":65000,"confidence":0.8}\''
+            )
             sys.exit(1)
     else:
         # Demo signal
@@ -1138,9 +1186,9 @@ if __name__ == "__main__":
 
     result = get_pipeline().process(raw)
     s = result.scored
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Signal Pipeline Result — ID: {s.pipeline_id}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"Symbol:      {s.symbol} | Action: {s.action.upper()} | Direction: {s.direction}")
     print(f"Price:       ${s.price:,.4f}")
     print(f"Confidence:  {s.confidence:.0%}")
@@ -1162,5 +1210,7 @@ if __name__ == "__main__":
 
     # Print kernel status
     ks = get_pipeline().kernel_status()
-    print(f"Kernel Status: day={ks.get('day','?')} | blocked={ks.get('blocked')} | "
-          f"consec_losses={ks.get('consecutive_loss_events','?')}")
+    print(
+        f"Kernel Status: day={ks.get('day', '?')} | blocked={ks.get('blocked')} | "
+        f"consec_losses={ks.get('consecutive_loss_events', '?')}"
+    )

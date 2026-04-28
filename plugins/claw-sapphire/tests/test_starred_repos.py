@@ -37,4 +37,3 @@ def test_sync_stars_reports_gh_failure(monkeypatch):
 
     assert "error" in got
     assert "gh api failed" in got["error"]
-

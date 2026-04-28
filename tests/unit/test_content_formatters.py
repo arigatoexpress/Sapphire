@@ -2,6 +2,7 @@
 
 Run: /usr/local/bin/python3 -m pytest tests/unit/test_content_formatters.py -v
 """
+
 from __future__ import annotations
 
 import sys
@@ -24,6 +25,7 @@ from lib.content.report_generator import Report  # type: ignore
 
 # ── Fixtures ───────────────────────────────────────────────────────────────────
 
+
 def _crypto_report(**overrides) -> Report:
     facts = {
         "predictions": {
@@ -41,7 +43,13 @@ def _crypto_report(**overrides) -> Report:
             "pnl_pct": 3.5,
             "open_positions": 2,
             "positions": [
-                {"symbol": "BTC", "side": "long", "entry_price": 65000, "stop_loss": 63000, "take_profit": 70000},
+                {
+                    "symbol": "BTC",
+                    "side": "long",
+                    "entry_price": 65000,
+                    "stop_loss": 63000,
+                    "take_profit": 70000,
+                },
             ],
         },
         "signal_pipeline": {
@@ -86,8 +94,20 @@ def _security_report(**overrides) -> Report:
         "exploited_in_wild": 3,
         "avg_cvss": 8.1,
         "top_cves": [
-            {"cve": "CVE-2026-1234", "title": "Remote code execution in libssl", "exploited": True, "cvss": 9.8, "priority_score": 0.95},
-            {"cve": "CVE-2026-5678", "title": "Privilege escalation in kernel", "exploited": False, "cvss": 7.2, "priority_score": 0.72},
+            {
+                "cve": "CVE-2026-1234",
+                "title": "Remote code execution in libssl",
+                "exploited": True,
+                "cvss": 9.8,
+                "priority_score": 0.95,
+            },
+            {
+                "cve": "CVE-2026-5678",
+                "title": "Privilege escalation in kernel",
+                "exploited": False,
+                "cvss": 7.2,
+                "priority_score": 0.72,
+            },
         ],
     }
     facts.update(overrides.get("facts", {}))
@@ -116,6 +136,7 @@ def _unknown_report() -> Report:
 
 # ── _shorten_to ────────────────────────────────────────────────────────────────
 
+
 class TestShortenTo:
     def test_short_text_unchanged(self):
         text = "Short text."
@@ -139,6 +160,7 @@ class TestShortenTo:
 
 
 # ── _split_tweets ──────────────────────────────────────────────────────────────
+
 
 class TestSplitTweets:
     def test_single_short_part(self):
@@ -167,6 +189,7 @@ class TestSplitTweets:
 
 
 # ── format_linkedin ─────────────────────────────────────────────────────────────
+
 
 class TestFormatLinkedIn:
     def test_crypto_report_returns_string(self):
@@ -213,17 +236,21 @@ class TestFormatLinkedIn:
         assert SHORT_DISCLAIMER in result
 
     def test_small_sample_crypto_omits_numeric_accuracy_claims(self):
-        result = format_linkedin(_crypto_report(facts={
-            "predictions": {
-                "total": 24,
-                "hits": 14,
-                "accuracy": 14 / 24,
-                "by_symbol": {
-                    "BTC": {"hits": 8, "total": 12, "accuracy": 8 / 12},
-                    "ETH": {"hits": 6, "total": 12, "accuracy": 6 / 12},
-                },
-            },
-        }))
+        result = format_linkedin(
+            _crypto_report(
+                facts={
+                    "predictions": {
+                        "total": 24,
+                        "hits": 14,
+                        "accuracy": 14 / 24,
+                        "by_symbol": {
+                            "BTC": {"hits": 8, "total": 12, "accuracy": 8 / 12},
+                            "ETH": {"hits": 6, "total": 12, "accuracy": 6 / 12},
+                        },
+                    },
+                }
+            )
+        )
         assert "58.3%" not in result
         assert "14/24" not in result
         assert "8/12" not in result
@@ -231,6 +258,7 @@ class TestFormatLinkedIn:
 
 
 # ── format_substack ────────────────────────────────────────────────────────────
+
 
 class TestFormatSubstack:
     def test_returns_markdown(self):
@@ -267,6 +295,7 @@ class TestFormatSubstack:
 
 
 # ── format_x_thread ────────────────────────────────────────────────────────────
+
 
 class TestFormatXThread:
     def test_crypto_returns_list(self):
@@ -324,17 +353,21 @@ class TestFormatXThread:
         assert len(result) >= 1
 
     def test_small_sample_crypto_thread_omits_numeric_accuracy_claims(self):
-        result = format_x_thread(_crypto_report(facts={
-            "predictions": {
-                "total": 24,
-                "hits": 14,
-                "accuracy": 14 / 24,
-                "by_symbol": {
-                    "BTC": {"hits": 8, "total": 12, "accuracy": 8 / 12},
-                    "ETH": {"hits": 6, "total": 12, "accuracy": 6 / 12},
-                },
-            },
-        }))
+        result = format_x_thread(
+            _crypto_report(
+                facts={
+                    "predictions": {
+                        "total": 24,
+                        "hits": 14,
+                        "accuracy": 14 / 24,
+                        "by_symbol": {
+                            "BTC": {"hits": 8, "total": 12, "accuracy": 8 / 12},
+                            "ETH": {"hits": 6, "total": 12, "accuracy": 6 / 12},
+                        },
+                    },
+                }
+            )
+        )
         joined = "\n".join(result)
         assert "58.3%" not in joined
         assert "14/24" not in joined

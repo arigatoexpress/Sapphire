@@ -26,6 +26,7 @@ cryptography = pytest.importorskip("cryptography")
 def wallet_mod(tmp_path, monkeypatch):
     """Load solana_wallet with all on-disk paths redirected into tmp_path."""
     from lib.trading import solana_wallet as sw
+
     importlib.reload(sw)
     monkeypatch.setattr(sw, "SAPPHIRE_DIR", tmp_path / ".sapphire")
     monkeypatch.setattr(sw, "WALLET_PATH", tmp_path / ".sapphire" / "wallet.enc")
@@ -44,6 +45,7 @@ def wallet_mod(tmp_path, monkeypatch):
 
 def test_b58encode_known_values():
     from lib.trading.solana_wallet import _b58encode
+
     # "Hello, World!" → Base58-encoded known value
     assert _b58encode(b"\x00") == "1"
     assert _b58encode(b"\x00\x00\x00") == "111"
@@ -57,12 +59,14 @@ def test_b58encode_known_values():
 
 def test_b58encode_preserves_leading_zeros():
     from lib.trading.solana_wallet import _b58encode
+
     assert _b58encode(b"\x00\x01").startswith("1")
     assert _b58encode(b"\x00\x00\x01").startswith("11")
 
 
 def test_b58encode_nonempty_output():
     from lib.trading.solana_wallet import _b58encode
+
     out = _b58encode(b"\x01" * 32)
     assert len(out) > 10
 
@@ -144,10 +148,14 @@ def test_simulate_swap_updates_ledger(wallet_mod):
     w.init_wallet()
     before = w.balance()
     prop = Proposal(
-        id="prop-test", ts="2026-04-18T00:00:00+00:00",
-        input_token="SOL", output_token="USDC",
-        input_amount=1.0, quoted_output=100.0,
-        quote_price=100.0, status="APPROVED",
+        id="prop-test",
+        ts="2026-04-18T00:00:00+00:00",
+        input_token="SOL",
+        output_token="USDC",
+        input_amount=1.0,
+        quoted_output=100.0,
+        quote_price=100.0,
+        status="APPROVED",
     )
     w._simulate_swap(prop)
     after = w.balance()

@@ -147,9 +147,7 @@ class AgentRunner:
             "cycle_count": agent.cycle_count,
             "interval_sec": agent.interval_sec,
             "last_cycle_completed_at": (
-                agent.last_cycle_completed_at.isoformat()
-                if agent.last_cycle_completed_at
-                else None
+                agent.last_cycle_completed_at.isoformat() if agent.last_cycle_completed_at else None
             ),
             "updated_at": datetime.now(UTC).isoformat(),
             "last_observation": agent.last_observation,

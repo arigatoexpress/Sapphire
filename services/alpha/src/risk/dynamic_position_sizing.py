@@ -133,8 +133,9 @@ class KellyCriterionCalculator:
         self.win_probability_history = []
         self.win_loss_ratio_history = []
 
-    def calculate_kelly_size(self, win_probability: float, win_loss_ratio: float,
-                           fraction: float = 1.0) -> float:
+    def calculate_kelly_size(
+        self, win_probability: float, win_loss_ratio: float, fraction: float = 1.0
+    ) -> float:
         """
         Calculate Kelly Criterion position size
 
@@ -174,8 +175,9 @@ class KellyCriterionCalculator:
 
         return kelly_fraction
 
-    def get_smoothed_kelly(self, current_win_prob: float, current_win_loss_ratio: float,
-                          fraction: float = 0.5) -> float:
+    def get_smoothed_kelly(
+        self, current_win_prob: float, current_win_loss_ratio: float, fraction: float = 0.5
+    ) -> float:
         """Get smoothed Kelly size using historical data"""
 
         if not self.win_probability_history:
@@ -184,8 +186,12 @@ class KellyCriterionCalculator:
         # Use exponential moving average for smoothing
         alpha = 0.1  # Smoothing factor
 
-        smoothed_win_prob = np.mean(self.win_probability_history) * (1 - alpha) + current_win_prob * alpha
-        smoothed_ratio = np.mean(self.win_loss_ratio_history) * (1 - alpha) + current_win_loss_ratio * alpha
+        smoothed_win_prob = (
+            np.mean(self.win_probability_history) * (1 - alpha) + current_win_prob * alpha
+        )
+        smoothed_ratio = (
+            np.mean(self.win_loss_ratio_history) * (1 - alpha) + current_win_loss_ratio * alpha
+        )
 
         return self.calculate_kelly_size(smoothed_win_prob, smoothed_ratio, fraction)
 
@@ -197,8 +203,9 @@ class VolatilityAdjuster:
         self.target_volatility = target_volatility
         self.volatility_history = {}
 
-    def adjust_for_volatility(self, symbol: str, predicted_return: float,
-                            current_volatility: float, base_size: float) -> float:
+    def adjust_for_volatility(
+        self, symbol: str, predicted_return: float, current_volatility: float, base_size: float
+    ) -> float:
         """
         Adjust position size based on volatility
 
@@ -249,8 +256,9 @@ class RiskManager:
         self.daily_pnl_history = []
         self.kill_switch_activated = False
 
-    def calculate_portfolio_risk(self, positions: dict[str, Position],
-                               market_data: dict[str, Any]) -> RiskMetrics:
+    def calculate_portfolio_risk(
+        self, positions: dict[str, Position], market_data: dict[str, Any]
+    ) -> RiskMetrics:
         """Calculate comprehensive portfolio risk metrics"""
 
         portfolio_value = sum(pos.market_value for pos in positions.values())
@@ -263,7 +271,7 @@ class RiskManager:
 
         for symbol, _position in positions.items():
             if symbol in market_data:
-                price_history = market_data[symbol].get('close', [])
+                price_history = market_data[symbol].get("close", [])
                 if len(price_history) >= 30:
                     returns = np.diff(np.log(price_history))
                     returns_data.append(returns)
@@ -279,13 +287,24 @@ class RiskManager:
                 avg_correlation = 0.0
 
             # Weighted portfolio volatility
-            position_weights = np.array([abs(pos.size * pos.current_price) / portfolio_value
-                                       for pos in positions.values()])
-            portfolio_volatility = np.sqrt(np.sum(position_weights ** 2 * np.array(volatilities) ** 2) +
-                                         2 * np.sum([position_weights[i] * position_weights[j] *
-                                                   volatilities[i] * volatilities[j] * avg_correlation
-                                                   for i in range(len(position_weights))
-                                                   for j in range(i+1, len(position_weights))]))
+            position_weights = np.array(
+                [abs(pos.size * pos.current_price) / portfolio_value for pos in positions.values()]
+            )
+            portfolio_volatility = np.sqrt(
+                np.sum(position_weights**2 * np.array(volatilities) ** 2)
+                + 2
+                * np.sum(
+                    [
+                        position_weights[i]
+                        * position_weights[j]
+                        * volatilities[i]
+                        * volatilities[j]
+                        * avg_correlation
+                        for i in range(len(position_weights))
+                        for j in range(i + 1, len(position_weights))
+                    ]
+                )
+            )
         else:
             portfolio_volatility = 0.0
 
@@ -294,7 +313,12 @@ class RiskManager:
             # Simulate portfolio returns
             portfolio_returns = np.zeros(len(returns_data[0]))
             for i, returns in enumerate(returns_data):
-                weight = abs(list(positions.values())[i].size * list(positions.values())[i].current_price) / portfolio_value
+                weight = (
+                    abs(
+                        list(positions.values())[i].size * list(positions.values())[i].current_price
+                    )
+                    / portfolio_value
+                )
                 portfolio_returns += weight * returns
 
             var_95 = np.percentile(portfolio_returns, 5)
@@ -340,8 +364,8 @@ class RiskManager:
             daily_risk_limit=self.config.max_daily_loss * portfolio_value,
             var_95=abs(var_95) * portfolio_value,
             expected_shortfall=abs(expected_shortfall) * portfolio_value,
-            correlation_risk=avg_correlation if 'avg_correlation' in locals() else 0.0,
-            concentration_risk=concentration_risk
+            correlation_risk=avg_correlation if "avg_correlation" in locals() else 0.0,
+            concentration_risk=concentration_risk,
         )
 
         return risk_metrics
@@ -380,7 +404,9 @@ class RiskManager:
 
         # Find appropriate scaling factor
         scaling_factor = 1.0
-        for level, multiplier in zip(self.config.drawdown_levels, self.config.drawdown_multipliers, strict=False):
+        for level, multiplier in zip(
+            self.config.drawdown_levels, self.config.drawdown_multipliers, strict=False
+        ):
             if current_dd >= level:
                 scaling_factor = multiplier
             else:
@@ -426,9 +452,9 @@ class DynamicPositionSizer:
         """Add callback for emergency events"""
         self.emergency_callbacks.append(callback)
 
-    async def calculate_position_size(self, prediction: EnsemblePrediction,
-                                    market_data: dict[str, Any],
-                                    portfolio_value: float) -> float:
+    async def calculate_position_size(
+        self, prediction: EnsemblePrediction, market_data: dict[str, Any], portfolio_value: float
+    ) -> float:
         """
         Calculate optimal position size for a trade
 
@@ -463,8 +489,10 @@ class DynamicPositionSizer:
             if self.config.volatility_scaling:
                 volatility = self._calculate_asset_volatility(prediction.symbol, market_data)
                 base_size = self.volatility_adjuster.adjust_for_volatility(
-                    prediction.symbol, prediction.direction * prediction.confidence,
-                    volatility, base_size
+                    prediction.symbol,
+                    prediction.direction * prediction.confidence,
+                    volatility,
+                    base_size,
                 )
 
             # Apply diversification limits
@@ -479,7 +507,9 @@ class DynamicPositionSizer:
             base_size *= drawdown_multiplier
 
             # Final limits
-            base_size = np.clip(base_size, self.config.min_position_size, self.config.max_position_size)
+            base_size = np.clip(
+                base_size, self.config.min_position_size, self.config.max_position_size
+            )
 
             # Emergency stop-loss check
             if self._check_emergency_stop(prediction, market_data):
@@ -496,7 +526,9 @@ class DynamicPositionSizer:
 
         scaling_factor = 1.0
 
-        for level, multiplier in zip(self.config.conviction_levels, self.config.conviction_multipliers, strict=False):
+        for level, multiplier in zip(
+            self.config.conviction_levels, self.config.conviction_multipliers, strict=False
+        ):
             if confidence >= level:
                 scaling_factor = multiplier
 
@@ -521,10 +553,10 @@ class DynamicPositionSizer:
     def _calculate_asset_volatility(self, symbol: str, market_data: dict[str, Any]) -> float:
         """Calculate asset volatility"""
 
-        if symbol not in market_data or 'close' not in market_data[symbol]:
+        if symbol not in market_data or "close" not in market_data[symbol]:
             return 0.02  # Default 2% volatility
 
-        prices = market_data[symbol]['close']
+        prices = market_data[symbol]["close"]
         if len(prices) < 10:
             return 0.02
 
@@ -547,7 +579,9 @@ class DynamicPositionSizer:
         if self.positions:
             # This would check correlation matrix
             # For now, simple position count adjustment
-            position_diversity_factor = min(1.0, self.config.min_positions / max(current_positions, 1))
+            position_diversity_factor = min(
+                1.0, self.config.min_positions / max(current_positions, 1)
+            )
             base_size *= position_diversity_factor
 
         return base_size
@@ -565,16 +599,20 @@ class DynamicPositionSizer:
 
         return base_size
 
-    def _check_emergency_stop(self, prediction: EnsemblePrediction, market_data: dict[str, Any]) -> bool:
+    def _check_emergency_stop(
+        self, prediction: EnsemblePrediction, market_data: dict[str, Any]
+    ) -> bool:
         """Check for emergency stop conditions"""
 
         # Circuit breaker for extreme market moves
         if prediction.symbol in market_data:
-            close_prices = market_data[prediction.symbol].get('close', [])
+            close_prices = market_data[prediction.symbol].get("close", [])
             if len(close_prices) >= 2:
                 recent_return = (close_prices[-1] - close_prices[-2]) / close_prices[-2]
                 if abs(recent_return) >= self.config.circuit_breaker_threshold:
-                    logger.warning(f"Circuit breaker triggered for {prediction.symbol}: {recent_return:.2%}")
+                    logger.warning(
+                        f"Circuit breaker triggered for {prediction.symbol}: {recent_return:.2%}"
+                    )
                     self.circuit_breaker_active = True
                     return True
 
@@ -586,8 +624,8 @@ class DynamicPositionSizer:
         try:
             # Update position prices and P&L
             for symbol, position in self.positions.items():
-                if symbol in market_data and 'close' in market_data[symbol]:
-                    position.current_price = market_data[symbol]['close'][-1]
+                if symbol in market_data and "close" in market_data[symbol]:
+                    position.current_price = market_data[symbol]["close"][-1]
                     position.update_pnl()
 
             # Recalculate portfolio risk
@@ -650,7 +688,7 @@ class DynamicPositionSizer:
         # For simulation, just scale down
         for position in self.positions.values():
             old_size = position.size
-            position.size *= (1 - reduction_factor)
+            position.size *= 1 - reduction_factor
             logger.info(f"Reduced {position.symbol} from {old_size:.4f} to {position.size:.4f}")
 
     async def _rebalance_concentration(self):
@@ -671,8 +709,14 @@ class DynamicPositionSizer:
             reduction = 0.3  # Reduce by 30%
             await self._reduce_positions(reduction)
 
-    def add_position(self, symbol: str, size: float, entry_price: float,
-                    stop_loss: float | None = None, take_profit: float | None = None):
+    def add_position(
+        self,
+        symbol: str,
+        size: float,
+        entry_price: float,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
+    ):
         """Add new position"""
 
         position = Position(
@@ -682,7 +726,7 @@ class DynamicPositionSizer:
             current_price=entry_price,
             timestamp=datetime.now(),
             stop_loss=stop_loss,
-            take_profit=take_profit
+            take_profit=take_profit,
         )
 
         self.positions[symbol] = position
@@ -705,21 +749,21 @@ class DynamicPositionSizer:
         total_position_value = sum(position_values.values())
 
         return {
-            'portfolio_value': total_value,
-            'position_count': len(self.positions),
-            'total_exposure': total_position_value,
-            'positions': {
+            "portfolio_value": total_value,
+            "position_count": len(self.positions),
+            "total_exposure": total_position_value,
+            "positions": {
                 symbol: {
-                    'size': pos.size,
-                    'entry_price': pos.entry_price,
-                    'current_price': pos.current_price,
-                    'unrealized_pnl': pos.unrealized_pnl,
-                    'market_value': pos.market_value
+                    "size": pos.size,
+                    "entry_price": pos.entry_price,
+                    "current_price": pos.current_price,
+                    "unrealized_pnl": pos.unrealized_pnl,
+                    "market_value": pos.market_value,
                 }
                 for symbol, pos in self.positions.items()
             },
-            'emergency_mode': self.emergency_mode,
-            'circuit_breaker': self.circuit_breaker_active
+            "emergency_mode": self.emergency_mode,
+            "circuit_breaker": self.circuit_breaker_active,
         }
 
 
@@ -729,8 +773,12 @@ def create_position_sizer(config: PositionSizingConfig = None) -> DynamicPositio
     return DynamicPositionSizer(config)
 
 
-async def calculate_optimal_size(sizer: DynamicPositionSizer, prediction: EnsemblePrediction,
-                               market_data: dict[str, Any], portfolio_value: float) -> float:
+async def calculate_optimal_size(
+    sizer: DynamicPositionSizer,
+    prediction: EnsemblePrediction,
+    market_data: dict[str, Any],
+    portfolio_value: float,
+) -> float:
     """Calculate optimal position size"""
     return await sizer.calculate_position_size(prediction, market_data, portfolio_value)
 

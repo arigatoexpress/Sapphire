@@ -25,7 +25,9 @@ def test_continuous_intelligence_plan_has_real_work_lanes() -> None:
     assert any(task["target_runtime"] == "windows-gpu" for task in tasks)
     assert any(task["lane"] == "strategy_backtest" and task.get("command") for task in tasks)
     assert any(task["id"] == "eth-privacy-quantum-research-refresh" for task in tasks)
-    assert any(task["id"] == "institutional-tokenization-agentic-payments-refresh" for task in tasks)
+    assert any(
+        task["id"] == "institutional-tokenization-agentic-payments-refresh" for task in tasks
+    )
     assert any(task["id"] == "x402-agent-market-dry-run-plan" for task in tasks)
     assert any(task["id"] == "regional-intel-ooda-readiness-review" for task in tasks)
     assert plan["inputs"]["market_universe"]["liked_symbols"][:3] == ["ETH", "BTC", "ZEC"]
@@ -61,10 +63,7 @@ def test_tokenization_and_x402_tasks_are_explicitly_non_executing() -> None:
 
 def test_regional_ooda_task_is_read_only_review_and_export_only() -> None:
     plan = ci.build_continuous_intelligence_plan(fetch_live=False)
-    task = {
-        task["id"]: task
-        for task in plan["tasks"]
-    }["regional-intel-ooda-readiness-review"]
+    task = {task["id"]: task for task in plan["tasks"]}["regional-intel-ooda-readiness-review"]
 
     assert task["lane"] == "regional_ooda"
     assert task["target_runtime"] == "mac-local"
@@ -75,7 +74,10 @@ def test_regional_ooda_task_is_read_only_review_and_export_only() -> None:
         any(keyword in action.lower() for keyword in ("review", "export", "open a pr"))
         for action in task["ooda_packet"]["act"]
     )
-    assert "No GCP, Foundry, workflow dispatch, Telegram, or trading write is invoked" in task["acceptance"]
+    assert (
+        "No GCP, Foundry, workflow dispatch, Telegram, or trading write is invoked"
+        in task["acceptance"]
+    )
 
 
 def test_gemini_ooda_task_is_dry_run_with_caps() -> None:
@@ -88,12 +90,9 @@ def test_gemini_ooda_task_is_dry_run_with_caps() -> None:
     assert task["safe_mode"] == "dry_run"
     assert "gemini_ooda.py" in task["command"]
     assert task["command"].endswith("plugins/claw-sapphire/tools/gemini_ooda.py")
-    assert "\"mode\":\"dry-run\"" in task["command"]
+    assert '"mode":"dry-run"' in task["command"]
     assert set(task["ooda_packet"]) == {"observe", "orient", "decide", "act"}
-    assert any(
-        "SAPPHIRE_GEMINI_LIVE=1" in gate
-        for gate in task["acceptance"]
-    )
+    assert any("SAPPHIRE_GEMINI_LIVE=1" in gate for gate in task["acceptance"])
     assert any("sensitivity" in gate.lower() for gate in task["acceptance"])
     assert "docs/ops/gemini-ooda-synthesizer-runbook.md" in task["source_docs"]
 

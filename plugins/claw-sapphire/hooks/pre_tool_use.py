@@ -55,7 +55,9 @@ def main():
     current_tier = os.environ.get("SAPPHIRE_CURRENT_TIER", "t3")
 
     if not is_available(current_tier) and current_tier != "t0":
-        print(f"⚠️ Budget exhausted for {current_tier}. Remaining: {remaining(current_tier)} tokens.")
+        print(
+            f"⚠️ Budget exhausted for {current_tier}. Remaining: {remaining(current_tier)} tokens."
+        )
         # Don't deny — just warn. The token_governor tracks overages.
         # Deny only if massively over budget
         if current_tier == "t3" and remaining("t3") < -50000:

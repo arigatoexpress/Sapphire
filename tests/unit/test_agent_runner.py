@@ -69,7 +69,13 @@ class _StubAgent(BaseAgent):
 def test_write_heartbeat_persists_expected_fields(tmp_path: Path):
     r = AgentRunner(repo_root=tmp_path)
     when = datetime(2026, 4, 26, 21, 0, tzinfo=UTC)
-    a = _StubAgent(name="alpha", interval_sec=300, cycle_count=7, last_completed=when, last_observation={"trades": 3})
+    a = _StubAgent(
+        name="alpha",
+        interval_sec=300,
+        cycle_count=7,
+        last_completed=when,
+        last_observation={"trades": 3},
+    )
     r._write_heartbeat(a)
     path = tmp_path / "data" / "agents" / "alpha.heartbeat"
     payload = json.loads(path.read_text())
@@ -112,8 +118,11 @@ def test_status_record_running_when_loaded_in_memory(tmp_path: Path):
     r = AgentRunner(repo_root=tmp_path)
     r._running_agents.add("alpha")
     record = r._status_record(
-        name="alpha", interval_sec=300, cycle_count=5,
-        last_cycle_completed_at=None, heartbeat_updated_at=None,
+        name="alpha",
+        interval_sec=300,
+        cycle_count=5,
+        last_cycle_completed_at=None,
+        heartbeat_updated_at=None,
     )
     assert record["state"] == "RUNNING"
 
@@ -121,8 +130,11 @@ def test_status_record_running_when_loaded_in_memory(tmp_path: Path):
 def test_status_record_stopped_when_no_heartbeat_and_not_running(tmp_path: Path):
     r = AgentRunner(repo_root=tmp_path)
     record = r._status_record(
-        name="alpha", interval_sec=300, cycle_count=5,
-        last_cycle_completed_at=None, heartbeat_updated_at=None,
+        name="alpha",
+        interval_sec=300,
+        cycle_count=5,
+        last_cycle_completed_at=None,
+        heartbeat_updated_at=None,
     )
     assert record["state"] == "STOPPED"
 
@@ -131,8 +143,11 @@ def test_status_record_running_when_heartbeat_recent(tmp_path: Path):
     r = AgentRunner(repo_root=tmp_path)
     recent = (datetime.now(UTC) - timedelta(seconds=10)).isoformat()
     record = r._status_record(
-        name="alpha", interval_sec=60, cycle_count=5,
-        last_cycle_completed_at=None, heartbeat_updated_at=recent,
+        name="alpha",
+        interval_sec=60,
+        cycle_count=5,
+        last_cycle_completed_at=None,
+        heartbeat_updated_at=recent,
     )
     assert record["state"] == "RUNNING"
     assert record["heartbeat_age_sec"] is not None
@@ -143,8 +158,11 @@ def test_status_record_stopped_when_heartbeat_stale(tmp_path: Path):
     r = AgentRunner(repo_root=tmp_path)
     stale = (datetime.now(UTC) - timedelta(seconds=600)).isoformat()
     record = r._status_record(
-        name="alpha", interval_sec=60, cycle_count=5,
-        last_cycle_completed_at=None, heartbeat_updated_at=stale,
+        name="alpha",
+        interval_sec=60,
+        cycle_count=5,
+        last_cycle_completed_at=None,
+        heartbeat_updated_at=stale,
     )
     assert record["state"] == "STOPPED"
     assert record["heartbeat_age_sec"] >= 600
@@ -155,8 +173,11 @@ def test_status_record_threshold_default_when_interval_zero(tmp_path: Path):
     r = AgentRunner(repo_root=tmp_path)
     just_under = (datetime.now(UTC) - timedelta(seconds=30)).isoformat()
     record = r._status_record(
-        name="alpha", interval_sec=0, cycle_count=0,
-        last_cycle_completed_at=None, heartbeat_updated_at=just_under,
+        name="alpha",
+        interval_sec=0,
+        cycle_count=0,
+        last_cycle_completed_at=None,
+        heartbeat_updated_at=just_under,
     )
     assert record["state"] == "RUNNING"
 

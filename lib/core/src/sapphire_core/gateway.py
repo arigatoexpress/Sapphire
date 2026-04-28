@@ -39,9 +39,7 @@ class ExecutionGateway:
         self.runner: web.AppRunner | None = None
         self._http_session = None
         self.status_provider = status_provider
-        self.legacy_tv_forward_url = str(
-            os.getenv("SAPPHIRE_LEGACY_TV_FORWARD_URL", "")
-        ).strip()
+        self.legacy_tv_forward_url = str(os.getenv("SAPPHIRE_LEGACY_TV_FORWARD_URL", "")).strip()
 
     async def _get_http_session(self):
         try:
@@ -112,7 +110,9 @@ class ExecutionGateway:
                 data = payload
         except Exception:
             logger.info("Ignoring legacy TradingView webhook on local gateway; non-JSON payload")
-            return web.json_response({"status": "ignored", "reason": "non_json_payload"}, status=202)
+            return web.json_response(
+                {"status": "ignored", "reason": "non_json_payload"}, status=202
+            )
 
         if self.legacy_tv_forward_url:
             try:

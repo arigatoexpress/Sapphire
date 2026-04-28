@@ -16,6 +16,7 @@ Usage:
 CLI:
     python3 -m lib.analytics.backtest [--symbols BTC-USD,ETH-USD] [--days 90]
 """
+
 from __future__ import annotations
 
 import argparse
@@ -34,9 +35,11 @@ log = logging.getLogger(__name__)
 # Types shared with strategies.py and backtest_engine.py
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Bar:
     """Single OHLCV bar."""
+
     ts: datetime
     open: float
     high: float
@@ -48,6 +51,7 @@ class Bar:
 @dataclass
 class Decision:
     """Signal from a strategy — direction + optional sizing / metadata."""
+
     direction: str  # "long" | "short" | "flat"
     size: float = 1.0
     stop_pct: float = 0.0
@@ -57,13 +61,23 @@ class Decision:
 
 DEFAULT_SYMBOLS = (
     # Crypto
-    "BTC-USD", "ETH-USD", "SOL-USD", "ZEC-USD",
+    "BTC-USD",
+    "ETH-USD",
+    "SOL-USD",
+    "ZEC-USD",
     # Equities
-    "SPY", "QQQ",
+    "SPY",
+    "QQQ",
     # Commodities
-    "GLD", "SLV", "USO", "URA", "COPX",
+    "GLD",
+    "SLV",
+    "USO",
+    "URA",
+    "COPX",
     # Macro
-    "DX-Y.NYB", "^VIX", "^TNX",
+    "DX-Y.NYB",
+    "^VIX",
+    "^TNX",
 )
 DEFAULT_OUTPUT_DIR = Path("data/backtests")
 
@@ -76,10 +90,10 @@ class BacktestConfig:
     sma_slow: int = 30
     initial_capital: float = 100_000.0
     fee_bps: float = 0.0
-    position_pct: float = 0.10           # 10% of equity per trade
-    rr_ratio: float = 1.67               # take-profit / stop-loss ratio
+    position_pct: float = 0.10  # 10% of equity per trade
+    rr_ratio: float = 1.67  # take-profit / stop-loss ratio
     atr_period: int = 14
-    atr_stop_mult: float = 1.5           # stop = entry ± mult × ATR
+    atr_stop_mult: float = 1.5  # stop = entry ± mult × ATR
     regime_enhancement: bool = True
     output_dir: Path = DEFAULT_OUTPUT_DIR
     high_conf_threshold: float = 0.75
@@ -89,7 +103,7 @@ class BacktestConfig:
 @dataclass
 class Trade:
     symbol: str
-    direction: str                       # long | short
+    direction: str  # long | short
     entry_date: str
     entry_price: float
     exit_date: str
@@ -100,7 +114,7 @@ class Trade:
     score: float
     confidence: float
     regime: str
-    exit_reason: str                     # tp | sl | cross | eod
+    exit_reason: str  # tp | sl | cross | eod
 
 
 @dataclass
@@ -151,14 +165,16 @@ def _load_ohlcv(symbol: str, days: int):
         close = float(row["Close"])
         if not math.isfinite(close) or close <= 0:
             continue
-        bars.append({
-            "date":  idx.strftime("%Y-%m-%d"),
-            "open":  float(row["Open"]),
-            "high":  float(row["High"]),
-            "low":   float(row["Low"]),
-            "close": close,
-            "volume": float(row.get("Volume", 0) or 0),
-        })
+        bars.append(
+            {
+                "date": idx.strftime("%Y-%m-%d"),
+                "open": float(row["Open"]),
+                "high": float(row["High"]),
+                "low": float(row["Low"]),
+                "close": close,
+                "volume": float(row.get("Volume", 0) or 0),
+            }
+        )
     return bars
 
 
@@ -185,7 +201,7 @@ def _atr(bars: list[dict], period: int) -> list[float | None]:
         tr = max(
             bar["high"] - bar["low"],
             abs(bar["high"] - prev_close),
-            abs(bar["low"]  - prev_close),
+            abs(bar["low"] - prev_close),
         )
         trs.append(tr)
     out: list[float | None] = [None] * len(bars)
@@ -207,13 +223,13 @@ def _classify_regime(closes: list[float], idx: int) -> tuple[str, float]:
     """
     if idx < 50:
         return "UNKNOWN", 0.0
-    ma20 = sum(closes[idx - 19:idx + 1]) / 20
-    ma50 = sum(closes[idx - 49:idx + 1]) / 50
+    ma20 = sum(closes[idx - 19 : idx + 1]) / 20
+    ma50 = sum(closes[idx - 49 : idx + 1]) / 50
     if ma50 == 0:
         return "UNKNOWN", 0.0
     slope = (ma20 - ma50) / ma50
     # recent returns volatility as uncertainty proxy
-    window = closes[idx - 19:idx + 1]
+    window = closes[idx - 19 : idx + 1]
     mean = sum(window) / len(window)
     var = sum((x - mean) ** 2 for x in window) / len(window)
     vol = math.sqrt(var) / mean if mean else 0.0
@@ -242,13 +258,11 @@ def _apply_enhancement(
     """
     flags: list[str] = []
     boost = 0.0
-    aligned = (
-        (regime == "TREND_UP"   and direction == "long") or
-        (regime == "TREND_DOWN" and direction == "short")
+    aligned = (regime == "TREND_UP" and direction == "long") or (
+        regime == "TREND_DOWN" and direction == "short"
     )
-    opposed = (
-        (regime == "TREND_UP"   and direction == "short") or
-        (regime == "TREND_DOWN" and direction == "long")
+    opposed = (regime == "TREND_UP" and direction == "short") or (
+        regime == "TREND_DOWN" and direction == "long"
     )
     if aligned:
         boost = 0.10 + 0.05 * abs(regime_score)
@@ -306,14 +320,16 @@ def _generate_signals(bars: list[dict], cfg: BacktestConfig) -> list[dict]:
         if not direction:
             continue
 
-        signals.append({
-            "idx":        i,
-            "date":       bars[i]["date"],
-            "price":      bars[i]["close"],
-            "direction":  direction,
-            "confidence": confidence,
-            "atr":        atr[i] if atr[i] else 0.0,
-        })
+        signals.append(
+            {
+                "idx": i,
+                "date": bars[i]["date"],
+                "price": bars[i]["close"],
+                "direction": direction,
+                "confidence": confidence,
+                "atr": atr[i] if atr[i] else 0.0,
+            }
+        )
     return signals
 
 
@@ -371,21 +387,23 @@ def _simulate(
                 pnl = open_trade["position_value"] * net_pnl_pct
                 equity += pnl
                 pnl_pct = net_pnl_pct * 100
-                trades.append(Trade(
-                    symbol=open_trade["symbol"],
-                    direction=direction,
-                    entry_date=open_trade["entry_date"],
-                    entry_price=entry,
-                    exit_date=bar["date"],
-                    exit_price=exit_price,
-                    pnl=round(pnl, 2),
-                    pnl_pct=round(pnl_pct, 3),
-                    bars_held=i - open_trade["entry_idx"],
-                    score=open_trade["score"],
-                    confidence=open_trade["confidence"],
-                    regime=open_trade["regime"],
-                    exit_reason=exit_reason,
-                ))
+                trades.append(
+                    Trade(
+                        symbol=open_trade["symbol"],
+                        direction=direction,
+                        entry_date=open_trade["entry_date"],
+                        entry_price=entry,
+                        exit_date=bar["date"],
+                        exit_price=exit_price,
+                        pnl=round(pnl, 2),
+                        pnl_pct=round(pnl_pct, 3),
+                        bars_held=i - open_trade["entry_idx"],
+                        score=open_trade["score"],
+                        confidence=open_trade["confidence"],
+                        regime=open_trade["regime"],
+                        exit_reason=exit_reason,
+                    )
+                )
                 open_trade = None
 
         # Entry: on crossover signal when flat
@@ -415,18 +433,18 @@ def _simulate(
             units = position_value / entry_price if entry_price else 0.0
             score = _score_signal(confidence, cfg.rr_ratio, cfg.position_pct)
             open_trade = {
-                "symbol":      sig.get("symbol") or "?",
-                "direction":   direction,
-                "entry_date":  bar["date"],
-                "entry_idx":   i,
+                "symbol": sig.get("symbol") or "?",
+                "direction": direction,
+                "entry_date": bar["date"],
+                "entry_idx": i,
                 "entry_price": entry_price,
-                "stop":        stop,
-                "target":      target,
+                "stop": stop,
+                "target": target,
                 "position_value": position_value,
-                "units":       units,
-                "confidence":  confidence,
-                "regime":      regime,
-                "score":       score,
+                "units": units,
+                "confidence": confidence,
+                "regime": regime,
+                "score": score,
             }
 
         equity_curve[i] = equity
@@ -457,7 +475,7 @@ def _metrics(
             sharpe = (mean / std) * math.sqrt(252)
         downside = [r for r in returns if r < 0]
         if downside:
-            d_var = sum(r ** 2 for r in downside) / len(downside)
+            d_var = sum(r**2 for r in downside) / len(downside)
             d_std = math.sqrt(d_var)
             if d_std > 0:
                 sortino = (mean / d_std) * math.sqrt(252)
@@ -475,22 +493,24 @@ def _metrics(
     wins = [t for t in trades if t.pnl > 0]
     losses = [t for t in trades if t.pnl <= 0]
     win_rate = len(wins) / len(trades) if trades else 0.0
-    gross_win  = sum(t.pnl for t in wins)
+    gross_win = sum(t.pnl for t in wins)
     gross_loss = abs(sum(t.pnl for t in losses))
-    profit_factor = (gross_win / gross_loss) if gross_loss > 0 else (float("inf") if gross_win > 0 else 0.0)
-    avg_win  = (gross_win / len(wins)) if wins else 0.0
+    profit_factor = (
+        (gross_win / gross_loss) if gross_loss > 0 else (float("inf") if gross_win > 0 else 0.0)
+    )
+    avg_win = (gross_win / len(wins)) if wins else 0.0
     avg_loss = (-gross_loss / len(losses)) if losses else 0.0
     avg_score = sum(t.score for t in trades) / len(trades) if trades else 0.0
 
     return {
-        "sharpe":        round(sharpe, 3),
-        "sortino":       round(sortino, 3),
-        "max_drawdown":  round(max_dd, 4),
-        "win_rate":      round(win_rate, 3),
+        "sharpe": round(sharpe, 3),
+        "sortino": round(sortino, 3),
+        "max_drawdown": round(max_dd, 4),
+        "win_rate": round(win_rate, 3),
         "profit_factor": round(profit_factor, 3) if math.isfinite(profit_factor) else 999.0,
-        "avg_win":       round(avg_win, 2),
-        "avg_loss":      round(avg_loss, 2),
-        "avg_score":     round(avg_score, 1),
+        "avg_win": round(avg_win, 2),
+        "avg_loss": round(avg_loss, 2),
+        "avg_score": round(avg_score, 1),
     }
 
 
@@ -517,7 +537,9 @@ class Backtester:
         if bankroll is not None or fee_bps is not None:
             base_cfg = replace(
                 base_cfg,
-                initial_capital=float(bankroll) if bankroll is not None else base_cfg.initial_capital,
+                initial_capital=float(bankroll)
+                if bankroll is not None
+                else base_cfg.initial_capital,
                 fee_bps=float(fee_bps) if fee_bps is not None else base_cfg.fee_bps,
             )
 
@@ -538,7 +560,9 @@ class Backtester:
         if bars:
             start_px = bars[0]["close"] or 1.0
             for b in bars:
-                benchmark_curve.append((b["date"], self.cfg.initial_capital * (b["close"] / start_px)))
+                benchmark_curve.append(
+                    (b["date"], self.cfg.initial_capital * (b["close"] / start_px))
+                )
         equity_pairs = [(b["date"], v) for b, v in zip(bars, curve, strict=False)]
         return BacktestResult(
             symbol=symbol,
@@ -565,32 +589,32 @@ class Backtester:
         """Run WITH-regime vs WITHOUT-regime across symbols and report delta."""
         syms = symbols or list(self.cfg.symbols)
         out: dict[str, Any] = {
-            "config":  asdict(self.cfg) | {"output_dir": str(self.cfg.output_dir)},
+            "config": asdict(self.cfg) | {"output_dir": str(self.cfg.output_dir)},
             "timestamp": datetime.now(UTC).isoformat(),
-            "with_regime":    {},
+            "with_regime": {},
             "without_regime": {},
-            "delta":          {},
+            "delta": {},
         }
         for sym in syms:
             try:
-                r_on  = self.run_symbol(sym, with_regime=True)
+                r_on = self.run_symbol(sym, with_regime=True)
                 r_off = self.run_symbol(sym, with_regime=False)
             except Exception as e:
-                out["with_regime"][sym]    = {"error": str(e)}
+                out["with_regime"][sym] = {"error": str(e)}
                 out["without_regime"][sym] = {"error": str(e)}
                 continue
-            out["with_regime"][sym]    = _result_to_dict(r_on)
+            out["with_regime"][sym] = _result_to_dict(r_on)
             out["without_regime"][sym] = _result_to_dict(r_off)
             out["delta"][sym] = {
-                "total_return_pct":  round(r_on.total_return_pct - r_off.total_return_pct, 2),
-                "sharpe":            round(r_on.sharpe - r_off.sharpe, 3),
-                "sortino":           round(r_on.sortino - r_off.sortino, 3),
-                "max_drawdown_pct":  round(r_on.max_drawdown_pct - r_off.max_drawdown_pct, 2),
-                "win_rate":          round(r_on.win_rate - r_off.win_rate, 3),
-                "profit_factor":     round(r_on.profit_factor - r_off.profit_factor, 3)
-                                     if math.isfinite(r_on.profit_factor) and math.isfinite(r_off.profit_factor)
-                                     else 0.0,
-                "trade_count":       r_on.trade_count - r_off.trade_count,
+                "total_return_pct": round(r_on.total_return_pct - r_off.total_return_pct, 2),
+                "sharpe": round(r_on.sharpe - r_off.sharpe, 3),
+                "sortino": round(r_on.sortino - r_off.sortino, 3),
+                "max_drawdown_pct": round(r_on.max_drawdown_pct - r_off.max_drawdown_pct, 2),
+                "win_rate": round(r_on.win_rate - r_off.win_rate, 3),
+                "profit_factor": round(r_on.profit_factor - r_off.profit_factor, 3)
+                if math.isfinite(r_on.profit_factor) and math.isfinite(r_off.profit_factor)
+                else 0.0,
+                "trade_count": r_on.trade_count - r_off.trade_count,
             }
         return out
 

@@ -25,8 +25,7 @@ def _write_draft(root, stamp: str, kind: str, *, passed: bool = True):
     x_path = ready_x / f"{stamp}_{kind}.jsonl"
     substack_path = ready_substack / f"{stamp}_{kind}.md"
     x_path.write_text(
-        json.dumps({"index": 0, "text": f"{kind} thread opener with cited facts."})
-        + "\n"
+        json.dumps({"index": 0, "text": f"{kind} thread opener with cited facts."}) + "\n"
     )
     substack_path.write_text(
         f"# {kind} title\n\nGenerated content for {kind}.\n\nInformational only.\n"
@@ -104,8 +103,7 @@ def test_build_work_order_from_draft_manifest(tmp_path):
     assert order["dry_run"] is True
     assert order["report"]["kind"] == "weekly_crypto_brief"
     assert order["provenance_manifest_path"] == (
-        "data/media/manifests/"
-        "20260427_media_work_order_20260427_0607_weekly_crypto_brief.json"
+        "data/media/manifests/20260427_media_work_order_20260427_0607_weekly_crypto_brief.json"
     )
     assert order["report"]["summary"]["symbols"] == ["BTC", "ETH"]
     assert order["renderings"][0]["path"].startswith("data/content/ready/")
@@ -128,8 +126,7 @@ def test_write_work_order_creates_order_and_manifest(tmp_path):
     order_path = result["path"]
     assert order_path.is_file()
     assert result["manifest"]["outputs"][0]["path"] == (
-        "data/media/work_orders/"
-        "20260427_media_work_order_20260427_0607_market_pulse.json"
+        "data/media/work_orders/20260427_media_work_order_20260427_0607_market_pulse.json"
     )
     assert result["manifest"]["inputs"][0]["path"] == (
         "data/content/drafts/20260427_0607_market_pulse.json"

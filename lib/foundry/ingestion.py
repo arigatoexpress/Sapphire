@@ -134,34 +134,36 @@ def transform_paper_trades(
             trade_id = row.get("pipeline_id") or _deterministic_id(
                 row.get("symbol"), ts, row.get("strategy")
             )
-            trades.append({
-                "id": trade_id,
-                "symbol": row.get("symbol", ""),
-                "direction": row.get("direction", ""),
-                "action": row.get("action", ""),
-                "strategy": row.get("strategy", ""),
-                "entry_price": row.get("price"),
-                "take_profit": row.get("take_profit"),
-                "stop_loss": row.get("stop_loss"),
-                "rr_ratio": row.get("rr_ratio"),
-                "confidence": row.get("confidence"),
-                "score": row.get("score"),
-                "position_usd": row.get("position_usd"),
-                "sizing_method": row.get("sizing_method"),
-                "routing": row.get("routing", ""),
-                "outcome": row.get("outcome"),
-                "pnl_usd": row.get("pnl_usd"),
-                "close_price": row.get("close_price"),
-                "opened_at": _iso(ts),
-                "closed_at": _iso(row.get("closed_at")),
-                "source": row.get("source", ""),
-                "regime": row.get("regime"),
-                "regime_score": row.get("regime_score"),
-                "fear_greed": row.get("fear_greed"),
-                "kronos_direction": row.get("kronos_direction"),
-                "funding_rate": row.get("funding_rate"),
-                "_sapphire_source": str(jsonl_file.relative_to(root)),
-            })
+            trades.append(
+                {
+                    "id": trade_id,
+                    "symbol": row.get("symbol", ""),
+                    "direction": row.get("direction", ""),
+                    "action": row.get("action", ""),
+                    "strategy": row.get("strategy", ""),
+                    "entry_price": row.get("price"),
+                    "take_profit": row.get("take_profit"),
+                    "stop_loss": row.get("stop_loss"),
+                    "rr_ratio": row.get("rr_ratio"),
+                    "confidence": row.get("confidence"),
+                    "score": row.get("score"),
+                    "position_usd": row.get("position_usd"),
+                    "sizing_method": row.get("sizing_method"),
+                    "routing": row.get("routing", ""),
+                    "outcome": row.get("outcome"),
+                    "pnl_usd": row.get("pnl_usd"),
+                    "close_price": row.get("close_price"),
+                    "opened_at": _iso(ts),
+                    "closed_at": _iso(row.get("closed_at")),
+                    "source": row.get("source", ""),
+                    "regime": row.get("regime"),
+                    "regime_score": row.get("regime_score"),
+                    "fear_greed": row.get("fear_greed"),
+                    "kronos_direction": row.get("kronos_direction"),
+                    "funding_rate": row.get("funding_rate"),
+                    "_sapphire_source": str(jsonl_file.relative_to(root)),
+                }
+            )
 
     log.info("Transformed %d PaperTrade objects from %s", len(trades), signals_dir)
     return trades
@@ -196,20 +198,22 @@ def transform_alerts(
             except Exception:
                 pass
         alert_id = row.get("id") or _deterministic_id(ts, evt_type, row.get("message", ""))
-        alerts.append({
-            "id": alert_id,
-            "title": row.get("title") or row.get("message", "")[:120],
-            "severity": row.get("priority") or row.get("severity", "medium"),
-            "category": evt_type,
-            "source": row.get("service") or row.get("source", "system"),
-            "device": row.get("device"),
-            "message": row.get("message", ""),
-            "timestamp": _iso(ts),
-            "resolved": row.get("resolved", False),
-            "resolved_at": _iso(row.get("resolved_at")),
-            "tags": row.get("tags") or [],
-            "_sapphire_source": "data/system_events.jsonl",
-        })
+        alerts.append(
+            {
+                "id": alert_id,
+                "title": row.get("title") or row.get("message", "")[:120],
+                "severity": row.get("priority") or row.get("severity", "medium"),
+                "category": evt_type,
+                "source": row.get("service") or row.get("source", "system"),
+                "device": row.get("device"),
+                "message": row.get("message", ""),
+                "timestamp": _iso(ts),
+                "resolved": row.get("resolved", False),
+                "resolved_at": _iso(row.get("resolved_at")),
+                "tags": row.get("tags") or [],
+                "_sapphire_source": "data/system_events.jsonl",
+            }
+        )
 
     # 2) data/security/**/*.json — if any structured security reports exist
     security_dir = root / "data" / "security"
@@ -221,20 +225,22 @@ def transform_alerts(
             findings = report.get("findings") or report.get("alerts") or [report]
             for f in findings:
                 alert_id = f.get("id") or _deterministic_id(fpath.name, f.get("title", ""))
-                alerts.append({
-                    "id": alert_id,
-                    "title": f.get("title", fpath.stem),
-                    "severity": f.get("severity", "medium"),
-                    "category": "security_report",
-                    "source": f.get("source", fpath.stem),
-                    "device": f.get("device"),
-                    "message": f.get("description") or f.get("message", ""),
-                    "timestamp": _iso(f.get("timestamp") or f.get("published")),
-                    "resolved": f.get("resolved", False),
-                    "resolved_at": None,
-                    "tags": f.get("tags") or [],
-                    "_sapphire_source": str(fpath.relative_to(root)),
-                })
+                alerts.append(
+                    {
+                        "id": alert_id,
+                        "title": f.get("title", fpath.stem),
+                        "severity": f.get("severity", "medium"),
+                        "category": "security_report",
+                        "source": f.get("source", fpath.stem),
+                        "device": f.get("device"),
+                        "message": f.get("description") or f.get("message", ""),
+                        "timestamp": _iso(f.get("timestamp") or f.get("published")),
+                        "resolved": f.get("resolved", False),
+                        "resolved_at": None,
+                        "tags": f.get("tags") or [],
+                        "_sapphire_source": str(fpath.relative_to(root)),
+                    }
+                )
 
     log.info("Transformed %d Alert objects", len(alerts))
     return alerts
@@ -270,31 +276,26 @@ def transform_service_health(
             for row in _load_jsonl(fpath, max_lines=500):
                 if not isinstance(row, dict):
                     continue
-                svc = (
-                    row.get("service_name")
-                    or row.get("service")
-                    or row.get("name")
-                    or fpath.stem
-                )
-                last_check = _iso(row.get("timestamp") or row.get("ts")) or _file_mtime_iso(
-                    fpath
-                )
+                svc = row.get("service_name") or row.get("service") or row.get("name") or fpath.stem
+                last_check = _iso(row.get("timestamp") or row.get("ts")) or _file_mtime_iso(fpath)
                 svc_id = _deterministic_id(svc, last_check or "")
-                objects.append({
-                    "id": svc_id,
-                    "service": svc,
-                    "status": row.get("status", "unknown"),
-                    "latency_ms": row.get("response_ms")
+                objects.append(
+                    {
+                        "id": svc_id,
+                        "service": svc,
+                        "status": row.get("status", "unknown"),
+                        "latency_ms": row.get("response_ms")
                         or row.get("latency_ms")
                         or row.get("latency"),
-                    "uptime_pct": row.get("uptime_pct"),
-                    "error_count": row.get("error_count", 0),
-                    "last_check": last_check,
-                    "host": row.get("host") or row.get("endpoint"),
-                    "tier": row.get("tier"),
-                    "notes": row.get("notes") or row.get("error") or "",
-                    "_sapphire_source": str(fpath.relative_to(root)),
-                })
+                        "uptime_pct": row.get("uptime_pct"),
+                        "error_count": row.get("error_count", 0),
+                        "last_check": last_check,
+                        "host": row.get("host") or row.get("endpoint"),
+                        "tier": row.get("tier"),
+                        "notes": row.get("notes") or row.get("error") or "",
+                        "_sapphire_source": str(fpath.relative_to(root)),
+                    }
+                )
 
         # Aggregate heartbeat file — fan out the services dict into per-service
         # objects. The .jsonl extension means it is not matched by the glob above.
@@ -327,19 +328,21 @@ def transform_service_health(
                         else:
                             continue
                         svc_id = _deterministic_id(svc_name, last_check or "", "heartbeat")
-                        objects.append({
-                            "id": svc_id,
-                            "service": svc_name,
-                            "status": status_str,
-                            "latency_ms": latency,
-                            "uptime_pct": None,
-                            "error_count": 0,
-                            "last_check": last_check,
-                            "host": None,
-                            "tier": None,
-                            "notes": notes,
-                            "_sapphire_source": str(heartbeat_path.relative_to(root)),
-                        })
+                        objects.append(
+                            {
+                                "id": svc_id,
+                                "service": svc_name,
+                                "status": status_str,
+                                "latency_ms": latency,
+                                "uptime_pct": None,
+                                "error_count": 0,
+                                "last_check": last_check,
+                                "host": None,
+                                "tier": None,
+                                "notes": notes,
+                                "_sapphire_source": str(heartbeat_path.relative_to(root)),
+                            }
+                        )
 
     # Fallback: build from known services in infrastructure topology
     topology_path = root / "data" / "device_topology.json"
@@ -349,9 +352,7 @@ def transform_service_health(
     if isinstance(devices, dict):
         device_items = devices.items()
     else:
-        device_items = (
-            (d.get("name", ""), d) for d in devices if isinstance(d, dict)
-        )
+        device_items = ((d.get("name", ""), d) for d in devices if isinstance(d, dict))
     for device_name, device in device_items:
         if not isinstance(device, dict):
             continue
@@ -367,19 +368,21 @@ def transform_service_health(
             svc_id = _deterministic_id(device_name, svc_name, "topology")
             # Only add if no health data exists for this service
             if not any(o["service"] == svc_name for o in objects):
-                objects.append({
-                    "id": svc_id,
-                    "service": svc_name,
-                    "status": "unknown",
-                    "latency_ms": None,
-                    "uptime_pct": None,
-                    "error_count": 0,
-                    "last_check": topology_last_check,
-                    "host": device.get("tailscaleIp") or device.get("ip") or device_name,
-                    "tier": None,
-                    "notes": f"From topology ({device_name})",
-                    "_sapphire_source": "data/device_topology.json",
-                })
+                objects.append(
+                    {
+                        "id": svc_id,
+                        "service": svc_name,
+                        "status": "unknown",
+                        "latency_ms": None,
+                        "uptime_pct": None,
+                        "error_count": 0,
+                        "last_check": topology_last_check,
+                        "host": device.get("tailscaleIp") or device.get("ip") or device_name,
+                        "tier": None,
+                        "notes": f"From topology ({device_name})",
+                        "_sapphire_source": "data/device_topology.json",
+                    }
+                )
 
     log.info("Transformed %d ServiceHealth objects", len(objects))
     return objects
@@ -408,24 +411,28 @@ def transform_threat_intel(
                 ts = t.get("published") or threats_file.parent.name
                 if since and str(ts) < since.isoformat():
                     continue
-                tid = t.get("canonical_id") or t.get("id") or _deterministic_id(
-                    t.get("title", ""), ts
+                tid = (
+                    t.get("canonical_id")
+                    or t.get("id")
+                    or _deterministic_id(t.get("title", ""), ts)
                 )
-                objects.append({
-                    "id": tid,
-                    "title": t.get("title", ""),
-                    "description": t.get("description", ""),
-                    "severity": t.get("severity", "medium"),
-                    "source": t.get("source", ""),
-                    "cve_ids": t.get("cve_ids") or [],
-                    "affected_products": t.get("affected_products") or [],
-                    "published_at": _iso(ts),
-                    "region": t.get("region", "GLOBAL"),
-                    "mitre_tactics": t.get("mitre_tactics") or [],
-                    "ioc_count": len(t.get("iocs") or []),
-                    "link": t.get("link") or t.get("url", ""),
-                    "_sapphire_source": str(threats_file.relative_to(root)),
-                })
+                objects.append(
+                    {
+                        "id": tid,
+                        "title": t.get("title", ""),
+                        "description": t.get("description", ""),
+                        "severity": t.get("severity", "medium"),
+                        "source": t.get("source", ""),
+                        "cve_ids": t.get("cve_ids") or [],
+                        "affected_products": t.get("affected_products") or [],
+                        "published_at": _iso(ts),
+                        "region": t.get("region", "GLOBAL"),
+                        "mitre_tactics": t.get("mitre_tactics") or [],
+                        "ioc_count": len(t.get("iocs") or []),
+                        "link": t.get("link") or t.get("url", ""),
+                        "_sapphire_source": str(threats_file.relative_to(root)),
+                    }
+                )
 
     # 2) data/threat_intel/*.md — extract title from first heading
     threat_md_dir = root / "data" / "threat_intel"
@@ -442,23 +449,23 @@ def transform_threat_intel(
             # Don't duplicate if already captured from threats.json
             if any(o["id"] == tid for o in objects):
                 continue
-            objects.append({
-                "id": tid,
-                "title": title,
-                "description": content[:500],
-                "severity": "medium",
-                "source": "sapphire-threat-intel",
-                "cve_ids": re.findall(r"CVE-\d{4}-\d+", content),
-                "affected_products": [],
-                "published_at": _iso(
-                    datetime.fromtimestamp(md_file.stat().st_mtime, UTC)
-                ),
-                "region": "GLOBAL",
-                "mitre_tactics": [],
-                "ioc_count": 0,
-                "link": "",
-                "_sapphire_source": str(md_file.relative_to(root)),
-            })
+            objects.append(
+                {
+                    "id": tid,
+                    "title": title,
+                    "description": content[:500],
+                    "severity": "medium",
+                    "source": "sapphire-threat-intel",
+                    "cve_ids": re.findall(r"CVE-\d{4}-\d+", content),
+                    "affected_products": [],
+                    "published_at": _iso(datetime.fromtimestamp(md_file.stat().st_mtime, UTC)),
+                    "region": "GLOBAL",
+                    "mitre_tactics": [],
+                    "ioc_count": 0,
+                    "link": "",
+                    "_sapphire_source": str(md_file.relative_to(root)),
+                }
+            )
 
     log.info("Transformed %d ThreatIntel objects", len(objects))
     return objects
@@ -495,18 +502,20 @@ def transform_daily_briefs(
             if not data:
                 continue
             brief_id = data.get("id") or _deterministic_id("brief", day_dir.name)
-            objects.append({
-                "id": brief_id,
-                "date": day_dir.name,
-                "title": data.get("title", f"Daily Brief — {day_dir.name}"),
-                "summary": data.get("summary", ""),
-                "sections": data.get("sections") or [],
-                "market_outlook": data.get("market_outlook"),
-                "threat_level": data.get("threat_level", "normal"),
-                "key_signals": data.get("key_signals") or [],
-                "generated_at": _iso(data.get("generated_at")),
-                "_sapphire_source": str(brief_json.relative_to(root)),
-            })
+            objects.append(
+                {
+                    "id": brief_id,
+                    "date": day_dir.name,
+                    "title": data.get("title", f"Daily Brief — {day_dir.name}"),
+                    "summary": data.get("summary", ""),
+                    "sections": data.get("sections") or [],
+                    "market_outlook": data.get("market_outlook"),
+                    "threat_level": data.get("threat_level", "normal"),
+                    "key_signals": data.get("key_signals") or [],
+                    "generated_at": _iso(data.get("generated_at")),
+                    "_sapphire_source": str(brief_json.relative_to(root)),
+                }
+            )
         elif brief_md.is_file():
             try:
                 content = brief_md.read_text(errors="replace")[:8000]
@@ -514,20 +523,22 @@ def transform_daily_briefs(
                 continue
             title_match = re.search(r"^#\s+(.+)", content, re.MULTILINE)
             brief_id = _deterministic_id("brief", day_dir.name)
-            objects.append({
-                "id": brief_id,
-                "date": day_dir.name,
-                "title": title_match.group(1).strip() if title_match else f"Daily Brief — {day_dir.name}",
-                "summary": content[:1000],
-                "sections": [],
-                "market_outlook": None,
-                "threat_level": "normal",
-                "key_signals": [],
-                "generated_at": _iso(
-                    datetime.fromtimestamp(brief_md.stat().st_mtime, UTC)
-                ),
-                "_sapphire_source": str(brief_md.relative_to(root)),
-            })
+            objects.append(
+                {
+                    "id": brief_id,
+                    "date": day_dir.name,
+                    "title": title_match.group(1).strip()
+                    if title_match
+                    else f"Daily Brief — {day_dir.name}",
+                    "summary": content[:1000],
+                    "sections": [],
+                    "market_outlook": None,
+                    "threat_level": "normal",
+                    "key_signals": [],
+                    "generated_at": _iso(datetime.fromtimestamp(brief_md.stat().st_mtime, UTC)),
+                    "_sapphire_source": str(brief_md.relative_to(root)),
+                }
+            )
 
     if since:
         objects = [o for o in objects if o.get("date", "") >= since.strftime("%Y-%m-%d")]
@@ -554,11 +565,7 @@ def _load_regional_export(
     for row in _load_jsonl(fpath, max_lines=10000):
         if not isinstance(row, dict):
             continue
-        ts = (
-            row.get("observed_at")
-            or row.get("last_seen_at")
-            or row.get("snapshot_updated_at")
-        )
+        ts = row.get("observed_at") or row.get("last_seen_at") or row.get("snapshot_updated_at")
         if since and ts and str(ts) < since.isoformat():
             continue
         obj = dict(row)

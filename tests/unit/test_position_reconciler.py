@@ -11,6 +11,7 @@ Critical paths:
   - run_check(): Firestore unavailable → Pub/Sub staleness still works
   - status() returns correct counts and ages
 """
+
 import asyncio
 import os
 import sys
@@ -21,6 +22,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/share
 from position_reconciler import PositionReconciler
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _run(coro):
     return asyncio.run(coro)
@@ -77,6 +79,7 @@ class _FakeDb:
 
 # ── Pub/Sub snapshot updates ──────────────────────────────────────────────────
 
+
 class TestHandlePositionUpdate:
     def test_stores_snapshot_for_platform(self):
         rec = _make()
@@ -102,6 +105,7 @@ class TestHandlePositionUpdate:
 
 
 # ── Staleness check (Pub/Sub) ─────────────────────────────────────────────────
+
 
 class TestStalenessCheck:
     def test_no_drift_when_fresh_with_positions(self):
@@ -141,6 +145,7 @@ class TestStalenessCheck:
 
 
 # ── Firestore diff ────────────────────────────────────────────────────────────
+
 
 class TestFirestoreDiff:
     def test_no_drift_when_counts_match(self):
@@ -198,6 +203,7 @@ class TestFirestoreDiff:
 
 
 # ── Status introspection ──────────────────────────────────────────────────────
+
 
 class TestReconcilerStatus:
     def test_status_reports_known_platforms(self):

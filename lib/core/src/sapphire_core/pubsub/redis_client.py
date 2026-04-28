@@ -9,6 +9,7 @@ Usage:
   export REDIS_URL=redis://localhost:6379
   # Then get_pubsub_client() returns RedisPubSubClient automatically.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -33,6 +34,7 @@ def _serialize(data: Any) -> str:
         data = asdict(data)
     if not isinstance(data, dict):
         data = {"value": data}
+
     # Convert datetimes to ISO strings
     def _coerce(obj: Any) -> Any:
         if isinstance(obj, dict):
@@ -42,6 +44,7 @@ def _serialize(data: Any) -> str:
         if isinstance(obj, datetime):
             return obj.isoformat()
         return obj
+
     return json.dumps(_coerce(data))
 
 
@@ -83,6 +86,7 @@ class RedisPubSubClient:
             return
         try:
             import redis.asyncio as aioredis  # type: ignore
+
             self._redis = aioredis.from_url(self._url, decode_responses=True)
             await self._redis.ping()
             self._initialized = True

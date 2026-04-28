@@ -11,6 +11,7 @@ def _load_scout_module():
     module = importlib.util.module_from_spec(spec)
     assert spec and spec.loader
     import sys as _sys
+
     _sys.modules["scout_sandbox_app"] = module
     spec.loader.exec_module(module)
     return module

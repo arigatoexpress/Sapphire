@@ -2,6 +2,7 @@
 
 Run: /usr/local/bin/python3 -m pytest tests/unit/test_command_guard.py -v
 """
+
 from __future__ import annotations
 
 import json
@@ -46,6 +47,7 @@ def guard(policy_file):
 
 # ─── Normalization tests ───────────────────────────────────────────────────────
 
+
 class TestNormalize:
     def test_collapses_whitespace(self):
         assert _normalize_command("rm   -rf   /") == "rm -rf /"
@@ -77,6 +79,7 @@ class TestNormalize:
 
 
 # ─── Block tests ───────────────────────────────────────────────────────────────
+
 
 class TestBlock:
     def test_blocks_rm_rf(self, guard):
@@ -126,6 +129,7 @@ class TestBlock:
 
 # ─── Confirmation tests ────────────────────────────────────────────────────────
 
+
 class TestConfirm:
     def test_requires_confirm_git_push(self, guard):
         result = guard.check("git push origin main")
@@ -142,6 +146,7 @@ class TestConfirm:
 
 
 # ─── Allow tests ───────────────────────────────────────────────────────────────
+
 
 class TestAllow:
     def test_allows_safe_command(self, guard):
@@ -167,6 +172,7 @@ class TestAllow:
 
 # ─── Batch tests ───────────────────────────────────────────────────────────────
 
+
 class TestBatch:
     def test_check_batch_mixed(self, guard):
         results = guard.check_batch(["echo hello", "rm -rf /", "git push"])
@@ -179,6 +185,7 @@ class TestBatch:
 
 
 # ─── Missing policy tests ──────────────────────────────────────────────────────
+
 
 class TestMissingPolicy:
     def test_unknown_component_defaults_confirm(self, policy_file):
@@ -199,6 +206,7 @@ class TestMissingPolicy:
 
 
 # ─── Guard result properties ───────────────────────────────────────────────────
+
 
 class TestGuardResult:
     def test_allowed_property(self, guard):

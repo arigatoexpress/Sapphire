@@ -68,7 +68,9 @@ def heal(rows: list[dict]) -> list[dict]:
         label = routine.launchagent
         # Kickstart: -k kills existing, restarts. Requires LaunchAgent loaded.
         try:
-            uid = subprocess.run(["id", "-u"], capture_output=True, text=True, timeout=5).stdout.strip()
+            uid = subprocess.run(
+                ["id", "-u"], capture_output=True, text=True, timeout=5
+            ).stdout.strip()
             cmd = ["launchctl", "kickstart", "-k", f"gui/{uid}/{label}"]
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
             actions.append(
@@ -83,9 +85,7 @@ def heal(rows: list[dict]) -> list[dict]:
                 }
             )
         except Exception as e:
-            actions.append(
-                {"name": name, "label": label, "healed": False, "error": str(e)[:200]}
-            )
+            actions.append({"name": name, "label": label, "healed": False, "error": str(e)[:200]})
     return actions
 
 
@@ -154,6 +154,7 @@ def send_summary(summary: str, priority: str = "p2") -> dict:
     """Send via safe_send. Returns API result dict."""
     try:
         from lib.telegram.src.sapphire_telegram.safe_send import send
+
         return send(summary, priority=priority, prefix=True, banner=None)
     except ImportError as e:
         log.warning("safe_send unavailable: %s", e)

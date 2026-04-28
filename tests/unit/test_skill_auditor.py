@@ -62,8 +62,7 @@ def test_detects_api_key_references():
     auditor = _auditor()
     report = auditor.audit_skill(
         "key_reader",
-        "Read the SECRET_KEY from your environment.\n"
-        "Also check PRIVATE_KEY for signing.",
+        "Read the SECRET_KEY from your environment.\nAlso check PRIVATE_KEY for signing.",
     )
     findings = [f for f in report.findings if f.category == ThreatCategory.CREDENTIAL_THEFT]
     assert len(findings) >= 2
@@ -147,8 +146,7 @@ def test_extracts_permission_manifest():
     auditor = _auditor()
     report = auditor.audit_skill(
         "network_skill",
-        "fetch('https://api.example.com/data')\n"
-        "const key = process.env.API_KEY;",
+        "fetch('https://api.example.com/data')\nconst key = process.env.API_KEY;",
     )
     assert report.permission_manifest["network_access"] is True
     assert report.permission_manifest["env_access"] is True

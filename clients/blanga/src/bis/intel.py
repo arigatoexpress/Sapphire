@@ -139,7 +139,9 @@ def _published_from_entry(entry) -> datetime:
     )
 
 
-def _news_event_type_for_entry(*, title: str, query_term: str, person_name_map: dict[str, str]) -> MarketEventType:
+def _news_event_type_for_entry(
+    *, title: str, query_term: str, person_name_map: dict[str, str]
+) -> MarketEventType:
     lowered_title = _norm(title)
     lowered_query = _norm(query_term)
 
@@ -219,11 +221,17 @@ def _extract_address_hint(text: str) -> str:
 
 def _detect_signal_kind(title: str, summary: str) -> str:
     lowered = _norm(f"{title} {summary}")
-    if any(term in lowered for term in ["vacate", "vacant", "closure", "closing", "shut down", "closed location"]):
+    if any(
+        term in lowered
+        for term in ["vacate", "vacant", "closure", "closing", "shut down", "closed location"]
+    ):
         return "vacancy"
     if any(term in lowered for term in ["opens", "opening", "grand opening", "new location"]):
         return "opening"
-    if any(term in lowered for term in ["new construction", "construction", "groundbreaking", "permit filed"]):
+    if any(
+        term in lowered
+        for term in ["new construction", "construction", "groundbreaking", "permit filed"]
+    ):
         return "new_construction"
     return "general"
 
@@ -245,7 +253,9 @@ def refresh_news_intelligence(
     query_terms = query_terms[:max_queries]
     cutoff = datetime.now(tz=UTC) - timedelta(days=max(0, lookback_days))
 
-    person_name_map = {_norm(person.full_name): person.person_urn for person in store.people.values()}
+    person_name_map = {
+        _norm(person.full_name): person.person_urn for person in store.people.values()
+    }
     existing_urls = {event.source_url for event in store.market_events.values() if event.source_url}
     created_events: list[MarketEvent] = []
     publication_filters = preferred_publications or [
@@ -282,7 +292,9 @@ def refresh_news_intelligence(
             address_hint = _extract_address_hint(f"{title} {summary}")
             signal_kind = _detect_signal_kind(title, summary)
             address_required = signal_kind in {"vacancy", "opening", "new_construction"}
-            actionable_property_signal = not (require_address_for_actionable_signals and address_required and not address_hint)
+            actionable_property_signal = not (
+                require_address_for_actionable_signals and address_required and not address_hint
+            )
 
             event = MarketEvent(
                 event_urn=make_urn("event"),
@@ -302,7 +314,9 @@ def refresh_news_intelligence(
                     "address_required": "true" if address_required else "false",
                     "address_extracted": "true" if address_hint else "false",
                     "actionable_property_signal": "true" if actionable_property_signal else "false",
-                    "research_queue": "true" if (address_required and not address_hint) else "false",
+                    "research_queue": "true"
+                    if (address_required and not address_hint)
+                    else "false",
                 },
             )
             store.add_market_event(event)

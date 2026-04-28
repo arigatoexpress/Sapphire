@@ -88,9 +88,7 @@ def test_production_adjacent_repos_have_no_spend_ci_posture() -> None:
     assert repos["sapphire"]["ci_strategy"] == "sapphire_self_hosted_gate"
     assert repos["project-go-forward"]["ci_strategy"] == "draft_auto_deploy"
     assert repos["hermes-agent"]["ci_strategy"] == "upstream_fork_local_only"
-    assert repos["regional-intel-workbench"]["ci_strategy"] == (
-        "local_evidence_skip_ci_bootstrap"
-    )
+    assert repos["regional-intel-workbench"]["ci_strategy"] == ("local_evidence_skip_ci_bootstrap")
 
 
 def test_manifest_tracks_upstream_integration_fleet() -> None:

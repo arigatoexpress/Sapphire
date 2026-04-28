@@ -470,9 +470,7 @@ def _render_crypto_brief(f: dict[str, Any]) -> str:
             f"{preds['hits']} ({_fmt_pct(preds['accuracy'])}). Per symbol:"
         )
         for sym, v in preds["by_symbol"].items():
-            lines.append(
-                f"- {sym}: {v['hits']}/{v['total']} correct " f"({_fmt_pct(v['accuracy'])})"
-            )
+            lines.append(f"- {sym}: {v['hits']}/{v['total']} correct ({_fmt_pct(v['accuracy'])})")
     else:
         lines.append(small_sample_accuracy_notice(preds, subject="The 6-factor TA model"))
         if preds["by_symbol"]:
@@ -496,9 +494,7 @@ def _render_crypto_brief(f: dict[str, Any]) -> str:
             extra = ""
             if rsi is not None:
                 extra = f", RSI {rsi:.1f}"
-            lines.append(
-                f"- {sym} {d} → target ${tp} " f"(entry ${ep}, conf {_fmt_pct(conf)}{extra})"
-            )
+            lines.append(f"- {sym} {d} → target ${tp} (entry ${ep}, conf {_fmt_pct(conf)}{extra})")
         lines.append("")
 
     lines.append("## Paper Portfolio ($100K book)")
@@ -558,7 +554,7 @@ def _render_ai_intel(f: dict[str, Any]) -> str:
     lines.append("## Projects Tracked")
     lines.append("")
     lines.append(
-        f"{f['tracked_projects']} projects in the active ledger " f"(data/tracked_projects.json)."
+        f"{f['tracked_projects']} projects in the active ledger (data/tracked_projects.json)."
     )
     return "\n".join(lines)
 
@@ -592,7 +588,7 @@ def _render_market_pulse(f: dict[str, Any]) -> str:
         tp = fc.get("target_price")
         conf = fc.get("confidence", 0)
         tf = fc.get("timeframe", "24h")
-        parts.append(f"{sym} forecast {d} toward ${tp} " f"({conf:.0%} confidence, {tf} horizon)")
+        parts.append(f"{sym} forecast {d} toward ${tp} ({conf:.0%} confidence, {tf} horizon)")
     forecast_text = "; ".join(parts) if parts else "no live forecasts available today"
     port = f["portfolio"]
     holdings = port.get("open_positions", 0)

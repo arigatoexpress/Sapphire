@@ -22,7 +22,9 @@ from typing import Any
 
 # Role override / instruction hijacking
 _ROLE_OVERRIDE_PATTERNS = [
-    re.compile(r"(?i)ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|rules?|context|prompts?|directives?)"),
+    re.compile(
+        r"(?i)ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|rules?|context|prompts?|directives?)"
+    ),
     re.compile(r"(?i)disregard\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|rules?)"),
     re.compile(r"(?i)forget\s+(everything|all)\s+(you|that)\s+(know|were\s+told|learned)"),
     re.compile(r"(?i)you\s+are\s+now\s+(a|an|my)\s+"),
@@ -39,9 +41,15 @@ _ROLE_OVERRIDE_PATTERNS = [
 
 # Data exfiltration via prompt
 _EXFIL_PATTERNS = [
-    re.compile(r"(?i)(send|post|transmit|exfiltrate|forward|email|upload)\s+.{0,20}(data|info|information|secrets?|keys?|tokens?|credentials?)\s"),
-    re.compile(r"(?i)(read|cat|print|echo|display|show|reveal|output)\s+(the\s+)?(env|environment|\.env|secrets?|api[_\s]?keys?|tokens?|password|credentials?)"),
-    re.compile(r"(?i)(curl|wget|fetch|request|http|https)\s+.{5,80}(webhook|pastebin|requestbin|ngrok|burp)"),
+    re.compile(
+        r"(?i)(send|post|transmit|exfiltrate|forward|email|upload)\s+.{0,20}(data|info|information|secrets?|keys?|tokens?|credentials?)\s"
+    ),
+    re.compile(
+        r"(?i)(read|cat|print|echo|display|show|reveal|output)\s+(the\s+)?(env|environment|\.env|secrets?|api[_\s]?keys?|tokens?|password|credentials?)"
+    ),
+    re.compile(
+        r"(?i)(curl|wget|fetch|request|http|https)\s+.{5,80}(webhook|pastebin|requestbin|ngrok|burp)"
+    ),
 ]
 
 # Code execution
@@ -69,6 +77,7 @@ ALL_INJECTION_PATTERNS: list[tuple[str, re.Pattern]] = (
 @dataclass
 class InjectionDetection:
     """Result of scanning text for injection attempts."""
+
     is_suspicious: bool
     findings: list[dict[str, str]] = field(default_factory=list)
     risk_score: float = 0.0  # 0.0 = clean, 1.0 = definitely malicious
@@ -86,11 +95,13 @@ def detect_injection(text: str) -> InjectionDetection:
     for category, pattern in ALL_INJECTION_PATTERNS:
         match = pattern.search(text)
         if match:
-            findings.append({
-                "category": category,
-                "matched": match.group(0)[:100],
-                "position": str(match.start()),
-            })
+            findings.append(
+                {
+                    "category": category,
+                    "matched": match.group(0)[:100],
+                    "position": str(match.start()),
+                }
+            )
 
     if not findings:
         return InjectionDetection(is_suspicious=False, risk_score=0.0)
@@ -118,11 +129,24 @@ _ZERO_WIDTH_RE = re.compile(
 )
 
 _HOMOGLYPH_MAP = {
-    "\u0410": "A", "\u0412": "B", "\u0421": "C", "\u0415": "E",
-    "\u041d": "H", "\u041a": "K", "\u041c": "M", "\u041e": "O",
-    "\u0420": "P", "\u0422": "T", "\u0425": "X",
-    "\u0430": "a", "\u0435": "e", "\u043e": "o", "\u0440": "p",
-    "\u0441": "c", "\u0443": "y", "\u0445": "x",
+    "\u0410": "A",
+    "\u0412": "B",
+    "\u0421": "C",
+    "\u0415": "E",
+    "\u041d": "H",
+    "\u041a": "K",
+    "\u041c": "M",
+    "\u041e": "O",
+    "\u0420": "P",
+    "\u0422": "T",
+    "\u0425": "X",
+    "\u0430": "a",
+    "\u0435": "e",
+    "\u043e": "o",
+    "\u0440": "p",
+    "\u0441": "c",
+    "\u0443": "y",
+    "\u0445": "x",
 }
 
 
@@ -201,10 +225,22 @@ def sanitize_trade_data_for_prompt(data: dict[str, Any], max_items: int = 20) ->
     that could carry injected content.
     """
     safe_fields = {
-        "symbol", "side", "action", "platform", "venue",
-        "quantity", "filled_quantity", "price", "avg_price",
-        "realized_pnl", "pnl", "net_pnl", "profit",
-        "success", "timestamp", "source",
+        "symbol",
+        "side",
+        "action",
+        "platform",
+        "venue",
+        "quantity",
+        "filled_quantity",
+        "price",
+        "avg_price",
+        "realized_pnl",
+        "pnl",
+        "net_pnl",
+        "profit",
+        "success",
+        "timestamp",
+        "source",
     }
 
     if isinstance(data, list):
@@ -246,14 +282,16 @@ def log_injection_attempt(
     """Record a detected injection attempt for auditing."""
     if not detection.is_suspicious:
         return
-    _injection_log.append({
-        "timestamp": time.time(),
-        "source": source,
-        "agent_id": agent_id,
-        "risk_score": detection.risk_score,
-        "categories": [f["category"] for f in detection.findings],
-        "matched_snippets": [f["matched"][:50] for f in detection.findings[:5]],
-    })
+    _injection_log.append(
+        {
+            "timestamp": time.time(),
+            "source": source,
+            "agent_id": agent_id,
+            "risk_score": detection.risk_score,
+            "categories": [f["category"] for f in detection.findings],
+            "matched_snippets": [f["matched"][:50] for f in detection.findings[:5]],
+        }
+    )
     if len(_injection_log) > _MAX_INJECTION_LOG:
         del _injection_log[: len(_injection_log) - _MAX_INJECTION_LOG]
 

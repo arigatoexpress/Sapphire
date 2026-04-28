@@ -114,7 +114,7 @@ def _http_json(url: str, timeout: float = HTTP_TIMEOUT) -> dict | list | None:
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
             last_exc = exc
             if attempt < 2:
-                time.sleep(2 ** attempt)
+                time.sleep(2**attempt)
     log.debug("chain: fetch failed %s (%s)", url, last_exc)
     return None
 
@@ -209,7 +209,17 @@ def _score_fear_greed(v: int | None) -> tuple[float, str] | None:
         return None
     # Map 0-100 to -1..+1 (extreme fear -> risk-off, extreme greed -> risk-on)
     score = (v - 50) / 50.0
-    label = "extreme fear" if v < 20 else "fear" if v < 40 else "neutral" if v < 60 else "greed" if v < 80 else "extreme greed"
+    label = (
+        "extreme fear"
+        if v < 20
+        else "fear"
+        if v < 40
+        else "neutral"
+        if v < 60
+        else "greed"
+        if v < 80
+        else "extreme greed"
+    )
     return score, f"Fear&Greed={v} ({label})"
 
 
@@ -263,8 +273,13 @@ def classify(snapshot_inputs: dict) -> RegimeClassification:
     components: list[tuple[float, str]] = []
     scorers = [
         (_score_fear_greed, snapshot_inputs.get("fear_greed")),
-        (_score_funding, (snapshot_inputs.get("btc_funding_rate_pct"),
-                          snapshot_inputs.get("eth_funding_rate_pct"))),
+        (
+            _score_funding,
+            (
+                snapshot_inputs.get("btc_funding_rate_pct"),
+                snapshot_inputs.get("eth_funding_rate_pct"),
+            ),
+        ),
         (_score_dominance, snapshot_inputs.get("btc_dominance_24h_change")),
         (_score_mcap_change, snapshot_inputs.get("total_mcap_24h_change_pct")),
         (_score_dxy, snapshot_inputs.get("dxy_1d_change_pct")),
@@ -282,8 +297,11 @@ def classify(snapshot_inputs: dict) -> RegimeClassification:
 
     if inputs_ok == 0:
         return RegimeClassification(
-            regime=Regime.NEUTRAL, score=0.0, reasons=["no inputs available"],
-            inputs_ok=0, inputs_total=inputs_total,
+            regime=Regime.NEUTRAL,
+            score=0.0,
+            reasons=["no inputs available"],
+            inputs_ok=0,
+            inputs_total=inputs_total,
         )
 
     score = sum(s for s, _ in components) / len(components)
@@ -295,8 +313,11 @@ def classify(snapshot_inputs: dict) -> RegimeClassification:
     else:
         regime = Regime.NEUTRAL
     return RegimeClassification(
-        regime=regime, score=round(score, 3), reasons=reasons,
-        inputs_ok=inputs_ok, inputs_total=inputs_total,
+        regime=regime,
+        score=round(score, 3),
+        reasons=reasons,
+        inputs_ok=inputs_ok,
+        inputs_total=inputs_total,
     )
 
 
@@ -316,12 +337,16 @@ def _read_last_state() -> dict | None:
 
 def _write_last_state(snapshot: ChainSnapshot) -> None:
     try:
-        LAST_STATE_FILE.write_text(json.dumps({
-            "timestamp": snapshot.timestamp,
-            "unix_ts": snapshot.unix_ts,
-            "regime": snapshot.classification.regime.value,
-            "score": snapshot.classification.score,
-        }))
+        LAST_STATE_FILE.write_text(
+            json.dumps(
+                {
+                    "timestamp": snapshot.timestamp,
+                    "unix_ts": snapshot.unix_ts,
+                    "regime": snapshot.classification.regime.value,
+                    "score": snapshot.classification.score,
+                }
+            )
+        )
     except OSError as exc:
         log.warning("chain: could not write last_state: %s", exc)
 
@@ -433,7 +458,11 @@ class ChainIntelligence:
             btc_dominance = float(mcp.get("btc")) if mcp.get("btc") is not None else None
             # CoinGecko doesn't return dominance delta directly — derive from
             # total mcap 24h change vs BTC price change if both present.
-            total_mcap_usd = float((gl.get("total_market_cap") or {}).get("usd")) if (gl.get("total_market_cap") or {}).get("usd") else None
+            total_mcap_usd = (
+                float((gl.get("total_market_cap") or {}).get("usd"))
+                if (gl.get("total_market_cap") or {}).get("usd")
+                else None
+            )
             total_mcap_24h_change_pct = (
                 float(gl.get("market_cap_change_percentage_24h_usd"))
                 if gl.get("market_cap_change_percentage_24h_usd") is not None
@@ -481,9 +510,13 @@ class ChainIntelligence:
             fear_greed=fg_value,
             fear_greed_label=fg_label,
             btc_dominance=round(btc_dominance, 3) if btc_dominance is not None else None,
-            btc_dominance_24h_change=round(btc_dominance_24h_change, 3) if btc_dominance_24h_change is not None else None,
+            btc_dominance_24h_change=round(btc_dominance_24h_change, 3)
+            if btc_dominance_24h_change is not None
+            else None,
             total_mcap_usd=total_mcap_usd,
-            total_mcap_24h_change_pct=round(total_mcap_24h_change_pct, 2) if total_mcap_24h_change_pct is not None else None,
+            total_mcap_24h_change_pct=round(total_mcap_24h_change_pct, 2)
+            if total_mcap_24h_change_pct is not None
+            else None,
             btc_funding_rate_pct=round(btc_funding, 4) if btc_funding is not None else None,
             eth_funding_rate_pct=round(eth_funding, 4) if eth_funding is not None else None,
             dxy=round(dxy, 3) if dxy is not None else None,
@@ -548,30 +581,34 @@ class ChainIntelligence:
         msg = (
             f"*Regime shift*: {shift.from_regime.value} {arrow} {shift.to_regime.value}\n"
             f"Score: {shift.from_score:+.2f} {arrow} {shift.to_score:+.2f}\n"
-            f"\n"
-            + "\n".join(f"• {r}" for r in shift.reasons[:6])
+            f"\n" + "\n".join(f"• {r}" for r in shift.reasons[:6])
         )
         _send_telegram(msg, priority="p0")
-        _publish_pubsub("risk-alerts", {
-            "kind": "regime_shift",
-            "from": shift.from_regime.value,
-            "to": shift.to_regime.value,
-            "from_score": shift.from_score,
-            "to_score": shift.to_score,
-            "timestamp": shift.timestamp,
-            "reasons": shift.reasons,
-            "snapshot": {
-                "fear_greed": snap.fear_greed,
-                "btc_funding_rate_pct": snap.btc_funding_rate_pct,
-                "vix": snap.vix,
-                "dxy_1d_change_pct": snap.dxy_1d_change_pct,
-                "btc_dominance_24h_change": snap.btc_dominance_24h_change,
+        _publish_pubsub(
+            "risk-alerts",
+            {
+                "kind": "regime_shift",
+                "from": shift.from_regime.value,
+                "to": shift.to_regime.value,
+                "from_score": shift.from_score,
+                "to_score": shift.to_score,
+                "timestamp": shift.timestamp,
+                "reasons": shift.reasons,
+                "snapshot": {
+                    "fear_greed": snap.fear_greed,
+                    "btc_funding_rate_pct": snap.btc_funding_rate_pct,
+                    "vix": snap.vix,
+                    "dxy_1d_change_pct": snap.dxy_1d_change_pct,
+                    "btc_dominance_24h_change": snap.btc_dominance_24h_change,
+                },
             },
-        })
+        )
         log.warning(
             "chain: regime shift %s -> %s (score %+.2f -> %+.2f)",
-            shift.from_regime.value, shift.to_regime.value,
-            shift.from_score, shift.to_score,
+            shift.from_regime.value,
+            shift.to_regime.value,
+            shift.from_score,
+            shift.to_score,
         )
 
 

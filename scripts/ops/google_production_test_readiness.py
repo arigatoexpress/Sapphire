@@ -315,7 +315,9 @@ def _launchagent_retargeting_gate(
     if missing_secret_refs:
         blockers.append(f"missing secrets-env refs: {', '.join(missing_secret_refs)}")
     if live_secret_keys:
-        labels = ", ".join(f"{name} has {', '.join(keys)}" for name, keys in live_secret_keys.items())
+        labels = ", ".join(
+            f"{name} has {', '.join(keys)}" for name, keys in live_secret_keys.items()
+        )
         blockers.append(f"live plist secret env remains: {labels}")
     if missing_tracked:
         blockers.append(f"missing tracked sanitized plists: {', '.join(missing_tracked)}")

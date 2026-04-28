@@ -27,9 +27,11 @@ log = logging.getLogger("sapphire.security.deps")
 # Data models
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Vulnerability:
     """A single CVE / advisory record."""
+
     id: str
     package: str
     installed_version: str
@@ -42,6 +44,7 @@ class Vulnerability:
 @dataclass
 class PackageInfo:
     """Metadata for one installed package."""
+
     name: str
     version: str
     latest_version: str = ""
@@ -54,6 +57,7 @@ class PackageInfo:
 @dataclass
 class ScanResult:
     """Aggregate result of a full dependency scan."""
+
     timestamp: str = ""
     total_packages: int = 0
     vulnerable_count: int = 0
@@ -71,6 +75,7 @@ class ScanResult:
 # ---------------------------------------------------------------------------
 # Scanner
 # ---------------------------------------------------------------------------
+
 
 class DependencyScanner:
     """Scans Python packages for security issues and generates SBOMs."""
@@ -134,20 +139,24 @@ class DependencyScanner:
             version = dist.metadata.get("Version", "0.0.0")
             lic = dist.metadata.get("License", "") or ""
             has_meta = bool(dist.metadata.get("Author") or dist.metadata.get("Author-email"))
-            packages.append(PackageInfo(
-                name=name,
-                version=version,
-                license=lic[:120],
-                has_metadata=has_meta,
-            ))
+            packages.append(
+                PackageInfo(
+                    name=name,
+                    version=version,
+                    license=lic[:120],
+                    has_metadata=has_meta,
+                )
+            )
         return sorted(packages, key=lambda p: p.name.lower())
 
     def _query_osv(self, package: str, version: str) -> list[Vulnerability]:
         """Query OSV.dev for known vulnerabilities."""
-        payload = json.dumps({
-            "version": version,
-            "package": {"name": package, "ecosystem": "PyPI"},
-        }).encode()
+        payload = json.dumps(
+            {
+                "version": version,
+                "package": {"name": package, "ecosystem": "PyPI"},
+            }
+        ).encode()
         data: dict | None = None
         for attempt in range(3):
             req = urllib.request.Request(
@@ -162,7 +171,7 @@ class DependencyScanner:
                 break
             except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
                 if attempt < 2:
-                    time.sleep(2 ** attempt)
+                    time.sleep(2**attempt)
                 else:
                     log.debug("OSV query failed for %s after 3 attempts: %s", package, exc)
                     return []
@@ -178,9 +187,12 @@ class DependencyScanner:
                     try:
                         s = float(score_str)
                         severity = (
-                            "critical" if s >= 9.0
-                            else "high" if s >= 7.0
-                            else "medium" if s >= 4.0
+                            "critical"
+                            if s >= 9.0
+                            else "high"
+                            if s >= 7.0
+                            else "medium"
+                            if s >= 4.0
                             else "low"
                         )
                     except ValueError:
@@ -196,15 +208,17 @@ class DependencyScanner:
             refs = v.get("references", [])
             ref_url = refs[0].get("url", "") if refs else ""
 
-            vulns.append(Vulnerability(
-                id=v.get("id", ""),
-                package=package,
-                installed_version=version,
-                severity=severity,
-                summary=(v.get("summary") or v.get("details", ""))[:200],
-                fixed_version=fixed,
-                reference=ref_url,
-            ))
+            vulns.append(
+                Vulnerability(
+                    id=v.get("id", ""),
+                    package=package,
+                    installed_version=version,
+                    severity=severity,
+                    summary=(v.get("summary") or v.get("details", ""))[:200],
+                    fixed_version=fixed,
+                    reference=ref_url,
+                )
+            )
         return vulns
 
     def _check_pypi_latest(self, pkg: PackageInfo) -> None:
@@ -222,7 +236,7 @@ class DependencyScanner:
                 return
             except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
                 if attempt < 2:
-                    time.sleep(2 ** attempt)
+                    time.sleep(2**attempt)
             except Exception:
                 return
 
@@ -260,13 +274,15 @@ class DependencyScanner:
         vuln_records = []
         for pkg in packages:
             for v in pkg.vulnerabilities:
-                vuln_records.append({
-                    "id": v.id,
-                    "source": {"name": "OSV", "url": "https://osv.dev"},
-                    "ratings": [{"severity": v.severity}],
-                    "description": v.summary,
-                    "affects": [{"ref": f"pkg:pypi/{pkg.name}@{pkg.version}"}],
-                })
+                vuln_records.append(
+                    {
+                        "id": v.id,
+                        "source": {"name": "OSV", "url": "https://osv.dev"},
+                        "ratings": [{"severity": v.severity}],
+                        "description": v.summary,
+                        "affects": [{"ref": f"pkg:pypi/{pkg.name}@{pkg.version}"}],
+                    }
+                )
         if vuln_records:
             bom["vulnerabilities"] = vuln_records
 
@@ -284,8 +300,6 @@ class DependencyScanner:
         # Each unsigned package costs 0.3 points (capped)
         score -= min(10, result.unsigned_count * 0.3)
         # Bonus: critical vulns cost extra
-        critical_count = sum(
-            1 for v in result.vulnerabilities if v.severity == "critical"
-        )
+        critical_count = sum(1 for v in result.vulnerabilities if v.severity == "critical")
         score -= min(10, critical_count * 5)
         return round(max(0.0, score), 1)

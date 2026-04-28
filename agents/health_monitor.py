@@ -15,6 +15,7 @@ Health endpoint: http://rari2_ip:19002/health
 Usage:
     python3 health_monitor.py [--once]
 """
+
 from __future__ import annotations
 
 import json
@@ -42,32 +43,32 @@ log = logging.getLogger("health-monitor")
 
 # ─── Endpoints to Monitor ─────────────────────────────────────────────────────
 
-MAC_IP   = "100.67.171.79"
-GPU_IP   = "100.71.10.48"
+MAC_IP = "100.67.171.79"
+GPU_IP = "100.71.10.48"
 RARI1_IP = "100.120.191.1"
 RARI2_IP = "100.87.225.89"  # self
 
-UPTIME_LOG  = Path("/home/rari/sapphire/uptime.jsonl")
+UPTIME_LOG = Path("/home/rari/sapphire/uptime.jsonl")
 HEALTH_PORT = 19002
-CHECK_INTERVAL = 60   # seconds between full checks
+CHECK_INTERVAL = 60  # seconds between full checks
 ALERT_COOLDOWN = 300  # 5 min between same-service alerts
 
 SERVICES = [
     # (name, url, timeout)
-    ("inference-proxy",  f"http://{MAC_IP}:11435/health",        5),
-    ("signal-logger",    f"http://{MAC_IP}:18081/health",         5),
-    ("dashboard",        f"http://{MAC_IP}:8080/health",          5),
-    ("control-plane",    f"http://{MAC_IP}:8082/health",          5),
-    ("regional-intel",   f"http://{MAC_IP}:8787/health",          5),
-    ("openbb-api",       f"http://{MAC_IP}:6900/api/v1/system/status", 5),
-    ("ollama-gpu",       f"http://{GPU_IP}:11434/api/tags",       8),
-    ("ollama-rari1",     f"http://{RARI1_IP}:11434/api/tags",     8),
-    ("ollama-mac",       f"http://{MAC_IP}:11434/api/tags",       5),
-    ("market-watchdog",  f"http://{RARI1_IP}:19001/health",       5),
+    ("inference-proxy", f"http://{MAC_IP}:11435/health", 5),
+    ("signal-logger", f"http://{MAC_IP}:18081/health", 5),
+    ("dashboard", f"http://{MAC_IP}:8080/health", 5),
+    ("control-plane", f"http://{MAC_IP}:8082/health", 5),
+    ("regional-intel", f"http://{MAC_IP}:8787/health", 5),
+    ("openbb-api", f"http://{MAC_IP}:6900/api/v1/system/status", 5),
+    ("ollama-gpu", f"http://{GPU_IP}:11434/api/tags", 8),
+    ("ollama-rari1", f"http://{RARI1_IP}:11434/api/tags", 8),
+    ("ollama-mac", f"http://{MAC_IP}:11434/api/tags", 5),
+    ("market-watchdog", f"http://{RARI1_IP}:19001/health", 5),
 ]
 
 # Temperature thresholds (Celsius)
-TEMP_WARNING  = 65.0
+TEMP_WARNING = 65.0
 TEMP_CRITICAL = 75.0
 
 # Disk space threshold
@@ -75,6 +76,7 @@ DISK_WARNING_PCT = 85.0
 
 
 # ─── HTTP Helpers ─────────────────────────────────────────────────────────────
+
 
 def _get(url: str, timeout: int = 5) -> tuple[bool, dict | None]:
     """Returns (healthy, response_data)."""
@@ -93,7 +95,8 @@ def _post(url: str, data: dict, timeout: int = 8) -> bool:
     try:
         body = json.dumps(data).encode()
         req = urllib.request.Request(
-            url, data=body,
+            url,
+            data=body,
             headers={"Content-Type": "application/json"},
             method="POST",
         )
@@ -105,6 +108,7 @@ def _post(url: str, data: dict, timeout: int = 8) -> bool:
 
 # ─── System Vitals (rari2 self-monitoring) ────────────────────────────────────
 
+
 def get_cpu_temp() -> float | None:
     """Read CPU temperature from thermal zone (Linux)."""
     try:
@@ -115,7 +119,9 @@ def get_cpu_temp() -> float | None:
         # Fallback: vcgencmd (Raspberry Pi)
         result = subprocess.run(
             ["vcgencmd", "measure_temp"],
-            capture_output=True, text=True, timeout=2,
+            capture_output=True,
+            text=True,
+            timeout=2,
         )
         if result.returncode == 0:
             # "temp=47.8'C"
@@ -136,11 +142,16 @@ def get_memory_usage() -> dict:
             parts = line.split()
             if len(parts) >= 2:
                 info[parts[0].rstrip(":")] = int(parts[1])
-        total  = info.get("MemTotal",     0) // 1024
-        free   = info.get("MemFree",      0) // 1024
-        avail  = info.get("MemAvailable", 0) // 1024
-        used   = total - avail
-        return {"total_mb": total, "used_mb": used, "free_mb": free, "used_pct": round(used / total * 100, 1) if total else 0}
+        total = info.get("MemTotal", 0) // 1024
+        free = info.get("MemFree", 0) // 1024
+        avail = info.get("MemAvailable", 0) // 1024
+        used = total - avail
+        return {
+            "total_mb": total,
+            "used_mb": used,
+            "free_mb": free,
+            "used_pct": round(used / total * 100, 1) if total else 0,
+        }
     except Exception:
         return {}
 
@@ -150,14 +161,21 @@ def get_disk_usage(path: str = "/") -> dict:
     try:
         result = subprocess.run(
             ["df", "-h", path],
-            capture_output=True, text=True, timeout=3,
+            capture_output=True,
+            text=True,
+            timeout=3,
         )
         if result.returncode == 0:
             lines = result.stdout.strip().splitlines()
             if len(lines) >= 2:
                 parts = lines[1].split()
-                return {"path": path, "total": parts[1], "used": parts[2],
-                        "free": parts[3], "used_pct": float(parts[4].rstrip("%"))}
+                return {
+                    "path": path,
+                    "total": parts[1],
+                    "used": parts[2],
+                    "free": parts[3],
+                    "used_pct": float(parts[4].rstrip("%")),
+                }
     except Exception:
         pass
     return {}
@@ -173,6 +191,7 @@ def get_uptime_seconds() -> float:
 
 # ─── Telegram Alert ───────────────────────────────────────────────────────────
 
+
 def send_telegram(msg: str) -> bool:
     """Send a Telegram alert via the bot API. Requires TELEGRAM_BOT_TOKEN +
     TELEGRAM_CHAT_ID. Returns False (logging a warning) when credentials
@@ -180,7 +199,7 @@ def send_telegram(msg: str) -> bool:
     is no LLM-path fallback.
     """
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
-    chat_id   = os.getenv("TELEGRAM_CHAT_ID", "")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
     if not (bot_token and chat_id):
         log.warning(
             "send_telegram: TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID unset — alert dropped: %s",
@@ -193,12 +212,13 @@ def send_telegram(msg: str) -> bool:
 
 # ─── Health Monitor ───────────────────────────────────────────────────────────
 
+
 @dataclass
 class ServiceStatus:
-    name:    str
+    name: str
     healthy: bool
     latency_ms: int
-    error:   str = ""
+    error: str = ""
     checked_at: str = ""
 
 
@@ -311,7 +331,9 @@ class HealthMonitor:
         record = {
             "timestamp": datetime.now(UTC).isoformat(),
             "check_count": self._check_count,
-            "services": {s.name: {"healthy": s.healthy, "latency_ms": s.latency_ms} for s in statuses},
+            "services": {
+                s.name: {"healthy": s.healthy, "latency_ms": s.latency_ms} for s in statuses
+            },
             "vitals": vitals,
             "healthy_count": sum(1 for s in statuses if s.healthy),
             "total_count": len(statuses),
@@ -329,14 +351,19 @@ class HealthMonitor:
         self.write_uptime(statuses, vitals)
         self._check_count += 1
         healthy = sum(1 for s in statuses if s.healthy)
-        log.info("Check complete: %d/%d services healthy | temp=%s",
-                 healthy, len(statuses), vitals.get("cpu_temp_c", "?"))
+        log.info(
+            "Check complete: %d/%d services healthy | temp=%s",
+            healthy,
+            len(statuses),
+            vitals.get("cpu_temp_c", "?"),
+        )
         return {"statuses": [asdict(s) for s in statuses], "vitals": vitals}
 
     def run(self) -> None:
         self._running = True
-        log.info("Health Monitor starting | interval=%ds | health_port=%d",
-                 CHECK_INTERVAL, HEALTH_PORT)
+        log.info(
+            "Health Monitor starting | interval=%ds | health_port=%d", CHECK_INTERVAL, HEALTH_PORT
+        )
 
         # Start health HTTP server
         threading.Thread(target=self._health_server, daemon=True).start()
@@ -378,15 +405,17 @@ class HealthMonitor:
             def do_GET(self):
                 if self.path in {"/health", "/"}:
                     latest = monitor.get_latest()
-                    body = json.dumps({
-                        "status": "ok",
-                        "agent": "health-monitor",
-                        "timestamp": datetime.now(UTC).isoformat(),
-                        "uptime_seconds": int(time.time() - monitor._start_ts),
-                        "check_count": monitor._check_count,
-                        "last_check": latest,
-                        "vitals": latest.get("vitals", {}),
-                    }).encode()
+                    body = json.dumps(
+                        {
+                            "status": "ok",
+                            "agent": "health-monitor",
+                            "timestamp": datetime.now(UTC).isoformat(),
+                            "uptime_seconds": int(time.time() - monitor._start_ts),
+                            "check_count": monitor._check_count,
+                            "last_check": latest,
+                            "vitals": latest.get("vitals", {}),
+                        }
+                    ).encode()
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
                     self.send_header("Content-Length", str(len(body)))
@@ -408,8 +437,10 @@ class HealthMonitor:
 
 # ─── Entry Point ─────────────────────────────────────────────────────────────
 
+
 def main() -> None:
     import argparse
+
     parser = argparse.ArgumentParser(description="Sapphire Health Monitor")
     parser.add_argument("--once", action="store_true", help="Run one check and exit")
     args = parser.parse_args()
@@ -442,8 +473,10 @@ def main() -> None:
             print(f"  {icon} {s['name']}: {s['latency_ms']}ms")
         vitals = result["vitals"]
         if vitals.get("cpu_temp_c"):
-            print(f"\nHardware: temp={vitals['cpu_temp_c']}°C | "
-                  f"mem={vitals.get('memory',{}).get('used_pct','?')}%")
+            print(
+                f"\nHardware: temp={vitals['cpu_temp_c']}°C | "
+                f"mem={vitals.get('memory', {}).get('used_pct', '?')}%"
+            )
     else:
         monitor.run()
 

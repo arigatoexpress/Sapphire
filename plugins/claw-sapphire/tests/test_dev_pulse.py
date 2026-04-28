@@ -56,37 +56,43 @@ def test_collect_repo_status_happy_path(fake_run, tmp_path):
 
     fake_run.register(
         ["git", "-C", str(repo_path), "branch", "--show-current"],
-        0, "main\n",
+        0,
+        "main\n",
     )
     fake_run.register(
         ["git", "-C", str(repo_path), "status", "--porcelain"],
-        0, " M file_a.py\n?? file_b.py\n",
+        0,
+        " M file_a.py\n?? file_b.py\n",
     )
     fake_run.register(
         ["gh", "pr", "list", "--repo", "arigato/test"],
         0,
-        json.dumps([
-            {
-                "number": 42,
-                "title": "feat: thing",
-                "isDraft": False,
-                "author": {"login": "bot"},
-                "updatedAt": "2026-04-23T00:00:00Z",
-            },
-        ]),
+        json.dumps(
+            [
+                {
+                    "number": 42,
+                    "title": "feat: thing",
+                    "isDraft": False,
+                    "author": {"login": "bot"},
+                    "updatedAt": "2026-04-23T00:00:00Z",
+                },
+            ]
+        ),
     )
     fake_run.register(
         ["gh", "run", "list", "--repo", "arigato/test"],
         0,
-        json.dumps([
-            {
-                "status": "completed",
-                "conclusion": "success",
-                "displayTitle": "feat: thing",
-                "createdAt": "2026-04-23T01:00:00Z",
-                "url": "https://github.com/arigato/test/actions/runs/1",
-            },
-        ]),
+        json.dumps(
+            [
+                {
+                    "status": "completed",
+                    "conclusion": "success",
+                    "displayTitle": "feat: thing",
+                    "createdAt": "2026-04-23T01:00:00Z",
+                    "url": "https://github.com/arigato/test/actions/runs/1",
+                },
+            ]
+        ),
     )
 
     status = dev_pulse.collect_repo_status("arigato/test", repo_path, "test")
@@ -103,9 +109,7 @@ def test_collect_repo_status_missing_local_path(fake_run, tmp_path):
     fake_run.register(["gh", "pr", "list"], 0, "[]")
     fake_run.register(["gh", "run", "list"], 0, "[]")
 
-    status = dev_pulse.collect_repo_status(
-        "arigato/test", tmp_path / "does-not-exist", "test"
-    )
+    status = dev_pulse.collect_repo_status("arigato/test", tmp_path / "does-not-exist", "test")
     assert status.local_path_exists is False
     assert status.local_branch is None
     assert status.local_dirty_count == 0
@@ -130,13 +134,15 @@ def test_collect_cloud_run_status_happy_path(fake_run):
     fake_run.register(
         ["gcloud", "run", "services", "describe"],
         0,
-        json.dumps({
-            "status": {
-                "latestReadyRevisionName": "svc-00055-xyz",
-                "url": "https://svc.run.app",
-                "conditions": [{"type": "Ready", "status": "True"}],
+        json.dumps(
+            {
+                "status": {
+                    "latestReadyRevisionName": "svc-00055-xyz",
+                    "url": "https://svc.run.app",
+                    "conditions": [{"type": "Ready", "status": "True"}],
+                }
             }
-        }),
+        ),
     )
     s = dev_pulse.collect_cloud_run_status("proj", "us-central1", "svc")
     assert s.latest_revision == "svc-00055-xyz"
@@ -148,12 +154,14 @@ def test_collect_cloud_run_status_not_ready(fake_run):
     fake_run.register(
         ["gcloud", "run", "services", "describe"],
         0,
-        json.dumps({
-            "status": {
-                "latestReadyRevisionName": "svc-00010",
-                "conditions": [{"type": "Ready", "status": "False"}],
+        json.dumps(
+            {
+                "status": {
+                    "latestReadyRevisionName": "svc-00010",
+                    "conditions": [{"type": "Ready", "status": "False"}],
+                }
             }
-        }),
+        ),
     )
     s = dev_pulse.collect_cloud_run_status("proj", "us-central1", "svc")
     assert s.ready is False
@@ -162,7 +170,9 @@ def test_collect_cloud_run_status_not_ready(fake_run):
 def test_collect_cloud_run_status_gcloud_error(fake_run):
     fake_run.register(
         ["gcloud", "run", "services", "describe"],
-        1, "", "service not found\n",
+        1,
+        "",
+        "service not found\n",
     )
     s = dev_pulse.collect_cloud_run_status("proj", "us-central1", "missing")
     assert s.error is not None
@@ -215,7 +225,14 @@ def test_pulse_runs_all_collectors(fake_run, tmp_path):
     fake_run.register(
         ["gcloud", "run", "services", "describe"],
         0,
-        json.dumps({"status": {"latestReadyRevisionName": "r1", "conditions": [{"type": "Ready", "status": "True"}]}}),
+        json.dumps(
+            {
+                "status": {
+                    "latestReadyRevisionName": "r1",
+                    "conditions": [{"type": "Ready", "status": "True"}],
+                }
+            }
+        ),
     )
     fake_run.register(["launchctl", "list"], 0, "PID\tStatus\tLabel\n")
 
@@ -232,19 +249,27 @@ def test_pulse_runs_all_collectors(fake_run, tmp_path):
 
 
 def test_pulse_runs_trading_and_webhook_collectors(monkeypatch):
-    monkeypatch.setattr(dev_pulse, "collect_trading_status", lambda: dev_pulse.TradingStatus(
-        last_signal_at="2026-04-24T12:00:00+00:00",
-        signals_today_count=3,
-        open_paper_positions=1,
-        paper_portfolio_value=101000.0,
-        paper_unrealized_pnl_usd=12.0,
-        paper_realized_pnl_today_usd=5.0,
-    ))
-    monkeypatch.setattr(dev_pulse, "collect_webhook_delivery_status", lambda db: dev_pulse.WebhookDeliveryStatus(
-        partner_id_stats=[{"partner_id": "etai", "attempted_24h": 1, "success_24h": 1}],
-        total_attempted_24h=1,
-        total_failed_24h=0,
-    ))
+    monkeypatch.setattr(
+        dev_pulse,
+        "collect_trading_status",
+        lambda: dev_pulse.TradingStatus(
+            last_signal_at="2026-04-24T12:00:00+00:00",
+            signals_today_count=3,
+            open_paper_positions=1,
+            paper_portfolio_value=101000.0,
+            paper_unrealized_pnl_usd=12.0,
+            paper_realized_pnl_today_usd=5.0,
+        ),
+    )
+    monkeypatch.setattr(
+        dev_pulse,
+        "collect_webhook_delivery_status",
+        lambda db: dev_pulse.WebhookDeliveryStatus(
+            partner_id_stats=[{"partner_id": "etai", "attempted_24h": 1, "success_24h": 1}],
+            total_attempted_24h=1,
+            total_failed_24h=0,
+        ),
+    )
 
     p = dev_pulse.pulse(
         repos=[],
@@ -271,7 +296,9 @@ def test_collect_trading_status_reads_signals_and_portfolio(tmp_path):
         "\n".join(
             [
                 json.dumps({"timestamp": (now - timedelta(hours=1)).isoformat(), "symbol": "BTC"}),
-                json.dumps({"timestamp": (now - timedelta(minutes=10)).isoformat(), "symbol": "ETH"}),
+                json.dumps(
+                    {"timestamp": (now - timedelta(minutes=10)).isoformat(), "symbol": "ETH"}
+                ),
             ]
         )
     )

@@ -86,6 +86,7 @@ def _tg(token: str, method: str, **params) -> dict:
     ctx = ssl.create_default_context()
     try:
         import certifi
+
         ctx.load_verify_locations(certifi.where())
     except ImportError:
         ctx.check_hostname = False

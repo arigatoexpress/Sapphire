@@ -99,14 +99,12 @@ def _call_market_universe(fetch_live: bool, trend_limit: int) -> tuple[dict[str,
             "source": "fallback",
             "stale": True,
             "liked_tokens": [
-                {"symbol": symbol, "yfinance_symbol": f"{symbol}-USD"}
-                for symbol in DEFAULT_SYMBOLS
+                {"symbol": symbol, "yfinance_symbol": f"{symbol}-USD"} for symbol in DEFAULT_SYMBOLS
             ],
             "trending_tokens": [],
             "combined_tokens": [],
             "venue_matrix": [
-                {"symbol": symbol, "backtest": f"{symbol}-USD"}
-                for symbol in DEFAULT_SYMBOLS
+                {"symbol": symbol, "backtest": f"{symbol}-USD"} for symbol in DEFAULT_SYMBOLS
             ],
             "source_docs": [],
         }, [f"market_universe:{_safe_error(exc)}"]
@@ -434,8 +432,8 @@ def _build_tasks(
                 "plugins/claw-sapphire/tools/gemini_ooda.py",
             ),
             command=(
-                "echo '{\"action\":\"synthesize\",\"topic\":\"Sapphire daily thesis OODA\","
-                "\"mode\":\"dry-run\"}' | python3 plugins/claw-sapphire/tools/gemini_ooda.py"
+                'echo \'{"action":"synthesize","topic":"Sapphire daily thesis OODA",'
+                '"mode":"dry-run"}\' | python3 plugins/claw-sapphire/tools/gemini_ooda.py'
             ),
             ooda_packet={
                 "observe": (
@@ -535,7 +533,9 @@ def _build_tasks(
                 "Return hypothesis JSON with strategy_name, diff_summary, required_data, "
                 "expected_edge, overfit_risk, and cpcv_command. Do not edit files."
             ),
-            expected_artifacts=("data/.autonomy/continuous_intelligence/strategy-hypotheses-*.json",),
+            expected_artifacts=(
+                "data/.autonomy/continuous_intelligence/strategy-hypotheses-*.json",
+            ),
             acceptance=(
                 "Each hypothesis includes a falsifiable backtest command",
                 "Overfit and regime risks are explicit",
@@ -564,7 +564,9 @@ def _build_tasks(
                 "with source_url, claim, confidence, stale_after, invalidation, and "
                 "which lens it supports."
             ),
-            expected_artifacts=("data/.autonomy/continuous_intelligence/eth-thesis-refresh-*.json",),
+            expected_artifacts=(
+                "data/.autonomy/continuous_intelligence/eth-thesis-refresh-*.json",
+            ),
             acceptance=(
                 "Primary sources preferred over commentary",
                 "Privacy and quantum claims include explicit uncertainty",
@@ -700,7 +702,9 @@ def _build_tasks(
             safe_mode="dry_run",
             symbols=tuple(liked[:4]),
             inputs=("tradingview_capabilities", "webhook_receiver", "order_drafts"),
-            expected_artifacts=("data/.autonomy/continuous_intelligence/tradingview-parity-*.json",),
+            expected_artifacts=(
+                "data/.autonomy/continuous_intelligence/tradingview-parity-*.json",
+            ),
             acceptance=(
                 "Dry-run payloads parse without order submission",
                 "HMAC failure and success cases are both covered",
@@ -764,8 +768,12 @@ def _input_summary(
         },
         "sovereign_thesis": {
             "mode": thesis.get("mode"),
-            "asset_count": (thesis.get("totals") or {}).get("assets", len(thesis.get("assets") or [])),
-            "lens_count": (thesis.get("totals") or {}).get("lenses", len(thesis.get("lenses") or [])),
+            "asset_count": (thesis.get("totals") or {}).get(
+                "assets", len(thesis.get("assets") or [])
+            ),
+            "lens_count": (thesis.get("totals") or {}).get(
+                "lenses", len(thesis.get("lenses") or [])
+            ),
             "top_symbols": _top_thesis_assets(thesis, limit=8),
             "evidence_coverage_pct": evidence_summary.get("coverage_pct"),
             "evidence_wired_pct": evidence_summary.get("wired_pct"),
@@ -867,7 +875,9 @@ def build_continuous_intelligence_plan(
 
 def cli(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--live", action="store_true", help="Allow live read-only market fetches where supported.")
+    parser.add_argument(
+        "--live", action="store_true", help="Allow live read-only market fetches where supported."
+    )
     parser.add_argument("--trend-limit", type=int, default=12)
     parser.add_argument("--pretty", action="store_true")
     args = parser.parse_args(argv)

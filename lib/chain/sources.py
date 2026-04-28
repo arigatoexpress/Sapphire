@@ -27,6 +27,7 @@ from typing import Any
 
 try:
     import certifi
+
     _SSL_CTX = ssl.create_default_context(cafile=certifi.where())
 except ImportError:
     _SSL_CTX = ssl.create_default_context()
@@ -207,7 +208,9 @@ def _json_request_with_retry(
     assert last_error is not None
     if isinstance(last_error, json.JSONDecodeError):
         raise SourceError(f"{method} {endpoint} -> invalid JSON: {last_error}") from last_error
-    raise SourceError(f"{method} {endpoint} -> {type(last_error).__name__}: {last_error}") from last_error
+    raise SourceError(
+        f"{method} {endpoint} -> {type(last_error).__name__}: {last_error}"
+    ) from last_error
 
 
 def _http_get(url: str, timeout: int = DEFAULT_TIMEOUT) -> Any:
@@ -384,7 +387,9 @@ class HyperliquidClient:
         """All perp markets with their current asset contexts."""
         resp = _http_post_json(self.BASE, {"type": "metaAndAssetCtxs"})
         if not isinstance(resp, list) or len(resp) != 2:
-            raise SourceError(f"Hyperliquid metaAndAssetCtxs shape unexpected: {type(resp).__name__}")
+            raise SourceError(
+                f"Hyperliquid metaAndAssetCtxs shape unexpected: {type(resp).__name__}"
+            )
         meta, ctxs = resp
         universe = meta.get("universe") or []
         if not isinstance(universe, list) or not isinstance(ctxs, list):
@@ -567,11 +572,17 @@ if __name__ == "__main__":
     print("=== DeFiLlama ===")
     ll = DefiLlamaClient()
     chains = ll.chains()
-    print(f"chains: {len(chains)}  (top 3 by TVL: {[c.name for c in sorted(chains, key=lambda x: -x.tvl)[:3]]})")
+    print(
+        f"chains: {len(chains)}  (top 3 by TVL: {[c.name for c in sorted(chains, key=lambda x: -x.tvl)[:3]]})"
+    )
     prices = ll.prices(["coingecko:bitcoin", "coingecko:ethereum"])
-    print(f"prices: BTC=${prices.get('coingecko:bitcoin',{}).get('price',0):,.0f} ETH=${prices.get('coingecko:ethereum',{}).get('price',0):,.0f}")
+    print(
+        f"prices: BTC=${prices.get('coingecko:bitcoin', {}).get('price', 0):,.0f} ETH=${prices.get('coingecko:ethereum', {}).get('price', 0):,.0f}"
+    )
     sc = ll.stablecoins()
-    print(f"stablecoins: total=${sc.total_usd:,.0f} USDT=${sc.tether_usd:,.0f} USDC=${sc.usdc_usd:,.0f}")
+    print(
+        f"stablecoins: total=${sc.total_usd:,.0f} USDT=${sc.tether_usd:,.0f} USDC=${sc.usdc_usd:,.0f}"
+    )
 
     print("\n=== Hyperliquid ===")
     hl = HyperliquidClient()
@@ -579,10 +590,14 @@ if __name__ == "__main__":
     print(f"assets: {len(ctxs)}")
     majors = [c for c in ctxs if c.coin in ("BTC", "ETH", "SOL")]
     for c in majors:
-        print(f"  {c.coin}: mark=${c.mark_px:,.2f} funding={c.funding_rate*100:+.4f}%/8h OI={c.open_interest:,.0f}")
+        print(
+            f"  {c.coin}: mark=${c.mark_px:,.2f} funding={c.funding_rate * 100:+.4f}%/8h OI={c.open_interest:,.0f}"
+        )
 
     print("\n=== CoinGecko ===")
     cg = CoinGeckoClient()
     gm = cg.global_market()
-    print(f"total mcap: ${gm.total_market_cap_usd:,.0f}  BTC.D: {gm.btc_dominance:.2f}%  ETH.D: {gm.eth_dominance:.2f}%")
+    print(
+        f"total mcap: ${gm.total_market_cap_usd:,.0f}  BTC.D: {gm.btc_dominance:.2f}%  ETH.D: {gm.eth_dominance:.2f}%"
+    )
     print(f"24h change: {gm.market_cap_change_pct_24h:+.2f}%")

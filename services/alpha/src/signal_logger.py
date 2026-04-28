@@ -40,6 +40,7 @@ sys.path.insert(0, str(Path.home() / "Code" / "Sapphire" / "plugins" / "claw-sap
 sys.path.insert(0, str(Path.home() / "Code" / "Sapphire" / "services" / "alpha"))
 try:
     from signal_pipeline import pipeline as _signal_pipeline
+
     _PIPELINE_AVAILABLE = True
 except Exception:
     _PIPELINE_AVAILABLE = False
@@ -119,7 +120,9 @@ async def receive_signal(request: Request):
 
     # Validate webhook secret — required, not optional
     if not _WEBHOOK_SECRET:
-        return JSONResponse({"error": "service misconfigured — WEBHOOK_SECRET not set"}, status_code=503)
+        return JSONResponse(
+            {"error": "service misconfigured — WEBHOOK_SECRET not set"}, status_code=503
+        )
     if body.get("secret") != _WEBHOOK_SECRET:
         return JSONResponse({"error": "unauthorized"}, status_code=401)
 
@@ -165,6 +168,7 @@ async def receive_signal(request: Request):
         # Fallback: quick Nemotron analysis + basic notification
         try:
             from nemotron import MODELS, generate
+
             analysis_prompt = f"Trading signal: {signal['action']} {signal['symbol']} at ${signal['price']} with confidence {signal['confidence']}. Strategy: {signal['strategy']}. Give a one-sentence assessment."
             result = generate(analysis_prompt, model=MODELS["classify"], timeout=10)
             ai_assessment = result.response if result.success else "Analysis unavailable"
@@ -172,8 +176,11 @@ async def receive_signal(request: Request):
             ai_assessment = "Analysis unavailable"
 
         try:
-            sys.path.insert(0, str(Path.home() / "Code" / "Sapphire" / "plugins" / "claw-sapphire" / "tools"))
+            sys.path.insert(
+                0, str(Path.home() / "Code" / "Sapphire" / "plugins" / "claw-sapphire" / "tools")
+            )
             from notify import send_telegram_message
+
             send_telegram_message(
                 f"📊 *Signal Received*\n\n"
                 f"{'🟢' if 'buy' in signal['action'].lower() else '🔴'} {signal['action']} {signal['symbol']}\n"
@@ -222,6 +229,7 @@ async def recent_signals():
 
 if __name__ == "__main__":
     import uvicorn
+
     port = int(os.environ.get("PORT", "18081"))
     # Bind to Tailscale IP only — never 0.0.0.0
     host = os.environ.get("HOST", "100.67.171.79")

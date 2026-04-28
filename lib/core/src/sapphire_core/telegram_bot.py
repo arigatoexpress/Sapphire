@@ -216,15 +216,10 @@ class TelegramPlatformBot:
             quantity = float(cmd_match.group(3))
             symbol = cmd_match.group(4).upper()
 
-            platforms = (
-                ["aster", "lighter"]
-                if platform == "all"
-                else [platform]
-            )
+            platforms = ["aster", "lighter"] if platform == "all" else [platform]
 
             await self.send_message(
-                f"⚡ **MANUAL OVERRIDE**\n"
-                f"🎯 `{platform.upper()}`: `{action} {quantity} {symbol}`",
+                f"⚡ **MANUAL OVERRIDE**\n🎯 `{platform.upper()}`: `{action} {quantity} {symbol}`",
                 priority=NotificationPriority.HIGH,
             )
 
@@ -261,7 +256,9 @@ class TelegramPlatformBot:
         attempts = 3
         for attempt in range(1, attempts + 1):
             try:
-                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20)) as session:
+                async with aiohttp.ClientSession(
+                    timeout=aiohttp.ClientTimeout(total=20)
+                ) as session:
                     async with session.post(url, json=payload) as resp:
                         resp_data = await resp.json()
                         if resp.status == 200:
@@ -432,7 +429,7 @@ class TelegramPlatformBot:
                 allocation = max(0.0, min(1.0, pct / 100.0))
 
             await self.send_message(
-                f"🧭 Allocation command accepted: `{raw_action.upper()}` `{target}` -> `{allocation*100:.0f}%`",
+                f"🧭 Allocation command accepted: `{raw_action.upper()}` `{target}` -> `{allocation * 100:.0f}%`",
                 priority=NotificationPriority.HIGH,
             )
 
@@ -462,11 +459,7 @@ class TelegramPlatformBot:
             symbol = cmd_match.group(4).upper()
 
             # Special case for "all"
-            platforms = (
-                ["aster", "lighter"]
-                if platform == "all"
-                else [platform]
-            )
+            platforms = ["aster", "lighter"] if platform == "all" else [platform]
 
             await self.send_message(
                 f"⚡ **MANUAL OVERRIDE DETECTED**\n"

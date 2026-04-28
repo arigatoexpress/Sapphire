@@ -37,7 +37,7 @@ class Bar:
 @dataclass
 class Trade:
     symbol: str
-    direction: str               # "long" | "short"
+    direction: str  # "long" | "short"
     entry_ts: str
     entry_price: float
     exit_ts: str
@@ -46,7 +46,7 @@ class Trade:
     pnl_usd: float
     pnl_pct: float
     hold_bars: int
-    exit_reason: str             # "take_profit" | "stop_loss" | "end_of_window" | "signal_flip"
+    exit_reason: str  # "take_profit" | "stop_loss" | "end_of_window" | "signal_flip"
     confidence: float = 0.0
     score: float = 0.0
 
@@ -97,8 +97,12 @@ def fetch_ohlcv(
     start = end - timedelta(days=days + 5)  # small overshoot in case of missing bars
     try:
         df = yf.download(
-            symbol, start=start.date(), end=end.date(),
-            interval=interval, progress=False, auto_adjust=False,
+            symbol,
+            start=start.date(),
+            end=end.date(),
+            interval=interval,
+            progress=False,
+            auto_adjust=False,
         )
     except Exception as e:
         log.warning("yfinance fetch failed for %s: %s — using synthetic", symbol, e)
@@ -117,20 +121,30 @@ def fetch_ohlcv(
 
     bars: list[Bar] = []
     for idx, row in df.iterrows():
-        ts = idx.to_pydatetime() if hasattr(idx, "to_pydatetime") else datetime.fromisoformat(str(idx))
+        ts = (
+            idx.to_pydatetime()
+            if hasattr(idx, "to_pydatetime")
+            else datetime.fromisoformat(str(idx))
+        )
         if ts.tzinfo is None:
             ts = ts.replace(tzinfo=UTC)
-        bars.append(Bar(
-            ts=ts,
-            open=_get(row, "Open"), high=_get(row, "High"), low=_get(row, "Low"),
-            close=_get(row, "Close"), volume=_get(row, "Volume"),
-        ))
+        bars.append(
+            Bar(
+                ts=ts,
+                open=_get(row, "Open"),
+                high=_get(row, "High"),
+                low=_get(row, "Low"),
+                close=_get(row, "Close"),
+                volume=_get(row, "Volume"),
+            )
+        )
     return bars[-days:] if len(bars) > days else bars
 
 
 def _synthetic_bars(symbol: str, days: int) -> list[Bar]:
     """Deterministic synthetic OHLCV for offline/CI runs. Seeded by symbol."""
     import random
+
     rng = random.Random(hash(symbol) & 0xFFFFFFFF)
     price = 100.0
     bars: list[Bar] = []
@@ -142,15 +156,22 @@ def _synthetic_bars(symbol: str, days: int) -> list[Bar]:
         price_next = max(1.0, price * (1 + drift + shock))
         hi = max(price, price_next) * (1 + abs(rng.gauss(0, 0.004)))
         lo = min(price, price_next) * (1 - abs(rng.gauss(0, 0.004)))
-        bars.append(Bar(
-            ts=ts, open=price, high=hi, low=lo, close=price_next,
-            volume=1_000_000 * (1 + rng.random()),
-        ))
+        bars.append(
+            Bar(
+                ts=ts,
+                open=price,
+                high=hi,
+                low=lo,
+                close=price_next,
+                volume=1_000_000 * (1 + rng.random()),
+            )
+        )
         price = price_next
     return bars
 
 
 # ── Metrics ────────────────────────────────────────────────────────────────
+
 
 def _returns_from_equity(equity: list[float]) -> list[float]:
     out: list[float] = []
@@ -233,7 +254,9 @@ def default_rsi_signal(symbol: str, bars: list[Bar], i: int) -> dict | None:
     price = bars[i].close
     if rsi < 30:
         return {
-            "symbol": symbol, "action": "buy", "price": price,
+            "symbol": symbol,
+            "action": "buy",
+            "price": price,
             "confidence": min(1.0, (30 - rsi) / 30 + 0.55),
             "strategy": "rsi_oversold",
             "take_profit": price * 1.05,
@@ -241,8 +264,11 @@ def default_rsi_signal(symbol: str, bars: list[Bar], i: int) -> dict | None:
         }
     if rsi > 70:
         return {
-            "symbol": symbol, "action": "close", "price": price,
-            "confidence": 0.6, "strategy": "rsi_overbought",
+            "symbol": symbol,
+            "action": "close",
+            "price": price,
+            "confidence": 0.6,
+            "strategy": "rsi_overbought",
         }
     return None
 
@@ -266,12 +292,27 @@ def run_backtest(
         bars = fetch_ohlcv(symbol, days=days)
     if len(bars) < 20:
         return BacktestResult(
-            symbol=symbol, start="", end="", bars=len(bars), trades=[],
-            initial_capital=initial_capital, final_capital=initial_capital,
-            total_return_pct=0.0, cagr_pct=0.0, sharpe=0.0, sortino=0.0,
-            max_drawdown_pct=0.0, calmar=0.0, win_rate=0.0, profit_factor=0.0,
-            avg_trade_pnl=0.0, avg_win=0.0, avg_loss=0.0, expectancy=0.0,
-            equity_curve=[], notes=[f"insufficient bars ({len(bars)})"],
+            symbol=symbol,
+            start="",
+            end="",
+            bars=len(bars),
+            trades=[],
+            initial_capital=initial_capital,
+            final_capital=initial_capital,
+            total_return_pct=0.0,
+            cagr_pct=0.0,
+            sharpe=0.0,
+            sortino=0.0,
+            max_drawdown_pct=0.0,
+            calmar=0.0,
+            win_rate=0.0,
+            profit_factor=0.0,
+            avg_trade_pnl=0.0,
+            avg_win=0.0,
+            avg_loss=0.0,
+            expectancy=0.0,
+            equity_curve=[],
+            notes=[f"insufficient bars ({len(bars)})"],
         )
 
     score_fn = _build_score_fn() if use_pipeline_scoring else None
@@ -320,15 +361,25 @@ def run_backtest(
 
         if action in {"buy", "long", "entry_long"} and open_pos is None:
             open_pos = _open(
-                symbol=symbol, direction="long", entry_ts=bar.ts, entry_price=price,
-                size_usd=capital * position_size_pct, raw=raw,
-                confidence=confidence, score=score,
+                symbol=symbol,
+                direction="long",
+                entry_ts=bar.ts,
+                entry_price=price,
+                size_usd=capital * position_size_pct,
+                raw=raw,
+                confidence=confidence,
+                score=score,
             )
         elif action in {"sell", "short", "entry_short"} and open_pos is None:
             open_pos = _open(
-                symbol=symbol, direction="short", entry_ts=bar.ts, entry_price=price,
-                size_usd=capital * position_size_pct, raw=raw,
-                confidence=confidence, score=score,
+                symbol=symbol,
+                direction="short",
+                entry_ts=bar.ts,
+                entry_price=price,
+                size_usd=capital * position_size_pct,
+                raw=raw,
+                confidence=confidence,
+                score=score,
             )
         elif action in {"close", "flat", "exit"} and open_pos is not None:
             pnl = _unrealized(open_pos, price)
@@ -348,17 +399,30 @@ def run_backtest(
 
 
 def _open(
-    *, symbol: str, direction: str, entry_ts: datetime, entry_price: float,
-    size_usd: float, raw: dict, confidence: float, score: float,
+    *,
+    symbol: str,
+    direction: str,
+    entry_ts: datetime,
+    entry_price: float,
+    size_usd: float,
+    raw: dict,
+    confidence: float,
+    score: float,
 ) -> dict:
     tp = float(raw.get("take_profit", 0) or 0)
     sl = float(raw.get("stop_loss", 0) or 0)
     return {
-        "symbol": symbol, "direction": direction,
-        "entry_ts": entry_ts, "entry_price": entry_price,
-        "size_usd": size_usd, "qty": size_usd / max(entry_price, 1e-9),
-        "take_profit": tp, "stop_loss": sl,
-        "confidence": confidence, "score": score, "entry_bar_idx": 0,
+        "symbol": symbol,
+        "direction": direction,
+        "entry_ts": entry_ts,
+        "entry_price": entry_price,
+        "size_usd": size_usd,
+        "qty": size_usd / max(entry_price, 1e-9),
+        "take_profit": tp,
+        "stop_loss": sl,
+        "confidence": confidence,
+        "score": score,
+        "entry_bar_idx": 0,
     }
 
 
@@ -393,8 +457,11 @@ def _check_exits(pos: dict, bar: Bar) -> Trade | None:
 def _close(pos: dict, exit_ts: datetime, exit_price: float, pnl_usd: float, reason: str) -> Trade:
     pnl_pct = (pnl_usd / pos["size_usd"] * 100) if pos["size_usd"] > 0 else 0.0
     return Trade(
-        symbol=pos["symbol"], direction=pos["direction"],
-        entry_ts=pos["entry_ts"].isoformat() if hasattr(pos["entry_ts"], "isoformat") else str(pos["entry_ts"]),
+        symbol=pos["symbol"],
+        direction=pos["direction"],
+        entry_ts=pos["entry_ts"].isoformat()
+        if hasattr(pos["entry_ts"], "isoformat")
+        else str(pos["entry_ts"]),
         entry_price=round(pos["entry_price"], 4),
         exit_ts=exit_ts.isoformat() if hasattr(exit_ts, "isoformat") else str(exit_ts),
         exit_price=round(exit_price, 4),
@@ -436,7 +503,9 @@ def _finalize(
     losses = [t for t in trades if t.pnl_usd < 0]
     total_wins = sum(t.pnl_usd for t in wins)
     total_losses = abs(sum(t.pnl_usd for t in losses))
-    profit_factor = (total_wins / total_losses) if total_losses > 0 else float("inf") if total_wins > 0 else 0.0
+    profit_factor = (
+        (total_wins / total_losses) if total_losses > 0 else float("inf") if total_wins > 0 else 0.0
+    )
     win_rate = (len(wins) / len(trades)) if trades else 0.0
     avg_win = (total_wins / len(wins)) if wins else 0.0
     avg_loss = (-total_losses / len(losses)) if losses else 0.0
@@ -473,6 +542,7 @@ def _build_score_fn() -> Callable[[dict], dict] | None:
     try:
         import sys
         from pathlib import Path as _P
+
         alpha = _P.home() / "Code" / "Sapphire" / "services" / "alpha"
         if str(alpha) not in sys.path:
             sys.path.insert(0, str(alpha))
@@ -489,6 +559,7 @@ def _build_score_fn() -> Callable[[dict], dict] | None:
 
 
 # ── Multi-symbol sweep & persistence ───────────────────────────────────────
+
 
 def run_sweep(
     symbols: Iterable[str],
@@ -513,7 +584,15 @@ def save_result(result: BacktestResult, out_dir: Path | str | None = None) -> Pa
 
 
 __all__ = [
-    "Bar", "Trade", "BacktestResult",
-    "fetch_ohlcv", "default_rsi_signal", "run_backtest", "run_sweep",
-    "save_result", "sharpe_ratio", "sortino_ratio", "max_drawdown_pct",
+    "Bar",
+    "Trade",
+    "BacktestResult",
+    "fetch_ohlcv",
+    "default_rsi_signal",
+    "run_backtest",
+    "run_sweep",
+    "save_result",
+    "sharpe_ratio",
+    "sortino_ratio",
+    "max_drawdown_pct",
 ]

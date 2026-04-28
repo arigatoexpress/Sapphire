@@ -86,8 +86,7 @@ def discover_drafts(
     refs = [
         ref
         for path in sorted((content_root / "drafts").glob("*.json"))
-        if (ref := _draft_ref(path)) is not None
-        and (not wanted or _slug(ref.kind) in wanted)
+        if (ref := _draft_ref(path)) is not None and (not wanted or _slug(ref.kind) in wanted)
     ]
     refs.sort(key=lambda ref: (ref.published_at, ref.path.name), reverse=True)
     if latest:
@@ -151,9 +150,7 @@ def _rendering_records(
                     "citation_count": quality.get("citation_count"),
                     "evidence_coverage": quality.get("evidence_coverage"),
                     "unsupported_claims": quality.get("unsupported_claims") or [],
-                    "performance_claim_violations": quality.get(
-                        "performance_claim_violations"
-                    )
+                    "performance_claim_violations": quality.get("performance_claim_violations")
                     or [],
                     "reasons": quality.get("reasons") or [],
                 },
@@ -223,9 +220,7 @@ def _deliverables(
     renderings: list[dict[str, Any]],
 ) -> dict[str, Any]:
     captions = [
-        text
-        for rendering in renderings
-        for text in rendering.get("caption_candidates", [])[:2]
+        text for rendering in renderings for text in rendering.get("caption_candidates", [])[:2]
     ]
     primary_caption = captions[0] if captions else title
     symbols = ", ".join(summary["symbols"]) if summary["symbols"] else "Sapphire"

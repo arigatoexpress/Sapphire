@@ -343,7 +343,9 @@ ANALYSIS: [Detailed reasoning with risk factors]
             return True
 
         # System 2 says HOLD but System 1 wants to trade = override (safety)
-        return bool(s2_decision == "HOLD" and s1_decision in ("BUY", "SELL") and s2_confidence >= 0.6)
+        return bool(
+            s2_decision == "HOLD" and s1_decision in ("BUY", "SELL") and s2_confidence >= 0.6
+        )
 
     def _update_system1_metrics(self, latency_ms: float):
         """Update System 1 performance metrics."""

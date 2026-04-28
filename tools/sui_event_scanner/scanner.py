@@ -14,6 +14,7 @@ WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 if EVENT_TYPE is None:
     raise SystemExit("MOVE_EVENT_TYPE environment variable not set")
 
+
 async def send_alert(event: Any) -> None:
     """Send event data to a webhook if configured."""
     if not WEBHOOK_URL:
@@ -25,6 +26,7 @@ async def send_alert(event: Any) -> None:
         print(f"Alert delivered: {resp.status_code}")
     except Exception as exc:
         print(f"Failed to deliver alert: {exc}")
+
 
 async def listen() -> None:
     """Subscribe to Move event type and forward events."""
@@ -48,6 +50,7 @@ async def listen() -> None:
             msg = await ws.recv()
             event = json.loads(msg)
             await send_alert(event)
+
 
 if __name__ == "__main__":
     try:

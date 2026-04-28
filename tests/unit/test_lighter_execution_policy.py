@@ -10,7 +10,10 @@ assert spec is not None and spec.loader is not None
 try:
     spec.loader.exec_module(mod)
 except Exception as exc:  # pragma: no cover - environment-dependent import guard
-    pytest.skip(f"bot-lighter module import unavailable in this test environment: {exc}", allow_module_level=True)
+    pytest.skip(
+        f"bot-lighter module import unavailable in this test environment: {exc}",
+        allow_module_level=True,
+    )
 
 
 @pytest.mark.asyncio

@@ -192,7 +192,9 @@ def _post(url: str, payload: dict, timeout: int = _DEFAULT_TIMEOUT) -> tuple[int
         return 0, {"description": str(e), "network_error": True}
 
 
-def _post_multipart(url: str, fields: dict, file_field: str, file_path: Path, timeout: int = 30) -> tuple[int, dict]:
+def _post_multipart(
+    url: str, fields: dict, file_field: str, file_path: Path, timeout: int = 30
+) -> tuple[int, dict]:
     boundary = f"----SapphireBoundary{random.randint(10**9, 10**10)}"
     body = bytearray()
     for k, v in fields.items():
@@ -257,12 +259,12 @@ def _send_one(
             continue
         # 429 → honor retry_after
         if status == 429:
-            wait = resp.get("parameters", {}).get("retry_after", 2 ** attempt)
+            wait = resp.get("parameters", {}).get("retry_after", 2**attempt)
             time.sleep(min(int(wait) + 1, 60))
             continue
         # 5xx / network → backoff
         if status == 0 or 500 <= status < 600:
-            time.sleep(2 ** attempt + random.uniform(0, 1))
+            time.sleep(2**attempt + random.uniform(0, 1))
             continue
         # 401/403 — no point retrying
         break
@@ -377,7 +379,9 @@ def main() -> int:
     p.add_argument("--parse", default=None, choices=["markdown", "markdownv2", "md"])
     p.add_argument("--photo", default=None, help="Attach image path")
     p.add_argument("--no-prefix", action="store_true", help="Skip priority emoji + banner")
-    p.add_argument("--banner", default="*Sapphire OS*", help="Header banner (or empty string to skip)")
+    p.add_argument(
+        "--banner", default="*Sapphire OS*", help="Header banner (or empty string to skip)"
+    )
     args = p.parse_args()
 
     text = sys.stdin.read() if args.message == "-" else args.message

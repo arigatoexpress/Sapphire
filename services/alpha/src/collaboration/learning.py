@@ -98,7 +98,7 @@ class SwarmLearning:
             # Append to history
             self._history.append(record)
             if len(self._history) > self.MAX_HISTORY:
-                self._history = self._history[-self.MAX_HISTORY:]
+                self._history = self._history[-self.MAX_HISTORY :]
 
             # Update symbol stats
             sym_stat = self._symbol_stats[record["symbol"]]
@@ -170,16 +170,20 @@ class SwarmLearning:
                 losses = int(stats["losses"])
                 win_rate = wins / count if count > 0 else 0.0
                 avg_pnl = stats["total_pnl"] / count if count > 0 else 0.0
-                results.append({
-                    "symbol": symbol,
-                    "count": count,
-                    "wins": wins,
-                    "losses": losses,
-                    "win_rate": round(win_rate, 4),
-                    "total_pnl": round(stats["total_pnl"], 2),
-                    "avg_pnl": round(avg_pnl, 2),
-                    "edge": "positive" if win_rate > 0.55 else ("negative" if win_rate < 0.45 else "neutral"),
-                })
+                results.append(
+                    {
+                        "symbol": symbol,
+                        "count": count,
+                        "wins": wins,
+                        "losses": losses,
+                        "win_rate": round(win_rate, 4),
+                        "total_pnl": round(stats["total_pnl"], 2),
+                        "avg_pnl": round(avg_pnl, 2),
+                        "edge": "positive"
+                        if win_rate > 0.55
+                        else ("negative" if win_rate < 0.45 else "neutral"),
+                    }
+                )
             results.sort(key=lambda x: x["win_rate"], reverse=True)
             return results
 
@@ -196,15 +200,19 @@ class SwarmLearning:
                 accurate = int(stats["accurate"])
                 win_rate = wins / count if count > 0 else 0.0
                 accuracy = accurate / count if count > 0 else 0.0
-                results.append({
-                    "timeframe": tf,
-                    "count": count,
-                    "wins": wins,
-                    "losses": int(stats["losses"]),
-                    "win_rate": round(win_rate, 4),
-                    "accuracy": round(accuracy, 4),
-                    "edge": "positive" if win_rate > 0.55 else ("negative" if win_rate < 0.45 else "neutral"),
-                })
+                results.append(
+                    {
+                        "timeframe": tf,
+                        "count": count,
+                        "wins": wins,
+                        "losses": int(stats["losses"]),
+                        "win_rate": round(win_rate, 4),
+                        "accuracy": round(accuracy, 4),
+                        "edge": "positive"
+                        if win_rate > 0.55
+                        else ("negative" if win_rate < 0.45 else "neutral"),
+                    }
+                )
             results.sort(key=lambda x: x["win_rate"], reverse=True)
             return results
 
@@ -242,14 +250,16 @@ class SwarmLearning:
                     continue
                 wins = int(stats.get("wins", 0))
                 win_rate = wins / count if count > 0 else 0.0
-                results.append({
-                    "conviction_range": bucket,
-                    "count": count,
-                    "wins": wins,
-                    "losses": int(stats.get("losses", 0)),
-                    "actual_win_rate": round(win_rate, 4),
-                    "calibrated": abs(win_rate - self._bucket_midpoint(bucket)) < 0.15,
-                })
+                results.append(
+                    {
+                        "conviction_range": bucket,
+                        "count": count,
+                        "wins": wins,
+                        "losses": int(stats.get("losses", 0)),
+                        "actual_win_rate": round(win_rate, 4),
+                        "calibrated": abs(win_rate - self._bucket_midpoint(bucket)) < 0.15,
+                    }
+                )
             return results
 
     def get_bot_synergy(self, min_samples: int = 0) -> list[dict[str, Any]]:
@@ -267,16 +277,20 @@ class SwarmLearning:
                 wins = int(stats["wins"])
                 win_rate = wins / count if count > 0 else 0.0
                 bots = pair_key.split("+", 1)
-                results.append({
-                    "pair": pair_key,
-                    "bot_a": bots[0] if len(bots) > 0 else "?",
-                    "bot_b": bots[1] if len(bots) > 1 else "?",
-                    "count": count,
-                    "wins": wins,
-                    "losses": int(stats["losses"]),
-                    "win_rate": round(win_rate, 4),
-                    "synergy": "strong" if win_rate > 0.65 else ("weak" if win_rate < 0.40 else "moderate"),
-                })
+                results.append(
+                    {
+                        "pair": pair_key,
+                        "bot_a": bots[0] if len(bots) > 0 else "?",
+                        "bot_b": bots[1] if len(bots) > 1 else "?",
+                        "count": count,
+                        "wins": wins,
+                        "losses": int(stats["losses"]),
+                        "win_rate": round(win_rate, 4),
+                        "synergy": "strong"
+                        if win_rate > 0.65
+                        else ("weak" if win_rate < 0.40 else "moderate"),
+                    }
+                )
             results.sort(key=lambda x: x["win_rate"], reverse=True)
             return results
 

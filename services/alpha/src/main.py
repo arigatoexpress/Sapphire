@@ -93,29 +93,69 @@ class TelegramRateLimiter:
     """Per-action rate limiter for Telegram commands."""
 
     # Critical actions (mutable trading state)
-    CRITICAL_ACTIONS = frozenset({
-        "KILL", "HALT", "HALT_TRADING", "RESUME", "RESUME_TRADING",
-        "BUY", "SELL", "CLOSE", "SET_EXECUTION_STAGE", "SET_DEX_EXECUTION_STAGE",
-        "SET_ALLOCATION", "DEALLOCATE", "APPROVE_SESSION", "REJECT_SESSION",
-        "APPROVE_ALL_SESSIONS", "REP_BAN_BOT", "MEDIA_PUBLISH", "MEDIA_DISPATCH",
-    })
+    CRITICAL_ACTIONS = frozenset(
+        {
+            "KILL",
+            "HALT",
+            "HALT_TRADING",
+            "RESUME",
+            "RESUME_TRADING",
+            "BUY",
+            "SELL",
+            "CLOSE",
+            "SET_EXECUTION_STAGE",
+            "SET_DEX_EXECUTION_STAGE",
+            "SET_ALLOCATION",
+            "DEALLOCATE",
+            "APPROVE_SESSION",
+            "REJECT_SESSION",
+            "APPROVE_ALL_SESSIONS",
+            "REP_BAN_BOT",
+            "MEDIA_PUBLISH",
+            "MEDIA_DISPATCH",
+        }
+    )
 
     # Read-only actions (safe, higher limit)
-    READONLY_ACTIONS = frozenset({
-        "STATUS", "CONTROL_STATUS", "HEARTBEAT", "PING", "MARKET_PRICES", "PRICES",
-        "PORTFOLIO", "POSITIONS", "MEMORY_STATUS", "COGNITION_STATUS",
-        "GATE_STATS", "PERMISSIONS", "PERM_STATS", "SKILL_AUDIT_STATS",
-        "FORUM_TOP_TOPICS", "FORUM_AGENTS", "REP_LEADERBOARD", "SWARM_STATS",
-        "LEARN_REPORT", "LEARN_SUMMARY", "TASK_LIST", "TASK_REPORT",
-        "SCOUT_STATUS", "FORUM_SCOUT_STATUS", "SECURITY_STATUS", "VT_STATUS",
-        "MEDIA_STATUS", "MEDIA_QUEUE_STATUS", "OUTREACH_STATS",
-    })
+    READONLY_ACTIONS = frozenset(
+        {
+            "STATUS",
+            "CONTROL_STATUS",
+            "HEARTBEAT",
+            "PING",
+            "MARKET_PRICES",
+            "PRICES",
+            "PORTFOLIO",
+            "POSITIONS",
+            "MEMORY_STATUS",
+            "COGNITION_STATUS",
+            "GATE_STATS",
+            "PERMISSIONS",
+            "PERM_STATS",
+            "SKILL_AUDIT_STATS",
+            "FORUM_TOP_TOPICS",
+            "FORUM_AGENTS",
+            "REP_LEADERBOARD",
+            "SWARM_STATS",
+            "LEARN_REPORT",
+            "LEARN_SUMMARY",
+            "TASK_LIST",
+            "TASK_REPORT",
+            "SCOUT_STATUS",
+            "FORUM_SCOUT_STATUS",
+            "SECURITY_STATUS",
+            "VT_STATUS",
+            "MEDIA_STATUS",
+            "MEDIA_QUEUE_STATUS",
+            "OUTREACH_STATS",
+        }
+    )
 
     def __init__(self):
         self._windows: dict[str, deque[float]] = defaultdict(deque)
         self._limits = {
-            "critical": 3,   # 3/min for trading-critical
-            "default": 10,   # 10/min for standard
+            "critical": 3,  # 3/min for trading-critical
+            "default": 10,  # 10/min for standard
             "readonly": 30,  # 30/min for read-only
         }
 
@@ -169,8 +209,7 @@ class AlphaEngine:
         self.memory = EnhancedMemoryBank()
         self.cognition = DualSpeedCognition()
         self._cognition_enabled = bool(
-            os.getenv("SAPPHIRE_COGNITION_ENABLED", "true").strip().lower()
-            in ("true", "1", "yes")
+            os.getenv("SAPPHIRE_COGNITION_ENABLED", "true").strip().lower() in ("true", "1", "yes")
         )
         self._memory_enabled = bool(
             os.getenv("SAPPHIRE_EPISODIC_MEMORY_ENABLED", "true").strip().lower()
@@ -197,9 +236,7 @@ class AlphaEngine:
         self._telegram_chat_id = str(chat_id or "").strip()
         logger.info(f"Alpha Hub: TELEGRAM_BOT_TOKEN is {'set' if token else 'NOT SET'}")
         self.telegram = TelegramPlatformBot(
-            bot_token=token, 
-            chat_id=chat_id, 
-            command_callback=self._handle_telegram_command
+            bot_token=token, chat_id=chat_id, command_callback=self._handle_telegram_command
         )
         # Initialize Gemini Guard
         self.ai = GeminiGuard(telegram_bot=self.telegram)
@@ -209,12 +246,16 @@ class AlphaEngine:
 
         self._heartbeat_task = None
         self._autonomy_task = None
-        self._kill_switch_active = self._env_flag(
-            "SAPPHIRE_KILL_SWITCH_ACTIVE", default=False
+        self._kill_switch_active = self._env_flag("SAPPHIRE_KILL_SWITCH_ACTIVE", default=False)
+        self._heartbeat_interval_seconds = max(
+            60, int(os.getenv("TELEGRAM_HEARTBEAT_INTERVAL_SECONDS", "900"))
         )
-        self._heartbeat_interval_seconds = max(60, int(os.getenv("TELEGRAM_HEARTBEAT_INTERVAL_SECONDS", "900")))
-        self._deallocation_failure_threshold = max(1, int(os.getenv("DEALLOCATION_FAILURE_THRESHOLD", "3")))
-        self._deallocation_cooldown_seconds = max(60, int(os.getenv("DEALLOCATION_COOLDOWN_SECONDS", "900")))
+        self._deallocation_failure_threshold = max(
+            1, int(os.getenv("DEALLOCATION_FAILURE_THRESHOLD", "3"))
+        )
+        self._deallocation_cooldown_seconds = max(
+            60, int(os.getenv("DEALLOCATION_COOLDOWN_SECONDS", "900"))
+        )
         self._default_venue_allocation = max(
             0.0, min(1.0, float(os.getenv("DEFAULT_VENUE_ALLOCATION", "1.0")))
         )
@@ -254,7 +295,9 @@ class AlphaEngine:
         self._latest_autonomy_session_key = ""
         # Multi-agent dispatch history (last N dispatches per agent)
         self._agent_dispatch_history: dict[str, list] = {
-            "OBSIDIAN": [], "EMERALD": [], "SAPPHIRE": [],
+            "OBSIDIAN": [],
+            "EMERALD": [],
+            "SAPPHIRE": [],
         }
         self._agent_dispatch_history_max = 50
         # Graduated escalation: risk-based approval routing
@@ -274,12 +317,14 @@ class AlphaEngine:
         # Phase 6: Social Media Manager
         from src.media.content_generator import ContentGenerator
         from src.media.manager import MediaManager
+
         self.media_manager = MediaManager(telegram_bot=self.telegram)
         self.content_generator = ContentGenerator(gemini_guard=self.ai)
         self._media_publish_task: asyncio.Task[Any] | None = None
         # Phase 9: OpenClaw Autonomous Operations
         from src.ci_feedback import CIFeedbackProcessor
         from src.openclaw_dispatch import OpenClawDispatcher
+
         self.openclaw_dispatcher = OpenClawDispatcher()
         self.ci_feedback = CIFeedbackProcessor(
             task_manager=self.tasks,
@@ -287,12 +332,14 @@ class AlphaEngine:
         )
         # Phase 8: Prediction Market Intelligence
         from src.feeds.prediction_aggregator import PredictionAggregator
+
         self.prediction_aggregator = PredictionAggregator()
         self.swarm._prediction_aggregator = self.prediction_aggregator
         self._prediction_market_task: asyncio.Task[Any] | None = None
         self._prediction_forum_task: asyncio.Task[Any] | None = None
         # Glint-style intel feed aggregator (public source-first).
         from src.feeds.intel_feed import IntelFeedAggregator
+
         self.intel_feed = IntelFeedAggregator()
         # Internal alpha signal scanner — autonomous trade idea generation
         self.alpha_scanner = AlphaSignalScanner(
@@ -329,9 +376,15 @@ class AlphaEngine:
         )
         self._failure_counts: dict[str, int] = defaultdict(int)
         self._owner_directive: str = os.getenv("SAPPHIRE_OWNER_DIRECTIVE", "").strip()
-        self._trading_gate_max_failure_pressure = max(1, int(os.getenv("SAPPHIRE_TRADING_GATE_MAX_FAILURE_PRESSURE", "3")))
-        self._trading_gate_min_active_venues = max(1, int(os.getenv("SAPPHIRE_TRADING_GATE_MIN_ACTIVE_VENUES", "1")))
-        self._hard_failure_cooldown_seconds = max(60, int(os.getenv("HARD_FAILURE_COOLDOWN_SECONDS", "3600")))
+        self._trading_gate_max_failure_pressure = max(
+            1, int(os.getenv("SAPPHIRE_TRADING_GATE_MAX_FAILURE_PRESSURE", "3"))
+        )
+        self._trading_gate_min_active_venues = max(
+            1, int(os.getenv("SAPPHIRE_TRADING_GATE_MIN_ACTIVE_VENUES", "1"))
+        )
+        self._hard_failure_cooldown_seconds = max(
+            60, int(os.getenv("HARD_FAILURE_COOLDOWN_SECONDS", "3600"))
+        )
         self._manual_review_venues: set[str] = set()
         self._auto_deallocated: set[str] = set()
         self._owner_directive_updated_at: int = 0
@@ -443,8 +496,9 @@ class AlphaEngine:
         }
         return aliases.get(value, "")
 
-
-    def _set_execution_stage(self, stage: str, source: str = "manual", agent_id: str = "OBSIDIAN") -> dict[str, Any]:
+    def _set_execution_stage(
+        self, stage: str, source: str = "manual", agent_id: str = "OBSIDIAN"
+    ) -> dict[str, Any]:
         gate.require(agent_id, Capability.SYSTEM_CONFIG, f"set_execution_stage({stage!r})")
         previous = self._dex_execution_stage
         applied = self.strategy.set_execution_stage(stage)
@@ -514,7 +568,9 @@ class AlphaEngine:
     def _parse_symbol_set(value: str) -> set[str]:
         if not value:
             return set()
-        tokens = [token.strip().upper() for token in value.replace("|", ",").replace(";", ",").split(",")]
+        tokens = [
+            token.strip().upper() for token in value.replace("|", ",").replace(";", ",").split(",")
+        ]
         return {token for token in tokens if token}
 
     def _symbol_allowed_for_venue(self, venue: str, symbol: str) -> bool:
@@ -652,7 +708,9 @@ class AlphaEngine:
             return base
         return round(max(0.001, min(base, float(cap))), 8)
 
-    def _set_tradingview_default_quantity(self, requested_quantity: float, agent_id: str = "SAPPHIRE") -> dict[str, Any]:
+    def _set_tradingview_default_quantity(
+        self, requested_quantity: float, agent_id: str = "SAPPHIRE"
+    ) -> dict[str, Any]:
         gate.require(agent_id, Capability.SYSTEM_CONFIG, f"set_tv_quantity({requested_quantity})")
         requested = max(0.0, float(requested_quantity))
         if requested <= 0:
@@ -705,12 +763,16 @@ class AlphaEngine:
 
             venues: set[str] = set()
             if isinstance(venues_raw, list):
-                venues = {self._normalize_platform(item) for item in venues_raw if isinstance(item, str)}
+                venues = {
+                    self._normalize_platform(item) for item in venues_raw if isinstance(item, str)
+                }
 
             symbols: set[str] = set()
             if isinstance(symbols_raw, list):
                 symbols = {
-                    str(item).strip().upper() for item in symbols_raw if isinstance(item, str) and str(item).strip()
+                    str(item).strip().upper()
+                    for item in symbols_raw
+                    if isinstance(item, str) and str(item).strip()
                 }
 
             max_quantity: float | None = None
@@ -721,7 +783,9 @@ class AlphaEngine:
                     if max_quantity_val > 0:
                         max_quantity = max_quantity_val
                 except (TypeError, ValueError):
-                    logger.warning(f"Invalid max_quantity for strategy rule `{name}`: {max_quantity_raw}")
+                    logger.warning(
+                        f"Invalid max_quantity for strategy rule `{name}`: {max_quantity_raw}"
+                    )
 
             rules[name.strip().lower()] = {
                 "venues": venues,
@@ -758,7 +822,10 @@ class AlphaEngine:
             (
                 "TradingView strategy rules optional in workbench mode",
                 (not self._tradingview_execution_enabled)
-                or (self._tradingview_enforce_strategy_rules and bool(self._tradingview_strategy_rules)),
+                or (
+                    self._tradingview_enforce_strategy_rules
+                    and bool(self._tradingview_strategy_rules)
+                ),
                 "Enable strategy rules if turning TradingView live mode on",
             ),
             (
@@ -778,7 +845,9 @@ class AlphaEngine:
             ),
             (
                 "TradingView community script access enabled",
-                getattr(self.tv_autonomy, "community_access_enabled", False) if self.tv_autonomy else False,
+                getattr(self.tv_autonomy, "community_access_enabled", False)
+                if self.tv_autonomy
+                else False,
                 "TRADINGVIEW_COMMUNITY_ACCESS_ENABLED is not true (or TV integration disabled)",
             ),
             (
@@ -843,7 +912,9 @@ class AlphaEngine:
             ]
         )
 
-        await self.telegram.send_message("\n".join(lines), priority="high" if status == "FAIL" else "medium")
+        await self.telegram.send_message(
+            "\n".join(lines), priority="high" if status == "FAIL" else "medium"
+        )
 
     def _build_signal_key(
         self,
@@ -865,7 +936,9 @@ class AlphaEngine:
             "targets": sorted(targets),
             "symbol": symbol,
             "quantity": quantity,
-            "strategy": self._extract_text_value(payload, ["strategy", "strategy_name", "alert_name"]),
+            "strategy": self._extract_text_value(
+                payload, ["strategy", "strategy_name", "alert_name"]
+            ),
             "timeframe": self._extract_text_value(payload, ["timeframe", "tf"]),
             "timestamp": self._extract_text_value(payload, ["timestamp", "time", "bar_time", "t"]),
         }
@@ -935,7 +1008,9 @@ class AlphaEngine:
         # - explicit target_platforms list wins
         # - explicit venue hint wins
         # - otherwise choose the best active venue (avoid duplicating across venues by default)
-        targets_raw = payload.get("target_platforms") or payload.get("targets") or payload.get("target") or []
+        targets_raw = (
+            payload.get("target_platforms") or payload.get("targets") or payload.get("target") or []
+        )
         targets: list[str] = []
         if isinstance(targets_raw, str):
             import re as _re
@@ -1029,9 +1104,16 @@ class AlphaEngine:
                 }
             guarded_quantity = max(guarded_quantity, float(guard.get("quantity", guarded_quantity)))
 
-        confidence = self._as_float(payload.get("_confidence")) or self._as_float(payload.get("confidence")) or 0.75
+        confidence = (
+            self._as_float(payload.get("_confidence"))
+            or self._as_float(payload.get("confidence"))
+            or 0.75
+        )
         confidence = max(0.01, min(0.99, float(confidence)))
-        source = str(payload.get("source") or payload.get("strategy") or "alpha-engine").strip() or "alpha-engine"
+        source = (
+            str(payload.get("source") or payload.get("strategy") or "alpha-engine").strip()
+            or "alpha-engine"
+        )
         leverage = self._as_float(payload.get("leverage"))
         if leverage is not None and leverage <= 0:
             leverage = None
@@ -1047,7 +1129,14 @@ class AlphaEngine:
 
         # Preserve caller metadata, but ensure we never serialize huge blobs.
         metadata = dict(payload.get("metadata") or {})
-        for key in ("grid", "strategy", "reduce_only", "price", "_reasoning", "_cognition_latency_ms"):
+        for key in (
+            "grid",
+            "strategy",
+            "reduce_only",
+            "price",
+            "_reasoning",
+            "_cognition_latency_ms",
+        ):
             if key in payload and key not in metadata:
                 metadata[key] = payload.get(key)
 
@@ -1073,12 +1162,16 @@ class AlphaEngine:
                     _is_buy = raw_action == "BUY"
                     if _tp_price is None and _tp_pct and _tp_pct > 0:
                         _tp_price = round(
-                            _entry_price * (1 + _tp_pct / 100) if _is_buy else _entry_price * (1 - _tp_pct / 100),
+                            _entry_price * (1 + _tp_pct / 100)
+                            if _is_buy
+                            else _entry_price * (1 - _tp_pct / 100),
                             8,
                         )
                     if _sl_price is None and _sl_pct and _sl_pct > 0:
                         _sl_price = round(
-                            _entry_price * (1 - _sl_pct / 100) if _is_buy else _entry_price * (1 + _sl_pct / 100),
+                            _entry_price * (1 - _sl_pct / 100)
+                            if _is_buy
+                            else _entry_price * (1 + _sl_pct / 100),
                             8,
                         )
 
@@ -1212,7 +1305,9 @@ class AlphaEngine:
         )
 
         self.telegram.record_activity(
-            OBSIDIAN, "system", f"Kill switch activated: {reason[:80]}",
+            OBSIDIAN,
+            "system",
+            f"Kill switch activated: {reason[:80]}",
         )
         await self.telegram.send_message(
             f"🛑 **KILL SWITCH ACTIVE**\nReason: `{reason}`\nAll venues are halted and deallocated.",
@@ -1247,7 +1342,9 @@ class AlphaEngine:
         )
 
         self.telegram.record_activity(
-            OBSIDIAN, "system", f"Trading resumed: {reason[:80]}",
+            OBSIDIAN,
+            "system",
+            f"Trading resumed: {reason[:80]}",
         )
         await self.telegram.send_message(
             f"✅ **TRADING RESUMED**\nReason: `{reason}`\nDefault allocations restored across all venues.",
@@ -1270,13 +1367,9 @@ class AlphaEngine:
         if snapshot["kill_switch_active"]:
             status_read = "Trading is intentionally halted by kill switch."
         elif active_count < self._trading_gate_min_active_venues:
-            status_read = (
-                f"Active venue count is below target ({active_count}/{self._trading_gate_min_active_venues})."
-            )
+            status_read = f"Active venue count is below target ({active_count}/{self._trading_gate_min_active_venues})."
         elif pressure > self._trading_gate_max_failure_pressure:
-            status_read = (
-                f"Failure pressure is elevated ({pressure}/{self._trading_gate_max_failure_pressure})."
-            )
+            status_read = f"Failure pressure is elevated ({pressure}/{self._trading_gate_max_failure_pressure})."
         else:
             status_read = "Runtime is inside autonomy guardrails."
         lines = [
@@ -1324,7 +1417,7 @@ class AlphaEngine:
             status = "PAUSED" if item["paused"] else "LIVE"
             fail_count = item.get("failure_count", 0)
             lines.append(
-                f"- `{venue}` | {status} | alloc `{item['allocation']*100:.0f}%` | failures `{fail_count}`"
+                f"- `{venue}` | {status} | alloc `{item['allocation'] * 100:.0f}%` | failures `{fail_count}`"
                 + (" | `MANUAL_REVIEW_HOLD`" if item.get("manual_review_required") else "")
             )
 
@@ -1401,18 +1494,11 @@ class AlphaEngine:
         # Stats
         lines.append("\n*Stats*")
         lines.append(f"  Total fills: {snap['total_trades']}")
-        lines.append(
-            f"  Realized PnL: {snap['total_realized_pnl']:+.4f}"
-        )
-        lines.append(
-            f"  Unrealized PnL: {snap['total_unrealized_pnl']:+.4f}"
-        )
+        lines.append(f"  Realized PnL: {snap['total_realized_pnl']:+.4f}")
+        lines.append(f"  Unrealized PnL: {snap['total_unrealized_pnl']:+.4f}")
         closed_count = snap["wins"] + snap["losses"]
         if closed_count > 0:
-            lines.append(
-                f"  Win rate: {snap['win_rate']}% "
-                f"({snap['wins']}W / {snap['losses']}L)"
-            )
+            lines.append(f"  Win rate: {snap['win_rate']}% ({snap['wins']}W / {snap['losses']}L)")
 
         # Recent closed trades
         if snap["recent_closed"]:
@@ -1461,7 +1547,9 @@ class AlphaEngine:
                 pass
 
         # Dual-Speed Cognition
-        lines.append(f"\n*Dual-Speed Cognition*: {'enabled' if self._cognition_enabled else 'disabled'}")
+        lines.append(
+            f"\n*Dual-Speed Cognition*: {'enabled' if self._cognition_enabled else 'disabled'}"
+        )
         if self._cognition_enabled:
             try:
                 metrics = self.cognition.get_metrics()
@@ -1559,10 +1647,6 @@ class AlphaEngine:
             "timestamp": int(time.time()),
         }
 
-
-
-
-
     @staticmethod
     def _fmt_unix_ts(timestamp: Any) -> str:
         try:
@@ -1573,10 +1657,6 @@ class AlphaEngine:
             return "n/a"
         return time.strftime("%Y-%m-%d %H:%M:%SZ", time.gmtime(value))
 
-
-
-
-
     def _collect_media_context(self) -> dict[str, Any]:
         """Collect system context for AI content generation."""
         snapshot = self._control_snapshot()
@@ -1586,7 +1666,9 @@ class AlphaEngine:
                 "wins": int(self._trade_metrics.get("wins", 0)),
                 "losses": int(self._trade_metrics.get("losses", 0)),
                 "win_rate": round(
-                    (self._trade_metrics["wins"] / max(1, self._trade_metrics["total_trades"])) * 100, 1
+                    (self._trade_metrics["wins"] / max(1, self._trade_metrics["total_trades"]))
+                    * 100,
+                    1,
                 ),
                 "realized_pnl": round(float(self._trade_metrics.get("realized_pnl", 0)), 4),
                 "uptime_hours": round((time.time() - self._started_at) / 3600, 1),
@@ -1602,10 +1684,7 @@ class AlphaEngine:
                 {"title": t.get("title", ""), "lane": t.get("lane", "")}
                 for t in list(self.forum.list_topics({}).get("topics", []))[:5]
             ],
-            "events": [
-                str(e.get("message", ""))
-                for e in list(self._system_logs)[-10:]
-            ],
+            "events": [str(e.get("message", "")) for e in list(self._system_logs)[-10:]],
         }
 
     def _build_media_draft(self, topic: str) -> dict[str, Any]:
@@ -1727,8 +1806,12 @@ class AlphaEngine:
     async def _send_heartbeat(self, reason: str) -> None:
         state = dispatcher.get_control_state()
         strategy_state = self.strategy.execution_state()
-        live = [venue for venue, item in state.items() if not item["paused"] and item["allocation"] > 0]
-        paused = [venue for venue, item in state.items() if item["paused"] or item["allocation"] <= 0]
+        live = [
+            venue for venue, item in state.items() if not item["paused"] and item["allocation"] > 0
+        ]
+        paused = [
+            venue for venue, item in state.items() if item["paused"] or item["allocation"] <= 0
+        ]
         total_failures = sum(self._failure_counts.values())
         pending_count = len(self._pending_autonomy_session_keys())
         directive = self._owner_directive.strip() or "none"
@@ -1795,10 +1878,14 @@ class AlphaEngine:
         state = dispatcher.get_control_state()
         strategy_state = self.strategy.execution_state()
         active_venues = [
-            venue for venue, item in state.items() if not item.get("paused") and item.get("allocation", 0) > 0
+            venue
+            for venue, item in state.items()
+            if not item.get("paused") and item.get("allocation", 0) > 0
         ]
         paused_venues = [
-            venue for venue, item in state.items() if item.get("paused") or item.get("allocation", 0) <= 0
+            venue
+            for venue, item in state.items()
+            if item.get("paused") or item.get("allocation", 0) <= 0
         ]
         total_failures = sum(self._failure_counts.values())
         return {
@@ -1811,8 +1898,16 @@ class AlphaEngine:
             "enabled_venues": sorted(list(dispatcher.bot_urls.keys())),
             "autonomy_dispatch_count": self._autonomy_dispatch_count,
             "agent_dispatch_counts": {k: len(v) for k, v in self._agent_dispatch_history.items()},
-            "allowed_repo_scope": sorted(list(getattr(self.tv_autonomy, "allowed_repo_scope", set()))) if self.tv_autonomy else [],
-            "allowed_project_scope": sorted(list(getattr(self.tv_autonomy, "allowed_project_scope", set()))) if self.tv_autonomy else [],
+            "allowed_repo_scope": sorted(
+                list(getattr(self.tv_autonomy, "allowed_repo_scope", set()))
+            )
+            if self.tv_autonomy
+            else [],
+            "allowed_project_scope": sorted(
+                list(getattr(self.tv_autonomy, "allowed_project_scope", set()))
+            )
+            if self.tv_autonomy
+            else [],
             "dex_execution_stage": strategy_state.get("dex_execution_stage", "paper"),
             "dex_live_dispatch": bool(strategy_state.get("stage_multiplier", 0) > 0),
             "dex_effective_quantity": float(strategy_state.get("effective_quantity", 0.0)),
@@ -1852,14 +1947,26 @@ class AlphaEngine:
         if active_count < self._trading_gate_min_active_venues:
             return {"trigger": "venue_shortfall", "agent": "OBSIDIAN", "category": "infrastructure"}
         if total_failures > self._trading_gate_max_failure_pressure:
-            return {"trigger": "failure_pressure", "agent": "OBSIDIAN", "category": "infrastructure"}
+            return {
+                "trigger": "failure_pressure",
+                "agent": "OBSIDIAN",
+                "category": "infrastructure",
+            }
 
         # Rotate scheduled cycles across agents
         cycle = self._autonomy_dispatch_count % 3
         if cycle == 0:
-            return {"trigger": "scheduled_maintenance", "agent": "OBSIDIAN", "category": "maintenance"}
+            return {
+                "trigger": "scheduled_maintenance",
+                "agent": "OBSIDIAN",
+                "category": "maintenance",
+            }
         elif cycle == 1:
-            return {"trigger": "scheduled_improvement", "agent": "EMERALD", "category": "improvement"}
+            return {
+                "trigger": "scheduled_improvement",
+                "agent": "EMERALD",
+                "category": "improvement",
+            }
         else:
             return {"trigger": "scheduled_review", "agent": "SAPPHIRE", "category": "review"}
 
@@ -1960,11 +2067,15 @@ class AlphaEngine:
         venue_lines = []
         for venue, profile in venue_profiles.items():
             status = "active" if venue in active else "paused"
-            venue_lines.append(f"  • **{profile.get('name', venue)}** ({status}) — {profile.get('role', 'n/a')}")
+            venue_lines.append(
+                f"  • **{profile.get('name', venue)}** ({status}) — {profile.get('role', 'n/a')}"
+            )
         venue_block = "\n".join(venue_lines) if venue_lines else "  (no venue profiles)"
 
         preferred = context.get("preferred_symbols", [])
-        preferred_text = ", ".join(preferred[:6]) + ("…" if len(preferred) > 6 else "") if preferred else "none"
+        preferred_text = (
+            ", ".join(preferred[:6]) + ("…" if len(preferred) > 6 else "") if preferred else "none"
+        )
 
         lines = [
             "🤖 **AUTONOMY DECISION BRIEF**",
@@ -1980,7 +2091,9 @@ class AlphaEngine:
             f"Outcome: {brief['expected_outcome']}",
         ]
         if approval_required and key != "n/a":
-            lines.append("Decision: `/approve <session_key> <note>` or `/reject <session_key> <reason>`")
+            lines.append(
+                "Decision: `/approve <session_key> <note>` or `/reject <session_key> <reason>`"
+            )
             lines.append("Bulk option: `/approve_all <note>`")
         elif approval_required:
             lines.append("Decision gate is ON, but no session key was returned from dispatch.")
@@ -2178,7 +2291,7 @@ class AlphaEngine:
         }
         # Trim old proposals (keep last 100)
         if len(self._proposals) > 100:
-            oldest_keys = sorted(self._proposals.keys())[:len(self._proposals) - 100]
+            oldest_keys = sorted(self._proposals.keys())[: len(self._proposals) - 100]
             for k in oldest_keys:
                 del self._proposals[k]
         return key
@@ -2244,9 +2357,7 @@ class AlphaEngine:
             return {"executed": True, "policy": "notify_proceed"}
 
         # require_approval — record proposal and await owner decision
-        proposal_key = self._record_proposal(
-            agent_id, capability, description, context
-        )
+        proposal_key = self._record_proposal(agent_id, capability, description, context)
         await self.telegram.send_as(
             OBSIDIAN,
             (
@@ -2268,33 +2379,39 @@ class AlphaEngine:
             state = dispatcher.get_control_state()
             for venue, info in state.items():
                 if info.get("paused"):
-                    issues.append({
-                        "type": "venue_paused",
-                        "severity": "high",
-                        "venue": venue,
-                        "reason": info.get("pause_reason", "unknown"),
-                        "agent": "OBSIDIAN",
-                    })
+                    issues.append(
+                        {
+                            "type": "venue_paused",
+                            "severity": "high",
+                            "venue": venue,
+                            "reason": info.get("pause_reason", "unknown"),
+                            "agent": "OBSIDIAN",
+                        }
+                    )
         except Exception:
             pass
         # Check failure pressure
         total_failures = sum(self._failure_counts.values())
         threshold = self._trading_gate_max_failure_pressure
         if total_failures > threshold * 0.7:
-            issues.append({
-                "type": "failure_pressure_warning",
-                "severity": "medium" if total_failures <= threshold else "high",
-                "pressure": total_failures,
-                "threshold": threshold,
-                "agent": "OBSIDIAN",
-            })
+            issues.append(
+                {
+                    "type": "failure_pressure_warning",
+                    "severity": "medium" if total_failures <= threshold else "high",
+                    "pressure": total_failures,
+                    "threshold": threshold,
+                    "agent": "OBSIDIAN",
+                }
+            )
         # Check kill switch
         if self._kill_switch_active:
-            issues.append({
-                "type": "kill_switch_active",
-                "severity": "critical",
-                "agent": "OBSIDIAN",
-            })
+            issues.append(
+                {
+                    "type": "kill_switch_active",
+                    "severity": "critical",
+                    "agent": "OBSIDIAN",
+                }
+            )
         return {"issues": issues, "checked_at": int(time.time())}
 
     @staticmethod
@@ -2355,7 +2472,9 @@ class AlphaEngine:
         ),
     }
 
-    async def _dispatch_full_autonomy_cycle(self, trigger: str, force: bool = False, agent_id: str = "OBSIDIAN") -> dict[str, Any]:
+    async def _dispatch_full_autonomy_cycle(
+        self, trigger: str, force: bool = False, agent_id: str = "OBSIDIAN"
+    ) -> dict[str, Any]:
         gate.require(agent_id, Capability.AUTONOMY_DISPATCH, f"autonomy_cycle({trigger!r})")
         if not self._full_autonomy_enabled:
             append_alpha_dispatch_evaluation_audit(
@@ -2384,16 +2503,23 @@ class AlphaEngine:
             return {
                 "dispatched": False,
                 "reason": "rate_limited",
-                "retry_after_seconds": int(self._autonomy_min_dispatch_interval_seconds - since_last),
+                "retry_after_seconds": int(
+                    self._autonomy_min_dispatch_interval_seconds - since_last
+                ),
             }
 
         context = self._autonomy_context_snapshot()
-        directive = self._owner_directive.strip() or "Optimize Sapphire uptime, reliability, and execution quality."
+        directive = (
+            self._owner_directive.strip()
+            or "Optimize Sapphire uptime, reliability, and execution quality."
+        )
         venue_hints = "; ".join(
             f"{v}: {p.get('role', '')}" for v, p in context.get("venue_profiles", {}).items()
         )
         preferred = ", ".join(context.get("preferred_symbols", [])[:6])
-        agent_focus = self._AGENT_INSTRUCTION_FOCUS.get(agent_id.upper(), self._AGENT_INSTRUCTION_FOCUS["OBSIDIAN"])
+        agent_focus = self._AGENT_INSTRUCTION_FOCUS.get(
+            agent_id.upper(), self._AGENT_INSTRUCTION_FOCUS["OBSIDIAN"]
+        )
         instruction = (
             f"{directive} {agent_focus} "
             "IMPORTANT: Venues are segregated specialists with no cross-venue arbitrage. "
@@ -2469,11 +2595,16 @@ class AlphaEngine:
             # Track per-agent dispatch history
             agent_key = agent_id.upper()
             if agent_key in self._agent_dispatch_history:
-                self._agent_dispatch_history[agent_key].append({
-                    "trigger": trigger, "ts": now,
-                })
+                self._agent_dispatch_history[agent_key].append(
+                    {
+                        "trigger": trigger,
+                        "ts": now,
+                    }
+                )
                 if len(self._agent_dispatch_history[agent_key]) > self._agent_dispatch_history_max:
-                    self._agent_dispatch_history[agent_key] = self._agent_dispatch_history[agent_key][-self._agent_dispatch_history_max:]
+                    self._agent_dispatch_history[agent_key] = self._agent_dispatch_history[
+                        agent_key
+                    ][-self._agent_dispatch_history_max :]
             session_key = str(hook_result.get("session_key", "")).strip()
             self._record_autonomy_session(session_key, trigger, instruction)
             self._record_system_log(
@@ -2483,7 +2614,8 @@ class AlphaEngine:
                 metadata={"session_key": hook_result.get("session_key", ""), "agent": agent_id},
             )
             self.telegram.record_activity(
-                persona, "autonomy",
+                persona,
+                "autonomy",
                 f"Dispatched cycle: {trigger}",
             )
             if session_key and not self._autonomy_require_owner_approval:
@@ -2599,7 +2731,8 @@ class AlphaEngine:
 
         # Record activity under EMERALD (strategy/analysis agent)
         self.telegram.record_activity(
-            EMERALD, "alpha_signal",
+            EMERALD,
+            "alpha_signal",
             f"{action.upper()} {symbol} (conf={confidence:.0%})",
         )
 
@@ -2625,9 +2758,7 @@ class AlphaEngine:
                 logger.info(f"Alpha signal {symbol}: pipeline returned {accepted}")
 
             # Resolve pending count
-            self.alpha_scanner.resolve_signal(
-                result.get("signal_key", ""), accepted == "executed"
-            )
+            self.alpha_scanner.resolve_signal(result.get("signal_key", ""), accepted == "executed")
         except Exception as exc:
             logger.error(f"Alpha scanner pipeline error: {exc}")
             self.alpha_scanner.resolve_signal("", False)
@@ -2646,7 +2777,8 @@ class AlphaEngine:
 
         # Record activity under EMERALD (strategy/analysis agent)
         self.telegram.record_activity(
-            EMERALD, "grid_signal",
+            EMERALD,
+            "grid_signal",
             f"{action} {symbol} (lvl {level})",
         )
 
@@ -2669,9 +2801,9 @@ class AlphaEngine:
         except Exception as exc:
             logger.error(f"Grid trader pipeline error: {exc}")
 
-
-
-    async def _record_trade_outcome(self, platform: str, success: bool, error_message: str = "") -> None:
+    async def _record_trade_outcome(
+        self, platform: str, success: bool, error_message: str = ""
+    ) -> None:
         venue = self._normalize_platform(platform)
         if venue not in dispatcher.bot_urls:
             return
@@ -2751,9 +2883,7 @@ class AlphaEngine:
                 if hard_failure
                 else f"{venue} auto-deallocated after {failures} consecutive failures."
             )
-            + (
-                f" Cooldown {cooldown_seconds}s."
-            ),
+            + (f" Cooldown {cooldown_seconds}s."),
             platforms=[venue],
             metadata={
                 "source": "alpha-engine",
@@ -2839,7 +2969,7 @@ class AlphaEngine:
                             metadata={"source": "alpha-engine"},
                         )
                         await self.telegram.send_message(
-                            f"✅ `{venue}` cooldown complete. Allocation restored to `{self._default_venue_allocation*100:.0f}%`.",
+                            f"✅ `{venue}` cooldown complete. Allocation restored to `{self._default_venue_allocation * 100:.0f}%`.",
                             priority="medium",
                         )
             except asyncio.CancelledError:
@@ -2879,9 +3009,7 @@ class AlphaEngine:
                         OBSIDIAN, f"Trading resumed on {target}. We're back in action."
                     )
                 elif action == "SET_ALLOCATION":
-                    await self._handle_control_command(
-                        target, "SET_ALLOCATION", value
-                    )
+                    await self._handle_control_command(target, "SET_ALLOCATION", value)
                     await self.telegram.send_as(
                         SAPPHIRE, f"Allocation for {target} set to {value:.0%}."
                     )
@@ -2937,9 +3065,7 @@ class AlphaEngine:
 
                 # Try to dispatch to OpenClaw for a real agent answer
                 if hasattr(self, "openclaw_dispatcher") and self.openclaw_dispatcher.enabled:
-                    await self.telegram.send_as(
-                        agent_persona, "Let me think about that..."
-                    )
+                    await self.telegram.send_as(agent_persona, "Let me think about that...")
                     agent_id = agent_name if agent_name != "AUTO" else "OBSIDIAN"
                     await self.openclaw_dispatcher.dispatch_instruction(
                         agent_id=agent_id,
@@ -3053,7 +3179,11 @@ class AlphaEngine:
             )
 
         # Permission gate: manual trades require TRADE_EXECUTE
-        gate.require("SAPPHIRE", Capability.TRADE_EXECUTE, f"manual_trade({action} {symbol} on {normalized_platform})")
+        gate.require(
+            "SAPPHIRE",
+            Capability.TRADE_EXECUTE,
+            f"manual_trade({action} {symbol} on {normalized_platform})",
+        )
 
         dispatched = await dispatcher.send_command(
             normalized_platform,
@@ -3166,7 +3296,6 @@ class AlphaEngine:
                 system_logs_handler=self._handle_system_logs_request,
                 forum_topics_handler=self._handle_forum_topics_request,
                 forum_create_topic_handler=self._handle_forum_create_topic_request,
-
                 forum_topic_detail_handler=self._handle_forum_topic_detail_request,
                 forum_replies_handler=self._handle_forum_replies_request,
                 forum_scout_status_handler=self._handle_forum_scout_status_request,
@@ -3202,26 +3331,20 @@ class AlphaEngine:
         if self._PositionReconciler is not None:
             try:
                 from google.cloud import firestore as _fs
-                _recon_db = _fs.AsyncClient(
-                    project=os.getenv("GCP_PROJECT_ID", "sapphire-479610")
-                )
+
+                _recon_db = _fs.AsyncClient(project=os.getenv("GCP_PROJECT_ID", "sapphire-479610"))
             except Exception:
                 _recon_db = None
             self._reconciler = self._PositionReconciler(
                 firestore_client=_recon_db,
-                stale_threshold_seconds=int(
-                    os.getenv("POSITION_STALE_THRESHOLD_SECONDS", "120")
-                ),
-                reconcile_interval=int(
-                    os.getenv("POSITION_RECONCILE_INTERVAL_SECONDS", "900")
-                ),
+                stale_threshold_seconds=int(os.getenv("POSITION_STALE_THRESHOLD_SECONDS", "120")),
+                reconcile_interval=int(os.getenv("POSITION_RECONCILE_INTERVAL_SECONDS", "900")),
             )
             # Subscribe to position-updates so the reconciler tracks live state.
             from pubsub.client import subscribe as _ps_subscribe
+
             await _ps_subscribe("position-updates", self._reconciler.handle_position_update)
-            asyncio.create_task(
-                self._reconciler.run_forever(self._on_position_drift)
-            )
+            asyncio.create_task(self._reconciler.run_forever(self._on_position_drift))
             logger.info("✅ Position reconciler started")
         else:
             logger.warning("PositionReconciler not available — skipping")
@@ -3234,18 +3357,25 @@ class AlphaEngine:
         await self.market_data.start()
         await self.strategy.start()
         self.telegram.record_activity(
-            OBSIDIAN, "system",
+            OBSIDIAN,
+            "system",
             f"Startup complete — venues: {', '.join(sorted(dispatcher.bot_urls.keys()))}",
         )
         if self._full_autonomy_enabled:
             self._autonomy_task = asyncio.create_task(self._autonomy_ops_loop())
+
             # Delay startup bootstrap to let gateway warm up and avoid cold-start races
             async def _deferred_bootstrap():
                 await asyncio.sleep(30)
                 try:
-                    await self._dispatch_full_autonomy_cycle(trigger="startup_bootstrap", force=True)
+                    await self._dispatch_full_autonomy_cycle(
+                        trigger="startup_bootstrap", force=True
+                    )
                 except Exception as exc:
-                    logger.warning(f"Startup bootstrap dispatch failed (non-fatal): {type(exc).__name__}: {exc}")
+                    logger.warning(
+                        f"Startup bootstrap dispatch failed (non-fatal): {type(exc).__name__}: {exc}"
+                    )
+
             asyncio.create_task(_deferred_bootstrap())
         else:
             logger.info("Full autonomy loop disabled (SAPPHIRE_FULL_AUTONOMY_ENABLED=false)")
@@ -3257,7 +3387,8 @@ class AlphaEngine:
             )
             logger.info("🔍 Internal alpha scanner task started")
             self.telegram.record_activity(
-                EMERALD, "alpha",
+                EMERALD,
+                "alpha",
                 f"Alpha scanner active — symbols: {','.join(self.alpha_scanner._scan_symbols[:5])}",
             )
         else:
@@ -3270,7 +3401,8 @@ class AlphaEngine:
             )
             logger.info("🧭 Grid trader task started")
             self.telegram.record_activity(
-                EMERALD, "grid",
+                EMERALD,
+                "grid",
                 f"Grid trader active — symbols: {','.join(self.grid_trader.metrics().get('symbols', [])[:5])}",
             )
         else:
@@ -3279,16 +3411,17 @@ class AlphaEngine:
         # 7. Start Prediction Market Intelligence (Phase 8)
         if self.prediction_aggregator.enabled:
             await self.prediction_aggregator.start()
-            self._prediction_forum_task = asyncio.create_task(
-                self._prediction_market_forum_loop()
-            )
+            self._prediction_forum_task = asyncio.create_task(self._prediction_market_forum_loop())
             logger.info("🔮 Prediction market intelligence active")
             self.telegram.record_activity(
-                SCOUT, "prediction_market",
+                SCOUT,
+                "prediction_market",
                 "Prediction market feeds started (Polymarket + Kalshi)",
             )
         else:
-            logger.info("Prediction market feeds disabled (SAPPHIRE_PREDICTION_MARKET_ENABLED=false)")
+            logger.info(
+                "Prediction market feeds disabled (SAPPHIRE_PREDICTION_MARKET_ENABLED=false)"
+            )
 
         # 8. Start Intel Feed (Glint-style market/news/research stream)
         if self.intel_feed.enabled:
@@ -3296,7 +3429,8 @@ class AlphaEngine:
             await self.intel_feed.refresh_once(force=True)
             logger.info("🧠 Intel feed active")
             self.telegram.record_activity(
-                SCOUT, "intel_feed",
+                SCOUT,
+                "intel_feed",
                 "Intel feed started (Google News + HN + GitHub; scrape fallback sandbox-gated)",
             )
         else:
@@ -3325,7 +3459,8 @@ class AlphaEngine:
                         f"PnL: {closed_trade.realized_pnl:+.4f}"
                     )
                     self.telegram.record_activity(
-                        SAPPHIRE, "portfolio",
+                        SAPPHIRE,
+                        "portfolio",
                         f"Closed {closed_trade.symbol} — PnL: {closed_trade.realized_pnl:+.4f}",
                     )
 
@@ -3337,7 +3472,8 @@ class AlphaEngine:
                     try:
                         self.memory.record_trade(message_data)
                         self.telegram.record_activity(
-                            EMERALD, "memory",
+                            EMERALD,
+                            "memory",
                             f"Recorded trade: {message_data.get('side', '?')} {message_data.get('symbol', '?')}",
                         )
                     except Exception:
@@ -3370,7 +3506,8 @@ class AlphaEngine:
                         metadata={"side": side, "symbol": symbol, "quantity": qty},
                     )
                     self.telegram.record_activity(
-                        SAPPHIRE, "trade",
+                        SAPPHIRE,
+                        "trade",
                         f"Filled {side} {qty} {symbol} on {platform}",
                     )
                     # Use LOW priority to batch execution updates
@@ -3390,7 +3527,8 @@ class AlphaEngine:
                         dispatcher.set_venue_allocation(platform, 0.0)
                         dispatcher.pause_venue(platform, reason=err)
                         self.telegram.record_activity(
-                            OBSIDIAN, "system",
+                            OBSIDIAN,
+                            "system",
                             f"Auto-paused {platform}: {err[:80]}",
                         )
                         await self.telegram.send_as(
@@ -3417,11 +3555,7 @@ class AlphaEngine:
                         severity_value = getattr(severity, "value", severity)
                         error_threshold = getattr(ErrorSeverity.ERROR, "value", ErrorSeverity.ERROR)
                         with contextlib.suppress(TypeError, ValueError):
-                            (
-                                "high"
-                                if int(severity_value) >= int(error_threshold)
-                                else "medium"
-                            )
+                            ("high" if int(severity_value) >= int(error_threshold) else "medium")
                         await self.telegram.send_as(SAPPHIRE, msg)
                         logger.warning(msg)
                     else:
@@ -3451,8 +3585,6 @@ class AlphaEngine:
 
     async def _handle_system_logs_request(self, payload: dict[str, Any]) -> list[dict[str, Any]]:
         return await handle_system_logs(self, payload)
-
-
 
     async def _handle_security_skills_status_request(self, _: dict[str, Any]) -> dict[str, Any]:
         return await handle_security_skills_status(self, _)

@@ -19,6 +19,7 @@ if str(ROOT) not in sys.path:
 
 def main() -> int:
     from lib.foundry.sync import run_sync
+
     result = run_sync()
     return 0 if result.ok else 1
 

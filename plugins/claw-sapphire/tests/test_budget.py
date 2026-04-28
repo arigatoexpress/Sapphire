@@ -36,7 +36,11 @@ def test_budget_exhaustion():
         tmp = Path(f.name)
 
     with patch.object(token_governor, "USAGE_PATH", tmp):
-        with patch.object(token_governor, "DAILY_BUDGETS", {"t0_nemotron": float("inf"), "t1_kimi": 100, "t2_claw": 300000, "t3_claude": 200000}):
+        with patch.object(
+            token_governor,
+            "DAILY_BUDGETS",
+            {"t0_nemotron": float("inf"), "t1_kimi": 100, "t2_claw": 300000, "t3_claude": 200000},
+        ):
             token_governor.record("t1", prompt_tokens=80, eval_tokens=30, task="test")
             assert not token_governor.is_available("t1")  # 110 > 100
 

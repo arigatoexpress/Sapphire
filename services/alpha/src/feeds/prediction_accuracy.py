@@ -117,9 +117,7 @@ class PredictionAccuracyTracker:
             "correct": correct,
             "brier_score": round(brier, 4),
             "source": source_key,
-            "time_to_resolution_hours": round(
-                (snap.resolved_time - snap.snapshot_time) / 3600, 1
-            ),
+            "time_to_resolution_hours": round((snap.resolved_time - snap.snapshot_time) / 3600, 1),
         }
 
     def get_accuracy_stats(self) -> dict[str, Any]:
@@ -158,16 +156,14 @@ class PredictionAccuracyTracker:
             "total_tracked": len(self._snapshots),
             "total_resolved": total_resolved,
             "total_pending": len(self._snapshots) - total_resolved,
-            "overall_accuracy_pct": round(
-                total_correct / total_resolved * 100, 1
-            ) if total_resolved else 0.0,
-            "overall_brier": round(
-                total_brier / total_resolved, 4
-            ) if total_resolved else 0.0,
+            "overall_accuracy_pct": round(total_correct / total_resolved * 100, 1)
+            if total_resolved
+            else 0.0,
+            "overall_brier": round(total_brier / total_resolved, 4) if total_resolved else 0.0,
             "high_conviction_resolved": hc_resolved,
-            "high_conviction_accuracy_pct": round(
-                hc_correct / hc_resolved * 100, 1
-            ) if hc_resolved else 0.0,
+            "high_conviction_accuracy_pct": round(hc_correct / hc_resolved * 100, 1)
+            if hc_resolved
+            else 0.0,
             "by_source": source_stats,
         }
 
@@ -176,17 +172,17 @@ class PredictionAccuracyTracker:
         pending = []
         for snap in self._snapshots.values():
             if not snap.resolved:
-                pending.append({
-                    "market_id": snap.market_id,
-                    "source": snap.source.value,
-                    "question": snap.question,
-                    "probability": snap.probability,
-                    "symbols": snap.symbols,
-                    "was_high_conviction": snap.was_high_conviction,
-                    "age_hours": round(
-                        (time.time() - snap.snapshot_time) / 3600, 1
-                    ),
-                })
+                pending.append(
+                    {
+                        "market_id": snap.market_id,
+                        "source": snap.source.value,
+                        "question": snap.question,
+                        "probability": snap.probability,
+                        "symbols": snap.symbols,
+                        "was_high_conviction": snap.was_high_conviction,
+                        "age_hours": round((time.time() - snap.snapshot_time) / 3600, 1),
+                    }
+                )
         return sorted(pending, key=lambda p: p["age_hours"], reverse=True)
 
     def format_telegram_accuracy(self) -> str:
@@ -228,14 +224,10 @@ class PredictionAccuracyTracker:
 
     def _evict_oldest(self) -> None:
         """Remove oldest resolved snapshots to stay under max capacity."""
-        resolved = [
-            (mid, snap) for mid, snap in self._snapshots.items() if snap.resolved
-        ]
+        resolved = [(mid, snap) for mid, snap in self._snapshots.items() if snap.resolved]
         if not resolved:
             # If no resolved, remove oldest unresolved
-            oldest_key = min(
-                self._snapshots, key=lambda k: self._snapshots[k].snapshot_time
-            )
+            oldest_key = min(self._snapshots, key=lambda k: self._snapshots[k].snapshot_time)
             del self._snapshots[oldest_key]
             return
 

@@ -368,7 +368,10 @@ def hermes_surfaces() -> list[dict[str, Any]]:
             "agents",
             matrix_status,
             evidence,
-            str(report.get("next_action") or "Keep Hermes quick exec gated through Sapphire CommandGuard."),
+            str(
+                report.get("next_action")
+                or "Keep Hermes quick exec gated through Sapphire CommandGuard."
+            ),
         )
     ]
 
@@ -434,11 +437,43 @@ def media_surfaces() -> list[dict[str, Any]]:
 
 
 def github_surfaces(runner: Runner) -> list[dict[str, Any]]:
-    prs = gh_json(runner, ["gh", "pr", "list", "--repo", "arigatoexpress/Sapphire", "--state", "open", "--limit", "50", "--json", "number,title,isDraft"])
-    issues = gh_json(runner, ["gh", "issue", "list", "--repo", "arigatoexpress/Sapphire", "--state", "open", "--limit", "50", "--json", "number,title"])
+    prs = gh_json(
+        runner,
+        [
+            "gh",
+            "pr",
+            "list",
+            "--repo",
+            "arigatoexpress/Sapphire",
+            "--state",
+            "open",
+            "--limit",
+            "50",
+            "--json",
+            "number,title,isDraft",
+        ],
+    )
+    issues = gh_json(
+        runner,
+        [
+            "gh",
+            "issue",
+            "list",
+            "--repo",
+            "arigatoexpress/Sapphire",
+            "--state",
+            "open",
+            "--limit",
+            "50",
+            "--json",
+            "number,title",
+        ],
+    )
     surfaces = []
     if prs is None:
-        surfaces.append(surface("github_open_prs", "github", "warn", "unavailable", "Check gh auth."))
+        surfaces.append(
+            surface("github_open_prs", "github", "warn", "unavailable", "Check gh auth.")
+        )
     else:
         drafts = [item for item in prs if item.get("isDraft")]
         surfaces.append(
@@ -451,7 +486,9 @@ def github_surfaces(runner: Runner) -> list[dict[str, Any]]:
             )
         )
     if issues is None:
-        surfaces.append(surface("github_open_issues", "github", "warn", "unavailable", "Check gh auth."))
+        surfaces.append(
+            surface("github_open_issues", "github", "warn", "unavailable", "Check gh auth.")
+        )
     else:
         surfaces.append(
             surface(
@@ -523,7 +560,9 @@ def local_http_surfaces(http: HttpProbe) -> list[dict[str, Any]]:
     for probe in LOCAL_HTTP_PROBES:
         result = http(probe["url"], tuple(probe["ok_statuses"]))
         status = "pass" if result.get("available") else "warn"
-        evidence = f"{probe['url']} -> {result.get('status') or result.get('error') or 'unavailable'}"
+        evidence = (
+            f"{probe['url']} -> {result.get('status') or result.get('error') or 'unavailable'}"
+        )
         rows.append(
             surface(
                 str(probe["id"]),
@@ -555,7 +594,9 @@ def required_secret_surfaces(runner: Runner) -> list[dict[str, Any]]:
             "required_secret_presence",
             "secrets",
             "pass",
-            "required groups ready; optional VirusTotal missing" if optional_missing else "required groups ready",
+            "required groups ready; optional VirusTotal missing"
+            if optional_missing
+            else "required groups ready",
             "Optional integrations can remain fallback-mode until exact need is proven.",
         )
     ]
@@ -646,7 +687,9 @@ def summarize_surfaces(surfaces: list[dict[str, Any]]) -> dict[str, Any]:
 
 def next_actions(surfaces: list[dict[str, Any]]) -> list[dict[str, str]]:
     priority = {"fail": 0, "blocked": 1, "warn": 2, "manual_gate": 3, "pass": 4}
-    rows = sorted(surfaces, key=lambda item: (priority.get(item["status"], 9), item["area"], item["id"]))
+    rows = sorted(
+        surfaces, key=lambda item: (priority.get(item["status"], 9), item["area"], item["id"])
+    )
     actions = []
     for item in rows:
         if item["status"] == "pass":
@@ -774,7 +817,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--include-cost", action="store_true")
     parser.add_argument("--project", action="append", dest="projects")
     parser.add_argument("--region", action="append", dest="regions")
-    parser.add_argument("--membership", action="append", choices=sorted(google_production_test_readiness.google_benefits_inventory.MEMBERSHIPS))
+    parser.add_argument(
+        "--membership",
+        action="append",
+        choices=sorted(google_production_test_readiness.google_benefits_inventory.MEMBERSHIPS),
+    )
     parser.add_argument("--format", choices=("markdown", "json"), default="markdown")
     parser.add_argument("--output", type=Path)
     return parser.parse_args()

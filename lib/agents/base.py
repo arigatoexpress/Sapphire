@@ -127,7 +127,9 @@ class BaseAgent:
                 try:
                     self.run_once()
                 except Exception:
-                    log.exception("Agent %s failed during cycle %d", self.name, self.cycle_count + 1)
+                    log.exception(
+                        "Agent %s failed during cycle %d", self.name, self.cycle_count + 1
+                    )
                 sleep_for = max(0.0, self.interval_sec - (time.monotonic() - cycle_started))
                 if self._stop_event.wait(sleep_for):
                     break

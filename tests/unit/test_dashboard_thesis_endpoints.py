@@ -98,9 +98,7 @@ def test_investments_thesis_requires_auth(client):
 # ── /api/autonomy/continuous-intelligence ───────────────────────────
 
 
-def test_continuous_intelligence_happy_path_defaults_to_dry_run(
-    client, monkeypatch
-):
+def test_continuous_intelligence_happy_path_defaults_to_dry_run(client, monkeypatch):
     captured = {"live": None}
 
     def fake_build(fetch_live: bool):
@@ -120,9 +118,7 @@ def test_continuous_intelligence_happy_path_defaults_to_dry_run(
 
     monkeypatch.setattr(ci, "build_continuous_intelligence_plan", fake_build)
 
-    response = client.get(
-        "/api/autonomy/continuous-intelligence", headers=_auth_header()
-    )
+    response = client.get("/api/autonomy/continuous-intelligence", headers=_auth_header())
 
     assert response.status_code == 200
     payload = response.get_json()
@@ -153,9 +149,7 @@ def test_continuous_intelligence_live_query_param(client, monkeypatch, flag):
     assert captured["live"] is True
 
 
-def test_continuous_intelligence_error_returns_safety_envelope(
-    client, monkeypatch
-):
+def test_continuous_intelligence_error_returns_safety_envelope(client, monkeypatch):
     import lib.autonomy.continuous_intelligence as ci
 
     def boom(fetch_live: bool):  # noqa: ARG001
@@ -163,9 +157,7 @@ def test_continuous_intelligence_error_returns_safety_envelope(
 
     monkeypatch.setattr(ci, "build_continuous_intelligence_plan", boom)
 
-    response = client.get(
-        "/api/autonomy/continuous-intelligence", headers=_auth_header()
-    )
+    response = client.get("/api/autonomy/continuous-intelligence", headers=_auth_header())
 
     assert response.status_code == 200
     payload = response.get_json()
@@ -200,9 +192,7 @@ def test_continuous_intelligence_artifacts_happy_path(client, monkeypatch):
         lambda write=False: {"records": 12, "write_enabled": False},
     )
 
-    response = client.get(
-        "/api/autonomy/continuous-intelligence/artifacts", headers=_auth_header()
-    )
+    response = client.get("/api/autonomy/continuous-intelligence/artifacts", headers=_auth_header())
 
     assert response.status_code == 200
     payload = response.get_json()
@@ -213,9 +203,7 @@ def test_continuous_intelligence_artifacts_happy_path(client, monkeypatch):
     assert payload["write_enabled"] is False
 
 
-def test_continuous_intelligence_artifacts_calls_snapshot_dry_run(
-    client, monkeypatch
-):
+def test_continuous_intelligence_artifacts_calls_snapshot_dry_run(client, monkeypatch):
     """``snapshot_tasks`` MUST be invoked with ``write=False``."""
     captured = {"write": None}
 
@@ -228,17 +216,13 @@ def test_continuous_intelligence_artifacts_calls_snapshot_dry_run(
     monkeypatch.setattr(cia, "artifact_status", lambda: {"files": {}, "totals": {}})
     monkeypatch.setattr(cia, "snapshot_tasks", fake_snapshot)
 
-    response = client.get(
-        "/api/autonomy/continuous-intelligence/artifacts", headers=_auth_header()
-    )
+    response = client.get("/api/autonomy/continuous-intelligence/artifacts", headers=_auth_header())
 
     assert response.status_code == 200
     assert captured["write"] is False
 
 
-def test_continuous_intelligence_artifacts_error_returns_safety_envelope(
-    client, monkeypatch
-):
+def test_continuous_intelligence_artifacts_error_returns_safety_envelope(client, monkeypatch):
     import lib.autonomy.continuous_intelligence_artifacts as cia
 
     def boom():
@@ -246,9 +230,7 @@ def test_continuous_intelligence_artifacts_error_returns_safety_envelope(
 
     monkeypatch.setattr(cia, "artifact_status", boom)
 
-    response = client.get(
-        "/api/autonomy/continuous-intelligence/artifacts", headers=_auth_header()
-    )
+    response = client.get("/api/autonomy/continuous-intelligence/artifacts", headers=_auth_header())
 
     assert response.status_code == 200
     payload = response.get_json()

@@ -69,6 +69,7 @@ class SecurityMonitor:
         # Kill switch
         try:
             from lib.core.security_kill_switch import is_engaged
+
             if is_engaged():
                 ks_active = True
                 score -= 40
@@ -79,6 +80,7 @@ class SecurityMonitor:
         # Dependency scanner
         try:
             from lib.security.dependency_scanner import DependencyScanner
+
             report = DependencyScanner().scan()
             criticals = [v for v in report.vulnerabilities if v.severity == "CRITICAL"]
             dep_issues = len(criticals)
@@ -91,6 +93,7 @@ class SecurityMonitor:
         # Model monitor
         try:
             from lib.security.model_monitor import ModelMonitor
+
             alerts = ModelMonitor().check_all()
             model_anomalies = len([a for a in alerts if a.get("severity") == "HIGH"])
             if model_anomalies:

@@ -89,7 +89,12 @@ def _score_asset(ctx: Any) -> AssetRisk:
     if abs_funding >= _FUNDING_CRITICAL_8H:
         fund_score = 40.0
     elif abs_funding >= _FUNDING_EXTREME_8H:
-        fund_score = 20.0 + (abs_funding - _FUNDING_EXTREME_8H) / (_FUNDING_CRITICAL_8H - _FUNDING_EXTREME_8H) * 20.0
+        fund_score = (
+            20.0
+            + (abs_funding - _FUNDING_EXTREME_8H)
+            / (_FUNDING_CRITICAL_8H - _FUNDING_EXTREME_8H)
+            * 20.0
+        )
     else:
         fund_score = abs_funding / _FUNDING_EXTREME_8H * 20.0
 
@@ -114,9 +119,9 @@ def _score_asset(ctx: Any) -> AssetRisk:
     detail_parts = []
     if abs_funding >= _FUNDING_EXTREME_8H:
         direction = "crowded long" if funding > 0 else "crowded short"
-        detail_parts.append(f"funding {funding*100:+.3f}%/8h ({direction})")
+        detail_parts.append(f"funding {funding * 100:+.3f}%/8h ({direction})")
     if oi_ratio > 1.5:
-        detail_parts.append(f"OI ${oi_usd/1e9:.1f}B ({oi_ratio:.1f}x baseline)")
+        detail_parts.append(f"OI ${oi_usd / 1e9:.1f}B ({oi_ratio:.1f}x baseline)")
     if oi_vol_ratio > 3:
         detail_parts.append(f"OI/vol {oi_vol_ratio:.1f}x (illiquid)")
     detail = "; ".join(detail_parts) or "within normal ranges"
@@ -152,6 +157,7 @@ class CascadeDetector:
             coins = ["BTC", "ETH", "SOL", "LINK", "ARB", "AVAX", "BNB", "MATIC"]
 
         from lib.chain.sources import HyperliquidClient, SourceError
+
         try:
             hl = HyperliquidClient()
             all_ctxs = hl.meta_and_asset_ctxs()

@@ -221,12 +221,8 @@ def test_plan_emits_score_and_close_when_long_take_profit_hit(tmp_path):
     assert score_payload["action"] == "close"
     assert score_payload["reason"] == "take_profit"
     # ATR 2.0 → SL = 100 - 1.5*2 = 97; TP = 100 + 2.5*2 = 105.
-    assert score_payload["stop_loss"] == pytest.approx(
-        100.0 - STOP_LOSS_ATR_MULT * 2.0
-    )
-    assert score_payload["take_profit"] == pytest.approx(
-        100.0 + TAKE_PROFIT_ATR_MULT * 2.0
-    )
+    assert score_payload["stop_loss"] == pytest.approx(100.0 - STOP_LOSS_ATR_MULT * 2.0)
+    assert score_payload["take_profit"] == pytest.approx(100.0 + TAKE_PROFIT_ATR_MULT * 2.0)
     assert score_payload["score"] == pytest.approx(100.0)
     # planned ids tracked for observation.
     assert agent._planned_signal_ids == ["s-1"]

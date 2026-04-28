@@ -76,7 +76,12 @@ class TestStatsComputation:
         assert s["portfolio_roi_pct"] is None
 
     def test_all_wins(self):
-        trades = [sp._normalize("S", "BTC", "long", "win", 100, 50000, 51000, 1000, 0.7, "R", None, None, "t") for _ in range(3)]
+        trades = [
+            sp._normalize(
+                "S", "BTC", "long", "win", 100, 50000, 51000, 1000, 0.7, "R", None, None, "t"
+            )
+            for _ in range(3)
+        ]
         s = sp._stats_for(trades)
         assert s["trades"] == 3
         assert s["wins"] == 3
@@ -88,8 +93,12 @@ class TestStatsComputation:
 
     def test_mixed_outcomes(self):
         trades = [
-            sp._normalize("S", "BTC", "long", "win", 200, 50000, 51000, 1000, 0.7, "R", None, None, "t"),
-            sp._normalize("S", "BTC", "long", "loss", -100, 50000, 49500, 1000, 0.7, "R", None, None, "t"),
+            sp._normalize(
+                "S", "BTC", "long", "win", 200, 50000, 51000, 1000, 0.7, "R", None, None, "t"
+            ),
+            sp._normalize(
+                "S", "BTC", "long", "loss", -100, 50000, 49500, 1000, 0.7, "R", None, None, "t"
+            ),
         ]
         s = sp._stats_for(trades)
         assert s["trades"] == 2
@@ -100,7 +109,12 @@ class TestStatsComputation:
         assert s["profit_factor"] == 2.0  # 200 / 100
 
     def test_only_losses(self):
-        trades = [sp._normalize("S", "BTC", "long", "loss", -100, 50000, 49500, 1000, 0.7, "R", None, None, "t") for _ in range(2)]
+        trades = [
+            sp._normalize(
+                "S", "BTC", "long", "loss", -100, 50000, 49500, 1000, 0.7, "R", None, None, "t"
+            )
+            for _ in range(2)
+        ]
         s = sp._stats_for(trades)
         assert s["win_rate"] == 0.0
         assert s["profit_factor"] == 0.0
@@ -129,8 +143,12 @@ class TestSharpe:
 class TestExpectancy:
     def test_in_stats_output(self):
         trades = [
-            sp._normalize("S", "BTC", "long", "win", 200, 50000, 51000, 1000, 0.7, "R", None, None, "t"),
-            sp._normalize("S", "BTC", "long", "loss", -100, 50000, 49500, 1000, 0.7, "R", None, None, "t"),
+            sp._normalize(
+                "S", "BTC", "long", "win", 200, 50000, 51000, 1000, 0.7, "R", None, None, "t"
+            ),
+            sp._normalize(
+                "S", "BTC", "long", "loss", -100, 50000, 49500, 1000, 0.7, "R", None, None, "t"
+            ),
         ]
         s = sp._stats_for(trades)
         # WR=0.5, avg_win=200, avg_loss=-100 → E = 0.5*200 + 0.5*-100 = 50
@@ -163,17 +181,20 @@ class TestReport:
     def test_reads_signals_dir(self, tmp_path, monkeypatch):
         sigs = tmp_path / "signals"
         sigs.mkdir()
-        _write_jsonl(sigs / "2026-04-18.jsonl", [
-            _trade(strategy="rsi", pnl=100, outcome="win"),
-            _trade(strategy="rsi", pnl=-50, outcome="loss", symbol="ETH"),
-            _trade(strategy="bb", pnl=200, outcome="win"),
-        ])
+        _write_jsonl(
+            sigs / "2026-04-18.jsonl",
+            [
+                _trade(strategy="rsi", pnl=100, outcome="win"),
+                _trade(strategy="rsi", pnl=-50, outcome="loss", symbol="ETH"),
+                _trade(strategy="bb", pnl=200, outcome="win"),
+            ],
+        )
         monkeypatch.setattr(sp, "SIGNALS_DIR", sigs)
         monkeypatch.setattr(sp, "PERF_SIGNALS", tmp_path / "nonexistent.jsonl")
         monkeypatch.setattr(sp, "PAPER_PORTFOLIO", tmp_path / "nonexistent.json")
         r = sp.report()
         assert r["trade_count"] == 3
-        assert r["overall"]["win_rate"] == pytest.approx(2/3, rel=0.01)
+        assert r["overall"]["win_rate"] == pytest.approx(2 / 3, rel=0.01)
         assert "rsi" in r["by_strategy"]
         assert "bb" in r["by_strategy"]
         assert r["by_strategy"]["rsi"]["trades"] == 2
@@ -182,12 +203,26 @@ class TestReport:
     def test_timeframe_bucketing(self, tmp_path, monkeypatch):
         sigs = tmp_path / "signals"
         sigs.mkdir()
-        _write_jsonl(sigs / "2026-04-18.jsonl", [
-            _trade(strategy="S", pnl=100, outcome="win",
-                   opened="2026-04-18T00:00:00+00:00", closed="2026-04-18T00:30:00+00:00"),  # 30min
-            _trade(strategy="S", pnl=50, outcome="win", symbol="ETH",
-                   opened="2026-04-18T00:00:00+00:00", closed="2026-04-18T12:00:00+00:00"),  # 12h
-        ])
+        _write_jsonl(
+            sigs / "2026-04-18.jsonl",
+            [
+                _trade(
+                    strategy="S",
+                    pnl=100,
+                    outcome="win",
+                    opened="2026-04-18T00:00:00+00:00",
+                    closed="2026-04-18T00:30:00+00:00",
+                ),  # 30min
+                _trade(
+                    strategy="S",
+                    pnl=50,
+                    outcome="win",
+                    symbol="ETH",
+                    opened="2026-04-18T00:00:00+00:00",
+                    closed="2026-04-18T12:00:00+00:00",
+                ),  # 12h
+            ],
+        )
         monkeypatch.setattr(sp, "SIGNALS_DIR", sigs)
         monkeypatch.setattr(sp, "PERF_SIGNALS", tmp_path / "np.jsonl")
         monkeypatch.setattr(sp, "PAPER_PORTFOLIO", tmp_path / "np.json")
@@ -201,22 +236,30 @@ class TestReport:
         """Same trade appearing in signals/ and perf/ should count once."""
         sigs = tmp_path / "signals"
         sigs.mkdir()
-        same_trade = _trade(strategy="dup", symbol="BTC",
-                            opened="2026-04-18T00:00:00+00:00",
-                            closed="2026-04-18T03:00:00+00:00")
+        same_trade = _trade(
+            strategy="dup",
+            symbol="BTC",
+            opened="2026-04-18T00:00:00+00:00",
+            closed="2026-04-18T03:00:00+00:00",
+        )
         _write_jsonl(sigs / "d.jsonl", [same_trade])
         perf = tmp_path / "perf.jsonl"
-        perf.write_text(json.dumps({
-            "symbol": "BTC",
-            "strategy": "dup",
-            "recorded_at": "2026-04-18T00:00:00+00:00",
-            "closed_at": "2026-04-18T03:00:00+00:00",
-            "outcome": "win",
-            "pnl_pct": 0.1,
-            "position_usd": 1000,
-            "entry_price": 50000,
-            "exit_price": 55000,
-        }) + "\n")
+        perf.write_text(
+            json.dumps(
+                {
+                    "symbol": "BTC",
+                    "strategy": "dup",
+                    "recorded_at": "2026-04-18T00:00:00+00:00",
+                    "closed_at": "2026-04-18T03:00:00+00:00",
+                    "outcome": "win",
+                    "pnl_pct": 0.1,
+                    "position_usd": 1000,
+                    "entry_price": 50000,
+                    "exit_price": 55000,
+                }
+            )
+            + "\n"
+        )
         monkeypatch.setattr(sp, "SIGNALS_DIR", sigs)
         monkeypatch.setattr(sp, "PERF_SIGNALS", perf)
         monkeypatch.setattr(sp, "PAPER_PORTFOLIO", tmp_path / "np.json")
@@ -229,10 +272,13 @@ class TestReport:
         # One closed, one still open (no outcome)
         open_trade = _trade(strategy="open", pnl=0, outcome="win")
         open_trade["outcome"] = None
-        _write_jsonl(sigs / "x.jsonl", [
-            _trade(strategy="S", pnl=100, outcome="win"),
-            open_trade,
-        ])
+        _write_jsonl(
+            sigs / "x.jsonl",
+            [
+                _trade(strategy="S", pnl=100, outcome="win"),
+                open_trade,
+            ],
+        )
         monkeypatch.setattr(sp, "SIGNALS_DIR", sigs)
         monkeypatch.setattr(sp, "PERF_SIGNALS", tmp_path / "np.jsonl")
         monkeypatch.setattr(sp, "PAPER_PORTFOLIO", tmp_path / "np.json")
@@ -254,11 +300,26 @@ class TestTimeseries:
     def test_equity_curve_monotonic_wins(self, tmp_path, monkeypatch):
         sigs = tmp_path / "signals"
         sigs.mkdir()
-        _write_jsonl(sigs / "d.jsonl", [
-            _trade(pnl=100, opened="2026-04-01T00:00:00+00:00", closed="2026-04-01T01:00:00+00:00"),
-            _trade(pnl=200, opened="2026-04-02T00:00:00+00:00", closed="2026-04-02T01:00:00+00:00", symbol="ETH"),
-            _trade(pnl=50, opened="2026-04-03T00:00:00+00:00", closed="2026-04-03T01:00:00+00:00", symbol="SOL"),
-        ])
+        _write_jsonl(
+            sigs / "d.jsonl",
+            [
+                _trade(
+                    pnl=100, opened="2026-04-01T00:00:00+00:00", closed="2026-04-01T01:00:00+00:00"
+                ),
+                _trade(
+                    pnl=200,
+                    opened="2026-04-02T00:00:00+00:00",
+                    closed="2026-04-02T01:00:00+00:00",
+                    symbol="ETH",
+                ),
+                _trade(
+                    pnl=50,
+                    opened="2026-04-03T00:00:00+00:00",
+                    closed="2026-04-03T01:00:00+00:00",
+                    symbol="SOL",
+                ),
+            ],
+        )
         monkeypatch.setattr(sp, "SIGNALS_DIR", sigs)
         monkeypatch.setattr(sp, "PERF_SIGNALS", tmp_path / "np.jsonl")
         monkeypatch.setattr(sp, "PAPER_PORTFOLIO", tmp_path / "np.json")
@@ -275,28 +336,55 @@ class TestTimeseries:
     def test_drawdown_tracked(self, tmp_path, monkeypatch):
         sigs = tmp_path / "signals"
         sigs.mkdir()
-        _write_jsonl(sigs / "d.jsonl", [
-            _trade(pnl=1000, outcome="win",
-                   opened="2026-04-01T00:00:00+00:00", closed="2026-04-01T01:00:00+00:00"),
-            _trade(pnl=-500, outcome="loss", symbol="ETH",
-                   opened="2026-04-02T00:00:00+00:00", closed="2026-04-02T01:00:00+00:00"),
-        ])
+        _write_jsonl(
+            sigs / "d.jsonl",
+            [
+                _trade(
+                    pnl=1000,
+                    outcome="win",
+                    opened="2026-04-01T00:00:00+00:00",
+                    closed="2026-04-01T01:00:00+00:00",
+                ),
+                _trade(
+                    pnl=-500,
+                    outcome="loss",
+                    symbol="ETH",
+                    opened="2026-04-02T00:00:00+00:00",
+                    closed="2026-04-02T01:00:00+00:00",
+                ),
+            ],
+        )
         monkeypatch.setattr(sp, "SIGNALS_DIR", sigs)
         monkeypatch.setattr(sp, "PERF_SIGNALS", tmp_path / "np.jsonl")
         monkeypatch.setattr(sp, "PAPER_PORTFOLIO", tmp_path / "np.json")
         ts = sp.timeseries(initial_capital=100000)
         # peak = 101000 (after win), then -500 → dd = -500/101000 ≈ -0.00495
         assert ts["max_drawdown"]["pct"] < 0
-        assert ts["max_drawdown"]["pct"] == pytest.approx(-500/101000, rel=0.01)
+        assert ts["max_drawdown"]["pct"] == pytest.approx(-500 / 101000, rel=0.01)
 
     def test_monthly_bucketing(self, tmp_path, monkeypatch):
         sigs = tmp_path / "signals"
         sigs.mkdir()
-        _write_jsonl(sigs / "d.jsonl", [
-            _trade(pnl=100, opened="2026-03-15T00:00:00+00:00", closed="2026-03-15T01:00:00+00:00"),
-            _trade(pnl=200, opened="2026-04-02T00:00:00+00:00", closed="2026-04-02T01:00:00+00:00", symbol="ETH"),
-            _trade(pnl=-50, opened="2026-04-10T00:00:00+00:00", closed="2026-04-10T01:00:00+00:00", symbol="SOL"),
-        ])
+        _write_jsonl(
+            sigs / "d.jsonl",
+            [
+                _trade(
+                    pnl=100, opened="2026-03-15T00:00:00+00:00", closed="2026-03-15T01:00:00+00:00"
+                ),
+                _trade(
+                    pnl=200,
+                    opened="2026-04-02T00:00:00+00:00",
+                    closed="2026-04-02T01:00:00+00:00",
+                    symbol="ETH",
+                ),
+                _trade(
+                    pnl=-50,
+                    opened="2026-04-10T00:00:00+00:00",
+                    closed="2026-04-10T01:00:00+00:00",
+                    symbol="SOL",
+                ),
+            ],
+        )
         monkeypatch.setattr(sp, "SIGNALS_DIR", sigs)
         monkeypatch.setattr(sp, "PERF_SIGNALS", tmp_path / "np.jsonl")
         monkeypatch.setattr(sp, "PAPER_PORTFOLIO", tmp_path / "np.json")
@@ -313,25 +401,29 @@ class TestTimeseries:
 class TestPaperPortfolioSource:
     def test_reads_portfolio_history(self, tmp_path, monkeypatch):
         pf = tmp_path / "portfolio.json"
-        pf.write_text(json.dumps({
-            "capital": 100500.0,
-            "initial_capital": 100000.0,
-            "positions": [],
-            "history": [
+        pf.write_text(
+            json.dumps(
                 {
-                    "symbol": "BTCUSDT",
-                    "side": "BUY",
-                    "entry_price": 70000,
-                    "exit_price": 75000,
-                    "original_size_usd": 10000,
-                    "pnl": 500,
-                    "confidence": 0.85,
-                    "opened_at": "2026-04-01T00:00:00+00:00",
-                    "closed_at": "2026-04-09T21:51:42+00:00",
-                    "exit_reason": "trailing_stop",
-                },
-            ],
-        }))
+                    "capital": 100500.0,
+                    "initial_capital": 100000.0,
+                    "positions": [],
+                    "history": [
+                        {
+                            "symbol": "BTCUSDT",
+                            "side": "BUY",
+                            "entry_price": 70000,
+                            "exit_price": 75000,
+                            "original_size_usd": 10000,
+                            "pnl": 500,
+                            "confidence": 0.85,
+                            "opened_at": "2026-04-01T00:00:00+00:00",
+                            "closed_at": "2026-04-09T21:51:42+00:00",
+                            "exit_reason": "trailing_stop",
+                        },
+                    ],
+                }
+            )
+        )
         monkeypatch.setattr(sp, "SIGNALS_DIR", tmp_path / "empty")
         monkeypatch.setattr(sp, "PERF_SIGNALS", tmp_path / "empty.jsonl")
         monkeypatch.setattr(sp, "PAPER_PORTFOLIO", pf)

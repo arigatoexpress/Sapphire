@@ -19,9 +19,14 @@ def learning():
 
 def test_record_outcome_success(learning):
     result = learning.record_outcome(
-        symbol="BTC/USDT", direction="LONG", timeframe="1h",
-        conviction=0.8, contributors=["BOT_A", "BOT_B"],
-        accurate=True, profitable=True, pnl=100.0,
+        symbol="BTC/USDT",
+        direction="LONG",
+        timeframe="1h",
+        conviction=0.8,
+        contributors=["BOT_A", "BOT_B"],
+        accurate=True,
+        profitable=True,
+        pnl=100.0,
     )
     assert result["ok"] is True
     assert result["total_records"] == 1
@@ -30,9 +35,14 @@ def test_record_outcome_success(learning):
 def test_record_multiple_outcomes(learning):
     for i in range(10):
         learning.record_outcome(
-            symbol="ETH", direction="SHORT", timeframe="4h",
-            conviction=0.6, contributors=[f"BOT_{i}"],
-            accurate=i % 2 == 0, profitable=i % 3 == 0, pnl=10.0 if i % 3 == 0 else -5.0,
+            symbol="ETH",
+            direction="SHORT",
+            timeframe="4h",
+            conviction=0.6,
+            contributors=[f"BOT_{i}"],
+            accurate=i % 2 == 0,
+            profitable=i % 3 == 0,
+            pnl=10.0 if i % 3 == 0 else -5.0,
         )
     summary = learning.summary()
     assert summary["total_records"] == 10
@@ -40,9 +50,14 @@ def test_record_multiple_outcomes(learning):
 
 def test_record_normalizes_inputs(learning):
     learning.record_outcome(
-        symbol="  btc  ", direction="long", timeframe="  1h  ",
+        symbol="  btc  ",
+        direction="long",
+        timeframe="  1h  ",
         conviction=1.5,  # should clamp to 1.0
-        contributors=["bot_a"], accurate=True, profitable=True, pnl=50.0,
+        contributors=["bot_a"],
+        accurate=True,
+        profitable=True,
+        pnl=50.0,
     )
     insights = learning.get_symbol_insights(min_samples=1)
     assert insights[0]["symbol"] == "BTC"
@@ -52,9 +67,14 @@ def test_history_max_cap(learning):
     learning.MAX_HISTORY = 10
     for _i in range(20):
         learning.record_outcome(
-            symbol="BTC", direction="LONG", timeframe="1h",
-            conviction=0.5, contributors=["BOT_A"],
-            accurate=True, profitable=True, pnl=1.0,
+            symbol="BTC",
+            direction="LONG",
+            timeframe="1h",
+            conviction=0.5,
+            contributors=["BOT_A"],
+            accurate=True,
+            profitable=True,
+            pnl=1.0,
         )
     assert learning.summary()["total_records"] == 10
 
@@ -70,15 +90,25 @@ def test_symbol_insights_empty(learning):
 def test_symbol_insights_with_data(learning):
     for _ in range(6):
         learning.record_outcome(
-            symbol="BTC", direction="LONG", timeframe="1h",
-            conviction=0.7, contributors=["BOT_A"],
-            accurate=True, profitable=True, pnl=50.0,
+            symbol="BTC",
+            direction="LONG",
+            timeframe="1h",
+            conviction=0.7,
+            contributors=["BOT_A"],
+            accurate=True,
+            profitable=True,
+            pnl=50.0,
         )
     for _ in range(4):
         learning.record_outcome(
-            symbol="BTC", direction="SHORT", timeframe="1h",
-            conviction=0.5, contributors=["BOT_B"],
-            accurate=False, profitable=False, pnl=-20.0,
+            symbol="BTC",
+            direction="SHORT",
+            timeframe="1h",
+            conviction=0.5,
+            contributors=["BOT_B"],
+            accurate=False,
+            profitable=False,
+            pnl=-20.0,
         )
     insights = learning.get_symbol_insights(min_samples=1)
     assert len(insights) == 1
@@ -95,9 +125,14 @@ def test_symbol_insights_with_data(learning):
 def test_symbol_insights_min_samples_filter(learning):
     for _ in range(3):
         learning.record_outcome(
-            symbol="SOL", direction="LONG", timeframe="1h",
-            conviction=0.5, contributors=["BOT_A"],
-            accurate=True, profitable=True, pnl=10.0,
+            symbol="SOL",
+            direction="LONG",
+            timeframe="1h",
+            conviction=0.5,
+            contributors=["BOT_A"],
+            accurate=True,
+            profitable=True,
+            pnl=10.0,
         )
     # Default MIN_SAMPLES_FOR_INSIGHT is 5
     insights = learning.get_symbol_insights()
@@ -112,15 +147,25 @@ def test_symbol_insights_min_samples_filter(learning):
 def test_timeframe_insights(learning):
     for _ in range(5):
         learning.record_outcome(
-            symbol="BTC", direction="LONG", timeframe="1h",
-            conviction=0.7, contributors=["BOT_A"],
-            accurate=True, profitable=True, pnl=30.0,
+            symbol="BTC",
+            direction="LONG",
+            timeframe="1h",
+            conviction=0.7,
+            contributors=["BOT_A"],
+            accurate=True,
+            profitable=True,
+            pnl=30.0,
         )
     for _ in range(5):
         learning.record_outcome(
-            symbol="BTC", direction="LONG", timeframe="4h",
-            conviction=0.7, contributors=["BOT_A"],
-            accurate=True, profitable=False, pnl=-10.0,
+            symbol="BTC",
+            direction="LONG",
+            timeframe="4h",
+            conviction=0.7,
+            contributors=["BOT_A"],
+            accurate=True,
+            profitable=False,
+            pnl=-10.0,
         )
     insights = learning.get_timeframe_insights()
     assert len(insights) == 2
@@ -145,15 +190,25 @@ def test_direction_insights_empty(learning):
 def test_direction_insights_with_data(learning):
     for _ in range(8):
         learning.record_outcome(
-            symbol="BTC", direction="LONG", timeframe="1h",
-            conviction=0.7, contributors=["BOT_A"],
-            accurate=True, profitable=True, pnl=20.0,
+            symbol="BTC",
+            direction="LONG",
+            timeframe="1h",
+            conviction=0.7,
+            contributors=["BOT_A"],
+            accurate=True,
+            profitable=True,
+            pnl=20.0,
         )
     for _ in range(2):
         learning.record_outcome(
-            symbol="BTC", direction="LONG", timeframe="1h",
-            conviction=0.3, contributors=["BOT_A"],
-            accurate=False, profitable=False, pnl=-10.0,
+            symbol="BTC",
+            direction="LONG",
+            timeframe="1h",
+            conviction=0.3,
+            contributors=["BOT_A"],
+            accurate=False,
+            profitable=False,
+            pnl=-10.0,
         )
     result = learning.get_direction_insights()
     assert result["LONG"]["count"] == 10
@@ -168,16 +223,26 @@ def test_conviction_calibration(learning):
     # High conviction → mostly wins
     for _ in range(5):
         learning.record_outcome(
-            symbol="BTC", direction="LONG", timeframe="1h",
-            conviction=0.9, contributors=["BOT_A"],
-            accurate=True, profitable=True, pnl=50.0,
+            symbol="BTC",
+            direction="LONG",
+            timeframe="1h",
+            conviction=0.9,
+            contributors=["BOT_A"],
+            accurate=True,
+            profitable=True,
+            pnl=50.0,
         )
     # Low conviction → mostly losses
     for _ in range(5):
         learning.record_outcome(
-            symbol="ETH", direction="SHORT", timeframe="4h",
-            conviction=0.2, contributors=["BOT_B"],
-            accurate=False, profitable=False, pnl=-20.0,
+            symbol="ETH",
+            direction="SHORT",
+            timeframe="4h",
+            conviction=0.2,
+            contributors=["BOT_B"],
+            accurate=False,
+            profitable=False,
+            pnl=-20.0,
         )
     cal = learning.get_conviction_calibration()
     assert len(cal) == 2
@@ -206,16 +271,26 @@ def test_bot_synergy_with_pairs(learning):
     # BOT_A + BOT_B always win together
     for _ in range(5):
         learning.record_outcome(
-            symbol="BTC", direction="LONG", timeframe="1h",
-            conviction=0.8, contributors=["BOT_A", "BOT_B"],
-            accurate=True, profitable=True, pnl=40.0,
+            symbol="BTC",
+            direction="LONG",
+            timeframe="1h",
+            conviction=0.8,
+            contributors=["BOT_A", "BOT_B"],
+            accurate=True,
+            profitable=True,
+            pnl=40.0,
         )
     # BOT_C + BOT_D always lose together
     for _ in range(5):
         learning.record_outcome(
-            symbol="ETH", direction="SHORT", timeframe="4h",
-            conviction=0.5, contributors=["BOT_C", "BOT_D"],
-            accurate=False, profitable=False, pnl=-15.0,
+            symbol="ETH",
+            direction="SHORT",
+            timeframe="4h",
+            conviction=0.5,
+            contributors=["BOT_C", "BOT_D"],
+            accurate=False,
+            profitable=False,
+            pnl=-15.0,
         )
     synergy = learning.get_bot_synergy()
     assert len(synergy) == 2
@@ -231,9 +306,14 @@ def test_bot_synergy_three_contributors(learning):
     """Three contributors should produce three pair entries."""
     for _ in range(5):
         learning.record_outcome(
-            symbol="SOL", direction="LONG", timeframe="1h",
-            conviction=0.7, contributors=["BOT_A", "BOT_B", "BOT_C"],
-            accurate=True, profitable=True, pnl=10.0,
+            symbol="SOL",
+            direction="LONG",
+            timeframe="1h",
+            conviction=0.7,
+            contributors=["BOT_A", "BOT_B", "BOT_C"],
+            accurate=True,
+            profitable=True,
+            pnl=10.0,
         )
     synergy = learning.get_bot_synergy()
     pair_keys = {s["pair"] for s in synergy}
@@ -247,9 +327,14 @@ def test_bot_synergy_three_contributors(learning):
 
 def test_symbol_bias_insufficient_data(learning):
     learning.record_outcome(
-        symbol="BTC", direction="LONG", timeframe="1h",
-        conviction=0.5, contributors=["BOT_A"],
-        accurate=True, profitable=True, pnl=10.0,
+        symbol="BTC",
+        direction="LONG",
+        timeframe="1h",
+        conviction=0.5,
+        contributors=["BOT_A"],
+        accurate=True,
+        profitable=True,
+        pnl=10.0,
     )
     assert learning.get_symbol_bias("BTC") == 0.0  # Not enough samples
 
@@ -257,9 +342,14 @@ def test_symbol_bias_insufficient_data(learning):
 def test_symbol_bias_positive(learning):
     for _ in range(10):
         learning.record_outcome(
-            symbol="BTC", direction="LONG", timeframe="1h",
-            conviction=0.7, contributors=["BOT_A"],
-            accurate=True, profitable=True, pnl=50.0,
+            symbol="BTC",
+            direction="LONG",
+            timeframe="1h",
+            conviction=0.7,
+            contributors=["BOT_A"],
+            accurate=True,
+            profitable=True,
+            pnl=50.0,
         )
     bias = learning.get_symbol_bias("BTC")
     assert bias == 1.0  # 100% win rate → max positive bias
@@ -268,9 +358,14 @@ def test_symbol_bias_positive(learning):
 def test_symbol_bias_negative(learning):
     for _ in range(10):
         learning.record_outcome(
-            symbol="DOGE", direction="LONG", timeframe="1h",
-            conviction=0.5, contributors=["BOT_A"],
-            accurate=False, profitable=False, pnl=-10.0,
+            symbol="DOGE",
+            direction="LONG",
+            timeframe="1h",
+            conviction=0.5,
+            contributors=["BOT_A"],
+            accurate=False,
+            profitable=False,
+            pnl=-10.0,
         )
     bias = learning.get_symbol_bias("DOGE")
     assert bias == -1.0  # 0% win rate → max negative bias
@@ -279,9 +374,14 @@ def test_symbol_bias_negative(learning):
 def test_symbol_bias_neutral(learning):
     for i in range(10):
         learning.record_outcome(
-            symbol="ETH", direction="LONG", timeframe="1h",
-            conviction=0.5, contributors=["BOT_A"],
-            accurate=True, profitable=i < 5, pnl=10.0 if i < 5 else -10.0,
+            symbol="ETH",
+            direction="LONG",
+            timeframe="1h",
+            conviction=0.5,
+            contributors=["BOT_A"],
+            accurate=True,
+            profitable=i < 5,
+            pnl=10.0 if i < 5 else -10.0,
         )
     bias = learning.get_symbol_bias("ETH")
     assert bias == 0.0  # 50% win rate → neutral
@@ -290,15 +390,25 @@ def test_symbol_bias_neutral(learning):
 def test_timeframe_bias(learning):
     for _ in range(8):
         learning.record_outcome(
-            symbol="BTC", direction="LONG", timeframe="1h",
-            conviction=0.5, contributors=["BOT_A"],
-            accurate=True, profitable=True, pnl=10.0,
+            symbol="BTC",
+            direction="LONG",
+            timeframe="1h",
+            conviction=0.5,
+            contributors=["BOT_A"],
+            accurate=True,
+            profitable=True,
+            pnl=10.0,
         )
     for _ in range(2):
         learning.record_outcome(
-            symbol="BTC", direction="LONG", timeframe="1h",
-            conviction=0.5, contributors=["BOT_A"],
-            accurate=False, profitable=False, pnl=-5.0,
+            symbol="BTC",
+            direction="LONG",
+            timeframe="1h",
+            conviction=0.5,
+            contributors=["BOT_A"],
+            accurate=False,
+            profitable=False,
+            pnl=-5.0,
         )
     bias = learning.get_timeframe_bias("1h")
     assert bias > 0  # 80% win rate → positive bias
@@ -307,9 +417,14 @@ def test_timeframe_bias(learning):
 def test_direction_bias(learning):
     for _ in range(6):
         learning.record_outcome(
-            symbol="BTC", direction="LONG", timeframe="1h",
-            conviction=0.5, contributors=["BOT_A"],
-            accurate=True, profitable=True, pnl=10.0,
+            symbol="BTC",
+            direction="LONG",
+            timeframe="1h",
+            conviction=0.5,
+            contributors=["BOT_A"],
+            accurate=True,
+            profitable=True,
+            pnl=10.0,
         )
     bias = learning.get_direction_bias("LONG")
     assert bias == 1.0  # All wins
@@ -328,9 +443,14 @@ def test_adaptive_confidence_positive_bias(learning):
     """With strong positive history, should increase confidence."""
     for _ in range(10):
         learning.record_outcome(
-            symbol="BTC", direction="LONG", timeframe="1h",
-            conviction=0.8, contributors=["BOT_A"],
-            accurate=True, profitable=True, pnl=50.0,
+            symbol="BTC",
+            direction="LONG",
+            timeframe="1h",
+            conviction=0.8,
+            contributors=["BOT_A"],
+            accurate=True,
+            profitable=True,
+            pnl=50.0,
         )
     adjusted = learning.adaptive_confidence("BTC", "LONG", "1h", 0.6)
     assert adjusted > 0.6  # Should be boosted
@@ -340,9 +460,14 @@ def test_adaptive_confidence_negative_bias(learning):
     """With strong negative history, should decrease confidence."""
     for _ in range(10):
         learning.record_outcome(
-            symbol="DOGE", direction="SHORT", timeframe="4h",
-            conviction=0.5, contributors=["BOT_A"],
-            accurate=False, profitable=False, pnl=-20.0,
+            symbol="DOGE",
+            direction="SHORT",
+            timeframe="4h",
+            conviction=0.5,
+            contributors=["BOT_A"],
+            accurate=False,
+            profitable=False,
+            pnl=-20.0,
         )
     adjusted = learning.adaptive_confidence("DOGE", "SHORT", "4h", 0.6)
     assert adjusted < 0.6  # Should be reduced
@@ -352,9 +477,14 @@ def test_adaptive_confidence_clamped(learning):
     """Adjusted confidence should be clamped 0.0–1.0."""
     for _ in range(10):
         learning.record_outcome(
-            symbol="BTC", direction="LONG", timeframe="1h",
-            conviction=0.9, contributors=["BOT_A"],
-            accurate=True, profitable=True, pnl=100.0,
+            symbol="BTC",
+            direction="LONG",
+            timeframe="1h",
+            conviction=0.9,
+            contributors=["BOT_A"],
+            accurate=True,
+            profitable=True,
+            pnl=100.0,
         )
     adjusted = learning.adaptive_confidence("BTC", "LONG", "1h", 0.99)
     assert 0.0 <= adjusted <= 1.0
@@ -406,14 +536,24 @@ def test_summary_empty(learning):
 
 def test_summary_with_data(learning):
     learning.record_outcome(
-        symbol="BTC", direction="LONG", timeframe="1h",
-        conviction=0.7, contributors=["BOT_A"],
-        accurate=True, profitable=True, pnl=50.0,
+        symbol="BTC",
+        direction="LONG",
+        timeframe="1h",
+        conviction=0.7,
+        contributors=["BOT_A"],
+        accurate=True,
+        profitable=True,
+        pnl=50.0,
     )
     learning.record_outcome(
-        symbol="ETH", direction="SHORT", timeframe="4h",
-        conviction=0.5, contributors=["BOT_B"],
-        accurate=False, profitable=False, pnl=-20.0,
+        symbol="ETH",
+        direction="SHORT",
+        timeframe="4h",
+        conviction=0.5,
+        contributors=["BOT_B"],
+        accurate=False,
+        profitable=False,
+        pnl=-20.0,
     )
     s = learning.summary()
     assert s["total_records"] == 2

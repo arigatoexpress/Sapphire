@@ -44,14 +44,16 @@ def _rising_bars(n: int = 30, start: float = 100.0) -> list[Bar]:
     price = start
     for i in range(n):
         nxt = price * 1.01
-        bars.append(Bar(
-            ts=base_ts + timedelta(days=i),
-            open=price,
-            high=nxt * 1.001,
-            low=price * 0.999,
-            close=nxt,
-            volume=1_000_000,
-        ))
+        bars.append(
+            Bar(
+                ts=base_ts + timedelta(days=i),
+                open=price,
+                high=nxt * 1.001,
+                low=price * 0.999,
+                close=nxt,
+                volume=1_000_000,
+            )
+        )
         price = nxt
     return bars
 

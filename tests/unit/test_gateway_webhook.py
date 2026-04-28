@@ -11,6 +11,7 @@ Critical paths:
   - Explicit payload TP/SL wins over env var defaults
   - No price → TP/SL not computed
 """
+
 import os
 import sys
 import types
@@ -48,6 +49,7 @@ def _import_gateway(secret="test-secret", tp_pct=None, sl_pct=None):
             del sys.modules["main"]
         try:
             import main as gw  # type: ignore[import]
+
             return gw
         except Exception:
             return None
@@ -74,6 +76,7 @@ class _patch_env:
 
 # ── Auth validation ────────────────────────────────────────────────────────────
 
+
 class TestWebhookAuth:
     """
     Test _validate_tradingview_secret directly using a minimal reimplementation
@@ -87,7 +90,9 @@ class TestWebhookAuth:
         from fastapi import HTTPException
 
         if not secret_env:
-            raise HTTPException(status_code=503, detail="TradingView webhook secret is not configured")
+            raise HTTPException(
+                status_code=503, detail="TradingView webhook secret is not configured"
+            )
 
         expected = secret_env.encode()
 
@@ -108,18 +113,21 @@ class TestWebhookAuth:
 
     def test_wrong_header_raises_401(self):
         from fastapi import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             self._validate("my-secret", header_val="wrong")
         assert exc_info.value.status_code == 401
 
     def test_no_secret_configured_raises_503(self):
         from fastapi import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             self._validate("", header_val="any")
         assert exc_info.value.status_code == 503
 
     def test_empty_header_and_body_raises_401(self):
         from fastapi import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             self._validate("my-secret", header_val=None, body_val=None)
         assert exc_info.value.status_code == 401
@@ -130,6 +138,7 @@ class TestWebhookAuth:
 
 
 # ── TP / SL computation ────────────────────────────────────────────────────────
+
 
 class TestTPSLComputation:
     """

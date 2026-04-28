@@ -128,9 +128,7 @@ def test_regime_narrative_empty_snapshot_returns_no_signal():
     ],
 )
 def test_regime_narrative_fear_greed_label_thresholds(fg, expected_label):
-    result = daily_brief._regime_narrative(
-        "NEUTRAL", 0.0, 0.5, {"fear_greed": fg}
-    )
+    result = daily_brief._regime_narrative("NEUTRAL", 0.0, 0.5, {"fear_greed": fg})
 
     assert f"({expected_label})" in result
     assert f"F&G {fg}" in result
@@ -139,7 +137,9 @@ def test_regime_narrative_fear_greed_label_thresholds(fg, expected_label):
 def test_regime_narrative_total_mcap_inflow_phrasing():
     """Total mcap >+1.5% is described as capital inflowing."""
     result = daily_brief._regime_narrative(
-        "RISK_ON", 0.5, 0.7,
+        "RISK_ON",
+        0.5,
+        0.7,
         {"fear_greed": 55, "total_mcap_24h_change_pct": 2.5},
     )
 
@@ -150,7 +150,9 @@ def test_regime_narrative_total_mcap_inflow_phrasing():
 def test_regime_narrative_total_mcap_outflow_phrasing():
     """Total mcap <-1.5% is described as capital leaving."""
     result = daily_brief._regime_narrative(
-        "RISK_OFF", -0.5, 0.7,
+        "RISK_OFF",
+        -0.5,
+        0.7,
         {"fear_greed": 25, "total_mcap_24h_change_pct": -2.5},
     )
 
@@ -161,7 +163,9 @@ def test_regime_narrative_total_mcap_outflow_phrasing():
 def test_regime_narrative_total_mcap_below_threshold_omits_phrase():
     """A small mcap change (-1.0% to +1.5%) doesn't trigger the inflow/outflow phrase."""
     result = daily_brief._regime_narrative(
-        "NEUTRAL", 0.0, 0.5,
+        "NEUTRAL",
+        0.0,
+        0.5,
         {"fear_greed": 50, "total_mcap_24h_change_pct": 0.5},
     )
 
@@ -171,7 +175,9 @@ def test_regime_narrative_total_mcap_below_threshold_omits_phrase():
 
 def test_regime_narrative_btc_dominance_arrow_up():
     result = daily_brief._regime_narrative(
-        "NEUTRAL", 0.0, 0.5,
+        "NEUTRAL",
+        0.0,
+        0.5,
         {"fear_greed": 50, "btc_dominance": 55.0, "btc_dominance_24h_change": 0.20},
     )
 
@@ -181,7 +187,9 @@ def test_regime_narrative_btc_dominance_arrow_up():
 
 def test_regime_narrative_btc_dominance_arrow_down():
     result = daily_brief._regime_narrative(
-        "NEUTRAL", 0.0, 0.5,
+        "NEUTRAL",
+        0.0,
+        0.5,
         {"fear_greed": 50, "btc_dominance": 55.0, "btc_dominance_24h_change": -0.20},
     )
 
@@ -191,7 +199,9 @@ def test_regime_narrative_btc_dominance_arrow_down():
 def test_regime_narrative_btc_dominance_flat_arrow():
     """When |change| <= 0.05, the flat (→) arrow is used."""
     result = daily_brief._regime_narrative(
-        "NEUTRAL", 0.0, 0.5,
+        "NEUTRAL",
+        0.0,
+        0.5,
         {"fear_greed": 50, "btc_dominance": 55.0, "btc_dominance_24h_change": 0.02},
     )
 
@@ -200,7 +210,9 @@ def test_regime_narrative_btc_dominance_flat_arrow():
 
 def test_regime_narrative_funding_normal_tag():
     result = daily_brief._regime_narrative(
-        "NEUTRAL", 0.0, 0.5,
+        "NEUTRAL",
+        0.0,
+        0.5,
         {"fear_greed": 50, "btc_funding_rate_pct": 0.02},
     )
 
@@ -211,7 +223,9 @@ def test_regime_narrative_funding_normal_tag():
 def test_regime_narrative_funding_flat_tag():
     """|funding| < 0.005 is tagged 'flat'."""
     result = daily_brief._regime_narrative(
-        "NEUTRAL", 0.0, 0.5,
+        "NEUTRAL",
+        0.0,
+        0.5,
         {"fear_greed": 50, "btc_funding_rate_pct": 0.001},
     )
 
@@ -221,7 +235,9 @@ def test_regime_narrative_funding_flat_tag():
 def test_regime_narrative_funding_longs_crowded_tag():
     """funding > 0.04 is tagged 'longs crowded'."""
     result = daily_brief._regime_narrative(
-        "NEUTRAL", 0.0, 0.5,
+        "NEUTRAL",
+        0.0,
+        0.5,
         {"fear_greed": 50, "btc_funding_rate_pct": 0.05},
     )
 
@@ -231,7 +247,9 @@ def test_regime_narrative_funding_longs_crowded_tag():
 def test_regime_narrative_funding_shorts_crowded_tag():
     """funding < -0.04 is tagged 'shorts crowded'."""
     result = daily_brief._regime_narrative(
-        "NEUTRAL", 0.0, 0.5,
+        "NEUTRAL",
+        0.0,
+        0.5,
         {"fear_greed": 50, "btc_funding_rate_pct": -0.05},
     )
 
@@ -240,7 +258,9 @@ def test_regime_narrative_funding_shorts_crowded_tag():
 
 def test_regime_narrative_eth_funding_appended_when_present():
     result = daily_brief._regime_narrative(
-        "NEUTRAL", 0.0, 0.5,
+        "NEUTRAL",
+        0.0,
+        0.5,
         {"fear_greed": 50, "btc_funding_rate_pct": 0.02, "eth_funding_rate_pct": 0.03},
     )
 
@@ -250,7 +270,9 @@ def test_regime_narrative_eth_funding_appended_when_present():
 def test_regime_narrative_dxy_and_vix_no_headwinds():
     """DXY ≤ 101 and VIX ≤ 20 → no 'macro headwinds' suffix."""
     result = daily_brief._regime_narrative(
-        "NEUTRAL", 0.0, 0.5,
+        "NEUTRAL",
+        0.0,
+        0.5,
         {"fear_greed": 50, "dxy": 100.0, "vix": 15.0},
     )
 
@@ -261,7 +283,9 @@ def test_regime_narrative_dxy_and_vix_no_headwinds():
 
 def test_regime_narrative_dxy_high_triggers_headwinds():
     result = daily_brief._regime_narrative(
-        "NEUTRAL", 0.0, 0.5,
+        "NEUTRAL",
+        0.0,
+        0.5,
         {"fear_greed": 50, "dxy": 105.0, "vix": 15.0},
     )
 
@@ -271,7 +295,9 @@ def test_regime_narrative_dxy_high_triggers_headwinds():
 def test_regime_narrative_vix_high_triggers_headwinds():
     """VIX > 20 also triggers 'macro headwinds' even with low DXY."""
     result = daily_brief._regime_narrative(
-        "NEUTRAL", 0.0, 0.5,
+        "NEUTRAL",
+        0.0,
+        0.5,
         {"fear_greed": 50, "dxy": 100.0, "vix": 25.0},
     )
 
@@ -280,7 +306,9 @@ def test_regime_narrative_vix_high_triggers_headwinds():
 
 def test_regime_narrative_vix_warning_emoji_above_25():
     result = daily_brief._regime_narrative(
-        "NEUTRAL", 0.0, 0.5,
+        "NEUTRAL",
+        0.0,
+        0.5,
         {"fear_greed": 50, "vix": 30.0},
     )
 
@@ -289,7 +317,9 @@ def test_regime_narrative_vix_warning_emoji_above_25():
 
 def test_regime_narrative_vix_elevated_marker_18_to_25():
     result = daily_brief._regime_narrative(
-        "NEUTRAL", 0.0, 0.5,
+        "NEUTRAL",
+        0.0,
+        0.5,
         {"fear_greed": 50, "vix": 22.0},
     )
 
@@ -298,7 +328,9 @@ def test_regime_narrative_vix_elevated_marker_18_to_25():
 
 def test_regime_narrative_vix_under_18_no_marker():
     result = daily_brief._regime_narrative(
-        "NEUTRAL", 0.0, 0.5,
+        "NEUTRAL",
+        0.0,
+        0.5,
         {"fear_greed": 50, "vix": 15.0},
     )
 
@@ -310,7 +342,10 @@ def test_regime_narrative_vix_under_18_no_marker():
 def test_regime_narrative_indented_with_two_spaces():
     """Output sentences are 2-space indented for the Telegram message tree."""
     result = daily_brief._regime_narrative(
-        "NEUTRAL", 0.0, 0.5, {"fear_greed": 50},
+        "NEUTRAL",
+        0.0,
+        0.5,
+        {"fear_greed": 50},
     )
 
     for line in result.split("\n"):

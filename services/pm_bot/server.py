@@ -163,7 +163,9 @@ class TelegramAPI:
         return self._post("sendMessage", payload)
 
     def get_updates(self, *, offset: int, timeout: int = 30) -> list[dict[str, Any]]:
-        data = self._post("getUpdates", {"offset": offset, "timeout": timeout, "allowed_updates": ["message"]})
+        data = self._post(
+            "getUpdates", {"offset": offset, "timeout": timeout, "allowed_updates": ["message"]}
+        )
         result = data.get("result")
         if isinstance(result, list):
             return [item for item in result if isinstance(item, dict)]
@@ -251,7 +253,9 @@ def _polling_loop() -> None:
     try:
         TELEGRAM_API.delete_webhook(drop_pending_updates=False)
     except Exception as exc:  # pragma: no cover - network/runtime behavior
-        logger.warning("Could not delete Telegram webhook before polling: %s", _redact_sensitive_text(exc))
+        logger.warning(
+            "Could not delete Telegram webhook before polling: %s", _redact_sensitive_text(exc)
+        )
 
     offset = int(POLLING_STATE.get("offset") or 0)
     while not POLLING_STOP.is_set():

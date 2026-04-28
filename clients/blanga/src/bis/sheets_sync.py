@@ -339,7 +339,8 @@ def normalize_notes_row(row: dict[str, Any]) -> NormalizedNotesRow:
         property_urn=_as_str(normalized.get("property_urn")),
         address_line1=_as_str(normalized.get("address_line1") or normalized.get("address")),
         owner_name=_as_str(normalized.get("owner_name") or normalized.get("owner")),
-        entered_by=_as_str(normalized.get("entered_by") or normalized.get("created_by")) or "broker",
+        entered_by=_as_str(normalized.get("entered_by") or normalized.get("created_by"))
+        or "broker",
         source_label=_as_str(normalized.get("source_label")) or "google-sheets",
         created_at=_as_date(normalized.get("created_at")),
         tags=tags,
@@ -364,7 +365,8 @@ def normalize_property_update_row(row: dict[str, Any]) -> NormalizedPropertyUpda
         field_name=field_name,
         new_value=new_value,
         reason=_as_str(normalized.get("reason")),
-        requested_by=_as_str(normalized.get("requested_by") or normalized.get("entered_by")) or "broker",
+        requested_by=_as_str(normalized.get("requested_by") or normalized.get("entered_by"))
+        or "broker",
         clear_field=bool(_as_bool(normalized.get("clear_field")) or False),
         source_label=_as_str(normalized.get("source_label")) or "google-sheets",
     )
@@ -373,7 +375,9 @@ def normalize_property_update_row(row: dict[str, Any]) -> NormalizedPropertyUpda
 def writeback_preview_rows(arena: InMemoryMasterArena, *, tab: str) -> list[dict[str, Any]]:
     if tab == "properties_computed":
         rows: list[dict[str, Any]] = []
-        for prop in sorted(arena.list_properties(), key=lambda p: (p.city.lower(), p.address_line1.lower())):
+        for prop in sorted(
+            arena.list_properties(), key=lambda p: (p.city.lower(), p.address_line1.lower())
+        ):
             rows.append(
                 {
                     "property_urn": prop.property_urn,
@@ -400,7 +404,9 @@ def writeback_preview_rows(arena: InMemoryMasterArena, *, tab: str) -> list[dict
 
     if tab == "properties_master_view":
         rows: list[dict[str, Any]] = []
-        for prop in sorted(arena.list_properties(), key=lambda p: (p.city.lower(), p.address_line1.lower())):
+        for prop in sorted(
+            arena.list_properties(), key=lambda p: (p.city.lower(), p.address_line1.lower())
+        ):
             owners = [owner.full_name for owner in arena.owners_for_property(prop.property_urn)]
             rows.append(
                 {
@@ -417,7 +423,9 @@ def writeback_preview_rows(arena: InMemoryMasterArena, *, tab: str) -> list[dict
                     "asking_price": prop.asking_price,
                     "close_price": prop.close_price,
                     "cap_rate": prop.cap_rate,
-                    "lease_expiration": prop.lease_expiration.isoformat() if prop.lease_expiration else "",
+                    "lease_expiration": prop.lease_expiration.isoformat()
+                    if prop.lease_expiration
+                    else "",
                     "days_on_market": arena.days_on_market(prop.property_urn),
                     "sale_price_per_building_sf": arena.sale_price_per_building_sf(prop),
                     "sale_price_per_land_sf": arena.sale_price_per_land_sf(prop),

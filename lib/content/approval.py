@@ -64,8 +64,10 @@ class ApprovalRecord:
 def _check_sensitivity(body: str) -> list[str]:
     try:
         import sys
+
         sys.path.insert(0, str(_REPO / "plugins" / "claw-sapphire" / "lib"))
         from sensitivity_classifier import classify
+
         result = classify(body)
         return result.get("flags", []) if isinstance(result, dict) else []
     except Exception:
@@ -120,6 +122,7 @@ def approve(report: Report, *, require_human: bool = False) -> ApprovalRecord:
         # Failure to reach Telegram must not block the draft from being parked.
         try:
             from lib.content import telegram_approval
+
             telegram_approval.request_approval(
                 kind=report.kind,
                 title=report.title,

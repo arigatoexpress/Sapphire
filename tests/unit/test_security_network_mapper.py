@@ -58,6 +58,7 @@ def probing_mapper():
 # Tests — Data models
 # ---------------------------------------------------------------------------
 
+
 class TestDataModels:
     def test_service_port_defaults(self):
         p = ServicePort(port=8080)
@@ -80,6 +81,7 @@ class TestDataModels:
 # ---------------------------------------------------------------------------
 # Tests — Node building
 # ---------------------------------------------------------------------------
+
 
 class TestNodeBuilding:
     def test_build_node_list(self, mapper):
@@ -108,6 +110,7 @@ class TestNodeBuilding:
 # Tests — Tailscale integration
 # ---------------------------------------------------------------------------
 
+
 class TestTailscale:
     @patch("subprocess.run")
     def test_tailscale_status_parsed(self, mock_run, mapper):
@@ -132,9 +135,7 @@ class TestTailscale:
                 },
             },
         }
-        mock_run.return_value = MagicMock(
-            returncode=0, stdout=json.dumps(ts_data)
-        )
+        mock_run.return_value = MagicMock(returncode=0, stdout=json.dumps(ts_data))
         peers = mapper._get_tailscale_status()
         assert len(peers) == 3
         ips = [p["ip"] for p in peers]
@@ -171,6 +172,7 @@ class TestTailscale:
 # Tests — Port probing
 # ---------------------------------------------------------------------------
 
+
 class TestPortProbing:
     @patch("socket.socket")
     def test_tcp_probe_open(self, mock_socket_cls, probing_mapper):
@@ -198,6 +200,7 @@ class TestPortProbing:
 # Tests — Trust zones
 # ---------------------------------------------------------------------------
 
+
 class TestTrustZones:
     def test_build_trust_zones(self, mapper):
         nodes = mapper._build_node_list()
@@ -214,10 +217,14 @@ class TestTrustZones:
 
     def test_untrusted_zone_created_for_unknown(self, mapper):
         nodes = mapper._build_node_list()
-        nodes.append(NetworkNode(
-            hostname="rogue", ip="10.0.0.99",
-            trust_zone="untrusted", tags=["unverified"],
-        ))
+        nodes.append(
+            NetworkNode(
+                hostname="rogue",
+                ip="10.0.0.99",
+                trust_zone="untrusted",
+                tags=["unverified"],
+            )
+        )
         zones = mapper._build_trust_zones(nodes)
         untrusted = [z for z in zones if z.name == "untrusted"]
         assert len(untrusted) == 1
@@ -228,6 +235,7 @@ class TestTrustZones:
 # Tests — Scoring
 # ---------------------------------------------------------------------------
 
+
 class TestScoring:
     def test_node_score_core_no_ports(self):
         node = NetworkNode(hostname="safe", ip="10.0.0.1", trust_zone="core")
@@ -236,7 +244,9 @@ class TestScoring:
 
     def test_node_score_open_unauth_ports(self):
         node = NetworkNode(
-            hostname="risky", ip="10.0.0.1", trust_zone="trusted",
+            hostname="risky",
+            ip="10.0.0.1",
+            trust_zone="trusted",
             ports=[
                 ServicePort(port=8080, status="open", authenticated=False),
                 ServicePort(port=6379, status="open", authenticated=False),
@@ -248,20 +258,34 @@ class TestScoring:
     def test_node_score_unverified_penalty(self):
         base = NetworkNode(hostname="known", ip="10.0.0.1", trust_zone="untrusted")
         unverified = NetworkNode(
-            hostname="unknown", ip="10.0.0.2",
-            trust_zone="untrusted", tags=["unverified"],
+            hostname="unknown",
+            ip="10.0.0.2",
+            trust_zone="untrusted",
+            tags=["unverified"],
         )
         assert NetworkMapper._score_node(unverified) > NetworkMapper._score_node(base)
 
     def test_aggregate_score_no_issues(self):
         result = NetworkScanResult(
-            total_nodes=2, online_nodes=2,
-            total_open_ports=0, unauthenticated_ports=0,
+            total_nodes=2,
+            online_nodes=2,
+            total_open_ports=0,
+            unauthenticated_ports=0,
             nodes=[
-                NetworkNode(hostname="a", ip="10.0.0.1", trust_zone="core",
-                            attack_surface_score=0, online=True),
-                NetworkNode(hostname="b", ip="10.0.0.2", trust_zone="trusted",
-                            attack_surface_score=5, online=True),
+                NetworkNode(
+                    hostname="a",
+                    ip="10.0.0.1",
+                    trust_zone="core",
+                    attack_surface_score=0,
+                    online=True,
+                ),
+                NetworkNode(
+                    hostname="b",
+                    ip="10.0.0.2",
+                    trust_zone="trusted",
+                    attack_surface_score=5,
+                    online=True,
+                ),
             ],
         )
         score = NetworkMapper._compute_aggregate_score(result)
@@ -269,15 +293,27 @@ class TestScoring:
 
     def test_aggregate_score_unknown_nodes(self):
         result = NetworkScanResult(
-            total_nodes=3, online_nodes=2,
+            total_nodes=3,
+            online_nodes=2,
             unauthenticated_ports=5,
             nodes=[
-                NetworkNode(hostname="a", ip="1", trust_zone="core",
-                            attack_surface_score=0, online=True),
-                NetworkNode(hostname="b", ip="2", trust_zone="untrusted",
-                            attack_surface_score=50, online=True),
-                NetworkNode(hostname="c", ip="3", trust_zone="untrusted",
-                            attack_surface_score=50, online=False),
+                NetworkNode(
+                    hostname="a", ip="1", trust_zone="core", attack_surface_score=0, online=True
+                ),
+                NetworkNode(
+                    hostname="b",
+                    ip="2",
+                    trust_zone="untrusted",
+                    attack_surface_score=50,
+                    online=True,
+                ),
+                NetworkNode(
+                    hostname="c",
+                    ip="3",
+                    trust_zone="untrusted",
+                    attack_surface_score=50,
+                    online=False,
+                ),
             ],
         )
         score = NetworkMapper._compute_aggregate_score(result)
@@ -285,12 +321,17 @@ class TestScoring:
 
     def test_score_never_negative(self):
         result = NetworkScanResult(
-            total_nodes=10, online_nodes=0,
+            total_nodes=10,
+            online_nodes=0,
             unauthenticated_ports=50,
             nodes=[
-                NetworkNode(hostname=f"n{i}", ip=f"10.0.0.{i}",
-                            trust_zone="untrusted", attack_surface_score=100,
-                            tags=["unverified"])
+                NetworkNode(
+                    hostname=f"n{i}",
+                    ip=f"10.0.0.{i}",
+                    trust_zone="untrusted",
+                    attack_surface_score=100,
+                    tags=["unverified"],
+                )
                 for i in range(10)
             ],
         )
@@ -300,6 +341,7 @@ class TestScoring:
 # ---------------------------------------------------------------------------
 # Tests — Full scan (mocked)
 # ---------------------------------------------------------------------------
+
 
 class TestFullScan:
     @patch("subprocess.run", side_effect=FileNotFoundError)
@@ -322,6 +364,7 @@ class TestFullScan:
 # ---------------------------------------------------------------------------
 # Tests — Known nodes config
 # ---------------------------------------------------------------------------
+
 
 class TestKnownNodes:
     def test_known_nodes_has_all_infra(self):

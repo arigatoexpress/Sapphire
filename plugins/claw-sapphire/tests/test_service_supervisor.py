@@ -55,7 +55,9 @@ class FakeDB:
 
 
 def status(label: str, *, loaded: bool = True, exit_code: int | None = 0, pid: int | None = 123):
-    return service_supervisor.ServiceStatus(label=label, loaded=loaded, pid=pid, exit_code=exit_code)
+    return service_supervisor.ServiceStatus(
+        label=label, loaded=loaded, pid=pid, exit_code=exit_code
+    )
 
 
 @pytest.fixture
@@ -171,8 +173,7 @@ def test_global_rate_limit_blocks_when_too_many_in_hour(monkeypatch, supervisor_
         "labels": {},
         "seen_event_categories": [],
         "restart_attempts": [
-            {"label": "a", "timestamp": (now - timedelta(minutes=i)).isoformat()}
-            for i in range(4)
+            {"label": "a", "timestamp": (now - timedelta(minutes=i)).isoformat()} for i in range(4)
         ],
     }
     supervisor_env.parent.mkdir(parents=True, exist_ok=True)
@@ -314,7 +315,9 @@ def test_dry_run_never_calls_restart(monkeypatch, supervisor_env):
 def test_state_file_round_trip(monkeypatch, supervisor_env):
     payload = {
         "labels": {"ai.hermes.gateway": {"last_attempt_at": "2026-04-24T12:00:00+00:00"}},
-        "restart_attempts": [{"label": "ai.hermes.gateway", "timestamp": "2026-04-24T12:00:00+00:00"}],
+        "restart_attempts": [
+            {"label": "ai.hermes.gateway", "timestamp": "2026-04-24T12:00:00+00:00"}
+        ],
         "seen_event_categories": ["ai.hermes.gateway:crashed"],
     }
 

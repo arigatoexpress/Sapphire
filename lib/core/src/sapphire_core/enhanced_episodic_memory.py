@@ -214,7 +214,7 @@ class CausalChain:
 
         # Link to previous event
         if self.events:
-            prev_id = f"{self.chain_id}-{len(self.events)-1}"
+            prev_id = f"{self.chain_id}-{len(self.events) - 1}"
             event.caused_by = prev_id
             self.events[-1].led_to = f"{self.chain_id}-{len(self.events)}"
 
@@ -438,10 +438,10 @@ class EnhancedEpisode:
         lesson_summary = self.lessons.get_summary() if self.lessons else "No lessons"
 
         return f"""📅 Episode: {self.name}
-🕐 Duration: {duration:.1f}h ({self.start_time.strftime('%a %H:%M')} UTC)
+🕐 Duration: {duration:.1f}h ({self.start_time.strftime("%a %H:%M")} UTC)
 📊 Regime: {self.regime.value} (confidence: {self.regime_confidence:.0%})
 💰 PnL: ${self.total_pnl:+,.2f} | Win Rate: {self.win_rate:.0%} | Sharpe: {self.sharpe_ratio:.2f}
-🏷️ Tags: {', '.join(self.tags) if self.tags else 'None'}
+🏷️ Tags: {", ".join(self.tags) if self.tags else "None"}
 
 LESSONS:
 {lesson_summary}"""

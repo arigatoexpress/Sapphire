@@ -122,6 +122,13 @@ if __name__ == "__main__":
     import sys
 
     if len(sys.argv) > 1 and sys.argv[1] == "publish":
-        print(run("publish", event_type="test", message="Test event from CLI", tags=["agent:claude", "device:mac"]))
+        print(
+            run(
+                "publish",
+                event_type="test",
+                message="Test event from CLI",
+                tags=["agent:claude", "device:mac"],
+            )
+        )
     else:
         print(run("read", limit=10))

@@ -20,7 +20,9 @@ from unittest.mock import patch
 SAPPHIRE = Path(__file__).resolve().parents[2]
 INTERNAL = SAPPHIRE / "plugins" / "claw-sapphire" / "tools" / "internal"
 
-_spec = importlib.util.spec_from_file_location("health_check_internal", INTERNAL / "health_check.py")
+_spec = importlib.util.spec_from_file_location(
+    "health_check_internal", INTERNAL / "health_check.py"
+)
 hc = importlib.util.module_from_spec(_spec)
 sys.modules["health_check_internal"] = hc
 _spec.loader.exec_module(hc)
@@ -47,8 +49,8 @@ class TestThoDeepProbe:
         monkeypatch.setattr(hc, "_load_tho_pin", lambda: "test-pin")
 
         responses = [
-            _resp({"token": "a" * 40}),                      # /api/admin/verify
-            _resp({"total": 2000}),                           # /api/customers/count
+            _resp({"token": "a" * 40}),  # /api/admin/verify
+            _resp({"total": 2000}),  # /api/customers/count
             _resp({"templates": [{"id": "t1"}, {"id": "t2"}]}),  # /api/documents/templates
         ]
 
@@ -70,7 +72,11 @@ class TestThoDeepProbe:
 
         def fake_urlopen(req, timeout=None, context=None):
             raise urllib.error.HTTPError(
-                url="x", code=401, msg="Unauthorized", hdrs=None, fp=None  # type: ignore[arg-type]
+                url="x",
+                code=401,
+                msg="Unauthorized",
+                hdrs=None,
+                fp=None,  # type: ignore[arg-type]
             )
 
         with patch("urllib.request.urlopen", side_effect=fake_urlopen):
@@ -110,7 +116,11 @@ class TestThoDeepProbe:
             if call["n"] == 2:
                 return _resp({"total": 1500})
             raise urllib.error.HTTPError(
-                url="x", code=500, msg="Server Error", hdrs=None, fp=None  # type: ignore[arg-type]
+                url="x",
+                code=500,
+                msg="Server Error",
+                hdrs=None,
+                fp=None,  # type: ignore[arg-type]
             )
 
         with patch("urllib.request.urlopen", side_effect=fake_urlopen):

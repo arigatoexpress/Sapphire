@@ -88,7 +88,8 @@ def _kronos_per_symbol(kronos: dict[str, Any]) -> dict[str, dict[str, Any]]:
             "interval": p.get("interval"),
             "projected_change_pct": (
                 round((final_close - current) / current * 100, 3)
-                if (final_close and current) else None
+                if (final_close and current)
+                else None
             ),
         }
     return out
@@ -245,15 +246,17 @@ def forecast() -> dict[str, Any]:
     for canonical, parts in merged.items():
         consensus = _consensus(parts["kronos"], parts["ta"])
         edge = _edge_score(parts["kronos"], parts["ta"], consensus)
-        rows.append({
-            "symbol": canonical,
-            "kronos_symbol": parts["kronos_symbol"],
-            "ta_symbol": parts["ta_symbol"],
-            "kronos": parts["kronos"],
-            "ta": parts["ta"],
-            "consensus": consensus,
-            "edge_score": edge,
-        })
+        rows.append(
+            {
+                "symbol": canonical,
+                "kronos_symbol": parts["kronos_symbol"],
+                "ta_symbol": parts["ta_symbol"],
+                "kronos": parts["kronos"],
+                "ta": parts["ta"],
+                "consensus": consensus,
+                "edge_score": edge,
+            }
+        )
 
     rows.sort(key=lambda r: abs(r["edge_score"]), reverse=True)
 
@@ -268,5 +271,6 @@ def forecast() -> dict[str, Any]:
 
 if __name__ == "__main__":
     import sys
+
     json.dump(forecast(), sys.stdout, indent=2, default=str)
     print()

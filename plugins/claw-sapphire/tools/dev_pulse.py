@@ -39,7 +39,11 @@ DEFAULT_REPOS = [
     ("arigatoexpress/Project-Go-Forward", Path.home() / "Code" / "Project-Go-Forward", "tho"),
     ("arigatoexpress/Sapphire", Path.home() / "Code" / "Sapphire", "sapphire"),
     ("arigatoexpress/cyber-threat-bot", Path.home() / "Code" / "cyber-threat-bot", "threat"),
-    ("arigatoexpress/regional-intel-workbench", Path.home() / "Code" / "regional-intel-workbench", "intel"),
+    (
+        "arigatoexpress/regional-intel-workbench",
+        Path.home() / "Code" / "regional-intel-workbench",
+        "intel",
+    ),
     ("arigatoexpress/crypto-tax-tracker", Path.home() / "Code" / "Cointracker", "crypto"),
 ]
 
@@ -236,11 +240,17 @@ def _gh_open_prs(full_name: str) -> tuple[list[dict], str | None]:
         return [], "gh CLI not installed"
     rc, out, err = _run(
         [
-            "gh", "pr", "list",
-            "--repo", full_name,
-            "--state", "open",
-            "--json", "number,title,isDraft,author,updatedAt",
-            "--limit", "10",
+            "gh",
+            "pr",
+            "list",
+            "--repo",
+            full_name,
+            "--state",
+            "open",
+            "--json",
+            "number,title,isDraft,author,updatedAt",
+            "--limit",
+            "10",
         ],
         timeout=8,
     )
@@ -267,10 +277,15 @@ def _gh_latest_ci(full_name: str) -> tuple[dict | None, str | None]:
         return None, "gh CLI not installed"
     rc, out, err = _run(
         [
-            "gh", "run", "list",
-            "--repo", full_name,
-            "--limit", "1",
-            "--json", "status,conclusion,displayTitle,createdAt,url",
+            "gh",
+            "run",
+            "list",
+            "--repo",
+            full_name,
+            "--limit",
+            "1",
+            "--json",
+            "status,conclusion,displayTitle,createdAt,url",
         ],
         timeout=8,
     )
@@ -299,9 +314,7 @@ def _local_git(repo_path: Path) -> tuple[str | None, int, str | None]:
     if rc != 0:
         return None, 0, err.strip()[:120] or None
     current = branch.strip() or None
-    rc2, status_out, _ = _run(
-        ["git", "-C", str(repo_path), "status", "--porcelain"], timeout=5
-    )
+    rc2, status_out, _ = _run(["git", "-C", str(repo_path), "status", "--porcelain"], timeout=5)
     dirty = len(status_out.strip().splitlines()) if rc2 == 0 else 0
     return current, dirty, None
 
@@ -333,9 +346,17 @@ def collect_cloud_run_status(project: str, region: str, service: str) -> CloudRu
         return CloudRunStatus(service=service, project=project, error="gcloud not installed")
     rc, out, err = _run(
         [
-            "gcloud", "run", "services", "describe", service,
-            "--region", region, "--project", project,
-            "--format", "json",
+            "gcloud",
+            "run",
+            "services",
+            "describe",
+            service,
+            "--region",
+            region,
+            "--project",
+            project,
+            "--format",
+            "json",
         ],
         timeout=12,
     )
@@ -438,8 +459,14 @@ def collect_trading_status(
             )
             status_text = str(record.get("paper_status") or record.get("status") or "").lower()
             action_text = str(record.get("action") or record.get("side") or "").lower()
-            has_close = record.get("paper_outcome") is not None or record.get("closed_at") is not None
-            if status_text in {"closed", "close", "filled_closed"} or action_text in {"close", "exit"} or has_close:
+            has_close = (
+                record.get("paper_outcome") is not None or record.get("closed_at") is not None
+            )
+            if (
+                status_text in {"closed", "close", "filled_closed"}
+                or action_text in {"close", "exit"}
+                or has_close
+            ):
                 open_by_key.pop(key, None)
             elif status_text == "open" or action_text in {"buy", "sell", "open"}:
                 open_by_key[key] = record
@@ -472,7 +499,9 @@ def collect_trading_status(
             ts = _parse_dt(item.get("closed_at") or item.get("timestamp"), today_start.tzinfo)
             if ts is None or ts.astimezone(today_start.tzinfo) < today_start:
                 continue
-            key = str(item.get("pipeline_id") or item.get("id") or f"history:{len(seen_realized_keys)}")
+            key = str(
+                item.get("pipeline_id") or item.get("id") or f"history:{len(seen_realized_keys)}"
+            )
             pnl = _first_float(item, ("pnl", "paper_pnl_usd", "realized_pnl_usd", "gross_pnl"))
             if pnl is not None:
                 realized_today += pnl
@@ -537,10 +566,7 @@ def _partner_id(activity: dict, metadata: dict) -> str:
 def _delivery_outcome(activity_type: str, metadata: dict) -> str:
     suffix = activity_type.split("partner_webhook_delivery.", 1)[-1].lower()
     status = str(
-        metadata.get("status")
-        or metadata.get("delivery_status")
-        or metadata.get("outcome")
-        or ""
+        metadata.get("status") or metadata.get("delivery_status") or metadata.get("outcome") or ""
     ).lower()
     text = f"{suffix} {status}"
     if any(token in text for token in ("failed", "failure", "error", "timeout")):
@@ -686,9 +712,9 @@ def pulse(
 
     with ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="dev-pulse") as ex:
         fut_to_kind: dict = {}
-        for (full, path, nick) in repo_list:
+        for full, path, nick in repo_list:
             fut_to_kind[ex.submit(collect_repo_status, full, path, nick)] = ("repo", nick)
-        for (proj, region, svc) in cr_list:
+        for proj, region, svc in cr_list:
             fut_to_kind[ex.submit(collect_cloud_run_status, proj, region, svc)] = ("cr", svc)
         fut_to_kind[ex.submit(collect_service_statuses, svc_list)] = ("svcs", None)
         if include_trading:
@@ -761,9 +787,7 @@ def format_markdown_v2(p: DevPulse) -> str:
         )
         for pr in r.open_prs[:3]:
             mark = "📝" if pr["draft"] else "🟢"
-            lines.append(
-                f"    {mark} \\#{pr['number']} {_md_escape(pr['title'])}"
-            )
+            lines.append(f"    {mark} \\#{pr['number']} {_md_escape(pr['title'])}")
 
     # Cloud Run
     if p.cloud_run:
@@ -785,9 +809,7 @@ def format_markdown_v2(p: DevPulse) -> str:
             lines.append(f"    ❌ {_md_escape(s.label)}")
         bad = [s for s in loaded if s.exit_code not in (None, 0)]
         for s in bad:
-            lines.append(
-                f"    ⚠️ {_md_escape(s.label)} exit\\={s.exit_code}"
-            )
+            lines.append(f"    ⚠️ {_md_escape(s.label)} exit\\={s.exit_code}")
 
     if p.trading:
         t = p.trading
@@ -808,7 +830,9 @@ def format_markdown_v2(p: DevPulse) -> str:
         lines.append(f"• signals today: {t.signals_today_count}")
         lines.append(f"• last signal: `{_md_escape(last_signal)}`")
         lines.append(f"• paper: {_md_escape(value)}, open: {t.open_paper_positions}")
-        lines.append(f"• PnL: unrealized {_md_escape(unrealized)}, realized today {_md_escape(realized)}")
+        lines.append(
+            f"• PnL: unrealized {_md_escape(unrealized)}, realized today {_md_escape(realized)}"
+        )
         if t.error:
             lines.append(f"    ⚠️ {_md_escape(t.error)[:200]}")
 
@@ -838,7 +862,9 @@ def format_markdown_v2(p: DevPulse) -> str:
 
 def _plain_md(text: Any) -> str:
     """Small Markdown-v1 escape for messages sent through notify.py."""
-    return str(text).replace("\\", "\\\\").replace("_", "\\_").replace("*", "\\*").replace("`", "\\`")
+    return (
+        str(text).replace("\\", "\\\\").replace("_", "\\_").replace("*", "\\*").replace("`", "\\`")
+    )
 
 
 def format_morning_digest_markdown(p: DevPulse) -> str:
@@ -887,13 +913,25 @@ def format_morning_digest_markdown(p: DevPulse) -> str:
     if p.trading:
         t = p.trading
         value = "unknown" if t.paper_portfolio_value is None else f"${t.paper_portfolio_value:,.2f}"
-        unrealized = "unknown" if t.paper_unrealized_pnl_usd is None else f"${t.paper_unrealized_pnl_usd:,.2f}"
-        realized = "unknown" if t.paper_realized_pnl_today_usd is None else f"${t.paper_realized_pnl_today_usd:,.2f}"
+        unrealized = (
+            "unknown"
+            if t.paper_unrealized_pnl_usd is None
+            else f"${t.paper_unrealized_pnl_usd:,.2f}"
+        )
+        realized = (
+            "unknown"
+            if t.paper_realized_pnl_today_usd is None
+            else f"${t.paper_realized_pnl_today_usd:,.2f}"
+        )
         lines.append("")
         lines.append("*Trading*")
-        lines.append(f"- Signals today: {t.signals_today_count}; last: {_plain_md(t.last_signal_at or 'none')}")
+        lines.append(
+            f"- Signals today: {t.signals_today_count}; last: {_plain_md(t.last_signal_at or 'none')}"
+        )
         lines.append(f"- Paper value: {_plain_md(value)}; open positions: {t.open_paper_positions}")
-        lines.append(f"- PnL: unrealized {_plain_md(unrealized)}; realized today {_plain_md(realized)}")
+        lines.append(
+            f"- PnL: unrealized {_plain_md(unrealized)}; realized today {_plain_md(realized)}"
+        )
         if t.error:
             lines.append(f"- Trading read warning: {_plain_md(t.error[:200])}")
 

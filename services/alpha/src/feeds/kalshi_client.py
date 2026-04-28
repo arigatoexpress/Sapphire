@@ -173,7 +173,9 @@ class KalshiClient(PredictionMarketFeed):
         volume_24h = int(raw.get("volume_24h", 0) or 0)
 
         # Kalshi prices are in cents; liquidity is in dollars string
-        liquidity_str = str(raw.get("liquidity_dollars", "0") or "0").replace("$", "").replace(",", "")
+        liquidity_str = (
+            str(raw.get("liquidity_dollars", "0") or "0").replace("$", "").replace(",", "")
+        )
         try:
             liquidity_usd = float(liquidity_str)
         except (ValueError, TypeError):

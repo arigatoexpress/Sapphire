@@ -2,6 +2,7 @@
 
 Run: /usr/local/bin/python3 -m pytest tests/unit/test_content_quality.py -v
 """
+
 from __future__ import annotations
 
 import sys
@@ -37,6 +38,7 @@ from lib.content.quality import (  # type: ignore
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
+
 def _good_text(extra: str = "") -> str:
     """Minimal passing text: 35+ words, 3+ numbers, short sentences, no banned phrases."""
     base = (
@@ -49,6 +51,7 @@ def _good_text(extra: str = "") -> str:
 
 
 # ── count_banned ──────────────────────────────────────────────────────────────
+
 
 class TestCountBanned:
     def test_no_hits(self):
@@ -84,6 +87,7 @@ class TestCountBanned:
 
 # ── count_numbers ─────────────────────────────────────────────────────────────
 
+
 class TestCountNumbers:
     def test_plain_integers(self):
         assert count_numbers("BTC up 5 points.") == 1
@@ -113,6 +117,7 @@ class TestCountNumbers:
 
 # ── citations / evidence ─────────────────────────────────────────────────────
 
+
 class TestCitationExtraction:
     def test_extracts_repo_paths(self):
         text = "Sources: data/content/ready/linkedin/post.md and docs/runbook.md"
@@ -138,6 +143,7 @@ class TestEvidenceMetrics:
 
 
 # ── readability ───────────────────────────────────────────────────────────────
+
 
 class TestReadability:
     def test_word_count_basic(self):
@@ -173,6 +179,7 @@ class TestReadability:
 
 
 # ── check (integration) ───────────────────────────────────────────────────────
+
 
 class TestCheck:
     def test_good_text_passes(self):
@@ -295,10 +302,7 @@ class TestCheck:
 
 class TestResearchSignals:
     def test_find_unsupported_claims(self):
-        text = (
-            "Markets are exciting today. "
-            "Clearly this means the thesis is correct."
-        )
+        text = "Markets are exciting today. Clearly this means the thesis is correct."
         claims = find_unsupported_claims(text)
         assert claims == ["Clearly this means the thesis is correct."]
 
@@ -331,14 +335,8 @@ class TestResearchSignals:
         assert score >= MIN_CITATION_QUALITY
 
     def test_find_small_sample_performance_claims(self):
-        text = (
-            "Track record note.\n"
-            "Predictions: 14/24 correct (58.3% accuracy).\n"
-            "BTC 8/12"
-        )
-        violations = find_small_sample_performance_claims(
-            text, {"predictions": {"total": 24}}
-        )
+        text = "Track record note.\nPredictions: 14/24 correct (58.3% accuracy).\nBTC 8/12"
+        violations = find_small_sample_performance_claims(text, {"predictions": {"total": 24}})
         assert violations == [
             "Predictions: 14/24 correct (58.3% accuracy)",
             "BTC 8/12",

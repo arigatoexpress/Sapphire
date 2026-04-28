@@ -141,7 +141,9 @@ def score_news(
     now = now or datetime.now(tz=UTC)
     assets = list(dict.fromkeys(chat_config.aster_assets + chat_config.lighter_assets))
     asset_map = _asset_terms(assets)
-    keyword_terms = [k.strip().lower() for k in list(macro_keywords) + chat_config.extra_keywords if k.strip()]
+    keyword_terms = [
+        k.strip().lower() for k in list(macro_keywords) + chat_config.extra_keywords if k.strip()
+    ]
 
     scored: list[ScoredNews] = []
     for item in items:
@@ -165,7 +167,9 @@ def score_news(
         recency_component = max(0, 22 - int(math.floor(item_age * 1.2)))
         reliability_component = int(round(item.source.reliability * 15))
 
-        alpha_score = max(0, min(100, relevance + recency_component + reliability_component + sentiment_component))
+        alpha_score = max(
+            0, min(100, relevance + recency_component + reliability_component + sentiment_component)
+        )
         if alpha_score < min_alpha_score:
             continue
 

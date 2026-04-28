@@ -21,7 +21,7 @@ def test_docs_plist_secret_rule_matches_docs_plist_excerpt() -> None:
     rule = _load_gitleaks_rule("sapphire-docs-plist-credential-value")
     path_pattern = re.compile(str(rule["path"]), re.IGNORECASE)
     value = "123456789" + ":" + "ABCdefGHIjklMNOpqrSTUvwxYZ_1234567"
-    sample = "<key>KIMI_CLAW_BOT_TOKEN</key>\n" f"<string>{value}</string>"
+    sample = f"<key>KIMI_CLAW_BOT_TOKEN</key>\n<string>{value}</string>"
 
     assert path_pattern.search("docs/security/example.md")
     assert not path_pattern.search("tests/fixtures/example.md")

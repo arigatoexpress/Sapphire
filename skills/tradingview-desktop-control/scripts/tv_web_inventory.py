@@ -16,7 +16,13 @@ import tv_registry_merge as tvrm
 
 SKILL_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OUTPUT = SKILL_ROOT / "output" / "tv-web-inventory.json"
-PWCLI_DEFAULT = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))) / "skills" / "playwright" / "scripts" / "playwright_cli.sh"
+PWCLI_DEFAULT = (
+    Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex")))
+    / "skills"
+    / "playwright"
+    / "scripts"
+    / "playwright_cli.sh"
+)
 
 
 ROLE_SELECTOR = ",".join(
@@ -38,7 +44,16 @@ ROLE_SELECTOR = ",".join(
     ]
 )
 
-INTERACTIVE_WEB_ROLES = {"button", "tab", "menuitem", "option", "checkbox", "switch", "radio", "link"}
+INTERACTIVE_WEB_ROLES = {
+    "button",
+    "tab",
+    "menuitem",
+    "option",
+    "checkbox",
+    "switch",
+    "radio",
+    "link",
+}
 INTERACTIVE_WEB_TAGS = {"button", "a"}
 
 WEB_CLICK_VERIFY_HINTS: dict[str, list[str]] = {
@@ -60,12 +75,42 @@ WEB_RECIPE_TIMEOUT_PROFILES: dict[str, dict[str, float]] = {
 }
 
 WEB_RECIPE_RETRY_PROFILES: dict[str, dict[str, float | int]] = {
-    "generic_click": {"web_exec_attempts": 2, "web_baseline_attempts": 2, "backoff_seconds": 0.5, "backoff_multiplier": 2.0},
-    "dialog_open": {"web_exec_attempts": 2, "web_baseline_attempts": 2, "backoff_seconds": 0.75, "backoff_multiplier": 2.0},
-    "menu_open": {"web_exec_attempts": 2, "web_baseline_attempts": 2, "backoff_seconds": 0.75, "backoff_multiplier": 2.0},
-    "search_dialog": {"web_exec_attempts": 3, "web_baseline_attempts": 2, "backoff_seconds": 0.75, "backoff_multiplier": 2.0},
-    "alert_form": {"web_exec_attempts": 3, "web_baseline_attempts": 2, "backoff_seconds": 0.75, "backoff_multiplier": 2.0},
-    "layout_flow": {"web_exec_attempts": 3, "web_baseline_attempts": 2, "backoff_seconds": 1.0, "backoff_multiplier": 2.0},
+    "generic_click": {
+        "web_exec_attempts": 2,
+        "web_baseline_attempts": 2,
+        "backoff_seconds": 0.5,
+        "backoff_multiplier": 2.0,
+    },
+    "dialog_open": {
+        "web_exec_attempts": 2,
+        "web_baseline_attempts": 2,
+        "backoff_seconds": 0.75,
+        "backoff_multiplier": 2.0,
+    },
+    "menu_open": {
+        "web_exec_attempts": 2,
+        "web_baseline_attempts": 2,
+        "backoff_seconds": 0.75,
+        "backoff_multiplier": 2.0,
+    },
+    "search_dialog": {
+        "web_exec_attempts": 3,
+        "web_baseline_attempts": 2,
+        "backoff_seconds": 0.75,
+        "backoff_multiplier": 2.0,
+    },
+    "alert_form": {
+        "web_exec_attempts": 3,
+        "web_baseline_attempts": 2,
+        "backoff_seconds": 0.75,
+        "backoff_multiplier": 2.0,
+    },
+    "layout_flow": {
+        "web_exec_attempts": 3,
+        "web_baseline_attempts": 2,
+        "backoff_seconds": 1.0,
+        "backoff_multiplier": 2.0,
+    },
 }
 
 
@@ -74,7 +119,9 @@ def run_pw(pwcli: Path, session: str, args: list[str], cwd: Path) -> str:
     proc = subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True)
     if proc.returncode != 0:
         msg = (proc.stderr or proc.stdout or "playwright-cli failed").strip()
-        raise RuntimeError(f"Playwright CLI failed ({' '.join(shlex.quote(a) for a in args)}): {msg}")
+        raise RuntimeError(
+            f"Playwright CLI failed ({' '.join(shlex.quote(a) for a in args)}): {msg}"
+        )
     return (proc.stdout or "").strip()
 
 
@@ -179,7 +226,9 @@ def parse_snapshot_yaml(snapshot_path: Path, max_refs: int = 4000) -> list[dict[
     return refs
 
 
-def snapshot_with_refs(pwcli: Path, session: str, cwd: Path, *, max_refs: int = 4000) -> tuple[str, Path, list[dict[str, Any]]]:
+def snapshot_with_refs(
+    pwcli: Path, session: str, cwd: Path, *, max_refs: int = 4000
+) -> tuple[str, Path, list[dict[str, Any]]]:
     last_exc: Exception | None = None
     for attempt in range(1, 4):
         try:
@@ -198,7 +247,9 @@ def snapshot_with_refs(pwcli: Path, session: str, cwd: Path, *, max_refs: int = 
     raise last_exc
 
 
-def _text_matches(hay: str | None, needle: str, *, match: str = "contains", case_sensitive: bool = False) -> bool:
+def _text_matches(
+    hay: str | None, needle: str, *, match: str = "contains", case_sensitive: bool = False
+) -> bool:
     if hay is None:
         return False
     left = hay if case_sensitive else hay.lower()
@@ -355,7 +406,9 @@ def slugify(text: str) -> str:
 
 def infer_risk(label: str) -> str:
     t = label.lower()
-    if any(k in t for k in ["buy", "sell", "trade", "order", "broker", "publish strategy", "execute"]):
+    if any(
+        k in t for k in ["buy", "sell", "trade", "order", "broker", "publish strategy", "execute"]
+    ):
         return "high"
     if any(k in t for k in ["delete", "remove", "clear", "reset", "close", "logout"]):
         return "medium"
@@ -436,10 +489,16 @@ def _build_web_verification_assertions(
     return assertions
 
 
-def _with_web_recipe_execution_policy(recipe: dict[str, Any], *, profile: str = "generic_click") -> dict[str, Any]:
+def _with_web_recipe_execution_policy(
+    recipe: dict[str, Any], *, profile: str = "generic_click"
+) -> dict[str, Any]:
     out = dict(recipe)
-    timeout_defaults = dict(WEB_RECIPE_TIMEOUT_PROFILES.get(profile, WEB_RECIPE_TIMEOUT_PROFILES["generic_click"]))
-    retry_defaults = dict(WEB_RECIPE_RETRY_PROFILES.get(profile, WEB_RECIPE_RETRY_PROFILES["generic_click"]))
+    timeout_defaults = dict(
+        WEB_RECIPE_TIMEOUT_PROFILES.get(profile, WEB_RECIPE_TIMEOUT_PROFILES["generic_click"])
+    )
+    retry_defaults = dict(
+        WEB_RECIPE_RETRY_PROFILES.get(profile, WEB_RECIPE_RETRY_PROFILES["generic_click"])
+    )
     existing_timeouts = out.get("timeouts") if isinstance(out.get("timeouts"), dict) else {}
     existing_retries = out.get("retry_policy") if isinstance(out.get("retry_policy"), dict) else {}
     out["timeouts"] = {**timeout_defaults, **existing_timeouts}
@@ -491,8 +550,12 @@ def _web_click_recipe(
     return _with_web_recipe_execution_policy(recipe, profile="generic_click")
 
 
-def _web_action_recipe_for_dom_control(ctrl: dict[str, Any], page: dict[str, Any], capture_label: str | None) -> dict[str, Any] | None:
-    raw_label = ctrl.get("aria_label") or ctrl.get("title") or ctrl.get("text") or ctrl.get("data_name")
+def _web_action_recipe_for_dom_control(
+    ctrl: dict[str, Any], page: dict[str, Any], capture_label: str | None
+) -> dict[str, Any] | None:
+    raw_label = (
+        ctrl.get("aria_label") or ctrl.get("title") or ctrl.get("text") or ctrl.get("data_name")
+    )
     if not raw_label:
         return None
     role = str(ctrl.get("role") or "").strip().lower()
@@ -512,7 +575,9 @@ def _web_action_recipe_for_dom_control(ctrl: dict[str, Any], page: dict[str, Any
     )
 
 
-def _web_action_recipe_for_snapshot_ref(ref: dict[str, Any], page: dict[str, Any], capture_label: str | None) -> dict[str, Any] | None:
+def _web_action_recipe_for_snapshot_ref(
+    ref: dict[str, Any], page: dict[str, Any], capture_label: str | None
+) -> dict[str, Any] | None:
     raw_label = ref.get("label") or ref.get("role")
     if not raw_label:
         return None
@@ -581,7 +646,7 @@ def _curated_web_flow_capabilities(capture: dict[str, Any]) -> list[dict[str, An
             },
         }
         if verify_capture_text_any:
-            assertions = ((recipe.get("verification") or {}).get("assertions") or [])
+            assertions = (recipe.get("verification") or {}).get("assertions") or []
             assertions.append(
                 {
                     "kind": "capture_text_any",
@@ -620,14 +685,22 @@ def _curated_web_flow_capabilities(capture: dict[str, Any]) -> list[dict[str, An
             {"kind": "plan_action_executed", "action": "snapshot-click-one-of", "min_count": 1},
             {"kind": "plan_action_executed", "action": "type", "min_count": 1},
             {"kind": "capture_label_equals", "value": out_capture_label},
-            {"kind": "snapshot_label_any", "values": ["Indicators", "Strategies", "Profiles"], "match": "contains"},
+            {
+                "kind": "snapshot_label_any",
+                "values": ["Indicators", "Strategies", "Profiles"],
+                "match": "contains",
+            },
             {"kind": "capture_text_any", "values": ["Strategies", "Profiles"], "match": "contains"},
         ]
         if click_result:
-            assertions.append({"kind": "plan_action_executed", "action": click_action, "min_count": 1})
+            assertions.append(
+                {"kind": "plan_action_executed", "action": click_action, "min_count": 1}
+            )
         else:
             # Query text often appears in the search field or result rows after typing.
-            assertions.append({"kind": "capture_text_any", "values": ["{{query}}"], "match": "contains"})
+            assertions.append(
+                {"kind": "capture_text_any", "values": ["{{query}}"], "match": "contains"}
+            )
         recipe = {
             "runner": "tv_web_inventory.py",
             "subcommand": "capture-after-actions",
@@ -640,19 +713,37 @@ def _curated_web_flow_capabilities(capture: dict[str, Any]) -> list[dict[str, An
                 "assertions": assertions,
             },
             "parameters": [
-                {"name": "query", "required": True, "description": "Indicator query or exact indicator label to click"}
+                {
+                    "name": "query",
+                    "required": True,
+                    "description": "Indicator query or exact indicator label to click",
+                }
             ],
         }
         return _with_web_recipe_execution_policy(recipe, profile="search_dialog")
 
-    def recipe_alert_fill_field(*, field_labels: list[str], param_name: str, out_capture_label: str, click_role: str | None = None) -> dict[str, Any]:
+    def recipe_alert_fill_field(
+        *,
+        field_labels: list[str],
+        param_name: str,
+        out_capture_label: str,
+        click_role: str | None = None,
+    ) -> dict[str, Any]:
         assertions = [
             {"kind": "plan_action_executed", "action": "snapshot-click-one-of", "min_count": 2},
             {"kind": "plan_action_executed", "action": "type", "min_count": 1},
             {"kind": "capture_label_equals", "value": out_capture_label},
-            {"kind": "snapshot_label_any", "values": ["Condition", "Notifications", "Create Alert"], "match": "contains"},
+            {
+                "kind": "snapshot_label_any",
+                "values": ["Condition", "Notifications", "Create Alert"],
+                "match": "contains",
+            },
             {"kind": "capture_text_any", "values": [f"{{{{{param_name}}}}}"], "match": "contains"},
-            {"kind": "capture_text_any", "values": ["Condition", "Notifications"], "match": "contains"},
+            {
+                "kind": "capture_text_any",
+                "values": ["Condition", "Notifications"],
+                "match": "contains",
+            },
         ]
         open_step = {
             "action": "snapshot-click-one-of",
@@ -686,7 +777,11 @@ def _curated_web_flow_capabilities(capture: dict[str, Any]) -> list[dict[str, An
                 "assertions": assertions,
             },
             "parameters": [
-                {"name": param_name, "required": True, "description": f"Value to type into alert {param_name.replace('_', ' ')} field"}
+                {
+                    "name": param_name,
+                    "required": True,
+                    "description": f"Value to type into alert {param_name.replace('_', ' ')} field",
+                }
             ],
         }
         return _with_web_recipe_execution_policy(recipe, profile="alert_form")
@@ -707,7 +802,11 @@ def _curated_web_flow_capabilities(capture: dict[str, Any]) -> list[dict[str, An
                 },
                 {
                     "action": "snapshot-click-one-of",
-                    "labels": ["Save all charts for all symbols and intervals on your layout", "Save all charts", "Save"],
+                    "labels": [
+                        "Save all charts for all symbols and intervals on your layout",
+                        "Save all charts",
+                        "Save",
+                    ],
                     "match": "contains",
                     "wait_after": 0.35,
                 },
@@ -717,9 +816,17 @@ def _curated_web_flow_capabilities(capture: dict[str, Any]) -> list[dict[str, An
                 "type": "web_inventory_capture",
                 "post_capture_label": out_capture_label,
                 "assertions": [
-                    {"kind": "plan_action_executed", "action": "snapshot-click-one-of", "min_count": 2},
+                    {
+                        "kind": "plan_action_executed",
+                        "action": "snapshot-click-one-of",
+                        "min_count": 2,
+                    },
                     {"kind": "capture_label_equals", "value": out_capture_label},
-                    {"kind": "snapshot_label_any", "values": ["Manage layouts", "Save all charts", "Layout setup"], "match": "contains"},
+                    {
+                        "kind": "snapshot_label_any",
+                        "values": ["Manage layouts", "Save all charts", "Layout setup"],
+                        "match": "contains",
+                    },
                 ],
             },
         }
@@ -747,7 +854,11 @@ def _curated_web_flow_capabilities(capture: dict[str, Any]) -> list[dict[str, An
                 "type": "web_inventory_capture",
                 "post_capture_label": out_capture_label,
                 "assertions": [
-                    {"kind": "plan_action_executed", "action": "snapshot-click-label", "min_count": 1},
+                    {
+                        "kind": "plan_action_executed",
+                        "action": "snapshot-click-label",
+                        "min_count": 1,
+                    },
                     {"kind": "capture_label_equals", "value": out_capture_label},
                     {
                         "kind": "snapshot_label_any",
@@ -788,8 +899,15 @@ def _curated_web_flow_capabilities(capture: dict[str, Any]) -> list[dict[str, An
             {"kind": "plan_action_executed", "action": "snapshot-click-label", "min_count": 1},
             {"kind": "plan_action_executed", "action": "snapshot-click-one-of", "min_count": 1},
             {"kind": "plan_action_executed", "action": "type", "min_count": 1},
-            {"kind": "snapshot_label_any", "values": ["Open layout", "Create new layout", "Save layout"], "match": "contains"},
-            {"kind": "capture_label_equals", "value": "layout-manager-search" if not click_result else "layout-manager-select"},
+            {
+                "kind": "snapshot_label_any",
+                "values": ["Open layout", "Create new layout", "Save layout"],
+                "match": "contains",
+            },
+            {
+                "kind": "capture_label_equals",
+                "value": "layout-manager-search" if not click_result else "layout-manager-select",
+            },
             {"kind": "capture_text_any", "values": ["{{layout_name}}"], "match": "contains"},
         ]
         if click_result:
@@ -801,24 +919,44 @@ def _curated_web_flow_capabilities(capture: dict[str, Any]) -> list[dict[str, An
                     "wait_after": 0.45,
                 }
             )
-            assertions[0] = {"kind": "plan_action_executed", "action": "snapshot-click-one-of", "min_count": 1}
-            assertions.append({"kind": "plan_action_executed", "action": "snapshot-click-label", "min_count": 1})
+            assertions[0] = {
+                "kind": "plan_action_executed",
+                "action": "snapshot-click-one-of",
+                "min_count": 1,
+            }
+            assertions.append(
+                {"kind": "plan_action_executed", "action": "snapshot-click-label", "min_count": 1}
+            )
             # Heuristic: after layout select, exact query text may no longer be visible.
-            assertions = [a for a in assertions if not (isinstance(a, dict) and a.get("kind") == "capture_text_any")]
-            assertions.append({"kind": "page_href_contains", "value": "/chart/", "match": "contains"})
+            assertions = [
+                a
+                for a in assertions
+                if not (isinstance(a, dict) and a.get("kind") == "capture_text_any")
+            ]
+            assertions.append(
+                {"kind": "page_href_contains", "value": "/chart/", "match": "contains"}
+            )
         recipe = {
             "runner": "tv_web_inventory.py",
             "subcommand": "capture-after-actions",
             "url": page_href,
             "actions": actions,
-            "capture_label": "layout-manager-search" if not click_result else "layout-manager-select",
+            "capture_label": "layout-manager-search"
+            if not click_result
+            else "layout-manager-select",
             "verification": {
                 "type": "web_inventory_capture",
-                "post_capture_label": "layout-manager-search" if not click_result else "layout-manager-select",
+                "post_capture_label": "layout-manager-search"
+                if not click_result
+                else "layout-manager-select",
                 "assertions": assertions,
             },
             "parameters": [
-                {"name": "layout_name", "required": True, "description": "Layout name/query to search (and optionally click)"}
+                {
+                    "name": "layout_name",
+                    "required": True,
+                    "description": "Layout name/query to search (and optionally click)",
+                }
             ],
         }
         return _with_web_recipe_execution_policy(recipe, profile="layout_flow")
@@ -842,7 +980,11 @@ def _curated_web_flow_capabilities(capture: dict[str, Any]) -> list[dict[str, An
                     verify_capture_text_appears_any=["Strategies", "Profiles"],
                     escape_first=True,
                 ),
-                "metadata": {"capture_label": capture_label, "page_href": page_href, "flow_kind": "open_dialog"},
+                "metadata": {
+                    "capture_label": capture_label,
+                    "page_href": page_href,
+                    "flow_kind": "open_dialog",
+                },
             }
         )
         add(
@@ -855,7 +997,11 @@ def _curated_web_flow_capabilities(capture: dict[str, Any]) -> list[dict[str, An
                 "tags": ["web", "flow", "indicators", "search"],
                 "preconditions": ["TradingView chart page loaded"],
                 "action_recipe": recipe_indicators_search(click_result=False),
-                "metadata": {"capture_label": capture_label, "page_href": page_href, "flow_kind": "search_dialog"},
+                "metadata": {
+                    "capture_label": capture_label,
+                    "page_href": page_href,
+                    "flow_kind": "search_dialog",
+                },
             }
         )
         add(
@@ -895,7 +1041,11 @@ def _curated_web_flow_capabilities(capture: dict[str, Any]) -> list[dict[str, An
                     verify_capture_text_appears_any=["Notifications"],
                     escape_first=True,
                 ),
-                "metadata": {"capture_label": capture_label, "page_href": page_href, "flow_kind": "open_dialog"},
+                "metadata": {
+                    "capture_label": capture_label,
+                    "page_href": page_href,
+                    "flow_kind": "open_dialog",
+                },
             }
         )
         add(
@@ -957,8 +1107,15 @@ def _curated_web_flow_capabilities(capture: dict[str, Any]) -> list[dict[str, An
                     labels=["Layout setup"],
                     role="button",
                     out_capture_label="layout-setup",
-                    verify_snapshot_any=["Sync in layout", "changes on all charts within the layout", "Crosshair is synced"],
-                    verify_capture_text_any=["Sync in layout", "changes on all charts within the layout"],
+                    verify_snapshot_any=[
+                        "Sync in layout",
+                        "changes on all charts within the layout",
+                        "Crosshair is synced",
+                    ],
+                    verify_capture_text_any=[
+                        "Sync in layout",
+                        "changes on all charts within the layout",
+                    ],
                     escape_first=True,
                     policy_profile="menu_open",
                 ),
@@ -980,7 +1137,11 @@ def _curated_web_flow_capabilities(capture: dict[str, Any]) -> list[dict[str, An
                 "tags": ["web", "flow", "layout", "manager", "menu"],
                 "preconditions": ["TradingView chart page loaded"],
                 "action_recipe": recipe_open_layout_manager_panel(),
-                "metadata": {"capture_label": capture_label, "page_href": page_href, "flow_kind": "open_menu"},
+                "metadata": {
+                    "capture_label": capture_label,
+                    "page_href": page_href,
+                    "flow_kind": "open_menu",
+                },
             }
         )
         add(
@@ -997,7 +1158,7 @@ def _curated_web_flow_capabilities(capture: dict[str, Any]) -> list[dict[str, An
                     "capture_label": capture_label,
                     "page_href": page_href,
                     "flow_kind": "layout_save",
-                "notes": "Heuristic click path that may overwrite current layout state.",
+                    "notes": "Heuristic click path that may overwrite current layout state.",
                 },
             }
         )
@@ -1011,7 +1172,11 @@ def _curated_web_flow_capabilities(capture: dict[str, Any]) -> list[dict[str, An
                 "tags": ["web", "flow", "layout", "search"],
                 "preconditions": ["TradingView chart page loaded"],
                 "action_recipe": recipe_layout_search(click_result=False),
-                "metadata": {"capture_label": capture_label, "page_href": page_href, "flow_kind": "layout_search"},
+                "metadata": {
+                    "capture_label": capture_label,
+                    "page_href": page_href,
+                    "flow_kind": "layout_search",
+                },
             }
         )
         add(
@@ -1051,7 +1216,11 @@ def _curated_web_flow_capabilities(capture: dict[str, Any]) -> list[dict[str, An
                     verify_capture_text_appears_any=["Scales", "Status line"],
                     escape_first=True,
                 ),
-                "metadata": {"capture_label": capture_label, "page_href": page_href, "flow_kind": "open_dialog"},
+                "metadata": {
+                    "capture_label": capture_label,
+                    "page_href": page_href,
+                    "flow_kind": "open_dialog",
+                },
             }
         )
 
@@ -1106,14 +1275,20 @@ def _curated_web_flow_capabilities(capture: dict[str, Any]) -> list[dict[str, An
                     },
                     profile="dialog_open",
                 ),
-                "metadata": {"capture_label": capture_label, "page_href": page_href, "flow_kind": "open_dialog"},
+                "metadata": {
+                    "capture_label": capture_label,
+                    "page_href": page_href,
+                    "flow_kind": "open_dialog",
+                },
             }
         )
 
     return out
 
 
-def build_web_capability_candidates(capture: dict[str, Any], max_caps: int = 300) -> list[dict[str, Any]]:
+def build_web_capability_candidates(
+    capture: dict[str, Any], max_caps: int = 300
+) -> list[dict[str, Any]]:
     caps: list[dict[str, Any]] = []
     seen: set[str] = set()
 
@@ -1132,7 +1307,13 @@ def build_web_capability_candidates(capture: dict[str, Any], max_caps: int = 300
             return caps
 
     for ctrl in capture.get("dom_controls", []) or []:
-        label = ctrl.get("aria_label") or ctrl.get("title") or ctrl.get("text") or ctrl.get("data_name") or ctrl.get("role")
+        label = (
+            ctrl.get("aria_label")
+            or ctrl.get("title")
+            or ctrl.get("text")
+            or ctrl.get("data_name")
+            or ctrl.get("role")
+        )
         if not label:
             continue
         tag = ctrl.get("tag") or "node"
@@ -1415,20 +1596,40 @@ def capture_web_inventory(
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="Enumerate visible TradingView Web controls/capabilities via Playwright CLI")
-    p.add_argument("--pwcli", type=Path, default=PWCLI_DEFAULT, help="Path to playwright_cli.sh wrapper")
+    p = argparse.ArgumentParser(
+        description="Enumerate visible TradingView Web controls/capabilities via Playwright CLI"
+    )
+    p.add_argument(
+        "--pwcli", type=Path, default=PWCLI_DEFAULT, help="Path to playwright_cli.sh wrapper"
+    )
     p.add_argument("--session", default="tv-web-inventory")
-    p.add_argument("--cwd", type=Path, default=Path.cwd(), help="Working directory for .playwright-cli artifacts")
-    p.add_argument("--url", default=None, help="Open this URL first (e.g. https://www.tradingview.com/chart/)")
+    p.add_argument(
+        "--cwd",
+        type=Path,
+        default=Path.cwd(),
+        help="Working directory for .playwright-cli artifacts",
+    )
+    p.add_argument(
+        "--url", default=None, help="Open this URL first (e.g. https://www.tradingview.com/chart/)"
+    )
     p.add_argument("--headed", action="store_true", help="Open browser in headed mode")
-    p.add_argument("--actions-file", type=Path, default=None, help="Optional JSON action plan to run before final capture")
-    p.add_argument("--capture-label", default="current-page", help="Context label stored in the output capture")
+    p.add_argument(
+        "--actions-file",
+        type=Path,
+        default=None,
+        help="Optional JSON action plan to run before final capture",
+    )
+    p.add_argument(
+        "--capture-label", default="current-page", help="Context label stored in the output capture"
+    )
     p.add_argument("--dom-limit", type=int, default=800)
     p.add_argument("--data-limit", type=int, default=1500)
     p.add_argument("--snapshot-ref-limit", type=int, default=4000)
     p.add_argument("--output", type=Path, default=None, help="Write JSON output file")
     p.add_argument("--write-default-output", action="store_true", help=f"Write to {DEFAULT_OUTPUT}")
-    p.add_argument("--no-close", action="store_true", help="Leave the Playwright session/browser open")
+    p.add_argument(
+        "--no-close", action="store_true", help="Leave the Playwright session/browser open"
+    )
     p.add_argument("--pretty", action="store_true")
     args = p.parse_args()
 

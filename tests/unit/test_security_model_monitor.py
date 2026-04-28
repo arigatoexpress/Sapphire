@@ -22,6 +22,7 @@ from lib.security.model_monitor import (
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def ollama_dir(tmp_path):
     """Create a minimal Ollama directory structure."""
@@ -51,10 +52,12 @@ def _create_model(ollama_dir, name, tag="latest", blob_content=b"model data"):
     manifest_dir = ollama_dir / "models" / "manifests" / "registry.ollama.ai" / "library" / name
     manifest_dir.mkdir(parents=True, exist_ok=True)
     manifest = {
-        "layers": [{
-            "digest": digest,
-            "size": len(blob_content),
-        }]
+        "layers": [
+            {
+                "digest": digest,
+                "size": len(blob_content),
+            }
+        ]
     }
     (manifest_dir / tag).write_text(json.dumps(manifest))
 
@@ -68,6 +71,7 @@ def _create_model(ollama_dir, name, tag="latest", blob_content=b"model data"):
 # ---------------------------------------------------------------------------
 # Tests — Data models
 # ---------------------------------------------------------------------------
+
 
 class TestDataModels:
     def test_blob_verification_defaults(self):
@@ -91,6 +95,7 @@ class TestDataModels:
 # Tests — Model enumeration
 # ---------------------------------------------------------------------------
 
+
 class TestModelEnumeration:
     def test_list_models_from_manifests(self, ollama_dir, monitor):
         _create_model(ollama_dir, "hermes3")
@@ -112,6 +117,7 @@ class TestModelEnumeration:
 # ---------------------------------------------------------------------------
 # Tests — Blob verification
 # ---------------------------------------------------------------------------
+
 
 class TestBlobVerification:
     def test_valid_blob(self, ollama_dir, monitor):
@@ -154,6 +160,7 @@ class TestBlobVerification:
 # Tests — Model verification
 # ---------------------------------------------------------------------------
 
+
 class TestModelVerification:
     def test_verify_valid_model(self, ollama_dir, monitor):
         _create_model(ollama_dir, "valid-model")
@@ -182,6 +189,7 @@ class TestModelVerification:
 # ---------------------------------------------------------------------------
 # Tests — Template scanning
 # ---------------------------------------------------------------------------
+
 
 class TestTemplateScan:
     def test_clean_template(self, ollama_dir, monitor):
@@ -236,6 +244,7 @@ class TestTemplateScan:
 # Tests — Full scan
 # ---------------------------------------------------------------------------
 
+
 class TestFullScan:
     def test_scan_with_valid_models(self, ollama_dir, monitor):
         _create_model(ollama_dir, "model-a")
@@ -256,6 +265,7 @@ class TestFullScan:
 # Tests — Scoring
 # ---------------------------------------------------------------------------
 
+
 class TestScoring:
     def test_perfect_score(self):
         r = ModelScanResult(total_models=5, verified_count=5)
@@ -267,10 +277,14 @@ class TestScoring:
         assert score < 100.0
 
     def test_critical_alerts_heavy_penalty(self):
-        alerts = [TemplateAlert(
-            model="x", pattern_name="injection",
-            severity="critical", matched_text="bad",
-        )]
+        alerts = [
+            TemplateAlert(
+                model="x",
+                pattern_name="injection",
+                severity="critical",
+                matched_text="bad",
+            )
+        ]
         r = ModelScanResult(total_models=1, template_alerts=alerts)
         score = ModelMonitor._compute_score(r)
         assert score <= 85.0
@@ -288,10 +302,12 @@ class TestScoring:
 # Tests — Backdoor patterns
 # ---------------------------------------------------------------------------
 
+
 class TestBackdoorPatterns:
     def test_all_patterns_compile(self):
         """Verify all regex patterns are valid."""
         import re
+
         for p in BACKDOOR_PATTERNS:
             re.compile(p["pattern"])
 

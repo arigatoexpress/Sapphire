@@ -45,13 +45,13 @@ REGIONAL_INTEL_API = "http://127.0.0.1:8787"
 # Intent-signal keyword buckets. Tuning is deliberate: high-intent buckets
 # score much higher than generic category matches.
 INTENT_SIGNALS: dict[str, tuple[str, ...]] = {
-    "hiring_growth":     ("hiring", "now hiring", "recruiting", "expanding team"),
-    "recent_permit":     ("permit", "construction", "remodel", "renovation", "new build"),
-    "new_location":      ("new location", "grand opening", "opening soon"),
-    "funding_event":     ("raised", "series a", "series b", "seed round", "funded"),
+    "hiring_growth": ("hiring", "now hiring", "recruiting", "expanding team"),
+    "recent_permit": ("permit", "construction", "remodel", "renovation", "new build"),
+    "new_location": ("new location", "grand opening", "opening soon"),
+    "funding_event": ("raised", "series a", "series b", "seed round", "funded"),
     "award_recognition": ("award", "top rated", "best of", "featured"),
-    "compliance_gap":    ("violation", "citation", "non-compliance", "fine"),
-    "ai_adoption":       ("ai", "automation", "chatbot", "machine learning"),
+    "compliance_gap": ("violation", "citation", "non-compliance", "fine"),
+    "ai_adoption": ("ai", "automation", "chatbot", "machine learning"),
 }
 
 TIER_THRESHOLDS = {"hot": 75, "warm": 55, "cool": 35}
@@ -220,19 +220,21 @@ def enrich_one(lead: dict, region: str = "") -> dict:
     emails = _guess_emails(name, domain)
 
     enriched = dict(lead)
-    enriched.update({
-        "score": score,
-        "tier": _tier(score),
-        "intent_signals": intents,
-        "score_reasons": reasons,
-        "enrichment": {
-            "normalized_name": name.strip(),
-            "slug": _slugify(name),
-            "domain": domain,
-            "maybe_emails": emails,
-            "enriched_at": datetime.now(UTC).isoformat(),
-        },
-    })
+    enriched.update(
+        {
+            "score": score,
+            "tier": _tier(score),
+            "intent_signals": intents,
+            "score_reasons": reasons,
+            "enrichment": {
+                "normalized_name": name.strip(),
+                "slug": _slugify(name),
+                "domain": domain,
+                "maybe_emails": emails,
+                "enriched_at": datetime.now(UTC).isoformat(),
+            },
+        }
+    )
     return enriched
 
 
@@ -259,16 +261,22 @@ def action_pipeline(
     """Pull leads from lead_engine discover, then enrich. Persists to disk."""
     # Call lead_engine via subprocess (no import — avoids coupling)
     discovery_input = {
-        "action": "discover", "industry": industry,
-        "region": region, "keywords": keywords or [], "limit": limit,
+        "action": "discover",
+        "industry": industry,
+        "region": region,
+        "keywords": keywords or [],
+        "limit": limit,
     }
     try:
         import subprocess
+
         tool = Path(__file__).parent / "lead_engine.py"
         proc = subprocess.run(
             ["python3", str(tool)],
             input=json.dumps(discovery_input),
-            capture_output=True, text=True, timeout=30,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         if proc.returncode != 0:
             return {"error": "lead_engine failed", "stderr": proc.stderr[:500]}
@@ -282,13 +290,19 @@ def action_pipeline(
     ENRICHED_DIR.mkdir(parents=True, exist_ok=True)
     ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     out_path = ENRICHED_DIR / f"{region}-{ts}.json"
-    out_path.write_text(json.dumps({
-        "generated_at": datetime.now(UTC).isoformat(),
-        "industry": industry,
-        "region": region,
-        "keywords": keywords or [],
-        **result,
-    }, indent=2, default=str))
+    out_path.write_text(
+        json.dumps(
+            {
+                "generated_at": datetime.now(UTC).isoformat(),
+                "industry": industry,
+                "region": region,
+                "keywords": keywords or [],
+                **result,
+            },
+            indent=2,
+            default=str,
+        )
+    )
     result["path"] = str(out_path)
     return result
 
@@ -307,12 +321,14 @@ def action_stats() -> dict:
             total += data.get("count", 0)
             for t, n in (data.get("tiers") or {}).items():
                 tiers_agg[t] = tiers_agg.get(t, 0) + n
-            recent.append({
-                "file": f.name,
-                "count": data.get("count"),
-                "region": data.get("region"),
-                "generated_at": data.get("generated_at"),
-            })
+            recent.append(
+                {
+                    "file": f.name,
+                    "count": data.get("count"),
+                    "region": data.get("region"),
+                    "generated_at": data.get("generated_at"),
+                }
+            )
         except Exception:
             pass
     return {
@@ -330,7 +346,8 @@ def main() -> None:
 
     if action == "score":
         result = action_score(
-            params.get("leads", []), region=params.get("region", ""),
+            params.get("leads", []),
+            region=params.get("region", ""),
         )
     elif action == "pipeline":
         result = action_pipeline(

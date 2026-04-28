@@ -36,8 +36,11 @@ def _run_tool(tool_name: str, params: dict) -> dict:
     try:
         r = subprocess.run(
             [sys.executable, str(tool_path)],
-            input=json.dumps(params), capture_output=True, text=True,
-            timeout=30, env=env,
+            input=json.dumps(params),
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=env,
         )
         return json.loads(r.stdout) if r.stdout.strip() else {"error": r.stderr[:200]}
     except Exception as e:
@@ -132,13 +135,25 @@ def action_decide(symbol: str = "BTC") -> dict:
     # ─── Source 1: Technical Analysis ───
     try:
         from technical_analysis import analyze
+
         profile = analyze(symbol)
         if profile:
-            ta_dir = "bullish" if profile.net_signal in ("bullish", "strong_bullish") else \
-                     "bearish" if profile.net_signal in ("bearish", "strong_bearish") else "neutral"
+            ta_dir = (
+                "bullish"
+                if profile.net_signal in ("bullish", "strong_bullish")
+                else "bearish"
+                if profile.net_signal in ("bearish", "strong_bearish")
+                else "neutral"
+            )
             ta_weight = 0.3  # 30% weight
-            votes.append((ta_dir, ta_weight, "TA",
-                          f"{profile.net_signal} RSI={profile.rsi_14:.0f} MA={profile.ma_trend}"))
+            votes.append(
+                (
+                    ta_dir,
+                    ta_weight,
+                    "TA",
+                    f"{profile.net_signal} RSI={profile.rsi_14:.0f} MA={profile.ma_trend}",
+                )
+            )
     except Exception as e:
         votes.append(("neutral", 0.1, "TA", f"unavailable: {e}"))
 
@@ -154,14 +169,21 @@ def action_decide(symbol: str = "BTC") -> dict:
     # ─── Source 3: Kronos Foundation Model ───
     kronos = _run_tool(
         "predict_kronos",
-        {"action": "predict", "symbol": _canonical_market_symbol(symbol), "predict_bars": 24, "interval": "1h"},
+        {
+            "action": "predict",
+            "symbol": _canonical_market_symbol(symbol),
+            "predict_bars": 24,
+            "interval": "1h",
+        },
     )
     if "error" not in kronos:
         k_dir = kronos.get("direction", "neutral")
         current_price = float(kronos.get("current_price", 0) or 0)
         predictions = kronos.get("predictions", [])
         predicted_close = float(predictions[-1]["close"]) if predictions else current_price
-        change_pct = ((predicted_close - current_price) / current_price * 100) if current_price else 0.0
+        change_pct = (
+            ((predicted_close - current_price) / current_price * 100) if current_price else 0.0
+        )
         k_conf = min(abs(change_pct) / 5, 1.0)  # Normalize to 0-1
         votes.append((k_dir, 0.25 * k_conf, "Kronos", f"{change_pct:+.1f}% predicted"))
     else:
@@ -170,7 +192,14 @@ def action_decide(symbol: str = "BTC") -> dict:
     # ─── Source 4: Macro Environment ───
     macro = _get_macro_sentiment()
     macro_weight = 0.10
-    votes.append((macro["sentiment"], macro_weight, "Macro", " | ".join(macro.get("reasons", [])[:2]) or "neutral"))
+    votes.append(
+        (
+            macro["sentiment"],
+            macro_weight,
+            "Macro",
+            " | ".join(macro.get("reasons", [])[:2]) or "neutral",
+        )
+    )
 
     # ─── Source 5: Track Record Modifier ───
     track = _get_paper_track_record()
@@ -232,6 +261,7 @@ def action_decide(symbol: str = "BTC") -> dict:
     try:
         sys.path.insert(0, str(SAPPHIRE_DIR))
         from lib.analytics.brain_accuracy import record_decision
+
         record_decision(result)
     except Exception as e:
         sys.stderr.write(f"brain_accuracy record failed: {e}\n")

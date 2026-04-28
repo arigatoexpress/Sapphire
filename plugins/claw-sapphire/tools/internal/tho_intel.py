@@ -26,9 +26,13 @@ from pathlib import Path
 
 SAPPHIRE_DIR = Path.home() / "Code" / "Sapphire"
 TOOLS_DIR = SAPPHIRE_DIR / "plugins" / "claw-sapphire" / "tools"
-SECRETS_DIR = Path(os.getenv("SAPPHIRE_SECRETS_DIR", str(Path.home() / ".config" / "sapphire-secrets")))
+SECRETS_DIR = Path(
+    os.getenv("SAPPHIRE_SECRETS_DIR", str(Path.home() / ".config" / "sapphire-secrets"))
+)
 
-THO_BASE_URL = os.getenv("THO_BASE_URL", "https://project-go-forward-691674245427.us-central1.run.app")
+THO_BASE_URL = os.getenv(
+    "THO_BASE_URL", "https://project-go-forward-691674245427.us-central1.run.app"
+)
 REGIONAL_INTEL_URL = os.getenv("REGIONAL_INTEL_URL", "http://127.0.0.1:8787")
 
 
@@ -53,7 +57,10 @@ def _run_tool(name: str, params: dict) -> dict:
     try:
         r = subprocess.run(
             [sys.executable, str(TOOLS_DIR / f"{name}.py")],
-            input=json.dumps(params), capture_output=True, text=True, timeout=30,
+            input=json.dumps(params),
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         return json.loads(r.stdout) if r.stdout.strip() else {}
     except Exception:
@@ -82,21 +89,30 @@ def action_market() -> dict:
     if pin:
         try:
             import certifi
+
             ctx = ssl.create_default_context(cafile=certifi.where())
         except ImportError:
             ctx = ssl.create_default_context()
         try:
-            token_resp = urllib.request.urlopen(urllib.request.Request(
-                f"{THO_BASE_URL}/api/admin/verify",
-                data=json.dumps({"pin": pin}).encode(),
-                headers={"Content-Type": "application/json"},
-            ), timeout=10, context=ctx)
+            token_resp = urllib.request.urlopen(
+                urllib.request.Request(
+                    f"{THO_BASE_URL}/api/admin/verify",
+                    data=json.dumps({"pin": pin}).encode(),
+                    headers={"Content-Type": "application/json"},
+                ),
+                timeout=10,
+                context=ctx,
+            )
             token = json.loads(token_resp.read()).get("token", "")
             if token:
-                stats_resp = urllib.request.urlopen(urllib.request.Request(
-                    f"{THO_BASE_URL}/api/analytics/customers",
-                    headers={"X-Admin-Token": token},
-                ), timeout=10, context=ctx)
+                stats_resp = urllib.request.urlopen(
+                    urllib.request.Request(
+                        f"{THO_BASE_URL}/api/analytics/customers",
+                        headers={"X-Admin-Token": token},
+                    ),
+                    timeout=10,
+                    context=ctx,
+                )
                 tho_stats = json.loads(stats_resp.read())
         except Exception:
             pass
@@ -109,7 +125,11 @@ def action_market() -> dict:
 
     analysis = {
         "mortgage_rate": mortgage_rate,
-        "affordability": "challenging" if mortgage_rate and mortgage_rate > 6.5 else "moderate" if mortgage_rate and mortgage_rate > 5.5 else "favorable",
+        "affordability": "challenging"
+        if mortgage_rate and mortgage_rate > 6.5
+        else "moderate"
+        if mortgage_rate and mortgage_rate > 5.5
+        else "favorable",
         "houston_permits": len(permits),
         "new_subdivisions": sum(1 for p in permits if "subdivision" in str(p).lower()),
         "tho_customers": tho_stats.get("total", 0),
@@ -130,7 +150,11 @@ def action_market() -> dict:
         "housing": housing.get("housing", {}),
         "rates": rates.get("rates", {}),
         "permits": {"total": len(permits), "subdivisions": analysis["new_subdivisions"]},
-        "tho": {"customers": analysis["tho_customers"], "conversion": analysis["tho_conversion"], "recent_leads": analysis["tho_recent_leads"]},
+        "tho": {
+            "customers": analysis["tho_customers"],
+            "conversion": analysis["tho_conversion"],
+            "recent_leads": analysis["tho_recent_leads"],
+        },
         "analysis": analysis,
     }
 
@@ -146,27 +170,61 @@ def action_buyers() -> dict:
     rate = a.get("mortgage_rate")
     if rate:
         if rate < 5.5:
-            indicators.append({"indicator": "Mortgage Rate", "signal": "strong_buy", "detail": f"{rate:.1f}% — very affordable"})
+            indicators.append(
+                {
+                    "indicator": "Mortgage Rate",
+                    "signal": "strong_buy",
+                    "detail": f"{rate:.1f}% — very affordable",
+                }
+            )
         elif rate < 6.5:
-            indicators.append({"indicator": "Mortgage Rate", "signal": "neutral", "detail": f"{rate:.1f}% — moderate"})
+            indicators.append(
+                {
+                    "indicator": "Mortgage Rate",
+                    "signal": "neutral",
+                    "detail": f"{rate:.1f}% — moderate",
+                }
+            )
         else:
-            indicators.append({"indicator": "Mortgage Rate", "signal": "headwind", "detail": f"{rate:.1f}% — challenging for buyers"})
+            indicators.append(
+                {
+                    "indicator": "Mortgage Rate",
+                    "signal": "headwind",
+                    "detail": f"{rate:.1f}% — challenging for buyers",
+                }
+            )
 
     # Permit activity (more permits = more demand)
     permits = a.get("houston_permits", 0)
     if permits > 50:
-        indicators.append({"indicator": "Houston Permits", "signal": "strong_demand", "detail": f"{permits} active permits"})
+        indicators.append(
+            {
+                "indicator": "Houston Permits",
+                "signal": "strong_demand",
+                "detail": f"{permits} active permits",
+            }
+        )
     elif permits > 20:
-        indicators.append({"indicator": "Houston Permits", "signal": "moderate", "detail": f"{permits} permits"})
+        indicators.append(
+            {"indicator": "Houston Permits", "signal": "moderate", "detail": f"{permits} permits"}
+        )
 
     # THO pipeline health
     conv = a.get("tho_conversion", 0)
     if conv > 60:
-        indicators.append({"indicator": "THO Conversion", "signal": "healthy", "detail": f"{conv}% enrolled"})
+        indicators.append(
+            {"indicator": "THO Conversion", "signal": "healthy", "detail": f"{conv}% enrolled"}
+        )
     elif conv > 40:
-        indicators.append({"indicator": "THO Conversion", "signal": "moderate", "detail": f"{conv}%"})
+        indicators.append(
+            {"indicator": "THO Conversion", "signal": "moderate", "detail": f"{conv}%"}
+        )
 
-    return {"success": True, "indicators": indicators, "market_sentiment": a.get("market_sentiment", "unknown")}
+    return {
+        "success": True,
+        "indicators": indicators,
+        "market_sentiment": a.get("market_sentiment", "unknown"),
+    }
 
 
 def main():

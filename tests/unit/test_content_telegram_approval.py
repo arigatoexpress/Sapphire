@@ -96,7 +96,8 @@ class TestHandleCallback:
     def test_draft_not_found_answers_callback(self, tmp_content, monkeypatch):
         answered = {}
         monkeypatch.setattr(
-            ta, "_answer_callback",
+            ta,
+            "_answer_callback",
             lambda cid, text, bot_token=None: answered.update(id=cid, text=text) or {"ok": True},
         )
         result = ta.handle_callback("apv:missing-slug", callback_id="cb1")
@@ -172,9 +173,7 @@ class TestHandleCallback:
         # The outer handle_callback doesn't catch edit errors — but real prod
         # wraps this in a try. For now verify the sequence: approve first, edit last.
         with pytest.raises(RuntimeError):
-            ta.handle_callback(
-                "apv:market-pulse", callback_id="cb4", chat_id=1, message_id=2
-            )
+            ta.handle_callback("apv:market-pulse", callback_id="cb4", chat_id=1, message_id=2)
         # Draft should still be in ready/ because move happens before edit
         assert list(tmp_content["ready"].iterdir())
 
@@ -193,11 +192,15 @@ class TestApprovalIntegration:
         from lib.content.report_generator import Report
 
         # Build a minimal Report; QA must pass for require_human path to run
-        fake_qa = type("QA", (), {
-            "passed": True,
-            "failures": [],
-            "to_dict": lambda self: {"passed": True},
-        })()
+        fake_qa = type(
+            "QA",
+            (),
+            {
+                "passed": True,
+                "failures": [],
+                "to_dict": lambda self: {"passed": True},
+            },
+        )()
         monkeypatch.setattr(approval, "run_qa", lambda report: fake_qa)
         monkeypatch.setattr(approval, "_check_sensitivity", lambda body: [])
 
@@ -209,6 +212,7 @@ class TestApprovalIntegration:
 
         # Patch the module-level reference used inside approve()
         import lib.content.telegram_approval as ta_mod
+
         monkeypatch.setattr(ta_mod, "request_approval", fake_request)
 
         report = Report(
@@ -225,17 +229,22 @@ class TestApprovalIntegration:
 
     def test_telegram_failure_does_not_block_parking(self, monkeypatch, tmp_path):
         from lib.content import approval
+
         importlib.reload(approval)
         monkeypatch.setattr(approval, "_PENDING_DIR", tmp_path / "pending")
         monkeypatch.setattr(approval, "_APPROVALS_FILE", tmp_path / "approvals.jsonl")
 
         from lib.content.report_generator import Report
 
-        fake_qa = type("QA", (), {
-            "passed": True,
-            "failures": [],
-            "to_dict": lambda self: {"passed": True},
-        })()
+        fake_qa = type(
+            "QA",
+            (),
+            {
+                "passed": True,
+                "failures": [],
+                "to_dict": lambda self: {"passed": True},
+            },
+        )()
         monkeypatch.setattr(approval, "run_qa", lambda report: fake_qa)
         monkeypatch.setattr(approval, "_check_sensitivity", lambda body: [])
 

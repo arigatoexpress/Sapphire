@@ -10,6 +10,7 @@ Usage from Kimi agent:
     X-Control-Token: <token>
     {"action": "create_task", "title": "...", "project": "sapphire", "priority": "high"}
 """
+
 from __future__ import annotations
 
 import logging
@@ -74,7 +75,11 @@ def dispatch(
         Result dict with at minimum {"status": "ok"|"error"}.
     """
     if action not in ALL_ACTIONS:
-        return {"status": "error", "error": f"unknown action: {action}", "valid_actions": sorted(ALL_ACTIONS)}
+        return {
+            "status": "error",
+            "error": f"unknown action: {action}",
+            "valid_actions": sorted(ALL_ACTIONS),
+        }
 
     if action in WRITE_ACTIONS and not verify_token(token):
         return {"status": "error", "error": "unauthorized — provide valid X-Control-Token"}
@@ -93,10 +98,12 @@ def dispatch(
 # Handlers
 # ---------------------------------------------------------------------------
 
+
 def _overview(payload: dict[str, Any]) -> dict[str, Any]:
     """Return a high-level system overview."""
     try:
         from .project_board import get_projects_overview
+
         return {"status": "ok", "overview": get_projects_overview()}
     except Exception as exc:
         logger.warning("project_board overview error: %s", exc)
@@ -105,6 +112,7 @@ def _overview(payload: dict[str, Any]) -> dict[str, Any]:
 
 def _list_tasks(payload: dict[str, Any]) -> dict[str, Any]:
     from .event_stream import recent_events
+
     limit = int(payload.get("limit", 20))
     events = recent_events(tags=["type:pm"], limit=limit)
     return {"status": "ok", "tasks": events, "count": len(events)}
@@ -114,15 +122,18 @@ def _create_task(payload: dict[str, Any]) -> dict[str, Any]:
     import uuid
 
     from .event_stream import append_event
+
     title = str(payload.get("title", "")).strip()
     if not title:
         return {"status": "error", "error": "title required"}
     task_id = f"task-{uuid.uuid4().hex[:8]}"
     append_event(
-        "task.created", source="kimi-bridge",
+        "task.created",
+        source="kimi-bridge",
         actor=str(payload.get("actor", "kimi")),
         project_id=str(payload.get("project", "sapphire")),
-        task_id=task_id, message=title,
+        task_id=task_id,
+        message=title,
         tags=["type:pm", f"priority:{payload.get('priority', 'medium')}"],
         payload={"title": title, "description": str(payload.get("description", ""))},
     )
@@ -131,18 +142,25 @@ def _create_task(payload: dict[str, Any]) -> dict[str, Any]:
 
 def _update_task(payload: dict[str, Any]) -> dict[str, Any]:
     from .event_stream import append_event
+
     task_id = str(payload.get("task_id", "")).strip()
     status = str(payload.get("status", "")).strip()
     if not task_id or not status:
         return {"status": "error", "error": "task_id and status required"}
-    append_event(f"task.{status}", source="kimi-bridge",
-        task_id=task_id, status=status,
-        message=str(payload.get("result", "")), tags=["type:pm"])
+    append_event(
+        f"task.{status}",
+        source="kimi-bridge",
+        task_id=task_id,
+        status=status,
+        message=str(payload.get("result", "")),
+        tags=["type:pm"],
+    )
     return {"status": "ok", "task": {"task_id": task_id, "status": status}}
 
 
 def _list_events(payload: dict[str, Any]) -> dict[str, Any]:
     from .event_stream import recent_events
+
     tags = payload.get("tags", [])
     limit = int(payload.get("limit", 30))
     events = recent_events(tags=tags or None, limit=limit)
@@ -160,6 +178,7 @@ def _list_agents(payload: dict[str, Any]) -> dict[str, Any]:
 def _autonomy_cycle(payload: dict[str, Any]) -> dict[str, Any]:
     """Trigger a lightweight autonomy cycle — summarise state + emit recommendations."""
     from .event_stream import append_event
+
     append_event(
         "autonomy.cycle.requested",
         source="kimi-bridge",
@@ -211,6 +230,7 @@ def _autonomy_audit_log_cls() -> type:
 def _sync_board(payload: dict[str, Any]) -> dict[str, Any]:
     try:
         from .project_board import get_projects_overview
+
         return {"status": "ok", "board": get_projects_overview()}
     except Exception as exc:
         return {"status": "ok", "board": {"error": str(exc)}}

@@ -33,7 +33,10 @@ except Exception:
 
 # ── Media Management ──────────────────────────────────────────────────
 
-async def handle_media_commands(engine: AlphaEngine, target: str, action: str, value: float) -> bool:
+
+async def handle_media_commands(
+    engine: AlphaEngine, target: str, action: str, value: float
+) -> bool:
     """Handle MEDIA_* control commands."""
     normalized = action.upper()
 
@@ -122,16 +125,22 @@ async def handle_media_commands(engine: AlphaEngine, target: str, action: str, v
             title=draft.get("title", ""),
             body=draft.get("body", ""),
             targets=targets,
-            source="telegram"
+            source="telegram",
         )
         request_id = request.get("request_id")
         status = request.get("status")
         if status == "draft":
-            await engine.telegram.send_message("📰 Request ignored (mode=draft_only).", priority="high")
+            await engine.telegram.send_message(
+                "📰 Request ignored (mode=draft_only).", priority="high"
+            )
         elif status == "pending_approval":
-            await engine.telegram.send_message(f"📰 Request `{request_id}` is pending approval.", priority="high")
+            await engine.telegram.send_message(
+                f"📰 Request `{request_id}` is pending approval.", priority="high"
+            )
         else:
-            await engine.telegram.send_message(f"📰 Request `{request_id}` queued for delivery.", priority="high")
+            await engine.telegram.send_message(
+                f"📰 Request `{request_id}` queued for delivery.", priority="high"
+            )
         return True
 
     if normalized in {"MEDIA_APPROVE", "MEDIA_REQUEST_APPROVE"}:
@@ -140,7 +149,9 @@ async def handle_media_commands(engine: AlphaEngine, target: str, action: str, v
         if engine.media_manager.approve_request(request_id):
             await engine.telegram.send_message(f"✅ Approved `{request_id}`.", priority="high")
         else:
-            await engine.telegram.send_message(f"❌ Failed to approve `{request_id}`.", priority="high")
+            await engine.telegram.send_message(
+                f"❌ Failed to approve `{request_id}`.", priority="high"
+            )
         return True
 
     if normalized in {"MEDIA_REJECT", "MEDIA_REQUEST_REJECT"}:
@@ -149,7 +160,9 @@ async def handle_media_commands(engine: AlphaEngine, target: str, action: str, v
         if engine.media_manager.reject_request(request_id):
             await engine.telegram.send_message(f"🛑 Rejected `{request_id}`.", priority="high")
         else:
-            await engine.telegram.send_message(f"❌ Failed to reject `{request_id}`.", priority="high")
+            await engine.telegram.send_message(
+                f"❌ Failed to reject `{request_id}`.", priority="high"
+            )
         return True
 
     return False
@@ -157,7 +170,10 @@ async def handle_media_commands(engine: AlphaEngine, target: str, action: str, v
 
 # ── Security & VirusTotal ─────────────────────────────────────────────
 
-async def handle_security_commands(engine: AlphaEngine, target: str, action: str, value: float) -> bool:
+
+async def handle_security_commands(
+    engine: AlphaEngine, target: str, action: str, value: float
+) -> bool:
     """Handle SECURITY_*, VT_*, SKILL_AUDIT_*, GATE_STATS commands."""
     normalized = action.upper()
 
@@ -188,9 +204,13 @@ async def handle_security_commands(engine: AlphaEngine, target: str, action: str
             requested_skill = str(target or "").strip()
         if requested_skill.startswith("{"):
             requested_skill = ""
-        upload_if_missing = payload.get("upload_if_missing", engine.vt_scanner.upload_if_missing_default)
+        upload_if_missing = payload.get(
+            "upload_if_missing", engine.vt_scanner.upload_if_missing_default
+        )
         upload_bool = str(upload_if_missing).strip().lower() in {"1", "true", "yes", "on"}
-        scan_scope = requested_skill if requested_skill and requested_skill.lower() != "all" else "all"
+        scan_scope = (
+            requested_skill if requested_skill and requested_skill.lower() != "all" else "all"
+        )
         await engine.telegram.send_message(
             f"🛡️ VirusTotal scan requested for `{scan_scope}` (upload-on-miss: `{'YES' if upload_bool else 'NO'}`).",
             priority="high",
@@ -240,7 +260,9 @@ async def handle_security_commands(engine: AlphaEngine, target: str, action: str
         if content:
             report = engine.skill_auditor.audit_skill("telegram_submitted", content)
             formatted = engine.skill_auditor.format_community_report(report)
-            engine.telegram.record_activity(EMERALD, "audit", f"Audited skill: {report.overall_severity.name}")
+            engine.telegram.record_activity(
+                EMERALD, "audit", f"Audited skill: {report.overall_severity.name}"
+            )
             await engine.telegram.send_as(EMERALD, formatted)
         else:
             await engine.telegram.send_as(EMERALD, "Usage: /audit <skill content to scan>")
@@ -293,7 +315,10 @@ async def handle_security_commands(engine: AlphaEngine, target: str, action: str
 
 # ── Forum Collaboration ───────────────────────────────────────────────
 
-async def handle_forum_commands(engine: AlphaEngine, target: str, action: str, value: float) -> bool:
+
+async def handle_forum_commands(
+    engine: AlphaEngine, target: str, action: str, value: float
+) -> bool:
     """Handle FORUM_* control commands."""
     if getattr(engine, "forum", None) is None:
         return False
@@ -307,7 +332,9 @@ async def handle_forum_commands(engine: AlphaEngine, target: str, action: str, v
         if not top:
             await engine.telegram.send_as(
                 EMERALD,
-                "📭 No forum topics found" + (f" in category `{category}`" if category else "") + ".",
+                "📭 No forum topics found"
+                + (f" in category `{category}`" if category else "")
+                + ".",
             )
         else:
             cat_label = f" [{category}]" if category else ""
@@ -327,7 +354,9 @@ async def handle_forum_commands(engine: AlphaEngine, target: str, action: str, v
         direction = str(payload.get("direction", "")).strip().lower()
         voter = str(payload.get("voter", "SAPPHIRE")).strip().upper()
         if not topic_id or not direction:
-            await engine.telegram.send_message("❌ Usage: `forum vote TOPIC-XXXXX up|down`", priority="high")
+            await engine.telegram.send_message(
+                "❌ Usage: `forum vote TOPIC-XXXXX up|down`", priority="high"
+            )
             return True
         gate.require(voter, Capability.FORUM_WRITE, f"vote_topic({topic_id}, {direction})")
         result = engine.forum.vote_topic(topic_id, voter, direction)
@@ -338,7 +367,10 @@ async def handle_forum_commands(engine: AlphaEngine, target: str, action: str, v
                 priority="medium",
             )
             approval_result = engine.forum.resolve_approval(topic_id)
-            if approval_result.get("ok") and approval_result.get("status") in ("approved", "rejected"):
+            if approval_result.get("ok") and approval_result.get("status") in (
+                "approved",
+                "rejected",
+            ):
                 status = approval_result["status"]
                 session_key = approval_result.get("session_key", "")
                 emoji = "✅" if status == "approved" else "🚫"
@@ -353,8 +385,10 @@ async def handle_forum_commands(engine: AlphaEngine, target: str, action: str, v
                     level="info",
                     tags=["forum", "approval", "governance"],
                     metadata={
-                        "topic_id": topic_id, "session_key": session_key,
-                        "status": status, "score": approval_result.get("score", 0),
+                        "topic_id": topic_id,
+                        "session_key": session_key,
+                        "status": status,
+                        "score": approval_result.get("score", 0),
                     },
                 )
         else:
@@ -380,7 +414,9 @@ async def handle_forum_commands(engine: AlphaEngine, target: str, action: str, v
         payload = engine._parse_json_payload(target)
         topic_id = str(payload.get("topic_id", "")).strip().upper()
         if not topic_id:
-            await engine.telegram.send_message("❌ Usage: `forum thread TOPIC-XXXXX`", priority="high")
+            await engine.telegram.send_message(
+                "❌ Usage: `forum thread TOPIC-XXXXX`", priority="high"
+            )
             return True
         detail = engine.forum.get_topic_detail(topic_id)
         if not detail:
@@ -451,7 +487,10 @@ async def handle_forum_commands(engine: AlphaEngine, target: str, action: str, v
 
 # ── Bot Reputation & Points ───────────────────────────────────────────
 
-async def handle_reputation_commands(engine: AlphaEngine, target: str, action: str, value: float) -> bool:
+
+async def handle_reputation_commands(
+    engine: AlphaEngine, target: str, action: str, value: float
+) -> bool:
     """Handle REP_* control commands."""
     if getattr(engine, "reputation", None) is None:
         return False
@@ -462,7 +501,9 @@ async def handle_reputation_commands(engine: AlphaEngine, target: str, action: s
         limit = max(1, min(25, int(payload.get("limit", 10))))
         board = engine.reputation.leaderboard(limit=limit)
         if not board:
-            await engine.telegram.send_as(EMERALD, "🏆 Leaderboard is empty — no bots registered yet.")
+            await engine.telegram.send_as(
+                EMERALD, "🏆 Leaderboard is empty — no bots registered yet."
+            )
         else:
             lines = [f"🏆 **Bot Leaderboard** (top {len(board)})\n"]
             for i, entry in enumerate(board, 1):
@@ -491,7 +532,9 @@ async def handle_reputation_commands(engine: AlphaEngine, target: str, action: s
         if not result.get("ok"):
             await engine.telegram.send_as(EMERALD, f"⚠️ Bot `{bot_id.upper()}` not found.")
         else:
-            status_emoji = {"active": "🟢", "warned": "🟡", "banned": "🔴"}.get(result.get("status", ""), "⚪")
+            status_emoji = {"active": "🟢", "warned": "🟡", "banned": "🔴"}.get(
+                result.get("status", ""), "⚪"
+            )
             lines = [
                 f"📊 **Bot Reputation: `{result['bot_id']}`** {status_emoji}\n",
                 f"Score: **{result.get('score', 0):.0f}** | Composite: **{result.get('composite', 0):.1f}**",
@@ -565,7 +608,10 @@ async def handle_reputation_commands(engine: AlphaEngine, target: str, action: s
 
 # ── Swarm Intelligence ────────────────────────────────────────────────
 
-async def handle_swarm_commands(engine: AlphaEngine, target: str, action: str, value: float) -> bool:
+
+async def handle_swarm_commands(
+    engine: AlphaEngine, target: str, action: str, value: float
+) -> bool:
     """Handle SWARM_* control commands."""
     if getattr(engine, "swarm", None) is None:
         return False
@@ -582,9 +628,14 @@ async def handle_swarm_commands(engine: AlphaEngine, target: str, action: str, v
         target_price = float(payload.get("target_price", 0))
         stop_loss = float(payload.get("stop_loss", 0))
         result = engine.swarm.submit_idea(
-            bot_id=bot_id, symbol=symbol, direction=direction,
-            confidence=confidence, timeframe=timeframe, rationale=rationale,
-            target_price=target_price, stop_loss=stop_loss,
+            bot_id=bot_id,
+            symbol=symbol,
+            direction=direction,
+            confidence=confidence,
+            timeframe=timeframe,
+            rationale=rationale,
+            target_price=target_price,
+            stop_loss=stop_loss,
         )
         if result.get("ok"):
             arrow = "🟢 LONG" if result["direction"] == "LONG" else "🔴 SHORT"
@@ -596,7 +647,9 @@ async def handle_swarm_commands(engine: AlphaEngine, target: str, action: str, v
                 priority="medium",
             )
         else:
-            await engine.telegram.send_as(EMERALD, f"⚠️ Swarm idea rejected: {result.get('error', '?')}")
+            await engine.telegram.send_as(
+                EMERALD, f"⚠️ Swarm idea rejected: {result.get('error', '?')}"
+            )
         return True
 
     if normalized == "SWARM_AGGREGATE":
@@ -607,11 +660,16 @@ async def handle_swarm_commands(engine: AlphaEngine, target: str, action: str, v
             return True
         result = engine.swarm.aggregate(symbol)
         if not result.get("ok"):
-            await engine.telegram.send_as(EMERALD, f"⚠️ Aggregation failed: {result.get('error', '?')}")
+            await engine.telegram.send_as(
+                EMERALD, f"⚠️ Aggregation failed: {result.get('error', '?')}"
+            )
             return True
         consensus_emoji = {
-            "LONG": "🟢", "SHORT": "🔴", "LEAN_LONG": "🟡↗",
-            "LEAN_SHORT": "🟡↘", "NEUTRAL": "⚪",
+            "LONG": "🟢",
+            "SHORT": "🔴",
+            "LEAN_LONG": "🟡↗",
+            "LEAN_SHORT": "🟡↘",
+            "NEUTRAL": "⚪",
         }.get(result["consensus"], "⚪")
         lines = [
             f"🐝 **Swarm Consensus: `{symbol}`** {consensus_emoji}\n",
@@ -669,7 +727,10 @@ async def handle_swarm_commands(engine: AlphaEngine, target: str, action: str, v
 
 # ── Collaborative Learning & Outreach ─────────────────────────────────
 
-async def handle_learning_commands(engine: AlphaEngine, target: str, action: str, value: float) -> bool:
+
+async def handle_learning_commands(
+    engine: AlphaEngine, target: str, action: str, value: float
+) -> bool:
     """Handle LEARN_* and OUTREACH_* control commands."""
     if getattr(engine, "learning", None) is None:
         return False
@@ -691,7 +752,9 @@ async def handle_learning_commands(engine: AlphaEngine, target: str, action: str
         if symbols:
             lines.append("\n**Symbols:**")
             for s in symbols[:5]:
-                edge_emoji = "🟢" if s["edge"] == "positive" else ("🔴" if s["edge"] == "negative" else "⚪")
+                edge_emoji = (
+                    "🟢" if s["edge"] == "positive" else ("🔴" if s["edge"] == "negative" else "⚪")
+                )
                 lines.append(
                     f"  {edge_emoji} `{s['symbol']}` — {s['win_rate']:.0%} win "
                     f"({s['count']} trades, ${s['total_pnl']:+,.2f})"
@@ -702,19 +765,27 @@ async def handle_learning_commands(engine: AlphaEngine, target: str, action: str
             for d in ("LONG", "SHORT"):
                 dd = directions.get(d, {})
                 if dd.get("count", 0) > 0:
-                    lines.append(f"  {'🟢' if d == 'LONG' else '🔴'} {d}: {dd['win_rate']:.0%} win ({dd['count']} trades)")
+                    lines.append(
+                        f"  {'🟢' if d == 'LONG' else '🔴'} {d}: {dd['win_rate']:.0%} win ({dd['count']} trades)"
+                    )
         cal = report.get("conviction_calibration", [])
         if cal:
             lines.append("\n**Conviction Calibration:**")
             for c in cal:
                 cal_ok = "✅" if c.get("calibrated") else "⚠️"
-                lines.append(f"  {cal_ok} {c['conviction_range']}: {c['actual_win_rate']:.0%} actual ({c['count']} trades)")
+                lines.append(
+                    f"  {cal_ok} {c['conviction_range']}: {c['actual_win_rate']:.0%} actual ({c['count']} trades)"
+                )
         synergy = report.get("bot_synergy", [])
         if synergy:
             lines.append("\n**Bot Synergy:**")
             for s in synergy[:5]:
-                syn_emoji = "🤝" if s["synergy"] == "strong" else ("💥" if s["synergy"] == "weak" else "🤷")
-                lines.append(f"  {syn_emoji} `{s['pair']}` — {s['win_rate']:.0%} ({s['count']} trades)")
+                syn_emoji = (
+                    "🤝" if s["synergy"] == "strong" else ("💥" if s["synergy"] == "weak" else "🤷")
+                )
+                lines.append(
+                    f"  {syn_emoji} `{s['pair']}` — {s['win_rate']:.0%} ({s['count']} trades)"
+                )
         await engine.telegram.send_message("\n".join(lines), priority="medium")
         return True
 
@@ -739,7 +810,9 @@ async def handle_learning_commands(engine: AlphaEngine, target: str, action: str
         sym_bias = engine.learning.get_symbol_bias(symbol) if symbol else 0.0
         dir_bias = engine.learning.get_direction_bias(direction) if direction else 0.0
         tf_bias = engine.learning.get_timeframe_bias(timeframe)
-        adjusted = engine.learning.adaptive_confidence(symbol or "?", direction or "LONG", timeframe, 0.5)
+        adjusted = engine.learning.adaptive_confidence(
+            symbol or "?", direction or "LONG", timeframe, 0.5
+        )
         lines = ["📚 **Learning Bias Check**\n"]
         if symbol:
             lines.append(f"Symbol `{symbol}`: bias = {sym_bias:+.2f}")
@@ -757,7 +830,9 @@ async def handle_learning_commands(engine: AlphaEngine, target: str, action: str
         custom_body = str(payload.get("custom_body", ""))
         s = engine.learning.summary()
         post = engine.outreach.compose_outreach(
-            template=template, symbol=symbol, custom_body=custom_body,
+            template=template,
+            symbol=symbol,
+            custom_body=custom_body,
             total_ideas=s.get("total_records", 0),
             win_rate=round(s.get("overall_win_rate", 0) * 100, 1),
         )
@@ -772,18 +847,23 @@ async def handle_learning_commands(engine: AlphaEngine, target: str, action: str
                 f"⏳ Outreach on cooldown — wait {cooldown['wait_seconds']}s.", priority="medium"
             )
             return True
-        dispatch_result = engine.forum.publish_scout_note({
-            "title": post["title"], "body": post["body"],
-            "category": post.get("category", "trade_idea"),
-            "lane": post.get("lane", "external"), "source": "molthub_outreach",
-        })
+        dispatch_result = engine.forum.publish_scout_note(
+            {
+                "title": post["title"],
+                "body": post["body"],
+                "category": post.get("category", "trade_idea"),
+                "lane": post.get("lane", "external"),
+                "source": "molthub_outreach",
+            }
+        )
         engine.outreach.record_dispatch(post, dispatch_result)
         ok = dispatch_result.get("ok", False)
         mode = dispatch_result.get("mode", "local")
         await engine.telegram.send_message(
             f"📡 **Outreach {'dispatched' if ok else 'failed'}** "
             f"(template=`{template}`, mode=`{mode}`"
-            + (f", symbol=`{symbol}`" if symbol else "") + ")",
+            + (f", symbol=`{symbol}`" if symbol else "")
+            + ")",
             priority="medium",
         )
         return True
@@ -819,6 +899,7 @@ async def handle_learning_commands(engine: AlphaEngine, target: str, action: str
 
 # ── Task Management ───────────────────────────────────────────────────
 
+
 async def handle_task_commands(engine: AlphaEngine, target: str, action: str, value: float) -> bool:
     """Handle TASK_* control commands."""
     if getattr(engine, "tasks", None) is None:
@@ -832,7 +913,9 @@ async def handle_task_commands(engine: AlphaEngine, target: str, action: str, va
             parts = str(target or "").strip().split("|")
             title = parts[0].strip() if parts else ""
         if not title:
-            await engine.telegram.send_message("❌ Task title required. Use `task create <title>`.", priority="high")
+            await engine.telegram.send_message(
+                "❌ Task title required. Use `task create <title>`.", priority="high"
+            )
             return True
         phase = str(payload.get("phase", "")).strip()
         agent = str(payload.get("agent", "UNASSIGNED")).strip()
@@ -841,12 +924,18 @@ async def handle_task_commands(engine: AlphaEngine, target: str, action: str, va
         tags_raw = payload.get("tags")
         tags = tags_raw if isinstance(tags_raw, list) else None
         result = engine.tasks.create_task(
-            title=title, phase=phase, agent=agent,
-            priority=priority, description=description, tags=tags,
+            title=title,
+            phase=phase,
+            agent=agent,
+            priority=priority,
+            description=description,
+            tags=tags,
         )
         if result.get("ok"):
             task = result["task"]
-            engine.telegram.record_activity(EMERALD, "task", f"Created {task['task_id']}: {task['title']}")
+            engine.telegram.record_activity(
+                EMERALD, "task", f"Created {task['task_id']}: {task['title']}"
+            )
             await engine.telegram.send_message(
                 f"✅ Task created: `{task['task_id']}`\nTitle: {task['title']}\n"
                 f"Agent: {task['agent']} | Priority: {task['priority']}\nStatus: {task['status']}",
@@ -866,13 +955,23 @@ async def handle_task_commands(engine: AlphaEngine, target: str, action: str, va
         result = engine.tasks.list_tasks(phase=phase, agent=agent, status=status_filter, limit=20)
         tasks_list = result.get("tasks", [])
         if not tasks_list:
-            await engine.telegram.send_message("📋 No tasks found matching filters.", priority="medium")
+            await engine.telegram.send_message(
+                "📋 No tasks found matching filters.", priority="medium"
+            )
             return True
         lines = [f"📋 **Tasks** ({result['showing']}/{result['total']})\n"]
-        status_emoji = {"pending": "⏳", "in_progress": "🔄", "completed": "✅", "blocked": "🚫", "cancelled": "❌"}
+        status_emoji = {
+            "pending": "⏳",
+            "in_progress": "🔄",
+            "completed": "✅",
+            "blocked": "🚫",
+            "cancelled": "❌",
+        }
         for t in tasks_list:
             emoji = status_emoji.get(t["status"], "•")
-            lines.append(f"{emoji} `{t['task_id']}` — {t['title']}\n   Agent: {t['agent']} | {t['priority']} | {t['status']}")
+            lines.append(
+                f"{emoji} `{t['task_id']}` — {t['title']}\n   Agent: {t['agent']} | {t['priority']} | {t['status']}"
+            )
         await engine.telegram.send_message("\n".join(lines), priority="medium")
         return True
 
@@ -883,21 +982,29 @@ async def handle_task_commands(engine: AlphaEngine, target: str, action: str, va
             parts = str(target or "").strip().split()
             task_id = parts[0] if parts else ""
         if not task_id:
-            await engine.telegram.send_message("❌ Task ID required. Use `task update <TASK-ID> <status>`.", priority="high")
+            await engine.telegram.send_message(
+                "❌ Task ID required. Use `task update <TASK-ID> <status>`.", priority="high"
+            )
             return True
         new_status = str(payload.get("status", "")).strip()
         new_priority = str(payload.get("priority", "")).strip()
         new_agent = str(payload.get("agent", "")).strip()
-        result = engine.tasks.update_task(task_id=task_id, status=new_status, priority=new_priority, agent=new_agent)
+        result = engine.tasks.update_task(
+            task_id=task_id, status=new_status, priority=new_priority, agent=new_agent
+        )
         if result.get("ok"):
             task = result["task"]
-            engine.telegram.record_activity(EMERALD, "task", f"Updated {task['task_id']}: status={task['status']}")
+            engine.telegram.record_activity(
+                EMERALD, "task", f"Updated {task['task_id']}: status={task['status']}"
+            )
             await engine.telegram.send_message(
                 f"✅ Task updated: `{task['task_id']}`\nStatus: {task['status']} | Priority: {task['priority']}\nAgent: {task['agent']}",
                 priority="medium",
             )
         else:
-            await engine.telegram.send_message(f"❌ Update failed: {result.get('error', 'unknown')}", priority="high")
+            await engine.telegram.send_message(
+                f"❌ Update failed: {result.get('error', 'unknown')}", priority="high"
+            )
         return True
 
     if normalized == "TASK_REPORT":
@@ -910,7 +1017,12 @@ async def handle_task_commands(engine: AlphaEngine, target: str, action: str, va
             return True
         ms = result["milestones_summary"]
         dlv = result["deliverables_summary"]
-        lines = ["📊 **Task Progress Report**\n", f"Total tasks: {result['total']}", f"Completion: {result['completion_rate'] * 100:.1f}%\n", "**By status:**"]
+        lines = [
+            "📊 **Task Progress Report**\n",
+            f"Total tasks: {result['total']}",
+            f"Completion: {result['completion_rate'] * 100:.1f}%\n",
+            "**By status:**",
+        ]
         for s, count in sorted(result["by_status"].items()):
             lines.append(f"  • {s}: {count}")
         lines.append("\n**By agent:**")
@@ -949,24 +1061,40 @@ async def handle_task_commands(engine: AlphaEngine, target: str, action: str, va
         if not agent:
             agent = str(target or "").strip().upper().split()[0] if target else ""
         if not agent:
-            await engine.telegram.send_message("❌ Agent name required. Use `task agent <AGENT>`.", priority="high")
+            await engine.telegram.send_message(
+                "❌ Agent name required. Use `task agent <AGENT>`.", priority="high"
+            )
             return True
         result = engine.tasks.agent_report(agent)
         if not result.get("ok"):
-            await engine.telegram.send_message(f"❌ {result.get('error', 'Agent report failed.')}", priority="high")
+            await engine.telegram.send_message(
+                f"❌ {result.get('error', 'Agent report failed.')}", priority="high"
+            )
             return True
         if result["total"] == 0:
-            await engine.telegram.send_message(f"📊 No tasks assigned to {agent}.", priority="medium")
+            await engine.telegram.send_message(
+                f"📊 No tasks assigned to {agent}.", priority="medium"
+            )
             return True
         lines = [
             f"📊 **{agent} Task Report**\n",
             f"Total: {result['total']} | Done: {result['completed']} | Active: {result['in_progress']}",
             f"Blocked: {result['blocked']} | Completion: {result['completion_rate'] * 100:.1f}%\n",
         ]
-        status_emoji = {"pending": "⏳", "in_progress": "🔄", "completed": "✅", "blocked": "🚫", "cancelled": "❌"}
+        status_emoji = {
+            "pending": "⏳",
+            "in_progress": "🔄",
+            "completed": "✅",
+            "blocked": "🚫",
+            "cancelled": "❌",
+        }
         for t in result["tasks"][:15]:
             emoji = status_emoji.get(t["status"], "•")
-            ms_str = f" MS:{t['milestones_done']}/{t['milestones_total']}" if t["milestones_total"] else ""
+            ms_str = (
+                f" MS:{t['milestones_done']}/{t['milestones_total']}"
+                if t["milestones_total"]
+                else ""
+            )
             lines.append(f"{emoji} `{t['task_id']}` {t['title']}{ms_str}")
         await engine.telegram.send_message("\n".join(lines), priority="medium")
         return True
@@ -976,7 +1104,10 @@ async def handle_task_commands(engine: AlphaEngine, target: str, action: str, va
 
 # ── Scout/Forum Publishing ────────────────────────────────────────────
 
-async def handle_scout_commands(engine: AlphaEngine, target: str, action: str, value: float) -> bool:
+
+async def handle_scout_commands(
+    engine: AlphaEngine, target: str, action: str, value: float
+) -> bool:
     """Handle SCOUT_* and FORUM_SCOUT_* control commands."""
     if getattr(engine, "forum", None) is None:
         return False
@@ -993,7 +1124,8 @@ async def handle_scout_commands(engine: AlphaEngine, target: str, action: str, v
                 f"Agent: `{profile.get('agent_id', 'SAPPHIRE_SCOUT')}`\n"
                 f"Sensitive access: `{profile.get('sensitive_data_access', 'none')}`\n"
                 f"Registered: `{'YES' if registration.get('registered') else 'NO'}`"
-                + (f" (@{registration.get('username')})" if registration.get("username") else "") + "\n"
+                + (f" (@{registration.get('username')})" if registration.get("username") else "")
+                + "\n"
                 f"Dispatch mode: `{bridge.get('dispatch_mode', 'none')}`\n"
                 f"External register URL: `{'YES' if bridge.get('register_url_configured') else 'NO'}`\n"
                 f"External post URL: `{'YES' if bridge.get('post_url_configured') else 'NO'}`\n"
@@ -1011,20 +1143,25 @@ async def handle_scout_commands(engine: AlphaEngine, target: str, action: str, v
             username = fallback_username.strip()
         if not username:
             await engine.telegram.send_message(
-                "❌ Scout register requires a username. Use `/scout register <username> [display_name]`.", priority="high"
+                "❌ Scout register requires a username. Use `/scout register <username> [display_name]`.",
+                priority="high",
             )
             return True
         display_name = str(payload.get("display_name", "")).strip()
         if not display_name:
             chunks = str(target or "").strip().split(" ", 1)
             display_name = chunks[1].strip() if len(chunks) > 1 else "Sapphire Scout"
-        bio = str(payload.get("bio", "")).strip() or "Least-privilege scout for public collaboration. No secrets, no trading actions."
+        bio = (
+            str(payload.get("bio", "")).strip()
+            or "Least-privilege scout for public collaboration. No secrets, no trading actions."
+        )
         result = await engine._handle_forum_scout_register_request(
             {"username": username, "display_name": display_name, "bio": bio}
         )
         if not result.get("ok"):
             await engine.telegram.send_message(
-                f"❌ Scout registration failed.\nReason: `{result.get('error', 'unknown')}`", priority="high"
+                f"❌ Scout registration failed.\nReason: `{result.get('error', 'unknown')}`",
+                priority="high",
             )
         return True
 
@@ -1035,24 +1172,28 @@ async def handle_scout_commands(engine: AlphaEngine, target: str, action: str, v
             body = str(target or "").strip()
         if not body:
             await engine.telegram.send_message(
-                "❌ Scout publish requires message body text. Use `/scout publish <note>`.", priority="high"
+                "❌ Scout publish requires message body text. Use `/scout publish <note>`.",
+                priority="high",
             )
             return True
-        result = await engine._handle_forum_scout_publish_request({
-            "topic_id": str(payload.get("topic_id", "")).strip(),
-            "post_id": str(payload.get("post_id", "")).strip(),
-            "title": str(payload.get("title", "")).strip(),
-            "body": body,
-            "author": str(payload.get("author", "")).strip() or "SAPPHIRE_SCOUT",
-            "kind": str(payload.get("kind", "")).strip() or "note",
-            "lane": str(payload.get("lane", "")).strip() or "external",
-            "state": str(payload.get("state", "")).strip() or "open",
-            "priority": str(payload.get("priority", "")).strip() or "medium",
-            "tags": payload.get("tags", ["scout", "external"]),
-        })
+        result = await engine._handle_forum_scout_publish_request(
+            {
+                "topic_id": str(payload.get("topic_id", "")).strip(),
+                "post_id": str(payload.get("post_id", "")).strip(),
+                "title": str(payload.get("title", "")).strip(),
+                "body": body,
+                "author": str(payload.get("author", "")).strip() or "SAPPHIRE_SCOUT",
+                "kind": str(payload.get("kind", "")).strip() or "note",
+                "lane": str(payload.get("lane", "")).strip() or "external",
+                "state": str(payload.get("state", "")).strip() or "open",
+                "priority": str(payload.get("priority", "")).strip() or "medium",
+                "tags": payload.get("tags", ["scout", "external"]),
+            }
+        )
         if not result.get("ok"):
             await engine.telegram.send_message(
-                f"❌ Scout publish failed.\nReason: `{result.get('error', 'unknown')}`", priority="high"
+                f"❌ Scout publish failed.\nReason: `{result.get('error', 'unknown')}`",
+                priority="high",
             )
             return True
         dispatch = result.get("dispatch", {}) if isinstance(result, dict) else {}
@@ -1075,7 +1216,9 @@ async def handle_scout_commands(engine: AlphaEngine, target: str, action: str, v
             else:
                 outcome = "provider cooldown active; retry after the next rate-limit window."
         elif reason == "moltbook_pending_claim":
-            outcome = "account is pending claim; owner claim completion is required before publishing."
+            outcome = (
+                "account is pending claim; owner claim completion is required before publishing."
+            )
         elif reason == "moltbook_already_registered":
             outcome = "provider already has this scout account registered."
         elif not dispatch.get("dispatched"):
@@ -1098,7 +1241,10 @@ async def handle_scout_commands(engine: AlphaEngine, target: str, action: str, v
 
 # ── Execution & Trading Configuration ─────────────────────────────────
 
-async def handle_execution_commands(engine: AlphaEngine, target: str, action: str, value: float) -> bool:
+
+async def handle_execution_commands(
+    engine: AlphaEngine, target: str, action: str, value: float
+) -> bool:
     """Handle execution stage, TradingView config, autonomy session, and venue allocation commands."""
     normalized = action.upper()
 
@@ -1106,7 +1252,8 @@ async def handle_execution_commands(engine: AlphaEngine, target: str, action: st
         requested = engine._parse_execution_stage_token(target)
         if not requested:
             await engine.telegram.send_message(
-                "❌ Invalid stage. Use one of: `paper`, `staged_live`, `full_live`.", priority="high"
+                "❌ Invalid stage. Use one of: `paper`, `staged_live`, `full_live`.",
+                priority="high",
             )
             return True
         applied = engine._set_execution_stage(requested, source="telegram")
@@ -1135,7 +1282,8 @@ async def handle_execution_commands(engine: AlphaEngine, target: str, action: st
         mode = str(target or "").strip().upper()
         if mode not in {"ON", "OFF", "TRUE", "FALSE", "1", "0"}:
             await engine.telegram.send_message(
-                "❌ Invalid TradingView signal mode. Use `/trade on [qty]` or `/trade off`.", priority="high"
+                "❌ Invalid TradingView signal mode. Use `/trade on [qty]` or `/trade off`.",
+                priority="high",
             )
             return True
         enable_execution = mode in {"ON", "TRUE", "1"}
@@ -1146,12 +1294,18 @@ async def handle_execution_commands(engine: AlphaEngine, target: str, action: st
             if quantity_value > 0:
                 quantity_result = engine._set_tradingview_default_quantity(quantity_value)
             elif engine._tradingview_default_quantity <= 0:
-                quantity_result = engine._set_tradingview_default_quantity(engine._recommended_default_trade_quantity())
+                quantity_result = engine._set_tradingview_default_quantity(
+                    engine._recommended_default_trade_quantity()
+                )
         engine._record_system_log(
             f"TradingView signal mode set to {'LIVE' if enable_execution else 'WORKBENCH_DRY-RUN'}"
             + (f" (qty={engine._tradingview_default_quantity})" if enable_execution else ""),
-            level="warning", tags=["control", "execution_mode"],
-            metadata={"execution_enabled": enable_execution, "default_quantity": engine._tradingview_default_quantity},
+            level="warning",
+            tags=["control", "execution_mode"],
+            metadata={
+                "execution_enabled": enable_execution,
+                "default_quantity": engine._tradingview_default_quantity,
+            },
         )
         if enable_execution:
             qty_note = f"Default qty `{engine._tradingview_default_quantity}`."
@@ -1160,7 +1314,9 @@ async def handle_execution_commands(engine: AlphaEngine, target: str, action: st
                     f"Default qty capped to `{quantity_result.get('applied')}` "
                     f"(cap `{quantity_result.get('cap')}`)."
                 )
-            await engine.telegram.send_message(f"✅ TradingView signal mode: `LIVE`. {qty_note}", priority="high")
+            await engine.telegram.send_message(
+                f"✅ TradingView signal mode: `LIVE`. {qty_note}", priority="high"
+            )
         else:
             await engine.telegram.send_message(
                 "🧪 TradingView signal mode: `WORKBENCH_DRY-RUN` (signals captured for research/backtests only).",
@@ -1178,14 +1334,19 @@ async def handle_execution_commands(engine: AlphaEngine, target: str, action: st
             return True
         result = engine._set_tradingview_default_quantity(float(value or 0.0))
         if not result.get("ok"):
-            await engine.telegram.send_message("❌ Default quantity must be greater than zero.", priority="high")
+            await engine.telegram.send_message(
+                "❌ Default quantity must be greater than zero.", priority="high"
+            )
             return True
         engine._record_system_log(
             "TradingView default quantity updated",
-            level="warning", tags=["control", "execution_mode"],
+            level="warning",
+            tags=["control", "execution_mode"],
             metadata={
-                "requested_quantity": result.get("requested"), "applied_quantity": result.get("applied"),
-                "capped": bool(result.get("capped")), "cap": result.get("cap"),
+                "requested_quantity": result.get("requested"),
+                "applied_quantity": result.get("applied"),
+                "capped": bool(result.get("capped")),
+                "cap": result.get("cap"),
             },
         )
         if result.get("capped"):
@@ -1207,18 +1368,25 @@ async def handle_execution_commands(engine: AlphaEngine, target: str, action: st
         note = str(decision_payload.get("note", "")).strip()[:400]
         pending_keys = engine._pending_autonomy_session_keys()
         if not pending_keys:
-            await engine.telegram.send_message("ℹ️ No pending autonomy sessions to approve.", priority="high")
+            await engine.telegram.send_message(
+                "ℹ️ No pending autonomy sessions to approve.", priority="high"
+            )
             return True
         success_count = 0
         failed: list[str] = []
         for session_key in pending_keys:
             result = await engine._apply_autonomy_session_decision(
-                session_key=session_key, decision="APPROVE", note=note, source="owner_bulk",
+                session_key=session_key,
+                decision="APPROVE",
+                note=note,
+                source="owner_bulk",
             )
             if result.get("dispatched"):
                 success_count += 1
             else:
-                failed.append(f"{result.get('session_key', session_key)}:{result.get('reason', 'unknown')}")
+                failed.append(
+                    f"{result.get('session_key', session_key)}:{result.get('reason', 'unknown')}"
+                )
         if failed:
             await engine.telegram.send_message(
                 f"⚠️ Bulk approval completed with partial failures.\n"
@@ -1243,11 +1411,15 @@ async def handle_execution_commands(engine: AlphaEngine, target: str, action: st
         decision = "APPROVE" if normalized == "APPROVE_SESSION" else "REJECT"
         if not session_key:
             await engine.telegram.send_message(
-                "⚠️ No pending autonomy session found. Trigger one with `/autonomy` first.", priority="high"
+                "⚠️ No pending autonomy session found. Trigger one with `/autonomy` first.",
+                priority="high",
             )
             return True
         result = await engine._apply_autonomy_session_decision(
-            session_key=session_key, decision=decision, note=note, source="owner_manual",
+            session_key=session_key,
+            decision=decision,
+            note=note,
+            source="owner_manual",
         )
         if result.get("dispatched"):
             await engine.telegram.send_message(
@@ -1276,13 +1448,16 @@ async def handle_execution_commands(engine: AlphaEngine, target: str, action: st
         )
         unknown = [venue for venue in targets if venue not in dispatcher.bot_urls]
         if unknown:
-            await engine.telegram.send_message(f"❌ Unknown venue(s): `{', '.join(unknown)}`", priority="high")
+            await engine.telegram.send_message(
+                f"❌ Unknown venue(s): `{', '.join(unknown)}`", priority="high"
+            )
             return True
         for venue in targets:
             dispatcher.set_venue_allocation(venue, allocation)
             if allocation <= 0:
                 dispatcher.pause_venue(
-                    venue, reason="Manual deallocation via Telegram",
+                    venue,
+                    reason="Manual deallocation via Telegram",
                     cooldown_seconds=max(engine._deallocation_cooldown_seconds, 3600),
                 )
             else:
@@ -1293,12 +1468,17 @@ async def handle_execution_commands(engine: AlphaEngine, target: str, action: st
         if allocation <= 0:
             engine._record_system_log(
                 f"Manual deallocation applied to {', '.join(targets)}",
-                level="warning", tags=["control", "allocation"], metadata={"allocation": allocation},
+                level="warning",
+                tags=["control", "allocation"],
+                metadata={"allocation": allocation},
             )
             await engine._publish_risk_alert(
-                action="halt_trading", severity="warning", alert_type="manual_deallocation",
+                action="halt_trading",
+                severity="warning",
+                alert_type="manual_deallocation",
                 message=f"Manual deallocation: {', '.join(targets)} set to 0%",
-                platforms=targets, metadata={"source": "telegram", "allocation": allocation},
+                platforms=targets,
+                metadata={"source": "telegram", "allocation": allocation},
             )
             await engine.telegram.send_message(
                 f"🧯 Deallocated `{', '.join(targets)}` to `0%` and halted trading on those venues.",
@@ -1306,16 +1486,21 @@ async def handle_execution_commands(engine: AlphaEngine, target: str, action: st
             )
         else:
             engine._record_system_log(
-                f"Manual allocation set for {', '.join(targets)} to {allocation*100:.0f}%",
-                level="info", tags=["control", "allocation"], metadata={"allocation": allocation},
+                f"Manual allocation set for {', '.join(targets)} to {allocation * 100:.0f}%",
+                level="info",
+                tags=["control", "allocation"],
+                metadata={"allocation": allocation},
             )
             await engine._publish_risk_alert(
-                action="resume_trading", severity="warning", alert_type="manual_allocation",
-                message=f"Manual allocation update: {', '.join(targets)} set to {allocation*100:.0f}%",
-                platforms=targets, metadata={"source": "telegram", "allocation": allocation},
+                action="resume_trading",
+                severity="warning",
+                alert_type="manual_allocation",
+                message=f"Manual allocation update: {', '.join(targets)} set to {allocation * 100:.0f}%",
+                platforms=targets,
+                metadata={"source": "telegram", "allocation": allocation},
             )
             await engine.telegram.send_message(
-                f"✅ Allocation for `{', '.join(targets)}` set to `{allocation*100:.0f}%`.",
+                f"✅ Allocation for `{', '.join(targets)}` set to `{allocation * 100:.0f}%`.",
                 priority="high",
             )
         return True
@@ -1325,7 +1510,10 @@ async def handle_execution_commands(engine: AlphaEngine, target: str, action: st
 
 # ── Core Control (kill switch, status, portfolio, etc.) ───────────────
 
-async def handle_core_control_commands(engine: AlphaEngine, target: str, action: str, value: float) -> bool:
+
+async def handle_core_control_commands(
+    engine: AlphaEngine, target: str, action: str, value: float
+) -> bool:
     """Handle core control commands: kill switch, status, portfolio, memory, focus, promotion, autonomy, owner chat."""
     normalized = action.upper()
 
@@ -1373,7 +1561,9 @@ async def handle_core_control_commands(engine: AlphaEngine, target: str, action:
                 ),
                 priority="high",
             )
-            await engine._send_promotion_gate_report(f"promotion:{applied.get('dex_execution_stage', requested_stage)}")
+            await engine._send_promotion_gate_report(
+                f"promotion:{applied.get('dex_execution_stage', requested_stage)}"
+            )
         else:
             await engine._send_promotion_gate_report("manual")
         return True
@@ -1396,7 +1586,9 @@ async def handle_core_control_commands(engine: AlphaEngine, target: str, action:
         ]
         for venue, info in ctrl.get("venues", {}).items():
             status = "PAUSED" if info.get("paused") else "LIVE"
-            context_lines.append(f"Venue {venue}: {status}, allocation {info.get('allocation', 1.0)*100:.0f}%")
+            context_lines.append(
+                f"Venue {venue}: {status}, allocation {info.get('allocation', 1.0) * 100:.0f}%"
+            )
         port_snap = engine.portfolio.snapshot()
         if port_snap["open_count"] > 0 or port_snap["total_trades"] > 0:
             context_lines.append(
@@ -1443,10 +1635,23 @@ async def handle_core_control_commands(engine: AlphaEngine, target: str, action:
             engine._owner_directive_updated_at = int(time.time())
             await engine.telegram.send_as(agent, "Noted — I'll factor that into our next cycle.")
         lowered = message.lower()
-        if any(kw in lowered for kw in (
-            "focus", "prioritize", "try", "make sure", "please", "want",
-            "should", "need", "let's", "stop", "start", "switch",
-        )):
+        if any(
+            kw in lowered
+            for kw in (
+                "focus",
+                "prioritize",
+                "try",
+                "make sure",
+                "please",
+                "want",
+                "should",
+                "need",
+                "let's",
+                "stop",
+                "start",
+                "switch",
+            )
+        ):
             engine._owner_directive = message[:500]
             engine._owner_directive_updated_at = int(time.time())
         return True
@@ -1501,9 +1706,17 @@ async def handle_core_control_commands(engine: AlphaEngine, target: str, action:
             directive = directive[:500]
         engine._owner_directive = directive
         engine._owner_directive_updated_at = int(time.time())
-        agent = EMERALD if any(w in directive.lower() for w in ("strategy", "optimize", "improve", "review")) else SAPPHIRE
+        agent = (
+            EMERALD
+            if any(w in directive.lower() for w in ("strategy", "optimize", "improve", "review"))
+            else SAPPHIRE
+        )
         await engine.telegram.send_as(agent, f"Got it — steering updated: *{directive[:100]}*")
-        hook_result = await engine.tv_autonomy.dispatch_owner_instruction(directive) if engine.tv_autonomy else {"dispatched": False}
+        hook_result = (
+            await engine.tv_autonomy.dispatch_owner_instruction(directive)
+            if engine.tv_autonomy
+            else {"dispatched": False}
+        )
         if hook_result.get("dispatched"):
             await engine.telegram.send_message(
                 f"Dispatched to OpenClaw agents (`{hook_result.get('session_key', 'n/a')}`).",
@@ -1521,7 +1734,10 @@ async def handle_core_control_commands(engine: AlphaEngine, target: str, action:
 
 # ── Prediction Market Intelligence ────────────────────────────────────
 
-async def handle_prediction_commands(engine: AlphaEngine, target: str, action: str, value: float) -> bool:
+
+async def handle_prediction_commands(
+    engine: AlphaEngine, target: str, action: str, value: float
+) -> bool:
     """Handle /predictions and /prediction commands (Phase 8)."""
     if getattr(engine, "prediction_aggregator", None) is None:
         return False
@@ -1589,7 +1805,10 @@ async def handle_prediction_commands(engine: AlphaEngine, target: str, action: s
 
 # ── Proposal & Operations Commands ─────────────────────────────────────
 
-async def handle_proposal_commands(engine: AlphaEngine, target: str, action: str, value: float) -> bool:
+
+async def handle_proposal_commands(
+    engine: AlphaEngine, target: str, action: str, value: float
+) -> bool:
     """Handle proposal, health, roadmap, and CI commands.
 
     Commands:
@@ -1610,9 +1829,7 @@ async def handle_proposal_commands(engine: AlphaEngine, target: str, action: str
     if normalized in {"PROPOSALS", "PENDING_PROPOSALS", "LIST_PROPOSALS"}:
         pending = engine._pending_proposals()
         if not pending:
-            await engine.telegram.send_message(
-                "✅ No pending proposals.", priority="medium"
-            )
+            await engine.telegram.send_message("✅ No pending proposals.", priority="medium")
             return True
         lines = [f"📋 **Pending Proposals** ({len(pending)})\n"]
         for p in pending[:10]:
@@ -1631,15 +1848,11 @@ async def handle_proposal_commands(engine: AlphaEngine, target: str, action: str
     if normalized in {"DIFF", "SHOW_DIFF", "PROPOSAL_DIFF"}:
         key = str(target or "").strip()
         if not key:
-            await engine.telegram.send_message(
-                "Usage: `/diff <proposal_key>`", priority="high"
-            )
+            await engine.telegram.send_message("Usage: `/diff <proposal_key>`", priority="high")
             return True
         proposal = engine._proposals.get(key)
         if not proposal:
-            await engine.telegram.send_message(
-                f"❌ Proposal `{key}` not found.", priority="high"
-            )
+            await engine.telegram.send_message(f"❌ Proposal `{key}` not found.", priority="high")
             return True
         diff_text = proposal.get("diff", "")
         if not diff_text:
@@ -1735,6 +1948,7 @@ async def handle_proposal_commands(engine: AlphaEngine, target: str, action: str
     if normalized in {"ROADMAP_SYNC", "SYNC_ROADMAP", "ROADMAP"}:
         try:
             from src.collaboration.task_manager import RoadmapParser
+
             parser = RoadmapParser()
             result = parser.generate_tasks(engine.tasks)
             await engine.telegram.send_message(
@@ -1854,14 +2068,18 @@ async def handle_proposal_commands(engine: AlphaEngine, target: str, action: str
                     ago_text = f"{ago // 60}m ago"
                 else:
                     ago_text = f"{ago // 3600}h ago"
-                lines.append(f"{emoji} **{agent_id}**: `{count}` dispatches | last: `{last_trigger}` ({ago_text})")
+                lines.append(
+                    f"{emoji} **{agent_id}**: `{count}` dispatches | last: `{last_trigger}` ({ago_text})"
+                )
             else:
                 lines.append(f"{emoji} **{agent_id}**: `{count}` dispatches | last: never")
 
         if hasattr(engine, "openclaw_dispatcher"):
             status = engine.openclaw_dispatcher.status()
             lines.append(f"\nGateway: `{status['gateway_url']}`")
-            lines.append(f"Enabled: `{status['enabled']}` | Token: `{'✅' if status['token_configured'] else '❌'}`")
+            lines.append(
+                f"Enabled: `{status['enabled']}` | Token: `{'✅' if status['token_configured'] else '❌'}`"
+            )
 
         await engine.telegram.send_message("\n".join(lines), priority="medium")
         return True
@@ -1889,7 +2107,9 @@ CONTROL_HANDLER_CHAIN = [
 ]
 
 
-async def dispatch_control_command(engine: AlphaEngine, target: str, action: str, value: float) -> None:
+async def dispatch_control_command(
+    engine: AlphaEngine, target: str, action: str, value: float
+) -> None:
     """
     Master dispatcher for all control commands.
     Replaces AlphaEngine._handle_control_command.

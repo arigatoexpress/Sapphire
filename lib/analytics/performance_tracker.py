@@ -33,9 +33,9 @@ DATA_DIR = ROOT / "data" / "performance"
 SIGNALS_FILE = DATA_DIR / "signals.jsonl"
 
 # Strategy decay detection
-_DECAY_WINDOW = 20        # last N signals to evaluate
+_DECAY_WINDOW = 20  # last N signals to evaluate
 _DECAY_WIN_RATE_DROP = 0.15  # if rolling win rate drops >15pp vs baseline
-_DECAY_MIN_TRADES = 10    # minimum trades before decay check kicks in
+_DECAY_MIN_TRADES = 10  # minimum trades before decay check kicks in
 
 
 class PerformanceTracker:
@@ -66,21 +66,25 @@ class PerformanceTracker:
             "timeframe": signal.get("timeframe", "24h"),
             "source": signal.get("source", "signal_pipeline"),
             "enhancer_flags": signal.get("enhancer_flags") or [],
-            "outcome": None,   # filled by record_outcome
+            "outcome": None,  # filled by record_outcome
             "exit_price": None,
             "pnl_pct": None,
             "closed_at": None,
         }
         self._append(entry)
-        log.debug("tracked signal %s %s %s (conf %.0f%%)",
-                  signal_id, entry["symbol"], entry["direction"],
-                  (entry["confidence"] or 0) * 100)
+        log.debug(
+            "tracked signal %s %s %s (conf %.0f%%)",
+            signal_id,
+            entry["symbol"],
+            entry["direction"],
+            (entry["confidence"] or 0) * 100,
+        )
         return signal_id
 
     def record_outcome(
         self,
         signal_id: str,
-        outcome: str,          # "win" | "loss" | "timeout"
+        outcome: str,  # "win" | "loss" | "timeout"
         exit_price: float | None = None,
         pnl_pct: float | None = None,
     ) -> bool:
@@ -104,8 +108,12 @@ class PerformanceTracker:
 
         if updated:
             self._file.write_text("\n".join(new_lines) + "\n")
-            log.debug("recorded outcome %s for signal %s (%.1f%%)",
-                      outcome, signal_id, (pnl_pct or 0) * 100)
+            log.debug(
+                "recorded outcome %s for signal %s (%.1f%%)",
+                outcome,
+                signal_id,
+                (pnl_pct or 0) * 100,
+            )
         return updated
 
     # ------------------------------------------------------------------
@@ -143,10 +151,7 @@ class PerformanceTracker:
         wins = [s for s in scored if s["outcome"] == "win"]
 
         win_rate = len(wins) / len(scored) if scored else None
-        avg_pnl = (
-            sum(s["pnl_pct"] or 0 for s in scored) / len(scored)
-            if scored else None
-        )
+        avg_pnl = sum(s["pnl_pct"] or 0 for s in scored) / len(scored) if scored else None
 
         # Per-symbol breakdown
         by_sym: dict[str, dict] = {}
@@ -198,40 +203,48 @@ class PerformanceTracker:
         if len(scored_chrono) < _DECAY_MIN_TRADES:
             return []
 
-        baseline_trades = scored_chrono[:-_DECAY_WINDOW] if len(scored_chrono) > _DECAY_WINDOW else []
+        baseline_trades = (
+            scored_chrono[:-_DECAY_WINDOW] if len(scored_chrono) > _DECAY_WINDOW else []
+        )
         recent_trades = scored_chrono[-_DECAY_WINDOW:]
 
         if not baseline_trades or not recent_trades:
             return []
 
-        baseline_wr = sum(1 for s in baseline_trades if s["outcome"] == "win") / len(baseline_trades)
+        baseline_wr = sum(1 for s in baseline_trades if s["outcome"] == "win") / len(
+            baseline_trades
+        )
         recent_wr = sum(1 for s in recent_trades if s["outcome"] == "win") / len(recent_trades)
         drop = baseline_wr - recent_wr
 
         alerts = []
         if drop >= _DECAY_WIN_RATE_DROP:
-            alerts.append({
-                "type": "win_rate_decay",
-                "severity": "high" if drop >= 0.25 else "moderate",
-                "baseline_win_rate": round(baseline_wr, 3),
-                "recent_win_rate": round(recent_wr, 3),
-                "drop": round(drop, 3),
-                "window": _DECAY_WINDOW,
-                "message": (
-                    f"Win rate dropped {drop:.0%} — {recent_wr:.0%} recent vs "
-                    f"{baseline_wr:.0%} baseline ({_DECAY_WINDOW} trade window)"
-                ),
-            })
+            alerts.append(
+                {
+                    "type": "win_rate_decay",
+                    "severity": "high" if drop >= 0.25 else "moderate",
+                    "baseline_win_rate": round(baseline_wr, 3),
+                    "recent_win_rate": round(recent_wr, 3),
+                    "drop": round(drop, 3),
+                    "window": _DECAY_WINDOW,
+                    "message": (
+                        f"Win rate dropped {drop:.0%} — {recent_wr:.0%} recent vs "
+                        f"{baseline_wr:.0%} baseline ({_DECAY_WINDOW} trade window)"
+                    ),
+                }
+            )
 
         # Also flag if last 5 signals were all losses
         last5 = recent_trades[-5:]
         if len(last5) == 5 and all(s["outcome"] == "loss" for s in last5):
-            alerts.append({
-                "type": "consecutive_losses",
-                "severity": "high",
-                "count": 5,
-                "message": "Last 5 scored signals were losses — review signal quality",
-            })
+            alerts.append(
+                {
+                    "type": "consecutive_losses",
+                    "severity": "high",
+                    "count": 5,
+                    "message": "Last 5 scored signals were losses — review signal quality",
+                }
+            )
 
         return alerts
 

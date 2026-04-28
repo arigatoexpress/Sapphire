@@ -31,7 +31,9 @@ def test_live_cache_payload_is_provenance_stamped(monkeypatch, tmp_path) -> None
 
     calls: list[dict[str, Any]] = []
 
-    def fake_sdk(prompt: str, *, model: str, max_output_tokens: int, api_key: str) -> dict[str, Any]:
+    def fake_sdk(
+        prompt: str, *, model: str, max_output_tokens: int, api_key: str
+    ) -> dict[str, Any]:
         calls.append({"prompt": prompt, "model": model, "api_key": api_key})
         return {
             "text": json.dumps(

@@ -95,9 +95,7 @@ def _artifact_metadata(
             "aux_symbols": list(AUX_SYMBOLS),
         },
         "bar_fingerprints": {
-            symbol: _bar_fingerprint(bars)
-            for symbol, bars in sorted(bars_map.items())
-            if bars
+            symbol: _bar_fingerprint(bars) for symbol, bars in sorted(bars_map.items()) if bars
         },
     }
 
@@ -198,6 +196,7 @@ def _build_aux_map(
 def _print_strategy_summary(all_best: list[SweepResult]) -> None:
     """Print per-strategy aggregate stats across all symbols."""
     from collections import defaultdict
+
     by_cls: dict[str, list[SweepResult]] = defaultdict(list)
     for r in all_best:
         by_cls[r.strategy_cls].append(r)
@@ -212,15 +211,17 @@ def _print_strategy_summary(all_best: list[SweepResult]) -> None:
 
     for avg_srt, cls_name, n, profitable in sorted(rows, reverse=True):
         bar = "█" * max(0, int(avg_srt * 4))
-        print(f"  {cls_name:<30} avg Sortino: {avg_srt:>6.2f}  {bar}  ({profitable}/{n} symbols profitable)")
+        print(
+            f"  {cls_name:<30} avg Sortino: {avg_srt:>6.2f}  {bar}  ({profitable}/{n} symbols profitable)"
+        )
 
 
 def run(days: int = 90, bankroll: float = 10_000.0) -> list[SweepResult]:
     t0 = time.time()
-    print(f"\n{'═'*70}")
+    print(f"\n{'═' * 70}")
     print(f"  Sapphire Strategy Sweep — {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}")
     print(f"  Symbols: {SYMBOLS}   Days: {days}   Bankroll: ${bankroll:,.0f}")
-    print(f"{'═'*70}\n")
+    print(f"{'═' * 70}\n")
 
     # ── 1. Fetch data ────────────────────────────────────────────────────────
     print("── Loading OHLCV ──")
@@ -244,8 +245,12 @@ def run(days: int = 90, bankroll: float = 10_000.0) -> list[SweepResult]:
     # Composite has an extra threshold dimension — we sweep it separately
     non_composite = [s for s in ALL_STRATEGIES if s is not SapphireComposite]
     composite_extra_combos = grid_size * len(COMPOSITE_THRESHOLDS)
-    total_backtests = grid_size * len(active_symbols) * len(non_composite) + composite_extra_combos * len(active_symbols)
-    print(f"\n── Running sweeps ({total_backtests} total backtests across {total_strategies} strategies) ──")
+    total_backtests = grid_size * len(active_symbols) * len(
+        non_composite
+    ) + composite_extra_combos * len(active_symbols)
+    print(
+        f"\n── Running sweeps ({total_backtests} total backtests across {total_strategies} strategies) ──"
+    )
 
     for i, strat_cls in enumerate(non_composite, 1):
         t1 = time.time()
@@ -253,8 +258,15 @@ def run(days: int = 90, bankroll: float = 10_000.0) -> list[SweepResult]:
         all_results.extend(results)
         elapsed = time.time() - t1
         profitable = sum(1 for r in results if r.total_return_pct > 0)
-        log.info("[%d/%d] %-30s  %3d backtests  %d profitable  %.1fs",
-                 i, total_strategies, strat_cls.__name__, len(results), profitable, elapsed)
+        log.info(
+            "[%d/%d] %-30s  %3d backtests  %d profitable  %.1fs",
+            i,
+            total_strategies,
+            strat_cls.__name__,
+            len(results),
+            profitable,
+            elapsed,
+        )
 
     # SapphireComposite: also sweep composite_threshold
     log.info("Sweeping SapphireComposite with threshold range %s...", COMPOSITE_THRESHOLDS)
@@ -262,6 +274,7 @@ def run(days: int = 90, bankroll: float = 10_000.0) -> list[SweepResult]:
     import itertools as _it
 
     from lib.analytics.strategies import PARAM_GRID
+
     for thresh, *combo_vals in _it.product(COMPOSITE_THRESHOLDS, *PARAM_GRID.values()):
         keys = list(PARAM_GRID.keys())
         params = StrategyParams(
@@ -274,27 +287,36 @@ def run(days: int = 90, bankroll: float = 10_000.0) -> list[SweepResult]:
             if not bars:
                 continue
             report = engine.run(bars, strat, sym, aux_map.get(sym, {}))
-            all_results.append(SweepResult(
-                strategy_cls=SapphireComposite.__name__,
-                strategy_name=strat.name,
-                symbol=sym,
-                rsi_period=params.rsi_period,
-                sl_pct=params.sl_pct,
-                tp_pct=params.tp_pct,
-                sortino=report.sortino,
-                sharpe=report.sharpe,
-                total_return_pct=report.total_return_pct,
-                win_rate=report.win_rate,
-                profit_factor=report.profit_factor,
-                max_drawdown_pct=report.max_drawdown_pct,
-                calmar=report.calmar,
-                total_trades=report.total_trades,
-                report=report,
-            ))
+            all_results.append(
+                SweepResult(
+                    strategy_cls=SapphireComposite.__name__,
+                    strategy_name=strat.name,
+                    symbol=sym,
+                    rsi_period=params.rsi_period,
+                    sl_pct=params.sl_pct,
+                    tp_pct=params.tp_pct,
+                    sortino=report.sortino,
+                    sharpe=report.sharpe,
+                    total_return_pct=report.total_return_pct,
+                    win_rate=report.win_rate,
+                    profit_factor=report.profit_factor,
+                    max_drawdown_pct=report.max_drawdown_pct,
+                    calmar=report.calmar,
+                    total_trades=report.total_trades,
+                    report=report,
+                )
+            )
     composite_count = sum(1 for r in all_results if r.strategy_cls == "SapphireComposite")
-    log.info("[5/5] %-30s  %3d backtests  %d profitable",
-             "SapphireComposite", composite_count,
-             sum(1 for r in all_results if r.strategy_cls == "SapphireComposite" and r.total_return_pct > 0))
+    log.info(
+        "[5/5] %-30s  %3d backtests  %d profitable",
+        "SapphireComposite",
+        composite_count,
+        sum(
+            1
+            for r in all_results
+            if r.strategy_cls == "SapphireComposite" and r.total_return_pct > 0
+        ),
+    )
 
     if not all_results:
         log.error("No results produced — all bar loads failed?")
@@ -328,11 +350,13 @@ def run(days: int = 90, bankroll: float = 10_000.0) -> list[SweepResult]:
 
     # ── 5. Comparison table ──────────────────────────────────────────────────
     print("\n")
-    print(format_table(
-        best,
-        title="Sapphire Strategy Comparison — best params per (strategy × symbol)",
-        top_n=len(best),
-    ))
+    print(
+        format_table(
+            best,
+            title="Sapphire Strategy Comparison — best params per (strategy × symbol)",
+            top_n=len(best),
+        )
+    )
 
     _print_strategy_summary(best)
 
@@ -343,7 +367,9 @@ def run(days: int = 90, bankroll: float = 10_000.0) -> list[SweepResult]:
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Sapphire multi-strategy sweep runner")
-    p.add_argument("--days",     type=int,   default=90,       help="Lookback window (default: 90)")
-    p.add_argument("--bankroll", type=float, default=10_000.0, help="Starting capital (default: 10000)")
+    p.add_argument("--days", type=int, default=90, help="Lookback window (default: 90)")
+    p.add_argument(
+        "--bankroll", type=float, default=10_000.0, help="Starting capital (default: 10000)"
+    )
     args = p.parse_args()
     run(days=args.days, bankroll=args.bankroll)

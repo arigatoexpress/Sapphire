@@ -29,10 +29,7 @@ def _control_plane_app_namespace():
     so the dashboard's ``app.py`` (used by test_sensitivity_filter.py)
     is restored after the import block.
     """
-    saved = {
-        name: sys.modules.pop(name, None)
-        for name in ("app", "app.event_stream")
-    }
+    saved = {name: sys.modules.pop(name, None) for name in ("app", "app.event_stream")}
     sys.path.insert(0, str(CP_ROOT))
     try:
         importlib.invalidate_caches()
@@ -81,7 +78,12 @@ def test_severities_match_documented_set():
 
 def test_tag_namespaces_match_documented_set():
     assert TAG_NAMESPACES == {
-        "project", "agent", "priority", "type", "service", "device",
+        "project",
+        "agent",
+        "priority",
+        "type",
+        "service",
+        "device",
     }
 
 
@@ -177,7 +179,9 @@ def test_append_event_appends_rather_than_overwrites(_redirect_event_path):
     append_event("e2", source="t")
     append_event("e3", source="t")
 
-    rows = [json.loads(line) for line in _redirect_event_path.read_text(encoding="utf-8").splitlines()]
+    rows = [
+        json.loads(line) for line in _redirect_event_path.read_text(encoding="utf-8").splitlines()
+    ]
     assert [r["event_type"] for r in rows] == ["e1", "e2", "e3"]
 
 

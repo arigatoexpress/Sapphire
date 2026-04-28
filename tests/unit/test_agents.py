@@ -225,9 +225,7 @@ def test_runner_loads_agent_by_name(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
     (repo_root / "data" / "signals").mkdir(parents=True)
     (repo_root / "plugins" / "claw-sapphire" / "tools").mkdir(parents=True)
-    (repo_root / "plugins" / "claw-sapphire" / "tools" / "market.py").write_text(
-        "print('[]')\n"
-    )
+    (repo_root / "plugins" / "claw-sapphire" / "tools" / "market.py").write_text("print('[]')\n")
     (repo_root / "data" / "paper_portfolio.json").write_text('{"positions": []}\n')
 
     runner = AgentRunner(repo_root=repo_root)

@@ -69,9 +69,7 @@ async def handle_platform_status(engine: Any, _: dict[str, Any]) -> dict[str, An
             venue,
             {"price": 0.0, "status": "offline", "age_seconds": None, "last_tick_ts": None},
         )
-        paused = bool(
-            venue_state.get("paused", False) or venue_state.get("allocation", 0.0) <= 0
-        )
+        paused = bool(venue_state.get("paused", False) or venue_state.get("allocation", 0.0) <= 0)
         feed_status = str(market.get("status", "offline")).lower()
 
         if engine._kill_switch_active:
@@ -245,9 +243,6 @@ async def handle_control_status(engine: Any, _: dict[str, Any]) -> dict[str, Any
     return engine._control_snapshot()
 
 
-
-
-
 # ---------------------------------------------------------------------------
 # Security Endpoints
 # ---------------------------------------------------------------------------
@@ -289,9 +284,7 @@ async def handle_security_skill_scan(engine: Any, payload: dict[str, Any]) -> di
             )
         return result
 
-    batch_result = await engine.vt_scanner.scan_all_skills(
-        upload_if_missing=upload_if_missing
-    )
+    batch_result = await engine.vt_scanner.scan_all_skills(upload_if_missing=upload_if_missing)
     if batch_result.get("ok"):
         engine._record_system_log(
             "VirusTotal batch scan completed",

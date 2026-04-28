@@ -83,9 +83,15 @@ class TestFoundryAuth:
     def test_from_env_no_creds_raises(self, monkeypatch):
         monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
         # Clear all credential vars
-        for v in ("PALANTIR_FOUNDRY_TOKEN", "FOUNDRY_TOKEN", "FOUNDRY_API_TOKEN",
-                   "PALANTIR_FOUNDRY_CLIENT_ID", "FOUNDRY_CLIENT_ID",
-                   "PALANTIR_FOUNDRY_CLIENT_SECRET", "FOUNDRY_CLIENT_SECRET"):
+        for v in (
+            "PALANTIR_FOUNDRY_TOKEN",
+            "FOUNDRY_TOKEN",
+            "FOUNDRY_API_TOKEN",
+            "PALANTIR_FOUNDRY_CLIENT_ID",
+            "FOUNDRY_CLIENT_ID",
+            "PALANTIR_FOUNDRY_CLIENT_SECRET",
+            "FOUNDRY_CLIENT_SECRET",
+        ):
             monkeypatch.delenv(v, raising=False)
         with pytest.raises(FoundryConfigError, match="No Foundry credentials"):
             FoundryAuth.from_env()
@@ -183,10 +189,12 @@ class TestFoundryClientDatasets:
         monkeypatch.setenv("FOUNDRY_ONTOLOGY", "sapphire-prod")
         monkeypatch.setenv("FOUNDRY_UPSERT_ACTION", "bulk-upsert")
         client = self._make_client(monkeypatch)
-        client._get = mock.Mock(side_effect=[
-            {"data": [{"apiName": "sapphire-prod", "rid": "ri.ontology.main.ontology.1"}]},
-            {"data": [{"apiName": "bulk-upsert", "rid": "ri.action.main.action.1"}]},
-        ])
+        client._get = mock.Mock(
+            side_effect=[
+                {"data": [{"apiName": "sapphire-prod", "rid": "ri.ontology.main.ontology.1"}]},
+                {"data": [{"apiName": "bulk-upsert", "rid": "ri.action.main.action.1"}]},
+            ]
+        )
 
         client.validate_upsert_target()
 
@@ -207,10 +215,12 @@ class TestFoundryClientDatasets:
         monkeypatch.setenv("FOUNDRY_ONTOLOGY", "default")
         monkeypatch.setenv("FOUNDRY_UPSERT_ACTION", "sapphire-upsert")
         client = self._make_client(monkeypatch)
-        client._get = mock.Mock(side_effect=[
-            {"data": [{"apiName": "default"}]},
-            {"data": [{"apiName": "other-action"}]},
-        ])
+        client._get = mock.Mock(
+            side_effect=[
+                {"data": [{"apiName": "default"}]},
+                {"data": [{"apiName": "other-action"}]},
+            ]
+        )
 
         with pytest.raises(FoundryConfigError, match="Configured Foundry upsert action"):
             client.validate_upsert_target()
@@ -297,11 +307,13 @@ class TestFoundryClientDatasets:
         monkeypatch.setenv("FOUNDRY_ONTOLOGY", "sapphire-prod")
         client = self._make_client(monkeypatch)
         client.dataset_map = {"PaperTrade": "ri.foundry.main.dataset.paper"}
-        client._get = mock.Mock(side_effect=[
-            {"data": [{"apiName": "sapphire-prod", "rid": "ri.ontology.main.ontology.1"}]},
-            {"data": [{"apiName": "PaperTrade", "rid": "ri.ontology.main.object-type.1"}]},
-            {"rid": "ri.foundry.main.dataset.paper"},
-        ])
+        client._get = mock.Mock(
+            side_effect=[
+                {"data": [{"apiName": "sapphire-prod", "rid": "ri.ontology.main.ontology.1"}]},
+                {"data": [{"apiName": "PaperTrade", "rid": "ri.ontology.main.object-type.1"}]},
+                {"rid": "ri.foundry.main.dataset.paper"},
+            ]
+        )
 
         client.validate_dataset_target(["PaperTrade"])
 
@@ -316,10 +328,12 @@ class TestFoundryClientDatasets:
     def test_validate_dataset_target_raises_when_object_type_missing(self, monkeypatch):
         client = self._make_client(monkeypatch)
         client.dataset_map = {"PaperTrade": "ri.foundry.main.dataset.paper"}
-        client._get = mock.Mock(side_effect=[
-            {"data": [{"apiName": "ontology"}]},
-            {"data": [{"apiName": "OtherType"}]},
-        ])
+        client._get = mock.Mock(
+            side_effect=[
+                {"data": [{"apiName": "ontology"}]},
+                {"data": [{"apiName": "OtherType"}]},
+            ]
+        )
 
         with pytest.raises(FoundryConfigError, match="object type"):
             client.validate_dataset_target(["PaperTrade"])
@@ -447,7 +461,8 @@ class TestAuthHeaderConstruction:
         client = FoundryClient.from_env()
 
         monkeypatch.setattr(
-            _client_mod.urllib.request, "urlopen",
+            _client_mod.urllib.request,
+            "urlopen",
             lambda req, **_kw: _FakeResp(b""),
         )
         assert client._get("/anything") == {}
@@ -479,7 +494,10 @@ class TestAuthHeaderConstruction:
 
         def fake_urlopen(req, **_kw):
             raise urllib.error.HTTPError(
-                req.full_url, 403, "Forbidden", hdrs=None,
+                req.full_url,
+                403,
+                "Forbidden",
+                hdrs=None,
                 fp=io.BytesIO(b'{"errorCode":"ACCESS_DENIED"}'),
             )
 
@@ -552,12 +570,15 @@ class TestOAuthRefresh:
         monkeypatch.setenv("PALANTIR_FOUNDRY_CLIENT_SECRET", "csecret")
         auth = FoundryAuth.from_env()
 
-        responses = iter([
-            _FakeResp(b'{"access_token":"first","expires_in":1}'),
-            _FakeResp(b'{"access_token":"second","expires_in":3600}'),
-        ])
+        responses = iter(
+            [
+                _FakeResp(b'{"access_token":"first","expires_in":1}'),
+                _FakeResp(b'{"access_token":"second","expires_in":3600}'),
+            ]
+        )
         monkeypatch.setattr(
-            _client_mod.urllib.request, "urlopen",
+            _client_mod.urllib.request,
+            "urlopen",
             lambda *_a, **_kw: next(responses),
         )
 
@@ -611,7 +632,8 @@ class TestUploadAndOntologyURLs:
         monkeypatch.setattr(_client_mod.urllib.request, "urlopen", fake_urlopen)
 
         result = client.upload_rows(
-            "ri.foundry.main.dataset.x", "master",
+            "ri.foundry.main.dataset.x",
+            "master",
             [{"id": "1"}, {"id": "2"}],
         )
         body = captured["data"].decode()

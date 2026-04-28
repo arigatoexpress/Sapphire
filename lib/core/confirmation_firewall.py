@@ -42,26 +42,27 @@ log = logging.getLogger(__name__)
 # ─── State Directories ────────────────────────────────────────────────────────
 
 SAPPHIRE_STATE = Path.home() / ".sapphire"
-PENDING_DIR    = SAPPHIRE_STATE / "pending_confirmations"
-LIMITS_FILE    = SAPPHIRE_STATE / "financial_limits.json"
-AUDIT_LOG      = SAPPHIRE_STATE / "audit" / "confirmation_firewall.jsonl"
+PENDING_DIR = SAPPHIRE_STATE / "pending_confirmations"
+LIMITS_FILE = SAPPHIRE_STATE / "financial_limits.json"
+AUDIT_LOG = SAPPHIRE_STATE / "audit" / "confirmation_firewall.jsonl"
 
-CONFIRMATION_TIMEOUT = 300   # 5 minutes
-DESTRUCTIVE_DELAY    = 30    # seconds after approval before executing
-DAILY_AUTO_LIMIT     = 100.0 # USD — paper/dry-run financial actions below this are auto-approved
+CONFIRMATION_TIMEOUT = 300  # 5 minutes
+DESTRUCTIVE_DELAY = 30  # seconds after approval before executing
+DAILY_AUTO_LIMIT = 100.0  # USD — paper/dry-run financial actions below this are auto-approved
 DAILY_AUTO_LIMIT_ENV = "SAPPHIRE_FIREWALL_DAILY_AUTO_LIMIT"
-AUDIT_LOG_ENV        = "SAPPHIRE_CONFIRMATION_FIREWALL_AUDIT_LOG"
+AUDIT_LOG_ENV = "SAPPHIRE_CONFIRMATION_FIREWALL_AUDIT_LOG"
 LIVE_FINANCIAL_AUTO_APPROVAL_ENV = "SAPPHIRE_FIREWALL_ALLOW_LIVE_FINANCIAL_AUTO_APPROVAL"
 
 # ─── Risk Classification ──────────────────────────────────────────────────────
 
+
 class ActionRisk(Enum):
-    READ_ONLY    = "read_only"      # File reads, health checks, log viewing
-    SELF_MODIFY  = "self_modify"    # Own logs, notes, self-messages
-    SYSTEM_MODIFY = "system_modify" # Service restarts, config writes
-    EXTERNAL_SEND = "external_send" # Messages to others, external API writes
-    FINANCIAL    = "financial"      # Trades, transfers, swaps
-    DESTRUCTIVE  = "destructive"    # File deletion, service unload, wipe
+    READ_ONLY = "read_only"  # File reads, health checks, log viewing
+    SELF_MODIFY = "self_modify"  # Own logs, notes, self-messages
+    SYSTEM_MODIFY = "system_modify"  # Service restarts, config writes
+    EXTERNAL_SEND = "external_send"  # Messages to others, external API writes
+    FINANCIAL = "financial"  # Trades, transfers, swaps
+    DESTRUCTIVE = "destructive"  # File deletion, service unload, wipe
 
 
 # Pattern sets for classify_action heuristics
@@ -198,6 +199,7 @@ def _is_paper_or_dry_run_financial(action: str, details: str = "") -> bool:
 
 # ─── Financial Limit Tracking ─────────────────────────────────────────────────
 
+
 def _get_redis():
     """Return a connected Redis client or None if Redis is unavailable.
 
@@ -206,12 +208,14 @@ def _get_redis():
     Also returns None when SAPPHIRE_NO_REDIS=1 is set (explicit test escape hatch).
     """
     import os
+
     if os.environ.get("SAPPHIRE_NO_REDIS"):
         return None
     if Path.home() / ".sapphire" != SAPPHIRE_STATE:
         return None  # test / non-standard context — use file fallback
     try:
         import redis
+
         r = redis.Redis(host="127.0.0.1", port=6379, db=0, socket_connect_timeout=1)
         r.ping()
         return r
@@ -257,6 +261,7 @@ def _record_spend(amount: float) -> None:
             r.incrbyfloat(key, amount)
             # Expire 2 days from now so yesterday's key is cleaned up automatically
             from datetime import timedelta
+
             r.expire(key, int(timedelta(days=2).total_seconds()))
             return
         except Exception:
@@ -264,6 +269,7 @@ def _record_spend(amount: float) -> None:
 
     # File-based fallback (flock-protected for multi-process safety)
     import fcntl
+
     SAPPHIRE_STATE.mkdir(parents=True, exist_ok=True)
     lock_path = LIMITS_FILE.with_suffix(".lock")
     with open(lock_path, "w") as lock_f:
@@ -303,6 +309,7 @@ def _try_consume_daily_budget(amount: float, limit: float) -> tuple[bool, float]
         try:
             new_total = float(r.incrbyfloat(key, amount))
             from datetime import timedelta
+
             with contextlib.suppress(Exception):
                 r.expire(key, int(timedelta(days=2).total_seconds()))
             if new_total > limit:
@@ -319,6 +326,7 @@ def _try_consume_daily_budget(amount: float, limit: float) -> tuple[bool, float]
             pass  # fall through to file lock
 
     import fcntl
+
     SAPPHIRE_STATE.mkdir(parents=True, exist_ok=True)
     lock_path = LIMITS_FILE.with_suffix(".lock")
     with open(lock_path, "w") as lock_f:
@@ -343,19 +351,25 @@ def _try_consume_daily_budget(amount: float, limit: float) -> tuple[bool, float]
 
 # ─── Pending Confirmation Store ───────────────────────────────────────────────
 
+
 def _write_pending(code: str, action: str, risk: ActionRisk, details: str) -> Path:
     """Write a pending confirmation record to disk."""
     PENDING_DIR.mkdir(parents=True, exist_ok=True)
     path = PENDING_DIR / f"{code}.json"
-    path.write_text(json.dumps({
-        "code":    code,
-        "action":  _audit_text(action, max_len=220),
-        "risk":    risk.value,
-        "details": _audit_text(details, max_len=1200),
-        "created": time.time(),
-        "expires": time.time() + CONFIRMATION_TIMEOUT,
-        "status":  "pending",  # pending | approved | denied
-    }, indent=2))
+    path.write_text(
+        json.dumps(
+            {
+                "code": code,
+                "action": _audit_text(action, max_len=220),
+                "risk": risk.value,
+                "details": _audit_text(details, max_len=1200),
+                "created": time.time(),
+                "expires": time.time() + CONFIRMATION_TIMEOUT,
+                "status": "pending",  # pending | approved | denied
+            },
+            indent=2,
+        )
+    )
     return path
 
 
@@ -488,8 +502,10 @@ def _deny_pending(code: str) -> bool:
 
 # ─── Telegram Notification ────────────────────────────────────────────────────
 
-def _send_confirmation_request(code: str, action: str, risk: ActionRisk,
-                                details: str, amount: float = 0.0) -> bool:
+
+def _send_confirmation_request(
+    code: str, action: str, risk: ActionRisk, details: str, amount: float = 0.0
+) -> bool:
     """Send a Telegram confirmation request. Returns True if sent successfully."""
     import os
     import ssl
@@ -497,26 +513,32 @@ def _send_confirmation_request(code: str, action: str, risk: ActionRisk,
     import urllib.request
 
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-    chat_id = os.environ.get("TELEGRAM_CHAT_ID", "") or \
-              os.environ.get("ALLOWED_TELEGRAM_CHAT_IDS", "").split(",")[0].strip()
+    chat_id = (
+        os.environ.get("TELEGRAM_CHAT_ID", "")
+        or os.environ.get("ALLOWED_TELEGRAM_CHAT_IDS", "").split(",")[0].strip()
+    )
 
     # Try file-based secrets
     if not token:
-        for p in [Path.home() / ".config" / "sapphire-secrets" / "telegram_bot_token",
-                  Path.home() / ".config" / "sapphire" / "telegram_bot_token"]:
+        for p in [
+            Path.home() / ".config" / "sapphire-secrets" / "telegram_bot_token",
+            Path.home() / ".config" / "sapphire" / "telegram_bot_token",
+        ]:
             if p.exists():
                 token = p.read_text().strip()
                 break
     if not chat_id:
-        for p in [Path.home() / ".config" / "sapphire-secrets" / "telegram_chat_id",
-                  Path.home() / ".config" / "sapphire" / "telegram_chat_id"]:
+        for p in [
+            Path.home() / ".config" / "sapphire-secrets" / "telegram_chat_id",
+            Path.home() / ".config" / "sapphire" / "telegram_chat_id",
+        ]:
             if p.exists():
                 chat_id = p.read_text().strip()
                 break
 
     if not token or not chat_id:
         log.warning("Confirmation firewall: Telegram not configured — using console fallback")
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"⚠ CONFIRMATION REQUIRED [{risk.value.upper()}]")
         print(f"Action:  {action}")
         print(f"Details: {details}")
@@ -525,21 +547,23 @@ def _send_confirmation_request(code: str, action: str, risk: ActionRisk,
         print(f"Code:    {code}")
         print(f"Expires: {CONFIRMATION_TIMEOUT}s")
         print("Approve: write 'approved' to pending confirmation file (check logs for path)")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
         log.info("Pending confirmation file: %s/%s.json", PENDING_DIR, code)
         return False
 
     risk_emoji = {
-        ActionRisk.SYSTEM_MODIFY:  "⚙️",
-        ActionRisk.EXTERNAL_SEND:  "📤",
-        ActionRisk.FINANCIAL:      "💰",
-        ActionRisk.DESTRUCTIVE:    "🚨",
+        ActionRisk.SYSTEM_MODIFY: "⚙️",
+        ActionRisk.EXTERNAL_SEND: "📤",
+        ActionRisk.FINANCIAL: "💰",
+        ActionRisk.DESTRUCTIVE: "🚨",
     }.get(risk, "⚠️")
 
     safe_action = _audit_text(action, max_len=220)
     safe_details = _audit_text(details, max_len=1200)
     amount_line = f"\n💵 Amount: ${amount:.2f}" if amount > 0 else ""
-    delay_line  = "\n⏱ 30-second delay enforced after approval" if risk == ActionRisk.DESTRUCTIVE else ""
+    delay_line = (
+        "\n⏱ 30-second delay enforced after approval" if risk == ActionRisk.DESTRUCTIVE else ""
+    )
 
     text = (
         f"{risk_emoji} *ACTION REQUIRES CONFIRMATION*\n"
@@ -552,15 +576,18 @@ def _send_confirmation_request(code: str, action: str, risk: ActionRisk,
         f"⏰ Expires in {CONFIRMATION_TIMEOUT // 60} minutes. Reply with the code above to approve."
     )
 
-    payload = json.dumps({
-        "chat_id": chat_id,
-        "text": text,
-        "parse_mode": "Markdown",
-    }).encode()
+    payload = json.dumps(
+        {
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": "Markdown",
+        }
+    ).encode()
 
     ssl_ctx = ssl.create_default_context()
     try:
         import certifi
+
         ssl_ctx.load_verify_locations(certifi.where())
     except ImportError:
         ssl_ctx.check_hostname = False
@@ -580,6 +607,7 @@ def _send_confirmation_request(code: str, action: str, risk: ActionRisk,
 
 
 # ─── Main Firewall Class ──────────────────────────────────────────────────────
+
 
 class ConfirmationFirewall:
     """Central authorization gate for all risky agent actions.
@@ -602,7 +630,7 @@ class ConfirmationFirewall:
         details: str = "",
         amount: float = 0.0,
         poll_interval: float = 2.0,
-        _send_fn=None,   # Injectable for testing
+        _send_fn=None,  # Injectable for testing
         _sleep_fn=None,  # Injectable for testing
     ) -> bool:
         """Request confirmation for a risky action.
@@ -649,8 +677,12 @@ class ConfirmationFirewall:
                 approved, new_total = False, _load_daily_spend() + amount
                 denial_reason = "daily_auto_limit_disabled"
             if approved:
-                log.info("Firewall financial auto-approved: $%.2f (daily: $%.2f/$%.2f)",
-                         amount, new_total, daily_auto_limit)
+                log.info(
+                    "Firewall financial auto-approved: $%.2f (daily: $%.2f/$%.2f)",
+                    amount,
+                    new_total,
+                    daily_auto_limit,
+                )
                 self._append_audit(
                     "confirmation.financial_auto_approved",
                     action=action,
@@ -700,8 +732,7 @@ class ConfirmationFirewall:
         if not sent:
             log.warning("Firewall: Telegram send failed — console fallback active")
 
-        log.info("Firewall waiting for confirmation [%s]: %s (code: %s)",
-                 risk.value, action, code)
+        log.info("Firewall waiting for confirmation [%s]: %s (code: %s)", risk.value, action, code)
 
         # ── Poll for response ──────────────────────────────────────────────────
         deadline = time.time() + CONFIRMATION_TIMEOUT
@@ -713,7 +744,9 @@ class ConfirmationFirewall:
                 if risk == ActionRisk.FINANCIAL and amount > 0:
                     _record_spend(amount)
                 if risk == ActionRisk.DESTRUCTIVE:
-                    log.info("Firewall: DESTRUCTIVE action — enforcing %ds delay", DESTRUCTIVE_DELAY)
+                    log.info(
+                        "Firewall: DESTRUCTIVE action — enforcing %ds delay", DESTRUCTIVE_DELAY
+                    )
                     sleep(DESTRUCTIVE_DELAY)
                 self._append_audit(
                     "confirmation.approved",
@@ -736,8 +769,12 @@ class ConfirmationFirewall:
                 )
                 return False
 
-        log.warning("Firewall: timed out after %ds — denying [%s]: %s",
-                    CONFIRMATION_TIMEOUT, risk.value, action)
+        log.warning(
+            "Firewall: timed out after %ds — denying [%s]: %s",
+            CONFIRMATION_TIMEOUT,
+            risk.value,
+            action,
+        )
         self._append_audit(
             "confirmation.timed_out",
             action=action,
@@ -758,8 +795,9 @@ class ConfirmationFirewall:
         risk = self.classify_action(action, target)
         if risk in (ActionRisk.READ_ONLY, ActionRisk.SELF_MODIFY):
             return True
-        log.warning("Firewall.auto_approve: action requires confirmation [%s]: %s",
-                    risk.value, action)
+        log.warning(
+            "Firewall.auto_approve: action requires confirmation [%s]: %s", risk.value, action
+        )
         return False
 
     def approve_pending(self, code: str) -> bool:

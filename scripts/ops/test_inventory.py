@@ -32,9 +32,7 @@ README_TESTS_RE = re.compile(
     r"\| Passing tests \| \*\*(?P<total>[\d,]+)\+\*\* \| "
     r"(?P<unit>[\d,]+)\+ unit · (?P<plugin>[\d,]+) plugin"
 )
-README_FILES_RE = re.compile(
-    r"\| Test files \| \*\*(?P<files>[\d,]+)\+\*\* \|"
-)
+README_FILES_RE = re.compile(r"\| Test files \| \*\*(?P<files>[\d,]+)\+\*\* \|")
 README_BADGE_RE = re.compile(
     r"\[!\[Tests\]\(https://img\.shields\.io/badge/tests-(?P<label>[^-]+)-2ea44f\)\]"
 )
@@ -67,11 +65,15 @@ class Inventory:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     inventory = collect_inventory()
-    check_result = check_readme_inventory(
-        inventory,
-        readme_path=args.readme,
-        max_drift=args.max_drift,
-    ) if args.check_readme else None
+    check_result = (
+        check_readme_inventory(
+            inventory,
+            readme_path=args.readme,
+            max_drift=args.max_drift,
+        )
+        if args.check_readme
+        else None
+    )
 
     if args.format == "json":
         print(json.dumps(render_json(inventory, check_result), indent=2, sort_keys=True))
@@ -98,10 +100,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def collect_inventory() -> Inventory:
-    suites = [
-        collect_suite(name, paths)
-        for name, paths in SUITES
-    ]
+    suites = [collect_suite(name, paths) for name, paths in SUITES]
     return Inventory(
         schema_version=1,
         generated_at=datetime.now(UTC).isoformat(timespec="seconds"),
@@ -154,10 +153,7 @@ def read_readme_counts(readme_path: Path = README) -> dict[str, int]:
     files_match = README_FILES_RE.search(text)
     if not files_match:
         raise ValueError("README Test files row was not found")
-    counts = {
-        name: int(value.replace(",", ""))
-        for name, value in tests_match.groupdict().items()
-    }
+    counts = {name: int(value.replace(",", "")) for name, value in tests_match.groupdict().items()}
     counts["badge_total"] = parse_badge_total(badge_match.group("label"))
     counts["files"] = int(files_match.group("files").replace(",", ""))
     return counts
@@ -183,21 +179,10 @@ def check_readme_inventory(
         **{suite.name: suite.tests for suite in inventory.suites},
     }
     advertised = read_readme_counts(readme_path)
-    deltas = {
-        key: actual[key] - advertised[key]
-        for key in ("total", "unit", "plugin", "files")
-    }
+    deltas = {key: actual[key] - advertised[key] for key in ("total", "unit", "plugin", "files")}
     deltas["badge_total"] = actual["total"] - advertised["badge_total"]
-    overclaims = {
-        key: delta
-        for key, delta in deltas.items()
-        if delta < 0
-    }
-    stale = {
-        key: delta
-        for key, delta in deltas.items()
-        if delta > max_drift
-    }
+    overclaims = {key: delta for key, delta in deltas.items() if delta < 0}
+    stale = {key: delta for key, delta in deltas.items() if delta > max_drift}
     return {
         "ok": not overclaims and not stale,
         "actual": actual,
@@ -230,9 +215,7 @@ def render_markdown(inventory: Inventory, check_result: dict[str, Any] | None) -
         "|---|---:|---:|---|",
     ]
     for suite in inventory.suites:
-        lines.append(
-            f"| {suite.name} | {suite.tests} | {suite.files} | {', '.join(suite.paths)} |"
-        )
+        lines.append(f"| {suite.name} | {suite.tests} | {suite.files} | {', '.join(suite.paths)} |")
     if check_result is not None:
         status = "PASS" if check_result["ok"] else "FAIL"
         lines.extend(

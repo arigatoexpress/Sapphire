@@ -77,9 +77,7 @@ def deflated_sharpe_ratio(
     sr_star = expected_max_sharpe(sharpe_list)
 
     # Non-Gaussian correction factor (Ledoit-Wolf moments)
-    correction = math.sqrt(
-        (1 - skewness * sr + ((kurtosis - 1) / 4) * sr**2) / n_obs
-    )
+    correction = math.sqrt((1 - skewness * sr + ((kurtosis - 1) / 4) * sr**2) / n_obs)
     deflated = (sr - sr_star) / max(1e-9, correction)
     prob = _norm_cdf(deflated)
 

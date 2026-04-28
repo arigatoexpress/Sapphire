@@ -26,11 +26,7 @@ def test_alpha_engine_autonomy_dry_run_defaults_true() -> None:
                 assert call.args
                 assert isinstance(call.args[0], ast.Constant)
                 assert call.args[0].value == "SAPPHIRE_AUTONOMY_DRY_RUN"
-                defaults = {
-                    kw.arg: kw.value
-                    for kw in call.keywords
-                    if kw.arg is not None
-                }
+                defaults = {kw.arg: kw.value for kw in call.keywords if kw.arg is not None}
                 assert isinstance(defaults["default"], ast.Constant)
                 assert defaults["default"].value is True
                 return

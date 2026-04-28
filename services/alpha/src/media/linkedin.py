@@ -20,8 +20,8 @@ class LinkedInClient:
     async def start(self):
         """Initialize Client."""
         if not self.enabled:
-             logger.info("🚫 LinkedIn automation disabled via config.")
-             return
+            logger.info("🚫 LinkedIn automation disabled via config.")
+            return
 
         if self.access_token:
             self.ready = True
@@ -32,18 +32,18 @@ class LinkedInClient:
     async def post(self, text: str, image_url: str | None = None) -> str | None:
         """
         Post text and optionally an image to LinkedIn.
-        
+
         Args:
             text: Post content.
             image_url: URL to an image.
-            
+
         Returns:
             Post URN if successful, None otherwise.
         """
         if not self.ready:
             logger.warning("⚠️ LinkedInClient not ready.")
             return None
-            
+
         logger.info(f"👔 [MOCK] Publishing to LinkedIn: {text[:50]}...")
         # Implementation TODO
         return "mock-linkedin-urn"

@@ -35,24 +35,25 @@ WALLET_FILE = SAPPHIRE_DIR / "data" / "solana_paper_wallet.json"
 
 # Known tokens — extend as needed. CoinGecko IDs for price lookup.
 TOKENS = {
-    "SOL":   {"coingecko": "solana",        "decimals": 9},
-    "USDC":  {"coingecko": "usd-coin",      "decimals": 6},
-    "USDT":  {"coingecko": "tether",        "decimals": 6},
-    "JUP":   {"coingecko": "jupiter-exchange-solana", "decimals": 6},
-    "BONK":  {"coingecko": "bonk",          "decimals": 5},
+    "SOL": {"coingecko": "solana", "decimals": 9},
+    "USDC": {"coingecko": "usd-coin", "decimals": 6},
+    "USDT": {"coingecko": "tether", "decimals": 6},
+    "JUP": {"coingecko": "jupiter-exchange-solana", "decimals": 6},
+    "BONK": {"coingecko": "bonk", "decimals": 5},
     "JITOSOL": {"coingecko": "jito-staked-sol", "decimals": 9},
-    "PYTH":  {"coingecko": "pyth-network",  "decimals": 6},
+    "PYTH": {"coingecko": "pyth-network", "decimals": 6},
 }
 
 # Swap simulation params
-DEFAULT_SPREAD_BPS = 20      # 0.20% — typical Jupiter spread for liquid pairs
-DEFAULT_SLIPPAGE_BPS = 30    # 0.30% — conservative estimate
-STARTING_USDC = 10_000.0     # $10K seed in paper wallet
+DEFAULT_SPREAD_BPS = 20  # 0.20% — typical Jupiter spread for liquid pairs
+DEFAULT_SLIPPAGE_BPS = 30  # 0.30% — conservative estimate
+STARTING_USDC = 10_000.0  # $10K seed in paper wallet
 
 
 def _ssl_ctx() -> ssl.SSLContext:
     try:
         import certifi
+
         return ssl.create_default_context(cafile=certifi.where())
     except ImportError:
         return ssl.create_default_context()
@@ -112,12 +113,14 @@ def action_balance() -> dict:
         px = prices.get(token, 0.0)
         value = qty * px
         total += value
-        rows.append({
-            "token": token,
-            "qty": _round_qty(token, qty),
-            "price_usd": round(px, 6) if px < 1 else round(px, 4),
-            "value_usd": round(value, 2),
-        })
+        rows.append(
+            {
+                "token": token,
+                "qty": _round_qty(token, qty),
+                "price_usd": round(px, 6) if px < 1 else round(px, 4),
+                "value_usd": round(value, 2),
+            }
+        )
     rows.sort(key=lambda r: r["value_usd"], reverse=True)
     return {
         "total_usd": round(total, 2),
@@ -135,16 +138,22 @@ def action_deposit(token: str, amount: float) -> dict:
         return {"error": "amount must be positive"}
     w = _load()
     w["balances"][token] = _round_qty(token, w["balances"].get(token, 0.0) + amount)
-    w["history"].append({
-        "action": "deposit", "token": token, "amount": amount,
-        "ts": datetime.now(UTC).isoformat(),
-    })
+    w["history"].append(
+        {
+            "action": "deposit",
+            "token": token,
+            "amount": amount,
+            "ts": datetime.now(UTC).isoformat(),
+        }
+    )
     _save(w)
     return {"success": True, "token": token, "new_balance": w["balances"][token]}
 
 
 def action_swap(
-    from_token: str, to_token: str, amount: float,
+    from_token: str,
+    to_token: str,
+    amount: float,
     spread_bps: float = DEFAULT_SPREAD_BPS,
     slippage_bps: float = DEFAULT_SLIPPAGE_BPS,
 ) -> dict:
@@ -179,17 +188,22 @@ def action_swap(
     if w["balances"][from_token] <= 0:
         w["balances"].pop(from_token, None)
     w["balances"][to_token] = _round_qty(
-        to_token, w["balances"].get(to_token, 0.0) + net_out,
+        to_token,
+        w["balances"].get(to_token, 0.0) + net_out,
     )
 
     record = {
         "action": "swap",
-        "from": from_token, "from_amount": amount,
-        "to": to_token, "to_amount": _round_qty(to_token, net_out),
-        "from_price_usd": from_px, "to_price_usd": to_px,
+        "from": from_token,
+        "from_amount": amount,
+        "to": to_token,
+        "to_amount": _round_qty(to_token, net_out),
+        "from_price_usd": from_px,
+        "to_price_usd": to_px,
         "notional_usd": round(notional_usd, 2),
         "fee_usd": round(fee_usd, 4),
-        "spread_bps": spread_bps, "slippage_bps": slippage_bps,
+        "spread_bps": spread_bps,
+        "slippage_bps": slippage_bps,
         "ts": datetime.now(UTC).isoformat(),
     }
     w["history"].append(record)
@@ -198,10 +212,12 @@ def action_swap(
     # Event bus publish — decision engine + dashboard consumers.
     try:
         import sys as _sys
+
         repo_root = Path.home() / "Code" / "Sapphire"
         if str(repo_root) not in _sys.path:
             _sys.path.insert(0, str(repo_root))
         from lib.core.event_bus import get_bus
+
         get_bus().publish("wallet.swap", record, source="solana_paper_wallet")
     except Exception:
         pass
@@ -261,7 +277,9 @@ def main() -> None:
         result = action_deposit(params.get("token", ""), float(params.get("amount", 0)))
     elif action == "swap":
         result = action_swap(
-            params.get("from", ""), params.get("to", ""), float(params.get("amount", 0)),
+            params.get("from", ""),
+            params.get("to", ""),
+            float(params.get("amount", 0)),
             spread_bps=float(params.get("spread_bps", DEFAULT_SPREAD_BPS)),
             slippage_bps=float(params.get("slippage_bps", DEFAULT_SLIPPAGE_BPS)),
         )

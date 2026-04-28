@@ -19,6 +19,7 @@ Usage:
     python3 scripts/validate_tool_registry.py
     python3 scripts/validate_tool_registry.py --json
 """
+
 from __future__ import annotations
 
 import argparse
@@ -125,9 +126,7 @@ def validate() -> tuple[list[str], dict]:
                 continue
             shim_path = ROOT / shim_str
             if not shim_path.exists():
-                errors.append(
-                    f"registry: deprecated `{name}` shim not found: {shim_str}"
-                )
+                errors.append(f"registry: deprecated `{name}` shim not found: {shim_str}")
                 continue
             shim_paths.add(shim_path.resolve())
             if not _shim_has_deprecation_warning(shim_path):
@@ -149,9 +148,7 @@ def validate() -> tuple[list[str], dict]:
             internal = TOOLS_DIR / "internal" / rel.name
             if internal.exists() and internal.resolve() in registered_paths:
                 continue
-        errors.append(
-            f"disk: `{disk_path.relative_to(ROOT)}` not listed in tool-registry.yaml"
-        )
+        errors.append(f"disk: `{disk_path.relative_to(ROOT)}` not listed in tool-registry.yaml")
 
     # Agent manifest must be a strict subset of registered + agent_facing.
     manifest_tools = manifest.get("tools", [])
@@ -166,25 +163,16 @@ def validate() -> tuple[list[str], dict]:
             continue
         if entry.get("status") != "registered":
             errors.append(
-                f"manifest: `{mname}` status is `{entry.get('status')}`, "
-                "must be `registered`"
+                f"manifest: `{mname}` status is `{entry.get('status')}`, must be `registered`"
             )
         if not entry.get("agent_facing"):
-            errors.append(
-                f"manifest: `{mname}` must have `agent_facing: true` in registry"
-            )
+            errors.append(f"manifest: `{mname}` must have `agent_facing: true` in registry")
 
     summary = {
         "registry_entries": len(registry["tools"]),
-        "registered": sum(
-            1 for e in registry["tools"] if e.get("status") == "registered"
-        ),
-        "internal": sum(
-            1 for e in registry["tools"] if e.get("status") == "internal"
-        ),
-        "deprecated": sum(
-            1 for e in registry["tools"] if e.get("status") == "deprecated"
-        ),
+        "registered": sum(1 for e in registry["tools"] if e.get("status") == "registered"),
+        "internal": sum(1 for e in registry["tools"] if e.get("status") == "internal"),
+        "deprecated": sum(1 for e in registry["tools"] if e.get("status") == "deprecated"),
         "manifest_entries": len(manifest_tools),
         "disk_files": len(_iter_tool_files()),
         "errors": len(errors),

@@ -36,7 +36,17 @@ STOPWORDS = {
     "my",
 }
 
-HIGH_RISK_TERMS = {"trade", "broker", "order", "buy", "sell", "execute", "cancel", "remove", "delete"}
+HIGH_RISK_TERMS = {
+    "trade",
+    "broker",
+    "order",
+    "buy",
+    "sell",
+    "execute",
+    "cancel",
+    "remove",
+    "delete",
+}
 
 
 def tokenize(text: str) -> list[str]:
@@ -101,7 +111,9 @@ def capability_search_fields(cap: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def score_capability(query: str, q_tokens: set[str], cap: dict[str, Any], prefer_surface_family: str | None) -> tuple[float, list[str]]:
+def score_capability(
+    query: str, q_tokens: set[str], cap: dict[str, Any], prefer_surface_family: str | None
+) -> tuple[float, list[str]]:
     fields = capability_search_fields(cap)
     fields["label"]
     label_norm = fields["label_norm"]
@@ -128,7 +140,9 @@ def score_capability(query: str, q_tokens: set[str], cap: dict[str, Any], prefer
     label_tokens = set(tokenize(label_norm))
     cluster_tokens = set(tokenize(cluster_key))
     tag_tokens = set(tokenize(" ".join(fields["tags"]))) if fields["tags"] else set()
-    metadata_tokens = set(tokenize(" ".join(fields["metadata_text"]))) if fields["metadata_text"] else set()
+    metadata_tokens = (
+        set(tokenize(" ".join(fields["metadata_text"]))) if fields["metadata_text"] else set()
+    )
     orig_tokens = set(tokenize(" ".join(fields["originals"]))) if fields["originals"] else set()
 
     token_overlap = len(q_tokens & label_tokens)
@@ -243,14 +257,18 @@ def format_text_results(query: str, registry_path: Path, rows: list[dict[str, An
         if r.get("cluster_key_normalized"):
             lines.append(f"   cluster_key: {r.get('cluster_key_normalized')}")
         if r.get("action_recipes"):
-            lines.append(f"   action_recipe: {json.dumps(r.get('action_recipes')[0], ensure_ascii=False)}")
+            lines.append(
+                f"   action_recipe: {json.dumps(r.get('action_recipes')[0], ensure_ascii=False)}"
+            )
         if r.get("reasons"):
             lines.append(f"   reasons: {', '.join(r.get('reasons')[:8])}")
     return "\n".join(lines)
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="Resolve a user intent/query to the best TradingView capability candidates")
+    p = argparse.ArgumentParser(
+        description="Resolve a user intent/query to the best TradingView capability candidates"
+    )
     p.add_argument("query", help="Intent text, e.g. 'open indicators' or 'settings'")
     p.add_argument("--registry", type=Path, default=DEFAULT_REGISTRY)
     p.add_argument("--top", type=int, default=10)
@@ -276,7 +294,11 @@ def main() -> int:
     )
 
     if args.json:
-        print(json.dumps({"query": args.query, "registry": str(args.registry), "results": rows}, indent=2))
+        print(
+            json.dumps(
+                {"query": args.query, "registry": str(args.registry), "results": rows}, indent=2
+            )
+        )
     else:
         print(format_text_results(args.query, args.registry, rows))
     return 0

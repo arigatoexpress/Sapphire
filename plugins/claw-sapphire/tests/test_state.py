@@ -46,7 +46,9 @@ def test_fixed_issue_skipped():
         tmp = Path(f.name)
 
     with patch.object(state_tool, "STATE_PATH", tmp):
-        issue = state_tool.record_issue("Cointracker", "test_fail", "test_csv.py", "timestamp parse error")
+        issue = state_tool.record_issue(
+            "Cointracker", "test_fail", "test_csv.py", "timestamp parse error"
+        )
         iid = issue["issue_id"]
 
         state_tool.record_attempt(iid, "t1", "fixed")

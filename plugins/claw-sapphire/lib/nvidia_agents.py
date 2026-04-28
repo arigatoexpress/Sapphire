@@ -29,8 +29,8 @@ OLLAMA_ENDPOINTS = [
 
 # Model selection based on Kadima Benchmark v3
 MODELS = {
-    "tool_caller": "hermes3:8b",       # Best at function calling (90%+ accuracy)
-    "fast_reason": "llama3.2:3b",       # Fast analysis (Nemotron Nano equivalent)
+    "tool_caller": "hermes3:8b",  # Best at function calling (90%+ accuracy)
+    "fast_reason": "llama3.2:3b",  # Fast analysis (Nemotron Nano equivalent)
     "deep_reason": "nemotron-cascade-2:latest",  # Deep reasoning (31.6B MoE, GPU only)
 }
 
@@ -43,7 +43,9 @@ SAPPHIRE_TOOLS = [
             "description": "Get RSI, MACD, Bollinger Bands, moving averages, and net signal for a crypto asset. Returns calculated indicators, not estimates.",
             "parameters": {
                 "type": "object",
-                "properties": {"symbol": {"type": "string", "description": "Asset symbol: BTC, ETH, or SOL"}},
+                "properties": {
+                    "symbol": {"type": "string", "description": "Asset symbol: BTC, ETH, or SOL"}
+                },
                 "required": ["symbol"],
             },
         },
@@ -55,7 +57,9 @@ SAPPHIRE_TOOLS = [
             "description": "Get support/resistance levels, trend strength, risk/reward ratio for a crypto asset.",
             "parameters": {
                 "type": "object",
-                "properties": {"symbol": {"type": "string", "description": "Asset symbol: BTC, ETH, or SOL"}},
+                "properties": {
+                    "symbol": {"type": "string", "description": "Asset symbol: BTC, ETH, or SOL"}
+                },
                 "required": ["symbol"],
             },
         },
@@ -75,7 +79,9 @@ SAPPHIRE_TOOLS = [
             "description": "Get real-time price quote for a stock from OpenBB.",
             "parameters": {
                 "type": "object",
-                "properties": {"symbol": {"type": "string", "description": "Stock ticker e.g. AAPL, NVDA"}},
+                "properties": {
+                    "symbol": {"type": "string", "description": "Stock ticker e.g. AAPL, NVDA"}
+                },
                 "required": ["symbol"],
             },
         },
@@ -95,7 +101,10 @@ SAPPHIRE_TOOLS = [
             "description": "Send a message to the user via Telegram.",
             "parameters": {
                 "type": "object",
-                "properties": {"message": {"type": "string"}, "priority": {"type": "string", "enum": ["p0", "p1", "p2"]}},
+                "properties": {
+                    "message": {"type": "string"},
+                    "priority": {"type": "string", "enum": ["p0", "p1", "p2"]},
+                },
                 "required": ["message"],
             },
         },
@@ -115,7 +124,9 @@ class AgentResponse:
     timestamp: str
 
 
-def _ollama_chat(model: str, messages: list[dict], tools: list[dict] | None = None, timeout: int = 60) -> dict:
+def _ollama_chat(
+    model: str, messages: list[dict], tools: list[dict] | None = None, timeout: int = 60
+) -> dict:
     """Send chat request to Ollama with tool support."""
     for _, base in OLLAMA_ENDPOINTS:
         try:
@@ -125,7 +136,8 @@ def _ollama_chat(model: str, messages: list[dict], tools: list[dict] | None = No
 
             data = json.dumps(payload).encode()
             req = urllib.request.Request(
-                f"{base}/api/chat", data=data,
+                f"{base}/api/chat",
+                data=data,
                 headers={"Content-Type": "application/json"},
             )
             with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -138,43 +150,72 @@ def _ollama_chat(model: str, messages: list[dict], tools: list[dict] | None = No
 def _execute_tool(name: str, args: dict) -> str:
     """Execute a tool and return the result as string."""
     import sys
+
     sys.path.insert(0, str(Path(__file__).parent))
 
     if name == "get_technical_analysis":
         from technical_analysis import analyze
+
         profile = analyze(args.get("symbol", "BTC"))
         if profile:
-            return json.dumps({
-                "symbol": profile.symbol, "price": profile.price,
-                "rsi": profile.rsi_14, "rsi_zone": profile.rsi_zone,
-                "macd_cross": profile.macd_cross, "ma_trend": profile.ma_trend,
-                "bb_position": profile.bb_position, "net_signal": profile.net_signal,
-                "signals_bullish": profile.signal_count_bullish,
-                "signals_bearish": profile.signal_count_bearish,
-                "atr_pct": profile.atr_pct, "volume_signal": profile.volume_signal,
-            })
+            return json.dumps(
+                {
+                    "symbol": profile.symbol,
+                    "price": profile.price,
+                    "rsi": profile.rsi_14,
+                    "rsi_zone": profile.rsi_zone,
+                    "macd_cross": profile.macd_cross,
+                    "ma_trend": profile.ma_trend,
+                    "bb_position": profile.bb_position,
+                    "net_signal": profile.net_signal,
+                    "signals_bullish": profile.signal_count_bullish,
+                    "signals_bearish": profile.signal_count_bearish,
+                    "atr_pct": profile.atr_pct,
+                    "volume_signal": profile.volume_signal,
+                }
+            )
         return json.dumps({"error": f"No data for {args.get('symbol')}"})
 
     elif name == "get_quant_analysis":
         from quant_analysis import analyze_full
+
         profile = analyze_full(args.get("symbol", "BTC"))
         if profile:
-            return json.dumps({
-                "symbol": profile.symbol, "price": profile.price,
-                "nearest_support": profile.nearest_support,
-                "nearest_resistance": profile.nearest_resistance,
-                "risk_reward": profile.risk_reward,
-                "trend_strength": profile.trend_strength,
-                "trend_direction": profile.trend_direction,
-                "support_levels": [{"price": s.price, "strength": s.strength} for s in profile.support_levels[:3]],
-                "resistance_levels": [{"price": r.price, "strength": r.strength} for r in profile.resistance_levels[:3]],
-            })
+            return json.dumps(
+                {
+                    "symbol": profile.symbol,
+                    "price": profile.price,
+                    "nearest_support": profile.nearest_support,
+                    "nearest_resistance": profile.nearest_resistance,
+                    "risk_reward": profile.risk_reward,
+                    "trend_strength": profile.trend_strength,
+                    "trend_direction": profile.trend_direction,
+                    "support_levels": [
+                        {"price": s.price, "strength": s.strength}
+                        for s in profile.support_levels[:3]
+                    ],
+                    "resistance_levels": [
+                        {"price": r.price, "strength": r.strength}
+                        for r in profile.resistance_levels[:3]
+                    ],
+                }
+            )
         return json.dumps({"error": f"No data for {args.get('symbol')}"})
 
     elif name == "get_correlation":
         from quant_analysis import correlation_matrix
+
         pairs = correlation_matrix()
-        return json.dumps([{"pair": f"{c.asset_a}/{c.asset_b}", "correlation": c.correlation, "interpretation": c.interpretation} for c in pairs])
+        return json.dumps(
+            [
+                {
+                    "pair": f"{c.asset_a}/{c.asset_b}",
+                    "correlation": c.correlation,
+                    "interpretation": c.interpretation,
+                }
+                for c in pairs
+            ]
+        )
 
     elif name == "get_equity_quote":
         try:
@@ -184,7 +225,13 @@ def _execute_tool(name: str, args: dict) -> str:
                 results = data.get("results", [])
                 if results:
                     q = results[0]
-                    return json.dumps({"symbol": q["symbol"], "price": q["last_price"], "volume": q.get("volume", 0)})
+                    return json.dumps(
+                        {
+                            "symbol": q["symbol"],
+                            "price": q["last_price"],
+                            "volume": q.get("volume", 0),
+                        }
+                    )
         except Exception as e:
             return json.dumps({"error": str(e)})
 
@@ -194,15 +241,20 @@ def _execute_tool(name: str, args: dict) -> str:
             preds = [json.loads(l) for l in pred_path.read_text().strip().splitlines() if l.strip()]
             scored = [p for p in preds if p.get("correct") is not None]
             correct = sum(1 for p in scored if p["correct"])
-            return json.dumps({
-                "total": len(preds), "scored": len(scored), "correct": correct,
-                "accuracy": round(correct / len(scored) * 100, 1) if scored else 0,
-            })
+            return json.dumps(
+                {
+                    "total": len(preds),
+                    "scored": len(scored),
+                    "correct": correct,
+                    "accuracy": round(correct / len(scored) * 100, 1) if scored else 0,
+                }
+            )
         return json.dumps({"total": 0, "accuracy": 0})
 
     elif name == "send_telegram":
         sys.path.insert(0, str(Path(__file__).parent.parent / "tools"))
         from notify import send_telegram_message
+
         result = send_telegram_message(args.get("message", ""), priority=args.get("priority", "p1"))
         return json.dumps({"sent": result.get("ok", False)})
 
@@ -217,7 +269,10 @@ def run_agent(query: str, max_turns: int = 3) -> AgentResponse:
     3. Nemotron synthesizes results
     """
     messages = [
-        {"role": "system", "content": "You are a trading analyst for Sapphire OS. Use the provided tools to gather real data before answering. Always call tools first, never guess numbers."},
+        {
+            "role": "system",
+            "content": "You are a trading analyst for Sapphire OS. Use the provided tools to gather real data before answering. Always call tools first, never guess numbers.",
+        },
         {"role": "user", "content": query},
     ]
 
@@ -268,7 +323,9 @@ Provide a concise, actionable analysis. Reference specific numbers from the data
         )
         synthesis = synth_response.get("message", {}).get("content", "Analysis unavailable")
     else:
-        synthesis = response.get("message", {}).get("content", "No tools called — unable to gather data")
+        synthesis = response.get("message", {}).get(
+            "content", "No tools called — unable to gather data"
+        )
 
     return AgentResponse(
         query=query,
@@ -283,7 +340,10 @@ Provide a concise, actionable analysis. Reference specific numbers from the data
 if __name__ == "__main__":
     import sys
 
-    query = " ".join(sys.argv[1:]) or "Analyze BTC and ETH. What are the key levels and which has a better setup?"
+    query = (
+        " ".join(sys.argv[1:])
+        or "Analyze BTC and ETH. What are the key levels and which has a better setup?"
+    )
 
     print("🤖 NVIDIA Agent Pipeline")
     print(f"   Query: {query}\n")

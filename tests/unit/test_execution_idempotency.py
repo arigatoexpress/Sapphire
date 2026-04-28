@@ -9,6 +9,7 @@ Critical paths:
   - Firestore: AlreadyExists → returns False (duplicate)
   - Firestore errors fail-open (return True to not block trades)
 """
+
 import asyncio
 import os
 import sys
@@ -19,6 +20,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../services/share
 from execution_idempotency import ExecutionIdempotency
 
 # ── Memory-only mode ──────────────────────────────────────────────────────────
+
 
 class TestIdempotencyMemoryMode:
     def _make(self, ttl=900) -> ExecutionIdempotency:
@@ -31,38 +33,46 @@ class TestIdempotencyMemoryMode:
 
     def test_duplicate_claim_returns_false(self):
         ei = self._make()
+
         async def _test():
             await ei.claim("sig-002", "ETHUSDT")
             return await ei.claim("sig-002", "ETHUSDT")
+
         result = asyncio.run(_test())
         assert result is False
 
     def test_different_signals_both_claim(self):
         ei = self._make()
+
         async def _test():
             r1 = await ei.claim("sig-A", "SOLUSDT")
             r2 = await ei.claim("sig-B", "SOLUSDT")
             return r1, r2
+
         r1, r2 = asyncio.run(_test())
         assert r1 is True
         assert r2 is True
 
     def test_stale_entry_evicted_and_reclaimed(self):
         ei = self._make(ttl=1)  # 1-second TTL
+
         async def _test():
             await ei.claim("sig-evict", "SYM")
             # Backdate the cache entry to be stale
             ei._cache["sig-evict"] = time.time() - 2
             return await ei.claim("sig-evict", "SYM")
+
         result = asyncio.run(_test())
         assert result is True  # re-claimed after eviction
 
     def test_mark_failed_removes_from_cache_and_allows_retry(self):
         ei = self._make()
+
         async def _test():
             await ei.claim("sig-retry", "SYM")
             await ei.mark_failed("sig-retry", "network error")
             return await ei.claim("sig-retry", "SYM")
+
         result = asyncio.run(_test())
         assert result is True  # retry allowed after mark_failed
 
@@ -78,6 +88,7 @@ class TestIdempotencyMemoryMode:
 
 
 # ── Document ID sanitization ───────────────────────────────────────────────────
+
 
 class TestIdempotencyDocId:
     def _make(self) -> ExecutionIdempotency:
@@ -108,6 +119,7 @@ class TestIdempotencyDocId:
 
 # ── Firestore AlreadyExists path (mocked) ────────────────────────────────────
 
+
 class _FakeDoc:
     class AlreadyExists(Exception):
         pass
@@ -118,6 +130,7 @@ class _FakeDoc:
     async def create(self, data):
         if self._fail == "already_exists":
             from google.api_core.exceptions import AlreadyExists as GAlreadyExists
+
             raise GAlreadyExists("already exists")
         elif self._fail == "network":
             raise OSError("connection refused")
@@ -154,9 +167,7 @@ class TestIdempotencyFirestorePaths:
 
         db = _FakeDb(MockDoc())
         ei = ExecutionIdempotency(platform="lighter", firestore_client=db)
-        result = asyncio.run(
-            ei._firestore_claim("sig-dup", "BTCUSDT")
-        )
+        result = asyncio.run(ei._firestore_claim("sig-dup", "BTCUSDT"))
         assert result is False
 
     def test_firestore_network_error_fails_open(self):
@@ -171,7 +182,5 @@ class TestIdempotencyFirestorePaths:
 
         db = _FakeDb(MockDoc())
         ei = ExecutionIdempotency(platform="lighter", firestore_client=db)
-        result = asyncio.run(
-            ei._firestore_claim("sig-net", "BTCUSDT")
-        )
+        result = asyncio.run(ei._firestore_claim("sig-net", "BTCUSDT"))
         assert result is True  # fail-open → allow execution
