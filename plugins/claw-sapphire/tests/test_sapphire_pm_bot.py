@@ -7,8 +7,19 @@ from collections import defaultdict
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "tools"))
 import sapphire_pm_bot as pm_bot
+from internal import _telegram_safety as safety
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """Each test gets a clean rate-limiter — otherwise per-user counts leak."""
+    pm_bot._RATE_LIMITER.reset()
+    yield
+    pm_bot._RATE_LIMITER.reset()
 
 
 class FakeDocSnapshot:
@@ -341,3 +352,262 @@ def test_svc_status_uses_service_supervisor_dry_run(monkeypatch):
     assert response["parse_mode"] == "MarkdownV2"
     assert "svc status" in response["text"]
     assert "ai\\.hermes\\.gateway" in response["text"]
+
+
+# ---------------------------------------------------------------------------
+# Wave 4 hardening tests — fail-closed allowlist + secret denylist + forbidden
+# commands + rate limit + new operator-console commands.
+# ---------------------------------------------------------------------------
+
+
+def test_allowlist_refusal_uses_generic_message_and_no_id_hint(monkeypatch):
+    """Refusal text must be the canonical generic string — no ID enumeration."""
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "999")
+    response = pm_bot.handle_telegram_command(_make_update("/help", user_id=12345))
+    assert response["text"] == safety.GENERIC_REFUSAL_TEXT
+    # Must not echo the attempted user_id back to the caller.
+    assert "12345" not in response["text"]
+
+
+def test_forbidden_command_is_rejected_for_allowed_user(monkeypatch):
+    """An allowed user attempting a forbidden command still gets a refusal."""
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    response = pm_bot.handle_telegram_command(_make_update("/trade BTC long"))
+    assert response["text"] == safety.OPERATOR_ONLY_PHYSICAL_ACTION_TEXT
+
+
+@pytest.mark.parametrize(
+    "verb",
+    ["/buy", "/sell", "/transfer", "/withdraw", "/rotate-key", "/exec", "/sudo", "/shell"],
+)
+def test_forbidden_verbs_all_rejected(monkeypatch, verb):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    response = pm_bot.handle_telegram_command(_make_update(f"{verb} arg"))
+    assert response["text"] == safety.OPERATOR_ONLY_PHYSICAL_ACTION_TEXT
+
+
+def test_rate_limit_blocks_after_per_minute_cap(monkeypatch):
+    """11th /help in a row in the same minute should be denied."""
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    # Default RateLimiter is 10/min.
+    for _ in range(safety.DEFAULT_RATE_LIMIT_PER_MINUTE):
+        pm_bot.handle_telegram_command(_make_update("/help"))
+    response = pm_bot.handle_telegram_command(_make_update("/help"))
+    assert response["text"] == safety.GENERIC_REFUSAL_TEXT
+
+
+def test_response_redacts_secrets_in_outgoing_text(monkeypatch):
+    """The _response wrapper must redact secret-like content."""
+    out = pm_bot._response("status: ok\nAPI_KEY=sk-abc123\nfine")
+    assert "sk-abc123" not in out["text"]
+    assert safety.REDACTED_PLACEHOLDER in out["text"]
+
+
+def test_live_trading_disabled_constant_is_true():
+    """Tripwire constant must remain True. Flipping it requires a code change
+    AND removes the assertion check by hand — defense in depth."""
+    assert pm_bot.LIVE_TRADING_DISABLED_FROM_TELEGRAM is True
+    assert safety.LIVE_TRADING_DISABLED_FROM_TELEGRAM is True
+
+
+def test_whoami_echoes_safe_identity_only(monkeypatch):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    response = pm_bot.handle_telegram_command(_make_update("/whoami"))
+    assert response["parse_mode"] == "MarkdownV2"
+    assert "user\\_id: 123" in response["text"]
+    assert "username: ari" in response["text"]
+    assert "chat\\_id: 555" in response["text"]
+
+
+def test_routines_list_returns_table(monkeypatch, tmp_path):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    fake_dir = tmp_path / "scheduled-tasks"
+    fake_dir.mkdir()
+    (fake_dir / "morning-briefing").mkdir()
+    (fake_dir / "morning-briefing" / "SKILL.md").write_text("---\nname: morning\n---")
+    (fake_dir / "evening-digest").mkdir()
+    monkeypatch.setattr(pm_bot, "_SCHEDULED_TASKS_DIR", fake_dir)
+    monkeypatch.setattr(pm_bot, "_ROUTINE_PAUSE_DIR", tmp_path / "pause")
+
+    response = pm_bot.handle_telegram_command(_make_update("/routines list"))
+    assert response["parse_mode"] == "MarkdownV2"
+    assert "morning\\-briefing" in response["text"]
+    assert "evening\\-digest" in response["text"]
+
+
+def test_routines_pause_creates_flag_file(monkeypatch, tmp_path):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    fake_tasks = tmp_path / "scheduled-tasks"
+    fake_tasks.mkdir()
+    (fake_tasks / "morning-briefing").mkdir()
+    pause_dir = tmp_path / "pause"
+    monkeypatch.setattr(pm_bot, "_SCHEDULED_TASKS_DIR", fake_tasks)
+    monkeypatch.setattr(pm_bot, "_ROUTINE_PAUSE_DIR", pause_dir)
+
+    response = pm_bot.handle_telegram_command(
+        _make_update("/routines pause morning-briefing")
+    )
+    assert response["parse_mode"] == "MarkdownV2"
+    assert "Paused routine: morning\\-briefing" in response["text"]
+    assert (pause_dir / "morning-briefing").exists()
+
+
+def test_routines_resume_requires_confirm_token(monkeypatch, tmp_path):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    pause_dir = tmp_path / "pause"
+    pause_dir.mkdir()
+    (pause_dir / "morning-briefing").write_text("paused")
+    monkeypatch.setattr(pm_bot, "_ROUTINE_PAUSE_DIR", pause_dir)
+
+    # Without CONFIRM — refusal, flag still present.
+    response = pm_bot.handle_telegram_command(
+        _make_update("/routines resume morning-briefing")
+    )
+    assert "Confirmation required" in response["text"]
+    assert (pause_dir / "morning-briefing").exists()
+
+    # With CONFIRM — success, flag removed.
+    response = pm_bot.handle_telegram_command(
+        _make_update("/routines resume morning-briefing CONFIRM")
+    )
+    assert "Resumed routine" in response["text"]
+    assert not (pause_dir / "morning-briefing").exists()
+
+
+def test_cancel_routine_requires_confirm_token(monkeypatch, tmp_path):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    fake_tasks = tmp_path / "scheduled-tasks"
+    fake_tasks.mkdir()
+    (fake_tasks / "factory-repo-fixer").mkdir()
+    pause_dir = tmp_path / "pause"
+    monkeypatch.setattr(pm_bot, "_SCHEDULED_TASKS_DIR", fake_tasks)
+    monkeypatch.setattr(pm_bot, "_ROUTINE_PAUSE_DIR", pause_dir)
+
+    # Without CONFIRM — refusal.
+    response = pm_bot.handle_telegram_command(
+        _make_update("/cancel-routine factory-repo-fixer")
+    )
+    assert "Confirmation required" in response["text"]
+    assert not pause_dir.exists() or not (pause_dir / "factory-repo-fixer").exists()
+
+    # With CONFIRM — flag created.
+    response = pm_bot.handle_telegram_command(
+        _make_update("/cancel-routine factory-repo-fixer CONFIRM")
+    )
+    assert "Cancelled routine" in response["text"]
+    assert (pause_dir / "factory-repo-fixer").exists()
+
+
+def test_routines_pause_rejects_invalid_routine_name(monkeypatch, tmp_path):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    monkeypatch.setattr(pm_bot, "_SCHEDULED_TASKS_DIR", tmp_path / "fake")
+    monkeypatch.setattr(pm_bot, "_ROUTINE_PAUSE_DIR", tmp_path / "pause")
+
+    response = pm_bot.handle_telegram_command(
+        _make_update("/routines pause ../etc/passwd")
+    )
+    assert response["text"] == safety.GENERIC_REFUSAL_TEXT
+
+
+def test_health_command_paste_safe_summary(monkeypatch):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    fake_health = SimpleNamespace(
+        check_services=lambda profile="brief": {
+            "control-plane:8082": {"status": "green", "detail": "ok"},
+            "redis:6379": {"status": "yellow", "detail": "slow"},
+        },
+        check_inference=lambda profile="brief": {
+            "mac_ollama": {"status": "green", "detail": "ok"},
+        },
+    )
+    monkeypatch.setitem(sys.modules, "health_check", fake_health)
+    response = pm_bot.handle_telegram_command(_make_update("/health"))
+    assert response["parse_mode"] == "MarkdownV2"
+    assert "YELLOW" in response["text"]
+    assert "green\\=2" in response["text"]
+    assert "yellow\\=1" in response["text"]
+
+
+def test_services_command_returns_table(monkeypatch):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    fake_health = SimpleNamespace(
+        check_services=lambda profile="brief": {
+            "control-plane:8082": {"status": "green", "detail": "200 OK"},
+        },
+        check_inference=lambda profile="brief": {},
+    )
+    monkeypatch.setitem(sys.modules, "health_check", fake_health)
+    response = pm_bot.handle_telegram_command(_make_update("/services"))
+    assert response["parse_mode"] == "MarkdownV2"
+    assert "control\\-plane:8082" in response["text"]
+    assert "green" in response["text"]
+
+
+def test_digest_morning_reads_archive_when_present(monkeypatch, tmp_path):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    from datetime import UTC as _UTC
+    from datetime import datetime as _dt
+
+    today = _dt.now(tz=_UTC).strftime("%Y-%m-%d")
+    log_dir = tmp_path / "morning_digest"
+    log_dir.mkdir()
+    (log_dir / f"{today}.md").write_text("Today's digest content")
+    monkeypatch.setattr(pm_bot, "_MORNING_DIGEST_LOG", log_dir)
+
+    response = pm_bot.handle_telegram_command(_make_update("/digest morning"))
+    assert response["parse_mode"] == "MarkdownV2"
+    assert "Today's digest content" in response["text"]
+
+
+def test_digest_morning_explains_when_missing(monkeypatch, tmp_path):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    monkeypatch.setattr(pm_bot, "_MORNING_DIGEST_LOG", tmp_path / "empty")
+    response = pm_bot.handle_telegram_command(_make_update("/digest morning"))
+    assert "No morning digest found" in response["text"]
+
+
+def test_digest_dev_uses_dev_pulse(monkeypatch):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    fake_dev = SimpleNamespace(
+        pulse=lambda: SimpleNamespace(),
+        format_markdown_v2=lambda result: "Dev pulse summary",
+    )
+    monkeypatch.setitem(sys.modules, "dev_pulse", fake_dev)
+    response = pm_bot.handle_telegram_command(_make_update("/digest dev"))
+    assert response["parse_mode"] == "MarkdownV2"
+    assert "Dev pulse summary" in response["text"]
+
+
+def test_existing_help_command_still_lists_all_commands(monkeypatch):
+    """Backward-compat: original help still works AND now mentions new ones."""
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    response = pm_bot.handle_telegram_command(_make_update("/help"))
+    text = response["text"]
+    # Original commands.
+    assert "/help" in text
+    assert "/status" in text
+    assert "/pm list" in text
+    assert "/rag" in text
+    # New commands.
+    assert "/health" in text
+    assert "/services" in text
+    assert "/whoami" in text
+    assert "/routines" in text
+
+
+def test_existing_status_command_unchanged(monkeypatch):
+    """Backward-compat: status command still produces the same shape."""
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    monkeypatch.setattr(
+        pm_bot.sapphire_status_tool,
+        "run",
+        lambda: '{"devices":[{"name":"mac","online":true}],"inference":{"proxy_health":{}}}',
+    )
+    monkeypatch.setattr(pm_bot, "_count_signals_today", lambda: 0)
+    monkeypatch.setattr(
+        pm_bot.requests, "get",
+        lambda *a, **k: SimpleNamespace(status_code=200, reason="OK"),
+    )
+    response = pm_bot.handle_telegram_command(_make_update("/status"))
+    assert response["parse_mode"] == "MarkdownV2"
+    assert "Mesh devices" in response["text"]

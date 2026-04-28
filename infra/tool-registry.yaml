@@ -109,6 +109,13 @@ tools:
     consumers: [scheduled-tasks.service-supervisor, services.pm-bot]
     description: LaunchAgent self-healing supervisor — detects crashed services, restarts with rate limits, escalates to Telegram only if restart fails. Shares notification surface with watchdog.
 
+  - name: _telegram_safety
+    path: plugins/claw-sapphire/tools/internal/_telegram_safety.py
+    status: internal
+    owner: sapphire
+    consumers: [services.pm-bot]
+    description: Pure-function safety primitives for the Sapphire Telegram operator console — fail-closed allowlist loader, per-user sliding-window rate limiter, secret-keyword denylist regex, forbidden-command regex, live-trading tripwire assertion. No I/O at import; stdlib-only.
+
   # Trading & signals
   - name: predict
     path: plugins/claw-sapphire/tools/internal/predict.py

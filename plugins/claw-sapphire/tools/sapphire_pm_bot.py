@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Telegram-first Sapphire PM bot tool.
 
-Phase 1 scope:
+Phase 1 scope (preserved):
 - fail-closed Telegram allowlist
 - /help
 - /status
@@ -9,6 +9,21 @@ Phase 1 scope:
 - /pm new <title>
 - /rag <query>
 - /claw <prompt> (stub)
+
+Phase 2 (Wave 4 hardening — operator console):
+- per-user rate limiting (≤10/min, ≤60/h) via shared safety module
+- secret-denylist regex strips api_key/token/password/bearer from outgoing text
+- forbidden-command guard rejects /trade /buy /sell /transfer /withdraw
+  /rotate-key /launch /exec /eval /sudo /shell etc. with a generic refusal
+- LIVE_TRADING_DISABLED_FROM_TELEGRAM tripwire asserted on every dispatch
+- /health, /services, /routines list|pause|resume, /digest morning|dev,
+  /cancel-routine, /whoami — all read-only or strictly bounded with
+  CONFIRM-token gate on dangerous reversibles
+
+Every command path passes through ``handle_telegram_command`` →
+allowlist → forbidden-command guard → rate-limit → dispatcher. The
+existing five commands continue to take the dispatcher branch they
+always did; the new commands sit alongside them.
 """
 
 from __future__ import annotations
@@ -32,8 +47,29 @@ except Exception:  # pragma: no cover
     firestore = None
 
 import status as sapphire_status_tool
+from internal import _telegram_safety as safety
 
 logger = logging.getLogger(__name__)
+
+# Re-export tripwire so callers / tests can read the canonical value.
+LIVE_TRADING_DISABLED_FROM_TELEGRAM = safety.LIVE_TRADING_DISABLED_FROM_TELEGRAM
+
+# Per-process shared rate limiter. The bot runs as a single LaunchAgent so
+# in-process state is the right fit. If we ever shard, this becomes a
+# Redis ZSET (see safety.RateLimiter docstring).
+_RATE_LIMITER = safety.RateLimiter()
+
+# Pause-flag directory for /routines pause|resume + /cancel-routine.
+# Scheduled tasks read these flags at startup and skip if present.
+_ROUTINE_PAUSE_DIR = Path.home() / ".sapphire" / "routine_pause"
+_SCHEDULED_TASKS_DIR = Path.home() / ".claude" / "scheduled-tasks"
+_MORNING_DIGEST_LOG = (
+    Path.home()
+    / "Code"
+    / "Sapphire"
+    / "data"
+    / "morning_digest"
+)
 
 SAPPHIRE_ROOT = Path.home() / "Code" / "Sapphire"
 THO_FIRESTORE_PROJECT = os.getenv("THO_FIRESTORE_PROJECT", "tho-ai-agent")
@@ -45,12 +81,21 @@ STATUS_HELP_TEXT = (
     "Available commands:\n"
     "• /help\n"
     "• /status\n"
+    "• /health\n"
+    "• /services\n"
     "• /dev pulse\n"
     "• /svc status\n"
     "• /pm list [--project <id>]\n"
     "• /pm new <title>\n"
     "• /rag <query>\n"
-    "• /claw <prompt>"
+    "• /claw <prompt>\n"
+    "• /routines list\n"
+    "• /routines pause <name>\n"
+    "• /routines resume <name> CONFIRM\n"
+    "• /digest morning\n"
+    "• /digest dev\n"
+    "• /cancel-routine <name> CONFIRM\n"
+    "• /whoami"
 )
 TASK_STATE_ORDER = ("todo", "in_progress", "in_review", "blocked")
 PRIORITY_LABELS = {
@@ -96,7 +141,15 @@ def redact_pii(text: str) -> str:
 
 
 def _response(text: str, parse_mode: str | None = None) -> dict[str, Any]:
-    return {"text": text, "parse_mode": parse_mode}
+    """Build a Telegram response dict.
+
+    Every outgoing payload runs through ``safety.redact_secrets`` so a
+    misconfigured upstream tool that prints an API key into a status
+    string cannot leak it via Telegram. The redactor is line-based so
+    a single offending line does not blank an entire status report.
+    """
+    redacted = safety.redact_secrets(text)
+    return {"text": redacted, "parse_mode": parse_mode}
 
 
 def _now_utc() -> datetime:
@@ -144,29 +197,68 @@ def _message_text(update: dict[str, Any]) -> str:
 
 
 def _allowed_user_ids() -> set[int]:
-    raw = os.getenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "")
-    allowed: set[int] = set()
-    for item in raw.split(","):
-        text = item.strip()
-        if not text:
-            continue
-        try:
-            allowed.add(int(text))
-        except ValueError:
-            logger.warning("Ignoring invalid Telegram allowlist entry: %r", text)
-    return allowed
+    """Backward-compatible wrapper around :func:`safety.load_allowed_user_ids`.
+
+    Existing tests import this name; preserve it. The implementation now
+    delegates to the shared safety module so policy lives in one place.
+    """
+    return safety.load_allowed_user_ids("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS")
 
 
 def _ensure_allowed(update: dict[str, Any]) -> dict[str, Any] | None:
+    """Reject senders who are not on the fail-closed allowlist.
+
+    Returns the generic refusal response when denied, or ``None`` when the
+    sender is permitted. The wording is identical to the rate-limit and
+    forbidden-command refusals — by design, the operator console never
+    tells a probe *why* it was rejected, only that it was.
+    """
     sender_id = _sender_id(update)
     allowed = _allowed_user_ids()
-    if sender_id is not None and sender_id in allowed:
+    if safety.is_allowed(sender_id, allowed):
         return None
     logger.warning("Denied Telegram PM bot request from user_id=%s", sender_id)
-    return _response(
-        "This Sapphire PM bot is not enabled for your Telegram user ID on this host.",
-        None,
+    return _response(safety.GENERIC_REFUSAL_TEXT, None)
+
+
+def _ensure_not_forbidden(text: str) -> dict[str, Any] | None:
+    """Reject any forbidden top-level command before dispatch.
+
+    The denylist (``FORBIDDEN_COMMAND_RE`` in the safety module) catches
+    ``/trade``, ``/buy``, ``/sell``, ``/transfer``, ``/withdraw``,
+    ``/rotate-key``, ``/launch``, ``/exec``, ``/eval``, ``/sudo``,
+    ``/shell``, etc. The check fires *after* allowlist + *before* the
+    dispatcher, so an allowed user attempting a forbidden command still
+    gets a refusal — and the dispatcher never sees the input. This keeps
+    policy in source rather than configuration.
+    """
+    if not safety.is_forbidden_command(text):
+        return None
+    logger.warning("Rejected forbidden Telegram command attempt: %r", text[:80])
+    return _response(safety.OPERATOR_ONLY_PHYSICAL_ACTION_TEXT, None)
+
+
+def _ensure_within_rate_limit(update: dict[str, Any]) -> dict[str, Any] | None:
+    """Apply the per-user sliding-window rate limit.
+
+    Returns the generic refusal when over the cap. The decision's
+    ``retry_after_seconds`` is logged for diagnostics but deliberately not
+    echoed — telling an attacker the exact reset time helps them pace.
+    """
+    sender_id = _sender_id(update)
+    if sender_id is None:
+        # Unknown sender — let allowlist handle it (it will deny).
+        return None
+    decision = _RATE_LIMITER.check(sender_id)
+    if decision.allowed:
+        return None
+    logger.warning(
+        "Rate-limited Telegram user_id=%s reason=%s retry_after=%.1fs",
+        sender_id,
+        decision.reason,
+        decision.retry_after_seconds,
     )
+    return _response(safety.GENERIC_REFUSAL_TEXT, None)
 
 
 def _parse_iso_dt(value: Any) -> datetime:
@@ -662,21 +754,383 @@ def _handle_svc_status() -> dict[str, Any]:
     return _response(_format_service_supervisor_markdown_v2(result), "MarkdownV2")
 
 
-def handle_telegram_command(update: dict[str, Any]) -> dict[str, Any]:
-    """Route a normalized Telegram update into a formatted bot response."""
-    refusal = _ensure_allowed(update)
-    if refusal is not None:
-        return refusal
+# ---------------------------------------------------------------------------
+# Wave 4 hardening — operator console additions.
+# All commands below are read-only or strictly bounded. Dangerous reversibles
+# (resume, cancel-routine) require the literal CONFIRM token.
+# ---------------------------------------------------------------------------
 
-    text = _message_text(update)
+
+def _handle_health() -> dict[str, Any]:
+    """Single-line health summary from the ``health_check`` tool.
+
+    Read-only, paste-safe. Output passes through the secret-redactor like
+    every other response. We deliberately call ``check_services`` /
+    ``check_inference`` directly with the ``brief`` profile rather than
+    invoking the CLI: the brief profile finishes in ~3 s and skips the
+    deep THO PIN probe (no secret in scope).
+    """
+    safety.assert_no_live_trading()
+    try:
+        import health_check  # type: ignore
+    except Exception as e:
+        return _response(
+            escape_markdown_v2(f"health_check unavailable: {type(e).__name__}"),
+            "MarkdownV2",
+        )
+    try:
+        services = health_check.check_services(profile="brief")
+        inference = health_check.check_inference(profile="brief")
+    except Exception as e:
+        return _response(
+            escape_markdown_v2(f"health_check failed: {type(e).__name__}: {e}")[:1000],
+            "MarkdownV2",
+        )
+
+    counts = {"green": 0, "yellow": 0, "red": 0, "unknown": 0}
+    for section in (services, inference):
+        for item in section.values():
+            status = str(item.get("status") or "unknown")
+            counts[status] = counts.get(status, 0) + 1
+
+    if counts["red"] > 0:
+        overall = "RED"
+    elif counts["yellow"] > 0:
+        overall = "YELLOW"
+    else:
+        overall = "GREEN"
+
+    summary = (
+        f"health: {overall} | green={counts['green']} "
+        f"yellow={counts['yellow']} red={counts['red']}"
+    )
+    return _response(escape_markdown_v2(summary), "MarkdownV2")
+
+
+def _format_services_table(services: dict[str, Any]) -> str:
+    lines = ["LaunchAgent + service status"]
+    for name in sorted(services.keys()):
+        item = services[name]
+        if not isinstance(item, dict):
+            continue
+        status = str(item.get("status") or "unknown")
+        detail = str(item.get("detail") or "")[:80]
+        lines.append(f"• {name} | {status} | {detail}")
+    return "\n".join(escape_markdown_v2(line) for line in lines)
+
+
+def _handle_services() -> dict[str, Any]:
+    """Read-only LaunchAgent + HTTP service status table."""
+    safety.assert_no_live_trading()
+    try:
+        import health_check  # type: ignore
+    except Exception as e:
+        return _response(
+            escape_markdown_v2(f"health_check unavailable: {type(e).__name__}"),
+            "MarkdownV2",
+        )
+    try:
+        services = health_check.check_services(profile="brief")
+    except Exception as e:
+        return _response(
+            escape_markdown_v2(f"services check failed: {type(e).__name__}: {e}")[:1000],
+            "MarkdownV2",
+        )
+    return _response(_format_services_table(services), "MarkdownV2")
+
+
+def _list_scheduled_tasks() -> list[dict[str, Any]]:
+    """Enumerate scheduled-task directories with last-modified hint."""
+    if not _SCHEDULED_TASKS_DIR.exists():
+        return []
+    out: list[dict[str, Any]] = []
+    for entry in sorted(_SCHEDULED_TASKS_DIR.iterdir()):
+        if not entry.is_dir():
+            continue
+        if entry.name.startswith("_") or entry.name.startswith("."):
+            continue
+        skill = entry / "SKILL.md"
+        try:
+            mtime = skill.stat().st_mtime if skill.exists() else entry.stat().st_mtime
+            last_modified = datetime.fromtimestamp(mtime, tz=UTC).isoformat(timespec="minutes")
+        except OSError:
+            last_modified = "?"
+        paused = (_ROUTINE_PAUSE_DIR / entry.name).exists()
+        out.append(
+            {
+                "name": entry.name,
+                "last_modified": last_modified,
+                "paused": paused,
+            }
+        )
+    return out
+
+
+def _handle_routines_list() -> dict[str, Any]:
+    safety.assert_no_live_trading()
+    try:
+        items = _list_scheduled_tasks()
+    except Exception as e:
+        return _response(
+            escape_markdown_v2(f"routines list failed: {type(e).__name__}: {e}")[:500],
+            "MarkdownV2",
+        )
+    if not items:
+        return _response(
+            escape_markdown_v2("No scheduled tasks found."), "MarkdownV2"
+        )
+    lines = [f"Scheduled tasks ({len(items)})"]
+    for item in items:
+        flag = " [PAUSED]" if item["paused"] else ""
+        lines.append(f"• {item['name']} | last_mtime={item['last_modified']}{flag}")
+    return _response(
+        "\n".join(escape_markdown_v2(line) for line in lines), "MarkdownV2"
+    )
+
+
+def _routine_pause_path(name: str) -> Path:
+    return _ROUTINE_PAUSE_DIR / name
+
+
+def _handle_routines_pause(text: str) -> dict[str, Any]:
+    """Set a pause flag for a scheduled task. Reversible via /routines resume.
+
+    Pause is *immediately effective* on the next scheduled-task startup —
+    tasks check ``~/.sapphire/routine_pause/<name>`` at startup and skip if
+    present. Existing in-flight runs are not interrupted; supervisor
+    cooldown applies. This is the safe default: pausing should never need
+    a CONFIRM token (it does no harm).
+    """
+    safety.assert_no_live_trading()
+    match = re.match(r"^/routines\s+pause\s+(\S+)\s*$", text, re.IGNORECASE)
+    if not match:
+        return _response("Usage: /routines pause <name>", None)
+    name = match.group(1).strip()
+    if not safety.is_valid_routine_name(name):
+        return _response(safety.GENERIC_REFUSAL_TEXT, None)
+
+    available = {item["name"] for item in _list_scheduled_tasks()}
+    if name not in available:
+        return _response(
+            escape_markdown_v2(f"Unknown routine: {name}"), "MarkdownV2"
+        )
+
+    try:
+        _ROUTINE_PAUSE_DIR.mkdir(parents=True, exist_ok=True)
+        flag = _routine_pause_path(name)
+        flag.write_text(_now_utc().isoformat() + "\n")
+    except OSError as e:
+        return _response(
+            escape_markdown_v2(f"Failed to pause: {type(e).__name__}")[:200],
+            "MarkdownV2",
+        )
+
+    return _response(
+        escape_markdown_v2(f"Paused routine: {name}. Use /routines resume {name} CONFIRM to re-enable."),
+        "MarkdownV2",
+    )
+
+
+def _handle_routines_resume(text: str) -> dict[str, Any]:
+    """Remove a routine pause flag. Requires CONFIRM token.
+
+    Resume is *destructive of the pause state* — it re-enables a routine
+    that the operator deliberately paused. We require the operator to
+    re-state intent with the literal ``CONFIRM`` suffix to prevent fat-
+    finger reactivation of a routine that was paused for a reason.
+    """
+    safety.assert_no_live_trading()
+    match = re.match(
+        r"^/routines\s+resume\s+(\S+)(?:\s+(\S+))?\s*$", text, re.IGNORECASE
+    )
+    if not match:
+        return _response("Usage: /routines resume <name> CONFIRM", None)
+    name = match.group(1).strip()
+    confirm = (match.group(2) or "").strip()
+    if not safety.is_valid_routine_name(name):
+        return _response(safety.GENERIC_REFUSAL_TEXT, None)
+    if confirm != safety.CONFIRM_TOKEN:
+        return _response(
+            escape_markdown_v2(
+                f"Confirmation required. Re-send: /routines resume {name} CONFIRM"
+            ),
+            "MarkdownV2",
+        )
+    flag = _routine_pause_path(name)
+    if not flag.exists():
+        return _response(
+            escape_markdown_v2(f"No pause flag set for: {name}"), "MarkdownV2"
+        )
+    try:
+        flag.unlink()
+    except OSError as e:
+        return _response(
+            escape_markdown_v2(f"Failed to resume: {type(e).__name__}")[:200],
+            "MarkdownV2",
+        )
+    return _response(
+        escape_markdown_v2(f"Resumed routine: {name}."), "MarkdownV2"
+    )
+
+
+def _handle_cancel_routine(text: str) -> dict[str, Any]:
+    """Pause a routine in-flight. Same flag mechanism; CONFIRM required.
+
+    Differs from ``/routines pause`` in that it is the *explicit dangerous
+    action* form — the wording in the help text and runbook is
+    deliberately stronger, and we never make this the easy path. The
+    underlying flag-file mechanism is identical, so recovery is
+    symmetric: ``/routines resume <name> CONFIRM`` reverses it.
+    """
+    safety.assert_no_live_trading()
+    match = re.match(
+        r"^/cancel-routine\s+(\S+)(?:\s+(\S+))?\s*$", text, re.IGNORECASE
+    )
+    if not match:
+        return _response("Usage: /cancel-routine <name> CONFIRM", None)
+    name = match.group(1).strip()
+    confirm = (match.group(2) or "").strip()
+    if not safety.is_valid_routine_name(name):
+        return _response(safety.GENERIC_REFUSAL_TEXT, None)
+    if confirm != safety.CONFIRM_TOKEN:
+        return _response(
+            escape_markdown_v2(
+                f"Confirmation required. Re-send: /cancel-routine {name} CONFIRM"
+            ),
+            "MarkdownV2",
+        )
+
+    available = {item["name"] for item in _list_scheduled_tasks()}
+    if name not in available:
+        return _response(
+            escape_markdown_v2(f"Unknown routine: {name}"), "MarkdownV2"
+        )
+    try:
+        _ROUTINE_PAUSE_DIR.mkdir(parents=True, exist_ok=True)
+        flag = _routine_pause_path(name)
+        flag.write_text(_now_utc().isoformat() + "\n")
+    except OSError as e:
+        return _response(
+            escape_markdown_v2(f"Failed to cancel: {type(e).__name__}")[:200],
+            "MarkdownV2",
+        )
+    return _response(
+        escape_markdown_v2(
+            f"Cancelled routine: {name}. Reverse with /routines resume {name} CONFIRM."
+        ),
+        "MarkdownV2",
+    )
+
+
+def _handle_digest_morning() -> dict[str, Any]:
+    """Render today's morning digest if it has run.
+
+    The morning_digest tool persists its rendered MarkdownV2 to
+    ``data/morning_digest/<YYYY-MM-DD>.md`` (when the LaunchAgent runs
+    with ``--archive``). We read that file directly when present rather
+    than re-running the digest from Telegram — the digest is allowed to
+    take 30+ s and we do not want to block the bot or re-bill external
+    APIs on operator demand. If today's file is missing, we explain why.
+    """
+    safety.assert_no_live_trading()
+    today = datetime.now(tz=UTC).strftime("%Y-%m-%d")
+    candidate = _MORNING_DIGEST_LOG / f"{today}.md"
+    if candidate.exists():
+        try:
+            content = candidate.read_text()[:3500]
+            return _response(content, "MarkdownV2")
+        except OSError as e:
+            return _response(
+                escape_markdown_v2(f"Failed to read digest: {type(e).__name__}")[:200],
+                "MarkdownV2",
+            )
+    return _response(
+        escape_markdown_v2(
+            f"No morning digest found for {today}. The 8 AM digest "
+            "may not have run yet, or archiving is off."
+        ),
+        "MarkdownV2",
+    )
+
+
+def _handle_digest_dev() -> dict[str, Any]:
+    """Render the latest dev_pulse summary (live, lazy import)."""
+    safety.assert_no_live_trading()
+    try:
+        import dev_pulse  # type: ignore
+    except Exception as e:
+        return _response(
+            escape_markdown_v2(f"dev_pulse unavailable: {type(e).__name__}"),
+            "MarkdownV2",
+        )
+    try:
+        result = dev_pulse.pulse()
+    except Exception as e:
+        return _response(
+            escape_markdown_v2(f"dev_pulse failed: {type(e).__name__}: {e}")[:3500],
+            "MarkdownV2",
+        )
+    return _response(dev_pulse.format_markdown_v2(result), "MarkdownV2")
+
+
+def _handle_whoami(update: dict[str, Any]) -> dict[str, Any]:
+    """Echo back the requesting Telegram chat_id and user_id.
+
+    Useful for debugging the allowlist (operator can see what user_id to
+    add to ``SAPPHIRE_PM_BOT_ALLOWED_USER_IDS``). Safe — there are no
+    secrets, no environment leak, no sender enumeration."""
+    safety.assert_no_live_trading()
+    sender_id = _sender_id(update)
+    username = _sender_username(update)
+    message = _message_from_update(update)
+    chat = message.get("chat") if isinstance(message, dict) else {}
+    chat_id = chat.get("id") if isinstance(chat, dict) else None
+    lines = [
+        "whoami",
+        f"user_id: {sender_id if sender_id is not None else 'unknown'}",
+        f"username: {username}",
+        f"chat_id: {chat_id if chat_id is not None else 'unknown'}",
+    ]
+    return _response(
+        "\n".join(escape_markdown_v2(line) for line in lines), "MarkdownV2"
+    )
+
+
+def _dispatch(text: str, update: dict[str, Any]) -> dict[str, Any]:
+    """Pure command-dispatch table. Allowlist + safety guards are upstream.
+
+    Extracted from ``handle_telegram_command`` so the two responsibilities
+    (gates vs routing) remain testable in isolation. New commands must
+    not bypass the gates; if you find yourself adding a branch here that
+    is sensitive, also extend the forbidden-command list in
+    ``_telegram_safety``.
+    """
     if text in {"/help", "/start"}:
         return _handle_help()
     if text == "/status":
         return _format_status_report()
+    if text == "/health":
+        return _handle_health()
+    if text == "/services":
+        return _handle_services()
     if text in {"/dev", "/dev pulse", "/pulse"}:
         return _handle_dev_pulse()
     if text == "/svc status":
         return _handle_svc_status()
+    if text == "/whoami":
+        return _handle_whoami(update)
+    if text == "/routines list":
+        return _handle_routines_list()
+    if text.startswith("/routines pause"):
+        return _handle_routines_pause(text)
+    if text.startswith("/routines resume"):
+        return _handle_routines_resume(text)
+    if text.startswith("/cancel-routine"):
+        return _handle_cancel_routine(text)
+    if text == "/digest morning":
+        return _handle_digest_morning()
+    if text == "/digest dev":
+        return _handle_digest_dev()
     if text.startswith("/pm list"):
         return _handle_pm_list(text)
     if text.startswith("/pm new"):
@@ -689,6 +1143,41 @@ def handle_telegram_command(update: dict[str, Any]) -> dict[str, Any]:
         escape_markdown_v2("Unrecognized input. Try /help."),
         "MarkdownV2",
     )
+
+
+def handle_telegram_command(update: dict[str, Any]) -> dict[str, Any]:
+    """Route a normalized Telegram update into a formatted bot response.
+
+    Order is load-bearing:
+    1. Live-trading tripwire (assert_no_live_trading).
+    2. Allowlist (fail-closed, generic refusal on miss).
+    3. Forbidden-command guard (rejects /trade, /buy, /sell, etc. with
+       a generic refusal; identical wording to allowlist denial so a
+       probe cannot tell which gate fired).
+    4. Per-user rate limit (10/min, 60/h sliding window).
+    5. Dispatch to the per-command handler.
+
+    Every step short-circuits on refusal. The handler return value is
+    re-redacted by ``_response`` so even if a downstream tool prints a
+    secret, the operator never sees it.
+    """
+    safety.assert_no_live_trading()
+
+    refusal = _ensure_allowed(update)
+    if refusal is not None:
+        return refusal
+
+    text = _message_text(update)
+
+    refusal = _ensure_not_forbidden(text)
+    if refusal is not None:
+        return refusal
+
+    refusal = _ensure_within_rate_limit(update)
+    if refusal is not None:
+        return refusal
+
+    return _dispatch(text, update)
 
 
 def main() -> None:
