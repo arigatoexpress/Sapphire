@@ -42,6 +42,7 @@ log = logging.getLogger("foundry.sync")
 _DEFAULT_INTERVAL = 900  # 15 minutes
 _STATE_FILE = "data/foundry_sync_state.json"
 _HISTORY_FILE = "data/foundry_sync_history.jsonl"
+_WATERMARK_DIR = Path.home() / ".cache" / "sapphire" / "foundry_sync"
 
 # Dataset source groups — maps Foundry object type → local file patterns
 _SOURCE_PATTERNS: dict[str, list[str]] = {
@@ -59,7 +60,80 @@ _SOURCE_PATTERNS: dict[str, list[str]] = {
     "Region": ["data/foundry/regional-intel/Region.ndjson"],
     "IntelItem": ["data/foundry/regional-intel/IntelItem.ndjson"],
     "IntelSourceHealth": ["data/foundry/regional-intel/IntelSourceHealth.ndjson"],
+    # Tranche-3 expansion (ontology v0.2.0). External-cache-backed sources
+    # (vector store mock, gemini cache, hyperliquid signal log) are guarded
+    # by repo-local mirror paths first; the worker scans home cache only as
+    # a fallback so CI never accidentally picks up developer state.
+    "IntelVectorRecord": [
+        "data/intel/bq_vector_mock.jsonl",
+    ],
+    "TelegramIntelMessage": [
+        "data/telegram_intel/*/messages.jsonl",
+    ],
+    "HyperliquidSignal": [
+        "data/hyperliquid_signals.jsonl",
+    ],
+    "OODAPacket": [
+        "data/gemini_ooda/*.json",
+    ],
+    "ThreatIndicator": [
+        "data/intelligence/*/threats.json",
+        "data/threat_intel/*.md",
+    ],
 }
+
+# Watermark files live under ~/.cache/sapphire/foundry_sync/<type>.json. The
+# watermark records the last-synced ``last_seen`` timestamp the transform
+# observed. The sync engine keeps using the file mtime+hash delta detection
+# for change scheduling, but emits + persists watermarks per type so external
+# consumers (dashboards, audits) can answer "when did Foundry last see N
+# records of type X?" without joining state files together.
+
+
+def watermark_path(object_type: str, *, base_dir: Path | None = None) -> Path:
+    """Return the per-type watermark file path."""
+    base = base_dir or _WATERMARK_DIR
+    return base / f"{object_type}.json"
+
+
+def load_watermark(
+    object_type: str, *, base_dir: Path | None = None
+) -> dict[str, Any]:
+    """Load the watermark for ``object_type``. Returns ``{}`` if missing/corrupt."""
+    path = watermark_path(object_type, base_dir=base_dir)
+    if not path.is_file():
+        return {}
+    try:
+        data = json.loads(path.read_text())
+        if isinstance(data, dict):
+            return data
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return {}
+
+
+def write_watermark(
+    object_type: str,
+    *,
+    last_synced_at: str,
+    object_count: int,
+    base_dir: Path | None = None,
+    extra: dict[str, Any] | None = None,
+) -> Path:
+    """Persist a watermark for ``object_type`` and return the path written."""
+    path = watermark_path(object_type, base_dir=base_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload: dict[str, Any] = {
+        "object_type": object_type,
+        "last_synced_at": last_synced_at,
+        "object_count": int(object_count),
+    }
+    if extra:
+        payload.update(extra)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str))
+    tmp.replace(path)
+    return path
 
 
 def _repo_root() -> Path:
@@ -343,13 +417,35 @@ def run_sync(
 
     objects_by_type: dict[str, list[dict[str, Any]]] = {}
     types_to_sync = list(changes.keys()) if not force else list(ALL_TRANSFORMS.keys())
+    watermark_base = Path(
+        os.environ.get("SAPPHIRE_FOUNDRY_WATERMARK_DIR", str(_WATERMARK_DIR))
+    ).expanduser()
 
     for obj_type in types_to_sync:
         fn = ALL_TRANSFORMS.get(obj_type)
         if fn is None:
             continue
         try:
-            objects_by_type[obj_type] = fn(root)
+            objects = fn(root)
+            objects_by_type[obj_type] = objects
+            # Watermark every transform that ran without crashing (even an
+            # empty result is meaningful: "we looked, the source had nothing
+            # new"). This is independent of upload outcome so consumers can
+            # tell when ingestion last touched the source even if Foundry
+            # itself is unreachable.
+            try:
+                write_watermark(
+                    obj_type,
+                    last_synced_at=now,
+                    object_count=len(objects),
+                    base_dir=watermark_base,
+                    extra={
+                        "changed_files": changes.get(obj_type, []),
+                        "force": bool(force),
+                    },
+                )
+            except OSError as wm_exc:
+                log.warning("Failed to write watermark for %s: %s", obj_type, wm_exc)
         except Exception as exc:
             log.exception("Transform %s failed", obj_type)
             result.errors.append(f"Transform {obj_type}: {exc}")

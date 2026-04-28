@@ -1,10 +1,12 @@
 # Foundry Ontology Schema — Sapphire
 
-**Version:** 1.0  
-**Date:** 2026-04-19  
+**Version:** 2.0 (Tranche-3 expansion)  
+**Date:** 2026-04-28  
 **Source:** `lib/foundry/ingestion.py` transforms  
 
 This document defines the Foundry ontology object types that Sapphire syncs into Palantir Foundry.  Each object type maps to a local data source, is transformed by `lib/foundry/ingestion.py`, and uploaded by `lib/foundry/sync.py` on a 15-minute delta-aware schedule.
+
+The 2.0 expansion adds five Tranche-2 surfaces (`IntelVectorRecord`, `TelegramIntelMessage`, `HyperliquidSignal`, `OODAPacket`, `ThreatIndicator`) and introduces per-type watermarks under `~/.cache/sapphire/foundry_sync/<type>.json`. The base directory is overridable via `SAPPHIRE_FOUNDRY_WATERMARK_DIR` for CI isolation. See `docs/products/foundry-ontology-0.2.0.md` for the buyer-facing summary.
 
 ---
 
@@ -204,6 +206,159 @@ Regional-intel source coverage and live-pull status.
 
 ---
 
+### IntelVectorRecord
+
+Vector-store-backed intel records (sovereign-thesis, convergence-watchlist, threat-intel, regional-intel) lifted into Foundry as a queryable corpus surface.
+
+| Property | Type | Source Field | Description |
+|----------|------|-------------|-------------|
+| `id` | `string` (PK) | `id` | Stable record identifier (mirror of `record_id`) |
+| `record_id` | `string` | `id` | Original BQ-vector record id |
+| `text` | `string` | `text` | Truncated intel text (≤2000 chars) |
+| `text_length` | `integer` | derived | Original (un-truncated) text length |
+| `source` | `string` | `source` | One of `KNOWN_SOURCES` (sovereign_thesis, convergence_watchlist, …) |
+| `metadata` | `object` | `metadata` | JSON-safe dict; no secrets |
+| `embedding_dims` | `integer` | derived | Length of the embedding vector |
+| `embedding_hash` | `string` | derived | First 16 hex chars of sha256(`{:.8f}` joined embedding) |
+| `created_at` | `timestamp` | `created_at` | ISO-8601 UTC |
+
+**Indexed fields:** `id`, `source`, `created_at`. **Retention:** mirrors the BQ vector store mock (`MAX_INDEX_RECORDS_PER_RUN = 5000`); records older than 90 days may be pruned by the upstream store.
+
+**Data sources:** `data/intel/bq_vector_mock.jsonl` (preferred), `~/.cache/sapphire/bq_vector_mock.jsonl` (fallback). Raw embedding vectors are intentionally NOT lifted into Foundry (`embedding_hash` lets you verify shape without exposing dimensionality details).
+
+---
+
+### TelegramIntelMessage
+
+Provenance-stamped Telegram channel intel messages, written by `services/telegram_intel/sink.py` and lifted into Foundry as a discoverable intel feed.
+
+| Property | Type | Source Field | Description |
+|----------|------|-------------|-------------|
+| `id` | `string` (PK) | `canonical_id` | sha256-derived stable id (24 hex chars) |
+| `canonical_id` | `string` | `canonical_id` | Same as `id` for join clarity |
+| `schema_version` | `integer` | `schema_version` | Currently `1` |
+| `channel_id` | `string` | `channel.id` | Telegram channel identifier |
+| `channel_handle` | `string` | `channel.handle` / `channel.name` | Display handle |
+| `channel_attribution` | `string` | `channel.attribution` | Public-source attribution string |
+| `message_id` | `string` | `message.id` | Telegram message id |
+| `text` | `string` | `message.text` | Sanitized message text (≤4000 chars) |
+| `text_length` | `integer` | derived | Original message length |
+| `truncated` | `boolean` | `message.truncated` | True if text was truncated by sanitizer |
+| `published_at` | `timestamp` | `message.published_at` | Message publish time |
+| `ingested_at` | `timestamp` | `ingested_at` | Sapphire sink ingestion time |
+| `quality_decision` | `string` | `quality.decision` | `keep` / `drop` / `quarantine` |
+| `quality_score` | `double` | `quality.score` | Quality filter confidence |
+| `quality_reason` | `string` | `quality.reason` | Decision rationale |
+| `classifier_label` | `string` | `classifier.label` | Topic/category label |
+| `classifier_confidence` | `double` | `classifier.confidence` | Classifier confidence |
+| `classifier_source` | `string` | `classifier.source` | Origin (`local-inference-proxy` etc.) |
+| `classifier_model` | `string` | `classifier.model` | Model id (e.g. `hermes3:8b`) |
+
+**Indexed fields:** `id`, `channel_id`, `published_at`, `quality_decision`, `classifier_label`. **Retention:** 180 days; daily JSONL files older than the retention window are pruned by the sink.
+
+**Data sources:** `data/telegram_intel/<YYYY-MM-DD>/messages.jsonl` (preferred). The sink defaults to `services.telegram_intel.config.DEFAULT_DATA_DIR` which currently points at the repo `data/telegram_intel/`.
+
+---
+
+### HyperliquidSignal
+
+Read-only public Hyperliquid market-structure signals from `services/hyperliquid/src/hyperliquid_bot/public_feed.py`. Strictly signal-only — no wallet keys, no live trading.
+
+| Property | Type | Source Field | Description |
+|----------|------|-------------|-------------|
+| `id` | `string` (PK) | derived (`hl:<event_id>` or hash fallback) | Stable signal id |
+| `event_id` | `string` | `event_id` | Sapphire event-bus id (when present) |
+| `topic` | `string` | `topic` | `hyperliquid.trade` / `hyperliquid.imbalance` / `hyperliquid.book.thin` |
+| `schema_version` | `string` | `schema_version` | `hyperliquid.signal.v1` |
+| `signal_type` | `string` | `signal_type` | `large_trade`, `top_of_book_imbalance`, `top_10_depth_drop` |
+| `symbol` | `string` | `symbol` | Upper-cased coin symbol |
+| `side` | `string` | `side` | Buy/sell (when applicable) |
+| `dominant_side` | `string` | `dominant_side` | `bid`/`ask` for imbalance signals |
+| `price` | `double` | `price` | Trade or quote price |
+| `size` | `double` | `size` | Trade size |
+| `notional_usd` | `double` | `notional_usd` | Trade notional |
+| `threshold_usd` | `double` | `threshold_usd` | Configured large-trade threshold |
+| `ratio` | `double` | `ratio` | Imbalance ratio (when applicable) |
+| `threshold_ratio` | `double` | `threshold_ratio` | Threshold ratio for the signal |
+| `sustained_seconds` | `double` | `sustained_seconds` | Duration the imbalance persisted |
+| `current_depth_usd` | `double` | `current_depth_usd` | Current top-10 depth (USD) |
+| `baseline_depth_usd` | `double` | `baseline_depth_usd` | Recent peak top-10 depth |
+| `drop_ratio` | `double` | `drop_ratio` | Depth drop as a ratio |
+| `threshold_drop_ratio` | `double` | `threshold_drop_ratio` | Threshold for the drop |
+| `window_seconds` | `integer` | `window_seconds` | Sliding-window length |
+| `exchange_time_ms` | `integer` | `exchange_time_ms` | Hyperliquid event time (ms) |
+| `trade_id` | `string` | `trade_id` | Trade id (when present) |
+| `observed_at` | `timestamp` | `observed_at` | When Sapphire saw the event |
+| `baseline_observed_at` | `timestamp` | `baseline_observed_at` | When the baseline was captured |
+| `published_at` | `timestamp` | `published_at` | Publisher emission time |
+| `paper_only` | `boolean` | `paper_only` | Always `true` in current build |
+| `live_trading_enabled` | `boolean` | `live_trading_enabled` | Always `false` in current build |
+| `source` | `string` | `source` | `hyperliquid-public-feed` |
+
+**Indexed fields:** `id`, `topic`, `symbol`, `published_at`, `signal_type`. **Retention:** 30 days (signals beyond that are de-prioritized; the local ledger rotates).
+
+**Data sources:** `data/hyperliquid_signals.jsonl` (preferred), `~/.sapphire/hyperliquid_signals.jsonl` (fallback). Tests must override via `SAPPHIRE_HYPERLIQUID_SIGNAL_PATH` to keep CI isolated from a developer's home cache.
+
+---
+
+### OODAPacket
+
+Bounded OODA (observe / orient / decide / act) packets emitted by the Gemini OODA tool (`plugins/claw-sapphire/tools/internal/gemini_ooda.py`). Live calls are gated by `SAPPHIRE_GEMINI_LIVE=1`; the cache files this transform reads are stamped with provenance.
+
+| Property | Type | Source Field | Description |
+|----------|------|-------------|-------------|
+| `id` | `string` (PK) | derived (`ooda:<request_hash>`) | Stable id |
+| `request_hash` | `string` | `request_hash` / cache filename stem | sha256-derived; identifies the request payload |
+| `observe` | `string` | `ooda.observe` | ≤1000 chars |
+| `orient` | `string` | `ooda.orient` | ≤1000 chars |
+| `decide` | `string` | `ooda.decide` | ≤1000 chars |
+| `act` | `string[]` | `ooda.act` | 0–8 actions, each ≤500 chars |
+| `model` | `string` | `provenance.model` | Gemini model id (e.g. `gemini-2.5-flash`) |
+| `generator` | `string` | `provenance.generator` | Tool generator id |
+| `mode` | `string` | `provenance.metadata.mode` | `live` / `dry-run` / `dry-run-safety` etc. |
+| `issued_at` | `timestamp` | `provenance.generated_at` | Cache stamp time |
+| `ttl_seconds` | `integer` | `provenance.ttl_seconds` | Cache TTL |
+| `prompt_tokens` | `integer` | `tokens.prompt_tokens` | Live prompt tokens (live mode only) |
+| `output_tokens` | `integer` | `tokens.output_tokens` | Live output tokens |
+| `total_tokens` | `integer` | `tokens.total_tokens` | Sum |
+| `cached` | `boolean` | `provenance.metadata.cache` | Whether the packet came from cache |
+
+**Indexed fields:** `id`, `model`, `mode`, `issued_at`. **Retention:** 7 days (matches the tool's max cache TTL of 7×86400 seconds). Only stamped envelopes are lifted; counter files are excluded.
+
+**Data sources:** `data/gemini_ooda/*.json` (preferred), `~/.cache/sapphire/gemini_ooda/*.json` (fallback). Override the directory with `SAPPHIRE_GEMINI_OODA_CACHE_DIR` for tests.
+
+---
+
+### ThreatIndicator
+
+Granular IOC view: each indicator carries the same advisory context as `ThreatIntel` PLUS extracted indicator-of-compromise arrays (CVE ids, IPv4 addresses, suspicious domain-shaped tokens, hex hashes). Distinct from `ThreatIntel` by purpose: this surface is for joining IOCs against `Alert`, `ServiceHealth`, or `IntelVectorRecord` without re-parsing free text.
+
+| Property | Type | Source Field | Description |
+|----------|------|-------------|-------------|
+| `id` | `string` (PK) | derived (`ti:<advisory_id>`) | Stable indicator id |
+| `advisory_id` | `string` | `canonical_id` / `id` / derived | Underlying advisory identifier |
+| `title` | `string` | `title` | Advisory title (≤500 chars) |
+| `severity` | `string` | `severity` | `low`, `medium`, `high`, `critical` |
+| `score` | `double` | `score` | CVSS or feed score (when present) |
+| `exploited` | `boolean` | `exploited` | True if listed in CISA KEV |
+| `source` | `string` | `source` | Feed source (CISA, NVD, internal) |
+| `cve_ids` | `string[]` | extracted + author-supplied | Up to 32 |
+| `ipv4_addresses` | `string[]` | extracted | Validated IPv4 strings, up to 32 |
+| `domains` | `string[]` | extracted + author-supplied | Domain-shaped tokens, up to 32 |
+| `hashes` | `string[]` | extracted + author-supplied | Hex digests (32–64 chars), lower-cased, up to 32 |
+| `ioc_total` | `integer` | derived | Sum of the four IOC array lengths |
+| `mitre_tactics` | `string[]` | `mitre_tactics` | MITRE ATT&CK tactic ids |
+| `affected_products` | `string[]` | `affected_products` | Product list |
+| `published_at` | `timestamp` | `published` | ISO-8601 |
+| `region` | `string` | `region` | `GLOBAL` etc. |
+| `link` | `string` | `link` / `url` | Source URL |
+
+**Indexed fields:** `id`, `advisory_id`, `severity`, `exploited`, `published_at`, `region`. **Retention:** 365 days; KEV-flagged indicators retained indefinitely.
+
+**Data sources:** `data/intelligence/*/threats.json`, `data/threat_intel/*.md`. Reads the same source files as `ThreatIntel` but emits one row per advisory with extracted IOC arrays.
+
+---
+
 ## Regional Manifest v2 Readiness
 
 The regional-intel workbench exports a runtime manifest at
@@ -242,6 +397,12 @@ These relationships connect object types in the Foundry ontology:
 | `region_items` | Region | IntelItem | 1:N | Regional items observed inside a region |
 | `region_sources` | Region | IntelSourceHealth | N:M | Public sources covering a region |
 | `item_alerts` | IntelItem | Alert | 1:N | Operational alerts derived from regional intelligence |
+| `vector_alerts` | IntelVectorRecord | Alert | N:M | Vector hits surfacing in alerts |
+| `intel_threats` | TelegramIntelMessage | ThreatIndicator | N:M | Telegram intel mentioning IOCs |
+| `signal_alerts` | HyperliquidSignal | Alert | 1:N | Alerts driven by Hyperliquid microstructure |
+| `ooda_threats` | OODAPacket | ThreatIndicator | N:M | OODA packets reasoning over indicators |
+| `indicator_alerts` | ThreatIndicator | Alert | 1:N | Alerts driven by IOC matches |
+| `indicator_services` | ThreatIndicator | ServiceHealth | N:M | Services impacted by an indicator |
 
 ---
 
@@ -338,5 +499,7 @@ Per the strategy doc, these Actions will be implemented after the ontology layer
 | `data/foundry_sync_history.jsonl` | Append-only sync log |
 | `tests/unit/test_foundry_client.py` | Client unit tests |
 | `tests/unit/test_foundry_ingestion.py` | Ingestion transform tests |
+| `tests/unit/test_foundry_ingestion_extensions.py` | Tranche-3 ontology v0.2.0 transform tests |
 | `tests/unit/test_foundry_readiness.py` | Readiness + schema audit tests |
 | `tests/unit/test_foundry_sync.py` | Sync engine tests |
+| `tests/unit/test_foundry_sync_extensions.py` | Tranche-3 sync watermark + new-type tests |

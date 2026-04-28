@@ -188,10 +188,15 @@ def test_schema_audit_reports_required_field_health_and_history_readback(tmp_pat
     audit = build_foundry_schema_audit(tmp_path)
 
     assert audit["status"] == "ready"
-    assert audit["totals"]["object_types"] == 8
-    assert audit["totals"]["objects"] == 8
+    # 0.2.0: 8 baseline types + 5 new (IntelVectorRecord, TelegramIntelMessage,
+    # HyperliquidSignal, OODAPacket, ThreatIndicator). The fixture exercises
+    # ThreatIndicator (it shares threats.json with ThreatIntel), so the object
+    # count goes up by exactly one. The other four new types have no fixture
+    # data and contribute zero objects.
+    assert audit["totals"]["object_types"] == 13
+    assert audit["totals"]["objects"] == 9
     assert audit["totals"]["missing_required_fields"] == 0
-    assert audit["totals"]["source_refs"] == 8
+    assert audit["totals"]["source_refs"] == 9
     object_types = {item["object_type"]: item for item in audit["object_types"]}
     assert object_types["PaperTrade"]["required_fields"] == [
         "id",
@@ -399,7 +404,9 @@ def test_readiness_embeds_schema_audit(tmp_path):
     readiness = build_foundry_readiness(tmp_path)
 
     assert readiness["schema_audit"]["status"] == "ready"
-    assert readiness["schema_audit"]["totals"]["objects"] == 8
+    # 0.2.0: ThreatIndicator parallels ThreatIntel on the same threats.json
+    # fixture, so the object count is 9 (8 baseline + 1 indicator).
+    assert readiness["schema_audit"]["totals"]["objects"] == 9
     regional_group = next(
         group for group in readiness["dataset_groups"] if group["id"] == "regional-intel"
     )

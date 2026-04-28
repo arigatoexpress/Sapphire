@@ -139,6 +139,24 @@ _OBJECT_REQUIRED_FIELDS: dict[str, tuple[str, ...]] = {
         "status",
         "snapshot_updated_at",
     ),
+    # Tranche-3 expansion (ontology v0.2.0).
+    "IntelVectorRecord": ("id", "record_id", "text", "source", "embedding_dims"),
+    "TelegramIntelMessage": (
+        "id",
+        "canonical_id",
+        "channel_id",
+        "message_id",
+        "text",
+    ),
+    "HyperliquidSignal": ("id", "topic", "symbol", "signal_type", "published_at"),
+    "OODAPacket": ("id", "request_hash", "observe", "orient", "decide", "model"),
+    "ThreatIndicator": (
+        "id",
+        "advisory_id",
+        "title",
+        "severity",
+        "ioc_total",
+    ),
 }
 
 _SYNC_HISTORY_REQUIRED_FIELDS = ("ok", "timestamp", "duration_s")
