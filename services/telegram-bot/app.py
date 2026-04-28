@@ -210,70 +210,52 @@ def _recent_start_date(days: int = 31, *, now: datetime | None = None) -> str:
 
 
 def _health_lines(data: dict[str, Any], *, include_repos: bool = False) -> list[str]:
-    """Render a compact, Telegram-safe health summary from live tool JSON."""
-    lines = [f"*{data.get('overall', 'UNKNOWN')}* — {data.get('summary', 'no summary')}"]
-    sections = ["services", "data_freshness", "inference"]
-    if include_repos:
-        sections.insert(1, "repos")
-    for section in sections:
-        items = data.get(section, {})
-        if not isinstance(items, dict):
-            continue
-        for name, info in items.items():
-            if not isinstance(info, dict):
-                continue
-            icon = {"green": "🟢", "yellow": "🟡", "red": "🔴"}.get(
-                info.get("status"), "⚪"
-            )
-            detail = str(info.get("detail", ""))[:70]
-            lines.append(f"{icon} `{name}`: {detail}")
-    return lines
+    """Render a compact, Telegram-safe health summary from live tool JSON.
+
+    Thin shim around ``lib.agents.health_context.build_health_context``. Kept
+    so that the ``/health`` Telegram command and existing tests continue to
+    work unchanged. The sole purpose of this function is text rendering — for
+    the canonical helper, see ``lib/agents/health_context.py``.
+    """
+    # Local import keeps `services/telegram-bot/app.py` importable from any
+    # CWD that adds the repo root to sys.path; lib/ is not on the global path.
+    from lib.agents.health_context import build_health_context
+
+    scope = "morning" if include_repos else "telegram"
+    ctx = build_health_context(scope, health_payload=data)
+    # Re-render the compact "*OVERALL* — summary" + per-check icon block to
+    # match the historical _health_lines signature exactly. We can't return
+    # ctx.rendered_lines for "telegram" scope because that includes the bot
+    # preamble; this helper only emits the health bullets.
+    if not data:
+        return [f"*{ctx.overall}* — {ctx.summary}"]
+    out = [f"*{ctx.overall}* — {ctx.summary}"]
+    out.extend(f"{c.icon} `{c.name}`: {c.detail}" for c in ctx.checks)
+    return out
 
 
 def _status_lines(data: dict[str, Any]) -> list[str]:
-    inference = data.get("inference", {}) if isinstance(data, dict) else {}
-    proxy = inference.get("proxy_health", {}) if isinstance(inference, dict) else {}
-    local_models = inference.get("local_models", []) if isinstance(inference, dict) else []
-    gpu_models = inference.get("gpu_models", []) if isinstance(inference, dict) else []
+    """Inference / model inventory bullets — delegates to the shared helper."""
+    from lib.agents.health_context import _inference_from_status, _render_status_lines
 
-    lines: list[str] = []
-    if proxy:
-        tier_bits = [f"{name}={state}" for name, state in sorted(proxy.items())]
-        lines.append("Inference proxy: " + ", ".join(tier_bits))
-    if local_models:
-        lines.append(f"Mac Ollama models: {len(local_models)} ({', '.join(local_models[:5])})")
-    if gpu_models:
-        lines.append(f"GPU Ollama models: {len(gpu_models)} ({', '.join(gpu_models[:5])})")
-    if not lines:
-        lines.append("Inference proxy/model inventory unavailable from live status.py.")
-    return lines
+    return _render_status_lines(_inference_from_status(data))
 
 
 def build_live_system_prompt() -> str:
-    """Build a live system prompt so free-text replies do not use stale facts."""
-    lines = [
-        "You are Sapphire, the AI assistant for Kadima Digital Strategies.",
-        "You are sharp, concise, technically deep but accessible. You are a trusted advisor, not a chatbot.",
-        "Use the live context below as the only current operational truth. If a field is missing, stale, red, or unavailable, say that directly instead of filling gaps from memory.",
-        "Never quote historical test counts, customer counts, model counts, win rates, or repo totals unless they appear in this live context or in a slash-command result from this request.",
-        "For precise data queries, suggest the relevant slash command such as /health, /status, /price, /threats, or /events.",
-        "Keep responses under 300 words unless the topic warrants depth.",
-        "",
-        f"Live context collected at {datetime.now(UTC).isoformat()}:",
-    ]
+    """Build a live system prompt so free-text replies do not use stale facts.
+
+    Delegates to ``lib.agents.health_context.build_health_context("telegram")``
+    so every surface that needs a live snapshot uses the same definition. Output
+    is identical to the pre-refactor inline implementation (PR #383).
+    """
+    from lib.agents.health_context import build_health_context
 
     health = _json_object(run_tool_direct("health_check.py", {"profile": "brief"}))
-    if health:
-        lines.append("Health snapshot:")
-        lines.extend(f"- {line}" for line in _health_lines(health))
-    else:
-        lines.append("Health snapshot: unavailable from health_check.py.")
-
     status = _json_object(run_tool_direct("status.py"))
-    lines.append("Status snapshot:")
-    lines.extend(f"- {line}" for line in _status_lines(status))
-
-    return "\n".join(lines)
+    ctx = build_health_context(
+        "telegram", health_payload=health, status_payload=status
+    )
+    return "\n".join(ctx.rendered_lines)
 
 
 def handle_command(
