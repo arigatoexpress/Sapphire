@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Template only. Live collection still refuses to start unless
+     SAPPHIRE_TELEGRAM_INTEL_LIVE=1, ~/.sapphire/telegram_intel.session exists,
+     and infra/telegram_channels.yaml has at least one enabled channel. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.sapphire.telegram-intel-reader</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/python3</string>
+        <string>/Users/aribs/Code/Sapphire/services/telegram_intel/run.py</string>
+        <string>daemon</string>
+        <string>--config</string>
+        <string>/Users/aribs/Code/Sapphire/infra/telegram_channels.yaml</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/aribs/Code/Sapphire</string>
+    <key>RunAtLoad</key>
+    <false/>
+    <key>KeepAlive</key>
+    <false/>
+    <key>StandardOutPath</key>
+    <string>/Users/aribs/Library/Logs/sapphire/telegram-intel-reader.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/aribs/Library/Logs/sapphire/telegram-intel-reader.err</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HOME</key>
+        <string>/Users/aribs</string>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>PYTHONPATH</key>
+        <string>/Users/aribs/Code/Sapphire</string>
+        <key>SAPPHIRE_TELEGRAM_INTEL_LIVE</key>
+        <string>0</string>
+    </dict>
+</dict>
+</plist>
