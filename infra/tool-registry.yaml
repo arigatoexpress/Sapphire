@@ -306,6 +306,14 @@ tools:
     consumers: []
     description: Solana wallet helper — balance, SPL token lookups. (Thin wrapper over lib.trading.solana_wallet.)
 
+  # AI complement — bounded Vertex/Gemini reasoning lane
+  - name: gemini_ooda
+    path: plugins/claw-sapphire/tools/internal/gemini_ooda.py
+    status: internal
+    owner: sapphire
+    consumers: []
+    description: Bounded Gemini OODA synthesizer. Dry-run by default; live mode requires SAPPHIRE_GEMINI_LIVE=1, runs through sensitivity gate, applies per-hour and per-month caps, caches results locally.
+
   # ── deprecated / sunset window ───────────────────────────────────────────
   - name: kronos_predict
     path: plugins/claw-sapphire/tools/_deprecated/kronos_predict.py
