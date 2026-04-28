@@ -25,6 +25,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from lib.core.provenance import write_envelope_sidecar
+from lib.core.routine_pause import abort_if_paused
 from lib.intel.sovereign_thesis import DEFAULT_CONFIG_PATH, build_sovereign_thesis_report
 
 OUT_DIR = REPO_ROOT / "data" / ".autonomy" / "gemini-ooda"
@@ -331,6 +332,7 @@ def run_daily(
 
 
 def main(argv: list[str] | None = None) -> int:
+    abort_if_paused("gemini-ooda-daily")
     parser = argparse.ArgumentParser(description="Write the daily dry-run Gemini OODA packet")
     parser.add_argument("--date", default=None, help="Override YYYY-MM-DD output date")
     parser.add_argument("--out-dir", default=str(OUT_DIR), help="Output directory")

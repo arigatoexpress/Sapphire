@@ -20,6 +20,12 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree as ET
 
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from lib.core.routine_pause import abort_if_paused  # noqa: E402
+
 DEFAULT_THREAT_BOT_BIN = Path.home() / "Code" / "cyber-threat-bot" / ".venv" / "bin" / "threat-bot"
 DEFAULT_DATA_DIR = Path.home() / "Code" / "Sapphire" / "data" / "intelligence"
 USER_AGENT = "sapphire-threat-refresh/0.1 (+https://github.com/arigatoexpress/Sapphire)"
@@ -43,6 +49,7 @@ def _threat_bot_bin() -> str | None:
 
 
 def main() -> int:
+    abort_if_paused("threat-refresh")
     threat_bot = _threat_bot_bin()
     if threat_bot is None:
         configured = os.environ.get("SAPPHIRE_THREATS_BOT_BIN") or str(DEFAULT_THREAT_BOT_BIN)

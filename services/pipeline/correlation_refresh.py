@@ -19,11 +19,12 @@ from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
-ROOT = Path.home() / "Code" / "Sapphire"
+ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from lib.analytics.correlation import CorrelationEngine  # noqa: E402
+from lib.core.routine_pause import abort_if_paused  # noqa: E402
 
 log = logging.getLogger("correlation_refresh")
 
@@ -62,6 +63,7 @@ def run(window_days: int = 30) -> dict:
 
 
 def main() -> int:
+    abort_if_paused("correlation-refresh")
     p = argparse.ArgumentParser()
     p.add_argument("--window", type=int, default=30, help="correlation window in days")
     args = p.parse_args()
