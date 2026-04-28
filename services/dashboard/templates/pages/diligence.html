@@ -105,6 +105,9 @@
     <div>
         <h1 style="font-size:1.4rem;font-weight:700;color:var(--text-primary);margin:0 0 4px;">Diligence</h1>
         <p style="color:var(--text-muted);font-size:.85rem;margin:0;">Buyer-grade packet, risk kernel, provenance, tests, and LaunchAgent posture.</p>
+        {% if buyer_safe %}
+        <p style="color:var(--amber);font-size:.78rem;margin:6px 0 0;">Buyer-safe profile: operational identifiers are redacted.</p>
+        {% endif %}
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <a class="btn" href="/sovereign-thesis/story">Story</a>
@@ -206,6 +209,8 @@
 
 <script type="application/json" id="diligence-seed">{{ diligence_summary | tojson }}</script>
 <script>
+const buyerSafeQuery = new URLSearchParams(window.location.search).get('profile') === 'buyer' ? '?profile=buyer' : '';
+
 function esc(value) {
     return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -302,11 +307,11 @@ async function loadDiligence() {
     } catch (_err) {}
 
     const [packet, risk, provenance, tests, launchagents] = await Promise.all([
-        fetch(`${window.location.origin}/api/diligence-summary`).then(r => r.json()),
-        fetch(`${window.location.origin}/api/risk-kernel-summary`).then(r => r.json()),
-        fetch(`${window.location.origin}/api/provenance-summary`).then(r => r.json()),
-        fetch(`${window.location.origin}/api/test-suite-health`).then(r => r.json()),
-        fetch(`${window.location.origin}/api/launchagent-summary`).then(r => r.json())
+        fetch(`${window.location.origin}/api/diligence-summary${buyerSafeQuery}`).then(r => r.json()),
+        fetch(`${window.location.origin}/api/risk-kernel-summary${buyerSafeQuery}`).then(r => r.json()),
+        fetch(`${window.location.origin}/api/provenance-summary${buyerSafeQuery}`).then(r => r.json()),
+        fetch(`${window.location.origin}/api/test-suite-health${buyerSafeQuery}`).then(r => r.json()),
+        fetch(`${window.location.origin}/api/launchagent-summary${buyerSafeQuery}`).then(r => r.json())
     ]);
     renderDiligencePacket(packet);
     renderRisk(risk);

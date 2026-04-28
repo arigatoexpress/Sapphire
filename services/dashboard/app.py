@@ -201,6 +201,19 @@ _SECRETISH_TEXT_RE = re.compile(
 )
 _BEARER_TEXT_RE = re.compile(r"(?i)\bbearer\s+[a-z0-9._~+/=-]{8,}")
 _USER_PATH_RE = re.compile(r"/Users/[^/\s)\"'`]+")
+_BUYER_SAFE_REDACTED_TEXT = "[buyer-safe redacted]"
+_BUYER_SAFE_FIELD_REPLACEMENTS: dict[str, Any] = {
+    "artifact": _BUYER_SAFE_REDACTED_TEXT,
+    "cache_dir": _BUYER_SAFE_REDACTED_TEXT,
+    "cache_root": _BUYER_SAFE_REDACTED_TEXT,
+    "endpoint": _BUYER_SAFE_REDACTED_TEXT,
+    "label": _BUYER_SAFE_REDACTED_TEXT,
+    "last_exit": None,
+    "pid": None,
+    "relative_path": _BUYER_SAFE_REDACTED_TEXT,
+    "root": _BUYER_SAFE_REDACTED_TEXT,
+    "roots": [],
+}
 
 
 def _paste_safe_text(value: Any, *, limit: int = 280) -> str:
@@ -216,6 +229,50 @@ def _paste_safe_text(value: Any, *, limit: int = 280) -> str:
     if len(text) <= limit:
         return text
     return f"{text[: max(0, limit - 3)].rstrip()}..."
+
+
+def _buyer_safe_requested() -> bool:
+    """Return True when a dashboard route should expose buyer-safe payloads."""
+    raw = (
+        request.args.get("profile")
+        or request.args.get("view")
+        or request.args.get("buyer_safe")
+        or request.args.get("public")
+        or ""
+    )
+    return str(raw).strip().lower() in {"1", "true", "yes", "buyer", "buyer_safe", "buyer-safe", "public"}
+
+
+def _buyer_safe_payload(payload: Any) -> Any:
+    """Redact operational identifiers while preserving diligence signal value."""
+    redacted_fields: set[str] = set()
+
+    def _walk(value: Any, key: str = "") -> Any:
+        normalized_key = key.lower()
+        if normalized_key in _BUYER_SAFE_FIELD_REPLACEMENTS:
+            redacted_fields.add(normalized_key)
+            return _BUYER_SAFE_FIELD_REPLACEMENTS[normalized_key]
+        if isinstance(value, dict):
+            return {str(child_key): _walk(child_value, str(child_key)) for child_key, child_value in value.items()}
+        if isinstance(value, list):
+            return [_walk(item, key) for item in value]
+        if isinstance(value, str):
+            return _paste_safe_text(value, limit=360)
+        return value
+
+    safe_payload = _walk(payload)
+    if isinstance(safe_payload, dict):
+        safe_payload["audience"] = "buyer_safe"
+        safe_payload["redaction"] = {
+            "profile": "buyer_safe",
+            "applied": True,
+            "fields": sorted(redacted_fields),
+        }
+    return safe_payload
+
+
+def _maybe_buyer_safe_payload(payload: Any) -> Any:
+    return _buyer_safe_payload(payload) if _buyer_safe_requested() else payload
 
 
 def _repo_display_path(path: Path | str) -> str:
@@ -3266,7 +3323,8 @@ def diligence_page():
         "pages/diligence.html",
         current_page="diligence",
         page_title="Diligence",
-        diligence_summary=_build_diligence_summary(),
+        diligence_summary=_maybe_buyer_safe_payload(_build_diligence_summary()),
+        buyer_safe=_buyer_safe_requested(),
     )
 
 
@@ -3277,20 +3335,21 @@ def observability_page():
         "pages/observability.html",
         current_page="observability",
         page_title="Observability",
-        routine_pause_summary=_build_routine_pause_summary(),
+        routine_pause_summary=_maybe_buyer_safe_payload(_build_routine_pause_summary()),
+        buyer_safe=_buyer_safe_requested(),
     )
 
 
 @app.route("/api/diligence-summary")
 @requires_auth
 def api_diligence_summary():
-    return jsonify(_build_diligence_summary())
+    return jsonify(_maybe_buyer_safe_payload(_build_diligence_summary()))
 
 
 @app.route("/api/risk-kernel-summary")
 @requires_auth
 def api_risk_kernel_summary():
-    return jsonify(_build_risk_kernel_summary())
+    return jsonify(_maybe_buyer_safe_payload(_build_risk_kernel_summary()))
 
 
 @app.route("/api/provenance-summary")
@@ -3301,19 +3360,19 @@ def api_provenance_summary():
         older_than_hours = float(raw_hours)
     except (TypeError, ValueError):
         older_than_hours = 24.0
-    return jsonify(_build_provenance_summary(older_than_hours=older_than_hours))
+    return jsonify(_maybe_buyer_safe_payload(_build_provenance_summary(older_than_hours=older_than_hours)))
 
 
 @app.route("/api/test-suite-health")
 @requires_auth
 def api_test_suite_health():
-    return jsonify(_build_test_suite_health())
+    return jsonify(_maybe_buyer_safe_payload(_build_test_suite_health()))
 
 
 @app.route("/api/launchagent-summary")
 @requires_auth
 def api_launchagent_summary():
-    return jsonify(_build_launchagent_summary())
+    return jsonify(_maybe_buyer_safe_payload(_build_launchagent_summary()))
 
 
 @app.route("/api/cross-asset-matrix")
@@ -3363,7 +3422,7 @@ def api_cross_asset_breakdowns():
 @app.route("/api/routine-pause-status")
 @requires_auth
 def api_routine_pause_status():
-    return jsonify(_build_routine_pause_summary())
+    return jsonify(_maybe_buyer_safe_payload(_build_routine_pause_summary()))
 
 
 @app.route("/api/foundry/readiness")
@@ -5250,7 +5309,7 @@ def _build_observability_tranche4_feeds() -> dict[str, Any]:
 @requires_auth
 def api_observability_system_summary():
     try:
-        return jsonify(_build_observability_system_summary())
+        return jsonify(_maybe_buyer_safe_payload(_build_observability_system_summary()))
     except Exception as exc:
         log.warning("observability summary error: %s", exc)
         return jsonify(
@@ -5267,7 +5326,7 @@ def api_observability_system_summary():
 @requires_auth
 def api_observability_stream_rates():
     try:
-        return jsonify(_build_observability_stream_rates())
+        return jsonify(_maybe_buyer_safe_payload(_build_observability_stream_rates()))
     except Exception as exc:
         log.warning("observability stream-rates error: %s", exc)
         return jsonify(
@@ -5284,7 +5343,7 @@ def api_observability_stream_rates():
 @requires_auth
 def api_observability_launchagents():
     try:
-        return jsonify(_build_observability_launchagents())
+        return jsonify(_maybe_buyer_safe_payload(_build_observability_launchagents()))
     except Exception as exc:
         log.warning("observability launchagents error: %s", exc)
         return jsonify(
@@ -5301,7 +5360,7 @@ def api_observability_launchagents():
 @requires_auth
 def api_observability_tranche4_feeds():
     try:
-        return jsonify(_build_observability_tranche4_feeds())
+        return jsonify(_maybe_buyer_safe_payload(_build_observability_tranche4_feeds()))
     except Exception as exc:
         log.warning("observability tranche4 feeds error: %s", exc)
         return jsonify(
