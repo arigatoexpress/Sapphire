@@ -365,6 +365,13 @@ tools:
     consumers: []
     description: Historical Event-Impact Modeling 0.1.0. Curated cited corpus plus empirical reaction-window lookup for macro, ETF, exchange-hack, enforcement, and broad macro-shock events across BTC/ETH/SOL/SPY/GLD. Dry-run by default; rebuild requires SAPPHIRE_EVENT_IMPACT_REBUILD=1 and writes provenance-stamped model artifacts. Actions, lookup/corpus/rebuild/accuracy-audit.
 
+  - name: counterparty_intel
+    path: plugins/claw-sapphire/tools/internal/counterparty_intel.py
+    status: internal
+    owner: sapphire
+    consumers: []
+    description: Hyperliquid Counter-Party Intelligence 0.1.0. Read-only public leaderboard and position-change tracker for top traders, dry-run by default and live-gated by SAPPHIRE_HYPERLIQUID_LIVE=1. Emits smart-money consensus signals without wallet keys or trade execution. Caps, ≤100 tracked traders, ≤12 refreshes/hour, min 30d PnL $50k, position-change threshold 15%. Actions, leaderboard/position-changes/smart-money-consensus/status.
+
   # ── deprecated / sunset window ───────────────────────────────────────────
   - name: kronos_predict
     path: plugins/claw-sapphire/tools/_deprecated/kronos_predict.py
