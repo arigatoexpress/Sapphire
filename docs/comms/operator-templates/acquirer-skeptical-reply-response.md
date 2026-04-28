@@ -2,12 +2,12 @@
 name: Acquirer corp-dev — skeptical reply, defensive but not deferential
 audience: Corp-dev rep who pushed back on valuation, scope, solo-engineer concern, or "we already build this"
 when_to_use: When a rep replies skeptically — typical objections are (a) "we already have something like this internally", (b) "the asking price is high for what we're seeing", (c) "you're one engineer", (d) "the trading metrics aren't validated enough". Defends without folding.
-placeholders: ["{{first_name}}", "{{their_company}}", "{{specific_objection_paraphrase}}", "{{evidence_doc_link}}"]
-last_updated: 2026-04-29
-provenance_sha: 1bcf221a
+placeholders: ["{{operator_name}}", "{{first_name}}", "{{system_name}}", "{{their_company}}", "{{specific_objection_paraphrase}}", "{{evidence_doc_link}}"]
+last_updated: 2026-04-28
+provenance_sha: baeedc4f
 ---
 
-# Re: Sapphire OS — fair pushback, here's the response
+# Re: {{system_name}} — fair pushback, here's the response
 
 Hi {{first_name}},
 
@@ -21,7 +21,7 @@ Appreciate you saying it directly. The pushback's fair on its face. Three things
 
 If any of that lands, I'm happy to do 30 minutes. If none of it does, I'd genuinely like to hear what would have changed your mind — that's useful signal for the next conversation.
 
-—Ari
+—{{operator_name}}
 
 ## Notes for the operator (NOT in the sent message)
 

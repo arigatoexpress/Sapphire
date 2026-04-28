@@ -1,17 +1,17 @@
 ---
 name: Live-trade cap bump — operator-to-self decision documentation
-audience: Operator (Ari) — self-documentation, not a sent comms
-when_to_use: Before promoting from $5 to $50 (or $50 to $500). Documents the decision with the Sortino-soak evidence required by docs/products/live-trading-ramp-memo.md. This file becomes the audit trail for the cap change.
-placeholders: ["{{decision_date}}", "{{from_cap}}", "{{to_cap}}", "{{soak_window_start}}", "{{soak_window_end}}", "{{sortino_value}}", "{{paper_drift_summary}}", "{{readiness_sweep_result}}", "{{kill_switch_status}}", "{{confirmation_firewall_status}}"]
-last_updated: 2026-04-29
-provenance_sha: 1bcf221a
+audience: Operator self-documentation, not a sent comms
+when_to_use: Before promoting between documented live-cap rungs. Documents the decision with the Sortino-soak evidence required by the governing ramp memo. This file becomes the audit trail for the cap change.
+placeholders: ["{{operator_name}}", "{{decision_date}}", "{{from_cap}}", "{{to_cap}}", "{{maximum_documented_cap}}", "{{soak_window_start}}", "{{soak_window_end}}", "{{sortino_value}}", "{{paper_drift_summary}}", "{{readiness_sweep_result}}", "{{kill_switch_status}}", "{{confirmation_firewall_status}}"]
+last_updated: 2026-04-28
+provenance_sha: baeedc4f
 ---
 
 # Live-trade cap bump: ${{from_cap}} → ${{to_cap}}
 
 **Decision date**: {{decision_date}}
-**Decided by**: Ari (operator, sole authority)
-**Soak window evaluated**: {{soak_window_start}} → {{soak_window_end}} ({{soak_window_end | days_since_start}} trading days)
+**Decided by**: {{operator_name}} (operator, sole authority)
+**Soak window evaluated**: {{soak_window_start}} → {{soak_window_end}} (<fill trading-day count> trading days)
 
 ## Evidence
 
@@ -43,7 +43,7 @@ Per `docs/products/live-trading-ramp-memo.md` Phase 1/2 promotion gates:
 If all checkboxes above are checked AND no checkbox required a "no" answer:
 - Cap bump APPROVED. Update the operator-side cap from ${{from_cap}} to ${{to_cap}}.
 - Next soak window starts: {{soak_window_end}} (i.e. immediately).
-- Next promotion eligible no earlier than: {{soak_window_end | plus_14_trading_days}}.
+- Next promotion eligible no earlier than: <fill next eligible date>.
 - File this document in `docs/audit/live-cap-bumps/{{decision_date}}-{{from_cap}}-to-{{to_cap}}.md`.
 
 If ANY checkbox is unchecked or a "no" answer is required:
@@ -57,15 +57,15 @@ If ANY checkbox is unchecked or a "no" answer is required:
 ## Notes
 
 - This decision is operator-sole. No autonomous system or external party authorizes a cap bump.
-- The $500 tier (if {{to_cap}} = 500) requires a separate PR plus operator-reviewed runbook update per the ramp memo. This document is necessary but NOT sufficient for that rung.
+- The maximum documented cap is ${{maximum_documented_cap}}. That rung requires a separate PR plus operator-reviewed runbook update per the ramp memo. This document is necessary but NOT sufficient for that rung.
 - A buyer or acquirer cannot inherit cap-bump authority by virtue of acquisition. The risk committee has to issue its own authorization.
 
-—Ari (operator, sole signature)
+—{{operator_name}} (operator, sole signature)
 
 ## Notes for the operator (NOT part of the audit trail)
 
 - Why this works: forces every promotion gate from the ramp memo to be checked individually, makes the "deny" path explicit (so "I think it's mostly fine" cannot pass as approval), and codes the audit trail location into the template itself so the document doesn't get lost.
 - Common edits: if you add a new strategy to the live-trading book, the Sortino computation may need a per-strategy breakdown rather than aggregate. Update the Evidence section's first bullet to list per-strategy.
 - Tone calibration: this is a cold legal-style audit doc, NOT a warm operator narrative. The point is auditability, not voice. Keep it formal.
-- DO NOT use this template if {{to_cap}} > 500. The $500 rung is the documented ceiling. Anything above requires a new ramp memo phase, not a new template instance.
+- DO NOT use this template if {{to_cap}} > {{maximum_documented_cap}}. The maximum documented cap is the current ceiling. Anything above requires a new ramp memo phase, not a new template instance.
 - DO file this even when DENIED. The denial trail is more valuable than the approval trail because it documents discipline.

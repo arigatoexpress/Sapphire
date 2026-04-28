@@ -2,12 +2,12 @@
 name: Acquirer corp-dev — positive reply, scoping a 30-min POC call
 audience: Corp-dev rep / FDE lead / partnerships PM who replied "interested, tell me more"
 when_to_use: Any time a corp-dev rep responds positively to the cold pitch and indicates willingness to take a call; this template books the 30-min and arms the call with materials.
-placeholders: ["{{first_name}}", "{{their_company}}", "{{calendar_link}}", "{{microsite_url}}", "{{diligence_pr_url}}", "{{deck_url}}", "{{call_focus_area}}"]
-last_updated: 2026-04-29
-provenance_sha: 1bcf221a
+placeholders: ["{{operator_name}}", "{{first_name}}", "{{system_name}}", "{{their_company}}", "{{calendar_link}}", "{{microsite_url}}", "{{diligence_pr_url}}", "{{deck_url}}", "{{call_focus_area}}"]
+last_updated: 2026-04-28
+provenance_sha: baeedc4f
 ---
 
-# Re: Sapphire OS — happy to set up a call
+# Re: {{system_name}} — happy to set up a call
 
 Hi {{first_name}},
 
@@ -17,7 +17,7 @@ Calendar: {{calendar_link}}
 
 What I'd like to use the time for:
 
-1. Five minutes on context — what {{their_company}} is actually trying to solve and where Sapphire might fit. If I've miscalibrated, I'd rather find out in minute three than minute twenty-five.
+1. Five minutes on context — what {{their_company}} is actually trying to solve and where {{system_name}} might fit. If I've miscalibrated, I'd rather find out in minute three than minute twenty-five.
 2. Fifteen-minute walkthrough of the operational-trust posture — provenance envelopes, risk kernel verdicts, dry-run-first execution. I'll screen-share live artifacts, not slides.
 3. Ten minutes on whatever you actually want to dig into — security, data flow, integration shape, commercial framing. Bring the questions; I'll surface the evidence.
 
@@ -29,7 +29,7 @@ To prep your team in advance:
 
 If {{call_focus_area}} is the priority, tell me before the call and I'll pre-stage that part of the system so we're not waiting on cold-cache loads.
 
-—Ari
+—{{operator_name}}
 
 ## Notes for the operator (NOT in the sent message)
 

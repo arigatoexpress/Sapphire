@@ -1,10 +1,10 @@
 ---
 name: Intro-call prep — 1-pager handed to operator before any new conversation
-audience: Operator (Ari) — pre-call brief, not a sent comms
+audience: Operator pre-call brief, not a sent comms
 when_to_use: Before any new prospect / inbound / corp-dev / partner intro call. Read 5-10 minutes before the call. Forces explicit articulation of who they are, what each side wants, and what would make you walk.
-placeholders: ["{{call_date}}", "{{their_name}}", "{{their_company}}", "{{their_role}}", "{{call_duration_min}}", "{{intro_source}}", "{{their_company_short_summary}}", "{{three_questions}}", "{{three_things_to_mention}}", "{{hard_pass_triggers}}"]
-last_updated: 2026-04-29
-provenance_sha: 1bcf221a
+placeholders: ["{{call_date}}", "{{their_name}}", "{{their_company}}", "{{their_role}}", "{{call_duration_min}}", "{{intro_source}}", "{{their_company_short_summary}}", "{{strongest_verified_proof_point}}", "{{second_verified_proof_point}}", "{{third_verified_proof_point}}", "{{three_questions}}", "{{three_things_to_mention}}", "{{hard_pass_triggers}}"]
+last_updated: 2026-04-28
+provenance_sha: baeedc4f
 ---
 
 # Intro call prep: {{their_name}} ({{their_company}}) — {{call_date}}
@@ -17,7 +17,7 @@ provenance_sha: 1bcf221a
 
 {{their_company_short_summary}}
 
-(2-3 sentences. What does the company do? Public / private? Stage? Why does this person at this company plausibly care about Sapphire?)
+(2-3 sentences. What does the company do? Public / private? Stage? Why does this person at this company plausibly care about the system?)
 
 ## What they want
 
@@ -55,16 +55,24 @@ What we want is NOT necessarily an offer or money. Often it's a redirect or a ye
 2. <continued>
 3. <continued>
 
-(One of these should be the strongest concrete proof point — the $5 BTC live fill, the 211 provenance-stamped artifacts, the 5,281 tests. Specific, not abstract. The other two should be tailored to what this specific company would care about.)
+Use freshly verified, non-sensitive proof points only:
+
+1. {{strongest_verified_proof_point}}
+2. {{second_verified_proof_point}}
+3. {{third_verified_proof_point}}
+
+(Specific, not abstract. Do not hard-code live-trade details, artifact counts, test counts, customer counts, or performance claims unless you verified them immediately before the call and they are appropriate for this recipient.)
 
 ## Hard-pass triggers
 
 <Things that, if they say or imply during the call, mean we walk. Examples:
 - "We'd want to see the system running before any commercial conversation." (Translation: free trial / extraction.)
 - "Our team would build this in 6 weeks anyway, but we're curious." (Translation: information-gathering.)
-- "We don't pay for IP at the early-stage; we'd structure this as an acqui-hire only." (Hard pass only if Ari has not pre-decided acqui-hire is acceptable.)
+- "We don't pay for IP at the early-stage; we'd structure this as an acqui-hire only." (Hard pass only if the operator has not pre-decided acqui-hire is acceptable.)
 - "We'd want to fold the IP into our existing platform under our license." (Without compensation discussion: hard pass.)
 - Any indication they want a multi-week unpaid POC before commercial framing.
+
+{{hard_pass_triggers}}
 
 If a hard-pass trigger fires: politely close the call ("appreciate the time, doesn't sound like the right fit"), document in the post-call note, do NOT promise follow-up materials.>
 

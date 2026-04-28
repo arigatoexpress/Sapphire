@@ -1,86 +1,87 @@
 {
   "envelope_version": "0.1.0",
-  "generated_at_utc": "2026-04-28T21:52:49.805760+00:00",
+  "generated_at_utc": "2026-04-28T22:16:30.434344+00:00",
   "worktree_branch": "docs/operator-comms-templates",
-  "head_sha_at_write_time": "1bcf221aa9e7719363102ac1c6d55b55840eedfe",
-  "description": "Operator communications template library \u2014 provenance sidecar.",
+  "head_sha_at_write_time": "baeedc4f2149f890408288c66fcfa3f08b21c981",
+  "description": "Operator communications template library \u2014 paste-safe provenance sidecar.",
   "parent_readme": {
     "file": "README.md",
-    "size_bytes": 8266,
-    "sha256": "a9971ad8796728e79aeafbbc831076a23682259bb6b6e8897fc1b8aebc12b65c"
+    "size_bytes": 10332,
+    "sha256": "9f9e5f6cabed6fe1d6156fd2ca6ee9fc09fa08a3858db4111bba5eeefff2c789"
   },
   "templates": [
     {
       "file": "operator-templates/acquirer-positive-reply-response.md",
-      "size_bytes": 2521,
-      "sha256": "d86d63fd9d30f3d2cf96f7e0ca6184e0940dbe86e96e66abe1876ef271044a4e"
+      "size_bytes": 2586,
+      "sha256": "eed600b0d07dadfcf2bfb21e9f39b4bbad87eb3f90abb30c5ee5705e2d70cf45"
     },
     {
       "file": "operator-templates/acquirer-skeptical-reply-response.md",
-      "size_bytes": 3335,
-      "sha256": "ee217648cd3460ca859c97fb67c51a30e3de786bf7bd654a19c77cad6abe4653"
+      "size_bytes": 3393,
+      "sha256": "d591ea33251a1c940e46e872918b3eb2c01cea3d25151cdc3bf3cbcb224142ad"
     },
     {
-      "file": "operator-templates/etai-followup-no-reply-day-3.md",
-      "size_bytes": 2666,
-      "sha256": "e35e2b98bf145aaffa49dd90d013807f55d056f8893b27cfb646172932230582"
+      "file": "operator-templates/contractor-followup-no-reply-day-3.md",
+      "size_bytes": 2691,
+      "sha256": "1b4f6e773af02b72eb8fdeb27ad4d66beffe18827c86b24dbad931852f85dbcb"
     },
     {
-      "file": "operator-templates/etai-integration-memo-share.md",
-      "size_bytes": 3190,
-      "sha256": "01d78eac681a5babed64116b8a8a701e117aa4f29a84d8dc7a33fac7c8770140"
+      "file": "operator-templates/contractor-integration-memo-share.md",
+      "size_bytes": 3081,
+      "sha256": "2aa62fd395de540026d62d78956a705bc9572bc0c5ee1aef6c2f7d7b9f2ba352"
     },
     {
       "file": "operator-templates/intro-call-prep-template.md",
-      "size_bytes": 5159,
-      "sha256": "9acc4251443b8db2e0cc3b36a2f28b987a568aeeee6f635423ee35900a36ca90"
+      "size_bytes": 5439,
+      "sha256": "587f4c79f742a939a28f404dc4bbc1b286d5003895ad59f20040661ee3bec040"
     },
     {
       "file": "operator-templates/live-trade-cap-bump-self-approval.md",
-      "size_bytes": 4432,
-      "sha256": "2de49f4b0bd2b063fb4347f879a23666d73b7f548f950d4e49180e4db791754a"
+      "size_bytes": 4522,
+      "sha256": "748bfb437435457e292e8b99c73c382d697d5e04189db836021244973cc55355"
     },
     {
       "file": "operator-templates/live-trade-incident-report.md",
-      "size_bytes": 5026,
-      "sha256": "a559fd1e42442005bfe2459c0fd11cea8e8c378efbdd7ff014bc7c32541c9ac9"
+      "size_bytes": 5083,
+      "sha256": "0c8e29b7526dd5ef5201ffbf64af1f2af99e7000ef0e6a230d25d4ded274906c"
     },
     {
-      "file": "operator-templates/palantir-followup-day-21.md",
-      "size_bytes": 1865,
-      "sha256": "e1608c637dc7d75d9192ba8e203087fd8c1333178eed86a6d40e5d1becf1a6d5"
+      "file": "operator-templates/partner-doc-bug-acknowledgement.md",
+      "size_bytes": 2392,
+      "sha256": "4b526951a632f22d76f707a98505b34156e720b094b7ea4ecdbe4763d930c5da"
     },
     {
-      "file": "operator-templates/palantir-followup-day-7.md",
-      "size_bytes": 1735,
-      "sha256": "e628cd9dd2aba49808a92c4edb6ab21b4771f10a0d846d6a90f84800a1f46a6f"
+      "file": "operator-templates/partner-site-link-broken.md",
+      "size_bytes": 2268,
+      "sha256": "0e163626c34e02f3c227a76971756c38f40e40618ff7231fcbe816db8a6c3cf6"
     },
     {
-      "file": "operator-templates/robinhood-cortex-cold-pitch.md",
-      "size_bytes": 3532,
-      "sha256": "9c89ca5394edab5f43a6ab2e2e47d13093e11a5c227bb3b920b430377aebdd46"
+      "file": "operator-templates/partner-weekly-cadence.md",
+      "size_bytes": 2083,
+      "sha256": "38add76cfc3ca714d2edbe0a871a04290c6d93cab5e7418986ccd1d100215692"
     },
     {
-      "file": "operator-templates/tho-celeste-link-broken.md",
-      "size_bytes": 2468,
-      "sha256": "23a557db40e94cc02f3abb2177a0432df3d60cd184b566528a9a21ffa45c483e"
+      "file": "operator-templates/strategic-acquirer-cold-pitch.md",
+      "size_bytes": 3313,
+      "sha256": "ace486f05e16bb5bf941d995d0024137758eddcc99166a6d7d36f2c6c1b59ca3"
     },
     {
-      "file": "operator-templates/tho-doc-bug-acknowledgement.md",
-      "size_bytes": 2405,
-      "sha256": "c978d146ed6b0433a7a0673139b36dd0a9cf4aec707086fa168e405c55b8e830"
+      "file": "operator-templates/strategic-acquirer-followup-day-21.md",
+      "size_bytes": 1987,
+      "sha256": "7b096bbd71d242cc3b2cd445d87a087f1ad9b76b71bf352de128ac3917c40031"
     },
     {
-      "file": "operator-templates/tho-weekly-cadence.md",
-      "size_bytes": 2122,
-      "sha256": "4564c33c4b3a0cad3981763135133396ff71a96fc24cb0569ccb9b1bbec9ce8e"
+      "file": "operator-templates/strategic-acquirer-followup-day-7.md",
+      "size_bytes": 1803,
+      "sha256": "03d153fa4ea4d8c2003a767ae656f432ec7b49261beb9c44af0c355dcab25da2"
     }
   ],
   "template_count": 13,
   "audit_notes": [
     "Each entry sha256 is the file as-written at envelope generation time.",
     "If a template is edited, regenerate this envelope to keep the audit trail current.",
-    "No PII in any template body; placeholders only.",
-    "YAML frontmatter validated; placeholders quoted to keep them parseable."
+    "Template bodies use placeholders for names, relationship context, customer identifiers, sensitive counts, trade identifiers, and performance claims.",
+    "YAML frontmatter validated; placeholders are quoted to keep them parseable.",
+    "Frontmatter provenance_sha values reference pre-edit head baeedc4f."
   ]
 }
