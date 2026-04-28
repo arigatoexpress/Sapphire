@@ -92,8 +92,10 @@ Policy:
 - `data/` mixes tracked reference/config files with ignored hot runtime state.
   The storage sync planner documents this distinction and keeps apply mode
   explicit.
-- `legacy_code/` and `results/` are deprecated git residents. They should move
-  to cold storage with a manifest before deletion from `main`.
+- `results/` remains a deprecated git resident. It should move to cold storage
+  with a manifest before deletion from `main`.
+- `legacy_code/` was cold-copied to Proton Drive on 2026-04-28 and removed from
+  git in the follow-up cleanup PR.
 
 ## Promotion Rules
 

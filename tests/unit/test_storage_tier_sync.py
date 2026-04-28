@@ -47,3 +47,14 @@ def test_apply_requires_explicit_gate(tmp_path: Path, capsys) -> None:
     assert rc == 2
     assert "--apply requires --i-mean-it" in out
     assert not (proton / "cold-tier").exists()
+
+
+def test_missing_cold_candidates_are_omitted(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    proton = tmp_path / "proton" / "Sapphire-OS"
+    repo.mkdir()
+    proton.mkdir(parents=True)
+
+    actions = storage_tier_sync.build_plan(repo, proton)
+
+    assert all(action.operation != "copy_tree" for action in actions)
