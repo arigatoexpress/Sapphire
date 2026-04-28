@@ -24,7 +24,7 @@ websockets>=16.0,<17
 # data / validation
 pydantic==2.13.2
 python-dateutil==2.9.0.post0
-orjson==3.10.13
+orjson==3.11.6
 pyyaml==6.0.3
 redis==5.2.1
 
@@ -36,7 +36,7 @@ scikit-learn==1.8.0
 
 # logging / config
 loguru==0.7.3
-python-dotenv==1.0.1
+python-dotenv==1.2.2
 
 # google / firebase — pinned tightly; without these pip resolution explodes
 google-cloud-firestore==2.27.0
