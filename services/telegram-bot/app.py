@@ -19,6 +19,7 @@ import subprocess
 import sys
 import urllib.request
 from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -194,6 +195,87 @@ def run_tool_direct(tool_script: str, input_data: dict | None = None) -> str:
         return f"Error: {e}"
 
 
+def _json_object(raw: str) -> dict[str, Any]:
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _recent_start_date(days: int = 31, *, now: datetime | None = None) -> str:
+    """Return a rolling ISO date for market-history commands."""
+    current = now or datetime.now(UTC)
+    return (current.date() - timedelta(days=days)).isoformat()
+
+
+def _health_lines(data: dict[str, Any], *, include_repos: bool = False) -> list[str]:
+    """Render a compact, Telegram-safe health summary from live tool JSON."""
+    lines = [f"*{data.get('overall', 'UNKNOWN')}* — {data.get('summary', 'no summary')}"]
+    sections = ["services", "data_freshness", "inference"]
+    if include_repos:
+        sections.insert(1, "repos")
+    for section in sections:
+        items = data.get(section, {})
+        if not isinstance(items, dict):
+            continue
+        for name, info in items.items():
+            if not isinstance(info, dict):
+                continue
+            icon = {"green": "🟢", "yellow": "🟡", "red": "🔴"}.get(
+                info.get("status"), "⚪"
+            )
+            detail = str(info.get("detail", ""))[:70]
+            lines.append(f"{icon} `{name}`: {detail}")
+    return lines
+
+
+def _status_lines(data: dict[str, Any]) -> list[str]:
+    inference = data.get("inference", {}) if isinstance(data, dict) else {}
+    proxy = inference.get("proxy_health", {}) if isinstance(inference, dict) else {}
+    local_models = inference.get("local_models", []) if isinstance(inference, dict) else []
+    gpu_models = inference.get("gpu_models", []) if isinstance(inference, dict) else []
+
+    lines: list[str] = []
+    if proxy:
+        tier_bits = [f"{name}={state}" for name, state in sorted(proxy.items())]
+        lines.append("Inference proxy: " + ", ".join(tier_bits))
+    if local_models:
+        lines.append(f"Mac Ollama models: {len(local_models)} ({', '.join(local_models[:5])})")
+    if gpu_models:
+        lines.append(f"GPU Ollama models: {len(gpu_models)} ({', '.join(gpu_models[:5])})")
+    if not lines:
+        lines.append("Inference proxy/model inventory unavailable from live status.py.")
+    return lines
+
+
+def build_live_system_prompt() -> str:
+    """Build a live system prompt so free-text replies do not use stale facts."""
+    lines = [
+        "You are Sapphire, the AI assistant for Kadima Digital Strategies.",
+        "You are sharp, concise, technically deep but accessible. You are a trusted advisor, not a chatbot.",
+        "Use the live context below as the only current operational truth. If a field is missing, stale, red, or unavailable, say that directly instead of filling gaps from memory.",
+        "Never quote historical test counts, customer counts, model counts, win rates, or repo totals unless they appear in this live context or in a slash-command result from this request.",
+        "For precise data queries, suggest the relevant slash command such as /health, /status, /price, /threats, or /events.",
+        "Keep responses under 300 words unless the topic warrants depth.",
+        "",
+        f"Live context collected at {datetime.now(UTC).isoformat()}:",
+    ]
+
+    health = _json_object(run_tool_direct("health_check.py", {"profile": "brief"}))
+    if health:
+        lines.append("Health snapshot:")
+        lines.extend(f"- {line}" for line in _health_lines(health))
+    else:
+        lines.append("Health snapshot: unavailable from health_check.py.")
+
+    status = _json_object(run_tool_direct("status.py"))
+    lines.append("Status snapshot:")
+    lines.extend(f"- {line}" for line in _status_lines(status))
+
+    return "\n".join(lines)
+
+
 def handle_command(
     cmd: str,
     args: str,
@@ -221,7 +303,8 @@ def handle_command(
         return run_tool_direct("market.py", {"action": "quote", "symbol": sym})
     elif cmd == "/btc":
         return run_tool_direct(
-            "market.py", {"action": "crypto", "symbol": "BTC-USD", "start_date": "2026-03-28"}
+            "market.py",
+            {"action": "crypto", "symbol": "BTC-USD", "start_date": _recent_start_date()},
         )
     elif cmd == "/chart":
         return run_tool_direct("market.py", {"action": "tv_quote"})
@@ -266,18 +349,10 @@ def handle_command(
 
     # System health
     elif cmd == "/health":
-        sender("🔬 Running 20-point health check...", chat_id)
-        result = run_tool_direct("health_check.py")
+        sender("🔬 Running live health check...", chat_id)
+        result = run_tool_direct("health_check.py", {"profile": "brief"})
         try:
-            data = json.loads(result)
-            lines = [f"*{data['overall']}* — {data['summary']}\n"]
-            for section in ["services", "repos", "data_freshness", "inference"]:
-                for name, info in data.get(section, {}).items():
-                    icon = {"green": "🟢", "yellow": "🟡", "red": "🔴"}.get(
-                        info.get("status"), "⚪"
-                    )
-                    lines.append(f"{icon} `{name}`: {info.get('detail', '')[:50]}")
-            return "\n".join(lines)
+            return "\n".join(_health_lines(json.loads(result)))
         except Exception:
             return result
 
@@ -368,7 +443,7 @@ def handle_command(
   /offers — Revenue opportunities
 
 *System:*
-  /health — 20-point ecosystem check
+  /health — Live health + data freshness check
   /status — Mesh + inference
   /events — Event stream
   /repos — GitHub starred sync
@@ -413,24 +488,6 @@ def handle_message(msg: dict, sender: Sender | None = None) -> None:
 _chat_history: dict[str, list[dict]] = {}
 _MAX_HISTORY = 10
 
-SAPPHIRE_SYSTEM_PROMPT = """You are Sapphire, the AI assistant for Kadima Digital Strategies. You run on a dual-node system: Mac (commander) + Windows PC (RTX 5070 Ti GPU).
-
-Your personality: sharp, concise, technically deep but accessible. You're a trusted advisor, not a chatbot. If you don't know something, say so.
-
-What you know about the system:
-- Sapphire OS: autonomous AI operations platform spanning trading, cybersecurity, real estate tech, and intelligence
-- 8 code repositories, 1,211+ automated tests, 20 scheduled tasks running 24/7
-- Trading pipeline: TradingView → Windows webhook → Mac signal logger, prediction scoring at 67% accuracy
-- THO (Texas Home Outlet): client app on Google Cloud Run with 1,963 customers in Firestore, 63 PDF templates
-- Cyber-threat-bot: live CISA KEV, NVD, MITRE ATT&CK intelligence with revenue synthesis
-- Regional Intel Workbench: business intelligence for Austin/Houston/Gunnison regions
-- Inference: Hermes 3 (8B, tool calling), Nemotron Mini (2.7B, fast), Llama 3.2 (3B) on RTX 5070 Ti
-
-When users ask about markets, threats, system status, or projects — give real, actionable answers based on what you know. For specific data queries, suggest they use slash commands like /threats, /health, /price.
-
-Keep responses under 300 words unless the topic warrants depth."""
-
-
 def chat_with_hermes(user_text: str, chat_id: str) -> str:
     """Send a conversational message to Hermes 3 on Windows GPU."""
     import urllib.error
@@ -444,7 +501,7 @@ def chat_with_hermes(user_text: str, chat_id: str) -> str:
         history = history[-_MAX_HISTORY:]
     _chat_history[chat_id] = history
 
-    messages = [{"role": "system", "content": SAPPHIRE_SYSTEM_PROMPT}] + history
+    messages = [{"role": "system", "content": build_live_system_prompt()}] + history
 
     # Try Windows GPU first, then Mac
     endpoints = [
