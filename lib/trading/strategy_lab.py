@@ -708,7 +708,7 @@ def _robinhood_crypto_order_payload(
 def build_robinhood_real_funds_readiness(*, configured: bool = False) -> dict[str, Any]:
     """Readiness plan for the funded Robinhood Crypto test budget."""
     return {
-        "stage": "draft_ready_not_submit_ready",
+        "stage": "manual_confirmed_crypto_only",
         "configured": configured,
         "cash_budget_usd": 50.0,
         "crypto": {
@@ -728,8 +728,8 @@ def build_robinhood_real_funds_readiness(*, configured: bool = False) -> dict[st
             "reason": "Robinhood's public trading API documentation is for Robinhood Crypto; equity order types are documented for app, web classic, and Legend flows, not a public stock-trading API.",
         },
         "submit_blockers": [
-            "no Sapphire submit/cancel/replace method exists for Robinhood orders",
-            "no real order without explicit operator order details and confirmation",
+            "no autonomous submit/cancel/replace path exists for Robinhood orders",
+            "no real order without explicit operator order details and confirmation token",
             "no stock or ETF automation through unofficial Robinhood endpoints",
             "no background scheduler can bypass the confirmation wall",
         ],
@@ -738,7 +738,7 @@ def build_robinhood_real_funds_readiness(*, configured: bool = False) -> dict[st
             "read-only account and quote calls succeed with redacted logging",
             "order draft matches v2 schema and stays unsigned",
             "paper order has expected fill/fee/slippage accounting",
-            "Ari manually approves one capped live crypto limit order",
+            "Ari manually approves each capped live crypto limit order",
         ],
     }
 

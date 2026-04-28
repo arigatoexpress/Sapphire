@@ -22,6 +22,10 @@ market data/order drafts, and Robinhood Chain testnet attestations.
   matrix: webhook alerts, Pine strategy fills, Advanced Charts datafeed needs,
   Trading Platform Broker API endpoints, and local CDP observability.
 - `GET /api/trading/strategy-lab` returns the combined strategy lab report.
+- `GET /api/trading/shadow-controller` returns a risk-managed paper-shadow
+  trading report: ranked candidates, capped manual-order dry-run instructions,
+  blocked live surfaces, and promotion gates. Add `?offline=1` to skip public
+  market-data fetches.
 - `POST /api/trading/order-draft` returns venue payload drafts for a symbol,
   action, and notional without signing or submitting anything.
 - The strategy-lab report includes `real_funds_readiness`, which documents the
@@ -61,6 +65,35 @@ The lab canonicalizes venue symbols before routing:
   it defaults to dry-run, enforces the pilot cap, requires a typed confirmation
   token for `--execute`, and is not wired into dashboard, scheduler, Telegram, or
   TradingView paths.
+- `scripts/ops/trading_shadow_controller.py` automates candidate ranking and
+  paper-shadow reporting only. Its generated manual-order command omits
+  `--execute` and uses a placeholder limit price until the live-read-only
+  readiness probe supplies a just-in-time guarded price.
 - Hyperliquid order drafts model the exchange action shape but omit nonce and
   signature by design.
 - Robinhood Chain integration targets testnet chain id `46630` only.
+
+## Shadow Controller
+
+The shadow controller is the highest-autonomy trading component currently
+allowed in Sapphire. It can run unattended for market screening, but it cannot
+spend money.
+
+What it automates:
+
+- Score Sapphire-liked crypto assets using priority, tags, public market data,
+  Robinhood Crypto tradability, and 24-hour change bands.
+- Cap every candidate at the existing `$5` first-order pilot limit.
+- Generate paper order drafts for all candidate venues.
+- Emit a manual Robinhood dry-run command for review without `--execute`.
+- Write an optional JSON report for dashboard or operator review:
+
+  ```bash
+  python3 scripts/ops/trading_shadow_controller.py --output
+  ```
+
+What remains blocked:
+
+- Scheduler, dashboard, Telegram, and TradingView live-submit paths.
+- Any Robinhood stock, ETF, or options automation through unofficial endpoints.
+- Any future live order that lacks Ari's exact one-order confirmation token.

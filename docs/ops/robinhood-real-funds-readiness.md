@@ -36,13 +36,16 @@ Reference: <https://robinhood.com/us/en/support/articles/order-types/>
 
 ## Sapphire Stage
 
-Sapphire is at `draft_ready_not_submit_ready`.
+Sapphire is at `manual_confirmed_crypto_only`.
 
 Allowed now:
 
 - Read Robinhood Crypto account, holdings, orders, and quotes with redacted
   logs.
 - Generate v2-shaped order drafts through `/api/trading/order-draft`.
+- Generate risk-managed paper-shadow candidate reports through
+  `/api/trading/shadow-controller` or
+  `scripts/ops/trading_shadow_controller.py`.
 - Use estimated-price and best-bid/ask preflights.
 - Paper trade the same strategy and compare fees, spread, and slippage.
 - Run `scripts/ops/robinhood_live_readiness.py --live-read-only` to load local
@@ -51,16 +54,22 @@ Allowed now:
 - Generate a manual-only Robinhood limit-order dry run with
   `scripts/ops/robinhood_manual_order.py`. It writes a redacted audit record and
   prints the exact confirmation token required for a real order.
+- Submit one manually confirmed, capped Robinhood Crypto limit order through
+  `scripts/ops/robinhood_manual_order.py --execute` only when Ari has typed the
+  exact matching confirmation token in the active terminal.
 
 Blocked now:
 
-- Submitting, canceling, or replacing a Robinhood order.
+- Any autonomous submission, cancelation, or replacement of a Robinhood order.
 - Background schedulers submitting any real trade.
 - Stock, ETF, or options automation through unofficial Robinhood endpoints.
 - Any order larger than the live pilot caps below.
 - Printing secret values, raw signatures, or full account identifiers.
 - Running `robinhood_manual_order.py --execute` without the exact typed
   confirmation token printed by the matching dry run.
+- Any automated shadow-controller output turning into a live order without
+  passing through `robinhood_manual_order.py` and the one-order confirmation
+  ceremony.
 
 ## Pilot Caps
 
@@ -97,6 +106,29 @@ Blocked now:
 7. The kill switch is clear immediately before submit.
 8. Ari gives an explicit one-order confirmation in the active terminal with:
    symbol, side, order type, limit price, maximum notional, and maximum loss.
+
+## Automated Shadow Trading
+
+`scripts/ops/trading_shadow_controller.py` is the production-ready automation
+surface for testing real trading logic without allowing unattended money
+movement. It ranks Sapphire-liked crypto assets, enforces the `$5` first-order
+cap, emits paper order drafts, and records every live-submit surface as blocked.
+
+Run a live public-data shadow report:
+
+```bash
+python3 scripts/ops/trading_shadow_controller.py --output
+```
+
+Run a deterministic offline report:
+
+```bash
+python3 scripts/ops/trading_shadow_controller.py --offline
+```
+
+The generated Robinhood command is intentionally a manual dry-run template. It
+does not include `--execute`, and the limit price remains a placeholder until a
+just-in-time live-read-only readiness check supplies a guarded price.
 
 ## Promotion Sequence
 

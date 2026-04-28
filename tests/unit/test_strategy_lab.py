@@ -123,7 +123,7 @@ def test_strategy_lab_report_keeps_live_trading_off(monkeypatch):
     assert report["safety"]["execution_stage"] == "paper"
     assert "TRADINGVIEW_EXECUTION_ENABLED=false" in report["safety"]["guards"]
     assert report["tradingview"]["broker_rest_endpoints"][0] == "/config"
-    assert report["real_funds_readiness"]["stage"] == "draft_ready_not_submit_ready"
+    assert report["real_funds_readiness"]["stage"] == "manual_confirmed_crypto_only"
     assert report["real_funds_readiness"]["crypto"]["first_order_max_notional_usd"] == 5.0
     assert (
         report["real_funds_readiness"]["stocks"]["official_public_trading_api_identified"] is False

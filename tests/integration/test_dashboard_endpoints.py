@@ -155,6 +155,30 @@ def test_order_draft_endpoint_is_dry_run(app_client):
     assert {draft["venue"] for draft in body["drafts"]} >= {"paper", "hyperliquid"}
 
 
+def test_trading_shadow_controller_endpoint_is_paper_only(app_client, monkeypatch):
+    _, client = app_client
+    from lib.trading import shadow_controller
+
+    monkeypatch.setattr(
+        shadow_controller,
+        "build_shadow_trading_report",
+        lambda fetch_live=True: {
+            "mode": "paper_shadow",
+            "live_execution_enabled": False,
+            "paper_trading_enabled": True,
+            "candidates": [],
+            "risk_policy": {"bounded_candidate_notional_usd": 5.0},
+        },
+    )
+
+    r = client.get("/api/trading/shadow-controller?offline=1", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["mode"] == "paper_shadow"
+    assert body["live_execution_enabled"] is False
+    assert body["risk_policy"]["bounded_candidate_notional_usd"] == 5.0
+
+
 def test_logs_endpoint_returns_shape(app_client):
     _, client = app_client
     r = client.get("/api/logs?hours=24", headers={"Authorization": _AUTH})

@@ -460,6 +460,21 @@ def api_trading_strategy_lab():
     return jsonify(get_cached("strategy_lab", fetch, ttl=STRATEGY_LAB_CACHE_DURATION))
 
 
+@app.route("/api/trading/shadow-controller")
+@requires_auth
+def api_trading_shadow_controller():
+    """Risk-managed paper-shadow trading controller report."""
+    fetch_live = (request.args.get("offline") or "").strip().lower() not in {"1", "true", "yes"}
+
+    def fetch():
+        from lib.trading.shadow_controller import build_shadow_trading_report
+
+        return build_shadow_trading_report(fetch_live=fetch_live)
+
+    cache_key = f"trading_shadow_controller::{fetch_live}"
+    return jsonify(get_cached(cache_key, fetch, ttl=STRATEGY_LAB_CACHE_DURATION))
+
+
 @app.route("/api/trading/order-draft", methods=["POST"])
 @requires_auth
 def api_trading_order_draft():
