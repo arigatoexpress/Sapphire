@@ -1,0 +1,297 @@
+{% extends 'base.html' %}
+
+{% block title %}Sovereign Thesis Story{% endblock %}
+
+{% block extra_css %}
+.story-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: var(--space-xl);
+    flex-wrap: wrap;
+}
+
+.story-status {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.story-shell {
+    display: grid;
+    gap: 16px;
+}
+
+.story-section {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-card);
+    overflow: hidden;
+}
+
+.story-section-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border-dim);
+}
+
+.story-section-title {
+    color: var(--text-primary);
+    font-size: .92rem;
+    font-weight: 750;
+    margin: 0;
+}
+
+.story-section-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(220px, .38fr);
+    gap: 16px;
+    padding: 16px;
+}
+
+.story-copy {
+    color: var(--text-secondary);
+    font-size: .82rem;
+    line-height: 1.55;
+    margin: 0;
+}
+
+.story-aside {
+    border-left: 1px solid var(--border-dim);
+    padding-left: 14px;
+    display: grid;
+    gap: 8px;
+    align-content: start;
+}
+
+.story-list {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.story-list li {
+    border: 1px solid var(--border-dim);
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: var(--text-secondary);
+    font-size: .74rem;
+    line-height: 1.35;
+    background: rgba(255,255,255,.025);
+}
+
+.story-metric {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: .72rem;
+    padding-bottom: 7px;
+    border-bottom: 1px solid var(--border-dim);
+}
+
+.story-metric:last-child { border-bottom: 0; padding-bottom: 0; }
+.story-metric .key { color: var(--text-muted); }
+.story-metric .value { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+
+@media (max-width: 900px) {
+    .story-section-body { grid-template-columns: 1fr; }
+    .story-aside { border-left: 0; border-top: 1px solid var(--border-dim); padding: 14px 0 0; }
+}
+{% endblock %}
+
+{% block content %}
+<div class="story-header">
+    <div>
+        <h1 style="font-size:1.4rem;font-weight:700;color:var(--text-primary);margin:0 0 4px;">Sovereign Thesis Story</h1>
+        <p style="color:var(--text-muted);font-size:.85rem;margin:0;">Research-only narrative stitched from the live thesis matrix.</p>
+    </div>
+    <div class="story-status">
+        <span class="pill neutral" id="story-mode">loading</span>
+        <span class="pill neutral" id="story-updated">--</span>
+        <a class="btn" href="/sovereign-thesis">Matrix</a>
+        <button class="btn primary" onclick="loadStory()">Refresh</button>
+    </div>
+</div>
+
+<div class="story-shell">
+    <section class="story-section" id="section-thesis">
+        <div class="story-section-head">
+            <h2 class="story-section-title">Thesis</h2>
+            <span class="pill neutral" id="story-thesis-badge">research</span>
+        </div>
+        <div class="story-section-body">
+            <p class="story-copy" id="story-thesis-copy">
+                The core thesis favors assets and infrastructure that preserve sovereignty: scarce settlement, censorship resistance, self-custody, credible neutrality, and resilient operating loops.
+            </p>
+            <aside class="story-aside" id="story-thesis-metrics">
+                <div class="story-metric"><span class="key">Assets</span><span class="value">--</span></div>
+            </aside>
+        </div>
+    </section>
+
+    <section class="story-section" id="section-evidence">
+        <div class="story-section-head">
+            <h2 class="story-section-title">Evidence</h2>
+            <span class="pill neutral" id="story-evidence-badge">ledger</span>
+        </div>
+        <div class="story-section-body">
+            <p class="story-copy" id="story-evidence-copy">
+                The matrix keeps evidence separate from conviction: every asset is scored against lenses, source requirements, provider wiring, and explicit gaps.
+            </p>
+            <aside class="story-aside">
+                <ul class="story-list" id="story-evidence-list"><li class="loading">Loading</li></ul>
+            </aside>
+        </div>
+    </section>
+
+    <section class="story-section" id="section-convergence">
+        <div class="story-section-head">
+            <h2 class="story-section-title">Convergence</h2>
+            <span class="pill neutral" id="story-convergence-badge">fit</span>
+        </div>
+        <div class="story-section-body">
+            <p class="story-copy" id="story-convergence-copy">
+                The story gets stronger where independent lenses agree: monetary hardness, network resilience, liquidity, developer surface, institutional fit, and operational observability.
+            </p>
+            <aside class="story-aside">
+                <ul class="story-list" id="story-convergence-list"><li class="loading">Loading</li></ul>
+            </aside>
+        </div>
+    </section>
+
+    <section class="story-section" id="section-bear-case">
+        <div class="story-section-head">
+            <h2 class="story-section-title">Bear case</h2>
+            <span class="pill neutral" id="story-bear-badge">invalidations</span>
+        </div>
+        <div class="story-section-body">
+            <p class="story-copy" id="story-bear-copy">
+                The bear case is kept visible instead of buried: missing sources, tripped invalidations, weak provider coverage, and operational gaps can demote a narrative before it becomes an action.
+            </p>
+            <aside class="story-aside">
+                <ul class="story-list" id="story-bear-list"><li class="loading">Loading</li></ul>
+            </aside>
+        </div>
+    </section>
+
+    <section class="story-section" id="section-acquirer-fit">
+        <div class="story-section-head">
+            <h2 class="story-section-title">Acquirer fit</h2>
+            <span class="pill neutral" id="story-acquirer-badge">packaged</span>
+        </div>
+        <div class="story-section-body">
+            <p class="story-copy" id="story-acquirer-copy">
+                The buyer story is not live execution. It is an inspectable intelligence system: thesis, evidence, provenance, risk gates, and dry-run operating discipline before any mutation path.
+            </p>
+            <aside class="story-aside">
+                <ul class="story-list" id="story-acquirer-list">
+                    <li>Palantir fit: ontology-ready evidence ledgers and Foundry sync posture.</li>
+                    <li>Robinhood fit: risk-first trading intelligence and order-draft discipline.</li>
+                    <li>Security fit: incident-to-control conversion, provenance, and LaunchAgent guardrails.</li>
+                </ul>
+            </aside>
+        </div>
+    </section>
+</div>
+
+<script>
+function esc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function pct(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? `${number.toFixed(1)}%` : '--';
+}
+
+function shortStamp(value) {
+    if (!value) return '--';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return String(value).replace('T', ' ').slice(0, 19);
+    return parsed.toLocaleString();
+}
+
+function list(items) {
+    return items.length
+        ? items.map(item => `<li>${esc(item)}</li>`).join('')
+        : '<li class="empty-state">No rows</li>';
+}
+
+function renderMetrics(totals) {
+    const rows = [
+        ['Assets', totals.assets ?? '--'],
+        ['Aligned', totals.aligned_assets ?? '--'],
+        ['Evidence coverage', pct(totals.evidence_coverage_pct)],
+        ['Wired coverage', pct(totals.evidence_wired_pct)],
+        ['Invalidation watches', totals.invalidation_watches ?? '--']
+    ];
+    document.getElementById('story-thesis-metrics').innerHTML = rows.map(([key, value]) => `
+        <div class="story-metric"><span class="key">${esc(key)}</span><span class="value">${esc(value)}</span></div>
+    `).join('');
+}
+
+async function loadStory() {
+    let data;
+    try {
+        const response = await fetch(`${window.location.origin}/api/investments/thesis`);
+        data = await response.json();
+    } catch (err) {
+        data = {error: String(err), totals: {}, assets: [], source_requirements: [], invalidation_queue: []};
+    }
+
+    const totals = data.totals || {};
+    const assets = data.assets || [];
+    const coreAssets = assets.filter(row => ['core', 'aligned'].includes(String(row.fit || '').toLowerCase()));
+    const topAssets = (coreAssets.length ? coreAssets : assets).slice(0, 4);
+    const sources = data.source_requirements || [];
+    const invalidations = data.invalidation_queue || [];
+    const gaps = assets.flatMap(row => (row.source_gaps || []).map(gap => `${row.symbol}: ${gap}`)).slice(0, 5);
+
+    document.getElementById('story-mode').textContent = data.mode || 'research';
+    document.getElementById('story-updated').textContent = shortStamp(data.generated_at);
+    document.getElementById('story-thesis-badge').textContent = `${totals.aligned_assets ?? 0} aligned`;
+    document.getElementById('story-evidence-badge').textContent = `${totals.evidence_required ?? 0} requirements`;
+    document.getElementById('story-convergence-badge').textContent = `${topAssets.length} assets`;
+    document.getElementById('story-bear-badge').textContent = `${totals.tripped_invalidations ?? 0} tripped`;
+    renderMetrics(totals);
+
+    if (topAssets.length) {
+        document.getElementById('story-thesis-copy').textContent =
+            `The current thesis clusters around ${topAssets.map(row => row.symbol).join(', ')} because the matrix scores them as the strongest matches for sovereignty, resilience, and inspectable evidence.`;
+    }
+
+    const evidenceRows = sources.slice(0, 5).map(row => {
+        const needs = Number(row.needs_wiring || 0);
+        const status = needs ? `${needs} wiring gap${needs === 1 ? '' : 's'}` : 'configured';
+        return `${row.id}: ${row.evidenced || 0} evidenced, ${row.provider_wired || 0} wired, ${status}`;
+    });
+    document.getElementById('story-evidence-list').innerHTML = list(evidenceRows);
+
+    const convergenceRows = topAssets.map(row => {
+        const lenses = (row.aligned_lenses || row.lenses || []).slice(0, 4).join(', ') || row.fit || 'watch';
+        const coverage = pct(row.evidence_summary?.coverage_pct);
+        return `${row.symbol} ${row.fit || 'watch'} · ${coverage} evidence · ${lenses}`;
+    });
+    document.getElementById('story-convergence-list').innerHTML = list(convergenceRows);
+
+    const bearRows = invalidations.slice(0, 5).map(row => `${row.symbol || row.asset || 'asset'}: ${row.watch || row.trigger || row.reason || 'watch'}`);
+    document.getElementById('story-bear-list').innerHTML = list([...bearRows, ...gaps].slice(0, 6));
+
+    const acquirerRows = [
+        `Palantir fit: ${totals.source_requirements ?? sources.length ?? 0} source requirements can become ontology-backed evidence rows.`,
+        `Robinhood fit: ${totals.invalidation_watches ?? 0} invalidation watches keep trading research subordinate to risk gates.`,
+        `Security fit: ${totals.evidence_needs_wiring ?? 0} wiring gaps stay visible instead of becoming hidden narrative debt.`
+    ];
+    document.getElementById('story-acquirer-list').innerHTML = list(acquirerRows);
+}
+
+document.addEventListener('DOMContentLoaded', loadStory);
+</script>
+{% endblock %}

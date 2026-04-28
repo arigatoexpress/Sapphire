@@ -1,9 +1,10 @@
 # Dashboard product pages — operator runbook
 
-This runbook covers the two product surfaces shipped in Wave 4 of the
-Sapphire dashboard: `/threat-intel` and `/customer-dossier`. Both pages
+This runbook covers the product surfaces shipped in Wave 4 and Wave 6 of the
+Sapphire dashboard: `/threat-intel`, `/customer-dossier`, `/diligence`, and
+`/sovereign-thesis/story`. These pages
 are *read-only*, *authenticated*, *paste-safe*, and *snapshot-only* —
-they do not call upstream APIs at request time. This runbook tells you
+they do not mutate upstream systems at request time. This runbook tells you
 how to keep the snapshots fresh, how to triage failures, and how to
 verify the safety contract before each release.
 
@@ -13,10 +14,16 @@ verify the safety contract before each release.
 |---|---|---|---|
 | `/threat-intel` | `/api/threat-intel` | `data/intelligence/<date>/threats.json` | `services/dashboard/refresh_threats.py` (LaunchAgent, every 4h) |
 | `/customer-dossier` | `/api/customer-dossier` | `data/tho_intel/dossier_*.json` | manual / scheduled (operator-driven) |
+| `/diligence` | `/api/diligence-summary`, `/api/risk-kernel-summary`, `/api/provenance-summary`, `/api/test-suite-health`, `/api/launchagent-summary` | `docs/diligence/00-09`, risk/provenance/test metadata, `launchctl list` labels | none |
+| `/sovereign-thesis/story` | `/api/investments/thesis` | `lib.intel.sovereign_thesis` report | none |
 
-Both pages inherit the dashboard's basic-auth (`AUTH_USERNAME` /
+All pages inherit the dashboard's basic-auth (`AUTH_USERNAME` /
 `AUTH_PASSWORD`). The cookies are not shared — each request must
 present the basic-auth header.
+
+The Wave 6 pages follow the same auth contract. They are GET-only and should
+return 405 for POST/PUT/PATCH/DELETE unless Flask itself changes routing
+behavior.
 
 ## /threat-intel — operations
 
@@ -174,10 +181,78 @@ python3 -c 'import os; print(len(os.environ["AUTH_PASSWORD"]))'
 The dashboard refuses to start if `AUTH_PASSWORD` is empty or in the
 weak-password list.
 
+## /diligence — operations
+
+The `/diligence` page is a buyer-facing aggregate. It does not run tests,
+start services, read secret files, inspect plist environment variables, or call
+external APIs. It composes small local summaries:
+
+- `/api/diligence-summary` reads `docs/diligence/00-09`, extracts the title,
+  first packet paragraph, first diligence-readout paragraph, and evidence list,
+  then redacts local user paths and secret-shaped text.
+- `/api/risk-kernel-summary` imports `lib.core.risk_kernel`, evaluates one safe
+  sample and one blocked sample, and returns policy names, version, and headline
+  thresholds from the live policy objects.
+- `/api/provenance-summary` calls `scripts.ops.provenance_verify.build_report`
+  in read-only mode and returns counts plus a capped invalid sample. It never
+  writes sidecars.
+- `/api/test-suite-health` reads source test files and `.pytest_cache` metadata
+  when present. It does not read README counts and does not invoke pytest.
+- `/api/launchagent-summary` reads version-controlled plist labels and
+  `launchctl list` output only. It returns `label`, `status_label`, `pid`, and
+  `last_exit`; it does not read plist secrets or call `launchctl load/unload`.
+
+### Smoke test
+
+```bash
+curl -sf -u "${AUTH_USERNAME:-sapphire}:${AUTH_PASSWORD}" \
+  http://127.0.0.1:8080/api/diligence-summary | jq '.status, .totals'
+curl -sf -u "${AUTH_USERNAME:-sapphire}:${AUTH_PASSWORD}" \
+  http://127.0.0.1:8080/api/risk-kernel-summary | jq '.status, .headline'
+curl -sf -u "${AUTH_USERNAME:-sapphire}:${AUTH_PASSWORD}" \
+  http://127.0.0.1:8080/api/launchagent-summary | jq '.totals'
+```
+
+Expected: diligence has 10 documents, risk kernel reports five default
+policies, and LaunchAgent rows contain labels plus last-exit values.
+
+### Diagnosing stale or sparse output
+
+1. For missing packet rows, check `ls docs/diligence/0*.md`.
+2. For provenance warnings, run
+   `python3 scripts/ops/provenance_verify.py --older-than-hours 24 --pretty`.
+3. For test health warnings, run the local verification gate, then refresh the
+   page so `.pytest_cache` reflects the latest local result.
+4. For LaunchAgent unknown status, run `launchctl list | grep sapphire` and
+   inspect whether macOS denied the read-only query.
+
+## /sovereign-thesis/story — operations
+
+The story page is the narrative companion to `/sovereign-thesis`. It fetches
+the existing `/api/investments/thesis` report and renders five fixed sections:
+Thesis, Evidence, Convergence, Bear case, and Acquirer fit.
+
+The page is intentionally research-only. It does not call order-draft routes,
+Telegram routes, lease-write routes, or any POST endpoint. The source API
+already carries the safety envelope for live trading and Telegram sends.
+
+### Smoke test
+
+```bash
+curl -sf -u "${AUTH_USERNAME:-sapphire}:${AUTH_PASSWORD}" \
+  http://127.0.0.1:8080/sovereign-thesis/story | grep -E "Thesis|Evidence|Convergence|Bear case|Acquirer fit"
+curl -sf -u "${AUTH_USERNAME:-sapphire}:${AUTH_PASSWORD}" \
+  http://127.0.0.1:8080/api/investments/thesis | jq '.mode, .totals'
+```
+
+Expected: all five story sections render, and the thesis API returns
+`research_intel_only` mode with asset/evidence totals.
+
 ## Safety contract — what the routes guarantee
 
-Both routes ship with a `safety` block in every response. The block is
-the load-bearing contract for downstream consumers:
+The `/threat-intel` and `/customer-dossier` routes ship with a `safety` block in
+every response. The block is the load-bearing contract for downstream
+consumers:
 
 | Field | Meaning |
 |---|---|
@@ -190,6 +265,12 @@ the load-bearing contract for downstream consumers:
 
 Consumers — including the page's own JavaScript — should treat the
 absence of any field above as an error condition.
+
+The `/diligence` and `/sovereign-thesis/story` surfaces rely on route-level
+constraints instead: dashboard basic auth, GET-only methods, no write helpers,
+sanitized summaries, and downstream APIs that are already read-only. Treat any
+future POST, live send, LaunchAgent mutation, or test-running behavior on these
+pages as a regression.
 
 ## Incident response
 

@@ -4,10 +4,14 @@ Sapphire Trading Dashboard
 Real-time trading system monitor and control interface
 """
 
+import ast
 import json
 import logging
 import os
+import plistlib
+import re
 import secrets
+import subprocess
 import sys
 import time
 from datetime import UTC, datetime, timedelta
@@ -186,6 +190,443 @@ def get_cached(key, fetch_func, ttl=CACHE_DURATION, *, raise_on_miss=False):
         if raise_on_miss:
             raise
         return {}
+
+
+_SECRETISH_TEXT_RE = re.compile(
+    r"(?i)\b(api[_-]?key|token|secret|password|private[_-]?key)\b\s*[:=]\s*[^,\s;]+"
+)
+_BEARER_TEXT_RE = re.compile(r"(?i)\bbearer\s+[a-z0-9._~+/=-]{8,}")
+_USER_PATH_RE = re.compile(r"/Users/[^/\s)\"'`]+")
+
+
+def _paste_safe_text(value: Any, *, limit: int = 280) -> str:
+    """Return compact dashboard text without local user paths or secret-shaped values."""
+    text = " ".join(str(value or "").split())
+    text = text.replace(str(_DASHBOARD_REPO_ROOT), "Sapphire")
+    text = text.replace(str(Path.home() / "Code" / "Sapphire"), "Sapphire")
+    text = _USER_PATH_RE.sub("~", text)
+    text = re.sub(r"\bAri's\b", "the operator's", text)
+    text = re.sub(r"\bAri\b", "the operator", text)
+    text = _SECRETISH_TEXT_RE.sub(lambda m: f"{m.group(1)}=[redacted]", text)
+    text = _BEARER_TEXT_RE.sub("Bearer [redacted]", text)
+    if len(text) <= limit:
+        return text
+    return f"{text[: max(0, limit - 3)].rstrip()}..."
+
+
+def _repo_display_path(path: Path | str) -> str:
+    raw = Path(path)
+    try:
+        return str(raw.resolve().relative_to(_DASHBOARD_REPO_ROOT.resolve()))
+    except (OSError, ValueError):
+        return _paste_safe_text(str(path), limit=160)
+
+
+def _first_paragraph(lines: list[str], *, start: int = 0) -> str:
+    paragraph: list[str] = []
+    in_code = False
+    for line in lines[start:]:
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            in_code = not in_code
+            continue
+        if in_code:
+            continue
+        if not stripped:
+            if paragraph:
+                break
+            continue
+        if stripped.startswith("#") or stripped.startswith("- "):
+            if paragraph:
+                break
+            continue
+        paragraph.append(stripped)
+    return " ".join(paragraph)
+
+
+def _extract_diligence_doc(path: Path) -> dict[str, Any]:
+    text = path.read_text(encoding="utf-8")
+    lines = text.splitlines()
+    title = next((line.lstrip("# ").strip() for line in lines if line.startswith("# ")), path.stem)
+    readout_index = next(
+        (idx + 1 for idx, line in enumerate(lines) if line.strip().lower() == "## diligence readout"),
+        len(lines),
+    )
+    evidence_index = next(
+        (idx + 1 for idx, line in enumerate(lines) if line.strip().lower() == "## evidence"),
+        len(lines),
+    )
+    evidence: list[str] = []
+    for line in lines[evidence_index:]:
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            break
+        if stripped.startswith("- "):
+            evidence.append(_paste_safe_text(stripped[2:], limit=140))
+    words = re.findall(r"\b[\w'-]+\b", text)
+    return {
+        "id": path.stem.split("-", 1)[0],
+        "title": _paste_safe_text(title, limit=120),
+        "path": _repo_display_path(path),
+        "summary": _paste_safe_text(_first_paragraph(lines, start=1), limit=360),
+        "readout": _paste_safe_text(_first_paragraph(lines, start=readout_index), limit=360),
+        "evidence": evidence[:6],
+        "metrics": {
+            "words": len(words),
+            "headings": sum(1 for line in lines if line.startswith("## ")),
+            "evidence_items": len(evidence),
+        },
+    }
+
+
+def _build_diligence_summary(root: Path | None = None) -> dict[str, Any]:
+    repo_root = root or _DASHBOARD_REPO_ROOT
+    diligence_dir = repo_root / "docs" / "diligence"
+    documents: list[dict[str, Any]] = []
+    missing: list[str] = []
+    for index in range(10):
+        matches = sorted(diligence_dir.glob(f"{index:02d}-*.md"))
+        if not matches:
+            missing.append(f"{index:02d}")
+            continue
+        try:
+            documents.append(_extract_diligence_doc(matches[0]))
+        except OSError as exc:
+            missing.append(f"{index:02d}:{exc.__class__.__name__}")
+    totals = {
+        "documents": len(documents),
+        "expected_documents": 10,
+        "missing_documents": len(missing),
+        "words": sum(doc["metrics"]["words"] for doc in documents),
+        "headings": sum(doc["metrics"]["headings"] for doc in documents),
+        "evidence_items": sum(doc["metrics"]["evidence_items"] for doc in documents),
+    }
+    return {
+        "mode": "read_only_diligence_packet",
+        "status": "pass" if not missing and len(documents) == 10 else "warn",
+        "source_root": "docs/diligence",
+        "generated_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
+        "totals": totals,
+        "missing": missing,
+        "documents": documents,
+    }
+
+
+def _build_risk_kernel_summary() -> dict[str, Any]:
+    from lib.core.risk_kernel import DecisionEnvelope, RiskKernelV1, __version__
+
+    kernel = RiskKernelV1()
+    safe_decision = DecisionEnvelope(
+        decision_id="diligence-safe-sample",
+        action="research_decision",
+        symbol="BTC-USD",
+        side="long",
+        notional_usd=1_000.0,
+        equity=100_000.0,
+        price=100_000.0,
+        quantity=0.01,
+        atr=1_500.0,
+        stop_loss_price=99_000.0,
+        risk_metrics={
+            "daily_loss_pct": 0.25,
+            "intraday_drawdown_pct": 0.4,
+            "kill_switch_active": False,
+        },
+    )
+    blocked_decision = DecisionEnvelope(
+        decision_id="diligence-block-sample",
+        action="open_order",
+        symbol="BTC-USD",
+        side="long",
+        notional_usd=15_000.0,
+        proposed_position_pct=15.0,
+        equity=100_000.0,
+        price=100_000.0,
+        quantity=0.15,
+        atr=20_000.0,
+        stop_loss_price=90_000.0,
+        risk_metrics={
+            "daily_loss_pct": 4.5,
+            "intraday_drawdown_pct": 3.8,
+            "kill_switch_active": True,
+        },
+        metadata={"ignore_risk_kernel": True},
+    )
+    safe_verdict = kernel.evaluate(safe_decision).to_dict()
+    blocked_verdict = kernel.evaluate(blocked_decision).to_dict()
+    policies = [
+        {
+            "name": getattr(policy, "name", policy.__class__.__name__),
+            "version": getattr(policy, "version", "unknown"),
+            "params": dict(getattr(policy, "params", {}) or {}),
+        }
+        for policy in kernel.policies
+    ]
+    params_by_name = {policy["name"]: policy["params"] for policy in policies}
+    return {
+        "mode": "read_only_risk_kernel_summary",
+        "status": "pass" if safe_verdict["allowed"] and not blocked_verdict["allowed"] else "warn",
+        "version": __version__,
+        "generated_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
+        "headline": {
+            "policy_count": len(policies),
+            "sample_allowed": safe_verdict["allowed"],
+            "blocked_fired_gates": len(blocked_verdict["fired_gates"]),
+            "max_daily_loss_pct": params_by_name.get("daily_loss", {}).get("max_loss_pct"),
+            "max_intraday_drawdown_pct": params_by_name.get("intraday_drawdown", {}).get(
+                "max_drawdown_pct"
+            ),
+            "max_position_pct": params_by_name.get("atr_sizing", {}).get("max_position_pct"),
+            "max_atr_risk_pct": params_by_name.get("atr_sizing", {}).get("max_atr_risk_pct"),
+            "max_single_trade_loss_pct": params_by_name.get("atr_sizing", {}).get(
+                "max_single_trade_loss_pct"
+            ),
+        },
+        "policies": policies,
+        "sample_verdicts": {
+            "safe": {
+                "allowed": safe_verdict["allowed"],
+                "fired_gates": [gate["policy"] for gate in safe_verdict["fired_gates"]],
+                "evaluation_ms": safe_verdict["evaluation_ms"],
+            },
+            "blocked": {
+                "allowed": blocked_verdict["allowed"],
+                "fired_gates": [gate["policy"] for gate in blocked_verdict["fired_gates"]],
+                "evaluation_ms": blocked_verdict["evaluation_ms"],
+            },
+        },
+    }
+
+
+def _build_provenance_summary(*, older_than_hours: float = 24.0) -> dict[str, Any]:
+    try:
+        from scripts.ops import provenance_verify
+
+        report = provenance_verify.build_report(
+            provenance_verify.DEFAULT_ROOTS,
+            older_than_hours=max(0.0, min(float(older_than_hours), 24 * 30)),
+        )
+        invalid_rows = [row for row in report.get("rows", []) if not row.get("ok")]
+        return {
+            "mode": "read_only_provenance_verifier",
+            "status": "pass" if report.get("ok") else "warn",
+            "schema_version": report.get("schema_version", 1),
+            "older_than_hours": report.get("older_than_hours", older_than_hours),
+            "checked": report.get("checked", 0),
+            "missing_or_invalid": report.get("missing_or_invalid", 0),
+            "roots": [_repo_display_path(Path(root)) for root in report.get("roots", [])],
+            "invalid_sample": [
+                {
+                    "artifact": _paste_safe_text(row.get("artifact"), limit=180),
+                    "reason": _paste_safe_text(row.get("reason"), limit=80),
+                }
+                for row in invalid_rows[:5]
+            ],
+        }
+    except Exception as exc:
+        log.warning("provenance summary unavailable: %s", exc)
+        return {
+            "mode": "read_only_provenance_verifier",
+            "status": "unknown",
+            "checked": 0,
+            "missing_or_invalid": 0,
+            "roots": [],
+            "invalid_sample": [],
+            "error": _paste_safe_text(f"{exc.__class__.__name__}: {exc}", limit=180),
+        }
+
+
+def _count_test_functions(path: Path) -> int:
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):
+        return 0
+    return sum(
+        1
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test_")
+    )
+
+
+def _load_pytest_cache(root: Path) -> dict[str, Any]:
+    cache_dir = root / ".pytest_cache" / "v" / "cache"
+    nodeids_path = cache_dir / "nodeids"
+    lastfailed_path = cache_dir / "lastfailed"
+    nodeids: list[str] = []
+    lastfailed: dict[str, Any] = {}
+    try:
+        raw_nodeids = json.loads(nodeids_path.read_text(encoding="utf-8"))
+        if isinstance(raw_nodeids, list):
+            nodeids = [str(item) for item in raw_nodeids]
+    except (OSError, json.JSONDecodeError):
+        nodeids = []
+    try:
+        raw_lastfailed = json.loads(lastfailed_path.read_text(encoding="utf-8"))
+        if isinstance(raw_lastfailed, dict):
+            lastfailed = raw_lastfailed
+    except (OSError, json.JSONDecodeError):
+        lastfailed = {}
+    return {
+        "root": root,
+        "nodeids": nodeids,
+        "lastfailed": lastfailed,
+        "cache_mtime": datetime.fromtimestamp(nodeids_path.stat().st_mtime, tz=UTC)
+        .replace(microsecond=0)
+        .isoformat()
+        if nodeids_path.exists()
+        else None,
+    }
+
+
+def _build_test_suite_health(root: Path | None = None) -> dict[str, Any]:
+    repo_root = root or _DASHBOARD_REPO_ROOT
+    cache = _load_pytest_cache(repo_root)
+    if not cache["nodeids"] and root is None:
+        for candidate in _DASHBOARD_ROOTS:
+            candidate_cache = _load_pytest_cache(candidate)
+            if candidate_cache["nodeids"]:
+                cache = candidate_cache
+                break
+    test_files = sorted((repo_root / "tests" / "unit").glob("test_*.py"))
+    plugin_files = sorted((repo_root / "plugins" / "claw-sapphire" / "tests").glob("test_*.py"))
+    nodeids = cache["nodeids"]
+    lastfailed = cache["lastfailed"]
+
+    def suite(prefix: str, files: list[Path]) -> dict[str, Any]:
+        return {
+            "path": prefix.rstrip("/"),
+            "test_files": len(files),
+            "test_functions": sum(_count_test_functions(path) for path in files),
+            "cached_nodeids": sum(1 for nodeid in nodeids if nodeid.startswith(prefix)),
+            "lastfailed": sum(1 for nodeid in lastfailed if nodeid.startswith(prefix)),
+        }
+
+    suites = {
+        "unit": suite("tests/unit/", test_files),
+        "plugin": suite("plugins/claw-sapphire/tests/", plugin_files),
+    }
+    lastfailed_count = len(lastfailed)
+    status = "pass" if nodeids and lastfailed_count == 0 else ("fail" if lastfailed_count else "warn")
+    return {
+        "mode": "read_only_test_suite_health",
+        "status": status,
+        "source": "pytest_cache" if nodeids else "static_source_inventory",
+        "cache_root": _repo_display_path(cache["root"]),
+        "cache_mtime": cache["cache_mtime"],
+        "totals": {
+            "suites": len(suites),
+            "test_files": sum(row["test_files"] for row in suites.values()),
+            "test_functions": sum(row["test_functions"] for row in suites.values()),
+            "cached_nodeids": len(nodeids),
+            "lastfailed": lastfailed_count,
+        },
+        "suites": suites,
+    }
+
+
+def _dashboard_launchagent_labels(root: Path | None = None) -> list[str]:
+    repo_root = root or _DASHBOARD_REPO_ROOT
+    paths = list((repo_root / "infra" / "launchagents").glob("*.plist"))
+    paths.extend((repo_root / "services").glob("*/launchagent/*.plist"))
+    labels: set[str] = {"ai.hermes.gateway"}
+    for path in paths:
+        try:
+            payload = plistlib.loads(path.read_bytes())
+        except (OSError, plistlib.InvalidFileException):
+            continue
+        label = payload.get("Label") if isinstance(payload, dict) else None
+        if isinstance(label, str) and label:
+            labels.add(label)
+    return sorted(labels)
+
+
+def _parse_launchctl_list(output: str) -> dict[str, dict[str, Any]]:
+    rows: dict[str, dict[str, Any]] = {}
+    for line in output.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.lower().startswith("pid"):
+            continue
+        parts = stripped.split(maxsplit=2)
+        if len(parts) != 3:
+            continue
+        pid_raw, status_raw, label = parts
+        pid = None if pid_raw == "-" else int(pid_raw) if pid_raw.lstrip("-").isdigit() else pid_raw
+        last_exit: int | str | None
+        last_exit = int(status_raw) if status_raw.lstrip("-").isdigit() else status_raw
+        rows[label] = {"pid": pid, "last_exit": last_exit}
+    return rows
+
+
+def _build_launchagent_summary() -> dict[str, Any]:
+    labels = _dashboard_launchagent_labels()
+    try:
+        result = subprocess.run(
+            ["launchctl", "list"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+        return {
+            "mode": "read_only_launchagent_status",
+            "status": "unknown",
+            "checked": False,
+            "error": _paste_safe_text(f"{exc.__class__.__name__}: {exc}", limit=160),
+            "totals": {"labels": len(labels), "running": 0, "loaded": 0, "not_loaded": 0},
+            "launchagents": [
+                {"label": label, "status_label": "unknown", "pid": None, "last_exit": None}
+                for label in labels
+            ],
+        }
+    if result.returncode != 0:
+        return {
+            "mode": "read_only_launchagent_status",
+            "status": "unknown",
+            "checked": True,
+            "error": _paste_safe_text(result.stderr, limit=160),
+            "totals": {"labels": len(labels), "running": 0, "loaded": 0, "not_loaded": 0},
+            "launchagents": [
+                {"label": label, "status_label": "unknown", "pid": None, "last_exit": None}
+                for label in labels
+            ],
+        }
+    parsed = _parse_launchctl_list(result.stdout)
+    rows: list[dict[str, Any]] = []
+    for label in labels:
+        live = parsed.get(label)
+        if not live:
+            rows.append({"label": label, "status_label": "not_loaded", "pid": None, "last_exit": None})
+            continue
+        pid = live.get("pid")
+        last_exit = live.get("last_exit")
+        if pid not in (None, "-"):
+            status_label = "running"
+        elif last_exit == 0:
+            status_label = "loaded"
+        else:
+            status_label = "exited"
+        rows.append(
+            {
+                "label": label,
+                "status_label": status_label,
+                "pid": pid,
+                "last_exit": last_exit,
+            }
+        )
+    totals = {
+        "labels": len(rows),
+        "running": sum(1 for row in rows if row["status_label"] == "running"),
+        "loaded": sum(1 for row in rows if row["status_label"] in {"running", "loaded", "exited"}),
+        "not_loaded": sum(1 for row in rows if row["status_label"] == "not_loaded"),
+    }
+    return {
+        "mode": "read_only_launchagent_status",
+        "status": "pass" if totals["loaded"] else "warn",
+        "checked": True,
+        "totals": totals,
+        "launchagents": rows,
+    }
 
 
 def fetch_sync(url):
@@ -2702,6 +3143,62 @@ def sovereign_thesis_page():
         current_page="sovereign-thesis",
         page_title="Sovereign Thesis",
     )
+
+
+@app.route("/sovereign-thesis/story")
+@requires_auth
+def sovereign_thesis_story_page():
+    return render_template(
+        "pages/sovereign_thesis_story.html",
+        current_page="sovereign-thesis-story",
+        page_title="Sovereign Thesis Story",
+    )
+
+
+@app.route("/diligence")
+@requires_auth
+def diligence_page():
+    return render_template(
+        "pages/diligence.html",
+        current_page="diligence",
+        page_title="Diligence",
+        diligence_summary=_build_diligence_summary(),
+    )
+
+
+@app.route("/api/diligence-summary")
+@requires_auth
+def api_diligence_summary():
+    return jsonify(_build_diligence_summary())
+
+
+@app.route("/api/risk-kernel-summary")
+@requires_auth
+def api_risk_kernel_summary():
+    return jsonify(_build_risk_kernel_summary())
+
+
+@app.route("/api/provenance-summary")
+@requires_auth
+def api_provenance_summary():
+    raw_hours = request.args.get("older_than_hours", "24")
+    try:
+        older_than_hours = float(raw_hours)
+    except (TypeError, ValueError):
+        older_than_hours = 24.0
+    return jsonify(_build_provenance_summary(older_than_hours=older_than_hours))
+
+
+@app.route("/api/test-suite-health")
+@requires_auth
+def api_test_suite_health():
+    return jsonify(_build_test_suite_health())
+
+
+@app.route("/api/launchagent-summary")
+@requires_auth
+def api_launchagent_summary():
+    return jsonify(_build_launchagent_summary())
 
 
 @app.route("/api/foundry/readiness")

@@ -1,0 +1,320 @@
+{% extends 'base.html' %}
+
+{% block title %}Diligence{% endblock %}
+
+{% block extra_css %}
+.diligence-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: var(--space-xl);
+    flex-wrap: wrap;
+}
+
+.diligence-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr);
+    gap: 16px;
+    align-items: start;
+}
+
+.diligence-doc-list,
+.diligence-panel-list {
+    display: grid;
+    gap: 10px;
+}
+
+.diligence-doc {
+    border: 1px solid var(--border-dim);
+    border-radius: 6px;
+    padding: 12px 14px;
+    background: rgba(98,255,64,.025);
+}
+
+.diligence-doc-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: baseline;
+    margin-bottom: 6px;
+}
+
+.diligence-doc-title {
+    color: var(--text-primary);
+    font-weight: 700;
+    font-size: .86rem;
+}
+
+.diligence-doc-path {
+    color: var(--text-muted);
+    font-size: .62rem;
+    white-space: nowrap;
+}
+
+.diligence-doc-copy,
+.diligence-panel-copy {
+    color: var(--text-secondary);
+    font-size: .76rem;
+    line-height: 1.45;
+}
+
+.diligence-evidence-row {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.diligence-chip {
+    border: 1px solid var(--border-dim);
+    border-radius: 4px;
+    color: var(--text-muted);
+    padding: 2px 6px;
+    font-size: .6rem;
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.diligence-kv {
+    display: grid;
+    grid-template-columns: minmax(130px, .5fr) minmax(0, 1fr);
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-dim);
+    font-size: .76rem;
+}
+
+.diligence-kv:last-child { border-bottom: 0; }
+.diligence-kv .key { color: var(--text-muted); }
+.diligence-kv .value { color: var(--text-primary); }
+
+.diligence-table-wrap {
+    overflow-x: auto;
+}
+
+@media (max-width: 1100px) {
+    .diligence-grid { grid-template-columns: 1fr; }
+}
+{% endblock %}
+
+{% block content %}
+<div class="diligence-header">
+    <div>
+        <h1 style="font-size:1.4rem;font-weight:700;color:var(--text-primary);margin:0 0 4px;">Diligence</h1>
+        <p style="color:var(--text-muted);font-size:.85rem;margin:0;">Buyer-grade packet, risk kernel, provenance, tests, and LaunchAgent posture.</p>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <a class="btn" href="/sovereign-thesis/story">Story</a>
+        <button class="btn primary" onclick="loadDiligence()">Refresh</button>
+    </div>
+</div>
+
+<div class="grid grid-4" style="margin-bottom:var(--space-xl);">
+    <div class="stat-card">
+        <div class="stat-label">Packet</div>
+        <div class="stat-value" id="dg-docs">--</div>
+        <div class="stat-change" id="dg-docs-sub">docs/diligence</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Risk Kernel</div>
+        <div class="stat-value" id="dg-risk">--</div>
+        <div class="stat-change" id="dg-risk-sub">policies</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Provenance</div>
+        <div class="stat-value" id="dg-prov">--</div>
+        <div class="stat-change" id="dg-prov-sub">verified</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Tests</div>
+        <div class="stat-value" id="dg-tests">--</div>
+        <div class="stat-change" id="dg-tests-sub">suite health</div>
+    </div>
+</div>
+
+<div class="diligence-grid">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Diligence Packet</h3>
+            <span class="pill neutral" id="dg-packet-status">loading</span>
+        </div>
+        <div class="card-body">
+            <div class="diligence-doc-list" id="dg-doc-list">
+                <div class="loading">Loading</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="diligence-panel-list">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Risk Kernel</h3>
+                <span class="pill neutral" id="dg-risk-status">loading</span>
+            </div>
+            <div class="card-body">
+                <div class="diligence-kv"><div class="key">Version</div><div class="value" id="dg-risk-version">--</div></div>
+                <div class="diligence-kv"><div class="key">Fired sample gates</div><div class="value" id="dg-risk-fired">--</div></div>
+                <div class="diligence-kv"><div class="key">Policy set</div><div class="value" id="dg-risk-policies">--</div></div>
+                <div class="diligence-kv"><div class="key">Headlines</div><div class="value" id="dg-risk-limits">--</div></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Provenance</h3>
+                <span class="pill neutral" id="dg-prov-status">loading</span>
+            </div>
+            <div class="card-body">
+                <div class="diligence-kv"><div class="key">Checked</div><div class="value" id="dg-prov-checked">--</div></div>
+                <div class="diligence-kv"><div class="key">Missing or invalid</div><div class="value" id="dg-prov-missing">--</div></div>
+                <div class="diligence-kv"><div class="key">Roots</div><div class="value" id="dg-prov-roots">--</div></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Test Suites</h3>
+                <span class="pill neutral" id="dg-test-status">loading</span>
+            </div>
+            <div class="card-body">
+                <div class="diligence-kv"><div class="key">Source</div><div class="value" id="dg-test-source">--</div></div>
+                <div class="diligence-kv"><div class="key">Cached nodeids</div><div class="value" id="dg-test-nodeids">--</div></div>
+                <div class="diligence-kv"><div class="key">Last failed</div><div class="value" id="dg-test-lastfailed">--</div></div>
+                <div class="diligence-kv"><div class="key">Files</div><div class="value" id="dg-test-files">--</div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-top:var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title">LaunchAgents</h3>
+        <span class="pill neutral" id="dg-launch-status">loading</span>
+    </div>
+    <div class="card-body no-pad">
+        <div class="diligence-table-wrap">
+            <table class="data-table">
+                <thead><tr><th>Label</th><th>Status</th><th>PID</th><th>Last Exit</th></tr></thead>
+                <tbody id="dg-launch-table"><tr><td colspan="4" class="loading">Loading</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script type="application/json" id="diligence-seed">{{ diligence_summary | tojson }}</script>
+<script>
+function esc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function pillClass(value) {
+    const raw = String(value || '').toLowerCase();
+    if (['pass', 'running', 'loaded', 'ready'].includes(raw)) return 'green';
+    if (['fail', 'exited', 'not_loaded'].includes(raw)) return 'red';
+    if (['warn', 'unknown'].includes(raw)) return 'amber';
+    return 'neutral';
+}
+
+function setPill(id, value) {
+    const el = document.getElementById(id);
+    el.className = `pill ${pillClass(value)}`;
+    el.textContent = value || '--';
+}
+
+function renderDiligencePacket(packet) {
+    const totals = packet.totals || {};
+    document.getElementById('dg-docs').textContent = `${totals.documents ?? 0}/10`;
+    document.getElementById('dg-docs-sub').textContent = `${totals.evidence_items ?? 0} evidence refs`;
+    setPill('dg-packet-status', packet.status || 'unknown');
+    const docs = packet.documents || [];
+    document.getElementById('dg-doc-list').innerHTML = docs.length
+        ? docs.map(doc => `
+            <div class="diligence-doc">
+                <div class="diligence-doc-top">
+                    <div class="diligence-doc-title">${esc(doc.id)} · ${esc(doc.title)}</div>
+                    <div class="diligence-doc-path">${esc(doc.path)}</div>
+                </div>
+                <div class="diligence-doc-copy">${esc(doc.summary)}</div>
+                <div class="diligence-doc-copy" style="margin-top:6px;color:var(--text-muted);">${esc(doc.readout)}</div>
+                <div class="diligence-evidence-row">
+                    ${(doc.evidence || []).slice(0, 4).map(item => `<span class="diligence-chip" title="${esc(item)}">${esc(item)}</span>`).join('')}
+                </div>
+            </div>
+        `).join('')
+        : '<div class="empty-state">No diligence documents found</div>';
+}
+
+function renderRisk(payload) {
+    const headline = payload.headline || {};
+    const policies = payload.policies || [];
+    document.getElementById('dg-risk').textContent = headline.policy_count ?? '--';
+    document.getElementById('dg-risk-sub').textContent = `${headline.blocked_fired_gates ?? 0} gates fire on block sample`;
+    setPill('dg-risk-status', payload.status || 'unknown');
+    document.getElementById('dg-risk-version').textContent = payload.version || '--';
+    document.getElementById('dg-risk-fired').textContent = (payload.sample_verdicts?.blocked?.fired_gates || []).join(', ') || '--';
+    document.getElementById('dg-risk-policies').textContent = policies.map(row => row.name).join(', ') || '--';
+    document.getElementById('dg-risk-limits').textContent =
+        `daily ${headline.max_daily_loss_pct ?? '--'}%, drawdown ${headline.max_intraday_drawdown_pct ?? '--'}%, position ${headline.max_position_pct ?? '--'}%`;
+}
+
+function renderProvenance(payload) {
+    document.getElementById('dg-prov').textContent = payload.missing_or_invalid ?? '--';
+    document.getElementById('dg-prov-sub').textContent = `${payload.checked ?? 0} checked`;
+    setPill('dg-prov-status', payload.status || 'unknown');
+    document.getElementById('dg-prov-checked').textContent = payload.checked ?? '--';
+    document.getElementById('dg-prov-missing').textContent = payload.missing_or_invalid ?? '--';
+    document.getElementById('dg-prov-roots').textContent = (payload.roots || []).join(', ') || '--';
+}
+
+function renderTests(payload) {
+    const totals = payload.totals || {};
+    document.getElementById('dg-tests').textContent = totals.cached_nodeids || totals.test_functions || '--';
+    document.getElementById('dg-tests-sub').textContent = `${totals.test_files ?? 0} files · ${totals.lastfailed ?? 0} failed cache`;
+    setPill('dg-test-status', payload.status || 'unknown');
+    document.getElementById('dg-test-source').textContent = payload.source || '--';
+    document.getElementById('dg-test-nodeids').textContent = totals.cached_nodeids ?? '--';
+    document.getElementById('dg-test-lastfailed').textContent = totals.lastfailed ?? '--';
+    document.getElementById('dg-test-files').textContent = totals.test_files ?? '--';
+}
+
+function renderLaunchAgents(payload) {
+    setPill('dg-launch-status', payload.status || 'unknown');
+    const rows = payload.launchagents || [];
+    document.getElementById('dg-launch-table').innerHTML = rows.length
+        ? rows.map(row => `
+            <tr>
+                <td>${esc(row.label)}</td>
+                <td><span class="pill ${pillClass(row.status_label)}">${esc(row.status_label)}</span></td>
+                <td>${esc(row.pid ?? '-')}</td>
+                <td>${esc(row.last_exit ?? '-')}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="4" class="empty-state">No LaunchAgent labels found</td></tr>';
+}
+
+async function loadDiligence() {
+    try {
+        const seed = JSON.parse(document.getElementById('diligence-seed').textContent || '{}');
+        renderDiligencePacket(seed);
+    } catch (_err) {}
+
+    const [packet, risk, provenance, tests, launchagents] = await Promise.all([
+        fetch(`${window.location.origin}/api/diligence-summary`).then(r => r.json()),
+        fetch(`${window.location.origin}/api/risk-kernel-summary`).then(r => r.json()),
+        fetch(`${window.location.origin}/api/provenance-summary`).then(r => r.json()),
+        fetch(`${window.location.origin}/api/test-suite-health`).then(r => r.json()),
+        fetch(`${window.location.origin}/api/launchagent-summary`).then(r => r.json())
+    ]);
+    renderDiligencePacket(packet);
+    renderRisk(risk);
+    renderProvenance(provenance);
+    renderTests(tests);
+    renderLaunchAgents(launchagents);
+}
+
+document.addEventListener('DOMContentLoaded', loadDiligence);
+</script>
+{% endblock %}
