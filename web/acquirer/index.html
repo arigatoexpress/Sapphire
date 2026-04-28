@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Sapphire OS — Acquirer Brief 0.1.0</title>
+<meta name="description" content="Sapphire OS: production-graded autonomy control plane. Acquirer brief covering Wave 4 + Tranche 2 surfaces, safety posture, and the diligence packet.">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<a class="skip-link" href="#mission">Skip to content</a>
+
+<header class="site-header">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">[S]</span>
+    <span class="brand-name">Sapphire OS</span>
+    <span class="brand-version">Acquirer Brief 0.1.0</span>
+  </div>
+  <nav class="primary-nav" aria-label="Primary">
+    <a href="#mission">Mission</a>
+    <a href="#capabilities">Capabilities</a>
+    <a href="#tech-stack">Tech</a>
+    <a href="#diligence">Diligence</a>
+    <a href="#safety">Safety</a>
+    <a href="#contact">Contact</a>
+  </nav>
+</header>
+
+<main>
+<section id="mission" class="section">
+  <h1>Sapphire is a production-graded autonomy control plane.</h1>
+  <p class="lede">
+    Sapphire turns one operator, owned local compute, and strict safety gates into an auditable
+    intelligence, trading, and operations system. Every decision flows through a versioned risk
+    kernel; every emitted artifact carries a provenance envelope; every external surface is
+    dry-run by default and live only behind explicit env-flag gates. The pages an acquirer can
+    walk in tomorrow morning and read - <a href="#diligence">Diligence Packet</a>,
+    <a href="#capabilities">Capabilities</a>, <a href="#safety">Safety Posture</a> - paint a complete
+    picture of what they would be acquiring without having to ask the operator a single question.
+  </p>
+</section>
+
+<section id="capabilities" class="section">
+  <h2>Capabilities</h2>
+  <p class="section-lede">
+    Eight acquisition-grade surfaces shipped in Wave 4 and Tranche 2. Each card links to the
+    product doc, names the PR that landed it, summarizes the safety posture, and shows a sparkline
+    of the headline metric or coverage.
+  </p>
+
+  <div class="card-grid">
+
+    <article class="card">
+      <header class="card-head">
+        <h3>1. Risk Kernel public surface</h3>
+        <span class="card-pr">PR #331</span>
+      </header>
+      <p>
+        Versioned <code>DecisionEnvelope -> RiskVerdict</code> contract at
+        <code>lib/core/risk_kernel</code>. Every proposed action is evaluated against composable
+        policies; failures fail closed; the verdict tree names every gate that fired. Backwards
+        compatible with the legacy <code>HardRiskKernel</code> path used by the live signal pipeline.
+      </p>
+      <svg class="sparkline" viewBox="0 0 120 32" aria-label="Risk kernel coverage trend">
+        <polyline points="0,28 15,24 30,22 45,18 60,14 75,12 90,8 105,6 120,4"></polyline>
+      </svg>
+      <dl class="card-metrics">
+        <div><dt>Schema version</dt><dd>1</dd></div>
+        <div><dt>Kernel version</dt><dd>0.1.0</dd></div>
+        <div><dt>Failure mode</dt><dd>Fail-closed</dd></div>
+      </dl>
+      <figure class="card-shot">
+        <img src="assets/screenshots/risk-kernel.png" alt="Risk kernel verdict tree (placeholder)" loading="lazy">
+        <figcaption>Placeholder. Operator-rendered via screenshot harness.</figcaption>
+      </figure>
+      <a class="card-link" href="../../docs/products/risk-kernel-0.1.0.md">Read product doc -&gt;</a>
+    </article>
+
+    <article class="card">
+      <header class="card-head">
+        <h3>2. Provenance envelopes</h3>
+        <span class="card-pr">PR #334</span>
+      </header>
+      <p>
+        Every emitted JSON artifact ships a sibling <code>.envelope.json</code> with
+        <code>generator</code>, <code>model</code>, <code>prompt_hash</code>,
+        <code>source_hashes</code>, <code>ttl</code>, and <code>version</code>. Verifier scripts
+        live at <code>scripts/ops/provenance_verify.py</code> and
+        <code>scripts/ops/provenance_backfill.py</code>.
+      </p>
+      <svg class="sparkline" viewBox="0 0 120 32" aria-label="Provenance coverage trend">
+        <polyline points="0,30 15,26 30,22 45,18 60,14 75,10 90,8 105,6 120,4"></polyline>
+      </svg>
+      <dl class="card-metrics">
+        <div><dt>Library</dt><dd>lib/core/provenance.py</dd></div>
+        <div><dt>Verifier</dt><dd>scripts/ops/provenance_verify.py</dd></div>
+        <div><dt>Default TTL</dt><dd>configurable</dd></div>
+      </dl>
+      <figure class="card-shot">
+        <img src="assets/screenshots/provenance-envelopes.png" alt="Provenance envelope listing (placeholder)" loading="lazy">
+        <figcaption>Placeholder. Operator-rendered via screenshot harness.</figcaption>
+      </figure>
+      <a class="card-link" href="../../docs/products/provenance-envelopes-0.1.0.md">Read product doc -&gt;</a>
+    </article>
+
+    <article class="card">
+      <header class="card-head">
+        <h3>3. Vertex eval harness</h3>
+        <span class="card-pr">PR #372</span>
+      </header>
+      <p>
+        Bounded Vertex evaluation lane at
+        <code>plugins/claw-sapphire/tools/internal/vertex_eval.py</code>. Dry-run by default,
+        sensitivity-gated, hard-capped per hour. Live mode requires
+        <code>SAPPHIRE_VERTEX_LIVE=1</code> plus secret-loaded credentials.
+      </p>
+      <svg class="sparkline" viewBox="0 0 120 32" aria-label="Vertex eval activity">
+        <polyline points="0,24 15,22 30,18 45,16 60,18 75,12 90,10 105,8 120,6"></polyline>
+      </svg>
+      <dl class="card-metrics">
+        <div><dt>Mode default</dt><dd>Dry-run</dd></div>
+        <div><dt>Cache</dt><dd>~/.cache/sapphire/vertex_eval</dd></div>
+        <div><dt>Live env flag</dt><dd>SAPPHIRE_VERTEX_LIVE</dd></div>
+      </dl>
+      <figure class="card-shot">
+        <img src="assets/screenshots/vertex-eval.png" alt="Vertex eval CLI output (placeholder)" loading="lazy">
+        <figcaption>Placeholder. Operator-rendered via screenshot harness.</figcaption>
+      </figure>
+      <a class="card-link" href="../../docs/products/risk-kernel-0.1.0.md">Lane safety pattern -&gt;</a>
+    </article>
+
+    <article class="card">
+      <header class="card-head">
+        <h3>4. Telegram operator console</h3>
+        <span class="card-pr">PR #373</span>
+      </header>
+      <p>
+        Hardened operator console for the Telegram bot. Routine pause/resume, kill-switch
+        confirmation, status digest. Allowlist + 2-phase commit on destructive verbs.
+        Confirmation firewall enforced at
+        <code>lib/core/confirmation_firewall.py</code>.
+      </p>
+      <svg class="sparkline" viewBox="0 0 120 32" aria-label="Operator console reliability">
+        <polyline points="0,8 15,10 30,8 45,6 60,8 75,6 90,8 105,6 120,4"></polyline>
+      </svg>
+      <dl class="card-metrics">
+        <div><dt>Allowlist</dt><dd>Per-tg-id</dd></div>
+        <div><dt>Destructive verbs</dt><dd>2-phase commit</dd></div>
+        <div><dt>Audit log</dt><dd>Event bus + JSONL</dd></div>
+      </dl>
+      <figure class="card-shot">
+        <img src="assets/screenshots/operator-console.png" alt="Telegram operator console (placeholder)" loading="lazy">
+        <figcaption>Placeholder. Operator-rendered via screenshot harness.</figcaption>
+      </figure>
+      <a class="card-link" href="../../docs/security/kill-switch-invariants.md">Read kill-switch invariants -&gt;</a>
+    </article>
+
+    <article class="card">
+      <header class="card-head">
+        <h3>5. Threat-intel + customer-dossier dashboards</h3>
+        <span class="card-pr">PR #374</span>
+      </header>
+      <p>
+        Two acquirer-readable dashboard pages: <code>/threat-intel</code> (CISA KEV / NVD / MITRE
+        ATT&amp;CK) and <code>/customer-dossier</code> (per-tenant rolled-up status with
+        deterministic hashing and PII redaction).
+      </p>
+      <svg class="sparkline" viewBox="0 0 120 32" aria-label="Threat coverage trend">
+        <polyline points="0,26 15,22 30,18 45,20 60,16 75,12 90,10 105,8 120,6"></polyline>
+      </svg>
+      <dl class="card-metrics">
+        <div><dt>Threat sources</dt><dd>CISA, NVD, MITRE</dd></div>
+        <div><dt>PII posture</dt><dd>Redacted by default</dd></div>
+        <div><dt>Auth</dt><dd>Inherited from dashboard</dd></div>
+      </dl>
+      <figure class="card-shot">
+        <img src="assets/screenshots/threat-intel.png" alt="Threat intel dashboard (placeholder)" loading="lazy">
+        <figcaption>Placeholder. Operator-rendered via screenshot harness.</figcaption>
+      </figure>
+      <a class="card-link" href="../../docs/products/threat-intel-product-0.1.0.md">Read product doc -&gt;</a>
+    </article>
+
+    <article class="card">
+      <header class="card-head">
+        <h3>6. BigQuery vector retrieval</h3>
+        <span class="card-pr">PR #376</span>
+      </header>
+      <p>
+        Mock + live retrieval over <code>IntelVectorRecord</code> embeddings.
+        <code>lib/intel/bq_vector_store.py</code> falls back to mock fixtures when Vertex Gecko +
+        BQ are not configured. Live mode is operator-gated.
+      </p>
+      <svg class="sparkline" viewBox="0 0 120 32" aria-label="Vector retrieval throughput">
+        <polyline points="0,22 15,18 30,16 45,14 60,12 75,12 90,10 105,8 120,6"></polyline>
+      </svg>
+      <dl class="card-metrics">
+        <div><dt>Backend</dt><dd>BigQuery + Gecko</dd></div>
+        <div><dt>Default mode</dt><dd>Mock fixtures</dd></div>
+        <div><dt>Index type</dt><dd>Approx. nearest neighbor</dd></div>
+      </dl>
+      <figure class="card-shot">
+        <img src="assets/screenshots/bq-vector.png" alt="BigQuery vector retrieval result (placeholder)" loading="lazy">
+        <figcaption>Placeholder. Operator-rendered via screenshot harness.</figcaption>
+      </figure>
+      <a class="card-link" href="../../docs/products/bq-vector-retrieval-0.1.0.md">Read product doc -&gt;</a>
+    </article>
+
+    <article class="card">
+      <header class="card-head">
+        <h3>7. Telegram channel intel reader</h3>
+        <span class="card-pr">PR #388</span>
+      </header>
+      <p>
+        Read-path intel reader subscribing to a curated channel allowlist. Bounded write rate,
+        no posting capability, per-channel TTL. Source-of-record at
+        <code>services/telegram_intel/sink.py</code>.
+      </p>
+      <svg class="sparkline" viewBox="0 0 120 32" aria-label="Channel intel volume">
+        <polyline points="0,28 15,24 30,22 45,16 60,14 75,12 90,10 105,8 120,6"></polyline>
+      </svg>
+      <dl class="card-metrics">
+        <div><dt>Direction</dt><dd>Read-only</dd></div>
+        <div><dt>Allowlist</dt><dd>Curated channels</dd></div>
+        <div><dt>Storage</dt><dd>JSONL + envelope</dd></div>
+      </dl>
+      <figure class="card-shot">
+        <img src="assets/screenshots/telegram-intel.png" alt="Telegram intel reader (placeholder)" loading="lazy">
+        <figcaption>Placeholder. Operator-rendered via screenshot harness.</figcaption>
+      </figure>
+      <a class="card-link" href="../../docs/products/telegram-intel-reader-0.1.0.md">Read product doc -&gt;</a>
+    </article>
+
+    <article class="card">
+      <header class="card-head">
+        <h3>8. Hyperliquid public feed</h3>
+        <span class="card-pr">PR #389</span>
+      </header>
+      <p>
+        Async subscriber to the Hyperliquid public feed. Read-only, structured signals into the
+        event bus, no order-flow exposure. Implementation at
+        <code>services/hyperliquid/src/hyperliquid_bot/public_feed.py</code>.
+      </p>
+      <svg class="sparkline" viewBox="0 0 120 32" aria-label="Hyperliquid signal volume">
+        <polyline points="0,30 15,24 30,20 45,18 60,14 75,10 90,8 105,6 120,4"></polyline>
+      </svg>
+      <dl class="card-metrics">
+        <div><dt>Network</dt><dd>Public feed only</dd></div>
+        <div><dt>Stream</dt><dd>signal.generated</dd></div>
+        <div><dt>Trading</dt><dd>Disabled</dd></div>
+      </dl>
+      <figure class="card-shot">
+        <img src="assets/screenshots/hyperliquid.png" alt="Hyperliquid public feed (placeholder)" loading="lazy">
+        <figcaption>Placeholder. Operator-rendered via screenshot harness.</figcaption>
+      </figure>
+      <a class="card-link" href="../../docs/products/hyperliquid-signal-0.1.0.md">Read product doc -&gt;</a>
+    </article>
+
+    <article class="card card-wide">
+      <header class="card-head">
+        <h3>9. Diligence pages: sovereign-thesis story + /diligence aggregate</h3>
+        <span class="card-pr">PR #386</span>
+      </header>
+      <p>
+        Two acquirer-readable dashboard pages render the diligence packet inline. The
+        sovereign-thesis story page narrates the convergence research; the
+        <code>/diligence</code> aggregate presents the 00-09 packet contents in one place.
+      </p>
+      <svg class="sparkline" viewBox="0 0 120 32" aria-label="Diligence completeness">
+        <polyline points="0,26 15,22 30,18 45,16 60,12 75,10 90,8 105,8 120,6"></polyline>
+      </svg>
+      <dl class="card-metrics">
+        <div><dt>Pages</dt><dd>/sovereign-thesis-story, /diligence</dd></div>
+        <div><dt>Auth</dt><dd>Dashboard auth</dd></div>
+        <div><dt>Source</dt><dd>docs/diligence/00-09</dd></div>
+      </dl>
+      <figure class="card-shot">
+        <img src="assets/screenshots/diligence.png" alt="Diligence aggregate page (placeholder)" loading="lazy">
+        <figcaption>Placeholder. Operator-rendered via screenshot harness.</figcaption>
+      </figure>
+      <a class="card-link" href="../../docs/diligence/00-executive-summary.md">Open diligence packet -&gt;</a>
+    </article>
+
+  </div>
+</section>
+
+<section id="tech-stack" class="section">
+  <h2>Tech Stack</h2>
+  <div class="stack-grid">
+    <article class="stack-card">
+      <h3>Mesh</h3>
+      <ul>
+        <li><strong>Mac</strong> commander - all services + control plane</li>
+        <li><strong>Windows</strong> GPU tier - Ollama 28 models, RTX 5070 Ti 16 GB</li>
+        <li><strong>Pi rari1 / rari2</strong> edge tier - small Ollama models</li>
+        <li><strong>Tailscale</strong> mesh - read-only ACL, trust-zone scoring</li>
+      </ul>
+    </article>
+    <article class="stack-card">
+      <h3>4-tier inference</h3>
+      <ul>
+        <li>T1 Windows GPU (~0.4s)</li>
+        <li>T2 Pi rari1 / rari2 (small models)</li>
+        <li>T3 Mac local (CPU fallback)</li>
+        <li>T4 Kimi Cloud (sensitivity-gated)</li>
+      </ul>
+    </article>
+    <article class="stack-card">
+      <h3>Contracts</h3>
+      <ul>
+        <li><code>contracts/SapphireSignalVerifier.sol</code> - on-chain signal registry</li>
+        <li><code>contracts/SapphirePaymentGate.sol</code> - micropayment gate (x402)</li>
+        <li>Robinhood Chain testnet (Arbitrum Orbit, ID 46630)</li>
+      </ul>
+    </article>
+    <article class="stack-card">
+      <h3>Event spine</h3>
+      <ul>
+        <li>Redis Streams primary</li>
+        <li>JSONL fallback (<code>data/events/bus.jsonl</code>)</li>
+        <li>SSE stream at <code>/api/events/stream</code></li>
+      </ul>
+    </article>
+  </div>
+</section>
+
+<section id="diligence" class="section">
+  <h2>Diligence Packet</h2>
+  <p class="section-lede">
+    Ten markdown files. Skim-friendly headers, evidence links to the codebase, and provenance
+    envelopes alongside the operator-readable memos. Every link target is a file in this repo.
+  </p>
+  <ol class="diligence-list">
+    <li><a href="../../docs/diligence/00-executive-summary.md">00 - Executive Summary</a></li>
+    <li><a href="../../docs/diligence/01-architecture.md">01 - Architecture</a></li>
+    <li><a href="../../docs/diligence/02-product-surfaces.md">02 - Product Surfaces</a></li>
+    <li><a href="../../docs/diligence/03-security-posture.md">03 - Security Posture</a></li>
+    <li><a href="../../docs/diligence/04-data-and-models.md">04 - Data &amp; Models</a></li>
+    <li><a href="../../docs/diligence/05-operations.md">05 - Operations</a></li>
+    <li><a href="../../docs/diligence/06-financials-and-spend.md">06 - Financials &amp; Spend</a></li>
+    <li><a href="../../docs/diligence/07-roadmap.md">07 - Roadmap</a></li>
+    <li><a href="../../docs/diligence/08-incidents-and-postmortems.md">08 - Incidents &amp; Postmortems</a></li>
+    <li><a href="../../docs/diligence/09-team-and-process.md">09 - Team &amp; Process</a></li>
+  </ol>
+</section>
+
+<section id="safety" class="section">
+  <h2>Safety Posture</h2>
+  <div class="safety-grid">
+    <article class="safety-card">
+      <h3>Kill switch</h3>
+      <p>
+        Global + security kill switches at <code>lib/core/kill_switch.py</code>. Witnessed
+        invariants: drawdown threshold, consecutive-loss threshold, latency threshold,
+        position-size cap, idempotency. Every fire is an event-bus event; every reset is logged.
+      </p>
+    </article>
+    <article class="safety-card">
+      <h3>Confirmation firewall</h3>
+      <p>
+        2-phase commit on destructive actions at
+        <code>lib/core/confirmation_firewall.py</code>. Confirmation tokens expire; archive flow
+        records the operator decision. The trading critical path is gated by CODEOWNERS.
+      </p>
+    </article>
+    <article class="safety-card">
+      <h3>Provenance envelopes</h3>
+      <p>
+        Every generated artifact carries
+        <code>{generator, model, prompt_hash, source_hashes, ttl, version}</code>. Verification
+        is a one-liner via <code>scripts/ops/provenance_verify.py</code>.
+      </p>
+    </article>
+    <article class="safety-card">
+      <h3>No-spend posture</h3>
+      <p>
+        <code>[skip ci]</code> on every commit; hosted GitHub Actions billing is gated by
+        <code>vars.SAPPHIRE_RUNNER</code>. Local CI verification is the merge gate.
+      </p>
+    </article>
+    <article class="safety-card">
+      <h3>Live capital posture</h3>
+      <p>
+        Crypto-only, manual confirmation, $5 first-order cap, $50 pilot. Stock automation is
+        not yet authorized. The full ramp from paper to live is documented in
+        <a href="../../docs/products/live-trading-ramp-memo.md">live-trading-ramp-memo.md</a>.
+      </p>
+    </article>
+    <article class="safety-card">
+      <h3>Secret handling</h3>
+      <p>
+        Secrets live at <code>~/.sapphire/secrets.env</code> (mode 0600). LaunchAgent plists do
+        not embed credentials. Live external paths load secrets only when their env flag is set
+        and then only into the calling process.
+      </p>
+    </article>
+  </div>
+</section>
+
+<section id="contact" class="section">
+  <h2>Founders &amp; Contact</h2>
+  <p>
+    <strong>Operator:</strong> Aristotle Spec.
+    <strong>Email:</strong> aristotlespec@gmail.com.
+    <strong>Repo:</strong> arigatoexpress/Sapphire.
+    <strong>Status:</strong> Acquirer review on request.
+  </p>
+  <p>
+    For a guided walkthrough, follow the <a href="../../docs/diligence/00-executive-summary.md">Executive Summary</a>
+    end-to-end, then open the <a href="../../docs/products/live-trading-ramp-memo.md">live-trading-ramp memo</a>
+    and <a href="../../docs/security/kill-switch-invariants.md">kill-switch invariants</a>.
+  </p>
+</section>
+</main>
+
+<footer class="site-footer">
+  <p>Sapphire OS - Acquirer Brief 0.1.0. No tracking. No analytics. No external JS.</p>
+</footer>
+</body>
+</html>

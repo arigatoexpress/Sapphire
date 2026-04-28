@@ -1,0 +1,11 @@
+# Sapphire OS - Acquirer microsite + dashboard screenshot harness
+#
+# Operator-only dependency. Install when rendering screenshots:
+#
+#     /usr/local/bin/python3 -m pip install -r web/acquirer/requirements.txt
+#     /usr/local/bin/python3 -m playwright install chromium  # ~300 MB
+#
+# The dry-run path used by tests does NOT import playwright. CI does NOT install this.
+# This is the only new prod dependency authorized for Tranche 3 Lane 4.
+
+playwright>=1.44,<2.0
