@@ -314,6 +314,13 @@ tools:
     consumers: []
     description: Bounded Gemini OODA synthesizer. Dry-run by default; live mode requires SAPPHIRE_GEMINI_LIVE=1, runs through sensitivity gate, applies per-hour and per-month caps, caches results locally.
 
+  - name: vertex_eval
+    path: plugins/claw-sapphire/tools/internal/vertex_eval.py
+    status: internal
+    owner: sapphire
+    consumers: []
+    description: Vertex/Gemini eval harness. Benchmarks Gemini OODA outputs against the local 4-tier inference mesh and a deterministic mock baseline using a reproducible rubric (structural_validity, actionability, citation_density). Dry-run by default; live mode requires SAPPHIRE_GEMINI_LIVE=1 plus a key plus the sensitivity gate, and applies the same per-hour and per-month caps as gemini_ooda plus a per-run prompt cap.
+
   # ── deprecated / sunset window ───────────────────────────────────────────
   - name: kronos_predict
     path: plugins/claw-sapphire/tools/_deprecated/kronos_predict.py
