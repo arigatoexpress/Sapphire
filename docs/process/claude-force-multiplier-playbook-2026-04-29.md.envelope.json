@@ -1,0 +1,41 @@
+{
+  "artifact_bytes": 40970,
+  "artifact_mtime": "2026-04-28T21:52:31+00:00",
+  "artifact_path": "docs/process/claude-force-multiplier-playbook-2026-04-29.md",
+  "artifact_sha256": "2b3716f2bf33057e19bdbf2aab79470ba9788cfe28f2b60760802e90778d7e56",
+  "provenance": {
+    "envelope_hash": "019fc7b271915c076a4dc77c38adbd585f638ce7011853fabc8db257ad0ca9d6",
+    "expires_at": null,
+    "generated_at": "2026-04-28T21:53:18+00:00",
+    "generator": "claude-force-multiplier-playbook-author",
+    "metadata": {
+      "artifact_kind": "process_playbook",
+      "as_of_date": "2026-04-29",
+      "cited_handoff_docs": 8,
+      "cited_issue_numbers": 1,
+      "cited_pr_numbers": 30,
+      "output_path": "docs/process/claude-force-multiplier-playbook-2026-04-29.md",
+      "sections": 12,
+      "source_policy": "repo_grounded_only",
+      "word_count": 5610
+    },
+    "model": "claude-opus-4-7-1m",
+    "payload_hash": "755fb1143f130240192268f0e66383c2c8bd2d5f9193ccb8272b14f33242c21d",
+    "prompt_hash": "78a5f30d4ef4d68d504103028ce30874a1922980772c3cb636dedc75f0917039",
+    "schema_version": 1,
+    "source_hashes": {
+      "CLAUDE.md": "0a799cdf8652faf3ca6e32bb9e0e97c45cac95ca0a92e809a61b281d74c75b7e",
+      "docs/architecture-overview.md": "dd7e7d47b7a4f332c857f9e3be9aaba5c7c6303f0963b294eba8b5c25ba53ac8",
+      "docs/handoffs/claude-night-session-2026-04-28-report.md": "f46c8ee4974d0cde2dc6187797a07fc01484367a2b7dec2fb8b53e927a2332a3",
+      "docs/handoffs/codex-megaprompt-tranche-3-2026-04-28.md": "2fbdf569aba6584b215240e5fb4cfd4d96e552cf90eafca45fb074826f56f80d",
+      "docs/handoffs/codex-megaprompt-tranche-4-2026-04-29-report.md": "46c57be5a802c3ef585a92455954cd777a49f184e1c8097bac83affe0ce9c00d",
+      "docs/handoffs/codex-overnight-agent-A-2026-04-28-report.md": "00444cd445ea6bd88c7d6fa7398fb254cceae808b48b7db283529db7a47686c7",
+      "docs/handoffs/codex-overnight-agent-B-2026-04-28-report.md": "8a703aab1adb880ce43af03a9873ad188bddb139483f426fe8243ccf7af390ef",
+      "docs/handoffs/codex-overnight-agent-C-2026-04-28-report.md": "83d74a5c07c43f5408bc69831c726e6279da6b1a9522f97ec0102b461fba2ad2",
+      "docs/handoffs/codex-overnight-megaprompt-2026-04-28-report.md": "7622ef739e1780d853dca901f414e6840bdb75a9971a425ac3185810c8ed7f71",
+      "docs/handoffs/cowork-morning-briefing-2026-04-28.md": "b5c4242231d0ada477de6370caca4d015144e5de771ffa3e5c41bb20fba7dfb8",
+      "lib/core/provenance.py": "683127976d459aae4d1fb302ffb8df1604104083284b47bbb25d34693c892ec9"
+    },
+    "ttl_seconds": null
+  }
+}
