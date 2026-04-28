@@ -7,6 +7,7 @@ records latency for subsequent requests.
 from __future__ import annotations
 
 import base64
+import importlib.util
 import json
 import os
 import sys
@@ -18,8 +19,21 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 DASHBOARD = ROOT / "services" / "dashboard"
-if str(DASHBOARD) not in sys.path:
-    sys.path.insert(0, str(DASHBOARD))
+
+pytestmark = pytest.mark.skipif(
+    importlib.util.find_spec("flask") is None,
+    reason="dashboard endpoint integration tests require Flask",
+)
+
+
+def _prioritize_dashboard_path() -> None:
+    dashboard_path = str(DASHBOARD)
+    while dashboard_path in sys.path:
+        sys.path.remove(dashboard_path)
+    sys.path.insert(0, dashboard_path)
+
+
+_prioritize_dashboard_path()
 
 
 _AUTH = "Basic " + base64.b64encode(b"sapphire:test").decode()
@@ -31,6 +45,7 @@ def app_client(tmp_path, monkeypatch):
     # Re-import app fresh for each test to reset in-process metrics state
     if "app" in sys.modules:
         del sys.modules["app"]
+    _prioritize_dashboard_path()
     import app as dash_app  # type: ignore
 
     # Point stale-data endpoints at tmp JSONL to isolate fixtures
