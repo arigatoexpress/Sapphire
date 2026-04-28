@@ -345,7 +345,7 @@ def test_hermes_sapphire_skill_surface_inventory_is_complete_and_sanitized() -> 
     skills = inventory["skills"]
 
     assert inventory["schema_version"] == 1
-    assert len(skills) == 15
+    assert len(skills) == 16
     assert {skill["classification"] for skill in skills} <= allowed_classes
     assert {skill["id"] for skill in skills} >= {
         "tradingview",
@@ -353,6 +353,7 @@ def test_hermes_sapphire_skill_surface_inventory_is_complete_and_sanitized() -> 
         "tho-operations",
         "paper-trading",
         "trading-brain",
+        "gemini-ooda",
     }
     assert all(
         skill["path"].startswith("/Users/aribs/.hermes/skills/sapphire/") for skill in skills
@@ -416,7 +417,7 @@ def test_collect_status_no_external_handles_local_ci_without_live_tools(tmp_path
     assert "worktree_count" in report["summary"]
     assert "dirty_worktrees" in report["summary"]
     assert isinstance(report["worktrees"], list)
-    assert report["summary"]["hermes_skill_classes"]["read_only"] == 9
+    assert report["summary"]["hermes_skill_classes"]["read_only"] == 10
     assert report["summary"]["hermes_production_adjacent_skills"] == 10
     assert sorted(report["summary"]["missing_local_repos"]) == sorted(
         repo["id"] for repo in manifest["repos"]
@@ -426,7 +427,7 @@ def test_collect_status_no_external_handles_local_ci_without_live_tools(tmp_path
     )
     assert report["summary"]["dirty_repos"] == []
     assert report["summary"]["upstream_dirty_repos"] == []
-    assert report["hermes_skills"]["skill_count"] == 15
+    assert report["hermes_skills"]["skill_count"] == 16
     assert len(report["gcp_projects"]) == len(manifest["gcp_projects"])
     assert report["local_runtime"]["docker"]["checked"] is False
     assert all(row["status"] == "not_checked" for row in report["local_runtime"]["launchagents"])

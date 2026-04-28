@@ -1,6 +1,6 @@
 schema_version: 1
 generated_for: sapphire-autonomous-org
-updated_at: "2026-04-26"
+updated_at: "2026-04-27"
 source_root: /Users/aribs/.hermes/skills/sapphire
 scope: Hermes Sapphire skills only; this inventory is read-only and does not change live Hermes behavior.
 
@@ -23,6 +23,25 @@ skills:
     side_effects:
       - external web/API reads
     next_action: Keep as separate security-intel capability; no absorb pressure.
+
+  - id: gemini-ooda
+    path: /Users/aribs/.hermes/skills/sapphire/gemini-ooda/SKILL.md
+    line_count: 92
+    classification: read_only
+    production_adjacent: false
+    surfaces:
+      - Sapphire gemini_ooda plugin tool
+      - bounded Vertex/Gemini reasoning lane
+    side_effects:
+      - dry-run mock by default; never reaches Google
+      - live mode reads ~/.sapphire/secrets.env (key value never echoed)
+      - writes cache + counters under ~/.cache/sapphire/gemini_ooda/
+    guardrails:
+      - dry-run by default
+      - live requires SAPPHIRE_GEMINI_LIVE=1
+      - sensitivity classifier blocks PII/credentials/mesh IPs in live mode
+      - per-hour and per-month token caps enforced
+    next_action: Keep dry-run-default; promote to higher cadence only after the operator reviews per-call cap and budget.
 
   - id: inference-tier
     path: /Users/aribs/.hermes/skills/sapphire/inference-tier/SKILL.md
