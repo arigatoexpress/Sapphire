@@ -1,0 +1,490 @@
+{% extends "base.html" %}
+
+{% block title %}Showcase{% endblock %}
+
+{% block extra_css %}
+.showcase-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+    gap: var(--space-lg);
+    align-items: stretch;
+    margin-bottom: var(--space-lg);
+}
+
+.showcase-band {
+    border: 1px solid var(--border-color);
+    background: rgba(11, 11, 26, 0.82);
+    border-radius: var(--radius-lg);
+    padding: var(--space-xl);
+    position: relative;
+    overflow: hidden;
+}
+
+.showcase-band::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--cyan), var(--amber), transparent);
+    opacity: 0.75;
+}
+
+.showcase-kicker {
+    color: var(--cyan);
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: var(--space-sm);
+}
+
+.showcase-title {
+    color: var(--text-primary);
+    font-family: var(--font-header);
+    font-size: 2.35rem;
+    font-weight: 400;
+    letter-spacing: 0;
+    line-height: 1;
+    text-transform: uppercase;
+    margin-bottom: var(--space-md);
+}
+
+.showcase-copy {
+    max-width: 780px;
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+    line-height: 1.7;
+}
+
+.showcase-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    margin-top: var(--space-lg);
+}
+
+.signal-ribbon {
+    display: grid;
+    gap: var(--space-sm);
+}
+
+.signal-tile {
+    border: 1px solid var(--border-dim);
+    border-radius: var(--radius);
+    padding: var(--space-md);
+    background: rgba(98, 255, 64, 0.025);
+    min-height: 86px;
+}
+
+.signal-label {
+    color: var(--text-muted);
+    font-size: 0.66rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: var(--space-xs);
+}
+
+.signal-value {
+    color: var(--amber);
+    font-family: var(--font-header);
+    font-size: 1.8rem;
+    line-height: 1;
+}
+
+.signal-note {
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    margin-top: var(--space-xs);
+}
+
+.section-band {
+    margin-bottom: var(--space-lg);
+}
+
+.showcase-grid {
+    display: grid;
+    gap: var(--space-lg);
+}
+
+.showcase-grid.cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.showcase-grid.cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.showcase-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    min-height: 228px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    background: rgba(11, 11, 26, 0.82);
+    padding: var(--space-lg);
+    text-decoration: none;
+    color: inherit;
+    transition: border-color var(--t-fast), background var(--t-fast), transform 120ms ease;
+}
+
+.showcase-card:hover {
+    border-color: var(--amber);
+    background: rgba(11, 11, 26, 0.96);
+    transform: translateY(-1px);
+}
+
+.card-eyebrow {
+    color: var(--cyan);
+    font-size: 0.66rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.card-heading {
+    color: var(--text-primary);
+    font-size: 1rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.card-copy {
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    line-height: 1.55;
+    flex: 1;
+}
+
+.card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    margin-top: var(--space-sm);
+}
+
+.flow-map {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: var(--space-sm);
+}
+
+.flow-node {
+    border: 1px solid var(--border-dim);
+    border-radius: var(--radius);
+    background: rgba(105, 214, 255, 0.045);
+    padding: var(--space-md);
+    min-height: 150px;
+    position: relative;
+}
+
+.flow-node::after {
+    content: '>';
+    position: absolute;
+    right: -11px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+}
+
+.flow-node:last-child::after {
+    content: '';
+}
+
+.flow-step {
+    color: var(--text-muted);
+    font-size: 0.62rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-bottom: var(--space-xs);
+}
+
+.flow-title {
+    color: var(--amber);
+    font-family: var(--font-header);
+    font-size: 1.15rem;
+    line-height: 1;
+    margin-bottom: var(--space-sm);
+}
+
+.flow-copy {
+    color: var(--text-secondary);
+    font-size: 0.76rem;
+    line-height: 1.45;
+}
+
+.demo-list {
+    display: grid;
+    gap: var(--space-sm);
+}
+
+.demo-row {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: var(--space-md);
+    border-bottom: 1px solid var(--border-dim);
+    padding: var(--space-md) 0;
+}
+
+.demo-row:last-child {
+    border-bottom: 0;
+}
+
+.demo-persona {
+    color: var(--amber);
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.demo-path {
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    line-height: 1.6;
+}
+
+.demo-path a {
+    color: var(--cyan);
+    text-decoration: none;
+}
+
+.demo-path a:hover {
+    color: var(--amber);
+}
+
+.repo-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+}
+
+.repo-table th,
+.repo-table td {
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid var(--border-dim);
+    text-align: left;
+}
+
+.repo-table th {
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 400;
+}
+
+.repo-table td {
+    color: var(--text-secondary);
+}
+
+.repo-table a {
+    color: var(--cyan);
+    text-decoration: none;
+}
+
+.repo-table a:hover {
+    color: var(--amber);
+}
+
+@media (max-width: 1180px) {
+    .showcase-hero,
+    .showcase-grid.cols-3,
+    .showcase-grid.cols-4,
+    .flow-map {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .flow-node::after {
+        content: '';
+    }
+}
+
+@media (max-width: 760px) {
+    .showcase-hero,
+    .showcase-grid.cols-3,
+    .showcase-grid.cols-4,
+    .flow-map,
+    .demo-row {
+        grid-template-columns: 1fr;
+    }
+
+    .showcase-title {
+        font-size: 1.65rem;
+    }
+}
+{% endblock %}
+
+{% block content %}
+<section class="showcase-hero">
+    <div class="showcase-band">
+        <div class="showcase-kicker">Unified front door</div>
+        <h2 class="showcase-title">Sapphire ecosystem showcase</h2>
+        <p class="showcase-copy">
+            A curated, read-only path through the systems already built: capital intelligence,
+            regional intelligence, autonomous operations, security posture, inference telemetry,
+            diligence artifacts, and the satellite repos that make the operating model real.
+        </p>
+        <div class="showcase-actions">
+            <a class="btn primary" href="/production-readiness">Open Readiness</a>
+            <a class="btn" href="/diligence">Diligence Packet</a>
+            <a class="btn" href="/sovereign-thesis">Sovereign Thesis</a>
+            <a class="btn" href="/intel">Regional Intel</a>
+        </div>
+    </div>
+    <aside class="showcase-band signal-ribbon" aria-label="Showcase metrics">
+        <div class="signal-tile">
+            <div class="signal-label">Dashboard surface</div>
+            <div class="signal-value">43</div>
+            <div class="signal-note">authenticated pages with SSE and read-only review paths</div>
+        </div>
+        <div class="signal-tile">
+            <div class="signal-label">Verification posture</div>
+            <div class="signal-value">0 FAIL</div>
+            <div class="signal-note">production-readiness sweep at latest closeout</div>
+        </div>
+        <div class="signal-tile">
+            <div class="signal-label">Automation surface</div>
+            <div class="signal-value">67</div>
+            <div class="signal-note">registered tool entries with registry validation</div>
+        </div>
+    </aside>
+</section>
+
+<section class="section-band showcase-band">
+    <div class="section-header">
+        <div class="section-title">Operating Loop</div>
+        <div class="section-subtitle">A compact map of how the built systems compound.</div>
+    </div>
+    <div class="flow-map">
+        <div class="flow-node">
+            <div class="flow-step">01</div>
+            <div class="flow-title">Sense</div>
+            <div class="flow-copy">market, chain, macro, threat, regional, and customer-context feeds land as bounded artifacts.</div>
+        </div>
+        <div class="flow-node">
+            <div class="flow-step">02</div>
+            <div class="flow-title">Reason</div>
+            <div class="flow-copy">correlators, Kronos, OODA synthesis, source-quality checks, and inference tiers turn feeds into claims.</div>
+        </div>
+        <div class="flow-node">
+            <div class="flow-step">03</div>
+            <div class="flow-title">Govern</div>
+            <div class="flow-copy">risk kernel, confirmation firewall, provenance envelopes, and kill switches keep action paths bounded.</div>
+        </div>
+        <div class="flow-node">
+            <div class="flow-step">04</div>
+            <div class="flow-title">Operate</div>
+            <div class="flow-copy">LaunchAgents, dashboard pages, Hermes skills, and runbooks convert routines into reviewable work.</div>
+        </div>
+        <div class="flow-node">
+            <div class="flow-step">05</div>
+            <div class="flow-title">Prove</div>
+            <div class="flow-copy">test inventory, readiness sweeps, runbook scores, and diligence docs keep the story evidence-backed.</div>
+        </div>
+    </div>
+</section>
+
+<section class="section-band showcase-grid cols-4">
+    <a class="showcase-card" href="/analytics">
+        <div class="card-eyebrow">Capital intelligence</div>
+        <div class="card-heading">Trading research cockpit</div>
+        <div class="card-copy">Strategy lab, cross-asset regimes, portfolio telemetry, risk metrics, Kronos predictions, and paper-first execution review.</div>
+        <div class="card-meta"><span class="pill green">read-only</span><span class="pill neutral">paper-first</span></div>
+    </a>
+    <a class="showcase-card" href="/intel">
+        <div class="card-eyebrow">Regional intelligence</div>
+        <div class="card-heading">Regional Intel Workbench</div>
+        <div class="card-copy">Local vote-monitor and regional-source intelligence surfaced through the dashboard, Foundry mapping, and the dedicated workbench repo.</div>
+        <div class="card-meta"><span class="pill green">source health</span><span class="pill neutral">export-ready</span></div>
+    </a>
+    <a class="showcase-card" href="/inference-telemetry">
+        <div class="card-eyebrow">Inference mesh</div>
+        <div class="card-heading">Local-first model routing</div>
+        <div class="card-copy">GPU, Pi, Mac, and cloud fallback telemetry with sensitivity gates and cost posture made visible for operators.</div>
+        <div class="card-meta"><span class="pill green">failover</span><span class="pill amber">bounded cloud</span></div>
+    </a>
+    <a class="showcase-card" href="/security/overview">
+        <div class="card-eyebrow">Security platform</div>
+        <div class="card-heading">SOC and risk controls</div>
+        <div class="card-copy">Threat intelligence, model integrity, network posture, PII redaction, and safety envelopes in one audit-friendly surface.</div>
+        <div class="card-meta"><span class="pill green">auth-gated</span><span class="pill neutral">paste-safe</span></div>
+    </a>
+    <a class="showcase-card" href="/diligence">
+        <div class="card-eyebrow">Acquisition diligence</div>
+        <div class="card-heading">Buyer-readable packet</div>
+        <div class="card-copy">Product surfaces, security posture, spend controls, data rights, roadmap, and evidence blocks tied back to live code paths.</div>
+        <div class="card-meta"><span class="pill green">evidence-backed</span><span class="pill neutral">redacted</span></div>
+    </a>
+    <a class="showcase-card" href="/content">
+        <div class="card-eyebrow">Content engine</div>
+        <div class="card-heading">Research to publish</div>
+        <div class="card-copy">Draft generation, quality gates, provenance, approval posture, and channel-specific publishing lanes for institutional narrative work.</div>
+        <div class="card-meta"><span class="pill green">rubric-gated</span><span class="pill neutral">approval-first</span></div>
+    </a>
+    <a class="showcase-card" href="/organization">
+        <div class="card-eyebrow">Autonomous operations</div>
+        <div class="card-heading">Control tower</div>
+        <div class="card-copy">Scheduled routines, repo hygiene, PM artifacts, runbook coverage, agent lanes, and continuous intelligence close the loop.</div>
+        <div class="card-meta"><span class="pill green">runbooked</span><span class="pill neutral">observable</span></div>
+    </a>
+    <a class="showcase-card" href="/chain/robinhood">
+        <div class="card-eyebrow">On-chain and venues</div>
+        <div class="card-heading">Chain and venue readiness</div>
+        <div class="card-copy">Robinhood Chain testnet, Hyperliquid public-feed signals, smart contracts, and live-trading gates without mainnet activation.</div>
+        <div class="card-meta"><span class="pill amber">testnet</span><span class="pill red">mainnet locked</span></div>
+    </a>
+</section>
+
+<section class="section-band showcase-grid cols-3">
+    <div class="showcase-band">
+        <div class="section-header">
+            <div class="section-title">Demo Paths</div>
+            <div class="section-subtitle">Curated routes for different conversations.</div>
+        </div>
+        <div class="demo-list">
+            <div class="demo-row">
+                <div class="demo-persona">Friend</div>
+                <div class="demo-path"><a href="/showcase">Showcase</a> -> <a href="/">Overview</a> -> <a href="/intel">Regional Intel</a> -> <a href="/content">Content</a></div>
+            </div>
+            <div class="demo-row">
+                <div class="demo-persona">Buyer</div>
+                <div class="demo-path"><a href="/diligence">Diligence</a> -> <a href="/production-readiness">Readiness</a> -> <a href="/risk">Risk</a> -> <a href="/sovereign-thesis/story">Thesis Story</a></div>
+            </div>
+            <div class="demo-row">
+                <div class="demo-persona">Engineer</div>
+                <div class="demo-path"><a href="/architecture">Operations</a> -> <a href="/inference-telemetry">Inference</a> -> <a href="/observability">Observability</a> -> <a href="/source-quality">Source Quality</a></div>
+            </div>
+            <div class="demo-row">
+                <div class="demo-persona">Operator</div>
+                <div class="demo-path"><a href="/command-deck">Command Deck</a> -> <a href="/activity">Activity</a> -> <a href="/logs">Logs</a> -> <a href="/settings">Settings</a></div>
+            </div>
+        </div>
+    </div>
+    <div class="showcase-band">
+        <div class="section-header">
+            <div class="section-title">Safety Stance</div>
+            <div class="section-subtitle">Every showcase path stays review-first.</div>
+        </div>
+        <div class="terminal-output">
+            <div class="line"><span class="level-info">READ_ONLY</span> Dashboard routes inspect state and artifacts.</div>
+            <div class="line"><span class="level-warn">NO_SENDS</span> Telegram sends are outside this surface.</div>
+            <div class="line"><span class="level-warn">NO_MAINNET</span> Live trading remains gated by explicit policy and kill switches.</div>
+            <div class="line"><span class="level-info">PASTE_SAFE</span> Diligence and product pages redact local paths and secret-shaped values.</div>
+            <div class="line"><span class="level-info">PROVENANCE</span> Product claims point back to tests, runbooks, artifacts, or code paths.</div>
+        </div>
+    </div>
+    <div class="showcase-band">
+        <div class="section-header">
+            <div class="section-title">Companion Repos</div>
+            <div class="section-subtitle">Satellite projects kept separate and linkable.</div>
+        </div>
+        <table class="repo-table">
+            <thead><tr><th>Repo</th><th>Role</th></tr></thead>
+            <tbody>
+                <tr><td><a href="https://github.com/arigatoexpress/regional-intel-workbench" target="_blank" rel="noopener">regional-intel-workbench</a></td><td>regional intelligence platform</td></tr>
+                <tr><td><a href="https://github.com/arigatoexpress/Project-Go-Forward" target="_blank" rel="noopener">Project-Go-Forward</a></td><td>THO client PM and document center</td></tr>
+                <tr><td><a href="https://github.com/arigatoexpress/tradingview-mcp" target="_blank" rel="noopener">tradingview-mcp</a></td><td>TradingView MCP bridge</td></tr>
+                <tr><td><a href="https://github.com/arigatoexpress/cyber-threat-bot" target="_blank" rel="noopener">cyber-threat-bot</a></td><td>CISA, NVD, and ATT&CK ingestion</td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

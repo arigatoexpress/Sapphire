@@ -168,7 +168,7 @@ Local JSONL (data/*.jsonl)  ──▶  services/pipeline/gcp_sync.py
 | analytics_dashboard | Flask | — | Analytics-focused dashboard variant. |
 | aster | async Python | — | Aster DEX (Solana) perpetuals bot. Shield HFT strategy. (Paused.) |
 | control-plane | FastAPI | 8082 | PM hub. Projects, tasks, JSONL event stream, Kimi dispatch bridge, runtime policy. |
-| dashboard | Flask | 8080 | Ops surface. 32 pages incl. `/threat-intel`, `/customer-dossier`, `/sovereign-thesis`. Basic-auth. |
+| dashboard | Flask | 8080 | Ops surface. 43 pages incl. `/showcase`, `/threat-intel`, `/customer-dossier`, `/sovereign-thesis`, and `/inference-telemetry`. Basic-auth. |
 | foundry_sync | Python | — | Scheduled Palantir Foundry sync daemon (15-min delta-aware + Telegram alerts). |
 | heartbeat | Python | — | 60s state-machine heartbeat daemon wrapper. |
 | hyperliquid | async Python | — | Hyperliquid L1 perps. (Stub at this writing — see `feat/hyperliquid-signal-subscription`.) |

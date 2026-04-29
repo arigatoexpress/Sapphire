@@ -38,6 +38,10 @@ redaction report scans configured diligence and microsite source files, applies
 the manifest patterns in memory, and verifies that committed acquirer screenshot
 files are zero-byte placeholders.
 
+The current safe-route plan starts with `/showcase`, the curated front door for
+friend, buyer, engineer, and operator demo paths. Treat it as the first capture
+unless a specific diligence request asks for a narrower page.
+
 Use `--no-write` when you only want stdout:
 
 ```bash

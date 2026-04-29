@@ -99,7 +99,7 @@ ships without explicit Telegram approval.**
 | | |
 |---|---|
 | Python tests passing | **1,967** (1,932 core + 35 plugin) |
-| Dashboard pages | 31 |
+| Dashboard pages | 43, including the curated `/showcase` front door |
 | Plugin tools | 32 (8 agent-facing, 24 internal, 1 deprecated) |
 | Quant strategies | 7 |
 | Scheduled tasks | 21 |
