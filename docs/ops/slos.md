@@ -228,10 +228,10 @@ chaos lab; production may differ but the qualitative bound holds):
 - Disk-full on JSONL → fail-fast, no retry storm (the test asserts a
   bounded number of write attempts before quantifying loss).
 
-When Tranche 6 Lane 6 (inference-mesh telemetry) lands the
-calls.jsonl writer in production (operator follow-up), these
-chaos-tested SLOs can be promoted from `chaos-verified` (CI assertion)
-to `measured` (production monitoring + alerting).
+The inference-proxy `calls.jsonl` writer now exists in the production request
+path. These chaos-tested SLOs can be promoted from `chaos-verified` (CI
+assertion) to `measured` when the telemetry dashboard consumes enough real
+call-log volume and alert thresholds are agreed.
 
 ---
 
