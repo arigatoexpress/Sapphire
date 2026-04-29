@@ -9,8 +9,7 @@ from typing import Any
 
 import dev_pulse
 from notify import send_alert
-
-from lib.core.routine_pause import abort_if_paused
+from routine_pause_bridge import abort_if_paused
 
 
 def run(*, dry_run: bool = False) -> dict[str, Any]:

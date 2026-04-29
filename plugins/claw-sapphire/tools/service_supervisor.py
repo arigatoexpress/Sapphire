@@ -21,8 +21,7 @@ from typing import Any
 
 from dev_pulse import DEFAULT_LAUNCHAGENT_LABELS, ServiceStatus, collect_service_statuses
 from notify import send_alert
-
-from lib.core.routine_pause import abort_if_paused
+from routine_pause_bridge import abort_if_paused
 
 STATE_FILE = (
     Path.home()

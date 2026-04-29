@@ -1,6 +1,6 @@
 # Sapphire OS — Routines Manifest
 
-Last updated: 2026-04-28
+Last updated: 2026-04-29
 
 Every automated routine in the Sapphire OS mesh. Single source of truth — if a job runs on a schedule, it is listed here with its schedule, owner process, output artifact, and recovery runbook. Anything not on this list should either be added or killed.
 
@@ -29,14 +29,16 @@ Check: `launchctl list | grep sapphire` — every row should show a PID (online)
 
 | Label | Cadence | Script | Output | Runbook |
 |-------|---------|--------|--------|---------|
-| `com.sapphire.morning-brief`       | 06:00 local / 07:00 CT | `services/intelligence/daily_brief.py`      | `data/intelligence/latest/daily_brief.md` + Telegram digest        | Manual dry-run: `python3 services/intelligence/daily_brief.py --dry-run` |
+| `com.sapphire.morning-brief`       | 06:00 local / 07:00 CT | `services/intelligence/daily_brief.py`      | `data/intelligence/YYYY-MM-DD/daily_brief.md` + Telegram p1 digest | `morning-brief-runbook.md`; dry-run still writes the dated artifact |
+| `com.sapphire.morning-digest`      | 08:00 local            | `services/morning_digest/run_once.sh`       | Telegram p3 operational digest; archive writer not yet implemented | `morning-digest-runbook.md`; manual no-send: `services/morning_digest/run_once.sh --dry-run` |
 | `com.sapphire.kronos-daily`        | 07:00 CT           | `scripts/kronos_daily_predictions.py`       | `data/intelligence/YYYY-MM-DD/predictions.json`                    | Manual: `python3 scripts/kronos_daily_predictions.py`; GPU must be up |
 | `com.sapphire.threat-refresh`      | every 4h           | `services/dashboard/refresh_threats.py`     | `data/intelligence/YYYY-MM-DD/threats.json`                        | Manual: `python3 services/dashboard/refresh_threats.py`; check CISA/NVD reachability |
 | `com.sapphire.chain-refresh`       | every 15 min       | `services.pipeline.chain_refresh`           | `data/chain/chain_<ts>.json` + `data/intelligence/latest/chain.json` | Manual: `python3 -m services.pipeline.chain_refresh` |
 | `com.sapphire.correlation-refresh` | hourly at :17      | `services.pipeline.correlation_refresh`     | `data/intelligence/latest/correlations.json`                       | Manual: `python3 -m services.pipeline.correlation_refresh` |
 | `com.sapphire.trading-shadow-controller` | every 30 min | `scripts/ops/trading_shadow_controller.py --output` | `data/trading/shadow-controller-latest.json` | Manual paper-only run: `python3 scripts/ops/trading_shadow_controller.py --output`; no Robinhood credentials or `--execute` flag |
+| `com.sapphire.market-intel`        | RunAtLoad + every 30 min | `python3 -m lib.intel.market_intelligence` | `data/intelligence/latest/market_intel.json`                       | `market-intel-runbook.md`; diagnostics: `python3 -m lib.intel.market_intelligence --test` |
 | `com.sapphire.gcp-sync`            | hourly at :05      | `services.pipeline.gcp_sync`                | Uploads to `gs://sapphire-data-lake/raw/*`; Cloud Function loads BQ | Manual: `python3 -m services.pipeline.gcp_sync -v` |
-| `com.sapphire.logrotate`           | 03:30 CT daily     | `infra/logrotate.py`                        | `.gz` archives under `~/autonomy-status/logs/` and `~/.hermes/logs/` | Manual: `python3 infra/logrotate.py` |
+| `com.sapphire.logrotate`           | 03:30 local daily  | `infra/logrotate.py`                        | `.gz` archives under `~/autonomy-status/logs/` and `~/.hermes/logs/` | `logrotate-runbook.md`; manual run mutates eligible logs |
 | `com.sapphire.backtest-weekly`      | Sat 22:00 local    | `python3 -m lib.analytics.run_strategies --days 90 --bankroll 10000` | `data/backtests/strategies/*.json`                                 | Remote shadow: `.github/workflows/weekly-backtest.yml`; keep local until artifacts soak clean |
 | `com.sapphire.content-engine`       | daily 06:00 local  | `python3 -m lib.content`                    | `data/content/drafts/*.json`, `data/content/ready/**/*`, `data/market_pulse/*.md` | Remote shadow: `.github/workflows/content-engine.yml`; keep local until artifacts soak clean |
 

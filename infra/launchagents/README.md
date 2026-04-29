@@ -19,7 +19,7 @@ Current inventory: 21 active plists in this directory, plus 1 disabled template 
 | `com.sapphire.gcp-sync.plist` | GCP → BigQuery event pipeline. | hourly at :05 |
 | `com.sapphire.heartbeat.plist` | Platform heartbeat daemon. | KeepAlive |
 | `com.sapphire.logrotate.plist` | Compress + rotate `~/autonomy-status/logs/`. | 03:30 daily |
-| `com.sapphire.market-intel.plist` | Market intelligence refresh. | scheduled |
+| `com.sapphire.market-intel.plist` | Market intelligence refresh. | RunAtLoad + every 30 min |
 | `com.sapphire.morning-brief.plist` | Canonical morning briefing run (`services/intelligence/daily_brief.py`). | 06:00 local / 07:00 CT daily |
 | `com.sapphire.openbb-api.plist` | OpenBB REST server on `:6900`. | KeepAlive |
 | `com.sapphire.security-pipeline.plist` | Security scan pipeline. | 03:00 daily |

@@ -130,8 +130,8 @@ These are scheduled or background processes that don't have their own
 | `com.sapphire.gcp-sync` | hourly | 5 min | < 1% | < 60 min watermark | manual |
 | `com.sapphire.gemini-ooda-daily` | daily | 5 min | < 5% | < 24 h | manual |
 | `com.sapphire.logrotate` | daily 03:30 | 60 s | < 0.1% | < 24 h | manual |
-| `com.sapphire.market-intel` | every 4h | 5 min | < 5% | < 4 h | manual |
-| `com.sapphire.morning-brief` | daily 08:00 | 5 min | < 5% | < 24 h | manual |
+| `com.sapphire.market-intel` | every 30 min | 5 min | < 5% | < 45 min | manual |
+| `com.sapphire.morning-brief` | daily 06:00 | 5 min | < 5% | < 24 h | manual |
 | `com.sapphire.security-pipeline` | daily 04:00 | 10 min | < 5% | < 24 h | manual |
 | `com.sapphire.self-optimization` | Sunday 23:00 | 5 min | < 10% | < 7 d | manual |
 | `com.sapphire.telemetry-collector` | every 60 s | 5 s | < 5% | < 60 s | aspirational |
