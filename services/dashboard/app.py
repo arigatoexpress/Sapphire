@@ -1665,6 +1665,35 @@ def system():
     return render_template("pages/system.html", current_page="system", page_title="System Status")
 
 
+_INFERENCE_TIER_ORDER = (
+    ("t1", "windows-gpu", "t1_windows_gpu", "Windows GPU"),
+    ("t2a", "pi-rari1", "t2_pi_rari1", "Pi rari1"),
+    ("t2b", "pi-rari2", "t2_pi_rari2", "Pi rari2"),
+    ("t3", "mac-local", "t3_mac_local", "Mac local"),
+    ("t4", "kimi-cloud", "t4_kimi_cloud", "Kimi cloud"),
+)
+
+
+def _normalize_inference_tiers(proxy_health: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Return dashboard-stable tier keys while preserving proxy health truth."""
+    endpoints = proxy_health.get("endpoints") if isinstance(proxy_health, dict) else {}
+    raw_tiers = proxy_health.get("tiers") if isinstance(proxy_health, dict) else {}
+    endpoints = endpoints if isinstance(endpoints, dict) else {}
+    raw_tiers = raw_tiers if isinstance(raw_tiers, dict) else {}
+
+    normalized: dict[str, dict[str, Any]] = {}
+    for tier_key, endpoint_key, raw_key, label in _INFERENCE_TIER_ORDER:
+        status = str(endpoints.get(endpoint_key, "unknown")).lower()
+        normalized[tier_key] = {
+            "label": label,
+            "endpoint_key": endpoint_key,
+            "status": status,
+            "healthy": status in {"healthy", "ok", "available"},
+            "url": raw_tiers.get(raw_key, ""),
+        }
+    return normalized
+
+
 @app.route("/api/system")
 @requires_auth
 def api_system():
@@ -1737,7 +1766,8 @@ def api_system():
         return {
             "inference": {
                 "endpoints": proxy_health.get("endpoints", {}),
-                "tiers": proxy_health.get("tiers", {}),
+                "tiers": _normalize_inference_tiers(proxy_health),
+                "raw_tiers": proxy_health.get("tiers", {}),
                 "metrics": proxy_metrics.get("metrics", {}),
             },
             "services": service_status,

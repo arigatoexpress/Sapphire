@@ -205,7 +205,7 @@ def test_pi_rari1_serves_fast_requests_via_safe_model(
     proxy_app._endpoint_health["pi-rari1"] = True
 
     tier, response, tried = proxy_app._try_pi_tier(
-        "nemotron-mini:latest",
+        proxy_app.MODEL_TIERS["fast"],
         [{"role": "user", "content": "hello"}],
         32,
         0.2,
@@ -235,7 +235,7 @@ def test_pi_routing_falls_back_to_rari2_when_rari1_fails(
         proxy_app._endpoint_health["pi-rari2"] = True
 
         tier, response, tried = proxy_app._try_pi_tier(
-            "nemotron-mini:latest",
+            proxy_app.MODEL_TIERS["fast"],
             [{"role": "user", "content": "fallback"}],
             32,
             0.2,

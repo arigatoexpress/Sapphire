@@ -81,8 +81,8 @@ def reset_health_and_metrics(app_module, monkeypatch, tmp_path):
 
 class TestModelAliases:
     def test_fast_resolves_to_nemotron_mini(self, app_module):
-        assert app_module.MODEL_TIERS["fast"] == "nemotron-mini:latest"
-        assert app_module.MODEL_TIERS["quick"] == "nemotron-mini:latest"
+        assert app_module.MODEL_TIERS["fast"] == "nemotron-mini:4b"
+        assert app_module.MODEL_TIERS["quick"] == "nemotron-mini:4b"
 
     def test_auto_and_balanced_resolve_to_hermes3(self, app_module):
         assert app_module.MODEL_TIERS["auto"] == "hermes3:8b"
