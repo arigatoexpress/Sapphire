@@ -35,8 +35,20 @@ function Invoke-WorkerCommand {
     )
 
     $started = [DateTime]::UtcNow
-    $output = & $Command[0] $Command[1..($Command.Length - 1)] 2>&1
-    $exitCode = $LASTEXITCODE
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        $output = & $Command[0] $Command[1..($Command.Length - 1)] 2>&1 | ForEach-Object {
+            $_.ToString()
+        }
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($null -eq $exitCode) {
+        $exitCode = 0
+    }
     $output | Out-File -FilePath $LogPath -Encoding utf8
     $finished = [DateTime]::UtcNow
 
