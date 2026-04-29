@@ -68,7 +68,24 @@ def fake_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         ]:
             fh.write(json.dumps(row, sort_keys=True, default=str) + "\n")
 
+    # Pollution-resistant import: other plugin tests can leave the
+    # `lib.timetravel.*` modules + the alias `timetravel_internal` cached
+    # in `sys.modules` with stale `SCOPE_TO_ROOT`. Drop any existing entries
+    # so the monkeypatch below applies to the freshly-imported module that
+    # the internal tool also uses.
+    for cached in [k for k in list(sys.modules) if k.startswith("lib.timetravel") or k == "timetravel_internal"]:
+        sys.modules.pop(cached, None)
     import lib.timetravel.snapshot as st_mod
+
+    # Reload the internal tool too, so it binds to the freshly-imported
+    # snapshot module (the one we're about to monkeypatch).
+    _spec_local = importlib.util.spec_from_file_location("timetravel_internal", INTERNAL)
+    assert _spec_local is not None and _spec_local.loader is not None
+    _module_local = importlib.util.module_from_spec(_spec_local)
+    _spec_local.loader.exec_module(_module_local)
+    sys.modules["timetravel_internal"] = _module_local
+    # Rebind the module-level alias so subsequent tests see the fresh one.
+    globals()["_module"] = _module_local
 
     fake_map = {
         "correlated_signals": base / "data" / "correlated_signals",

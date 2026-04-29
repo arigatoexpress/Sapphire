@@ -517,20 +517,16 @@ def test_redact_name_never_raises_on_arbitrary_input(name: str) -> None:
 import pytest as _pytest  # noqa: E402  (placement intentional — local helper)
 
 
-@_pytest.mark.xfail(
-    reason=(
-        "Found-bug #1: redacted email local part with non-alphanumeric "
-        "leading char is not recognised on second pass. Fix planned in "
-        "follow-up; widening _REDACTED_EMAIL_RE prefix class is the "
-        "minimal patch."
-    ),
-    strict=False,
-)
+# Lane 1 found-bug #1 (regression-pinned 2026-04-30): redacted email local
+# part with non-alphanumeric leading char (`_+-.`) was not recognised on the
+# second pass, breaking idempotence. Fix landed in `lib/security/pii_redactor`
+# by widening the prefix character class in `_REDACTED_EMAIL_RE` and the
+# `prefix_match` regex from `[A-Za-z0-9]` to `[A-Za-z0-9._%+-]`.
 @given(
     st.sampled_from(["_alice", "+sales", ".bob", "-system"]),
     _EMAIL_DOMAIN,
 )
-def test_redact_email_idempotence_with_special_first_char_xfail(
+def test_redact_email_idempotence_with_special_first_char(
     local: str, domain: str
 ) -> None:
     raw = f"{local}@{domain}"
