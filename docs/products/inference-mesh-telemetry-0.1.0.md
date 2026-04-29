@@ -19,7 +19,16 @@ A buyer's diligence question — *"What does it cost to run, and is it efficient
 
 Until this lane shipped, "How much is each tier costing us?" had no empirical answer. It does now.
 
-This module **does not modify the inference proxy**. It is a **read-only consumer** of the call log written by the proxy. That preserves the trading critical path (the proxy is on it) and keeps cost analysis independently verifiable.
+The telemetry stack is split deliberately:
+
+- `services/inference-proxy/app.py` appends sanitized per-tier call records in
+  the existing `_record()` path.
+- `lib/inference_telemetry/` is a **read-only consumer** of that call log.
+
+The writer stores tier, model, latency, outcome, token counts, and error class.
+It does **not** store prompts, completions, message content, or credentials.
+That keeps the trading critical path narrow while making cost analysis
+independently verifiable.
 
 ---
 
@@ -91,11 +100,21 @@ Every dollar figure has a defensible source:
 
 This means the first run on a fresh box prints honest *zero* cost for T4 — instead of a fabricated number. The recommender's top-level `caveats` list calls this out plainly.
 
-### 3.3 Synthetic-only fallback
-When `~/.cache/sapphire/inference_proxy/calls.jsonl` is absent (the common case before the proxy is updated to write call logs in the documented schema), `aggregator.synthetic_fixture_report()` produces a deterministic synthetic report whose `has_real_data=False` flag is surfaced everywhere — dashboard chip, plugin tool output, recommender bundle. **Synthetic data is never silently treated as real data.** This is the same posture Tranche 4's correlator and Tranche 5's customer surface adopted.
+### 3.3 Synthetic fallback when no real call log exists
+When `~/.cache/sapphire/inference_proxy/calls.jsonl` is absent, empty, or
+pointed elsewhere via `INFERENCE_PROXY_CALLS_PATH`,
+`aggregator.synthetic_fixture_report()` produces a deterministic synthetic
+report whose `has_real_data=False` flag is surfaced everywhere — dashboard
+chip, plugin tool output, recommender bundle. **Synthetic data is never
+silently treated as real data.** This is the same posture Tranche 4's
+correlator and Tranche 5's customer surface adopted.
 
 ### 3.4 Permissive parsing
-The proxy's existing `_metrics` shape uses keys like `prompt_tokens` / `completion_tokens` / `elapsed_ms`. The aggregator's `parse_record()` accepts both the documented `tokens_in` / `tokens_out` / `latency_ms` keys *and* their alternates. This keeps the contract loose enough that the proxy can adopt the JSONL writer in a follow-on PR without breaking the aggregator.
+The proxy writer emits `tokens_in` / `tokens_out` / `latency_ms`, while the
+aggregator's `parse_record()` also accepts alternate keys such as
+`prompt_tokens` / `completion_tokens` / `elapsed_ms`. This keeps the contract
+loose enough for older fixtures, one-off diagnostics, or future adapters
+without breaking the dashboard.
 
 ### 3.5 Stable ordering for tests + provenance
 Tiers in the report appear in canonical order (T1, T2 rari1, T2 rari2, T3, T4) followed by lexically-sorted unknown tiers. This makes test assertions robust and provenance hashes stable across re-runs. Recommendations are sorted by `(kind, from_tier, to_tier)` so two re-runs against the same input data produce byte-identical reports (and thus byte-identical provenance envelopes).
@@ -142,10 +161,16 @@ Paste-safety:
 
 ## 6. Operator-owed actions
 
-1. **Wire the proxy to write `calls.jsonl`.** This lane reads from `~/.cache/sapphire/inference_proxy/calls.jsonl` in the documented schema. Writing the JSONL file is a follow-on PR against `services/inference-proxy/app.py` — it should slot into the existing `_record()` path. **This lane does NOT modify the proxy** — by design.
-2. **Supply Kimi rates.** Once the proxy writes T4 calls, operator should pull the latest rates from <https://platform.moonshot.cn/docs/pricing/chat> and pass them to `with_kimi_rates()` (or via the plugin tool's `cost_model` payload field).
-3. **Tune T1 / T3 electricity proxies.** Default values are illustrative. Real numbers come from a Kill-A-Watt + duty-cycle measurement.
-4. **Decide on T4 → T1 trade-offs.** Recommendations are illustrative; operator decides.
+1. **Collect enough real call volume.** The proxy writer now exists, but SLO
+   promotion should wait for representative traffic, agreed alert thresholds,
+   and a clear retention/rotation expectation for `calls.jsonl`.
+2. **Supply Kimi rates.** Pull the latest rates from
+   <https://platform.moonshot.cn/docs/pricing/chat> and pass them to
+   `with_kimi_rates()` (or via the plugin tool's `cost_model` payload field).
+3. **Tune T1 / T3 electricity proxies.** Default values are illustrative. Real
+   numbers come from a Kill-A-Watt + duty-cycle measurement.
+4. **Decide on T4 → T1 trade-offs.** Recommendations are illustrative; operator
+   decides.
 
 ---
 
@@ -180,4 +205,14 @@ Paste-safety:
 
 ## 10. One-paragraph version
 
-> Sapphire's 4-tier inference mesh now has empirical telemetry. A pure-data library (`lib/inference_telemetry/`) reads the proxy's call log, aggregates per-tier latency / throughput / error / token / cost, and emits honest "switch X→Y to save $Z/mo" recommendations with capability + latency + sample-size caveats. The cost model uses electricity-only proxies for T1/T3, zero for T2, and operator-supplied per-token rates for T4 Kimi Cloud — never fabricated, always cited to Moonshot's published pricing page (<https://platform.moonshot.cn/docs/pricing/chat>, retrieved 2026-04-29). Every artifact is provenance-stamped. Read-only: the inference proxy is untouched. Recommendations are illustrative; the operator owns the actual routing decision.
+> Sapphire's 4-tier inference mesh now has empirical telemetry. The inference
+> proxy appends sanitized per-tier call records, and a pure-data library
+> (`lib/inference_telemetry/`) reads that call log, aggregates per-tier latency
+> / throughput / error / token / cost, and emits honest "switch X→Y to save
+> $Z/mo" recommendations with capability + latency + sample-size caveats. The
+> cost model uses electricity-only proxies for T1/T3, zero for T2, and
+> operator-supplied per-token rates for T4 Kimi Cloud — never fabricated, always
+> cited to Moonshot's published pricing page
+> (<https://platform.moonshot.cn/docs/pricing/chat>, retrieved 2026-04-29).
+> Every optional report artifact is provenance-stamped. Recommendations are
+> illustrative; the operator owns the actual routing decision.
