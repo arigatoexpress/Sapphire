@@ -28,6 +28,26 @@ def test_backfill_apply_writes_and_verify_passes(tmp_path) -> None:
     assert verify["checked"] == 1
 
 
+def test_backfill_repair_invalid_rewrites_hash_mismatch(tmp_path) -> None:
+    artifact = tmp_path / "draft.md"
+    artifact.write_text("hello", encoding="utf-8")
+    provenance_backfill.build_report((tmp_path,), apply=True)
+    artifact.write_text("hello again", encoding="utf-8")
+
+    dry_run = provenance_backfill.build_report(
+        (tmp_path,), apply=False, repair_invalid=True
+    )
+    repaired = provenance_backfill.build_report(
+        (tmp_path,), apply=True, repair_invalid=True
+    )
+    verify = provenance_verify.build_report((tmp_path,), older_than_hours=0)
+
+    assert dry_run["sidecars_to_repair"] == 1
+    assert dry_run["rows"][0]["reason"] == "artifact_hash_mismatch"
+    assert repaired["sidecars_repaired"] == 1
+    assert verify["ok"] is True
+
+
 def test_verify_reports_missing_sidecar(tmp_path) -> None:
     artifact = tmp_path / "draft.md"
     artifact.write_text("hello", encoding="utf-8")
