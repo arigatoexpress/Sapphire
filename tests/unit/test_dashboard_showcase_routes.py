@@ -126,6 +126,20 @@ def test_showcase_page_links_to_satellite_frontends(client):
         assert f'href="{href}"' in html
 
 
+def test_showcase_metrics_are_derived_from_live_repo_contracts():
+    dashboard_app._tool_registry_metric.cache_clear()
+    dashboard_app._production_readiness_metric.cache_clear()
+
+    payload = dashboard_app._build_unified_dashboard_payload()
+    metrics = {item["label"]: item for item in payload["metrics"]}
+
+    assert metrics["Dashboard Routes"]["value"] == str(dashboard_app._dashboard_page_route_count())
+    assert int(metrics["Dashboard Routes"]["value"]) >= 48
+    assert metrics["Registry Entries"]["value"] == "67 / 0"
+    assert metrics["Readiness"]["value"].endswith(" FAIL")
+    assert metrics["Satellite Frontends"]["value"] == str(len(payload["satellite_dashboards"]))
+
+
 def test_showcase_page_surfaces_adjacent_project_coverage(client):
     response = client.get("/showcase", headers=_auth_header())
     html = response.get_data(as_text=True)
