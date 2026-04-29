@@ -36,14 +36,14 @@ are the 8 from `claude.ai/code/routines` per CLAUDE.md.
 |---|---|---|---|
 | `services/alpha/` (signal logger + trading) | `tranche5-live-soak-runbook.md`, `robinhood-real-funds-readiness.md` | 4 | Add a single canonical `alpha-runbook.md` consolidating bring-up, env vars, signal-logger restart, paper→live cutover. |
 | `services/audit_panel/` | `audit-panel-runbook.md` | 5 | — |
-| `services/control-plane/` | (none direct; covered partially by `safe-merge-runbook.md`) | 2 | Write `control-plane-runbook.md` covering CONTROL_PLANE_TOKEN, fail-closed 503 behavior, project/task CRUD endpoints, Kimi bridge. |
+| `services/control-plane/` | `control-plane-runbook.md` | 3 | Add endpoint-level smoke tests for token-gated task mutation and Kimi bridge denial paths. |
 | `services/correlator/` | `signal-correlator-runbook.md` | 5 | — |
 | `services/counterparty/` | `counterparty-intel-runbook.md` | 4 | Add explicit "what to do when counterparty source returns garbage" section. |
 | `services/cross_asset/` | `cross-asset-runbook.md` | 5 | — |
 | `services/customer_api/` | `customer-api-runbook.md` | 3 | Document the three live gates from ADR 0008 in detail (env flag, payment-verified, allowlist file). Sparse on failure modes. |
 | `services/dashboard/` | `dashboard-product-pages-runbook.md`, `dashboard-public-demo-runbook.md`, `observability-dashboard-runbook.md` | 5 | — |
 | `services/event_impact/` | `event-impact-runbook.md` | 5 | — |
-| `services/foundry_sync/` | (none direct; covered by `docs/foundry-strategy-2026-04-19.md`) | 2 | Write `foundry-sync-runbook.md` covering bearer/OAuth refresh, 15-min sync cadence, schema-drift detection, what to do when readiness audit shows mismatches. |
+| `services/foundry_sync/` | `foundry-sync-runbook.md` | 3 | Add fixture-backed smoke coverage for the first three dry-run/readiness commands and expand post-success incident drills. |
 | `services/heartbeat/` | `heartbeat-runbook.md` | 3 | Add automated smoke coverage for one-shot mode and clarify overlap with `lib/core/heartbeat.py` self-heal monitor. |
 | `services/hyperliquid/` | `hyperliquid-feed-runbook.md` | 4 | Public-feed side documented; live-executor side (signing verification, mainnet flip protocol, daily-loss auto-pause) needs a dedicated section. |
 | `services/inference-proxy/` | `inference-tenant-quotas.md` | 3 | Quota doc exists but operational (4-tier failover, model-alias mapping, sensitivity gate, GPU-only model 503 path) needs a full runbook. |
@@ -68,11 +68,11 @@ several. Counted services that are operationally meaningful — paused
 `live_portfolio_daemon`, `service_supervisor` are listed under
 LaunchAgents below since their runbook surface is the agent itself).
 
-**Service average**: 3.73 (sum 97, n 26).
+**Service average**: 3.81 (sum 99, n 26).
 
-**Lowest-scored services** (need attention first): `control-plane` (2),
-`foundry_sync` (2), `security_pipeline` (2), then the newly lifted but
-still-partial `heartbeat`, `openbb_api`, `pipeline`, and `webhook` (3).
+**Lowest-scored services** (need attention first): `security_pipeline` (2),
+then the newly lifted but still-partial `control-plane`, `foundry_sync`,
+`heartbeat`, `openbb_api`, `pipeline`, and `webhook` (3).
 
 ---
 
@@ -85,9 +85,9 @@ still-partial `heartbeat`, `openbb_api`, `pipeline`, and `webhook` (3).
 | `com.sapphire.chain-refresh` | `infra/launchagents/com.sapphire.chain-refresh.plist` | `onchain-intel-runbook.md` (partial) | 3 | Add agent-level restart + log-path to onchain runbook. |
 | `com.sapphire.content-engine` | `infra/launchagents/com.sapphire.content-engine.plist` | `content-engine-soak-runbook.md` | 4 | Soak runbook covers the cloud routine well; agent-side draft → publish flow could be more explicit. |
 | `com.sapphire.content-publisher` | `infra/launchagents/com.sapphire.content-publisher.plist` | (none direct) | 1 | Write `content-publisher-runbook.md` covering Substack/X/LinkedIn/Typefully publish queue, approval flow, kill switch. |
-| `com.sapphire.control-plane` | `infra/launchagents/com.sapphire.control-plane.plist` | (none direct) | 1 | See `services/control-plane/` gap. |
+| `com.sapphire.control-plane` | `infra/launchagents/com.sapphire.control-plane.plist` | `control-plane-runbook.md` | 3 | Add launchd-specific restart fixture checks and document durable-store cutover once it is used. |
 | `com.sapphire.correlation-refresh` | `infra/launchagents/com.sapphire.correlation-refresh.plist` | `signal-correlator-runbook.md` | 4 | Correlator runbook is solid but agent restart procedure is implicit. |
-| `com.sapphire.foundry-sync` | `infra/launchagents/com.sapphire.foundry-sync.plist` | (none direct) | 1 | See `services/foundry_sync/` gap. |
+| `com.sapphire.foundry-sync` | `infra/launchagents/com.sapphire.foundry-sync.plist` | `foundry-sync-runbook.md` | 3 | Add a fixture-backed smoke for pause behavior and a reviewed live-stack drill after Foundry provisioning. |
 | `com.sapphire.gcp-sync` | `infra/launchagents/com.sapphire.gcp-sync.plist` | `gcp-pipeline-runbook.md` | 3 | Add launchd-specific last-run examples once live gcp-sync logs are sampled after the next scheduled fire. |
 | `com.sapphire.gemini-ooda-daily` | `infra/launchagents/com.sapphire.gemini-ooda-daily.plist` | `gemini-ooda-daily-runbook.md`, `gemini-ooda-synthesizer-runbook.md` | 5 | — |
 | `com.sapphire.heartbeat` | `infra/launchagents/com.sapphire.heartbeat.plist` | `heartbeat-runbook.md` | 3 | Add automated smoke coverage for one-shot mode and clarify overlap with `lib/core/heartbeat.py` self-heal monitor. |
@@ -114,14 +114,13 @@ plus 6 service-local). The original lane spec said 23 LaunchAgents;
 the 28-count emerged because Tranches 4-5 added service-local plists
 the prior counts missed.
 
-**LaunchAgent average**: 2.68 (sum 75, n 28).
+**LaunchAgent average**: 2.71 (sum 76, n 28).
 
 **Lowest-scored LaunchAgents** (priority): `backtest-weekly` (1),
-`content-publisher` (1), `control-plane` (1), `foundry-sync` (1),
-`self-optimization` (1), `telemetry-collector` (1),
+`content-publisher` (1), `self-optimization` (1), `telemetry-collector` (1),
 `trading-shadow-controller` (1), `tradingview-cdp` (1). Newly lifted
-but still partial: `gcp-sync`, `heartbeat`, `openbb-api`, and
-`service-supervisor` (3).
+but still partial: `control-plane`, `foundry-sync`, `gcp-sync`, `heartbeat`,
+`openbb-api`, and `service-supervisor` (3).
 
 ---
 
@@ -154,10 +153,10 @@ LaunchAgent-driven daemons.
 
 - **Total surfaces**: 62 (26 services + 28 LaunchAgents + 8 cloud
   routines).
-- **Aggregate score**: 212 / 310 = **3.42 / 5**.
+- **Aggregate score**: 215 / 310 = **3.47 / 5**.
 - **Score 5 surfaces**: 18 (29%).
-- **Score < 4 surfaces requiring gap action**: 36 (58%).
-- **Score 1 surfaces (no runbook)**: 9 (15%).
+- **Score < 4 surfaces requiring gap action**: 33 (53%).
+- **Score 1 surfaces (no runbook)**: 6 (10%).
 
 The asymmetry is still sharp: cloud routines and LLM-tool runbooks
 (`gemini-ooda-*`, `narrative-synthesis`, `vertex-eval`) are
@@ -173,9 +172,8 @@ runbook never lands.
 
 ## Recommended remediation order
 
-1. **Foundry-sync + control-plane** (both score 1-2) — both are
-   acquisition-narrative surfaces; a Foundry reviewer asking "how does
-   the sync work" wants a runbook.
+1. **Security pipeline** (score 2) — the remaining service-level score-2
+   gap; scheduled security scan operations should not depend on tribal memory.
 2. **TradingView-CDP + content-publisher** (both score 1) — both have
    GUI dependencies; recovery from a Chrome / Substack quirk is
    undocumented.
@@ -183,10 +181,10 @@ runbook never lands.
    trading-shadow-controller** (all score 1) — periodic daemons that
    "just work" until they don't. Writing a 1-page note for each is
    cheap insurance.
-4. **Heartbeat + service-supervisor + OpenBB API + webhook + pipeline**
-   (now score 3) — these have adequate operator runbooks after the
-   2026-04-29 uplift, but still need command-level smoke tests and the
-   webhook auth-hardening code follow-up.
+4. **Control-plane + Foundry-sync + Heartbeat + service-supervisor +
+   OpenBB API + webhook + pipeline** (now score 3) — these have adequate
+   operator runbooks after the 2026-04-29 uplifts, but still need
+   command-level smoke tests and endpoint-specific drills.
 
 ---
 
