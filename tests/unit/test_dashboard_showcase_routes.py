@@ -47,6 +47,7 @@ def test_showcase_page_renders_with_curated_links(client):
     assert response.status_code == 200
     html = response.get_data(as_text=True)
     assert "Unified Sapphire dashboard" in html
+    assert "Walkthrough paths" in html
     assert "Satellite frontends" in html
     assert "&lt;built-in method copy" not in html
     assert "Dashboards consolidate live services" in html
@@ -63,6 +64,29 @@ def test_showcase_page_renders_with_curated_links(client):
     ):
         assert f'href="{route}"' in html
     assert 'href="/overview"' not in html
+    assert 'href="/platform"' not in html
+
+
+def test_showcase_page_surfaces_guided_walkthroughs(client):
+    response = client.get("/showcase", headers=_auth_header())
+    html = response.get_data(as_text=True)
+
+    for path in (
+        "Buyer proof path",
+        "Operator health path",
+        "Satellite demo path",
+        "Engineering source path",
+    ):
+        assert path in html
+
+    for href in (
+        "/observability",
+        "/inference-telemetry",
+        "/logs",
+        "/infrastructure",
+        "https://github.com/arigatoexpress/Sapphire",
+    ):
+        assert f'href="{href}"' in html
 
 
 def test_unified_dashboard_aliases_render_same_surface(client):
@@ -79,6 +103,12 @@ def test_showcase_page_surfaces_satellite_repositories(client):
 
     for repo in ("regional-intel-workbench", "Project-Go-Forward", "org-platform"):
         assert repo in html
+
+    for href in (
+        "https://github.com/arigatoexpress/Project-Go-Forward",
+        "https://github.com/arigatoexpress/regional-intel-workbench",
+    ):
+        assert f'href="{href}"' in html
 
 
 def test_showcase_page_links_to_satellite_frontends(client):
@@ -103,6 +133,13 @@ def test_showcase_page_surfaces_adjacent_project_coverage(client):
     for repo in ("tradingview-mcp", "cyber-threat-bot", "crypto-tax-tracker"):
         assert repo in html
 
+    for href in (
+        "https://github.com/arigatoexpress/tradingview-mcp",
+        "https://github.com/arigatoexpress/cyber-threat-bot",
+        "https://github.com/arigatoexpress/crypto-tax-tracker",
+    ):
+        assert f'href="{href}"' in html
+
 
 def test_showcase_route_appears_in_global_nav(client):
     response = client.get("/", headers=_auth_header())
@@ -125,6 +162,8 @@ def test_showcase_is_paste_safe(client):
     html = response.get_data(as_text=True)
 
     assert "/Users/aribs" not in html
+    assert "~/" not in html
+    assert "local_path" not in html
     assert "AUTH_PASSWORD" not in html
     assert "MOONSHOT_API_KEY" not in html
     assert "HYPERLIQUID_PRIVATE_KEY" not in html
