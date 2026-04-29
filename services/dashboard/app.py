@@ -5019,6 +5019,242 @@ def api_backtest_results():
         ), 200
 
 
+_WALKFORWARD_RESULTS_ROOT = _DASHBOARD_REPO_ROOT / "data" / "backtests" / "walkforward"
+
+
+def _walkforward_empty_payload(reason: str) -> dict[str, Any]:
+    return {
+        "mode": "read_only_walkforward_results",
+        "status": "no_data",
+        "reason": reason,
+        "summary": {
+            "strategy_count": 0,
+            "artifact_count": 0,
+            "horizon_count": 0,
+            "dsr_pass_count": 0,
+            "best_strategy": None,
+            "best_horizon_days": None,
+            "best_sortino": None,
+        },
+        "strategies": [],
+    }
+
+
+def _latest_walkforward_manifest_path() -> Path | None:
+    root = _WALKFORWARD_RESULTS_ROOT
+    if not root.exists() or not root.is_dir():
+        return None
+    candidates = [
+        child / "manifest.json"
+        for child in root.iterdir()
+        if child.is_dir() and (child / "manifest.json").is_file()
+    ]
+    candidates.sort(key=lambda p: p.parent.name, reverse=True)
+    return candidates[0] if candidates else None
+
+
+def _walkforward_artifact_path(manifest_path: Path, raw_path: Any) -> Path | None:
+    if not raw_path:
+        return None
+    path = Path(str(raw_path))
+    candidates: list[Path] = []
+    if path.is_absolute():
+        candidates.append(manifest_path.parent / path.name)
+        candidates.append(path)
+    else:
+        candidates.append(manifest_path.parent / path)
+        candidates.append(_DASHBOARD_REPO_ROOT / path)
+        candidates.append(manifest_path.parent / path.name)
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _walkforward_horizon_summary(block: dict[str, Any]) -> dict[str, Any]:
+    result = block.get("result") or {}
+    regime = block.get("regime_decomposition") or {}
+    dsr = block.get("deflated_sharpe") or {}
+    payload = {
+        "horizon_days": block.get("horizon_days"),
+        "n_windows": result.get("n_windows", 0),
+        "n_active_windows": result.get("n_active_windows", 0),
+        "mean_test_sortino": result.get("mean_test_sortino"),
+        "median_test_sortino": result.get("median_test_sortino"),
+        "test_sortino_cv": result.get("test_sortino_cv"),
+        "mean_test_sharpe": result.get("mean_test_sharpe"),
+        "mean_test_calmar": result.get("mean_test_calmar"),
+        "mean_test_total_return_pct": result.get("mean_test_total_return_pct"),
+        "mean_test_win_rate": result.get("mean_test_win_rate"),
+        "mean_test_profit_factor": result.get("mean_test_profit_factor"),
+        "aggregate_test_max_drawdown_pct": result.get("aggregate_test_max_drawdown_pct"),
+        "dsr_passed": dsr.get("passed"),
+        "dsr_probability": dsr.get("probability"),
+        "deflated_sharpe": dsr.get("deflated_sharpe"),
+        "dsr_threshold": dsr.get("threshold"),
+        "dominant_regime": regime.get("dominant_regime"),
+        "n_labelled": regime.get("n_labelled", 0),
+        "n_unlabelled": regime.get("n_unlabelled", 0),
+    }
+    if "error" in block:
+        payload["error"] = block.get("error")
+    return payload
+
+
+def _walkforward_best_horizon(horizons: list[dict[str, Any]]) -> dict[str, Any] | None:
+    scored = [
+        horizon
+        for horizon in horizons
+        if isinstance(horizon.get("mean_test_sortino"), int | float)
+    ]
+    if not scored:
+        return None
+    return max(
+        scored,
+        key=lambda h: (
+            h.get("mean_test_sortino") or 0,
+            h.get("dsr_probability") or 0,
+            h.get("n_active_windows") or 0,
+        ),
+    )
+
+
+def _walkforward_strategy_summary(
+    *,
+    artifact_entry: dict[str, Any],
+    manifest_path: Path,
+) -> dict[str, Any]:
+    strategy_name = str(artifact_entry.get("strategy") or "")
+    artifact_path = _walkforward_artifact_path(manifest_path, artifact_entry.get("path"))
+    if artifact_path is None:
+        return {
+            "strategy": strategy_name or "unknown",
+            "status": "missing",
+            "error": "artifact file missing",
+            "artifact_path": None,
+            "horizons": [],
+            "best_horizon": None,
+        }
+
+    payload = json.loads(artifact_path.read_text(encoding="utf-8"))
+    horizons = [
+        _walkforward_horizon_summary(block)
+        for block in payload.get("horizons", [])
+        if isinstance(block, dict)
+    ]
+    return {
+        "strategy": payload.get("strategy_cls") or strategy_name or artifact_path.stem,
+        "status": "ok",
+        "version": payload.get("version"),
+        "generated_at": payload.get("generated_at"),
+        "symbol": payload.get("symbol"),
+        "artifact_path": _repo_display_path(artifact_path),
+        "horizons": horizons,
+        "best_horizon": _walkforward_best_horizon(horizons),
+    }
+
+
+def _build_walkforward_results_payload() -> dict[str, Any]:
+    manifest_path = _latest_walkforward_manifest_path()
+    if manifest_path is None:
+        return _walkforward_empty_payload("no walk-forward manifest on disk")
+
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        payload = _walkforward_empty_payload("latest manifest unreadable")
+        payload["error"] = f"{exc.__class__.__name__}: {exc}"[:200]
+        payload["manifest_path"] = _repo_display_path(manifest_path)
+        return payload
+
+    artifacts = [item for item in manifest.get("artifacts", []) if isinstance(item, dict)]
+    strategies: list[dict[str, Any]] = []
+    for entry in artifacts:
+        try:
+            strategies.append(
+                _walkforward_strategy_summary(artifact_entry=entry, manifest_path=manifest_path)
+            )
+        except (json.JSONDecodeError, OSError) as exc:
+            strategies.append(
+                {
+                    "strategy": str(entry.get("strategy") or "unknown"),
+                    "status": "unreadable",
+                    "error": f"{exc.__class__.__name__}: {exc}"[:200],
+                    "artifact_path": None,
+                    "horizons": [],
+                    "best_horizon": None,
+                }
+            )
+
+    all_horizons = [
+        horizon
+        for strategy in strategies
+        for horizon in strategy.get("horizons", [])
+        if isinstance(horizon, dict)
+    ]
+    best = _walkforward_best_horizon(
+        [
+            {**strategy["best_horizon"], "strategy": strategy["strategy"]}
+            for strategy in strategies
+            if isinstance(strategy.get("best_horizon"), dict)
+        ]
+    )
+    payload = {
+        "mode": "read_only_walkforward_results",
+        "status": "ok",
+        "report_date": manifest_path.parent.name,
+        "manifest_path": _repo_display_path(manifest_path),
+        "manifest": {
+            "version": manifest.get("version"),
+            "generated_at": manifest.get("generated_at"),
+            "symbol": manifest.get("symbol"),
+            "bars_source": manifest.get("bars_source"),
+            "n_bars": manifest.get("n_bars"),
+            "horizons_days": manifest.get("horizons_days", []),
+            "selection_metric": manifest.get("selection_metric"),
+            "bankroll": manifest.get("bankroll"),
+            "regime_label_count": manifest.get("regime_label_count"),
+        },
+        "summary": {
+            "strategy_count": sum(1 for strategy in strategies if strategy.get("status") == "ok"),
+            "artifact_count": len(artifacts),
+            "horizon_count": len(all_horizons),
+            "dsr_pass_count": sum(1 for horizon in all_horizons if horizon.get("dsr_passed") is True),
+            "best_strategy": best.get("strategy") if best else None,
+            "best_horizon_days": best.get("horizon_days") if best else None,
+            "best_sortino": best.get("mean_test_sortino") if best else None,
+        },
+        "strategies": strategies,
+    }
+    return payload
+
+
+@app.route("/api/walkforward-results")
+@requires_auth
+def api_walkforward_results():
+    """Read-only summary of latest walk-forward / DSR artifacts."""
+    try:
+        return jsonify(_maybe_buyer_safe_payload(_build_walkforward_results_payload()))
+    except Exception as exc:
+        log.warning("walk-forward results API error: %s", exc)
+        payload = {
+            "mode": "read_only_walkforward_results",
+            "status": "unknown",
+            "error": f"{exc.__class__.__name__}: {exc}"[:200],
+            "summary": {
+                "strategy_count": 0,
+                "artifact_count": 0,
+                "horizon_count": 0,
+                "dsr_pass_count": 0,
+                "best_strategy": None,
+                "best_horizon_days": None,
+                "best_sortino": None,
+            },
+            "strategies": [],
+        }
+        return jsonify(payload), 200
+
+
 @app.route("/api/trading-brain")
 @requires_auth
 def api_trading_brain():

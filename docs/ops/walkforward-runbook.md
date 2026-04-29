@@ -242,12 +242,14 @@ test name.
 
 ## Integration touch points
 
-- **Dashboard `/performance` page** — does not consume walk-forward yet.
-  Lane 5 ends at the disk artifact. A future Lane can wire a
-  `/api/walkforward-results` endpoint that reads the latest
-  `data/backtests/walkforward/<date>/manifest.json` and surfaces per-strategy
-  walk-forward Sortino + DSR pass/fail beside the existing in-sample sweep
-  table. This is a deliberate "do less, ship something working" boundary.
+- **Dashboard `/performance` page** — consumes the latest
+  `data/backtests/walkforward/<date>/manifest.json` through the read-only
+  `/api/walkforward-results` endpoint. The page surfaces the best OOS
+  horizon per strategy, mean test Sortino, DSR pass/fail, DSR probability,
+  Sortino CV, dominant regime, and active-vs-total walk-forward windows.
+  If no manifest exists yet, the endpoint returns HTTP 200 with
+  `status=no_data` and the table renders the empty-state message instead of
+  failing the dashboard.
 - **Telegram morning brief** — does not consume walk-forward. Same boundary
   rationale.
 - **Tool registry CI** — `infra/tool-registry.yaml` was extended with a
@@ -299,9 +301,10 @@ python3 scripts/validate_tool_registry.py
 python3 -m services.walkforward.build --strategies RegimeAwareRSI \
     --horizons 90 --train 60 --test 20 --bars-source synthetic --quiet
 echo '{"action":"status"}' | python3 plugins/claw-sapphire/tools/walkforward.py
+python3 -m pytest tests/unit/test_dashboard_walkforward_results.py -q
 ```
 
-All six should pass with zero failures, and the build step should write a
+All seven should pass with zero failures, and the build step should write a
 `data/backtests/walkforward/<today>/RegimeAwareRSI.json`.
 
 ## Roll-back
