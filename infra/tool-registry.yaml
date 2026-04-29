@@ -14,10 +14,36 @@
 # agent-manifest.yaml must be a strict subset of entries with status=registered
 # whose `agent_facing: true`. Keep the manifest lean — research shows LLM
 # tool-selection accuracy drops from 74% to 49% as manifest size grows.
+#
+# ─── Section ordering convention (ADR 0011) ───────────────────────────────
+# Parallel-merge waves of Tranche 5 and Tranche 6 hit YAML conflicts on this
+# file because every lane appended at the same insertion point. The
+# convention codified by ADR 0011 (`docs/adr/0011-tool-registry-section-
+# ordering.md`) is:
+#
+#   1. Top of file: registered / agent-facing tools (the lean LLM-visible
+#      subset).
+#   2. Then internal tools, grouped by tranche of introduction. Each tranche
+#      group is preceded by a divider comment of the form
+#      ``# ─── Tranche N ─── ...`` so new lanes can append within their
+#      tranche window without colliding with prior tranches' tail.
+#   3. Then deprecated tools.
+#   4. Tail: ``# ─── Tranche 7 reserved ─── ...`` placeholder, so the next
+#      tranche has a stable insertion point that does not need to migrate
+#      prior-tranche entries.
+#
+# When a new tool is added in tranche N, append it inside the
+# ``# ─── Tranche N ─── ...`` block. NEVER insert at end-of-file unless you
+# are opening a brand-new tranche window (and then you bump the reserved
+# divider).
+#
+# NOTE: existing entries are not reordered — the section markers below are
+# additive comments. CI invariant `validate_tool_registry.py` is unaffected.
 
 version: 1
 
 tools:
+  # ─── Registered / agent-facing (LLM-visible) ──────────────────────────────
   # ── registered / agent-facing ─────────────────────────────────────────────
   - name: sapphire_dispatch
     path: plugins/claw-sapphire/tools/dispatch.py
@@ -542,3 +568,8 @@ tools:
     owner: sapphire
     consumers: [services.walkforward, scheduled-tasks.backtest-sweep]
     description: Walk-forward backtest + regime decomposition + walk-forward Deflated Sharpe wrapper 0.1.0. Pure orchestrator over lib.analytics.strategies, deterministic synthetic OHLCV by default, never modifies upstream analytics modules. Actions, run/decompose/deflated/latest/status. Caps, train≥60 bars, test≥20 bars, max 1500 bars per run; horizons 90/180/365 days for the build script. No live data, no Telegram sends.
+
+  # ─── Tranche 7 reserved (ADR 0011) ────────────────────────────────────────
+  # New Tranche 7 tool entries should be appended below this divider so the
+  # parallel-merge wave does not collide with prior-tranche tails. Bump the
+  # divider to ``Tranche 8 reserved`` once Tranche 7 closes out.

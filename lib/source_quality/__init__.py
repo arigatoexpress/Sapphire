@@ -40,6 +40,15 @@ from lib.source_quality.decay import (
     DecayReport,
     detect_decay,
 )
+from lib.source_quality.registry import (
+    BUILTIN_SOURCES,
+    SourceQualityEntry,
+    default_registry,
+    records_for_sources,
+    register_source,
+    registered_sources,
+    source_signal_to_record,
+)
 from lib.source_quality.snr import (
     DEFAULT_OUTCOME_WINDOW_HOURS,
     Outcome,
@@ -50,6 +59,7 @@ from lib.source_quality.snr import (
 )
 
 __all__ = [
+    "BUILTIN_SOURCES",
     "CorrelationPair",
     "CorrelationReport",
     "DEFAULT_DECAY_THRESHOLD",
@@ -59,10 +69,16 @@ __all__ = [
     "NEAR_DUPLICATE_THRESHOLD",
     "Outcome",
     "SignalRecord",
+    "SourceQualityEntry",
     "SourceSNR",
     "compute_pairwise_correlation",
     "compute_source_snr",
+    "default_registry",
     "detect_decay",
     "flag_near_duplicates",
+    "records_for_sources",
+    "register_source",
+    "registered_sources",
     "score_signal_against_outcome",
+    "source_signal_to_record",
 ]

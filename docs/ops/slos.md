@@ -187,24 +187,51 @@ path to making them `measured`.
 
 ---
 
-## Chaos / failure-mode SLOs (Tranche 6 Lane 8 will populate)
+## Chaos-tested SLOs (Tranche 6 Lane 8 — landed)
 
 Tranche 6 Lane 8 (chaos engineering on event bus + Redis fallback)
-will produce concrete SLOs for failure-mode recovery. Placeholders
-below; mark these `aspirational` until Lane 8 lands the chaos test
-results:
+landed 5 canonical scenarios with deterministic invariants verified
+in CI under `tests/integration/test_event_bus_chaos.py`. The
+placeholders previously in this section are replaced with the
+**chaos-tested SLOs** below. Status `chaos-verified` means: the
+invariant is asserted by ≥ 1 test in `tests/integration/test_event_bus_chaos.py`,
+the test passes today on `main`, and the chaos runbook
+(`docs/ops/chaos-engineering-runbook.md`) is the audit reference.
 
-- **Redis-dies-mid-publish recovery**: JSONL fallback engages within
-  500 ms; zero events lost. (`aspirational` — to be confirmed by
-  Lane 8 chaos test #3.)
-- **Redis recovers after N seconds**: dual-write reconciliation
-  completes within 10 s; ordering preserved. (`aspirational`.)
-- **Disk-full on JSONL fallback**: write fails fast (no retry storm),
-  alert fires within 5 s. (`aspirational`.)
+| Scenario | Invariant | Status | Test reference |
+|---|---|---|---|
+| Redis dies mid-publish | Zero events lost; pre-trip in Redis, post-trip in JSONL fallback | chaos-verified | `test_redis_dies_mid_publish_zero_loss`, `test_redis_dies_mid_publish_pre_in_redis_post_in_jsonl` |
+| Redis dies mid-publish | Ordering preserved across the trip boundary | chaos-verified | `test_redis_dies_mid_publish_ordering_preserved` |
+| Redis dies mid-publish | No duplicates | chaos-verified | `test_redis_dies_mid_publish_no_duplicates` |
+| Redis dies mid-subscribe | Subscriber sees the JSONL tail after Redis dies | chaos-verified | scenario 2 cases in `test_event_bus_chaos.py` |
+| Redis recovers after N seconds | Dual-write reconciliation, zero loss | chaos-verified | `test_redis_recovers_zero_loss`, `test_redis_recovers_phases_partition_correctly` |
+| Redis recovers after N seconds | Ordering preserved across the heal boundary | chaos-verified | `test_redis_recovers_ordering_preserved_across_boundary` |
+| Disk-full on JSONL fallback | Loss is *quantified* (not silent), not a retry storm | chaos-verified | `test_jsonl_fallback_disk_full_quantifies_loss` |
+| Dual-write mismatch | Duplicate is *flagged* (allowed), total publish count correct | chaos-verified | `test_dual_write_mismatch_flags_duplicate`, `test_dual_write_mismatch_total_published_correct` |
+| All canonical scenarios | Zero-loss invariant holds across all 5 scenarios | chaos-verified | `test_zero_loss_invariant_across_all_canonical_scenarios` |
 
-Once Lane 8 ships, these placeholders are replaced with measured
-numbers, and the chaos engineering runbook
-(`docs/ops/chaos-engineering-runbook.md`) becomes the audit reference.
+The full canonical scenario list (5) is exercised by
+`test_list_scenarios_returns_five_canonical_names`; each is
+parametrised by `RedisDiesMidPublishScenario`,
+`RedisDiesMidSubscribeScenario`, `RedisRecoversAfterScenario`,
+`DualWriteMismatchScenario`, and `JsonlDiskFullScenario`.
+
+**Latency targets** (measured against a `FakeRedis` clock on the
+chaos lab; production may differ but the qualitative bound holds):
+
+- Redis-dies-mid-publish → JSONL fallback engages within the same
+  publish call (no inter-call retry; the fallback is in the publish
+  path itself, not a separate worker).
+- Redis-recovers-after → dual-write reconciliation completes on the
+  next event published after recovery (single-call cost; zero
+  background reconciliation thread).
+- Disk-full on JSONL → fail-fast, no retry storm (the test asserts a
+  bounded number of write attempts before quantifying loss).
+
+When Tranche 6 Lane 6 (inference-mesh telemetry) lands the
+calls.jsonl writer in production (operator follow-up), these
+chaos-tested SLOs can be promoted from `chaos-verified` (CI assertion)
+to `measured` (production monitoring + alerting).
 
 ---
 

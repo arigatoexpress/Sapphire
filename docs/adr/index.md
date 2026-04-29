@@ -34,6 +34,7 @@ that supersedes the old one.
 | [0008](0008-customer-surface-mock-default-with-three-gates.md) | Customer-facing surface is mock-default with three live gates | accepted |
 | [0009](0009-foundry-ontology-as-acquisition-bridge.md) | Palantir Foundry ontology as acquisition bridge | accepted |
 | [0010](0010-cowork-vs-claude-code-vs-codex-split.md) | Cowork vs Claude Code vs Codex agent split | accepted |
+| [0011](0011-tool-registry-section-ordering.md) | Tool registry section ordering convention | accepted |
 
 ## One-line summaries
 
@@ -67,3 +68,8 @@ that supersedes the old one.
 - **0010 Cowork vs Claude Code vs Codex split** — agent routing by task
   shape: Codex for parallel-build lanes, Claude for long-context +
   refactors + skills, Cowork for operator-in-the-loop sessions.
+- **0011 Tool registry section ordering** — `infra/tool-registry.yaml`
+  organises entries by tranche of introduction; new tools append
+  inside their tranche's block, with a reserved divider at the tail
+  for the next tranche. Eliminates the parallel-merge YAML conflict
+  observed throughout Tranche 5 and Tranche 6.

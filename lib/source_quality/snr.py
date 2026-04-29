@@ -223,6 +223,7 @@ def compute_source_snr(
     window_hours: int = DEFAULT_OUTCOME_WINDOW_HOURS,
     window_start: datetime | None = None,
     window_end: datetime | None = None,
+    snapshot_at: datetime | None = None,
 ) -> dict[str, SourceSNR]:
     """Compute per-source SNR over the joined signal+outcome stream.
 
@@ -239,6 +240,21 @@ def compute_source_snr(
         Optional explicit reporting window — used as the
         ``window_start`` / ``window_end`` fields on the emitted
         :class:`SourceSNR`. If omitted we infer them from the data.
+    snapshot_at
+        **Lane 9 wiring (Lane 3 ↔ Lane 4)**. When provided, every
+        signal whose ``timestamp > snapshot_at`` is dropped, and every
+        outcome whose ``timestamp > snapshot_at`` is dropped. This
+        gives the caller a deterministic "what was the SNR-as-of-T"
+        view that is bit-identical to the SNR computed today over the
+        same in-memory data, modulo the time-travel exclusion. When
+        ``None`` (default) the function behaves exactly as before.
+
+        Implementation note: this is purely a pre-filter. We do not
+        load a time-travel snapshot from disk here — the caller is
+        responsible for providing the data they want scored. The
+        ``services.source_quality.run`` daemon and the time-travel
+        plugin tool collaborate when an end-to-end snapshot SNR is
+        needed; this kwarg exists so they can share one code path.
 
     Returns
     -------
@@ -247,6 +263,12 @@ def compute_source_snr(
     """
     sigs = list(signals)
     outs = list(outcomes)
+    if snapshot_at is not None:
+        # Tag-naive datetimes as UTC (consistent with the rest of the module).
+        if snapshot_at.tzinfo is None:
+            snapshot_at = snapshot_at.replace(tzinfo=UTC)
+        sigs = [s for s in sigs if s.timestamp <= snapshot_at]
+        outs = [o for o in outs if o.timestamp <= snapshot_at]
     if not sigs:
         return {}
     by_source: dict[str, list[SignalRecord]] = {}

@@ -126,3 +126,27 @@ If the answer is "no", the test must use Pattern A or Pattern B. The
   (section "Fixture-clock vs impl-clock date-flake template")
 - Canonical example: `tests/unit/test_dev_pulse.py::test_collect_trading_status_reads_signals_and_portfolio`
 - Canonical example: `tests/unit/test_control_plane_scoring.py::test_score_news_now_defaults_to_current_time`
+
+## Related — property test catalog (Tranche 6 Lane 1)
+
+The Tranche 6 property-based testing pass (`tests/property/`) treats clock
+discipline as a first-class invariant. Every property test in that catalog
+that touches a clock primitive applies Pattern A (inject the clock). The
+catalog as of 2026-04-30 (≥ 80 properties + 1 `xfail` documenting a real bug
+in the PII redactor):
+
+| File | Properties | Clock-aware |
+|---|---:|---|
+| `tests/property/test_pii_redactor_properties.py` | 18 + 1 xfail | n/a (no clock) |
+| `tests/property/test_correlator_scoring_properties.py` | 14 | Pattern A |
+| `tests/property/test_audit_panel_heuristics_properties.py` | 16 | Pattern A |
+| `tests/property/test_observability_aggregator_properties.py` | 14 | Pattern A |
+| `tests/property/test_live_portfolio_sortino_properties.py` | 12 | Pattern A |
+| `tests/property/test_walkforward_properties.py` (Lane 9 wiring) | ≥ 6 | Pattern A |
+
+When you add a new property test that touches a clock primitive, follow this
+ADR: inject the clock, do not let Hypothesis generate timestamps that
+disagree with the impl's notion of "now". The
+`tests/property/test_walkforward_properties.py` invariants are the reference
+for combining Hypothesis strategies with deterministic clocks against the
+walk-forward engine.
