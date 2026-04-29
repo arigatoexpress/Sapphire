@@ -467,6 +467,15 @@ tools:
     consumers: [services.onchain_intel, scheduled-tasks.chain-refresh, hermes-agent.trading-analysis]
     description: On-chain intelligence 0.2.0 across Glassnode, Santiment, Ethereum RPC, and Solana RPC. Fixture by default; live calls require per-provider SAPPHIRE_*_LIVE gates plus key/RPC envs. Enforces local caps of 60/hour, 100k/day, and 730-day backfill. Read-only only; no wallet keys, no transactions, no trading.
 
+  # Inference mesh telemetry 0.1.0 (Tranche 6 Lane 6)
+  - name: inference_telemetry
+    path: plugins/claw-sapphire/tools/internal/inference_telemetry.py
+    shim: plugins/claw-sapphire/tools/inference_telemetry.py
+    status: internal
+    owner: sapphire
+    consumers: [services.dashboard]
+    description: Inference Mesh Telemetry 0.1.0. Reads ~/.cache/sapphire/inference_proxy/calls.jsonl (synthetic fixture fallback when absent), aggregates per-tier latency p50/p95/p99/p999, throughput, error rate, token consumption, and cost across the 4-tier inference mesh (T1 Windows GPU, T2 Pi rari1+rari2, T3 Mac local, T4 Kimi Cloud). Cost model uses electricity-only proxies for T1/T3 plus operator-supplied per-token Kimi rates from Moonshot's published pricing (https://platform.moonshot.cn/docs/pricing/chat); rates are NOT fabricated. Recommendations are illustrative — operator owns the actual decision. Actions, report/recommendations/cost-model/status. Read-only; never modifies the inference proxy.
+
   # ── deprecated / sunset window ───────────────────────────────────────────
   - name: kronos_predict
     path: plugins/claw-sapphire/tools/_deprecated/kronos_predict.py
