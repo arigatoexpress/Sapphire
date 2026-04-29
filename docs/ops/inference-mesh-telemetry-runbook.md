@@ -290,4 +290,5 @@ To retire this lane (e.g. if the inference proxy adopts an internal telemetry su
 - Moonshot AI pricing: <https://platform.moonshot.cn/docs/pricing/chat> (retrieved 2026-04-29). The single external citation; per-token rates are operator-supplied at runtime, never baked into the library.
 - Tranche 6 megaprompt: `docs/handoffs/tranche-6-excellence-megaprompt-2026-04-29.md` (Lane 6).
 - Provenance schema: `lib/core/provenance.py`.
-- Inference proxy: `services/inference-proxy/app.py` (untouched by this lane — read-only consumer only).
+- Inference proxy: `services/inference-proxy/app.py` (writer owner; the
+  telemetry library remains a read-only consumer).
