@@ -23,7 +23,7 @@ Current inventory: 21 active plists in this directory, plus 1 disabled template 
 | `com.sapphire.morning-brief.plist` | Canonical morning briefing run (`services/intelligence/daily_brief.py`). | 06:00 local / 07:00 CT daily |
 | `com.sapphire.openbb-api.plist` | OpenBB REST server on `:6900`. | KeepAlive |
 | `com.sapphire.security-pipeline.plist` | Security scan pipeline. | 03:00 daily |
-| `com.sapphire.self-optimization.plist` | Self-improvement review loop. | daily |
+| `com.sapphire.self-optimization.plist` | Self-improvement review loop. | Sunday 23:00 |
 | `com.sapphire.signal-logger.plist` | TradingView webhook receiver / uvicorn on `:18081`. | KeepAlive |
 | `com.sapphire.telemetry-collector.plist` | Metric roll-up (`services/pipeline/telemetry_collector.py`). | every 5 min |
 | `com.sapphire.threat-refresh.plist` | Threat-intel feed refresh (`services/dashboard/refresh_threats.py`). | every 4 h |
