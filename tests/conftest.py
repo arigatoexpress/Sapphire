@@ -67,7 +67,14 @@ def _missing_optional_test_deps(collection_path: Path) -> list[str]:
     except ValueError:
         return []
     required = _OPTIONAL_TEST_DEPS_BY_FILE.get(rel_path, ())
-    return [module for module in required if importlib.util.find_spec(module) is None]
+    missing = []
+    for module in required:
+        try:
+            if importlib.util.find_spec(module) is None:
+                missing.append(module)
+        except ModuleNotFoundError:
+            missing.append(module)
+    return missing
 
 
 def pytest_ignore_collect(collection_path: Path, config) -> bool:
