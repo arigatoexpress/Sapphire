@@ -140,6 +140,41 @@ def test_showcase_metrics_are_derived_from_live_repo_contracts():
     assert metrics["Satellite Frontends"]["value"] == str(len(payload["satellite_dashboards"]))
 
 
+def test_showcase_satellite_cards_use_manifest_metadata():
+    dashboard_app._org_repo_index.cache_clear()
+
+    payload = dashboard_app._build_unified_dashboard_payload()
+    satellites = {item["name"]: item for item in payload["satellite_dashboards"]}
+
+    tho = satellites["Project-Go-Forward / THO"]
+    assert tho["summary"] == "THO client PM and production business system"
+    assert "core" in tho["tags"]
+    assert "active cloud run" in tho["tags"]
+    assert "production adjacent" in tho["tags"]
+    assert any(
+        link["href"] == "https://github.com/arigatoexpress/Project-Go-Forward"
+        for link in tho["links"]
+    )
+
+    regional = satellites["regional-intel-workbench"]
+    assert regional["summary"] == "Regional intelligence feeds, maps, and graph workflows"
+    assert "satellite" in regional["tags"]
+    assert "active capability" in regional["tags"]
+    assert any(
+        link["href"] == "https://github.com/arigatoexpress/regional-intel-workbench"
+        for link in regional["links"]
+    )
+
+    pm_hub = satellites["Agentic PM Hub"]
+    assert pm_hub["summary"].startswith("Private BD analytics agent repo")
+    assert "integration" in pm_hub["tags"]
+    assert "guardrails complete protected cloud run" in pm_hub["tags"]
+    assert any(
+        link["href"] == "https://github.com/arigatoexpress/AgenticArigato"
+        for link in pm_hub["links"]
+    )
+
+
 def test_showcase_page_surfaces_adjacent_project_coverage(client):
     response = client.get("/showcase", headers=_auth_header())
     html = response.get_data(as_text=True)

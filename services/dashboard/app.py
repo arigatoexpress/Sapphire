@@ -898,6 +898,70 @@ def _production_readiness_metric() -> dict[str, str]:
     }
 
 
+@lru_cache(maxsize=1)
+def _org_repo_index() -> dict[str, dict[str, Any]]:
+    """Load paste-safe repo metadata for showcase satellite cards."""
+    try:
+        import yaml
+
+        manifest = yaml.safe_load((_DASHBOARD_REPO_ROOT / "infra" / "org-repos.yaml").read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    repos = manifest.get("repos", []) if isinstance(manifest, dict) else []
+    return {
+        str(repo.get("id")): repo
+        for repo in repos
+        if isinstance(repo, dict) and repo.get("id")
+    }
+
+
+def _manifest_summary(repo_id: str, fallback: str) -> str:
+    repo = _org_repo_index().get(repo_id, {})
+    role = repo.get("role")
+    return str(role) if role else fallback
+
+
+def _manifest_repo_link(repo_id: str) -> dict[str, Any] | None:
+    repo = _org_repo_index().get(repo_id, {})
+    github = repo.get("github")
+    if not github:
+        return None
+    return {
+        "label": "Repository",
+        "href": f"https://github.com/{github}",
+        "external": True,
+    }
+
+
+def _manifest_tags(repo_id: str, extra: list[str]) -> list[str]:
+    repo = _org_repo_index().get(repo_id, {})
+    tags = list(extra)
+    for key in ("classification", "migration_state"):
+        value = repo.get(key)
+        if value:
+            tags.append(str(value).replace("_", " "))
+    if repo.get("production_adjacent"):
+        tags.append("production adjacent")
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for tag in tags:
+        clean = tag.strip()
+        if clean and clean.lower() not in seen:
+            seen.add(clean.lower())
+            deduped.append(clean)
+    return deduped
+
+
+def _append_link(
+    links: list[dict[str, Any]],
+    link: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    if link:
+        return [*links, link]
+    return links
+
+
 def _build_unified_dashboard_payload() -> dict[str, Any]:
     """Read-only dashboard directory for Sapphire and adjacent frontends."""
     registry_metric = _tool_registry_metric()
@@ -906,49 +970,61 @@ def _build_unified_dashboard_payload() -> dict[str, Any]:
         {
             "name": "Project-Go-Forward / THO",
             "status": "Production",
-            "summary": "FastAPI and React platform for the Texas Home Outlet site, CRM flows, partner APIs, document generation, and regulatory RAG.",
-            "links": [
-                {"label": "Live Site", "href": "https://sapphirealpha.xyz", "external": True},
-                {
-                    "label": "Health",
-                    "href": "https://sapphirealpha.xyz/health",
-                    "external": True,
-                },
-                {
-                    "label": "Cloud Run Health",
-                    "href": "https://project-go-forward-trgi34bxuq-uc.a.run.app/health",
-                    "external": True,
-                },
-            ],
-            "tags": ["Cloud Run", "React", "FastAPI"],
+            "summary": _manifest_summary(
+                "project-go-forward",
+                "FastAPI and React platform for the Texas Home Outlet site, CRM flows, partner APIs, document generation, and regulatory RAG.",
+            ),
+            "links": _append_link(
+                [
+                    {"label": "Live Site", "href": "https://sapphirealpha.xyz", "external": True},
+                    {
+                        "label": "Health",
+                        "href": "https://sapphirealpha.xyz/health",
+                        "external": True,
+                    },
+                    {
+                        "label": "Cloud Run Health",
+                        "href": "https://project-go-forward-trgi34bxuq-uc.a.run.app/health",
+                        "external": True,
+                    },
+                ],
+                _manifest_repo_link("project-go-forward"),
+            ),
+            "tags": _manifest_tags("project-go-forward", ["Cloud Run", "React", "FastAPI"]),
         },
         {
             "name": "regional-intel-workbench",
             "status": "Local Showcase",
-            "summary": "Public-source regional intelligence console with Austin, Houston, and Gunnison coverage plus client-specific feed surfaces.",
-            "links": [
-                {
-                    "label": "Analyst Console",
-                    "href": "http://127.0.0.1:8768/intel",
-                    "external": True,
-                },
-                {
-                    "label": "Blanga Austin",
-                    "href": "http://127.0.0.1:8768/blanga/austin",
-                    "external": True,
-                },
-                {
-                    "label": "Vote Monitor",
-                    "href": "http://127.0.0.1:8768/vote-monitor",
-                    "external": True,
-                },
-                {
-                    "label": "API Health",
-                    "href": "http://127.0.0.1:8768/api/intel/health",
-                    "external": True,
-                },
-            ],
-            "tags": ["regional intel", "client feed", "provenance"],
+            "summary": _manifest_summary(
+                "regional-intel-workbench",
+                "Public-source regional intelligence console with Austin, Houston, and Gunnison coverage plus client-specific feed surfaces.",
+            ),
+            "links": _append_link(
+                [
+                    {
+                        "label": "Analyst Console",
+                        "href": "http://127.0.0.1:8768/intel",
+                        "external": True,
+                    },
+                    {
+                        "label": "Blanga Austin",
+                        "href": "http://127.0.0.1:8768/blanga/austin",
+                        "external": True,
+                    },
+                    {
+                        "label": "Vote Monitor",
+                        "href": "http://127.0.0.1:8768/vote-monitor",
+                        "external": True,
+                    },
+                    {
+                        "label": "API Health",
+                        "href": "http://127.0.0.1:8768/api/intel/health",
+                        "external": True,
+                    },
+                ],
+                _manifest_repo_link("regional-intel-workbench"),
+            ),
+            "tags": _manifest_tags("regional-intel-workbench", ["regional intel", "client feed", "provenance"]),
         },
         {
             "name": "org-platform",
@@ -972,20 +1048,26 @@ def _build_unified_dashboard_payload() -> dict[str, Any]:
         {
             "name": "Agentic PM Hub",
             "status": "Protected",
-            "summary": "Authenticated Cloud Run project-management hub for operator coordination; linked as a protected satellite surface.",
-            "links": [
-                {
-                    "label": "Service Health",
-                    "href": "https://agentic-pm-hub-trgi34bxuq-uc.a.run.app/health",
-                    "external": True,
-                },
-                {
-                    "label": "Liveness",
-                    "href": "https://agentic-pm-hub-trgi34bxuq-uc.a.run.app/healthz/",
-                    "external": True,
-                },
-            ],
-            "tags": ["Cloud Run", "protected", "coordination"],
+            "summary": _manifest_summary(
+                "agentic-arigato",
+                "Authenticated Cloud Run project-management hub for operator coordination; linked as a protected satellite surface.",
+            ),
+            "links": _append_link(
+                [
+                    {
+                        "label": "Service Health",
+                        "href": "https://agentic-pm-hub-trgi34bxuq-uc.a.run.app/health",
+                        "external": True,
+                    },
+                    {
+                        "label": "Liveness",
+                        "href": "https://agentic-pm-hub-trgi34bxuq-uc.a.run.app/healthz/",
+                        "external": True,
+                    },
+                ],
+                _manifest_repo_link("agentic-arigato"),
+            ),
+            "tags": _manifest_tags("agentic-arigato", ["Cloud Run", "protected", "coordination"]),
         },
     ]
 
