@@ -515,3 +515,12 @@ tools:
     owner: sapphire
     consumers: [sec_edgar_source, services.intelligence]
     description: Pure deterministic SEC filing classifier. Maps 8-K item codes (1.01, 4.01, 4.02, 5.02, 7.01, 9.01, etc.) and 10-K/10-Q/amendment forms to (severity, direction, summary) FilingEvent records with asset hints. No HTTP, no I/O.
+
+  # Time-travel + replay capability 0.1.0 (Tranche 6 Lane 3)
+  - name: timetravel
+    path: plugins/claw-sapphire/tools/internal/timetravel.py
+    shim: plugins/claw-sapphire/tools/timetravel.py
+    status: internal
+    owner: sapphire
+    consumers: [services.timetravel, hermes-agent.system-ops]
+    description: Time-Travel + Replay 0.1.0. Read-only over append-only JSONL under data/ (correlated_signals, narratives, cross_asset, macro, onchain, events/bus). Builds an interval index cached at ~/.cache/sapphire/timetravel/index.json (idempotent), packages a SystemSnapshot for any UTC timestamp, replays the correlator + narrative engine against snapshot data, and diffs replay vs actual to surface drift. Never writes to data/, never publishes events, never places trades. Actions, snapshot/replay/diff/index-status.
