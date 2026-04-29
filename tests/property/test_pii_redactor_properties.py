@@ -507,14 +507,9 @@ def test_redact_name_never_raises_on_arbitrary_input(name: str) -> None:
 # benign (still no raw PII leaked) but breaks idempotence for ~20 % of valid
 # RFC-style locals.
 #
-# This test is marked ``xfail(strict=False)``: it documents the gap so a
-# follow-up PR can fix the recogniser regex (widen prefix class to
-# ``[A-Za-z0-9._%+-]``) and remove the xfail without re-discovering the
-# falsifying example. See ``docs/products/test-rigor-0.1.0.md`` § Found Bugs.
+# This regression now passes after widening the recogniser regex prefix class
+# to ``[A-Za-z0-9._%+-]``; keep it as a permanent idempotence pin.
 # ---------------------------------------------------------------------------
-
-
-import pytest as _pytest  # noqa: E402  (placement intentional — local helper)
 
 
 # Lane 1 found-bug #1 (regression-pinned 2026-04-30): redacted email local

@@ -36,8 +36,11 @@ We adopt a **no-spend posture** with three enforcement points:
    cleanly without consuming hosted minutes. When populated, the workflow runs
    on the self-hosted runner only.
 3. **`scripts/ops/sapphire_safe_merge.sh`** wraps `gh pr merge --squash` with
-   the explicit `-t '<title> [skip ci]'` flag and a post-merge `gh run list`
-   sweep that cancels any queued or in-progress runs.
+   the explicit `-t '<title> [skip ci]'` flag. Before merge, it classifies the
+   PR's changed files and runs `scripts/ops/local_ci_verify.py --pr <N> --quiet`
+   for any non-documentation PR. After merge, it runs a scoped `gh run list`
+   sweep that cancels only queued or in-progress runs attributable to the
+   just-merged PR.
 
 The wrapper is the canonical merge path for autonomous PRs. Operator-driven
 merges of trading-critical-path PRs (CODEOWNERS-gated; see ADR 0003) follow
@@ -53,10 +56,11 @@ the same cadence but with `--admin` removed.
   - Discipline scales: same wrapper works for Codex agents, Claude agents, and
     operator-driven merges.
 - **Negative**:
-  - We do not get green-CI evidence on every PR. Operators must run the
-    verification protocol (`ruff`, both pytest blocks, registry validator,
-    production-readiness sweep) **locally** before merging. This is a real
-    burden for satellite-repo PRs that lack a wrapper.
+  - We do not get hosted green-CI evidence on every PR. For Sapphire, the
+    safe-merge wrapper now enforces local CI before non-documentation
+    `[skip ci]` merges. Satellite-repo PRs that lack a wrapper still rely on
+    the operator to run the verification protocol (`ruff`, both pytest blocks,
+    registry validator, production-readiness sweep) locally before merging.
   - The `[skip ci]` discipline is human-enforced — there is no commit-hook
     that adds it automatically. A forgotten `[skip ci]` is a real risk and
     has happened (PR #388).
