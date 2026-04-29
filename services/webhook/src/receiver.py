@@ -328,7 +328,7 @@ def _build_research_worker_status() -> dict[str, Any]:
         payload["output_root_label"] = _short_path_label(root)
         return payload
     try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
     except (json.JSONDecodeError, OSError) as exc:
         payload = _research_worker_empty_payload("latest manifest unreadable")
         payload["error"] = f"{exc.__class__.__name__}: {exc}"[:200]

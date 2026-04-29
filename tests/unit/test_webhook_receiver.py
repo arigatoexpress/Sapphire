@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import json
 import sys
 from pathlib import Path
 from typing import Any
@@ -538,3 +539,27 @@ def test_research_worker_payload_marks_failed_or_unsafe(receiver):
 
     assert receiver._build_research_worker_payload(failed_manifest)["status"] == "degraded"
     assert receiver._build_research_worker_payload(unsafe_manifest)["status"] == "unsafe"
+
+
+def test_research_worker_status_accepts_powershell_utf8_bom(receiver, tmp_path, monkeypatch):
+    run_dir = tmp_path / "20260429T212042Z"
+    run_dir.mkdir()
+    manifest = {
+        "generated_at": "2026-04-29T21:20:42Z",
+        "paper_only": True,
+        "live_trading_enabled": False,
+        "telegram_sends_enabled": False,
+        "run_dir": str(run_dir),
+        "commands": [{"name": "strategy_sweep", "exit_code": 0}],
+        "artifacts": [],
+    }
+    (run_dir / "manifest.json").write_text(
+        "\ufeff" + json.dumps(manifest),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(receiver, "RESEARCH_WORKER_OUTPUT_ROOT", str(tmp_path))
+
+    payload = receiver._build_research_worker_status()
+
+    assert payload["status"] == "ok"
+    assert payload["run_id"] == "20260429T212042Z"
