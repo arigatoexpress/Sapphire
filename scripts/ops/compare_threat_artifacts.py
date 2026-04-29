@@ -19,6 +19,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from lib.core.provenance import write_envelope_sidecar  # noqa: E402
+
 PASS = "PASS"
 WARN = "WARN"
 FAIL = "FAIL"
@@ -468,14 +474,56 @@ def write_reports(report: dict[str, Any], out_dir: Path) -> None:
     try:
         out_dir.mkdir(parents=True, exist_ok=True)
         stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-        (out_dir / f"threat-shadow-comparison-{stamp}.json").write_text(
-            json.dumps(report, indent=2) + "\n", encoding="utf-8"
-        )
-        (out_dir / f"threat-shadow-comparison-{stamp}.md").write_text(
-            render_markdown(report), encoding="utf-8"
-        )
+        json_path = out_dir / f"threat-shadow-comparison-{stamp}.json"
+        md_path = out_dir / f"threat-shadow-comparison-{stamp}.md"
+        json_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+        md_path.write_text(render_markdown(report), encoding="utf-8")
+        source_paths = _report_source_paths(report)
+        metadata = {
+            "comparison": "threat-shadow",
+            "verdict": report.get("verdict"),
+            "compared_at": report.get("compared_at"),
+        }
+        for path in (json_path, md_path):
+            write_envelope_sidecar(
+                path,
+                generator="scripts.ops.compare_threat_artifacts",
+                source_paths=source_paths,
+                ttl_seconds=7 * 24 * 3600,
+                metadata=metadata,
+            )
     except OSError as exc:
         raise ReportWriteError(f"{out_dir}: {exc}") from exc
+
+
+def _report_source_paths(report: dict[str, Any]) -> tuple[Path, ...]:
+    inputs = report.get("inputs") if isinstance(report.get("inputs"), dict) else {}
+    paths: list[Path] = []
+    for side in ("local", "remote"):
+        entry = inputs.get(side)
+        if not isinstance(entry, dict):
+            continue
+        raw_path = entry.get("path")
+        if raw_path:
+            paths.append(Path(str(raw_path)))
+    selection = report.get("selection")
+    if isinstance(selection, dict):
+        for side in ("local", "remote"):
+            entry = selection.get(side)
+            if not isinstance(entry, dict):
+                continue
+            raw_path = entry.get("path")
+            if raw_path:
+                paths.append(Path(str(raw_path)))
+    deduped: list[Path] = []
+    seen: set[str] = set()
+    for path in paths:
+        key = str(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(path)
+    return tuple(deduped)
 
 
 def render_markdown(report: dict[str, Any]) -> str:
