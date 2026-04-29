@@ -34,9 +34,9 @@ def test_status_action_with_custom_path(tmp_path: Path):
     assert out["calls_path_exists"] is True
 
 
-def test_report_action_runs_synthetic_fallback_when_no_data():
-    """When ~/.cache/sapphire/inference_proxy/calls.jsonl is absent, synthetic kicks in."""
-    out = _tool().report_action({})
+def test_report_action_runs_synthetic_fallback_when_no_data(tmp_path: Path):
+    """When the selected calls.jsonl path is absent, synthetic kicks in."""
+    out = _tool().report_action({"path": str(tmp_path / "missing-calls.jsonl")})
     assert out["ok"] is True
     assert out["action"] == "report"
     # has_real_data is False for the synthetic fixture.

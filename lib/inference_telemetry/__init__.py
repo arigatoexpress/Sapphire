@@ -25,10 +25,11 @@ Source-of-truth for input shape: the inference proxy writes call records to
       "error_class": null                    # populated when ok=false
     }
 
-This format is intentionally a strict subset of the inference proxy's existing
-``_metrics`` shape so the proxy can adopt it later without changing aggregator
-inputs. Tests cover both the documented shape and a handful of permissive edge
-cases (missing keys, malformed lines).
+This format is intentionally a sanitized subset of the inference proxy's
+request path: it records tier, model, latency, outcome, token counts, and error
+class without storing prompts, completions, API keys, or tenant secrets. Tests
+cover both the documented shape and a handful of permissive edge cases (missing
+keys, malformed lines).
 """
 
 from __future__ import annotations

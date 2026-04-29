@@ -26,7 +26,7 @@ def kimi_test_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(proxy_app, "_is_healthy", lambda name: name == "kimi-cloud")
     monkeypatch.setattr(proxy_app, "_mark_ok", lambda name: None)
     monkeypatch.setattr(proxy_app, "_mark_failed", lambda name: None)
-    monkeypatch.setattr(proxy_app, "_record", lambda name, ok, elapsed_ms: None)
+    monkeypatch.setattr(proxy_app, "_record", lambda *args, **kwargs: None)
     monkeypatch.delenv("KIMI_RELAY_CHAT_ID", raising=False)
     monkeypatch.delenv("KIMI_CLAW_BOT_TOKEN", raising=False)
 
