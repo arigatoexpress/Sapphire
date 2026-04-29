@@ -484,3 +484,25 @@ tools:
     remove_in: v0.5.0
     consumers: []
     description: Legacy Kronos forecaster — duplicate of predict_kronos. Use predict_kronos instead.
+
+  # SEC filings + earnings call intelligence 0.1.0 (Lane 7)
+  - name: sec_edgar_source
+    path: lib/sources/sec_edgar.py
+    status: internal
+    owner: sapphire
+    consumers: [signal_correlator, services.intelligence]
+    description: SEC EDGAR filings adapter for 8-K / 10-Q / 10-K. Pulls from data.sec.gov for curated tickers in ~/.sapphire/sec_tickers.yaml (default empty). Live pulls require SAPPHIRE_SEC_LIVE=1 plus SAPPHIRE_SEC_UA_NAME / SAPPHIRE_SEC_UA_EMAIL for the SEC-mandated User-Agent. Throttled to 10 req/sec hard ceiling per SEC's published rate limit; cached 1h under ~/.cache/sapphire/sec_edgar/. Cap, ≤5 tickers per pull.
+
+  - name: earnings_calls_source
+    path: lib/sources/earnings_calls.py
+    status: internal
+    owner: sapphire
+    consumers: [signal_correlator, services.intelligence]
+    description: Earnings call transcript adapter. Free-tier-only — operator-supplied IR RSS feeds in ~/.sapphire/earnings_rss.yaml, plus optional transcript fixture files under ~/.cache/sapphire/earnings_calls/<ticker>/. Paid providers (AlphaVantage / Polygon / Tiingo) documented but NOT wired. Live pulls require SAPPHIRE_EARNINGS_LIVE=1; cached 1h. 5 req/sec ceiling.
+
+  - name: sec_classifier
+    path: lib/sources/sec_classifier.py
+    status: internal
+    owner: sapphire
+    consumers: [sec_edgar_source, services.intelligence]
+    description: Pure deterministic SEC filing classifier. Maps 8-K item codes (1.01, 4.01, 4.02, 5.02, 7.01, 9.01, etc.) and 10-K/10-Q/amendment forms to (severity, direction, summary) FilingEvent records with asset hints. No HTTP, no I/O.

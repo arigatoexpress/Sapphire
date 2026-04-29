@@ -1,0 +1,42 @@
+# Sapphire SEC EDGAR ticker watchlist (example, intentionally empty)
+# ----------------------------------------------------------------------
+# This file is the example/template form of `~/.sapphire/sec_tickers.yaml`,
+# which the SECEdgarSource adapter reads at runtime.
+#
+# Copy this file to ~/.sapphire/sec_tickers.yaml and add the tickers you
+# want to track. We ship ZERO real ticker handles by default — operators
+# opt in per ticker. Sapphire never assumes a watchlist for you.
+#
+# Schema
+# ------
+#
+# tickers:
+#   - <SYMBOL>           # plain US-equity ticker, e.g. AAPL, NVDA, TSLA
+#   - <SYMBOL>
+# max_per_pull: 5        # optional. Hard-capped at 5 by the lane spec; smaller is fine.
+#
+# Notes
+# -----
+#
+# 1. SEC EDGAR is a free service but REQUIRES a User-Agent header
+#    identifying the requester + a contact email. Set:
+#       SAPPHIRE_SEC_UA_NAME=YourCompanyName
+#       SAPPHIRE_SEC_UA_EMAIL=ops@yourdomain.example
+#    Without these the adapter falls back to a generic Sapphire UA. SEC
+#    will eventually rate-limit (or block) any caller without a valid UA.
+#
+# 2. Live mode is operator-flagged via SAPPHIRE_SEC_LIVE=1. By default
+#    the adapter operates in dry-run / cache mode — no live HTTP calls.
+#
+# 3. The adapter respects a strict 10 req/sec ceiling (SEC's published
+#    rate limit). Sapphire will throttle automatically; you do not need
+#    to set anything.
+#
+# 4. Cache TTL is 1h. Submissions don't change frequently and SEC asks
+#    callers to be polite about repeat fetches.
+#
+# 5. Per the lane spec, no more than 5 tickers per pull. If your list
+#    is longer, the adapter pulls the first 5 each cycle.
+
+tickers: []
+# max_per_pull: 5
