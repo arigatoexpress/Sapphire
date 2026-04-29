@@ -533,3 +533,12 @@ tools:
     owner: sapphire
     consumers: [services.timetravel, hermes-agent.system-ops]
     description: Time-Travel + Replay 0.1.0. Read-only over append-only JSONL under data/ (correlated_signals, narratives, cross_asset, macro, onchain, events/bus). Builds an interval index cached at ~/.cache/sapphire/timetravel/index.json (idempotent), packages a SystemSnapshot for any UTC timestamp, replays the correlator + narrative engine against snapshot data, and diffs replay vs actual to surface drift. Never writes to data/, never publishes events, never places trades. Actions, snapshot/replay/diff/index-status.
+
+  # Walk-forward + regime decomposition 0.1.0 (Tranche 6 Lane 5)
+  - name: walkforward
+    path: plugins/claw-sapphire/tools/internal/walkforward.py
+    shim: plugins/claw-sapphire/tools/walkforward.py
+    status: internal
+    owner: sapphire
+    consumers: [services.walkforward, scheduled-tasks.backtest-sweep]
+    description: Walk-forward backtest + regime decomposition + walk-forward Deflated Sharpe wrapper 0.1.0. Pure orchestrator over lib.analytics.strategies, deterministic synthetic OHLCV by default, never modifies upstream analytics modules. Actions, run/decompose/deflated/latest/status. Caps, train≥60 bars, test≥20 bars, max 1500 bars per run; horizons 90/180/365 days for the build script. No live data, no Telegram sends.
