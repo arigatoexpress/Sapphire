@@ -79,12 +79,16 @@ If the file is missing, the aggregator falls back to `synthetic_fixture_report()
 ### 4.1 First-time setup (fresh box)
 
 1. **Verify the calls file path.** `python3 plugins/claw-sapphire/tools/inference_telemetry.py <<< '{"action":"status"}'`. Look at `calls_path_exists`.
-2. **If missing**, create the cache directory:
+2. **If missing**, confirm whether the proxy has handled any logged calls since
+   boot. The production proxy now creates the parent directory and appends
+   sanitized records on the first per-tier call unless
+   `INFERENCE_CALL_LOG_ENABLED=0` is set. To pre-create the path on a fresh box:
    ```bash
    mkdir -p ~/.cache/sapphire/inference_proxy
    touch ~/.cache/sapphire/inference_proxy/calls.jsonl
    ```
-   Until the proxy is wired to write call records, the file stays empty and the aggregator falls back to synthetic data.
+   An empty file means "no logged calls yet", "the writer is disabled", or "the
+   proxy is writing to a different `INFERENCE_PROXY_CALLS_PATH`".
 3. **Pull Kimi rates.** Visit <https://platform.moonshot.cn/docs/pricing/chat> and note the input + output per-million-token rates for whichever Kimi SKU the proxy uses. Convert to per-1k tokens (`rate_per_1m / 1000.0`).
 4. **Persist the rates** in `~/.sapphire/secrets.env` if you want a single source of truth, but **never commit them**:
    ```bash
@@ -100,7 +104,9 @@ If the panel becomes important to a buyer-facing demo:
 
 1. Run `make doctor` to confirm services are healthy.
 2. Open `/inference-telemetry`; verify the System Summary numbers look sane.
-3. If the page shows `mode = synthetic / no data`, that is correct when the proxy hasn't written any calls yet. **Do not fabricate data.**
+3. If the page shows `mode = synthetic / no data`, that is correct when the
+   proxy has not served any logged calls yet, the call log is disabled, or the
+   dashboard is reading a different file. **Do not fabricate data.**
 
 ### 4.3 Tuning the cost model
 
@@ -166,7 +172,11 @@ echo '{"action":"status"}' | python3 plugins/claw-sapphire/tools/inference_telem
 
 *Likely cause.* Synthetic-fixture mode. The synthetic fixture deliberately uses small numbers so it isn't mistaken for real data; the dashboard chip shows `mode: synthetic / no data` and `has_real_data: false`. **This is the system being honest, not a bug.**
 
-*Remediation.* Wire the proxy to write to `calls.jsonl`. Until that happens, every metric is synthetic.
+*Remediation.* The proxy writer exists in `services/inference-proxy/app.py`.
+Verify `INFERENCE_CALL_LOG_ENABLED` is not `0`, check
+`INFERENCE_PROXY_CALLS_PATH`, confirm the proxy has served a request through a
+logged tier, and inspect the call-log file permissions. Until a real call lands,
+synthetic mode is expected.
 
 ### 5.3 T4 cost is $0 but Kimi has been used
 
