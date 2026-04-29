@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+{% block title %}Inference Mesh Telemetry{% endblock %}
+
+{% block content %}
+<style>
+.it-header {
+    margin-bottom: var(--space-xl);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: var(--space-md);
+}
+.it-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+    gap: var(--space-lg);
+}
+.it-panel {
+    border: 1px solid var(--border-color);
+    background: rgba(10, 16, 10, 0.66);
+    padding: var(--space-lg);
+}
+.it-panel h2 {
+    color: var(--amber);
+    font-size: 1.15rem;
+    font-weight: 400;
+    margin-bottom: var(--space-md);
+}
+.it-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-md);
+    margin-bottom: var(--space-md);
+}
+.it-stat {
+    border: 1px solid var(--border-dim);
+    padding: var(--space-md);
+    min-height: 82px;
+}
+.it-stat .label {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+}
+.it-stat .value {
+    color: var(--text-primary);
+    font-size: 1.6rem;
+    margin-top: var(--space-sm);
+}
+.it-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+.it-table th, .it-table td {
+    border-bottom: 1px solid var(--border-dim);
+    padding: 8px;
+    text-align: left;
+    overflow-wrap: anywhere;
+    font-size: 0.85rem;
+}
+.it-table th {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+}
+.it-empty {
+    border: 1px dashed var(--border-dim);
+    color: var(--text-muted);
+    padding: var(--space-lg);
+}
+.it-rec {
+    border: 1px solid var(--border-dim);
+    padding: var(--space-md);
+    margin-bottom: var(--space-md);
+}
+.it-rec .rec-head { color: var(--amber); margin-bottom: var(--space-sm); }
+.it-rec .rec-savings { font-size: 1.2rem; color: var(--text-primary); }
+.it-rec ul { margin: var(--space-sm) 0 0; padding-left: 1.2em; color: var(--text-muted); font-size: 0.85rem; }
+.it-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border: 1px solid var(--border-dim);
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    margin-left: var(--space-sm);
+}
+.it-tag.ok { border-color: var(--green, #5be67a); color: var(--green, #5be67a); }
+.it-tag.warn { border-color: var(--amber); color: var(--amber); }
+.it-tag.err { border-color: var(--red, #ff6961); color: var(--red, #ff6961); }
+</style>
+
+<div class="it-header">
+    <h1>Inference Mesh Telemetry</h1>
+    <p class="text-muted">Per-tier latency, throughput, error rate, token consumption, cost projection. 4 tiers: T1 Windows GPU, T2 Pi (rari1, rari2), T3 Mac local, T4 Kimi Cloud. Recommendations are illustrative — operator owns decisions.</p>
+</div>
+
+<div class="it-grid">
+    <section class="it-panel">
+        <h2>System Summary</h2>
+        <div class="it-stats">
+            <div class="it-stat"><div class="label">Total Calls</div><div class="value" id="it-total-calls">--</div></div>
+            <div class="it-stat"><div class="label">Error Rate</div><div class="value" id="it-error-rate">--</div></div>
+            <div class="it-stat"><div class="label">Cost (USD)</div><div class="value" id="it-cost">--</div></div>
+        </div>
+        <div class="it-stats">
+            <div class="it-stat"><div class="label">Window</div><div class="value" id="it-window" style="font-size:0.85rem;">--</div></div>
+            <div class="it-stat"><div class="label">Tokens</div><div class="value" id="it-tokens">--</div></div>
+            <div class="it-stat"><div class="label">Mode</div><div class="value" id="it-mode" style="font-size:0.85rem;">--</div></div>
+        </div>
+        <div id="it-summary-notes" class="text-muted" style="font-size:0.82rem;"></div>
+    </section>
+
+    <section class="it-panel">
+        <h2>Per-Tier Metrics</h2>
+        <div id="it-tier-table"></div>
+    </section>
+
+    <section class="it-panel">
+        <h2>Cost Projection</h2>
+        <div class="it-stats">
+            <div class="it-stat"><div class="label">$/month</div><div class="value" id="it-monthly-cost">--</div></div>
+            <div class="it-stat"><div class="label">Calls/month</div><div class="value" id="it-monthly-calls">--</div></div>
+            <div class="it-stat"><div class="label">Kimi Rates</div><div class="value" id="it-kimi-rates" style="font-size:0.9rem;">--</div></div>
+        </div>
+        <div id="it-cost-citations" class="text-muted" style="font-size:0.82rem;"></div>
+    </section>
+
+    <section class="it-panel">
+        <h2>Recommendations</h2>
+        <div id="it-recommendations"></div>
+    </section>
+</div>
+
+<script>
+async function fetchJSON(url) {
+    const r = await fetch(url, { credentials: 'include' });
+    if (!r.ok) throw new Error(`${url} HTTP ${r.status}`);
+    return await r.json();
+}
+
+function fmtUSD(v) {
+    if (v == null || isNaN(v)) return '--';
+    return '$' + Number(v).toFixed(4);
+}
+
+function fmtNum(v) {
+    if (v == null || isNaN(v)) return '--';
+    return Number(v).toLocaleString();
+}
+
+function fmtMs(v) {
+    if (v == null || isNaN(v)) return '--';
+    if (v >= 1000) return (v / 1000).toFixed(2) + 's';
+    return Math.round(v) + 'ms';
+}
+
+function fmtPct(v) {
+    if (v == null || isNaN(v)) return '--';
+    return (Number(v) * 100).toFixed(2) + '%';
+}
+
+async function loadInferenceTelemetry() {
+    try {
+        const [report, recBundle] = await Promise.all([
+            fetchJSON('/api/inference-telemetry-report'),
+            fetchJSON('/api/inference-telemetry-recommendations'),
+        ]);
+
+        // Summary panel
+        document.getElementById('it-total-calls').textContent = fmtNum(report.total_calls);
+        document.getElementById('it-error-rate').textContent = fmtPct(report.error_rate);
+        document.getElementById('it-cost').textContent = fmtUSD(report.total_cost_usd);
+        document.getElementById('it-tokens').textContent = fmtNum(report.total_tokens);
+
+        const ws = report.window_seconds;
+        let windowLabel = '--';
+        if (ws && ws > 0) {
+            if (ws >= 3600) windowLabel = (ws / 3600).toFixed(2) + 'h';
+            else if (ws >= 60) windowLabel = (ws / 60).toFixed(1) + 'min';
+            else windowLabel = ws.toFixed(1) + 's';
+        }
+        document.getElementById('it-window').textContent = windowLabel;
+
+        const mode = report.has_real_data ? 'real' : 'synthetic / no data';
+        document.getElementById('it-mode').textContent = mode;
+        const modeEl = document.getElementById('it-mode');
+        if (!report.has_real_data) {
+            modeEl.style.color = 'var(--amber)';
+        }
+
+        // Notes
+        const notesEl = document.getElementById('it-summary-notes');
+        if (report.notes && report.notes.length) {
+            notesEl.innerHTML = '<strong>Notes:</strong><ul>' +
+                report.notes.map(n => `<li>${n}</li>`).join('') + '</ul>';
+        } else {
+            notesEl.textContent = '';
+        }
+
+        // Tier table
+        const tierTable = document.getElementById('it-tier-table');
+        if (report.tiers && report.tiers.length) {
+            const rows = report.tiers.map(t => `
+                <tr>
+                    <td>${t.tier}</td>
+                    <td>${fmtNum(t.calls)}</td>
+                    <td>${fmtMs(t.latency_p50_ms)}</td>
+                    <td>${fmtMs(t.latency_p99_ms)}</td>
+                    <td>${fmtPct(t.error_rate)}</td>
+                    <td>${fmtUSD(t.cost_usd)}</td>
+                </tr>
+            `).join('');
+            tierTable.innerHTML = `
+                <table class="it-table">
+                    <thead><tr><th>Tier</th><th>Calls</th><th>p50</th><th>p99</th><th>Err</th><th>Cost</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `;
+        } else {
+            tierTable.innerHTML = '<div class="it-empty">No tier data — calls.jsonl is empty or missing.</div>';
+        }
+
+        // Cost projection
+        document.getElementById('it-monthly-cost').textContent = fmtUSD(report.projected_monthly_cost_usd);
+        document.getElementById('it-monthly-calls').textContent = fmtNum(report.projected_monthly_calls);
+        document.getElementById('it-kimi-rates').textContent = recBundle.kimi_rates_supplied ? 'supplied' : 'unsupplied (T4 cost = $0)';
+
+        const citationsEl = document.getElementById('it-cost-citations');
+        const citations = [];
+        if (report.cost_model_citations && report.cost_model_citations.length) {
+            for (const c of report.cost_model_citations) citations.push(`<li>${c}</li>`);
+        }
+        if (citations.length) {
+            citationsEl.innerHTML = '<strong>Citations:</strong><ul>' + citations.join('') + '</ul>';
+        } else {
+            citationsEl.textContent = '';
+        }
+
+        // Recommendations
+        const recEl = document.getElementById('it-recommendations');
+        const recs = recBundle.recommendations || [];
+        if (recs.length === 0) {
+            recEl.innerHTML = '<div class="it-empty">No recommendations — system is in expected configuration or sample size too small.</div>';
+        } else {
+            recEl.innerHTML = recs.map(r => {
+                const dirLabel = r.kind === 'switch_tier'
+                    ? `${r.from_tier} → ${r.to_tier}`
+                    : `${r.kind}: ${r.from_tier || 'system'}`;
+                const tag = r.confidence;
+                const tagClass = tag === 'high' ? 'ok' : tag === 'medium' ? 'warn' : 'err';
+                const savings = r.kind === 'switch_tier'
+                    ? `<div class="rec-savings">monthly savings: ${fmtUSD(r.monthly_savings_usd)} <span class="text-muted" style="font-size:0.75rem;">(volume: ${fmtNum(r.monthly_volume)} calls/mo)</span></div>`
+                    : '';
+                const caveats = (r.caveats || []).map(c => `<li>${c}</li>`).join('');
+                return `
+                    <div class="it-rec">
+                        <div class="rec-head">${dirLabel} <span class="it-tag ${tagClass}">${tag}</span></div>
+                        ${savings}
+                        <div class="text-muted" style="font-size:0.82rem;">${r.rationale || ''}</div>
+                        <ul>${caveats}</ul>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Top-level caveats
+        if (recBundle.caveats && recBundle.caveats.length) {
+            const head = '<strong>Caveats:</strong><ul>' + recBundle.caveats.map(c => `<li>${c}</li>`).join('') + '</ul>';
+            const ce = document.createElement('div');
+            ce.className = 'text-muted';
+            ce.style.fontSize = '0.82rem';
+            ce.style.marginTop = 'var(--space-md)';
+            ce.innerHTML = head;
+            recEl.appendChild(ce);
+        }
+    } catch (e) {
+        document.getElementById('it-summary-notes').textContent = 'Load error: ' + e.message;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadInferenceTelemetry);
+setInterval(loadInferenceTelemetry, 60_000);
+</script>
+{% endblock %}

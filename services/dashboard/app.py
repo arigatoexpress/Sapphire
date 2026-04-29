@@ -5586,6 +5586,176 @@ def api_source_quality_decay():
         ), 200
 
 
+# ─── Inference Mesh Telemetry (Tranche 6 Lane 6) ──────────────────────────
+# Routes appended at the bottom intentionally to avoid a merge conflict with
+# the parallel Lane 4 (source quality) which appends in the observability
+# block region. Both lanes are isolated to their own route sections so the
+# integration-pass merge is mechanical.
+
+def _build_inference_telemetry_report() -> dict[str, Any]:
+    """Aggregate telemetry from ~/.cache/sapphire/inference_proxy/calls.jsonl.
+
+    Falls back to a synthetic fixture report when no real log exists, with
+    ``has_real_data=False`` clearly surfaced in the UI.
+    """
+    try:
+        from lib.inference_telemetry.aggregator import (
+            DEFAULT_CALLS_PATH,
+            aggregate,
+            project_monthly_calls,
+            project_monthly_cost,
+            synthetic_fixture_report,
+        )
+        from lib.inference_telemetry.cost_model import DEFAULT_COST_MODEL
+    except Exception as exc:
+        return {
+            "schema_version": 1,
+            "ok": False,
+            "has_real_data": False,
+            "error": f"telemetry import failed: {exc.__class__.__name__}",
+            "tiers": [],
+            "notes": ["lib.inference_telemetry import error"],
+        }
+
+    try:
+        if DEFAULT_CALLS_PATH.exists():
+            report = aggregate()
+        else:
+            report = synthetic_fixture_report()
+    except Exception as exc:
+        log.warning("inference telemetry aggregate error: %s", exc)
+        return {
+            "schema_version": 1,
+            "ok": False,
+            "has_real_data": False,
+            "error": f"{exc.__class__.__name__}: {exc}"[:200],
+            "tiers": [],
+            "notes": ["aggregator raised; see server log"],
+        }
+
+    payload = report.to_dict()
+    payload["projected_monthly_cost_usd"] = round(project_monthly_cost(report), 6)
+    payload["projected_monthly_calls"] = round(project_monthly_calls(report), 3)
+    payload["cost_model_citations"] = [
+        f"Moonshot pricing: {DEFAULT_COST_MODEL.moonshot_pricing_url} "
+        f"(retrieved {DEFAULT_COST_MODEL.moonshot_pricing_retrieved})",
+        "T1 GPU + T3 Mac use electricity-only proxies; not metered.",
+    ]
+    payload["ok"] = True
+    return payload
+
+
+def _build_inference_telemetry_recommendations() -> dict[str, Any]:
+    try:
+        from lib.inference_telemetry.aggregator import (
+            DEFAULT_CALLS_PATH,
+            aggregate,
+            synthetic_fixture_report,
+        )
+        from lib.inference_telemetry.cost_model import DEFAULT_COST_MODEL
+        from lib.inference_telemetry.recommender import recommend
+    except Exception as exc:
+        return {
+            "schema_version": 1,
+            "ok": False,
+            "has_real_data": False,
+            "error": f"recommender import failed: {exc.__class__.__name__}",
+            "recommendations": [],
+            "caveats": [],
+        }
+
+    try:
+        if DEFAULT_CALLS_PATH.exists():
+            report = aggregate()
+        else:
+            report = synthetic_fixture_report()
+        bundle = recommend(report, cost_model=DEFAULT_COST_MODEL)
+    except Exception as exc:
+        log.warning("inference telemetry recommender error: %s", exc)
+        return {
+            "schema_version": 1,
+            "ok": False,
+            "has_real_data": False,
+            "error": f"{exc.__class__.__name__}: {exc}"[:200],
+            "recommendations": [],
+            "caveats": [],
+        }
+
+    out = bundle.to_dict()
+    out["ok"] = True
+    return out
+
+
+@app.route("/inference-telemetry")
+@requires_auth
+def inference_telemetry_page():
+    return render_template(
+        "pages/inference_telemetry.html",
+        current_page="inference-telemetry",
+        page_title="Inference Mesh Telemetry",
+    )
+
+
+@app.route("/api/inference-telemetry-report")
+@requires_auth
+def api_inference_telemetry_report():
+    try:
+        return jsonify(_build_inference_telemetry_report())
+    except Exception as exc:
+        log.warning("inference telemetry report error: %s", exc)
+        return jsonify(
+            {
+                "schema_version": 1,
+                "ok": False,
+                "error": f"{exc.__class__.__name__}: {exc}"[:200],
+                "tiers": [],
+            }
+        ), 200
+
+
+@app.route("/api/inference-telemetry-recommendations")
+@requires_auth
+def api_inference_telemetry_recommendations():
+    try:
+        return jsonify(_build_inference_telemetry_recommendations())
+    except Exception as exc:
+        log.warning("inference telemetry recommendations error: %s", exc)
+        return jsonify(
+            {
+                "schema_version": 1,
+                "ok": False,
+                "error": f"{exc.__class__.__name__}: {exc}"[:200],
+                "recommendations": [],
+                "caveats": [],
+            }
+        ), 200
+
+
+@app.route("/api/inference-telemetry-cost-model")
+@requires_auth
+def api_inference_telemetry_cost_model():
+    try:
+        from lib.inference_telemetry.cost_model import DEFAULT_COST_MODEL
+
+        return jsonify(
+            {
+                "schema_version": 1,
+                "ok": True,
+                "cost_model": DEFAULT_COST_MODEL.to_dict(),
+            }
+        )
+    except Exception as exc:
+        log.warning("inference telemetry cost-model error: %s", exc)
+        return jsonify(
+            {
+                "schema_version": 1,
+                "ok": False,
+                "error": f"{exc.__class__.__name__}: {exc}"[:200],
+                "cost_model": None,
+            }
+        ), 200
+
+
 if __name__ == "__main__":
     # Start background metrics collector (snapshots every 5 min)
     try:
