@@ -4,7 +4,7 @@
   "description": "Buyer-safe redaction and export-readiness manifest for Sapphire dashboard public-demo artifacts.",
   "safe_routes": [
     {"path": "/", "label": "Overview", "filename": "overview.html"},
-    {"path": "/showcase", "label": "Showcase", "filename": "showcase.html"},
+    {"path": "/showcase", "label": "Unified Dashboard", "filename": "showcase.html"},
     {"path": "/architecture", "label": "Operations", "filename": "architecture.html"},
     {"path": "/production-readiness", "label": "Production Readiness", "filename": "production-readiness.html"},
     {"path": "/diligence", "label": "Diligence Packet", "filename": "diligence.html"},

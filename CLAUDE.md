@@ -93,7 +93,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `services/analytics_dashboard/` | service | Analytics-focused dashboard variant. |
 | `services/aster/` | service | Aster DEX bot — Solana perps (paused). |
 | `services/control-plane/` | service | PM hub: projects, tasks, events, Kimi bridge [Mac:8082]. |
-| `services/dashboard/` | service | Flask dashboard [Mac:8080] — 43 pages including `/showcase`, SSE event stream, performance + forecast + backtest endpoints. |
+| `services/dashboard/` | service | Flask dashboard [Mac:8080] — 43 pages including the unified `/showcase`, SSE event stream, performance + forecast + backtest endpoints. |
 | `services/foundry_sync/` | service | Scheduled Foundry sync daemon — wraps `lib/foundry/sync.py`. |
 | `services/heartbeat/` | service | Heartbeat daemon wrapper (`run.py`, `heartbeat.py`). |
 | `services/hyperliquid/` | service | Hyperliquid L1 bot — public-feed signal subscriber + live-trading executor (`hyperliquid_bot/risk.py`, hard caps: $5/order, 3x lev, 5 positions, $25/day loss, file-killswitch). Mainnet refused until EIP-712 signing is verified on testnet (`policy.signing_verified=False`). |

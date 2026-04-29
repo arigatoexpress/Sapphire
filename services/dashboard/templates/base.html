@@ -722,6 +722,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: var(--space-md);
+            flex-wrap: wrap;
             font-size: 0.7rem;
             color: var(--text-muted);
             background: rgba(7, 7, 17, 0.92);
@@ -729,7 +731,13 @@
 
         .footer-links {
             display: flex;
+            flex-wrap: wrap;
             gap: var(--space-lg);
+        }
+
+        .terminal-footer > div:last-child {
+            overflow-wrap: anywhere;
+            text-align: right;
         }
 
         .footer-links a {
@@ -815,6 +823,16 @@
                 font-size: 1rem;
                 border: 1px solid var(--border-dim);
                 margin-bottom: var(--space-sm);
+            }
+
+            .terminal-footer {
+                align-items: flex-start;
+                flex-direction: column;
+                padding: var(--space-md);
+            }
+
+            .terminal-footer > div:last-child {
+                text-align: left;
             }
         }
 
@@ -986,7 +1004,7 @@
         <nav class="terminal-nav" id="terminal-nav">
             <div class="nav-group">
                 <a href="/" class="nav-item {% if current_page == 'overview' %}active{% endif %}">Overview</a>
-                <a href="/showcase" class="nav-item {% if current_page == 'showcase' %}active{% endif %}">Showcase</a>
+                <a href="/showcase" class="nav-item {% if current_page == 'showcase' %}active{% endif %}">Unified</a>
                 <a href="/architecture" class="nav-item {% if current_page == 'architecture' %}active{% endif %}">Operations</a>
                 <a href="/activity" class="nav-item {% if current_page == 'activity' %}active{% endif %}">Activity</a>
             </div>

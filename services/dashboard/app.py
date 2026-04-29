@@ -803,6 +803,256 @@ def fetch_sync(url):
         return {}
 
 
+def _build_unified_dashboard_payload() -> dict[str, Any]:
+    """Read-only dashboard directory for Sapphire and adjacent frontends."""
+    return {
+        "generated_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
+        "metrics": [
+            {
+                "label": "Dashboard Routes",
+                "value": "43",
+                "note": "Authenticated operator, product, diligence, and intel surfaces",
+            },
+            {
+                "label": "Registry Entries",
+                "value": "67",
+                "note": "Tool registry entries with zero validation errors",
+            },
+            {
+                "label": "Readiness",
+                "value": "0 FAIL",
+                "note": "Latest local production-readiness posture is failure-free",
+            },
+            {
+                "label": "Satellite Frontends",
+                "value": "4",
+                "note": "THO, regional intel, org-platform, and protected PM hub",
+            },
+        ],
+        "primary_surfaces": [
+            {
+                "kicker": "Mission Control",
+                "title": "System Overview",
+                "href": "/",
+                "summary": "Live service posture, inference tier health, activity feed, quick navigation, and operational KPIs.",
+                "tags": ["operator", "live status", "SSE"],
+            },
+            {
+                "kicker": "Reliability",
+                "title": "Production Readiness",
+                "href": "/production-readiness",
+                "summary": "Failure and warning matrix for repo state, no-spend gates, runbooks, LaunchAgents, and external-readiness checks.",
+                "tags": ["0 FAIL target", "ops"],
+            },
+            {
+                "kicker": "Observability",
+                "title": "Signals and Inference",
+                "href": "/inference-telemetry",
+                "summary": "Inference proxy telemetry, tier routing, model latency, quota posture, and service health context.",
+                "tags": ["LLM mesh", "telemetry"],
+            },
+            {
+                "kicker": "Diligence",
+                "title": "Buyer Packet",
+                "href": "/diligence",
+                "summary": "Acquirer-ready proof surface with product capabilities, security posture, provenance, and roadmap artifacts.",
+                "tags": ["demo-safe", "evidence"],
+            },
+            {
+                "kicker": "Intel",
+                "title": "Regional Intelligence",
+                "href": "/intel",
+                "summary": "Sapphire-hosted regional context, source quality, geographic signals, and client-ready intelligence paths.",
+                "tags": ["regional", "sources"],
+            },
+            {
+                "kicker": "Products",
+                "title": "Threat Intel and Dossier",
+                "href": "/threat-intel",
+                "summary": "Productized security intelligence, customer dossier workflows, and showcase-ready commercial surfaces.",
+                "tags": ["product", "client"],
+            },
+        ],
+        "satellite_dashboards": [
+            {
+                "name": "Project-Go-Forward / THO",
+                "status": "Production",
+                "summary": "FastAPI and React platform for the Texas Home Outlet site, CRM flows, partner APIs, document generation, and regulatory RAG.",
+                "links": [
+                    {"label": "Live Site", "href": "https://sapphirealpha.xyz", "external": True},
+                    {
+                        "label": "Health",
+                        "href": "https://sapphirealpha.xyz/health",
+                        "external": True,
+                    },
+                    {
+                        "label": "Cloud Run Health",
+                        "href": "https://project-go-forward-trgi34bxuq-uc.a.run.app/health",
+                        "external": True,
+                    },
+                ],
+                "tags": ["Cloud Run", "React", "FastAPI"],
+            },
+            {
+                "name": "regional-intel-workbench",
+                "status": "Local Showcase",
+                "summary": "Public-source regional intelligence console with Austin, Houston, and Gunnison coverage plus client-specific feed surfaces.",
+                "links": [
+                    {
+                        "label": "Analyst Console",
+                        "href": "http://127.0.0.1:8768/intel",
+                        "external": True,
+                    },
+                    {
+                        "label": "Blanga Austin",
+                        "href": "http://127.0.0.1:8768/blanga/austin",
+                        "external": True,
+                    },
+                    {
+                        "label": "Vote Monitor",
+                        "href": "http://127.0.0.1:8768/vote-monitor",
+                        "external": True,
+                    },
+                    {
+                        "label": "API Health",
+                        "href": "http://127.0.0.1:8768/api/intel/health",
+                        "external": True,
+                    },
+                ],
+                "tags": ["regional intel", "client feed", "provenance"],
+            },
+            {
+                "name": "org-platform",
+                "status": "Local Dashboard",
+                "summary": "Autonomous organization fallback dashboard for unified events, crypto signals, Foundry-ready transforms, and local demos.",
+                "links": [
+                    {"label": "Dashboard", "href": "http://127.0.0.1:3000", "external": True},
+                    {
+                        "label": "Events JSON",
+                        "href": "http://127.0.0.1:3000/events.json",
+                        "external": True,
+                    },
+                    {
+                        "label": "Crypto JSON",
+                        "href": "http://127.0.0.1:3000/crypto.json",
+                        "external": True,
+                    },
+                ],
+                "tags": ["Next.js", "events", "Foundry"],
+            },
+            {
+                "name": "Agentic PM Hub",
+                "status": "Protected",
+                "summary": "Authenticated Cloud Run project-management hub for operator coordination; linked as a protected satellite surface.",
+                "links": [
+                    {
+                        "label": "Service Health",
+                        "href": "https://agentic-pm-hub-trgi34bxuq-uc.a.run.app/health",
+                        "external": True,
+                    },
+                    {
+                        "label": "Liveness",
+                        "href": "https://agentic-pm-hub-trgi34bxuq-uc.a.run.app/healthz/",
+                        "external": True,
+                    },
+                ],
+                "tags": ["Cloud Run", "protected", "coordination"],
+            },
+        ],
+        "adjacent_projects": [
+            {
+                "name": "tradingview-mcp / tradingview-mcp-v2",
+                "coverage": "TradingView bridge and dry-run signal tooling",
+                "href": "/api/tradingview/capabilities",
+                "surface": "Capability matrix JSON",
+            },
+            {
+                "name": "cyber-threat-bot",
+                "coverage": "Defensive threat collection and research workflow",
+                "href": "/threat-intel",
+                "surface": "Threat Intel product surface",
+            },
+            {
+                "name": "crypto-tax-tracker",
+                "coverage": "Finance-supporting satellite tracked from the org manifest",
+                "href": "/sapphire-book",
+                "surface": "Sapphire Book context",
+            },
+        ],
+        "dashboard_directory": [
+            {
+                "group": "Command",
+                "links": [
+                    {"label": "Overview", "href": "/"},
+                    {"label": "Operations", "href": "/architecture"},
+                    {"label": "Activity", "href": "/activity"},
+                    {"label": "Organization", "href": "/organization"},
+                ],
+            },
+            {
+                "group": "Trading",
+                "links": [
+                    {"label": "Portfolio", "href": "/portfolio"},
+                    {"label": "Performance", "href": "/performance"},
+                    {"label": "Factors", "href": "/factors"},
+                    {"label": "Cascade", "href": "/cascade"},
+                    {"label": "Analytics", "href": "/analytics"},
+                ],
+            },
+            {
+                "group": "Intelligence",
+                "links": [
+                    {"label": "Intelligence", "href": "/intelligence"},
+                    {"label": "Investments", "href": "/investment-intel"},
+                    {"label": "Cross Asset", "href": "/cross-asset"},
+                    {"label": "Sovereign Thesis", "href": "/sovereign-thesis"},
+                    {"label": "Source Quality", "href": "/source-quality"},
+                ],
+            },
+            {
+                "group": "Product",
+                "links": [
+                    {"label": "Diligence", "href": "/diligence"},
+                    {"label": "Threat Intel", "href": "/threat-intel"},
+                    {"label": "Customer Dossier", "href": "/customer-dossier"},
+                    {"label": "Sapphire Book", "href": "/sapphire-book"},
+                ],
+            },
+            {
+                "group": "Safety",
+                "links": [
+                    {"label": "Observability", "href": "/observability"},
+                    {"label": "Security", "href": "/security"},
+                    {"label": "Security Overview", "href": "/security/overview"},
+                    {"label": "Robinhood Chain", "href": "/chain/robinhood"},
+                ],
+            },
+        ],
+        "operating_loop": [
+            {
+                "step": "Observe",
+                "title": "Signals and status",
+                "copy": "Dashboards consolidate live services, local artifacts, public-source intel, and satellite health into one read-only view.",
+            },
+            {
+                "step": "Orient",
+                "title": "Evidence map",
+                "copy": "Product, diligence, operations, trading, and source-quality paths stay one click apart for quick walkthroughs.",
+            },
+            {
+                "step": "Decide",
+                "title": "Guarded posture",
+                "copy": "Production-readiness, security, no-spend gates, and paper-only trading boundaries remain explicit in the command surface.",
+            },
+            {
+                "step": "Show",
+                "title": "Friend-ready demo",
+                "copy": "External frontends and Sapphire routes are grouped by purpose so the strongest proof paths are easy to present.",
+            },
+        ],
+    }
+
+
 @app.route("/")
 @requires_auth
 def index():
@@ -813,11 +1063,16 @@ def index():
 
 
 @app.route("/showcase")
+@app.route("/unified")
+@app.route("/unified-dashboard")
 @requires_auth
 def showcase():
     """Curated read-only front door for demos and ecosystem orientation."""
     return render_template(
-        "pages/showcase.html", current_page="showcase", page_title="Showcase"
+        "pages/showcase.html",
+        current_page="showcase",
+        page_title="Unified Dashboard",
+        unified_dashboard=_build_unified_dashboard_payload(),
     )
 
 
@@ -3379,7 +3634,9 @@ def api_provenance_summary():
         older_than_hours = float(raw_hours)
     except (TypeError, ValueError):
         older_than_hours = 24.0
-    return jsonify(_maybe_buyer_safe_payload(_build_provenance_summary(older_than_hours=older_than_hours)))
+    return jsonify(
+        _maybe_buyer_safe_payload(_build_provenance_summary(older_than_hours=older_than_hours))
+    )
 
 
 @app.route("/api/test-suite-health")
@@ -4012,7 +4269,8 @@ def _select_latest_threat_snapshot() -> tuple[Path | None, str | None]:
     # Fall back: scan dated subdirs.
     candidates = sorted(
         (
-            p for p in _THREAT_INTEL_INTELLIGENCE_DIR.iterdir()
+            p
+            for p in _THREAT_INTEL_INTELLIGENCE_DIR.iterdir()
             if p.is_dir() and (p / "threats.json").is_file()
         ),
         reverse=True,
@@ -4032,7 +4290,9 @@ def _classify_threat_severity(score: float, exploited: bool) -> str:
     return "low"
 
 
-def _build_threat_intel_payload(*, snapshot_path: Path | None, snapshot_date: str | None) -> dict[str, Any]:
+def _build_threat_intel_payload(
+    *, snapshot_path: Path | None, snapshot_date: str | None
+) -> dict[str, Any]:
     if snapshot_path is None:
         payload = _safe_threats_payload(error="no_snapshot_available")
         return payload
@@ -4100,15 +4360,19 @@ def _build_threat_intel_payload(*, snapshot_path: Path | None, snapshot_date: st
             entry["citations"] += 1
         for tag in t.get("tags") or []:
             tag_str = str(tag)
-            if tag_str.startswith("T") and len(tag_str) >= 5 and tag_str[1:].split(".")[0].isdigit():
+            if (
+                tag_str.startswith("T")
+                and len(tag_str) >= 5
+                and tag_str[1:].split(".")[0].isdigit()
+            ):
                 entry = technique_counts.setdefault(
                     tag_str[:32],
                     {"id": tag_str[:32], "title": "", "citations": 0, "severity": sev},
                 )
                 entry["citations"] += 1
 
-    kev_rows.sort(key=lambda r: (r.get("score") or 0.0), reverse=True)
-    nvd_rows.sort(key=lambda r: (r.get("score") or 0.0), reverse=True)
+    kev_rows.sort(key=lambda r: r.get("score") or 0.0, reverse=True)
+    nvd_rows.sort(key=lambda r: r.get("score") or 0.0, reverse=True)
     technique_rows = sorted(
         technique_counts.values(), key=lambda r: r.get("citations", 0), reverse=True
     )
@@ -4236,7 +4500,7 @@ def _load_dossier_tenant_salt(
                 if not stripped or stripped.startswith("#"):
                     continue
                 if stripped.startswith("export "):
-                    stripped = stripped[len("export "):].lstrip()
+                    stripped = stripped[len("export ") :].lstrip()
                 if "=" not in stripped:
                     continue
                 k, _, v = stripped.partition("=")
@@ -5112,9 +5376,7 @@ def _walkforward_horizon_summary(block: dict[str, Any]) -> dict[str, Any]:
 
 def _walkforward_best_horizon(horizons: list[dict[str, Any]]) -> dict[str, Any] | None:
     scored = [
-        horizon
-        for horizon in horizons
-        if isinstance(horizon.get("mean_test_sortino"), int | float)
+        horizon for horizon in horizons if isinstance(horizon.get("mean_test_sortino"), int | float)
     ]
     if not scored:
         return None
@@ -5228,7 +5490,9 @@ def _build_walkforward_results_payload() -> dict[str, Any]:
             "strategy_count": sum(1 for strategy in strategies if strategy.get("status") == "ok"),
             "artifact_count": len(artifacts),
             "horizon_count": len(all_horizons),
-            "dsr_pass_count": sum(1 for horizon in all_horizons if horizon.get("dsr_passed") is True),
+            "dsr_pass_count": sum(
+                1 for horizon in all_horizons if horizon.get("dsr_passed") is True
+            ),
             "best_strategy": best.get("strategy") if best else None,
             "best_horizon_days": best.get("horizon_days") if best else None,
             "best_sortino": best.get("mean_test_sortino") if best else None,
@@ -5882,6 +6146,7 @@ def api_source_quality_decay():
 # the parallel Lane 4 (source quality) which appends in the observability
 # block region. Both lanes are isolated to their own route sections so the
 # integration-pass merge is mechanical.
+
 
 def _build_inference_telemetry_report() -> dict[str, Any]:
     """Aggregate telemetry from ~/.cache/sapphire/inference_proxy/calls.jsonl.

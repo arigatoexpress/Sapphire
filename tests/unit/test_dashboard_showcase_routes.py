@@ -1,4 +1,4 @@
-"""Dashboard showcase route stays auth-gated, paste-safe, and navigable."""
+"""Unified dashboard route stays auth-gated, paste-safe, and navigable."""
 
 from __future__ import annotations
 
@@ -46,7 +46,10 @@ def test_showcase_page_renders_with_curated_links(client):
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    assert "Sapphire ecosystem showcase" in html
+    assert "Unified Sapphire dashboard" in html
+    assert "Satellite frontends" in html
+    assert "&lt;built-in method copy" not in html
+    assert "Dashboards consolidate live services" in html
     for route in (
         "/",
         "/production-readiness",
@@ -56,21 +59,48 @@ def test_showcase_page_renders_with_curated_links(client):
         "/inference-telemetry",
         "/source-quality",
         "/chain/robinhood",
+        "/security/overview",
     ):
         assert f'href="{route}"' in html
     assert 'href="/overview"' not in html
+
+
+def test_unified_dashboard_aliases_render_same_surface(client):
+    for route in ("/unified", "/unified-dashboard"):
+        response = client.get(route, headers=_auth_header())
+
+        assert response.status_code == 200
+        assert "Unified Sapphire dashboard" in response.get_data(as_text=True)
 
 
 def test_showcase_page_surfaces_satellite_repositories(client):
     response = client.get("/showcase", headers=_auth_header())
     html = response.get_data(as_text=True)
 
-    for repo in (
-        "regional-intel-workbench",
-        "Project-Go-Forward",
-        "tradingview-mcp",
-        "cyber-threat-bot",
+    for repo in ("regional-intel-workbench", "Project-Go-Forward", "org-platform"):
+        assert repo in html
+
+
+def test_showcase_page_links_to_satellite_frontends(client):
+    response = client.get("/showcase", headers=_auth_header())
+    html = response.get_data(as_text=True)
+
+    for href in (
+        "https://sapphirealpha.xyz",
+        "https://sapphirealpha.xyz/health",
+        "http://127.0.0.1:8768/intel",
+        "http://127.0.0.1:8768/blanga/austin",
+        "http://127.0.0.1:8768/vote-monitor",
+        "http://127.0.0.1:3000",
     ):
+        assert f'href="{href}"' in html
+
+
+def test_showcase_page_surfaces_adjacent_project_coverage(client):
+    response = client.get("/showcase", headers=_auth_header())
+    html = response.get_data(as_text=True)
+
+    for repo in ("tradingview-mcp", "cyber-threat-bot", "crypto-tax-tracker"):
         assert repo in html
 
 
@@ -79,13 +109,14 @@ def test_showcase_route_appears_in_global_nav(client):
     html = response.get_data(as_text=True)
 
     assert 'href="/showcase"' in html
+    assert ">Unified</a>" in html
 
 
 def test_showcase_active_nav_state(client):
     response = client.get("/showcase", headers=_auth_header())
     html = response.get_data(as_text=True)
 
-    assert 'current_page == \'showcase\'' not in html
+    assert "current_page == 'showcase'" not in html
     assert re.search(r'href="/showcase"[^>]*active', html)
 
 

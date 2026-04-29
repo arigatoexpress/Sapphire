@@ -27,7 +27,7 @@ Sapphire is a continuously-running, mesh-topology operating system that integrat
 
 The intelligence subsystem now composes deterministic signal correlation, cross-asset regime detection, regulatory/macro calendars, on-chain provider snapshots, Hyperliquid counter-party tracking, historical event-impact lookup tables, and rubric-gated narrative synthesis. The trading subsystem remains behind risk-kernel, confirmation-firewall, dry-run, and kill-switch controls. The inference mesh provides four-tier failover (RTX 5070 Ti GPU -> Raspberry Pi -> Mac CPU -> Kimi Cloud) with a sensitivity classifier that fails closed against PII or secret egress to managed cloud endpoints. The content engine is a research-to-publish pipeline with an institutional quality gate that blocks unsupported performance claims before they reach Substack, X, LinkedIn, or Typefully.
 
-The platform is operated as a research instrument: every routine produces an artifact, every artifact has a verdict, every generated artifact carries provenance, and every verdict feeds a 43-page operational dashboard with a curated `/showcase` front door.
+The platform is operated as a research instrument: every routine produces an artifact, every artifact has a verdict, every generated artifact carries provenance, and every verdict feeds a 43-page operational dashboard with a unified `/showcase` front door.
 
 > $$\mathrm{NetPnL} = \underbrace{\sum_{t}\,\mathrm{edge}_t\,\cdot\,\mathrm{capital}_t\,\cdot\,\mathrm{efficiency}_t}_{\text{alpha}} \;-\; \underbrace{\sum_{t}\,\mathrm{fees}_t + \mathrm{slip}_t + \mathrm{infra}_t + \mathrm{tail}_t}_{\text{cost}}$$
 
@@ -135,7 +135,7 @@ flowchart LR
 |---|---:|---|
 | Passing tests | **6,294+** | 5,804+ unit · 490 plugin (`python scripts/ops/test_inventory.py --check-readme`) |
 | Test files | **356+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
-| Dashboard pages | **43** | Flask + SSE, basic-auth, `/showcase`, observability, cross-asset, diligence, threat-intel, dossier pages |
+| Dashboard pages | **43** | Flask + SSE, basic-auth, unified `/showcase`, observability, cross-asset, diligence, threat-intel, dossier pages |
 | Quant strategies | **7** | `lib/analytics/strategies.py` |
 | Pine strategies | **5** | `pine/standalone/` |
 | Plugin tools (registered · internal · deprecated) | **7 · 59 · 1** | 67 total entries in `infra/tool-registry.yaml` |
@@ -609,7 +609,7 @@ flowchart LR
 
 | Category | Pages |
 |---|---|
-| **Orientation** | showcase · overview · architecture · sapphire_book |
+| **Orientation** | showcase / unified · overview · architecture · sapphire_book |
 | **Command** | command_deck · control · system · settings · activity · logs · agents |
 | **Trading** | signals · predictions · portfolio · performance · risk · factors · analytics · cascade |
 | **Intelligence** | intel · intelligence · investment_intel · cross_asset · sovereign_thesis · sovereign_thesis_story · narrative_eval · source_quality |
@@ -617,7 +617,7 @@ flowchart LR
 | **Content & autonomy** | content · organization · observability · inference_telemetry · agents_autonomous |
 | **Security & diligence** | soc · security · security_overview · health · infrastructure · production_readiness · threat_intel · customer_dossier · diligence |
 
-Start demos at `/showcase`, then branch into persona-specific routes such as `/diligence`, `/production-readiness`, `/sovereign-thesis`, `/intel`, `/inference-telemetry`, and `/source-quality`. Live event stream at `/api/events/stream`. Performance endpoints wired to real trade data: `/api/strategy-performance` · `/api/performance-timeseries` · `/api/backtest-results` · `/api/forecast`. Tranche 4 feed health is exposed through `/api/observability-tranche4-feeds`, with cross-asset endpoints at `/api/cross-asset-matrix`, `/api/cross-asset-regime`, and `/api/cross-asset-breakdowns`.
+Start demos at `/showcase` or `/unified`, then branch into persona-specific routes such as `/diligence`, `/production-readiness`, `/sovereign-thesis`, `/intel`, `/inference-telemetry`, and `/source-quality`; the unified view also links the THO, Regional Intel Workbench, org-platform, protected PM Hub, TradingView MCP, cyber-threat-bot, and crypto-tax-tracker surfaces from one directory. Live event stream at `/api/events/stream`. Performance endpoints wired to real trade data: `/api/strategy-performance` · `/api/performance-timeseries` · `/api/backtest-results` · `/api/forecast`. Tranche 4 feed health is exposed through `/api/observability-tranche4-feeds`, with cross-asset endpoints at `/api/cross-asset-matrix`, `/api/cross-asset-regime`, and `/api/cross-asset-breakdowns`.
 
 ### 10.2 Routines — 34 LaunchAgent definitions
 

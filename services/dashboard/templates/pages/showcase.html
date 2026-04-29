@@ -1,490 +1,661 @@
 {% extends "base.html" %}
 
-{% block title %}Showcase{% endblock %}
+{% block title %}Unified Dashboard{% endblock %}
 
 {% block extra_css %}
-.showcase-hero {
+.unified-shell {
     display: grid;
-    grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
-    gap: var(--space-lg);
-    align-items: stretch;
-    margin-bottom: var(--space-lg);
+    gap: var(--space-xl);
 }
 
-.showcase-band {
+.unified-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+    gap: var(--space-lg);
+    align-items: end;
+    padding: clamp(22px, 4vw, 42px);
     border: 1px solid var(--border-color);
-    background: rgba(11, 11, 26, 0.82);
     border-radius: var(--radius-lg);
-    padding: var(--space-xl);
+    background:
+        linear-gradient(135deg, rgba(105, 214, 255, 0.10), rgba(255, 198, 77, 0.045) 45%, rgba(98, 255, 64, 0.06)),
+        rgba(11, 11, 26, 0.88);
     position: relative;
     overflow: hidden;
 }
 
-.showcase-band::before {
+.unified-hero::before {
     content: '';
     position: absolute;
     inset: 0 0 auto;
     height: 1px;
-    background: linear-gradient(90deg, transparent, var(--cyan), var(--amber), transparent);
-    opacity: 0.75;
+    background: linear-gradient(90deg, transparent, var(--cyan), var(--amber), var(--green), transparent);
+    opacity: 0.85;
 }
 
-.showcase-kicker {
+.unified-kicker,
+.section-kicker,
+.card-kicker {
     color: var(--cyan);
-    font-size: 0.72rem;
-    letter-spacing: 0.18em;
+    font-size: 0.68rem;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
-    margin-bottom: var(--space-sm);
 }
 
-.showcase-title {
+.unified-title {
+    max-width: 900px;
+    margin: var(--space-sm) 0 var(--space-md);
     color: var(--text-primary);
     font-family: var(--font-header);
-    font-size: 2.35rem;
+    font-size: clamp(2rem, 5vw, 4.2rem);
+    font-weight: 400;
+    line-height: 0.95;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.unified-copy {
+    max-width: 820px;
+    color: var(--text-secondary);
+    font-size: 0.94rem;
+    line-height: 1.7;
+}
+
+.unified-actions,
+.card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+}
+
+.unified-actions {
+    margin-top: var(--space-lg);
+}
+
+.hero-panel {
+    border-left: 1px solid var(--border-dim);
+    padding-left: var(--space-lg);
+}
+
+.hero-panel-title {
+    color: var(--amber);
+    font-family: var(--font-header);
+    font-size: 1.45rem;
+    line-height: 1;
+    margin-bottom: var(--space-sm);
+    text-transform: uppercase;
+}
+
+.hero-panel-copy {
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    line-height: 1.65;
+    margin-bottom: var(--space-md);
+}
+
+.hero-list {
+    display: grid;
+    gap: var(--space-sm);
+}
+
+.hero-list-row {
+    display: grid;
+    grid-template-columns: 84px minmax(0, 1fr);
+    gap: var(--space-sm);
+    padding: var(--space-sm) 0;
+    border-top: 1px solid var(--border-dim);
+}
+
+.hero-list-label {
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.hero-list-value {
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    line-height: 1.45;
+}
+
+.metric-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-md);
+}
+
+.metric-card,
+.surface-card,
+.satellite-card,
+.loop-card {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    background: rgba(11, 11, 26, 0.84);
+}
+
+.metric-card {
+    padding: var(--space-lg);
+    min-height: 140px;
+}
+
+.metric-label {
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.metric-value {
+    margin: var(--space-sm) 0;
+    color: var(--amber);
+    font-family: var(--font-header);
+    font-size: 2.1rem;
+    line-height: 1;
+}
+
+.metric-note {
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    line-height: 1.5;
+}
+
+.unified-section {
+    display: grid;
+    gap: var(--space-md);
+}
+
+.section-head {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: var(--space-md);
+    border-bottom: 1px solid var(--border-dim);
+    padding-bottom: var(--space-md);
+}
+
+.section-title {
+    margin-top: var(--space-xs);
+    color: var(--text-primary);
+    font-family: var(--font-header);
+    font-size: 1.5rem;
     font-weight: 400;
     letter-spacing: 0;
     line-height: 1;
     text-transform: uppercase;
-    margin-bottom: var(--space-md);
 }
 
-.showcase-copy {
-    max-width: 780px;
-    color: var(--text-secondary);
-    font-size: 0.92rem;
-    line-height: 1.7;
-}
-
-.showcase-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-sm);
-    margin-top: var(--space-lg);
-}
-
-.signal-ribbon {
-    display: grid;
-    gap: var(--space-sm);
-}
-
-.signal-tile {
-    border: 1px solid var(--border-dim);
-    border-radius: var(--radius);
-    padding: var(--space-md);
-    background: rgba(98, 255, 64, 0.025);
-    min-height: 86px;
-}
-
-.signal-label {
+.section-note {
+    max-width: 560px;
     color: var(--text-muted);
-    font-size: 0.66rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    margin-bottom: var(--space-xs);
+    font-size: 0.78rem;
+    line-height: 1.55;
+    text-align: right;
 }
 
-.signal-value {
-    color: var(--amber);
-    font-family: var(--font-header);
-    font-size: 1.8rem;
-    line-height: 1;
-}
-
-.signal-note {
-    color: var(--text-muted);
-    font-size: 0.72rem;
-    margin-top: var(--space-xs);
-}
-
-.section-band {
-    margin-bottom: var(--space-lg);
-}
-
-.showcase-grid {
+.surface-grid {
     display: grid;
-    gap: var(--space-lg);
-}
-
-.showcase-grid.cols-3 {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-md);
 }
 
-.showcase-grid.cols-4 {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.showcase-card {
+.surface-card,
+.satellite-card,
+.loop-card {
     display: flex;
     flex-direction: column;
     gap: var(--space-sm);
-    min-height: 228px;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-lg);
-    background: rgba(11, 11, 26, 0.82);
+    min-height: 230px;
     padding: var(--space-lg);
-    text-decoration: none;
     color: inherit;
+    text-decoration: none;
     transition: border-color var(--t-fast), background var(--t-fast), transform 120ms ease;
 }
 
-.showcase-card:hover {
+.surface-card:hover,
+.satellite-card:hover {
     border-color: var(--amber);
-    background: rgba(11, 11, 26, 0.96);
+    background: rgba(11, 11, 26, 0.97);
     transform: translateY(-1px);
 }
 
-.card-eyebrow {
-    color: var(--cyan);
-    font-size: 0.66rem;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-}
-
-.card-heading {
+.card-title {
     color: var(--text-primary);
     font-size: 1rem;
     letter-spacing: 0.04em;
+    line-height: 1.35;
     text-transform: uppercase;
 }
 
 .card-copy {
     color: var(--text-secondary);
     font-size: 0.82rem;
-    line-height: 1.55;
+    line-height: 1.6;
     flex: 1;
 }
 
-.card-meta {
+.tag-row {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-xs);
-    margin-top: var(--space-sm);
 }
 
-.flow-map {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: var(--space-sm);
-}
-
-.flow-node {
+.tag,
+.status-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
     border: 1px solid var(--border-dim);
-    border-radius: var(--radius);
-    background: rgba(105, 214, 255, 0.045);
-    padding: var(--space-md);
-    min-height: 150px;
-    position: relative;
-}
-
-.flow-node::after {
-    content: '>';
-    position: absolute;
-    right: -11px;
-    top: 50%;
-    transform: translateY(-50%);
+    border-radius: 999px;
+    padding: 0 var(--space-sm);
     color: var(--text-muted);
-}
-
-.flow-node:last-child::after {
-    content: '';
-}
-
-.flow-step {
-    color: var(--text-muted);
-    font-size: 0.62rem;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    margin-bottom: var(--space-xs);
-}
-
-.flow-title {
-    color: var(--amber);
-    font-family: var(--font-header);
-    font-size: 1.15rem;
-    line-height: 1;
-    margin-bottom: var(--space-sm);
-}
-
-.flow-copy {
-    color: var(--text-secondary);
-    font-size: 0.76rem;
-    line-height: 1.45;
-}
-
-.demo-list {
-    display: grid;
-    gap: var(--space-sm);
-}
-
-.demo-row {
-    display: grid;
-    grid-template-columns: 150px minmax(0, 1fr);
-    gap: var(--space-md);
-    border-bottom: 1px solid var(--border-dim);
-    padding: var(--space-md) 0;
-}
-
-.demo-row:last-child {
-    border-bottom: 0;
-}
-
-.demo-persona {
-    color: var(--amber);
-    font-size: 0.78rem;
+    font-size: 0.66rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
+    white-space: nowrap;
 }
 
-.demo-path {
-    color: var(--text-secondary);
-    font-size: 0.82rem;
-    line-height: 1.6;
+.status-chip {
+    border-color: rgba(98, 255, 64, 0.28);
+    color: var(--green);
 }
 
-.demo-path a {
-    color: var(--cyan);
+.satellite-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-md);
+}
+
+.satellite-head {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: var(--space-md);
+}
+
+.link-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 34px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 0 var(--space-md);
+    color: var(--text-primary);
+    background: rgba(105, 214, 255, 0.04);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
     text-decoration: none;
+    text-transform: uppercase;
+    transition: border-color var(--t-fast), color var(--t-fast), background var(--t-fast);
 }
 
-.demo-path a:hover {
+.link-button:hover {
+    border-color: var(--amber);
     color: var(--amber);
+    background: rgba(255, 198, 77, 0.055);
 }
 
-.repo-table {
+.loop-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-md);
+}
+
+.loop-card {
+    min-height: 190px;
+}
+
+.loop-step {
+    color: var(--text-muted);
+    font-size: 0.66rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.loop-title {
+    color: var(--amber);
+    font-family: var(--font-header);
+    font-size: 1.2rem;
+    line-height: 1;
+    text-transform: uppercase;
+}
+
+.directory-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.8rem;
+    font-size: 0.82rem;
 }
 
-.repo-table th,
-.repo-table td {
-    padding: var(--space-sm) var(--space-md);
+.coverage-table {
+    margin-top: var(--space-md);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    background: rgba(11, 11, 26, 0.68);
+    overflow: hidden;
+}
+
+.directory-table th,
+.directory-table td {
     border-bottom: 1px solid var(--border-dim);
+    padding: var(--space-md) var(--space-sm);
     text-align: left;
+    vertical-align: top;
 }
 
-.repo-table th {
+.directory-table th {
     color: var(--text-muted);
     font-size: 0.68rem;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    font-weight: 400;
 }
 
-.repo-table td {
-    color: var(--text-secondary);
+.directory-group {
+    color: var(--amber);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
 }
 
-.repo-table a {
+.directory-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+}
+
+.directory-links a {
     color: var(--cyan);
     text-decoration: none;
 }
 
-.repo-table a:hover {
+.directory-links a:hover {
     color: var(--amber);
 }
 
-@media (max-width: 1180px) {
-    .showcase-hero,
-    .showcase-grid.cols-3,
-    .showcase-grid.cols-4,
-    .flow-map {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
+.safety-band {
+    display: grid;
+    grid-template-columns: 190px minmax(0, 1fr);
+    gap: var(--space-lg);
+    align-items: start;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    background: rgba(98, 255, 64, 0.025);
+}
 
-    .flow-node::after {
-        content: '';
+.safety-label {
+    color: var(--green);
+    font-family: var(--font-header);
+    font-size: 1.2rem;
+    line-height: 1;
+    text-transform: uppercase;
+}
+
+.safety-copy {
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    line-height: 1.65;
+}
+
+@media (max-width: 1180px) {
+    .unified-hero,
+    .surface-grid,
+    .loop-grid,
+    .metric-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
-@media (max-width: 760px) {
-    .showcase-hero,
-    .showcase-grid.cols-3,
-    .showcase-grid.cols-4,
-    .flow-map,
-    .demo-row {
+@media (max-width: 780px) {
+    .unified-hero,
+    .metric-grid,
+    .surface-grid,
+    .satellite-grid,
+    .loop-grid,
+    .safety-band {
         grid-template-columns: 1fr;
     }
 
-    .showcase-title {
-        font-size: 1.65rem;
+    .hero-panel {
+        border-left: 0;
+        border-top: 1px solid var(--border-dim);
+        padding-left: 0;
+        padding-top: var(--space-lg);
+    }
+
+    .section-head,
+    .satellite-head {
+        align-items: start;
+        flex-direction: column;
+    }
+
+    .section-note {
+        text-align: left;
+    }
+
+    .directory-table,
+    .directory-table tbody,
+    .directory-table tr,
+    .directory-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .directory-table thead {
+        display: none;
+    }
+
+    .coverage-table {
+        border-left: 0;
+        border-right: 0;
+        border-radius: 0;
+    }
+
+    .directory-table td {
+        padding-left: 0;
+        padding-right: 0;
     }
 }
 {% endblock %}
 
 {% block content %}
-<section class="showcase-hero">
-    <div class="showcase-band">
-        <div class="showcase-kicker">Unified front door</div>
-        <h2 class="showcase-title">Sapphire ecosystem showcase</h2>
-        <p class="showcase-copy">
-            A curated, read-only path through the systems already built: capital intelligence,
-            regional intelligence, autonomous operations, security posture, inference telemetry,
-            diligence artifacts, and the satellite repos that make the operating model real.
-        </p>
-        <div class="showcase-actions">
-            <a class="btn primary" href="/production-readiness">Open Readiness</a>
-            <a class="btn" href="/diligence">Diligence Packet</a>
-            <a class="btn" href="/sovereign-thesis">Sovereign Thesis</a>
-            <a class="btn" href="/intel">Regional Intel</a>
+{% set dashboard = unified_dashboard %}
+<div class="unified-shell">
+    <section class="unified-hero" aria-labelledby="unified-title">
+        <div>
+            <div class="unified-kicker">Unified Command Surface</div>
+            <h1 class="unified-title" id="unified-title">Unified Sapphire dashboard</h1>
+            <p class="unified-copy">
+                Sapphire, THO, regional intelligence, org-platform, and protected
+                coordination surfaces in one polished read-only command center for
+                demos, operating reviews, and quick proof-path navigation.
+            </p>
+            <div class="unified-actions" aria-label="Primary dashboard actions">
+                <a class="btn primary" href="/">Open overview</a>
+                <a class="btn" href="/production-readiness">Readiness</a>
+                <a class="btn" href="/diligence">Diligence</a>
+                <a class="btn" href="/intel">Regional intel</a>
+            </div>
         </div>
-    </div>
-    <aside class="showcase-band signal-ribbon" aria-label="Showcase metrics">
-        <div class="signal-tile">
-            <div class="signal-label">Dashboard surface</div>
-            <div class="signal-value">43</div>
-            <div class="signal-note">authenticated pages with SSE and read-only review paths</div>
-        </div>
-        <div class="signal-tile">
-            <div class="signal-label">Verification posture</div>
-            <div class="signal-value">0 FAIL</div>
-            <div class="signal-note">production-readiness sweep at latest closeout</div>
-        </div>
-        <div class="signal-tile">
-            <div class="signal-label">Automation surface</div>
-            <div class="signal-value">67</div>
-            <div class="signal-note">registered tool entries with registry validation</div>
-        </div>
-    </aside>
-</section>
+        <aside class="hero-panel" aria-label="Showcase posture">
+            <div class="hero-panel-title">Professional showcase</div>
+            <p class="hero-panel-copy">
+                Built for one-screen orientation: production app links, local demo
+                frontends, evidence surfaces, safety posture, and the highest-value
+                Sapphire routes stay visible without exposing local secrets.
+            </p>
+            <div class="hero-list">
+                <div class="hero-list-row">
+                    <div class="hero-list-label">Mode</div>
+                    <div class="hero-list-value">Read-only orientation with authenticated Sapphire routes</div>
+                </div>
+                <div class="hero-list-row">
+                    <div class="hero-list-label">Freshness</div>
+                    <div class="hero-list-value">{{ dashboard.generated_at }}</div>
+                </div>
+                <div class="hero-list-row">
+                    <div class="hero-list-label">Boundary</div>
+                    <div class="hero-list-value">Paper trading, no-spend CI, and protected live services remain explicit</div>
+                </div>
+            </div>
+        </aside>
+    </section>
 
-<section class="section-band showcase-band">
-    <div class="section-header">
-        <div class="section-title">Operating Loop</div>
-        <div class="section-subtitle">A compact map of how the built systems compound.</div>
-    </div>
-    <div class="flow-map">
-        <div class="flow-node">
-            <div class="flow-step">01</div>
-            <div class="flow-title">Sense</div>
-            <div class="flow-copy">market, chain, macro, threat, regional, and customer-context feeds land as bounded artifacts.</div>
-        </div>
-        <div class="flow-node">
-            <div class="flow-step">02</div>
-            <div class="flow-title">Reason</div>
-            <div class="flow-copy">correlators, Kronos, OODA synthesis, source-quality checks, and inference tiers turn feeds into claims.</div>
-        </div>
-        <div class="flow-node">
-            <div class="flow-step">03</div>
-            <div class="flow-title">Govern</div>
-            <div class="flow-copy">risk kernel, confirmation firewall, provenance envelopes, and kill switches keep action paths bounded.</div>
-        </div>
-        <div class="flow-node">
-            <div class="flow-step">04</div>
-            <div class="flow-title">Operate</div>
-            <div class="flow-copy">LaunchAgents, dashboard pages, Hermes skills, and runbooks convert routines into reviewable work.</div>
-        </div>
-        <div class="flow-node">
-            <div class="flow-step">05</div>
-            <div class="flow-title">Prove</div>
-            <div class="flow-copy">test inventory, readiness sweeps, runbook scores, and diligence docs keep the story evidence-backed.</div>
-        </div>
-    </div>
-</section>
+    <section class="metric-grid" aria-label="Unified dashboard metrics">
+        {% for metric in dashboard.metrics %}
+        <article class="metric-card">
+            <div class="metric-label">{{ metric.label }}</div>
+            <div class="metric-value">{{ metric.value }}</div>
+            <div class="metric-note">{{ metric.note }}</div>
+        </article>
+        {% endfor %}
+    </section>
 
-<section class="section-band showcase-grid cols-4">
-    <a class="showcase-card" href="/analytics">
-        <div class="card-eyebrow">Capital intelligence</div>
-        <div class="card-heading">Trading research cockpit</div>
-        <div class="card-copy">Strategy lab, cross-asset regimes, portfolio telemetry, risk metrics, Kronos predictions, and paper-first execution review.</div>
-        <div class="card-meta"><span class="pill green">read-only</span><span class="pill neutral">paper-first</span></div>
-    </a>
-    <a class="showcase-card" href="/intel">
-        <div class="card-eyebrow">Regional intelligence</div>
-        <div class="card-heading">Regional Intel Workbench</div>
-        <div class="card-copy">Local vote-monitor and regional-source intelligence surfaced through the dashboard, Foundry mapping, and the dedicated workbench repo.</div>
-        <div class="card-meta"><span class="pill green">source health</span><span class="pill neutral">export-ready</span></div>
-    </a>
-    <a class="showcase-card" href="/inference-telemetry">
-        <div class="card-eyebrow">Inference mesh</div>
-        <div class="card-heading">Local-first model routing</div>
-        <div class="card-copy">GPU, Pi, Mac, and cloud fallback telemetry with sensitivity gates and cost posture made visible for operators.</div>
-        <div class="card-meta"><span class="pill green">failover</span><span class="pill amber">bounded cloud</span></div>
-    </a>
-    <a class="showcase-card" href="/security/overview">
-        <div class="card-eyebrow">Security platform</div>
-        <div class="card-heading">SOC and risk controls</div>
-        <div class="card-copy">Threat intelligence, model integrity, network posture, PII redaction, and safety envelopes in one audit-friendly surface.</div>
-        <div class="card-meta"><span class="pill green">auth-gated</span><span class="pill neutral">paste-safe</span></div>
-    </a>
-    <a class="showcase-card" href="/diligence">
-        <div class="card-eyebrow">Acquisition diligence</div>
-        <div class="card-heading">Buyer-readable packet</div>
-        <div class="card-copy">Product surfaces, security posture, spend controls, data rights, roadmap, and evidence blocks tied back to live code paths.</div>
-        <div class="card-meta"><span class="pill green">evidence-backed</span><span class="pill neutral">redacted</span></div>
-    </a>
-    <a class="showcase-card" href="/content">
-        <div class="card-eyebrow">Content engine</div>
-        <div class="card-heading">Research to publish</div>
-        <div class="card-copy">Draft generation, quality gates, provenance, approval posture, and channel-specific publishing lanes for institutional narrative work.</div>
-        <div class="card-meta"><span class="pill green">rubric-gated</span><span class="pill neutral">approval-first</span></div>
-    </a>
-    <a class="showcase-card" href="/organization">
-        <div class="card-eyebrow">Autonomous operations</div>
-        <div class="card-heading">Control tower</div>
-        <div class="card-copy">Scheduled routines, repo hygiene, PM artifacts, runbook coverage, agent lanes, and continuous intelligence close the loop.</div>
-        <div class="card-meta"><span class="pill green">runbooked</span><span class="pill neutral">observable</span></div>
-    </a>
-    <a class="showcase-card" href="/chain/robinhood">
-        <div class="card-eyebrow">On-chain and venues</div>
-        <div class="card-heading">Chain and venue readiness</div>
-        <div class="card-copy">Robinhood Chain testnet, Hyperliquid public-feed signals, smart contracts, and live-trading gates without mainnet activation.</div>
-        <div class="card-meta"><span class="pill amber">testnet</span><span class="pill red">mainnet locked</span></div>
-    </a>
-</section>
+    <section class="unified-section" aria-labelledby="primary-surfaces-title">
+        <div class="section-head">
+            <div>
+                <div class="section-kicker">Sapphire Core</div>
+                <h2 class="section-title" id="primary-surfaces-title">Primary command surfaces</h2>
+            </div>
+            <p class="section-note">
+                Operator, product, diligence, intelligence, and reliability views
+                grouped as the canonical Sapphire walkthrough path.
+            </p>
+        </div>
+        <div class="surface-grid">
+            {% for surface in dashboard.primary_surfaces %}
+            <a class="surface-card" href="{{ surface.href }}">
+                <div class="card-kicker">{{ surface.kicker }}</div>
+                <div class="card-title">{{ surface.title }}</div>
+                <div class="card-copy">{{ surface.summary }}</div>
+                <div class="tag-row">
+                    {% for tag in surface.tags %}
+                    <span class="tag">{{ tag }}</span>
+                    {% endfor %}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
 
-<section class="section-band showcase-grid cols-3">
-    <div class="showcase-band">
-        <div class="section-header">
-            <div class="section-title">Demo Paths</div>
-            <div class="section-subtitle">Curated routes for different conversations.</div>
-        </div>
-        <div class="demo-list">
-            <div class="demo-row">
-                <div class="demo-persona">Friend</div>
-                <div class="demo-path"><a href="/showcase">Showcase</a> -> <a href="/">Overview</a> -> <a href="/intel">Regional Intel</a> -> <a href="/content">Content</a></div>
+    <section class="unified-section" aria-labelledby="satellites-title">
+        <div class="section-head">
+            <div>
+                <div class="section-kicker">Ecosystem Links</div>
+                <h2 class="section-title" id="satellites-title">Satellite frontends</h2>
             </div>
-            <div class="demo-row">
-                <div class="demo-persona">Buyer</div>
-                <div class="demo-path"><a href="/diligence">Diligence</a> -> <a href="/production-readiness">Readiness</a> -> <a href="/risk">Risk</a> -> <a href="/sovereign-thesis/story">Thesis Story</a></div>
-            </div>
-            <div class="demo-row">
-                <div class="demo-persona">Engineer</div>
-                <div class="demo-path"><a href="/architecture">Operations</a> -> <a href="/inference-telemetry">Inference</a> -> <a href="/observability">Observability</a> -> <a href="/source-quality">Source Quality</a></div>
-            </div>
-            <div class="demo-row">
-                <div class="demo-persona">Operator</div>
-                <div class="demo-path"><a href="/command-deck">Command Deck</a> -> <a href="/activity">Activity</a> -> <a href="/logs">Logs</a> -> <a href="/settings">Settings</a></div>
-            </div>
+            <p class="section-note">
+                Production, protected, and local showcase frontends are separated by
+                status so each link carries the right expectation.
+            </p>
         </div>
-    </div>
-    <div class="showcase-band">
-        <div class="section-header">
-            <div class="section-title">Safety Stance</div>
-            <div class="section-subtitle">Every showcase path stays review-first.</div>
+        <div class="satellite-grid">
+            {% for satellite in dashboard.satellite_dashboards %}
+            <article class="satellite-card">
+                <div class="satellite-head">
+                    <div>
+                        <div class="card-kicker">{{ satellite.name }}</div>
+                        <div class="card-title">{{ satellite.status }}</div>
+                    </div>
+                    <span class="status-chip">{{ satellite.status }}</span>
+                </div>
+                <div class="card-copy">{{ satellite.summary }}</div>
+                <div class="card-actions">
+                    {% for link in satellite.links %}
+                    <a class="link-button" href="{{ link.href }}" {% if link.external %}target="_blank" rel="noopener noreferrer"{% endif %}>{{ link.label }}</a>
+                    {% endfor %}
+                </div>
+                <div class="tag-row">
+                    {% for tag in satellite.tags %}
+                    <span class="tag">{{ tag }}</span>
+                    {% endfor %}
+                </div>
+            </article>
+            {% endfor %}
         </div>
-        <div class="terminal-output">
-            <div class="line"><span class="level-info">READ_ONLY</span> Dashboard routes inspect state and artifacts.</div>
-            <div class="line"><span class="level-warn">NO_SENDS</span> Telegram sends are outside this surface.</div>
-            <div class="line"><span class="level-warn">NO_MAINNET</span> Live trading remains gated by explicit policy and kill switches.</div>
-            <div class="line"><span class="level-info">PASTE_SAFE</span> Diligence and product pages redact local paths and secret-shaped values.</div>
-            <div class="line"><span class="level-info">PROVENANCE</span> Product claims point back to tests, runbooks, artifacts, or code paths.</div>
-        </div>
-    </div>
-    <div class="showcase-band">
-        <div class="section-header">
-            <div class="section-title">Companion Repos</div>
-            <div class="section-subtitle">Satellite projects kept separate and linkable.</div>
-        </div>
-        <table class="repo-table">
-            <thead><tr><th>Repo</th><th>Role</th></tr></thead>
+        <table class="directory-table coverage-table" aria-label="Adjacent project coverage">
+            <thead>
+                <tr>
+                    <th>Adjacent project</th>
+                    <th>Coverage</th>
+                    <th>Surface</th>
+                </tr>
+            </thead>
             <tbody>
-                <tr><td><a href="https://github.com/arigatoexpress/regional-intel-workbench" target="_blank" rel="noopener">regional-intel-workbench</a></td><td>regional intelligence platform</td></tr>
-                <tr><td><a href="https://github.com/arigatoexpress/Project-Go-Forward" target="_blank" rel="noopener">Project-Go-Forward</a></td><td>THO client PM and document center</td></tr>
-                <tr><td><a href="https://github.com/arigatoexpress/tradingview-mcp" target="_blank" rel="noopener">tradingview-mcp</a></td><td>TradingView MCP bridge</td></tr>
-                <tr><td><a href="https://github.com/arigatoexpress/cyber-threat-bot" target="_blank" rel="noopener">cyber-threat-bot</a></td><td>CISA, NVD, and ATT&CK ingestion</td></tr>
+                {% for project in dashboard.adjacent_projects %}
+                <tr>
+                    <td class="directory-group">{{ project.name }}</td>
+                    <td>{{ project.coverage }}</td>
+                    <td><a class="link-button" href="{{ project.href }}">{{ project.surface }}</a></td>
+                </tr>
+                {% endfor %}
             </tbody>
         </table>
-    </div>
-</section>
+    </section>
+
+    <section class="unified-section" aria-labelledby="loop-title">
+        <div class="section-head">
+            <div>
+                <div class="section-kicker">Operating Model</div>
+                <h2 class="section-title" id="loop-title">Closed-loop dashboard map</h2>
+            </div>
+            <p class="section-note">
+                The unified surface keeps evidence, context, safeguards, and demos
+                adjacent instead of scattering them across repo memory.
+            </p>
+        </div>
+        <div class="loop-grid">
+            {% for item in dashboard.operating_loop %}
+            <article class="loop-card">
+                <div class="loop-step">{{ item.step }}</div>
+                <div class="loop-title">{{ item.title }}</div>
+                <div class="card-copy">{{ item["copy"] }}</div>
+            </article>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="unified-section" aria-labelledby="directory-title">
+        <div class="section-head">
+            <div>
+                <div class="section-kicker">Route Directory</div>
+                <h2 class="section-title" id="directory-title">Dashboard directory</h2>
+            </div>
+            <p class="section-note">
+                The full walkthrough spine, grouped by operator intent.
+            </p>
+        </div>
+        <table class="directory-table">
+            <thead>
+                <tr>
+                    <th>Group</th>
+                    <th>Routes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in dashboard.dashboard_directory %}
+                <tr>
+                    <td class="directory-group">{{ row.group }}</td>
+                    <td>
+                        <div class="directory-links">
+                            {% for link in row.links %}
+                            <a href="{{ link.href }}">{{ link.label }}</a>
+                            {% endfor %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="safety-band" aria-labelledby="safety-title">
+        <div class="safety-label" id="safety-title">Safety posture</div>
+        <div class="safety-copy">
+            This page is an authenticated read-only directory. It links to existing
+            dashboard and satellite surfaces, avoids local absolute paths, and does
+            not expose keys, private environment variable values, order execution,
+            Telegram send controls, or live trading controls.
+        </div>
+    </section>
+</div>
 {% endblock %}
