@@ -29,26 +29,18 @@ echo python webhook_receiver.py ^>^> C:\sapphire\logs\webhook.log 2^>^&1
 echo [OK] Created: C:\sapphire\start_webhook.bat
 
 REM Create TV Agent startup script (will be filled with actual path)
-set "TV_PATH="
-if exist "C:\TradingViewAutonomousManager\backend\main.py" (
-    set "TV_PATH=C:\TradingViewAutonomousManager\backend"
-) else if exist "C:\sapphire\tv-agent\backend\main.py" (
-    set "TV_PATH=C:\sapphire\tv-agent\backend"
-) else if exist "%USERPROFILE%\TradingViewAutonomousManager\backend\main.py" (
-    set "TV_PATH=%USERPROFILE%\TradingViewAutonomousManager\backend"
-)
-
-if defined TV_PATH (
+set "TV_REPO=E:\Sapphire\Code\Sapphire"
+set "TV_LAUNCHER=%TV_REPO%\scripts\windows_setup\start_tv_agent.ps1"
+if exist "%TV_LAUNCHER%" (
     (
     echo @echo off
-    echo cd /d "%TV_PATH%"
-    echo call venv\Scripts\activate.bat
-    echo uvicorn main:app --host 0.0.0.0 --port 8081 --log-level info ^>^> C:\sapphire\logs\tv_agent.log 2^>^&1
+    echo cd /d "%TV_REPO%"
+    echo powershell -NoProfile -ExecutionPolicy Bypass -File "%TV_LAUNCHER%" -RepoPath "%TV_REPO%" -HostAddress 0.0.0.0 -Port 8081 ^>^> C:\sapphire\logs\tv_agent.log 2^>^&1
     ) > "C:\sapphire\start_tv_agent.bat"
     echo [OK] Created: C:\sapphire\start_tv_agent.bat
 ) else (
-    echo [WARN] TV Agent not found - skipping TV Agent auto-start
-    echo        You can add it manually later.
+    echo [WARN] Repo-owned TV Agent launcher not found - skipping TV Agent auto-start
+    echo        Expected: %TV_LAUNCHER%
 )
 
 echo.
@@ -66,11 +58,11 @@ if %errorlevel% == 0 (
 
 REM TV Agent Task
 if exist "C:\sapphire\start_tv_agent.bat" (
-    schtasks /create /tn "SapphireTVAgent" /tr "C:\sapphire\start_tv_agent.bat" /sc onstart /ru SYSTEM /rl HIGHEST /f 2>nul
+    schtasks /create /tn "Sapphire-TV-Agent" /tr "C:\sapphire\start_tv_agent.bat" /sc onstart /ru SYSTEM /rl HIGHEST /f 2>nul
     if %errorlevel% == 0 (
-        echo [OK] Created task: SapphireTVAgent
+        echo [OK] Created task: Sapphire-TV-Agent
     ) else (
-        echo [INFO] Task SapphireTVAgent already exists or requires admin rights
+        echo [INFO] Task Sapphire-TV-Agent already exists or requires admin rights
     )
 )
 
@@ -132,7 +124,7 @@ echo   - Desktop\Start TV Agent.bat
 echo.
 echo To start now (as current user):
 echo   schtasks /run /tn "SapphireWebhook"
-echo   schtasks /run /tn "SapphireTVAgent"
+echo   schtasks /run /tn "Sapphire-TV-Agent"
 echo.
 echo Logs: C:\sapphire\logs\
 echo.

@@ -6,7 +6,8 @@ echo.
 
 REM Configuration
 set "TV_AGENT_PORT=8081"
-set "TV_AGENT_DIR=C:\TradingViewAutonomousManager\backend"
+set "TV_AGENT_REPO=E:\Sapphire\Code\Sapphire"
+set "TV_AGENT_LAUNCHER=%TV_AGENT_REPO%\scripts\windows_setup\start_tv_agent.ps1"
 
 echo [1/3] Checking if TV Agent is already running...
 netstat -ano | findstr ":%TV_AGENT_PORT%" | findstr "LISTENING" >nul
@@ -26,47 +27,31 @@ if %errorlevel% == 0 (
 echo [OK] TV Agent not running - will start now
 echo.
 
-REM Find installation
-echo [2/3] Locating TV Agent installation...
-set "FOUND_DIR="
-
-if exist "C:\TradingViewAutonomousManager\backend\main.py" (
-    set "FOUND_DIR=C:\TradingViewAutonomousManager\backend"
-) else if exist "C:\sapphire\tv-agent\backend\main.py" (
-    set "FOUND_DIR=C:\sapphire\tv-agent\backend"
-) else if exist "%USERPROFILE%\TradingViewAutonomousManager\backend\main.py" (
-    set "FOUND_DIR=%USERPROFILE%\TradingViewAutonomousManager\backend"
-)
-
-if not defined FOUND_DIR (
-    echo [ERROR] TV Agent not found in common locations!
+REM Find repo-owned launcher
+echo [2/3] Locating repo-owned TV Agent launcher...
+if not exist "%TV_AGENT_LAUNCHER%" (
+    echo [ERROR] TV Agent launcher not found!
+    echo Expected: %TV_AGENT_LAUNCHER%
     echo.
-    echo Checked:
-    echo   - C:\TradingViewAutonomousManager\backend
-    echo   - C:\sapphire\tv-agent\backend
-    echo   - %USERPROFILE%\TradingViewAutonomousManager\backend
-    echo.
-    echo Please specify the correct path:
-    set /p "FOUND_DIR=Enter path to backend folder: "
-)
-
-echo [OK] Found: %FOUND_DIR%
-echo.
-
-REM Check venv
-echo [3/3] Checking virtual environment...
-if not exist "%FOUND_DIR%\venv\Scripts\activate.bat" (
-    echo [ERROR] Virtual environment not found!
-    echo Run setup first:
-    echo   cd %FOUND_DIR%
-    echo   python -m venv venv
-    echo   venv\Scripts\activate
-    echo   pip install -r requirements.txt
-    echo   playwright install chromium
+    echo Update the checkout first:
+    echo   cd /d %TV_AGENT_REPO%
+    echo   git pull --ff-only
     goto end
 )
 
-echo [OK] Virtual environment found
+echo [OK] Found: %TV_AGENT_LAUNCHER%
+echo.
+
+REM Check Python
+echo [3/3] Checking Python...
+python --version >nul 2>nul
+if not %errorlevel% == 0 (
+    echo [ERROR] Python was not found on PATH.
+    echo Pass an explicit Python path to scripts\windows_setup\create_tv_agent_task.ps1.
+    goto end
+)
+
+echo [OK] Python available
 echo.
 
 REM Start the service
@@ -85,10 +70,7 @@ echo.
 echo ===============================================================
 echo.
 
-cd /d "%FOUND_DIR%"
-call venv\Scripts\activate.bat
-
-uvicorn main:app --host 0.0.0.0 --port %TV_AGENT_PORT% --log-level info
+powershell -NoProfile -ExecutionPolicy Bypass -File "%TV_AGENT_LAUNCHER%" -RepoPath "%TV_AGENT_REPO%" -HostAddress 0.0.0.0 -Port %TV_AGENT_PORT%
 
 :end
 echo.

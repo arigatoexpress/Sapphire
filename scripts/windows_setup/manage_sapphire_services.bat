@@ -10,7 +10,8 @@ REM Configuration
 set "WEBHOOK_PORT=9090"
 set "TV_AGENT_PORT=8081"
 set "WEBHOOK_DIR=C:\sapphire\services\workbench\tradingview"
-set "TV_AGENT_DIR=C:\TradingViewAutonomousManager\backend"
+set "TV_AGENT_REPO=E:\Sapphire\Code\Sapphire"
+set "TV_AGENT_LAUNCHER=%TV_AGENT_REPO%\scripts\windows_setup\start_tv_agent.ps1"
 
 REM Check which services are running
 echo [1/4] Checking current service status...
@@ -113,19 +114,17 @@ if %TV_AGENT_RUNNING% == 1 (
     goto end
 )
 
-if not exist "%TV_AGENT_DIR%\venv\Scripts\activate.bat" (
-    echo [ERROR] TV Agent virtual environment not found!
-    echo [INFO] Expected: %TV_AGENT_DIR%\venv
+if not exist "%TV_AGENT_LAUNCHER%" (
+    echo [ERROR] TV Agent launcher not found!
+    echo [INFO] Expected: %TV_AGENT_LAUNCHER%
     goto end
 )
 
-cd /d "%TV_AGENT_DIR%"
-call venv\Scripts\activate.bat
-
-start "TradingView Agent" uvicorn main:app --host 0.0.0.0 --port %TV_AGENT_PORT% --log-level info
+cd /d "%TV_AGENT_REPO%"
+start "TradingView Agent" powershell -NoProfile -ExecutionPolicy Bypass -File "%TV_AGENT_LAUNCHER%" -RepoPath "%TV_AGENT_REPO%" -HostAddress 0.0.0.0 -Port %TV_AGENT_PORT%
 timeout /t 3 /nobreak >nul
 
-curl -s http://localhost:%TV_AGENT_PORT%/health | findstr "running" >nul
+curl -s http://localhost:%TV_AGENT_PORT%/health | findstr "windows_tv_agent" >nul
 if %errorlevel% == 0 (
     echo [SUCCESS] TV Agent started successfully!
     echo [URL] http://100.71.10.48:%TV_AGENT_PORT%

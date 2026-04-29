@@ -415,9 +415,23 @@ async def _probe_local_service(url: str) -> dict:
         async with httpx.AsyncClient(timeout=LOCAL_SERVICE_PROBE_TIMEOUT_SECONDS) as client:
             response = await client.get(url)
             latency_ms = int((datetime.now(UTC) - started).total_seconds() * 1000)
+            body_status = None
+            if response.headers.get("content-type", "").startswith("application/json"):
+                with contextlib.suppress(Exception):
+                    payload = response.json()
+                    if isinstance(payload, dict):
+                        body_status = str(payload.get("status") or "").lower() or None
+            healthy = response.status_code == 200 and body_status not in {
+                "degraded",
+                "down",
+                "error",
+                "failed",
+                "unhealthy",
+            }
             return {
-                "healthy": response.status_code == 200,
+                "healthy": healthy,
                 "status_code": response.status_code,
+                "status": body_status,
                 "latency_ms": latency_ms,
             }
     except Exception as exc:
