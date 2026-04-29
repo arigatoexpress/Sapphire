@@ -10,13 +10,26 @@ import subprocess
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import PurePosixPath
 from typing import Any
 
 DEFAULT_REPO = "arigatoexpress/Sapphire"
 RUN_FIELDS = "databaseId,status,headSha,headBranch,displayTitle,event"
-PR_FIELDS = "title,headRefName,headRefOid"
+PR_FIELDS = "title,headRefName,headRefOid,files"
 ACTIVE_RUN_STATUSES = {"queued", "in_progress"}
 SKIP_CI_RE = re.compile(r"\[\s*skip\s+ci\s*\]", re.IGNORECASE)
+DOC_FILENAMES = {
+    "AGENTS.md",
+    "CLAUDE.md",
+    "README.md",
+    "RTK.md",
+}
+DOC_TEXT_SUFFIXES = {
+    ".adoc",
+    ".markdown",
+    ".md",
+    ".rst",
+}
 
 
 class SafeMergeError(RuntimeError):
@@ -36,6 +49,7 @@ class PullRequestInfo:
     title: str
     head_ref_name: str
     head_ref_oid: str
+    changed_files: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -43,6 +57,8 @@ class SafeMergeResult:
     pr_number: int
     subject: str
     cancelled_runs: tuple[int, ...]
+    docs_only: bool
+    local_ci_ran: bool
     dry_run: bool = False
 
 
@@ -109,6 +125,7 @@ def fetch_pr_info(
     title = str(payload.get("title") or "").strip()
     head_ref_name = str(payload.get("headRefName") or "").strip()
     head_ref_oid = str(payload.get("headRefOid") or "").strip()
+    changed_files = parse_changed_files(payload.get("files"))
     if not title or not head_ref_name or not head_ref_oid:
         raise SafeMergeError("gh pr view did not return title/head ref metadata")
     return PullRequestInfo(
@@ -116,6 +133,60 @@ def fetch_pr_info(
         title=title,
         head_ref_name=head_ref_name,
         head_ref_oid=head_ref_oid,
+        changed_files=changed_files,
+    )
+
+
+def parse_changed_files(raw_files: Any) -> tuple[str, ...]:
+    """Extract changed file paths from the `gh pr view --json files` payload."""
+    if raw_files is None:
+        return ()
+    if not isinstance(raw_files, list):
+        raise SafeMergeError("gh pr view returned malformed files metadata")
+    paths: list[str] = []
+    for item in raw_files:
+        if not isinstance(item, dict):
+            raise SafeMergeError("gh pr view returned malformed files metadata")
+        path = str(item.get("path") or "").strip()
+        if not path:
+            raise SafeMergeError("gh pr view returned a file without a path")
+        paths.append(path)
+    return tuple(paths)
+
+
+def is_documentation_path(path: str) -> bool:
+    """Return true when a path is documentation/media only."""
+    normalized = PurePosixPath(path)
+    if normalized.is_absolute() or ".." in normalized.parts:
+        return False
+    if normalized.parts and normalized.parts[0] == "docs":
+        return True
+    if normalized.name in DOC_FILENAMES:
+        return True
+    return normalized.suffix.lower() in DOC_TEXT_SUFFIXES
+
+
+def is_docs_only_pr(pr: PullRequestInfo) -> bool:
+    """Return true when every changed file is safe to merge without full local CI."""
+    return bool(pr.changed_files) and all(is_documentation_path(path) for path in pr.changed_files)
+
+
+def run_local_ci_for_pr(
+    pr: PullRequestInfo,
+    *,
+    runner: Runner = subprocess_runner,
+) -> None:
+    """Run the local CI mirror for non-docs `[skip ci]` merges."""
+    _run(
+        [
+            sys.executable,
+            "scripts/ops/local_ci_verify.py",
+            "--pr",
+            str(pr.number),
+            "--quiet",
+        ],
+        runner=runner,
+        purpose="local CI verification",
     )
 
 
@@ -193,8 +264,20 @@ def safe_merge(
     pr_number = parse_pr_number(raw_pr_number)
     pr = fetch_pr_info(pr_number, repo=repo, runner=runner)
     subject = build_subject(pr.title)
+    docs_only = is_docs_only_pr(pr)
     if dry_run:
-        return SafeMergeResult(pr_number=pr.number, subject=subject, cancelled_runs=(), dry_run=True)
+        return SafeMergeResult(
+            pr_number=pr.number,
+            subject=subject,
+            cancelled_runs=(),
+            docs_only=docs_only,
+            local_ci_ran=False,
+            dry_run=True,
+        )
+    local_ci_ran = False
+    if not docs_only:
+        run_local_ci_for_pr(pr, runner=runner)
+        local_ci_ran = True
     _run(
         [
             "gh",
@@ -214,7 +297,13 @@ def safe_merge(
     )
     runs = active_runs_for_pr(pr=pr, subject=subject, repo=repo, runner=runner)
     cancelled = cancel_runs(runs, repo=repo, runner=runner)
-    return SafeMergeResult(pr_number=pr.number, subject=subject, cancelled_runs=cancelled)
+    return SafeMergeResult(
+        pr_number=pr.number,
+        subject=subject,
+        cancelled_runs=cancelled,
+        docs_only=docs_only,
+        local_ci_ran=local_ci_ran,
+    )
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
@@ -238,6 +327,8 @@ def main(argv: list[str] | None = None) -> int:
                 "pr_number": result.pr_number,
                 "subject": result.subject,
                 "cancelled_runs": list(result.cancelled_runs),
+                "docs_only": result.docs_only,
+                "local_ci_ran": result.local_ci_ran,
                 "dry_run": result.dry_run,
             },
             sort_keys=True,

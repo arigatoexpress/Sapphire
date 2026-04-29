@@ -10,9 +10,13 @@ That is convenient, but it is also easy to forget the skip marker when the PR
 title itself does not contain it.
 
 `scripts/ops/sapphire_safe_merge.py` is the guardrail for that failure mode. It
-reads the PR title through `gh pr view`, appends `[skip ci]` when missing, runs
-the squash merge with an explicit `-t` subject, then inspects recent workflow
-runs and cancels only runs that can be attributed to the just-merged PR.
+reads the PR title and changed-file list through `gh pr view`, appends
+`[skip ci]` when missing, and classifies the PR before merge. Documentation-only
+PRs keep the cheap path. Any PR that touches code, tests, configs, workflows, or
+data must first pass `scripts/ops/local_ci_verify.py --pr <N> --quiet`; a
+failing local CI result stops the merge before the squash commit lands. After a
+successful squash merge, the wrapper inspects recent workflow runs and cancels
+only runs that can be attributed to the just-merged PR.
 
 ## Command
 
@@ -40,12 +44,20 @@ Use `--dry-run` to see the resolved subject without merging:
 /usr/local/bin/python3 scripts/ops/sapphire_safe_merge.py 394 --dry-run
 ```
 
-The tool prints compact JSON with the PR number, the final squash subject, and
-any workflow run IDs it cancelled.
+The tool prints compact JSON with the PR number, the final squash subject,
+whether the PR was documentation-only, whether local CI ran, and any workflow
+run IDs it cancelled.
 
 ## Preconditions
 
-Use this only after local verification is green for the PR worktree:
+For PRs that touch code, tests, configs, workflows, or data, the wrapper now
+runs the full local CI verifier automatically before merging:
+
+```bash
+/usr/local/bin/python3 scripts/ops/local_ci_verify.py --pr <PR> --quiet
+```
+
+The manual equivalent remains useful while iterating in a worktree:
 
 ```bash
 ruff check .
@@ -54,6 +66,13 @@ ruff check .
 /usr/local/bin/python3 scripts/validate_tool_registry.py
 /usr/local/bin/python3 scripts/ops/production_readiness_sweep.py --no-external
 ```
+
+Documentation-only PRs are intentionally exempt from the automatic full local CI
+run. The docs-only classifier accepts files under `docs/`, top-level operator
+docs such as `README.md`, `CLAUDE.md`, `AGENTS.md`, and common Markdown/AsciiDoc
+suffixes. Empty or malformed file metadata is treated as non-docs and therefore
+requires local CI. Root dependency files such as `requirements-test.txt` are not
+docs-only even though they use a text suffix.
 
 Also confirm the PR is cleanly mergeable:
 
@@ -88,9 +107,11 @@ PR. Missing or malformed run IDs are ignored rather than guessed.
 
 ## Recovery
 
-If the merge command fails, the wrapper exits non-zero before any cancellation.
-Read the `safe-merge error:` line, fix the PR state, and retry after verifying
-that the branch still contains the intended changes.
+If local CI fails, the wrapper exits non-zero before the merge. Read the
+`safe-merge error:` line, open the JSON report under `data/ci/`, fix the PR, and
+retry. If the merge command itself fails, the wrapper also exits non-zero before
+any cancellation. In both cases, verify that the branch still contains the
+intended changes before retrying.
 
 If the merge succeeds but `gh run list` fails, manually inspect recent runs:
 
@@ -111,12 +132,12 @@ risk than a corrected follow-up note.
 
 ## Notes For Operators
 
-The wrapper is intentionally small and importable. Unit tests mock all `gh`
-subprocess calls so the guardrail can be checked without network access or live
-PR mutation. The script does not read secrets, does not alter branch protection,
-and does not broaden permissions. It assumes `gh` is already authenticated for
-the Sapphire repository, which is the same prerequisite as the manual merge
-flow it replaces.
+The wrapper is intentionally small and importable. Unit tests mock all `gh` and
+local-verifier subprocess calls so the guardrail can be checked without network
+access or live PR mutation. The script does not read secrets, does not alter
+branch protection, and does not broaden permissions. It assumes `gh` is already
+authenticated for the Sapphire repository, which is the same prerequisite as the
+manual merge flow it replaces.
 
 The safest habit is simple: after local verification passes, run
 `make safe-merge PR=<N>` instead of typing the raw `gh pr merge` command by
