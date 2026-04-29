@@ -84,15 +84,18 @@ _EMAIL_RE = re.compile(
 )
 
 # Already-redacted email pattern: "<first2>***@<domain>". Used to short-circuit
-# idempotence and to recognize redacted emails in text walks.
+# idempotence and to recognize redacted emails in text walks. The prefix
+# character class mirrors the local-part class in `_EMAIL_RE` so emails like
+# `_alice@example.com` redact to `_a***@example.com` and survive the second
+# pass unchanged. Found bug captured by Lane 1 property test, fixed 2026-04-30.
 _REDACTED_EMAIL_RE = re.compile(
-    r"(?<![\w.+-])([A-Za-z0-9]{1,2})\*{3}@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,})(?![A-Za-z0-9])"
+    r"(?<![\w.+-])([A-Za-z0-9._%+-]{1,2})\*{3}@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,})(?![A-Za-z0-9])"
 )
 
 # Already-redacted markers so we can short-circuit the idempotence guarantee.
 _REDACTED_NAME_RE = re.compile(r"^customer_[0-9a-f]{6}$")
 _REDACTED_PHONE_RE = re.compile(r"\*{3}-\*{3}-\d{4}")
-_REDACTED_EMAIL_LOCAL_RE = re.compile(r"^[A-Za-z0-9]{1,2}\*{3}$")
+_REDACTED_EMAIL_LOCAL_RE = re.compile(r"^[A-Za-z0-9._%+-]{1,2}\*{3}$")
 
 # US state abbreviations — used to detect city/state addresses.
 _US_STATES = frozenset(
@@ -303,7 +306,7 @@ def redact_email(email: str | None) -> str:
         return "<redacted>@<redacted>"
     local, domain = m.group(1), m.group(2)
     # Already-redacted local part pattern in case caller passed e.g. "al***".
-    prefix_match = re.match(r"^([A-Za-z0-9]{1,2})\*{3}$", local)
+    prefix_match = re.match(r"^([A-Za-z0-9._%+-]{1,2})\*{3}$", local)
     if prefix_match:
         return f"{prefix_match.group(1)}***@{domain}"
     prefix = local[:2] if len(local) >= 2 else (local[:1] if local else "")
