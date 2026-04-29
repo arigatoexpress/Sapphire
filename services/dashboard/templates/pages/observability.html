@@ -216,6 +216,44 @@
             </tbody>
         </table>
     </section>
+
+    <!-- ─── Tranche 6 Lane 9 wiring — Lane 6 (inference telemetry) ↔ Tranche 3 observability ─── -->
+    <section class="obs-panel">
+        <h2>Inference Mesh Telemetry</h2>
+        <p class="text-muted" style="margin-bottom: var(--space-sm);">
+            Per-tier latency p50/p95/p99/p999, throughput, error rate, token consumption, and
+            cost across the 4-tier inference mesh (T1 Windows GPU, T2 Pi rari1+rari2, T3 Mac local,
+            T4 Kimi Cloud). Read-only — never modifies the inference proxy.
+        </p>
+        <table class="obs-table">
+            <tbody>
+                <tr>
+                    <th>Telemetry page</th>
+                    <td><a href="/inference-telemetry">/inference-telemetry</a></td>
+                </tr>
+                <tr>
+                    <th>Report API</th>
+                    <td><code>GET /api/inference-telemetry-report</code></td>
+                </tr>
+                <tr>
+                    <th>Recommendations API</th>
+                    <td><code>GET /api/inference-telemetry-recommendations</code></td>
+                </tr>
+                <tr>
+                    <th>Cost model API</th>
+                    <td><code>GET /api/inference-telemetry-cost-model</code></td>
+                </tr>
+                <tr>
+                    <th>Backing module</th>
+                    <td><code>lib/inference_telemetry/</code></td>
+                </tr>
+                <tr>
+                    <th>Calls log</th>
+                    <td><code>~/.cache/sapphire/inference_proxy/calls.jsonl</code> (synthetic fallback when absent)</td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
 </div>
 
 <script>
