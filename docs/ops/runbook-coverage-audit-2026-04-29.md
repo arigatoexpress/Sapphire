@@ -46,7 +46,7 @@ are the 8 from `claude.ai/code/routines` per CLAUDE.md.
 | `services/foundry_sync/` | `foundry-sync-runbook.md` | 3 | Add fixture-backed smoke coverage for the first three dry-run/readiness commands and expand post-success incident drills. |
 | `services/heartbeat/` | `heartbeat-runbook.md` | 3 | Add automated smoke coverage for one-shot mode and clarify overlap with `lib/core/heartbeat.py` self-heal monitor. |
 | `services/hyperliquid/` | `hyperliquid-feed-runbook.md` | 4 | Public-feed side documented; live-executor side (signing verification, mainnet flip protocol, daily-loss auto-pause) needs a dedicated section. |
-| `services/inference-proxy/` | `inference-tenant-quotas.md` | 3 | Quota doc exists but operational (4-tier failover, model-alias mapping, sensitivity gate, GPU-only model 503 path) needs a full runbook. |
+| `services/inference-proxy/` | `inference-proxy-runbook.md`, `inference-tenant-quotas.md`, `inference-mesh-telemetry-runbook.md` | 4 | Add command-level smoke automation for GET probes and LaunchAgent restart drills; current runbook now covers 4-tier failover, aliases, sensitivity gate, GPU-only fail-closed behavior, quotas, cache, and telemetry writer. |
 | `services/intelligence/` | `intelligence-breadth-runbook.md` | 3 | Breadth roadmap exists but daily-brief generator + chain-refresh operations are not covered. |
 | `services/macro_intel/` | `macro-intel-runbook.md` | 5 | — |
 | `services/morning_digest/` | `morning-digest-runbook.md`, `mission-status-digest-runbook.md` (cloud); `evening-digest-runbook.md` (cloud) | 3 | Add an archive writer or align `/digest morning` docs with the current send-only LaunchAgent behavior. |
@@ -68,7 +68,7 @@ several. Counted services that are operationally meaningful — paused
 `live_portfolio_daemon`, `service_supervisor` are listed under
 LaunchAgents below since their runbook surface is the agent itself).
 
-**Service average**: 3.85 (sum 100, n 26).
+**Service average**: 3.88 (sum 101, n 26).
 
 **Lowest-scored services** (need attention first): the newly lifted but
 still-partial `control-plane`, `foundry_sync`, `security_pipeline`,
@@ -103,7 +103,7 @@ still-partial `control-plane`, `foundry_sync`, `security_pipeline`,
 | `com.sapphire.trading-shadow-controller` | `infra/launchagents/com.sapphire.trading-shadow-controller.plist` | `trading-shadow-runbook.md` | 3 | Add stale-report alerting and fixture coverage for offline output/routine freshness. |
 | `com.sapphire.tradingview-cdp` | `infra/launchagents/com.sapphire.tradingview-cdp.plist` | `tradingview-cdp-runbook.md` | 3 | Add a CDP-specific plist assertion and read-only MCP status smoke coverage. |
 | `com.sapphire.dashboard` (service-local) | `services/dashboard/launchagent/com.sapphire.dashboard.plist` | `dashboard-product-pages-runbook.md`, `observability-dashboard-runbook.md` | 5 | — |
-| `com.sapphire.inference-proxy` (service-local) | `services/inference-proxy/launchagent/com.sapphire.inference-proxy.plist` | `inference-tenant-quotas.md` | 3 | See `services/inference-proxy/` gap. |
+| `com.sapphire.inference-proxy` (service-local) | `services/inference-proxy/launchagent/com.sapphire.inference-proxy.plist` | `inference-proxy-runbook.md`, `inference-tenant-quotas.md` | 4 | Add fixture-backed restart/health smoke automation before scoring 5. |
 | `com.sapphire.morning-digest` (service-local) | `services/morning_digest/launchagent/com.sapphire.morning-digest.plist` | `morning-digest-runbook.md` | 3 | Add archive support for `data/morning_digest/YYYY-MM-DD.md` or remove the stale archive expectation from `/digest morning`. |
 | `com.sapphire.pm-bot` (service-local) | `services/pm_bot/launchagent/com.sapphire.pm-bot.plist` | `telegram-operator-console-runbook.md` | 4 | See `services/pm_bot/` gap. |
 | `com.sapphire.service-supervisor` (service-local) | `services/service_supervisor/launchagent/com.sapphire.service-supervisor.plist` | `service-supervisor-runbook.md` | 3 | Add fixture-backed tests for the operator commands shown in the runbook and document a manual state-clear checklist. |
@@ -114,7 +114,7 @@ plus 6 service-local). The original lane spec said 23 LaunchAgents;
 the 28-count emerged because Tranches 4-5 added service-local plists
 the prior counts missed.
 
-**LaunchAgent average**: 3.32 (sum 93, n 28).
+**LaunchAgent average**: 3.36 (sum 94, n 28).
 
 **Lowest-scored LaunchAgents** (priority): no score-1 or score-2
 LaunchAgents remain. The lowest tier is now score 3: `alpha-agent`,
@@ -123,7 +123,7 @@ LaunchAgents remain. The lowest tier is now score 3: `alpha-agent`,
 `logrotate`, `market-intel`, `morning-brief`, `openbb-api`,
 `self-optimization`, `signal-logger`, `telemetry-collector`,
 `trading-shadow-controller`, `tradingview-cdp`, plus service-local
-`inference-proxy`, `morning-digest`, and `service-supervisor`.
+`morning-digest` and `service-supervisor`.
 
 ---
 
@@ -156,9 +156,9 @@ LaunchAgent-driven daemons.
 
 - **Total surfaces**: 62 (26 services + 28 LaunchAgents + 8 cloud
   routines).
-- **Aggregate score**: 233 / 310 = **3.76 / 5**.
+- **Aggregate score**: 235 / 310 = **3.79 / 5**.
 - **Score 5 surfaces**: 18 (29%).
-- **Score < 4 surfaces requiring gap action**: 33 (53%).
+- **Score < 4 surfaces requiring gap action**: 31 (50%).
 - **Score 1 surfaces (no runbook)**: 0 (0%).
 
 The asymmetry is still sharp: cloud routines and LLM-tool runbooks
