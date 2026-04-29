@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.sapphire.source-quality</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/python3</string>
+    <string>/Users/aribs/Code/Sapphire/services/source_quality/run.py</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/aribs/Code/Sapphire</string>
+  <!--
+    Operator opt-in: this LaunchAgent template ships with RunAtLoad=false.
+    Flip to <true/> after manual dry-run review (see the runbook).
+  -->
+  <key>RunAtLoad</key>
+  <false/>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>6</integer>
+    <key>Minute</key>
+    <integer>30</integer>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>/Users/aribs/.local/var/log/sapphire/source-quality.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/aribs/.local/var/log/sapphire/source-quality.err.log</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <!-- The daemon writes to disk by default; the plugin tool never does. -->
+    <key>SAPPHIRE_SOURCE_QUALITY_LIVE</key>
+    <string>0</string>
+  </dict>
+</dict>
+</plist>

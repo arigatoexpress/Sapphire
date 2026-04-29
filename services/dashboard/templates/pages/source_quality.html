@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% block title %}Source Quality{% endblock %}
+
+{% block content %}
+<style>
+.sq-header {
+    margin-bottom: var(--space-xl);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: var(--space-md);
+}
+.sq-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    gap: var(--space-lg);
+}
+.sq-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: var(--space-md);
+}
+.sq-card h2 {
+    margin: 0 0 var(--space-sm) 0;
+    font-size: 1.05rem;
+    color: var(--text-primary);
+}
+.sq-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+.sq-table th, .sq-table td {
+    text-align: left;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+.sq-status-good { color: #2ecc71; }
+.sq-status-warn { color: #f39c12; }
+.sq-status-bad  { color: #e74c3c; }
+.sq-empty {
+    color: var(--text-secondary);
+    font-style: italic;
+    padding: var(--space-md);
+}
+.sq-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--card-bg-alt, rgba(255,255,255,0.05));
+    border: 1px solid var(--border-color);
+    font-size: 0.75rem;
+}
+.sq-pill.dup { background: rgba(231,76,60,0.15); color: #e74c3c; }
+.sq-pill.decay { background: rgba(243,156,18,0.15); color: #f39c12; }
+</style>
+
+<div class="sq-header">
+    <h1>Source Quality Measurement</h1>
+    <p class="text-secondary">
+        Per-source signal-to-noise (precision/recall/F1), pairwise
+        correlation (near-duplicate detection at 87% agreement),
+        and rolling decay vs. historical baseline. Read-only:
+        the daemon under <code>services/source_quality</code>
+        recomputes daily.
+    </p>
+</div>
+
+<div class="sq-grid">
+    <div class="sq-card">
+        <h2>SNR per source</h2>
+        <div id="sq-snr-status" class="sq-empty">Loading…</div>
+        <table class="sq-table" id="sq-snr-table" style="display:none;">
+            <thead>
+                <tr>
+                    <th>Source</th>
+                    <th>Samples</th>
+                    <th>Precision</th>
+                    <th>Recall</th>
+                    <th>F1</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div class="sq-card">
+        <h2>Cross-source correlation</h2>
+        <div id="sq-corr-status" class="sq-empty">Loading…</div>
+        <table class="sq-table" id="sq-corr-table" style="display:none;">
+            <thead>
+                <tr>
+                    <th>Source A</th>
+                    <th>Source B</th>
+                    <th>Overlap</th>
+                    <th>Agreement</th>
+                    <th>Flag</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div class="sq-card">
+        <h2>Decay alerts</h2>
+        <div id="sq-decay-status" class="sq-empty">Loading…</div>
+        <table class="sq-table" id="sq-decay-table" style="display:none;">
+            <thead>
+                <tr>
+                    <th>Source</th>
+                    <th>Baseline F1</th>
+                    <th>Recent F1</th>
+                    <th>Δ</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+async function loadSourceQualityPanels() {
+    try {
+        const [snr, corr, decay] = await Promise.all([
+            fetch('/api/source-quality-snr', {credentials: 'same-origin'}).then(r => r.json()),
+            fetch('/api/source-quality-correlation', {credentials: 'same-origin'}).then(r => r.json()),
+            fetch('/api/source-quality-decay', {credentials: 'same-origin'}).then(r => r.json()),
+        ]);
+        renderSnr(snr);
+        renderCorr(corr);
+        renderDecay(decay);
+    } catch (err) {
+        console.error('source-quality fetch failed', err);
+    }
+}
+
+function renderSnr(payload) {
+    const status = document.getElementById('sq-snr-status');
+    const table = document.getElementById('sq-snr-table');
+    const tbody = table.querySelector('tbody');
+    tbody.innerHTML = '';
+    const snr = payload && payload.snr ? payload.snr : {};
+    const sources = Object.keys(snr).sort();
+    if (!sources.length) {
+        status.style.display = '';
+        status.textContent = (payload && payload.reason) || 'No SNR report on disk yet.';
+        table.style.display = 'none';
+        return;
+    }
+    for (const source of sources) {
+        const row = snr[source];
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${source}</td>
+            <td>${row.samples}</td>
+            <td>${(row.precision || 0).toFixed(3)}</td>
+            <td>${(row.recall || 0).toFixed(3)}</td>
+            <td>${(row.f1 || 0).toFixed(3)}</td>
+        `;
+        tbody.appendChild(tr);
+    }
+    status.style.display = 'none';
+    table.style.display = '';
+}
+
+function renderCorr(payload) {
+    const status = document.getElementById('sq-corr-status');
+    const table = document.getElementById('sq-corr-table');
+    const tbody = table.querySelector('tbody');
+    tbody.innerHTML = '';
+    const pairs = (payload && payload.correlation && payload.correlation.pairs) || [];
+    if (!pairs.length) {
+        status.style.display = '';
+        status.textContent = (payload && payload.reason) || 'No pairs yet.';
+        table.style.display = 'none';
+        return;
+    }
+    for (const p of pairs) {
+        const tr = document.createElement('tr');
+        const flag = p.near_duplicate ? '<span class="sq-pill dup">near-dup</span>' : '';
+        const rate = p.agreement_rate == null ? '—' : p.agreement_rate.toFixed(3);
+        tr.innerHTML = `
+            <td>${p.source_a}</td>
+            <td>${p.source_b}</td>
+            <td>${p.overlap}</td>
+            <td>${rate}</td>
+            <td>${flag}</td>
+        `;
+        tbody.appendChild(tr);
+    }
+    status.style.display = 'none';
+    table.style.display = '';
+}
+
+function renderDecay(payload) {
+    const status = document.getElementById('sq-decay-status');
+    const table = document.getElementById('sq-decay-table');
+    const tbody = table.querySelector('tbody');
+    tbody.innerHTML = '';
+    const alerts = (payload && payload.decay && payload.decay.alerts) || [];
+    if (!alerts.length) {
+        status.style.display = '';
+        status.textContent = (payload && payload.reason) || 'No decay data yet.';
+        table.style.display = 'none';
+        return;
+    }
+    for (const a of alerts) {
+        const tr = document.createElement('tr');
+        const recent = a.recent_f1 == null ? '—' : a.recent_f1.toFixed(3);
+        const delta = a.delta == null ? '—' : a.delta.toFixed(3);
+        const flag = a.decay
+            ? '<span class="sq-pill decay">decayed</span>'
+            : (a.low_sample ? '<span class="sq-pill">low-sample</span>' : 'ok');
+        tr.innerHTML = `
+            <td>${a.source}</td>
+            <td>${(a.baseline_f1 || 0).toFixed(3)}</td>
+            <td>${recent}</td>
+            <td>${delta}</td>
+            <td>${flag}</td>
+        `;
+        tbody.appendChild(tr);
+    }
+    status.style.display = 'none';
+    table.style.display = '';
+}
+
+loadSourceQualityPanels();
+setInterval(loadSourceQualityPanels, 60_000);
+</script>
+{% endblock %}
