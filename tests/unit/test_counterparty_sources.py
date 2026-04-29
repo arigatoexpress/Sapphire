@@ -36,7 +36,10 @@ def test_live_enabled_reads_env(monkeypatch):
 
 
 def test_config_to_dict():
-    assert HyperliquidCounterpartyConfig(api_url="https://example.com").to_dict()["api_url"] == "https://example.com"
+    assert (
+        HyperliquidCounterpartyConfig(api_url="https://example.com").to_dict()["api_url"]
+        == "https://example.com"
+    )
 
 
 def test_live_leaderboard_posts_public_payload(monkeypatch, tmp_path):
@@ -45,7 +48,9 @@ def test_live_leaderboard_posts_public_payload(monkeypatch, tmp_path):
     monkeypatch.setenv("SAPPHIRE_HYPERLIQUID_LIVE", "1")
     monkeypatch.setattr(sources, "COUNTER_PATH", tmp_path / "leaderboard.json")
     monkeypatch.setattr(sources, "CACHE_DIR", tmp_path)
-    client = HyperliquidCounterpartyClient(HyperliquidCounterpartyConfig(api_url="https://example.com"))
+    client = HyperliquidCounterpartyClient(
+        HyperliquidCounterpartyConfig(api_url="https://example.com")
+    )
     captured = {}
 
     class Resp:
@@ -56,7 +61,13 @@ def test_live_leaderboard_posts_public_payload(monkeypatch, tmp_path):
             return False
 
         def read(self):
-            return json.dumps({"leaderboard": [{"address": "0x1", "realized_pnl_30d_usd": 100000, "sharpe_30d": 1}]}).encode()
+            return json.dumps(
+                {
+                    "leaderboard": [
+                        {"address": "0x1", "realized_pnl_30d_usd": 100000, "sharpe_30d": 1}
+                    ]
+                }
+            ).encode()
 
     def fake_urlopen(req, timeout):
         captured["body"] = json.loads(req.data.decode())
@@ -77,7 +88,9 @@ def test_live_positions_posts_public_payload(monkeypatch, tmp_path):
 
     def fake_post(payload):
         assert payload["type"] == "clearinghouseState"
-        return {"assetPositions": [{"position": {"coin": "BTC", "szi": "1", "signed_size_usd": 100}}]}
+        return {
+            "assetPositions": [{"position": {"coin": "BTC", "szi": "1", "signed_size_usd": 100}}]
+        }
 
     monkeypatch.setattr(client, "_post", fake_post)
     assert client.positions("0x1")[0].asset == "BTC"

@@ -209,7 +209,9 @@ def test_aggregate_unknown_tier_is_listed_in_notes(tmp_path: Path):
 
 def test_aggregate_skips_invalid_lines_counted(tmp_path: Path):
     target = tmp_path / "calls.jsonl"
-    target.write_text("garbage\n{}\n" + json.dumps({"tier": "T1_windows_gpu"}) + "\n", encoding="utf-8")
+    target.write_text(
+        "garbage\n{}\n" + json.dumps({"tier": "T1_windows_gpu"}) + "\n", encoding="utf-8"
+    )
     rep = aggregate(target)
     assert rep.parsed_lines == 1
     assert rep.skipped_lines == 2
@@ -337,7 +339,9 @@ def test_aggregate_orders_known_tiers_canonically():
     base = datetime(2026, 4, 28, 12, 0, 0, tzinfo=UTC)
     fixtures = [
         # Out-of-order on purpose.
-        CallRecord(tier="T4_kimi_cloud", ts=base, latency_ms=2400, ok=True, tokens_in=1, tokens_out=1),
+        CallRecord(
+            tier="T4_kimi_cloud", ts=base, latency_ms=2400, ok=True, tokens_in=1, tokens_out=1
+        ),
         CallRecord(tier="T1_windows_gpu", ts=base, latency_ms=400, ok=True),
         CallRecord(tier="T3_mac_local", ts=base, latency_ms=80000, ok=True),
     ]

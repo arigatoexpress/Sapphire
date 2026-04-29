@@ -152,7 +152,9 @@ SURFACES: tuple[SurfaceSpec, ...] = (
                 required_for_soak_evidence=False,
             ),
         ),
-        notes=("Event-impact runtime is lookup-only; model rebuild is a separate operator-gated action.",),
+        notes=(
+            "Event-impact runtime is lookup-only; model rebuild is a separate operator-gated action.",
+        ),
     ),
 )
 
@@ -214,7 +216,9 @@ def read_secret_names(secret_file: Path) -> tuple[set[str], dict[str, Any]]:
     }
 
 
-def credential_status(spec: CredentialSpec, *, secret_names: set[str], secret_meta: dict[str, Any]) -> dict[str, Any]:
+def credential_status(
+    spec: CredentialSpec, *, secret_names: set[str], secret_meta: dict[str, Any]
+) -> dict[str, Any]:
     env_present = sorted(name for name in spec.names if os.environ.get(name, "") != "")
     file_present = sorted(name for name in spec.names if name in secret_names)
     present = bool(env_present or file_present)
@@ -336,7 +340,11 @@ def looks_like_secret_value(value: str) -> bool:
     lowered = value.lower()
     if "sk-" in lowered or "bearer " in lowered:
         return True
-    return len(value) >= 48 and any(char.isdigit() for char in value) and any(char.isalpha() for char in value)
+    return (
+        len(value) >= 48
+        and any(char.isdigit() for char in value)
+        and any(char.isalpha() for char in value)
+    )
 
 
 def service_statuses(*, root: Path) -> list[dict[str, Any]]:
@@ -413,9 +421,7 @@ def readiness_for_surface(
     ]
     artifact_unknown = [row["kind"] for row in required_artifacts if row["claim"] == UNKNOWN]
     missing_artifacts = [
-        row["kind"]
-        for row in required_artifacts
-        if row["claim"] == OBSERVED and not row["present"]
+        row["kind"] for row in required_artifacts if row["claim"] == OBSERVED and not row["present"]
     ]
     dry_soak_ready = not live_enabled and not artifact_unknown
     if live_enabled:
@@ -432,7 +438,9 @@ def readiness_for_surface(
     elif missing_credentials:
         live_enablement_state = "operator_action_required"
     elif surface.live_flags or surface.bus_flags:
-        live_enablement_state = "available_but_disabled" if not live_enabled else "enabled_in_environment"
+        live_enablement_state = (
+            "available_but_disabled" if not live_enabled else "enabled_in_environment"
+        )
     else:
         live_enablement_state = "not_applicable"
 
@@ -478,7 +486,9 @@ def build_report(
     include_service_status: bool = True,
 ) -> dict[str, Any]:
     root = root.resolve()
-    secret_names, secret_meta = read_secret_names(secret_file or Path.home() / ".sapphire" / "secrets.env")
+    secret_names, secret_meta = read_secret_names(
+        secret_file or Path.home() / ".sapphire" / "secrets.env"
+    )
 
     flag_names: list[str] = []
     for surface in SURFACES:
@@ -492,9 +502,7 @@ def build_report(
         for spec in surface.credentials
     ]
     artifacts = [
-        artifact_status(spec, root=root)
-        for surface in SURFACES
-        for spec in surface.artifacts
+        artifact_status(spec, root=root) for surface in SURFACES for spec in surface.artifacts
     ]
     readiness = [
         readiness_for_surface(
@@ -641,7 +649,9 @@ def render_markdown(report: dict[str, Any]) -> str:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=ROOT)
-    parser.add_argument("--secret-file", type=Path, default=Path.home() / ".sapphire" / "secrets.env")
+    parser.add_argument(
+        "--secret-file", type=Path, default=Path.home() / ".sapphire" / "secrets.env"
+    )
     parser.add_argument("--format", choices=("json", "markdown"), default="markdown")
     parser.add_argument(
         "--no-service-status",

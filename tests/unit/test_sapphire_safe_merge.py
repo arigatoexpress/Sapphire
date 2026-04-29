@@ -70,7 +70,9 @@ def _calls(fake: FakeGh, *parts: str) -> list[list[str]]:
 
 
 def _local_ci_calls(fake: FakeGh) -> list[list[str]]:
-    return [cmd for cmd in fake.calls if cmd[:2] == [sys.executable, "scripts/ops/local_ci_verify.py"]]
+    return [
+        cmd for cmd in fake.calls if cmd[:2] == [sys.executable, "scripts/ops/local_ci_verify.py"]
+    ]
 
 
 def test_build_subject_appends_skip_ci():
@@ -78,11 +80,17 @@ def test_build_subject_appends_skip_ci():
 
 
 def test_build_subject_does_not_double_append_skip_ci():
-    assert safe_merge.build_subject("feat(ops): guardrail [skip ci]") == "feat(ops): guardrail [skip ci]"
+    assert (
+        safe_merge.build_subject("feat(ops): guardrail [skip ci]")
+        == "feat(ops): guardrail [skip ci]"
+    )
 
 
 def test_build_subject_accepts_case_variant_skip_ci():
-    assert safe_merge.build_subject("feat(ops): guardrail [SKIP CI]") == "feat(ops): guardrail [SKIP CI]"
+    assert (
+        safe_merge.build_subject("feat(ops): guardrail [SKIP CI]")
+        == "feat(ops): guardrail [SKIP CI]"
+    )
 
 
 def test_build_subject_rejects_empty_title():

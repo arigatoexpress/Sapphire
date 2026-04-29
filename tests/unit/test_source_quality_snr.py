@@ -22,8 +22,12 @@ def _ts(day: int = 1, hour: int = 12) -> datetime:
     return datetime(2026, 4, day, hour, 0, tzinfo=UTC)
 
 
-def _sig(source: str, direction: str, day: int = 1, *, conf: float = 0.8, symbol: str = "BTC") -> SignalRecord:
-    return SignalRecord(source=source, symbol=symbol, timestamp=_ts(day, 12), direction=direction, confidence=conf)
+def _sig(
+    source: str, direction: str, day: int = 1, *, conf: float = 0.8, symbol: str = "BTC"
+) -> SignalRecord:
+    return SignalRecord(
+        source=source, symbol=symbol, timestamp=_ts(day, 12), direction=direction, confidence=conf
+    )
 
 
 def _out(direction_value: float, day: int = 1, *, hour: int = 18, symbol: str = "BTC") -> Outcome:
@@ -107,9 +111,7 @@ def test_compute_snr_emits_one_entry_per_source():
 
 
 def test_compute_snr_perfect_source_has_f1_one():
-    sigs = [
-        _sig("alpha", "bull", day=d) for d in range(1, 7)
-    ] + [
+    sigs = [_sig("alpha", "bull", day=d) for d in range(1, 7)] + [
         _sig("alpha", "bear", day=d) for d in range(7, 13)
     ]
     outs = [_out(0.5, day=d, hour=18) for d in range(1, 7)] + [
@@ -210,10 +212,9 @@ def test_compute_snr_separates_per_source_independently():
         _sig("beta", "bear", day=4),
         _sig("beta", "bear", day=5),
     ]
-    outs = [
-        _out(0.5, day=d, hour=18) for d in range(1, 6)
-    ] + [
-        _out(0.5, day=d, hour=18) for d in range(1, 6)  # alpha right, beta wrong
+    outs = [_out(0.5, day=d, hour=18) for d in range(1, 6)] + [
+        _out(0.5, day=d, hour=18)
+        for d in range(1, 6)  # alpha right, beta wrong
     ]
 
     res = compute_source_snr(sigs, outs)
@@ -243,9 +244,18 @@ def test_signal_record_as_dict_round_trip():
 
 def test_outcome_direction_respects_neutral_band():
     # below band → neutral
-    assert Outcome(symbol="BTC", timestamp=_ts(1), realised_return=NEUTRAL_BAND / 2).direction == "neutral"
-    assert Outcome(symbol="BTC", timestamp=_ts(1), realised_return=NEUTRAL_BAND * 2).direction == "bull"
-    assert Outcome(symbol="BTC", timestamp=_ts(1), realised_return=-NEUTRAL_BAND * 2).direction == "bear"
+    assert (
+        Outcome(symbol="BTC", timestamp=_ts(1), realised_return=NEUTRAL_BAND / 2).direction
+        == "neutral"
+    )
+    assert (
+        Outcome(symbol="BTC", timestamp=_ts(1), realised_return=NEUTRAL_BAND * 2).direction
+        == "bull"
+    )
+    assert (
+        Outcome(symbol="BTC", timestamp=_ts(1), realised_return=-NEUTRAL_BAND * 2).direction
+        == "bear"
+    )
 
 
 def test_compute_snr_matches_first_outcome_inside_window():
@@ -265,12 +275,22 @@ def test_source_snr_dataclass_round_trip_via_from_dict_unsupported_explicit():
     snr_obj = compute_source_snr(sigs, outs)["alpha"]
 
     assert isinstance(snr_obj, SourceSNR)
-    assert snr_obj.true_positives + snr_obj.false_positives + snr_obj.true_negatives + snr_obj.false_negatives == snr_obj.samples
+    assert (
+        snr_obj.true_positives
+        + snr_obj.false_positives
+        + snr_obj.true_negatives
+        + snr_obj.false_negatives
+        == snr_obj.samples
+    )
 
 
 def test_compute_snr_handles_identical_timestamps_for_different_symbols():
-    sig_btc = SignalRecord(source="alpha", symbol="BTC", timestamp=_ts(1), direction="bull", confidence=0.9)
-    sig_eth = SignalRecord(source="alpha", symbol="ETH", timestamp=_ts(1), direction="bull", confidence=0.9)
+    sig_btc = SignalRecord(
+        source="alpha", symbol="BTC", timestamp=_ts(1), direction="bull", confidence=0.9
+    )
+    sig_eth = SignalRecord(
+        source="alpha", symbol="ETH", timestamp=_ts(1), direction="bull", confidence=0.9
+    )
     out_btc = Outcome(symbol="BTC", timestamp=_ts(1) + timedelta(hours=1), realised_return=0.5)
     out_eth = Outcome(symbol="ETH", timestamp=_ts(1) + timedelta(hours=1), realised_return=-0.5)
 

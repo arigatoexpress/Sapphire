@@ -24,6 +24,7 @@ OPS_DIR = REPO_ROOT / "docs" / "ops"
 AUDIT_FILE = OPS_DIR / "runbook-coverage-audit-2026-04-29.md"
 SLO_FILE = OPS_DIR / "slos.md"
 
+
 def _audit_rows() -> list[dict[str, str]]:
     """Parse every row of the audit doc into a list of dicts.
 
@@ -49,11 +50,7 @@ def _audit_rows() -> list[dict[str, str]]:
             continue
         # Score column is the first cell that is a single digit 1-5.
         score_idx = next(
-            (
-                i
-                for i, c in enumerate(cells)
-                if c.isdigit() and len(c) == 1 and 1 <= int(c) <= 5
-            ),
+            (i for i, c in enumerate(cells) if c.isdigit() and len(c) == 1 and 1 <= int(c) <= 5),
             None,
         )
         if score_idx is None:
@@ -133,8 +130,7 @@ def test_every_score_is_integer_1_to_5():
     for row in rows:
         score = int(row["score"])
         assert 1 <= score <= 5, (
-            f"surface {row['surface']!r} has score {score}; "
-            f"rubric only defines 1..5"
+            f"surface {row['surface']!r} has score {score}; rubric only defines 1..5"
         )
 
 
@@ -292,9 +288,7 @@ def test_tranche7_uplift_runbook_files_are_operator_substantive(runbook: str):
 
 def test_slos_file_exists_as_companion_artifact():
     """The audit doc has a partner SLO artifact at docs/ops/slos.md."""
-    assert SLO_FILE.is_file(), (
-        f"missing partner SLO file at {SLO_FILE}; Lane 2 spec requires both"
-    )
+    assert SLO_FILE.is_file(), f"missing partner SLO file at {SLO_FILE}; Lane 2 spec requires both"
 
 
 def test_slos_file_marks_aspirational_explicitly():
@@ -313,9 +307,7 @@ def test_slos_file_covers_availability_latency_error_freshness():
     """The SLO doc must define all four SLO axes per the lane spec."""
     text = SLO_FILE.read_text().lower()
     for axis in ("availability", "latency", "error rate", "freshness"):
-        assert axis in text, (
-            f"slos.md must define the {axis!r} SLO axis"
-        )
+        assert axis in text, f"slos.md must define the {axis!r} SLO axis"
 
 
 def test_audit_count_matches_lane_spec_floor():
@@ -340,6 +332,4 @@ def test_audit_count_matches_lane_spec_floor():
 def test_audit_has_three_top_level_sections(section_anchor: str):
     """Audit must split into Services / LaunchAgents / Cloud routines."""
     text = AUDIT_FILE.read_text()
-    assert section_anchor in text, (
-        f"audit must have section {section_anchor!r}"
-    )
+    assert section_anchor in text, f"audit must have section {section_anchor!r}"

@@ -46,9 +46,7 @@ def _flag_timestamp(path: Path) -> str:
         return first_line
     try:
         return (
-            datetime.fromtimestamp(path.stat().st_mtime, tz=UTC)
-            .replace(microsecond=0)
-            .isoformat()
+            datetime.fromtimestamp(path.stat().st_mtime, tz=UTC).replace(microsecond=0).isoformat()
         )
     except OSError:
         return "unknown"

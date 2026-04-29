@@ -56,7 +56,9 @@ def test_build_record_keeps_channel_attribution_not_sender_metadata() -> None:
 
 
 def test_build_record_defangs_urls_and_redacts_pii() -> None:
-    record = _record(text="Email ari@example.com about https://evil.example/CVE-2026-5555 mitigation.")
+    record = _record(
+        text="Email ari@example.com about https://evil.example/CVE-2026-5555 mitigation."
+    )
     text = record["message"]["text"]
     assert "ari@example.com" not in text
     assert "https://" not in text

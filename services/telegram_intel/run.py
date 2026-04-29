@@ -103,7 +103,9 @@ def evaluate_live_gate(
     )
 
 
-def _backend_for(factory: BackendFactory, cache: dict[str, ReaderBackend], name: str) -> ReaderBackend:
+def _backend_for(
+    factory: BackendFactory, cache: dict[str, ReaderBackend], name: str
+) -> ReaderBackend:
     if name not in cache:
         cache[name] = factory(name)
     return cache[name]
@@ -289,7 +291,9 @@ def daemon(
                     config_path=config_path,
                     data_dir=data_dir,
                     counter_path=counter_path,
-                    source_paths=(Path(config_path).expanduser() if config_path else DEFAULT_CONFIG_PATH,),
+                    source_paths=(
+                        Path(config_path).expanduser() if config_path else DEFAULT_CONFIG_PATH,
+                    ),
                 ),
                 sort_keys=True,
             ),

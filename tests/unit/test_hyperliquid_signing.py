@@ -153,9 +153,7 @@ def test_l1_domain_matches_sdk_constants() -> None:
 
 
 def test_sign_returns_r_s_v_components() -> None:
-    sig = sign_l1_action(
-        TEST_WALLET, _order_action(), nonce=1700000000000, is_mainnet=False
-    )
+    sig = sign_l1_action(TEST_WALLET, _order_action(), nonce=1700000000000, is_mainnet=False)
 
     assert set(sig) == {"r", "s", "v"}
     assert sig["r"].startswith("0x")
@@ -167,9 +165,7 @@ def test_recover_returns_signer_address() -> None:
     nonce = 1700000000000
     sig = sign_l1_action(TEST_WALLET, _order_action(), nonce=nonce, is_mainnet=False)
 
-    recovered = recover_l1_signer(
-        _order_action(), sig, nonce=nonce, is_mainnet=False
-    )
+    recovered = recover_l1_signer(_order_action(), sig, nonce=nonce, is_mainnet=False)
 
     assert recovered.lower() == TEST_WALLET.address.lower()
 
@@ -177,9 +173,7 @@ def test_recover_returns_signer_address() -> None:
 def test_mainnet_and_testnet_produce_different_signatures() -> None:
     nonce = 42
     main_sig = sign_l1_action(TEST_WALLET, _order_action(), nonce=nonce, is_mainnet=True)
-    test_sig = sign_l1_action(
-        TEST_WALLET, _order_action(), nonce=nonce, is_mainnet=False
-    )
+    test_sig = sign_l1_action(TEST_WALLET, _order_action(), nonce=nonce, is_mainnet=False)
 
     assert main_sig != test_sig
 
@@ -189,9 +183,7 @@ def test_recovery_with_wrong_network_fails_to_match() -> None:
     nonce = 99
     sig = sign_l1_action(TEST_WALLET, _order_action(), nonce=nonce, is_mainnet=False)
 
-    recovered_wrong_net = recover_l1_signer(
-        _order_action(), sig, nonce=nonce, is_mainnet=True
-    )
+    recovered_wrong_net = recover_l1_signer(_order_action(), sig, nonce=nonce, is_mainnet=True)
 
     assert recovered_wrong_net.lower() != TEST_WALLET.address.lower()
 

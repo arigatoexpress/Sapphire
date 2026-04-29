@@ -177,7 +177,7 @@ def test_scan_secrets_skips_commented_lines(run_mod):
     """Comment-prefixed matches must not be flagged (false-positive guard)."""
     module, root = run_mod
     target = root / "plugins" / "annotated.py"
-    target.write_text('# Example: AKIAIOSFODNN7EXAMPLE\nx = 1\n')
+    target.write_text("# Example: AKIAIOSFODNN7EXAMPLE\nx = 1\n")
 
     findings = module.scan_secrets()
 
@@ -283,9 +283,7 @@ def test_scan_dependencies_marks_vulnerable_when_findings(run_mod, monkeypatch):
     deps = [{"name": "requests", "version": "1.0", "vulns": [{"id": "PYSEC-2025-1"}]}]
 
     def fake_run(*args, **kwargs):
-        return SimpleNamespace(
-            stdout=json.dumps({"dependencies": deps}), stderr="", returncode=0
-        )
+        return SimpleNamespace(stdout=json.dumps({"dependencies": deps}), stderr="", returncode=0)
 
     monkeypatch.setattr(module.subprocess, "run", fake_run)
 
@@ -416,8 +414,16 @@ def test_refresh_threat_intel_handles_subprocess_exception(run_mod, monkeypatch)
 def test_main_writes_pipeline_json_with_expected_shape(run_mod, monkeypatch):
     module, root = run_mod
 
-    monkeypatch.setattr(module, "scan_secrets", lambda: [{"file": "lib/x.py", "type": "GitHub PAT", "line_preview": "..."}])
-    monkeypatch.setattr(module, "scan_dependencies", lambda: {"python": [{"name": "requests"}], "status": "vulnerable"})
+    monkeypatch.setattr(
+        module,
+        "scan_secrets",
+        lambda: [{"file": "lib/x.py", "type": "GitHub PAT", "line_preview": "..."}],
+    )
+    monkeypatch.setattr(
+        module,
+        "scan_dependencies",
+        lambda: {"python": [{"name": "requests"}], "status": "vulnerable"},
+    )
     monkeypatch.setattr(module, "refresh_threat_intel", lambda: {"total": 4})
 
     # No event bus / Telegram in-process; let the try/except absorb any import error.
@@ -441,7 +447,9 @@ def test_main_writes_pipeline_json_with_expected_shape(run_mod, monkeypatch):
 def test_main_truncates_findings_to_first_twenty(run_mod, monkeypatch):
     module, _ = run_mod
 
-    huge_findings = [{"file": f"lib/f{i}.py", "type": "API key", "line_preview": "..."} for i in range(50)]
+    huge_findings = [
+        {"file": f"lib/f{i}.py", "type": "API key", "line_preview": "..."} for i in range(50)
+    ]
     monkeypatch.setattr(module, "scan_secrets", lambda: huge_findings)
     monkeypatch.setattr(module, "scan_dependencies", lambda: {"python": [], "status": "ok"})
     monkeypatch.setattr(module, "refresh_threat_intel", lambda: {})

@@ -91,7 +91,12 @@ class NewsAPISource:
                 matched.append(article)
         if not matched:
             return None
-        score = sum(self._article_score(" ".join(str(a.get(k) or "") for k in ("title", "description", "content"))) for a in matched)
+        score = sum(
+            self._article_score(
+                " ".join(str(a.get(k) or "") for k in ("title", "description", "content"))
+            )
+            for a in matched
+        )
         newest = max((parse_iso(a.get("publishedAt")) for a in matched), default=None)
         direction = "bull" if score > 0 else "bear" if score < 0 else "neutral"
         timestamp = newest or utc_now()

@@ -243,7 +243,15 @@ def _buyer_safe_requested() -> bool:
         or request.args.get("public")
         or ""
     )
-    return str(raw).strip().lower() in {"1", "true", "yes", "buyer", "buyer_safe", "buyer-safe", "public"}
+    return str(raw).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "buyer",
+        "buyer_safe",
+        "buyer-safe",
+        "public",
+    }
 
 
 def _buyer_safe_payload(payload: Any) -> Any:
@@ -256,7 +264,10 @@ def _buyer_safe_payload(payload: Any) -> Any:
             redacted_fields.add(normalized_key)
             return _BUYER_SAFE_FIELD_REPLACEMENTS[normalized_key]
         if isinstance(value, dict):
-            return {str(child_key): _walk(child_value, str(child_key)) for child_key, child_value in value.items()}
+            return {
+                str(child_key): _walk(child_value, str(child_key))
+                for child_key, child_value in value.items()
+            }
         if isinstance(value, list):
             return [_walk(item, key) for item in value]
         if isinstance(value, str):
@@ -313,7 +324,11 @@ def _extract_diligence_doc(path: Path) -> dict[str, Any]:
     lines = text.splitlines()
     title = next((line.lstrip("# ").strip() for line in lines if line.startswith("# ")), path.stem)
     readout_index = next(
-        (idx + 1 for idx, line in enumerate(lines) if line.strip().lower() == "## diligence readout"),
+        (
+            idx + 1
+            for idx, line in enumerate(lines)
+            if line.strip().lower() == "## diligence readout"
+        ),
         len(lines),
     )
     evidence_index = next(
@@ -584,7 +599,8 @@ def _count_test_functions(path: Path) -> int:
     return sum(
         1
         for node in ast.walk(tree)
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test_")
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name.startswith("test_")
     )
 
 
@@ -646,7 +662,9 @@ def _build_test_suite_health(root: Path | None = None) -> dict[str, Any]:
         "plugin": suite("plugins/claw-sapphire/tests/", plugin_files),
     }
     lastfailed_count = len(lastfailed)
-    status = "pass" if nodeids and lastfailed_count == 0 else ("fail" if lastfailed_count else "warn")
+    status = (
+        "pass" if nodeids and lastfailed_count == 0 else ("fail" if lastfailed_count else "warn")
+    )
     return {
         "mode": "read_only_test_suite_health",
         "status": status,
@@ -736,7 +754,9 @@ def _build_launchagent_summary() -> dict[str, Any]:
     for label in labels:
         live = parsed.get(label)
         if not live:
-            rows.append({"label": label, "status_label": "not_loaded", "pid": None, "last_exit": None})
+            rows.append(
+                {"label": label, "status_label": "not_loaded", "pid": None, "last_exit": None}
+            )
             continue
         pid = live.get("pid")
         last_exit = live.get("last_exit")

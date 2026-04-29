@@ -481,13 +481,16 @@ def parse_treasury_auctions_html(
         when = _as_utc_date_time(auction_date, hour=17)
         if not _within_since(when, since):
             continue
-        security = _row_value(
-            row_map,
-            "security type",
-            "security term",
-            "security",
-            "type",
-        ) or "Treasury security"
+        security = (
+            _row_value(
+                row_map,
+                "security type",
+                "security term",
+                "security",
+                "type",
+            )
+            or "Treasury security"
+        )
         cusip = _row_value(row_map, "cusip")
         issue_date = _row_value(row_map, "issue date")
         maturity_date = _row_value(row_map, "maturity date")
@@ -605,7 +608,9 @@ class BaseMacroSource:
         if not self.respect_robots:
             return True
         parsed = urllib.parse.urlparse(url)
-        robots_url = urllib.parse.urlunparse((parsed.scheme, parsed.netloc, "/robots.txt", "", "", ""))
+        robots_url = urllib.parse.urlunparse(
+            (parsed.scheme, parsed.netloc, "/robots.txt", "", "", "")
+        )
         rp = urllib.robotparser.RobotFileParser()
         rp.set_url(robots_url)
         try:

@@ -392,11 +392,13 @@ class ConvergenceWatchlistSource:
 
     name: str = "convergence_watchlist"
     path: Path = field(
-        default_factory=lambda: REPO_ROOT
-        / "world_knowledge"
-        / "research"
-        / "kimi-p1-sun-drone"
-        / "convergence_watchlist.json"
+        default_factory=lambda: (
+            REPO_ROOT
+            / "world_knowledge"
+            / "research"
+            / "kimi-p1-sun-drone"
+            / "convergence_watchlist.json"
+        )
     )
 
     _TIER_CONF = {
@@ -562,9 +564,7 @@ class KronosForecastSource:
 @dataclass
 class TAScannerSource:
     name: str = "ta_scanner"
-    path: Path = field(
-        default_factory=lambda: REPO_ROOT / "data" / "trading_predictions.jsonl"
-    )
+    path: Path = field(default_factory=lambda: REPO_ROOT / "data" / "trading_predictions.jsonl")
 
     def latest_for(self, symbol: str, timeframe: str) -> SourceSignal | None:
         target = _canonical_symbol(symbol)
@@ -628,16 +628,16 @@ class CrossAssetRegimeSource:
                     continue
                 direction, default_confidence = _REGIME_TO_SIGNAL.get(label, ("neutral", 0.20))
                 ts = _parse_iso(
-                    entry.get("timestamp")
-                    or entry.get("generated_at")
-                    or entry.get("as_of")
+                    entry.get("timestamp") or entry.get("generated_at") or entry.get("as_of")
                 )
                 return SourceSignal(
                     source=self.name,
                     symbol=target,
                     timeframe=timeframe,
                     direction=direction,
-                    confidence=_coerce_confidence(entry.get("confidence"), default=default_confidence),
+                    confidence=_coerce_confidence(
+                        entry.get("confidence"), default=default_confidence
+                    ),
                     age_seconds=_age_seconds(ts, now=now),
                     timestamp_iso=ts.isoformat() if ts else "",
                     raw={

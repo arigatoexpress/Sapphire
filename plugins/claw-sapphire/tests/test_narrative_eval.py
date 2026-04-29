@@ -54,7 +54,9 @@ def test_score_thesis_action() -> None:
 
 
 def test_aggregates_action_accepts_inline_scores() -> None:
-    score = ne.handle({"action": "score-thesis", "thesis": _thesis(), "outcome": _outcome()})["score"]
+    score = ne.handle({"action": "score-thesis", "thesis": _thesis(), "outcome": _outcome()})[
+        "score"
+    ]
     out = ne.handle({"action": "aggregates", "scores": [score], "group_by": "symbol"})
     assert out["ok"] is True
     assert out["groups"]["BTC"]["scored"] == 1

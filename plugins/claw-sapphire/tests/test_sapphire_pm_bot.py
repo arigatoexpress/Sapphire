@@ -532,9 +532,7 @@ def test_routines_pause_creates_flag_file(monkeypatch, tmp_path):
     monkeypatch.setattr(pm_bot, "_SCHEDULED_TASKS_DIR", fake_tasks)
     monkeypatch.setattr(pm_bot, "_ROUTINE_PAUSE_DIR", pause_dir)
 
-    response = pm_bot.handle_telegram_command(
-        _make_update("/routines pause morning-briefing")
-    )
+    response = pm_bot.handle_telegram_command(_make_update("/routines pause morning-briefing"))
     assert response["parse_mode"] == "MarkdownV2"
     assert "Paused routine: morning\\-briefing" in response["text"]
     assert (pause_dir / "morning-briefing").exists()
@@ -548,9 +546,7 @@ def test_routines_resume_requires_confirm_token(monkeypatch, tmp_path):
     monkeypatch.setattr(pm_bot, "_ROUTINE_PAUSE_DIR", pause_dir)
 
     # Without CONFIRM — refusal, flag still present.
-    response = pm_bot.handle_telegram_command(
-        _make_update("/routines resume morning-briefing")
-    )
+    response = pm_bot.handle_telegram_command(_make_update("/routines resume morning-briefing"))
     assert "Confirmation required" in response["text"]
     assert (pause_dir / "morning-briefing").exists()
 
@@ -572,9 +568,7 @@ def test_cancel_routine_requires_confirm_token(monkeypatch, tmp_path):
     monkeypatch.setattr(pm_bot, "_ROUTINE_PAUSE_DIR", pause_dir)
 
     # Without CONFIRM — refusal.
-    response = pm_bot.handle_telegram_command(
-        _make_update("/cancel-routine factory-repo-fixer")
-    )
+    response = pm_bot.handle_telegram_command(_make_update("/cancel-routine factory-repo-fixer"))
     assert "Confirmation required" in response["text"]
     assert not pause_dir.exists() or not (pause_dir / "factory-repo-fixer").exists()
 
@@ -591,9 +585,7 @@ def test_routines_pause_rejects_invalid_routine_name(monkeypatch, tmp_path):
     monkeypatch.setattr(pm_bot, "_SCHEDULED_TASKS_DIR", tmp_path / "fake")
     monkeypatch.setattr(pm_bot, "_ROUTINE_PAUSE_DIR", tmp_path / "pause")
 
-    response = pm_bot.handle_telegram_command(
-        _make_update("/routines pause ../etc/passwd")
-    )
+    response = pm_bot.handle_telegram_command(_make_update("/routines pause ../etc/passwd"))
     assert response["text"] == safety.GENERIC_REFUSAL_TEXT
 
 
@@ -693,7 +685,8 @@ def test_existing_status_command_unchanged(monkeypatch):
     )
     monkeypatch.setattr(pm_bot, "_count_signals_today", lambda: 0)
     monkeypatch.setattr(
-        pm_bot.requests, "get",
+        pm_bot.requests,
+        "get",
         lambda *a, **k: SimpleNamespace(status_code=200, reason="OK"),
     )
     response = pm_bot.handle_telegram_command(_make_update("/status"))

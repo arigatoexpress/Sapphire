@@ -82,9 +82,7 @@ def test_site_files_exist() -> None:
 
 def test_no_inline_script_blocks(parsed: _CollectingParser) -> None:
     """No JS framework, no analytics, no inline scripting."""
-    assert parsed.scripts == [], (
-        f"acquirer microsite must be JS-free; found {parsed.scripts}"
-    )
+    assert parsed.scripts == [], f"acquirer microsite must be JS-free; found {parsed.scripts}"
 
 
 def test_no_inline_event_handlers(parsed: _CollectingParser) -> None:
@@ -100,9 +98,7 @@ def test_only_local_stylesheet_links(parsed: _CollectingParser) -> None:
     assert sheets, "expected at least one stylesheet link"
     for sheet in sheets:
         href = sheet.get("href", "")
-        assert href.startswith("assets/"), (
-            f"stylesheet must be local; got {href!r}"
-        )
+        assert href.startswith("assets/"), f"stylesheet must be local; got {href!r}"
 
 
 def test_image_sources_are_local(parsed: _CollectingParser) -> None:
@@ -162,9 +158,7 @@ def test_screenshot_placeholders_present_for_every_image(parsed: _CollectingPars
     for img in parsed.images:
         rel = img.get("src", "")
         target = SITE_DIR / rel
-        assert target.is_file(), (
-            f"missing placeholder PNG for {rel} (expected at {target})"
-        )
+        assert target.is_file(), f"missing placeholder PNG for {rel} (expected at {target})"
 
 
 def test_local_doc_links_resolve(parsed: _CollectingParser) -> None:
@@ -175,9 +169,7 @@ def test_local_doc_links_resolve(parsed: _CollectingParser) -> None:
             continue
         # Resolve relative to the index.html directory.
         target = (SITE_DIR / href).resolve()
-        assert target.exists(), (
-            f"broken relative link {href!r} -> {target}"
-        )
+        assert target.exists(), f"broken relative link {href!r} -> {target}"
 
 
 def test_diligence_packet_links_complete() -> None:
@@ -189,9 +181,7 @@ def test_diligence_packet_links_complete() -> None:
         matches = list(diligence_dir.glob(f"{prefix}*.md"))
         assert matches, f"diligence packet missing {prefix}*.md"
         target_name = matches[0].name
-        assert target_name in body, (
-            f"index.html does not link {target_name}"
-        )
+        assert target_name in body, f"index.html does not link {target_name}"
 
 
 def test_styles_css_is_self_contained() -> None:
@@ -199,7 +189,7 @@ def test_styles_css_is_self_contained() -> None:
     css = STYLES_CSS.read_text(encoding="utf-8")
     assert "url(https://" not in css, "no remote url() in CSS"
     assert "url(http://" not in css, "no remote url() in CSS"
-    assert "@import" not in css.lower() or "@import url(\"assets/" in css.lower() or True, (
+    assert "@import" not in css.lower() or '@import url("assets/' in css.lower() or True, (
         "ban @import unless local; manual review required"
     )
     # Tailwind CDN guard: the CDN URL contains "cdn.tailwindcss.com".

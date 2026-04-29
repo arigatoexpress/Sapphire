@@ -82,9 +82,7 @@ def test_http_json_handles_invalid_json_payload():
         return bad_resp
 
     with (
-        patch.object(
-            chain_mod.urllib.request, "urlopen", side_effect=lambda *a, **k: _fresh_bad()
-        ),
+        patch.object(chain_mod.urllib.request, "urlopen", side_effect=lambda *a, **k: _fresh_bad()),
         patch.object(chain_mod.time, "sleep"),
     ):
         result = chain_mod._http_json("https://example.test/badjson")

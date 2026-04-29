@@ -478,10 +478,9 @@ def _select_train_combo(
             best_value = value
             best_trades = report.total_trades
             best_report = report
-        elif (
-            value == best_value
-            and (report.total_trades, _params_sort_key(combo))
-            < (best_trades, _params_sort_key(best_combo))
+        elif value == best_value and (report.total_trades, _params_sort_key(combo)) < (
+            best_trades,
+            _params_sort_key(best_combo),
         ):
             # Lexicographic tie-break to keep the result deterministic.
             best_combo = combo
@@ -745,9 +744,7 @@ def _aggregate(result: WalkforwardResult) -> None:
     result.n_active_windows = len(active)
     result.mean_test_sortino = round(statistics.fmean(sortinos), 4)
     result.median_test_sortino = round(statistics.median(sortinos), 4)
-    result.std_test_sortino = round(
-        statistics.pstdev(sortinos) if len(sortinos) > 1 else 0.0, 4
-    )
+    result.std_test_sortino = round(statistics.pstdev(sortinos) if len(sortinos) > 1 else 0.0, 4)
     result.mean_test_sharpe = round(statistics.fmean(sharpes), 4)
     result.mean_test_calmar = round(statistics.fmean(calmars), 4)
     result.mean_test_total_return_pct = round(statistics.fmean(rets), 6)
@@ -755,10 +752,12 @@ def _aggregate(result: WalkforwardResult) -> None:
     result.mean_test_profit_factor = round(min(statistics.fmean(pfs), 999.0), 4)
     result.aggregate_test_max_drawdown_pct = round(max(dds), 6)
 
-    raw_cv = (result.std_test_sortino / abs(result.mean_test_sortino)) if result.mean_test_sortino != 0 else float("inf")
-    result.test_sortino_cv = (
-        round(raw_cv, 4) if math.isfinite(raw_cv) else 999.0
+    raw_cv = (
+        (result.std_test_sortino / abs(result.mean_test_sortino))
+        if result.mean_test_sortino != 0
+        else float("inf")
     )
+    result.test_sortino_cv = round(raw_cv, 4) if math.isfinite(raw_cv) else 999.0
 
 
 # ---------------------------------------------------------------------------

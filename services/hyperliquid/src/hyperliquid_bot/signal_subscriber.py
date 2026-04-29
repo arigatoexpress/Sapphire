@@ -47,9 +47,7 @@ _SELL_ALIASES = frozenset({"sell", "short", "open_short"})
 _CLOSE_ALIASES = frozenset({"close", "exit", "flatten"})
 
 
-def translate_signal(
-    raw: dict[str, Any], *, default_size_usd: float
-) -> dict[str, Any] | None:
+def translate_signal(raw: dict[str, Any], *, default_size_usd: float) -> dict[str, Any] | None:
     """Map a webhook signal entry to the executor's expected shape.
 
     Returns ``None`` if the signal is unroutable (missing/unknown action or

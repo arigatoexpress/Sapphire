@@ -130,9 +130,11 @@ class LaborSource:
                     "Host": "data.usajobs.gov",
                 },
             )
-            items = (((payload.get("SearchResult") or {}).get("SearchResultItems")) or [])
+            items = ((payload.get("SearchResult") or {}).get("SearchResultItems")) or []
             for item in items:
-                descriptor = item.get("MatchedObjectDescriptor") if isinstance(item, Mapping) else None
+                descriptor = (
+                    item.get("MatchedObjectDescriptor") if isinstance(item, Mapping) else None
+                )
                 if isinstance(descriptor, Mapping):
                     jobs.append(
                         {

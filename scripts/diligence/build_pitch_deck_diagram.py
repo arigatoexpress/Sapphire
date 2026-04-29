@@ -3,6 +3,7 @@
 Style matches the deck: Midnight Executive palette (deep navy + sapphire blue + ice).
 Output: /tmp/sapphire-deck-build/architecture.png at 1600x900 (16:9 friendly).
 """
+
 from __future__ import annotations
 
 import os
@@ -22,33 +23,74 @@ ACCENT_2 = "#8edcff"
 LINE = "#2a3a5e"
 
 
-def draw_box(ax, x, y, w, h, label, sublabel=None, fill=BG_CARD, edge=LINE,
-             label_color=FG, sub_color=FG_MUTED, fontsize=10, sub_fontsize=8,
-             radius=0.04):
+def draw_box(
+    ax,
+    x,
+    y,
+    w,
+    h,
+    label,
+    sublabel=None,
+    fill=BG_CARD,
+    edge=LINE,
+    label_color=FG,
+    sub_color=FG_MUTED,
+    fontsize=10,
+    sub_fontsize=8,
+    radius=0.04,
+):
     box = FancyBboxPatch(
-        (x, y), w, h,
+        (x, y),
+        w,
+        h,
         boxstyle=f"round,pad=0.005,rounding_size={radius}",
-        linewidth=1.2, edgecolor=edge, facecolor=fill,
+        linewidth=1.2,
+        edgecolor=edge,
+        facecolor=fill,
     )
     ax.add_patch(box)
     if sublabel:
-        ax.text(x + w / 2, y + h * 0.62, label,
-                ha="center", va="center", fontsize=fontsize,
-                color=label_color, weight="bold")
-        ax.text(x + w / 2, y + h * 0.30, sublabel,
-                ha="center", va="center", fontsize=sub_fontsize,
-                color=sub_color)
+        ax.text(
+            x + w / 2,
+            y + h * 0.62,
+            label,
+            ha="center",
+            va="center",
+            fontsize=fontsize,
+            color=label_color,
+            weight="bold",
+        )
+        ax.text(
+            x + w / 2,
+            y + h * 0.30,
+            sublabel,
+            ha="center",
+            va="center",
+            fontsize=sub_fontsize,
+            color=sub_color,
+        )
     else:
-        ax.text(x + w / 2, y + h / 2, label,
-                ha="center", va="center", fontsize=fontsize,
-                color=label_color, weight="bold")
+        ax.text(
+            x + w / 2,
+            y + h / 2,
+            label,
+            ha="center",
+            va="center",
+            fontsize=fontsize,
+            color=label_color,
+            weight="bold",
+        )
 
 
 def draw_arrow(ax, x1, y1, x2, y2, color=ACCENT, width=1.2, style="-|>"):
     arrow = FancyArrowPatch(
-        (x1, y1), (x2, y2),
-        arrowstyle=style, mutation_scale=12,
-        color=color, linewidth=width, alpha=0.85,
+        (x1, y1),
+        (x2, y2),
+        arrowstyle=style,
+        mutation_scale=12,
+        color=color,
+        linewidth=width,
+        alpha=0.85,
     )
     ax.add_patch(arrow)
 
@@ -69,12 +111,36 @@ def main():
         spine.set_visible(False)
 
     # No internal title — the slide owns the title. Section column labels only.
-    ax.text(2.0, 8.5, "SIGNAL SOURCES", ha="center", va="center",
-            fontsize=10, color=ACCENT_2, weight="bold")
-    ax.text(7.0, 8.5, "CORRELATION + GOVERNANCE", ha="center", va="center",
-            fontsize=10, color=ACCENT_2, weight="bold")
-    ax.text(13.8, 8.5, "GOVERNED OUTPUTS", ha="center", va="center",
-            fontsize=10, color=ACCENT_2, weight="bold")
+    ax.text(
+        2.0,
+        8.5,
+        "SIGNAL SOURCES",
+        ha="center",
+        va="center",
+        fontsize=10,
+        color=ACCENT_2,
+        weight="bold",
+    )
+    ax.text(
+        7.0,
+        8.5,
+        "CORRELATION + GOVERNANCE",
+        ha="center",
+        va="center",
+        fontsize=10,
+        color=ACCENT_2,
+        weight="bold",
+    )
+    ax.text(
+        13.8,
+        8.5,
+        "GOVERNED OUTPUTS",
+        ha="center",
+        va="center",
+        fontsize=10,
+        color=ACCENT_2,
+        weight="bold",
+    )
 
     # Section underlines
     for cx in (2.0, 7.0, 13.8):
@@ -101,31 +167,91 @@ def main():
 
     # ---- Column 2: Correlator (middle) ----
     # Event bus
-    draw_box(ax, 4.6, 7.0, 4.8, 0.85, "Event Bus",
-             "Redis Streams + JSONL fallback", fill=BG_ELEV, fontsize=12, sub_fontsize=9)
+    draw_box(
+        ax,
+        4.6,
+        7.0,
+        4.8,
+        0.85,
+        "Event Bus",
+        "Redis Streams + JSONL fallback",
+        fill=BG_ELEV,
+        fontsize=12,
+        sub_fontsize=9,
+    )
 
     # Correlator
-    draw_box(ax, 4.6, 5.6, 4.8, 1.05, "Signal Correlator",
-             "edge_score · consensus · corroborated_by", fill=BG_CARD,
-             edge=ACCENT, fontsize=12, sub_fontsize=9)
+    draw_box(
+        ax,
+        4.6,
+        5.6,
+        4.8,
+        1.05,
+        "Signal Correlator",
+        "edge_score · consensus · corroborated_by",
+        fill=BG_CARD,
+        edge=ACCENT,
+        fontsize=12,
+        sub_fontsize=9,
+    )
 
     # Narrative synthesis
-    draw_box(ax, 4.6, 4.15, 4.8, 1.05, "Narrative Synthesis",
-             "Bounded LLM thesis · invalidators · rubric gate", fill=BG_CARD,
-             edge=ACCENT, fontsize=12, sub_fontsize=9)
+    draw_box(
+        ax,
+        4.6,
+        4.15,
+        4.8,
+        1.05,
+        "Narrative Synthesis",
+        "Bounded LLM thesis · invalidators · rubric gate",
+        fill=BG_CARD,
+        edge=ACCENT,
+        fontsize=12,
+        sub_fontsize=9,
+    )
 
     # Risk Kernel + Provenance
-    draw_box(ax, 4.6, 2.7, 2.3, 1.05, "Risk Kernel",
-             "DecisionEnvelope → RiskVerdict\nfail-closed", fill=BG_CARD,
-             edge=ACCENT_2, fontsize=11, sub_fontsize=8)
-    draw_box(ax, 7.1, 2.7, 2.3, 1.05, "Provenance",
-             "envelope.json sidecar\nSHA-256 sources", fill=BG_CARD,
-             edge=ACCENT_2, fontsize=11, sub_fontsize=8)
+    draw_box(
+        ax,
+        4.6,
+        2.7,
+        2.3,
+        1.05,
+        "Risk Kernel",
+        "DecisionEnvelope → RiskVerdict\nfail-closed",
+        fill=BG_CARD,
+        edge=ACCENT_2,
+        fontsize=11,
+        sub_fontsize=8,
+    )
+    draw_box(
+        ax,
+        7.1,
+        2.7,
+        2.3,
+        1.05,
+        "Provenance",
+        "envelope.json sidecar\nSHA-256 sources",
+        fill=BG_CARD,
+        edge=ACCENT_2,
+        fontsize=11,
+        sub_fontsize=8,
+    )
 
     # Confirmation firewall
-    draw_box(ax, 4.6, 1.25, 4.8, 1.05, "Confirmation Firewall + Kill Switches",
-             "2-phase commit · operator confirm · drawdown halt", fill=BG_ELEV,
-             edge=ACCENT_2, fontsize=11, sub_fontsize=9)
+    draw_box(
+        ax,
+        4.6,
+        1.25,
+        4.8,
+        1.05,
+        "Confirmation Firewall + Kill Switches",
+        "2-phase commit · operator confirm · drawdown halt",
+        fill=BG_ELEV,
+        edge=ACCENT_2,
+        fontsize=11,
+        sub_fontsize=9,
+    )
 
     # ---- Column 3: Outputs (right) ----
     outputs = [
@@ -167,9 +293,9 @@ def main():
         draw_arrow(ax, 9.45, 1.78, out_x - 0.05, y, color=ACCENT, width=0.8)
 
     plt.tight_layout()
-    plt.savefig(output_path,
-                dpi=140, facecolor=BG, edgecolor="none", bbox_inches="tight",
-                pad_inches=0.15)
+    plt.savefig(
+        output_path, dpi=140, facecolor=BG, edgecolor="none", bbox_inches="tight", pad_inches=0.15
+    )
     print(f"WROTE {output_path}")
 
 

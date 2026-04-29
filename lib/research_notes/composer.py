@@ -181,4 +181,3 @@ def compose_research_note(
         generated_at=generated,
         provenance=provenance,
     )
-

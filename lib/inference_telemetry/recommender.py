@@ -158,7 +158,9 @@ def _switch_recommendation(
 
     # Compute current cost share attributable to this tier alone.
     if report.window_seconds and report.window_seconds > 0:
-        tier_share = observed.cost_usd / max(report.total_cost_usd, 1e-12) if report.total_cost_usd else 0.0
+        tier_share = (
+            observed.cost_usd / max(report.total_cost_usd, 1e-12) if report.total_cost_usd else 0.0
+        )
     else:
         tier_share = 0.0
     monthly_total_cost = project_monthly_cost(report)
@@ -257,7 +259,9 @@ def recommend(
 
     # Recommendation 1: T4 → T1 (cost saving, capability gated).
     if TIER_T4_KIMI in by_tier and TIER_T1_GPU in by_tier:
-        latency_warn = _latency_caveat(by_tier[TIER_T4_KIMI], by_tier[TIER_T1_GPU], "T1_windows_gpu")
+        latency_warn = _latency_caveat(
+            by_tier[TIER_T4_KIMI], by_tier[TIER_T1_GPU], "T1_windows_gpu"
+        )
         rec = _switch_recommendation(
             report,
             by_tier,
@@ -347,15 +351,12 @@ def recommend(
             top_classes = sorted(ts.error_classes.items(), key=lambda x: -x[1])[:3]
             if top_classes:
                 note.caveats.append(
-                    "top error classes: "
-                    + ", ".join(f"{c}={n}" for c, n in top_classes)
+                    "top error classes: " + ", ".join(f"{c}={n}" for c, n in top_classes)
                 )
             bundle.recommendations.append(note)
 
     # Stable ordering for tests + provenance.
-    bundle.recommendations.sort(
-        key=lambda r: (r.kind, r.from_tier or "", r.to_tier or "")
-    )
+    bundle.recommendations.sort(key=lambda r: (r.kind, r.from_tier or "", r.to_tier or ""))
     return bundle
 
 

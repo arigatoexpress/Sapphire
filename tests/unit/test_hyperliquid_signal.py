@@ -116,9 +116,9 @@ def test_bbo_imbalance_resets_when_dominant_side_changes():
     engine.process_bbo(_bbo(bid_sz="10", ask_sz="40"), now=105.0)
 
     assert engine.process_bbo(_bbo(bid_sz="10", ask_sz="40"), now=111.0) == []
-    assert engine.process_bbo(_bbo(bid_sz="10", ask_sz="40"), now=116.0)[0][
-        "dominant_side"
-    ] == "ask"
+    assert (
+        engine.process_bbo(_bbo(bid_sz="10", ask_sz="40"), now=116.0)[0]["dominant_side"] == "ask"
+    )
 
 
 def test_bbo_imbalance_has_emit_cooldown():

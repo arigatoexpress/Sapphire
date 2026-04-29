@@ -19,7 +19,9 @@ def _now_iso() -> str:
 
 def _safe(text: str, *, limit: int = 220) -> str:
     compact = re.sub(r"\s+", " ", str(text or "")).strip()
-    compact = re.sub(r"(?i)(api[_-]?key|secret|token|password)\s*[=:]\s*\S+", r"\1=[redacted]", compact)
+    compact = re.sub(
+        r"(?i)(api[_-]?key|secret|token|password)\s*[=:]\s*\S+", r"\1=[redacted]", compact
+    )
     return compact[:limit]
 
 

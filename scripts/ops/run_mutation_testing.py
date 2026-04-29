@@ -58,9 +58,7 @@ MUTATION_TARGETS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ),
     (
         "lib/correlator/scoring.py",
-        (
-            "tests/property/test_correlator_scoring_properties.py",
-        ),
+        ("tests/property/test_correlator_scoring_properties.py",),
     ),
     (
         "lib/live_portfolio/sortino.py",
@@ -71,9 +69,7 @@ MUTATION_TARGETS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ),
     (
         "lib/live_portfolio/ramp_gate.py",
-        (
-            "tests/unit/test_live_portfolio_ramp_gate.py",
-        ),
+        ("tests/unit/test_live_portfolio_ramp_gate.py",),
     ),
     (
         "lib/audit_panel/heuristics.py",
@@ -112,9 +108,7 @@ class ModuleResult:
 
 def _build_command(source_path: str, test_paths: tuple[str, ...]) -> tuple[str, ...]:
     """Return the mutmut command sequence for one module."""
-    runner = "python3 -m pytest -x --tb=no -q " + " ".join(
-        shlex.quote(p) for p in test_paths
-    )
+    runner = "python3 -m pytest -x --tb=no -q " + " ".join(shlex.quote(p) for p in test_paths)
     return (
         sys.executable,
         "-m",
@@ -295,10 +289,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--module",
         action="append",
         default=None,
-        help=(
-            "Restrict to one module path (repeatable). Default: all "
-            "MUTATION_TARGETS."
-        ),
+        help=("Restrict to one module path (repeatable). Default: all MUTATION_TARGETS."),
     )
     parser.add_argument(
         "--print-only",
@@ -326,9 +317,7 @@ def _filter_targets(
         if source in requested:
             out.append((source, tests))
     if not out:
-        raise SystemExit(
-            f"No matching modules in MUTATION_TARGETS for {requested!r}."
-        )
+        raise SystemExit(f"No matching modules in MUTATION_TARGETS for {requested!r}.")
     return tuple(out)
 
 

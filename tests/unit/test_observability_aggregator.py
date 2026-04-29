@@ -30,7 +30,9 @@ def _frozen_now() -> datetime:
     return _NOW
 
 
-def _make_completed(stdout: str = "", returncode: int = 0, stderr: str = "") -> subprocess.CompletedProcess[str]:
+def _make_completed(
+    stdout: str = "", returncode: int = 0, stderr: str = ""
+) -> subprocess.CompletedProcess[str]:
     return subprocess.CompletedProcess(
         args=["launchctl", "list"],
         returncode=returncode,
@@ -72,6 +74,7 @@ def _seed_signal_dir(repo_root: Path, subdir: str, records: list[dict]) -> Path:
 def _runner_with_output(output: str):
     def _runner() -> subprocess.CompletedProcess[str]:
         return _make_completed(output)
+
     return _runner
 
 
@@ -166,10 +169,26 @@ def test_inference_proxy_reads_token_consumption_when_present(tmp_path):
     cache = tmp_path / "proxy"
     cache.mkdir()
     (cache / "token_consumption.json").write_text(
-        json.dumps({"total": 12345, "by_tier": {"T1_GPU": 999}, "window": "lifetime", "last_updated": 1761500000})
+        json.dumps(
+            {
+                "total": 12345,
+                "by_tier": {"T1_GPU": 999},
+                "window": "lifetime",
+                "last_updated": 1761500000,
+            }
+        )
     )
     (cache / "tier_health.json").write_text(
-        json.dumps([{"tier": "T1_GPU", "endpoint": "100.71.10.48:11434", "healthy": True, "latency_ms": 410}])
+        json.dumps(
+            [
+                {
+                    "tier": "T1_GPU",
+                    "endpoint": "100.71.10.48:11434",
+                    "healthy": True,
+                    "latency_ms": 410,
+                }
+            ]
+        )
     )
     proxy = aggregator._build_inference_proxy(cache_dir=cache, now=_NOW)
     assert proxy.available is True
@@ -199,8 +218,8 @@ def test_signal_streams_count_recent_records_only(tmp_path):
     now_ts = _NOW.timestamp()
     records = [
         {"ts": (_NOW - timedelta(minutes=30)).isoformat()},  # within 1h
-        {"ts": (_NOW - timedelta(hours=2)).isoformat()},     # within 24h
-        {"ts": (_NOW - timedelta(days=2)).isoformat()},      # outside both
+        {"ts": (_NOW - timedelta(hours=2)).isoformat()},  # within 24h
+        {"ts": (_NOW - timedelta(days=2)).isoformat()},  # outside both
     ]
     _seed_signal_dir(repo_root, "signals", records)
     streams = aggregator._build_signal_streams(
@@ -381,10 +400,13 @@ def test_event_bus_topic_distribution_counts_correctly(tmp_path):
 def test_event_bus_skips_non_dict_lines(tmp_path):
     bus = tmp_path / "bus.jsonl"
     bus.write_text(
-        json.dumps({"type": "good.event", "ts": _NOW.isoformat()}) + "\n"
-        + json.dumps([1, 2, 3]) + "\n"  # not-a-dict
+        json.dumps({"type": "good.event", "ts": _NOW.isoformat()})
+        + "\n"
+        + json.dumps([1, 2, 3])
+        + "\n"  # not-a-dict
         + "garbage line\n"
-        + json.dumps({"topic": "alt.topic"}) + "\n"
+        + json.dumps({"topic": "alt.topic"})
+        + "\n"
     )
     snap = aggregator._build_event_bus(bus_path=bus)
     assert snap.events_seen == 2

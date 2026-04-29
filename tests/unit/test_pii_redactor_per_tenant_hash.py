@@ -158,7 +158,7 @@ def test_per_tenant_hash_handles_empty_tenant() -> None:
 def test_per_tenant_hash_output_shape_is_tenant_prefix_hex_suffix() -> None:
     out = per_tenant_hash("Marie Curie", "acme", salt="x")
     assert out.startswith("tenant_acme_")
-    suffix = out[len("tenant_acme_"):]
+    suffix = out[len("tenant_acme_") :]
     assert re.fullmatch(r"[0-9a-f]{16}", suffix), f"unexpected hash suffix: {suffix!r}"
 
 

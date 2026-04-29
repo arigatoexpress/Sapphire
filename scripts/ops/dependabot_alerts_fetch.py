@@ -243,9 +243,17 @@ def fetch_and_render(
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--repo", default=DEFAULT_REPO, help=f"GitHub repo (default: {DEFAULT_REPO}).")
-    parser.add_argument("--state", default=DEFAULT_STATE, help="Alert state to fetch (open|fixed|dismissed|auto_dismissed).")
-    parser.add_argument("--markdown-only", action="store_true", help="Print only the markdown digest.")
+    parser.add_argument(
+        "--repo", default=DEFAULT_REPO, help=f"GitHub repo (default: {DEFAULT_REPO})."
+    )
+    parser.add_argument(
+        "--state",
+        default=DEFAULT_STATE,
+        help="Alert state to fetch (open|fixed|dismissed|auto_dismissed).",
+    )
+    parser.add_argument(
+        "--markdown-only", action="store_true", help="Print only the markdown digest."
+    )
     parser.add_argument("--json-only", action="store_true", help="Print only the JSON envelope.")
     return parser.parse_args(argv)
 

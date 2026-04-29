@@ -235,9 +235,7 @@ def correlate_once(
         signals_by_source,
         hard_limit=config.freshness_hard_limit_seconds,
     )
-    capped = _cap_fan_in(
-        fresh, weights=config.weights, max_sources=config.max_sources
-    )
+    capped = _cap_fan_in(fresh, weights=config.weights, max_sources=config.max_sources)
     score = compose_score(capped, config.weights)
     consensus = _consensus_label(score)
 
@@ -330,9 +328,7 @@ def correlate_universe(
             try:
                 sig = src.latest_for(symbol, timeframe)
             except Exception as exc:  # noqa: BLE001 - never bubble adapter errors.
-                log.warning(
-                    "source %s failed for (%s, %s): %s", src.name, symbol, timeframe, exc
-                )
+                log.warning("source %s failed for (%s, %s): %s", src.name, symbol, timeframe, exc)
                 continue
             if sig is None:
                 continue

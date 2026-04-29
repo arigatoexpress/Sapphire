@@ -171,7 +171,9 @@ def coerce_close_series(raw: Any) -> dict[str, float]:
             else:
                 close = _point_close(value)
                 if close is not None:
-                    out[_point_timestamp(value, idx) if isinstance(value, Mapping) else str(key)] = close
+                    out[
+                        _point_timestamp(value, idx) if isinstance(value, Mapping) else str(key)
+                    ] = close
         return dict(sorted(out.items()))
     if isinstance(raw, Iterable) and not isinstance(raw, str | bytes):
         for idx, point in enumerate(raw):

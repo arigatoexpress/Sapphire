@@ -319,9 +319,7 @@ def test_pull_once_reports_backend_errors(tmp_path: Path) -> None:
 def test_pull_once_uses_classifier_cap_fallback(tmp_path: Path) -> None:
     cfg_path = _write_config(tmp_path / "channels.yaml", classifier=True)
     counter_path = tmp_path / "counters.json"
-    counter_path.write_text(
-        json.dumps({"classifications": [time.time()] * 200}), encoding="utf-8"
-    )
+    counter_path.write_text(json.dumps({"classifications": [time.time()] * 200}), encoding="utf-8")
     result = pull_once(
         config_path=cfg_path,
         data_dir=tmp_path / "data",

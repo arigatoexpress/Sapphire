@@ -123,9 +123,7 @@ def _coerce_dict(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
-def _checks_from_health(
-    data: dict[str, Any], *, include_repos: bool
-) -> tuple[HealthCheck, ...]:
+def _checks_from_health(data: dict[str, Any], *, include_repos: bool) -> tuple[HealthCheck, ...]:
     sections = ["services", "data_freshness", "inference"]
     if include_repos:
         sections.insert(1, "repos")
@@ -187,7 +185,9 @@ _TELEGRAM_PREAMBLE: tuple[str, ...] = (
 )
 
 
-def _render_health_lines(ctx_overall: str, ctx_summary: str, checks: tuple[HealthCheck, ...]) -> list[str]:
+def _render_health_lines(
+    ctx_overall: str, ctx_summary: str, checks: tuple[HealthCheck, ...]
+) -> list[str]:
     """Match the historical ``_health_lines`` output verbatim."""
     lines = [f"*{ctx_overall}* — {ctx_summary}"]
     for c in checks:
@@ -199,9 +199,7 @@ def _render_status_lines(inference: InferenceSnapshot) -> list[str]:
     """Match the historical ``_status_lines`` output verbatim."""
     lines: list[str] = []
     if inference.proxy_health:
-        tier_bits = [
-            f"{name}={state}" for name, state in sorted(inference.proxy_health.items())
-        ]
+        tier_bits = [f"{name}={state}" for name, state in sorted(inference.proxy_health.items())]
         lines.append("Inference proxy: " + ", ".join(tier_bits))
     if inference.local_models:
         lines.append(
@@ -299,9 +297,13 @@ def _render_ops(
             for name, state in sorted(inference.proxy_health.items()):
                 lines.append(f"  proxy {name}: {state}")
         if inference.local_models:
-            lines.append(f"  mac models ({len(inference.local_models)}): {', '.join(inference.local_models)}")
+            lines.append(
+                f"  mac models ({len(inference.local_models)}): {', '.join(inference.local_models)}"
+            )
         if inference.gpu_models:
-            lines.append(f"  gpu models ({len(inference.gpu_models)}): {', '.join(inference.gpu_models)}")
+            lines.append(
+                f"  gpu models ({len(inference.gpu_models)}): {', '.join(inference.gpu_models)}"
+            )
     if errors:
         lines.append(f"ERRORS ({len(errors)}):")
         for err in errors:
@@ -354,9 +356,7 @@ def build_health_context(
         ValueError: If ``scope`` is not one of the four supported literals.
     """
     if scope not in _VALID_SCOPES:
-        raise ValueError(
-            f"unknown scope {scope!r}; expected one of {_VALID_SCOPES}"
-        )
+        raise ValueError(f"unknown scope {scope!r}; expected one of {_VALID_SCOPES}")
 
     health_payload = health_payload or {}
     status_payload = status_payload or {}
@@ -366,9 +366,7 @@ def build_health_context(
 
     health_available = bool(health_payload)
     overall = str(health_payload.get("overall", "UNKNOWN")) if health_available else "UNKNOWN"
-    summary = (
-        str(health_payload.get("summary", "no summary")) if health_available else "no summary"
-    )
+    summary = str(health_payload.get("summary", "no summary")) if health_available else "no summary"
 
     include_repos = scope in {"morning", "ops"}
     checks = _checks_from_health(health_payload, include_repos=include_repos)

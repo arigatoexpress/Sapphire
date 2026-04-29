@@ -20,7 +20,10 @@ FROZEN_NOW = datetime(2026, 4, 28, 12, 0, tzinfo=UTC)
 
 
 def _series(values: list[float], *, prefix: str = "2026-04-") -> list[dict[str, float | str]]:
-    return [{"timestamp": f"{prefix}{idx + 1:02d}T00:00:00Z", "close": value} for idx, value in enumerate(values)]
+    return [
+        {"timestamp": f"{prefix}{idx + 1:02d}T00:00:00Z", "close": value}
+        for idx, value in enumerate(values)
+    ]
 
 
 def test_pearson_perfect_positive() -> None:
@@ -77,7 +80,11 @@ def test_coerce_close_series_accepts_mapping_of_values() -> None:
 
 
 def test_coerce_close_series_skips_nan_and_missing_close() -> None:
-    rows = [{"timestamp": "a", "close": 1.0}, {"timestamp": "b"}, {"timestamp": "c", "close": float("nan")}]
+    rows = [
+        {"timestamp": "a", "close": 1.0},
+        {"timestamp": "b"},
+        {"timestamp": "c", "close": float("nan")},
+    ]
     assert coerce_close_series(rows) == {"a": 1.0}
 
 
@@ -129,8 +136,16 @@ def test_window_too_short_returns_none_for_pair() -> None:
 def test_partial_timestamp_overlap_uses_shared_samples_only() -> None:
     matrix = build_correlation_matrix(
         {
-            "A": [{"timestamp": "1", "close": 1}, {"timestamp": "2", "close": 2}, {"timestamp": "3", "close": 3}],
-            "B": [{"timestamp": "2", "close": 2}, {"timestamp": "3", "close": 3}, {"timestamp": "4", "close": 4}],
+            "A": [
+                {"timestamp": "1", "close": 1},
+                {"timestamp": "2", "close": 2},
+                {"timestamp": "3", "close": 3},
+            ],
+            "B": [
+                {"timestamp": "2", "close": 2},
+                {"timestamp": "3", "close": 3},
+                {"timestamp": "4", "close": 4},
+            ],
         },
         windows={"3obs": 3},
         min_observations=2,
@@ -200,6 +215,10 @@ def test_build_matrix_includes_breakdown_events() -> None:
 
 def test_matrix_output_is_deterministic_for_fixed_inputs_and_time() -> None:
     payload = {"A": _series([1, 2, 3, 4]), "B": _series([4, 3, 2, 1])}
-    first = build_correlation_matrix(payload, windows={"4obs": 4}, min_observations=2, now=FROZEN_NOW)
-    second = build_correlation_matrix(payload, windows={"4obs": 4}, min_observations=2, now=FROZEN_NOW)
+    first = build_correlation_matrix(
+        payload, windows={"4obs": 4}, min_observations=2, now=FROZEN_NOW
+    )
+    second = build_correlation_matrix(
+        payload, windows={"4obs": 4}, min_observations=2, now=FROZEN_NOW
+    )
     assert first.to_dict() == second.to_dict()

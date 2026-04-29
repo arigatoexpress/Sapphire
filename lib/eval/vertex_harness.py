@@ -328,13 +328,9 @@ def enforce_caps(
 ) -> tuple[bool, str]:
     """Return (within_caps, reason). Reason is empty if within caps."""
     if prompt_count > EVAL_PROMPTS_PER_RUN_HARD:
-        return False, (
-            f"prompts_per_run_breach: {prompt_count} > {EVAL_PROMPTS_PER_RUN_HARD}"
-        )
+        return False, (f"prompts_per_run_breach: {prompt_count} > {EVAL_PROMPTS_PER_RUN_HARD}")
     if max_output_tokens > MAX_OUTPUT_TOKENS_HARD:
-        return False, (
-            f"output_tokens_breach: {max_output_tokens} > {MAX_OUTPUT_TOKENS_HARD}"
-        )
+        return False, (f"output_tokens_breach: {max_output_tokens} > {MAX_OUTPUT_TOKENS_HARD}")
     if input_chars > MAX_INPUT_CHARS_HARD:
         return False, f"input_chars_breach: {input_chars} > {MAX_INPUT_CHARS_HARD}"
     return True, ""

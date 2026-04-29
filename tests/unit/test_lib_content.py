@@ -382,9 +382,7 @@ class TestApprovalFlow:
 
 
 class TestAutoPublishDiscovery:
-    def _seed(
-        self, tmp: Path, platform: str, ts: str, kind: str, content: str = "body"
-    ) -> Path:
+    def _seed(self, tmp: Path, platform: str, ts: str, kind: str, content: str = "body") -> Path:
         sub = tmp / platform
         sub.mkdir(parents=True, exist_ok=True)
         ext = "md" if platform != "x" else "jsonl"

@@ -175,9 +175,7 @@ def _compare(
     pair: tuple[str, str],
 ) -> SignalDiff:
     if actual is None and replay is None:
-        return SignalDiff(
-            symbol=pair[0], timeframe=pair[1], status="missing"
-        )
+        return SignalDiff(symbol=pair[0], timeframe=pair[1], status="missing")
     if actual is None:
         return _replay_only(replay, pair, replay_narrative)
     if replay is None:
@@ -313,12 +311,8 @@ def diff_actual_vs_replay(
         # diff is still computable, but the caller probably has a bug.
         pass
 
-    actual_correlated = _index_by_pair(
-        snapshot.by_scope("correlated_signals").rows
-    )
-    actual_narratives = _index_narratives(
-        snapshot.by_scope("narratives").rows
-    )
+    actual_correlated = _index_by_pair(snapshot.by_scope("correlated_signals").rows)
+    actual_narratives = _index_narratives(snapshot.by_scope("narratives").rows)
     replay_correlated = _index_by_pair(replay_result.correlated_signals)
     replay_narratives_idx: dict[tuple[str, str], dict[str, Any]] = {}
     for narr in replay_result.narratives:

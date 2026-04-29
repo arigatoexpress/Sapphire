@@ -58,7 +58,7 @@ _HASH_LEN = 6  # 6 hex chars = 24 bits = enough to disambiguate within a page
 # stable, non-reversible hash) while letting live-mode tenants rotate their
 # salt independently.
 _PER_TENANT_HASH_LEN = 16  # 16 hex chars = 64 bits — enough to disambiguate
-                          # across tenants without becoming an ID-of-record.
+# across tenants without becoming an ID-of-record.
 _DEFAULT_TENANT_SALT_PREFIX = "sapphire-dossier-default-tenant-salt-v1"
 
 # Phone numbers: tolerant of separators (- . space) and optional country code.
@@ -100,11 +100,56 @@ _REDACTED_EMAIL_LOCAL_RE = re.compile(r"^[A-Za-z0-9._%+-]{1,2}\*{3}$")
 # US state abbreviations — used to detect city/state addresses.
 _US_STATES = frozenset(
     {
-        "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
-        "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
-        "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
-        "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
-        "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
+        "AL",
+        "AK",
+        "AZ",
+        "AR",
+        "CA",
+        "CO",
+        "CT",
+        "DE",
+        "FL",
+        "GA",
+        "HI",
+        "ID",
+        "IL",
+        "IN",
+        "IA",
+        "KS",
+        "KY",
+        "LA",
+        "ME",
+        "MD",
+        "MA",
+        "MI",
+        "MN",
+        "MS",
+        "MO",
+        "MT",
+        "NE",
+        "NV",
+        "NH",
+        "NJ",
+        "NM",
+        "NY",
+        "NC",
+        "ND",
+        "OH",
+        "OK",
+        "OR",
+        "PA",
+        "RI",
+        "SC",
+        "SD",
+        "TN",
+        "TX",
+        "UT",
+        "VT",
+        "VA",
+        "WA",
+        "WV",
+        "WI",
+        "WY",
         "DC",
     }
 )
@@ -275,8 +320,10 @@ def redact_phone(phone: str | None) -> str:
         return "***-***-****"
     if _REDACTED_PHONE_RE.search(s) and not re.search(r"\b\d{7,}\b", s):
         # Already redacted — leave it alone for idempotence.
-        return s if _REDACTED_PHONE_RE.fullmatch(s) else _REDACTED_PHONE_RE.sub(
-            lambda m: m.group(0), s
+        return (
+            s
+            if _REDACTED_PHONE_RE.fullmatch(s)
+            else _REDACTED_PHONE_RE.sub(lambda m: m.group(0), s)
         )
     digits = re.sub(r"\D", "", s)
     if len(digits) < 4:
@@ -395,7 +442,31 @@ def redact_text(text: str | None) -> str:
     for line in s.split("\n"):
         if _STREET_NUMBER_RE.match(line) and any(
             kw in line.lower()
-            for kw in (" street", " st ", " st,", " ave", " avenue", " road", " rd ", " rd,", " blvd", " lane", " ln ", " ln,", " drive", " dr ", " dr,", " way", " court", " ct ", " ct,", " circle", " place", " pl ", " pl,")
+            for kw in (
+                " street",
+                " st ",
+                " st,",
+                " ave",
+                " avenue",
+                " road",
+                " rd ",
+                " rd,",
+                " blvd",
+                " lane",
+                " ln ",
+                " ln,",
+                " drive",
+                " dr ",
+                " dr,",
+                " way",
+                " court",
+                " ct ",
+                " ct,",
+                " circle",
+                " place",
+                " pl ",
+                " pl,",
+            )
         ):
             line = re.sub(r"^\s*\d+\s+", "<redacted> ", line)
         if _PO_BOX_RE.search(line) and "<redacted PO Box>" not in line:
@@ -426,13 +497,21 @@ def redact_record(record: Any, *, _depth: int = 0) -> Any:
             key_norm = str(k).strip().lower()
             mode = _FIELD_REDACTORS.get(key_norm)
             if mode == "name":
-                out[k] = redact_name(v if isinstance(v, str) else (str(v) if v is not None else None))
+                out[k] = redact_name(
+                    v if isinstance(v, str) else (str(v) if v is not None else None)
+                )
             elif mode == "phone":
-                out[k] = redact_phone(v if isinstance(v, str) else (str(v) if v is not None else None))
+                out[k] = redact_phone(
+                    v if isinstance(v, str) else (str(v) if v is not None else None)
+                )
             elif mode == "email":
-                out[k] = redact_email(v if isinstance(v, str) else (str(v) if v is not None else None))
+                out[k] = redact_email(
+                    v if isinstance(v, str) else (str(v) if v is not None else None)
+                )
             elif mode == "address":
-                out[k] = redact_address(v if isinstance(v, str) else (str(v) if v is not None else None))
+                out[k] = redact_address(
+                    v if isinstance(v, str) else (str(v) if v is not None else None)
+                )
             elif mode == "drop":
                 out[k] = "<redacted>"
             else:

@@ -37,10 +37,18 @@ def compose_note(
     generated_at: str | None = None,
 ) -> ResearchNote:
     """Compose a note from provided data or the latest local artifacts."""
-    backtest_summary_data = backtest_summary_data if backtest_summary_data is not None else backtest_results.summary()
-    leaderboard_data = leaderboard_data if leaderboard_data is not None else backtest_results.leaderboard()
-    performance_data = performance_data if performance_data is not None else strategy_performance.report()
-    timeseries_data = timeseries_data if timeseries_data is not None else strategy_performance.timeseries()
+    backtest_summary_data = (
+        backtest_summary_data if backtest_summary_data is not None else backtest_results.summary()
+    )
+    leaderboard_data = (
+        leaderboard_data if leaderboard_data is not None else backtest_results.leaderboard()
+    )
+    performance_data = (
+        performance_data if performance_data is not None else strategy_performance.report()
+    )
+    timeseries_data = (
+        timeseries_data if timeseries_data is not None else strategy_performance.timeseries()
+    )
     return compose_research_note(
         backtest_summary=backtest_summary_data,
         leaderboard=leaderboard_data,

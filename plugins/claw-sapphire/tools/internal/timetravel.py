@@ -97,9 +97,7 @@ def _coerce_scope(payload: dict[str, Any]) -> tuple[str, ...]:
         raise ValueError("'scope' must be a comma-separated string or list")
     invalid = [s for s in scopes if s not in SCOPE_TO_ROOT]
     if invalid:
-        raise ValueError(
-            f"unknown scope(s) {invalid}; valid: {sorted(SCOPE_TO_ROOT)}"
-        )
+        raise ValueError(f"unknown scope(s) {invalid}; valid: {sorted(SCOPE_TO_ROOT)}")
     return tuple(scopes)
 
 
@@ -126,9 +124,7 @@ def snapshot_action(payload: dict[str, Any]) -> dict[str, Any]:
     scope = _coerce_scope(payload)
     cache_path = Path(payload.get("cache_path") or INDEX_PATH).expanduser()
     rebuild = bool(payload.get("rebuild_index"))
-    snap = take_snapshot(
-        at, scope=scope, cache_path=cache_path, rebuild_index=rebuild
-    )
+    snap = take_snapshot(at, scope=scope, cache_path=cache_path, rebuild_index=rebuild)
     cap = int(payload.get("max_rows_per_scope") or DEFAULT_MAX_ROWS_PER_SCOPE)
     return {
         "ok": True,

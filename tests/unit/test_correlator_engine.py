@@ -191,9 +191,11 @@ def test_max_sources_per_correlation_caps_fan_in() -> None:
     config = CorrelatorConfig(weights=weights)
     payload = {f"s{i}": _sig("bull", 0.5, source=f"s{i}") for i in range(20)}
     out = correlate_once(
-        symbol="BTC", timeframe="1h",
+        symbol="BTC",
+        timeframe="1h",
         signals_by_source=payload,
-        config=config, now=FROZEN_NOW,
+        config=config,
+        now=FROZEN_NOW,
     )
     assert out.contributing == MAX_SOURCES_PER_CORRELATION
     # The 4 lowest-weight sources should have been dropped.
@@ -205,7 +207,8 @@ def test_max_sources_per_correlation_caps_fan_in() -> None:
 def test_zero_weight_sources_silently_ignored_in_engine() -> None:
     weights = ScoringWeights(source_weights={"a": 1.0, "b": 0.0})
     out = correlate_once(
-        symbol="BTC", timeframe="1h",
+        symbol="BTC",
+        timeframe="1h",
         signals_by_source={
             "a": _sig("bull", 0.5, source="a"),
             "b": _sig("bear", 0.5, source="b"),
@@ -221,7 +224,8 @@ def test_zero_weight_sources_silently_ignored_in_engine() -> None:
 
 def test_single_source_no_agreement_bonus() -> None:
     out = correlate_once(
-        symbol="BTC", timeframe="1h",
+        symbol="BTC",
+        timeframe="1h",
         signals_by_source={"tradingview": _sig("bull", 1.0)},
         now=FROZEN_NOW,
     )
@@ -235,20 +239,23 @@ def test_three_source_agreement_applies_bonus() -> None:
     )
     config = CorrelatorConfig(weights=weights)
     out = correlate_once(
-        symbol="BTC", timeframe="1h",
+        symbol="BTC",
+        timeframe="1h",
         signals_by_source={
             "tradingview": _sig("bull", 0.5, source="tradingview"),
             "ta_scanner": _sig("bull", 0.5, source="ta_scanner"),
             "kronos_forecast": _sig("bull", 0.5, source="kronos_forecast"),
         },
-        config=config, now=FROZEN_NOW,
+        config=config,
+        now=FROZEN_NOW,
     )
     assert out.agreement_multiplier == pytest.approx(1.4, abs=1e-6)
 
 
 def test_edge_score_is_bounded() -> None:
     out = correlate_once(
-        symbol="BTC", timeframe="1h",
+        symbol="BTC",
+        timeframe="1h",
         signals_by_source={f"s{i}": _sig("bull", 1.0, source=f"s{i}") for i in range(8)},
         now=FROZEN_NOW,
     )
@@ -258,7 +265,8 @@ def test_edge_score_is_bounded() -> None:
 def test_contradict_score_corroboration_picks_dominant_side() -> None:
     weights = ScoringWeights(source_weights={"big": 2.0, "small": 0.5})
     out = correlate_once(
-        symbol="BTC", timeframe="1h",
+        symbol="BTC",
+        timeframe="1h",
         signals_by_source={
             "big": _sig("bull", 1.0, source="big"),
             "small": _sig("bear", 1.0, source="small"),
@@ -339,9 +347,7 @@ def test_correlate_universe_swallows_adapter_errors() -> None:
             raise RuntimeError("kaboom")
 
     src = _StubSource(name="tradingview", signals={("BTC", "1h"): {"direction": "bull"}})
-    out = correlate_universe(
-        [("BTC", "1h")], sources=[src, _Bomb()], now=FROZEN_NOW
-    )
+    out = correlate_universe([("BTC", "1h")], sources=[src, _Bomb()], now=FROZEN_NOW)
     assert len(out) == 1
     # The non-broken source still contributed.
     assert out[0].consensus == "PARTIAL_BULL"
@@ -349,7 +355,8 @@ def test_correlate_universe_swallows_adapter_errors() -> None:
 
 def test_correlated_signal_to_dict_roundtrips() -> None:
     out = correlate_once(
-        symbol="BTC", timeframe="1h",
+        symbol="BTC",
+        timeframe="1h",
         signals_by_source={"tradingview": _sig("bull", 0.5)},
         now=FROZEN_NOW,
     )
@@ -362,7 +369,8 @@ def test_correlated_signal_to_dict_roundtrips() -> None:
 
 def test_provenance_envelope_includes_weights_signature() -> None:
     out = correlate_once(
-        symbol="BTC", timeframe="1h",
+        symbol="BTC",
+        timeframe="1h",
         signals_by_source={"tradingview": _sig("bull", 0.5)},
         now=FROZEN_NOW,
     )
@@ -384,7 +392,8 @@ def test_engine_handles_source_signal_dataclass_inputs() -> None:
         raw={},
     )
     out = correlate_once(
-        symbol="BTC", timeframe="1h",
+        symbol="BTC",
+        timeframe="1h",
         signals_by_source={"tradingview": sig},
         now=FROZEN_NOW,
     )
@@ -393,7 +402,8 @@ def test_engine_handles_source_signal_dataclass_inputs() -> None:
 
 def test_negative_age_treated_as_fresh_not_stale() -> None:
     out = correlate_once(
-        symbol="BTC", timeframe="1h",
+        symbol="BTC",
+        timeframe="1h",
         signals_by_source={"tradingview": _sig("bull", 0.7, age=-100)},
         now=FROZEN_NOW,
     )
@@ -407,7 +417,8 @@ def test_universe_pair_can_be_constructed() -> None:
 
 def test_freshness_seconds_reports_min_age_across_sources() -> None:
     out = correlate_once(
-        symbol="BTC", timeframe="1h",
+        symbol="BTC",
+        timeframe="1h",
         signals_by_source={
             "tradingview": _sig("bull", 0.5, age=120),
             "ta_scanner": _sig("bull", 0.5, age=30),

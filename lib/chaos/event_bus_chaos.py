@@ -109,12 +109,8 @@ class FakeRedis:
         if self.partition.partitioned:
             raise FakeRedisError("redis partition active")
         self._call_count += 1
-        if self._intermittent is not None and self._intermittent.should_fail(
-            self._call_count
-        ):
-            raise FakeRedisError(
-                f"intermittent failure (call #{self._call_count})"
-            )
+        if self._intermittent is not None and self._intermittent.should_fail(self._call_count):
+            raise FakeRedisError(f"intermittent failure (call #{self._call_count})")
 
     def xadd(
         self,
@@ -186,7 +182,11 @@ class FakeRedis:
         return self.xread(cursor, count=count, block=block)
 
     def xgroup_create(
-        self, stream: str, group: str, id: str = "$", mkstream: bool = False  # noqa: A002
+        self,
+        stream: str,
+        group: str,
+        id: str = "$",
+        mkstream: bool = False,  # noqa: A002
     ) -> bool:
         self._maybe_raise()
         if mkstream:
@@ -268,9 +268,7 @@ class ChaosTranscript:
     def assert_no_duplicates(self) -> None:
         dups = self.duplicates()
         if dups:
-            raise AssertionError(
-                f"chaos scenario {self.scenario!r}: duplicates: {dups}"
-            )
+            raise AssertionError(f"chaos scenario {self.scenario!r}: duplicates: {dups}")
 
     def assert_ordering_preserved(self) -> None:
         """Across redis+jsonl, the published order must match the merged order.
@@ -455,9 +453,7 @@ class RedisDiesMidSubscribeScenario(ChaosScenario):
         seen.extend(e.data.get("marker", "") for e in pre_replay)
 
         self.fake_redis.trip()
-        for i in range(
-            self.n_pre_events + 1, self.n_pre_events + self.n_post_events + 1
-        ):
+        for i in range(self.n_pre_events + 1, self.n_pre_events + self.n_post_events + 1):
             self.publish_marker(bus, i)
         post_replay = bus.replay("signal.generated", limit=100)
         seen.extend(e.data.get("marker", "") for e in post_replay)
@@ -510,8 +506,7 @@ class JsonlDiskFullScenario(ChaosScenario):
             # Restore real path for the .collect() pass that reads back JSONL.
             bus._fallback_path = fallback_path
         self.captured.notes.append(
-            f"slow_disk recorded {slow_disk.writes} writes "
-            f"(threshold={self.error_after_n_writes})"
+            f"slow_disk recorded {slow_disk.writes} writes (threshold={self.error_after_n_writes})"
         )
         return self.collect()
 
@@ -538,9 +533,7 @@ class RedisRecoversAfterScenario(ChaosScenario):
             self.publish_marker(bus, i)
 
         self.fake_redis.trip()
-        for i in range(
-            self.n_phase_one + 1, self.n_phase_one + self.n_partition_phase + 1
-        ):
+        for i in range(self.n_phase_one + 1, self.n_phase_one + self.n_partition_phase + 1):
             self.publish_marker(bus, i)
 
         self.fake_redis.heal()

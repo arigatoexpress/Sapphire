@@ -62,7 +62,9 @@ def _load_repo_lib_module(qualname: str, relpath: str) -> Any:
 _load_repo_lib_module("lib.core.provenance", "lib/core/provenance.py")
 _load_repo_lib_module("lib.synthesis.prompts", "lib/synthesis/prompts.py")
 _load_repo_lib_module("lib.synthesis.rubric", "lib/synthesis/rubric.py")
-_engine = _load_repo_lib_module("lib.synthesis.narrative_engine", "lib/synthesis/narrative_engine.py")
+_engine = _load_repo_lib_module(
+    "lib.synthesis.narrative_engine", "lib/synthesis/narrative_engine.py"
+)
 _synthesis_pkg = _load_repo_lib_module("lib.synthesis", "lib/synthesis/__init__.py")
 _service = _load_repo_lib_module("services.synthesis.run", "services/synthesis/run.py")
 
@@ -103,7 +105,9 @@ def _narrative_path(date: str | None = None) -> Path:
     return DEFAULT_OUTPUT_ROOT / (date or _today()) / "theses.jsonl"
 
 
-def _latest_signal(symbol: str | None, timeframe: str | None, *, date: str | None = None) -> dict[str, Any] | None:
+def _latest_signal(
+    symbol: str | None, timeframe: str | None, *, date: str | None = None
+) -> dict[str, Any] | None:
     rows = _service.latest_signal_rows(input_root=DEFAULT_SIGNAL_ROOT, date=date)
     symbol_norm = str(symbol or "").upper()
     timeframe_norm = str(timeframe or "").lower()
@@ -119,7 +123,9 @@ def _latest_signal(symbol: str | None, timeframe: str | None, *, date: str | Non
 def synthesize_once_action(payload: dict[str, Any]) -> dict[str, Any]:
     signal = payload.get("signal")
     if not isinstance(signal, dict):
-        signal = _latest_signal(payload.get("symbol"), payload.get("timeframe"), date=payload.get("date"))
+        signal = _latest_signal(
+            payload.get("symbol"), payload.get("timeframe"), date=payload.get("date")
+        )
     if not isinstance(signal, dict):
         return {
             "ok": False,

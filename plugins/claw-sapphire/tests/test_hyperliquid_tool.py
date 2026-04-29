@@ -15,7 +15,9 @@ for path in (ROOT, SERVICE_SRC):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
-_spec = importlib.util.spec_from_file_location("hyperliquid_tool", TOOLS / "internal" / "hyperliquid.py")
+_spec = importlib.util.spec_from_file_location(
+    "hyperliquid_tool", TOOLS / "internal" / "hyperliquid.py"
+)
 hyperliquid = importlib.util.module_from_spec(_spec)
 assert _spec.loader is not None
 _spec.loader.exec_module(hyperliquid)

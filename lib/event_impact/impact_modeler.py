@@ -124,8 +124,7 @@ class ImpactModel:
 
     def profile_map(self) -> dict[tuple[str, str, str, int], ImpactProfile]:
         return {
-            (p.category, p.sub_category, p.asset.upper(), p.horizon_hours): p
-            for p in self.profiles
+            (p.category, p.sub_category, p.asset.upper(), p.horizon_hours): p for p in self.profiles
         }
 
 

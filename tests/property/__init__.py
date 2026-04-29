@@ -28,8 +28,8 @@ settings.register_profile(
     "default",
     max_examples=100,
     deadline=None,  # property bodies run pure code, but `redact_text` does
-                    # regex walks that occasionally bump up against the
-                    # default 200ms deadline on slow CI VMs.
+    # regex walks that occasionally bump up against the
+    # default 200ms deadline on slow CI VMs.
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much],
 )
 settings.register_profile(

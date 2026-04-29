@@ -797,11 +797,15 @@ def test_narrative_eval_page_and_endpoints_render_empty_state(app_client):
     assert body["ok"] is True
     assert body["overall"]["scored"] == 0
 
-    aggregates = client.get("/api/narrative-eval-aggregates?group_by=symbol", headers={"Authorization": _AUTH})
+    aggregates = client.get(
+        "/api/narrative-eval-aggregates?group_by=symbol", headers={"Authorization": _AUTH}
+    )
     assert aggregates.status_code == 200
     assert aggregates.get_json()["groups"] == {}
 
-    diagnostics = client.get("/api/narrative-eval-aggregates?view=diagnostics", headers={"Authorization": _AUTH})
+    diagnostics = client.get(
+        "/api/narrative-eval-aggregates?view=diagnostics", headers={"Authorization": _AUTH}
+    )
     assert diagnostics.status_code == 200
     assert diagnostics.get_json()["false_positives"] == []
 
