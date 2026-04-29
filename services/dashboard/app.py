@@ -5434,6 +5434,158 @@ def api_observability_tranche4_feeds():
         ), 200
 
 
+# ─── Tranche 6 Lane 4 — Source Quality Measurement ──────────────────────
+#
+# Dashboard surface for ``services/source_quality``. Read-only: the
+# routes below read the most recent ``data/source_quality/<date>/
+# report.json`` and slice it into three views (SNR, correlation, decay).
+# When no report exists yet (fresh install / daemon disabled) the
+# routes degrade to an empty paste-safe payload rather than 500.
+
+
+_SOURCE_QUALITY_REPORT_ROOT = Path(__file__).resolve().parents[2] / "data" / "source_quality"
+
+
+def _source_quality_latest_report() -> dict[str, Any] | None:
+    """Return the newest ``report.json`` payload under data/source_quality.
+
+    Walks the dated subdirectories newest-first and stops on the first
+    file that parses. Returns ``None`` when nothing is on disk.
+    """
+    root = _SOURCE_QUALITY_REPORT_ROOT
+    if not root.exists() or not root.is_dir():
+        return None
+    candidates = []
+    for child in root.iterdir():
+        if not child.is_dir():
+            continue
+        report_path = child / "report.json"
+        if report_path.is_file():
+            candidates.append(report_path)
+    if not candidates:
+        return None
+    candidates.sort(key=lambda p: p.parent.name, reverse=True)
+    for path in candidates:
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+    return None
+
+
+def _source_quality_empty_payload(reason: str) -> dict[str, Any]:
+    return {
+        "mode": "read_only_source_quality",
+        "status": "no_data",
+        "reason": reason,
+        "summary": {
+            "sources_count": 0,
+            "samples_total": 0,
+            "near_duplicate_pairs": 0,
+            "decayed_sources_count": 0,
+        },
+    }
+
+
+@app.route("/source-quality")
+@requires_auth
+def source_quality_page():
+    """Render the source-quality dashboard page (template-driven)."""
+    return render_template("pages/source_quality.html")
+
+
+@app.route("/api/source-quality-snr")
+@requires_auth
+def api_source_quality_snr():
+    try:
+        report = _source_quality_latest_report()
+        if report is None:
+            payload = _source_quality_empty_payload("no report on disk")
+            payload["snr"] = {}
+            payload["sources"] = []
+        else:
+            snr = report.get("snr") or {}
+            payload = {
+                "mode": "read_only_source_quality_snr",
+                "status": "ok",
+                "report_date": report.get("report_date"),
+                "snr": snr,
+                "sources": sorted(snr.keys()),
+                "summary": report.get("summary", {}),
+            }
+        return jsonify(_maybe_buyer_safe_payload(payload))
+    except Exception as exc:
+        log.warning("source-quality snr error: %s", exc)
+        return jsonify(
+            {
+                "mode": "read_only_source_quality_snr",
+                "status": "unknown",
+                "error": f"{exc.__class__.__name__}: {exc}"[:200],
+                "snr": {},
+            }
+        ), 200
+
+
+@app.route("/api/source-quality-correlation")
+@requires_auth
+def api_source_quality_correlation():
+    try:
+        report = _source_quality_latest_report()
+        if report is None:
+            payload = _source_quality_empty_payload("no report on disk")
+            payload["correlation"] = {"pairs": [], "near_duplicates": []}
+        else:
+            correlation = report.get("correlation") or {}
+            payload = {
+                "mode": "read_only_source_quality_correlation",
+                "status": "ok",
+                "report_date": report.get("report_date"),
+                "correlation": correlation,
+                "near_duplicates": report.get("near_duplicates", []),
+            }
+        return jsonify(_maybe_buyer_safe_payload(payload))
+    except Exception as exc:
+        log.warning("source-quality correlation error: %s", exc)
+        return jsonify(
+            {
+                "mode": "read_only_source_quality_correlation",
+                "status": "unknown",
+                "error": f"{exc.__class__.__name__}: {exc}"[:200],
+                "correlation": {"pairs": []},
+            }
+        ), 200
+
+
+@app.route("/api/source-quality-decay")
+@requires_auth
+def api_source_quality_decay():
+    try:
+        report = _source_quality_latest_report()
+        if report is None:
+            payload = _source_quality_empty_payload("no report on disk")
+            payload["decay"] = {"alerts": [], "decayed_sources": []}
+        else:
+            decay = report.get("decay") or {}
+            payload = {
+                "mode": "read_only_source_quality_decay",
+                "status": "ok",
+                "report_date": report.get("report_date"),
+                "decay": decay,
+                "decayed_sources": decay.get("decayed_sources", []),
+            }
+        return jsonify(_maybe_buyer_safe_payload(payload))
+    except Exception as exc:
+        log.warning("source-quality decay error: %s", exc)
+        return jsonify(
+            {
+                "mode": "read_only_source_quality_decay",
+                "status": "unknown",
+                "error": f"{exc.__class__.__name__}: {exc}"[:200],
+                "decay": {"alerts": []},
+            }
+        ), 200
+
+
 if __name__ == "__main__":
     # Start background metrics collector (snapshots every 5 min)
     try:

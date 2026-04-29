@@ -474,6 +474,15 @@ tools:
     consumers: [services.onchain_intel, scheduled-tasks.chain-refresh, hermes-agent.trading-analysis]
     description: On-chain intelligence 0.2.0 across Glassnode, Santiment, Ethereum RPC, and Solana RPC. Fixture by default; live calls require per-provider SAPPHIRE_*_LIVE gates plus key/RPC envs. Enforces local caps of 60/hour, 100k/day, and 730-day backfill. Read-only only; no wallet keys, no transactions, no trading.
 
+  # Source quality measurement 0.1.0
+  - name: source_quality
+    path: plugins/claw-sapphire/tools/internal/source_quality.py
+    shim: plugins/claw-sapphire/tools/source_quality.py
+    status: internal
+    owner: sapphire
+    consumers: [services.dashboard, services.source_quality]
+    description: Source quality measurement 0.1.0 — per-source signal-to-noise (precision/recall/F1 vs eventual outcomes), pairwise cross-source correlation (87% near-duplicate flag), and rolling decay vs historical baseline. Read-only consumer of services/source_quality/run.py; live writes from the plugin tool are intentionally disabled.
+
   # ── deprecated / sunset window ───────────────────────────────────────────
   - name: kronos_predict
     path: plugins/claw-sapphire/tools/_deprecated/kronos_predict.py
