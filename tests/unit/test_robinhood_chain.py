@@ -393,10 +393,11 @@ class TestDeployScript:
         )
         assert "explorer" in loaded["robinhood_testnet"]["contracts"]["SapphirePaymentGate"]
 
-    def test_contracts_dir_has_both_solidity_files(self):
+    def test_contracts_dir_has_solidity_files(self):
         contracts_dir = ROOT / "contracts"
         assert (contracts_dir / "SapphireSignalVerifier.sol").exists()
         assert (contracts_dir / "SapphirePaymentGate.sol").exists()
+        assert (contracts_dir / "SapphireSentinelRegistry.sol").exists()
 
     def test_foundry_toml_has_correct_chain_id(self):
         foundry_toml = ROOT / "foundry.toml"

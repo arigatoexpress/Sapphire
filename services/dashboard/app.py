@@ -2604,6 +2604,7 @@ def api_robinhood_chain_status():
                 "gas_price_gwei": status.gas_price_gwei,
                 "signal_verifier_address": status.signal_verifier_address,
                 "payment_gate_address": status.payment_gate_address,
+                "sentinel_registry_address": status.sentinel_registry_address,
                 "signal_count": status.signal_count,
                 "error": status.error,
             }
@@ -2641,6 +2642,49 @@ def api_robinhood_payment_stats():
     except Exception as e:
         log.exception("robinhood payment stats failed")
         return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+
+
+@app.route("/chain/sentinel")
+@requires_auth
+def sentinel_page():
+    """Sapphire Sentinel hackathon demo for agentic payments on Robinhood Chain."""
+    return render_template(
+        "pages/sentinel.html", current_page="sentinel", page_title="Sapphire Sentinel"
+    )
+
+
+@app.route("/api/hackathon/sentinel/demo")
+@requires_auth
+def api_sentinel_demo():
+    """Return the static testnet-only Sentinel demo state."""
+    try:
+        from lib.hackathon.sentinel import build_demo_state
+
+        return jsonify(build_demo_state())
+    except Exception as e:
+        log.exception("sentinel demo failed")
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+
+
+@app.route("/api/hackathon/sentinel/evaluate", methods=["POST"])
+@requires_auth
+def api_sentinel_evaluate():
+    """Evaluate an agent payment attempt without settlement or order submission."""
+    try:
+        body = request.get_json(silent=True) or {}
+        from lib.hackathon.sentinel import evaluate_from_payload
+
+        return jsonify(
+            {
+                "execution_enabled": False,
+                "mode": "policy_preview_only",
+                "decision": evaluate_from_payload(body),
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+        )
+    except Exception as e:
+        log.exception("sentinel evaluation failed")
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 400
 
 
 @app.route("/risk")

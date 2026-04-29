@@ -340,6 +340,8 @@ Robinhood Chain is an Arbitrum Orbit L3 (chain ID **46630**). Sapphire uses it a
 │  publishSignal(...)        │        │   signals[id] = Signal{}  │
 └────────────┬───────────────┘        │  SapphirePaymentGate      │
              │                        │   pay(endpoint, amount)   │
+             │                        │  SapphireSentinelRegistry │
+             │                        │   mandates + receipts     │
              ▼                        └─────────────┬─────────────┘
         event_bus                                   │
   chain.signal.{published,                          ▼
@@ -352,9 +354,11 @@ Robinhood Chain is an Arbitrum Orbit L3 (chain ID **46630**). Sapphire uses it a
 
 - **`contracts/SapphireSignalVerifier.sol`** — operator-controlled signal registry. `publishSignal(strategyId, symbol, direction, confidence, proofHash)` writes into `mapping(uint256 => Signal)`. The `proofHash` field is reserved for future verifiable-computation integration (Aztec / Succinct / EZKL).
 - **`contracts/SapphirePaymentGate.sol`** — on-chain micropayment gate: `pay(endpoint, amount)`. Paid endpoints gate off-chain responses against the most recent payment event.
+- **`contracts/SapphireSentinelRegistry.sol`** — non-custodial agent mandate and payment-receipt anchor for Robinhood Chain testnet. It records policy hashes, x402 resource/result/risk hashes, and bounded spend without moving funds or submitting trades.
+- **`lib/hackathon/sentinel.py`** — testnet-only policy evaluator for the London buildathon demo. It blocks untrusted domains, spend-limit breaches, prompt-injection text, and secret-egress attempts before any paid resource can be consumed.
 - **`lib/chain/robinhood_chain.py`** — Python client: `RobinhoodChainClient.publish_signal(strategy, symbol, direction, confidence)`, `get_chain_status()`, address resolution from `data/chain/deployments.json`. Graceful fallback when `web3` is not installed.
-- **`scripts/deploy_robinhood_chain.py`** — deploy both contracts, record addresses.
-- Dashboard page: **`/robinhood_chain`** — shows latest N signals, per-strategy publish rate, pending gas.
+- **`scripts/deploy_robinhood_chain.py`** — deploy contracts, record addresses.
+- Dashboard pages: **`/chain/robinhood`** and **`/chain/sentinel`** — show contract status, agent payment policy decisions, x402 payment requirements, and dry-run order drafts.
 
 ### Env
 
@@ -368,6 +372,7 @@ Robinhood Chain is an Arbitrum Orbit L3 (chain ID **46630**). Sapphire uses it a
 - **Auditability**: an independent third party can verify that the signals a Sapphire customer received are the same signals committed on-chain — no retro-editing.
 - **Proof-of-work for strategies**: once ZK proofs are wired into `proofHash`, a consumer can verify that a claimed backtest actually ran against the claimed data.
 - **Composability**: other agents can pay `SapphirePaymentGate` to unlock premium endpoints without trusting Sapphire's billing system.
+- **Agentic safety**: `SapphireSentinelRegistry` gives every agent payment a policy hash and risk hash on Robinhood Chain before any downstream order draft becomes visible.
 
 ---
 

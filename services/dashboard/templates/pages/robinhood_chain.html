@@ -184,7 +184,7 @@
         <p>
             RPC: <a href="https://rpc.testnet.chain.robinhood.com" target="_blank">rpc.testnet.chain.robinhood.com</a> ·
             Explorer: <a href="https://explorer.testnet.chain.robinhood.com" target="_blank">explorer.testnet.chain.robinhood.com</a><br>
-            Contracts: SapphireSignalVerifier · SapphirePaymentGate ·
+            Contracts: SapphireSignalVerifier · SapphirePaymentGate · SapphireSentinelRegistry ·
             Tooling: Foundry / Hardhat / Arbitrum Stylus
         </p>
     </div>
@@ -215,6 +215,10 @@
         <div class="rh-stat-row">
             <span class="rh-stat-label">SapphirePaymentGate</span>
             <span class="rh-stat-value addr" id="stat-payment">—</span>
+        </div>
+        <div class="rh-stat-row">
+            <span class="rh-stat-label">SapphireSentinelRegistry</span>
+            <span class="rh-stat-value addr" id="stat-sentinel">—</span>
         </div>
     </div>
 
@@ -293,6 +297,7 @@ async function loadStatus() {
         document.getElementById('stat-sigcount').textContent = d.signal_count != null ? d.signal_count : (d.connected ? '0' : '—');
         document.getElementById('stat-verifier').innerHTML = addrLink(d.signal_verifier_address);
         document.getElementById('stat-payment').innerHTML = addrLink(d.payment_gate_address);
+        document.getElementById('stat-sentinel').innerHTML = addrLink(d.sentinel_registry_address);
     } catch (e) {
         document.getElementById('conn-label').textContent = 'fetch error';
     }

@@ -45,6 +45,7 @@ CONTRACTS_DIR = ROOT / "contracts"
 CONTRACTS = [
     "SapphireSignalVerifier",
     "SapphirePaymentGate",
+    "SapphireSentinelRegistry",
 ]
 
 

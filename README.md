@@ -8,7 +8,7 @@
 
 [![CI](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
 [![Security](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml)
-[![Tests](https://img.shields.io/badge/tests-6%2C294%2B%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-6%2C334%2B%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
 [![Tools](https://img.shields.io/badge/tools-67-0d9488)](infra/tool-registry.yaml)
 [![Dashboard](https://img.shields.io/badge/dashboard-43%20pages-6d28d9)](services/dashboard/templates/pages)
 [![Readiness](https://img.shields.io/badge/readiness-0%20FAIL-2ea44f)](scripts/ops/production_readiness_sweep.py)
@@ -133,9 +133,9 @@ flowchart LR
 
 | Surface | Count | Detail |
 |---|---:|---|
-| Passing tests | **6,294+** | 5,804+ unit · 490 plugin (`python scripts/ops/test_inventory.py --check-readme`) |
-| Test files | **356+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
-| Dashboard pages | **43** | Flask + SSE, basic-auth, unified `/showcase`, observability, cross-asset, diligence, threat-intel, dossier pages |
+| Passing tests | **6,334+** | 5,844+ unit · 490 plugin (`python scripts/ops/test_inventory.py --check-readme`) |
+| Test files | **362+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
+| Dashboard pages | **44** | Flask + SSE, basic-auth, unified `/showcase`, observability, cross-asset, diligence, threat-intel, dossier, Sentinel pages |
 | Quant strategies | **7** | `lib/analytics/strategies.py` |
 | Pine strategies | **5** | `pine/standalone/` |
 | Plugin tools (registered · internal · deprecated) | **7 · 59 · 1** | 67 total entries in `infra/tool-registry.yaml` |
@@ -170,7 +170,7 @@ flowchart TB
     Impact[Event-Impact Lookup<br/>expected reaction bands]:::model
     Narrative[Narrative Synthesis<br/>thesis + invalidators]:::output
     Adv[Adversarial Defense<br/>wash trade · prompt · oracle checks]:::guard
-    Obs[Observability + Acquirer Views<br/>43 dashboard pages]:::output
+    Obs[Observability + Acquirer Views<br/>44 dashboard pages]:::output
 
     TV --> Corr
     HL --> Corr
@@ -564,8 +564,9 @@ Solidity 0.8.x, deployed to Robinhood Chain testnet (Arbitrum Orbit, chain ID `4
 |---|---|
 | [`SapphireSignalVerifier.sol`](contracts/SapphireSignalVerifier.sol) | On-chain trading signal registry — `publishSignal(strategyId, symbol, direction, confidence, proofHash)` with operator-controlled verification and a ZK-proof hash field reserved for verifiable computation. |
 | [`SapphirePaymentGate.sol`](contracts/SapphirePaymentGate.sol) | Micropayment gate for paid inference and data calls — counterpart to the x402 middleware. |
+| [`SapphireSentinelRegistry.sol`](contracts/SapphireSentinelRegistry.sol) | Non-custodial mandate and receipt registry for agentic x402 payments, private-risk attestations, and dry-run RWA order drafts. |
 
-Deployment: [`scripts/deploy_robinhood_chain.py`](scripts/deploy_robinhood_chain.py). Foundry config: [`foundry.toml`](foundry.toml). Deployed addresses tracked under `data/chain/` (gitignored). Dashboard: `/robinhood_chain`.
+Deployment: [`scripts/deploy_robinhood_chain.py`](scripts/deploy_robinhood_chain.py). Foundry config: [`foundry.toml`](foundry.toml). Deployed addresses tracked under `data/chain/` (gitignored). Dashboards: `/chain/robinhood`, `/chain/sentinel`.
 
 ---
 
