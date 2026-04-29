@@ -222,12 +222,14 @@ def test_audit_covers_known_critical_surfaces():
         ("`services/pipeline/`", "gcp-pipeline-runbook.md", 3),
         ("`services/webhook/`", "webhook-runbook.md", 3),
         ("`com.sapphire.control-plane`", "control-plane-runbook.md", 3),
+        ("`com.sapphire.content-publisher`", "content-publisher-runbook.md", 3),
         ("`com.sapphire.foundry-sync`", "foundry-sync-runbook.md", 3),
         ("`com.sapphire.security-pipeline`", "security-pipeline-runbook.md", 3),
         ("`com.sapphire.gcp-sync`", "gcp-pipeline-runbook.md", 3),
         ("`com.sapphire.heartbeat`", "heartbeat-runbook.md", 3),
         ("`com.sapphire.openbb-api`", "openbb-api-runbook.md", 3),
         ("`com.sapphire.service-supervisor` (service-local)", "service-supervisor-runbook.md", 3),
+        ("`com.sapphire.tradingview-cdp`", "tradingview-cdp-runbook.md", 3),
     ],
 )
 def test_tranche7_runbook_uplift_surfaces_are_no_longer_score_one(
@@ -252,9 +254,11 @@ def test_tranche7_runbook_uplift_surfaces_are_no_longer_score_one(
     [
         "heartbeat-runbook.md",
         "control-plane-runbook.md",
+        "content-publisher-runbook.md",
         "foundry-sync-runbook.md",
         "security-pipeline-runbook.md",
         "service-supervisor-runbook.md",
+        "tradingview-cdp-runbook.md",
         "openbb-api-runbook.md",
         "gcp-pipeline-runbook.md",
         "webhook-runbook.md",

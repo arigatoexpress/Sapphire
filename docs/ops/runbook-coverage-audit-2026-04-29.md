@@ -84,7 +84,7 @@ still-partial `control-plane`, `foundry_sync`, `security_pipeline`,
 | `com.sapphire.backtest-weekly` | `infra/launchagents/com.sapphire.backtest-weekly.plist` | (none direct) | 1 | Write a runbook covering the weekly backtest sweep cadence + how to inspect the regenerated `data/backtests/strategies/`. |
 | `com.sapphire.chain-refresh` | `infra/launchagents/com.sapphire.chain-refresh.plist` | `onchain-intel-runbook.md` (partial) | 3 | Add agent-level restart + log-path to onchain runbook. |
 | `com.sapphire.content-engine` | `infra/launchagents/com.sapphire.content-engine.plist` | `content-engine-soak-runbook.md` | 4 | Soak runbook covers the cloud routine well; agent-side draft → publish flow could be more explicit. |
-| `com.sapphire.content-publisher` | `infra/launchagents/com.sapphire.content-publisher.plist` | (none direct) | 1 | Write `content-publisher-runbook.md` covering Substack/X/LinkedIn/Typefully publish queue, approval flow, kill switch. |
+| `com.sapphire.content-publisher` | `infra/launchagents/com.sapphire.content-publisher.plist` | `content-publisher-runbook.md` | 3 | Add a no-write CLI dry-run mode and fixture coverage for duplicate-ledger recovery. |
 | `com.sapphire.control-plane` | `infra/launchagents/com.sapphire.control-plane.plist` | `control-plane-runbook.md` | 3 | Add launchd-specific restart fixture checks and document durable-store cutover once it is used. |
 | `com.sapphire.correlation-refresh` | `infra/launchagents/com.sapphire.correlation-refresh.plist` | `signal-correlator-runbook.md` | 4 | Correlator runbook is solid but agent restart procedure is implicit. |
 | `com.sapphire.foundry-sync` | `infra/launchagents/com.sapphire.foundry-sync.plist` | `foundry-sync-runbook.md` | 3 | Add a fixture-backed smoke for pause behavior and a reviewed live-stack drill after Foundry provisioning. |
@@ -101,7 +101,7 @@ still-partial `control-plane`, `foundry_sync`, `security_pipeline`,
 | `com.sapphire.telemetry-collector` | `infra/launchagents/com.sapphire.telemetry-collector.plist` | (none) | 1 | Write `telemetry-collector-runbook.md` covering metrics destinations, what consumes the telemetry. |
 | `com.sapphire.threat-refresh` | `infra/launchagents/com.sapphire.threat-refresh.plist` | `threat-intel-sweep-runbook.md` | 4 | Threat runbook covers the cloud routine; agent-side cadence + log path implicit. |
 | `com.sapphire.trading-shadow-controller` | `infra/launchagents/com.sapphire.trading-shadow-controller.plist` | (none direct) | 1 | Write `trading-shadow-runbook.md` covering shadow-mode logic, when it's active, where logs go. |
-| `com.sapphire.tradingview-cdp` | `infra/launchagents/com.sapphire.tradingview-cdp.plist` | (none direct) | 1 | Write `tradingview-cdp-runbook.md` covering Chrome remote-debugging-port, MCP handshake, recovery when desktop app exits. |
+| `com.sapphire.tradingview-cdp` | `infra/launchagents/com.sapphire.tradingview-cdp.plist` | `tradingview-cdp-runbook.md` | 3 | Add a CDP-specific plist assertion and read-only MCP status smoke coverage. |
 | `com.sapphire.dashboard` (service-local) | `services/dashboard/launchagent/com.sapphire.dashboard.plist` | `dashboard-product-pages-runbook.md`, `observability-dashboard-runbook.md` | 5 | — |
 | `com.sapphire.inference-proxy` (service-local) | `services/inference-proxy/launchagent/com.sapphire.inference-proxy.plist` | `inference-tenant-quotas.md` | 3 | See `services/inference-proxy/` gap. |
 | `com.sapphire.morning-digest` (service-local) | `services/morning_digest/launchagent/com.sapphire.morning-digest.plist` | (partial) | 2 | See `services/morning_digest/` gap. |
@@ -114,13 +114,13 @@ plus 6 service-local). The original lane spec said 23 LaunchAgents;
 the 28-count emerged because Tranches 4-5 added service-local plists
 the prior counts missed.
 
-**LaunchAgent average**: 2.75 (sum 77, n 28).
+**LaunchAgent average**: 2.89 (sum 81, n 28).
 
 **Lowest-scored LaunchAgents** (priority): `backtest-weekly` (1),
-`content-publisher` (1), `self-optimization` (1), `telemetry-collector` (1),
-`trading-shadow-controller` (1), `tradingview-cdp` (1). Newly lifted
-but still partial: `control-plane`, `foundry-sync`, `gcp-sync`, `heartbeat`,
-`openbb-api`, and `service-supervisor` (3).
+`self-optimization` (1), `telemetry-collector` (1),
+`trading-shadow-controller` (1). Newly lifted but still partial:
+`content-publisher`, `control-plane`, `foundry-sync`, `gcp-sync`,
+`heartbeat`, `openbb-api`, `service-supervisor`, and `tradingview-cdp` (3).
 
 ---
 
@@ -153,17 +153,17 @@ LaunchAgent-driven daemons.
 
 - **Total surfaces**: 62 (26 services + 28 LaunchAgents + 8 cloud
   routines).
-- **Aggregate score**: 217 / 310 = **3.50 / 5**.
+- **Aggregate score**: 221 / 310 = **3.56 / 5**.
 - **Score 5 surfaces**: 18 (29%).
 - **Score < 4 surfaces requiring gap action**: 33 (53%).
-- **Score 1 surfaces (no runbook)**: 6 (10%).
+- **Score 1 surfaces (no runbook)**: 4 (6%).
 
 The asymmetry is still sharp: cloud routines and LLM-tool runbooks
 (`gemini-ooda-*`, `narrative-synthesis`, `vertex-eval`) are
 comprehensive; LaunchAgent-side daemons that quietly run in the
 background (`telemetry-collector`, `logrotate`, `self-optimization`,
-`tradingview-cdp`, `content-publisher`) are the weakest remaining
-surface.
+`backtest-weekly`, `trading-shadow-controller`) are the weakest
+remaining surface.
 The pattern: when a runbook is required to bring a routine online
 from a cold start, it gets written. When a daemon "just runs", the
 runbook never lands.
@@ -172,21 +172,19 @@ runbook never lands.
 
 ## Recommended remediation order
 
-1. **TradingView-CDP + content-publisher** (both score 1) — both have
-   GUI dependencies; recovery from a Chrome / Substack quirk is
-   undocumented.
-2. **Backtest-weekly + telemetry-collector + self-optimization +
+1. **Backtest-weekly + telemetry-collector + self-optimization +
    trading-shadow-controller** (all score 1) — periodic daemons that
    "just work" until they don't. Writing a 1-page note for each is
    cheap insurance.
-3. **Logrotate + market-intel + morning-brief** (all score 2) — small
-   local daemons where a concise cadence/log/recovery note would remove
-   avoidable operator ambiguity.
-4. **Control-plane + Foundry-sync + Security pipeline + Heartbeat +
-   service-supervisor + OpenBB API + webhook + pipeline** (now score 3) —
+2. **Logrotate + market-intel + morning-brief + morning-digest**
+   (all score 2) — small local daemons where a concise cadence/log/recovery
+   note would remove avoidable operator ambiguity.
+3. **Content-publisher + TradingView-CDP + Control-plane + Foundry-sync +
+   Security pipeline + Heartbeat + service-supervisor + OpenBB API +
+   webhook + pipeline** (now score 3) —
    these have adequate operator runbooks after the 2026-04-29 uplifts,
-   but still need command-level smoke tests, no-notify drills, and
-   endpoint-specific recovery coverage.
+   but still need command-level smoke tests, no-notify drills, read-only
+   CDP status checks, and endpoint-specific recovery coverage.
 
 ---
 
