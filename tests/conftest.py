@@ -50,6 +50,7 @@ _OPTIONAL_TEST_DEPS_BY_FILE = {
     "tests/unit/test_roadmap_parser.py": ("aiohttp",),
     "tests/unit/test_robinhood_chain.py": ("web3",),
     "tests/unit/test_sapphire_forum_service.py": ("aiohttp",),
+    "tests/unit/test_services_openbb_api.py": ("openbb_core",),
     "tests/unit/test_signal_logger_webhook.py": ("aiohttp",),
     "tests/unit/test_skill_auditor.py": ("aiohttp",),
     "tests/unit/test_swarm_aggregation.py": ("aiohttp",),

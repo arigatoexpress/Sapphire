@@ -40,6 +40,10 @@ pandas==3.0.2
 scipy==1.15.0
 scikit-learn==1.8.0
 
+# reporting / pdf — pulled in by lib/research_notes (added by 2026-04-28
+# `feat(research): LP-grade research notes pipeline 0.1.0`)
+reportlab>=4.0
+
 # logging / config
 loguru==0.7.3
 python-dotenv==1.2.2

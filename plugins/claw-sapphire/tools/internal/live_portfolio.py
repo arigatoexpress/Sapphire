@@ -8,7 +8,6 @@ account identifiers are hashed before persistence.
 
 from __future__ import annotations
 
-import io
 import json
 import sys
 from datetime import UTC, datetime
