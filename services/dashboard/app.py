@@ -14,6 +14,8 @@ import secrets
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 from datetime import UTC, datetime, timedelta
 from functools import wraps
 from pathlib import Path
@@ -5470,6 +5472,14 @@ def api_backtest_results():
 
 
 _WALKFORWARD_RESULTS_ROOT = _DASHBOARD_REPO_ROOT / "data" / "backtests" / "walkforward"
+_WINDOWS_RESEARCH_WORKER_URL = os.environ.get(
+    "WINDOWS_RESEARCH_WORKER_URL",
+    "http://100.71.10.48:9090/windows/research-worker/latest",
+)
+_WINDOWS_WEBHOOK_HEALTH_URL = os.environ.get(
+    "WINDOWS_WEBHOOK_HEALTH_URL",
+    "http://100.71.10.48:9090/webhook/health",
+)
 
 
 def _walkforward_empty_payload(reason: str) -> dict[str, Any]:
@@ -5702,6 +5712,147 @@ def api_walkforward_results():
             },
             "strategies": [],
         }
+        return jsonify(payload), 200
+
+
+def _windows_research_worker_empty_payload(reason: str) -> dict[str, Any]:
+    return {
+        "mode": "read_only_windows_research_worker",
+        "status": "no_data",
+        "source": "dashboard_proxy",
+        "reason": reason,
+        "summary": {
+            "command_count": 0,
+            "failed_count": 0,
+            "artifact_count": 0,
+            "safety_clear": False,
+        },
+        "safety": {
+            "paper_only": False,
+            "live_trading_enabled": False,
+            "telegram_sends_enabled": False,
+        },
+        "commands": [],
+        "artifacts": [],
+    }
+
+
+def _remote_path_label(raw_path: Any) -> str | None:
+    if raw_path in (None, ""):
+        return None
+    text = str(raw_path)
+    if text.startswith(".../"):
+        return _paste_safe_text(text, limit=120)
+    parts = [
+        part for part in text.replace("\\", "/").split("/") if part and not part.endswith(":")
+    ]
+    if not parts:
+        return None
+    return _paste_safe_text(".../" + "/".join(parts[-3:]), limit=120)
+
+
+def _fetch_json_url(url: str, *, timeout: float = 5.0) -> dict[str, Any]:
+    with urllib.request.urlopen(url, timeout=timeout) as response:  # nosec B310 - fixed private Tailscale URL from config.
+        payload = json.loads(response.read(1024 * 1024))
+    return payload if isinstance(payload, dict) else {}
+
+
+def _normalize_windows_research_worker_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+    safety = payload.get("safety") if isinstance(payload.get("safety"), dict) else {}
+    commands = [
+        {
+            "name": _paste_safe_text(command.get("name") or "unknown", limit=64),
+            "status": "failed" if command.get("status") == "failed" else "ok",
+            "exit_code": command.get("exit_code"),
+            "duration_seconds": command.get("duration_seconds"),
+            "started_at": command.get("started_at"),
+            "finished_at": command.get("finished_at"),
+            "log_path_label": _remote_path_label(
+                command.get("log_path_label") or command.get("log_path")
+            ),
+        }
+        for command in payload.get("commands", [])
+        if isinstance(command, dict)
+    ]
+    artifacts = [
+        {
+            "kind": _paste_safe_text(artifact.get("kind") or "artifact", limit=64),
+            "path_label": _remote_path_label(artifact.get("path_label") or artifact.get("path")),
+        }
+        for artifact in payload.get("artifacts", [])
+        if isinstance(artifact, dict)
+    ]
+    paper_only = safety.get("paper_only") is True
+    live_trading_enabled = safety.get("live_trading_enabled") is True
+    telegram_sends_enabled = safety.get("telegram_sends_enabled") is True
+    safety_clear = paper_only and not live_trading_enabled and not telegram_sends_enabled
+    status = str(payload.get("status") or "unknown")
+    if not safety_clear and status == "ok":
+        status = "unsafe"
+    return {
+        "mode": "read_only_windows_research_worker",
+        "status": status,
+        "source": _paste_safe_text(payload.get("source") or "windows_webhook", limit=64),
+        "generated_at": payload.get("generated_at"),
+        "host": _paste_safe_text(payload.get("host"), limit=80),
+        "git_sha_short": _paste_safe_text(payload.get("git_sha_short"), limit=16),
+        "run_id": _paste_safe_text(payload.get("run_id"), limit=40),
+        "manifest_path_label": _remote_path_label(payload.get("manifest_path_label")),
+        "run_dir_label": _remote_path_label(payload.get("run_dir_label")),
+        "output_root_label": _remote_path_label(payload.get("output_root_label")),
+        "reason": _paste_safe_text(payload.get("reason"), limit=180)
+        if payload.get("reason")
+        else None,
+        "summary": {
+            "command_count": int(summary.get("command_count") or len(commands)),
+            "failed_count": int(summary.get("failed_count") or 0),
+            "artifact_count": int(summary.get("artifact_count") or len(artifacts)),
+            "safety_clear": bool(
+                summary.get("safety_clear") if "safety_clear" in summary else safety_clear
+            ),
+        },
+        "safety": {
+            "paper_only": paper_only,
+            "live_trading_enabled": live_trading_enabled,
+            "telegram_sends_enabled": telegram_sends_enabled,
+        },
+        "commands": commands,
+        "artifacts": artifacts,
+    }
+
+
+def _build_windows_research_worker_payload() -> dict[str, Any]:
+    errors: list[str] = []
+    for url, extractor in (
+        (_WINDOWS_RESEARCH_WORKER_URL, lambda body: body),
+        (_WINDOWS_WEBHOOK_HEALTH_URL, lambda body: body.get("research_worker")),
+    ):
+        try:
+            body = _fetch_json_url(url)
+        except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+            errors.append(f"{exc.__class__.__name__}: {exc}"[:120])
+            continue
+        payload = extractor(body)
+        if isinstance(payload, dict):
+            return _normalize_windows_research_worker_payload(payload)
+        errors.append("research_worker_missing")
+    payload = _windows_research_worker_empty_payload("windows worker status unavailable")
+    if errors:
+        payload["error"] = "; ".join(errors)[-240:]
+    return payload
+
+
+@app.route("/api/windows-research-worker")
+@requires_auth
+def api_windows_research_worker():
+    """Read-only summary of the latest paper-only Windows research worker run."""
+    try:
+        return jsonify(_maybe_buyer_safe_payload(_build_windows_research_worker_payload()))
+    except Exception as exc:
+        log.warning("windows research worker API error: %s", exc)
+        payload = _windows_research_worker_empty_payload("dashboard proxy error")
+        payload["error"] = f"{exc.__class__.__name__}: {exc}"[:200]
         return jsonify(payload), 200
 
 

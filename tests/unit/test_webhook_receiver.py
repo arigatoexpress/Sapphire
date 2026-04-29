@@ -486,3 +486,55 @@ async def test_publish_signal_records_partial_success(monkeypatch, receiver):
     fail_targets = [t for t in result["targets"] if not t["ok"]]
     assert len(ok_targets) == 1
     assert len(fail_targets) == 2
+
+
+def test_research_worker_payload_is_path_safe_and_paper_only(receiver):
+    manifest = {
+        "generated_at": "2026-04-29T21:04:24Z",
+        "host": "DESKTOP-HFCK6U9",
+        "git_sha": "6e7c106742ef225fb784be9a3020e15ddba64dd1",
+        "run_dir": "E:\\Sapphire\\research-worker\\20260429T210424Z",
+        "output_root": "E:\\Sapphire\\research-worker",
+        "paper_only": True,
+        "live_trading_enabled": False,
+        "telegram_sends_enabled": False,
+        "commands": [
+            {
+                "name": "strategy_sweep",
+                "exit_code": 0,
+                "started_at": "2026-04-29T21:04:24Z",
+                "finished_at": "2026-04-29T21:04:29Z",
+                "log_path": "E:\\Sapphire\\research-worker\\20260429T210424Z\\backtest.log",
+            }
+        ],
+        "artifacts": ["E:\\Sapphire\\research-worker\\20260429T210424Z\\backtest"],
+    }
+
+    payload = receiver._build_research_worker_payload(manifest)
+
+    assert payload["status"] == "ok"
+    assert payload["summary"]["safety_clear"] is True
+    assert payload["summary"]["failed_count"] == 0
+    assert payload["git_sha_short"] == "6e7c1067"
+    assert payload["run_id"] == "20260429T210424Z"
+    assert payload["commands"][0]["duration_seconds"] == 5.0
+    assert payload["commands"][0]["log_path_label"] == ".../research-worker/20260429T210424Z/backtest.log"
+    assert payload["artifacts"][0]["path_label"] == ".../research-worker/20260429T210424Z/backtest"
+
+
+def test_research_worker_payload_marks_failed_or_unsafe(receiver):
+    failed_manifest = {
+        "paper_only": True,
+        "live_trading_enabled": False,
+        "telegram_sends_enabled": False,
+        "commands": [{"name": "strategy_sweep", "exit_code": 1}],
+    }
+    unsafe_manifest = {
+        "paper_only": True,
+        "live_trading_enabled": True,
+        "telegram_sends_enabled": False,
+        "commands": [{"name": "strategy_sweep", "exit_code": 0}],
+    }
+
+    assert receiver._build_research_worker_payload(failed_manifest)["status"] == "degraded"
+    assert receiver._build_research_worker_payload(unsafe_manifest)["status"] == "unsafe"

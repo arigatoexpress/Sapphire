@@ -23,6 +23,7 @@ import uuid
 from contextlib import asynccontextmanager
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, Optional
 
 import httpx
@@ -59,6 +60,10 @@ EDGE_CAPABILITIES_COLLECTION = "edge_capabilities"
 SYSTEM_LOGS_COLLECTION = "system_logs"
 CAPABILITY_SYNC_INTERVAL_SECONDS = int(os.getenv("CAPABILITY_SYNC_INTERVAL_SECONDS", "180"))
 LOCAL_SERVICE_PROBE_TIMEOUT_SECONDS = float(os.getenv("LOCAL_SERVICE_PROBE_TIMEOUT_SECONDS", "5.0"))
+RESEARCH_WORKER_OUTPUT_ROOT = os.getenv(
+    "RESEARCH_WORKER_OUTPUT_ROOT",
+    os.getenv("WINDOWS_RESEARCH_WORKER_OUTPUT_ROOT", "E:/Sapphire/research-worker"),
+)
 
 # Supported symbols → canonical Sapphire format
 SYMBOL_MAP = {
@@ -165,6 +170,175 @@ _capability_snapshot: dict[str, Any] = {
     "last_sync": None,
     "error": "not_initialized",
 }
+
+
+def _short_path_label(raw_path: Any) -> str | None:
+    if raw_path in (None, ""):
+        return None
+    parts = [
+        part
+        for part in str(raw_path).replace("\\", "/").split("/")
+        if part and not part.endswith(":")
+    ]
+    if not parts:
+        return None
+    return ".../" + "/".join(parts[-3:])
+
+
+def _path_leaf(raw_path: Any) -> str | None:
+    if raw_path in (None, ""):
+        return None
+    parts = [
+        part
+        for part in str(raw_path).replace("\\", "/").split("/")
+        if part and not part.endswith(":")
+    ]
+    return parts[-1] if parts else None
+
+
+def _parse_iso_timestamp(value: Any) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _seconds_between(started_at: Any, finished_at: Any) -> float | None:
+    started = _parse_iso_timestamp(started_at)
+    finished = _parse_iso_timestamp(finished_at)
+    if not started or not finished:
+        return None
+    return round(max((finished - started).total_seconds(), 0.0), 3)
+
+
+def _latest_research_worker_manifest(root: Path) -> Path | None:
+    if not root.exists() or not root.is_dir():
+        return None
+    candidates = [
+        child / "manifest.json"
+        for child in root.iterdir()
+        if child.is_dir() and (child / "manifest.json").is_file()
+    ]
+    candidates.sort(key=lambda path: (path.stat().st_mtime, path.parent.name), reverse=True)
+    return candidates[0] if candidates else None
+
+
+def _research_worker_empty_payload(reason: str) -> dict[str, Any]:
+    return {
+        "mode": "read_only_windows_research_worker",
+        "status": "no_data",
+        "source": "windows_webhook",
+        "reason": reason,
+        "summary": {
+            "command_count": 0,
+            "failed_count": 0,
+            "artifact_count": 0,
+            "safety_clear": False,
+        },
+        "safety": {
+            "paper_only": False,
+            "live_trading_enabled": False,
+            "telegram_sends_enabled": False,
+        },
+        "commands": [],
+        "artifacts": [],
+    }
+
+
+def _build_research_worker_payload(
+    manifest: dict[str, Any],
+    *,
+    manifest_path: Path | None = None,
+) -> dict[str, Any]:
+    commands = [item for item in manifest.get("commands", []) if isinstance(item, dict)]
+    artifacts = list(manifest.get("artifacts", [])) if isinstance(manifest.get("artifacts"), list) else []
+    safety = {
+        "paper_only": manifest.get("paper_only") is True,
+        "live_trading_enabled": manifest.get("live_trading_enabled") is True,
+        "telegram_sends_enabled": manifest.get("telegram_sends_enabled") is True,
+    }
+    safety_clear = (
+        safety["paper_only"]
+        and not safety["live_trading_enabled"]
+        and not safety["telegram_sends_enabled"]
+    )
+    command_rows: list[dict[str, Any]] = []
+    failed_count = 0
+    for command in commands:
+        exit_code = command.get("exit_code")
+        failed = exit_code not in (0, "0")
+        failed_count += int(failed)
+        command_rows.append(
+            {
+                "name": str(command.get("name") or "unknown"),
+                "status": "failed" if failed else "ok",
+                "exit_code": exit_code,
+                "started_at": command.get("started_at"),
+                "finished_at": command.get("finished_at"),
+                "duration_seconds": _seconds_between(
+                    command.get("started_at"), command.get("finished_at")
+                ),
+                "log_path_label": _short_path_label(command.get("log_path")),
+            }
+        )
+
+    status = "ok"
+    if not safety_clear:
+        status = "unsafe"
+    elif failed_count:
+        status = "degraded"
+
+    return {
+        "mode": "read_only_windows_research_worker",
+        "status": status,
+        "source": "windows_webhook",
+        "generated_at": manifest.get("generated_at"),
+        "host": manifest.get("host"),
+        "git_sha": manifest.get("git_sha"),
+        "git_sha_short": str(manifest.get("git_sha") or "")[:8] or None,
+        "run_id": _path_leaf(manifest.get("run_dir")),
+        "manifest_path_label": _short_path_label(manifest_path),
+        "run_dir_label": _short_path_label(manifest.get("run_dir")),
+        "output_root_label": _short_path_label(manifest.get("output_root")),
+        "summary": {
+            "command_count": len(command_rows),
+            "failed_count": failed_count,
+            "artifact_count": len(artifacts),
+            "safety_clear": safety_clear,
+        },
+        "safety": safety,
+        "commands": command_rows,
+        "artifacts": [
+            {
+                "kind": _path_leaf(path) or "artifact",
+                "path_label": _short_path_label(path),
+            }
+            for path in artifacts
+        ],
+    }
+
+
+def _build_research_worker_status() -> dict[str, Any]:
+    root = Path(RESEARCH_WORKER_OUTPUT_ROOT)
+    manifest_path = _latest_research_worker_manifest(root)
+    if manifest_path is None:
+        payload = _research_worker_empty_payload("no manifest on disk")
+        payload["output_root_label"] = _short_path_label(root)
+        return payload
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        payload = _research_worker_empty_payload("latest manifest unreadable")
+        payload["error"] = f"{exc.__class__.__name__}: {exc}"[:200]
+        payload["manifest_path_label"] = _short_path_label(manifest_path)
+        return payload
+    if not isinstance(manifest, dict):
+        payload = _research_worker_empty_payload("latest manifest is not an object")
+        payload["manifest_path_label"] = _short_path_label(manifest_path)
+        return payload
+    return _build_research_worker_payload(manifest, manifest_path=manifest_path)
 
 
 def _get_publisher():
@@ -618,6 +792,7 @@ async def status():
             ),
             "last_sync": (_capability_snapshot or {}).get("updated_at"),
         },
+        "research_worker": _build_research_worker_status(),
         "supported_actions": VALID_ACTIONS,
         "symbol_map": SYMBOL_MAP,
     }
@@ -654,6 +829,7 @@ async def webhook_health():
                 "gpu_count", 0
             ),
         },
+        "research_worker": _build_research_worker_status(),
     }
 
 
@@ -664,6 +840,11 @@ async def windows_capabilities():
         snapshot = {"available": False, "error": "capabilities_not_ready"}
     snapshot["timestamp"] = datetime.now(UTC).isoformat()
     return snapshot
+
+
+@app.get("/windows/research-worker/latest")
+async def windows_research_worker_latest():
+    return _build_research_worker_status()
 
 
 @app.get("/alerts")

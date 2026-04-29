@@ -506,6 +506,33 @@
     </div>
 </div>
 
+<!-- Windows research worker (paper-only desktop backtests) -->
+<div class="perf-section">
+    <div class="perf-section-title">Windows Research Worker</div>
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom: 10px; flex-wrap: wrap;">
+        <span style="color:#b8e8b0; font-size:0.75rem; letter-spacing:0.06em; text-transform:uppercase;">Latest run</span>
+        <span id="windowsResearchMeta" style="color:#9fd89c; font-size:0.72rem; margin-left:auto;">&mdash;</span>
+    </div>
+    <div class="panel" style="padding: 0; margin-bottom: 0;">
+        <div class="table-scroll">
+            <table class="strat-table">
+                <thead>
+                    <tr>
+                        <th>Command</th>
+                        <th>Status</th>
+                        <th>Exit</th>
+                        <th>Duration</th>
+                        <th>Log</th>
+                    </tr>
+                </thead>
+                <tbody id="windowsResearchBody">
+                    <tr><td colspan="5" style="text-align:center; padding:24px; color: #9fd89c;">Loading Windows worker status…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 <!-- Walk-forward OOS validation (latest artifact sweep) -->
 <div class="perf-section">
     <div class="perf-section-title">Walk-Forward Validation &mdash; OOS + DSR</div>
@@ -1136,6 +1163,44 @@
         });
     }
 
+    function renderWindowsResearchWorker(payload) {
+        var body = document.getElementById('windowsResearchBody');
+        var meta = document.getElementById('windowsResearchMeta');
+        if (!body) return;
+        var summary = (payload || {}).summary || {};
+        var commands = (payload || {}).commands || [];
+
+        if (meta) {
+            if (!payload || payload.status !== 'ok') {
+                meta.textContent = (payload && (payload.reason || payload.status)) ? (payload.reason || payload.status) : 'worker status unavailable';
+            } else {
+                var issued = payload.generated_at ? new Date(payload.generated_at) : null;
+                var stamp = issued && !isNaN(issued.getTime()) ? issued.toISOString().slice(0, 16).replace('T', ' ') + 'Z' : (payload.run_id || 'latest');
+                var safety = summary.safety_clear ? 'paper-only' : 'safety watch';
+                meta.textContent = payload.host + ' · ' + payload.run_id + ' · ' + summary.artifact_count + ' artifacts · ' + safety + ' · ' + stamp;
+            }
+        }
+
+        if (!commands.length) {
+            body.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:24px; color: #9fd89c;">No Windows research-worker manifest exposed yet.</td></tr>';
+            return;
+        }
+
+        var html = '';
+        commands.forEach(function (command) {
+            var ok = command.status === 'ok' && Number(command.exit_code || 0) === 0;
+            var dur = command.duration_seconds == null ? '—' : Number(command.duration_seconds).toFixed(1) + 's';
+            html += '<tr>'
+                + '<td class="strat-name">' + escapeHtml(command.name) + '</td>'
+                + '<td class="' + (ok ? 'val-pos' : 'val-neg') + '">' + (ok ? 'OK' : 'CHECK') + '</td>'
+                + '<td>' + (command.exit_code == null ? '—' : escapeHtml(command.exit_code)) + '</td>'
+                + '<td>' + dur + '</td>'
+                + '<td style="color:#9fd89c;">' + escapeHtml(command.log_path_label) + '</td>'
+                + '</tr>';
+        });
+        body.innerHTML = html;
+    }
+
     function renderWalkforwardResults(payload) {
         var body = document.getElementById('walkforwardBody');
         var meta = document.getElementById('walkforwardMeta');
@@ -1249,6 +1314,13 @@
 
         var metricSel = document.getElementById('backtestMetric');
         fetchBacktestResults(metricSel ? metricSel.value : 'sortino');
+
+        fetch('/api/windows-research-worker', {credentials: 'same-origin'})
+            .then(function (r) { return r.json(); })
+            .then(renderWindowsResearchWorker)
+            .catch(function (err) {
+                console.warn('windows-research-worker fetch failed', err);
+            });
 
         fetch('/api/walkforward-results', {credentials: 'same-origin'})
             .then(function (r) { return r.json(); })
