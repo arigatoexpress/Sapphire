@@ -215,9 +215,13 @@ def test_audit_covers_known_critical_surfaces():
     ("surface", "runbook", "minimum_score"),
     [
         ("`services/heartbeat/`", "heartbeat-runbook.md", 3),
+        ("`services/control-plane/`", "control-plane-runbook.md", 3),
+        ("`services/foundry_sync/`", "foundry-sync-runbook.md", 3),
         ("`services/openbb_api/`", "openbb-api-runbook.md", 3),
         ("`services/pipeline/`", "gcp-pipeline-runbook.md", 3),
         ("`services/webhook/`", "webhook-runbook.md", 3),
+        ("`com.sapphire.control-plane`", "control-plane-runbook.md", 3),
+        ("`com.sapphire.foundry-sync`", "foundry-sync-runbook.md", 3),
         ("`com.sapphire.gcp-sync`", "gcp-pipeline-runbook.md", 3),
         ("`com.sapphire.heartbeat`", "heartbeat-runbook.md", 3),
         ("`com.sapphire.openbb-api`", "openbb-api-runbook.md", 3),
@@ -245,6 +249,8 @@ def test_tranche7_runbook_uplift_surfaces_are_no_longer_score_one(
     "runbook",
     [
         "heartbeat-runbook.md",
+        "control-plane-runbook.md",
+        "foundry-sync-runbook.md",
         "service-supervisor-runbook.md",
         "openbb-api-runbook.md",
         "gcp-pipeline-runbook.md",
