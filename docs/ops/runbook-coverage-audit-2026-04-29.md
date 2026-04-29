@@ -96,11 +96,11 @@ still-partial `control-plane`, `foundry_sync`, `security_pipeline`,
 | `com.sapphire.morning-brief` | `infra/launchagents/com.sapphire.morning-brief.plist` | (none direct) | 2 | See `services/morning_digest/` gap. |
 | `com.sapphire.openbb-api` | `infra/launchagents/com.sapphire.openbb-api.plist` | `openbb-api-runbook.md` | 3 | Add provider-route smoke tests that avoid external market-data calls and document the Python/OpenBB version pin once stabilized. |
 | `com.sapphire.security-pipeline` | `infra/launchagents/com.sapphire.security-pipeline.plist` | `security-pipeline-runbook.md` | 3 | Add a launchd stale-report check and a reviewed no-notify drill for manual reruns. |
-| `com.sapphire.self-optimization` | `infra/launchagents/com.sapphire.self-optimization.plist` | (none) | 1 | Write `self-optimization-runbook.md` covering the optimizer's read-only stance + what to do when it produces a bad recommendation. |
+| `com.sapphire.self-optimization` | `infra/launchagents/com.sapphire.self-optimization.plist` | `self-optimization-runbook.md` | 3 | Add fixture coverage for `optimize.py` dry-run/event side effects and a freshness check for optimization events. |
 | `com.sapphire.signal-logger` | `infra/launchagents/com.sapphire.signal-logger.plist` | `tranche5-live-soak-runbook.md` (partial) | 3 | Same gap as `services/alpha/`. |
 | `com.sapphire.telemetry-collector` | `infra/launchagents/com.sapphire.telemetry-collector.plist` | `telemetry-collector-runbook.md` | 3 | Add direct routine-freshness tracking and fixture coverage for metrics/health append contracts. |
 | `com.sapphire.threat-refresh` | `infra/launchagents/com.sapphire.threat-refresh.plist` | `threat-intel-sweep-runbook.md` | 4 | Threat runbook covers the cloud routine; agent-side cadence + log path implicit. |
-| `com.sapphire.trading-shadow-controller` | `infra/launchagents/com.sapphire.trading-shadow-controller.plist` | (none direct) | 1 | Write `trading-shadow-runbook.md` covering shadow-mode logic, when it's active, where logs go. |
+| `com.sapphire.trading-shadow-controller` | `infra/launchagents/com.sapphire.trading-shadow-controller.plist` | `trading-shadow-runbook.md` | 3 | Add stale-report alerting and fixture coverage for offline output/routine freshness. |
 | `com.sapphire.tradingview-cdp` | `infra/launchagents/com.sapphire.tradingview-cdp.plist` | `tradingview-cdp-runbook.md` | 3 | Add a CDP-specific plist assertion and read-only MCP status smoke coverage. |
 | `com.sapphire.dashboard` (service-local) | `services/dashboard/launchagent/com.sapphire.dashboard.plist` | `dashboard-product-pages-runbook.md`, `observability-dashboard-runbook.md` | 5 | — |
 | `com.sapphire.inference-proxy` (service-local) | `services/inference-proxy/launchagent/com.sapphire.inference-proxy.plist` | `inference-tenant-quotas.md` | 3 | See `services/inference-proxy/` gap. |
@@ -114,13 +114,15 @@ plus 6 service-local). The original lane spec said 23 LaunchAgents;
 the 28-count emerged because Tranches 4-5 added service-local plists
 the prior counts missed.
 
-**LaunchAgent average**: 3.04 (sum 85, n 28).
+**LaunchAgent average**: 3.18 (sum 89, n 28).
 
-**Lowest-scored LaunchAgents** (priority): `self-optimization` (1),
-`trading-shadow-controller` (1). Newly lifted but still partial:
-`backtest-weekly`, `content-publisher`, `control-plane`, `foundry-sync`,
-`gcp-sync`, `heartbeat`, `openbb-api`, `service-supervisor`,
-`telemetry-collector`, and `tradingview-cdp` (3).
+**Lowest-scored LaunchAgents** (priority): `logrotate`,
+`market-intel`, `morning-brief`, and service-local `morning-digest`
+(2). Newly lifted but still partial: `backtest-weekly`,
+`content-publisher`, `control-plane`, `foundry-sync`, `gcp-sync`,
+`heartbeat`, `openbb-api`, `self-optimization`,
+`service-supervisor`, `telemetry-collector`,
+`trading-shadow-controller`, and `tradingview-cdp` (3).
 
 ---
 
@@ -153,16 +155,16 @@ LaunchAgent-driven daemons.
 
 - **Total surfaces**: 62 (26 services + 28 LaunchAgents + 8 cloud
   routines).
-- **Aggregate score**: 225 / 310 = **3.63 / 5**.
+- **Aggregate score**: 229 / 310 = **3.69 / 5**.
 - **Score 5 surfaces**: 18 (29%).
 - **Score < 4 surfaces requiring gap action**: 33 (53%).
-- **Score 1 surfaces (no runbook)**: 2 (3%).
+- **Score 1 surfaces (no runbook)**: 0 (0%).
 
 The asymmetry is still sharp: cloud routines and LLM-tool runbooks
 (`gemini-ooda-*`, `narrative-synthesis`, `vertex-eval`) are
 comprehensive; LaunchAgent-side daemons that quietly run in the
-background (`logrotate`, `self-optimization`, `trading-shadow-controller`,
-`market-intel`) are the weakest remaining surface.
+background (`logrotate`, `market-intel`, `morning-brief`, and
+service-local `morning-digest`) are the weakest remaining surface.
 The pattern: when a runbook is required to bring a routine online
 from a cold start, it gets written. When a daemon "just runs", the
 runbook never lands.
@@ -171,15 +173,13 @@ runbook never lands.
 
 ## Recommended remediation order
 
-1. **Self-optimization + trading-shadow-controller** (both score 1) —
-   periodic daemons that "just work" until they don't. Writing a 1-page
-   note for each is cheap insurance.
-2. **Logrotate + market-intel + morning-brief + morning-digest**
+1. **Logrotate + market-intel + morning-brief + morning-digest**
    (all score 2) — small local daemons where a concise cadence/log/recovery
    note would remove avoidable operator ambiguity.
-3. **Backtest-weekly + telemetry-collector + Content-publisher +
+2. **Backtest-weekly + telemetry-collector + Content-publisher +
    TradingView-CDP + Control-plane + Foundry-sync + Security pipeline +
-   Heartbeat + service-supervisor + OpenBB API + webhook + pipeline**
+   Heartbeat + self-optimization + trading-shadow-controller +
+   service-supervisor + OpenBB API + webhook + pipeline**
    (now score 3) —
    these have adequate operator runbooks after the 2026-04-29 uplifts,
    but still need command-level smoke tests, freshness tracking,

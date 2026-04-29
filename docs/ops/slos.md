@@ -133,10 +133,10 @@ These are scheduled or background processes that don't have their own
 | `com.sapphire.market-intel` | every 4h | 5 min | < 5% | < 4 h | manual |
 | `com.sapphire.morning-brief` | daily 08:00 | 5 min | < 5% | < 24 h | manual |
 | `com.sapphire.security-pipeline` | daily 04:00 | 10 min | < 5% | < 24 h | manual |
-| `com.sapphire.self-optimization` | daily 20:53 | 5 min | < 10% | < 24 h | manual |
+| `com.sapphire.self-optimization` | Sunday 23:00 | 5 min | < 10% | < 7 d | manual |
 | `com.sapphire.telemetry-collector` | every 60 s | 5 s | < 5% | < 60 s | aspirational |
 | `com.sapphire.threat-refresh` | twice daily | 5 min | < 5% | < 12 h | manual |
-| `com.sapphire.trading-shadow-controller` | every 60 s | 5 s | < 5% | < 60 s | aspirational |
+| `com.sapphire.trading-shadow-controller` | every 30 min | 30 s | < 5% | < 2 h | manual |
 | `com.sapphire.tradingview-cdp` | continuous | n/a (long-running) | < 1% (when TV desktop is up) | n/a | manual |
 
 ## Cloud routines (Anthropic claude.ai/code/routines)
@@ -243,7 +243,8 @@ The honest list of what we do not measure today:
 2. **Heartbeat tick freshness** (Lane 6 telemetry could surface this).
 3. **Telemetry-collector own-availability** (meta: who watches the
    watcher?).
-4. **Trading-shadow-controller decision latency** (no instrumentation).
+4. **Trading-shadow-controller per-candidate decision latency**
+   (artifact freshness is tracked; p99 decision latency is not instrumented).
 5. **Service-supervisor restart latency** (no instrumentation).
 
 This list is the work-stream for Tranche 7 if Tranche 6 doesn't get

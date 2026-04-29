@@ -229,8 +229,10 @@ def test_audit_covers_known_critical_surfaces():
         ("`com.sapphire.gcp-sync`", "gcp-pipeline-runbook.md", 3),
         ("`com.sapphire.heartbeat`", "heartbeat-runbook.md", 3),
         ("`com.sapphire.openbb-api`", "openbb-api-runbook.md", 3),
+        ("`com.sapphire.self-optimization`", "self-optimization-runbook.md", 3),
         ("`com.sapphire.service-supervisor` (service-local)", "service-supervisor-runbook.md", 3),
         ("`com.sapphire.telemetry-collector`", "telemetry-collector-runbook.md", 3),
+        ("`com.sapphire.trading-shadow-controller`", "trading-shadow-runbook.md", 3),
         ("`com.sapphire.tradingview-cdp`", "tradingview-cdp-runbook.md", 3),
     ],
 )
@@ -264,7 +266,9 @@ def test_tranche7_runbook_uplift_surfaces_are_no_longer_score_one(
         "telemetry-collector-runbook.md",
         "tradingview-cdp-runbook.md",
         "openbb-api-runbook.md",
+        "self-optimization-runbook.md",
         "gcp-pipeline-runbook.md",
+        "trading-shadow-runbook.md",
         "webhook-runbook.md",
     ],
 )
