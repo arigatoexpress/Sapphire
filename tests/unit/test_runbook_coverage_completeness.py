@@ -211,6 +211,56 @@ def test_audit_covers_known_critical_surfaces():
         )
 
 
+@pytest.mark.parametrize(
+    ("surface", "runbook", "minimum_score"),
+    [
+        ("`services/heartbeat/`", "heartbeat-runbook.md", 3),
+        ("`services/openbb_api/`", "openbb-api-runbook.md", 3),
+        ("`services/pipeline/`", "gcp-pipeline-runbook.md", 3),
+        ("`services/webhook/`", "webhook-runbook.md", 3),
+        ("`com.sapphire.gcp-sync`", "gcp-pipeline-runbook.md", 3),
+        ("`com.sapphire.heartbeat`", "heartbeat-runbook.md", 3),
+        ("`com.sapphire.openbb-api`", "openbb-api-runbook.md", 3),
+        ("`com.sapphire.service-supervisor` (service-local)", "service-supervisor-runbook.md", 3),
+    ],
+)
+def test_tranche7_runbook_uplift_surfaces_are_no_longer_score_one(
+    surface: str,
+    runbook: str,
+    minimum_score: int,
+):
+    """Tranche 7 uplifted the first critical runbook gaps from missing to adequate."""
+    rows = {row["surface"]: row for row in _audit_rows()}
+    assert surface in rows, f"missing audit row for {surface}"
+    row = rows[surface]
+    assert runbook in row["runbook"], (
+        f"{surface} should cite {runbook}, got {row['runbook']!r}"
+    )
+    assert int(row["score"]) >= minimum_score, (
+        f"{surface} should score at least {minimum_score}, got {row['score']}"
+    )
+
+
+@pytest.mark.parametrize(
+    "runbook",
+    [
+        "heartbeat-runbook.md",
+        "service-supervisor-runbook.md",
+        "openbb-api-runbook.md",
+        "gcp-pipeline-runbook.md",
+        "webhook-runbook.md",
+    ],
+)
+def test_tranche7_uplift_runbook_files_are_operator_substantive(runbook: str):
+    """New runbooks must include real operating commands and failure guidance."""
+    path = OPS_DIR / runbook
+    assert path.is_file(), f"missing runbook {path}"
+    text = path.read_text()
+    assert len(text) > 2500, f"{runbook} is too short to be operationally useful"
+    for required in ("Normal Operation", "Common Failures", "Safety Notes", "Escalation"):
+        assert required in text, f"{runbook} missing {required!r} section"
+
+
 def test_slos_file_exists_as_companion_artifact():
     """The audit doc has a partner SLO artifact at docs/ops/slos.md."""
     assert SLO_FILE.is_file(), (
