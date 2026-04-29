@@ -506,6 +506,36 @@
     </div>
 </div>
 
+<!-- Walk-forward OOS validation (latest artifact sweep) -->
+<div class="perf-section">
+    <div class="perf-section-title">Walk-Forward Validation &mdash; OOS + DSR</div>
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom: 10px; flex-wrap: wrap;">
+        <span style="color:#b8e8b0; font-size:0.75rem; letter-spacing:0.06em; text-transform:uppercase;">Latest sweep</span>
+        <span id="walkforwardMeta" style="color:#9fd89c; font-size:0.72rem; margin-left:auto;">&mdash;</span>
+    </div>
+    <div class="panel" style="padding: 0; margin-bottom: 0;">
+        <div class="table-scroll">
+            <table class="strat-table">
+                <thead>
+                    <tr>
+                        <th>Strategy</th>
+                        <th>Best Horizon</th>
+                        <th>Sortino</th>
+                        <th>DSR</th>
+                        <th>DSR Prob</th>
+                        <th>Sortino CV</th>
+                        <th>Regime</th>
+                        <th>Windows</th>
+                    </tr>
+                </thead>
+                <tbody id="walkforwardBody">
+                    <tr><td colspan="8" style="text-align:center; padding:24px; color: #9fd89c;">Loading walk-forward artifacts…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 <!-- Per-symbol breakdown -->
 <div class="perf-section">
     <div class="perf-section-title">Per-Symbol Performance</div>
@@ -1098,6 +1128,66 @@
             });
     }
 
+    /* ── Render walk-forward validation from /api/walkforward-results ── */
+    function escapeHtml(v) {
+        if (v == null || v === '') return '—';
+        return String(v).replace(/[&<>"']/g, function (ch) {
+            return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[ch];
+        });
+    }
+
+    function renderWalkforwardResults(payload) {
+        var body = document.getElementById('walkforwardBody');
+        var meta = document.getElementById('walkforwardMeta');
+        if (!body) return;
+        var summary = (payload || {}).summary || {};
+        var strategies = (payload || {}).strategies || [];
+
+        if (meta) {
+            if (!payload || payload.status !== 'ok') {
+                meta.textContent = (payload && payload.reason) ? payload.reason : 'no walk-forward artifacts on disk';
+            } else {
+                var manifest = payload.manifest || {};
+                var issued = manifest.generated_at ? new Date(manifest.generated_at) : null;
+                var stamp = issued && !isNaN(issued.getTime()) ? issued.toISOString().slice(0, 10) : (payload.report_date || 'latest');
+                meta.textContent = summary.strategy_count + ' strategies · ' + summary.horizon_count + ' horizons · ' + summary.dsr_pass_count + ' DSR pass · ' + stamp;
+            }
+        }
+
+        if (!strategies.length) {
+            body.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:24px; color: #9fd89c;">No walk-forward artifacts yet. Run services.walkforward.build to populate this panel.</td></tr>';
+            return;
+        }
+
+        strategies.sort(function (a, b) {
+            function sortinoValue(strategy) {
+                var v = ((strategy || {}).best_horizon || {}).mean_test_sortino;
+                return v == null ? -9999 : Number(v);
+            }
+            return sortinoValue(b) - sortinoValue(a);
+        });
+
+        var html = '';
+        strategies.forEach(function (strategy) {
+            var best = strategy.best_horizon || {};
+            var passed = best.dsr_passed === true;
+            var passText = best.dsr_passed == null ? '—' : (passed ? 'PASS' : 'WATCH');
+            var passCls = best.dsr_passed == null ? '' : (passed ? 'val-pos' : 'val-neg');
+            var windows = (best.n_active_windows != null ? best.n_active_windows : 0) + ' / ' + (best.n_windows != null ? best.n_windows : 0);
+            html += '<tr>'
+                + '<td class="strat-name">' + escapeHtml(strategy.strategy) + '</td>'
+                + '<td>' + (best.horizon_days != null ? best.horizon_days + 'd' : '—') + '</td>'
+                + '<td class="' + (best.mean_test_sortino != null && best.mean_test_sortino > 0 ? 'val-pos' : best.mean_test_sortino != null ? 'val-neg' : '') + '">' + fmtFloat(best.mean_test_sortino, 2) + '</td>'
+                + '<td class="' + passCls + '">' + passText + '</td>'
+                + '<td>' + fmtPct(best.dsr_probability) + '</td>'
+                + '<td class="' + (best.test_sortino_cv != null && best.test_sortino_cv <= 1 ? 'val-pos' : best.test_sortino_cv != null ? 'val-neg' : '') + '">' + fmtFloat(best.test_sortino_cv, 2) + '</td>'
+                + '<td style="color:#9fd89c;">' + escapeHtml(best.dominant_regime) + '</td>'
+                + '<td>' + windows + '</td>'
+                + '</tr>';
+        });
+        body.innerHTML = html;
+    }
+
     /* ── Render hero stats ── */
     function renderHero(overall) {
         var pnl = overall.total_pnl_usd;
@@ -1159,6 +1249,13 @@
 
         var metricSel = document.getElementById('backtestMetric');
         fetchBacktestResults(metricSel ? metricSel.value : 'sortino');
+
+        fetch('/api/walkforward-results', {credentials: 'same-origin'})
+            .then(function (r) { return r.json(); })
+            .then(renderWalkforwardResults)
+            .catch(function (err) {
+                console.warn('walkforward-results fetch failed', err);
+            });
 
         fetch('/api/forecast', {credentials: 'same-origin'})
             .then(function (r) { return r.json(); })
