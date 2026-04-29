@@ -20,6 +20,13 @@ paths = [
     '''tests/unit/test_molthub_outreach\.py''',
     '''tests/unit/test_sensitivity_filter\.py''',
     '''tests/unit/test_ws_dashboard\.py''',
+    # Security-scanner + adversarial-telemetry tests — fake token shapes are deliberate test fixtures.
+    '''tests/unit/test_adversarial_telemetry\.py''',
+    '''tests/unit/test_audit_panel_heuristics\.py''',
+    '''tests/unit/test_audit_panel_reporter\.py''',
+    '''tests/unit/test_services_security_pipeline\.py''',
+    '''tests/unit/test_tranche5_live_soak_readiness\.py''',
+    '''tests/property/test_audit_panel_heuristics_properties\.py''',
     # Doc-fixture curl examples with placeholder bearer tokens — not real keys.
     '''docs/ops/customer-api-runbook\.md''',
     '''docs/products/customer-product-surface-0\.1\.0\.md''',
