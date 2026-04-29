@@ -44,7 +44,7 @@ are the 8 from `claude.ai/code/routines` per CLAUDE.md.
 | `services/dashboard/` | `dashboard-product-pages-runbook.md`, `dashboard-public-demo-runbook.md`, `observability-dashboard-runbook.md` | 5 | — |
 | `services/event_impact/` | `event-impact-runbook.md` | 5 | — |
 | `services/foundry_sync/` | (none direct; covered by `docs/foundry-strategy-2026-04-19.md`) | 2 | Write `foundry-sync-runbook.md` covering bearer/OAuth refresh, 15-min sync cadence, schema-drift detection, what to do when readiness audit shows mismatches. |
-| `services/heartbeat/` | (none) | 1 | Write `heartbeat-runbook.md` covering 60s state machine, alert thresholds, what kill-switch state corresponds to what heartbeat color. |
+| `services/heartbeat/` | `heartbeat-runbook.md` | 3 | Add automated smoke coverage for one-shot mode and clarify overlap with `lib/core/heartbeat.py` self-heal monitor. |
 | `services/hyperliquid/` | `hyperliquid-feed-runbook.md` | 4 | Public-feed side documented; live-executor side (signing verification, mainnet flip protocol, daily-loss auto-pause) needs a dedicated section. |
 | `services/inference-proxy/` | `inference-tenant-quotas.md` | 3 | Quota doc exists but operational (4-tier failover, model-alias mapping, sensitivity gate, GPU-only model 503 path) needs a full runbook. |
 | `services/intelligence/` | `intelligence-breadth-runbook.md` | 3 | Breadth roadmap exists but daily-brief generator + chain-refresh operations are not covered. |
@@ -52,14 +52,14 @@ are the 8 from `claude.ai/code/routines` per CLAUDE.md.
 | `services/morning_digest/` | `mission-status-digest-runbook.md` (cloud); `evening-digest-runbook.md` (cloud) | 3 | Local `morning-digest-runbook.md` is missing; the morning-brief LaunchAgent runs locally and needs its own. |
 | `services/narrative_evaluation/` | `narrative-eval-runbook.md` | 4 | Sparse on regression-on-rubric path. |
 | `services/onchain_intel/` | `onchain-intel-runbook.md` | 5 | — |
-| `services/openbb_api/` | (none direct; CLAUDE.md "Gotchas" notes broken auto-gen pkg) | 1 | Write `openbb-api-runbook.md` covering :6900 REST surface, why SDK is broken, restart procedure, provider list (32 providers per CLAUDE.md). |
-| `services/pipeline/` | (none direct) | 1 | Write `gcp-pipeline-runbook.md` covering events → GCS + BigQuery hourly watermark, what to do when sync stalls. |
+| `services/openbb_api/` | `openbb-api-runbook.md` | 3 | Add provider-route smoke tests that avoid external market-data calls and document the Python/OpenBB version pin once stabilized. |
+| `services/pipeline/` | `gcp-pipeline-runbook.md` | 3 | Add dry-run fixture smoke coverage and a Cloud Function failure triage section once live logs are reviewed. |
 | `services/pm_bot/` | `telegram-operator-console-runbook.md` | 4 | Operator-console runbook is comprehensive on Telegram safety; pm-bot daemon-side restart procedure is implicit. |
 | `services/research_notes/` | `research-notes-runbook.md` | 3 | Sparse — needs operational sections (regen cadence, what to do when sources fail). |
 | `services/security_pipeline/` | (none direct; covered partly by `threat-intel-sweep-runbook.md`) | 2 | Write `security-pipeline-runbook.md` covering scheduled full-system security scan → SOC page (per CLAUDE.md). |
 | `services/synthesis/` | `narrative-synthesis-runbook.md` | 5 | — |
 | `services/telegram_intel/` | `telegram-intel-reader-runbook.md` | 4 | Add explicit "channel curation went wrong" recovery (touches `telegram-channel-curation-runbook.md` but that's a separate concern). |
-| `services/webhook/` | (none) | 1 | Write `webhook-runbook.md` covering Windows :9090 receiver, TradingView signature verification, signal-logger handoff, what to do when webhook is down. |
+| `services/webhook/` | `webhook-runbook.md` | 3 | Add explicit `WEBHOOK_SECRET`/HMAC enforcement plus accepted/rejected request tests before public exposure. |
 
 **Service tally**: 26 services audited (the lane spec said 19; the
 canonical `services/` directory has more after Tranches 4-5 added
@@ -68,11 +68,11 @@ several. Counted services that are operationally meaningful — paused
 `live_portfolio_daemon`, `service_supervisor` are listed under
 LaunchAgents below since their runbook surface is the agent itself).
 
-**Service average**: 3.4 (sum 89, n 26).
+**Service average**: 3.73 (sum 97, n 26).
 
-**Lowest-scored services** (need attention first): `heartbeat` (1),
-`openbb_api` (1), `pipeline` (1), `webhook` (1), `control-plane` (2),
-`foundry_sync` (2), `security_pipeline` (2).
+**Lowest-scored services** (need attention first): `control-plane` (2),
+`foundry_sync` (2), `security_pipeline` (2), then the newly lifted but
+still-partial `heartbeat`, `openbb_api`, `pipeline`, and `webhook` (3).
 
 ---
 
@@ -88,13 +88,13 @@ LaunchAgents below since their runbook surface is the agent itself).
 | `com.sapphire.control-plane` | `infra/launchagents/com.sapphire.control-plane.plist` | (none direct) | 1 | See `services/control-plane/` gap. |
 | `com.sapphire.correlation-refresh` | `infra/launchagents/com.sapphire.correlation-refresh.plist` | `signal-correlator-runbook.md` | 4 | Correlator runbook is solid but agent restart procedure is implicit. |
 | `com.sapphire.foundry-sync` | `infra/launchagents/com.sapphire.foundry-sync.plist` | (none direct) | 1 | See `services/foundry_sync/` gap. |
-| `com.sapphire.gcp-sync` | `infra/launchagents/com.sapphire.gcp-sync.plist` | (none direct) | 1 | See `services/pipeline/` gap. |
+| `com.sapphire.gcp-sync` | `infra/launchagents/com.sapphire.gcp-sync.plist` | `gcp-pipeline-runbook.md` | 3 | Add launchd-specific last-run examples once live gcp-sync logs are sampled after the next scheduled fire. |
 | `com.sapphire.gemini-ooda-daily` | `infra/launchagents/com.sapphire.gemini-ooda-daily.plist` | `gemini-ooda-daily-runbook.md`, `gemini-ooda-synthesizer-runbook.md` | 5 | — |
-| `com.sapphire.heartbeat` | `infra/launchagents/com.sapphire.heartbeat.plist` | (none) | 1 | See `services/heartbeat/` gap. |
+| `com.sapphire.heartbeat` | `infra/launchagents/com.sapphire.heartbeat.plist` | `heartbeat-runbook.md` | 3 | Add automated smoke coverage for one-shot mode and clarify overlap with `lib/core/heartbeat.py` self-heal monitor. |
 | `com.sapphire.logrotate` | `infra/launchagents/com.sapphire.logrotate.plist` | (none direct; cited in MEMORY.md as 3:30 AM, 5MB trigger, gzip) | 2 | Write `logrotate-runbook.md` — short note documenting the cadence + retention policy + how to recover gzipped archives. |
 | `com.sapphire.market-intel` | `infra/launchagents/com.sapphire.market-intel.plist` | (none direct) | 2 | Add a section to `intelligence-breadth-runbook.md` covering this agent specifically. |
 | `com.sapphire.morning-brief` | `infra/launchagents/com.sapphire.morning-brief.plist` | (none direct) | 2 | See `services/morning_digest/` gap. |
-| `com.sapphire.openbb-api` | `infra/launchagents/com.sapphire.openbb-api.plist` | (none direct) | 1 | See `services/openbb_api/` gap. |
+| `com.sapphire.openbb-api` | `infra/launchagents/com.sapphire.openbb-api.plist` | `openbb-api-runbook.md` | 3 | Add provider-route smoke tests that avoid external market-data calls and document the Python/OpenBB version pin once stabilized. |
 | `com.sapphire.security-pipeline` | `infra/launchagents/com.sapphire.security-pipeline.plist` | (partial) | 2 | See `services/security_pipeline/` gap. |
 | `com.sapphire.self-optimization` | `infra/launchagents/com.sapphire.self-optimization.plist` | (none) | 1 | Write `self-optimization-runbook.md` covering the optimizer's read-only stance + what to do when it produces a bad recommendation. |
 | `com.sapphire.signal-logger` | `infra/launchagents/com.sapphire.signal-logger.plist` | `tranche5-live-soak-runbook.md` (partial) | 3 | Same gap as `services/alpha/`. |
@@ -106,7 +106,7 @@ LaunchAgents below since their runbook surface is the agent itself).
 | `com.sapphire.inference-proxy` (service-local) | `services/inference-proxy/launchagent/com.sapphire.inference-proxy.plist` | `inference-tenant-quotas.md` | 3 | See `services/inference-proxy/` gap. |
 | `com.sapphire.morning-digest` (service-local) | `services/morning_digest/launchagent/com.sapphire.morning-digest.plist` | (partial) | 2 | See `services/morning_digest/` gap. |
 | `com.sapphire.pm-bot` (service-local) | `services/pm_bot/launchagent/com.sapphire.pm-bot.plist` | `telegram-operator-console-runbook.md` | 4 | See `services/pm_bot/` gap. |
-| `com.sapphire.service-supervisor` (service-local) | `services/service_supervisor/launchagent/com.sapphire.service-supervisor.plist` | (none direct) | 1 | Write `service-supervisor-runbook.md` covering supervisor's restart-on-failure semantics and the LaunchAgents it watches. |
+| `com.sapphire.service-supervisor` (service-local) | `services/service_supervisor/launchagent/com.sapphire.service-supervisor.plist` | `service-supervisor-runbook.md` | 3 | Add fixture-backed tests for the operator commands shown in the runbook and document a manual state-clear checklist. |
 | `com.sapphire.telegram-intel-reader` (service-local) | `services/telegram_intel/launchagent/com.sapphire.telegram-intel-reader.plist` | `telegram-intel-reader-runbook.md` | 4 | See `services/telegram_intel/` gap. |
 
 **LaunchAgent tally**: 28 plist files audited (22 in `infra/launchagents/`
@@ -114,14 +114,14 @@ plus 6 service-local). The original lane spec said 23 LaunchAgents;
 the 28-count emerged because Tranches 4-5 added service-local plists
 the prior counts missed.
 
-**LaunchAgent average**: 2.4 (sum 67, n 28).
+**LaunchAgent average**: 2.68 (sum 75, n 28).
 
 **Lowest-scored LaunchAgents** (priority): `backtest-weekly` (1),
 `content-publisher` (1), `control-plane` (1), `foundry-sync` (1),
-`gcp-sync` (1), `heartbeat` (1), `openbb-api` (1),
 `self-optimization` (1), `telemetry-collector` (1),
-`trading-shadow-controller` (1), `tradingview-cdp` (1),
-`service-supervisor` (1).
+`trading-shadow-controller` (1), `tradingview-cdp` (1). Newly lifted
+but still partial: `gcp-sync`, `heartbeat`, `openbb-api`, and
+`service-supervisor` (3).
 
 ---
 
@@ -154,16 +154,17 @@ LaunchAgent-driven daemons.
 
 - **Total surfaces**: 62 (26 services + 28 LaunchAgents + 8 cloud
   routines).
-- **Aggregate score**: 196 / 310 = **3.16 / 5**.
+- **Aggregate score**: 212 / 310 = **3.42 / 5**.
 - **Score 5 surfaces**: 18 (29%).
 - **Score < 4 surfaces requiring gap action**: 36 (58%).
-- **Score 1 surfaces (no runbook)**: 17 (27%).
+- **Score 1 surfaces (no runbook)**: 9 (15%).
 
-The asymmetry is sharp: cloud routines and LLM-tool runbooks
+The asymmetry is still sharp: cloud routines and LLM-tool runbooks
 (`gemini-ooda-*`, `narrative-synthesis`, `vertex-eval`) are
 comprehensive; LaunchAgent-side daemons that quietly run in the
-background (`heartbeat`, `telemetry-collector`, `logrotate`,
-`self-optimization`, `service-supervisor`) are the weakest surface.
+background (`telemetry-collector`, `logrotate`, `self-optimization`,
+`tradingview-cdp`, `content-publisher`) are the weakest remaining
+surface.
 The pattern: when a runbook is required to bring a routine online
 from a cold start, it gets written. When a daemon "just runs", the
 runbook never lands.
@@ -172,22 +173,20 @@ runbook never lands.
 
 ## Recommended remediation order
 
-1. **Heartbeat + service-supervisor** (both score 1) — these are the
-   only paths to "what does the system look like when something is
-   wrong?" Without runbooks, on-call response time is unbounded.
-2. **OpenBB API + webhook + pipeline** (all score 1) — these are
-   ingress paths. A 30-minute outage on any of them silently degrades
-   intelligence quality.
-3. **Foundry-sync + control-plane** (both score 1-2) — both are
+1. **Foundry-sync + control-plane** (both score 1-2) — both are
    acquisition-narrative surfaces; a Foundry reviewer asking "how does
    the sync work" wants a runbook.
-4. **TradingView-CDP + content-publisher** (both score 1) — both have
+2. **TradingView-CDP + content-publisher** (both score 1) — both have
    GUI dependencies; recovery from a Chrome / Substack quirk is
    undocumented.
-5. **Backtest-weekly + telemetry-collector + self-optimization +
+3. **Backtest-weekly + telemetry-collector + self-optimization +
    trading-shadow-controller** (all score 1) — periodic daemons that
    "just work" until they don't. Writing a 1-page note for each is
    cheap insurance.
+4. **Heartbeat + service-supervisor + OpenBB API + webhook + pipeline**
+   (now score 3) — these have adequate operator runbooks after the
+   2026-04-29 uplift, but still need command-level smoke tests and the
+   webhook auth-hardening code follow-up.
 
 ---
 
