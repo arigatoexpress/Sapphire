@@ -12,7 +12,7 @@ Current inventory: 21 active plists in this directory, plus 1 disabled template 
 | `com.sapphire.backtest-weekly.plist` | Weekly strategy sweep artifact generation. | weekly |
 | `com.sapphire.chain-refresh.plist` | Chain intelligence snapshot (`services.pipeline.chain_refresh`). | every 15 min |
 | `com.sapphire.content-engine.plist` | Scheduled content generation. | weekly |
-| `com.sapphire.content-publisher.plist` | Scheduled content publishing. | on-demand |
+| `com.sapphire.content-publisher.plist` | Scheduled content publishing. | 06:15 daily |
 | `com.sapphire.control-plane.plist` | FastAPI control plane (uvicorn on `:8082`). | KeepAlive |
 | `com.sapphire.correlation-refresh.plist` | Cross-asset correlation refresh. | hourly at :17 |
 | `com.sapphire.foundry-sync.plist` | Foundry sync daemon. | every 15 min |
@@ -28,7 +28,7 @@ Current inventory: 21 active plists in this directory, plus 1 disabled template 
 | `com.sapphire.telemetry-collector.plist` | Metric roll-up (`services/pipeline/telemetry_collector.py`). | every 5 min |
 | `com.sapphire.threat-refresh.plist` | Threat-intel feed refresh (`services/dashboard/refresh_threats.py`). | every 4 h |
 | `com.sapphire.trading-shadow-controller.plist` | Paper-shadow trading controller (`scripts/ops/trading_shadow_controller.py --output`); writes capped order candidates only, with no live submit path. | every 30 min |
-| `com.sapphire.tradingview-cdp.plist` | TradingView CDP bridge. | KeepAlive |
+| `com.sapphire.tradingview-cdp.plist` | TradingView CDP bridge. | RunAtLoad one-shot |
 
 ## Alpha Agent
 
