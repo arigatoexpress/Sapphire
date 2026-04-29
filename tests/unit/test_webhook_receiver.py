@@ -296,8 +296,13 @@ def test_build_trade_signal_round_trips_metadata_fields(receiver):
 
 
 class _StubResponse:
-    def __init__(self, status_code: int = 200):
+    def __init__(self, status_code: int = 200, payload: dict[str, Any] | None = None):
         self.status_code = status_code
+        self._payload = payload or {}
+        self.headers = {"content-type": "application/json"}
+
+    def json(self):
+        return self._payload
 
 
 class _StubAsyncClient:
@@ -317,6 +322,10 @@ class _StubAsyncClient:
         self.calls.append({"url": url, "json": json, "headers": dict(headers or {})})
         return self._response_factory(url)
 
+    async def get(self, url):
+        self.calls.append({"url": url, "json": None, "headers": {}})
+        return self._response_factory(url)
+
     def __init_subclass__(cls, **kwargs):  # pragma: no cover
         super().__init_subclass__(**kwargs)
 
@@ -329,6 +338,35 @@ def _install_stub_client(monkeypatch, receiver, response_factory):
 
     monkeypatch.setattr(receiver.httpx, "AsyncClient", _factory)
     return stub
+
+
+@pytest.mark.asyncio
+async def test_probe_local_service_marks_degraded_json_as_unhealthy(monkeypatch, receiver):
+    _install_stub_client(
+        monkeypatch,
+        receiver,
+        response_factory=lambda url: _StubResponse(200, {"status": "degraded"}),
+    )
+
+    result = await receiver._probe_local_service("http://127.0.0.1:8081/health")
+
+    assert result["healthy"] is False
+    assert result["status_code"] == 200
+    assert result["status"] == "degraded"
+
+
+@pytest.mark.asyncio
+async def test_probe_local_service_keeps_healthy_json_healthy(monkeypatch, receiver):
+    _install_stub_client(
+        monkeypatch,
+        receiver,
+        response_factory=lambda url: _StubResponse(200, {"status": "healthy"}),
+    )
+
+    result = await receiver._probe_local_service("http://127.0.0.1:8081/health")
+
+    assert result["healthy"] is True
+    assert result["status"] == "healthy"
 
 
 @pytest.mark.asyncio

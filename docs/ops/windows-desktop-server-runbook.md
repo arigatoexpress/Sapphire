@@ -123,6 +123,39 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 Do not start the task until the manual smoke run has produced a manifest and
 the artifact location has been reviewed.
 
+## TradingView Workbench Agent
+
+The live `Sapphire-TV-Agent` and `Sapphire-TV-Agent-Logon` tasks should point
+at the repo-owned read-only agent, not the removed
+`TradingViewAutonomousManager` backend.
+
+| Script | Purpose |
+|---|---|
+| `scripts/windows_setup/start_tv_agent.ps1` | Starts `python -m services.windows_tv_agent.server` on port `8081`; exits 0 if the port is already listening. |
+| `scripts/windows_setup/create_tv_agent_task.ps1` | Registers startup and logon tasks for the read-only agent. |
+| `scripts/windows_setup/create_task_scheduler_job.ps1` | Backwards-compatible wrapper that delegates to `create_tv_agent_task.ps1`. |
+
+Install or repair the tasks from Windows PowerShell:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File E:\Sapphire\Code\Sapphire\scripts\windows_setup\create_tv_agent_task.ps1 `
+  -PythonPath C:\Users\aribs\AppData\Local\Programs\Python\Python313\python.exe `
+  -StartNow
+```
+
+Health checks:
+
+```powershell
+curl.exe http://127.0.0.1:8081/health
+curl.exe http://127.0.0.1:8081/tabs
+```
+
+The agent is a read-only visibility surface. It reports `status=degraded` when
+TradingView Desktop CDP is unavailable at `127.0.0.1:9222`, but it still
+confirms that the `8081` service is alive. Do not add order-entry or Telegram
+send behavior to this service.
+
 ## Strategy Experiments
 
 Windows GPU strategy work should start as continuous-intelligence leases:
