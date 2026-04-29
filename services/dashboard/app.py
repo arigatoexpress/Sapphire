@@ -4858,6 +4858,52 @@ def api_strategy_performance():
         ), 200
 
 
+@app.route("/api/hyperliquid/live-status")
+@requires_auth
+def api_hyperliquid_live_status():
+    """Read-only inspector for the Hyperliquid trading executor's state.
+
+    Reuses ``_live_status_payload`` from ``plugins/claw-sapphire/tools/internal/
+    hyperliquid.py`` so the dashboard surfaces the exact same view operators see
+    via the plugin tool's ``live-status`` action: killswitch flag, recent trades,
+    daily realized-loss tally, env flags, and policy defaults.
+
+    Query params:
+      limit: int in [1, 50], default 5 — number of recent trades returned.
+
+    Failure mode: if the plugin tool helper cannot be imported (e.g. PRs #443/
+    #444/#453 not merged yet, or the path moved), returns HTTP 503 with an
+    ``{"error","reason"}`` body rather than crashing the dashboard worker.
+    """
+    try:
+        limit = int(request.args.get("limit") or 5)
+    except (TypeError, ValueError):
+        limit = 5
+    limit = max(1, min(50, limit))
+
+    try:
+        import importlib.util
+
+        sapphire_root = Path(__file__).resolve().parents[2]
+        tool_path = (
+            sapphire_root / "plugins" / "claw-sapphire" / "tools" / "internal" / "hyperliquid.py"
+        )
+        spec = importlib.util.spec_from_file_location("hyperliquid_dashboard", tool_path)
+        if spec is None or spec.loader is None:
+            raise ImportError("could not locate hyperliquid plugin tool")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        helper = getattr(module, "_live_status_payload", None)
+        if helper is None:
+            raise ImportError("_live_status_payload not exported by hyperliquid tool")
+        payload = helper(limit)
+    except Exception as exc:
+        log.warning("hyperliquid live-status API unavailable: %s", exc)
+        return jsonify({"error": "live-status unavailable", "reason": str(exc)}), 503
+
+    return jsonify(payload), 200
+
+
 @app.route("/api/convergence-watchlist")
 @requires_auth
 def api_convergence_watchlist():
