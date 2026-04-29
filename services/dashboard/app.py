@@ -17,7 +17,7 @@ import time
 import urllib.error
 import urllib.request
 from datetime import UTC, datetime, timedelta
-from functools import wraps
+from functools import lru_cache, wraps
 from pathlib import Path
 from typing import Any
 
@@ -805,29 +805,211 @@ def fetch_sync(url):
         return {}
 
 
+def _dashboard_page_route_count() -> int:
+    """Count registered, non-static dashboard page routes."""
+    routes: set[str] = set()
+    for rule in app.url_map.iter_rules():
+        if "GET" not in (rule.methods or set()):
+            continue
+        path = rule.rule
+        if path.startswith("/api/") or path.startswith("/static/") or "<" in path:
+            continue
+        routes.add(path)
+    return len(routes)
+
+
+@lru_cache(maxsize=1)
+def _tool_registry_metric() -> dict[str, str]:
+    """Return the registry metric from the validator, with a YAML fallback."""
+    fallback_count = "unknown"
+    try:
+        import yaml
+
+        registry = yaml.safe_load((_DASHBOARD_REPO_ROOT / "infra" / "tool-registry.yaml").read_text(encoding="utf-8"))
+        tools = registry.get("tools", []) if isinstance(registry, dict) else []
+        fallback_count = str(len(tools))
+    except Exception:
+        fallback_count = "unknown"
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "scripts/validate_tool_registry.py", "--json"],
+            cwd=_DASHBOARD_REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=8,
+            check=False,
+        )
+        if result.returncode == 0:
+            payload = json.loads(result.stdout)
+            summary = payload.get("summary", {})
+            entries = summary.get("registry_entries", fallback_count)
+            errors = len(payload.get("errors", []))
+            return {
+                "value": f"{entries} / {errors}",
+                "note": "Registry entries / validation errors from the local validator",
+            }
+    except Exception:
+        pass
+
+    return {
+        "value": f"{fallback_count} / ?",
+        "note": "Registry entries from YAML; validator unavailable in this process",
+    }
+
+
+@lru_cache(maxsize=1)
+def _production_readiness_metric() -> dict[str, str]:
+    """Return the no-external production-readiness summary for showcase use."""
+    try:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "scripts/ops/production_readiness_sweep.py",
+                "--no-external",
+                "--format",
+                "json",
+            ],
+            cwd=_DASHBOARD_REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=12,
+            check=False,
+        )
+        if result.returncode in {0, 20} and result.stdout.strip():
+            payload = json.loads(result.stdout)
+            summary = payload.get("summary", {})
+            fail = int(summary.get("fail", 0))
+            return {
+                "value": f"{fail} FAIL",
+                "note": (
+                    "No-external sweep: "
+                    f"{summary.get('pass', 0)} pass, "
+                    f"{summary.get('warn', 0)} warn, "
+                    f"{summary.get('skip', 0)} skip"
+                ),
+            }
+    except Exception:
+        pass
+
+    return {
+        "value": "unknown",
+        "note": "No-external production-readiness sweep unavailable",
+    }
+
+
 def _build_unified_dashboard_payload() -> dict[str, Any]:
     """Read-only dashboard directory for Sapphire and adjacent frontends."""
+    registry_metric = _tool_registry_metric()
+    readiness_metric = _production_readiness_metric()
+    satellite_dashboards = [
+        {
+            "name": "Project-Go-Forward / THO",
+            "status": "Production",
+            "summary": "FastAPI and React platform for the Texas Home Outlet site, CRM flows, partner APIs, document generation, and regulatory RAG.",
+            "links": [
+                {"label": "Live Site", "href": "https://sapphirealpha.xyz", "external": True},
+                {
+                    "label": "Health",
+                    "href": "https://sapphirealpha.xyz/health",
+                    "external": True,
+                },
+                {
+                    "label": "Cloud Run Health",
+                    "href": "https://project-go-forward-trgi34bxuq-uc.a.run.app/health",
+                    "external": True,
+                },
+            ],
+            "tags": ["Cloud Run", "React", "FastAPI"],
+        },
+        {
+            "name": "regional-intel-workbench",
+            "status": "Local Showcase",
+            "summary": "Public-source regional intelligence console with Austin, Houston, and Gunnison coverage plus client-specific feed surfaces.",
+            "links": [
+                {
+                    "label": "Analyst Console",
+                    "href": "http://127.0.0.1:8768/intel",
+                    "external": True,
+                },
+                {
+                    "label": "Blanga Austin",
+                    "href": "http://127.0.0.1:8768/blanga/austin",
+                    "external": True,
+                },
+                {
+                    "label": "Vote Monitor",
+                    "href": "http://127.0.0.1:8768/vote-monitor",
+                    "external": True,
+                },
+                {
+                    "label": "API Health",
+                    "href": "http://127.0.0.1:8768/api/intel/health",
+                    "external": True,
+                },
+            ],
+            "tags": ["regional intel", "client feed", "provenance"],
+        },
+        {
+            "name": "org-platform",
+            "status": "Local Dashboard",
+            "summary": "Autonomous organization fallback dashboard for unified events, crypto signals, Foundry-ready transforms, and local demos.",
+            "links": [
+                {"label": "Dashboard", "href": "http://127.0.0.1:3000", "external": True},
+                {
+                    "label": "Events JSON",
+                    "href": "http://127.0.0.1:3000/events.json",
+                    "external": True,
+                },
+                {
+                    "label": "Crypto JSON",
+                    "href": "http://127.0.0.1:3000/crypto.json",
+                    "external": True,
+                },
+            ],
+            "tags": ["Next.js", "events", "Foundry"],
+        },
+        {
+            "name": "Agentic PM Hub",
+            "status": "Protected",
+            "summary": "Authenticated Cloud Run project-management hub for operator coordination; linked as a protected satellite surface.",
+            "links": [
+                {
+                    "label": "Service Health",
+                    "href": "https://agentic-pm-hub-trgi34bxuq-uc.a.run.app/health",
+                    "external": True,
+                },
+                {
+                    "label": "Liveness",
+                    "href": "https://agentic-pm-hub-trgi34bxuq-uc.a.run.app/healthz/",
+                    "external": True,
+                },
+            ],
+            "tags": ["Cloud Run", "protected", "coordination"],
+        },
+    ]
+
     return {
         "generated_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
         "metrics": [
             {
                 "label": "Dashboard Routes",
-                "value": "43",
-                "note": "Authenticated operator, product, diligence, and intel surfaces",
+                "value": str(_dashboard_page_route_count()),
+                "note": "Registered non-static dashboard page routes, including aliases",
             },
             {
                 "label": "Registry Entries",
-                "value": "67",
-                "note": "Tool registry entries with zero validation errors",
+                "value": registry_metric["value"],
+                "note": registry_metric["note"],
             },
             {
                 "label": "Readiness",
-                "value": "0 FAIL",
-                "note": "Latest local production-readiness posture is failure-free",
+                "value": readiness_metric["value"],
+                "note": readiness_metric["note"],
             },
             {
                 "label": "Satellite Frontends",
-                "value": "4",
+                "value": str(len(satellite_dashboards)),
                 "note": "THO, regional intel, org-platform, and protected PM hub with repo pointers",
             },
         ],
@@ -955,92 +1137,7 @@ def _build_unified_dashboard_payload() -> dict[str, Any]:
                 "tags": ["product", "client"],
             },
         ],
-        "satellite_dashboards": [
-            {
-                "name": "Project-Go-Forward / THO",
-                "status": "Production",
-                "summary": "FastAPI and React platform for the Texas Home Outlet site, CRM flows, partner APIs, document generation, and regulatory RAG.",
-                "links": [
-                    {"label": "Live Site", "href": "https://sapphirealpha.xyz", "external": True},
-                    {
-                        "label": "Health",
-                        "href": "https://sapphirealpha.xyz/health",
-                        "external": True,
-                    },
-                    {
-                        "label": "Cloud Run Health",
-                        "href": "https://project-go-forward-trgi34bxuq-uc.a.run.app/health",
-                        "external": True,
-                    },
-                ],
-                "tags": ["Cloud Run", "React", "FastAPI"],
-            },
-            {
-                "name": "regional-intel-workbench",
-                "status": "Local Showcase",
-                "summary": "Public-source regional intelligence console with Austin, Houston, and Gunnison coverage plus client-specific feed surfaces.",
-                "links": [
-                    {
-                        "label": "Analyst Console",
-                        "href": "http://127.0.0.1:8768/intel",
-                        "external": True,
-                    },
-                    {
-                        "label": "Blanga Austin",
-                        "href": "http://127.0.0.1:8768/blanga/austin",
-                        "external": True,
-                    },
-                    {
-                        "label": "Vote Monitor",
-                        "href": "http://127.0.0.1:8768/vote-monitor",
-                        "external": True,
-                    },
-                    {
-                        "label": "API Health",
-                        "href": "http://127.0.0.1:8768/api/intel/health",
-                        "external": True,
-                    },
-                ],
-                "tags": ["regional intel", "client feed", "provenance"],
-            },
-            {
-                "name": "org-platform",
-                "status": "Local Dashboard",
-                "summary": "Autonomous organization fallback dashboard for unified events, crypto signals, Foundry-ready transforms, and local demos.",
-                "links": [
-                    {"label": "Dashboard", "href": "http://127.0.0.1:3000", "external": True},
-                    {
-                        "label": "Events JSON",
-                        "href": "http://127.0.0.1:3000/events.json",
-                        "external": True,
-                    },
-                    {
-                        "label": "Crypto JSON",
-                        "href": "http://127.0.0.1:3000/crypto.json",
-                        "external": True,
-                    },
-                ],
-                "tags": ["Next.js", "events", "Foundry"],
-            },
-            {
-                "name": "Agentic PM Hub",
-                "status": "Protected",
-                "summary": "Authenticated Cloud Run project-management hub for operator coordination; linked as a protected satellite surface.",
-                "links": [
-                    {
-                        "label": "Service Health",
-                        "href": "https://agentic-pm-hub-trgi34bxuq-uc.a.run.app/health",
-                        "external": True,
-                    },
-                    {
-                        "label": "Liveness",
-                        "href": "https://agentic-pm-hub-trgi34bxuq-uc.a.run.app/healthz/",
-                        "external": True,
-                    },
-                ],
-                "tags": ["Cloud Run", "protected", "coordination"],
-            },
-        ],
+        "satellite_dashboards": satellite_dashboards,
         "adjacent_projects": [
             {
                 "name": "Project-Go-Forward / THO",
