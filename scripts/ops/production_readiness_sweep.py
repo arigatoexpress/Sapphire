@@ -609,11 +609,18 @@ def inference_proxy_health_check() -> Check:
                 evidence += f"; status={parsed.get('status')}"
             endpoints = parsed.get("endpoints")
             if isinstance(endpoints, dict):
+                disabled = sorted(
+                    str(name)
+                    for name, value in endpoints.items()
+                    if str(value).lower() in {"disabled"}
+                )
                 degraded = sorted(
                     str(name)
                     for name, value in endpoints.items()
-                    if str(value).lower() not in {"healthy", "ok", "available"}
+                    if str(value).lower() not in {"healthy", "ok", "available", "disabled"}
                 )
+                if disabled:
+                    evidence += f"; disabled_tiers={','.join(disabled)}"
                 if degraded and status == "PASS":
                     status = "WARN"
                     evidence += f"; degraded_tiers={','.join(degraded)}"
