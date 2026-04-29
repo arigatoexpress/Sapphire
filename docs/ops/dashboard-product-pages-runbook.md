@@ -1,7 +1,7 @@
 # Dashboard product pages — operator runbook
 
 This runbook covers the product and demo surfaces shipped across the
-Sapphire dashboard: `/showcase`, `/threat-intel`, `/customer-dossier`,
+Sapphire dashboard: `/showcase`, `/unified`, `/threat-intel`, `/customer-dossier`,
 `/diligence`, and `/sovereign-thesis/story`. These pages
 are *read-only*, *authenticated*, *paste-safe*, and *snapshot-only* —
 they do not mutate upstream systems at request time. This runbook tells you
@@ -12,7 +12,7 @@ verify the safety contract before each release.
 
 | Page | API | Source data | Refresh agent |
 |---|---|---|---|
-| `/showcase` | none | static links to existing dashboard surfaces and satellite repos | none |
+| `/showcase` / `/unified` | none | read-only unified dashboard payload with Sapphire routes, satellite frontend links, and adjacent project coverage | none |
 | `/threat-intel` | `/api/threat-intel` | `data/intelligence/<date>/threats.json` | `services/dashboard/refresh_threats.py` (LaunchAgent, every 4h) |
 | `/customer-dossier` | `/api/customer-dossier` | `data/tho_intel/dossier_*.json` | manual / scheduled (operator-driven) |
 | `/diligence` | `/api/diligence-summary`, `/api/risk-kernel-summary`, `/api/provenance-summary`, `/api/test-suite-health`, `/api/launchagent-summary` | `docs/diligence/00-09`, risk/provenance/test metadata, `launchctl list` labels | none |
@@ -26,13 +26,15 @@ The Wave 6 pages follow the same auth contract. They are GET-only and should
 return 405 for POST/PUT/PATCH/DELETE unless Flask itself changes routing
 behavior.
 
-## /showcase — demo front door
+## /showcase — unified demo front door
 
-`/showcase` is the curated orientation page for friends, buyers, engineers,
-and operators. It does not call a dedicated API, perform external fetches,
-submit forms, send Telegram messages, enable live trading, or read local
-runtime artifacts. It links to existing authenticated pages and public GitHub
-repo URLs only.
+`/showcase` is the unified orientation page for friends, buyers, engineers,
+and operators. `/unified` and `/unified-dashboard` are aliases for the same
+surface. It does not call a dedicated API, perform external fetches, submit
+forms, send Telegram messages, enable live trading, or read local runtime
+artifacts. It links to existing authenticated Sapphire pages, production THO,
+local regional-intel and org-platform frontends, protected PM Hub health URLs,
+and adjacent project coverage surfaces.
 
 Use it as the first page in any demo, then branch by audience:
 
