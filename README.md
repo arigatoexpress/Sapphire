@@ -8,9 +8,9 @@
 
 [![CI](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
 [![Security](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml)
-[![Tests](https://img.shields.io/badge/tests-6%2C449%2B%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-6%2C484%2B%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
 [![Tools](https://img.shields.io/badge/tools-67-0d9488)](infra/tool-registry.yaml)
-[![Dashboard](https://img.shields.io/badge/dashboard-49%20pages-6d28d9)](services/dashboard/templates/pages)
+[![Dashboard](https://img.shields.io/badge/dashboard-50%20pages-6d28d9)](services/dashboard/templates/pages)
 [![Readiness](https://img.shields.io/badge/readiness-0%20FAIL-2ea44f)](scripts/ops/production_readiness_sweep.py)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3776ab?logo=python&logoColor=white)](https://www.python.org/)
 [![Solidity](https://img.shields.io/badge/solidity-0.8.x-363636?logo=solidity&logoColor=white)](contracts/)
@@ -27,7 +27,7 @@ Sapphire is a continuously-running, mesh-topology operating system that integrat
 
 The intelligence subsystem now composes deterministic signal correlation, cross-asset regime detection, regulatory/macro calendars, on-chain provider snapshots, Hyperliquid counter-party tracking, historical event-impact lookup tables, and rubric-gated narrative synthesis. The trading subsystem remains behind risk-kernel, confirmation-firewall, dry-run, and kill-switch controls. The inference mesh provides four-tier failover (RTX 5070 Ti GPU -> Raspberry Pi -> Mac CPU -> Kimi Cloud) with a sensitivity classifier that fails closed against PII or secret egress to managed cloud endpoints. The content engine is a research-to-publish pipeline with an institutional quality gate that blocks unsupported performance claims before they reach Substack, X, LinkedIn, or Typefully.
 
-The platform is operated as a research instrument: every routine produces an artifact, every artifact has a verdict, every generated artifact carries provenance, and every verdict feeds a 49-page operational dashboard with a unified `/showcase` front door.
+The platform is operated as a research instrument: every routine produces an artifact, every artifact has a verdict, every generated artifact carries provenance, and every verdict feeds a 50-page operational dashboard with a unified `/showcase` front door.
 
 > $$\mathrm{NetPnL} = \underbrace{\sum_{t}\,\mathrm{edge}_t\,\cdot\,\mathrm{capital}_t\,\cdot\,\mathrm{efficiency}_t}_{\text{alpha}} \;-\; \underbrace{\sum_{t}\,\mathrm{fees}_t + \mathrm{slip}_t + \mathrm{infra}_t + \mathrm{tail}_t}_{\text{cost}}$$
 
@@ -133,9 +133,9 @@ flowchart LR
 
 | Surface | Count | Detail |
 |---|---:|---|
-| Passing tests | **6,449+** | 5,956+ unit · 493 plugin (`python scripts/ops/test_inventory.py --check-readme`) |
-| Test files | **368+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
-| Dashboard pages | **49** | Flask + SSE, basic-auth, unified `/showcase`, observability, cross-asset, diligence, threat-intel, dossier, Sentinel pages |
+| Passing tests | **6,484+** | 5,991+ unit · 493 plugin (`python scripts/ops/test_inventory.py --check-readme`) |
+| Test files | **374+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
+| Dashboard pages | **50** | Flask + SSE, basic-auth, unified `/showcase`, observability, cross-asset, diligence, threat-intel, dossier, lead-intel, Sentinel pages |
 | Quant strategies | **7** | `lib/analytics/strategies.py` |
 | Pine strategies | **5** | `pine/standalone/` |
 | Plugin tools (registered · internal · deprecated) | **7 · 59 · 1** | 67 total entries in `infra/tool-registry.yaml` |
@@ -170,7 +170,7 @@ flowchart TB
     Impact[Event-Impact Lookup<br/>expected reaction bands]:::model
     Narrative[Narrative Synthesis<br/>thesis + invalidators]:::output
     Adv[Adversarial Defense<br/>wash trade · prompt · oracle checks]:::guard
-    Obs[Observability + Acquirer Views<br/>44 dashboard pages]:::output
+    Obs[Observability + Acquirer Views<br/>50 dashboard pages]:::output
 
     TV --> Corr
     HL --> Corr

@@ -22,7 +22,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -679,6 +679,59 @@ def _section_robinhood() -> dict:
     }
 
 
+def _section_leads() -> dict:
+    """Houston home-lead pipeline summary (count, hot, top lead).
+
+    Reads from data/leads/houston_leads.jsonl via lib.intel.pipeline.stats().
+    """
+    try:
+        from lib.intel.houston_leads import load_leads
+        from lib.intel.pipeline import HOT_LEAD_THRESHOLD, stats
+    except Exception as e:
+        return {"status": f"leads module unavailable: {e}", "text": None}
+
+    try:
+        s = stats()
+        leads = load_leads()
+    except Exception as e:
+        return {"status": f"leads read failed: {e}", "text": None}
+
+    if not s or not s.get("total"):
+        return {"status": "no leads ingested yet", "text": None}
+
+    # New since last brief: anything ingested in the last 24h.
+    cutoff = datetime.now(UTC) - timedelta(hours=24)
+    new_leads = 0
+    for lead in leads:
+        try:
+            ts = datetime.fromisoformat(lead.get("ingested_at", "").replace("Z", "+00:00"))
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=UTC)
+            if ts >= cutoff:
+                new_leads += 1
+        except (TypeError, ValueError):
+            continue
+
+    # Top lead = highest score, then most recent.
+    scored = [l for l in leads if isinstance(l.get("score"), (int, float))]
+    scored.sort(key=lambda l: (l["score"], l.get("ingested_at", "")), reverse=True)
+    top = scored[0] if scored else None
+
+    parts = [
+        f"  📋 *Pipeline:* {s['total']} leads · "
+        f"{s['hot_leads']} hot (≥{HOT_LEAD_THRESHOLD}) · "
+        f"{new_leads} new in 24h"
+    ]
+    if s.get("avg_score") is not None:
+        parts.append(f"  avg score: `{s['avg_score']}`")
+    if top:
+        addr = (top.get("address") or "")[:60]
+        parts.append(
+            f"  🏆 Top: `{top.get('score')}` — {top.get('type', '?')} @ {addr}"
+        )
+    return {"status": "ok", "text": "\n".join(parts), "stats": s, "new_leads": new_leads}
+
+
 def _section_recommendation(
     regime: dict,
     sentiment: dict,
@@ -776,6 +829,7 @@ def build_brief() -> str:
     kron = _section_kronos()
     threats = _section_threats()
     health = _section_health()
+    leads = _section_leads()
 
     rec = _section_recommendation(regime, sent, cascade, kronos=kron, threats=threats)
 
@@ -823,6 +877,9 @@ def build_brief() -> str:
         "",
         "*Threat intel*",
         _t(threats, "threats"),
+        "",
+        "*Home leads (Houston)*",
+        _t(leads, "leads"),
         "",
         "*System health*",
         _t(health, "health"),
