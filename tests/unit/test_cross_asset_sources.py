@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -166,6 +167,8 @@ def test_stale_cache_rejected_when_live_true(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("SAPPHIRE_CROSS_ASSET_LIVE", "1")
     adapter = FakeAdapter(cache_root=tmp_path, ttl_seconds=-1)
     adapter._write_cache("BTC", synthetic_ohlcv("BTC", points=2, now=FROZEN_NOW, source="stale"))
+    path = adapter._cache_path("BTC")
+    os.utime(path, (FROZEN_NOW.timestamp(), FROZEN_NOW.timestamp()))
     rows = adapter.get_ohlcv("BTC", live=True, limit=2, now=FROZEN_NOW + timedelta(days=1))
     assert adapter.live_calls == 1
     assert rows[-1].source == "live:BTC"

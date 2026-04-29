@@ -8,9 +8,9 @@
 
 [![CI](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
 [![Security](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml)
-[![Tests](https://img.shields.io/badge/tests-6%2C287%2B%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-6%2C294%2B%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
 [![Tools](https://img.shields.io/badge/tools-67-0d9488)](infra/tool-registry.yaml)
-[![Dashboard](https://img.shields.io/badge/dashboard-38%20pages-6d28d9)](services/dashboard/templates/pages)
+[![Dashboard](https://img.shields.io/badge/dashboard-43%20pages-6d28d9)](services/dashboard/templates/pages)
 [![Readiness](https://img.shields.io/badge/readiness-0%20FAIL-2ea44f)](scripts/ops/production_readiness_sweep.py)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3776ab?logo=python&logoColor=white)](https://www.python.org/)
 [![Solidity](https://img.shields.io/badge/solidity-0.8.x-363636?logo=solidity&logoColor=white)](contracts/)
@@ -27,7 +27,7 @@ Sapphire is a continuously-running, mesh-topology operating system that integrat
 
 The intelligence subsystem now composes deterministic signal correlation, cross-asset regime detection, regulatory/macro calendars, on-chain provider snapshots, Hyperliquid counter-party tracking, historical event-impact lookup tables, and rubric-gated narrative synthesis. The trading subsystem remains behind risk-kernel, confirmation-firewall, dry-run, and kill-switch controls. The inference mesh provides four-tier failover (RTX 5070 Ti GPU -> Raspberry Pi -> Mac CPU -> Kimi Cloud) with a sensitivity classifier that fails closed against PII or secret egress to managed cloud endpoints. The content engine is a research-to-publish pipeline with an institutional quality gate that blocks unsupported performance claims before they reach Substack, X, LinkedIn, or Typefully.
 
-The platform is operated as a research instrument: every routine produces an artifact, every artifact has a verdict, every generated artifact carries provenance, and every verdict feeds a 38-page operational dashboard.
+The platform is operated as a research instrument: every routine produces an artifact, every artifact has a verdict, every generated artifact carries provenance, and every verdict feeds a 43-page operational dashboard with a curated `/showcase` front door.
 
 > $$\mathrm{NetPnL} = \underbrace{\sum_{t}\,\mathrm{edge}_t\,\cdot\,\mathrm{capital}_t\,\cdot\,\mathrm{efficiency}_t}_{\text{alpha}} \;-\; \underbrace{\sum_{t}\,\mathrm{fees}_t + \mathrm{slip}_t + \mathrm{infra}_t + \mathrm{tail}_t}_{\text{cost}}$$
 
@@ -98,7 +98,7 @@ flowchart LR
     ContentEngine[Content Engine<br/>17 modules · 7-check rubric]:::content
     Publishers[Publishers<br/>Substack · X · LinkedIn · Typefully]:::content
 
-    Dashboard[Dashboard<br/>38 pages · SSE]:::edge
+    Dashboard[Dashboard<br/>43 pages · SSE]:::edge
     Foundry[Palantir Foundry<br/>15-min ontology sync]:::storage
     GCP[GCP Lake<br/>BigQuery sapphire.*]:::storage
 
@@ -133,9 +133,9 @@ flowchart LR
 
 | Surface | Count | Detail |
 |---|---:|---|
-| Passing tests | **6,287+** | 5,797+ unit · 490 plugin (`python scripts/ops/test_inventory.py --check-readme`) |
-| Test files | **355+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
-| Dashboard pages | **38** | Flask + SSE, basic-auth, observability, cross-asset, diligence, threat-intel, dossier pages |
+| Passing tests | **6,294+** | 5,804+ unit · 490 plugin (`python scripts/ops/test_inventory.py --check-readme`) |
+| Test files | **356+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
+| Dashboard pages | **43** | Flask + SSE, basic-auth, `/showcase`, observability, cross-asset, diligence, threat-intel, dossier pages |
 | Quant strategies | **7** | `lib/analytics/strategies.py` |
 | Pine strategies | **5** | `pine/standalone/` |
 | Plugin tools (registered · internal · deprecated) | **7 · 59 · 1** | 67 total entries in `infra/tool-registry.yaml` |
@@ -170,7 +170,7 @@ flowchart TB
     Impact[Event-Impact Lookup<br/>expected reaction bands]:::model
     Narrative[Narrative Synthesis<br/>thesis + invalidators]:::output
     Adv[Adversarial Defense<br/>wash trade · prompt · oracle checks]:::guard
-    Obs[Observability + Acquirer Views<br/>38 dashboard pages]:::output
+    Obs[Observability + Acquirer Views<br/>43 dashboard pages]:::output
 
     TV --> Corr
     HL --> Corr
@@ -603,21 +603,21 @@ flowchart LR
 
 ## 10. Operational Telemetry
 
-### 10.1 Dashboard — 38 pages
+### 10.1 Dashboard — 43 pages
 
 `services/dashboard/` — Flask · SSE · basic-auth · 10 s cached fetchers.
 
 | Category | Pages |
 |---|---|
-| **Command** | overview · command_deck · control · system · settings · agents |
-| **Trading** | signals · predictions · portfolio · performance · sapphire_book · risk · factors |
-| **Intelligence** | intel · intelligence · investment_intel · chain · cross_asset · cascade · sovereign_thesis · sovereign_thesis_story |
-| **Content & ops** | content · organization · activity · logs · observability · diligence |
-| **Security** | soc · security · health · infrastructure · production_readiness · threat_intel · customer_dossier |
-| **Architecture** | architecture · analytics |
-| **Integrations** | robinhood_chain · agents_autonomous |
+| **Orientation** | showcase · overview · architecture · sapphire_book |
+| **Command** | command_deck · control · system · settings · activity · logs · agents |
+| **Trading** | signals · predictions · portfolio · performance · risk · factors · analytics · cascade |
+| **Intelligence** | intel · intelligence · investment_intel · cross_asset · sovereign_thesis · sovereign_thesis_story · narrative_eval · source_quality |
+| **Chain & venues** | chain · robinhood_chain |
+| **Content & autonomy** | content · organization · observability · inference_telemetry · agents_autonomous |
+| **Security & diligence** | soc · security · security_overview · health · infrastructure · production_readiness · threat_intel · customer_dossier · diligence |
 
-Live event stream at `/api/events/stream`. Performance endpoints wired to real trade data: `/api/strategy-performance` · `/api/performance-timeseries` · `/api/backtest-results` · `/api/forecast`. Tranche 4 feed health is exposed through `/api/observability-tranche4-feeds`, with cross-asset endpoints at `/api/cross-asset-matrix`, `/api/cross-asset-regime`, and `/api/cross-asset-breakdowns`.
+Start demos at `/showcase`, then branch into persona-specific routes such as `/diligence`, `/production-readiness`, `/sovereign-thesis`, `/intel`, `/inference-telemetry`, and `/source-quality`. Live event stream at `/api/events/stream`. Performance endpoints wired to real trade data: `/api/strategy-performance` · `/api/performance-timeseries` · `/api/backtest-results` · `/api/forecast`. Tranche 4 feed health is exposed through `/api/observability-tranche4-feeds`, with cross-asset endpoints at `/api/cross-asset-matrix`, `/api/cross-asset-regime`, and `/api/cross-asset-breakdowns`.
 
 ### 10.2 Routines — 34 LaunchAgent definitions
 

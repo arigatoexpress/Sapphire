@@ -812,6 +812,15 @@ def index():
     )
 
 
+@app.route("/showcase")
+@requires_auth
+def showcase():
+    """Curated read-only front door for demos and ecosystem orientation."""
+    return render_template(
+        "pages/showcase.html", current_page="showcase", page_title="Showcase"
+    )
+
+
 @app.route("/architecture")
 @requires_auth
 def architecture():

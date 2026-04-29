@@ -1,8 +1,8 @@
 # Dashboard product pages — operator runbook
 
-This runbook covers the product surfaces shipped in Wave 4 and Wave 6 of the
-Sapphire dashboard: `/threat-intel`, `/customer-dossier`, `/diligence`, and
-`/sovereign-thesis/story`. These pages
+This runbook covers the product and demo surfaces shipped across the
+Sapphire dashboard: `/showcase`, `/threat-intel`, `/customer-dossier`,
+`/diligence`, and `/sovereign-thesis/story`. These pages
 are *read-only*, *authenticated*, *paste-safe*, and *snapshot-only* —
 they do not mutate upstream systems at request time. This runbook tells you
 how to keep the snapshots fresh, how to triage failures, and how to
@@ -12,6 +12,7 @@ verify the safety contract before each release.
 
 | Page | API | Source data | Refresh agent |
 |---|---|---|---|
+| `/showcase` | none | static links to existing dashboard surfaces and satellite repos | none |
 | `/threat-intel` | `/api/threat-intel` | `data/intelligence/<date>/threats.json` | `services/dashboard/refresh_threats.py` (LaunchAgent, every 4h) |
 | `/customer-dossier` | `/api/customer-dossier` | `data/tho_intel/dossier_*.json` | manual / scheduled (operator-driven) |
 | `/diligence` | `/api/diligence-summary`, `/api/risk-kernel-summary`, `/api/provenance-summary`, `/api/test-suite-health`, `/api/launchagent-summary` | `docs/diligence/00-09`, risk/provenance/test metadata, `launchctl list` labels | none |
@@ -24,6 +25,28 @@ present the basic-auth header.
 The Wave 6 pages follow the same auth contract. They are GET-only and should
 return 405 for POST/PUT/PATCH/DELETE unless Flask itself changes routing
 behavior.
+
+## /showcase — demo front door
+
+`/showcase` is the curated orientation page for friends, buyers, engineers,
+and operators. It does not call a dedicated API, perform external fetches,
+submit forms, send Telegram messages, enable live trading, or read local
+runtime artifacts. It links to existing authenticated pages and public GitHub
+repo URLs only.
+
+Use it as the first page in any demo, then branch by audience:
+
+- Friend: `/showcase` -> `/` -> `/intel` -> `/content`
+- Buyer: `/diligence` -> `/production-readiness` -> `/risk` -> `/sovereign-thesis/story`
+- Engineer: `/architecture` -> `/inference-telemetry` -> `/observability` -> `/source-quality`
+- Operator: `/command-deck` -> `/activity` -> `/logs` -> `/settings`
+
+Release checks:
+
+```bash
+/usr/local/bin/python3 -m pytest tests/unit/test_dashboard_showcase_routes.py -q
+/usr/local/bin/python3 scripts/ops/dashboard_public_demo_readiness.py --no-write --pretty
+```
 
 ## /threat-intel — operations
 

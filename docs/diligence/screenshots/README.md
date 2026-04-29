@@ -17,6 +17,7 @@ published outside the repo, not committed with sensitive dashboard state.
 
 | Placeholder | Intended Capture |
 |---|---|
+| `/Users/aribs/Code/Sapphire/docs/diligence/screenshots/dashboard-showcase.md` | `/showcase` with demo paths and ecosystem capability cards visible |
 | `/Users/aribs/Code/Sapphire/docs/diligence/screenshots/dashboard-sovereign-thesis.md` | `/sovereign-thesis` with Gemini OODA daily delta visible |
 | `/Users/aribs/Code/Sapphire/docs/diligence/screenshots/dashboard-production-readiness.md` | `/production-readiness` after a local readiness sweep |
 | `/Users/aribs/Code/Sapphire/docs/diligence/screenshots/dashboard-risk.md` | `/risk` or risk-kernel verdict display if surfaced |
