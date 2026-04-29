@@ -158,6 +158,7 @@ class ChainStatus:
     gas_price_gwei: float | None = None
     signal_verifier_address: str | None = None
     payment_gate_address: str | None = None
+    sentinel_registry_address: str | None = None
     signal_count: int | None = None
     error: str | None = None
 
@@ -387,6 +388,7 @@ class RobinhoodChainClient:
                 gas_price_gwei=float(gas_price),
                 signal_verifier_address=self._addresses.get("SapphireSignalVerifier"),
                 payment_gate_address=self._addresses.get("SapphirePaymentGate"),
+                sentinel_registry_address=self._addresses.get("SapphireSentinelRegistry"),
                 signal_count=signal_count,
             )
         except Exception as exc:

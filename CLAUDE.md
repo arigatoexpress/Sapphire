@@ -73,7 +73,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 
 ## Module Map
 
-**Key counts (verified 2026-04-29 after `/showcase`):** 6,294 collected tests (5,804 core + 490 plugin, per `scripts/ops/test_inventory.py --check-readme`) · 43 dashboard pages · 7 quant strategies · 20 LaunchAgents (folded in by the 2026-04-21 audit; see `docs/archive/2026/audits/launchagents-audit-2026-04-21.md`) · 21 scheduled tasks · 2 smart contracts.
+**Key counts (verified 2026-04-29 after `/showcase`):** 6,334+ collected tests (5,844+ core + 490 plugin, per `scripts/ops/test_inventory.py --check-readme`) · 44 dashboard pages · 7 quant strategies · 20 LaunchAgents (folded in by the 2026-04-21 audit; see `docs/archive/2026/audits/launchagents-audit-2026-04-21.md`) · 21 scheduled tasks · 3 smart contracts.
 
 | Path | Type | Description |
 |------|------|-------------|
@@ -105,7 +105,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `services/telegram-bot/` | service | Legacy bot (replaced by hermes-agent gateway). |
 | `services/webhook/` | service | TradingView webhook receiver [Windows:9090]. |
 | `plugins/claw-sapphire/` | plugin | 63 tool scripts on disk (36 at top level + 25 in `internal/` + 2 in `_deprecated/`), 10 libs, 376 collected tests. |
-| `contracts/` | solidity | **`SapphireSignalVerifier.sol`** (on-chain signal registry with ZK proof hash field), **`SapphirePaymentGate.sol`** (micropayment gate). Deployed on Robinhood Chain testnet via `scripts/deploy_robinhood_chain.py`. |
+| `contracts/` | solidity | **`SapphireSignalVerifier.sol`** (on-chain signal registry with ZK proof hash field), **`SapphirePaymentGate.sol`** (micropayment gate), **`SapphireSentinelRegistry.sol`** (non-custodial agent mandate/payment receipt anchor). Deployed on Robinhood Chain testnet via `scripts/deploy_robinhood_chain.py`. |
 | `pine/` | pine | 5 TradingView strategies (standalone/: v1, v2, v3 Ultra, MultiSymbol Screener, Mac variant). |
 | `skills/` | skills | Agent-executable capabilities. |
 | `data/content/` | data | Content engine drafts + ready/ queue. |

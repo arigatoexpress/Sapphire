@@ -222,6 +222,54 @@ def test_order_draft_endpoint_is_dry_run(app_client):
     assert {draft["venue"] for draft in body["drafts"]} >= {"paper", "hyperliquid"}
 
 
+def test_sentinel_demo_endpoint_is_testnet_paper_only(app_client):
+    _, client = app_client
+
+    r = client.get("/api/hackathon/sentinel/demo", headers={"Authorization": _AUTH})
+
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["project"]["primary_chain"] == "Robinhood Chain Testnet"
+    assert body["project"]["mode"] == "testnet_paper_only"
+    assert body["approved_flow"]["approved"] is True
+    assert body["blocked_flow"]["approved"] is False
+    assert body["safety"]["live_trading_enabled"] is False
+    assert body["safety"]["real_funds_enabled"] is False
+
+
+def test_sentinel_page_renders(app_client):
+    _, client = app_client
+
+    r = client.get("/chain/sentinel", headers={"Authorization": _AUTH})
+
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert "Sapphire Sentinel" in html
+    assert "/api/hackathon/sentinel/demo" in html
+
+
+def test_sentinel_evaluate_endpoint_blocks_untrusted_domain(app_client):
+    _, client = app_client
+
+    r = client.post(
+        "/api/hackathon/sentinel/evaluate",
+        headers={"Authorization": _AUTH},
+        json={
+            "resource": "https://untrusted.example/api/alpha",
+            "amount_usdc": "0.01",
+            "action": "buy-private-signal",
+            "payload_summary": "normal request",
+        },
+    )
+
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["execution_enabled"] is False
+    assert body["mode"] == "policy_preview_only"
+    assert body["decision"]["approved"] is False
+    assert "domain_not_allowed" in body["decision"]["risk_flags"]
+
+
 def test_trading_shadow_controller_endpoint_is_paper_only(app_client, monkeypatch):
     _, client = app_client
     from lib.trading import shadow_controller

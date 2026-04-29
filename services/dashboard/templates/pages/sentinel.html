@@ -1,0 +1,419 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .sentinel-shell {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+        gap: 16px;
+        align-items: start;
+    }
+    @media (max-width: 1080px) {
+        .sentinel-shell { grid-template-columns: 1fr; }
+    }
+    .sentinel-band {
+        border: 1px solid var(--border);
+        background: var(--bg-card);
+        border-radius: 8px;
+        padding: 18px;
+        margin-bottom: 16px;
+    }
+    .sentinel-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 14px;
+    }
+    .sentinel-title h2 {
+        margin: 0 0 6px;
+        font-size: 18px;
+        font-weight: 650;
+        letter-spacing: 0;
+    }
+    .sentinel-title p {
+        margin: 0;
+        color: var(--text-secondary);
+        font-size: 12px;
+        line-height: 1.5;
+    }
+    .sentinel-badge {
+        flex: 0 0 auto;
+        border: 1px solid rgba(20,184,166,0.35);
+        background: rgba(20,184,166,0.09);
+        color: #5eead4;
+        border-radius: 6px;
+        padding: 7px 10px;
+        font-size: 10px;
+        font-family: var(--font-mono);
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+    .sentinel-kpis {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+    }
+    @media (max-width: 760px) {
+        .sentinel-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    .sentinel-kpi {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px;
+        min-height: 74px;
+        background: rgba(255,255,255,0.02);
+    }
+    .sentinel-kpi .label {
+        color: var(--text-muted);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: 8px;
+    }
+    .sentinel-kpi .value {
+        font-family: var(--font-mono);
+        font-size: 15px;
+        color: var(--text-primary);
+        overflow-wrap: anywhere;
+    }
+    .sentinel-panel-title {
+        color: var(--text-muted);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 12px;
+    }
+    .sentinel-flow-tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-bottom: 14px;
+    }
+    .sentinel-tab {
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        min-height: 36px;
+        background: rgba(255,255,255,0.02);
+        color: var(--text-secondary);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        cursor: pointer;
+    }
+    .sentinel-tab.active {
+        border-color: rgba(20,184,166,0.45);
+        background: rgba(20,184,166,0.12);
+        color: #5eead4;
+    }
+    .sentinel-decision {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 12px;
+        margin-bottom: 12px;
+    }
+    .sentinel-decision .state {
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: 0;
+    }
+    .sentinel-decision .state.approved { color: var(--green); }
+    .sentinel-decision .state.blocked { color: var(--red); }
+    .sentinel-hash {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--text-muted);
+        overflow-wrap: anywhere;
+        text-align: right;
+    }
+    .sentinel-list {
+        display: grid;
+        gap: 7px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+    .sentinel-list li {
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8px 10px;
+        font-size: 12px;
+        color: var(--text-secondary);
+        background: rgba(255,255,255,0.015);
+    }
+    .sentinel-list li.good { border-color: rgba(34,197,94,0.25); }
+    .sentinel-list li.bad { border-color: rgba(239,68,68,0.25); }
+    .sentinel-rows {
+        display: grid;
+        gap: 1px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .sentinel-row {
+        display: grid;
+        grid-template-columns: minmax(130px, 0.4fr) minmax(0, 1fr);
+        gap: 12px;
+        padding: 9px 11px;
+        background: rgba(255,255,255,0.015);
+        font-size: 12px;
+    }
+    .sentinel-row span:first-child {
+        color: var(--text-muted);
+        text-transform: uppercase;
+        font-size: 10px;
+        letter-spacing: 0.05em;
+    }
+    .sentinel-row span:last-child {
+        color: var(--text-secondary);
+        font-family: var(--font-mono);
+        overflow-wrap: anywhere;
+    }
+    .sentinel-code {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: rgba(0,0,0,0.18);
+        color: var(--text-secondary);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        line-height: 1.55;
+        padding: 12px;
+        overflow-x: auto;
+        min-height: 118px;
+        max-height: 260px;
+    }
+    .sentinel-form {
+        display: grid;
+        grid-template-columns: 1fr 120px;
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+    .sentinel-input {
+        min-height: 36px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: rgba(255,255,255,0.03);
+        color: var(--text-primary);
+        padding: 0 10px;
+        font-size: 12px;
+    }
+    .sentinel-run {
+        min-height: 36px;
+        border: 1px solid rgba(20,184,166,0.4);
+        border-radius: 6px;
+        background: rgba(20,184,166,0.11);
+        color: #5eead4;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        cursor: pointer;
+    }
+</style>
+
+<div class="sentinel-band">
+    <div class="sentinel-header">
+        <div class="sentinel-title">
+            <h2>Sapphire Sentinel</h2>
+            <p>Policy, privacy, and payment safety for autonomous RWA agents on Robinhood Chain testnet.</p>
+        </div>
+        <div class="sentinel-badge">testnet paper-only</div>
+    </div>
+    <div class="sentinel-kpis">
+        <div class="sentinel-kpi">
+            <div class="label">Primary Chain</div>
+            <div class="value" id="kpi-chain">...</div>
+        </div>
+        <div class="sentinel-kpi">
+            <div class="label">Payment Rail</div>
+            <div class="value" id="kpi-payment">...</div>
+        </div>
+        <div class="sentinel-kpi">
+            <div class="label">Budget</div>
+            <div class="value" id="kpi-budget">...</div>
+        </div>
+        <div class="sentinel-kpi">
+            <div class="label">Mode</div>
+            <div class="value" id="kpi-mode">...</div>
+        </div>
+    </div>
+</div>
+
+<div class="sentinel-shell">
+    <section>
+        <div class="sentinel-band">
+            <div class="sentinel-panel-title">Agent Payment Decision</div>
+            <div class="sentinel-flow-tabs">
+                <button class="sentinel-tab active" id="tab-approved" onclick="showFlow('approved')">approved flow</button>
+                <button class="sentinel-tab" id="tab-blocked" onclick="showFlow('blocked')">blocked flow</button>
+            </div>
+            <div class="sentinel-decision">
+                <div class="state" id="decision-state">...</div>
+                <div class="sentinel-hash" id="decision-receipt"></div>
+            </div>
+            <ul class="sentinel-list" id="decision-reasons"></ul>
+        </div>
+
+        <div class="sentinel-band">
+            <div class="sentinel-panel-title">x402 Payment Requirement</div>
+            <div class="sentinel-rows">
+                <div class="sentinel-row"><span>resource</span><span id="x402-resource">...</span></div>
+                <div class="sentinel-row"><span>network</span><span id="x402-network">...</span></div>
+                <div class="sentinel-row"><span>asset</span><span id="x402-asset">...</span></div>
+                <div class="sentinel-row"><span>amount</span><span id="x402-amount">...</span></div>
+                <div class="sentinel-row"><span>pay to</span><span id="x402-payto">...</span></div>
+            </div>
+        </div>
+
+        <div class="sentinel-band">
+            <div class="sentinel-panel-title">On-Chain Anchor Preview</div>
+            <div class="sentinel-rows">
+                <div class="sentinel-row"><span>contract</span><span id="anchor-contract">...</span></div>
+                <div class="sentinel-row"><span>policy hash</span><span id="anchor-policy">...</span></div>
+                <div class="sentinel-row"><span>result hash</span><span id="anchor-result">...</span></div>
+                <div class="sentinel-row"><span>risk hash</span><span id="anchor-risk">...</span></div>
+                <div class="sentinel-row"><span>broadcast</span><span id="anchor-broadcast">...</span></div>
+            </div>
+        </div>
+    </section>
+
+    <aside>
+        <div class="sentinel-band">
+            <div class="sentinel-panel-title">Mandate</div>
+            <div class="sentinel-rows">
+                <div class="sentinel-row"><span>id</span><span id="mandate-id">...</span></div>
+                <div class="sentinel-row"><span>controller</span><span id="mandate-controller">...</span></div>
+                <div class="sentinel-row"><span>agent</span><span id="mandate-agent">...</span></div>
+                <div class="sentinel-row"><span>expires</span><span id="mandate-expiry">...</span></div>
+                <div class="sentinel-row"><span>privacy</span><span id="mandate-privacy">...</span></div>
+            </div>
+        </div>
+
+        <div class="sentinel-band">
+            <div class="sentinel-panel-title">Evaluate Resource</div>
+            <div class="sentinel-form">
+                <input class="sentinel-input" id="eval-resource" value="https://signals.sapphire.local/api/private-rwa-signal?basket=RH-STOCKS">
+                <button class="sentinel-run" onclick="evaluateResource()">evaluate</button>
+            </div>
+            <pre class="sentinel-code" id="eval-output">{}</pre>
+        </div>
+
+        <div class="sentinel-band">
+            <div class="sentinel-panel-title">Order Draft</div>
+            <pre class="sentinel-code" id="order-draft">{}</pre>
+        </div>
+    </aside>
+</div>
+
+<script>
+let sentinelData = null;
+let activeFlow = 'approved';
+
+function fmtUsdcAtomic(value) {
+    const atomic = Number(value || 0);
+    return (atomic / 1000000).toFixed(6) + ' USDC';
+}
+
+function shortHash(value) {
+    if (!value) return '';
+    return value.slice(0, 10) + '...' + value.slice(-8);
+}
+
+function flowData() {
+    if (!sentinelData) return null;
+    return activeFlow === 'approved' ? sentinelData.approved_flow : sentinelData.blocked_flow;
+}
+
+function showFlow(name) {
+    activeFlow = name;
+    document.getElementById('tab-approved').classList.toggle('active', name === 'approved');
+    document.getElementById('tab-blocked').classList.toggle('active', name === 'blocked');
+    renderFlow();
+}
+
+function renderFlow() {
+    const flow = flowData();
+    if (!flow) return;
+    const state = document.getElementById('decision-state');
+    state.textContent = flow.approved ? 'APPROVED' : 'BLOCKED';
+    state.className = 'state ' + (flow.approved ? 'approved' : 'blocked');
+    document.getElementById('decision-receipt').textContent = shortHash(flow.receipt_id);
+
+    const list = document.getElementById('decision-reasons');
+    list.innerHTML = flow.reasons.map(reason => {
+        const klass = flow.approved ? 'good' : 'bad';
+        return `<li class="${klass}">${reason}</li>`;
+    }).join('');
+
+    const req = flow.payment_requirements;
+    document.getElementById('x402-resource').textContent = req.resource;
+    document.getElementById('x402-network').textContent = req.network;
+    document.getElementById('x402-asset').textContent = req.asset;
+    document.getElementById('x402-amount').textContent = fmtUsdcAtomic(req.maxAmountRequired);
+    document.getElementById('x402-payto').textContent = req.payTo;
+
+    const anchor = flow.chain_anchor;
+    document.getElementById('anchor-contract').textContent = anchor.contract + ' / chain ' + anchor.chain_id;
+    document.getElementById('anchor-policy').textContent = anchor.mandate_policy_hash;
+    document.getElementById('anchor-result').textContent = anchor.result_hash;
+    document.getElementById('anchor-risk').textContent = anchor.risk_hash;
+    document.getElementById('anchor-broadcast').textContent = String(anchor.broadcast) + ' (' + anchor.mode + ')';
+
+    const order = flow.order_draft || {};
+    document.getElementById('order-draft').textContent = JSON.stringify({
+        execution_enabled: order.execution_enabled,
+        mode: order.mode,
+        symbol: order.symbol,
+        action: order.action,
+        primary_draft: order.primary_draft
+    }, null, 2);
+}
+
+async function evaluateResource() {
+    const resource = document.getElementById('eval-resource').value;
+    const response = await fetch('/api/hackathon/sentinel/evaluate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            resource,
+            amount_usdc: '0.012',
+            action: 'buy-private-signal',
+            payload_summary: 'agent requests private RWA basket signal',
+            result_summary: 'private basket risk passes issuer concentration and drawdown caps',
+            order_symbol: 'PLTR',
+            notional_usd: 25
+        })
+    });
+    const body = await response.json();
+    document.getElementById('eval-output').textContent = JSON.stringify({
+        approved: body.decision && body.decision.approved,
+        risk_flags: body.decision && body.decision.risk_flags,
+        receipt_id: body.decision && body.decision.receipt_id,
+        mode: body.mode
+    }, null, 2);
+}
+
+async function loadSentinel() {
+    const response = await fetch('/api/hackathon/sentinel/demo');
+    sentinelData = await response.json();
+
+    document.getElementById('kpi-chain').textContent =
+        sentinelData.project.primary_chain + ' ' + sentinelData.project.chain_id;
+    document.getElementById('kpi-payment').textContent = sentinelData.project.settlement_network;
+    document.getElementById('kpi-budget').textContent =
+        '$' + sentinelData.mandate.remaining_usdc + ' / $' + sentinelData.mandate.max_spend_usdc;
+    document.getElementById('kpi-mode').textContent = sentinelData.project.mode;
+
+    document.getElementById('mandate-id').textContent = sentinelData.mandate.mandate_id;
+    document.getElementById('mandate-controller').textContent = sentinelData.mandate.controller;
+    document.getElementById('mandate-agent').textContent = sentinelData.mandate.agent;
+    document.getElementById('mandate-expiry').textContent = sentinelData.mandate.expires_at;
+    document.getElementById('mandate-privacy').textContent = sentinelData.mandate.privacy_mode;
+
+    renderFlow();
+    evaluateResource();
+}
+
+loadSentinel();
+</script>
+{% endblock %}

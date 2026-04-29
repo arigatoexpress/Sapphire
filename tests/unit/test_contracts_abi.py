@@ -1,4 +1,4 @@
-"""Smoke tests for the two production Solidity contracts.
+"""Smoke tests for the production Solidity contracts.
 
 These are *text-level* tests over the `.sol` source — they do not invoke
 `forge` (not installed in CI per the 2026-04-26 contracts review) or compile
