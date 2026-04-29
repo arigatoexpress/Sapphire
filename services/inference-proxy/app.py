@@ -123,8 +123,8 @@ MODEL_TIERS = {
     "auto": "hermes3:8b",
     "balanced": "hermes3:8b",
     # Pi-eligible (light, ≤4B)
-    "fast": "nemotron-mini:latest",
-    "quick": "nemotron-mini:latest",
+    "fast": "nemotron-mini:4b",
+    "quick": "nemotron-mini:4b",
     "tiny": "qwen2.5:0.5b",  # ultra-light, Pi-native
     # GPU-heavy — benchmark-calibrated 2026-04-14 (RTX 5070 Ti)
     "deep": "qwen3:14b",  # verified on Windows — deep multi-step

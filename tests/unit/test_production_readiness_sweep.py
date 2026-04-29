@@ -150,6 +150,96 @@ def test_inference_health_passes_when_all_tiers_healthy(monkeypatch) -> None:
     assert "degraded_tiers" not in check.evidence
 
 
+def test_windows_ollama_inventory_passes_with_required_models(monkeypatch) -> None:
+    names = [
+        "nemotron-mini:4b",
+        "hermes3:8b",
+        "gemma4:latest",
+        "deepseek-r1:14b",
+        "qwen3.5:9b",
+        "qwen3:14b",
+        "qwen3.6:27b",
+        "nemotron-cascade-2:latest",
+        "qwen2.5:32b",
+    ]
+
+    def fake_urlopen(request: object, timeout: int) -> _FakeHTTPResponse:
+        assert timeout == 5
+        assert str(request).endswith("/api/tags")
+        return _FakeHTTPResponse(200, {"models": [{"name": name} for name in names]})
+
+    monkeypatch.setattr(sweep.urllib.request, "urlopen", fake_urlopen)
+
+    check = sweep.windows_ollama_inventory_check("http://100.71.10.48:11434")
+
+    assert check.status == "PASS"
+    assert "models=9" in check.evidence
+    assert "required_present=9/9" in check.evidence
+    assert "missing_aliases" not in check.evidence
+
+
+def test_windows_ollama_inventory_warns_on_missing_aliases(monkeypatch) -> None:
+    def fake_urlopen(_request: object, timeout: int) -> _FakeHTTPResponse:
+        assert timeout == 5
+        return _FakeHTTPResponse(
+            200,
+            {
+                "models": [
+                    {"name": "nemotron-mini:4b"},
+                    {"name": "hermes3:8b"},
+                ]
+            },
+        )
+
+    monkeypatch.setattr(sweep.urllib.request, "urlopen", fake_urlopen)
+
+    check = sweep.windows_ollama_inventory_check("http://100.71.10.48:11434")
+
+    assert check.status == "WARN"
+    assert "required_present=2/9" in check.evidence
+    assert "missing_aliases" in check.evidence
+    assert "reason" in check.evidence
+
+
+def test_tcp_check_can_warn_for_optional_desktop_ports(monkeypatch) -> None:
+    def fake_create_connection(_address: tuple[str, int], timeout: int) -> object:
+        assert timeout == 3
+        raise OSError("down")
+
+    monkeypatch.setattr(sweep.socket, "create_connection", fake_create_connection)
+
+    check = sweep.tcp_check("windows", "telemetry_dashboard_tcp", "100.71.10.48", 3001, warn_on_error=True)
+
+    assert check.status == "WARN"
+
+
+def test_windows_webhook_health_surfaces_degraded_subservices(monkeypatch) -> None:
+    def fake_urlopen(_request: object, timeout: int) -> _FakeHTTPResponse:
+        assert timeout == 5
+        return _FakeHTTPResponse(
+            200,
+            {
+                "status": "healthy",
+                "services": {
+                    "windows_webhook": {"healthy": True},
+                    "windows_ollama": {"healthy": True},
+                    "windows_tv_agent": {"healthy": False},
+                },
+                "capabilities": {"ollama_model_count": 29, "gpu_count": 1},
+            },
+        )
+
+    monkeypatch.setattr(sweep.urllib.request, "urlopen", fake_urlopen)
+
+    check = sweep.windows_webhook_health_check("100.71.10.48")
+
+    assert check.status == "WARN"
+    assert "status=healthy" in check.evidence
+    assert "degraded_services=windows_tv_agent" in check.evidence
+    assert "ollama_model_count=29" in check.evidence
+    assert "gpu_count=1" in check.evidence
+
+
 def test_satellite_ci_no_spend_gates_pass_for_gated_workflows(tmp_path: Path) -> None:
     repo = tmp_path / "satellite"
     workflows = repo / ".github" / "workflows"

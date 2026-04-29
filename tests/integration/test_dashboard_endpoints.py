@@ -75,6 +75,58 @@ def test_metrics_records_latency(app_client):
     assert "X-Response-Time-ms" in r.headers
 
 
+def test_system_api_normalizes_inference_tiers(app_client, monkeypatch):
+    dash_app, client = app_client
+
+    def fake_fetch(url: str):
+        if url.endswith("/health"):
+            return {
+                "status": "ok",
+                "endpoints": {
+                    "windows-gpu": "healthy",
+                    "pi-rari1": "failed",
+                    "pi-rari2": "failed",
+                    "mac-local": "healthy",
+                    "kimi-cloud": "healthy",
+                },
+                "tiers": {
+                    "t1_windows_gpu": "http://100.71.10.48:11434",
+                    "t2_pi_rari1": "http://100.120.191.1:11434 (enabled=True)",
+                    "t2_pi_rari2": "http://100.87.225.89:11434 (enabled=True)",
+                    "t3_mac_local": "http://127.0.0.1:11434",
+                    "t4_kimi_cloud": "https://api.moonshot.cn/v1",
+                },
+            }
+        if url.endswith("/metrics"):
+            return {"metrics": {}}
+        if url.endswith("/json"):
+            return []
+        if url.endswith("/api/signals/recent"):
+            return {"count": 0, "signals": []}
+        return {"status": "ok"}
+
+    class _Socket:
+        def close(self):
+            return None
+
+    monkeypatch.setattr(dash_app, "fetch_sync", fake_fetch)
+    import socket
+
+    monkeypatch.setattr(socket, "create_connection", lambda *_args, **_kwargs: _Socket())
+
+    response = client.get("/api/system", headers={"Authorization": _AUTH})
+
+    assert response.status_code == 200
+    body = response.get_json()
+    tiers = body["inference"]["tiers"]
+    assert tiers["t1"]["healthy"] is True
+    assert tiers["t1"]["endpoint_key"] == "windows-gpu"
+    assert tiers["t1"]["url"] == "http://100.71.10.48:11434"
+    assert tiers["t2a"]["healthy"] is False
+    assert body["inference"]["endpoints"]["windows-gpu"] == "healthy"
+    assert body["inference"]["raw_tiers"]["t1_windows_gpu"] == "http://100.71.10.48:11434"
+
+
 def test_opportunities_reads_signals_jsonl(app_client, tmp_path, monkeypatch):
     dash_app, client = app_client
     # Redirect the Sapphire data root for this test

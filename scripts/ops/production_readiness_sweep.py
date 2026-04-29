@@ -24,6 +24,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import yaml
 
@@ -37,8 +38,27 @@ DEFAULT_BQ_TABLE = "production_readiness_probes"
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
 DEFAULT_SECRET_ENV = Path.home() / ".sapphire" / "secrets.env"
 SAPPHIRE_SECRETS_DIR = Path.home() / ".config" / "sapphire-secrets"
+DEFAULT_WINDOWS_GPU_URL = "http://100.71.10.48:11434"
+DEFAULT_WINDOWS_HOST = "100.71.10.48"
 GEMINI_PROBE_PROMPT = "Return exactly SAPPHIRE_GEMINI_PROBE_OK and nothing else."
 GEMINI_PROBE_RESPONSE = "SAPPHIRE_GEMINI_PROBE_OK"
+WINDOWS_REQUIRED_MODELS = {
+    "fast": "nemotron-mini:4b",
+    "balanced": "hermes3:8b",
+    "code": "gemma4:latest",
+    "reason": "deepseek-r1:14b",
+    "qwen-reason": "qwen3.5:9b",
+    "deep": "qwen3:14b",
+    "qwen3.6": "qwen3.6:27b",
+    "cascade": "nemotron-cascade-2",
+    "large": "qwen2.5:32b",
+}
+WINDOWS_SERVICE_PORTS = {
+    "desktop_ssh_tcp": 22,
+    "tradingview_agent_tcp": 8081,
+    "tradingview_webhook_tcp": 9090,
+    "telemetry_dashboard_tcp": 3001,
+}
 NO_SPEND_CI_STRATEGIES = {
     "local_evidence_skip_ci_bootstrap",
     "sapphire_self_hosted_gate",
@@ -69,6 +89,7 @@ def main(argv: list[str] | None = None) -> int:
     checks.append(probe_satellite_merge_posture(no_external=args.no_external))
     checks.extend(probe_launchagents())
     checks.extend(probe_local_endpoints(env))
+    checks.extend(probe_windows_desktop_server())
     checks.extend(probe_safety())
     checks.extend(probe_provenance())
     checks.extend(probe_routines(no_external=args.no_external))
@@ -605,6 +626,156 @@ def inference_proxy_health_check() -> Check:
     )
 
 
+def probe_windows_desktop_server(env: dict[str, str] | None = None) -> list[Check]:
+    """Probe Ari's Windows desktop as the private Sapphire accelerator node."""
+    values = env or os.environ
+    gpu_url = str(values.get("WINDOWS_GPU_URL") or DEFAULT_WINDOWS_GPU_URL).rstrip("/")
+    host = str(values.get("WINDOWS_GPU_HOST") or urlparse(gpu_url).hostname or DEFAULT_WINDOWS_HOST)
+
+    checks = [windows_ollama_inventory_check(gpu_url), windows_webhook_health_check(host)]
+    checks.extend(
+        tcp_check("windows", name, host, port, warn_on_error=True)
+        for name, port in WINDOWS_SERVICE_PORTS.items()
+    )
+    return checks
+
+
+def windows_ollama_inventory_check(base_url: str = DEFAULT_WINDOWS_GPU_URL) -> Check:
+    started = time.perf_counter()
+    url = f"{base_url.rstrip('/')}/api/tags"
+    try:
+        with urllib.request.urlopen(url, timeout=5) as response:  # nosec B310 - fixed private Tailscale readiness URL.
+            status_code = response.status
+            body = response.read(1024 * 1024)
+    except urllib.error.HTTPError as exc:
+        return Check(
+            "windows",
+            "ollama_model_inventory",
+            "WARN",
+            f"http={exc.code}",
+            int((time.perf_counter() - started) * 1000),
+        )
+    except Exception as exc:
+        return Check(
+            "windows",
+            "ollama_model_inventory",
+            "WARN",
+            exc.__class__.__name__,
+            int((time.perf_counter() - started) * 1000),
+        )
+
+    status = "PASS" if 200 <= status_code < 300 else "WARN"
+    evidence = f"http={status_code}"
+    try:
+        parsed = json.loads(body)
+    except json.JSONDecodeError:
+        return Check(
+            "windows",
+            "ollama_model_inventory",
+            "WARN",
+            f"{evidence}; invalid_json",
+            int((time.perf_counter() - started) * 1000),
+        )
+
+    models = parsed.get("models") if isinstance(parsed, dict) else []
+    names = sorted(
+        str(item.get("name") or item.get("model") or "")
+        for item in models
+        if isinstance(item, dict) and (item.get("name") or item.get("model"))
+    )
+    missing = [
+        alias
+        for alias, required_model in sorted(WINDOWS_REQUIRED_MODELS.items())
+        if not model_inventory_has(names, required_model)
+    ]
+    if missing:
+        status = "WARN"
+    present = len(WINDOWS_REQUIRED_MODELS) - len(missing)
+    evidence += f"; models={len(names)}; required_present={present}/{len(WINDOWS_REQUIRED_MODELS)}"
+    if missing:
+        evidence += f"; missing_aliases={','.join(missing)}"
+    return Check(
+        "windows",
+        "ollama_model_inventory",
+        status,
+        evidence,
+        int((time.perf_counter() - started) * 1000),
+    )
+
+
+def model_inventory_has(model_names: list[str], required_model: str) -> bool:
+    if required_model in model_names:
+        return True
+    if ":" in required_model:
+        return False
+    prefix = f"{required_model}:"
+    return any(name.startswith(prefix) for name in model_names)
+
+
+def windows_webhook_health_check(host: str = DEFAULT_WINDOWS_HOST) -> Check:
+    started = time.perf_counter()
+    url = f"http://{host}:9090/webhook/health"
+    try:
+        with urllib.request.urlopen(url, timeout=5) as response:  # nosec B310 - fixed private Tailscale readiness URL.
+            status_code = response.status
+            body = response.read(1024 * 1024)
+    except urllib.error.HTTPError as exc:
+        return Check(
+            "windows",
+            "webhook_health",
+            "WARN",
+            f"http={exc.code}",
+            int((time.perf_counter() - started) * 1000),
+        )
+    except Exception as exc:
+        return Check(
+            "windows",
+            "webhook_health",
+            "WARN",
+            exc.__class__.__name__,
+            int((time.perf_counter() - started) * 1000),
+        )
+
+    evidence = f"http={status_code}"
+    try:
+        parsed = json.loads(body)
+    except json.JSONDecodeError:
+        return Check(
+            "windows",
+            "webhook_health",
+            "WARN",
+            f"{evidence}; invalid_json",
+            int((time.perf_counter() - started) * 1000),
+        )
+    services = parsed.get("services") if isinstance(parsed, dict) else {}
+    services = services if isinstance(services, dict) else {}
+    degraded = sorted(
+        str(name)
+        for name, value in services.items()
+        if isinstance(value, dict) and value.get("healthy") is not True
+    )
+    capabilities = parsed.get("capabilities") if isinstance(parsed, dict) else {}
+    capabilities = capabilities if isinstance(capabilities, dict) else {}
+    root_status = str(parsed.get("status") or "unknown") if isinstance(parsed, dict) else "unknown"
+    status = "PASS" if 200 <= status_code < 300 and root_status == "healthy" else "WARN"
+    if degraded:
+        status = "WARN"
+    evidence += f"; status={root_status}"
+    if degraded:
+        evidence += f"; degraded_services={','.join(degraded)}"
+    if "ollama_model_count" in capabilities:
+        evidence += f"; ollama_model_count={capabilities.get('ollama_model_count')}"
+    if "gpu_count" in capabilities:
+        evidence += f"; gpu_count={capabilities.get('gpu_count')}"
+    return Check(
+        "windows",
+        "webhook_health",
+        status,
+        evidence,
+        int((time.perf_counter() - started) * 1000),
+    )
+
+
 def probe_safety() -> list[Check]:
     result = run(
         [sys.executable, "scripts/ops/safety_status_report.py", "--json"], cwd=ROOT, timeout=30
@@ -1042,7 +1213,14 @@ def http_check(
     )
 
 
-def tcp_check(category: str, name: str, host: str, port: int) -> Check:
+def tcp_check(
+    category: str,
+    name: str,
+    host: str,
+    port: int,
+    *,
+    warn_on_error: bool = False,
+) -> Check:
     started = time.perf_counter()
     try:
         with socket.create_connection((host, port), timeout=3):
@@ -1057,7 +1235,7 @@ def tcp_check(category: str, name: str, host: str, port: int) -> Check:
         return Check(
             category,
             name,
-            "FAIL",
+            "WARN" if warn_on_error else "FAIL",
             exc.__class__.__name__,
             int((time.perf_counter() - started) * 1000),
         )
