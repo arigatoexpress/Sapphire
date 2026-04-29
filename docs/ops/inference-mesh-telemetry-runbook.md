@@ -58,7 +58,11 @@ The aggregator reads exactly one file:
 }
 ```
 
-Permissive: the parser accepts `prompt_tokens` / `completion_tokens` (proxy's existing key names), `elapsed_ms`, `success`, `endpoint`, and `backend` as alternates. So the proxy can adopt the call-log writer in any of those shapes.
+Permissive: the parser accepts `prompt_tokens` / `completion_tokens`,
+`elapsed_ms`, `success`, `endpoint`, and `backend` as alternates. The
+production proxy writer now emits the documented `tokens_in` / `tokens_out` /
+`latency_ms` shape, while those alternates keep older fixtures and diagnostic
+logs readable.
 
 Tier values must be one of:
 

@@ -106,9 +106,10 @@ review immediately.
 
 **Notes**:
 
-- The inference-proxy SLO is `aspirational` because per-tier latency
-  is not measured today. Lane 6 of Tranche 6 (inference mesh telemetry)
-  is the path to making this `measured` with real p50/p99/p999 numbers.
+- The inference-proxy SLO remains `aspirational` until the telemetry
+  dashboard has enough real `calls.jsonl` volume and agreed alert thresholds.
+  The proxy now writes per-tier latency records; promotion to `measured`
+  requires operating evidence, not more schema work.
 - Dashboard SSE freshness is bounded by event-bus latency (Redis
   primary, JSONL fallback). When Redis is down, freshness can degrade
   to ~5 s.
@@ -239,7 +240,8 @@ call-log volume and alert thresholds are agreed.
 
 The honest list of what we do not measure today:
 
-1. **Per-tier inference-proxy latency** (Lane 6 of Tranche 6 will fix).
+1. **Per-tier inference-proxy latency alerting** (writer exists; thresholds,
+   retention, and alert routing are not yet agreed).
 2. **Heartbeat tick freshness** (Lane 6 telemetry could surface this).
 3. **Telemetry-collector own-availability** (meta: who watches the
    watcher?).
