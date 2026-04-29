@@ -49,7 +49,7 @@ are the 8 from `claude.ai/code/routines` per CLAUDE.md.
 | `services/inference-proxy/` | `inference-tenant-quotas.md` | 3 | Quota doc exists but operational (4-tier failover, model-alias mapping, sensitivity gate, GPU-only model 503 path) needs a full runbook. |
 | `services/intelligence/` | `intelligence-breadth-runbook.md` | 3 | Breadth roadmap exists but daily-brief generator + chain-refresh operations are not covered. |
 | `services/macro_intel/` | `macro-intel-runbook.md` | 5 | — |
-| `services/morning_digest/` | `mission-status-digest-runbook.md` (cloud); `evening-digest-runbook.md` (cloud) | 3 | Local `morning-digest-runbook.md` is missing; the morning-brief LaunchAgent runs locally and needs its own. |
+| `services/morning_digest/` | `morning-digest-runbook.md`, `mission-status-digest-runbook.md` (cloud); `evening-digest-runbook.md` (cloud) | 3 | Add an archive writer or align `/digest morning` docs with the current send-only LaunchAgent behavior. |
 | `services/narrative_evaluation/` | `narrative-eval-runbook.md` | 4 | Sparse on regression-on-rubric path. |
 | `services/onchain_intel/` | `onchain-intel-runbook.md` | 5 | — |
 | `services/openbb_api/` | `openbb-api-runbook.md` | 3 | Add provider-route smoke tests that avoid external market-data calls and document the Python/OpenBB version pin once stabilized. |
@@ -91,9 +91,9 @@ still-partial `control-plane`, `foundry_sync`, `security_pipeline`,
 | `com.sapphire.gcp-sync` | `infra/launchagents/com.sapphire.gcp-sync.plist` | `gcp-pipeline-runbook.md` | 3 | Add launchd-specific last-run examples once live gcp-sync logs are sampled after the next scheduled fire. |
 | `com.sapphire.gemini-ooda-daily` | `infra/launchagents/com.sapphire.gemini-ooda-daily.plist` | `gemini-ooda-daily-runbook.md`, `gemini-ooda-synthesizer-runbook.md` | 5 | — |
 | `com.sapphire.heartbeat` | `infra/launchagents/com.sapphire.heartbeat.plist` | `heartbeat-runbook.md` | 3 | Add automated smoke coverage for one-shot mode and clarify overlap with `lib/core/heartbeat.py` self-heal monitor. |
-| `com.sapphire.logrotate` | `infra/launchagents/com.sapphire.logrotate.plist` | (none direct; cited in MEMORY.md as 3:30 AM, 5MB trigger, gzip) | 2 | Write `logrotate-runbook.md` — short note documenting the cadence + retention policy + how to recover gzipped archives. |
-| `com.sapphire.market-intel` | `infra/launchagents/com.sapphire.market-intel.plist` | (none direct) | 2 | Add a section to `intelligence-breadth-runbook.md` covering this agent specifically. |
-| `com.sapphire.morning-brief` | `infra/launchagents/com.sapphire.morning-brief.plist` | (none direct) | 2 | See `services/morning_digest/` gap. |
+| `com.sapphire.logrotate` | `infra/launchagents/com.sapphire.logrotate.plist` | `logrotate-runbook.md` | 3 | Add fixture-backed unit tests for rotate/prune behavior and a plist-specific cadence assertion. |
+| `com.sapphire.market-intel` | `infra/launchagents/com.sapphire.market-intel.plist` | `market-intel-runbook.md` | 3 | Add a routine freshness check for `market_intel.json` and a plist-specific 30-minute cadence assertion. |
+| `com.sapphire.morning-brief` | `infra/launchagents/com.sapphire.morning-brief.plist` | `morning-brief-runbook.md` | 3 | Align routine-health artifact tracking with dated `daily_brief.md` outputs or add a verified latest symlink/copy. |
 | `com.sapphire.openbb-api` | `infra/launchagents/com.sapphire.openbb-api.plist` | `openbb-api-runbook.md` | 3 | Add provider-route smoke tests that avoid external market-data calls and document the Python/OpenBB version pin once stabilized. |
 | `com.sapphire.security-pipeline` | `infra/launchagents/com.sapphire.security-pipeline.plist` | `security-pipeline-runbook.md` | 3 | Add a launchd stale-report check and a reviewed no-notify drill for manual reruns. |
 | `com.sapphire.self-optimization` | `infra/launchagents/com.sapphire.self-optimization.plist` | `self-optimization-runbook.md` | 3 | Add fixture coverage for `optimize.py` dry-run/event side effects and a freshness check for optimization events. |
@@ -104,7 +104,7 @@ still-partial `control-plane`, `foundry_sync`, `security_pipeline`,
 | `com.sapphire.tradingview-cdp` | `infra/launchagents/com.sapphire.tradingview-cdp.plist` | `tradingview-cdp-runbook.md` | 3 | Add a CDP-specific plist assertion and read-only MCP status smoke coverage. |
 | `com.sapphire.dashboard` (service-local) | `services/dashboard/launchagent/com.sapphire.dashboard.plist` | `dashboard-product-pages-runbook.md`, `observability-dashboard-runbook.md` | 5 | — |
 | `com.sapphire.inference-proxy` (service-local) | `services/inference-proxy/launchagent/com.sapphire.inference-proxy.plist` | `inference-tenant-quotas.md` | 3 | See `services/inference-proxy/` gap. |
-| `com.sapphire.morning-digest` (service-local) | `services/morning_digest/launchagent/com.sapphire.morning-digest.plist` | (partial) | 2 | See `services/morning_digest/` gap. |
+| `com.sapphire.morning-digest` (service-local) | `services/morning_digest/launchagent/com.sapphire.morning-digest.plist` | `morning-digest-runbook.md` | 3 | Add archive support for `data/morning_digest/YYYY-MM-DD.md` or remove the stale archive expectation from `/digest morning`. |
 | `com.sapphire.pm-bot` (service-local) | `services/pm_bot/launchagent/com.sapphire.pm-bot.plist` | `telegram-operator-console-runbook.md` | 4 | See `services/pm_bot/` gap. |
 | `com.sapphire.service-supervisor` (service-local) | `services/service_supervisor/launchagent/com.sapphire.service-supervisor.plist` | `service-supervisor-runbook.md` | 3 | Add fixture-backed tests for the operator commands shown in the runbook and document a manual state-clear checklist. |
 | `com.sapphire.telegram-intel-reader` (service-local) | `services/telegram_intel/launchagent/com.sapphire.telegram-intel-reader.plist` | `telegram-intel-reader-runbook.md` | 4 | See `services/telegram_intel/` gap. |
@@ -114,15 +114,16 @@ plus 6 service-local). The original lane spec said 23 LaunchAgents;
 the 28-count emerged because Tranches 4-5 added service-local plists
 the prior counts missed.
 
-**LaunchAgent average**: 3.18 (sum 89, n 28).
+**LaunchAgent average**: 3.32 (sum 93, n 28).
 
-**Lowest-scored LaunchAgents** (priority): `logrotate`,
-`market-intel`, `morning-brief`, and service-local `morning-digest`
-(2). Newly lifted but still partial: `backtest-weekly`,
-`content-publisher`, `control-plane`, `foundry-sync`, `gcp-sync`,
-`heartbeat`, `openbb-api`, `self-optimization`,
-`service-supervisor`, `telemetry-collector`,
-`trading-shadow-controller`, and `tradingview-cdp` (3).
+**Lowest-scored LaunchAgents** (priority): no score-1 or score-2
+LaunchAgents remain. The lowest tier is now score 3: `alpha-agent`,
+`backtest-weekly`, `chain-refresh`, `content-publisher`,
+`control-plane`, `foundry-sync`, `gcp-sync`, `heartbeat`,
+`logrotate`, `market-intel`, `morning-brief`, `openbb-api`,
+`self-optimization`, `signal-logger`, `telemetry-collector`,
+`trading-shadow-controller`, `tradingview-cdp`, plus service-local
+`inference-proxy`, `morning-digest`, and `service-supervisor`.
 
 ---
 
@@ -155,7 +156,7 @@ LaunchAgent-driven daemons.
 
 - **Total surfaces**: 62 (26 services + 28 LaunchAgents + 8 cloud
   routines).
-- **Aggregate score**: 229 / 310 = **3.69 / 5**.
+- **Aggregate score**: 233 / 310 = **3.76 / 5**.
 - **Score 5 surfaces**: 18 (29%).
 - **Score < 4 surfaces requiring gap action**: 33 (53%).
 - **Score 1 surfaces (no runbook)**: 0 (0%).
@@ -163,8 +164,8 @@ LaunchAgent-driven daemons.
 The asymmetry is still sharp: cloud routines and LLM-tool runbooks
 (`gemini-ooda-*`, `narrative-synthesis`, `vertex-eval`) are
 comprehensive; LaunchAgent-side daemons that quietly run in the
-background (`logrotate`, `market-intel`, `morning-brief`, and
-service-local `morning-digest`) are the weakest remaining surface.
+background are now documented at least to score 3, but still need more
+fixture-backed smoke coverage and routine-freshness checks.
 The pattern: when a runbook is required to bring a routine online
 from a cold start, it gets written. When a daemon "just runs", the
 runbook never lands.
@@ -173,12 +174,10 @@ runbook never lands.
 
 ## Recommended remediation order
 
-1. **Logrotate + market-intel + morning-brief + morning-digest**
-   (all score 2) — small local daemons where a concise cadence/log/recovery
-   note would remove avoidable operator ambiguity.
-2. **Backtest-weekly + telemetry-collector + Content-publisher +
+1. **Backtest-weekly + telemetry-collector + Content-publisher +
    TradingView-CDP + Control-plane + Foundry-sync + Security pipeline +
-   Heartbeat + self-optimization + trading-shadow-controller +
+   Heartbeat + logrotate + market-intel + morning-brief +
+   morning-digest + self-optimization + trading-shadow-controller +
    service-supervisor + OpenBB API + webhook + pipeline**
    (now score 3) —
    these have adequate operator runbooks after the 2026-04-29 uplifts,

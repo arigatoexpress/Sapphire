@@ -142,6 +142,13 @@ tools:
     consumers: [scheduled-tasks.service-supervisor, services.pm-bot]
     description: LaunchAgent self-healing supervisor — detects crashed services, restarts with rate limits, escalates to Telegram only if restart fails. Shares notification surface with watchdog.
 
+  - name: routine_pause_bridge
+    path: plugins/claw-sapphire/tools/routine_pause_bridge.py
+    status: internal
+    owner: sapphire
+    consumers: [scheduled-tasks.morning-digest, scheduled-tasks.service-supervisor]
+    description: Import bridge for repo-root routine pause helpers when plugin-local test packages shadow the Sapphire lib.core namespace.
+
   - name: _telegram_safety
     path: plugins/claw-sapphire/tools/internal/_telegram_safety.py
     status: internal

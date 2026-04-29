@@ -8,8 +8,8 @@
 
 [![CI](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
 [![Security](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml)
-[![Tests](https://img.shields.io/badge/tests-6%2C230%2B%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
-[![Tools](https://img.shields.io/badge/tools-49-0d9488)](infra/tool-registry.yaml)
+[![Tests](https://img.shields.io/badge/tests-6%2C287%2B%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
+[![Tools](https://img.shields.io/badge/tools-67-0d9488)](infra/tool-registry.yaml)
 [![Dashboard](https://img.shields.io/badge/dashboard-38%20pages-6d28d9)](services/dashboard/templates/pages)
 [![Readiness](https://img.shields.io/badge/readiness-0%20FAIL-2ea44f)](scripts/ops/production_readiness_sweep.py)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3776ab?logo=python&logoColor=white)](https://www.python.org/)
@@ -133,12 +133,12 @@ flowchart LR
 
 | Surface | Count | Detail |
 |---|---:|---|
-| Passing tests | **6,230+** | 5,740+ unit · 490 plugin (`python scripts/ops/test_inventory.py --check-readme`) |
-| Test files | **354+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
+| Passing tests | **6,287+** | 5,797+ unit · 490 plugin (`python scripts/ops/test_inventory.py --check-readme`) |
+| Test files | **355+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
 | Dashboard pages | **38** | Flask + SSE, basic-auth, observability, cross-asset, diligence, threat-intel, dossier pages |
 | Quant strategies | **7** | `lib/analytics/strategies.py` |
 | Pine strategies | **5** | `pine/standalone/` |
-| Plugin tools (registered · internal · deprecated) | **7 · 41 · 1** | 49 total entries in `infra/tool-registry.yaml` |
+| Plugin tools (registered · internal · deprecated) | **7 · 59 · 1** | 67 total entries in `infra/tool-registry.yaml` |
 | LaunchAgent definitions | **34** | Active plists plus service-level templates; runtime loading remains operator-controlled |
 | Product docs | **19** | `docs/products/`, including Tranche 4 buyer-facing surfaces |
 | Hermes Telegram skills | **16** | `~/.hermes/skills/sapphire/`, audited in `infra/hermes-sapphire-skills.yaml` |
