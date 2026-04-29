@@ -127,6 +127,7 @@
 .metric-card,
 .surface-card,
 .satellite-card,
+.path-card,
 .loop-card {
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
@@ -200,6 +201,7 @@
 
 .surface-card,
 .satellite-card,
+.path-card,
 .loop-card {
     display: flex;
     flex-direction: column;
@@ -212,7 +214,8 @@
 }
 
 .surface-card:hover,
-.satellite-card:hover {
+.satellite-card:hover,
+.path-card:hover {
     border-color: var(--amber);
     background: rgba(11, 11, 26, 0.97);
     transform: translateY(-1px);
@@ -263,6 +266,38 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-md);
+}
+
+.path-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-md);
+}
+
+.path-card {
+    min-height: 260px;
+}
+
+.path-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+}
+
+.path-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    border-bottom: 1px solid rgba(105, 214, 255, 0.34);
+    color: var(--cyan);
+    font-size: 0.72rem;
+    line-height: 1.3;
+    text-decoration: none;
+}
+
+.path-link:hover {
+    border-color: var(--amber);
+    color: var(--amber);
 }
 
 .satellite-head {
@@ -399,6 +434,7 @@
 @media (max-width: 1180px) {
     .unified-hero,
     .surface-grid,
+    .path-grid,
     .loop-grid,
     .metric-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -410,6 +446,7 @@
     .metric-grid,
     .surface-grid,
     .satellite-grid,
+    .path-grid,
     .loop-grid,
     .safety-band {
         grid-template-columns: 1fr;
@@ -537,6 +574,39 @@
         </div>
     </section>
 
+    <section class="unified-section" aria-labelledby="walkthrough-title">
+        <div class="section-head">
+            <div>
+                <div class="section-kicker">Guided Index</div>
+                <h2 class="section-title" id="walkthrough-title">Walkthrough paths</h2>
+            </div>
+            <p class="section-note">
+                Persona-oriented paths keep buyer review, operator health,
+                satellite demos, and source context reachable without adding
+                controls.
+            </p>
+        </div>
+        <div class="path-grid">
+            {% for path in dashboard.walkthrough_paths %}
+            <article class="path-card">
+                <div class="card-kicker">{{ path.persona }}</div>
+                <div class="card-title">{{ path.title }}</div>
+                <div class="card-copy">{{ path.summary }}</div>
+                <div class="path-links">
+                    {% for link in path.links %}
+                    <a class="path-link" href="{{ link.href }}" {% if link.external %}target="_blank" rel="noopener noreferrer"{% endif %}>{{ link.label }}</a>
+                    {% endfor %}
+                </div>
+                <div class="tag-row">
+                    {% for tag in path.tags %}
+                    <span class="tag">{{ tag }}</span>
+                    {% endfor %}
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+    </section>
+
     <section class="unified-section" aria-labelledby="satellites-title">
         <div class="section-head">
             <div>
@@ -575,9 +645,9 @@
         <table class="directory-table coverage-table" aria-label="Adjacent project coverage">
             <thead>
                 <tr>
-                    <th>Adjacent project</th>
+                    <th>Repository</th>
                     <th>Coverage</th>
-                    <th>Surface</th>
+                    <th>Pointers</th>
                 </tr>
             </thead>
             <tbody>
@@ -585,7 +655,13 @@
                 <tr>
                     <td class="directory-group">{{ project.name }}</td>
                     <td>{{ project.coverage }}</td>
-                    <td><a class="link-button" href="{{ project.href }}">{{ project.surface }}</a></td>
+                    <td>
+                        <div class="directory-links">
+                            {% for link in project.links %}
+                            <a href="{{ link.href }}" {% if link.external %}target="_blank" rel="noopener noreferrer"{% endif %}>{{ link.label }}</a>
+                            {% endfor %}
+                        </div>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>

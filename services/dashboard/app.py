@@ -826,7 +826,87 @@ def _build_unified_dashboard_payload() -> dict[str, Any]:
             {
                 "label": "Satellite Frontends",
                 "value": "4",
-                "note": "THO, regional intel, org-platform, and protected PM hub",
+                "note": "THO, regional intel, org-platform, and protected PM hub with repo pointers",
+            },
+        ],
+        "walkthrough_paths": [
+            {
+                "persona": "Buyer proof path",
+                "title": "Executive evidence",
+                "summary": "Start with the curated front door, then move through diligence, readiness, security, and provenance-heavy source quality.",
+                "links": [
+                    {"label": "Showcase", "href": "/showcase"},
+                    {"label": "Diligence", "href": "/diligence"},
+                    {"label": "Readiness", "href": "/production-readiness"},
+                    {"label": "Security", "href": "/security/overview"},
+                    {"label": "Source Quality", "href": "/source-quality"},
+                ],
+                "tags": ["buyer", "evidence", "read-only"],
+            },
+            {
+                "persona": "Operator health path",
+                "title": "Daily command loop",
+                "summary": "Open the live overview, then inspect observability, inference telemetry, logs, and launch posture without mutating services.",
+                "links": [
+                    {"label": "Overview", "href": "/"},
+                    {"label": "Observability", "href": "/observability"},
+                    {"label": "Inference", "href": "/inference-telemetry"},
+                    {"label": "Logs", "href": "/logs"},
+                    {"label": "Infrastructure", "href": "/infrastructure"},
+                ],
+                "tags": ["operator", "health", "local"],
+            },
+            {
+                "persona": "Satellite demo path",
+                "title": "Sapphire plus frontends",
+                "summary": "Jump from Sapphire into THO production, the regional-intel console, org-platform, and the protected PM hub with clear status labels.",
+                "links": [
+                    {
+                        "label": "THO",
+                        "href": "https://sapphirealpha.xyz",
+                        "external": True,
+                    },
+                    {
+                        "label": "Regional Intel",
+                        "href": "http://127.0.0.1:8768/intel",
+                        "external": True,
+                    },
+                    {
+                        "label": "org-platform",
+                        "href": "http://127.0.0.1:3000",
+                        "external": True,
+                    },
+                    {
+                        "label": "PM Hub",
+                        "href": "https://agentic-pm-hub-trgi34bxuq-uc.a.run.app/health",
+                        "external": True,
+                    },
+                ],
+                "tags": ["frontends", "satellites", "no controls"],
+            },
+            {
+                "persona": "Engineering source path",
+                "title": "Repo-grounded context",
+                "summary": "Use the repository pointers and Sapphire pages to connect product surfaces back to source ownership and guardrails.",
+                "links": [
+                    {
+                        "label": "Sapphire",
+                        "href": "https://github.com/arigatoexpress/Sapphire",
+                        "external": True,
+                    },
+                    {
+                        "label": "Project-Go-Forward",
+                        "href": "https://github.com/arigatoexpress/Project-Go-Forward",
+                        "external": True,
+                    },
+                    {
+                        "label": "regional-intel",
+                        "href": "https://github.com/arigatoexpress/regional-intel-workbench",
+                        "external": True,
+                    },
+                    {"label": "Organization", "href": "/organization"},
+                ],
+                "tags": ["repos", "guardrails", "source"],
             },
         ],
         "primary_surfaces": [
@@ -961,22 +1041,89 @@ def _build_unified_dashboard_payload() -> dict[str, Any]:
         ],
         "adjacent_projects": [
             {
+                "name": "Project-Go-Forward / THO",
+                "coverage": "Production business system, CRM, partner APIs, document generation, and the public THO app.",
+                "href": "https://sapphirealpha.xyz",
+                "surface": "Production app",
+                "links": [
+                    {
+                        "label": "Production app",
+                        "href": "https://sapphirealpha.xyz",
+                        "external": True,
+                    },
+                    {
+                        "label": "Repository",
+                        "href": "https://github.com/arigatoexpress/Project-Go-Forward",
+                        "external": True,
+                    },
+                    {"label": "Diligence", "href": "/diligence"},
+                ],
+            },
+            {
+                "name": "regional-intel-workbench",
+                "coverage": "Regional intelligence feeds, client-ready intel consoles, vote monitoring, and Foundry-oriented exports.",
+                "href": "http://127.0.0.1:8768/intel",
+                "surface": "Local intel console",
+                "links": [
+                    {
+                        "label": "Analyst console",
+                        "href": "http://127.0.0.1:8768/intel",
+                        "external": True,
+                    },
+                    {
+                        "label": "Repository",
+                        "href": "https://github.com/arigatoexpress/regional-intel-workbench",
+                        "external": True,
+                    },
+                    {"label": "Sapphire intel", "href": "/intel"},
+                ],
+            },
+            {
                 "name": "tradingview-mcp / tradingview-mcp-v2",
                 "coverage": "TradingView bridge and dry-run signal tooling",
                 "href": "/api/tradingview/capabilities",
                 "surface": "Capability matrix JSON",
+                "links": [
+                    {"label": "Capabilities", "href": "/api/tradingview/capabilities"},
+                    {
+                        "label": "Ari bridge repo",
+                        "href": "https://github.com/arigatoexpress/tradingview-mcp",
+                        "external": True,
+                    },
+                    {
+                        "label": "Upstream bridge",
+                        "href": "https://github.com/tradesdontlie/tradingview-mcp",
+                        "external": True,
+                    },
+                ],
             },
             {
                 "name": "cyber-threat-bot",
                 "coverage": "Defensive threat collection and research workflow",
                 "href": "/threat-intel",
                 "surface": "Threat Intel product surface",
+                "links": [
+                    {"label": "Threat Intel", "href": "/threat-intel"},
+                    {
+                        "label": "Repository",
+                        "href": "https://github.com/arigatoexpress/cyber-threat-bot",
+                        "external": True,
+                    },
+                ],
             },
             {
                 "name": "crypto-tax-tracker",
                 "coverage": "Finance-supporting satellite tracked from the org manifest",
                 "href": "/sapphire-book",
                 "surface": "Sapphire Book context",
+                "links": [
+                    {"label": "Sapphire Book", "href": "/sapphire-book"},
+                    {
+                        "label": "Repository",
+                        "href": "https://github.com/arigatoexpress/crypto-tax-tracker",
+                        "external": True,
+                    },
+                ],
             },
         ],
         "dashboard_directory": [
