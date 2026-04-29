@@ -150,6 +150,31 @@ def test_inference_health_passes_when_all_tiers_healthy(monkeypatch) -> None:
     assert "degraded_tiers" not in check.evidence
 
 
+def test_inference_health_ignores_disabled_tiers(monkeypatch) -> None:
+    def fake_urlopen(_request: object, timeout: int) -> _FakeHTTPResponse:
+        assert timeout == 5
+        return _FakeHTTPResponse(
+            200,
+            {
+                "status": "ok",
+                "endpoints": {
+                    "windows-gpu": "healthy",
+                    "pi-rari1": "disabled",
+                    "pi-rari2": "disabled",
+                    "mac-local": "healthy",
+                },
+            },
+        )
+
+    monkeypatch.setattr(sweep.urllib.request, "urlopen", fake_urlopen)
+
+    check = sweep.inference_proxy_health_check()
+
+    assert check.status == "PASS"
+    assert "disabled_tiers=pi-rari1,pi-rari2" in check.evidence
+    assert "degraded_tiers" not in check.evidence
+
+
 def test_windows_ollama_inventory_passes_with_required_models(monkeypatch) -> None:
     names = [
         "nemotron-mini:4b",

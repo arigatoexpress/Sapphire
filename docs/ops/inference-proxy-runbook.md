@@ -100,6 +100,10 @@ Important defaults:
   closed or exact-fallback only where explicitly allowed.
 - `PI_SERVE_MODELS` is intentionally narrow. Do not route large prompts or
   GPU-only models to Pi.
+- Disabled Pi tiers are reported as `disabled`, not `failed`, and are skipped
+  by background probes. As of 2026-04-29 both Pi Tailscale nodes were offline
+  for 9 days, so the tracked LaunchAgent disables T2 until the nodes are
+  reachable again.
 - `MAC_EXACT_FALLBACK_MODELS` permits exact local fallback where the Mac has
   the requested model.
 
@@ -238,9 +242,10 @@ then ask the operator or prepare an explicit rollback note.
 ### Pi tier times out
 
 1. Confirm `PI_RARI1_ENABLED` / `PI_RARI2_ENABLED` in the plist or environment.
-2. Verify the model is in `PI_SERVE_MODELS`.
-3. Leave `PI_DEFAULT_MODEL` small unless benchmark evidence supports a change.
-4. Treat repeated timeouts as a tier-health problem, not a reason to broaden
+2. Check `tailscale status` and confirm the Pi node was recently seen.
+3. Verify the model is in `PI_SERVE_MODELS`.
+4. Leave `PI_DEFAULT_MODEL` small unless benchmark evidence supports a change.
+5. Treat repeated timeouts as a tier-health problem, not a reason to broaden
    model routing.
 
 ### Sensitive prompt reaches cloud

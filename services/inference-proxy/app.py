@@ -248,6 +248,22 @@ def _should_preflight(name: str, max_age_sec: float = 30) -> bool:
         return age > max_age_sec
 
 
+def _endpoint_enabled(name: str) -> bool:
+    """Return whether an endpoint should participate in live probing/routing."""
+    if name == "pi-rari1":
+        return PI_RARI1_ENABLED
+    if name == "pi-rari2":
+        return PI_RARI2_ENABLED
+    return True
+
+
+def _endpoint_status(name: str) -> str:
+    """Return a health status that distinguishes disabled tiers from failures."""
+    if not _endpoint_enabled(name):
+        return "disabled"
+    return "healthy" if _is_healthy(name) else "failed"
+
+
 # ─── Metrics ─────────────────────────────────────────────────────────────────
 _metrics = {
     name: {"requests": 0, "success": 0, "failure": 0, "total_ms": 0}
@@ -1167,8 +1183,7 @@ def _background_health_probe():
     """Runs every 30s. Probes failed endpoints to detect recovery early."""
     probes = [
         ("windows-gpu", WINDOWS_GPU),
-        ("pi-rari1", PI_RARI1),
-        ("pi-rari2", PI_RARI2),
+        *_enabled_pi_targets(),
         ("mac-local", MAC_LOCAL),
     ]
     while True:
@@ -1199,9 +1214,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 {
                     "status": "ok",
                     "service": "inference-proxy",
-                    "endpoints": {
-                        name: ("healthy" if _is_healthy(name) else "failed") for name in ENDPOINTS
-                    },
+                    "endpoints": {name: _endpoint_status(name) for name in ENDPOINTS},
                     "tiers": {
                         "t1_windows_gpu": WINDOWS_GPU,
                         "t2_pi_rari1": f"{PI_RARI1} (enabled={PI_RARI1_ENABLED})",
@@ -1253,8 +1266,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
         # does not mean the endpoint is down for inference.
         for name, base in [
             ("windows-gpu", WINDOWS_GPU),
-            ("pi-rari1", PI_RARI1),
-            ("pi-rari2", PI_RARI2),
+            *_enabled_pi_targets(),
             ("mac-local", MAC_LOCAL),
         ]:
             if not _is_healthy(name):

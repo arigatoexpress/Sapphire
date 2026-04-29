@@ -151,6 +151,16 @@ class TestTierMembership:
         names = [t[0] for t in targets]
         assert names == ["pi-rari1", "pi-rari2"]
 
+    def test_disabled_pi_endpoint_status_is_not_failed(self, app_module, monkeypatch):
+        monkeypatch.setattr(app_module, "PI_RARI1_ENABLED", False)
+        monkeypatch.setattr(app_module, "PI_RARI2_ENABLED", False)
+        app_module._mark_failed("pi-rari1")
+        app_module._mark_failed("pi-rari2")
+
+        assert app_module._endpoint_status("pi-rari1") == "disabled"
+        assert app_module._endpoint_status("pi-rari2") == "disabled"
+        assert app_module._enabled_pi_targets() == []
+
 
 # ─── Sensitivity classifier ───────────────────────────────────────────────────
 
@@ -919,9 +929,26 @@ class TestGetEndpoints:
         assert payload["service"] == "inference-proxy"
         assert set(payload["endpoints"].keys()) == set(app_module.ENDPOINTS)
         for status in payload["endpoints"].values():
-            assert status in {"healthy", "failed"}
+            assert status in {"healthy", "failed", "disabled"}
         assert "tiers" in payload
         assert "t1_windows_gpu" in payload["tiers"]
+
+    def test_health_response_reports_disabled_pi_tiers(self, app_module, monkeypatch):
+        monkeypatch.setattr(app_module, "PI_RARI1_ENABLED", False)
+        monkeypatch.setattr(app_module, "PI_RARI2_ENABLED", False)
+
+        handler = _make_handler(
+            app_module,
+            path="/health",
+            body=b"",
+            method="GET",
+        )
+        handler.do_GET()
+
+        assert handler._captured_status == 200
+        payload = _response_payload(handler)
+        assert payload["endpoints"]["pi-rari1"] == "disabled"
+        assert payload["endpoints"]["pi-rari2"] == "disabled"
 
     def test_metrics_response_shape_with_data(self, app_module):
         # Seed a few metric points to exercise the avg/success_rate formatters.

@@ -24,7 +24,7 @@
     <key>EnvironmentVariables</key>
     <dict>
         <key>PI_RARI1_ENABLED</key>
-        <string>1</string>
+        <string>0</string>
         <key>PI_RARI2_ENABLED</key>
         <string>0</string>
     </dict>
