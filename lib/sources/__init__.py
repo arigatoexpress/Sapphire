@@ -169,15 +169,20 @@ def canonical_symbol(value: Any) -> str:
 
 from .defillama import DeFiLlamaSource
 from .dune import DuneNamedQuerySource
+from .earnings_calls import EarningsCallSource
 from .labor import LaborSource
 from .news import NewsAPISource
+from .sec_edgar import SECEdgarSource
 from .x_sentiment import XSentimentSource
 
 __all__ = [
+    "DEFAULT_USER_AGENT",
     "DeFiLlamaSource",
     "DuneNamedQuerySource",
+    "EarningsCallSource",
     "LaborSource",
     "NewsAPISource",
+    "SECEdgarSource",
     "SourceError",
     "XSentimentSource",
     "age_seconds",

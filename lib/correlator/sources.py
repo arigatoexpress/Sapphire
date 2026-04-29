@@ -659,8 +659,10 @@ def available_sources() -> tuple[type, ...]:
     from lib.sources import (
         DeFiLlamaSource,
         DuneNamedQuerySource,
+        EarningsCallSource,
         LaborSource,
         NewsAPISource,
+        SECEdgarSource,
         XSentimentSource,
     )
 
@@ -679,6 +681,8 @@ def available_sources() -> tuple[type, ...]:
         XSentimentSource,
         NewsAPISource,
         LaborSource,
+        SECEdgarSource,
+        EarningsCallSource,
     )
 
 
@@ -687,8 +691,10 @@ def build_default_sources() -> list[SignalSource]:
     from lib.sources import (
         DeFiLlamaSource,
         DuneNamedQuerySource,
+        EarningsCallSource,
         LaborSource,
         NewsAPISource,
+        SECEdgarSource,
         XSentimentSource,
     )
 
@@ -707,6 +713,8 @@ def build_default_sources() -> list[SignalSource]:
         XSentimentSource(),
         NewsAPISource(),
         LaborSource(),
+        SECEdgarSource(),
+        EarningsCallSource(),
     ]
 
 
