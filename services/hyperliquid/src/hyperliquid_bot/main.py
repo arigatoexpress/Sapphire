@@ -2,9 +2,11 @@
 risk-managed :class:`HyperliquidLiveExecutor`.
 
 Signal flow:
-    services/alpha → pubsub topic 'trading-signals' → this bot → executor → client
+    TradingView → webhook → signal_logger appends to data/trading_signals.jsonl
+        → :class:`SignalSubscriber` tails the jsonl from a persisted offset
+        → :class:`HyperliquidLiveExecutor` (caps + killswitch) → client
 
-Caps (see ``lib.trading.hyperliquid_live.HyperliquidLivePolicy``):
+Caps (see ``hyperliquid_bot.risk.HyperliquidLivePolicy``):
     - $5/order notional
     - 3x max leverage
     - 5 max open positions
@@ -47,6 +49,11 @@ from .risk import (  # noqa: E402
     HyperliquidLivePolicy,
     load_private_key,
 )
+from .signal_subscriber import (  # noqa: E402
+    DEFAULT_OFFSET_PATH,
+    DEFAULT_SIGNAL_PATH,
+    SignalSubscriber,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +61,20 @@ logger = logging.getLogger(__name__)
 def _resolve_testnet() -> bool:
     raw = os.getenv("HYPERLIQUID_TESTNET", "true").strip().lower()
     return raw not in ("0", "false", "no", "off")
+
+
+def _resolve_signal_path() -> Path:
+    override = os.getenv("HYPERLIQUID_SIGNAL_PATH", "").strip()
+    if override:
+        return Path(override).expanduser()
+    return ROOT / DEFAULT_SIGNAL_PATH
+
+
+def _resolve_offset_path() -> Path:
+    override = os.getenv("HYPERLIQUID_SIGNAL_OFFSET_PATH", "").strip()
+    if override:
+        return Path(override).expanduser()
+    return ROOT / DEFAULT_OFFSET_PATH
 
 
 class HyperliquidBot:
@@ -77,6 +98,7 @@ class HyperliquidBot:
         self.testnet = _resolve_testnet() if testnet is None else testnet
         self._client = HyperliquidClient(private_key, testnet=self.testnet)
         self._executor: HyperliquidLiveExecutor | None = None
+        self._subscriber: SignalSubscriber | None = None
         self.running = False
 
     async def start(self) -> None:
@@ -93,17 +115,41 @@ class HyperliquidBot:
                 status["state"]["open_positions"],
                 status["trading_enabled"],
             )
+            self._subscriber = SignalSubscriber(
+                self._handle_signal,
+                signal_path=_resolve_signal_path(),
+                offset_path=_resolve_offset_path(),
+                default_size_usd=self.policy.max_order_notional_usd,
+            )
             await self._run_loop()
 
     async def _run_loop(self) -> None:
-        """Main loop — TODO wire pubsub 'trading-signals' subscription.
+        """Tail the trading-signals jsonl and feed each entry to the executor."""
+        assert self._subscriber is not None
+        subscriber_task = asyncio.create_task(self._subscriber.run())
+        try:
+            while self.running:
+                await asyncio.sleep(0.5)
+        finally:
+            self._subscriber.stop()
+            subscriber_task.cancel()
+            try:
+                await subscriber_task
+            except (asyncio.CancelledError, Exception):
+                pass
 
-        Until the subscription lands, the bot simply heartbeats so the LaunchAgent
-        / systemd unit stays healthy. Signals can also be injected for tests via
-        :meth:`execute`.
-        """
-        while self.running:
-            await asyncio.sleep(5)
+    async def _handle_signal(self, signal_payload: dict) -> None:
+        """Subscriber callback — dispatch one translated signal to the executor."""
+        if self._executor is None:
+            logger.warning("signal received before executor ready; dropping")
+            return
+        result = await self._executor.execute_signal(signal_payload)
+        logger.info(
+            "signal handled symbol=%s action=%s status=%s",
+            signal_payload.get("symbol"),
+            signal_payload.get("action"),
+            result.status,
+        )
 
     async def execute(self, signal: dict) -> dict:
         """Execute a trading signal through the risk-managed executor.
