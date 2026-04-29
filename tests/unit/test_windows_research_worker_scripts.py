@@ -18,6 +18,8 @@ def test_research_worker_runs_paper_only_backtest_and_walkforward() -> None:
     assert "services.walkforward.build" in script
     assert "--bars-source" in script
     assert '"synthetic"' in script
+    assert '$env:PYTHONUTF8 = "1"' in script
+    assert '$env:PYTHONIOENCODING = "utf-8"' in script
     assert "$ErrorActionPreference = \"Continue\"" in script
     assert "$exitCode = $LASTEXITCODE" in script
     assert "Out-File -FilePath $LogPath" in script
