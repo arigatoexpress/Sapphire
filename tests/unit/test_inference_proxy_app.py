@@ -48,8 +48,10 @@ def app_module():
 
 
 @pytest.fixture(autouse=True)
-def reset_health_and_metrics(app_module):
+def reset_health_and_metrics(app_module, monkeypatch, tmp_path):
     """Reset health flags + metrics counters between tests."""
+    monkeypatch.setenv("INFERENCE_PROXY_CALLS_PATH", str(tmp_path / "calls.jsonl"))
+    monkeypatch.setattr(app_module, "_CALL_LOG_ENABLED", True)
     with app_module._health_lock:
         for name in app_module.ENDPOINTS:
             app_module._endpoint_health[name] = True
@@ -329,6 +331,66 @@ class TestMetrics:
             app_module._record(f"filler-{i}", True, 1)
         app_module._record("overflow-tier", True, 1)
         assert "overflow-tier" not in app_module._metrics
+
+    def test_record_appends_sanitized_call_record(self, app_module):
+        app_module._record(
+            "windows-gpu",
+            success=True,
+            elapsed_ms=120,
+            model="hermes3:8b",
+            response={"usage": {"prompt_tokens": 11, "completion_tokens": 7}},
+        )
+
+        rows = app_module._calls_log_path().read_text(encoding="utf-8").splitlines()
+        assert len(rows) == 1
+        record = json.loads(rows[0])
+        assert record["tier"] == "T1_windows_gpu"
+        assert record["model"] == "hermes3:8b"
+        assert record["latency_ms"] == 120
+        assert record["ok"] is True
+        assert record["tokens_in"] == 11
+        assert record["tokens_out"] == 7
+        assert record["error_class"] is None
+        assert "messages" not in record
+        assert "content" not in record
+
+    def test_record_skips_proxy_and_unknown_tiers_for_call_log(self, app_module):
+        app_module._record("proxy", success=True, elapsed_ms=1)
+        app_module._record("unknown-tier", success=False, elapsed_ms=1)
+
+        assert not app_module._calls_log_path().exists()
+
+    def test_record_raw_bytes_usage_for_mac_local(self, app_module):
+        response = json.dumps(
+            {"usage": {"prompt_tokens": 3, "completion_tokens": 5, "total_tokens": 8}}
+        ).encode()
+
+        app_module._record(
+            "mac-local",
+            success=True,
+            elapsed_ms=90,
+            model="hermes3:8b",
+            response=response,
+        )
+
+        record = json.loads(app_module._calls_log_path().read_text(encoding="utf-8"))
+        assert record["tier"] == "T3_mac_local"
+        assert record["tokens_in"] == 3
+        assert record["tokens_out"] == 5
+
+    def test_record_failure_includes_error_class(self, app_module):
+        app_module._record(
+            "pi-rari1",
+            success=False,
+            elapsed_ms=30_000,
+            model="qwen2.5:0.5b",
+            error_class="TimeoutError",
+        )
+
+        record = json.loads(app_module._calls_log_path().read_text(encoding="utf-8"))
+        assert record["tier"] == "T2_pi_rari1"
+        assert record["ok"] is False
+        assert record["error_class"] == "TimeoutError"
 
 
 # ─── Tenant quotas + prompt cache ─────────────────────────────────────────────

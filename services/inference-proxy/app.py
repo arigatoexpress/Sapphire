@@ -43,6 +43,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from socketserver import ThreadingMixIn
@@ -253,12 +254,95 @@ _metrics = {
     for name in ENDPOINTS + ["proxy"]
 }
 _metrics_lock = threading.Lock()
+_call_log_lock = threading.Lock()
 
 
 _MAX_METRIC_KEYS = 32  # Guard against unbounded growth from unknown tier names
+_CALL_LOG_ENABLED = os.getenv("INFERENCE_CALL_LOG_ENABLED", "1") != "0"
+_CALL_LOG_DEFAULT_PATH = Path.home() / ".cache" / "sapphire" / "inference_proxy" / "calls.jsonl"
+_CALL_LOG_TIER_MAP = {
+    "windows-gpu": "T1_windows_gpu",
+    "pi-rari1": "T2_pi_rari1",
+    "pi-rari2": "T2_pi_rari2",
+    "mac-local": "T3_mac_local",
+    "kimi-cloud": "T4_kimi_cloud",
+}
 
 
-def _record(tier: str, success: bool, elapsed_ms: int):
+def _calls_log_path() -> Path:
+    return Path(os.getenv("INFERENCE_PROXY_CALLS_PATH", str(_CALL_LOG_DEFAULT_PATH))).expanduser()
+
+
+def _coerce_int(value, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _usage_from_response(response) -> tuple[int, int]:
+    if isinstance(response, bytes):
+        try:
+            response = json.loads(response.decode())
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return 0, 0
+    if not isinstance(response, dict):
+        return 0, 0
+    usage = response.get("usage") or {}
+    if not isinstance(usage, dict):
+        return 0, 0
+    return (
+        _coerce_int(usage.get("prompt_tokens", usage.get("tokens_in", 0))),
+        _coerce_int(usage.get("completion_tokens", usage.get("tokens_out", 0))),
+    )
+
+
+def _append_call_record(
+    tier: str,
+    *,
+    success: bool,
+    elapsed_ms: int,
+    model: str = "",
+    response=None,
+    error_class: str | None = None,
+) -> None:
+    """Append sanitized per-tier telemetry without storing prompts or completions."""
+    if not _CALL_LOG_ENABLED:
+        return
+    canonical_tier = _CALL_LOG_TIER_MAP.get(tier)
+    if not canonical_tier:
+        return
+    tokens_in, tokens_out = _usage_from_response(response)
+    record = {
+        "ts": datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
+        "tier": canonical_tier,
+        "model": str(model or ""),
+        "latency_ms": max(0, int(elapsed_ms or 0)),
+        "ok": bool(success),
+        "tokens_in": tokens_in,
+        "tokens_out": tokens_out,
+        "error_class": None if success else (error_class or "InferenceError"),
+    }
+    try:
+        path = _calls_log_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        line = json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n"
+        with _call_log_lock:
+            with path.open("a", encoding="utf-8") as handle:
+                handle.write(line)
+    except OSError as exc:
+        log.warning("inference call telemetry write failed: %s", exc)
+
+
+def _record(
+    tier: str,
+    success: bool,
+    elapsed_ms: int,
+    *,
+    model: str = "",
+    response=None,
+    error_class: str | None = None,
+):
     with _metrics_lock:
         if tier not in _metrics and len(_metrics) >= _MAX_METRIC_KEYS:
             log.warning(
@@ -272,6 +356,14 @@ def _record(tier: str, success: bool, elapsed_ms: int):
         else:
             m["failure"] += 1
         m["total_ms"] += elapsed_ms
+    _append_call_record(
+        tier,
+        success=success,
+        elapsed_ms=elapsed_ms,
+        model=model,
+        response=response,
+        error_class=error_class,
+    )
 
 
 # ─── Tenant Quotas + Prompt Cache ────────────────────────────────────────────
@@ -679,18 +771,25 @@ def _try_ollama_native(
             return None
         elapsed = int((time.time() - t0) * 1000)
         _mark_ok(endpoint_name)
-        _record(endpoint_name, True, elapsed)
+        openai_response = _native_to_openai(native, model)
+        _record(endpoint_name, True, elapsed, model=model, response=openai_response)
         log.info(
             "-> inference via %s (native ollama, model=%s, %dms)", endpoint_name, model, elapsed
         )
-        return _native_to_openai(native, model)
+        return openai_response
     except urllib.error.HTTPError as e:
         if e.code == 404:
             log.warning("x %s: model '%s' not found (404) — endpoint healthy", endpoint_name, model)
         else:
             log.warning("x %s native HTTP %d: %s", endpoint_name, e.code, str(e)[:60])
             _mark_failed(endpoint_name)
-            _record(endpoint_name, False, int((time.time() - t0) * 1000))
+            _record(
+                endpoint_name,
+                False,
+                int((time.time() - t0) * 1000),
+                model=model,
+                error_class=type(e).__name__,
+            )
         return None
     except (TimeoutError, OSError) as e:
         err_str = str(e)
@@ -704,15 +803,15 @@ def _try_ollama_native(
             # (Cold model loads in Ollama respond normally; a socket timeout = host down.)
             log.warning("x %s timed out after %dms — marking failed", endpoint_name, elapsed)
             _mark_failed(endpoint_name)
-            _record(endpoint_name, False, elapsed)
+            _record(endpoint_name, False, elapsed, model=model, error_class=type(e).__name__)
         elif "Connection refused" in err_str or "No route" in err_str:
             log.warning("x %s unreachable (%s): %s", endpoint_name, base_url, err_str[:60])
             _mark_failed(endpoint_name)
-            _record(endpoint_name, False, elapsed)
+            _record(endpoint_name, False, elapsed, model=model, error_class=type(e).__name__)
         else:
             log.warning("x %s OS error: %s", endpoint_name, err_str[:80])
             _mark_failed(endpoint_name)
-            _record(endpoint_name, False, elapsed)
+            _record(endpoint_name, False, elapsed, model=model, error_class=type(e).__name__)
         return None
     except Exception as e:
         err_str = str(e)
@@ -720,11 +819,11 @@ def _try_ollama_native(
         if "timed out" in err_str:
             log.warning("x %s timed out — marking failed", endpoint_name)
             _mark_failed(endpoint_name)
-            _record(endpoint_name, False, elapsed)
+            _record(endpoint_name, False, elapsed, model=model, error_class=type(e).__name__)
         else:
             log.warning("x %s failed: %s", endpoint_name, err_str[:80])
             _mark_failed(endpoint_name)
-            _record(endpoint_name, False, elapsed)
+            _record(endpoint_name, False, elapsed, model=model, error_class=type(e).__name__)
         return None
 
 
@@ -753,7 +852,7 @@ def _try_mac_local(path: str, body: bytes, model: str = "") -> tuple[int, bytes]
             data = resp.read()
             elapsed = int((time.time() - t0) * 1000)
             _mark_ok("mac-local")
-            _record("mac-local", True, elapsed)
+            _record("mac-local", True, elapsed, model=model, response=data)
             log.info(
                 "-> inference via mac-local (openai-compat, model=%s, %dms)", model or "?", elapsed
             )
@@ -764,7 +863,13 @@ def _try_mac_local(path: str, body: bytes, model: str = "") -> tuple[int, bytes]
         else:
             log.warning("x mac-local HTTP %d: %s", e.code, str(e)[:60])
             _mark_failed("mac-local")
-            _record("mac-local", False, int((time.time() - t0) * 1000))
+            _record(
+                "mac-local",
+                False,
+                int((time.time() - t0) * 1000),
+                model=model,
+                error_class=type(e).__name__,
+            )
         return None
     except BrokenPipeError:
         log.warning("x mac-local: client disconnected (BrokenPipe) — endpoint healthy")
@@ -772,7 +877,13 @@ def _try_mac_local(path: str, body: bytes, model: str = "") -> tuple[int, bytes]
     except Exception as e:
         log.warning("x mac-local failed: %s", str(e)[:80])
         _mark_failed("mac-local")
-        _record("mac-local", False, int((time.time() - t0) * 1000))
+        _record(
+            "mac-local",
+            False,
+            int((time.time() - t0) * 1000),
+            model=model,
+            error_class=type(e).__name__,
+        )
         return None
 
 
@@ -835,13 +946,19 @@ def _call_openai_compat(
             data = json.loads(resp.read())
             elapsed = int((time.time() - t0) * 1000)
             _mark_ok("kimi-cloud")
-            _record("kimi-cloud", True, elapsed)
-            log.info("-> inference via %s (%dms)", label, elapsed)
             data["model"] = label
+            _record("kimi-cloud", True, elapsed, model=label, response=data)
+            log.info("-> inference via %s (%dms)", label, elapsed)
             return data
     except Exception as e:
         _mark_failed("kimi-cloud")
-        _record("kimi-cloud", False, int((time.time() - t0) * 1000))
+        _record(
+            "kimi-cloud",
+            False,
+            int((time.time() - t0) * 1000),
+            model=label,
+            error_class=type(e).__name__,
+        )
         log.warning("x %s failed: %s", label, str(e)[:80])
         return None
 
@@ -902,13 +1019,18 @@ def _call_kimi_cloud(
                     if not text or not text.strip():
                         log.warning("x kimi-relay returned empty response")
                         _mark_failed("kimi-cloud")
-                        _record("kimi-cloud", False, int((time.time() - t0) * 1000))
+                        _record(
+                            "kimi-cloud",
+                            False,
+                            int((time.time() - t0) * 1000),
+                            model="kimi-relay",
+                            error_class="EmptyResponse",
+                        )
                         return None
                     elapsed = int((time.time() - t0) * 1000)
                     _mark_ok("kimi-cloud")
-                    _record("kimi-cloud", True, elapsed)
                     log.info("-> inference via kimi-relay (telegram, %dms)", elapsed)
-                    return {
+                    response = {
                         "id": f"chatcmpl-relay-{int(time.time())}",
                         "object": "chat.completion",
                         "created": int(time.time()),
@@ -922,10 +1044,18 @@ def _call_kimi_cloud(
                         ],
                         "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
                     }
+                    _record("kimi-cloud", True, elapsed, model="kimi-relay", response=response)
+                    return response
                 except Exception as e:
                     elapsed = int((time.time() - t0) * 1000)
                     _mark_failed("kimi-cloud")
-                    _record("kimi-cloud", False, elapsed)
+                    _record(
+                        "kimi-cloud",
+                        False,
+                        elapsed,
+                        model="kimi-relay",
+                        error_class=type(e).__name__,
+                    )
                     log.warning("x kimi-relay failed: %s", str(e)[:80])
         else:
             log.debug(
