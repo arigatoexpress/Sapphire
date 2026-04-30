@@ -4489,6 +4489,195 @@ def narrative_eval_page():
     )
 
 
+# ---------------------------------------------------------------------------
+# /timetravel — operator-facing as-of-T snapshot view (Tranche 7-G).
+# ---------------------------------------------------------------------------
+#
+# Reads ``lib.timetravel.snapshot.take_snapshot`` to answer "what was the
+# correlator + narrative state at T?". Read-only research tool — never writes
+# back to ``data/``, never publishes to the event bus, never places orders or
+# alerts. The link is opt-in (operator-only) and surfaced from the Ops nav.
+
+# Default per-scope row cap. Snapshots for older timestamps can exceed
+# 100k rows per scope; cap before serialising to keep responses bounded.
+_TIMETRAVEL_DEFAULT_ROW_CAP = 200
+_TIMETRAVEL_MAX_ROW_CAP = 2000
+
+
+def _timetravel_parse_at(raw: str | None) -> datetime | None:
+    """Coerce a user-supplied ISO/datetime-local string to UTC datetime.
+
+    Accepts ``YYYY-MM-DDTHH:MM`` (HTML datetime-local), ``YYYY-MM-DDTHH:MM:SS``,
+    full ISO-8601 with offset, or trailing ``Z``. Returns ``None`` on failure.
+    """
+    if not raw:
+        return None
+    candidate = str(raw).strip()
+    if not candidate:
+        return None
+    if candidate.endswith("Z"):
+        candidate = candidate[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(candidate)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
+
+
+def _timetravel_truncate(snapshot_dict: dict[str, Any], cap: int) -> dict[str, Any]:
+    """Cap each scope's ``rows`` list at ``cap`` (most-recent kept)."""
+    entries = snapshot_dict.get("entries") or {}
+    truncated: dict[str, Any] = {}
+    for name, entry in entries.items():
+        rows = list(entry.get("rows") or [])
+        if cap > 0 and len(rows) > cap:
+            entry = dict(entry)
+            entry["rows"] = rows[-cap:]
+            entry["truncated"] = True
+            entry["truncated_to"] = cap
+            entry["original_row_count"] = len(rows)
+        truncated[name] = entry
+    snapshot_dict["entries"] = truncated
+    return snapshot_dict
+
+
+def _timetravel_index_summary() -> dict[str, Any]:
+    """Return a small, safe summary of the on-disk index for the UI."""
+    try:
+        from lib.timetravel.snapshot import index_status as _index_status
+
+        return _index_status()
+    except Exception as exc:  # pragma: no cover - defensive
+        log.warning("timetravel index summary error: %s", exc)
+        return {
+            "exists": False,
+            "files": 0,
+            "rows": 0,
+            "signature": None,
+            "built_at": None,
+            "error": f"{exc.__class__.__name__}: {exc}",
+        }
+
+
+def _timetravel_build_payload(
+    *,
+    at: datetime,
+    scope_filter: tuple[str, ...] | None,
+    cap: int,
+) -> dict[str, Any]:
+    """Build a single ``take_snapshot`` payload, with row-cap + no-data path."""
+    from lib.timetravel.snapshot import DEFAULT_SCOPE, take_snapshot
+
+    requested_scope = scope_filter or DEFAULT_SCOPE
+    snap = take_snapshot(at, scope=requested_scope)
+    snapshot_dict = _timetravel_truncate(snap.to_dict(), cap)
+
+    # "No data this far back" detection: every scope is empty.
+    entries = snapshot_dict.get("entries") or {}
+    all_empty = bool(entries) and all(
+        bool((entry or {}).get("empty", True)) for entry in entries.values()
+    )
+    return {
+        "ok": True,
+        "at": snapshot_dict.get("at"),
+        "scope": snapshot_dict.get("scope"),
+        "snapshot": snapshot_dict,
+        "no_data": all_empty,
+        "row_cap": cap,
+        "index": _timetravel_index_summary(),
+    }
+
+
+@app.route("/timetravel")
+@requires_auth
+def timetravel_page():
+    """Render the operator-facing as-of-T snapshot debug page."""
+    from lib.timetravel.snapshot import DEFAULT_SCOPE
+
+    return render_template(
+        "pages/timetravel.html",
+        current_page="timetravel",
+        page_title="Time Travel",
+        default_scopes=list(DEFAULT_SCOPE),
+        index_summary=_timetravel_index_summary(),
+    )
+
+
+@app.route("/api/timetravel-snapshot")
+@requires_auth
+def api_timetravel_snapshot():
+    """Return the as-of-T snapshot (and optionally a 'now' comparison).
+
+    Query params:
+      ``at`` — ISO-8601 / datetime-local string, defaults to ``utcnow()``
+      ``compare_to_now`` — when truthy (``1``/``true``), include a second
+        snapshot anchored at ``utcnow()`` for side-by-side rendering
+      ``scope`` — optional comma-separated list (defaults to all scopes)
+      ``max_rows_per_scope`` — int, default 200, max 2000
+    """
+    raw_at = request.args.get("at")
+    parsed_at = _timetravel_parse_at(raw_at) if raw_at else datetime.now(UTC)
+    if parsed_at is None:
+        return jsonify(
+            {
+                "ok": False,
+                "error": (
+                    "invalid 'at' — expected ISO-8601 / datetime-local "
+                    "(e.g. 2026-04-30T12:00 or 2026-04-30T12:00:00+00:00)"
+                ),
+                "at": raw_at,
+            }
+        ), 400
+
+    raw_compare = (request.args.get("compare_to_now") or "").strip().lower()
+    compare_to_now = raw_compare in {"1", "true", "yes", "on"}
+
+    raw_scope = request.args.get("scope")
+    scope_filter: tuple[str, ...] | None = None
+    if raw_scope:
+        scope_filter = tuple(s.strip() for s in raw_scope.split(",") if s.strip())
+        if not scope_filter:
+            scope_filter = None
+
+    try:
+        cap = int(request.args.get("max_rows_per_scope") or _TIMETRAVEL_DEFAULT_ROW_CAP)
+    except (TypeError, ValueError):
+        cap = _TIMETRAVEL_DEFAULT_ROW_CAP
+    cap = max(1, min(cap, _TIMETRAVEL_MAX_ROW_CAP))
+
+    try:
+        primary = _timetravel_build_payload(at=parsed_at, scope_filter=scope_filter, cap=cap)
+    except Exception as exc:  # noqa: BLE001 - return clean JSON, don't crash.
+        log.warning("timetravel snapshot error (at=%s): %s", parsed_at, exc)
+        return jsonify(
+            {
+                "ok": False,
+                "error": f"{exc.__class__.__name__}: {exc}"[:300],
+                "at": parsed_at.isoformat(),
+            }
+        ), 500
+
+    payload: dict[str, Any] = {
+        "ok": True,
+        "primary": primary,
+        "compare_to_now": compare_to_now,
+    }
+    if compare_to_now:
+        try:
+            payload["now"] = _timetravel_build_payload(
+                at=datetime.now(UTC), scope_filter=scope_filter, cap=cap
+            )
+        except Exception as exc:  # noqa: BLE001 - 'now' is best-effort.
+            log.warning("timetravel 'now' snapshot error: %s", exc)
+            payload["now"] = {
+                "ok": False,
+                "error": f"{exc.__class__.__name__}: {exc}"[:300],
+            }
+    return jsonify(payload)
+
+
 @app.route("/api/diligence-summary")
 @requires_auth
 def api_diligence_summary():
