@@ -312,6 +312,18 @@ def probe_satellite_ci_no_spend_gates(manifest_path: Path = ORG_REPOS_MANIFEST) 
     )
 
 
+# WARN-by-design: this probe emits WARN whenever any satellite repo has
+# `allow_auto_merge=false`. That posture is intentional across the org — Ari's
+# autonomy playbook explicitly avoids GitHub auto-merge in favor of explicit
+# admin-squash-merge after local verification is green (see the Codex tranche
+# megaprompts under `docs/handoffs/` and CLAUDE.md "Cloud Routines" section,
+# which lists "no auto-merge" as a hard policy for the 8 routines). The check
+# would only flip to PASS if every satellite enabled `allow_auto_merge=true`,
+# which would weaken the autonomy posture. WARN is the correct steady state and
+# should be left as-is until/unless the org-wide merge policy changes. The
+# probe still escalates to FAIL on truly broken settings (no squash, no
+# branch-delete, runner gate missing), so genuinely critical drift is caught.
+# Re-evaluate only if the autonomy playbook changes its merge policy.
 def probe_satellite_merge_posture(
     *,
     no_external: bool,
@@ -997,6 +1009,19 @@ def probe_provenance() -> list[Check]:
     return [Check("provenance", "artifact_envelopes", status, evidence, result.duration_ms)]
 
 
+# WARN-by-design: each soaking routine emits WARN until its `gate_state` flips
+# from "collecting" to "ready_for_artifact_review", which requires the
+# scheduled-success threshold in `infra/org-repos.yaml > soak_tracking.
+# required_scheduled_successes` to be met. The current cohort started soaking
+# 2026-04-26 with cutover gates documented at:
+#   - `docs/org/backtest-weekly-shadow-soak-2026-04-26.md`  (4 weekly cycles)
+#   - `docs/org/threat-refresh-shadow-soak-2026-04-26.md`   (24 cycles / ~4 days)
+#   - `docs/org/content-engine-shadow-soak-2026-04-26.md`   (7 daily cycles)
+# These WARNs are the visible read-back of an in-progress soak window, NOT a
+# regression. The runbooks (`docs/ops/<routine>-runbook.md`) cover what would
+# flip each gate to PASS. Re-evaluate after the targeted cycle counts complete:
+# backtest-weekly ~2026-05-24 (4 Saturdays), threat-refresh and content-engine
+# converge sooner. Memory ref: `project_remote_shadow_soak_gate.md`.
 def probe_routines(*, no_external: bool) -> list[Check]:
     cmd = [sys.executable, "scripts/ops/routine_soak_status.py", "--format", "json"]
     if no_external:
@@ -1061,6 +1086,20 @@ def probe_github(*, no_external: bool) -> list[Check]:
     ]
 
 
+# WARN-by-design (manual_gate): the readiness gates emitted by
+# `google_production_test_readiness.py` include hard-coded `manual_gate`
+# entries that the sweep maps to WARN (see `manual_gate -> WARN` mapping
+# below). The most-visible one is `gate_gemini_api_or_vertex_live_calls`,
+# which is intentionally NEVER allowed to auto-flip to PASS — it represents
+# "this harness must not invoke live Gemini/Vertex calls without an explicit
+# human-defined target/budget/cap". The runbook
+# `docs/ops/production-readiness-matrix-runbook.md` formalizes this:
+#   "Manual gates are expected for surfaces such as live Gemini/Vertex calls,
+#    BigQuery/GCS writes, Veo generation, and LaunchAgent retargeting."
+# This gate would only flip to PASS by removing the manual_gate guardrail in
+# `google_production_test_readiness.py`, which would weaken the safety
+# posture. Leave as WARN. Re-evaluate only if Sapphire ever moves Gemini/Vertex
+# from "manual-target each invocation" to "always-on with budget caps".
 def probe_google_readiness(args: argparse.Namespace, *, no_external: bool) -> list[Check]:
     cmd = [
         sys.executable,
