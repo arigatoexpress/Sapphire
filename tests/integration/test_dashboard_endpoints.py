@@ -889,3 +889,73 @@ def test_tradingview_orchestrator_probe_endpoint(app_client, monkeypatch):
     body = r.get_json()
     assert body["status"] == "ok"
     assert body["state"]["payload"]["symbol"] == "BINANCE:ETHUSDT"
+
+
+
+def test_tradingview_orchestrator_artifact_endpoint_blocks_traversal(app_client, monkeypatch):
+    _, client = app_client
+    r = client.get(
+        "/api/tradingview/orchestrator/artifacts/../../etc/passwd",
+        headers={"Authorization": _AUTH},
+    )
+    assert r.status_code == 400
+    body = r.get_json()
+    assert body["reason"] == "invalid_path"
+
+
+def test_tradingview_orchestrator_artifact_endpoint_returns_png(app_client, monkeypatch, tmp_path):
+    _, client = app_client
+    from lib.trading import tradingview_orchestrator
+
+    fake_root = tmp_path / "tv_ta"
+    fake_root.mkdir()
+    session = fake_root / "20260101T000000Z"
+    session.mkdir()
+    png = session / "test.png"
+    png.write_bytes(b"\x89PNG\r\n\x1a\nfake")
+
+    monkeypatch.setattr(tradingview_orchestrator, "DEFAULT_ARTIFACT_ROOT", str(fake_root))
+
+    r = client.get(
+        "/api/tradingview/orchestrator/artifacts/20260101T000000Z/test.png",
+        headers={"Authorization": _AUTH},
+    )
+    assert r.status_code == 200
+    assert r.mimetype == "image/png"
+
+
+def test_tradingview_orchestrator_artifact_endpoint_returns_json(app_client, monkeypatch, tmp_path):
+    _, client = app_client
+    from lib.trading import tradingview_orchestrator
+
+    fake_root = tmp_path / "tv_ta"
+    fake_root.mkdir()
+    session = fake_root / "20260101T000000Z"
+    session.mkdir()
+    j = session / "manifest.json"
+    j.write_text('{"ok": true}', encoding="utf-8")
+
+    monkeypatch.setattr(tradingview_orchestrator, "DEFAULT_ARTIFACT_ROOT", str(fake_root))
+
+    r = client.get(
+        "/api/tradingview/orchestrator/artifacts/20260101T000000Z/manifest.json",
+        headers={"Authorization": _AUTH},
+    )
+    assert r.status_code == 200
+    assert r.mimetype == "application/json"
+    assert r.get_json()["ok"] is True
+
+
+def test_tradingview_orchestrator_artifact_endpoint_404_for_missing(app_client, monkeypatch, tmp_path):
+    _, client = app_client
+    from lib.trading import tradingview_orchestrator
+
+    fake_root = tmp_path / "tv_ta"
+    fake_root.mkdir()
+    monkeypatch.setattr(tradingview_orchestrator, "DEFAULT_ARTIFACT_ROOT", str(fake_root))
+
+    r = client.get(
+        "/api/tradingview/orchestrator/artifacts/20260101T000000Z/nope.png",
+        headers={"Authorization": _AUTH},
+    )
+    assert r.status_code == 404

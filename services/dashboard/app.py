@@ -1850,6 +1850,25 @@ def api_tradingview_orchestrator_probe():
     )
 
 
+@app.route("/api/tradingview/orchestrator/artifacts/<path:artifact_path>")
+@requires_auth
+def api_tradingview_orchestrator_artifact(artifact_path: str):
+    """Serve a TradingView TA capture artifact (screenshot, JSON, etc.)."""
+    from lib.trading.tradingview_orchestrator import DEFAULT_ARTIFACT_ROOT
+
+    base = Path(DEFAULT_ARTIFACT_ROOT)
+    target = (base / artifact_path).resolve()
+    # Security: prevent path traversal outside the artifact root
+    try:
+        target.relative_to(base.resolve())
+    except ValueError:
+        return jsonify({"status": "error", "reason": "invalid_path"}), 400
+    if not target.exists() or not target.is_file():
+        return jsonify({"status": "error", "reason": "not_found"}), 404
+    mimetype = "image/png" if target.suffix == ".png" else "application/json"
+    return send_file(str(target), mimetype=mimetype)
+
+
 @app.route("/api/proposals")
 @requires_auth
 def api_proposals():

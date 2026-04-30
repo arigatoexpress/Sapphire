@@ -123,6 +123,10 @@
                 </table>
             </div>
         </div>
+        <div id="tv-orchestrator-screenshots" style="margin-top: 16px;">
+            <h4 style="margin: 0 0 8px; font-size: 14px; color: var(--muted);">Latest Screenshots</h4>
+            <div class="grid grid-4" id="tv-orchestrator-screenshot-grid"><p class="venue-muted">No screenshots yet</p></div>
+        </div>
     </div>
 </div>
 
@@ -367,6 +371,37 @@
       ? `Session: ${latest.session_id}\nGenerated: ${latest.generated_at || '—'}\nSymbols: ${latest.symbol_count != null ? latest.symbol_count : '—'}\nTimeframes: ${latest.timeframe_count != null ? latest.timeframe_count : '—'}`
       : 'No sessions captured yet';
     document.getElementById('tv-orchestrator-gate').textContent = (latest && latest.mutation_enabled) ? 'Mutation On' : 'Read-Only';
+
+    const screenshotGrid = document.getElementById('tv-orchestrator-screenshot-grid');
+    screenshotGrid.innerHTML = '';
+    if (latest && latest.session_id) {
+      const manifestResp = await fetch(apiUrl(`/api/tradingview/orchestrator/latest`)).then(r => r.json());
+      const manifest = manifestResp.manifest || {};
+      const symbols = manifest.symbols || [];
+      const timeframes = manifest.timeframes || [];
+      const items = symbols.length ? symbols : timeframes;
+      let hasImages = false;
+      for (const item of items.slice(0, 4)) {
+        const artifacts = item.artifacts || [];
+        const ss = artifacts.find(a => a.kind === 'screenshot' && a.ok);
+        if (ss && ss.path) {
+          hasImages = true;
+          const relative = ss.path.replace(/^.*data\/tradingview_ta\//, '');
+          screenshotGrid.insertAdjacentHTML('beforeend', `
+            <div style="text-align: center;">
+              <a href="${apiUrl('/api/tradingview/orchestrator/artifacts/' + relative)}" target="_blank">
+                <img src="${apiUrl('/api/tradingview/orchestrator/artifacts/' + relative)}" style="max-width: 100%; border-radius: 6px; border: 1px solid var(--border);" alt="${esc(item.symbol || item.timeframe || 'screenshot')}">
+              </a>
+              <div style="font-size: 11px; color: var(--muted); margin-top: 4px;">${esc(item.symbol || item.timeframe || 'screenshot')}</div>
+            </div>`);
+        }
+      }
+      if (!hasImages) {
+        screenshotGrid.innerHTML = '<p class="venue-muted">No screenshots in latest session</p>';
+      }
+    } else {
+      screenshotGrid.innerHTML = '<p class="venue-muted">No screenshots yet</p>';
+    }
   } catch (e) {
     document.getElementById('universe-source').textContent = 'Offline';
     document.getElementById('liked-token-tbody').innerHTML = '<tr><td colspan="3" class="venue-muted">Unavailable</td></tr>';
@@ -378,6 +413,7 @@
     document.getElementById('tv-watchlist-export').textContent = 'Unavailable';
     document.getElementById('tv-orchestrator-sessions-tbody').innerHTML = '<tr><td colspan="4" class="venue-muted">Unavailable</td></tr>';
     document.getElementById('tv-orchestrator-latest').textContent = 'Unavailable';
+    document.getElementById('tv-orchestrator-screenshot-grid').innerHTML = '<p class="venue-muted">Unavailable</p>';
   }
 
   let resp;
