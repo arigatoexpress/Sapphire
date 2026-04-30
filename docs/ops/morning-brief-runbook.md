@@ -1,6 +1,34 @@
 # Morning Brief Runbook
 
-Last reviewed: 2026-04-29
+Last reviewed: 2026-04-30
+
+## Triage Quickstart
+
+Failure mode addressed: the morning brief did not arrive in Telegram on
+schedule, or the latest dated artifact looks malformed.
+
+```bash
+launchctl print gui/$(id -u)/com.sapphire.morning-brief
+```
+
+```bash
+find data/intelligence -maxdepth 2 -name daily_brief.md -print | sort | tail -7
+```
+
+```bash
+tail -n 100 data/logs/morning-brief-err.log
+```
+
+If the latest dated `daily_brief.md` exists but no Telegram landed, the issue
+is in the notify path — inspect stderr without exposing token contents. If no
+artifact for today, check the pause flag at
+`/Users/aribs/.sapphire/routine_pause/morning-brief` and stderr for collector
+failures.
+
+Live monitors: routine-health badge for `com.sapphire.morning-brief`;
+dashboard `/observability` morning-brief tile.
+On-call escalation: intel owner; p3 unless three consecutive days are missed
+or a broken brief was sent to Telegram, then p2.
 
 This runbook covers `com.sapphire.morning-brief`, the local LaunchAgent that
 builds the canonical daily intelligence brief and sends it through the shared

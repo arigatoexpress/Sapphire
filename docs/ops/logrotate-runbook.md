@@ -1,6 +1,34 @@
 # Logrotate Runbook
 
-Last reviewed: 2026-04-29
+Last reviewed: 2026-04-30
+
+## Triage Quickstart
+
+Failure mode addressed: logrotate appears stuck (logs growing without rotation)
+or the routine is reporting non-zero exit codes.
+
+```bash
+launchctl print gui/$(id -u)/com.sapphire.logrotate
+```
+
+```bash
+tail -n 80 /Users/aribs/autonomy-status/logs/logrotate.log
+```
+
+```bash
+find /Users/aribs/autonomy-status/logs /Users/aribs/.hermes/logs \
+  -maxdepth 1 -type f \( -name '*.log' -o -name '*.err' -o -name '*.gz' \) \
+  -exec ls -lh {} \;
+```
+
+If the third command shows files smaller than 5 MB, no rotation is expected.
+If files are oversized and not being rotated, check the pause flag at
+`/Users/aribs/.sapphire/routine_pause/logrotate` and stderr for permission
+errors.
+
+Live monitors: routine-health badge on dashboard `/observability`.
+On-call escalation: ops owner; p3 unless logs exceed disk-safe size or stderr
+shows repeated permission failures, then p2.
 
 This runbook covers `com.sapphire.logrotate`, the local LaunchAgent that
 compresses oversized operator logs. It is a maintenance routine only: it never
