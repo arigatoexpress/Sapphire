@@ -156,6 +156,52 @@ def cmd_pine_generate(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_pine_generate_batch(args: argparse.Namespace) -> int:
+    plan = build_tradingview_ta_machine(fetch_live=not args.offline, limit=args.limit)
+    universe = plan["watchlist"]["symbols"][: args.limit]
+    orch = TradingViewOrchestrator(tv_bin=args.tv_bin) if args.validate else None
+    generated: list[dict[str, Any]] = []
+    for row in universe:
+        tv_symbol = str(row.get("tradingview_symbol") or row.get("symbol") or "").strip()
+        if not tv_symbol:
+            continue
+        pine = render_sapphire_watch_indicator(tv_symbol)
+        written = write_template(
+            f"Sapphire_Watch_{tv_symbol}",
+            pine,
+            metadata={
+                "kind": "sapphire_watch_indicator",
+                "tradingview_symbol": tv_symbol,
+                "rank": row.get("rank"),
+                "base_symbol": row.get("symbol"),
+            },
+        )
+        if orch is not None:
+            validation = orch.pine_validate_file(written["pine_path"])
+            written["validation_ok"] = validation["ok"]
+            written["validation"] = validation
+        generated.append(written)
+    out = {
+        "status": "ok",
+        "mode": "pine-generate-batch",
+        "count": len(generated),
+        "validate": bool(args.validate),
+        "all_valid": all(g.get("validation_ok", True) for g in generated),
+        "generated": [
+            {
+                "name": g["name"],
+                "slug": g["slug"],
+                "pine_path": g["pine_path"],
+                "validation_ok": g.get("validation_ok"),
+            }
+            for g in generated
+        ],
+    }
+    _write_json(args.out, out)
+    print(json.dumps(out, indent=2, sort_keys=True))
+    return 0 if out["all_valid"] else 2
+
+
 def cmd_pine_load(args: argparse.Namespace) -> int:
     orch = TradingViewOrchestrator(
         tv_bin=args.tv_bin,
@@ -259,6 +305,19 @@ def main(argv: list[str] | None = None) -> int:
         help="Run analyze + check on the generated file (no chart needed)",
     )
     p_pine_generate.set_defaults(func=cmd_pine_generate)
+
+    p_pine_batch = sub.add_parser(
+        "pine-generate-batch",
+        help="Generate Sapphire Pine indicators for top-N market universe symbols",
+    )
+    p_pine_batch.add_argument("--offline", action="store_true", help="Skip live market fetches")
+    p_pine_batch.add_argument("--limit", type=int, default=6, help="Max symbols")
+    p_pine_batch.add_argument(
+        "--validate",
+        action="store_true",
+        help="Run analyze + check on each generated file",
+    )
+    p_pine_batch.set_defaults(func=cmd_pine_generate_batch)
 
     p_pine_load = sub.add_parser(
         "pine-load",

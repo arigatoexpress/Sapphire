@@ -86,3 +86,35 @@ def test_render_works_for_multiple_venues(symbol: str):
     src = render_sapphire_watch_indicator(symbol)
     assert symbol in src
     assert "ta.ema" in src
+
+
+def test_render_emits_webhook_contract_field_names():
+    """Generated payload must use field names the receiver accepts."""
+    src = render_sapphire_watch_indicator("BINANCE:ETHUSDT")
+    # receiver reads `time`, not `ts`
+    assert '"time"' in src
+    assert '"ts":' not in src
+    # interval + exchange are optional but the webhook understands them
+    assert '"interval"' in src
+    assert '"exchange"' in src
+
+
+def test_generated_payload_actions_are_in_webhook_valid_set():
+    """Each emitted `action` value must be in services/webhook VALID_ACTIONS."""
+    import sys
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    # Pull VALID_ACTIONS by parsing the receiver source — avoids importing the
+    # FastAPI module (which has heavy side effects including network probes).
+    receiver = (root / "services" / "webhook" / "src" / "receiver.py").read_text(
+        encoding="utf-8"
+    )
+    src = render_sapphire_watch_indicator("BINANCE:ETHUSDT")
+    for action in ("long", "short", "exit_long", "exit_short"):
+        # Generated indicator emits these
+        assert f'"action": "{action}"' in src or action in src
+        # Receiver source must declare them in VALID_ACTIONS
+        assert f'"{action}"' in receiver

@@ -127,6 +127,22 @@
             <h4 style="margin: 0 0 8px; font-size: 14px; color: var(--muted);">Latest Screenshots</h4>
             <div class="grid grid-4" id="tv-orchestrator-screenshot-grid"><p class="venue-muted">No screenshots yet</p></div>
         </div>
+        <div class="grid grid-2" style="margin-top: 16px;">
+            <div>
+                <h4 style="margin: 0 0 8px; font-size: 14px; color: var(--muted);">Pine Scripts</h4>
+                <table class="data-table compact-table">
+                    <thead><tr><th>Source</th><th>Name</th><th>Detail</th></tr></thead>
+                    <tbody id="tv-orchestrator-pine-tbody"><tr><td colspan="3" class="loading">Loading…</td></tr></tbody>
+                </table>
+            </div>
+            <div>
+                <h4 style="margin: 0 0 8px; font-size: 14px; color: var(--muted);">Active Alerts</h4>
+                <table class="data-table compact-table">
+                    <thead><tr><th>Symbol</th><th>Type</th><th>Active</th></tr></thead>
+                    <tbody id="tv-orchestrator-alerts-tbody"><tr><td colspan="3" class="loading">Loading…</td></tr></tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -402,6 +418,60 @@
     } else {
       screenshotGrid.innerHTML = '<p class="venue-muted">No screenshots yet</p>';
     }
+
+    // Pine + Alerts panels
+    try {
+      const [pineResp, alertsResp] = await Promise.all([
+        fetch(apiUrl('/api/tradingview/orchestrator/pine')).then(r => r.json()),
+        fetch(apiUrl('/api/tradingview/orchestrator/alerts')).then(r => r.json()),
+      ]);
+
+      const pineTbody = document.getElementById('tv-orchestrator-pine-tbody');
+      pineTbody.innerHTML = '';
+      const acctScripts = (pineResp.tv_account || {}).scripts || [];
+      const localScripts = pineResp.generated_local || [];
+      for (const s of acctScripts.slice(0, 6)) {
+        pineTbody.insertAdjacentHTML('beforeend', `
+          <tr>
+            <td><span class="badge badge-info">TV</span></td>
+            <td title="${esc(s.title || s.name || '')}">${esc(s.name || s.title || '—')}</td>
+            <td style="font-size: 11px; color: var(--muted);">v${esc(s.version || '?')}</td>
+          </tr>`);
+      }
+      for (const s of localScripts.slice(0, 6)) {
+        pineTbody.insertAdjacentHTML('beforeend', `
+          <tr>
+            <td><span class="badge badge-success">Sapphire</span></td>
+            <td title="${esc(s.pine_path || '')}">${esc(s.name || s.slug || '—')}</td>
+            <td style="font-size: 11px; color: var(--muted);">${esc(s.kind || 'template')}</td>
+          </tr>`);
+      }
+      if (!acctScripts.length && !localScripts.length) {
+        pineTbody.innerHTML = '<tr><td colspan="3" class="venue-muted">No scripts</td></tr>';
+      }
+
+      const alertsTbody = document.getElementById('tv-orchestrator-alerts-tbody');
+      alertsTbody.innerHTML = '';
+      const alerts = (alertsResp.alerts || []).slice(0, 8);
+      for (const a of alerts) {
+        const sym = a.symbol || '—';
+        const type = a.type || '—';
+        const active = a.active ? '✓' : '·';
+        const color = a.active ? 'var(--success, #00ff88)' : 'var(--muted)';
+        alertsTbody.insertAdjacentHTML('beforeend', `
+          <tr>
+            <td>${esc(sym)}</td>
+            <td>${esc(type)}</td>
+            <td style="color: ${color}; text-align: center;">${active}</td>
+          </tr>`);
+      }
+      if (!alerts.length) {
+        alertsTbody.innerHTML = '<tr><td colspan="3" class="venue-muted">No alerts</td></tr>';
+      }
+    } catch (pineErr) {
+      document.getElementById('tv-orchestrator-pine-tbody').innerHTML = '<tr><td colspan="3" class="venue-muted">Unavailable</td></tr>';
+      document.getElementById('tv-orchestrator-alerts-tbody').innerHTML = '<tr><td colspan="3" class="venue-muted">Unavailable</td></tr>';
+    }
   } catch (e) {
     document.getElementById('universe-source').textContent = 'Offline';
     document.getElementById('liked-token-tbody').innerHTML = '<tr><td colspan="3" class="venue-muted">Unavailable</td></tr>';
@@ -414,6 +484,8 @@
     document.getElementById('tv-orchestrator-sessions-tbody').innerHTML = '<tr><td colspan="4" class="venue-muted">Unavailable</td></tr>';
     document.getElementById('tv-orchestrator-latest').textContent = 'Unavailable';
     document.getElementById('tv-orchestrator-screenshot-grid').innerHTML = '<p class="venue-muted">Unavailable</p>';
+    document.getElementById('tv-orchestrator-pine-tbody').innerHTML = '<tr><td colspan="3" class="venue-muted">Unavailable</td></tr>';
+    document.getElementById('tv-orchestrator-alerts-tbody').innerHTML = '<tr><td colspan="3" class="venue-muted">Unavailable</td></tr>';
   }
 
   let resp;
