@@ -1163,21 +1163,34 @@
         });
     }
 
+    function formatAge(seconds) {
+        if (seconds == null || isNaN(Number(seconds))) return 'age unknown';
+        var total = Math.max(0, Number(seconds));
+        var hours = Math.floor(total / 3600);
+        if (hours < 1) return Math.floor(total / 60) + 'm old';
+        if (hours < 48) return hours + 'h old';
+        return Math.floor(hours / 24) + 'd old';
+    }
+
     function renderWindowsResearchWorker(payload) {
         var body = document.getElementById('windowsResearchBody');
         var meta = document.getElementById('windowsResearchMeta');
         if (!body) return;
         var summary = (payload || {}).summary || {};
         var commands = (payload || {}).commands || [];
+        var freshness = (payload || {}).freshness || {};
+        var schedule = (payload || {}).schedule || {};
 
         if (meta) {
-            if (!payload || payload.status !== 'ok') {
+            if (!payload || (payload.status !== 'ok' && payload.status !== 'stale')) {
                 meta.textContent = (payload && (payload.reason || payload.status)) ? (payload.reason || payload.status) : 'worker status unavailable';
             } else {
                 var issued = payload.generated_at ? new Date(payload.generated_at) : null;
                 var stamp = issued && !isNaN(issued.getTime()) ? issued.toISOString().slice(0, 16).replace('T', ' ') + 'Z' : (payload.run_id || 'latest');
                 var safety = summary.safety_clear ? 'paper-only' : 'safety watch';
-                meta.textContent = payload.host + ' · ' + payload.run_id + ' · ' + summary.artifact_count + ' artifacts · ' + safety + ' · ' + stamp;
+                var task = schedule.last_task_result_label || schedule.status || 'task unknown';
+                var freshnessText = (freshness.status || 'freshness unknown') + ' · ' + formatAge(freshness.age_seconds);
+                meta.textContent = payload.host + ' · ' + payload.run_id + ' · ' + summary.artifact_count + ' artifacts · ' + safety + ' · ' + freshnessText + ' · task ' + task + ' · ' + stamp;
             }
         }
 

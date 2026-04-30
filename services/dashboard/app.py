@@ -5980,6 +5980,49 @@ def _fetch_json_url(url: str, *, timeout: float = 5.0) -> dict[str, Any]:
     return payload if isinstance(payload, dict) else {}
 
 
+def _safe_int(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _normalize_worker_freshness(payload: dict[str, Any]) -> dict[str, Any]:
+    freshness = payload.get("freshness") if isinstance(payload.get("freshness"), dict) else {}
+    status = _paste_safe_text(freshness.get("status") or "unknown", limit=24)
+    age_seconds = _safe_int(freshness.get("age_seconds"))
+    max_age_seconds = _safe_int(freshness.get("max_age_seconds"))
+    fresh = freshness.get("fresh")
+    return {
+        "status": status,
+        "age_seconds": age_seconds,
+        "max_age_seconds": max_age_seconds,
+        "fresh": bool(fresh) if fresh is not None else status == "fresh",
+    }
+
+
+def _normalize_worker_schedule(payload: dict[str, Any]) -> dict[str, Any]:
+    schedule = payload.get("schedule") if isinstance(payload.get("schedule"), dict) else {}
+    last_task_result = _safe_int(schedule.get("last_task_result"))
+    last_result_ok = schedule.get("last_result_ok")
+    return {
+        "task_name": _paste_safe_text(schedule.get("task_name") or "SapphireResearchWorker", limit=80),
+        "status": _paste_safe_text(schedule.get("status") or "unknown", limit=32),
+        "state": _paste_safe_text(schedule.get("state"), limit=32),
+        "last_run_time": schedule.get("last_run_time"),
+        "next_run_time": schedule.get("next_run_time"),
+        "last_task_result": last_task_result,
+        "last_task_result_label": _paste_safe_text(
+            schedule.get("last_task_result_label") or "unknown",
+            limit=48,
+        ),
+        "last_result_ok": bool(last_result_ok) if last_result_ok is not None else None,
+        "reason": _paste_safe_text(schedule.get("reason"), limit=160)
+        if schedule.get("reason")
+        else None,
+    }
+
+
 def _normalize_windows_research_worker_payload(payload: dict[str, Any]) -> dict[str, Any]:
     summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
     safety = payload.get("safety") if isinstance(payload.get("safety"), dict) else {}
@@ -6013,6 +6056,8 @@ def _normalize_windows_research_worker_payload(payload: dict[str, Any]) -> dict[
     status = str(payload.get("status") or "unknown")
     if not safety_clear and status == "ok":
         status = "unsafe"
+    freshness = _normalize_worker_freshness(payload)
+    schedule = _normalize_worker_schedule(payload)
     return {
         "mode": "read_only_windows_research_worker",
         "status": status,
@@ -6024,6 +6069,8 @@ def _normalize_windows_research_worker_payload(payload: dict[str, Any]) -> dict[
         "manifest_path_label": _remote_path_label(payload.get("manifest_path_label")),
         "run_dir_label": _remote_path_label(payload.get("run_dir_label")),
         "output_root_label": _remote_path_label(payload.get("output_root_label")),
+        "freshness": freshness,
+        "schedule": schedule,
         "reason": _paste_safe_text(payload.get("reason"), limit=180)
         if payload.get("reason")
         else None,
@@ -6034,6 +6081,7 @@ def _normalize_windows_research_worker_payload(payload: dict[str, Any]) -> dict[
             "safety_clear": bool(
                 summary.get("safety_clear") if "safety_clear" in summary else safety_clear
             ),
+            "manifest_age_seconds": freshness["age_seconds"],
         },
         "safety": {
             "paper_only": paper_only,

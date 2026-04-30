@@ -59,6 +59,9 @@ WINDOWS_SERVICE_PORTS = {
     "tradingview_webhook_tcp": 9090,
     "telemetry_dashboard_tcp": 3001,
 }
+WINDOWS_RESEARCH_WORKER_MAX_AGE_SECONDS = int(
+    os.getenv("WINDOWS_RESEARCH_WORKER_MAX_AGE_SECONDS", "129600")
+)
 NO_SPEND_CI_STRATEGIES = {
     "local_evidence_skip_ci_bootstrap",
     "sapphire_self_hosted_gate",
@@ -639,7 +642,11 @@ def probe_windows_desktop_server(env: dict[str, str] | None = None) -> list[Chec
     gpu_url = str(values.get("WINDOWS_GPU_URL") or DEFAULT_WINDOWS_GPU_URL).rstrip("/")
     host = str(values.get("WINDOWS_GPU_HOST") or urlparse(gpu_url).hostname or DEFAULT_WINDOWS_HOST)
 
-    checks = [windows_ollama_inventory_check(gpu_url), windows_webhook_health_check(host)]
+    checks = [
+        windows_ollama_inventory_check(gpu_url),
+        windows_webhook_health_check(host),
+        windows_research_worker_check(host),
+    ]
     checks.extend(
         tcp_check("windows", name, host, port, warn_on_error=True)
         for name, port in WINDOWS_SERVICE_PORTS.items()
@@ -777,6 +784,135 @@ def windows_webhook_health_check(host: str = DEFAULT_WINDOWS_HOST) -> Check:
     return Check(
         "windows",
         "webhook_health",
+        status,
+        evidence,
+        int((time.perf_counter() - started) * 1000),
+    )
+
+
+def _parse_iso_datetime(value: Any) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed
+
+
+def _age_seconds(value: Any) -> int | None:
+    parsed = _parse_iso_datetime(value)
+    if not parsed:
+        return None
+    return max(0, int((datetime.now(UTC) - parsed).total_seconds()))
+
+
+def windows_research_worker_check(host: str = DEFAULT_WINDOWS_HOST) -> Check:
+    started = time.perf_counter()
+    url = f"http://{host}:9090/windows/research-worker/latest"
+    try:
+        with urllib.request.urlopen(url, timeout=5) as response:  # nosec B310 - fixed private Tailscale readiness URL.
+            status_code = response.status
+            body = response.read(1024 * 1024)
+    except urllib.error.HTTPError as exc:
+        return Check(
+            "windows",
+            "research_worker_freshness",
+            "WARN",
+            f"http={exc.code}",
+            int((time.perf_counter() - started) * 1000),
+        )
+    except Exception as exc:
+        return Check(
+            "windows",
+            "research_worker_freshness",
+            "WARN",
+            exc.__class__.__name__,
+            int((time.perf_counter() - started) * 1000),
+        )
+
+    evidence = f"http={status_code}"
+    try:
+        parsed = json.loads(body)
+    except json.JSONDecodeError:
+        return Check(
+            "windows",
+            "research_worker_freshness",
+            "WARN",
+            f"{evidence}; invalid_json",
+            int((time.perf_counter() - started) * 1000),
+        )
+    if not isinstance(parsed, dict):
+        return Check(
+            "windows",
+            "research_worker_freshness",
+            "WARN",
+            f"{evidence}; invalid_payload",
+            int((time.perf_counter() - started) * 1000),
+        )
+
+    worker_status = str(parsed.get("status") or "unknown")
+    summary = parsed.get("summary") if isinstance(parsed.get("summary"), dict) else {}
+    safety = parsed.get("safety") if isinstance(parsed.get("safety"), dict) else {}
+    freshness = parsed.get("freshness") if isinstance(parsed.get("freshness"), dict) else {}
+    schedule = parsed.get("schedule") if isinstance(parsed.get("schedule"), dict) else {}
+
+    age = freshness.get("age_seconds")
+    if age is None:
+        age = _age_seconds(parsed.get("generated_at"))
+    try:
+        age_int = int(age) if age is not None else None
+    except (TypeError, ValueError):
+        age_int = None
+
+    failed_count = int(summary.get("failed_count") or 0)
+    safety_clear = bool(summary.get("safety_clear")) or (
+        safety.get("paper_only") is True
+        and safety.get("live_trading_enabled") is False
+        and safety.get("telegram_sends_enabled") is False
+    )
+    schedule_status = str(schedule.get("status") or "unknown")
+    task_result = str(schedule.get("last_task_result_label") or schedule.get("last_task_result") or "unknown")
+    task_ok = schedule.get("last_result_ok")
+
+    status = "PASS" if 200 <= status_code < 300 and worker_status in {"ok", "stale"} else "WARN"
+    reasons: list[str] = []
+    if not safety_clear:
+        status = "WARN"
+        reasons.append("unsafe")
+    if failed_count:
+        status = "WARN"
+        reasons.append(f"failed_commands={failed_count}")
+    if age_int is None:
+        status = "WARN"
+        reasons.append("age_unknown")
+    elif age_int > WINDOWS_RESEARCH_WORKER_MAX_AGE_SECONDS:
+        status = "WARN"
+        reasons.append("manifest_stale")
+    if schedule_status not in {"ok", "unavailable", "unknown"}:
+        status = "WARN"
+        reasons.append(f"task_status={schedule_status}")
+    if task_ok is False:
+        status = "WARN"
+        reasons.append(f"task_result={task_result}")
+
+    evidence += f"; status={worker_status}"
+    if parsed.get("run_id"):
+        evidence += f"; run_id={parsed.get('run_id')}"
+    if parsed.get("git_sha_short"):
+        evidence += f"; sha={parsed.get('git_sha_short')}"
+    if age_int is not None:
+        evidence += f"; age_seconds={age_int}"
+    evidence += f"; safety_clear={safety_clear}; failed_count={failed_count}"
+    if schedule:
+        evidence += f"; task={schedule_status}/{task_result}"
+    if reasons:
+        evidence += f"; reasons={','.join(reasons)}"
+    return Check(
+        "windows",
+        "research_worker_freshness",
         status,
         evidence,
         int((time.perf_counter() - started) * 1000),
