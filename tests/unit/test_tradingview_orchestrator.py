@@ -10,6 +10,8 @@ from unittest.mock import patch
 import pytest
 
 from lib.trading.tradingview_orchestrator import (
+    EVENT_PINE_BATCH_COMPLETED,
+    EVENT_SESSION_COMPLETED,
     TradingViewOrchestrator,
     TVCommandError,
 )
@@ -123,7 +125,7 @@ def test_capture_sweep_read_only_no_mutations(tmp_artifact_root: Path):
     symbols = [
         {"symbol": "ETH", "tradingview_symbol": "BINANCE:ETHUSDT", "rank": 1},
     ]
-    with patch.object(orch, "screenshot", return_value={"ok": True, "path": "/tmp/fake.png", "filename": "fake.png"}):
+    with patch("lib.trading.tradingview_orchestrator._emit_event"), patch.object(orch, "screenshot", return_value={"ok": True, "path": "/tmp/fake.png", "filename": "fake.png"}):
         with patch.object(orch, "probe_ohlcv", return_value={"ok": True}):
             with patch.object(orch, "probe_quote", return_value={"ok": True}):
                 manifest = orch.capture_sweep(symbols, session_id="test-session")
@@ -143,7 +145,7 @@ def test_capture_deep_read_only_no_mutations(tmp_artifact_root: Path):
         artifact_root=tmp_artifact_root,
         mutation_enabled=False,
     )
-    with patch.object(orch, "screenshot", return_value={"ok": True, "path": "/tmp/fake.png", "filename": "fake.png"}):
+    with patch("lib.trading.tradingview_orchestrator._emit_event"), patch.object(orch, "screenshot", return_value={"ok": True, "path": "/tmp/fake.png", "filename": "fake.png"}):
         with patch.object(orch, "probe_ohlcv", return_value={"ok": True}):
             with patch.object(orch, "probe_values", return_value={"ok": True}):
                 with patch.object(orch, "probe_quote", return_value={"ok": True}):
@@ -166,6 +168,126 @@ def test_latest_manifest_returns_none_when_empty(tmp_artifact_root: Path):
 def test_list_sessions_empty(tmp_artifact_root: Path):
     orch = TradingViewOrchestrator(tv_bin="echo", artifact_root=tmp_artifact_root)
     assert orch.list_sessions() == []
+
+
+def test_capture_sweep_emits_session_completed_event(tmp_artifact_root: Path):
+    """capture_sweep must publish exactly one session_completed event."""
+    orch = TradingViewOrchestrator(
+        tv_bin="echo",
+        artifact_root=tmp_artifact_root,
+        mutation_enabled=False,
+    )
+    symbols = [
+        {"symbol": "ETH", "tradingview_symbol": "BINANCE:ETHUSDT", "rank": 1},
+        {"symbol": "BTC", "tradingview_symbol": "BINANCE:BTCUSDT", "rank": 2},
+    ]
+    published: list[tuple[str, dict]] = []
+
+    def fake_publish(event_type: str, data: dict, source: str | None = None) -> str:
+        published.append((event_type, data))
+        return "fake-id"
+
+    fake_bus_module = type("M", (), {"publish": staticmethod(fake_publish)})
+    with patch.dict(
+        "sys.modules", {"lib.core.event_bus": fake_bus_module}
+    ), patch.object(
+        orch, "screenshot",
+        return_value={"ok": True, "path": "/tmp/fake.png", "filename": "fake.png"},
+    ), patch.object(
+        orch, "probe_ohlcv", return_value={"ok": True}
+    ), patch.object(
+        orch, "probe_quote", return_value={"ok": True}
+    ):
+        manifest = orch.capture_sweep(symbols, session_id="evt-test-sweep")
+
+    assert len(published) == 1, f"expected exactly one event, got {published}"
+    event_type, payload = published[0]
+    assert event_type == EVENT_SESSION_COMPLETED
+    assert payload["session_id"] == "evt-test-sweep"
+    assert payload["schema_version"] == manifest["schema_version"]
+    assert payload["symbol_count"] == 2
+    assert payload["timeframe_count"] == 1
+    assert payload["manifest_path"].endswith("manifest.json")
+    # Payload must be JSON-serializable for the bus.
+    json.dumps(payload)
+
+
+def test_capture_symbol_deep_emits_session_completed_event(tmp_artifact_root: Path):
+    orch = TradingViewOrchestrator(
+        tv_bin="echo",
+        artifact_root=tmp_artifact_root,
+        mutation_enabled=False,
+    )
+    published: list[tuple[str, dict]] = []
+
+    def fake_publish(event_type: str, data: dict, source: str | None = None) -> str:
+        published.append((event_type, data))
+        return "fake-id"
+
+    fake_bus_module = type("M", (), {"publish": staticmethod(fake_publish)})
+    with patch.dict(
+        "sys.modules", {"lib.core.event_bus": fake_bus_module}
+    ), patch.object(
+        orch, "screenshot",
+        return_value={"ok": True, "path": "/tmp/fake.png", "filename": "fake.png"},
+    ), patch.object(
+        orch, "probe_ohlcv", return_value={"ok": True}
+    ), patch.object(
+        orch, "probe_values", return_value={"ok": True}
+    ), patch.object(
+        orch, "probe_quote", return_value={"ok": True}
+    ):
+        manifest = orch.capture_symbol_deep(
+            "ETH", "BINANCE:ETHUSDT", timeframes=["60", "240"], session_id="evt-test-deep"
+        )
+
+    assert len(published) == 1
+    event_type, payload = published[0]
+    assert event_type == EVENT_SESSION_COMPLETED
+    assert payload["session_id"] == "evt-test-deep"
+    assert payload["schema_version"] == manifest["schema_version"]
+    assert payload["symbol_count"] == 1
+    assert payload["timeframe_count"] == 2
+    assert payload["manifest_path"].endswith("manifest.json")
+
+
+def test_emit_event_swallows_bus_failures(tmp_artifact_root: Path):
+    """If the event bus raises, capture must still complete normally."""
+    from lib.trading import tradingview_orchestrator as orch_mod
+
+    orch = TradingViewOrchestrator(
+        tv_bin="echo",
+        artifact_root=tmp_artifact_root,
+        mutation_enabled=False,
+    )
+    symbols = [{"symbol": "ETH", "tradingview_symbol": "BINANCE:ETHUSDT", "rank": 1}]
+
+    def boom(*_a, **_k):
+        raise RuntimeError("redis exploded")
+
+    fake_bus_module = type("M", (), {"publish": staticmethod(boom)})
+    with patch.dict(
+        "sys.modules", {"lib.core.event_bus": fake_bus_module}
+    ), patch.object(
+        orch, "screenshot",
+        return_value={"ok": True, "path": "/tmp/fake.png", "filename": "fake.png"},
+    ), patch.object(
+        orch, "probe_ohlcv", return_value={"ok": True}
+    ), patch.object(
+        orch, "probe_quote", return_value={"ok": True}
+    ):
+        # Must not raise.
+        manifest = orch.capture_sweep(symbols, session_id="evt-test-failsafe")
+
+    assert manifest["session_id"] == "evt-test-failsafe"
+    assert (tmp_artifact_root / "evt-test-failsafe" / "manifest.json").exists()
+    # Sanity: module-level constants still exposed for any caller wiring.
+    assert orch_mod.EVENT_PINE_BATCH_COMPLETED == "tradingview.orchestrator.pine_batch_completed"
+
+
+def test_event_name_constants_match_spec():
+    assert EVENT_SESSION_COMPLETED == "tradingview.orchestrator.session_completed"
+    assert EVENT_PINE_BATCH_COMPLETED == "tradingview.orchestrator.pine_batch_completed"
 
 
 def test_list_sessions_with_manifests(tmp_artifact_root: Path):
