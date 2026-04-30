@@ -206,6 +206,123 @@ def test_market_universe_endpoint_uses_strategy_lab(app_client, monkeypatch):
     assert body["corrected_aliases"]["MATIC"] == "POL"
 
 
+def test_tradingview_ta_machine_endpoint_is_analysis_only(app_client, monkeypatch):
+    _, client = app_client
+    from lib.trading import tradingview_ta_machine
+
+    monkeypatch.setattr(
+        tradingview_ta_machine,
+        "build_tradingview_ta_machine",
+        lambda fetch_live=True, limit=18: {
+            "mode": "tradingview_ta_machine_plan",
+            "watchlist_name": "Sapphire Dynamic TA",
+            "safety": {
+                "live_trading_enabled": False,
+                "execution_policy": "analysis_only_no_order_submit",
+            },
+            "watchlist": {
+                "symbols_txt": "BINANCE:BTCUSDT,BINANCE:ETHUSDT",
+                "symbol_count": 2,
+                "symbols": [{"symbol": "BTC", "tradingview_symbol": "BINANCE:BTCUSDT"}],
+            },
+            "indicator_stack": [{"id": "rsi_14", "tradingview_name": "Relative Strength Index"}],
+            "chart_layout": {"default_layout": "2x2"},
+            "work_orders": [
+                {
+                    "id": "tv-ta-01-btc",
+                    "operator_gated_mutation_commands": ["tv watchlist add BINANCE:BTCUSDT"],
+                    "read_only_readback_commands": ["tv values"],
+                    "execution_policy": "analysis_only_no_order_submit",
+                }
+            ],
+        },
+    )
+
+    r = client.get(
+        "/api/tradingview/ta-machine?offline=1&limit=2",
+        headers={"Authorization": _AUTH},
+    )
+
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["watchlist"]["symbols_txt"] == "BINANCE:BTCUSDT,BINANCE:ETHUSDT"
+    assert body["safety"]["live_trading_enabled"] is False
+    assert body["work_orders"][0]["execution_policy"] == "analysis_only_no_order_submit"
+
+
+def test_tradingview_watchlist_txt_endpoint_returns_plain_text(app_client, monkeypatch):
+    _, client = app_client
+    from lib.trading import tradingview_ta_machine
+
+    monkeypatch.setattr(
+        tradingview_ta_machine,
+        "build_tradingview_watchlist_txt",
+        lambda fetch_live=True, limit=18: "BINANCE:BTCUSDT,BINANCE:ETHUSDT",
+    )
+
+    r = client.get(
+        "/api/tradingview/watchlist.txt?offline=1&limit=2",
+        headers={"Authorization": _AUTH},
+    )
+
+    assert r.status_code == 200
+    assert r.mimetype == "text/plain"
+    assert r.get_data(as_text=True).strip() == "BINANCE:BTCUSDT,BINANCE:ETHUSDT"
+
+
+def test_analytics_page_surfaces_tradingview_ta_machine(app_client):
+    _, client = app_client
+
+    r = client.get("/analytics", headers={"Authorization": _AUTH})
+
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert "TradingView TA Machine" in html
+    assert "/api/tradingview/ta-machine?limit=12" in html
+    assert "tv-watchlist-export" in html
+
+
+def test_trading_workbench_watchlist_endpoint_is_read_only(app_client):
+    _, client = app_client
+
+    r = client.get(
+        "/api/trading/workbench/watchlist?offline=1&symbols=BTCUSDT,MATIC",
+        headers={"Authorization": _AUTH},
+    )
+
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["schema_version"] == "trading-workbench.watchlist.v1"
+    assert body["execution_enabled"] is False
+    assert [row["symbol"] for row in body["items"]] == ["BTC", "POL"]
+    assert "browser_mutation" in body["safety"]["blocked_actions"]
+
+
+def test_trading_workbench_work_orders_preview_endpoint_blocks_mutations(app_client):
+    _, client = app_client
+
+    r = client.post(
+        "/api/trading/workbench/work-orders/preview",
+        headers={"Authorization": _AUTH},
+        json={
+            "symbols": ["BTCUSDT"],
+            "timeframes": ["60"],
+            "jobs": ["ta_profile", "chart_plan"],
+            "strategies": ["SapphireComposite"],
+            "allow_live_trading": False,
+            "allow_telegram": False,
+            "allow_browser_mutation": False,
+        },
+    )
+
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["schema_version"] == "trading-workbench.work_orders.v1"
+    assert body["execution_enabled"] is False
+    assert body["work_orders"][0]["steps"][-1]["status"] == "blocked"
+    assert "trade_submit" in body["work_orders"][0]["blocked_actions"]
+
+
 def test_order_draft_endpoint_is_dry_run(app_client):
     _, client = app_client
 
