@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.sapphire.tradingview-pine-batch</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/python3</string>
+        <string>/Users/aribs/Code/Sapphire/scripts/ops/tradingview_ta_capture.py</string>
+        <string>pine-generate-batch</string>
+        <string>--offline</string>
+        <string>--limit</string>
+        <string>8</string>
+        <string>--validate</string>
+        <string>--out</string>
+        <string>/Users/aribs/autonomy-status/logs/tradingview-pine-batch-latest.json</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict>
+            <key>Hour</key>
+            <integer>13</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+    </array>
+    <key>StandardOutPath</key>
+    <string>/Users/aribs/autonomy-status/logs/tradingview-pine-batch.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/aribs/autonomy-status/logs/tradingview-pine-batch.err</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+</dict>
+</plist>
