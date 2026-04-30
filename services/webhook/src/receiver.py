@@ -274,9 +274,9 @@ $taskName = {task_name_json}
 $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
 $info = Get-ScheduledTaskInfo -TaskName $taskName -ErrorAction SilentlyContinue
 if (-not $task) {{
-  [pscustomobject]@{{ task_name = $taskName; status = 'missing' }}
+  $payload = [pscustomobject]@{{ task_name = $taskName; status = 'missing' }}
 }} else {{
-  [pscustomobject]@{{
+  $payload = [pscustomobject]@{{
     task_name = $taskName
     status = 'ok'
     state = [string]$task.State
@@ -285,6 +285,7 @@ if (-not $task) {{
     last_task_result = if ($info) {{ $info.LastTaskResult }} else {{ $null }}
   }}
 }}
+$payload | ConvertTo-Json -Depth 4
 """
     encoded = base64.b64encode(script.encode("utf-16le")).decode("ascii")
     try:
@@ -307,8 +308,17 @@ if (-not $task) {{
             "status": "unavailable",
             "reason": (result.stderr or "powershell_failed")[-160:],
         }
+    raw_stdout = result.stdout.strip()
+    start = raw_stdout.find("{")
+    end = raw_stdout.rfind("}")
+    if start == -1 or end == -1:
+        return {
+            "task_name": RESEARCH_WORKER_TASK_NAME,
+            "status": "unavailable",
+            "reason": "empty_task_json",
+        }
     try:
-        payload = json.loads(result.stdout.strip())
+        payload = json.loads(raw_stdout[start : end + 1])
     except json.JSONDecodeError as exc:
         return {
             "task_name": RESEARCH_WORKER_TASK_NAME,
