@@ -265,6 +265,105 @@ def test_windows_webhook_health_surfaces_degraded_subservices(monkeypatch) -> No
     assert "gpu_count=1" in check.evidence
 
 
+def test_windows_research_worker_passes_with_fresh_safe_manifest(monkeypatch) -> None:
+    def fake_urlopen(_request: object, timeout: int) -> _FakeHTTPResponse:
+        assert timeout == 5
+        return _FakeHTTPResponse(
+            200,
+            {
+                "status": "ok",
+                "run_id": "20260429T215406Z",
+                "git_sha_short": "edff5a8b",
+                "freshness": {"age_seconds": 120, "max_age_seconds": 129600, "fresh": True},
+                "summary": {"failed_count": 0, "safety_clear": True},
+                "safety": {
+                    "paper_only": True,
+                    "live_trading_enabled": False,
+                    "telegram_sends_enabled": False,
+                },
+                "schedule": {
+                    "status": "ok",
+                    "last_task_result_label": "not_started",
+                    "last_result_ok": True,
+                },
+            },
+        )
+
+    monkeypatch.setattr(sweep.urllib.request, "urlopen", fake_urlopen)
+
+    check = sweep.windows_research_worker_check("100.71.10.48")
+
+    assert check.status == "PASS"
+    assert "run_id=20260429T215406Z" in check.evidence
+    assert "age_seconds=120" in check.evidence
+    assert "task=ok/not_started" in check.evidence
+
+
+def test_windows_research_worker_warns_on_stale_manifest(monkeypatch) -> None:
+    def fake_urlopen(_request: object, timeout: int) -> _FakeHTTPResponse:
+        assert timeout == 5
+        return _FakeHTTPResponse(
+            200,
+            {
+                "status": "stale",
+                "run_id": "20260429T215406Z",
+                "freshness": {
+                    "age_seconds": sweep.WINDOWS_RESEARCH_WORKER_MAX_AGE_SECONDS + 1,
+                    "max_age_seconds": sweep.WINDOWS_RESEARCH_WORKER_MAX_AGE_SECONDS,
+                    "fresh": False,
+                },
+                "summary": {"failed_count": 0, "safety_clear": True},
+                "safety": {
+                    "paper_only": True,
+                    "live_trading_enabled": False,
+                    "telegram_sends_enabled": False,
+                },
+                "schedule": {
+                    "status": "ok",
+                    "last_task_result_label": "success",
+                    "last_result_ok": True,
+                },
+            },
+        )
+
+    monkeypatch.setattr(sweep.urllib.request, "urlopen", fake_urlopen)
+
+    check = sweep.windows_research_worker_check("100.71.10.48")
+
+    assert check.status == "WARN"
+    assert "manifest_stale" in check.evidence
+
+
+def test_windows_research_worker_warns_on_failed_task_result(monkeypatch) -> None:
+    def fake_urlopen(_request: object, timeout: int) -> _FakeHTTPResponse:
+        assert timeout == 5
+        return _FakeHTTPResponse(
+            200,
+            {
+                "status": "ok",
+                "freshness": {"age_seconds": 120, "fresh": True},
+                "summary": {"failed_count": 0, "safety_clear": True},
+                "safety": {
+                    "paper_only": True,
+                    "live_trading_enabled": False,
+                    "telegram_sends_enabled": False,
+                },
+                "schedule": {
+                    "status": "ok",
+                    "last_task_result_label": "code_1",
+                    "last_result_ok": False,
+                },
+            },
+        )
+
+    monkeypatch.setattr(sweep.urllib.request, "urlopen", fake_urlopen)
+
+    check = sweep.windows_research_worker_check("100.71.10.48")
+
+    assert check.status == "WARN"
+    assert "task_result=code_1" in check.evidence
+
+
 def test_satellite_ci_no_spend_gates_pass_for_gated_workflows(tmp_path: Path) -> None:
     repo = tmp_path / "satellite"
     workflows = repo / ".github" / "workflows"

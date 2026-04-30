@@ -113,6 +113,18 @@ The worker manifest records `paper_only=true`,
 commands, logs, and artifact paths. Keep `WalkforwardBarsSource` as
 `synthetic` unless the operator intentionally wants read-only yfinance data.
 
+The Windows webhook exposes the latest run at:
+
+```text
+http://100.71.10.48:9090/windows/research-worker/latest
+```
+
+That payload includes manifest freshness (`age_seconds`, `max_age_seconds`,
+`fresh`) and read-only Task Scheduler state for `SapphireResearchWorker`
+(`state`, `last_run_time`, `next_run_time`, `last_task_result_label`). The
+default freshness budget is 36 hours so a daily overnight worker has room for
+normal scheduling jitter without hiding stale evidence.
+
 Task Scheduler install is a separate operator action:
 
 ```powershell

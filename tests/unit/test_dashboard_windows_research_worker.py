@@ -62,6 +62,22 @@ def _worker_payload() -> dict:
         "run_id": "20260429T210424Z",
         "manifest_path_label": ".../research-worker/20260429T210424Z/manifest.json",
         "run_dir_label": "E:\\Sapphire\\research-worker\\20260429T210424Z",
+        "freshness": {
+            "status": "fresh",
+            "age_seconds": 120,
+            "max_age_seconds": 129600,
+            "fresh": True,
+        },
+        "schedule": {
+            "task_name": "SapphireResearchWorker",
+            "status": "ok",
+            "state": "Ready",
+            "last_run_time": "1999-11-30T00:00:00-07:00",
+            "next_run_time": "2026-04-30T02:30:00-06:00",
+            "last_task_result": 267011,
+            "last_task_result_label": "not_started",
+            "last_result_ok": True,
+        },
         "summary": {
             "command_count": 2,
             "failed_count": 0,
@@ -119,6 +135,12 @@ def test_windows_research_worker_api_summarizes_worker_payload(
     assert payload["summary"]["command_count"] == 2
     assert payload["summary"]["failed_count"] == 0
     assert payload["summary"]["safety_clear"] is True
+    assert payload["summary"]["manifest_age_seconds"] == 120
+    assert payload["freshness"]["status"] == "fresh"
+    assert payload["freshness"]["fresh"] is True
+    assert payload["schedule"]["task_name"] == "SapphireResearchWorker"
+    assert payload["schedule"]["last_task_result_label"] == "not_started"
+    assert payload["schedule"]["last_result_ok"] is True
     assert payload["safety"]["paper_only"] is True
     assert payload["safety"]["live_trading_enabled"] is False
     assert payload["commands"][0]["name"] == "strategy_sweep"

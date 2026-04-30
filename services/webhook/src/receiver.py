@@ -12,6 +12,7 @@ Signal flow:
 """
 
 import asyncio
+import base64
 import contextlib
 import json
 import logging
@@ -64,6 +65,8 @@ RESEARCH_WORKER_OUTPUT_ROOT = os.getenv(
     "RESEARCH_WORKER_OUTPUT_ROOT",
     os.getenv("WINDOWS_RESEARCH_WORKER_OUTPUT_ROOT", "E:/Sapphire/research-worker"),
 )
+RESEARCH_WORKER_MAX_AGE_SECONDS = int(os.getenv("RESEARCH_WORKER_MAX_AGE_SECONDS", "129600"))
+RESEARCH_WORKER_TASK_NAME = os.getenv("RESEARCH_WORKER_TASK_NAME", "SapphireResearchWorker")
 
 # Supported symbols → canonical Sapphire format
 SYMBOL_MAP = {
@@ -213,6 +216,117 @@ def _seconds_between(started_at: Any, finished_at: Any) -> float | None:
     return round(max((finished - started).total_seconds(), 0.0), 3)
 
 
+def _age_seconds(generated_at: Any, *, now: datetime | None = None) -> int | None:
+    generated = _parse_iso_timestamp(generated_at)
+    if not generated:
+        return None
+    current = now or datetime.now(UTC)
+    if generated.tzinfo is None:
+        generated = generated.replace(tzinfo=UTC)
+    return max(0, int((current - generated).total_seconds()))
+
+
+def _research_worker_freshness(generated_at: Any) -> dict[str, Any]:
+    age = _age_seconds(generated_at)
+    status = "unknown"
+    if age is not None:
+        status = "fresh" if age <= RESEARCH_WORKER_MAX_AGE_SECONDS else "stale"
+    return {
+        "status": status,
+        "age_seconds": age,
+        "max_age_seconds": RESEARCH_WORKER_MAX_AGE_SECONDS,
+        "fresh": status == "fresh",
+    }
+
+
+_TASK_RESULT_LABELS = {
+    0: "success",
+    267009: "running",
+    267011: "not_started",
+}
+
+
+def _task_result_label(value: Any) -> str:
+    try:
+        code = int(value)
+    except (TypeError, ValueError):
+        return "unknown"
+    return _TASK_RESULT_LABELS.get(code, f"code_{code}")
+
+
+def _task_result_ok(value: Any) -> bool:
+    return _task_result_label(value) in {"success", "running", "not_started"}
+
+
+def _query_research_worker_task() -> dict[str, Any]:
+    """Read Task Scheduler state without exposing task arguments."""
+    if platform.system().lower() != "windows":
+        return {
+            "task_name": RESEARCH_WORKER_TASK_NAME,
+            "status": "unavailable",
+            "reason": "not_windows",
+        }
+
+    task_name_json = json.dumps(RESEARCH_WORKER_TASK_NAME)
+    script = f"""
+$ProgressPreference = 'SilentlyContinue'
+$taskName = {task_name_json}
+$task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+$info = Get-ScheduledTaskInfo -TaskName $taskName -ErrorAction SilentlyContinue
+if (-not $task) {{
+  [pscustomobject]@{{ task_name = $taskName; status = 'missing' }}
+}} else {{
+  [pscustomobject]@{{
+    task_name = $taskName
+    status = 'ok'
+    state = [string]$task.State
+    last_run_time = if ($info -and $info.LastRunTime) {{ $info.LastRunTime.ToString('o') }} else {{ $null }}
+    next_run_time = if ($info -and $info.NextRunTime) {{ $info.NextRunTime.ToString('o') }} else {{ $null }}
+    last_task_result = if ($info) {{ $info.LastTaskResult }} else {{ $null }}
+  }}
+}}
+"""
+    encoded = base64.b64encode(script.encode("utf-16le")).decode("ascii")
+    try:
+        result = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return {
+            "task_name": RESEARCH_WORKER_TASK_NAME,
+            "status": "unavailable",
+            "reason": f"{exc.__class__.__name__}: {exc}"[:160],
+        }
+    if result.returncode != 0:
+        return {
+            "task_name": RESEARCH_WORKER_TASK_NAME,
+            "status": "unavailable",
+            "reason": (result.stderr or "powershell_failed")[-160:],
+        }
+    try:
+        payload = json.loads(result.stdout.strip())
+    except json.JSONDecodeError as exc:
+        return {
+            "task_name": RESEARCH_WORKER_TASK_NAME,
+            "status": "unavailable",
+            "reason": f"JSONDecodeError: {exc}"[:160],
+        }
+    if not isinstance(payload, dict):
+        return {
+            "task_name": RESEARCH_WORKER_TASK_NAME,
+            "status": "unavailable",
+            "reason": "unexpected_task_payload",
+        }
+    label = _task_result_label(payload.get("last_task_result"))
+    payload["last_task_result_label"] = label
+    payload["last_result_ok"] = _task_result_ok(payload.get("last_task_result"))
+    return payload
+
+
 def _latest_research_worker_manifest(root: Path) -> Path | None:
     if not root.exists() or not root.is_dir():
         return None
@@ -231,6 +345,8 @@ def _research_worker_empty_payload(reason: str) -> dict[str, Any]:
         "status": "no_data",
         "source": "windows_webhook",
         "reason": reason,
+        "freshness": _research_worker_freshness(None),
+        "schedule": _query_research_worker_task(),
         "summary": {
             "command_count": 0,
             "failed_count": 0,
@@ -251,6 +367,7 @@ def _build_research_worker_payload(
     manifest: dict[str, Any],
     *,
     manifest_path: Path | None = None,
+    schedule: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     commands = [item for item in manifest.get("commands", []) if isinstance(item, dict)]
     artifacts = list(manifest.get("artifacts", [])) if isinstance(manifest.get("artifacts"), list) else []
@@ -284,11 +401,14 @@ def _build_research_worker_payload(
             }
         )
 
+    freshness = _research_worker_freshness(manifest.get("generated_at"))
     status = "ok"
     if not safety_clear:
         status = "unsafe"
     elif failed_count:
         status = "degraded"
+    elif freshness["status"] == "stale":
+        status = "stale"
 
     return {
         "mode": "read_only_windows_research_worker",
@@ -302,6 +422,8 @@ def _build_research_worker_payload(
         "manifest_path_label": _short_path_label(manifest_path),
         "run_dir_label": _short_path_label(manifest.get("run_dir")),
         "output_root_label": _short_path_label(manifest.get("output_root")),
+        "freshness": freshness,
+        "schedule": schedule if schedule is not None else _query_research_worker_task(),
         "summary": {
             "command_count": len(command_rows),
             "failed_count": failed_count,
@@ -322,10 +444,12 @@ def _build_research_worker_payload(
 
 def _build_research_worker_status() -> dict[str, Any]:
     root = Path(RESEARCH_WORKER_OUTPUT_ROOT)
+    schedule = _query_research_worker_task()
     manifest_path = _latest_research_worker_manifest(root)
     if manifest_path is None:
         payload = _research_worker_empty_payload("no manifest on disk")
         payload["output_root_label"] = _short_path_label(root)
+        payload["schedule"] = schedule
         return payload
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
@@ -333,12 +457,14 @@ def _build_research_worker_status() -> dict[str, Any]:
         payload = _research_worker_empty_payload("latest manifest unreadable")
         payload["error"] = f"{exc.__class__.__name__}: {exc}"[:200]
         payload["manifest_path_label"] = _short_path_label(manifest_path)
+        payload["schedule"] = schedule
         return payload
     if not isinstance(manifest, dict):
         payload = _research_worker_empty_payload("latest manifest is not an object")
         payload["manifest_path_label"] = _short_path_label(manifest_path)
+        payload["schedule"] = schedule
         return payload
-    return _build_research_worker_payload(manifest, manifest_path=manifest_path)
+    return _build_research_worker_payload(manifest, manifest_path=manifest_path, schedule=schedule)
 
 
 def _get_publisher():

@@ -12,6 +12,7 @@ import importlib
 import importlib.util
 import json
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -527,9 +528,22 @@ async def test_publish_signal_records_partial_success(monkeypatch, receiver):
     assert len(fail_targets) == 2
 
 
-def test_research_worker_payload_is_path_safe_and_paper_only(receiver):
+def test_research_worker_payload_is_path_safe_and_paper_only(receiver, monkeypatch):
+    monkeypatch.setattr(
+        receiver,
+        "_query_research_worker_task",
+        lambda: {
+            "task_name": "SapphireResearchWorker",
+            "status": "ok",
+            "state": "Ready",
+            "last_task_result": 267011,
+            "last_task_result_label": "not_started",
+            "last_result_ok": True,
+            "next_run_time": "2026-04-30T02:30:00-06:00",
+        },
+    )
     manifest = {
-        "generated_at": "2026-04-29T21:04:24Z",
+        "generated_at": datetime.now(UTC).isoformat(),
         "host": "DESKTOP-HFCK6U9",
         "git_sha": "6e7c106742ef225fb784be9a3020e15ddba64dd1",
         "run_dir": "E:\\Sapphire\\research-worker\\20260429T210424Z",
@@ -556,27 +570,44 @@ def test_research_worker_payload_is_path_safe_and_paper_only(receiver):
     assert payload["summary"]["failed_count"] == 0
     assert payload["git_sha_short"] == "6e7c1067"
     assert payload["run_id"] == "20260429T210424Z"
+    assert payload["freshness"]["status"] == "fresh"
+    assert payload["freshness"]["fresh"] is True
+    assert payload["schedule"]["last_task_result_label"] == "not_started"
+    assert payload["schedule"]["last_result_ok"] is True
     assert payload["commands"][0]["duration_seconds"] == 5.0
     assert payload["commands"][0]["log_path_label"] == ".../research-worker/20260429T210424Z/backtest.log"
     assert payload["artifacts"][0]["path_label"] == ".../research-worker/20260429T210424Z/backtest"
 
 
-def test_research_worker_payload_marks_failed_or_unsafe(receiver):
+def test_research_worker_payload_marks_failed_unsafe_or_stale(receiver, monkeypatch):
+    monkeypatch.setattr(receiver, "RESEARCH_WORKER_MAX_AGE_SECONDS", 60)
     failed_manifest = {
+        "generated_at": datetime.now(UTC).isoformat(),
         "paper_only": True,
         "live_trading_enabled": False,
         "telegram_sends_enabled": False,
         "commands": [{"name": "strategy_sweep", "exit_code": 1}],
     }
     unsafe_manifest = {
+        "generated_at": datetime.now(UTC).isoformat(),
         "paper_only": True,
         "live_trading_enabled": True,
+        "telegram_sends_enabled": False,
+        "commands": [{"name": "strategy_sweep", "exit_code": 0}],
+    }
+    stale_manifest = {
+        "generated_at": (datetime.now(UTC) - timedelta(minutes=5)).isoformat(),
+        "paper_only": True,
+        "live_trading_enabled": False,
         "telegram_sends_enabled": False,
         "commands": [{"name": "strategy_sweep", "exit_code": 0}],
     }
 
     assert receiver._build_research_worker_payload(failed_manifest)["status"] == "degraded"
     assert receiver._build_research_worker_payload(unsafe_manifest)["status"] == "unsafe"
+    payload = receiver._build_research_worker_payload(stale_manifest)
+    assert payload["status"] == "stale"
+    assert payload["freshness"]["status"] == "stale"
 
 
 def test_research_worker_status_accepts_powershell_utf8_bom(receiver, tmp_path, monkeypatch):
