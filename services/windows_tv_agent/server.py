@@ -26,6 +26,11 @@ SERVICE_NAME = "windows_tv_agent"
 MODE = "read_only_tradingview_workbench_agent"
 DEFAULT_CDP_URL = os.environ.get("TRADINGVIEW_CDP_URL", "http://127.0.0.1:9222")
 DEFAULT_PORT = int(os.environ.get("WINDOWS_TV_AGENT_PORT", "8081"))
+# When set to "1", the agent is only `healthy` if it can also reach a TradingView
+# Desktop CDP endpoint locally. Defaults to "0" because the canonical Sapphire
+# topology runs TradingView on the Mac commander; the Windows host serves the
+# webhook + Ollama + research worker, not the TV workbench.
+DEFAULT_CDP_REQUIRED = os.environ.get("WINDOWS_TV_AGENT_CDP_REQUIRED", "0") == "1"
 
 JsonFetcher = Callable[[str, float], Any]
 
@@ -123,13 +128,22 @@ def build_status_payload(
     cdp_url: str = DEFAULT_CDP_URL,
     timeout: float = 2.0,
     fetcher: JsonFetcher = fetch_json,
+    cdp_required: bool = DEFAULT_CDP_REQUIRED,
 ) -> dict[str, Any]:
     cdp = probe_tradingview_cdp(base_url=cdp_url, timeout=timeout, fetcher=fetcher)
-    healthy = bool(cdp.get("healthy"))
+    cdp_healthy = bool(cdp.get("healthy"))
+    # When CDP is not required (canonical topology — TV runs on the Mac), the
+    # agent itself is healthy as long as the process is up. We surface CDP
+    # reachability separately via the `cdp` block so callers can still see it.
+    if cdp_required:
+        status = "healthy" if cdp_healthy else "degraded"
+    else:
+        status = "healthy" if cdp_healthy else "agent_only"
     return {
         "service": SERVICE_NAME,
         "mode": MODE,
-        "status": "healthy" if healthy else "degraded",
+        "status": status,
+        "cdp_required": cdp_required,
         "timestamp": datetime.now(UTC).isoformat(),
         "host": socket.gethostname(),
         "platform": platform.platform(),

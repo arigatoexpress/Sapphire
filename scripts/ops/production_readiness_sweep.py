@@ -763,10 +763,20 @@ def windows_webhook_health_check(host: str = DEFAULT_WINDOWS_HOST) -> Check:
         )
     services = parsed.get("services") if isinstance(parsed, dict) else {}
     services = services if isinstance(services, dict) else {}
+    # `agent_only` is a non-degraded state: the service process is up, but a
+    # downstream optional dependency (e.g. CDP for windows_tv_agent on a host
+    # that doesn't run TradingView) is not connected. Treat as informational.
+    agent_only = sorted(
+        str(name)
+        for name, value in services.items()
+        if isinstance(value, dict) and str(value.get("status", "")).lower() == "agent_only"
+    )
     degraded = sorted(
         str(name)
         for name, value in services.items()
-        if isinstance(value, dict) and value.get("healthy") is not True
+        if isinstance(value, dict)
+        and value.get("healthy") is not True
+        and str(value.get("status", "")).lower() != "agent_only"
     )
     capabilities = parsed.get("capabilities") if isinstance(parsed, dict) else {}
     capabilities = capabilities if isinstance(capabilities, dict) else {}
@@ -777,6 +787,8 @@ def windows_webhook_health_check(host: str = DEFAULT_WINDOWS_HOST) -> Check:
     evidence += f"; status={root_status}"
     if degraded:
         evidence += f"; degraded_services={','.join(degraded)}"
+    if agent_only:
+        evidence += f"; agent_only_services={','.join(agent_only)}"
     if "ollama_model_count" in capabilities:
         evidence += f"; ollama_model_count={capabilities.get('ollama_model_count')}"
     if "gpu_count" in capabilities:

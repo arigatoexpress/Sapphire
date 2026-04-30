@@ -227,6 +227,108 @@ class TradingViewOrchestrator:
             "added": added,
         }
 
+    # ------------------------------------------------------------------
+    # Pine Script orchestration
+    # ------------------------------------------------------------------
+
+    def pine_list(self) -> dict[str, Any]:
+        """List Pine scripts saved on the user's TradingView account."""
+        return self._run("pine", "list")
+
+    def pine_get(self) -> dict[str, Any]:
+        """Read the Pine script currently loaded in the editor."""
+        return self._run("pine", "get")
+
+    def pine_errors(self) -> dict[str, Any]:
+        """Get current Pine compilation errors."""
+        return self._run("pine", "errors")
+
+    def pine_console(self) -> dict[str, Any]:
+        """Get Pine console / log output."""
+        return self._run("pine", "console")
+
+    def pine_check_file(self, path: str | Path) -> dict[str, Any]:
+        """Server-side compile check of a Pine source file (no chart needed)."""
+        return self._run("pine", "check", "-f", str(path))
+
+    def pine_analyze_file(self, path: str | Path) -> dict[str, Any]:
+        """Offline static analysis of a Pine source file."""
+        return self._run("pine", "analyze", "-f", str(path))
+
+    def pine_open(self, name_or_id: str) -> dict[str, Any]:
+        if not self.mutation_enabled:
+            return {"mutated": False, "reason": f"{MUTATION_ENV} must be 1"}
+        return self._run("pine", "open", name_or_id)
+
+    def pine_set_from_file(self, path: str | Path) -> dict[str, Any]:
+        if not self.mutation_enabled:
+            return {"mutated": False, "reason": f"{MUTATION_ENV} must be 1"}
+        return self._run("pine", "set", "--file", str(path))
+
+    def pine_compile(self) -> dict[str, Any]:
+        if not self.mutation_enabled:
+            return {"mutated": False, "reason": f"{MUTATION_ENV} must be 1"}
+        return self._run("pine", "compile")
+
+    def pine_save(self) -> dict[str, Any]:
+        if not self.mutation_enabled:
+            return {"mutated": False, "reason": f"{MUTATION_ENV} must be 1"}
+        return self._run("pine", "save")
+
+    def pine_validate_file(self, path: str | Path) -> dict[str, Any]:
+        """Run analyze + check on a file, return both results.
+
+        Read-only: no chart manipulation. Useful for CI / pre-flight checks.
+        """
+        analyze = self.pine_analyze_file(path)
+        check = self.pine_check_file(path)
+        return {
+            "ok": analyze["ok"] and check["ok"],
+            "analyze": analyze,
+            "check": check,
+            "path": str(path),
+        }
+
+    # ------------------------------------------------------------------
+    # Alert orchestration
+    # ------------------------------------------------------------------
+
+    def alerts_list(self) -> dict[str, Any]:
+        return self._run("alert", "list")
+
+    def alert_create(
+        self,
+        price: float,
+        condition: str = "crossing",
+        message: str = "Sapphire alert",
+    ) -> dict[str, Any]:
+        if not self.mutation_enabled:
+            return {"mutated": False, "reason": f"{MUTATION_ENV} must be 1"}
+        if condition not in {"crossing", "greater_than", "less_than"}:
+            return {
+                "mutated": False,
+                "ok": False,
+                "reason": f"invalid condition: {condition}",
+            }
+        return self._run(
+            "alert",
+            "create",
+            "-p",
+            str(price),
+            "-c",
+            condition,
+            "-m",
+            message,
+        )
+
+    def alert_delete(self, alert_id: str | int | None = None) -> dict[str, Any]:
+        if not self.mutation_enabled:
+            return {"mutated": False, "reason": f"{MUTATION_ENV} must be 1"}
+        args = ["alert", "delete"]
+        if alert_id is not None:
+            args.append(str(alert_id))
+        return self._run(*args)
+
     def screenshot(
         self,
         symbol: str,

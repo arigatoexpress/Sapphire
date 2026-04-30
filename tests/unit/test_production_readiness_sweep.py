@@ -248,7 +248,7 @@ def test_windows_webhook_health_surfaces_degraded_subservices(monkeypatch) -> No
                 "services": {
                     "windows_webhook": {"healthy": True},
                     "windows_ollama": {"healthy": True},
-                    "windows_tv_agent": {"healthy": False},
+                    "windows_tv_agent": {"healthy": False, "status": "broken"},
                 },
                 "capabilities": {"ollama_model_count": 29, "gpu_count": 1},
             },
@@ -263,6 +263,32 @@ def test_windows_webhook_health_surfaces_degraded_subservices(monkeypatch) -> No
     assert "degraded_services=windows_tv_agent" in check.evidence
     assert "ollama_model_count=29" in check.evidence
     assert "gpu_count=1" in check.evidence
+
+
+def test_windows_webhook_health_treats_agent_only_as_pass(monkeypatch) -> None:
+    """`agent_only` (process up, optional CDP unreachable) is informational, not degraded."""
+
+    def fake_urlopen(_request: object, timeout: int) -> _FakeHTTPResponse:
+        return _FakeHTTPResponse(
+            200,
+            {
+                "status": "healthy",
+                "services": {
+                    "windows_webhook": {"healthy": True, "status": "active"},
+                    "windows_ollama": {"healthy": True},
+                    "windows_tv_agent": {"healthy": False, "status": "agent_only"},
+                },
+                "capabilities": {"ollama_model_count": 29, "gpu_count": 1},
+            },
+        )
+
+    monkeypatch.setattr(sweep.urllib.request, "urlopen", fake_urlopen)
+
+    check = sweep.windows_webhook_health_check("100.71.10.48")
+
+    assert check.status == "PASS"
+    assert "agent_only_services=windows_tv_agent" in check.evidence
+    assert "degraded_services" not in check.evidence
 
 
 def test_windows_research_worker_passes_with_fresh_safe_manifest(monkeypatch) -> None:

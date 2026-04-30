@@ -23,6 +23,11 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from lib.trading.pine_templates import (
+    list_generated,
+    render_sapphire_watch_indicator,
+    write_template,
+)
 from lib.trading.tradingview_orchestrator import TradingViewOrchestrator
 from lib.trading.tradingview_ta_machine import build_tradingview_ta_machine
 
@@ -109,6 +114,83 @@ def cmd_deep(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_pine_list(args: argparse.Namespace) -> int:
+    orch = TradingViewOrchestrator(tv_bin=args.tv_bin)
+    out = {
+        "status": "ok",
+        "tv_account_scripts": orch.pine_list(),
+        "generated_local": list_generated(),
+    }
+    _write_json(args.out, out)
+    print(json.dumps(out, indent=2, sort_keys=True))
+    return 0
+
+
+def cmd_pine_validate(args: argparse.Namespace) -> int:
+    orch = TradingViewOrchestrator(tv_bin=args.tv_bin)
+    result = orch.pine_validate_file(args.path)
+    out = {"status": "ok" if result["ok"] else "fail", "result": result}
+    _write_json(args.out, out)
+    print(json.dumps(out, indent=2, sort_keys=True))
+    return 0 if result["ok"] else 2
+
+
+def cmd_pine_generate(args: argparse.Namespace) -> int:
+    pine = render_sapphire_watch_indicator(args.symbol)
+    name = args.name or f"Sapphire_Watch_{args.symbol}"
+    written = write_template(
+        name,
+        pine,
+        metadata={
+            "kind": "sapphire_watch_indicator",
+            "tradingview_symbol": args.symbol,
+        },
+    )
+    if args.validate:
+        orch = TradingViewOrchestrator(tv_bin=args.tv_bin)
+        validation = orch.pine_validate_file(written["pine_path"])
+        written["validation"] = validation
+    out: dict[str, Any] = {"status": "ok", "generated": written}
+    _write_json(args.out, out)
+    print(json.dumps(out, indent=2, sort_keys=True))
+    return 0
+
+
+def cmd_pine_load(args: argparse.Namespace) -> int:
+    orch = TradingViewOrchestrator(
+        tv_bin=args.tv_bin,
+        mutation_enabled=args.mutate,
+    )
+    set_res = orch.pine_set_from_file(args.path)
+    compile_res: dict[str, Any] = {"mutated": False, "skipped": True}
+    if args.compile:
+        compile_res = orch.pine_compile()
+    errors = orch.pine_errors() if args.compile else {"ok": True, "skipped": True}
+    out = {
+        "status": "ok" if set_res.get("ok", False) or set_res.get("mutated") is False else "fail",
+        "set": set_res,
+        "compile": compile_res,
+        "errors": errors,
+    }
+    _write_json(args.out, out)
+    print(json.dumps(out, indent=2, sort_keys=True))
+    return 0
+
+
+def cmd_alerts_list(args: argparse.Namespace) -> int:
+    orch = TradingViewOrchestrator(tv_bin=args.tv_bin)
+    payload = orch.alerts_list()
+    body = (payload.get("payload") or {}) if isinstance(payload, dict) else {}
+    out = {
+        "status": "ok" if payload.get("ok") else "fail",
+        "alert_count": body.get("alert_count"),
+        "result": payload,
+    }
+    _write_json(args.out, out)
+    print(json.dumps(out, indent=2, sort_keys=True))
+    return 0
+
+
 def cmd_latest(args: argparse.Namespace) -> int:
     orch = TradingViewOrchestrator(tv_bin=args.tv_bin)
     manifest = orch.latest_manifest()
@@ -154,6 +236,44 @@ def main(argv: list[str] | None = None) -> int:
     p_latest = sub.add_parser("latest", help="Show latest captured session manifest")
     p_latest.add_argument("--limit", type=int, default=10, help="Recent sessions to list")
     p_latest.set_defaults(func=cmd_latest)
+
+    p_pine_list = sub.add_parser("pine-list", help="List TV-saved + locally-generated Pine scripts")
+    p_pine_list.set_defaults(func=cmd_pine_list)
+
+    p_pine_validate = sub.add_parser(
+        "pine-validate",
+        help="Run analyze + server-side check on a Pine source file",
+    )
+    p_pine_validate.add_argument("path", help="Path to .pine source file")
+    p_pine_validate.set_defaults(func=cmd_pine_validate)
+
+    p_pine_generate = sub.add_parser(
+        "pine-generate",
+        help="Generate a Sapphire-aligned Pine script for a symbol",
+    )
+    p_pine_generate.add_argument("symbol", help="TradingView symbol (e.g. BINANCE:ETHUSDT)")
+    p_pine_generate.add_argument("--name", help="Template name override")
+    p_pine_generate.add_argument(
+        "--validate",
+        action="store_true",
+        help="Run analyze + check on the generated file (no chart needed)",
+    )
+    p_pine_generate.set_defaults(func=cmd_pine_generate)
+
+    p_pine_load = sub.add_parser(
+        "pine-load",
+        help="Push a Pine source file into the TV editor (mutation-gated)",
+    )
+    p_pine_load.add_argument("path", help="Path to .pine source file")
+    p_pine_load.add_argument(
+        "--compile",
+        action="store_true",
+        help="Compile after loading and report errors",
+    )
+    p_pine_load.set_defaults(func=cmd_pine_load)
+
+    p_alerts_list = sub.add_parser("alerts-list", help="List active TradingView alerts")
+    p_alerts_list.set_defaults(func=cmd_alerts_list)
 
     args = parser.parse_args(argv)
 

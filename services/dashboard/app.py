@@ -1869,6 +1869,46 @@ def api_tradingview_orchestrator_artifact(artifact_path: str):
     return send_file(str(target), mimetype=mimetype)
 
 
+@app.route("/api/tradingview/orchestrator/pine")
+@requires_auth
+def api_tradingview_orchestrator_pine():
+    """List Pine scripts on the TV account + locally generated templates."""
+    from lib.trading.pine_templates import list_generated
+    from lib.trading.tradingview_orchestrator import TradingViewOrchestrator
+
+    orch = TradingViewOrchestrator()
+    tv_scripts = orch.pine_list()
+    payload = tv_scripts.get("payload") or {}
+    return jsonify(
+        {
+            "status": "ok",
+            "tv_account": {
+                "ok": tv_scripts.get("ok", False),
+                "scripts": payload.get("scripts", []) or [],
+            },
+            "generated_local": list_generated(),
+        }
+    )
+
+
+@app.route("/api/tradingview/orchestrator/alerts")
+@requires_auth
+def api_tradingview_orchestrator_alerts():
+    """List active TradingView alerts (read-only)."""
+    from lib.trading.tradingview_orchestrator import TradingViewOrchestrator
+
+    orch = TradingViewOrchestrator()
+    res = orch.alerts_list()
+    payload = res.get("payload") or {}
+    return jsonify(
+        {
+            "status": "ok" if res.get("ok") else "fail",
+            "alert_count": payload.get("alert_count"),
+            "alerts": payload.get("alerts") or [],
+        }
+    )
+
+
 @app.route("/api/proposals")
 @requires_auth
 def api_proposals():

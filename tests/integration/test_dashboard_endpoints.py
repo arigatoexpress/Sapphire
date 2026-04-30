@@ -959,3 +959,79 @@ def test_tradingview_orchestrator_artifact_endpoint_404_for_missing(app_client, 
         headers={"Authorization": _AUTH},
     )
     assert r.status_code == 404
+
+
+def test_tradingview_orchestrator_pine_endpoint(app_client, monkeypatch, tmp_path):
+    _, client = app_client
+    from lib.trading import pine_templates, tradingview_orchestrator
+
+    monkeypatch.setattr(
+        tradingview_orchestrator.TradingViewOrchestrator,
+        "pine_list",
+        lambda self: {
+            "ok": True,
+            "payload": {"scripts": [{"id": "X", "name": "Test", "title": "Test"}]},
+        },
+    )
+    # Empty generated dir
+    monkeypatch.setattr(pine_templates, "DEFAULT_GENERATED_ROOT", tmp_path / "missing")
+
+    r = client.get(
+        "/api/tradingview/orchestrator/pine",
+        headers={"Authorization": _AUTH},
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["status"] == "ok"
+    assert body["tv_account"]["ok"] is True
+    assert len(body["tv_account"]["scripts"]) == 1
+    assert body["generated_local"] == []
+
+
+def test_tradingview_orchestrator_alerts_endpoint(app_client, monkeypatch):
+    _, client = app_client
+    from lib.trading import tradingview_orchestrator
+
+    monkeypatch.setattr(
+        tradingview_orchestrator.TradingViewOrchestrator,
+        "alerts_list",
+        lambda self: {
+            "ok": True,
+            "payload": {
+                "alert_count": 2,
+                "alerts": [
+                    {"alert_id": 1, "symbol": "BINANCE:ETHUSDT", "active": True},
+                    {"alert_id": 2, "symbol": "BINANCE:BTCUSDT", "active": False},
+                ],
+            },
+        },
+    )
+    r = client.get(
+        "/api/tradingview/orchestrator/alerts",
+        headers={"Authorization": _AUTH},
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["status"] == "ok"
+    assert body["alert_count"] == 2
+    assert len(body["alerts"]) == 2
+
+
+def test_tradingview_orchestrator_alerts_endpoint_handles_failure(app_client, monkeypatch):
+    _, client = app_client
+    from lib.trading import tradingview_orchestrator
+
+    monkeypatch.setattr(
+        tradingview_orchestrator.TradingViewOrchestrator,
+        "alerts_list",
+        lambda self: {"ok": False, "stderr": "tv unreachable"},
+    )
+    r = client.get(
+        "/api/tradingview/orchestrator/alerts",
+        headers={"Authorization": _AUTH},
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["status"] == "fail"
+    assert body["alert_count"] is None
+    assert body["alerts"] == []

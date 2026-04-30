@@ -37,15 +37,27 @@ def test_status_payload_is_healthy_when_cdp_is_reachable() -> None:
     assert payload["cdp"]["tradingview_tab_count"] == 1
 
 
-def test_status_payload_is_degraded_when_cdp_is_missing() -> None:
+def test_status_payload_is_agent_only_when_cdp_missing_and_not_required() -> None:
     def fake_fetcher(_url: str, _timeout: float):
         raise URLError("connection refused")
 
-    payload = server.build_status_payload(fetcher=fake_fetcher)
+    payload = server.build_status_payload(fetcher=fake_fetcher, cdp_required=False)
 
-    assert payload["status"] == "degraded"
+    assert payload["status"] == "agent_only"
+    assert payload["cdp_required"] is False
     assert payload["cdp"]["healthy"] is False
     assert payload["capabilities"]["trade_execution"] is False
+
+
+def test_status_payload_is_degraded_when_cdp_required_and_missing() -> None:
+    def fake_fetcher(_url: str, _timeout: float):
+        raise URLError("connection refused")
+
+    payload = server.build_status_payload(fetcher=fake_fetcher, cdp_required=True)
+
+    assert payload["status"] == "degraded"
+    assert payload["cdp_required"] is True
+    assert payload["cdp"]["healthy"] is False
 
 
 def test_tabs_are_read_only_and_redacted_to_hosts() -> None:
