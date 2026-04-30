@@ -8,7 +8,7 @@ The fetchers in this module are intentionally small and boring:
 * per-source counters and raw response caches live under
   ``~/.cache/sapphire/macro/<source>/``.
 
-Only stdlib plus ``feedparser`` is used. HTML pages are parsed with
+Only stdlib plus ``feedparser`` is used when available. HTML pages are parsed with
 ``html.parser`` and robots checks use ``urllib.robotparser``.
 """
 
@@ -32,7 +32,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
 
-import feedparser
+from lib.macro import feedparser_compat as feedparser
 
 MAX_PULLS_PER_HOUR_PER_SOURCE = 4
 MAX_EVENTS_PER_PULL = 100

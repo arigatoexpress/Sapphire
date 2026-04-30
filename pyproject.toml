@@ -17,6 +17,7 @@ dev = [
     # Keep this aligned with requirements-test.txt so bare `pytest` collection
     # has the optional service deps the unit suite imports.
     "aiohttp==3.13.5",
+    "annotated-doc==0.0.4",
     "fastapi==0.136.1",
     "feedparser==6.0.11",
     "flask==3.1.3",

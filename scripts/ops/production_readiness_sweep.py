@@ -40,6 +40,8 @@ DEFAULT_SECRET_ENV = Path.home() / ".sapphire" / "secrets.env"
 SAPPHIRE_SECRETS_DIR = Path.home() / ".config" / "sapphire-secrets"
 DEFAULT_WINDOWS_GPU_URL = "http://100.71.10.48:11434"
 DEFAULT_WINDOWS_HOST = "100.71.10.48"
+DEFAULT_WINDOWS_HTTP_TIMEOUT_SECONDS = 5.0
+DEFAULT_WINDOWS_TCP_TIMEOUT_SECONDS = 3.0
 GEMINI_PROBE_PROMPT = "Return exactly SAPPHIRE_GEMINI_PROBE_OK and nothing else."
 GEMINI_PROBE_RESPONSE = "SAPPHIRE_GEMINI_PROBE_OK"
 WINDOWS_REQUIRED_MODELS = {
@@ -670,7 +672,7 @@ def windows_ollama_inventory_check(base_url: str = DEFAULT_WINDOWS_GPU_URL) -> C
     started = time.perf_counter()
     url = f"{base_url.rstrip('/')}/api/tags"
     try:
-        with urllib.request.urlopen(url, timeout=5) as response:  # nosec B310 - fixed private Tailscale readiness URL.
+        with urllib.request.urlopen(url, timeout=windows_http_timeout_seconds()) as response:  # nosec B310 - fixed private Tailscale readiness URL.
             status_code = response.status
             body = response.read(1024 * 1024)
     except urllib.error.HTTPError as exc:
@@ -742,7 +744,7 @@ def windows_webhook_health_check(host: str = DEFAULT_WINDOWS_HOST) -> Check:
     started = time.perf_counter()
     url = f"http://{host}:9090/webhook/health"
     try:
-        with urllib.request.urlopen(url, timeout=5) as response:  # nosec B310 - fixed private Tailscale readiness URL.
+        with urllib.request.urlopen(url, timeout=windows_http_timeout_seconds()) as response:  # nosec B310 - fixed private Tailscale readiness URL.
             status_code = response.status
             body = response.read(1024 * 1024)
     except urllib.error.HTTPError as exc:
@@ -837,7 +839,7 @@ def windows_research_worker_check(host: str = DEFAULT_WINDOWS_HOST) -> Check:
     started = time.perf_counter()
     url = f"http://{host}:9090/windows/research-worker/latest"
     try:
-        with urllib.request.urlopen(url, timeout=5) as response:  # nosec B310 - fixed private Tailscale readiness URL.
+        with urllib.request.urlopen(url, timeout=windows_http_timeout_seconds()) as response:  # nosec B310 - fixed private Tailscale readiness URL.
             status_code = response.status
             body = response.read(1024 * 1024)
     except urllib.error.HTTPError as exc:
@@ -1417,7 +1419,7 @@ def tcp_check(
 ) -> Check:
     started = time.perf_counter()
     try:
-        with socket.create_connection((host, port), timeout=3):
+        with socket.create_connection((host, port), timeout=windows_tcp_timeout_seconds()):
             return Check(
                 category,
                 name,
@@ -1433,6 +1435,31 @@ def tcp_check(
             exc.__class__.__name__,
             int((time.perf_counter() - started) * 1000),
         )
+
+
+def windows_http_timeout_seconds() -> float:
+    return positive_float_env(
+        "SAPPHIRE_WINDOWS_HTTP_TIMEOUT_SECONDS",
+        DEFAULT_WINDOWS_HTTP_TIMEOUT_SECONDS,
+    )
+
+
+def windows_tcp_timeout_seconds() -> float:
+    return positive_float_env(
+        "SAPPHIRE_WINDOWS_TCP_TIMEOUT_SECONDS",
+        DEFAULT_WINDOWS_TCP_TIMEOUT_SECONDS,
+    )
+
+
+def positive_float_env(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        return default
+    return value if value > 0 else default
 
 
 @dataclass
