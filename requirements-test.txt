@@ -20,6 +20,7 @@ mutmut>=2.5,<3
 
 # web / http
 aiohttp==3.13.5
+annotated-doc==0.0.4
 fastapi==0.136.1
 feedparser==6.0.11
 flask==3.1.3

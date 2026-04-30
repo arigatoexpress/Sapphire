@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from lib.macro import feedparser_compat
 from lib.macro.sources import (
     FED_PRESS_RSS_URL,
     BISRSSSource,
@@ -104,6 +105,23 @@ def test_parse_feed_events_strips_html_summary():
     events = parse_feed_events(xml, source="fed_rss", label="Fed", feed_url=FED_PRESS_RSS_URL)
     assert events[0].title == "Fed & markets"
     assert events[0].summary == "Policy unchanged"
+
+
+def test_parse_feed_events_uses_stdlib_fallback_when_feedparser_legacy_shim_missing(
+    monkeypatch,
+):
+    monkeypatch.setattr(feedparser_compat, "_load_feedparser", lambda: None)
+    xml = """<?xml version="1.0"?><rss version="2.0"><channel><item>
+    <title>Fallback feed</title><link>https://example.test/fallback</link>
+    <pubDate>Thu, 29 Jan 2026 19:00:00 GMT</pubDate>
+    <description><![CDATA[<p>Parsed <b>safely</b></p>]]></description>
+    </item></channel></rss>"""
+
+    events = parse_feed_events(xml, source="fed_rss", label="Fed", feed_url=FED_PRESS_RSS_URL)
+
+    assert events[0].title == "Fallback feed"
+    assert events[0].summary == "Parsed safely"
+    assert events[0].published_at == datetime(2026, 1, 29, 19, tzinfo=UTC)
 
 
 def test_fomc_calendar_parser_extracts_forward_meetings():

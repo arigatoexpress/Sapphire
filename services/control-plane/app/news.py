@@ -10,10 +10,10 @@ from datetime import UTC, datetime
 from html import unescape
 from urllib.parse import urlparse
 
-import feedparser
 import httpx
 
 from app.models import NewsItem, NewsSource
+from lib.macro import feedparser_compat as feedparser
 
 logger = logging.getLogger(__name__)
 
