@@ -54,11 +54,57 @@ The LaunchAgent plist under `services/telegram_intel/launchagent/` is a template
 only. It ships with `SAPPHIRE_TELEGRAM_INTEL_LIVE=0` and `RunAtLoad=false`.
 Do not load it until the config, session, and logs directory have been checked.
 
+## Import Offline History
+
+Telegram Desktop JSON exports can be imported without contacting Telegram,
+loading an MTProto session, or enabling the live reader. Export from Telegram
+Desktop with JSON format, then point Sapphire at the local export file or
+directory:
+
+```bash
+/usr/local/bin/python3 services/telegram_intel/run.py import-history \
+  --export-path ~/Downloads/Telegram\ Desktop/DataExport_*/result.json \
+  --data-dir data/telegram_history_intel
+```
+
+The importer writes two local-only artifacts:
+
+- `data/telegram_history_intel/messages.jsonl` — sanitized, provenance-stamped
+  message rows with hashed chat and participant identifiers.
+- `data/telegram_history_intel/conversation_context.json` — deterministic
+  summaries for chat counts, top tags, open loops, commitments, and decisions.
+
+Both artifacts get `.envelope.json` sidecars. The default output directory is
+ignored by git. Do not commit real Telegram exports or imported history.
+
+By default, chat names, sender names, export file names, sender IDs, forwarded
+handles, emails, phone numbers, wallet addresses, and clickable URLs are not
+persisted. `--include-title-hints` exists for local operator triage only and
+stores sanitized/truncated chat title hints; leave it off for shareable
+artifacts.
+
+Plugin stdin action:
+
+```json
+{
+  "action": "import-history",
+  "export_path": "/absolute/path/to/result.json",
+  "data_dir": "data/telegram_history_intel"
+}
+```
+
+Dashboard summary is available after import at `/api/telegram-history-intel`
+behind normal dashboard auth. `/api/intel` also includes a source row with
+Telegram history availability, message count, freshness, artifact sidecar
+presence, and the read-only/no-send safety envelope.
+
 ## Validate
 
 ```bash
 /usr/local/bin/python3 -m pytest \
+  tests/unit/test_dashboard_telegram_history_intel.py \
   tests/unit/test_telegram_intel_reader.py \
+  tests/unit/test_telegram_history_export.py \
   tests/unit/test_telegram_intel_quality.py \
   tests/unit/test_telegram_intel_sink.py \
   plugins/claw-sapphire/tests/test_telegram_intel.py -q

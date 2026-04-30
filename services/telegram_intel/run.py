@@ -19,6 +19,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from services.telegram_intel.backends import (
     DEFAULT_SESSION_PATH,
     BackendError,
@@ -32,6 +36,7 @@ from services.telegram_intel.config import (
     TelegramIntelConfig,
     load_config,
 )
+from services.telegram_intel.history_export import HistoryExportError, import_history_export
 from services.telegram_intel.models import (
     MAX_CLASSIFICATIONS_PER_HOUR,
     MAX_MESSAGES_PER_HOUR,
@@ -295,10 +300,21 @@ def daemon(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("status", "pull-once", "daemon", "models"))
+    parser.add_argument("action", choices=("status", "pull-once", "daemon", "models", "import-history"))
     parser.add_argument("--config", type=Path)
     parser.add_argument("--data-dir", type=Path)
     parser.add_argument("--counter-path", type=Path, default=DEFAULT_COUNTER_PATH)
+    parser.add_argument(
+        "--export-path",
+        type=Path,
+        help="Local Telegram Desktop JSON export file or directory for import-history.",
+    )
+    parser.add_argument(
+        "--include-title-hints",
+        action="store_true",
+        help="Include sanitized chat title hints in offline history artifacts.",
+    )
+    parser.add_argument("--limit", type=int, help="Maximum messages to parse from the export.")
     return parser
 
 
@@ -319,6 +335,22 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.action == "models":
         print(json.dumps(available_models(), indent=2, sort_keys=True))
+        return 0
+    if args.action == "import-history":
+        if not args.export_path:
+            print(json.dumps({"ok": False, "error": "--export-path is required"}, indent=2))
+            return 2
+        try:
+            result = import_history_export(
+                args.export_path,
+                data_dir=args.data_dir,
+                include_title_hints=args.include_title_hints,
+                limit=args.limit,
+            ).to_dict()
+        except HistoryExportError as exc:
+            print(json.dumps({"ok": False, "error": str(exc)}, indent=2, sort_keys=True))
+            return 2
+        print(json.dumps(result, indent=2, sort_keys=True))
         return 0
     if args.action == "pull-once":
         result = pull_once(

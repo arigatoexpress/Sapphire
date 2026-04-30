@@ -92,6 +92,7 @@ data/market_pulse/
 data/performance/
 data/threat_intel/
 data/trading/
+data/telegram_history_intel/
 results/
 qwen*.json
 services/control-plane/app/data/system_events.jsonl
