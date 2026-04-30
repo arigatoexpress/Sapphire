@@ -125,7 +125,44 @@ PY
      6. `## Suggested next action` — one short sentence prioritizing
         Sapphire-relevant items first.
 
-10. Print a one-line status summary to stdout: either
+10. Supersede older open sweep issues conservatively.
+
+    The exact-fingerprint check in step 7 prevents duplicate issues for
+    identical CVE sets. A newer sweep can still partially supersede an
+    older open issue when some CVEs carry forward and others age out. After
+    creating the new issue, inspect older open issues with the same label:
+
+    ```bash
+    gh issue list --state open --label threat-intel-sweep \
+      --json number,title,body,createdAt --limit 20
+    ```
+
+    Comment and close an older issue as superseded only when all of these
+    are true:
+
+    - the older issue is more than 24 hours old and is not the issue just
+      opened;
+    - every ransomware-known CVE in the older issue is present in the new
+      issue, or the older issue has no ransomware-known CVE that is absent
+      from the new issue;
+    - any unresolved blocker in the older issue is represented in the new
+      issue, for example GHAS/Dependabot visibility unavailable;
+    - neither issue contains a Sapphire-relevant dependency or deployment
+      exposure that is absent from the other issue.
+
+    Use a short comment such as:
+
+    ```text
+    Closing as superseded by #<new_issue>. The newer sweep carries the
+    still-relevant ransomware-known set and the same unresolved blocker;
+    no older Sapphire-relevant dependency or deployment exposure is being
+    dropped.
+    ```
+
+    If the comparison is ambiguous, leave both issues open and add a
+    triage comment rather than closing automatically.
+
+11. Print a one-line status summary to stdout: either
     `threat-intel-sweep: clear` or
     `threat-intel-sweep: <N_CRIT> criticals, issue #<num>`.
 
