@@ -1833,6 +1833,28 @@ def api_tradingview_orchestrator_latest():
     return jsonify({"status": "ok", "manifest": manifest})
 
 
+@app.route("/api/tradingview/orchestrator/scoring/latest")
+@requires_auth
+def api_tradingview_orchestrator_scoring_latest():
+    """Latest TA-capture scoring rows, sorted by absolute score (desc).
+
+    Closes the loop from "TradingView orchestrator captured these TA values"
+    back into Sapphire's scoring. Each row carries ``score`` in [-1, +1],
+    ``regime``, and a short ``rationale``. Read-only; does not call ``tv``.
+    """
+    try:
+        top_n_raw = request.args.get("top_n")
+        top_n = int(top_n_raw) if top_n_raw is not None else None
+        if top_n is not None and top_n <= 0:
+            top_n = None
+    except ValueError:
+        top_n = None
+    from lib.trading.tradingview_orchestrator import TradingViewOrchestrator
+
+    orch = TradingViewOrchestrator()
+    return jsonify({"status": "ok", "scoring": orch.latest_scoring(top_n=top_n)})
+
+
 @app.route("/api/tradingview/orchestrator/probe")
 @requires_auth
 def api_tradingview_orchestrator_probe():
