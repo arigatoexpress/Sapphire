@@ -223,6 +223,24 @@ def cmd_pine_load(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_pine_promote(args: argparse.Namespace) -> int:
+    orch = TradingViewOrchestrator(
+        tv_bin=args.tv_bin,
+        mutation_enabled=args.mutate,
+    )
+    result = orch.pine_promote(args.path)
+    if result.get("mutated") is False and not args.mutate:
+        # Gate-blocked: surface as ok status (the orchestrator's contract)
+        out = {"status": "blocked", "result": result}
+    elif result.get("ok"):
+        out = {"status": "ok", "result": result}
+    else:
+        out = {"status": "fail", "result": result}
+    _write_json(args.out, out)
+    print(json.dumps(out, indent=2, sort_keys=True))
+    return 0 if out["status"] in {"ok", "blocked"} else 2
+
+
 def cmd_alerts_list(args: argparse.Namespace) -> int:
     orch = TradingViewOrchestrator(tv_bin=args.tv_bin)
     payload = orch.alerts_list()
@@ -330,6 +348,13 @@ def main(argv: list[str] | None = None) -> int:
         help="Compile after loading and report errors",
     )
     p_pine_load.set_defaults(func=cmd_pine_load)
+
+    p_pine_promote = sub.add_parser(
+        "pine-promote",
+        help="Set + compile + save a Pine source file into TV (mutation-gated)",
+    )
+    p_pine_promote.add_argument("path", help="Path to .pine source file")
+    p_pine_promote.set_defaults(func=cmd_pine_promote)
 
     p_alerts_list = sub.add_parser("alerts-list", help="List active TradingView alerts")
     p_alerts_list.set_defaults(func=cmd_alerts_list)
