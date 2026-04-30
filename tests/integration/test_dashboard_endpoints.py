@@ -282,6 +282,53 @@ def test_analytics_page_surfaces_tradingview_ta_machine(app_client):
     assert "tv-watchlist-export" in html
 
 
+def test_analytics_page_includes_orchestrator_sse_wiring(app_client):
+    """Analytics page must subscribe to the orchestrator SSE event names and
+    have a Live badge + reconnecting EventSource client wired in."""
+    _, client = app_client
+
+    r = client.get("/analytics", headers={"Authorization": _AUTH})
+
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    # The two new event names are referenced in the JS subscription list.
+    assert "tradingview.orchestrator.session_completed" in html
+    assert "tradingview.orchestrator.pine_batch_completed" in html
+    # SSE endpoint and EventSource client.
+    assert "/api/events/stream" in html
+    assert "EventSource" in html
+    # Live badge element is present.
+    assert 'id="tv-orchestrator-live"' in html
+    # Throttle constant is present (5s minimum between refreshes).
+    assert "ORCH_REFRESH_MIN_MS" in html
+
+
+def test_events_stream_endpoint_accepts_connection(app_client):
+    """The SSE endpoint should accept a connection and emit an opening payload."""
+    _, client = app_client
+
+    # Use a concrete pattern matching one of our new event names so the
+    # subscription resolves a single stream without depending on EVENT_TYPES.
+    r = client.get(
+        "/api/events/stream?types=tradingview.orchestrator.session_completed",
+        headers={"Authorization": _AUTH},
+        buffered=False,
+    )
+    assert r.status_code == 200
+    assert r.headers.get("Content-Type", "").startswith("text/event-stream")
+    # Read just the opening frame so we don't block on the long-lived stream.
+    chunk = next(r.response)
+    if isinstance(chunk, bytes):
+        chunk = chunk.decode("utf-8", errors="replace")
+    # Either the opening 'open' event fired, or an 'error' frame degraded gracefully.
+    assert ("event: open" in chunk) or ("event: error" in chunk)
+    # Cleanup so the generator doesn't keep its subscription alive.
+    try:
+        r.close()
+    except Exception:
+        pass
+
+
 def test_trading_workbench_watchlist_endpoint_is_read_only(app_client):
     _, client = app_client
 

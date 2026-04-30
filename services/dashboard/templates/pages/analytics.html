@@ -108,6 +108,7 @@
     <div class="card-header">
         <h3 class="card-title"><i class="fas fa-robot" style="margin-right: 8px; color: var(--primary);"></i>TradingView Orchestrator</h3>
         <span class="badge badge-info" id="tv-orchestrator-gate">Read-Only</span>
+        <span class="badge" id="tv-orchestrator-live" style="margin-left: 6px; background: rgba(148, 163, 184, 0.15); color: var(--muted, #888); border: 1px solid var(--border, #333); transition: background 0.4s, color 0.4s; font-size: 11px;" title="SSE auto-refresh status">Live</span>
     </div>
     <div class="card-body">
         <div class="grid grid-2">
@@ -644,6 +645,204 @@
         <td>${off.trade_count ?? '—'}</td><td>${on.trade_count ?? '—'}</td>
       </tr>`);
   }
+
+  // ── Orchestrator SSE auto-refresh ────────────────────────────────────────
+  // Subscribes to the dashboard event stream and re-fetches the four orchestrator
+  // endpoints (sessions, latest, pine, alerts) when a capture/pine batch completes.
+  // Throttle: at most one refresh per 5 seconds. Reconnect with exponential backoff.
+  const ORCH_EVENT_TYPES = [
+    'tradingview.orchestrator.session_completed',
+    'tradingview.orchestrator.pine_batch_completed',
+  ];
+  const ORCH_REFRESH_MIN_MS = 5000;
+  let lastOrchRefresh = 0;
+  let pendingOrchRefresh = null;
+
+  function flashLiveBadge() {
+    const b = document.getElementById('tv-orchestrator-live');
+    if (!b) return;
+    b.style.background = 'rgba(34, 197, 94, 0.25)';
+    b.style.color = '#22c55e';
+    setTimeout(() => {
+      b.style.background = 'rgba(148, 163, 184, 0.15)';
+      b.style.color = 'var(--muted, #888)';
+    }, 1200);
+  }
+
+  async function refreshOrchestratorPanels() {
+    try {
+      const [sessResp, latestResp, pineResp, alertsResp] = await Promise.all([
+        fetch(apiUrl('/api/tradingview/orchestrator/sessions?limit=10')).then(r => r.json()),
+        fetch(apiUrl('/api/tradingview/orchestrator/latest')).then(r => r.json()),
+        fetch(apiUrl('/api/tradingview/orchestrator/pine')).then(r => r.json()),
+        fetch(apiUrl('/api/tradingview/orchestrator/alerts')).then(r => r.json()),
+      ]);
+
+      const orchSessions = document.getElementById('tv-orchestrator-sessions-tbody');
+      if (orchSessions) {
+        orchSessions.innerHTML = '';
+        const sessions = (sessResp.sessions || []).slice(0, 10);
+        for (const row of sessions) {
+          orchSessions.insertAdjacentHTML('beforeend', `
+            <tr>
+              <td title="${esc(row.session_id)}">${esc(row.session_id)}</td>
+              <td>${esc(row.schema_version || '—')}</td>
+              <td>${esc(row.symbol_count != null ? row.symbol_count : '—')}</td>
+              <td>${esc(row.timeframe_count != null ? row.timeframe_count : '—')}</td>
+            </tr>`);
+        }
+        if (!sessions.length) {
+          orchSessions.innerHTML = '<tr><td colspan="4" class="venue-muted">No sessions</td></tr>';
+        }
+        const latestRow = sessions[0];
+        const latestEl = document.getElementById('tv-orchestrator-latest');
+        if (latestEl) {
+          latestEl.textContent = latestRow
+            ? `Session: ${latestRow.session_id}\nGenerated: ${latestRow.generated_at || '—'}\nSymbols: ${latestRow.symbol_count != null ? latestRow.symbol_count : '—'}\nTimeframes: ${latestRow.timeframe_count != null ? latestRow.timeframe_count : '—'}`
+            : 'No sessions captured yet';
+        }
+        const gateEl = document.getElementById('tv-orchestrator-gate');
+        if (gateEl) {
+          gateEl.textContent = (latestRow && latestRow.mutation_enabled) ? 'Mutation On' : 'Read-Only';
+        }
+      }
+
+      const screenshotGrid = document.getElementById('tv-orchestrator-screenshot-grid');
+      if (screenshotGrid) {
+        screenshotGrid.innerHTML = '';
+        const manifest = (latestResp || {}).manifest || {};
+        const symbols = manifest.symbols || [];
+        const timeframes = manifest.timeframes || [];
+        const items = symbols.length ? symbols : timeframes;
+        let hasImages = false;
+        for (const item of items.slice(0, 4)) {
+          const artifacts = item.artifacts || [];
+          const ss = artifacts.find(a => a.kind === 'screenshot' && a.ok);
+          if (ss && ss.path) {
+            hasImages = true;
+            const relative = ss.path.replace(/^.*data\/tradingview_ta\//, '');
+            screenshotGrid.insertAdjacentHTML('beforeend', `
+              <div style="text-align: center;">
+                <a href="${apiUrl('/api/tradingview/orchestrator/artifacts/' + relative)}" target="_blank">
+                  <img src="${apiUrl('/api/tradingview/orchestrator/artifacts/' + relative)}" style="max-width: 100%; border-radius: 6px; border: 1px solid var(--border);" alt="${esc(item.symbol || item.timeframe || 'screenshot')}">
+                </a>
+                <div style="font-size: 11px; color: var(--muted); margin-top: 4px;">${esc(item.symbol || item.timeframe || 'screenshot')}</div>
+              </div>`);
+          }
+        }
+        if (!hasImages) {
+          screenshotGrid.innerHTML = '<p class="venue-muted">No screenshots in latest session</p>';
+        }
+      }
+
+      const pineTbody = document.getElementById('tv-orchestrator-pine-tbody');
+      if (pineTbody) {
+        pineTbody.innerHTML = '';
+        const acctScripts = (pineResp.tv_account || {}).scripts || [];
+        const localScripts = pineResp.generated_local || [];
+        for (const s of acctScripts.slice(0, 6)) {
+          pineTbody.insertAdjacentHTML('beforeend', `
+            <tr>
+              <td><span class="badge badge-info">TV</span></td>
+              <td title="${esc(s.title || s.name || '')}">${esc(s.name || s.title || '—')}</td>
+              <td style="font-size: 11px; color: var(--muted);">v${esc(s.version || '?')}</td>
+            </tr>`);
+        }
+        for (const s of localScripts.slice(0, 6)) {
+          pineTbody.insertAdjacentHTML('beforeend', `
+            <tr>
+              <td><span class="badge badge-success">Sapphire</span></td>
+              <td title="${esc(s.pine_path || '')}">${esc(s.name || s.slug || '—')}</td>
+              <td style="font-size: 11px; color: var(--muted);">${esc(s.kind || 'template')}</td>
+            </tr>`);
+        }
+        if (!acctScripts.length && !localScripts.length) {
+          pineTbody.innerHTML = '<tr><td colspan="3" class="venue-muted">No scripts</td></tr>';
+        }
+      }
+
+      const alertsTbody = document.getElementById('tv-orchestrator-alerts-tbody');
+      if (alertsTbody) {
+        alertsTbody.innerHTML = '';
+        const alerts = ((alertsResp || {}).alerts || []).slice(0, 8);
+        for (const a of alerts) {
+          const sym = a.symbol || '—';
+          const type = a.type || '—';
+          const active = a.active ? '✓' : '·';
+          const color = a.active ? 'var(--success, #00ff88)' : 'var(--muted)';
+          alertsTbody.insertAdjacentHTML('beforeend', `
+            <tr>
+              <td>${esc(sym)}</td>
+              <td>${esc(type)}</td>
+              <td style="color: ${color}; text-align: center;">${active}</td>
+            </tr>`);
+        }
+        if (!alerts.length) {
+          alertsTbody.innerHTML = '<tr><td colspan="3" class="venue-muted">No alerts</td></tr>';
+        }
+      }
+    } catch (err) {
+      // Quiet failure — preserve last-good DOM, leave the badge unchanged.
+      console && console.warn && console.warn('Orchestrator refresh failed:', err);
+    }
+  }
+
+  function scheduleOrchestratorRefresh() {
+    flashLiveBadge();
+    const now = Date.now();
+    const elapsed = now - lastOrchRefresh;
+    if (elapsed >= ORCH_REFRESH_MIN_MS) {
+      lastOrchRefresh = now;
+      refreshOrchestratorPanels();
+      return;
+    }
+    if (pendingOrchRefresh) return;
+    pendingOrchRefresh = setTimeout(() => {
+      pendingOrchRefresh = null;
+      lastOrchRefresh = Date.now();
+      refreshOrchestratorPanels();
+    }, ORCH_REFRESH_MIN_MS - elapsed);
+  }
+
+  function connectOrchestratorSSE() {
+    if (typeof EventSource === 'undefined') return;
+    let es = null;
+    let backoff = 1000;
+    const maxBackoff = 30000;
+    let closedByUs = false;
+
+    function open() {
+      try {
+        const url = apiUrl('/api/events/stream') + '?types=' + encodeURIComponent(ORCH_EVENT_TYPES.join(','));
+        es = new EventSource(url, { withCredentials: true });
+      } catch (e) {
+        scheduleReconnect();
+        return;
+      }
+      es.addEventListener('open', () => { backoff = 1000; });
+      const onPayload = () => scheduleOrchestratorRefresh();
+      ORCH_EVENT_TYPES.forEach(t => es.addEventListener(t, onPayload));
+      es.addEventListener('error', () => {
+        if (closedByUs) return;
+        try { es && es.close(); } catch (_) { /* noop */ }
+        scheduleReconnect();
+      });
+    }
+
+    function scheduleReconnect() {
+      const delay = backoff;
+      backoff = Math.min(maxBackoff, Math.round(backoff * 1.7));
+      setTimeout(() => { if (!closedByUs) open(); }, delay);
+    }
+
+    window.addEventListener('beforeunload', () => {
+      closedByUs = true;
+      try { es && es.close(); } catch (_) { /* noop */ }
+    });
+    open();
+  }
+
+  connectOrchestratorSSE();
 })();
 </script>
 {% endblock %}

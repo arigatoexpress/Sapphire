@@ -293,6 +293,20 @@ def cmd_pine_generate_batch(args: argparse.Namespace) -> int:
     }
     _write_json(args.out, out)
     print(json.dumps(out, indent=2, sort_keys=True))
+    # Best-effort dashboard notification: never blocks main path.
+    from lib.trading.tradingview_orchestrator import (
+        EVENT_PINE_BATCH_COMPLETED,
+        _emit_event,
+    )
+
+    _emit_event(
+        EVENT_PINE_BATCH_COMPLETED,
+        {
+            "count": int(out["count"]),
+            "all_valid": bool(out["all_valid"]),
+            "kinds": sorted({"sapphire_watch_indicator"}),
+        },
+    )
     return 0 if out["all_valid"] else 2
 
 

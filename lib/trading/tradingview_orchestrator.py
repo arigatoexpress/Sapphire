@@ -13,6 +13,7 @@ screen without changing symbol or studies).
 from __future__ import annotations
 
 import json
+import logging
 import os
 import subprocess
 from datetime import UTC, datetime
@@ -24,10 +25,35 @@ from lib.trading.tradingview_ta_machine import (
     INDICATOR_STACK,
 )
 
+log = logging.getLogger(__name__)
+
 DEFAULT_TV_BIN = "tv"
 DEFAULT_ARTIFACT_ROOT = Path.home() / "Code" / "Sapphire" / "data" / "tradingview_ta"
 MUTATION_ENV = "SAPPHIRE_TV_MUTATION_ENABLED"
 CAPTURE_TIMEOUT = 30
+
+# Event names emitted to the bus. Kept here (not in lib.core.event_bus.EVENT_TYPES)
+# because the canonical EVENT_TYPES list is reserved for trading/regime/threat
+# signals that participate in WorldState aggregation. These are dashboard
+# notifications only — subscribers use the exact name patterns.
+EVENT_SESSION_COMPLETED = "tradingview.orchestrator.session_completed"
+EVENT_PINE_BATCH_COMPLETED = "tradingview.orchestrator.pine_batch_completed"
+
+
+def _emit_event(event_type: str, payload: dict[str, Any]) -> None:
+    """Best-effort publish to the event bus.
+
+    Never raises. The bus itself degrades to a JSONL fallback when Redis is
+    unreachable, so the only failure modes here are import errors or unexpected
+    exceptions; both are logged and swallowed so the orchestrator's main path
+    is unaffected.
+    """
+    try:
+        from lib.core.event_bus import publish  # local import: keep tv module light
+
+        publish(event_type, payload, source="tradingview-orchestrator")
+    except Exception as exc:  # noqa: BLE001 — defensive: never block capture
+        log.warning("event_bus publish failed (%s): %s", event_type, exc)
 
 
 class TVCommandError(Exception):
@@ -533,6 +559,17 @@ class TradingViewOrchestrator:
         manifest_path = session_dir / "manifest.json"
         manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
         manifest["manifest_path"] = str(manifest_path)
+
+        _emit_event(
+            EVENT_SESSION_COMPLETED,
+            {
+                "session_id": session_id,
+                "schema_version": manifest["schema_version"],
+                "symbol_count": 1,
+                "timeframe_count": len(manifest["timeframes"]),
+                "manifest_path": str(manifest_path),
+            },
+        )
         return manifest
 
     def capture_sweep(
@@ -596,6 +633,17 @@ class TradingViewOrchestrator:
         manifest_path = session_dir / "manifest.json"
         manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
         manifest["manifest_path"] = str(manifest_path)
+
+        _emit_event(
+            EVENT_SESSION_COMPLETED,
+            {
+                "session_id": session_id,
+                "schema_version": manifest["schema_version"],
+                "symbol_count": len(manifest["symbols"]),
+                "timeframe_count": 1,
+                "manifest_path": str(manifest_path),
+            },
+        )
         return manifest
 
     def latest_manifest(self) -> dict[str, Any] | None:
