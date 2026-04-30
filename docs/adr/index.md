@@ -35,6 +35,7 @@ that supersedes the old one.
 | [0009](0009-foundry-ontology-as-acquisition-bridge.md) | Palantir Foundry ontology as acquisition bridge | accepted |
 | [0010](0010-cowork-vs-claude-code-vs-codex-split.md) | Cowork vs Claude Code vs Codex agent split | accepted |
 | [0011](0011-tool-registry-section-ordering.md) | Tool registry section ordering convention | accepted |
+| [0012](0012-tradingview-orchestrator-architecture.md) | TradingView orchestrator architecture | accepted |
 
 ## One-line summaries
 
@@ -73,3 +74,10 @@ that supersedes the old one.
   inside their tranche's block, with a reserved divider at the tail
   for the next tranche. Eliminates the parallel-merge YAML conflict
   observed throughout Tranche 5 and Tranche 6.
+- **0012 TradingView orchestrator architecture** — TV is driven as a
+  TA rendering engine (deliberate, not reconciled), every mutation is
+  gated by `SAPPHIRE_TV_MUTATION_ENABLED=1`, scheduled jobs are
+  read-only, the Pine generator emits webhook-contract JSON pinned
+  by a unit test, the Windows agent ships in `agent_only` state,
+  artifact paths are traversal-guarded, and generated Pine lives in a
+  gitignored content-addressable directory.

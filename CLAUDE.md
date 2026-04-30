@@ -327,6 +327,7 @@ All in `~/.claude/scheduled-tasks/`. Run when Claude Code is open. Tasks marked 
 - `docs/kronos-integration-plan.md` — Kronos ML forecasting
 - `docs/tradingview-cdp-setup.md` — TradingView CDP setup
 - `docs/ops/tradingview-orchestrator-runbook.md` — TV orchestrator operator runbook (CLI, dashboard endpoints, mutation gate, scheduled jobs)
+- `docs/adr/0012-tradingview-orchestrator-architecture.md` — ADR 0012: TV orchestrator design decisions (mutation gate, read-only-by-default scheduled jobs, Pine ↔ webhook contract, agent_only state, artifact path-traversal guard)
 - `docs/QUICK_START_GUIDE.md` — first-run setup
 - `docs/LOGGING.md` — event + audit log schema
 - `docs/CLOUDFLARE_DNS_SETUP.md` — tunnel config
