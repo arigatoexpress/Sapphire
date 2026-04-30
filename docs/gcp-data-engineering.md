@@ -1,6 +1,6 @@
 # Sapphire OS — GCP Data Engineering
 
-Last updated: 2026-04-17
+Last updated: 2026-04-30
 
 End-to-end reference for the `tho-ai-agent` project's data plane: what lives in GCP, how data flows from the Mac into BigQuery, and how to recover when something breaks.
 
@@ -43,7 +43,7 @@ training work.
 | `threat_intel`       | `severity, source`          | Pub/Sub sub + GCF  | cyber-threat-bot → `sapphire-threats` topic |
 | `inference_metrics`  | `tier, model`               | GCF from GCS       | telemetry_collector → `raw/metrics/` |
 | `service_health`     | `service_name, status`      | GCF from GCS       | telemetry_collector → `raw/health/` |
-| `leads`              | `grade, status`             | (planned)          | `lead-refresh` (not yet implemented) |
+| `leads`              | `grade, status`             | GCF from GCS       | `gcp_sync` warm path from `data/leads/pipeline_*.json` and `data/leads/houston_leads.jsonl` |
 | `regional_regions`   | `region_id, name`           | planned GCF from GCS | regional-intel workbench export → `raw/regional_regions/` |
 | `regional_intel_items` | `region_id, kind, source_name` | planned GCF from GCS | regional-intel workbench export → `raw/regional_intel_items/` |
 | `regional_source_health` | `status, category`       | planned GCF from GCS | regional-intel workbench export → `raw/regional_source_health/` |
@@ -177,7 +177,7 @@ Any new producer must pick one path. This is the contract.
 | `cyber-threat-bot` ingesters                        | A    | topic `sapphire-threats`                     | `threat_intel` |
 | `services/pipeline/telemetry_collector.py` (proxy)  | B    | GCS `raw/metrics/YYYY-MM-DD/*.ndjson`        | `inference_metrics` |
 | `services/pipeline/telemetry_collector.py` (probes) | B    | GCS `raw/health/YYYY-MM-DD/*.ndjson`         | `service_health` |
-| (planned) `scripts/lead_refresh.sh`                 | B    | GCS `raw/leads/YYYY-MM-DD/*.ndjson`          | `leads` |
+| `python3 -m lib.intel.pipeline --run` + `services.pipeline.gcp_sync` | B | GCS `raw/leads/YYYY-MM-DD/*.ndjson` | `leads` |
 | (planned) regional-intel export promotion           | B    | GCS `raw/regional_regions/YYYY-MM-DD/*.ndjson` | `regional_regions` |
 | (planned) regional-intel export promotion           | B    | GCS `raw/regional_intel_items/YYYY-MM-DD/*.ndjson` | `regional_intel_items` |
 | (planned) regional-intel export promotion           | B    | GCS `raw/regional_source_health/YYYY-MM-DD/*.ndjson` | `regional_source_health` |

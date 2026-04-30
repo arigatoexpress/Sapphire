@@ -58,6 +58,26 @@ def _stable_id(*parts: Any) -> str:
     return hashlib.sha1("::".join(str(p) for p in parts).encode()).hexdigest()[:16]
 
 
+def _grade_from_score_value(score: Any) -> str | None:
+    if score is None:
+        return None
+    try:
+        value = float(score)
+    except (TypeError, ValueError):
+        return None
+    if value > 1:
+        value = value / 100.0
+    if value >= 0.80:
+        return "A"
+    if value >= 0.65:
+        return "B"
+    if value >= 0.50:
+        return "C"
+    if value >= 0.30:
+        return "D"
+    return "F"
+
+
 # ---------------------------------------------------------------------------
 # State (watermark per source)
 # ---------------------------------------------------------------------------
@@ -364,9 +384,12 @@ def transform_health(files: list[Path]) -> Iterator[dict]:
 
 
 def transform_leads(files: list[Path]) -> Iterator[dict]:
-    """data/leads/pipeline_*.json → leads rows."""
+    """data/leads/pipeline_*.json or houston_leads.jsonl → leads rows."""
     now = _now_iso()
     for fp in files:
+        if fp.name == "houston_leads.jsonl":
+            yield from _transform_houston_leads_jsonl(fp, now=now)
+            continue
         try:
             data = json.loads(fp.read_text())
         except (OSError, json.JSONDecodeError) as e:
@@ -400,6 +423,57 @@ def transform_leads(files: list[Path]) -> Iterator[dict]:
             }
 
 
+def _transform_houston_leads_jsonl(fp: Path, *, now: str) -> Iterator[dict]:
+    """Map the local Houston lead JSONL store into the BigQuery lead schema."""
+    try:
+        handle = fp.open("r", encoding="utf-8")
+    except OSError as e:
+        log.warning("houston leads read failed %s: %s", fp, e)
+        return
+    try:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                lead = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(lead, dict):
+                continue
+            raw = lead.get("raw_data") if isinstance(lead.get("raw_data"), dict) else {}
+            score = lead.get("score")
+            timestamp = _parse_ts(lead.get("created_at") or lead.get("ingested_at"))
+            yield {
+                "lead_id": lead.get("id")
+                or _stable_id(lead.get("address"), lead.get("type"), timestamp),
+                "address": lead.get("address"),
+                "neighborhood": lead.get("neighborhood"),
+                "city": lead.get("city") or raw.get("city") or "Houston",
+                "state": lead.get("state") or raw.get("state") or "TX",
+                "zip": lead.get("zip") or raw.get("zip"),
+                "score": score,
+                "grade": lead.get("grade") or _grade_from_score_value(score),
+                "permit_type": lead.get("permit_type") or lead.get("type") or raw.get("permit_type"),
+                "permit_value_usd": lead.get("permit_value_usd")
+                or raw.get("declared_value")
+                or raw.get("value_usd"),
+                "owner_name": lead.get("owner_name") or raw.get("owner"),
+                "contacted": bool(lead.get("contacted")),
+                "contacted_at": _parse_ts(lead.get("contacted_at"))
+                if lead.get("contacted_at")
+                else None,
+                "status": lead.get("status") or "LEAD",
+                "source": lead.get("source"),
+                "timestamp": timestamp,
+                "ingested_at": now,
+            }
+    except OSError as e:
+        log.warning("houston leads read failed %s: %s", fp, e)
+    finally:
+        handle.close()
+
+
 # ---------------------------------------------------------------------------
 # Source registry
 # ---------------------------------------------------------------------------
@@ -409,7 +483,7 @@ def transform_leads(files: list[Path]) -> Iterator[dict]:
 class Source:
     name: str
     table: str
-    glob: str  # relative to DATA_DIR
+    glob: str | tuple[str, ...]  # relative to DATA_DIR
     transform: Callable[[list[Path]], Iterator[dict]]
 
 
@@ -420,7 +494,12 @@ SOURCES: dict[str, Source] = {
     ),
     "threats": Source("threats", "threat_intel", "intelligence/*/threats.json", transform_threats),
     "regime": Source("regime", "market_regime", "chain/*.json", transform_regime),
-    "leads": Source("leads", "leads", "leads/pipeline_*.json", transform_leads),
+    "leads": Source(
+        "leads",
+        "leads",
+        ("leads/pipeline_*.json", "leads/houston_leads.jsonl"),
+        transform_leads,
+    ),
     "metrics": Source("metrics", "inference_metrics", "metrics/*.ndjson", transform_metrics),
     "health": Source("health", "service_health", "health/*.ndjson", transform_health),
 }
@@ -431,9 +510,15 @@ SOURCES: dict[str, Source] = {
 # ---------------------------------------------------------------------------
 
 
-def _discover_files(glob: str, since_mtime: float) -> list[Path]:
+def _discover_files(glob: str | tuple[str, ...], since_mtime: float) -> list[Path]:
     """Find files matching glob with mtime > since_mtime."""
-    return sorted(p for p in DATA_DIR.glob(glob) if p.is_file() and p.stat().st_mtime > since_mtime)
+    patterns = (glob,) if isinstance(glob, str) else glob
+    files: set[Path] = set()
+    for pattern in patterns:
+        files.update(
+            p for p in DATA_DIR.glob(pattern) if p.is_file() and p.stat().st_mtime > since_mtime
+        )
+    return sorted(files)
 
 
 def _write_ndjson(rows: Iterable[dict], dest: Path) -> int:
