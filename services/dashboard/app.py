@@ -863,6 +863,13 @@ def _tool_registry_metric() -> dict[str, str]:
 def _production_readiness_metric() -> dict[str, str]:
     """Return the no-external production-readiness summary for showcase use."""
     try:
+        env = os.environ.copy()
+        env.update(
+            {
+                "SAPPHIRE_WINDOWS_HTTP_TIMEOUT_SECONDS": "1",
+                "SAPPHIRE_WINDOWS_TCP_TIMEOUT_SECONDS": "1",
+            }
+        )
         result = subprocess.run(
             [
                 sys.executable,
@@ -872,9 +879,10 @@ def _production_readiness_metric() -> dict[str, str]:
                 "json",
             ],
             cwd=_DASHBOARD_REPO_ROOT,
+            env=env,
             capture_output=True,
             text=True,
-            timeout=12,
+            timeout=20,
             check=False,
         )
         if result.returncode in {0, 20} and result.stdout.strip():

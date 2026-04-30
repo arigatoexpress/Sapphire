@@ -238,6 +238,22 @@ def test_tcp_check_can_warn_for_optional_desktop_ports(monkeypatch) -> None:
     assert check.status == "WARN"
 
 
+def test_windows_probe_timeouts_are_env_tunable(monkeypatch) -> None:
+    timeouts: list[float] = []
+
+    def fake_urlopen(_request: object, timeout: float) -> _FakeHTTPResponse:
+        timeouts.append(timeout)
+        raise OSError("down")
+
+    monkeypatch.setenv("SAPPHIRE_WINDOWS_HTTP_TIMEOUT_SECONDS", "1.5")
+    monkeypatch.setattr(sweep.urllib.request, "urlopen", fake_urlopen)
+
+    check = sweep.windows_ollama_inventory_check("http://100.71.10.48:11434")
+
+    assert check.status == "WARN"
+    assert timeouts == [1.5]
+
+
 def test_windows_webhook_health_surfaces_degraded_subservices(monkeypatch) -> None:
     def fake_urlopen(_request: object, timeout: int) -> _FakeHTTPResponse:
         assert timeout == 5
