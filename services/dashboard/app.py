@@ -1540,8 +1540,13 @@ def api_watchlist():
 
     def fetch():
         from lib.trading.strategy_lab import build_market_universe
+        from lib.trading.tradingview_ta_machine import build_tradingview_ta_machine
 
         universe = build_market_universe(fetch_live=True)
+        ta_machine = build_tradingview_ta_machine(
+            fetch_live=False,
+            market_universe=universe,
+        )
         liked = universe.get("liked_tokens", [])
         core_symbols = {"BTC", "ETH", "SOL", "HYPE", "ZEC"}
         major_crypto = [
@@ -1581,6 +1586,14 @@ def api_watchlist():
             "liked_tokens": liked,
             "trending_tokens": universe.get("trending_tokens", []),
             "venue_matrix": universe.get("venue_matrix", []),
+            "tradingview_watchlist": ta_machine.get("watchlist", {}),
+            "tradingview_ta_machine": {
+                "watchlist_name": ta_machine.get("watchlist_name"),
+                "indicator_stack": ta_machine.get("indicator_stack", []),
+                "chart_layout": ta_machine.get("chart_layout", {}),
+                "work_orders": ta_machine.get("work_orders", []),
+                "safety": ta_machine.get("safety", {}),
+            },
             "corrected_aliases": universe.get("corrected_aliases", {}),
             "pair_analysis": [
                 {
@@ -1629,6 +1642,112 @@ def api_tradingview_capabilities():
         return build_tradingview_capability_matrix()
 
     return jsonify(get_cached("tradingview_capabilities", fetch, ttl=STRATEGY_LAB_CACHE_DURATION))
+
+
+@app.route("/api/tradingview/ta-machine")
+@requires_auth
+def api_tradingview_ta_machine():
+    """Dynamic TradingView watchlist, TA stack, and chart automation work orders."""
+    offline = (request.args.get("offline") or "").strip().lower() in {"1", "true", "yes"}
+    try:
+        limit = max(1, min(50, int(request.args.get("limit", "18"))))
+    except ValueError:
+        limit = 18
+
+    def fetch():
+        from lib.trading.tradingview_ta_machine import build_tradingview_ta_machine
+
+        return build_tradingview_ta_machine(fetch_live=not offline, limit=limit)
+
+    cache_key = f"tradingview_ta_machine::{not offline}::{limit}"
+    return jsonify(get_cached(cache_key, fetch, ttl=STRATEGY_LAB_CACHE_DURATION))
+
+
+@app.route("/api/tradingview/watchlist.txt")
+@requires_auth
+def api_tradingview_watchlist_txt():
+    """TradingView-compatible comma-separated watchlist TXT export."""
+    offline = (request.args.get("offline") or "").strip().lower() in {"1", "true", "yes"}
+    try:
+        limit = max(1, min(50, int(request.args.get("limit", "18"))))
+    except ValueError:
+        limit = 18
+
+    def fetch():
+        from lib.trading.tradingview_ta_machine import build_tradingview_watchlist_txt
+
+        return build_tradingview_watchlist_txt(fetch_live=not offline, limit=limit)
+
+    cache_key = f"tradingview_watchlist_txt::{not offline}::{limit}"
+    body = get_cached(cache_key, fetch, ttl=STRATEGY_LAB_CACHE_DURATION)
+    return Response(str(body) + "\n", mimetype="text/plain")
+
+
+@app.route("/api/trading/workbench/watchlist")
+@requires_auth
+def api_trading_workbench_watchlist():
+    """Read-only TradingView/Sapphire workbench watchlist contract."""
+    offline = (request.args.get("offline") or "").strip().lower() in {"1", "true", "yes"}
+    symbols = [
+        token.strip()
+        for token in (request.args.get("symbols") or "").split(",")
+        if token.strip()
+    ]
+    try:
+        limit = max(1, min(50, int(request.args.get("limit", "18"))))
+    except ValueError:
+        limit = 18
+
+    def fetch():
+        from lib.trading.tradingview_ta_machine import build_trading_workbench_watchlist
+
+        return build_trading_workbench_watchlist(
+            fetch_live=not offline,
+            limit=limit,
+            symbols=symbols or None,
+        )
+
+    cache_key = f"trading_workbench_watchlist::{not offline}::{limit}::{','.join(symbols)}"
+    return jsonify(get_cached(cache_key, fetch, ttl=STRATEGY_LAB_CACHE_DURATION))
+
+
+@app.route("/api/trading/workbench/work-orders/preview", methods=["POST"])
+@requires_auth
+def api_trading_workbench_work_orders_preview():
+    """Preview TA/chart work orders without mutating TradingView or trading venues."""
+    payload = request.get_json(silent=True) or {}
+
+    def _list_field(name: str, default: list[str]) -> list[str]:
+        raw = payload.get(name)
+        if raw is None:
+            return default
+        if isinstance(raw, list):
+            return [str(item).strip() for item in raw if str(item).strip()]
+        return [token.strip() for token in str(raw).split(",") if token.strip()]
+
+    from lib.trading.tradingview_ta_machine import build_trading_workbench_work_order_preview
+
+    return jsonify(
+        build_trading_workbench_work_order_preview(
+            symbols=_list_field("symbols", ["BTC", "ETH", "SOL", "HYPE"]),
+            timeframes=_list_field("timeframes", ["60", "240", "D"]),
+            jobs=_list_field(
+                "jobs",
+                [
+                    "ta_profile",
+                    "forecast",
+                    "correlation",
+                    "backtest_summary",
+                    "pine_preview",
+                    "chart_plan",
+                ],
+            ),
+            strategies=_list_field("strategies", ["SapphireComposite", "RegimeAwareRSI"]),
+            allow_live_trading=bool(payload.get("allow_live_trading") is True),
+            allow_telegram=bool(payload.get("allow_telegram") is True),
+            allow_browser_mutation=bool(payload.get("allow_browser_mutation") is True),
+        )
+    )
 
 
 @app.route("/api/trading/strategy-lab")

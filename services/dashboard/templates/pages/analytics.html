@@ -69,6 +69,30 @@
 
 <div class="card" style="margin-bottom: var(--space-xl);">
     <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-chart-area" style="margin-right: 8px; color: var(--success);"></i>TradingView TA Machine</h3>
+        <span class="badge badge-warning" id="tv-ta-gate">Analysis Only</span>
+    </div>
+    <div class="card-body">
+        <div class="grid grid-2">
+            <div>
+                <table class="data-table compact-table">
+                    <thead><tr><th>#</th><th>Symbol</th><th>TradingView</th><th>24h</th><th>Mode</th></tr></thead>
+                    <tbody id="tv-ta-symbol-tbody"><tr><td colspan="5" class="loading">Loading…</td></tr></tbody>
+                </table>
+            </div>
+            <div>
+                <table class="data-table compact-table">
+                    <thead><tr><th>Work Order</th><th>Symbol</th><th>Readback</th></tr></thead>
+                    <tbody id="tv-ta-workorder-tbody"><tr><td colspan="3" class="loading">Loading…</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+        <pre class="ta-export" id="tv-watchlist-export">Loading…</pre>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: var(--space-xl);">
+    <div class="card-header">
         <h3 class="card-title"><i class="fas fa-plug" style="margin-right: 8px; color: var(--primary);"></i>TradingView Coverage</h3>
         <span class="badge badge-warning" id="tv-live-gate">Execution Off</span>
     </div>
@@ -168,6 +192,7 @@
   .token-up { color: #22c55e; }
   .token-down { color: #ef4444; }
   .venue-muted { color: var(--muted, #888); }
+  .ta-export { margin-top: 12px; padding: 10px; border: 1px solid var(--border, #333); border-radius: 6px; overflow-x: auto; white-space: pre-wrap; color: var(--text, #ddd); background: rgba(255,255,255,0.03); font-size: 0.78rem; }
   .heatmap-row { display: grid; grid-template-columns: 60px repeat(12, 1fr); gap: 2px; margin-bottom: 2px; }
   .heatmap-cell { padding: 6px; text-align: center; border-radius: 3px; font-size: 0.75rem; }
   .heatmap-label { font-weight: 600; padding: 6px; }
@@ -199,11 +224,13 @@
     if (clamped >= 0) return `rgba(34, 197, 94, ${0.15 + (clamped / 10) * 0.65})`;
     return `rgba(239, 68, 68, ${0.15 + (Math.abs(clamped) / 10) * 0.65})`;
   }
+  function apiUrl(path) { return new URL(path, window.location.origin).toString(); }
 
   try {
-    const [universe, tvCaps] = await Promise.all([
-      fetch('/api/analytics/market-universe').then(r => r.json()),
-      fetch('/api/tradingview/capabilities').then(r => r.json()),
+    const [universe, tvCaps, taMachine] = await Promise.all([
+      fetch(apiUrl('/api/analytics/market-universe')).then(r => r.json()),
+      fetch(apiUrl('/api/tradingview/capabilities')).then(r => r.json()),
+      fetch(apiUrl('/api/tradingview/ta-machine?limit=12')).then(r => r.json()),
     ]);
     document.getElementById('universe-source').textContent = universe.stale ? 'Fallback' : 'Live';
 
@@ -250,6 +277,38 @@
       venueBody.innerHTML = '<tr><td colspan="4" class="venue-muted">No venue rows</td></tr>';
     }
 
+    const taSymbols = document.getElementById('tv-ta-symbol-tbody');
+    taSymbols.innerHTML = '';
+    for (const row of ((taMachine.watchlist || {}).symbols || []).slice(0, 8)) {
+      taSymbols.insertAdjacentHTML('beforeend', `
+        <tr>
+          <td>${esc(row.rank)}</td>
+          <td><strong>${esc(row.symbol)}</strong></td>
+          <td title="${esc(row.tradingview_symbol)}">${esc(row.tradingview_symbol)}</td>
+          <td class="${pctClass(row.change_24h_pct)}">${fmtPct(row.change_24h_pct)}</td>
+          <td>${esc(row.momentum_bucket || 'pending')}</td>
+        </tr>`);
+    }
+    if (!(((taMachine.watchlist || {}).symbols || []).length)) {
+      taSymbols.innerHTML = '<tr><td colspan="5" class="venue-muted">No TA rows</td></tr>';
+    }
+    document.getElementById('tv-watchlist-export').textContent = (taMachine.watchlist || {}).symbols_txt || 'No export';
+    document.getElementById('tv-ta-gate').textContent = ((taMachine.safety || {}).execution_policy || 'analysis_only').replaceAll('_', ' ');
+
+    const workBody = document.getElementById('tv-ta-workorder-tbody');
+    workBody.innerHTML = '';
+    for (const row of (taMachine.work_orders || []).slice(0, 6)) {
+      workBody.insertAdjacentHTML('beforeend', `
+        <tr>
+          <td title="${esc(row.id)}">${esc(row.id)}</td>
+          <td><strong>${esc(row.symbol)}</strong></td>
+          <td>${esc((row.read_only_readback_commands || []).slice(0, 3).join(', '))}</td>
+        </tr>`);
+    }
+    if (!(taMachine.work_orders || []).length) {
+      workBody.innerHTML = '<tr><td colspan="3" class="venue-muted">No work orders</td></tr>';
+    }
+
     const tvBody = document.getElementById('tv-capability-tbody');
     tvBody.innerHTML = '';
     for (const row of (tvCaps.groups || [])) {
@@ -270,11 +329,14 @@
     document.getElementById('trending-token-tbody').innerHTML = '<tr><td colspan="3" class="venue-muted">Unavailable</td></tr>';
     document.getElementById('venue-symbol-tbody').innerHTML = '<tr><td colspan="4" class="venue-muted">Unavailable</td></tr>';
     document.getElementById('tv-capability-tbody').innerHTML = '<tr><td colspan="4" class="venue-muted">Unavailable</td></tr>';
+    document.getElementById('tv-ta-symbol-tbody').innerHTML = '<tr><td colspan="5" class="venue-muted">Unavailable</td></tr>';
+    document.getElementById('tv-ta-workorder-tbody').innerHTML = '<tr><td colspan="3" class="venue-muted">Unavailable</td></tr>';
+    document.getElementById('tv-watchlist-export').textContent = 'Unavailable';
   }
 
   let resp;
   try {
-    resp = await fetch('/api/analytics/performance').then(r => r.json());
+    resp = await fetch(apiUrl('/api/analytics/performance')).then(r => r.json());
   } catch (e) {
     document.getElementById('a-generated').textContent = 'fetch failed: ' + e.message;
     return;
@@ -371,7 +433,10 @@
   // Regime breakdown table
   const tb = document.getElementById('regime-tbody');
   tb.innerHTML = '';
-  for (const r of (resp.regime_breakdown || [])) {
+  const regimeRows = Array.isArray(resp.regime_breakdown)
+    ? resp.regime_breakdown
+    : Object.values(resp.regime_breakdown || {});
+  for (const r of regimeRows) {
     tb.insertAdjacentHTML('beforeend', `
       <tr>
         <td><strong style="color:${regimeColors[r.regime] || '#aaa'}">${r.regime}</strong></td>
@@ -381,7 +446,7 @@
         <td style="color:${r.total_pnl >= 0 ? '#22c55e' : '#ef4444'}">$${fmt(r.total_pnl)}</td>
       </tr>`);
   }
-  if (!resp.regime_breakdown || !resp.regime_breakdown.length) {
+  if (!regimeRows.length) {
     tb.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">No trades in backtest window</td></tr>';
   }
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from lib.trading import strategy_lab as lab
+from lib.trading import tradingview_ta_machine as tv_ta
 
 
 def test_canonicalize_symbol_corrects_known_aliases():
@@ -123,8 +124,113 @@ def test_strategy_lab_report_keeps_live_trading_off(monkeypatch):
     assert report["safety"]["execution_stage"] == "paper"
     assert "TRADINGVIEW_EXECUTION_ENABLED=false" in report["safety"]["guards"]
     assert report["tradingview"]["broker_rest_endpoints"][0] == "/config"
+    assert "tv watchlist get" in report["tradingview"]["mcp_v2_tool_map"]["read_safe"]
+    assert "tv watchlist add <symbol>" in report["tradingview"]["mcp_v2_tool_map"][
+        "operator_gated"
+    ]
+    assert "alert-to-live-trade bridge" in report["tradingview"]["mcp_v2_tool_map"][
+        "unsupported"
+    ]
     assert report["real_funds_readiness"]["stage"] == "manual_confirmed_crypto_only"
     assert report["real_funds_readiness"]["crypto"]["first_order_max_notional_usd"] == 5.0
     assert (
         report["real_funds_readiness"]["stocks"]["official_public_trading_api_identified"] is False
     )
+
+
+def test_tradingview_ta_machine_builds_ranked_watchlist_from_market_universe():
+    market = {
+        "generated_at": "2026-04-30T00:00:00+00:00",
+        "source": "fixture",
+        "stale": False,
+        "combined_tokens": [
+            {
+                "symbol": "BTC",
+                "name": "Bitcoin",
+                "tradingview_symbol": "BINANCE:BTCUSDT",
+                "priority": "high",
+                "tags": ["liked", "core", "robinhood"],
+                "change_24h_pct": 2.4,
+                "hyperliquid_symbol": "BTC",
+                "robinhood_symbol": "BTC-USD",
+            },
+            {
+                "symbol": "CHIP",
+                "name": "Chip",
+                "tradingview_symbol": "CHIPUSDT",
+                "priority": "watch",
+                "tags": ["trending"],
+                "trend_score": 0,
+            },
+        ],
+    }
+
+    plan = tv_ta.build_tradingview_ta_machine(
+        fetch_live=False,
+        limit=2,
+        market_universe=market,
+    )
+
+    assert plan["safety"]["live_trading_enabled"] is False
+    assert plan["watchlist"]["symbols_txt"] == "BINANCE:BTCUSDT,BINANCE:CHIPUSDT"
+    assert plan["watchlist"]["symbols"][0]["symbol"] == "BTC"
+    assert plan["watchlist"]["symbols"][0]["ta_state"] == "pending_tradingview_readback"
+    assert plan["indicator_stack"][0]["tradingview_name"] == "Moving Average Exponential"
+    assert plan["work_orders"][0]["execution_policy"] == "analysis_only_no_order_submit"
+    assert "tv watchlist add BINANCE:BTCUSDT" in plan["work_orders"][0][
+        "operator_gated_mutation_commands"
+    ]
+    assert "tv ohlcv --summary -n 120" in plan["work_orders"][0]["read_only_readback_commands"]
+    assert "submit/cancel/replace broker orders" in plan["automation_lanes"]["never_automatic"]
+
+
+def test_tradingview_watchlist_txt_is_exchange_prefixed():
+    market = {
+        "generated_at": "2026-04-30T00:00:00+00:00",
+        "source": "fixture",
+        "stale": False,
+        "combined_tokens": [
+            {"symbol": "ETH", "tradingview_symbol": "BINANCE:ETHUSDT", "priority": "high"},
+            {"symbol": "SOL", "tradingview_symbol": "BINANCE:SOLUSDT", "priority": "high"},
+        ],
+    }
+
+    body = tv_ta.build_tradingview_watchlist_txt(
+        fetch_live=False,
+        limit=2,
+        market_universe=market,
+    )
+
+    assert body == "BINANCE:ETHUSDT,BINANCE:SOLUSDT"
+
+
+def test_trading_workbench_watchlist_contract_blocks_mutations():
+    report = tv_ta.build_trading_workbench_watchlist(
+        fetch_live=False,
+        symbols=["BTCUSDT", "MATIC"],
+    )
+
+    assert report["schema_version"] == "trading-workbench.watchlist.v1"
+    assert report["mode"] == "read_only"
+    assert report["execution_enabled"] is False
+    assert [row["symbol"] for row in report["items"]] == ["BTC", "POL"]
+    assert report["items"][0]["venue_status"]["tradingview"] == "available"
+    assert "browser_mutation" in report["safety"]["blocked_actions"]
+    assert "webhook_post" in report["safety"]["blocked_actions"]
+
+
+def test_trading_workbench_work_order_preview_is_preview_only():
+    report = tv_ta.build_trading_workbench_work_order_preview(
+        symbols=["BTCUSDT"],
+        timeframes=["60", "D"],
+        jobs=["ta_profile", "chart_plan"],
+        strategies=["SapphireComposite"],
+    )
+
+    assert report["schema_version"] == "trading-workbench.work_orders.v1"
+    assert report["mode"] == "preview_only"
+    assert report["execution_enabled"] is False
+    assert len(report["work_orders"]) == 2
+    assert report["work_orders"][0]["steps"][-1]["status"] == "blocked"
+    assert report["work_orders"][0]["steps"][-1]["reason"] == "browser_mutation_disabled"
+    assert "trade_submit" in report["work_orders"][0]["blocked_actions"]

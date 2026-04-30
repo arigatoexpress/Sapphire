@@ -609,6 +609,49 @@ def build_tradingview_capability_matrix() -> dict[str, Any]:
             "receiver_timeout_budget_under_3s",
             "TRADINGVIEW_EXECUTION_ENABLED=false_until_paper_validation",
         ],
+        "mcp_v2_tool_map": {
+            "read_safe": [
+                "tv status",
+                "tv state",
+                "tv quote",
+                "tv ohlcv --summary",
+                "tv values",
+                "tv data lines/labels/tables/boxes",
+                "tv watchlist get",
+                "tv replay status",
+                "tv pane list",
+                "tv layout list",
+                "tv pine analyze --file <path>",
+            ],
+            "operator_gated": [
+                "tv watchlist add <symbol>",
+                "tv symbol <symbol>",
+                "tv timeframe <resolution>",
+                "tv pane layout 2x2",
+                "tv pane symbol <pane> <symbol>",
+                "tv indicator add \"Relative Strength Index\"",
+                "tv indicator set <entity_id> -i '<json>'",
+                "tv pine set --file <path>",
+                "tv pine compile",
+                "tv pine save",
+                "tv alert create/delete",
+                "tv draw shape/remove/clear",
+            ],
+            "external_compile": [
+                "tv pine check --file <path>",
+            ],
+            "tos_sensitive": [
+                "tv stream quote/bars/values/lines/labels/tables/all",
+                "tv batch_run across symbols/timeframes",
+                "persistent raw TradingView OHLCV capture",
+            ],
+            "unsupported": [
+                "watchlist remove/reorder through v2 CLI",
+                "broker order submit/cancel/replace from TradingView CDP",
+                "alert-to-live-trade bridge",
+                "TradingView market-data redistribution",
+            ],
+        },
     }
 
 
