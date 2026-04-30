@@ -22,6 +22,13 @@ X402_ENABLED=1 python3 services/inference-proxy/app.py       # inference proxy w
 # TradingView MCP (requires TV Desktop w/ --remote-debugging-port=9222)
 tv status && tv quote && tv pine compile && tv stream all
 
+# TradingView orchestrator (Mac-side automation; mutation-gated)
+python3 scripts/ops/tradingview_ta_capture.py probe                           # read-only state snapshot
+python3 scripts/ops/tradingview_ta_capture.py sweep --offline --limit 6       # capture screenshots + ohlcv
+python3 scripts/ops/tradingview_ta_capture.py pine-generate-batch --validate  # emit Sapphire Pine for top-N + server-side check
+SAPPHIRE_TV_MUTATION_ENABLED=1 python3 scripts/ops/tradingview_ta_capture.py --mutate sweep  # mutation-enabled
+# Scheduled: com.sapphire.tradingview-ta-capture LaunchAgent runs sweep every 4h, read-only
+
 # OpenBB
 curl "http://localhost:6900/api/v1/equity/price/quote?symbol=AAPL&provider=yfinance"
 
@@ -88,7 +95,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `lib/payments/` | library | `x402_middleware.py` — HTTP 402 micropayment gate (Flask + raw-socket), EVM signature verification. |
 | `lib/agents/` | library | Paper-only autonomous harness (`base.py`, `alpha_agent.py`, `runner.py`) plus the broader OpenClaw/NemoClaw dispatch stack under `src/sapphire_agents/`. |
 | `lib/telegram/` | library | `kimi_relay.py`, `login_widget.py` (HMAC-SHA256 Login Widget verifier). |
-| `lib/trading/` | library | `solana_wallet.py`. |
+| `lib/trading/` | library | `solana_wallet.py`, `tradingview_orchestrator.py` (drives `tv` CLI on Mac, mutation-gated by `SAPPHIRE_TV_MUTATION_ENABLED=1`), `pine_templates.py` (Sapphire Pine v5 indicator generator emitting webhook-format JSON), `tradingview_ta_machine.py`, `strategy_lab.py`, `shadow_controller.py`. |
 | `services/alpha/` | service | Trading engine + signal logger [Mac:18081]. |
 | `services/analytics_dashboard/` | service | Analytics-focused dashboard variant. |
 | `services/aster/` | service | Aster DEX bot — Solana perps (paused). |
