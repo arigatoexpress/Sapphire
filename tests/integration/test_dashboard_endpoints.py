@@ -796,3 +796,96 @@ def test_gemini_ooda_endpoint_can_return_daily_diff(app_client, tmp_path, monkey
     assert mutated["context_summary.totals.assets"]["before"] == "2"
     assert mutated["context_summary.totals.assets"]["after"] == "3"
     assert mutated["tool_response.ooda.decide"]["after"] == "watch deltas"
+
+
+
+def test_tradingview_orchestrator_sessions_endpoint(app_client, monkeypatch):
+    _, client = app_client
+    from lib.trading import tradingview_orchestrator
+
+    monkeypatch.setattr(
+        tradingview_orchestrator.TradingViewOrchestrator,
+        "list_sessions",
+        lambda self, limit=20: [
+            {
+                "session_id": "20260101T000000Z",
+                "generated_at": "2026-01-01T00:00:00+00:00",
+                "schema_version": "tradingview-orchestrator.sweep_capture.v1",
+                "symbol_count": 3,
+                "timeframe_count": 0,
+            }
+        ],
+    )
+
+    r = client.get("/api/tradingview/orchestrator/sessions?limit=5", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["status"] == "ok"
+    assert len(body["sessions"]) == 1
+    assert body["sessions"][0]["session_id"] == "20260101T000000Z"
+
+
+def test_tradingview_orchestrator_latest_endpoint(app_client, monkeypatch):
+    _, client = app_client
+    from lib.trading import tradingview_orchestrator
+
+    monkeypatch.setattr(
+        tradingview_orchestrator.TradingViewOrchestrator,
+        "latest_manifest",
+        lambda self: {
+            "schema_version": "tradingview-orchestrator.sweep_capture.v1",
+            "session_id": "20260101T000000Z",
+            "symbols": [{"symbol": "ETH"}],
+        },
+    )
+
+    r = client.get("/api/tradingview/orchestrator/latest", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["status"] == "ok"
+    assert body["manifest"]["session_id"] == "20260101T000000Z"
+
+
+def test_tradingview_orchestrator_latest_empty_sessions(app_client, monkeypatch):
+    _, client = app_client
+    from lib.trading import tradingview_orchestrator
+
+    monkeypatch.setattr(
+        tradingview_orchestrator.TradingViewOrchestrator,
+        "latest_manifest",
+        lambda self: None,
+    )
+
+    r = client.get("/api/tradingview/orchestrator/latest", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["status"] == "ok"
+    assert body["manifest"] is None
+    assert "No sessions captured yet" in body["note"]
+
+
+def test_tradingview_orchestrator_probe_endpoint(app_client, monkeypatch):
+    _, client = app_client
+    from lib.trading import tradingview_orchestrator
+
+    monkeypatch.setattr(
+        tradingview_orchestrator.TradingViewOrchestrator,
+        "probe_state",
+        lambda self: {"ok": True, "payload": {"symbol": "BINANCE:ETHUSDT"}},
+    )
+    monkeypatch.setattr(
+        tradingview_orchestrator.TradingViewOrchestrator,
+        "probe_quote",
+        lambda self: {"ok": True},
+    )
+    monkeypatch.setattr(
+        tradingview_orchestrator.TradingViewOrchestrator,
+        "probe_values",
+        lambda self: {"ok": True},
+    )
+
+    r = client.get("/api/tradingview/orchestrator/probe", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["status"] == "ok"
+    assert body["state"]["payload"]["symbol"] == "BINANCE:ETHUSDT"

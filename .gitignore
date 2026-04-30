@@ -112,3 +112,4 @@ world_knowledge/
 
 # SOPS age keys (NEVER commit)
 **/keys.txt
+data/tradingview_ta/

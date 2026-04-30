@@ -1806,6 +1806,50 @@ def api_trading_order_draft():
         return jsonify({"error": f"{type(e).__name__}: {e}"}), 400
 
 
+@app.route("/api/tradingview/orchestrator/sessions")
+@requires_auth
+def api_tradingview_orchestrator_sessions():
+    """List recent TradingView TA capture sessions."""
+    try:
+        limit = max(1, min(100, int(request.args.get("limit", "20"))))
+    except ValueError:
+        limit = 20
+    from lib.trading.tradingview_orchestrator import TradingViewOrchestrator
+
+    orch = TradingViewOrchestrator()
+    return jsonify({"status": "ok", "sessions": orch.list_sessions(limit=limit)})
+
+
+@app.route("/api/tradingview/orchestrator/latest")
+@requires_auth
+def api_tradingview_orchestrator_latest():
+    """Latest TradingView TA capture manifest."""
+    from lib.trading.tradingview_orchestrator import TradingViewOrchestrator
+
+    orch = TradingViewOrchestrator()
+    manifest = orch.latest_manifest()
+    if manifest is None:
+        return jsonify({"status": "ok", "manifest": None, "note": "No sessions captured yet"})
+    return jsonify({"status": "ok", "manifest": manifest})
+
+
+@app.route("/api/tradingview/orchestrator/probe")
+@requires_auth
+def api_tradingview_orchestrator_probe():
+    """Read-only probe of current TradingView Desktop state."""
+    from lib.trading.tradingview_orchestrator import TradingViewOrchestrator
+
+    orch = TradingViewOrchestrator()
+    return jsonify(
+        {
+            "status": "ok",
+            "state": orch.probe_state(),
+            "quote": orch.probe_quote(),
+            "values": orch.probe_values(),
+        }
+    )
+
+
 @app.route("/api/proposals")
 @requires_auth
 def api_proposals():

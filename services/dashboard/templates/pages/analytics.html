@@ -104,6 +104,28 @@
     </div>
 </div>
 
+<div class="card" style="margin-bottom: var(--space-xl);">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-robot" style="margin-right: 8px; color: var(--primary);"></i>TradingView Orchestrator</h3>
+        <span class="badge badge-info" id="tv-orchestrator-gate">Read-Only</span>
+    </div>
+    <div class="card-body">
+        <div class="grid grid-2">
+            <div>
+                <h4 style="margin: 0 0 8px; font-size: 14px; color: var(--muted);">Latest Session</h4>
+                <pre class="ta-export" id="tv-orchestrator-latest" style="min-height: 80px;">Loading…</pre>
+            </div>
+            <div>
+                <h4 style="margin: 0 0 8px; font-size: 14px; color: var(--muted);">Recent Sessions</h4>
+                <table class="data-table compact-table">
+                    <thead><tr><th>Session</th><th>Schema</th><th>Syms</th><th>TFs</th></tr></thead>
+                    <tbody id="tv-orchestrator-sessions-tbody"><tr><td colspan="4" class="loading">Loading…</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Equity curve with BTC benchmark -->
 <div class="card" style="margin-bottom: var(--space-xl);">
     <div class="card-header">
@@ -227,10 +249,11 @@
   function apiUrl(path) { return new URL(path, window.location.origin).toString(); }
 
   try {
-    const [universe, tvCaps, taMachine] = await Promise.all([
+    const [universe, tvCaps, taMachine, tvOrch] = await Promise.all([
       fetch(apiUrl('/api/analytics/market-universe')).then(r => r.json()),
       fetch(apiUrl('/api/tradingview/capabilities')).then(r => r.json()),
       fetch(apiUrl('/api/tradingview/ta-machine?limit=12')).then(r => r.json()),
+      fetch(apiUrl('/api/tradingview/orchestrator/sessions?limit=10')).then(r => r.json()),
     ]);
     document.getElementById('universe-source').textContent = universe.stale ? 'Fallback' : 'Live';
 
@@ -323,6 +346,27 @@
     if (!(tvCaps.groups || []).length) {
       tvBody.innerHTML = '<tr><td colspan="4" class="venue-muted">No capability rows</td></tr>';
     }
+
+    const orchSessions = document.getElementById('tv-orchestrator-sessions-tbody');
+    orchSessions.innerHTML = '';
+    const sessions = (tvOrch.sessions || []).slice(0, 10);
+    for (const row of sessions) {
+      orchSessions.insertAdjacentHTML('beforeend', `
+        <tr>
+          <td title="${esc(row.session_id)}">${esc(row.session_id)}</td>
+          <td>${esc(row.schema_version || '—')}</td>
+          <td>${esc(row.symbol_count != null ? row.symbol_count : '—')}</td>
+          <td>${esc(row.timeframe_count != null ? row.timeframe_count : '—')}</td>
+        </tr>`);
+    }
+    if (!sessions.length) {
+      orchSessions.innerHTML = '<tr><td colspan="4" class="venue-muted">No sessions</td></tr>';
+    }
+    const latest = sessions[0];
+    document.getElementById('tv-orchestrator-latest').textContent = latest
+      ? `Session: ${latest.session_id}\nGenerated: ${latest.generated_at || '—'}\nSymbols: ${latest.symbol_count != null ? latest.symbol_count : '—'}\nTimeframes: ${latest.timeframe_count != null ? latest.timeframe_count : '—'}`
+      : 'No sessions captured yet';
+    document.getElementById('tv-orchestrator-gate').textContent = (latest && latest.mutation_enabled) ? 'Mutation On' : 'Read-Only';
   } catch (e) {
     document.getElementById('universe-source').textContent = 'Offline';
     document.getElementById('liked-token-tbody').innerHTML = '<tr><td colspan="3" class="venue-muted">Unavailable</td></tr>';
@@ -332,6 +376,8 @@
     document.getElementById('tv-ta-symbol-tbody').innerHTML = '<tr><td colspan="5" class="venue-muted">Unavailable</td></tr>';
     document.getElementById('tv-ta-workorder-tbody').innerHTML = '<tr><td colspan="3" class="venue-muted">Unavailable</td></tr>';
     document.getElementById('tv-watchlist-export').textContent = 'Unavailable';
+    document.getElementById('tv-orchestrator-sessions-tbody').innerHTML = '<tr><td colspan="4" class="venue-muted">Unavailable</td></tr>';
+    document.getElementById('tv-orchestrator-latest').textContent = 'Unavailable';
   }
 
   let resp;
