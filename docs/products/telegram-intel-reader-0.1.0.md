@@ -14,6 +14,9 @@ persisted record with `lib/core/provenance.py`.
   channel posts visible to the bot.
 - Sink: `data/telegram_intel/YYYY-MM-DD/messages.jsonl`.
 - Plugin actions: `status`, `pull-once`, `recent`, `quality-test`, `models`.
+- Offline history import: `import-history` reads local Telegram Desktop JSON
+  exports without live Telegram API access and writes sanitized history/context
+  artifacts under `data/telegram_history_intel/`.
 - Caps: 32 enabled channels, 600 messages/hour, 200 local-model
   classifications/hour, 8000 characters per stored message.
 - Channel schema: `id`, `category`, `weight`, `backend`, `enabled`, and `notes`;
@@ -21,11 +24,31 @@ persisted record with `lib/core/provenance.py`.
   backward-compatible aliases.
 - Optional classifier: local inference proxy at `127.0.0.1:11435`, model alias
   `balanced`, 5 second timeout, heuristic fallback.
+- Dashboard summary: `/api/telegram-history-intel` exposes aggregate offline
+  history counts, artifact sidecar posture, sanitized signal previews, and a
+  no-send/no-live-API safety envelope behind dashboard auth.
 
 ## Non-Goals
 
 - No real Telegram sends.
+- No automatic access to the operator's Telegram account or chat history.
+- No committed real Telegram exports or imported history artifacts.
 - No trading critical path integration.
 - No committed private channel inventory.
 - No persistence of Telegram sender IDs, sender handles, phone numbers, email
   addresses, wallet addresses, or raw clickable URLs.
+
+## Offline History Context
+
+`services.telegram_intel.history_export` turns operator-provided Telegram Desktop
+JSON into two local artifacts:
+
+- `messages.jsonl`: provenance-stamped rows with hashed chat/participant IDs,
+  sanitized text, media kind, reply linkage, link domains, tags, and
+  open-loop/commitment/decision signals.
+- `conversation_context.json`: deterministic aggregate context for chats,
+  participants, tags, open loops, commitments, and decisions.
+
+This is the first read-only bridge from personal Telegram history into the
+Sapphire intel pipeline. It is designed for local recall, audit, and future
+dashboarding, not for unreviewed sharing.

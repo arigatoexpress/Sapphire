@@ -7,6 +7,7 @@ Actions:
   recent       - return recent provenance-stamped records from the local sink
   quality-test - evaluate one text blob with the pure quality heuristics
   models       - list the optional local classifier model and fallback
+  import-history - import a local Telegram Desktop JSON export without live API calls
 """
 
 from __future__ import annotations
@@ -21,6 +22,10 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from services.telegram_intel.classifier import available_models  # noqa: E402
+from services.telegram_intel.history_export import (  # noqa: E402
+    HistoryExportError,
+    import_history_export,
+)
 from services.telegram_intel.quality_filter import quality_filter  # noqa: E402
 from services.telegram_intel.run import pull_once, status  # noqa: E402
 from services.telegram_intel.sink import TelegramIntelSink  # noqa: E402
@@ -63,6 +68,21 @@ def handle(payload: dict[str, Any]) -> dict[str, Any]:
         limit = max(1, min(int(payload.get("limit", 20)), 200))
         return {"ok": True, "records": TelegramIntelSink(data_dir).recent(limit=limit)}
 
+    if action == "import-history":
+        export_path = _path(payload.get("export_path"))
+        if not export_path:
+            return {"ok": False, "error": "export_path is required"}
+        try:
+            result = import_history_export(
+                export_path,
+                data_dir=data_dir,
+                include_title_hints=payload.get("include_title_hints") is True,
+                limit=int(payload["limit"]) if payload.get("limit") is not None else None,
+            )
+        except (HistoryExportError, OSError, ValueError) as exc:
+            return {"ok": False, "error": str(exc)}
+        return result.to_dict()
+
     if action == "pull-once":
         kwargs = {"config_path": config_path, "data_dir": data_dir}
         if counter_path:
@@ -74,7 +94,14 @@ def handle(payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "ok": False,
         "error": f"unknown action: {action}",
-        "known_actions": ["status", "pull-once", "recent", "quality-test", "models"],
+        "known_actions": [
+            "status",
+            "pull-once",
+            "recent",
+            "quality-test",
+            "models",
+            "import-history",
+        ],
     }
 
 

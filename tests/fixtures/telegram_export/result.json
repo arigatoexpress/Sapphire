@@ -1,0 +1,59 @@
+{
+  "about": "Synthetic Telegram Desktop export fixture. No real Telegram data.",
+  "chats": {
+    "list": [
+      {
+        "id": 1001,
+        "name": "Client Research Room",
+        "type": "private_group",
+        "messages": [
+          {
+            "id": 1,
+            "type": "message",
+            "date": "2026-04-28T10:00:00",
+            "date_unixtime": "1777370400",
+            "from": "Operator Alpha",
+            "from_id": "user123",
+            "text": [
+              "Can you follow up on CVE-2026-9999 before tomorrow? Email analyst@example.invalid, call +1 202-555-0198, and review https://example.com/ioc-list."
+            ]
+          },
+          {
+            "id": 2,
+            "type": "message",
+            "date": "2026-04-28T10:05:00+00:00",
+            "from": "Research Partner",
+            "from_id": "user456",
+            "reply_to_message_id": 1,
+            "forwarded_from": "@privatealpha",
+            "text": [
+              {
+                "type": "bold",
+                "text": "Approved"
+              },
+              " - let's do the sapphire dashboard merge tonight. Ping @privatealpha and never store 0x1234567890abcdef1234567890abcdef12345678."
+            ]
+          },
+          {
+            "id": 3,
+            "type": "message",
+            "date": "2026-04-28T10:10:00+00:00",
+            "from": "Operator Alpha",
+            "from_id": "user123",
+            "media_type": "photo",
+            "photo": "(File not included. Change data exporting settings to download.)",
+            "text": ""
+          },
+          {
+            "id": 4,
+            "type": "service",
+            "date": "2026-04-28T10:11:00+00:00",
+            "actor": "System User",
+            "action": "invite_members",
+            "text": ""
+          }
+        ]
+      }
+    ]
+  }
+}

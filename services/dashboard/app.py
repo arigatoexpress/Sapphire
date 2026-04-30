@@ -56,6 +56,7 @@ _DASHBOARD_REPO_ROOT = Path(__file__).resolve().parents[2]
 _AGENT_EVENTS_FILE = _DASHBOARD_REPO_ROOT / "data" / "events" / "bus.jsonl"
 _AGENT_HEARTBEAT_DIR = _DASHBOARD_REPO_ROOT / "data" / "agents"
 _GEMINI_OODA_DAILY_DIR = _DASHBOARD_REPO_ROOT / "data" / ".autonomy" / "gemini-ooda"
+_TELEGRAM_HISTORY_INTEL_DIR = _DASHBOARD_REPO_ROOT / "data" / "telegram_history_intel"
 _ROUTINE_PAUSE_DIR = Path.home() / ".sapphire" / "routine_pause"
 
 # Configuration
@@ -5368,6 +5369,112 @@ def _attach_geo(item: dict) -> dict:
     return item
 
 
+def _telegram_history_intel_summary(
+    data_dir: Path | None = None,
+    *,
+    signal_limit: int = 10,
+) -> dict[str, Any]:
+    """Return an auth-gated, path-safe summary of offline Telegram history intel."""
+    root = data_dir or _TELEGRAM_HISTORY_INTEL_DIR
+    context_path = root / "conversation_context.json"
+    messages_path = root / "messages.jsonl"
+    base: dict[str, Any] = {
+        "available": False,
+        "status": "missing",
+        "summary": {
+            "chats": 0,
+            "messages": 0,
+            "participants": 0,
+            "open_loops": 0,
+            "commitments": 0,
+            "decisions": 0,
+            "top_tags": [],
+        },
+        "artifacts": {
+            "messages_jsonl": messages_path.exists(),
+            "messages_envelope": (root / "messages.jsonl.envelope.json").exists(),
+            "context_json": context_path.exists(),
+            "context_envelope": (root / "conversation_context.json.envelope.json").exists(),
+            "context_provenance_verified": False,
+        },
+        "latest_message_at": None,
+        "signals": {"open_loops": [], "commitments": [], "decisions": []},
+        "safety": {
+            "telegram_sends_enabled": False,
+            "live_api_contact": False,
+            "raw_export_paths_exposed": False,
+            "identity_mode": "hashed",
+        },
+    }
+    if not context_path.exists():
+        return base
+
+    try:
+        from lib.core.provenance import verify
+
+        payload = json.loads(context_path.read_text(encoding="utf-8"))
+        base["artifacts"]["context_provenance_verified"] = verify(payload)
+        summary = payload.get("summary") or {}
+        chats = payload.get("chats") if isinstance(payload.get("chats"), list) else []
+        latest = None
+        for chat in chats:
+            stamp = str(chat.get("last_message_at") or "")
+            if stamp and (latest is None or stamp > latest):
+                latest = stamp
+
+        def signals(name: str) -> list[dict[str, Any]]:
+            rows = payload.get(name) if isinstance(payload.get(name), list) else []
+            cleaned: list[dict[str, Any]] = []
+            for row in rows[: max(1, min(int(signal_limit), 50))]:
+                cleaned.append(
+                    {
+                        "canonical_id": str(row.get("canonical_id") or ""),
+                        "chat_hash": str(row.get("chat_hash") or ""),
+                        "published_at": str(row.get("published_at") or ""),
+                        "snippet": str(row.get("snippet") or "")[:240],
+                    }
+                )
+            return cleaned
+
+        base.update(
+            {
+                "available": True,
+                "status": "ready",
+                "summary": {
+                    "chats": int(summary.get("chats") or 0),
+                    "messages": int(summary.get("messages") or 0),
+                    "participants": int(summary.get("participants") or 0),
+                    "open_loops": int(summary.get("open_loops") or 0),
+                    "commitments": int(summary.get("commitments") or 0),
+                    "decisions": int(summary.get("decisions") or 0),
+                    "top_tags": summary.get("top_tags") or [],
+                },
+                "latest_message_at": latest,
+                "signals": {
+                    "open_loops": signals("open_loops"),
+                    "commitments": signals("commitments"),
+                    "decisions": signals("decisions"),
+                },
+            }
+        )
+    except Exception as exc:
+        base["status"] = "unreadable"
+        base["error"] = f"{exc.__class__.__name__}: {exc}"
+    return base
+
+
+@app.route("/api/telegram-history-intel")
+@requires_auth
+def api_telegram_history_intel():
+    """Offline Telegram history intelligence summary.
+
+    Auth-gated and read-only. Returns sanitized snippets and aggregate counts
+    from `data/telegram_history_intel/conversation_context.json`; never contacts
+    Telegram and never exposes raw export paths.
+    """
+    return jsonify(_telegram_history_intel_summary())
+
+
 @app.route("/api/intel")
 @requires_auth
 def api_intel():
@@ -5428,6 +5535,7 @@ def api_intel():
     except Exception as e:
         log.warning("intel API failed to summarize Foundry readiness: %s", e)
 
+    telegram_history = _telegram_history_intel_summary()
     sources = [
         {
             "name": "Threat snapshots",
@@ -5450,6 +5558,13 @@ def api_intel():
             "last_pull": foundry.get("latest_materialization"),
             "items": ((foundry.get("totals") or {}).get("files") or 0),
         },
+        {
+            "name": "Telegram History",
+            "type": "Offline conversation context",
+            "status": "active" if telegram_history.get("available") else "local-only",
+            "last_pull": telegram_history.get("latest_message_at"),
+            "items": (telegram_history.get("summary") or {}).get("messages") or 0,
+        },
     ]
 
     # Attach geo coords so the /intel Leaflet map can plot each item
@@ -5461,6 +5576,14 @@ def api_intel():
             "sources": sources,
             "item_count": len(items),
             "foundry": foundry,
+            "telegram_history": {
+                "available": telegram_history.get("available", False),
+                "status": telegram_history.get("status"),
+                "summary": telegram_history.get("summary"),
+                "latest_message_at": telegram_history.get("latest_message_at"),
+                "artifacts": telegram_history.get("artifacts"),
+                "safety": telegram_history.get("safety"),
+            },
             "last_updated": time.time(),
         }
     )

@@ -17,6 +17,7 @@ from services.telegram_intel.quality_filter import quality_filter
 from services.telegram_intel.sink import TelegramIntelSink, build_record
 
 INTERNAL = ROOT / "plugins" / "claw-sapphire" / "tools" / "internal" / "telegram_intel.py"
+HISTORY_FIXTURE = ROOT / "tests" / "fixtures" / "telegram_export" / "result.json"
 
 _spec = importlib.util.spec_from_file_location("telegram_intel_internal", INTERNAL)
 assert _spec is not None and _spec.loader is not None
@@ -115,10 +116,44 @@ def test_pull_once_refuses_without_live_gate(tmp_path: Path) -> None:
     assert out["error"] == "live gate refused"
 
 
+def test_import_history_action_reads_offline_export(tmp_path: Path) -> None:
+    out = telegram_intel.handle(
+        {
+            "action": "import-history",
+            "export_path": str(HISTORY_FIXTURE),
+            "data_dir": str(tmp_path / "history"),
+        }
+    )
+    assert out["ok"] is True
+    assert out["stats"]["written_messages"] == 3
+    assert out["stats"]["open_loops"] == 1
+    assert Path(out["messages_path"]).exists()
+    assert Path(out["context_path"]).exists()
+
+
 def test_unknown_action_lists_known_actions() -> None:
     out = telegram_intel.handle({"action": "bogus"})
     assert out["ok"] is False
     assert "quality-test" in out["known_actions"]
+    assert "import-history" in out["known_actions"]
+
+
+def test_import_history_action_requires_export_path() -> None:
+    out = telegram_intel.handle({"action": "import-history"})
+    assert out["ok"] is False
+    assert out["error"] == "export_path is required"
+
+
+def test_import_history_action_rejects_missing_export_path(tmp_path: Path) -> None:
+    out = telegram_intel.handle(
+        {
+            "action": "import-history",
+            "export_path": str(tmp_path / "missing.json"),
+            "data_dir": str(tmp_path / "history"),
+        }
+    )
+    assert out["ok"] is False
+    assert "export path not found" in out["error"]
 
 
 def test_main_rejects_invalid_json() -> None:

@@ -6,6 +6,7 @@ __all__ = [
     "backends",
     "classifier",
     "config",
+    "history_export",
     "quality_filter",
     "rate_limits",
     "run",
