@@ -20,6 +20,8 @@ paths = [
     '''tests/unit/test_molthub_outreach\.py''',
     '''tests/unit/test_sensitivity_filter\.py''',
     '''tests/unit/test_ws_dashboard\.py''',
+    # Property test intentionally generates fake token shapes and asserts redaction.
+    '''tests/property/test_audit_panel_heuristics_properties\.py''',
     # Doc-fixture curl examples with placeholder bearer tokens — not real keys.
     '''docs/ops/customer-api-runbook\.md''',
     '''docs/products/customer-product-surface-0\.1\.0\.md''',
