@@ -175,6 +175,44 @@ def test_inference_health_ignores_disabled_tiers(monkeypatch) -> None:
     assert "degraded_tiers" not in check.evidence
 
 
+def test_scheduled_launchagent_nonzero_last_status_warns(monkeypatch) -> None:
+    always_on = [
+        "com.sapphire.dashboard",
+        "com.sapphire.control-plane",
+        "com.sapphire.signal-logger",
+        "com.sapphire.inference-proxy",
+        "com.sapphire.pm-bot",
+        "com.sapphire.heartbeat",
+        "com.sapphire.openbb-api",
+        "com.sapphire.cloudflare-tunnel",
+        "ai.hermes.gateway",
+        "actions.runner.arigatoexpress-Sapphire.ari-macbook-sapphire",
+    ]
+    scheduled = [
+        ("com.sapphire.gcp-sync", "1"),
+        ("com.sapphire.content-engine", "0"),
+        ("com.sapphire.threat-refresh", "0"),
+        ("com.sapphire.morning-brief", "0"),
+        ("com.sapphire.backtest-weekly", "0"),
+        ("com.sapphire.security-pipeline", "0"),
+        ("com.sapphire.telemetry-collector", "0"),
+        ("com.sapphire.foundry-sync", "0"),
+        ("com.sapphire.tradingview-cdp", "0"),
+    ]
+    stdout = "\n".join(
+        [f"123\t0\t{label}" for label in always_on]
+        + [f"-\t{status}\t{label}" for label, status in scheduled]
+    )
+
+    monkeypatch.setattr(sweep, "run", lambda _cmd: sweep.RunResult(0, stdout, "", 12))
+
+    checks = {check.name: check for check in sweep.probe_launchagents()}
+
+    assert checks["com.sapphire.gcp-sync"].status == "WARN"
+    assert "last_status=1" in checks["com.sapphire.gcp-sync"].evidence
+    assert checks["com.sapphire.content-engine"].status == "PASS"
+
+
 def test_windows_ollama_inventory_passes_with_required_models(monkeypatch) -> None:
     names = [
         "nemotron-mini:4b",
