@@ -541,7 +541,10 @@ def probe_launchagents() -> list[Check]:
             )
         else:
             evidence = "running" if pid != "-" else f"loaded idle (last_status={status})"
-            checks.append(Check("launchagent", label, "PASS", evidence))
+            check_status = "PASS"
+            if kind == "scheduled" and pid == "-" and status != "0":
+                check_status = "WARN"
+            checks.append(Check("launchagent", label, check_status, evidence))
     return checks
 
 
