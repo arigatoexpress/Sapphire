@@ -326,6 +326,7 @@ All in `~/.claude/scheduled-tasks/`. Run when Claude Code is open. Tasks marked 
 - `docs/gcp-data-engineering.md` — Data lake design, BigQuery schema
 - `docs/kronos-integration-plan.md` — Kronos ML forecasting
 - `docs/tradingview-cdp-setup.md` — TradingView CDP setup
+- `docs/ops/tradingview-orchestrator-runbook.md` — TV orchestrator operator runbook (CLI, dashboard endpoints, mutation gate, scheduled jobs)
 - `docs/QUICK_START_GUIDE.md` — first-run setup
 - `docs/LOGGING.md` — event + audit log schema
 - `docs/CLOUDFLARE_DNS_SETUP.md` — tunnel config
