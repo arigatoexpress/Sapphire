@@ -14,6 +14,7 @@ import json
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -608,6 +609,34 @@ def test_research_worker_payload_marks_failed_unsafe_or_stale(receiver, monkeypa
     payload = receiver._build_research_worker_payload(stale_manifest)
     assert payload["status"] == "stale"
     assert payload["freshness"]["status"] == "stale"
+
+
+def test_research_worker_task_query_parses_powershell_json(receiver, monkeypatch):
+    monkeypatch.setattr(receiver.platform, "system", lambda: "Windows")
+
+    def fake_run(*_args, **_kwargs):
+        return SimpleNamespace(
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "task_name": "SapphireResearchWorker",
+                    "status": "ok",
+                    "state": "Ready",
+                    "last_run_time": "1999-11-30T00:00:00-07:00",
+                    "next_run_time": "2026-04-30T02:30:00-06:00",
+                    "last_task_result": 267011,
+                }
+            ),
+            stderr="",
+        )
+
+    monkeypatch.setattr(receiver.subprocess, "run", fake_run)
+
+    payload = receiver._query_research_worker_task()
+
+    assert payload["status"] == "ok"
+    assert payload["last_task_result_label"] == "not_started"
+    assert payload["last_result_ok"] is True
 
 
 def test_research_worker_status_accepts_powershell_utf8_bom(receiver, tmp_path, monkeypatch):
