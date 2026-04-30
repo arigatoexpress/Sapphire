@@ -185,6 +185,36 @@ runbook never lands.
    no-notify drills, read-only CDP status checks, and endpoint-specific
    recovery coverage.
 
+### Tranche 7-C lift (2026-04-30)
+
+The Tranche 7-C lift PR added:
+
+1. A `tests/runbooks/test_runbook_smoke.py` smoke test that parses each
+   listed runbook, extracts the first three fenced bash blocks, and
+   asserts they pass `bash -n` (50 tests, < 1 s).
+2. A standardized **Triage Quickstart** section at the top of 16 of the
+   18 surfaces in the remediation order. Each section names the failure
+   mode addressed, gives 3 paste-ready commands, names live monitors,
+   and sets on-call priority.
+3. Defense-in-depth: `test_trading_critical_runbooks_not_in_smoke_set`
+   asserts that webhook, trading-shadow, hyperliquid-feed, hyperliquid-
+   live, robinhood-real-funds, and tranche5-live-soak runbooks stay OUT
+   of the smoke set. They are gated by separate review tracks.
+
+Surfaces lifted (16 of 18; trading-shadow and webhook deliberately
+skipped per AGENTS.md trading-critical-path ownership): backtest-weekly,
+telemetry-collector, content-publisher, tradingview-cdp, control-plane,
+foundry-sync, security-pipeline, heartbeat, logrotate, market-intel,
+morning-brief, morning-digest, self-optimization, service-supervisor,
+openbb-api, gcp-pipeline.
+
+Score impact: each lifted surface now meets a stronger 3/5 — it has the
+audit's required gap-addressing context AND a CI-enforceable contract
+that the first three commands stay shell-valid. Re-grading to 4/5
+requires the deeper fixture-backed coverage the audit calls out
+(per-surface unit tests for behaviors like rotation, prune, restart
+drills); that is out of scope for the docs-only Tranche 7-C lane.
+
 ---
 
 ## Audit metadata
@@ -197,5 +227,6 @@ runbook never lands.
 - **Provenance**: this audit is a deterministic artifact; running the
   same inventory + same rubric should produce the same scores within
   ± 1 per surface.
+- **Last lift**: 2026-04-30 (Tranche 7-C runbook lift PR — 16 surfaces).
 - **Next audit**: when Tranche 7 ships, or when ≥ 5 surfaces have had
   their runbooks rewritten.

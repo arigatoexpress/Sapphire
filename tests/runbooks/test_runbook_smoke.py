@@ -76,10 +76,7 @@ _FENCE_PATTERN = re.compile(
 def _extract_fenced_blocks(markdown: str) -> list[tuple[str, str]]:
     """Return ``(lang, body)`` for each fenced code block, in document order."""
 
-    return [
-        (m.group("lang") or "", m.group("body"))
-        for m in _FENCE_PATTERN.finditer(markdown)
-    ]
+    return [(m.group("lang") or "", m.group("body")) for m in _FENCE_PATTERN.finditer(markdown)]
 
 
 def _is_bash_block(lang: str, body: str) -> bool:
@@ -204,9 +201,8 @@ def test_runbook_first_three_commands_parse(runbook_name: str) -> None:
         ok, stderr = _bash_syntax_check(body)
         if not ok:
             failures.append(f"  block {idx}: {stderr.strip()}\n    body:\n{body}")
-    assert not failures, (
-        f"{runbook_name}: first-3-commands failed `bash -n`:\n"
-        + "\n".join(failures)
+    assert not failures, f"{runbook_name}: first-3-commands failed `bash -n`:\n" + "\n".join(
+        failures
     )
 
 
