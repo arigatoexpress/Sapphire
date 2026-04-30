@@ -275,6 +275,82 @@ class TradingViewOrchestrator:
             return {"mutated": False, "reason": f"{MUTATION_ENV} must be 1"}
         return self._run("pine", "save")
 
+    def pine_promote(self, pine_path: str | Path) -> dict[str, Any]:
+        """Promote a local Pine source file into the TV editor: set + compile + save.
+
+        Closes the loop from "generated locally" to "live in the TV editor on the
+        user's TradingView account". Mutation-gated.
+
+        Stages run in order; the first failure short-circuits and is reported in
+        ``stage``. Each stage's raw ``_run`` result is preserved in ``stages`` so
+        callers (CLI / dashboards) can inspect stdout/stderr. On clean compile
+        the script is saved to the TV account and ``ok=True`` is returned.
+        """
+        if not self.mutation_enabled:
+            return {"mutated": False, "reason": f"{MUTATION_ENV} must be 1"}
+
+        stages: dict[str, Any] = {}
+
+        set_res = self.pine_set_from_file(pine_path)
+        stages["set"] = set_res
+        if not set_res.get("ok", False):
+            return {
+                "ok": False,
+                "mutated": True,
+                "stage": "set",
+                "path": str(pine_path),
+                "stages": stages,
+            }
+
+        compile_res = self.pine_compile()
+        stages["compile"] = compile_res
+        if not compile_res.get("ok", False):
+            return {
+                "ok": False,
+                "mutated": True,
+                "stage": "compile",
+                "path": str(pine_path),
+                "stages": stages,
+            }
+
+        errors_res = self.pine_errors()
+        stages["errors"] = errors_res
+        errors_payload = errors_res.get("payload") if isinstance(errors_res, dict) else None
+        error_list: list[Any] = []
+        if isinstance(errors_payload, dict):
+            raw = errors_payload.get("errors") or errors_payload.get("diagnostics") or []
+            if isinstance(raw, list):
+                error_list = raw
+        elif isinstance(errors_payload, list):
+            error_list = errors_payload
+        if not errors_res.get("ok", False) or error_list:
+            return {
+                "ok": False,
+                "mutated": True,
+                "stage": "errors",
+                "path": str(pine_path),
+                "errors": error_list,
+                "stages": stages,
+            }
+
+        save_res = self.pine_save()
+        stages["save"] = save_res
+        if not save_res.get("ok", False):
+            return {
+                "ok": False,
+                "mutated": True,
+                "stage": "save",
+                "path": str(pine_path),
+                "stages": stages,
+            }
+
+        return {
+            "ok": True,
+            "mutated": True,
+            "path": str(pine_path),
+            "stages": stages,
+        }
+
     def pine_validate_file(self, path: str | Path) -> dict[str, Any]:
         """Run analyze + check on a file, return both results.
 

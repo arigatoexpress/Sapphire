@@ -106,6 +106,109 @@ def test_pine_save_blocked_without_gate(orch: TradingViewOrchestrator):
     assert orch.pine_save()["mutated"] is False
 
 
+# Pine promote --------------------------------------------------------------------
+
+
+def test_pine_promote_blocked_without_gate(orch: TradingViewOrchestrator):
+    res = orch.pine_promote("/tmp/foo.pine")
+    assert res["mutated"] is False
+    assert "SAPPHIRE_TV_MUTATION_ENABLED" in res["reason"]
+
+
+def test_pine_promote_stops_at_first_failed_stage(orch_mutating: TradingViewOrchestrator):
+    def fake(*args, **kwargs):
+        # pine set fails — should never reach compile/errors/save
+        if args[:2] == ("pine", "set"):
+            return {
+                "ok": False,
+                "returncode": 1,
+                "stderr": "no editor",
+                "command": "tv pine set --file /tmp/foo.pine",
+                "stdout": "",
+                "payload": None,
+                "parse_error": None,
+            }
+        raise AssertionError(f"unexpected _run call after failure: {args}")
+
+    with patch.object(orch_mutating, "_run", side_effect=fake) as run:
+        result = orch_mutating.pine_promote("/tmp/foo.pine")
+
+    assert result["ok"] is False
+    assert result["mutated"] is True
+    assert result["stage"] == "set"
+    assert "set" in result["stages"]
+    assert "compile" not in result["stages"]
+    assert "errors" not in result["stages"]
+    assert "save" not in result["stages"]
+    # Only the pine_set call should have run
+    assert run.call_count == 1
+
+
+def test_pine_promote_happy_path_runs_all_four_stages(
+    orch_mutating: TradingViewOrchestrator,
+):
+    calls: list[tuple] = []
+
+    def fake(*args, **kwargs):
+        calls.append(args)
+        if args[:2] == ("pine", "set"):
+            return {"ok": True, "stdout": "set", "stderr": "", "payload": None}
+        if args[:2] == ("pine", "compile"):
+            return {"ok": True, "stdout": "compiled", "stderr": "", "payload": {"compiled": True}}
+        if args[:2] == ("pine", "errors"):
+            return {"ok": True, "stdout": "", "stderr": "", "payload": {"errors": []}}
+        if args[:2] == ("pine", "save"):
+            return {"ok": True, "stdout": "saved", "stderr": "", "payload": {"saved": True}}
+        raise AssertionError(f"unexpected _run call: {args}")
+
+    with patch.object(orch_mutating, "_run", side_effect=fake):
+        result = orch_mutating.pine_promote("/tmp/foo.pine")
+
+    assert result["ok"] is True
+    assert result["mutated"] is True
+    assert result["path"] == "/tmp/foo.pine"
+    assert set(result["stages"].keys()) == {"set", "compile", "errors", "save"}
+    # Each stage's raw result is preserved
+    assert result["stages"]["set"]["ok"] is True
+    assert result["stages"]["compile"]["payload"] == {"compiled": True}
+    assert result["stages"]["errors"]["payload"] == {"errors": []}
+    assert result["stages"]["save"]["payload"] == {"saved": True}
+    # All four tv calls happened in order
+    assert [c[:2] for c in calls] == [
+        ("pine", "set"),
+        ("pine", "compile"),
+        ("pine", "errors"),
+        ("pine", "save"),
+    ]
+
+
+def test_pine_promote_fails_when_compile_reports_errors(
+    orch_mutating: TradingViewOrchestrator,
+):
+    def fake(*args, **kwargs):
+        if args[:2] == ("pine", "set"):
+            return {"ok": True, "payload": None}
+        if args[:2] == ("pine", "compile"):
+            return {"ok": True, "payload": {"compiled": True}}
+        if args[:2] == ("pine", "errors"):
+            return {
+                "ok": True,
+                "payload": {
+                    "errors": [{"line": 12, "message": "Undeclared identifier 'foo'"}]
+                },
+            }
+        raise AssertionError(f"unexpected _run call after errors: {args}")
+
+    with patch.object(orch_mutating, "_run", side_effect=fake):
+        result = orch_mutating.pine_promote("/tmp/foo.pine")
+
+    assert result["ok"] is False
+    assert result["stage"] == "errors"
+    assert result["errors"] == [{"line": 12, "message": "Undeclared identifier 'foo'"}]
+    # save should NOT have run
+    assert "save" not in result["stages"]
+
+
 # Alerts --------------------------------------------------------------------------
 
 
