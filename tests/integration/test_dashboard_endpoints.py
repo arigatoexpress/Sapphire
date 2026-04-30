@@ -1064,6 +1064,74 @@ def test_tradingview_orchestrator_alerts_endpoint(app_client, monkeypatch):
     assert len(body["alerts"]) == 2
 
 
+def test_tradingview_orchestrator_scoring_latest_endpoint(app_client, monkeypatch):
+    _, client = app_client
+    from lib.trading import tradingview_orchestrator
+
+    monkeypatch.setattr(
+        tradingview_orchestrator.TradingViewOrchestrator,
+        "latest_scoring",
+        lambda self, top_n=None: {
+            "session_id": "20260101T000000Z",
+            "schema_version": "tradingview-orchestrator.sweep_capture.v1",
+            "generated_at": "2026-01-01T00:00:00+00:00",
+            "scored_at": "2026-01-01T00:01:00+00:00",
+            "items": [
+                {"symbol": "BTC", "tradingview_symbol": "BINANCE:BTCUSDT",
+                 "timeframe": "60", "rank": 2,
+                 "score": -0.8, "regime": "RISK_OFF", "rationale": "RSI=20; Δ=-8%"},
+                {"symbol": "SOL", "tradingview_symbol": "BINANCE:SOLUSDT",
+                 "timeframe": "60", "rank": 3,
+                 "score": 0.5, "regime": "RISK_ON", "rationale": "RSI=70; Δ=+6%"},
+            ],
+        },
+    )
+    r = client.get(
+        "/api/tradingview/orchestrator/scoring/latest?top_n=2",
+        headers={"Authorization": _AUTH},
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["status"] == "ok"
+    items = body["scoring"]["items"]
+    assert len(items) == 2
+    assert items[0]["symbol"] == "BTC"
+    assert items[0]["score"] == -0.8
+    assert items[0]["regime"] == "RISK_OFF"
+    assert "RSI=20" in items[0]["rationale"]
+
+
+def test_tradingview_orchestrator_scoring_latest_requires_auth(app_client):
+    _, client = app_client
+    r = client.get("/api/tradingview/orchestrator/scoring/latest")
+    assert r.status_code == 401
+
+
+def test_tradingview_orchestrator_scoring_latest_empty_session(app_client, monkeypatch):
+    _, client = app_client
+    from lib.trading import tradingview_orchestrator
+
+    monkeypatch.setattr(
+        tradingview_orchestrator.TradingViewOrchestrator,
+        "latest_scoring",
+        lambda self, top_n=None: {
+            "session_id": None,
+            "schema_version": None,
+            "generated_at": None,
+            "scored_at": "2026-01-01T00:00:00+00:00",
+            "items": [],
+        },
+    )
+    r = client.get(
+        "/api/tradingview/orchestrator/scoring/latest",
+        headers={"Authorization": _AUTH},
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["status"] == "ok"
+    assert body["scoring"]["items"] == []
+
+
 def test_tradingview_orchestrator_alerts_endpoint_handles_failure(app_client, monkeypatch):
     _, client = app_client
     from lib.trading import tradingview_orchestrator

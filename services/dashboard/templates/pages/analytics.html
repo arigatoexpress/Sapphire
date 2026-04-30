@@ -144,6 +144,13 @@
                 </table>
             </div>
         </div>
+        <div style="margin-top: 16px;">
+            <h4 style="margin: 0 0 8px; font-size: 14px; color: var(--muted);">TA Score (top 3 by |score|)</h4>
+            <table class="data-table compact-table">
+                <thead><tr><th>Symbol</th><th>TF</th><th>Score</th><th>Regime</th><th>Rationale</th></tr></thead>
+                <tbody id="tv-orchestrator-scoring-tbody"><tr><td colspan="5" class="loading">Loading…</td></tr></tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -473,6 +480,33 @@
       document.getElementById('tv-orchestrator-pine-tbody').innerHTML = '<tr><td colspan="3" class="venue-muted">Unavailable</td></tr>';
       document.getElementById('tv-orchestrator-alerts-tbody').innerHTML = '<tr><td colspan="3" class="venue-muted">Unavailable</td></tr>';
     }
+
+    // TA Score panel — top 3 by |score| from latest scoring manifest.
+    try {
+      const scoringResp = await fetch(apiUrl('/api/tradingview/orchestrator/scoring/latest?top_n=3')).then(r => r.json());
+      const scoringTbody = document.getElementById('tv-orchestrator-scoring-tbody');
+      scoringTbody.innerHTML = '';
+      const items = ((scoringResp.scoring || {}).items) || [];
+      for (const row of items) {
+        const score = Number(row.score);
+        const scoreColor = isFinite(score)
+          ? (score > 0.05 ? 'var(--success, #00ff88)' : (score < -0.05 ? 'var(--danger, #ef4444)' : 'var(--muted)'))
+          : 'var(--muted)';
+        scoringTbody.insertAdjacentHTML('beforeend', `
+          <tr>
+            <td title="${esc(row.tradingview_symbol || '')}">${esc(row.symbol || row.tradingview_symbol || '—')}</td>
+            <td>${esc(row.timeframe || '—')}</td>
+            <td style="color: ${scoreColor}; font-variant-numeric: tabular-nums;">${isFinite(score) ? score.toFixed(3) : '—'}</td>
+            <td>${esc(row.regime || '—')}</td>
+            <td style="font-size: 11px; color: var(--muted);" title="${esc(row.rationale || '')}">${esc(row.rationale || '—')}</td>
+          </tr>`);
+      }
+      if (!items.length) {
+        scoringTbody.innerHTML = '<tr><td colspan="5" class="venue-muted">No scoring yet — run a sweep to populate</td></tr>';
+      }
+    } catch (scoringErr) {
+      document.getElementById('tv-orchestrator-scoring-tbody').innerHTML = '<tr><td colspan="5" class="venue-muted">Unavailable</td></tr>';
+    }
   } catch (e) {
     document.getElementById('universe-source').textContent = 'Offline';
     document.getElementById('liked-token-tbody').innerHTML = '<tr><td colspan="3" class="venue-muted">Unavailable</td></tr>';
@@ -487,6 +521,8 @@
     document.getElementById('tv-orchestrator-screenshot-grid').innerHTML = '<p class="venue-muted">Unavailable</p>';
     document.getElementById('tv-orchestrator-pine-tbody').innerHTML = '<tr><td colspan="3" class="venue-muted">Unavailable</td></tr>';
     document.getElementById('tv-orchestrator-alerts-tbody').innerHTML = '<tr><td colspan="3" class="venue-muted">Unavailable</td></tr>';
+    const scoringTbodyEl = document.getElementById('tv-orchestrator-scoring-tbody');
+    if (scoringTbodyEl) scoringTbodyEl.innerHTML = '<tr><td colspan="5" class="venue-muted">Unavailable</td></tr>';
   }
 
   let resp;

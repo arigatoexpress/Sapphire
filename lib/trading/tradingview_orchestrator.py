@@ -8,6 +8,13 @@ This module commands the local TradingView Desktop instance via the `tv` CLI to:
 All mutations are gated by SAPPHIRE_TV_MUTATION_ENABLED. Without the gate, the
 orchestrator runs in read-only capture mode (it records what is currently on
 screen without changing symbol or studies).
+
+The orchestrator also scores each captured symbol/timeframe via
+``compute_quick_signal_score`` — a pure, deterministic helper that turns the
+in-memory OHLCV summary (and, when available, the indicator-values payload from
+``tv values``) into ``{"score": float in [-1, +1], "regime": str,
+"rationale": str}``. Scoring runs entirely on artifacts that were already
+captured; no extra ``tv`` calls are issued.
 """
 
 from __future__ import annotations
@@ -15,6 +22,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
@@ -54,6 +62,241 @@ def _emit_event(event_type: str, payload: dict[str, Any]) -> None:
         publish(event_type, payload, source="tradingview-orchestrator")
     except Exception as exc:  # noqa: BLE001 — defensive: never block capture
         log.warning("event_bus publish failed (%s): %s", event_type, exc)
+
+
+_FLOAT_RE = re.compile(r"-?\d+(?:\.\d+)?")
+
+
+def _parse_numeric(value: Any) -> float | None:
+    """Coerce a TradingView indicator-values entry to a float.
+
+    ``tv values`` returns strings ("65.32", "1.234e+04", "−12.5%", "-").
+    Returns None for missing / non-numeric entries (e.g. "∅", empty).
+    """
+    if value is None:
+        return None
+    if isinstance(value, int | float):
+        if isinstance(value, float) and (value != value):  # NaN
+            return None
+        return float(value)
+    if not isinstance(value, str):
+        return None
+    s = value.strip()
+    if not s or s in {"-", "—", "∅", "n/a", "N/A"}:
+        return None
+    # Normalize unicode minus, strip percent.
+    s = s.replace("−", "-").replace("%", "").replace(",", "")
+    m = _FLOAT_RE.search(s)
+    if not m:
+        return None
+    try:
+        return float(m.group(0))
+    except (TypeError, ValueError):
+        return None
+
+
+def _flatten_indicator_values(values_payload: Any) -> dict[str, float]:
+    """Flatten the ``tv values`` payload into a single name → float map.
+
+    The payload is a list of ``{"name": <study>, "values": {<title>: <str>}}``
+    entries. Keys are normalized to lowercase for case-insensitive lookups
+    (e.g. "RSI", "Plot", "MACD", "Histogram", "Upper", "Lower", "Volume").
+    """
+    out: dict[str, float] = {}
+    if isinstance(values_payload, dict):
+        # Could be a {"ok": True, "payload": [...]} envelope. Drill in.
+        inner = values_payload.get("payload") if "payload" in values_payload else None
+        if inner is not None:
+            return _flatten_indicator_values(inner)
+        # Otherwise treat as a single entry-shaped dict.
+        candidates = [values_payload]
+    elif isinstance(values_payload, list):
+        candidates = values_payload
+    else:
+        return out
+
+    for entry in candidates:
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry.get("name") or "").lower()
+        vals = entry.get("values") or {}
+        if not isinstance(vals, dict):
+            continue
+        for title, raw in vals.items():
+            num = _parse_numeric(raw)
+            if num is None:
+                continue
+            key = f"{name}:{str(title).lower()}".strip(":")
+            out[key] = num
+            # Also store the bare title for convenience.
+            bare = str(title).lower()
+            out.setdefault(bare, num)
+    return out
+
+
+def _ohlcv_summary_payload(ohlcv: Any) -> dict[str, Any] | None:
+    """Extract the summary dict from a probe_ohlcv result envelope."""
+    if not isinstance(ohlcv, dict):
+        return None
+    payload = ohlcv.get("payload")
+    if isinstance(payload, dict):
+        return payload
+    # Sometimes the envelope itself looks like the summary (used by tests).
+    if "open" in ohlcv and "close" in ohlcv:
+        return ohlcv
+    return None
+
+
+def _change_pct_from_summary(summary: dict[str, Any]) -> float | None:
+    """Extract the period change percent (as a float, e.g. 2.5 for +2.5%)."""
+    raw = summary.get("change_pct")
+    if raw is None:
+        # Fall back to deriving from open/close if available.
+        try:
+            open_ = float(summary.get("open"))
+            close_ = float(summary.get("close"))
+        except (TypeError, ValueError):
+            return None
+        if not open_:
+            return None
+        return ((close_ - open_) / open_) * 100.0
+    return _parse_numeric(raw)
+
+
+def _last5_trend(summary: dict[str, Any]) -> float:
+    """Return a [-1, +1] trend score from last_5_bars closes (linear slope sign).
+
+    Robust to short / missing series — degrades to 0.0.
+    """
+    bars = summary.get("last_5_bars") or []
+    if not isinstance(bars, list) or len(bars) < 2:
+        return 0.0
+    closes: list[float] = []
+    for bar in bars:
+        if isinstance(bar, dict):
+            c = bar.get("close")
+            try:
+                closes.append(float(c))
+            except (TypeError, ValueError):
+                continue
+    if len(closes) < 2:
+        return 0.0
+    first = closes[0]
+    last = closes[-1]
+    if first <= 0:
+        return 0.0
+    delta_pct = (last - first) / first * 100.0
+    # Normalize: a 5-bar move of ±5% is treated as a strong trend (clipped to ±1).
+    return max(-1.0, min(1.0, delta_pct / 5.0))
+
+
+def compute_quick_signal_score(
+    ohlcv_summary: Any,
+    indicator_values: Any | None = None,
+) -> dict[str, Any]:
+    """Score a captured TradingView snapshot in [-1, +1].
+
+    Pure function over ``probe_ohlcv`` + ``probe_values`` artifacts. No side
+    effects, no live market calls.
+
+    Sub-scores (each in [-1, +1]) are blended with fixed weights:
+      - RSI deviation from 50 (weight 0.30 if available)
+      - MACD histogram sign + magnitude vs price (weight 0.30 if available)
+      - EMA-20 vs price ratio (weight 0.20 if available)
+      - Period change percent (always-on fallback, weight 0.10)
+      - 5-bar local trend (always-on fallback, weight 0.10)
+
+    Missing components are skipped and the remaining weights are renormalized.
+    The returned ``regime`` is one of ``RISK_ON | TRANSITION | RISK_OFF`` and is
+    derived from the period change percent thresholds in ``StrategyParams``
+    (``+5% / -5%``) so the bucketing is consistent with the analytics
+    strategies. ``rationale`` is a short human-readable string listing the
+    components that contributed.
+    """
+    summary = _ohlcv_summary_payload(ohlcv_summary) or {}
+    values = _flatten_indicator_values(indicator_values) if indicator_values is not None else {}
+
+    components: list[tuple[str, float, float, str]] = []  # (name, score, weight, note)
+
+    rsi = values.get("rsi:plot") or values.get("rsi") or values.get("plot")
+    if rsi is not None and 0.0 <= rsi <= 100.0:
+        # Map RSI 0→-1, 50→0, 100→+1. Centered at 50 = neutral.
+        rsi_score = max(-1.0, min(1.0, (rsi - 50.0) / 50.0))
+        components.append(("rsi", rsi_score, 0.30, f"RSI={rsi:.1f}"))
+
+    # MACD histogram: positive = bullish momentum acceleration.
+    macd_hist = (
+        values.get("macd:histogram")
+        or values.get("histogram")
+        or values.get("macd:hist")
+    )
+    close = _parse_numeric(summary.get("close"))
+    if macd_hist is not None and close and close > 0:
+        # Histogram normalized against close price, then clipped.
+        ratio = macd_hist / close
+        macd_score = max(-1.0, min(1.0, ratio * 200.0))  # 0.5% of price → ±1
+        components.append(("macd", macd_score, 0.30, f"MACD_hist={macd_hist:.4f}"))
+    elif macd_hist is not None:
+        # Fallback: sign-only contribution if we don't have a price reference.
+        sign = 1.0 if macd_hist > 0 else (-1.0 if macd_hist < 0 else 0.0)
+        components.append(("macd", sign, 0.30, f"MACD_hist={macd_hist:.4f}"))
+
+    # EMA-20 trend: price vs the 20-period EMA tells us short-term direction.
+    ema = (
+        values.get("moving average exponential:plot")
+        or values.get("ema:plot")
+        or values.get("ema")
+    )
+    if ema is not None and close and close > 0:
+        diff_pct = (close - ema) / ema * 100.0
+        # ±2% above/below EMA → ±1 (clipped).
+        ema_score = max(-1.0, min(1.0, diff_pct / 2.0))
+        components.append(("ema", ema_score, 0.20, f"close_vs_EMA20={diff_pct:+.2f}%"))
+
+    # Always-on fallbacks: period change % and last-5-bar trend. These keep the
+    # scorer functional when only the OHLCV summary was captured (sweep mode).
+    change_pct = _change_pct_from_summary(summary)
+    if change_pct is not None:
+        # ±10% over the captured window → ±1 (clipped).
+        change_score = max(-1.0, min(1.0, change_pct / 10.0))
+        components.append(("change_pct", change_score, 0.10, f"Δ={change_pct:+.2f}%"))
+
+    trend_score = _last5_trend(summary)
+    if trend_score != 0.0 or summary.get("last_5_bars"):
+        components.append(("trend5", trend_score, 0.10, "5-bar trend"))
+
+    # Blend, renormalizing weights of present components.
+    total_weight = sum(w for _, _, w, _ in components)
+    if total_weight > 0:
+        blended = sum(s * w for _, s, w, _ in components) / total_weight
+        score = max(-1.0, min(1.0, blended))
+    else:
+        score = 0.0
+
+    # Regime bucket — mirror StrategyParams defaults (±5%).
+    if change_pct is None:
+        regime = "TRANSITION"
+    elif change_pct >= 5.0:
+        regime = "RISK_ON"
+    elif change_pct <= -5.0:
+        regime = "RISK_OFF"
+    else:
+        regime = "TRANSITION"
+
+    if components:
+        rationale = "; ".join(note for _, _, _, note in components)
+    else:
+        rationale = "no scorable components"
+
+    return {
+        "score": round(score, 4),
+        "regime": regime,
+        "rationale": rationale,
+        "components": [
+            {"name": n, "score": round(s, 4), "weight": w, "note": note}
+            for n, s, w, note in components
+        ],
+    }
 
 
 class TVCommandError(Exception):
@@ -554,6 +797,18 @@ class TradingViewOrchestrator:
             quote = self.probe_quote(tradingview_symbol)
             tf_record["quote_ok"] = quote["ok"]
 
+            # Score from captured artifacts (pure, no extra tv calls).
+            try:
+                tf_record["score"] = compute_quick_signal_score(ohlcv, values)
+            except Exception as exc:  # noqa: BLE001 — never block capture on scoring
+                log.warning("scoring failed for %s @ %s: %s", tradingview_symbol, tf, exc)
+                tf_record["score"] = {
+                    "score": 0.0,
+                    "regime": "TRANSITION",
+                    "rationale": f"scorer error: {exc}",
+                    "components": [],
+                }
+
             manifest["timeframes"].append(tf_record)
 
         manifest_path = session_dir / "manifest.json"
@@ -628,6 +883,20 @@ class TradingViewOrchestrator:
             quote = self.probe_quote(tv_symbol)
             sym_record["quote_ok"] = quote["ok"]
 
+            # Score from captured artifacts (pure, no extra tv calls). Sweep
+            # does not capture indicator values; the scorer falls back to the
+            # OHLCV change-percent + 5-bar trend components.
+            try:
+                sym_record["score"] = compute_quick_signal_score(ohlcv, None)
+            except Exception as exc:  # noqa: BLE001 — never block capture on scoring
+                log.warning("scoring failed for %s: %s", tv_symbol, exc)
+                sym_record["score"] = {
+                    "score": 0.0,
+                    "regime": "TRANSITION",
+                    "rationale": f"scorer error: {exc}",
+                    "components": [],
+                }
+
             manifest["symbols"].append(sym_record)
 
         manifest_path = session_dir / "manifest.json"
@@ -645,6 +914,77 @@ class TradingViewOrchestrator:
             },
         )
         return manifest
+
+    def latest_scoring(self, top_n: int | None = None) -> dict[str, Any]:
+        """Return the latest manifest's scoring rows, sorted by abs(score) desc.
+
+        Output shape::
+
+            {
+              "session_id": str | None,
+              "schema_version": str | None,
+              "generated_at": str | None,
+              "scored_at": <ISO8601>,
+              "items": [
+                {"symbol": ..., "tradingview_symbol": ..., "timeframe": ...,
+                 "score": float, "regime": str, "rationale": str},
+                ...
+              ],
+            }
+
+        Items come from sweep ``symbols[]`` records or deep-capture
+        ``timeframes[]`` records — whichever shape the latest manifest has.
+        """
+        manifest = self.latest_manifest()
+        out: dict[str, Any] = {
+            "session_id": None,
+            "schema_version": None,
+            "generated_at": None,
+            "scored_at": self._now_iso(),
+            "items": [],
+        }
+        if not manifest:
+            return out
+
+        out["session_id"] = manifest.get("session_id")
+        out["schema_version"] = manifest.get("schema_version")
+        out["generated_at"] = manifest.get("generated_at")
+
+        items: list[dict[str, Any]] = []
+        symbols = manifest.get("symbols") or []
+        for row in symbols:
+            score = row.get("score") or {}
+            if not isinstance(score, dict):
+                continue
+            items.append({
+                "symbol": row.get("symbol"),
+                "tradingview_symbol": row.get("tradingview_symbol"),
+                "timeframe": manifest.get("primary_timeframe"),
+                "rank": row.get("rank"),
+                "score": score.get("score", 0.0),
+                "regime": score.get("regime"),
+                "rationale": score.get("rationale"),
+            })
+        timeframes = manifest.get("timeframes") or []
+        for row in timeframes:
+            score = row.get("score") or {}
+            if not isinstance(score, dict):
+                continue
+            items.append({
+                "symbol": manifest.get("symbol"),
+                "tradingview_symbol": manifest.get("tradingview_symbol"),
+                "timeframe": row.get("timeframe"),
+                "rank": None,
+                "score": score.get("score", 0.0),
+                "regime": score.get("regime"),
+                "rationale": score.get("rationale"),
+            })
+
+        items.sort(key=lambda r: abs(float(r.get("score") or 0.0)), reverse=True)
+        if top_n is not None and top_n > 0:
+            items = items[:top_n]
+        out["items"] = items
+        return out
 
     def latest_manifest(self) -> dict[str, Any] | None:
         """Return the latest session manifest, if any."""
