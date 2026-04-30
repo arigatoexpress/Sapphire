@@ -24,8 +24,11 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from lib.trading.pine_templates import (
+    MAX_SCREENER_SYMBOLS,
     list_generated,
+    render_sapphire_screener,
     render_sapphire_watch_indicator,
+    render_sapphire_watch_strategy,
     write_template,
 )
 from lib.trading.tradingview_orchestrator import TradingViewOrchestrator
@@ -156,21 +159,111 @@ def cmd_pine_generate(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_pine_generate_strategy(args: argparse.Namespace) -> int:
+    """Generate a Pine v5 strategy() variant of the watch indicator.
+
+    Same signal logic as `pine-generate` but emits `strategy(...)` so
+    TradingView's Strategy Tester reports in-TV P/L.
+    """
+    pine = render_sapphire_watch_strategy(args.symbol)
+    name = args.name or f"Sapphire_Strategy_{args.symbol}"
+    written = write_template(
+        name,
+        pine,
+        metadata={
+            "kind": "sapphire_watch_strategy",
+            "tradingview_symbol": args.symbol,
+        },
+    )
+    if args.validate:
+        orch = TradingViewOrchestrator(tv_bin=args.tv_bin)
+        validation = orch.pine_validate_file(written["pine_path"])
+        written["validation"] = validation
+    out: dict[str, Any] = {"status": "ok", "generated": written}
+    _write_json(args.out, out)
+    print(json.dumps(out, indent=2, sort_keys=True))
+    return 0
+
+
+def cmd_pine_generate_screener(args: argparse.Namespace) -> int:
+    """Generate one screener Pine for the top-N market universe.
+
+    Pine has a hard cap on `request.security()` calls; the renderer
+    enforces `MAX_SCREENER_SYMBOLS` (40).
+    """
+    if args.limit > MAX_SCREENER_SYMBOLS:
+        print(
+            json.dumps(
+                {
+                    "status": "error",
+                    "reason": (
+                        f"--limit {args.limit} exceeds Pine cap "
+                        f"({MAX_SCREENER_SYMBOLS} symbols)"
+                    ),
+                }
+            ),
+            file=sys.stderr,
+        )
+        return 1
+    plan = build_tradingview_ta_machine(fetch_live=not args.offline, limit=args.limit)
+    universe = plan["watchlist"]["symbols"][: args.limit]
+    symbols: list[str] = []
+    for row in universe:
+        tv_symbol = str(row.get("tradingview_symbol") or row.get("symbol") or "").strip()
+        if tv_symbol:
+            symbols.append(tv_symbol)
+    if not symbols:
+        print(
+            json.dumps({"status": "error", "reason": "no symbols available"}),
+            file=sys.stderr,
+        )
+        return 1
+    pine = render_sapphire_screener(symbols, lookback=args.lookback)
+    name = args.name or f"Sapphire_Screener_top{len(symbols)}"
+    written = write_template(
+        name,
+        pine,
+        metadata={
+            "kind": "sapphire_screener",
+            "symbol_count": len(symbols),
+            "symbols": symbols,
+            "lookback": args.lookback,
+        },
+    )
+    if args.validate:
+        orch = TradingViewOrchestrator(tv_bin=args.tv_bin)
+        validation = orch.pine_validate_file(written["pine_path"])
+        written["validation"] = validation
+    out: dict[str, Any] = {"status": "ok", "generated": written}
+    _write_json(args.out, out)
+    print(json.dumps(out, indent=2, sort_keys=True))
+    return 0
+
+
 def cmd_pine_generate_batch(args: argparse.Namespace) -> int:
     plan = build_tradingview_ta_machine(fetch_live=not args.offline, limit=args.limit)
     universe = plan["watchlist"]["symbols"][: args.limit]
     orch = TradingViewOrchestrator(tv_bin=args.tv_bin) if args.validate else None
     generated: list[dict[str, Any]] = []
+    kind = getattr(args, "kind", "indicator")
+    if kind == "strategy":
+        renderer = render_sapphire_watch_strategy
+        kind_meta = "sapphire_watch_strategy"
+        name_prefix = "Sapphire_Strategy_"
+    else:
+        renderer = render_sapphire_watch_indicator
+        kind_meta = "sapphire_watch_indicator"
+        name_prefix = "Sapphire_Watch_"
     for row in universe:
         tv_symbol = str(row.get("tradingview_symbol") or row.get("symbol") or "").strip()
         if not tv_symbol:
             continue
-        pine = render_sapphire_watch_indicator(tv_symbol)
+        pine = renderer(tv_symbol)
         written = write_template(
-            f"Sapphire_Watch_{tv_symbol}",
+            f"{name_prefix}{tv_symbol}",
             pine,
             metadata={
-                "kind": "sapphire_watch_indicator",
+                "kind": kind_meta,
                 "tradingview_symbol": tv_symbol,
                 "rank": row.get("rank"),
                 "base_symbol": row.get("symbol"),
@@ -184,6 +277,7 @@ def cmd_pine_generate_batch(args: argparse.Namespace) -> int:
     out = {
         "status": "ok",
         "mode": "pine-generate-batch",
+        "kind": kind,
         "count": len(generated),
         "validate": bool(args.validate),
         "all_valid": all(g.get("validation_ok", True) for g in generated),
@@ -335,7 +429,53 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Run analyze + check on each generated file",
     )
+    p_pine_batch.add_argument(
+        "--kind",
+        choices=["indicator", "strategy"],
+        default="indicator",
+        help="Renderer to use: 'indicator' (alerts only) or 'strategy' (in-TV P/L)",
+    )
     p_pine_batch.set_defaults(func=cmd_pine_generate_batch)
+
+    p_pine_strategy = sub.add_parser(
+        "pine-generate-strategy",
+        help="Generate a Pine v5 strategy() (in-TV Strategy Tester) for a symbol",
+    )
+    p_pine_strategy.add_argument("symbol", help="TradingView symbol (e.g. BINANCE:ETHUSDT)")
+    p_pine_strategy.add_argument("--name", help="Template name override")
+    p_pine_strategy.add_argument(
+        "--validate",
+        action="store_true",
+        help="Run analyze + check on the generated file (no chart needed)",
+    )
+    p_pine_strategy.set_defaults(func=cmd_pine_generate_strategy)
+
+    p_pine_screener = sub.add_parser(
+        "pine-generate-screener",
+        help=(
+            "Generate one multi-symbol screener Pine for the top-N market "
+            f"universe (max {MAX_SCREENER_SYMBOLS})"
+        ),
+    )
+    p_pine_screener.add_argument(
+        "--offline", action="store_true", help="Skip live market fetches"
+    )
+    p_pine_screener.add_argument(
+        "--limit",
+        type=int,
+        default=20,
+        help=f"Symbol count (default 20, max {MAX_SCREENER_SYMBOLS})",
+    )
+    p_pine_screener.add_argument(
+        "--lookback", type=int, default=50, help="max_bars_back for the screener"
+    )
+    p_pine_screener.add_argument("--name", help="Template name override")
+    p_pine_screener.add_argument(
+        "--validate",
+        action="store_true",
+        help="Run analyze + check on the generated file",
+    )
+    p_pine_screener.set_defaults(func=cmd_pine_generate_screener)
 
     p_pine_load = sub.add_parser(
         "pine-load",
