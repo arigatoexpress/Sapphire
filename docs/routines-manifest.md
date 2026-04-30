@@ -1,6 +1,6 @@
 # Sapphire OS — Routines Manifest
 
-Last updated: 2026-04-29
+Last updated: 2026-04-30
 
 Every automated routine in the Sapphire OS mesh. Single source of truth — if a job runs on a schedule, it is listed here with its schedule, owner process, output artifact, and recovery runbook. Anything not on this list should either be added or killed.
 
@@ -41,6 +41,7 @@ Check: `launchctl list | grep sapphire` — every row should show a PID (online)
 | `com.sapphire.logrotate`           | 03:30 local daily  | `infra/logrotate.py`                        | `.gz` archives under `~/autonomy-status/logs/` and `~/.hermes/logs/` | `logrotate-runbook.md`; manual run mutates eligible logs |
 | `com.sapphire.backtest-weekly`      | Sat 22:00 local    | `python3 -m lib.analytics.run_strategies --days 90 --bankroll 10000` | `data/backtests/strategies/*.json`                                 | Remote shadow: `.github/workflows/weekly-backtest.yml`; keep local until artifacts soak clean |
 | `com.sapphire.content-engine`       | daily 06:00 local  | `python3 -m lib.content`                    | `data/content/drafts/*.json`, `data/content/ready/**/*`, `data/market_pulse/*.md` | Remote shadow: `.github/workflows/content-engine.yml`; keep local until artifacts soak clean |
+| `com.sapphire.lead-pipeline`        | Mon 09:00 local    | `python3 -m lib.intel.pipeline --run`       | `data/leads/houston_leads.jsonl` + `data/leads/geocache.json`       | Manual local check: `python3 -m lib.intel.pipeline --stats`; full run fetches public Houston sources and writes local JSONL |
 
 ## 2.1 Remote-shadow schedules
 
@@ -162,7 +163,6 @@ gcloud services enable cloudscheduler.googleapis.com --project=tho-ai-agent
 
 | Name                  | Cadence       | Script                                          | Notes |
 |-----------------------|---------------|-------------------------------------------------|-------|
-| `lead-refresh`        | Mon 09:00 CT  | `scripts/lead_refresh.sh` (not written)         | Re-collect Houston permits, score new leads |
 | `ops-report`          | 23:00 CT      | `scripts/ops_report.py` (not written)           | Daily ops summary → Telegram + `data/intelligence/YYYY-MM-DD/ops_report.md` |
 | `weekly-backup`       | Sun 04:00 CT  | `scripts/bq_export_parquet.sh` (not written)    | Export key BQ tables → `gs://sapphire-archives/parquet/<date>/` |
 

@@ -6,7 +6,7 @@ Autonomous trading + intelligence + content ops. Telegram-first, agent-driven, e
 
 ```bash
 # Test
-pytest tests/unit/ --tb=short -q           # 5,991 collected by test_inventory.py
+pytest tests/unit/ --tb=short -q           # 5,994 collected by test_inventory.py
 pytest plugins/claw-sapphire/tests/ -q     # 493 collected by test_inventory.py
 
 # Lint
@@ -80,7 +80,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 
 ## Module Map
 
-**Key counts (verified 2026-04-30 after `/showcase`):** 6,484+ collected tests (5,991+ core + 493 plugin, per `scripts/ops/test_inventory.py --check-readme`) · 50 dashboard pages · 7 quant strategies · 20 active LaunchAgents (folded in by the 2026-04-21 audit; tracked definitions remain operator-controlled; see `docs/archive/2026/audits/launchagents-audit-2026-04-21.md`) · 21 scheduled tasks · 3 smart contracts.
+**Key counts (verified 2026-04-30 after `/showcase`):** 6,487+ collected tests (5,994+ core + 493 plugin, per `scripts/ops/test_inventory.py --check-readme`) · 50 dashboard pages · 7 quant strategies · 20 active LaunchAgents (folded in by the 2026-04-21 audit; tracked definitions remain operator-controlled; see `docs/archive/2026/audits/launchagents-audit-2026-04-21.md`) · 21 scheduled tasks · 3 smart contracts.
 
 | Path | Type | Description |
 |------|------|-------------|
