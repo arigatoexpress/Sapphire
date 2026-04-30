@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+
+{% block title %}Home Leads{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+{% endblock %}
+
+{% block extra_css %}
+.leads-layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: var(--space-md);
+    min-height: 70vh;
+}
+.lead-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: var(--space-sm);
+    margin-bottom: var(--space-md);
+}
+.stat-card {
+    border: 1px solid var(--border-dim);
+    background: rgba(0, 0, 0, 0.5);
+    padding: var(--space-sm);
+    font-family: var(--font-terminal);
+}
+.stat-card .label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.stat-card .value {
+    font-size: 1.4rem;
+    color: var(--text-primary);
+    margin-top: 4px;
+}
+#lead-map {
+    height: 70vh;
+    border: 1px solid var(--border-dim);
+    background: #111;
+}
+.lead-sidebar {
+    border: 1px solid var(--border-dim);
+    background: rgba(0, 0, 0, 0.4);
+    padding: var(--space-sm);
+    overflow-y: auto;
+    max-height: 70vh;
+}
+.lead-row {
+    border-bottom: 1px dotted rgba(255, 176, 0, 0.08);
+    padding: var(--space-xs) 0;
+    cursor: pointer;
+    font-family: var(--font-terminal);
+}
+.lead-row:hover { background: rgba(255, 176, 0, 0.05); }
+.lead-row .score {
+    display: inline-block;
+    min-width: 36px;
+    text-align: right;
+    font-weight: bold;
+    margin-right: var(--space-sm);
+}
+.score-hot   { color: #ff5454; }
+.score-warm  { color: #ffb000; }
+.score-cool  { color: #ffe066; }
+.score-cold  { color: #6ec1ff; }
+.lead-row .meta {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    display: block;
+    margin-top: 2px;
+}
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-md);
+    align-items: center;
+    font-size: 0.8rem;
+}
+.controls select, .controls input, .controls button {
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid var(--border-dim);
+    color: var(--text-primary);
+    padding: 4px 8px;
+    font-family: var(--font-terminal);
+    font-size: 0.8rem;
+}
+.controls button { cursor: pointer; }
+.controls button:hover { background: rgba(255, 176, 0, 0.1); }
+.empty {
+    color: var(--text-muted);
+    padding: var(--space-md);
+    border: 1px dashed var(--border-dim);
+    text-align: center;
+}
+.popup-body {
+    font-family: var(--font-terminal);
+    font-size: 0.8rem;
+    color: #111;
+    line-height: 1.4;
+}
+.popup-body .pscore { font-size: 1.1rem; font-weight: bold; }
+{% endblock %}
+
+{% block content %}
+<section>
+    <h2>Home Leads // Houston Pipeline</h2>
+    <p style="color: var(--text-muted); font-size: 0.85rem;">
+        Sources: <code>311 CRIS</code> · <code>permits XLSX</code> · <code>Regional Intel</code>.
+        Run <code>python3 -m lib.intel.pipeline --run</code> to refresh.
+    </p>
+
+    <div class="lead-stats" id="stats-row">
+        <div class="stat-card"><div class="label">Total</div><div class="value" id="stat-total">—</div></div>
+        <div class="stat-card"><div class="label">Avg score</div><div class="value" id="stat-avg">—</div></div>
+        <div class="stat-card"><div class="label">Hot (≥80)</div><div class="value" id="stat-hot">—</div></div>
+        <div class="stat-card"><div class="label">Geocoded</div><div class="value" id="stat-geo">—</div></div>
+        <div class="stat-card"><div class="label">Sources</div><div class="value" id="stat-sources">—</div></div>
+    </div>
+
+    <div class="controls">
+        <label>Source:
+            <select id="filter-source">
+                <option value="">all</option>
+                <option value="311">311</option>
+                <option value="permit">permit</option>
+                <option value="regional_intel">regional_intel</option>
+            </select>
+        </label>
+        <label>Min score:
+            <input type="number" id="filter-score" min="0" max="100" step="5" placeholder="0" style="width: 70px;" />
+        </label>
+        <label>Urgency:
+            <select id="filter-urgency">
+                <option value="">all</option>
+                <option value="high">high</option>
+                <option value="medium">medium</option>
+                <option value="low">low</option>
+            </select>
+        </label>
+        <label>ZIP:
+            <input type="text" id="filter-zip" placeholder="77002" style="width: 80px;" />
+        </label>
+        <button id="btn-apply">Apply</button>
+        <button id="btn-score" title="POST /api/leads/score">Score unscored</button>
+    </div>
+
+    <div class="leads-layout">
+        <div id="lead-map"></div>
+        <div class="lead-sidebar" id="lead-list">
+            <div class="empty">Loading leads…</div>
+        </div>
+    </div>
+</section>
+
+<script>
+(function() {
+    const MAP_DEFAULT = [29.7604, -95.3698]; // Houston centroid
+    const map = L.map('lead-map').setView(MAP_DEFAULT, 10);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    let markers = [];
+
+    function escapeHtml(value) {
+        const el = document.createElement('span');
+        el.textContent = value == null ? '' : String(value);
+        return el.innerHTML;
+    }
+
+    function dataCoord(value) {
+        const n = Number(value);
+        return Number.isFinite(n) ? String(n) : '';
+    }
+
+    function scoreClass(s) {
+        if (s == null) return 'score-cold';
+        if (s >= 90) return 'score-hot';
+        if (s >= 75) return 'score-warm';
+        if (s >= 50) return 'score-cool';
+        return 'score-cold';
+    }
+
+    function colorFor(s) {
+        if (s == null) return '#6ec1ff';
+        if (s >= 90) return '#ff5454';
+        if (s >= 75) return '#ffb000';
+        if (s >= 50) return '#ffe066';
+        return '#6ec1ff';
+    }
+
+    function buildFilters() {
+        const params = new URLSearchParams();
+        const src = document.getElementById('filter-source').value;
+        const score = document.getElementById('filter-score').value;
+        const urg = document.getElementById('filter-urgency').value;
+        const zip = document.getElementById('filter-zip').value;
+        if (src) params.set('source', src);
+        if (score) params.set('score_min', score);
+        if (urg) params.set('urgency', urg);
+        if (zip) params.set('zip', zip);
+        return params;
+    }
+
+    async function loadStats() {
+        try {
+            const r = await fetch('/api/leads/stats');
+            const j = await r.json();
+            document.getElementById('stat-total').textContent = j.total ?? '—';
+            document.getElementById('stat-avg').textContent = j.avg_score ?? '—';
+            document.getElementById('stat-hot').textContent = j.hot_leads ?? '—';
+            document.getElementById('stat-geo').textContent = j.geocoded ?? '—';
+            const src = j.by_source || {};
+            document.getElementById('stat-sources').textContent =
+                Object.entries(src).map(function(e) { return e[0] + ':' + e[1]; }).join(' ') || '—';
+        } catch (e) {
+            console.error('stats failed', e);
+        }
+    }
+
+    async function loadMap() {
+        markers.forEach(function(m) { map.removeLayer(m); });
+        markers = [];
+        const params = buildFilters();
+        const r = await fetch('/api/leads/map?' + params.toString());
+        const geo = await r.json();
+        const pts = [];
+        (geo.features || []).forEach(function(f) {
+            const c = f.geometry.coordinates;
+            const p = f.properties;
+            const scoreText = p.score == null ? '—' : escapeHtml(p.score);
+            const marker = L.circleMarker([c[1], c[0]], {
+                radius: 7,
+                fillColor: colorFor(p.score),
+                color: '#000',
+                weight: 1,
+                fillOpacity: 0.85,
+            }).addTo(map);
+            marker.bindPopup(
+                '<div class="popup-body">' +
+                '<div class="pscore" style="color:' + colorFor(p.score) + '">' +
+                    'Score: ' + scoreText + '</div>' +
+                '<div><strong>' + escapeHtml(p.address) + '</strong></div>' +
+                '<div>' + escapeHtml(p.type) + ' · ' + escapeHtml(p.source) + '</div>' +
+                '<div>' + escapeHtml(p.description) + '</div>' +
+                (p.score_reason ? '<div><em>' + escapeHtml(p.score_reason) + '</em></div>' : '') +
+                (p.urgency ? '<div>Urgency: ' + escapeHtml(p.urgency) + '</div>' : '') +
+                '</div>'
+            );
+            markers.push(marker);
+            pts.push([c[1], c[0]]);
+        });
+        if (pts.length) {
+            map.fitBounds(L.latLngBounds(pts).pad(0.1), { maxZoom: 12 });
+        }
+    }
+
+    async function loadList() {
+        const params = buildFilters();
+        params.set('limit', '200');
+        const r = await fetch('/api/leads?' + params.toString());
+        const j = await r.json();
+        const list = document.getElementById('lead-list');
+        const leads = j.leads || [];
+        if (!leads.length) {
+            list.innerHTML = '<div class="empty">No leads match filters. Run <code>python3 -m lib.intel.pipeline --run</code>.</div>';
+            return;
+        }
+        list.innerHTML = leads.map(function(l) {
+            const s = l.score == null ? '—' : escapeHtml(l.score);
+            return '<div class="lead-row" data-lat="' + dataCoord(l.lat) + '" data-lng="' + dataCoord(l.lng) + '">' +
+                '<span class="score ' + scoreClass(l.score) + '">' + s + '</span>' +
+                '<span>' + escapeHtml(l.type || '(untyped)') + '</span>' +
+                '<span class="meta">' + escapeHtml(l.address) + ' · ' + escapeHtml(l.source) +
+                (l.urgency ? ' · ' + escapeHtml(l.urgency) : '') + '</span>' +
+                '</div>';
+        }).join('');
+        list.querySelectorAll('.lead-row').forEach(function(row) {
+            row.addEventListener('click', function() {
+                const lat = parseFloat(row.dataset.lat);
+                const lng = parseFloat(row.dataset.lng);
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    map.setView([lat, lng], 14);
+                }
+            });
+        });
+    }
+
+    async function refresh() {
+        await Promise.all([loadStats(), loadMap(), loadList()]);
+    }
+
+    document.getElementById('btn-apply').addEventListener('click', refresh);
+    document.getElementById('btn-score').addEventListener('click', async function() {
+        this.disabled = true;
+        this.textContent = 'Scoring…';
+        try {
+            const r = await fetch('/api/leads/score', { method: 'POST' });
+            const j = await r.json();
+            this.textContent = 'Scored ' + (j.scored || 0);
+            await refresh();
+        } catch (e) {
+            this.textContent = 'Score failed';
+            console.error(e);
+        }
+        setTimeout(function() {
+            const btn = document.getElementById('btn-score');
+            btn.disabled = false;
+            btn.textContent = 'Score unscored';
+        }, 4000);
+    });
+
+    refresh();
+})();
+</script>
+{% endblock %}

@@ -4195,6 +4195,136 @@ def intel_page():
     return render_template("pages/intel.html", current_page="intel", page_title="Intel")
 
 
+@app.route("/intel/leads")
+@requires_auth
+def intel_leads_page():
+    """Houston home-lead pipeline — Leaflet map + ranked sidebar."""
+    return render_template(
+        "pages/intel_leads.html",
+        current_page="intel-leads",
+        page_title="Home Leads",
+    )
+
+
+def _filter_leads(leads, *, score_min=None, source=None, zip_code=None, urgency=None):
+    out = []
+    for lead in leads:
+        if score_min is not None:
+            s = lead.get("score")
+            if not isinstance(s, (int, float)) or s < score_min:
+                continue
+        if source and lead.get("source") != source:
+            continue
+        if zip_code and str(lead.get("zip", "")).strip() != str(zip_code).strip():
+            continue
+        if urgency and lead.get("urgency") != urgency:
+            continue
+        out.append(lead)
+    return out
+
+
+@app.route("/api/leads")
+@requires_auth
+def api_leads():
+    """Paginated lead list. Filters: score_min, source, zip, urgency, limit, offset."""
+    try:
+        from lib.intel.houston_leads import load_leads
+    except Exception as e:
+        return jsonify({"error": f"lead module unavailable: {e}"}), 500
+
+    leads = load_leads()
+    score_min = request.args.get("score_min", type=float)
+    source = request.args.get("source")
+    zip_code = request.args.get("zip")
+    urgency = request.args.get("urgency")
+    limit = request.args.get("limit", default=100, type=int)
+    offset = request.args.get("offset", default=0, type=int)
+
+    filtered = _filter_leads(
+        leads,
+        score_min=score_min,
+        source=source,
+        zip_code=zip_code,
+        urgency=urgency,
+    )
+    # Newest scored, highest scoring first; fall back to ingestion order.
+    filtered.sort(
+        key=lambda l: (l.get("score") or -1, l.get("ingested_at") or ""),
+        reverse=True,
+    )
+    page = filtered[offset : offset + limit]
+    return jsonify(
+        {
+            "total": len(filtered),
+            "limit": limit,
+            "offset": offset,
+            "leads": page,
+        }
+    )
+
+
+@app.route("/api/leads/map")
+@requires_auth
+def api_leads_map():
+    """GeoJSON FeatureCollection for the map page (geocoded leads only)."""
+    try:
+        from lib.intel.houston_leads import load_leads
+    except Exception as e:
+        return jsonify({"error": f"lead module unavailable: {e}"}), 500
+
+    score_min = request.args.get("score_min", type=float)
+    source = request.args.get("source")
+    leads = _filter_leads(load_leads(), score_min=score_min, source=source)
+
+    features = []
+    for lead in leads:
+        lat, lng = lead.get("lat"), lead.get("lng")
+        if lat is None or lng is None:
+            continue
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": {"type": "Point", "coordinates": [float(lng), float(lat)]},
+                "properties": {
+                    "id": lead.get("id"),
+                    "address": lead.get("address"),
+                    "type": lead.get("type"),
+                    "source": lead.get("source"),
+                    "score": lead.get("score"),
+                    "score_reason": lead.get("score_reason"),
+                    "urgency": lead.get("urgency"),
+                    "description": lead.get("description"),
+                    "created_at": lead.get("created_at"),
+                },
+            }
+        )
+    return jsonify({"type": "FeatureCollection", "features": features})
+
+
+@app.route("/api/leads/stats")
+@requires_auth
+def api_leads_stats():
+    try:
+        from lib.intel.pipeline import stats as lead_stats
+    except Exception as e:
+        return jsonify({"error": f"lead module unavailable: {e}"}), 500
+    return jsonify(lead_stats())
+
+
+@app.route("/api/leads/score", methods=["POST"])
+@requires_auth
+def api_leads_score():
+    """Score every unscored lead in the JSONL store. Returns the count."""
+    try:
+        from lib.intel.lead_scorer import score_unscored
+    except Exception as e:
+        return jsonify({"error": f"lead module unavailable: {e}"}), 500
+    payload = request.get_json(silent=True) or {}
+    limit = payload.get("limit")
+    n = score_unscored(limit=limit if isinstance(limit, int) else None)
+    return jsonify({"scored": n})
+
+
 @app.route("/investment-intel")
 @requires_auth
 def investment_intel_page():

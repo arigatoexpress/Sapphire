@@ -6,8 +6,8 @@ Autonomous trading + intelligence + content ops. Telegram-first, agent-driven, e
 
 ```bash
 # Test
-pytest tests/unit/ --tb=short -q           # 5,740 collected by test_inventory.py
-pytest plugins/claw-sapphire/tests/ -q     # 490 collected by test_inventory.py
+pytest tests/unit/ --tb=short -q           # 5,991 collected by test_inventory.py
+pytest plugins/claw-sapphire/tests/ -q     # 493 collected by test_inventory.py
 
 # Lint
 ruff check .                          # pyproject.toml rules (E501 ignored)
@@ -80,7 +80,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 
 ## Module Map
 
-**Key counts (verified 2026-04-30 after `/showcase`):** 6,449+ collected tests (5,956+ core + 493 plugin, per `scripts/ops/test_inventory.py --check-readme`) · 49 dashboard pages · 7 quant strategies · 20 LaunchAgents (folded in by the 2026-04-21 audit; see `docs/archive/2026/audits/launchagents-audit-2026-04-21.md`) · 21 scheduled tasks · 3 smart contracts.
+**Key counts (verified 2026-04-30 after `/showcase`):** 6,484+ collected tests (5,991+ core + 493 plugin, per `scripts/ops/test_inventory.py --check-readme`) · 50 dashboard pages · 7 quant strategies · 20 active LaunchAgents (folded in by the 2026-04-21 audit; tracked definitions remain operator-controlled; see `docs/archive/2026/audits/launchagents-audit-2026-04-21.md`) · 21 scheduled tasks · 3 smart contracts.
 
 | Path | Type | Description |
 |------|------|-------------|
@@ -100,7 +100,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `services/analytics_dashboard/` | service | Analytics-focused dashboard variant. |
 | `services/aster/` | service | Aster DEX bot — Solana perps (paused). |
 | `services/control-plane/` | service | PM hub: projects, tasks, events, Kimi bridge [Mac:8082]. |
-| `services/dashboard/` | service | Flask dashboard [Mac:8080] — 49 pages including the unified `/showcase`, SSE event stream, performance + forecast + backtest endpoints. |
+| `services/dashboard/` | service | Flask dashboard [Mac:8080] — 50 pages including the unified `/showcase`, SSE event stream, lead-intel, performance + forecast + backtest endpoints. |
 | `services/foundry_sync/` | service | Scheduled Foundry sync daemon — wraps `lib/foundry/sync.py`. |
 | `services/heartbeat/` | service | Heartbeat daemon wrapper (`run.py`, `heartbeat.py`). |
 | `services/hyperliquid/` | service | Hyperliquid L1 bot — public-feed signal subscriber + live-trading executor (`hyperliquid_bot/risk.py`, hard caps: $5/order, 3x lev, 5 positions, $25/day loss, file-killswitch). Mainnet refused until EIP-712 signing is verified on testnet (`policy.signing_verified=False`). |

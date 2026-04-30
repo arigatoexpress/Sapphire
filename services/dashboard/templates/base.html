@@ -981,6 +981,7 @@
 
         {% block extra_css %}{% endblock %}
     </style>
+    {% block extra_head %}{% endblock %}
 </head>
 <body>
     <div class="app">
@@ -1023,6 +1024,7 @@
                 <a href="/cross-asset" class="nav-item {% if current_page == 'cross-asset' %}active{% endif %}">Cross Asset</a>
                 <a href="/sovereign-thesis" class="nav-item {% if current_page == 'sovereign-thesis' %}active{% endif %}">Thesis</a>
                 <a href="/intel" class="nav-item {% if current_page == 'intel' %}active{% endif %}">Regional</a>
+                <a href="/intel/leads" class="nav-item {% if current_page == 'intel-leads' %}active{% endif %}">Home Leads</a>
             </div>
             <div class="nav-group">
                 <span class="nav-group-label">Chain</span>
