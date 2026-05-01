@@ -2,6 +2,8 @@
 
 Wave A: ``aave_v3`` only.
 Wave B step 1: ``kumbaya`` (UniswapV3-fork DEX-spot).
+Wave B step 2: ``usdm`` (native stable + LayerZero OFT) +
+    ``peg_monitor`` (severity classifier / circuit-breaker primitive).
 
 All wrappers compose with the ``MegaETHClient`` from
 ``plugins.claw_sapphire.tools.internal.megaeth`` (PR #529) — they never
