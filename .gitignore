@@ -75,6 +75,7 @@ data/.gcp_sync_state.json
 data/.watchdog_state.json
 data/foundry/
 data/google/
+data/hackathon/
 data/media/
 data/readiness/
 data/*.envelope.json
