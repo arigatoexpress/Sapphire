@@ -242,3 +242,134 @@ Composition: each intent function fans out across the contracts/ wrappers, retur
 - **PR #527 (`megaeth_executor.py` scaffold)** is the only writer. Wave C wires `protocols.swap()`, `protocols.supply()`, `protocols.create_perp_order()` to call into the executor's `_sign_and_send()` path. **Until then, every public function in `protocols.py` is read-only.** A defense-in-depth assertion in the facade rejects any request with `dry_run=False` while `policy.signing_verified is False`.
 - **PR #528 (docs + integration test harness)** — the new `docs/integrations/megaeth-protocol-map.md` (this file) cross-links to `docs/integrations/megaeth.md`. The `tests/integration/megaeth/` harness gains a `test_registry_addresses_have_code` check (gated by `SAPPHIRE_MEGAETH_INTEGRATION=1`) once Wave A registers anything.
 
+
+---
+
+## 4. ABI fetching and caching strategy
+
+### 4.1 Source priority
+
+For each protocol target, fetch ABI in this order, take the first that succeeds:
+
+1. **Blockscout v2 API** — `GET https://megaeth.blockscout.com/api/v2/smart-contracts/{address}` returns `{ "abi": [...], "verified_at": "2026-04-30T...", "compiler_version": "v0.8.20", "is_proxy": bool, "implementations": [...] }`. The verified-contracts feed is the single most reliable source on this chain — every Aave V3, GMX V2, Silo, Kumbaya, USDM, Diamond facet that is verified, lives here. Field shape is documented at [`blockscout.github.io/api`](https://blockscout.github.io/api/).
+2. **Project Github / npm** — for Kumbaya (`@kumbaya_xyz/swap-router-contracts`), GMX (`gmx-io/gmx-synthetics`), Aave (`aave-dao/aave-v3-origin`), Optimism (`ethereum-optimism/optimism`). Pin to a commit SHA in `lib/chains/megaeth/abis/<protocol>/SOURCE`.
+3. **Manual** — only for World Markets (closed source) and any protocol whose verified bytecode is on chain but ABI isn't anywhere else. Manual ABIs go in `abis/<protocol>/_manual/` with a README explaining the source.
+
+### 4.2 Versioning + proxy-upgrade defense
+
+The risk: an ERC-1967 / TransparentUpgradeable proxy gets its implementation swapped, the ABI we cached is now stale, our wrappers silently call functions that don't exist or behave differently.
+
+Defense:
+
+1. Pin every ABI by `(chain_id=4326, address, blockscout_verified_at, implementation_address)` — implementation is read once at fetch time via `_call("eth_call", [PROXY, "5c60da1b..."])` (the EIP-1967 implementation slot) for proxies, captured in a sidecar file `<name>.meta.json`:
+
+```json
+{
+  "chain_id": 4326,
+  "proxy_address": "0x46Dcd5F4600319b02649Fd76B55aA6c1035CA478",
+  "implementation_address": "0xc74c6a98593214934e6F9C88C43c3A696C44da4D",
+  "blockscout_verified_at": "2026-04-29T22:17:30.581188Z",
+  "compiler_version": "v0.8.20+commit.a1b79de6",
+  "is_proxy": true,
+  "fetched_at": "2026-04-30T...",
+  "abi_hash_sha256": "..."
+}
+```
+
+2. **Refresh policy**: at startup, the registry's `verify()` method re-reads the EIP-1967 implementation slot for each proxy entry and asserts it matches the cached `implementation_address`. Mismatch → refuse to instantiate that protocol's wrapper, emit `chain.abi.upgrade_detected` event.
+
+3. **CI guard**: a new test `tests/unit/test_megaeth_abi_freshness.py` runs in CI (network-gated, only fires when `SAPPHIRE_MEGAETH_INTEGRATION=1`) and asserts every registered ABI's `implementation_address` matches the live chain. Drifts surface in nightly CI rather than at runtime.
+
+### 4.3 Storage layout
+
+```
+lib/chains/megaeth/abis/
+  fetcher.py              # Blockscout v2 fetch + cache
+  aave_v3/
+    Pool.json
+    Pool.meta.json
+    Oracle.json
+    Oracle.meta.json
+    SOURCE                # Plain text: "aave-dao/aave-address-book@<sha> + Blockscout"
+  kumbaya/
+    SwapRouter02.json
+    SwapRouter02.meta.json
+    QuoterV2.json
+    QuoterV2.meta.json
+    UniswapV3Pool.json    # generic pool ABI shared across all Kumbaya pools
+  gmx/
+    Reader.json + .meta.json
+    ExchangeRouter.json + .meta.json
+    EventEmitter.json + .meta.json
+  ...
+```
+
+Files are checked into git. The fetcher is idempotent: running `python3 -m lib.chains.megaeth.abis.fetcher --refresh` re-pulls everything and emits a diff. CI fails the PR if anyone hand-edits an ABI file (hash mismatch with `--verify`).
+
+### 4.4 Refresh cadence
+
+- **Manual** (default): operator runs `--refresh` when they bump a protocol.
+- **Weekly CI**: a new lightweight job `.github/workflows/megaeth-abi-drift.yml` (gated, network-allowed) runs `--check` and opens an issue if any implementation slot has rotated.
+- **Pre-deploy**: every Wave-A/B/C build PR runs `--verify` as part of `make megaeth` to ensure the ABI tree is consistent with HEAD.
+
+---
+
+## 5. Phased build plan
+
+Each wave is a discrete set of PRs with concrete file paths, test targets, and dependencies. All three waves carry `[skip ci]` on docs commits and full CI on code commits.
+
+### Wave A — this week (read-only foundation, no agent surface)
+
+**Goal:** registry + ABI fetcher + typed wrapper for the top-1 protocol (Aave V3, $392M TVL) + read-only intent facade. Aave first because (a) 80% of chain TVL, (b) canonical addresses already authoritatively sourced from `aave-dao/aave-address-book/AaveV3MegaEth.sol`, (c) ABIs are well-known and stable, (d) the read surface (`UI_POOL_DATA_PROVIDER.getReservesData()`) gives Sapphire instant on-chain-fundamentals visibility.
+
+| PR | Title | Files added | Tests | Risk |
+|---|---|---|---|---|
+| A-1 | `feat(megaeth): chains package skeleton + ABI fetcher` | `lib/chains/__init__.py`, `lib/chains/megaeth/__init__.py`, `lib/chains/megaeth/registry.py`, `lib/chains/megaeth/abis/fetcher.py`, `lib/chains/megaeth/abis/SOURCE`, `tests/unit/test_megaeth_registry.py` | 12+ | low (no network in unit tests; fetcher uses injected client) |
+| A-2 | `feat(megaeth): Aave V3 typed wrapper + reserve reads` | `lib/chains/megaeth/contracts/aave_v3.py`, `lib/chains/megaeth/abis/aave_v3/Pool.json` (+ `.meta.json`), `lib/chains/megaeth/abis/aave_v3/Oracle.json` (+ `.meta.json`), `lib/chains/megaeth/abis/aave_v3/UiPoolDataProvider.json`, `tests/unit/test_megaeth_aave_v3.py` | 18+ | low |
+| A-3 | `feat(megaeth): Chainlink-style oracle wrapper` | `lib/chains/megaeth/contracts/oracle.py`, `lib/chains/megaeth/abis/oracle/EACAggregatorProxy.json`, `tests/unit/test_megaeth_oracle.py` | 8+ | low |
+| A-4 | `feat(megaeth): protocols.py — supply_apy, stable_health intents` | `lib/chains/megaeth/protocols.py`, `tests/unit/test_megaeth_protocols.py` | 10+ | low |
+| A-5 | `docs(megaeth): wave-A integration test fixture` | `tests/integration/megaeth/test_aave_reads.py` (gated by `SAPPHIRE_MEGAETH_INTEGRATION=1`) | 3+ | low |
+
+Total Wave A: ~5 PRs, ~50 tests, all read-only, no agent-facing tool yet, no executor changes.
+
+Dependencies: PR #529 (`MegaETHClient`) merged first; PR #527 (executor scaffold) untouched.
+
+### Wave B — next week (broaden coverage + agent surface)
+
+**Goal:** wrappers for top-3 protocols + indexer adapter + agent-facing plugin tool exposing `list/quote/inspect` intents.
+
+| PR | Title | Files added | Tests | Risk |
+|---|---|---|---|---|
+| B-1 | `feat(megaeth): Kumbaya UniV3 wrapper + quote intent` | `lib/chains/megaeth/contracts/kumbaya.py`, `abis/kumbaya/{SwapRouter02,QuoterV2,UniswapV3Pool,NonfungiblePositionManager}.json` + meta, `tests/unit/test_megaeth_kumbaya.py` | 25+ | low |
+| B-2 | `feat(megaeth): GMX V2 read wrapper (Reader + EventEmitter)` | `lib/chains/megaeth/contracts/gmx_v2.py`, `abis/gmx/{Reader,ExchangeRouter,DataStore,EventEmitter,OrderHandler}.json` + meta, `tests/unit/test_megaeth_gmx_v2.py` | 25+ | medium (130-contract diamond — picking the right read surface matters) |
+| B-3 | `feat(megaeth): USDM stable health module + bridge predeploys` | `lib/chains/megaeth/contracts/usdm.py`, `lib/chains/megaeth/contracts/rabbithole_bridge.py`, `abis/usdm/{Minter_v2,StabilityPool_v2,ReservePool_v1}.json` + meta, `abis/bridge/{L2ToL1MessagePasser,L2StandardBridge}.json` | 15+ | low |
+| B-4 | `feat(megaeth): indexer adapter (eth_getLogs backend)` | `lib/chains/megaeth/indexer.py`, `tests/unit/test_megaeth_indexer.py` | 12+ | low |
+| B-5 | `feat(megaeth): agent-facing megaeth_protocols plugin tool` | `plugins/claw-sapphire/tools/megaeth_protocols.py` (shim), `plugins/claw-sapphire/tools/internal/megaeth_protocols.py` (real impl), `plugins/claw-sapphire/tests/test_megaeth_protocols_tool.py`, `infra/tool-registry.yaml` (new entry, `status: internal`) | 18+ | low |
+| B-6 | `feat(megaeth): dashboard /megaeth panel + 4 read endpoints` | `services/dashboard/templates/megaeth.html`, route handlers, `tests/unit/test_dashboard_megaeth.py` | 8+ | low |
+
+Total Wave B: ~6 PRs, ~100 tests, agent gets read-only `megaeth_protocols` tool, dashboard gets a panel. **Still no signing, no executor wire-up.**
+
+Dependencies: Wave A merged. Wave B-5 is the first agent-facing surface — it must be `status: internal` in the registry (matching the precedent set by PR #529's `megaeth` tool entry; the LLM only sees the lean 5-tool subset in `agent-manifest.yaml`).
+
+### Wave C — after activation gates flip (write paths)
+
+**Goal:** swap, supply, withdraw, perp-create — all behind the same fail-closed stack `services/hyperliquid/src/hyperliquid_bot/risk.py` uses, mirrored into `megaeth_executor`.
+
+**Hard preconditions** (every one is a code-edit gate, no env-var-only flips):
+
+1. PR #527 `megaeth_executor.py:65` — `MAINNET_CHAIN_ID` set from `None` → `4326`. **Paired-review item with #2.**
+2. PR #527 `megaeth_executor.py:93` — `signing_verified: bool = False` → `True`. Only after EIP-712 / standard-tx signing has been verified end-to-end with `python3 scripts/ops/verify_megaeth_signing.py --testnet-order` (script does not yet exist; ships in C-1 below).
+3. Existing per-order $5 cap, $25/day loss cap, killswitch file `~/.sapphire/megaeth_trading_pause` left at defaults — same posture as Hyperliquid + Robinhood live capital.
+
+| PR | Title | Files added/changed | Tests | Risk |
+|---|---|---|---|---|
+| C-1 | `feat(megaeth): signing verification harness + script` | `lib/chains/megaeth/signing.py`, `scripts/ops/verify_megaeth_signing.py`, `tests/unit/test_megaeth_signing.py` | 20+ | medium |
+| C-2 | `feat(megaeth): Aave V3 supply/borrow write path through executor` | `lib/chains/megaeth/contracts/aave_v3.py` (add `build_supply_tx`, `build_borrow_tx`), `plugins/claw-sapphire/tools/internal/megaeth_executor.py` (wire intents), `tests/plugins/test_megaeth_executor_aave.py` | 25+ | high |
+| C-3 | `feat(megaeth): Kumbaya swap write path` | `lib/chains/megaeth/contracts/kumbaya.py` (add `build_swap_tx`), executor wiring, `tests/plugins/test_megaeth_executor_swap.py` | 20+ | high |
+| C-4 | `feat(megaeth): GMX V2 perp create-order write path` | `lib/chains/megaeth/contracts/gmx_v2.py` (add `build_create_order_tx`), executor wiring, `tests/plugins/test_megaeth_executor_perp.py` | 25+ | high |
+| C-5 | `ops(megaeth): runbook + activation checklist` | `docs/ops/megaeth-live-trading-runbook.md` (mirrors `docs/ops/hyperliquid-live-trading-runbook.md`) | 0 | low |
+
+Total Wave C: ~5 PRs, ~90 tests, **paper-only until the dual code-edit gates are flipped**. PR #527's existing 7-gate stack carries forward — Wave C just adds the wrappers behind it.
+
+Risk distribution: A=low, B=low/medium, C=high. Wave C does **not** ship until Hyperliquid mainnet (parallel safety-equivalent) has run clean for ≥30 days at the $5/order cap with `signing_verified=True`.
+
