@@ -14,9 +14,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 from .config import IngestConfig, LogFilter, killswitch_active
 from .forwarder import EventForwarder
@@ -32,8 +33,7 @@ logger = logging.getLogger(__name__)
 class WsConnector(Protocol):
     """Protocol matching ``websockets.connect`` for testability."""
 
-    def __call__(self, url: str, **kwargs: Any) -> Any:
-        ...
+    def __call__(self, url: str, **kwargs: Any) -> Any: ...
 
 
 @dataclass
@@ -160,7 +160,11 @@ class MegaEthWsClient:
         while not self._stop_requested:
             iterations += 1
             if max_iterations is not None and iterations > max_iterations:
-                return {"status": "stopped", "reason": "max_iterations", "iterations": iterations - 1}
+                return {
+                    "status": "stopped",
+                    "reason": "max_iterations",
+                    "iterations": iterations - 1,
+                }
 
             self.stats.connect_attempts += 1
             try:

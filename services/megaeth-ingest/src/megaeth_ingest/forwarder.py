@@ -46,7 +46,7 @@ class EventForwarder:
     webhook_secret: str = ""
     queue_max: int = 4096
     forwarding_enabled: bool = False
-    paused_provider: "PausedProvider | None" = None
+    paused_provider: PausedProvider | None = None
     stats: ForwarderStats = field(default_factory=ForwarderStats)
     _queue: asyncio.Queue[dict[str, Any]] = field(init=False)
     _worker_task: asyncio.Task[None] | None = field(default=None, init=False)
@@ -110,7 +110,7 @@ class EventForwarder:
         """Wait until the queue is empty or timeout elapses (testing helper)."""
         try:
             await asyncio.wait_for(self._queue.join(), timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return
 
     async def _run_worker(self) -> None:
@@ -148,5 +148,4 @@ class EventForwarder:
 class PausedProvider(Protocol):
     """Returns True when forwarding should be suspended."""
 
-    def is_paused(self) -> bool:
-        ...
+    def is_paused(self) -> bool: ...

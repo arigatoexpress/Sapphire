@@ -43,7 +43,7 @@ class AiohttpPoster:
         self._timeout = aiohttp.ClientTimeout(total=timeout_sec)
         self._session: aiohttp.ClientSession | None = None
 
-    async def __aenter__(self) -> "AiohttpPoster":
+    async def __aenter__(self) -> AiohttpPoster:
         self._session = aiohttp.ClientSession(timeout=self._timeout)
         return self
 
@@ -124,7 +124,7 @@ async def run_service(config: IngestConfig | None = None) -> None:
         if not ws_task.done():
             try:
                 await asyncio.wait_for(ws_task, timeout=2.0)
-            except (asyncio.TimeoutError, Exception):
+            except (TimeoutError, Exception):
                 ws_task.cancel()
         await forwarder.stop()
         await runner.cleanup()
