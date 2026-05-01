@@ -580,3 +580,22 @@ tools:
   # New Tranche 7 tool entries should be appended below this divider so the
   # parallel-merge wave does not collide with prior-tranche tails. Bump the
   # divider to ``Tranche 8 reserved`` once Tranche 7 closes out.
+
+  # 0G hackathon integration (Track 2: Verifiable Finance) — Tranche 7
+  - name: og_publish
+    path: plugins/claw-sapphire/tools/og_publish.py
+    status: registered
+    agent_facing: true
+    owner: sapphire
+    consumers: [services.alpha.signal_logger, scheduled-tasks.kronos-daily, hermes-agent.trading]
+    description: |
+      Publish a Sapphire trading signal to 0G Storage and anchor its merkle root on 0G Chain via SapphireSignalVerifier.publishSignal. Inert unless SAPPHIRE_OG_ENABLED=1 and OG_PRIVATE_KEY is set. Returns {root_hash, storage_tx, anchor.{signal_id, tx_hash, explorer_url}}.
+
+  - name: og_verify
+    path: plugins/claw-sapphire/tools/og_verify.py
+    status: registered
+    agent_facing: true
+    owner: sapphire
+    consumers: [services.dashboard, hermes-agent.trading, audit]
+    description: |
+      Verify a previously-published Sapphire signal against 0G state. Reads the on-chain entry from SapphireSignalVerifier, downloads the blob from 0G Storage with merkle proof verification, and surfaces the TEE attestation chatID for off-chain re-verification. Read-only — no key required.

@@ -156,6 +156,13 @@ async def receive_signal(request: Request):
     with open(EVENTS_PATH, "a") as f:
         f.write(json.dumps(event) + "\n")
 
+    # 0G publish (fire-and-forget, gated by SAPPHIRE_OG_ENABLED).
+    # Never blocks or raises; see lib/og/hooks.py.
+    with contextlib.suppress(Exception):
+        from lib.og.hooks import publish_signal_async
+
+        publish_signal_async(signal)
+
     # ── Signal Pipeline (scoring + routing + confirmation firewall) ─────────
     pipeline_result = None
     if _PIPELINE_AVAILABLE:
