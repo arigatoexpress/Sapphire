@@ -79,7 +79,7 @@ def equity_quote(symbol: str, provider: str = "yfinance") -> MarketQuote | dict:
     r = results[0]
     return MarketQuote(
         symbol=r.get("symbol", symbol),
-        price=r.get("last_price", 0),
+        price=r.get("last_price") or r.get("prev_close") or r.get("close") or r.get("regular_market_previous_close") or 0,
         open=r.get("open", 0),
         high=r.get("high", 0),
         low=r.get("low", 0),
