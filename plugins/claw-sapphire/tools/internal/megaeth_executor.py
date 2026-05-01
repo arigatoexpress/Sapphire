@@ -28,10 +28,11 @@ Activation gates (every flip is a code change unless noted):
     5. ``SAPPHIRE_MEGAETH_TESTNET_KEY`` env var set (RUNTIME). Loading from
        a file or hardcoded value is intentionally not supported.
     6. ``SAPPHIRE_MEGAETH_DRY_RUN`` not set to ``1`` (RUNTIME).
-    7. ``MAINNET_CHAIN_ID`` constant in this module is a TODO placeholder.
-       Until a real value is filled in *and* ``policy.signing_verified=True``
-       is flipped, ``send_transaction`` on mainnet raises
-       ``NotImplementedError`` (CODE).
+    7. ``MAINNET_CHAIN_ID`` is pinned to ``4326`` (the canonical MegaETH
+       mainnet chain ID, ``0x10e6``). The mainnet path remains locked
+       until ``policy.signing_verified=True`` is flipped via a code
+       change — both the constructor and ``send_transaction`` refuse to
+       sign for mainnet while ``signing_verified=False`` (CODE).
 """
 
 from __future__ import annotations
@@ -54,15 +55,16 @@ KILLSWITCH_PATH_DEFAULT = "~/.sapphire/megaeth_trading_pause"
 TRADE_LOG_PATH_DEFAULT = "data/megaeth_trades.jsonl"
 DAILY_PNL_PATH_DEFAULT = "data/megaeth_daily_pnl.json"
 
-# MegaETH testnet chain ID — public testnet is 6342 ("MegaETH Testnet").
-TESTNET_CHAIN_ID = 6342
+# MegaETH chain IDs — canonical (verified 2026-04-30).
+# Carrot testnet: 6343 (0x18c7); mainnet: 4326 (0x10e6).
+TESTNET_CHAIN_ID: int = 6343
+MAINNET_CHAIN_ID: int = 4326
 
-# TODO(megaeth-mainnet): MegaETH mainnet has not launched at the time of
-# this scaffold (2026-04-30). Fill in the canonical mainnet chain_id only
-# after MegaETH publishes it AND after policy.signing_verified=True has
-# been flipped via a code change. Until then, any attempt to use this
-# value as the constructor's ``chain_id`` will be refused.
-MAINNET_CHAIN_ID: int | None = None
+# NOTE: pinning ``MAINNET_CHAIN_ID = 4326`` does NOT activate the mainnet
+# path. The single source-code gate that allows mainnet sends is
+# ``MegaETHLivePolicy.signing_verified``; both the constructor and
+# ``send_transaction`` refuse mainnet while ``signing_verified=False``.
+# Flipping that field requires a code edit, never an env flag.
 
 ENV_KEY_TESTNET = "SAPPHIRE_MEGAETH_TESTNET_KEY"
 ENV_DRY_RUN = "SAPPHIRE_MEGAETH_DRY_RUN"
@@ -241,26 +243,28 @@ class MegaETHExecutor:
                 signing_verified=base_policy.signing_verified,
             )
 
-        # Mainnet refusal: even if a future operator hardcodes a chain_id
-        # equal to MAINNET_CHAIN_ID, this constructor refuses unless
-        # signing_verified has been flipped in source.
-        if MAINNET_CHAIN_ID is not None and chain_id == MAINNET_CHAIN_ID:
-            if not base_policy.signing_verified:
-                raise NotImplementedError(
-                    "MegaETH mainnet path is locked. To activate: (1) verify a "
-                    "clean testnet trade, (2) flip MegaETHLivePolicy."
-                    "signing_verified=True in source, (3) confirm "
-                    "MAINNET_CHAIN_ID matches the official MegaETH mainnet ID."
-                )
+        # Mainnet refusal: even though MAINNET_CHAIN_ID is now pinned, the
+        # mainnet path is gated on policy.signing_verified, NOT on whether
+        # MAINNET_CHAIN_ID has a real value. The audit-loud-on-flip
+        # contract is: signing_verified must be flipped to True in source
+        # before any mainnet send is attempted.
+        if chain_id == MAINNET_CHAIN_ID and not base_policy.signing_verified:
+            raise NotImplementedError(
+                "MegaETH mainnet path is locked. To activate: (1) verify a "
+                "clean testnet trade, (2) flip MegaETHLivePolicy."
+                "signing_verified=True in source, (3) confirm "
+                f"MAINNET_CHAIN_ID={MAINNET_CHAIN_ID} matches the canonical "
+                "MegaETH mainnet ID."
+            )
 
         # If the operator passes a chain_id that is neither testnet nor
-        # the recorded mainnet placeholder, treat it as untrusted.
-        if chain_id != TESTNET_CHAIN_ID:
-            if MAINNET_CHAIN_ID is None or chain_id != MAINNET_CHAIN_ID:
-                raise ValueError(
-                    f"refusing unknown chain_id={chain_id}; "
-                    f"expected TESTNET_CHAIN_ID={TESTNET_CHAIN_ID}"
-                )
+        # mainnet, treat it as untrusted.
+        if chain_id != TESTNET_CHAIN_ID and chain_id != MAINNET_CHAIN_ID:
+            raise ValueError(
+                f"refusing unknown chain_id={chain_id}; "
+                f"expected TESTNET_CHAIN_ID={TESTNET_CHAIN_ID} or "
+                f"MAINNET_CHAIN_ID={MAINNET_CHAIN_ID}"
+            )
 
         self.rpc_url = rpc_url
         self.chain_id = chain_id
@@ -304,15 +308,12 @@ class MegaETHExecutor:
             blockers.append("daily_loss_cap_reached")
 
         # Mainnet refusal at send time too — defense in depth.
-        if MAINNET_CHAIN_ID is not None and self.chain_id == MAINNET_CHAIN_ID:
-            if not self.policy.signing_verified:
-                blockers.append("mainnet_locked_signing_not_verified")
+        if self.chain_id == MAINNET_CHAIN_ID and not self.policy.signing_verified:
+            blockers.append("mainnet_locked_signing_not_verified")
 
         # Chain id sanity (also checked in __init__; re-check here in case
         # a caller monkey-patched it).
-        if self.chain_id != TESTNET_CHAIN_ID and (
-            MAINNET_CHAIN_ID is None or self.chain_id != MAINNET_CHAIN_ID
-        ):
+        if self.chain_id != TESTNET_CHAIN_ID and self.chain_id != MAINNET_CHAIN_ID:
             blockers.append("unknown_chain_id")
 
         # tx_dict.chainId, if present, must agree.

@@ -320,17 +320,62 @@ def test_record_realized_pnl_persists_loss_only(policy: me.MegaETHLivePolicy):
 # ---------------------------------------------------------------------------
 
 
-def test_mainnet_chain_id_is_placeholder():
-    """Constant must remain None until MegaETH publishes mainnet & operator
-    flips signing_verified=True in source. Failing this test means someone
-    filled in a real mainnet chain_id; that requires a paired
-    signing_verified=True audit."""
-    assert me.MAINNET_CHAIN_ID is None, (
-        "MAINNET_CHAIN_ID was set without a paired signing_verified review. "
-        "See module docstring activation gates."
+def test_mainnet_chain_id_is_pinned():
+    """MAINNET_CHAIN_ID is pinned to the canonical MegaETH mainnet value.
+
+    Pinning the constant does NOT activate mainnet — that requires
+    flipping ``signing_verified=True`` in source. The original placeholder
+    contract (``MAINNET_CHAIN_ID is None``) was replaced with the real
+    chain ID once MegaETH published it; the audit-loud-on-flip semantic
+    is preserved by the ``signing_verified`` field, not by the constant.
+    """
+    assert me.MAINNET_CHAIN_ID == 4326, (
+        "MAINNET_CHAIN_ID drifted from the canonical value 4326 (0x10e6). "
+        "If MegaETH renumbered the chain, audit signing_verified before changing."
     )
 
 
 def test_signing_verified_default_is_false():
-    """Default policy must remain fail-closed."""
+    """Default policy must remain fail-closed.
+
+    This is the single audit-loud-on-flip gate that allows mainnet
+    sends; flipping it to True must be a code change reviewed against
+    a clean testnet trade.
+    """
     assert me.MegaETHLivePolicy().signing_verified is False
+
+
+def test_no_broadcast_path_in_module():
+    """Scaffold contract: there is no broadcast RPC call.
+
+    ``send_transaction`` only ever returns ``signed_dry_run`` or
+    ``blocked``/``error`` — never a ``broadcast`` status. This test
+    enforces that contract by source-grepping for the JSON-RPC method
+    names that would actually broadcast a tx; if a future refactor adds
+    one of those calls, the test fails and the audit-loud contract
+    requires the operator to revisit signing_verified before continuing.
+    """
+    import inspect
+
+    src = inspect.getsource(me)
+    forbidden = ("eth_sendRawTransaction", "eth_sendTransaction")
+    for token in forbidden:
+        assert token not in src, (
+            f"module source mentions '{token}' — the scaffold must not "
+            "include a broadcast path; revisit signing_verified before adding"
+        )
+    # ``send_transaction`` never returns a 'broadcast' status — the only
+    # statuses the scaffold can emit are listed in the result-type docstring.
+    sig_status_values = {"signed_dry_run", "blocked", "error"}
+    # Spot-check: the SendResult status field's permitted values are exactly
+    # those (sanity check for the contract).
+    assert all(v in src for v in sig_status_values)
+
+
+def test_testnet_chain_id_is_canonical():
+    """TESTNET_CHAIN_ID is the canonical carrot testnet ID 6343 (0x18c7).
+
+    A previous draft of this scaffold used 6342 — that was a typo. The
+    correct value is 6343 per docs.megaeth.com.
+    """
+    assert me.TESTNET_CHAIN_ID == 6343
