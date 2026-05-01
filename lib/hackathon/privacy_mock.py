@@ -23,10 +23,10 @@ import hmac
 import json
 import os
 import secrets
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
 from hashlib import sha256
-from typing import Mapping
 
 
 def _canonical_weights(weights: Mapping[str, Decimal]) -> bytes:
