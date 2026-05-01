@@ -398,9 +398,7 @@ class MegaETHExecutor:
 
         signed = Account.sign_transaction(signing_payload, priv_key)
         # eth-account 0.13+ exposes raw bytes as ``raw_transaction``.
-        raw = getattr(signed, "raw_transaction", None) or getattr(
-            signed, "rawTransaction", None
-        )
+        raw = getattr(signed, "raw_transaction", None) or getattr(signed, "rawTransaction", None)
         if raw is None:
             raise RuntimeError("eth_account returned no raw transaction")
         return "0x" + raw.hex() if not raw.hex().startswith("0x") else raw.hex()
