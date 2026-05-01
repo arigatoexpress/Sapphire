@@ -15,6 +15,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 from urllib.parse import urlparse
 
+from lib.hackathon.chain_health_gate import ChainHealthGate, ChainHealthVerdict
 from lib.hackathon.privacy_mock import FhevmClient, default_demo_basket
 from lib.payments.x402_middleware import DEFAULT_USDC_CONTRACTS, PaymentRequirements
 
@@ -128,11 +129,16 @@ class SentinelDecision:
     payment_requirements: PaymentRequirements
     chain_anchor: dict[str, Any]
     order_draft: dict[str, Any] | None = None
+    chain_health: ChainHealthVerdict | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["spend_remaining_usdc"] = _money(self.spend_remaining_usdc)
         data["payment_requirements"] = self.payment_requirements.to_wire()
+        if self.chain_health is not None and data.get("chain_health"):
+            ch = data["chain_health"]
+            if ch.get("peg_divergence_bps") is not None:
+                ch["peg_divergence_bps"] = str(ch["peg_divergence_bps"])
         return data
 
 
@@ -191,8 +197,16 @@ def evaluate_attempt(
     order_symbol: str = "PLTR",
     order_action: str = "buy",
     notional_usd: float = 25.0,
+    gate: ChainHealthGate | None = None,
+    target_chain_id: int | None = None,
 ) -> SentinelDecision:
-    """Evaluate a paid agent action without settling or submitting anything."""
+    """Evaluate a paid agent action without settling or submitting anything.
+
+    When ``gate`` is provided, runs a chain-health check on
+    ``target_chain_id`` (defaulting to the mandate's ``chain_id``) and
+    refuses the payment if the chain reports a BLOCK severity. Existing
+    callers that don't pass ``gate`` get the legacy policy-only path.
+    """
 
     active_mandate = mandate or default_mandate()
     reasons: list[str] = []
@@ -220,6 +234,18 @@ def evaluate_attempt(
             risk_flags.append("prompt_injection")
             redactions.append(pattern)
 
+    # Chain-health gate: refuse payments whose alpha references a chain
+    # currently in distress (USDM depegging, Aave reserves paused-and-pinned).
+    # Runs after policy checks so an obviously-malformed request still flags
+    # those reasons too — judges see the full risk picture, not just the
+    # last-failing layer.
+    chain_health: ChainHealthVerdict | None = None
+    if gate is not None:
+        eval_chain = target_chain_id if target_chain_id is not None else active_mandate.chain_id
+        chain_health = gate.evaluate_chain(eval_chain)
+        if chain_health.severity == "BLOCK":
+            risk_flags.append("chain_state_degraded")
+
     approved = not risk_flags
     if approved:
         reasons.extend(
@@ -232,6 +258,8 @@ def evaluate_attempt(
         )
     else:
         reasons.extend(_reason_for_flag(flag) for flag in risk_flags)
+        if chain_health is not None and chain_health.severity == "BLOCK":
+            reasons.extend(chain_health.reasons)
 
     # Source result_hash + risk_hash from the FHEVM-shaped mock so the
     # public commitments are computed over hidden basket weights instead of
@@ -305,6 +333,7 @@ def evaluate_attempt(
         payment_requirements=requirements,
         chain_anchor=chain_anchor,
         order_draft=order_draft,
+        chain_health=chain_health,
     )
 
 
@@ -482,4 +511,5 @@ def _reason_for_flag(flag: str) -> str:
         "spend_limit_exceeded": "payment would exceed remaining agent budget",
         "secret_egress_risk": "payload appears to request or expose secret material",
         "prompt_injection": "payload contains prompt-injection language",
+        "chain_state_degraded": "target chain reports degraded state (peg break or paused reserve)",
     }.get(flag, flag.replace("_", " "))
