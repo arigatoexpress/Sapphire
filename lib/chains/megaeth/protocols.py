@@ -21,6 +21,12 @@ from .contracts.aave_v3 import (
     ReserveData,
     UserAccountData,
 )
+from .contracts.kumbaya import (
+    Kumbaya,
+    KumbayaAddresses,
+    PoolInfo,
+)
+from .dex_router import DexRoutingTable, SwapQuote, best_quote, quote_kumbaya
 from .registry import ProtocolEntry, ProtocolRegistry
 
 
@@ -46,6 +52,31 @@ class UserLendPosition:
     venue: str
     user: str
     account: UserAccountData
+
+
+@dataclass(frozen=True)
+class DexVenueOverview:
+    """Per-DEX overview surfaced by :meth:`MegaETHProtocols.dex_overview`."""
+
+    venue: str
+    category: str
+    pool_count: int
+    top_pools: list[PoolInfo] = field(default_factory=list, compare=False)
+
+
+@dataclass(frozen=True)
+class DexOverview:
+    """Aggregate DEX overview across all registered DEX-spot venues."""
+
+    venues: list[DexVenueOverview] = field(default_factory=list)
+
+    @property
+    def venue_count(self) -> int:
+        return len(self.venues)
+
+    @property
+    def total_pool_count(self) -> int:
+        return sum(v.pool_count for v in self.venues)
 
 
 class MegaETHProtocols:
@@ -74,6 +105,32 @@ class MegaETHProtocols:
         if entry.category != "lending":
             raise ValueError(f"protocol {venue!r} is not a lending venue (category={entry.category})")
         return AaveV3(self._client, AaveV3Addresses.from_registry_entry(entry))
+
+    def _kumbaya(self, venue: str = "kumbaya") -> Kumbaya:
+        entry = self.registry.get(venue)
+        if entry.category != "dex_spot":
+            raise ValueError(
+                f"protocol {venue!r} is not a DEX-spot venue (category={entry.category})"
+            )
+        return Kumbaya(self._client, KumbayaAddresses.from_registry_entry(entry))
+
+    def _dex_routing_table(self) -> DexRoutingTable:
+        """Build a DexRoutingTable from every ``dex_spot`` registry entry.
+
+        Wave B step 1: only Kumbaya is wired. Adding more DEXes is just
+        another ``register(...)`` call here. Future steps may move this
+        registration into the registry yaml itself once we have >1 DEX.
+        """
+        table = DexRoutingTable()
+        for entry in self.registry.by_category("dex_spot"):
+            if entry.key == "kumbaya":
+                kb = Kumbaya(self._client, KumbayaAddresses.from_registry_entry(entry))
+
+                async def _kb_quote(t_in: str, t_out: str, amt: int, _kb: Kumbaya = kb) -> Any:
+                    return await quote_kumbaya(_kb, t_in, t_out, amt)
+
+                table.register(entry.key, _kb_quote)
+        return table
 
     async def lend_overview(self, venue: str = "aave_v3") -> LendOverview:
         """Aggregate lending stats for one venue.
@@ -142,6 +199,55 @@ class MegaETHProtocols:
     async def oracle_price(self, asset: str, venue: str = "aave_v3") -> Decimal:
         aave = self._aave(venue)
         return await aave.get_asset_price(asset)
+
+    # -- DEX-spot read paths (Wave B) --------------------------------------
+
+    async def quote_swap(
+        self,
+        token_in: str,
+        token_out: str,
+        amount_in: int,
+        *,
+        max_hops: int = 2,
+    ) -> SwapQuote | None:
+        """Best quote for ``amount_in`` of ``token_in`` swapped to ``token_out``.
+
+        Wave B step 1 only routes through Kumbaya direct (single-hop)
+        — ``max_hops`` is accepted for forward-compatibility (Wave B
+        step 2 will add stable-bridge multi-hop routing through USDM).
+
+        Returns ``None`` if no DEX has a viable pool for the pair, which
+        callers should treat as "venue unsupported, fall back to a CEX
+        or skip the trade." We deliberately do NOT raise here — empty
+        quotes are a normal data condition for niche pairs.
+        """
+        if max_hops < 1:
+            raise ValueError(f"max_hops must be >= 1, got {max_hops!r}")
+        # max_hops is not yet used (only direct routes); accepted for
+        # API compatibility with Wave B step 2's multi-hop router.
+        _ = max_hops
+
+        table = self._dex_routing_table()
+        if len(table) == 0:
+            return None
+        return await best_quote(table, token_in, token_out, amount_in)
+
+    async def dex_overview(self) -> DexOverview:
+        """List registered DEXes with their top live pools."""
+        venues: list[DexVenueOverview] = []
+        for entry in self.registry.by_category("dex_spot"):
+            if entry.key == "kumbaya":
+                kb = Kumbaya(self._client, KumbayaAddresses.from_registry_entry(entry))
+                pools = await kb.top_pools_by_tvl()
+                venues.append(
+                    DexVenueOverview(
+                        venue=entry.key,
+                        category=entry.category,
+                        pool_count=len(pools),
+                        top_pools=pools,
+                    )
+                )
+        return DexOverview(venues=venues)
 
     # -- write (Wave C) ----------------------------------------------------
 

@@ -1,0 +1,14 @@
+{
+  "chain_id": 4326,
+  "address": "0xe5bbef8de2db447a7432a47eba58924d94ee470e",
+  "contract_name": "SwapRouter02",
+  "is_proxy": false,
+  "implementation_address": null,
+  "blockscout_verified_at": "2026-01-15T03:50:53.332852Z",
+  "compiler_version": "v0.7.6+commit.7338295f",
+  "abi_function_count": 39,
+  "fetched_at": "2026-05-01T02:10:44.229683+00:00",
+  "verified_at": "2026-05-01T02:10:44.229683+00:00",
+  "source_url": "https://megaeth.blockscout.com/address/0xE5BbEF8De2DB447a7432A47EBa58924d94eE470e",
+  "source": "blockscout"
+}
