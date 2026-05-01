@@ -1,0 +1,14 @@
+{
+  "chain_id": 4326,
+  "address": "0x1f1a8dc7e138c34b503ca080962ac10b75384a27",
+  "contract_name": "QuoterV2",
+  "is_proxy": false,
+  "implementation_address": null,
+  "blockscout_verified_at": "2026-01-15T03:51:30.954948Z",
+  "compiler_version": "v0.7.6+commit.7338295f",
+  "abi_function_count": 7,
+  "fetched_at": "2026-05-01T02:10:44.229683+00:00",
+  "verified_at": "2026-05-01T02:10:44.229683+00:00",
+  "source_url": "https://megaeth.blockscout.com/address/0x1F1a8dC7E138C34b503Ca080962aC10B75384a27",
+  "source": "blockscout"
+}

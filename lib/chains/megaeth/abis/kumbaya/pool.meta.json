@@ -1,0 +1,15 @@
+{
+  "chain_id": 4326,
+  "address": null,
+  "contract_name": "UniswapV3Pool",
+  "is_proxy": false,
+  "implementation_address": null,
+  "blockscout_verified_at": null,
+  "compiler_version": null,
+  "abi_function_count": 8,
+  "fetched_at": "2026-04-30T20:10:00Z",
+  "verified_at": "2026-04-30T20:10:00Z",
+  "source_url": "https://github.com/Uniswap/v3-core/blob/main/contracts/UniswapV3Pool.sol",
+  "source": "uniswap-v3-core-canonical",
+  "notes": "Kumbaya is a UniswapV3 fork; pool contracts are CREATE2-deployed by the factory and are NOT verified on Blockscout (verified 2026-04-30 against pool 0x587f6eeafc7ad567e96ed1b62775fa6402164b22 — name=null, is_verified=null, abi=[]). UniV3 forks rarely modify the pool ABI surface, so we lift the canonical UniswapV3Pool read-method subset from the upstream Uniswap v3-core repo. Mirrors the Wave A pool_min.json workaround for the unverified Aave Pool impl. Read-only methods only: slot0, liquidity, fee, tickSpacing, token0, token1, ticks, observe."
+}

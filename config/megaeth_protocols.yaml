@@ -41,3 +41,31 @@ aave_v3:
     sourced from aave-dao/aave-v3-origin/src/contracts/interfaces/IPool.sol.
     UiPoolDataProvider is the canonical aggregate read entrypoint —
     `getReservesData(provider)` returns every reserve in one call.
+
+kumbaya:
+  name: "Kumbaya (UniswapV3 fork)"
+  category: dex_spot
+  priority: 1
+  status: active
+  docs_url: "https://github.com/zgos/Kumbaya-xyz-integrator-kit"
+  addresses:
+    factory: "0x68b34591f662508076927803c567Cc8006988a09"
+    quoter_v2: "0x1F1a8dC7E138C34b503Ca080962aC10B75384a27"
+    swap_router: "0xE5BbEF8De2DB447a7432A47EBa58924d94eE470e"
+  abi_paths:
+    factory: "kumbaya/factory.json"
+    quoter_v2: "kumbaya/quoter_v2.json"
+    swap_router: "kumbaya/swap_router.json"
+    pool: "kumbaya/pool.json"
+  notes: >
+    Second-largest spot venue on MegaETH ($74.8M TVL as of 2026-04-30).
+    Factory, QuoterV2, SwapRouter02 are all VERIFIED on Blockscout
+    (cross-checked 2026-04-30). Pool contracts are CREATE2-deployed
+    clones and NOT verified — pool.json is the canonical UniswapV3Pool
+    read-method subset lifted from Uniswap/v3-core (mirrors Wave A's
+    pool_min.json workaround for the unverified Aave Pool impl).
+    QuoterV2 is `stateMutability: nonpayable` (not view) — it works
+    via eth_call but NOT via on-chain staticcall; see the wrapper
+    docstring for the full footgun explanation. Wave B step 1 wires
+    factory + quoter for read paths; SwapRouter02 ABI is pinned for
+    Wave C to bind without a re-fetch.
