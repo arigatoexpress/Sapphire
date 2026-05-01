@@ -1,0 +1,30 @@
+# MegaETH ingest service config (example).
+# Copy to config/megaeth.yaml and edit. Env vars override every key here.
+
+# Public testnet WSS sequencer endpoint. Override for prod / private RPC.
+wss_url: "wss://carrot.megaeth.com/ws"
+chain_id: 6342
+health_port: 8788
+
+# Where ingested events are POSTed. Defaults to local Sapphire signal-logger.
+signal_logger_url: "http://127.0.0.1:18081/api/signals"
+# Required by signal-logger. Loaded from WEBHOOK_SECRET env in practice.
+# webhook_secret: ""
+
+# Read-only by default — flip to true (or env SAPPHIRE_MEGAETH_INGEST_ENABLED=1)
+# only after you've watched the queue + lag metrics on /health for a soak.
+forwarding_enabled: false
+
+# Bounded queue + drop-oldest. ~10ms blocks → 1s of HTTP backpressure ≈ 100 events.
+queue_max: 4096
+reconnect_backoff_sec: 2.0
+reconnect_max_sec: 60.0
+
+# Optional logs subscriptions. Each entry MUST include addresses (no wide-open
+# logs subscription on a 10ms-block chain). topics is optional.
+log_filters: []
+# log_filters:
+#   - addresses:
+#       - "0x0000000000000000000000000000000000000000"
+#     topics:
+#       - "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"  # Transfer
