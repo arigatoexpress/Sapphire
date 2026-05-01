@@ -1,0 +1,5 @@
+# MegaETH Ingest Service Dependencies
+aiohttp>=3.9.0
+PyYAML>=6.0.0
+websockets>=16.0,<17
+python-dotenv>=1.0.0
