@@ -99,6 +99,7 @@ markers = [
     "gpu: requires the Windows GPU tier",
     "asyncio: pytest-asyncio marker — kept registered so --strict-markers doesn't reject it",
     "xdist_group: pytest-xdist serialization tag (group of tests pinned to one worker)",
+    "megaeth_integration: MegaETH testnet integration tests — gated by SAPPHIRE_MEGAETH_INTEGRATION=1",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning:aiohttp.*",
