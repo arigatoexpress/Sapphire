@@ -1,0 +1,12 @@
+{
+  "chain_id": 4326,
+  "address": "0x1ab55bbdd5df0782bbcf73553af93bc6b29a286b",
+  "is_proxy": false,
+  "implementation_address": null,
+  "blockscout_verified_at": "2026-01-27T03:52:06.699500Z",
+  "compiler_version": "v0.8.27+commit.40a35a09",
+  "contract_name": "UiPoolDataProviderV3",
+  "abi_hash_sha256": "c907f564825e4f150b9b43bdc1f625cb1faf4180f226321f7dcccde345180522",
+  "fetched_at": "2026-05-01T01:51:44.285339+00:00",
+  "source": "blockscout"
+}
