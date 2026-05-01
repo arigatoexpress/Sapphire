@@ -623,3 +623,12 @@ tools:
     consumers: [wildfire-watch.ground-station, services.dashboard, hermes-agent.alerts]
     description: |
       Ingest, query, and aggregate wildfire-watch drone signals. Validates a payload against the v1 wildfire_signal schema (~/Code/wildfire-watch/sapphire_integration/wildfire_signal_schema.json), appends to data/wildfire_signals.jsonl with idempotency on signal_id, emits a wildfire.signal.detected event_bus envelope, and exposes list/stats/schema_info actions. Never sends Telegram directly; the operator-supervised hermes wildfire-alert skill consumes the bus event.
+
+  # MegaETH read-only RPC client (real-time L2, ~10ms blocks) — Tranche 7
+  - name: megaeth
+    path: plugins/claw-sapphire/tools/internal/megaeth.py
+    status: internal
+    owner: sapphire
+    consumers: [hermes-agent.trading-analysis, services.intelligence]
+    description: |
+      Read-only MegaETH JSON-RPC client + plugin tool. Actions, status (chain_id + latest block + gas_price), balance <address> (wei + ETH-equivalent), tx <hash> (receipt summary + explorer URL), mempool_snapshot (txpool_status preferred, falls back to newPendingTransactions WS sample). RPC method allow-list enforced — no signing, no private keys, no state-changing calls. Endpoints configurable via SAPPHIRE_MEGAETH_RPC_URL / SAPPHIRE_MEGAETH_WS_URL / SAPPHIRE_MEGAETH_CHAIN_ID; defaults are MegaETH testnet (carrot.megaeth.com, chain_id 6343).
