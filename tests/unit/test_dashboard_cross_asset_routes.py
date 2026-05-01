@@ -107,7 +107,9 @@ def test_matrix_api_requires_auth(client) -> None:
 
 
 def test_matrix_api_returns_selected_matrix(client) -> None:
-    response = client.get("/api/cross-asset-matrix?window=7d&method=pearson", headers=_auth_header())
+    response = client.get(
+        "/api/cross-asset-matrix?window=7d&method=pearson", headers=_auth_header()
+    )
     payload = response.get_json()
     assert response.status_code == 200
     assert payload["matrix"]["assets"] == ["BTC", "ETH"]
@@ -116,7 +118,9 @@ def test_matrix_api_returns_selected_matrix(client) -> None:
 
 
 def test_matrix_api_falls_back_to_available_window(client) -> None:
-    response = client.get("/api/cross-asset-matrix?window=30d&method=kendall", headers=_auth_header())
+    response = client.get(
+        "/api/cross-asset-matrix?window=30d&method=kendall", headers=_auth_header()
+    )
     payload = response.get_json()
     assert response.status_code == 200
     assert payload["window"] == "7d"

@@ -225,11 +225,7 @@ def compute_quick_signal_score(
         components.append(("rsi", rsi_score, 0.30, f"RSI={rsi:.1f}"))
 
     # MACD histogram: positive = bullish momentum acceleration.
-    macd_hist = (
-        values.get("macd:histogram")
-        or values.get("histogram")
-        or values.get("macd:hist")
-    )
+    macd_hist = values.get("macd:histogram") or values.get("histogram") or values.get("macd:hist")
     close = _parse_numeric(summary.get("close"))
     if macd_hist is not None and close and close > 0:
         # Histogram normalized against close price, then clipped.
@@ -243,9 +239,7 @@ def compute_quick_signal_score(
 
     # EMA-20 trend: price vs the 20-period EMA tells us short-term direction.
     ema = (
-        values.get("moving average exponential:plot")
-        or values.get("ema:plot")
-        or values.get("ema")
+        values.get("moving average exponential:plot") or values.get("ema:plot") or values.get("ema")
     )
     if ema is not None and close and close > 0:
         diff_pct = (close - ema) / ema * 100.0
@@ -764,34 +758,40 @@ class TradingViewOrchestrator:
 
             # Screenshot
             ss = self.screenshot(tradingview_symbol, tf, session_dir)
-            tf_record["artifacts"].append({
-                "kind": "screenshot",
-                "ok": ss["ok"],
-                "path": ss["path"],
-                "filename": ss["filename"],
-            })
+            tf_record["artifacts"].append(
+                {
+                    "kind": "screenshot",
+                    "ok": ss["ok"],
+                    "path": ss["path"],
+                    "filename": ss["filename"],
+                }
+            )
 
             # OHLCV summary
             ohlcv = self.probe_ohlcv(tradingview_symbol)
             ohlcv_path = session_dir / self._safe_filename(tradingview_symbol, tf, "ohlcv.json")
             ohlcv_path.write_text(json.dumps(ohlcv, indent=2, sort_keys=True), encoding="utf-8")
-            tf_record["artifacts"].append({
-                "kind": "ohlcv",
-                "ok": ohlcv["ok"],
-                "path": str(ohlcv_path),
-                "filename": ohlcv_path.name,
-            })
+            tf_record["artifacts"].append(
+                {
+                    "kind": "ohlcv",
+                    "ok": ohlcv["ok"],
+                    "path": str(ohlcv_path),
+                    "filename": ohlcv_path.name,
+                }
+            )
 
             # Values
             values = self.probe_values()
             values_path = session_dir / self._safe_filename(tradingview_symbol, tf, "values.json")
             values_path.write_text(json.dumps(values, indent=2, sort_keys=True), encoding="utf-8")
-            tf_record["artifacts"].append({
-                "kind": "indicator_values",
-                "ok": values["ok"],
-                "path": str(values_path),
-                "filename": values_path.name,
-            })
+            tf_record["artifacts"].append(
+                {
+                    "kind": "indicator_values",
+                    "ok": values["ok"],
+                    "path": str(values_path),
+                    "filename": values_path.name,
+                }
+            )
 
             # Quote
             quote = self.probe_quote(tradingview_symbol)
@@ -867,18 +867,22 @@ class TradingViewOrchestrator:
                 self.setup_chart(tv_symbol, primary_timeframe)
 
             ss = self.screenshot(tv_symbol, primary_timeframe, session_dir)
-            sym_record["artifacts"].append({
-                "kind": "screenshot",
-                "ok": ss["ok"],
-                "path": ss["path"],
-                "filename": ss["filename"],
-            })
+            sym_record["artifacts"].append(
+                {
+                    "kind": "screenshot",
+                    "ok": ss["ok"],
+                    "path": ss["path"],
+                    "filename": ss["filename"],
+                }
+            )
 
             ohlcv = self.probe_ohlcv(tv_symbol)
-            sym_record["artifacts"].append({
-                "kind": "ohlcv",
-                "ok": ohlcv["ok"],
-            })
+            sym_record["artifacts"].append(
+                {
+                    "kind": "ohlcv",
+                    "ok": ohlcv["ok"],
+                }
+            )
 
             quote = self.probe_quote(tv_symbol)
             sym_record["quote_ok"] = quote["ok"]
@@ -956,29 +960,33 @@ class TradingViewOrchestrator:
             score = row.get("score") or {}
             if not isinstance(score, dict):
                 continue
-            items.append({
-                "symbol": row.get("symbol"),
-                "tradingview_symbol": row.get("tradingview_symbol"),
-                "timeframe": manifest.get("primary_timeframe"),
-                "rank": row.get("rank"),
-                "score": score.get("score", 0.0),
-                "regime": score.get("regime"),
-                "rationale": score.get("rationale"),
-            })
+            items.append(
+                {
+                    "symbol": row.get("symbol"),
+                    "tradingview_symbol": row.get("tradingview_symbol"),
+                    "timeframe": manifest.get("primary_timeframe"),
+                    "rank": row.get("rank"),
+                    "score": score.get("score", 0.0),
+                    "regime": score.get("regime"),
+                    "rationale": score.get("rationale"),
+                }
+            )
         timeframes = manifest.get("timeframes") or []
         for row in timeframes:
             score = row.get("score") or {}
             if not isinstance(score, dict):
                 continue
-            items.append({
-                "symbol": manifest.get("symbol"),
-                "tradingview_symbol": manifest.get("tradingview_symbol"),
-                "timeframe": row.get("timeframe"),
-                "rank": None,
-                "score": score.get("score", 0.0),
-                "regime": score.get("regime"),
-                "rationale": score.get("rationale"),
-            })
+            items.append(
+                {
+                    "symbol": manifest.get("symbol"),
+                    "tradingview_symbol": manifest.get("tradingview_symbol"),
+                    "timeframe": row.get("timeframe"),
+                    "rank": None,
+                    "score": score.get("score", 0.0),
+                    "regime": score.get("regime"),
+                    "rationale": score.get("rationale"),
+                }
+            )
 
         items.sort(key=lambda r: abs(float(r.get("score") or 0.0)), reverse=True)
         if top_n is not None and top_n > 0:
@@ -1010,11 +1018,13 @@ class TradingViewOrchestrator:
             manifest = session / "manifest.json"
             if manifest.exists():
                 data = json.loads(manifest.read_text(encoding="utf-8"))
-                results.append({
-                    "session_id": session.name,
-                    "generated_at": data.get("generated_at"),
-                    "schema_version": data.get("schema_version"),
-                    "symbol_count": len(data.get("symbols") or []),
-                    "timeframe_count": len(data.get("timeframes") or []),
-                })
+                results.append(
+                    {
+                        "session_id": session.name,
+                        "generated_at": data.get("generated_at"),
+                        "schema_version": data.get("schema_version"),
+                        "symbol_count": len(data.get("symbols") or []),
+                        "timeframe_count": len(data.get("timeframes") or []),
+                    }
+                )
         return results

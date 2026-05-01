@@ -7,7 +7,9 @@ from lib.counterparty.tracker import PositionChange
 
 
 def _change(trader="0x1", asset="BTC", side="long", old=100, new=150, pct=50):
-    return PositionChange(trader, asset, "long", side, old, new, pct, side, "2024-01-01T00:00:00+00:00")
+    return PositionChange(
+        trader, asset, "long", side, old, new, pct, side, "2024-01-01T00:00:00+00:00"
+    )
 
 
 def test_generate_signal_for_single_long_change():

@@ -105,9 +105,7 @@ class TestIntelVectorRecord:
 
     def test_non_numeric_embedding_rejected(self):
         with pytest.raises(ValueError, match="numeric"):
-            to_IntelVectorRecord(
-                {"id": "v", "text": "x", "embedding": [0.1, "oops"]}
-            )
+            to_IntelVectorRecord({"id": "v", "text": "x", "embedding": [0.1, "oops"]})
 
     def test_long_text_truncated(self):
         env = to_IntelVectorRecord(
@@ -248,9 +246,7 @@ class TestTelegramIntelMessage:
 
     def test_long_text_truncated_and_length_preserved(self):
         big = "X" * 9000
-        env = to_TelegramIntelMessage(
-            self._row(message={"id": "1", "text": big})
-        )
+        env = to_TelegramIntelMessage(self._row(message={"id": "1", "text": big}))
         assert len(env["text"]) == 4000
         assert env["text_length"] == 9000
 
@@ -264,9 +260,7 @@ class TestTelegramIntelMessage:
             # Dup of c1 within the same file should be deduped.
             self._row(canonical_id="c1"),
         ]
-        (day / "messages.jsonl").write_text(
-            "\n".join(json.dumps(r) for r in rows) + "\n"
-        )
+        (day / "messages.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
         monkeypatch.setenv("SAPPHIRE_TELEGRAM_INTEL_DATA_DIR", str(base))
         objs = transform_telegram_intel_messages(tmp_path)
         ids = sorted(o["id"] for o in objs)
@@ -284,9 +278,7 @@ class TestTelegramIntelMessage:
             canonical_id="new",
             ingested_at="2026-04-27T00:00:00+00:00",
         )
-        (day / "messages.jsonl").write_text(
-            json.dumps(old) + "\n" + json.dumps(new) + "\n"
-        )
+        (day / "messages.jsonl").write_text(json.dumps(old) + "\n" + json.dumps(new) + "\n")
         monkeypatch.setenv("SAPPHIRE_TELEGRAM_INTEL_DATA_DIR", str(base))
         since = datetime(2026, 4, 20, tzinfo=UTC)
         objs = transform_telegram_intel_messages(tmp_path, since=since)
@@ -368,10 +360,7 @@ class TestHyperliquidSignal:
     def test_transform_reads_repo_log(self, tmp_path, monkeypatch):
         log_path = tmp_path / "hl_signals.jsonl"
         log_path.write_text(
-            json.dumps(self._row(event_id="a"))
-            + "\n"
-            + json.dumps(self._row(event_id="b"))
-            + "\n"
+            json.dumps(self._row(event_id="a")) + "\n" + json.dumps(self._row(event_id="b")) + "\n"
         )
         monkeypatch.setenv("SAPPHIRE_HYPERLIQUID_SIGNAL_PATH", str(log_path))
         objs = transform_hyperliquid_signals(tmp_path)
@@ -455,18 +444,14 @@ class TestOODAPacket:
     def test_act_array_capped(self):
         many_actions = [f"action-{i}" for i in range(50)]
         env = to_OODAPacket(
-            self._envelope(
-                ooda={"observe": "x", "orient": "y", "decide": "z", "act": many_actions}
-            )
+            self._envelope(ooda={"observe": "x", "orient": "y", "decide": "z", "act": many_actions})
         )
         assert len(env["act"]) == 8
 
     def test_long_strings_truncated(self):
         big = "Q" * 2000
         env = to_OODAPacket(
-            self._envelope(
-                ooda={"observe": big, "orient": big, "decide": big, "act": [big]}
-            )
+            self._envelope(ooda={"observe": big, "orient": big, "decide": big, "act": [big]})
         )
         assert len(env["observe"]) == 1000
         assert len(env["orient"]) == 1000
@@ -566,9 +551,7 @@ class TestThreatIndicator:
             to_ThreatIndicator("nope")  # type: ignore[arg-type]
 
     def test_id_derived_when_canonical_missing(self):
-        env = to_ThreatIndicator(
-            {"title": "Mystery threat", "published": "2026-04-27"}
-        )
+        env = to_ThreatIndicator({"title": "Mystery threat", "published": "2026-04-27"})
         assert env["id"].startswith("ti:")
         assert env["advisory_id"]
 
@@ -745,11 +728,7 @@ class TestTransientErrorTolerance:
     def test_intel_vector_skips_unparseable_lines(self, tmp_path, monkeypatch):
         path = tmp_path / "vector.jsonl"
         path.write_text(
-            "garbage{not-json\n"
-            + json.dumps(
-                {"id": "ok", "text": "ok", "embedding": [0.1]}
-            )
-            + "\n"
+            "garbage{not-json\n" + json.dumps({"id": "ok", "text": "ok", "embedding": [0.1]}) + "\n"
         )
         monkeypatch.setenv("SAPPHIRE_BQ_VECTOR_MOCK_PATH", str(path))
         objs = transform_intel_vector_records(tmp_path)
@@ -776,16 +755,12 @@ class TestTransientErrorTolerance:
 
     def test_telegram_intel_handles_missing_directory(self, tmp_path, monkeypatch):
         # Override points to a non-existent dir; transform should return [].
-        monkeypatch.setenv(
-            "SAPPHIRE_TELEGRAM_INTEL_DATA_DIR", str(tmp_path / "does-not-exist")
-        )
+        monkeypatch.setenv("SAPPHIRE_TELEGRAM_INTEL_DATA_DIR", str(tmp_path / "does-not-exist"))
         objs = transform_telegram_intel_messages(tmp_path)
         assert objs == []
 
     def test_ooda_handles_missing_dir(self, tmp_path, monkeypatch):
-        monkeypatch.setenv(
-            "SAPPHIRE_GEMINI_OODA_CACHE_DIR", str(tmp_path / "no-cache")
-        )
+        monkeypatch.setenv("SAPPHIRE_GEMINI_OODA_CACHE_DIR", str(tmp_path / "no-cache"))
         objs = transform_ooda_packets(tmp_path)
         assert objs == []
 

@@ -271,7 +271,9 @@ def test_tcp_check_can_warn_for_optional_desktop_ports(monkeypatch) -> None:
 
     monkeypatch.setattr(sweep.socket, "create_connection", fake_create_connection)
 
-    check = sweep.tcp_check("windows", "telemetry_dashboard_tcp", "100.71.10.48", 3001, warn_on_error=True)
+    check = sweep.tcp_check(
+        "windows", "telemetry_dashboard_tcp", "100.71.10.48", 3001, warn_on_error=True
+    )
 
     assert check.status == "WARN"
 

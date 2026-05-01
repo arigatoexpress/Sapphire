@@ -64,9 +64,10 @@ def test_citation_density_rewards_sources_and_numbers() -> None:
     weak["counter_thesis_one_paragraph"] = "However, the vague read could weaken."
     weak["next_signal_to_watch"] = "Watch the next market update."
     strong = _thesis()
-    assert score_narrative(strong, signal=_signal()).citation_density > score_narrative(
-        weak, signal=_signal()
-    ).citation_density
+    assert (
+        score_narrative(strong, signal=_signal()).citation_density
+        > score_narrative(weak, signal=_signal()).citation_density
+    )
 
 
 def test_internal_consistency_flags_wrong_position() -> None:

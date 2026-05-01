@@ -201,9 +201,7 @@ class TestSovereignThesisReportShape:
         ops_actions = {row["action"] for row in report["ops_queue"]}
         assert "complete_symbol_mapping" in ops_actions
 
-    def test_build_report_raises_on_empty_config(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_build_report_raises_on_empty_config(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(st, "load_thesis_config", lambda *a, **kw: {"lenses": [], "assets": []})
         with pytest.raises(ValueError):
             st.build_sovereign_thesis_report()

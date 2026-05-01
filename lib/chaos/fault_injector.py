@@ -138,13 +138,8 @@ class SlowDisk:
 
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             self._writes += 1
-            if (
-                self.error_after_n_writes is not None
-                and self._writes > self.error_after_n_writes
-            ):
-                raise OSError(
-                    f"simulated disk full after {self.error_after_n_writes} writes"
-                )
+            if self.error_after_n_writes is not None and self._writes > self.error_after_n_writes:
+                raise OSError(f"simulated disk full after {self.error_after_n_writes} writes")
             if self.write_latency_ms:
                 self.sleep_fn(self.write_latency_ms / 1000.0)
             return fn(*args, **kwargs)

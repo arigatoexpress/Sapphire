@@ -52,7 +52,9 @@ def test_seed_redacts_source_email() -> None:
 def test_seed_can_persist(tmp_path) -> None:
     from lib.live_portfolio.ledger import LiveLedger
 
-    result = seed_record(fill_payload(), ledger=LiveLedger(tmp_path), persist=True, account_salt="salt")
+    result = seed_record(
+        fill_payload(), ledger=LiveLedger(tmp_path), persist=True, account_salt="salt"
+    )
     assert result["persisted"] is True
     assert result["path"]
 

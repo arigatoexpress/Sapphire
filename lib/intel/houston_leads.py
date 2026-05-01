@@ -280,8 +280,18 @@ def _most_recent_permit_url(now: datetime | None = None) -> str:
     last_sunday = last_sunday.fromordinal(now.toordinal() - days_back)
     next_saturday_day = last_sunday.day + 6  # may overflow into next month — Houston tolerates this
     months = [
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December",
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
     ]
     month_name = months[last_sunday.month - 1]
     file_part = f"{month_name}%20{last_sunday.day:02d}_{next_saturday_day}.xlsx"

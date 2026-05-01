@@ -102,7 +102,9 @@ def _record(entry: dict) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--predictions", help="Path to a specific predictions.json (default: latest)")
+    parser.add_argument(
+        "--predictions", help="Path to a specific predictions.json (default: latest)"
+    )
     parser.add_argument("--symbol", action="append", help="Restrict to specific symbol(s)")
     parser.add_argument("--dry-run", action="store_true", help="Print payloads without publishing")
     args = parser.parse_args()

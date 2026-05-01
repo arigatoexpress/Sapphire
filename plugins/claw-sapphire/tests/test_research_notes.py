@@ -77,9 +77,7 @@ def test_compose_action_returns_note():
 def test_render_latest_and_aggregate(tmp_path):
     render = research_notes.handle(_payload("render", str(tmp_path)))
     latest = research_notes.handle({"action": "latest", "output_root": str(tmp_path)})
-    aggregate = research_notes.handle(
-        {"action": "aggregate-summary", "output_root": str(tmp_path)}
-    )
+    aggregate = research_notes.handle({"action": "aggregate-summary", "output_root": str(tmp_path)})
 
     assert render["ok"] is True
     assert latest["latest"]["strategy_slug"] == "sapphire-composite"

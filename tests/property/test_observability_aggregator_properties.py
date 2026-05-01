@@ -134,7 +134,7 @@ def _strip_uptime(payload: dict) -> dict:
 @given(signal_sources())
 @hyp_settings(suppress_health_check=[HealthCheck.too_slow])
 def test_snapshot_to_dict_serializes_deterministically(
-    sources: tuple[tuple[str, str], ...]
+    sources: tuple[tuple[str, str], ...],
 ) -> None:
     """Two builds with the same inputs must produce byte-identical JSON.
 
@@ -166,9 +166,7 @@ def test_snapshot_to_dict_serializes_deterministically(
 
 @given(signal_sources())
 @hyp_settings(suppress_health_check=[HealthCheck.too_slow])
-def test_snapshot_size_bounded_under_1mb(
-    sources: tuple[tuple[str, str], ...]
-) -> None:
+def test_snapshot_size_bounded_under_1mb(sources: tuple[tuple[str, str], ...]) -> None:
     snapshot = build_system_snapshot(
         signal_sources=sources,
         launchctl_runner=_empty_launchctl_runner,
@@ -186,9 +184,7 @@ def test_snapshot_size_bounded_under_1mb(
 
 @given(signal_sources())
 @hyp_settings(suppress_health_check=[HealthCheck.too_slow])
-def test_snapshot_never_leaks_home_path(
-    sources: tuple[tuple[str, str], ...]
-) -> None:
+def test_snapshot_never_leaks_home_path(sources: tuple[tuple[str, str], ...]) -> None:
     snapshot = build_system_snapshot(
         signal_sources=sources,
         launchctl_runner=_empty_launchctl_runner,
@@ -197,9 +193,7 @@ def test_snapshot_never_leaks_home_path(
     )
     home = str(Path.home())
     payload = json.dumps(snapshot.to_dict())
-    assert home not in payload, (
-        f"$HOME ({home!r}) leaked into snapshot — see _display_path"
-    )
+    assert home not in payload, f"$HOME ({home!r}) leaked into snapshot — see _display_path"
 
 
 # ---------------------------------------------------------------------------
@@ -223,9 +217,7 @@ REQUIRED_TOP_LEVEL_KEYS = {
 
 @given(signal_sources())
 @hyp_settings(suppress_health_check=[HealthCheck.too_slow])
-def test_snapshot_top_level_keys_present(
-    sources: tuple[tuple[str, str], ...]
-) -> None:
+def test_snapshot_top_level_keys_present(sources: tuple[tuple[str, str], ...]) -> None:
     snapshot = build_system_snapshot(
         signal_sources=sources,
         launchctl_runner=_empty_launchctl_runner,
@@ -247,9 +239,7 @@ def test_snapshot_top_level_keys_present(
 
 @given(signal_sources())
 @hyp_settings(suppress_health_check=[HealthCheck.too_slow])
-def test_stream_rates_slim_matches_full_snapshot(
-    sources: tuple[tuple[str, str], ...]
-) -> None:
+def test_stream_rates_slim_matches_full_snapshot(sources: tuple[tuple[str, str], ...]) -> None:
     if not sources:
         return
     snapshot = build_system_snapshot(

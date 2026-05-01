@@ -90,7 +90,9 @@ def test_default_complexity_caps_are_monotonic_non_decreasing(runtime_policy):
     # absent (caller falls back to default 5 via ``max_complexity``).
     pairs = [("t0", "t1"), ("t1", "t3")]
     for low, high in pairs:
-        assert caps[low] <= caps[high], f"complexity({low})>{caps[low]} > complexity({high})={caps[high]}"
+        assert caps[low] <= caps[high], (
+            f"complexity({low})>{caps[low]} > complexity({high})={caps[high]}"
+        )
 
 
 def test_default_blocked_repos_starts_empty(runtime_policy):
@@ -136,9 +138,7 @@ def test_load_recovers_from_corrupt_json(runtime_policy, isolated_policy_path):
 # ─── save() ───────────────────────────────────────────────────────────────────
 
 
-def test_save_writes_indented_json_and_creates_parents(
-    runtime_policy, tmp_path, monkeypatch
-):
+def test_save_writes_indented_json_and_creates_parents(runtime_policy, tmp_path, monkeypatch):
     """save() must mkdir(parents=True) and emit pretty JSON."""
     target = tmp_path / "nested" / "dir" / "runtime_policy.json"
     monkeypatch.setattr(runtime_policy, "POLICY_PATH", target)
@@ -247,9 +247,7 @@ def test_load_is_deterministic(runtime_policy, isolated_policy_path):
     assert a == b == c
 
 
-def test_load_with_override_isolates_caller_mutations(
-    runtime_policy, isolated_policy_path
-):
+def test_load_with_override_isolates_caller_mutations(runtime_policy, isolated_policy_path):
     """When a file override is present, mutating the load() result is safe.
 
     NOTE — known irregularity: when **no** override file is present, the
@@ -312,8 +310,15 @@ def test_save_overwrites_existing_file(runtime_policy, isolated_policy_path):
 
 def test_all_public_helpers_have_docstrings(runtime_policy):
     """Every exported helper should document its contract."""
-    for name in ("load", "save", "is_tier_allowed", "is_repo_allowed",
-                 "max_complexity", "should_verify", "can_auto_commit"):
+    for name in (
+        "load",
+        "save",
+        "is_tier_allowed",
+        "is_repo_allowed",
+        "max_complexity",
+        "should_verify",
+        "can_auto_commit",
+    ):
         fn = getattr(runtime_policy, name)
         assert fn.__doc__, f"{name} is missing a docstring"
 

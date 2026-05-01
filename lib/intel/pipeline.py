@@ -104,7 +104,9 @@ def stats() -> dict[str, Any]:
     hot = 0
     geocoded = 0
     for lead in leads:
-        by_source[lead.get("source", "unknown")] = by_source.get(lead.get("source", "unknown"), 0) + 1
+        by_source[lead.get("source", "unknown")] = (
+            by_source.get(lead.get("source", "unknown"), 0) + 1
+        )
         if lead.get("urgency"):
             by_urgency[lead["urgency"]] = by_urgency.get(lead["urgency"], 0) + 1
         if isinstance(lead.get("score"), (int, float)):

@@ -26,8 +26,16 @@ def event(title: str, *, source: str = "fed_rss", summary: str = "") -> MacroEve
         ("FOMC Holds Rates Unchanged", "fed_rss", "monetary_policy"),
         ("Federal Open Market Committee releases minutes", "fed_fomc", "monetary_policy"),
         ("CFTC Charges Crypto Exchange With Fraud", "cftc_rss", "regulatory_enforcement"),
-        ("SEC Charges Coinbase With Operating Unregistered Exchange", "sec_atom", "regulatory_enforcement"),
-        ("Employment Situation: nonfarm payroll employment rises", "bls_empsit_rss", "data_release"),
+        (
+            "SEC Charges Coinbase With Operating Unregistered Exchange",
+            "sec_atom",
+            "regulatory_enforcement",
+        ),
+        (
+            "Employment Situation: nonfarm payroll employment rises",
+            "bls_empsit_rss",
+            "data_release",
+        ),
         ("Consumer Price Index inflation hotter than expected", "bls_empsit_rss", "data_release"),
         ("Treasury auction: 10-Year Note", "treasury_auctions", "treasury_auction"),
         ("ECB monetary policy decisions", "ecb_rss", "international"),

@@ -52,10 +52,17 @@ def test_pr_from_gh_payload_maps_nested_fields():
 
 
 def test_collect_merged_prs_calls_list_then_detail():
-    fake = FakeGh([
-        [{"number": 7, "title": "feat: audit [skip ci]"}],
-        {"number": 7, "title": "feat: audit [skip ci]", "files": [], "commits": [{"messageHeadline": "feat: audit [skip ci]"}]},
-    ])
+    fake = FakeGh(
+        [
+            [{"number": 7, "title": "feat: audit [skip ci]"}],
+            {
+                "number": 7,
+                "title": "feat: audit [skip ci]",
+                "files": [],
+                "commits": [{"messageHeadline": "feat: audit [skip ci]"}],
+            },
+        ]
+    )
 
     prs = audit_run.collect_merged_prs(since="2026-04-21", gh=fake)
 
@@ -74,12 +81,21 @@ def test_collect_merged_prs_respects_call_cap():
 
 
 def test_run_panel_writes_report_json_and_envelope(tmp_path):
-    fake = FakeGh([
-        [{"number": 7, "title": "feat: audit"}],
-        {"number": 7, "title": "feat: audit", "files": [], "commits": [{"messageHeadline": "feat: audit"}]},
-    ])
+    fake = FakeGh(
+        [
+            [{"number": 7, "title": "feat: audit"}],
+            {
+                "number": 7,
+                "title": "feat: audit",
+                "files": [],
+                "commits": [{"messageHeadline": "feat: audit"}],
+            },
+        ]
+    )
 
-    result = audit_run.run_panel(cache_dir=tmp_path, gh=fake, open_issue=False, now=datetime(2026, 4, 28, tzinfo=UTC))
+    result = audit_run.run_panel(
+        cache_dir=tmp_path, gh=fake, open_issue=False, now=datetime(2026, 4, 28, tzinfo=UTC)
+    )
 
     assert result.pr_count == 1
     assert result.finding_count >= 1
@@ -89,9 +105,15 @@ def test_run_panel_writes_report_json_and_envelope(tmp_path):
 
 
 def test_run_panel_issue_disabled_is_skipped(tmp_path):
-    fake = FakeGh([[],])
+    fake = FakeGh(
+        [
+            [],
+        ]
+    )
 
-    result = audit_run.run_panel(cache_dir=tmp_path, gh=fake, open_issue=False, now=datetime(2026, 4, 28, tzinfo=UTC))
+    result = audit_run.run_panel(
+        cache_dir=tmp_path, gh=fake, open_issue=False, now=datetime(2026, 4, 28, tzinfo=UTC)
+    )
 
     assert result.issue_action == "skipped"
 
@@ -100,16 +122,31 @@ def test_maybe_publish_issue_creates_findings_issue_for_high():
     finding = audit_run.Finding("x", "high", 1.0, "summary", 1, "title")
     fake = FakeGh(["https://github.com/arigatoexpress/Sapphire/issues/1"])
 
-    action, url = audit_run.maybe_publish_issue(report="body", findings=(finding,), repo="arigatoexpress/Sapphire", gh=fake)
+    action, url = audit_run.maybe_publish_issue(
+        report="body", findings=(finding,), repo="arigatoexpress/Sapphire", gh=fake
+    )
 
     assert action == "created_findings_issue"
     assert url.endswith("/1")
 
 
 def test_maybe_publish_issue_comments_on_existing_rolling_summary():
-    fake = FakeGh([[{"number": 2, "url": "https://github.com/x/2", "title": audit_run.ROLLING_SUMMARY_TITLE}], ""])
+    fake = FakeGh(
+        [
+            [
+                {
+                    "number": 2,
+                    "url": "https://github.com/x/2",
+                    "title": audit_run.ROLLING_SUMMARY_TITLE,
+                }
+            ],
+            "",
+        ]
+    )
 
-    action, url = audit_run.maybe_publish_issue(report="body", findings=(), repo="arigatoexpress/Sapphire", gh=fake)
+    action, url = audit_run.maybe_publish_issue(
+        report="body", findings=(), repo="arigatoexpress/Sapphire", gh=fake
+    )
 
     assert action == "commented_rolling_summary"
     assert url == "https://github.com/x/2"

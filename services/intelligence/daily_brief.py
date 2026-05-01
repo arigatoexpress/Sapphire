@@ -726,9 +726,7 @@ def _section_leads() -> dict:
         parts.append(f"  avg score: `{s['avg_score']}`")
     if top:
         addr = (top.get("address") or "")[:60]
-        parts.append(
-            f"  🏆 Top: `{top.get('score')}` — {top.get('type', '?')} @ {addr}"
-        )
+        parts.append(f"  🏆 Top: `{top.get('score')}` — {top.get('type', '?')} @ {addr}")
     return {"status": "ok", "text": "\n".join(parts), "stats": s, "new_leads": new_leads}
 
 

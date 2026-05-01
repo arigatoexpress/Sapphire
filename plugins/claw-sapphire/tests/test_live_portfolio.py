@@ -52,21 +52,35 @@ def test_input_provenance_action() -> None:
 
 
 def test_seed_trade_non_persistent(tmp_path) -> None:
-    out = tool.handle({"action": "seed-trade", "trade": fill_payload(), "ledger_root": str(tmp_path)})
+    out = tool.handle(
+        {"action": "seed-trade", "trade": fill_payload(), "ledger_root": str(tmp_path)}
+    )
     assert out["ok"] is True
     assert out["persisted"] is False
 
 
 def test_seed_trade_persistent(tmp_path) -> None:
     out = tool.handle(
-        {"action": "seed-trade", "trade": fill_payload(), "ledger_root": str(tmp_path), "persist": True}
+        {
+            "action": "seed-trade",
+            "trade": fill_payload(),
+            "ledger_root": str(tmp_path),
+            "persist": True,
+        }
     )
     assert out["ok"] is True
     assert out["persisted"] is True
 
 
 def test_ledger_action(tmp_path) -> None:
-    tool.handle({"action": "seed-trade", "trade": fill_payload(), "ledger_root": str(tmp_path), "persist": True})
+    tool.handle(
+        {
+            "action": "seed-trade",
+            "trade": fill_payload(),
+            "ledger_root": str(tmp_path),
+            "persist": True,
+        }
+    )
     out = tool.handle({"action": "ledger", "ledger_root": str(tmp_path)})
     assert out["summary"]["trade_count"] == 1
 
@@ -91,9 +105,7 @@ def test_sortino_action() -> None:
 
 
 def test_forecast_action() -> None:
-    out = tool.handle(
-        {"action": "forecast-rung-completion", "tier_start": "2026-04-01T00:00:00Z"}
-    )
+    out = tool.handle({"action": "forecast-rung-completion", "tier_start": "2026-04-01T00:00:00Z"})
     assert out["ok"] is True
 
 

@@ -305,7 +305,9 @@ def build_parser() -> argparse.ArgumentParser:
     daemon_p = sub.add_parser("daemon", help="continuous poll loop")
     daemon_p.add_argument("--poll-interval-seconds", type=float, default=60.0)
     daemon_p.add_argument(
-        "--max-iterations", type=int, default=None,
+        "--max-iterations",
+        type=int,
+        default=None,
         help="cap iterations (for testing)",
     )
     sub.add_parser("status", help="report counters")

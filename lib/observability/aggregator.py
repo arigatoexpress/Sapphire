@@ -192,7 +192,7 @@ def _display_path(path: Path) -> str:
         return str(path)
     home = str(Path.home())
     if text.startswith(home):
-        return "~" + text[len(home):]
+        return "~" + text[len(home) :]
     return text
 
 
@@ -350,9 +350,7 @@ def _build_heartbeat(
     totals = {
         "labels": len(rows),
         "running": sum(1 for row in rows if row.status_label == "running"),
-        "loaded": sum(
-            1 for row in rows if row.status_label in {"running", "loaded", "exited"}
-        ),
+        "loaded": sum(1 for row in rows if row.status_label in {"running", "loaded", "exited"}),
         "not_loaded": sum(1 for row in rows if row.status_label == "not_loaded"),
         "unknown": sum(1 for row in rows if row.status_label == "unknown"),
     }
@@ -422,9 +420,7 @@ def _process_uptime_seconds() -> int | None:
 # ---------------------------------------------------------------------------
 
 
-def _build_inference_proxy(
-    *, cache_dir: Path, now: datetime
-) -> InferenceProxySnapshot:
+def _build_inference_proxy(*, cache_dir: Path, now: datetime) -> InferenceProxySnapshot:
     snapshot = InferenceProxySnapshot(cache_dir=_display_path(cache_dir))
     if not cache_dir.exists():
         snapshot.available = False
@@ -479,14 +475,34 @@ def _mock_tier_health(now: datetime) -> list[dict[str, Any]]:
     """
     iso = now.replace(microsecond=0).isoformat()
     return [
-        {"tier": "T1_GPU", "endpoint": "100.71.10.48:11434", "healthy": False,
-         "latency_ms": None, "last_check": iso},
-        {"tier": "T2_PI", "endpoint": "100.120.191.1:11434", "healthy": False,
-         "latency_ms": None, "last_check": iso},
-        {"tier": "T3_MAC", "endpoint": "127.0.0.1:11434", "healthy": False,
-         "latency_ms": None, "last_check": iso},
-        {"tier": "T4_KIMI", "endpoint": "api.moonshot.cn", "healthy": False,
-         "latency_ms": None, "last_check": iso},
+        {
+            "tier": "T1_GPU",
+            "endpoint": "100.71.10.48:11434",
+            "healthy": False,
+            "latency_ms": None,
+            "last_check": iso,
+        },
+        {
+            "tier": "T2_PI",
+            "endpoint": "100.120.191.1:11434",
+            "healthy": False,
+            "latency_ms": None,
+            "last_check": iso,
+        },
+        {
+            "tier": "T3_MAC",
+            "endpoint": "127.0.0.1:11434",
+            "healthy": False,
+            "latency_ms": None,
+            "last_check": iso,
+        },
+        {
+            "tier": "T4_KIMI",
+            "endpoint": "api.moonshot.cn",
+            "healthy": False,
+            "latency_ms": None,
+            "last_check": iso,
+        },
     ]
 
 
@@ -761,10 +777,7 @@ def _build_event_bus(*, bus_path: Path, max_events: int = _MAX_BUS_EVENTS) -> Ev
         ts = _extract_timestamp(record)
         if ts is not None:
             timestamps.append(ts)
-    distribution = [
-        {"topic": topic, "count": count}
-        for topic, count in counter.most_common(20)
-    ]
+    distribution = [{"topic": topic, "count": count} for topic, count in counter.most_common(20)]
     return EventBusSnapshot(
         relative_path=relative,
         events_seen=events_seen,
@@ -800,18 +813,16 @@ def build_system_snapshot(
     resolved_pause = pause_dir or DEFAULT_PAUSE_DIR
     resolved_proxy = inference_proxy_cache or DEFAULT_INFERENCE_PROXY_CACHE
     resolved_bus = bus_path or DEFAULT_BUS_PATH
-    resolved_sources = tuple(signal_sources) if signal_sources is not None else DEFAULT_SIGNAL_SOURCES
+    resolved_sources = (
+        tuple(signal_sources) if signal_sources is not None else DEFAULT_SIGNAL_SOURCES
+    )
     current = _now(now)
     heartbeat, agents = _build_heartbeat(
         repo_root=resolved_root, now=current, launchctl_runner=launchctl_runner
     )
     proxy = _build_inference_proxy(cache_dir=resolved_proxy, now=current)
-    streams = _build_signal_streams(
-        repo_root=resolved_root, now=current, sources=resolved_sources
-    )
-    provenance = _build_provenance(
-        repo_root=resolved_root, now=current, runner=provenance_runner
-    )
+    streams = _build_signal_streams(repo_root=resolved_root, now=current, sources=resolved_sources)
+    provenance = _build_provenance(repo_root=resolved_root, now=current, runner=provenance_runner)
     pause_summary, _ = _build_routine_pause(pause_dir=resolved_pause)
     bus_snapshot = _build_event_bus(bus_path=resolved_bus)
     heartbeat["launchagents"] = [asdict(row) for row in agents]
@@ -842,11 +853,11 @@ def build_stream_rates_only(
 ) -> dict[str, Any]:
     """Slim variant for ``/api/observability-stream-rates``."""
     resolved_root = repo_root or DEFAULT_REPO_ROOT
-    resolved_sources = tuple(signal_sources) if signal_sources is not None else DEFAULT_SIGNAL_SOURCES
-    current = _now(now)
-    streams = _build_signal_streams(
-        repo_root=resolved_root, now=current, sources=resolved_sources
+    resolved_sources = (
+        tuple(signal_sources) if signal_sources is not None else DEFAULT_SIGNAL_SOURCES
     )
+    current = _now(now)
+    streams = _build_signal_streams(repo_root=resolved_root, now=current, sources=resolved_sources)
     totals_1h = sum(stream.rate_1h for stream in streams)
     totals_24h = sum(stream.rate_24h for stream in streams)
     return {
@@ -907,5 +918,3 @@ def _read_json_safe(path: Path) -> Any:
             return json.load(handle)
     except (OSError, json.JSONDecodeError):
         return None
-
-

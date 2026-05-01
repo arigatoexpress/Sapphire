@@ -128,9 +128,7 @@ def test_nearest_run_snapshot_selection_writes_selection_metadata(tmp_path: Path
     assert exit_code == 0
     payload = json.loads(
         next(
-            path
-            for path in report_dir.glob("*.json")
-            if not path.name.endswith(".envelope.json")
+            path for path in report_dir.glob("*.json") if not path.name.endswith(".envelope.json")
         ).read_text()
     )
     assert payload["selection"]["mode"] == "nearest_run_snapshot"

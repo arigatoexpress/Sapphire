@@ -13,7 +13,9 @@ from lib.counterparty.tracker import (
 
 
 def test_trader_stats_from_dict_accepts_aliases():
-    trader = TraderStats.from_dict({"user": "0xABC", "pnl30d": 100000, "pnl90d": 200000, "sharpe": 1.5})
+    trader = TraderStats.from_dict(
+        {"user": "0xABC", "pnl30d": 100000, "pnl90d": 200000, "sharpe": 1.5}
+    )
     assert trader.address == "0xabc"
     assert trader.realized_pnl_30d_usd == 100000
 
@@ -32,15 +34,28 @@ def test_rank_traders_filters_small_accounts():
 def test_rank_traders_orders_by_quality():
     ranked = rank_traders(
         [
-            {"address": "0x1", "realized_pnl_30d_usd": 100000, "realized_pnl_90d_usd": 0, "sharpe_30d": 0},
-            {"address": "0x2", "realized_pnl_30d_usd": 120000, "realized_pnl_90d_usd": 300000, "sharpe_30d": 2},
+            {
+                "address": "0x1",
+                "realized_pnl_30d_usd": 100000,
+                "realized_pnl_90d_usd": 0,
+                "sharpe_30d": 0,
+            },
+            {
+                "address": "0x2",
+                "realized_pnl_30d_usd": 120000,
+                "realized_pnl_90d_usd": 300000,
+                "sharpe_30d": 2,
+            },
         ]
     )
     assert ranked[0].address == "0x2"
 
 
 def test_rank_traders_caps_top_n_and_hard_max():
-    rows = [{"address": f"0x{i}", "realized_pnl_30d_usd": 100000 + i, "sharpe_30d": 1} for i in range(150)]
+    rows = [
+        {"address": f"0x{i}", "realized_pnl_30d_usd": 100000 + i, "sharpe_30d": 1}
+        for i in range(150)
+    ]
     assert len(rank_traders(rows, top_n=500)) == MAX_TRADERS_TRACKED
 
 
@@ -82,12 +97,16 @@ def test_track_position_changes_ignores_small_shift():
 
 
 def test_track_position_changes_detects_new_position():
-    changes = track_position_changes([], [TraderPosition("0x1", "BTC", "long", 100)], threshold_pct=15)
+    changes = track_position_changes(
+        [], [TraderPosition("0x1", "BTC", "long", 100)], threshold_pct=15
+    )
     assert changes[0].old_size_usd == 0
 
 
 def test_track_position_changes_detects_closed_position_as_flat():
-    changes = track_position_changes([TraderPosition("0x1", "BTC", "long", 100)], [], threshold_pct=15)
+    changes = track_position_changes(
+        [TraderPosition("0x1", "BTC", "long", 100)], [], threshold_pct=15
+    )
     assert changes[0].side == "flat"
 
 
@@ -122,7 +141,9 @@ def test_position_change_to_dict():
 
 
 def test_bad_numeric_values_default_to_zero():
-    trader = TraderStats.from_dict({"address": "0x1", "realized_pnl_30d_usd": "bad", "sharpe_30d": "bad"})
+    trader = TraderStats.from_dict(
+        {"address": "0x1", "realized_pnl_30d_usd": "bad", "sharpe_30d": "bad"}
+    )
     assert trader.realized_pnl_30d_usd == 0
 
 
@@ -131,5 +152,9 @@ def test_empty_trader_address_is_filtered():
 
 
 def test_detected_at_is_iso_utc():
-    change = track_position_changes([], [TraderPosition("0x1", "BTC", "long", 100)], detected_at=datetime(2024, 1, 1, tzinfo=UTC))[0]
+    change = track_position_changes(
+        [],
+        [TraderPosition("0x1", "BTC", "long", 100)],
+        detected_at=datetime(2024, 1, 1, tzinfo=UTC),
+    )[0]
     assert change.detected_at == "2024-01-01T00:00:00+00:00"

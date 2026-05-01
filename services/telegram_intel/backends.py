@@ -83,7 +83,9 @@ class MTProtoBackend:
 
             min_id = int(since_id) if since_id and str(since_id).isdigit() else 0
             messages: list[RawMessage] = []
-            async with TelegramClient(str(self.session_path), int(self.api_id), self.api_hash) as client:
+            async with TelegramClient(
+                str(self.session_path), int(self.api_id), self.api_hash
+            ) as client:
                 async for item in client.iter_messages(channel.source, limit=limit, min_id=min_id):
                     text = _message_text_from_telegram(item)
                     if not text:

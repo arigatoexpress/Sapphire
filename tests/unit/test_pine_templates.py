@@ -53,8 +53,8 @@ def test_render_indicator_respects_extra_payload():
     )
     # extra fields are emitted as escaped JSON inside a Pine single-quoted string,
     # so quotes appear as backslash-escapes in the source
-    assert r'\"tier\": \"primary\"' in src
-    assert r'\"ladder\": 1' in src
+    assert r"\"tier\": \"primary\"" in src
+    assert r"\"ladder\": 1" in src
 
 
 def test_write_template_writes_pine_and_metadata(tmp_path: Path):
@@ -122,9 +122,7 @@ def test_generated_payload_actions_are_in_webhook_valid_set():
         sys.path.insert(0, str(root))
     # Pull VALID_ACTIONS by parsing the receiver source — avoids importing the
     # FastAPI module (which has heavy side effects including network probes).
-    receiver = (root / "services" / "webhook" / "src" / "receiver.py").read_text(
-        encoding="utf-8"
-    )
+    receiver = (root / "services" / "webhook" / "src" / "receiver.py").read_text(encoding="utf-8")
     src = render_sapphire_watch_indicator("BINANCE:ETHUSDT")
     for action in ("long", "short", "exit_long", "exit_short"):
         # Generated indicator emits these

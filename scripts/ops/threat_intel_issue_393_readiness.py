@@ -34,9 +34,7 @@ try:  # pragma: no cover - availability depends on the operator environment
 except ImportError:  # pragma: no cover
     certifi = None
 
-CISA_KEV_URL = (
-    "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
-)
+CISA_KEV_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
 DEFAULT_REPO = "arigatoexpress/Sapphire"
 DEFAULT_RECENT_DAYS = 7
 DEFAULT_KEV_LIMIT = 10
@@ -200,8 +198,7 @@ def load_kev_payload(path: Path | None = None) -> dict[str, Any]:
 
 def _kev_product_text(entry: dict[str, Any]) -> str:
     return " ".join(
-        str(entry.get(field) or "")
-        for field in ("vendorProject", "product", "vulnerabilityName")
+        str(entry.get(field) or "") for field in ("vendorProject", "product", "vulnerabilityName")
     )
 
 
@@ -359,8 +356,7 @@ def fetch_dependabot_status(repo: str) -> dict[str, Any]:
     return {
         "status": "available",
         "alerts_count": result.get("alerts_count", 0),
-        "critical_high_open": int(by_severity.get("critical", 0))
-        + int(by_severity.get("high", 0)),
+        "critical_high_open": int(by_severity.get("critical", 0)) + int(by_severity.get("high", 0)),
         "by_severity": by_severity,
         "by_ecosystem": summary.get("by_ecosystem", {}),
     }
@@ -378,13 +374,21 @@ def build_report(
     kev = classify_kev_candidates(kev_payload, dependencies, as_of=as_of)
     deployment = summarize_deployment_footprint(root)
     dependabot = (
-        {"status": "skipped", "reason": "operator requested --skip-ghas", "critical_high_open": None}
+        {
+            "status": "skipped",
+            "reason": "operator requested --skip-ghas",
+            "critical_high_open": None,
+        }
         if skip_ghas
         else fetch_dependabot_status(repo)
     )
-    deployment_clear = all(item["status"] == "absent_by_repo_config_evidence" for item in deployment)
+    deployment_clear = all(
+        item["status"] == "absent_by_repo_config_evidence" for item in deployment
+    )
     kev_clear = kev["sapphire_relevant_reported_count"] == 0
-    ghas_clear = dependabot.get("status") == "available" and dependabot.get("critical_high_open") == 0
+    ghas_clear = (
+        dependabot.get("status") == "available" and dependabot.get("critical_high_open") == 0
+    )
     ready_to_close = bool(deployment_clear and kev_clear and ghas_clear)
     ready_to_comment = bool(deployment_clear and kev_clear)
     if ready_to_close:
@@ -440,7 +444,9 @@ def render_markdown(report: dict[str, Any]) -> str:
 
     lines.extend(["", "### Unknown"])
     if dependabot["status"] != "available":
-        lines.append("- GHAS/Dependabot alert contents remain unknown until alerts are enabled or token scope is refreshed.")
+        lines.append(
+            "- GHAS/Dependabot alert contents remain unknown until alerts are enabled or token scope is refreshed."
+        )
     else:
         lines.append("- No unknown GHAS/Dependabot state from this run.")
 
@@ -452,7 +458,9 @@ def render_markdown(report: dict[str, Any]) -> str:
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", default=".", help="Sapphire checkout root.")
-    parser.add_argument("--repo", default=DEFAULT_REPO, help=f"GitHub repo, default {DEFAULT_REPO}.")
+    parser.add_argument(
+        "--repo", default=DEFAULT_REPO, help=f"GitHub repo, default {DEFAULT_REPO}."
+    )
     parser.add_argument("--kev-json", type=Path, help="Use a local CISA KEV JSON payload.")
     parser.add_argument("--as-of", help="Date for recent KEV window, YYYY-MM-DD.")
     parser.add_argument("--skip-ghas", action="store_true", help="Skip live Dependabot API check.")

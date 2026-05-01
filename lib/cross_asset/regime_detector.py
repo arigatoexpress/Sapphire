@@ -47,7 +47,9 @@ def _round(value: float | None, digits: int = 4) -> float | None:
     return round(float(value), digits)
 
 
-def _coerce_matrix(raw: MethodMatrix | Mapping[str, Any]) -> tuple[list[str], list[list[float | None]], str]:
+def _coerce_matrix(
+    raw: MethodMatrix | Mapping[str, Any],
+) -> tuple[list[str], list[list[float | None]], str]:
     if isinstance(raw, MethodMatrix):
         return raw.assets, raw.matrix, raw.window
     assets = [str(asset).upper() for asset in raw.get("assets", [])]  # type: ignore[union-attr]
@@ -156,9 +158,7 @@ def detect_regime(
         label = "regime_uncertain"
         confidence = 0.2 if observed_pairs else 0.0
         drivers.append("insufficient pair coverage")
-    elif (broad_abs or 0.0) >= 0.72 or (
-        risk_corr >= 0.72 and abs(dollar_corr or 0.0) >= 0.42
-    ):
+    elif (broad_abs or 0.0) >= 0.72 or (risk_corr >= 0.72 and abs(dollar_corr or 0.0) >= 0.42):
         label = "crisis_correlation_spike"
         confidence = min(0.96, 0.62 + max(broad_abs or 0.0, risk_corr) * 0.34)
         drivers.append("broad absolute correlation spike")

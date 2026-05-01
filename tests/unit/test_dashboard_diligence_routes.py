@@ -259,9 +259,7 @@ def test_launchagent_summary_api_reports_labels_and_last_exit(client, monkeypatc
             args[0],
             0,
             stdout=(
-                "PID\tStatus\tLabel\n"
-                "123\t0\tcom.sapphire.dashboard\n"
-                "-\t-15\tai.hermes.gateway\n"
+                "PID\tStatus\tLabel\n123\t0\tcom.sapphire.dashboard\n-\t-15\tai.hermes.gateway\n"
             ),
             stderr="",
         )
@@ -280,9 +278,7 @@ def test_launchagent_summary_api_reports_labels_and_last_exit(client, monkeypatc
     assert by_label["com.sapphire.missing"]["status_label"] == "not_loaded"
 
 
-def test_launchagent_summary_buyer_profile_redacts_operational_identifiers(
-    client, monkeypatch
-):
+def test_launchagent_summary_buyer_profile_redacts_operational_identifiers(client, monkeypatch):
     monkeypatch.setattr(
         dashboard_app,
         "_dashboard_launchagent_labels",
@@ -295,9 +291,7 @@ def test_launchagent_summary_buyer_profile_redacts_operational_identifiers(
             args[0],
             0,
             stdout=(
-                "PID\tStatus\tLabel\n"
-                "123\t0\tcom.sapphire.dashboard\n"
-                "-\t-15\tai.hermes.gateway\n"
+                "PID\tStatus\tLabel\n123\t0\tcom.sapphire.dashboard\n-\t-15\tai.hermes.gateway\n"
             ),
             stderr="",
         )

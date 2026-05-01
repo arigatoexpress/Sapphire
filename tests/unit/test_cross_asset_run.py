@@ -9,7 +9,9 @@ FROZEN_NOW = datetime(2026, 4, 28, 12, 0, tzinfo=UTC)
 
 def test_build_snapshot_is_cache_or_dry_run_by_default(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr("lib.cross_asset.sources.CACHE_ROOT", tmp_path)
-    snapshot = run.build_snapshot(assets=["BTC", "ETH", "DXY"], live=False, now=FROZEN_NOW, limit=120)
+    snapshot = run.build_snapshot(
+        assets=["BTC", "ETH", "DXY"], live=False, now=FROZEN_NOW, limit=120
+    )
     assert snapshot["ok"] is True
     assert snapshot["mode"] == "cache_or_dry_run"
     assert snapshot["provenance"]["schema_version"] == 1

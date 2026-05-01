@@ -61,9 +61,7 @@ def test_dry_run_command_includes_every_test_path() -> None:
         result = by_module[source]
         joined = " ".join(result.command)
         for test_path in tests:
-            assert test_path in joined, (
-                f"command for {source!r} missing test path {test_path!r}"
-            )
+            assert test_path in joined, f"command for {source!r} missing test path {test_path!r}"
 
 
 def test_render_markdown_is_paste_safe(tmp_path: Path) -> None:
@@ -117,13 +115,9 @@ def test_main_dry_run_prints_markdown_and_writes_report(
     json.loads(files[0].read_text())
 
 
-def test_main_print_only_skips_sidecar(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_main_print_only_skips_sidecar(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """``--print-only`` keeps Markdown but does not write a JSON sidecar."""
-    rc = run_mutation_testing.main(
-        ["--report-root", str(tmp_path), "--print-only"]
-    )
+    rc = run_mutation_testing.main(["--report-root", str(tmp_path), "--print-only"])
     assert rc == 0
     files = list(tmp_path.glob("mutation_report_*.json"))
     assert files == []
@@ -131,6 +125,7 @@ def test_main_print_only_skips_sidecar(
 
 def test_live_flag_unset_stays_in_dry_run(monkeypatch: pytest.MonkeyPatch) -> None:
     """Even if ``run_targets(live=False)`` we never shell out to mutmut."""
+
     # Sentinel: replace _live_run with a function that raises if called.
     def _should_not_run(target):  # noqa: ANN001, ANN202
         raise AssertionError("Live mutation runner invoked without flag!")
@@ -154,9 +149,7 @@ def test_force_live_flag_takes_effect(monkeypatch: pytest.MonkeyPatch) -> None:
 
     def _capture_live(target):  # noqa: ANN001, ANN202
         seen.append(True)
-        return run_mutation_testing.ModuleResult(
-            module=target[0], mode="live", command=("noop",)
-        )
+        return run_mutation_testing.ModuleResult(module=target[0], mode="live", command=("noop",))
 
     monkeypatch.setattr(run_mutation_testing, "_live_run", _capture_live)
     rc = run_mutation_testing.main(

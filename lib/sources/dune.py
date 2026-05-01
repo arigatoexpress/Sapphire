@@ -73,7 +73,9 @@ class DuneNamedQuerySource:
             query_id = int(query.get("id") or query.get("query_id") or 0)
             if query_id <= 0:
                 continue
-            result = self._run_query(query_id, query.get("params") if isinstance(query.get("params"), Mapping) else None)
+            result = self._run_query(
+                query_id, query.get("params") if isinstance(query.get("params"), Mapping) else None
+            )
             rows.append(
                 {
                     "name": str(query.get("name") or query_id),

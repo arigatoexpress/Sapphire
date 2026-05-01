@@ -135,7 +135,9 @@ def build_user_prompt(
     return prompt[: max_input_chars - 1] + "\n"
 
 
-def build_messages(signal: Mapping[str, Any], *, max_input_chars: int, mode: str) -> list[dict[str, str]]:
+def build_messages(
+    signal: Mapping[str, Any], *, max_input_chars: int, mode: str
+) -> list[dict[str, str]]:
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
         {

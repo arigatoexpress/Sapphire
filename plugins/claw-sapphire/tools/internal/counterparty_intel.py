@@ -61,9 +61,15 @@ def handle(payload: dict[str, Any]) -> dict[str, Any]:
         return {**client.status(), "version": VERSION}
     if action == "leaderboard":
         top_n = int(payload.get("top_n") or 50)
-        return {"ok": True, "traders": [t.to_dict() for t in client.leaderboard(top_n=top_n)], "version": VERSION}
+        return {
+            "ok": True,
+            "traders": [t.to_dict() for t in client.leaderboard(top_n=top_n)],
+            "version": VERSION,
+        }
     if action == "position-changes":
-        changes = track_position_changes(payload.get("previous") or [], payload.get("current") or [])
+        changes = track_position_changes(
+            payload.get("previous") or [], payload.get("current") or []
+        )
         return {"ok": True, "position_changes": [c.to_dict() for c in changes], "version": VERSION}
     if action == "smart-money-consensus":
         signals = generate_signals(payload.get("position_changes") or [])

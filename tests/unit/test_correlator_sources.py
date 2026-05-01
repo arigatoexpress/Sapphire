@@ -93,9 +93,7 @@ def test_tradingview_source_canonicalizes_btc_usd(tmp_path) -> None:
     base.mkdir()
     file = base / "2026-04-28.jsonl"
     file.write_text(
-        json.dumps(
-            {"symbol": "BTC-USD", "direction": "sell", "timestamp": _iso(datetime.now(UTC))}
-        )
+        json.dumps({"symbol": "BTC-USD", "direction": "sell", "timestamp": _iso(datetime.now(UTC))})
         + "\n",
         encoding="utf-8",
     )
@@ -154,9 +152,7 @@ def test_telegram_intel_source_reads_label(tmp_path) -> None:
 def test_telegram_intel_source_neutral_default(tmp_path) -> None:
     path = tmp_path / "telegram_intel_signals.jsonl"
     path.write_text(
-        json.dumps(
-            {"symbols": ["BTC"], "label": "uncertain", "timestamp": _iso(datetime.now(UTC))}
-        )
+        json.dumps({"symbols": ["BTC"], "label": "uncertain", "timestamp": _iso(datetime.now(UTC))})
         + "\n",
         encoding="utf-8",
     )

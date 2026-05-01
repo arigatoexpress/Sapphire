@@ -39,9 +39,9 @@ def test_prompt_redacts_sensitive_keys() -> None:
 
 
 def test_prompt_rendering_is_deterministic() -> None:
-    assert prompts.build_user_prompt(_signal(), max_input_chars=18_000) == prompts.build_user_prompt(
+    assert prompts.build_user_prompt(
         _signal(), max_input_chars=18_000
-    )
+    ) == prompts.build_user_prompt(_signal(), max_input_chars=18_000)
 
 
 def test_prompt_truncates_to_cap() -> None:

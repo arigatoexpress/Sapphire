@@ -40,9 +40,7 @@ def og_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 class TestUploadFile:
-    def test_returns_root_and_tx(
-        self, fake_helper: Path, og_env: None, tmp_path: Path
-    ) -> None:
+    def test_returns_root_and_tx(self, fake_helper: Path, og_env: None, tmp_path: Path) -> None:
         target = tmp_path / "blob.bin"
         target.write_bytes(b"hi")
         captured: dict[str, Any] = {}

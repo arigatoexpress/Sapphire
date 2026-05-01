@@ -17,7 +17,11 @@ loaded_lib = sys.modules.get("lib")
 loaded_paths = list(getattr(loaded_lib, "__path__", [])) if loaded_lib is not None else []
 if str(repo_lib) not in loaded_paths:
     pkg = types.ModuleType("lib")
-    pkg.__path__ = [str(repo_lib), *(p for p in loaded_paths if p != str(repo_lib)), str(plugin_lib)]
+    pkg.__path__ = [
+        str(repo_lib),
+        *(p for p in loaded_paths if p != str(repo_lib)),
+        str(plugin_lib),
+    ]
     sys.modules["lib"] = pkg
 
 from lib.research_notes.pipeline import (  # noqa: E402
@@ -79,9 +83,7 @@ def handle(payload: dict[str, Any]) -> dict[str, Any]:
         return aggregate_summary(output_root=output_root)
     return {
         "ok": False,
-        "error": (
-            "unknown action; use compose, render, build, latest, or aggregate-summary"
-        ),
+        "error": ("unknown action; use compose, render, build, latest, or aggregate-summary"),
     }
 
 

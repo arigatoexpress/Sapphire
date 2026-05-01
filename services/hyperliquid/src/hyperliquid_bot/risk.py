@@ -341,9 +341,7 @@ class HyperliquidLiveExecutor:
             response = await self._submit(signal, verdict)
         except Exception as exc:
             log.exception("hyperliquid order failed")
-            result = ExecutionResult(
-                status="error", signal=signal, verdict=verdict, error=str(exc)
-            )
+            result = ExecutionResult(status="error", signal=signal, verdict=verdict, error=str(exc))
             self._log(result)
             return result
 
@@ -380,8 +378,7 @@ class HyperliquidLiveExecutor:
         positions = [
             pos
             for pos in user_state.get("assetPositions", [])
-            if isinstance(pos, dict)
-            and float((pos.get("position") or {}).get("szi", 0) or 0) != 0
+            if isinstance(pos, dict) and float((pos.get("position") or {}).get("szi", 0) or 0) != 0
         ]
         return RiskState(
             open_positions=len(positions),
@@ -390,9 +387,7 @@ class HyperliquidLiveExecutor:
             trading_enabled=self._trading_enabled,
         )
 
-    async def _submit(
-        self, signal: dict[str, Any], verdict: RiskVerdict
-    ) -> dict[str, Any]:
+    async def _submit(self, signal: dict[str, Any], verdict: RiskVerdict) -> dict[str, Any]:
         symbol = str(signal.get("symbol") or "BTC").upper()
         action = str(signal.get("action") or "").lower()
         if action == "close":

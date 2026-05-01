@@ -105,10 +105,7 @@ def test_pump_samples_hold_candidate_for_review() -> None:
     candidate = report["candidates"][0]
 
     assert candidate["decision"] == "hold_bot_pump_review"
-    rules = {
-        finding["rule_id"]
-        for finding in candidate["bot_pump_review"]["report"]["findings"]
-    }
+    rules = {finding["rule_id"] for finding in candidate["bot_pump_review"]["report"]["findings"]}
     assert "pump_language_with_bot_or_profit_claim" in rules
     assert "coordinated_pump_burst" in rules
 

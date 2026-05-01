@@ -56,8 +56,7 @@ class OHLCVPoint:
 class OHLCVAdapter(Protocol):
     name: str
 
-    def supports(self, asset: str) -> bool:
-        ...
+    def supports(self, asset: str) -> bool: ...
 
     def get_ohlcv(
         self,
@@ -66,8 +65,7 @@ class OHLCVAdapter(Protocol):
         live: bool = False,
         limit: int = 24 * 120,
         now: datetime | None = None,
-    ) -> list[OHLCVPoint]:
-        ...
+    ) -> list[OHLCVPoint]: ...
 
 
 class CachedOHLCVAdapter:
@@ -201,7 +199,9 @@ class HyperliquidCachedSourceAdapter(CachedOHLCVAdapter):
 
     name = "hyperliquid"
 
-    def __init__(self, *, cache_root: Path | None = None, ttl_seconds: int = CACHE_TTL_SECONDS) -> None:
+    def __init__(
+        self, *, cache_root: Path | None = None, ttl_seconds: int = CACHE_TTL_SECONDS
+    ) -> None:
         super().__init__(
             cache_root=cache_root,
             ttl_seconds=ttl_seconds,
@@ -224,7 +224,9 @@ def _coerce_point(raw: dict[str, Any], *, default_source: str) -> OHLCVPoint:
     high = float(raw.get("high") or raw.get("h") or max(open_, close))
     low = float(raw.get("low") or raw.get("l") or min(open_, close))
     volume = float(raw.get("volume") or raw.get("v") or 0.0)
-    timestamp = str(raw.get("timestamp") or raw.get("date") or raw.get("time") or raw.get("t") or "")
+    timestamp = str(
+        raw.get("timestamp") or raw.get("date") or raw.get("time") or raw.get("t") or ""
+    )
     return OHLCVPoint(
         timestamp=timestamp,
         open=open_,
@@ -324,7 +326,9 @@ def fetch_universe(
     now: datetime | None = None,
 ) -> dict[str, list[OHLCVPoint]]:
     """Fetch a capped cross-asset universe from cache-first adapters."""
-    wanted = [asset.strip().upper() for asset in (assets or DEFAULT_ASSET_MAP) if str(asset).strip()]
+    wanted = [
+        asset.strip().upper() for asset in (assets or DEFAULT_ASSET_MAP) if str(asset).strip()
+    ]
     wanted = list(dict.fromkeys(wanted))
     if len(wanted) > MAX_ASSETS_HARD:
         raise ValueError(f"asset count {len(wanted)} exceeds MAX_ASSETS_HARD={MAX_ASSETS_HARD}")
@@ -333,7 +337,9 @@ def fetch_universe(
     for asset in wanted:
         adapter = next((candidate for candidate in adapter_list if candidate.supports(asset)), None)
         if adapter is None:
-            out[asset] = synthetic_ohlcv(asset, points=limit, now=now, source="synthetic:unsupported")
+            out[asset] = synthetic_ohlcv(
+                asset, points=limit, now=now, source="synthetic:unsupported"
+            )
             continue
         out[asset] = adapter.get_ohlcv(asset, live=live, limit=limit, now=now)
     return out
@@ -342,7 +348,9 @@ def fetch_universe(
 def to_close_series(rows_by_asset: dict[str, list[OHLCVPoint]]) -> dict[str, list[dict[str, Any]]]:
     """Return JSON-friendly rows accepted by ``build_correlation_matrix``."""
     return {
-        asset: [{"timestamp": row.timestamp, "close": row.close, "source": row.source} for row in rows]
+        asset: [
+            {"timestamp": row.timestamp, "close": row.close, "source": row.source} for row in rows
+        ]
         for asset, rows in rows_by_asset.items()
     }
 

@@ -40,7 +40,9 @@ def test_report_observes_safe_default_flags_without_secret_values(tmp_path, monk
     assert report["summary"]["safe_defaults_observed"] is True
     assert report["safety"]["external_writes_attempted"] is False
     assert all(row["claim"] == readiness.OBSERVED for row in report["live_flags"])
-    narrative_key = next(row for row in report["credentials"] if row["label"] == "Gemini narrative key")
+    narrative_key = next(
+        row for row in report["credentials"] if row["label"] == "Gemini narrative key"
+    )
     assert narrative_key["present"] is True
     serialized = json.dumps(report, sort_keys=True)
     assert "sk-super-secret-test-value" not in serialized

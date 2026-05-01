@@ -212,7 +212,9 @@ def run_once(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--once", action="store_true", help="run once and exit")
-    parser.add_argument("--live", action="store_true", help="allow live adapters when env gate is set")
+    parser.add_argument(
+        "--live", action="store_true", help="allow live adapters when env gate is set"
+    )
     parser.add_argument("--publish", action="store_true", help="publish local event-bus events")
     parser.add_argument("--interval-seconds", type=int, default=3600)
     parser.add_argument("--assets", default="", help="comma-separated asset list")

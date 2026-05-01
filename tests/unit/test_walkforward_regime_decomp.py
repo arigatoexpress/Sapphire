@@ -74,18 +74,14 @@ def test_attach_labels_forward_fill_inherits_prior_label() -> None:
 
 def test_attach_labels_forward_fill_uses_default_when_no_prior() -> None:
     labels = {"2026-01-05": "risk_on"}
-    out = attach_regime_labels(
-        ["2026-01-01", "2026-01-05"], labels, semantics="forward_fill"
-    )
+    out = attach_regime_labels(["2026-01-01", "2026-01-05"], labels, semantics="forward_fill")
     assert out == ["regime_uncertain", "risk_on"]
 
 
 def test_attach_labels_nearest_prior_falls_through_to_future() -> None:
     """If no prior label exists, ``nearest_prior`` should reach forward."""
     labels = {"2026-01-05": "risk_on"}
-    out = attach_regime_labels(
-        ["2026-01-01", "2026-01-05"], labels, semantics="nearest_prior"
-    )
+    out = attach_regime_labels(["2026-01-01", "2026-01-05"], labels, semantics="nearest_prior")
     assert out == ["risk_on", "risk_on"]
 
 

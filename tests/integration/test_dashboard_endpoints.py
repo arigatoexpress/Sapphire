@@ -797,11 +797,15 @@ def test_narrative_eval_page_and_endpoints_render_empty_state(app_client):
     assert body["ok"] is True
     assert body["overall"]["scored"] == 0
 
-    aggregates = client.get("/api/narrative-eval-aggregates?group_by=symbol", headers={"Authorization": _AUTH})
+    aggregates = client.get(
+        "/api/narrative-eval-aggregates?group_by=symbol", headers={"Authorization": _AUTH}
+    )
     assert aggregates.status_code == 200
     assert aggregates.get_json()["groups"] == {}
 
-    diagnostics = client.get("/api/narrative-eval-aggregates?view=diagnostics", headers={"Authorization": _AUTH})
+    diagnostics = client.get(
+        "/api/narrative-eval-aggregates?view=diagnostics", headers={"Authorization": _AUTH}
+    )
     assert diagnostics.status_code == 200
     assert diagnostics.get_json()["false_positives"] == []
 
@@ -845,7 +849,6 @@ def test_gemini_ooda_endpoint_can_return_daily_diff(app_client, tmp_path, monkey
     assert mutated["tool_response.ooda.decide"]["after"] == "watch deltas"
 
 
-
 def test_tradingview_orchestrator_sessions_endpoint(app_client, monkeypatch):
     _, client = app_client
     from lib.trading import tradingview_orchestrator
@@ -864,7 +867,9 @@ def test_tradingview_orchestrator_sessions_endpoint(app_client, monkeypatch):
         ],
     )
 
-    r = client.get("/api/tradingview/orchestrator/sessions?limit=5", headers={"Authorization": _AUTH})
+    r = client.get(
+        "/api/tradingview/orchestrator/sessions?limit=5", headers={"Authorization": _AUTH}
+    )
     assert r.status_code == 200
     body = r.get_json()
     assert body["status"] == "ok"
@@ -938,7 +943,6 @@ def test_tradingview_orchestrator_probe_endpoint(app_client, monkeypatch):
     assert body["state"]["payload"]["symbol"] == "BINANCE:ETHUSDT"
 
 
-
 def test_tradingview_orchestrator_artifact_endpoint_blocks_traversal(app_client, monkeypatch):
     _, client = app_client
     r = client.get(
@@ -993,7 +997,9 @@ def test_tradingview_orchestrator_artifact_endpoint_returns_json(app_client, mon
     assert r.get_json()["ok"] is True
 
 
-def test_tradingview_orchestrator_artifact_endpoint_404_for_missing(app_client, monkeypatch, tmp_path):
+def test_tradingview_orchestrator_artifact_endpoint_404_for_missing(
+    app_client, monkeypatch, tmp_path
+):
     _, client = app_client
     from lib.trading import tradingview_orchestrator
 
@@ -1077,12 +1083,24 @@ def test_tradingview_orchestrator_scoring_latest_endpoint(app_client, monkeypatc
             "generated_at": "2026-01-01T00:00:00+00:00",
             "scored_at": "2026-01-01T00:01:00+00:00",
             "items": [
-                {"symbol": "BTC", "tradingview_symbol": "BINANCE:BTCUSDT",
-                 "timeframe": "60", "rank": 2,
-                 "score": -0.8, "regime": "RISK_OFF", "rationale": "RSI=20; Δ=-8%"},
-                {"symbol": "SOL", "tradingview_symbol": "BINANCE:SOLUSDT",
-                 "timeframe": "60", "rank": 3,
-                 "score": 0.5, "regime": "RISK_ON", "rationale": "RSI=70; Δ=+6%"},
+                {
+                    "symbol": "BTC",
+                    "tradingview_symbol": "BINANCE:BTCUSDT",
+                    "timeframe": "60",
+                    "rank": 2,
+                    "score": -0.8,
+                    "regime": "RISK_OFF",
+                    "rationale": "RSI=20; Δ=-8%",
+                },
+                {
+                    "symbol": "SOL",
+                    "tradingview_symbol": "BINANCE:SOLUSDT",
+                    "timeframe": "60",
+                    "rank": 3,
+                    "score": 0.5,
+                    "regime": "RISK_ON",
+                    "rationale": "RSI=70; Δ=+6%",
+                },
             ],
         },
     )

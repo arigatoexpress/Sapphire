@@ -28,8 +28,14 @@ class TraderStats:
     def from_dict(cls, raw: dict[str, Any]) -> TraderStats:
         return cls(
             address=str(raw.get("address") or raw.get("user") or raw.get("account") or "").lower(),
-            display_name=(str(raw.get("display_name") or raw.get("name")) if raw.get("display_name") or raw.get("name") else None),
-            realized_pnl_30d_usd=_float(raw.get("realized_pnl_30d_usd", raw.get("pnl30d", raw.get("pnl")))),
+            display_name=(
+                str(raw.get("display_name") or raw.get("name"))
+                if raw.get("display_name") or raw.get("name")
+                else None
+            ),
+            realized_pnl_30d_usd=_float(
+                raw.get("realized_pnl_30d_usd", raw.get("pnl30d", raw.get("pnl")))
+            ),
             realized_pnl_90d_usd=_float(raw.get("realized_pnl_90d_usd", raw.get("pnl90d"))),
             sharpe_30d=_float(raw.get("sharpe_30d", raw.get("sharpe"))),
             win_rate_30d=_maybe_float(raw.get("win_rate_30d", raw.get("winRate"))),
@@ -139,7 +145,9 @@ def rank_traders(
         for trader in traders
         if trader.address and trader.realized_pnl_30d_usd >= min_30d_pnl_usd
     ]
-    ranked = sorted(eligible, key=lambda t: (t.quality_score(), t.realized_pnl_30d_usd), reverse=True)
+    ranked = sorted(
+        eligible, key=lambda t: (t.quality_score(), t.realized_pnl_30d_usd), reverse=True
+    )
     return ranked[:capped]
 
 
@@ -162,8 +170,18 @@ def track_position_changes(
     detected_at: datetime | None = None,
 ) -> list[PositionChange]:
     """Return material position shifts without mutating upstream data."""
-    prev = [p if isinstance(p, TraderPosition) else TraderPosition.from_dict(str(p.get("trader") or p.get("address") or ""), p) for p in previous]
-    curr = [p if isinstance(p, TraderPosition) else TraderPosition.from_dict(str(p.get("trader") or p.get("address") or ""), p) for p in current]
+    prev = [
+        p
+        if isinstance(p, TraderPosition)
+        else TraderPosition.from_dict(str(p.get("trader") or p.get("address") or ""), p)
+        for p in previous
+    ]
+    curr = [
+        p
+        if isinstance(p, TraderPosition)
+        else TraderPosition.from_dict(str(p.get("trader") or p.get("address") or ""), p)
+        for p in current
+    ]
     prev_map = _position_map(prev)
     curr_map = _position_map(curr)
     keys = sorted(set(prev_map) | set(curr_map))

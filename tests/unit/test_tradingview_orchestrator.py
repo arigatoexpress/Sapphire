@@ -126,7 +126,14 @@ def test_capture_sweep_read_only_no_mutations(tmp_artifact_root: Path):
     symbols = [
         {"symbol": "ETH", "tradingview_symbol": "BINANCE:ETHUSDT", "rank": 1},
     ]
-    with patch("lib.trading.tradingview_orchestrator._emit_event"), patch.object(orch, "screenshot", return_value={"ok": True, "path": "/tmp/fake.png", "filename": "fake.png"}):
+    with (
+        patch("lib.trading.tradingview_orchestrator._emit_event"),
+        patch.object(
+            orch,
+            "screenshot",
+            return_value={"ok": True, "path": "/tmp/fake.png", "filename": "fake.png"},
+        ),
+    ):
         with patch.object(orch, "probe_ohlcv", return_value={"ok": True}):
             with patch.object(orch, "probe_quote", return_value={"ok": True}):
                 manifest = orch.capture_sweep(symbols, session_id="test-session")
@@ -146,7 +153,14 @@ def test_capture_deep_read_only_no_mutations(tmp_artifact_root: Path):
         artifact_root=tmp_artifact_root,
         mutation_enabled=False,
     )
-    with patch("lib.trading.tradingview_orchestrator._emit_event"), patch.object(orch, "screenshot", return_value={"ok": True, "path": "/tmp/fake.png", "filename": "fake.png"}):
+    with (
+        patch("lib.trading.tradingview_orchestrator._emit_event"),
+        patch.object(
+            orch,
+            "screenshot",
+            return_value={"ok": True, "path": "/tmp/fake.png", "filename": "fake.png"},
+        ),
+    ):
         with patch.object(orch, "probe_ohlcv", return_value={"ok": True}):
             with patch.object(orch, "probe_values", return_value={"ok": True}):
                 with patch.object(orch, "probe_quote", return_value={"ok": True}):
@@ -189,15 +203,15 @@ def test_capture_sweep_emits_session_completed_event(tmp_artifact_root: Path):
         return "fake-id"
 
     fake_bus_module = type("M", (), {"publish": staticmethod(fake_publish)})
-    with patch.dict(
-        "sys.modules", {"lib.core.event_bus": fake_bus_module}
-    ), patch.object(
-        orch, "screenshot",
-        return_value={"ok": True, "path": "/tmp/fake.png", "filename": "fake.png"},
-    ), patch.object(
-        orch, "probe_ohlcv", return_value={"ok": True}
-    ), patch.object(
-        orch, "probe_quote", return_value={"ok": True}
+    with (
+        patch.dict("sys.modules", {"lib.core.event_bus": fake_bus_module}),
+        patch.object(
+            orch,
+            "screenshot",
+            return_value={"ok": True, "path": "/tmp/fake.png", "filename": "fake.png"},
+        ),
+        patch.object(orch, "probe_ohlcv", return_value={"ok": True}),
+        patch.object(orch, "probe_quote", return_value={"ok": True}),
     ):
         manifest = orch.capture_sweep(symbols, session_id="evt-test-sweep")
 
@@ -226,17 +240,16 @@ def test_capture_symbol_deep_emits_session_completed_event(tmp_artifact_root: Pa
         return "fake-id"
 
     fake_bus_module = type("M", (), {"publish": staticmethod(fake_publish)})
-    with patch.dict(
-        "sys.modules", {"lib.core.event_bus": fake_bus_module}
-    ), patch.object(
-        orch, "screenshot",
-        return_value={"ok": True, "path": "/tmp/fake.png", "filename": "fake.png"},
-    ), patch.object(
-        orch, "probe_ohlcv", return_value={"ok": True}
-    ), patch.object(
-        orch, "probe_values", return_value={"ok": True}
-    ), patch.object(
-        orch, "probe_quote", return_value={"ok": True}
+    with (
+        patch.dict("sys.modules", {"lib.core.event_bus": fake_bus_module}),
+        patch.object(
+            orch,
+            "screenshot",
+            return_value={"ok": True, "path": "/tmp/fake.png", "filename": "fake.png"},
+        ),
+        patch.object(orch, "probe_ohlcv", return_value={"ok": True}),
+        patch.object(orch, "probe_values", return_value={"ok": True}),
+        patch.object(orch, "probe_quote", return_value={"ok": True}),
     ):
         manifest = orch.capture_symbol_deep(
             "ETH", "BINANCE:ETHUSDT", timeframes=["60", "240"], session_id="evt-test-deep"
@@ -267,15 +280,15 @@ def test_emit_event_swallows_bus_failures(tmp_artifact_root: Path):
         raise RuntimeError("redis exploded")
 
     fake_bus_module = type("M", (), {"publish": staticmethod(boom)})
-    with patch.dict(
-        "sys.modules", {"lib.core.event_bus": fake_bus_module}
-    ), patch.object(
-        orch, "screenshot",
-        return_value={"ok": True, "path": "/tmp/fake.png", "filename": "fake.png"},
-    ), patch.object(
-        orch, "probe_ohlcv", return_value={"ok": True}
-    ), patch.object(
-        orch, "probe_quote", return_value={"ok": True}
+    with (
+        patch.dict("sys.modules", {"lib.core.event_bus": fake_bus_module}),
+        patch.object(
+            orch,
+            "screenshot",
+            return_value={"ok": True, "path": "/tmp/fake.png", "filename": "fake.png"},
+        ),
+        patch.object(orch, "probe_ohlcv", return_value={"ok": True}),
+        patch.object(orch, "probe_quote", return_value={"ok": True}),
     ):
         # Must not raise.
         manifest = orch.capture_sweep(symbols, session_id="evt-test-failsafe")
@@ -296,12 +309,14 @@ def test_list_sessions_with_manifests(tmp_artifact_root: Path):
     session = tmp_artifact_root / "20260101T000000Z"
     session.mkdir(parents=True)
     (session / "manifest.json").write_text(
-        json.dumps({
-            "generated_at": "2026-01-01T00:00:00+00:00",
-            "schema_version": "v1",
-            "symbols": [{}, {}],
-            "timeframes": [],
-        }),
+        json.dumps(
+            {
+                "generated_at": "2026-01-01T00:00:00+00:00",
+                "schema_version": "v1",
+                "symbols": [{}, {}],
+                "timeframes": [],
+            }
+        ),
         encoding="utf-8",
     )
     results = orch.list_sessions()
@@ -315,10 +330,16 @@ def test_list_sessions_with_manifests(tmp_artifact_root: Path):
 # ---------------------------------------------------------------------------
 
 
-def _ohlcv(open_: float, close: float, *, change_pct: str | None = None,
-           last5: list[float] | None = None) -> dict:
+def _ohlcv(
+    open_: float, close: float, *, change_pct: str | None = None, last5: list[float] | None = None
+) -> dict:
     """Build a probe_ohlcv-shaped envelope for tests."""
-    summary: dict = {"open": open_, "close": close, "high": max(open_, close), "low": min(open_, close)}
+    summary: dict = {
+        "open": open_,
+        "close": close,
+        "high": max(open_, close),
+        "low": min(open_, close),
+    }
     if change_pct is not None:
         summary["change_pct"] = change_pct
     if last5 is not None:
@@ -326,8 +347,9 @@ def _ohlcv(open_: float, close: float, *, change_pct: str | None = None,
     return {"ok": True, "payload": summary}
 
 
-def _values(rsi: float | None = None, macd_hist: float | None = None,
-            ema: float | None = None) -> list[dict]:
+def _values(
+    rsi: float | None = None, macd_hist: float | None = None, ema: float | None = None
+) -> list[dict]:
     """Build a probe_values-shaped payload (list of {name, values})."""
     out = []
     if rsi is not None:
@@ -416,7 +438,10 @@ def test_score_handles_partial_indicator_values():
 def test_score_ignores_garbage_values_payload():
     """Non-numeric / sentinel indicator values must not corrupt the score."""
     ohlcv = _ohlcv(100.0, 100.0, change_pct="0%")
-    bad_values = [{"name": "RSI", "values": {"Plot": "∅"}}, {"name": "MACD", "values": {"Histogram": "n/a"}}]
+    bad_values = [
+        {"name": "RSI", "values": {"Plot": "∅"}},
+        {"name": "MACD", "values": {"Histogram": "n/a"}},
+    ]
     res = compute_quick_signal_score(ohlcv, bad_values)
     # No RSI/MACD components contributed.
     component_names = [c["name"] for c in res["components"]]
@@ -467,16 +492,23 @@ def test_capture_sweep_populates_score_per_symbol(tmp_artifact_root: Path):
     fake_ohlcv = {
         "ok": True,
         "payload": {
-            "open": 100.0, "close": 105.0, "high": 106.0, "low": 99.0,
+            "open": 100.0,
+            "close": 105.0,
+            "high": 106.0,
+            "low": 99.0,
             "change_pct": "5.0%",
             "last_5_bars": [{"close": c} for c in [100, 101, 103, 104, 105]],
         },
     }
-    with patch("lib.trading.tradingview_orchestrator._emit_event"), patch.object(
-        orch, "screenshot",
-        return_value={"ok": True, "path": "/tmp/fake.png", "filename": "fake.png"},
-    ), patch.object(orch, "probe_ohlcv", return_value=fake_ohlcv), patch.object(
-        orch, "probe_quote", return_value={"ok": True}
+    with (
+        patch("lib.trading.tradingview_orchestrator._emit_event"),
+        patch.object(
+            orch,
+            "screenshot",
+            return_value={"ok": True, "path": "/tmp/fake.png", "filename": "fake.png"},
+        ),
+        patch.object(orch, "probe_ohlcv", return_value=fake_ohlcv),
+        patch.object(orch, "probe_quote", return_value={"ok": True}),
     ):
         manifest = orch.capture_sweep(symbols, session_id="score-sweep")
 
@@ -491,9 +523,7 @@ def test_capture_sweep_populates_score_per_symbol(tmp_artifact_root: Path):
         assert score["score"] > 0.0  # +5% is bullish
 
     # Persisted manifest must include the score field too.
-    persisted = json.loads(
-        (tmp_artifact_root / "score-sweep" / "manifest.json").read_text()
-    )
+    persisted = json.loads((tmp_artifact_root / "score-sweep" / "manifest.json").read_text())
     assert all("score" in s for s in persisted["symbols"])
 
 
@@ -506,7 +536,10 @@ def test_capture_symbol_deep_populates_score_per_timeframe(tmp_artifact_root: Pa
     fake_ohlcv = {
         "ok": True,
         "payload": {
-            "open": 100.0, "close": 95.0, "high": 102.0, "low": 94.0,
+            "open": 100.0,
+            "close": 95.0,
+            "high": 102.0,
+            "low": 94.0,
             "change_pct": "-5.0%",
             "last_5_bars": [{"close": c} for c in [100, 99, 97, 96, 95]],
         },
@@ -518,12 +551,17 @@ def test_capture_symbol_deep_populates_score_per_timeframe(tmp_artifact_root: Pa
             {"name": "MACD", "values": {"Histogram": "-0.4"}},
         ],
     }
-    with patch("lib.trading.tradingview_orchestrator._emit_event"), patch.object(
-        orch, "screenshot",
-        return_value={"ok": True, "path": "/tmp/fake.png", "filename": "fake.png"},
-    ), patch.object(orch, "probe_ohlcv", return_value=fake_ohlcv), patch.object(
-        orch, "probe_values", return_value=fake_values
-    ), patch.object(orch, "probe_quote", return_value={"ok": True}):
+    with (
+        patch("lib.trading.tradingview_orchestrator._emit_event"),
+        patch.object(
+            orch,
+            "screenshot",
+            return_value={"ok": True, "path": "/tmp/fake.png", "filename": "fake.png"},
+        ),
+        patch.object(orch, "probe_ohlcv", return_value=fake_ohlcv),
+        patch.object(orch, "probe_values", return_value=fake_values),
+        patch.object(orch, "probe_quote", return_value={"ok": True}),
+    ):
         manifest = orch.capture_symbol_deep(
             "ETH", "BINANCE:ETHUSDT", timeframes=["60", "240"], session_id="score-deep"
         )
@@ -546,20 +584,31 @@ def test_latest_scoring_sorts_by_abs_score(tmp_artifact_root: Path):
     session = tmp_artifact_root / "20260101T000000Z"
     session.mkdir(parents=True)
     (session / "manifest.json").write_text(
-        json.dumps({
-            "generated_at": "2026-01-01T00:00:00+00:00",
-            "schema_version": "tradingview-orchestrator.sweep_capture.v1",
-            "session_id": "20260101T000000Z",
-            "primary_timeframe": "60",
-            "symbols": [
-                {"symbol": "ETH", "tradingview_symbol": "BINANCE:ETHUSDT",
-                 "score": {"score": 0.2, "regime": "TRANSITION", "rationale": "weak"}},
-                {"symbol": "BTC", "tradingview_symbol": "BINANCE:BTCUSDT",
-                 "score": {"score": -0.8, "regime": "RISK_OFF", "rationale": "strong bear"}},
-                {"symbol": "SOL", "tradingview_symbol": "BINANCE:SOLUSDT",
-                 "score": {"score": 0.5, "regime": "RISK_ON", "rationale": "strong bull"}},
-            ],
-        }),
+        json.dumps(
+            {
+                "generated_at": "2026-01-01T00:00:00+00:00",
+                "schema_version": "tradingview-orchestrator.sweep_capture.v1",
+                "session_id": "20260101T000000Z",
+                "primary_timeframe": "60",
+                "symbols": [
+                    {
+                        "symbol": "ETH",
+                        "tradingview_symbol": "BINANCE:ETHUSDT",
+                        "score": {"score": 0.2, "regime": "TRANSITION", "rationale": "weak"},
+                    },
+                    {
+                        "symbol": "BTC",
+                        "tradingview_symbol": "BINANCE:BTCUSDT",
+                        "score": {"score": -0.8, "regime": "RISK_OFF", "rationale": "strong bear"},
+                    },
+                    {
+                        "symbol": "SOL",
+                        "tradingview_symbol": "BINANCE:SOLUSDT",
+                        "score": {"score": 0.5, "regime": "RISK_ON", "rationale": "strong bull"},
+                    },
+                ],
+            }
+        ),
         encoding="utf-8",
     )
     res = orch.latest_scoring()

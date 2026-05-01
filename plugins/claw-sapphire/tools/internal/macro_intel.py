@@ -109,7 +109,9 @@ def recent_action(*, date: str | None = None, limit: int = 20) -> dict[str, Any]
 
 
 def _fallback_calendar_rows() -> list[dict[str, Any]]:
-    return build_calendar((), include_static=True, max_forward_days=MAX_FORWARD_CALENDAR_DAYS).to_dicts()
+    return build_calendar(
+        (), include_static=True, max_forward_days=MAX_FORWARD_CALENDAR_DAYS
+    ).to_dicts()
 
 
 def calendar_action(*, date: str | None = None, hours: float | None = None) -> dict[str, Any]:
@@ -184,7 +186,9 @@ def handle(payload: dict[str, Any]) -> dict[str, Any]:
             hours=float(hours) if hours is not None else None,
         )
     if action == "next-event-for-asset":
-        return next_event_for_asset_action(asset=str(payload.get("asset") or ""), date=payload.get("date"))
+        return next_event_for_asset_action(
+            asset=str(payload.get("asset") or ""), date=payload.get("date")
+        )
     if action == "pull-once":
         return pull_once_action(payload)
     if action == "status":

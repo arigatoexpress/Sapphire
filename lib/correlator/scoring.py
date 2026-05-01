@@ -265,9 +265,7 @@ def compose_score(
 
     # Contradiction penalty: when bulls *and* bears both contribute non-zero,
     # the score is dampened toward zero.
-    contradict_factor = (
-        weights.contradict_penalty if (bull_count > 0 and bear_count > 0) else 1.0
-    )
+    contradict_factor = weights.contradict_penalty if (bull_count > 0 and bear_count > 0) else 1.0
 
     blended = raw * agreement_multiplier * contradict_factor
     edge = max(-1.0, min(1.0, blended))
@@ -355,9 +353,7 @@ def load_weights(path: Path | None = None) -> ScoringWeights:
         contradict_penalty=max(
             0.0, min(1.0, _f("contradict_penalty", defaults.contradict_penalty))
         ),
-        min_contrib_threshold=max(
-            0.0, _f("min_contrib_threshold", defaults.min_contrib_threshold)
-        ),
+        min_contrib_threshold=max(0.0, _f("min_contrib_threshold", defaults.min_contrib_threshold)),
     )
 
 
