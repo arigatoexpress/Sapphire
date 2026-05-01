@@ -596,9 +596,14 @@ class MegaETHProtocols:
             try:
                 prices = await adapter.prices_for_market(m, decimals=token_decimals)
                 info = await gmx.market_info(m.market_token, prices)
-            except (KeyError, ValueError):
-                # Token has no Aave oracle entry, or revert. Skip funding +
-                # OI for this market but keep the summary.
+            except (KeyError, ValueError, RuntimeError):
+                # Token has no Aave oracle entry (KeyError from adapter),
+                # or the oracle reverts (RuntimeError from JSON-RPC),
+                # or the wrapper rejects shapes (ValueError). Skip
+                # funding + OI for this market but keep the summary.
+                # See gmx_price_adapter docstring — GMX markets typically
+                # cover a SUPERSET of Aave-listed tokens, so reverts are
+                # an expected data condition for synthetic-index markets.
                 patched_summaries.append(summaries[i])
                 continue
 
