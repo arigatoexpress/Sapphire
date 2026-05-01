@@ -15,6 +15,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 from urllib.parse import urlparse
 
+from lib.hackathon.privacy_mock import FhevmClient, default_demo_basket
 from lib.payments.x402_middleware import DEFAULT_USDC_CONTRACTS, PaymentRequirements
 
 ROBINHOOD_CHAIN_ID = 46630
@@ -232,20 +233,12 @@ def evaluate_attempt(
     else:
         reasons.extend(_reason_for_flag(flag) for flag in risk_flags)
 
-    result_hash = _hash_payload(
-        {
-            "result_summary": attempt.result_summary,
-            "privacy_mode": active_mandate.privacy_mode,
-            "symbol": order_symbol.upper(),
-        }
-    )
-    risk_hash = _hash_payload(
-        {
-            "risk_flags": sorted(set(risk_flags)),
-            "approved": approved,
-            "redactions": sorted(set(redactions)),
-        }
-    )
+    # Source result_hash + risk_hash from the FHEVM-shaped mock so the
+    # public commitments are computed over hidden basket weights instead of
+    # the previous placeholder payloads. Production swap: replace
+    # FhevmClient with zama_fhevm.FhevmClient (zero diff at this call-site).
+    _basket = default_demo_basket()
+    result_hash, risk_hash = _basket.compute_hashes(FhevmClient())
     resource_hash = _hash_payload({"resource": attempt.resource, "method": attempt.method})
     receipt_id = _hash_payload(
         {
