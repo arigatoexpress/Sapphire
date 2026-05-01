@@ -135,7 +135,11 @@ def test_showcase_metrics_are_derived_from_live_repo_contracts():
 
     assert metrics["Dashboard Routes"]["value"] == str(dashboard_app._dashboard_page_route_count())
     assert int(metrics["Dashboard Routes"]["value"]) >= 48
-    assert metrics["Registry Entries"]["value"] == "67 / 0"
+    # Wave A/B.1/B.2 added zero registered tools. Wave B.5 added one
+    # (sapphire_megaeth_protocols), bringing the registry from 67 → 70
+    # (Tranche 6 lanes accounted for the intermediate +2). Update the
+    # assertion as new tranches land — the validator is the source of truth.
+    assert metrics["Registry Entries"]["value"] == "70 / 0"
     assert metrics["Readiness"]["value"].endswith(" FAIL")
     assert metrics["Satellite Frontends"]["value"] == str(len(payload["satellite_dashboards"]))
 

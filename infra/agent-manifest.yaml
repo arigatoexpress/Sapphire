@@ -17,7 +17,8 @@
 
 version: 1
 
-# Agent-visible tool set (5 entries — lean by design).
+# Agent-visible tool set (6 entries — still lean, well under the 8-tool
+# accuracy-cliff the Kimi research found at 49%).
 tools:
   - name: sapphire_market
     rationale: >
@@ -44,6 +45,16 @@ tools:
     rationale: >
       Factory memory — the LLM reads it to avoid re-attempting failed fixes
       and writes it to record new known-issues/backoff timers.
+
+  - name: sapphire_megaeth_protocols
+    rationale: >
+      Single-tool surface for every MegaETH read intent (Aave V3 lending,
+      Kumbaya DEX quotes, USDM peg health, oracle prices). The LLM picks
+      among 8 read-only actions via the tool's own dispatcher; routing
+      among Aave/Kumbaya/USDM venues requires judgment from the user
+      question shape ("what's happening on MegaETH" vs "is USDM safe to
+      lever right now"). One tool with many actions, not many tools —
+      manifest stays lean.
 
 # Explicitly NOT in the manifest — here to document the pruning decision.
 excluded:
