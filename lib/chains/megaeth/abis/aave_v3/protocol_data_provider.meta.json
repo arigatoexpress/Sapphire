@@ -1,0 +1,12 @@
+{
+  "chain_id": 4326,
+  "address": "0x9588b453a4ee24a420830cb3302195ca7aa3b403",
+  "is_proxy": false,
+  "implementation_address": null,
+  "blockscout_verified_at": "2026-01-27T04:05:18.622911Z",
+  "compiler_version": "v0.8.27+commit.40a35a09",
+  "contract_name": "AaveProtocolDataProvider",
+  "abi_hash_sha256": "994f88408b356bff78c61df926b21ae9ce19e81c40992e19c161436df7a9b921",
+  "fetched_at": "2026-05-01T01:51:44.287838+00:00",
+  "source": "blockscout"
+}
