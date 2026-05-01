@@ -7,7 +7,12 @@ import json
 from typing import Any
 
 import pytest
-from megaeth_ingest.config import IngestConfig, LogFilter
+from megaeth_ingest.config import (
+    MAINNET_CHAIN_ID,
+    TESTNET_CHAIN_ID,
+    IngestConfig,
+    LogFilter,
+)
 from megaeth_ingest.forwarder import EventForwarder
 from megaeth_ingest.ws_client import (
     MegaEthWsClient,
@@ -104,11 +109,11 @@ def test_build_subscription_payloads_with_logs():
 
 def test_enrich_event_newheads_decodes_hex():
     raw = {"number": "0xa", "hash": "0xfeed", "timestamp": "0x1f"}
-    enriched = enrich_event(kind="newHeads", raw=raw, chain_id=6342)
+    enriched = enrich_event(kind="newHeads", raw=raw, chain_id=TESTNET_CHAIN_ID)
     assert enriched["block_number"] == 10
     assert enriched["block_hash"] == "0xfeed"
     assert enriched["block_timestamp"] == 31
-    assert enriched["chain_id"] == 6342
+    assert enriched["chain_id"] == TESTNET_CHAIN_ID == 6343
     assert enriched["source"] == "megaeth-ingest"
     assert "timestamp" in enriched
     assert enriched["symbol"] == "MEGAETH:newHeads"
@@ -122,11 +127,12 @@ def test_enrich_event_logs_extracts_topics_and_addr():
         "logIndex": "0x2",
         "transactionHash": "0xbeef",
     }
-    enriched = enrich_event(kind="logs", raw=raw, chain_id=6342)
+    enriched = enrich_event(kind="logs", raw=raw, chain_id=MAINNET_CHAIN_ID)
     assert enriched["block_number"] == 5
     assert enriched["address"] == "0xdead"
     assert enriched["log_index"] == 2
     assert enriched["tx_hash"] == "0xbeef"
+    assert enriched["chain_id"] == MAINNET_CHAIN_ID == 4326
 
 
 @pytest.mark.asyncio
@@ -164,7 +170,9 @@ async def test_subscribe_and_consume_one_block():
     assert client.stats.last_block_number == 255
     assert len(poster.calls) == 1
     assert poster.calls[0]["block_number"] == 255
-    assert poster.calls[0]["chain_id"] == 6342
+    # Default config now targets mainnet (4326). The previous value 6342
+    # was a typo for the carrot testnet chain_id (correct value 6343).
+    assert poster.calls[0]["chain_id"] == MAINNET_CHAIN_ID == 4326
 
 
 @pytest.mark.asyncio

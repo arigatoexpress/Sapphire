@@ -5,12 +5,19 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from megaeth_ingest.config import (
     DEFAULT_CHAIN_ID,
     DEFAULT_HEALTH_PORT,
+    DEFAULT_HTTP_RPC,
     DEFAULT_QUEUE_MAX,
     DEFAULT_SIGNAL_LOGGER_URL,
     DEFAULT_WSS,
+    MAINNET_CHAIN_ID,
+    TESTNET_CHAIN_ID,
+    WSSRequiredError,
+    assert_startup_invariants,
     killswitch_active,
     load_config,
 )
@@ -25,6 +32,72 @@ def test_defaults_when_no_env_no_yaml(tmp_path):
     assert cfg.queue_max == DEFAULT_QUEUE_MAX
     assert cfg.forwarding_enabled is False
     assert cfg.log_filters == ()
+
+
+def test_chain_id_constants_match_canonical_values():
+    """Mainnet 4326 (0x10e6); testnet (carrot) 6343 (0x18c7)."""
+    assert MAINNET_CHAIN_ID == 4326
+    assert TESTNET_CHAIN_ID == 6343
+    # The default must point at mainnet now.
+    assert DEFAULT_CHAIN_ID == MAINNET_CHAIN_ID
+
+
+def test_default_targets_mainnet_http_with_no_wss(tmp_path):
+    """Defaults: mainnet HTTP, blank WSS, polling-mode-by-default."""
+    cfg = load_config(env={}, config_path=tmp_path / "missing.yaml")
+    assert cfg.http_rpc_url == DEFAULT_HTTP_RPC == "https://mainnet.megaeth.com/rpc"
+    assert cfg.wss_url == ""
+    assert cfg.use_http_polling is True
+    assert cfg.wss_required is False
+    assert cfg.poll_interval_sec == 1.0
+
+
+def test_assert_startup_invariants_passes_for_polling_mode(tmp_path):
+    cfg = load_config(env={}, config_path=tmp_path / "missing.yaml")
+    # Default is HTTP-polling — should not raise.
+    assert_startup_invariants(cfg)
+
+
+def test_assert_startup_invariants_refuses_when_wss_required_but_no_url(tmp_path):
+    cfg = load_config(
+        env={"SAPPHIRE_MEGAETH_WSS_REQUIRED": "1"},
+        config_path=tmp_path / "missing.yaml",
+    )
+    assert cfg.wss_required is True
+    assert cfg.wss_url == ""
+    with pytest.raises(WSSRequiredError, match="public mainnet WSS unavailable"):
+        assert_startup_invariants(cfg)
+
+
+def test_assert_startup_invariants_passes_when_wss_required_with_url(tmp_path):
+    cfg = load_config(
+        env={
+            "SAPPHIRE_MEGAETH_WSS_REQUIRED": "1",
+            "SAPPHIRE_MEGAETH_WSS": "wss://partner.example/megaeth",
+        },
+        config_path=tmp_path / "missing.yaml",
+    )
+    assert cfg.wss_required is True
+    assert cfg.wss_url == "wss://partner.example/megaeth"
+    assert cfg.use_http_polling is False
+    # Should not raise.
+    assert_startup_invariants(cfg)
+
+
+def test_testnet_override_via_env(tmp_path):
+    """Operator opts in to carrot testnet via env."""
+    cfg = load_config(
+        env={
+            "SAPPHIRE_MEGAETH_CHAIN_ID": str(TESTNET_CHAIN_ID),
+            "SAPPHIRE_MEGAETH_RPC_URL": "https://carrot.megaeth.com/rpc",
+            "SAPPHIRE_MEGAETH_WSS": "wss://carrot.megaeth.com/ws",
+        },
+        config_path=tmp_path / "missing.yaml",
+    )
+    assert cfg.chain_id == 6343
+    assert cfg.http_rpc_url == "https://carrot.megaeth.com/rpc"
+    assert cfg.wss_url == "wss://carrot.megaeth.com/ws"
+    assert cfg.use_http_polling is False
 
 
 def test_env_overrides_defaults(tmp_path):

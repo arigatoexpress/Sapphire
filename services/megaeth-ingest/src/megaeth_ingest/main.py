@@ -28,9 +28,10 @@ ROOT = Path(__file__).resolve().parents[4]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from .config import IngestConfig, load_config  # noqa: E402
+from .config import IngestConfig, assert_startup_invariants, load_config  # noqa: E402
 from .forwarder import EventForwarder  # noqa: E402
 from .health import start_health_server  # noqa: E402
+from .http_poller import AiohttpJsonPoster, HttpPollClient  # noqa: E402
 from .ws_client import MegaEthWsClient  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -77,9 +78,15 @@ def _setup_logging() -> None:
 async def run_service(config: IngestConfig | None = None) -> None:
     """Bring up the full service. Blocks until SIGINT/SIGTERM or stop()."""
     cfg = config or load_config()
+    # Refuse to start if the operator asked for WSS but didn't supply a URL.
+    assert_startup_invariants(cfg)
+    mode = "http-poll" if cfg.use_http_polling else "wss"
     logger.info(
-        "megaeth_ingest starting wss=%s chain_id=%s health_port=%d forwarding=%s queue_max=%d filters=%d",
-        cfg.wss_url,
+        "megaeth_ingest starting mode=%s wss=%s http=%s chain_id=%s health_port=%d "
+        "forwarding=%s queue_max=%d filters=%d",
+        mode,
+        cfg.wss_url or "<unset>",
+        cfg.http_rpc_url,
         cfg.chain_id,
         cfg.health_port,
         cfg.forwarding_enabled,
@@ -95,7 +102,19 @@ async def run_service(config: IngestConfig | None = None) -> None:
             queue_max=cfg.queue_max,
             forwarding_enabled=cfg.forwarding_enabled,
         )
-        client = MegaEthWsClient(config=cfg, forwarder=forwarder)
+        client: MegaEthWsClient | HttpPollClient
+        if cfg.use_http_polling:
+            # Reuse the aiohttp session inside ``poster`` for the JSON-RPC poller.
+            rpc_poster = AiohttpJsonPoster(session=poster._session)  # type: ignore[arg-type]
+            client = HttpPollClient(config=cfg, forwarder=forwarder, poster=rpc_poster)
+            logger.warning(
+                "megaeth_ingest using HTTP-polling fallback (~%.2fs latency vs WS); "
+                "set SAPPHIRE_MEGAETH_WSS to a partner-provider URL for low-latency "
+                "subscriptions",
+                cfg.poll_interval_sec,
+            )
+        else:
+            client = MegaEthWsClient(config=cfg, forwarder=forwarder)
         forwarder.paused_provider = client  # killswitch shared
 
         await forwarder.start()
