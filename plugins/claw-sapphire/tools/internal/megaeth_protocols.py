@@ -16,6 +16,10 @@ Surface (all read-only, all return JSON-serializable dicts):
 * ``stable_health`` — composite USDM peg + supply + auth state.
 * ``peg_status`` — quick severity-only USDM peg classification.
 * ``is_safe_for_leverage`` — boolean gate Wave C strategy code consumes.
+* ``perps_overview`` — GMX V2 markets (lightweight by default).
+* ``perps_market_info`` — full per-market state (funding, OI, borrowing).
+* ``perps_funding_rate_apr`` — annualized funding rate for one market.
+* ``perps_oi_skew`` — long share of total open interest in [0, 1].
 * ``list_protocols`` — registry enumeration (categories + addresses).
 * ``describe_actions`` — self-describing action manifest for the LLM.
 
@@ -265,6 +269,42 @@ ACTION_SCHEMA: dict[str, dict[str, Any]] = {
         "returns": "dict {safe: bool, reason: str (empty when safe)}",
         "example": {"action": "is_safe_for_leverage"},
     },
+    "perps_overview": {
+        "description": "GMX V2 perps overview — list active markets with optional funding+OI overlay. Default is the cheap one-RPC path; set include_funding=true for full per-market funding+OI (~24 RPC reads).",
+        "args": {
+            "venue": "str = 'gmx_v2' (optional)",
+            "include_funding": "bool = false (set true for funding_extremes + total_oi_usd)",
+        },
+        "returns": "dict {venue, market_count, markets[], total_oi_usd, funding_extremes}",
+        "example": {"action": "perps_overview"},
+    },
+    "perps_market_info": {
+        "description": "Full per-market GMX V2 state — funding factor, OI long/short, borrowing factors, is_disabled. Reads prices via Aave oracle and encodes them to GMX scale.",
+        "args": {
+            "market": "str (0x... market_token address, REQUIRED)",
+            "venue": "str = 'gmx_v2' (optional)",
+        },
+        "returns": "dict {market: {market_token, index_token, long_token, short_token, name}, funding_factor_per_second, longs_pay_shorts, borrowing_factor_long/short, open_interest_long/short, is_disabled}",
+        "example": {"action": "perps_market_info", "market": "0x31edcc52be2fa55ba68f50409f9e6b7d9ebf3d59"},
+    },
+    "perps_funding_rate_apr": {
+        "description": "Annualized funding rate for one GMX V2 market — signed Decimal fraction. Positive: longs pay shorts. Negative: shorts pay longs.",
+        "args": {
+            "market": "str (0x... market_token address, REQUIRED)",
+            "venue": "str = 'gmx_v2' (optional)",
+        },
+        "returns": "dict {market, venue, funding_apr (Decimal as string)}",
+        "example": {"action": "perps_funding_rate_apr", "market": "0x31edcc52be2fa55ba68f50409f9e6b7d9ebf3d59"},
+    },
+    "perps_oi_skew": {
+        "description": "Long share of open interest for one GMX V2 market — Decimal in [0, 1]. 0.5 == balanced book, 1 == 100% long, 0 == 100% short.",
+        "args": {
+            "market": "str (0x... market_token address, REQUIRED)",
+            "venue": "str = 'gmx_v2' (optional)",
+        },
+        "returns": "dict {market, venue, oi_skew (Decimal as string)}",
+        "example": {"action": "perps_oi_skew", "market": "0x31edcc52be2fa55ba68f50409f9e6b7d9ebf3d59"},
+    },
     "list_protocols": {
         "description": "Registry enumeration — every protocol Sapphire knows about on chain 4326, with category + addresses.",
         "args": {"category": "str (optional filter — lending|dex_spot|stable|...)"},
@@ -447,6 +487,34 @@ async def _action_is_safe_for_leverage(
     return {"safe": safe, "reason": reason, "venue": venue}
 
 
+async def _action_perps_overview(proto: MegaETHProtocols, payload: dict[str, Any]) -> Any:
+    venue = str(payload.get("venue", "gmx_v2"))
+    include_funding = bool(payload.get("include_funding", False))
+    return await proto.perps_overview(venue=venue, include_funding=include_funding)
+
+
+async def _action_perps_market_info(proto: MegaETHProtocols, payload: dict[str, Any]) -> Any:
+    market = _require_address(payload.get("market"), "market")
+    venue = str(payload.get("venue", "gmx_v2"))
+    return await proto.perps_market_info(market_addr=market, venue=venue)
+
+
+async def _action_perps_funding_rate_apr(
+    proto: MegaETHProtocols, payload: dict[str, Any]
+) -> Any:
+    market = _require_address(payload.get("market"), "market")
+    venue = str(payload.get("venue", "gmx_v2"))
+    apr = await proto.perps_funding_rate_apr(market_addr=market, venue=venue)
+    return {"market": market, "venue": venue, "funding_apr": apr}
+
+
+async def _action_perps_oi_skew(proto: MegaETHProtocols, payload: dict[str, Any]) -> Any:
+    market = _require_address(payload.get("market"), "market")
+    venue = str(payload.get("venue", "gmx_v2"))
+    skew = await proto.perps_oi_skew(market_addr=market, venue=venue)
+    return {"market": market, "venue": venue, "oi_skew": skew}
+
+
 def _action_list_protocols_sync(proto: MegaETHProtocols, payload: dict[str, Any]) -> Any:
     """Sync — no chain reads needed; the registry is in-memory."""
     category_filter = payload.get("category")
@@ -505,6 +573,10 @@ _ASYNC_ACTIONS: dict[str, Any] = {
     "stable_health": _action_stable_health,
     "peg_status": _action_peg_status,
     "is_safe_for_leverage": _action_is_safe_for_leverage,
+    "perps_overview": _action_perps_overview,
+    "perps_market_info": _action_perps_market_info,
+    "perps_funding_rate_apr": _action_perps_funding_rate_apr,
+    "perps_oi_skew": _action_perps_oi_skew,
 }
 
 

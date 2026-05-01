@@ -137,7 +137,7 @@
     },
     {
       "name": "sapphire_megaeth_protocols",
-      "description": "Read protocols on MegaETH (chain 4326): Aave V3 lending state, Kumbaya DEX quotes, USDM peg/health, oracle prices. Use for any 'what's happening on MegaETH' question. Read-only — no swaps or borrows. Actions: lend_overview, lend_user_position, oracle_price, quote_swap, dex_overview, stable_health, peg_status, is_safe_for_leverage, list_protocols, describe_actions.",
+      "description": "Read protocols on MegaETH (chain 4326): Aave V3 lending state, Kumbaya DEX quotes, USDM peg/health, oracle prices, GMX V2 perps (markets, funding, OI). Use for any 'what's happening on MegaETH' question. Read-only — no swaps, borrows, or order placement. Actions: lend_overview, lend_user_position, oracle_price, quote_swap, dex_overview, stable_health, peg_status, is_safe_for_leverage, perps_overview, perps_market_info, perps_funding_rate_apr, perps_oi_skew, list_protocols, describe_actions.",
       "inputSchema": {"type": "object", "additionalProperties": true},
       "command": "python3",
       "args": ["plugins/claw-sapphire/tools/megaeth_protocols.py"],

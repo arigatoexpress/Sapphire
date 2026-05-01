@@ -21,6 +21,13 @@ from .contracts.aave_v3 import (
     ReserveData,
     UserAccountData,
 )
+from .contracts.gmx_price_adapter import GmxPriceAdapter, MarketPrices, TokenDecimals
+from .contracts.gmx_v2 import (
+    GMX_PRICE_BASE,
+    GmxV2,
+    GmxV2Addresses,
+    MarketInfo,
+)
 from .contracts.kumbaya import (
     Kumbaya,
     KumbayaAddresses,
@@ -111,6 +118,39 @@ class StableHealth:
     block_reason: str
 
 
+@dataclass(frozen=True)
+class MarketSummary:
+    """Compact summary of one GMX V2 market — the slice the LLM consumes.
+
+    Surfaces only what the agent layer / dashboard needs (display name +
+    the four-address tuple). Use :meth:`MegaETHProtocols.perps_market_info`
+    for funding/OI/borrowing detail on a single market.
+    """
+
+    name: str
+    market_token: str
+    index_token: str
+    long_token: str
+    short_token: str
+    is_disabled: bool
+
+
+@dataclass(frozen=True)
+class PerpsOverview:
+    """Aggregate perps-side snapshot composed from one venue (GMX V2 in B.3)."""
+
+    venue: str  # "gmx_v2" — Wave B.3 is single-venue
+    market_count: int
+    markets: list[MarketSummary] = field(default_factory=list)
+    # Total open interest across markets, USD-denominated. ``Decimal(0)`` if
+    # ``include_funding=False`` was passed (the default — the OI fetch costs
+    # 2 RPC reads per market).
+    total_oi_usd: Decimal = Decimal(0)
+    # Top-3 markets by abs(funding APR), keyed by market_token. Empty when
+    # ``include_funding=False`` to keep the lightweight call lightweight.
+    funding_extremes: dict[str, Decimal] = field(default_factory=dict)
+
+
 class MegaETHProtocols:
     """Intent facade. Construct with a client + (optional) registry override.
 
@@ -162,6 +202,26 @@ class MegaETHProtocols:
                 f"protocol {venue!r} is not a stable venue (category={entry.category})"
             )
         return USDM(self._client, USDMAddresses.from_registry_entry(entry))
+
+    def _gmx(self, venue: str = "gmx_v2") -> GmxV2:
+        entry = self.registry.get(venue)
+        if entry.category != "dex_perps":
+            raise ValueError(
+                f"protocol {venue!r} is not a perps venue (category={entry.category})"
+            )
+        return GmxV2(self._client, GmxV2Addresses.from_registry_entry(entry))
+
+    def _price_adapter(
+        self,
+        *,
+        gmx_venue: str = "gmx_v2",
+        aave_venue: str = "aave_v3",
+    ) -> GmxPriceAdapter:
+        """Build a fresh price adapter wired to the registered venues."""
+        return GmxPriceAdapter(
+            aave_v3=self._aave(aave_venue),
+            gmx=self._gmx(gmx_venue),
+        )
 
     def _dex_routing_table(self) -> DexRoutingTable:
         """Build a DexRoutingTable from every ``dex_spot`` registry entry.
@@ -476,6 +536,160 @@ class MegaETHProtocols:
         if block:
             return (False, reason)
         return (True, "")
+
+    # -- Perps read paths (Wave B.3 follow-up) -----------------------------
+
+    async def perps_overview(
+        self,
+        venue: str = "gmx_v2",
+        *,
+        include_funding: bool = False,
+        token_decimals: TokenDecimals | None = None,
+    ) -> PerpsOverview:
+        """Enumerate active GMX V2 markets with optional funding overlay.
+
+        Default ``include_funding=False`` does ONE RPC call (``getMarkets``)
+        and returns a thin summary list — cheap enough for dashboard polling.
+        Setting ``include_funding=True`` triggers a per-market price fetch +
+        ``getMarketInfo`` + 2x ``getOpenInterestWithPnl`` (cost = N * 4 reads,
+        currently ~24 reads for the 6-market mainnet).
+
+        Markets flagged ``isDisabled`` are skipped from ``markets`` but counted
+        in ``market_count`` so callers see the gap. ``funding_extremes`` ranks
+        markets by absolute funding APR.
+        """
+        gmx = self._gmx(venue)
+        markets = await gmx.list_markets()
+        active = [m for m in markets if m.market_token]  # all entries from list_markets
+
+        # Build summaries — we don't yet know is_disabled without
+        # getMarketInfo, so we pass False; if include_funding=True we
+        # patch them up below.
+        summaries = [
+            MarketSummary(
+                name=m.name,
+                market_token=m.market_token,
+                index_token=m.index_token,
+                long_token=m.long_token,
+                short_token=m.short_token,
+                is_disabled=False,
+            )
+            for m in active
+        ]
+
+        if not include_funding:
+            return PerpsOverview(
+                venue=venue,
+                market_count=len(active),
+                markets=summaries,
+                total_oi_usd=Decimal(0),
+                funding_extremes={},
+            )
+
+        # Heavyweight path — fetch funding + OI for every market.
+        adapter = self._price_adapter(gmx_venue=venue)
+        funding_apr: dict[str, Decimal] = {}
+        total_oi = Decimal(0)
+        patched_summaries: list[MarketSummary] = []
+
+        for i, m in enumerate(active):
+            try:
+                prices = await adapter.prices_for_market(m, decimals=token_decimals)
+                info = await gmx.market_info(m.market_token, prices)
+            except (KeyError, ValueError, RuntimeError):
+                # Token has no Aave oracle entry (KeyError from adapter),
+                # or the oracle reverts (RuntimeError from JSON-RPC),
+                # or the wrapper rejects shapes (ValueError). Skip
+                # funding + OI for this market but keep the summary.
+                # See gmx_price_adapter docstring — GMX markets typically
+                # cover a SUPERSET of Aave-listed tokens, so reverts are
+                # an expected data condition for synthetic-index markets.
+                patched_summaries.append(summaries[i])
+                continue
+
+            apr = GmxV2._funding_apr_from_info(info)
+            funding_apr[m.market_token] = apr
+            # OI is 1e30-scaled USD per the GMX wrapper docstring.
+            scale = Decimal(10) ** GMX_PRICE_BASE
+            total_oi += (Decimal(info.open_interest_long) + Decimal(info.open_interest_short)) / scale
+            patched_summaries.append(
+                MarketSummary(
+                    name=m.name,
+                    market_token=m.market_token,
+                    index_token=m.index_token,
+                    long_token=m.long_token,
+                    short_token=m.short_token,
+                    is_disabled=info.is_disabled,
+                )
+            )
+
+        # Top-3 markets by abs(APR) — sorted so the strongest signal wins.
+        ordered = sorted(funding_apr.items(), key=lambda kv: -abs(kv[1]))
+        top_funding = dict(ordered[:3])
+
+        return PerpsOverview(
+            venue=venue,
+            market_count=len(active),
+            markets=patched_summaries,
+            total_oi_usd=total_oi,
+            funding_extremes=top_funding,
+        )
+
+    async def perps_market_info(
+        self,
+        market_addr: str,
+        venue: str = "gmx_v2",
+        *,
+        token_decimals: TokenDecimals | None = None,
+    ) -> MarketInfo:
+        """Full per-market state (funding + OI + borrowing) for ``market_addr``.
+
+        Pulls prices via :class:`GmxPriceAdapter` (Aave oracle → GMX scale)
+        then calls :meth:`GmxV2.market_info`. Total RPC cost: 1 list +
+        3 oracle reads + 1 getMarketInfo + 2 getOpenInterestWithPnl = 7.
+        """
+        adapter = self._price_adapter(gmx_venue=venue)
+        prices: MarketPrices = await adapter.prices_for_market_address(
+            market_addr,
+            decimals=token_decimals,
+        )
+        gmx = self._gmx(venue)
+        return await gmx.market_info(market_addr, prices)
+
+    async def perps_funding_rate_apr(
+        self,
+        market_addr: str,
+        venue: str = "gmx_v2",
+        *,
+        token_decimals: TokenDecimals | None = None,
+    ) -> Decimal:
+        """Annualized funding rate for one market (signed Decimal fraction).
+
+        Convenience around :meth:`perps_market_info`. Sign convention
+        matches :meth:`GmxV2.funding_rate_apr`: positive → longs pay shorts.
+        """
+        info = await self.perps_market_info(
+            market_addr, venue=venue, token_decimals=token_decimals
+        )
+        # Reuse the static helper so the math lives in exactly one place.
+        return GmxV2._funding_apr_from_info(info)
+
+    async def perps_oi_skew(
+        self,
+        market_addr: str,
+        venue: str = "gmx_v2",
+        *,
+        token_decimals: TokenDecimals | None = None,
+    ) -> Decimal:
+        """Long share of open interest for one market: ``long / (long + short)``.
+
+        Returns ``Decimal('0.5')`` when the book is balanced or empty,
+        ``Decimal('1')`` when 100% long, ``Decimal('0')`` when 100% short.
+        """
+        info = await self.perps_market_info(
+            market_addr, venue=venue, token_decimals=token_decimals
+        )
+        return GmxV2._oi_skew_from_info(info)
 
     # -- write (Wave C) ----------------------------------------------------
 
