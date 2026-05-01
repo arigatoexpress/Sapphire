@@ -373,3 +373,72 @@ Total Wave C: ~5 PRs, ~90 tests, **paper-only until the dual code-edit gates are
 
 Risk distribution: A=low, B=low/medium, C=high. Wave C does **not** ship until Hyperliquid mainnet (parallel safety-equivalent) has run clean for ≥30 days at the $5/order cap with `signing_verified=True`.
 
+
+---
+
+## 6. "AI-optimized chain" honest assessment
+
+The MegaETH marketing positions the chain as "AI-optimized." It's worth being precise about what that means and doesn't mean for Sapphire.
+
+### What MegaETH actually delivers
+
+- **~10ms mini-blocks / ~1s full EVM blocks** ([per docs.megaeth.com architecture](https://docs.megaeth.com/), confirmed by the testnet WSS feed in PR #530 reaching 50–100 msg/sec sustained `newHeads`).
+- **~$0.001 effective gas** — measured: `eth_gasPrice = 0xf4240` = 1,000,000 wei = 0.001 gwei on 2026-04-30. A 200k-gas Aave supply costs ~200 Gwei = 2×10⁻⁷ ETH ≈ $0.00045 at $2,250 ETH.
+- **Single sequencer, no on-chain L2 consensus delay** — execution is centralized; full nodes ingest state diffs. EVM-equivalent (Optimism Isthmus EVM semantics).
+- **OP Stack canonical bridge with DisputeGameFactory** — fault proofs are upstream OP infrastructure.
+
+There are **no on-chain ML primitives**. No trusted-execution coprocessor for inference. No on-chain model registry, no native zkML verifier. The phrase "AI-optimized" is **about EVM execution characteristics** — latency, cost, throughput — not about chain-resident ML.
+
+### What that means for Sapphire's agent stack
+
+Sapphire's existing inference stack (`services/inference-proxy/`, 4-tier failover Mac→Pi→Windows→Kimi) does the ML off-chain. The chain's job is to be a fast, cheap, verifiable execution surface. With that frame:
+
+| Dimension | MegaETH (4326) | Ethereum L1 | Base / Arbitrum | Solana | Implication for Sapphire |
+|---|---|---|---|---|---|
+| Block time | ~10ms mini / ~1s full | ~12s | ~2s / ~250ms | ~400ms slot | Loop frequency bound — `live_portfolio_daemon` polling can be 1Hz vs 0.08Hz on L1, **12.5× more reactive**. |
+| Effective gas (200k tx) | ~$0.00045 | ~$5–$25 | ~$0.05–$0.20 | ~$0.0005 | **Exploration is free.** A 1,000-call simulation sweep that costs $5 on L1 costs $0.45 here. Strategy-lab can probe the chain at L1-prohibitive cadences. |
+| Throughput | ~100k TPS target (advertised) | ~15 TPS | ~250 / ~4000 TPS | ~3000–5000 TPS sustained | Not the binding constraint for a single agent. |
+| Mature DEX-perps surface | GMX V2 ($8.6M) + Gains ($0.24M) | dYdX (off-chain) / Hyperliquid offchain | GMX, Vertex, Hyperliquid | Drift, Mango, Hyperliquid mainnet | **L1 has no real on-chain perps.** Base/Arbitrum and Solana are stronger here today. MegaETH is roughly Base-2024-equivalent in perps depth. |
+| Mature lending | Aave V3 + Silo v2 | Aave V3, Compound, Morpho, Spark, etc. | Aave V3, Radiant, Silo, Moonwell | MarginFi, Solend, Kamino | L1 wins on diversity; MegaETH+Solana are tied at "Aave + one isolated-pool challenger." |
+| Composability with L1 | Canonical OP bridge, ~7d challenge | native | OP/Arbitrum bridges | Wormhole / external | Same model as Base/Arb — fine for value transfer, not real-time. |
+| Sequencer trust | Single, centralized | n/a | Single (Coinbase/OffchainLabs) | Validator set | **No improvement** over Base/Arb. Real-time DA on EigenDA is a differentiator on paper but doesn't change Sapphire's execution risk. |
+| Time to confirm a fill | ~10ms preconfirmed → ~1s safe | ~12s | ~2s / ~250ms preconf | ~400ms (probabilistic) | **The actual differentiator.** A Sapphire signal-to-fill loop runs ~10× faster than Base, ~120× faster than L1. Whether that translates to PnL depends on whether the strategy is latency-sensitive. For RegimeAwareRSI on 1-minute bars: irrelevant. For inventory rebalancing or arb against off-chain CEX: meaningful. |
+
+### Honest take
+
+**Block time is the real differentiator.** Latency-sensitive strategies (CEX-DEX arbitrage, JIT-LP, mean-reverting market-making) get an actual structural edge here vs Base/Arb. Latency-insensitive strategies (regime-aware momentum, multi-timeframe, funding-rate contrarian) get **none** and would actually be marginally cheaper to deploy on Base or Solana given the deeper liquidity.
+
+**Cost is not the differentiator most people think.** Base + Arbitrum already brought a single-tx cost into the ~$0.05–$0.20 range. Going to ~$0.0005 unlocks specific kinds of probing (per-block oracle sampling, per-block portfolio re-pricing, brute-force backtest replay against live state) but doesn't change the rank order of strategies.
+
+**"AI-optimized" is overstated as a marketing label.** What's actually true: the chain is well-suited for **agentic execution loops where the agent's decisions arrive faster than 1 block**. If your strategy makes a decision every 5 minutes, you can run it on any L2 indistinguishably. If your strategy is genuinely sub-second (HFT, arb-against-CEX, JIT) — MegaETH is the best EVM venue for that strategy today, full stop.
+
+For Sapphire today: **lukewarm.** Most live strategies (`RegimeAwareRSI`, `FundingRateContrarian`, `MultiTFMomentum`, `SapphireComposite`) operate on minute-or-coarser bars and won't notice the latency bump. The reasons to integrate are (a) hedge against the "this becomes the dominant L2" outcome, (b) earn Wave 1 incentives without putting capital at meaningful risk ($25/day cap), (c) build the agent-execution surface for **future** strategies that *would* benefit (live JIT-LP, active inventory management on Aave, auto-rebalance of an Avon-vault lookalike). All three are real but none is on-fire-urgent.
+
+The honest one-line recommendation: **integrate read-only (Waves A+B) immediately, defer Wave C until either Hyperliquid mainnet has soaked clean for 30 days OR a strategy explicitly requiring sub-second loops shows positive backtest in `lib/analytics/strategy_lab.py`**, whichever comes first.
+
+---
+
+## 7. Open questions and unknowns
+
+Listed as questions rather than guesses.
+
+1. **Subgraph / hosted-indexer URLs** — does any of GMX, Aave V3 MegaETH, Kumbaya have a Goldsky / TheGraph hosted endpoint live? Could not verify. PR #530 ingests events directly via WSS as a fallback; Wave B's `indexer.py` should swap to a subgraph backend when one ships.
+
+2. **World Markets contract address + ABI** — the project keeps source closed until "sufficient liquidity" ([docs.world.inc/venue/technical-overview](https://docs.world.inc/venue/technical-overview)). At $12.3M TVL this is the third-largest live protocol. Without an ABI, we can do nothing programmatically — track it, revisit when source ships.
+
+3. **MegaStaking semantics** — the `MegaStakingProxy` (`0x42bfAAA203B8259270A1b5EF4576dB6b8359Daa1`) and impl (`0xa47623Af538AAc8D7F0957AB2889E9cC46E80B3b`) are verified on Blockscout but I did not read the implementation source. Is this MEGA-token staking (operators / sequencer-fee share) or something else? Affects whether it goes in the Wave-A oracle/staking bucket or stays priority-3.
+
+4. **MEGA TGE economics** — TGE happens **today** (2026-04-30). Token goes from "0 distribution" → "10B fixed supply circulating with $464M 24h volume per Blockscout token feed." The chain TVL was $490M two days ago and 80% of it is Aave V3 USDe / USDM positions, which are stablecoin-denominated — so MEGA price action shouldn't move TVL much, but it will move every USD-denominated metric the dashboard pulls. Need to decide if the ingest should switch to ETH-denominated metrics for stability.
+
+5. **Wave 1 incentive distribution mechanics** — Wave 1 incentives run Apr 28 → Jun 23. The token contract is live, the distribution mechanism (claim contract, merkle drop, etc.) is not enumerated in any source we checked. Affects whether Sapphire can earn rewards passively on the test capital.
+
+6. **GMX V2 oracle dependency** — GMX V2 on other chains uses Chainlink **plus** an off-chain price-feed bridge (Stork). On MegaETH, is GMX using the new in-chain Chainlink-style aggregators (the `Aggregator_*_megaeth` contracts) or a separate keeper-pushed feed? Affects the `chain.regime.shift` signal path — if GMX is using a fundamentally different oracle than Aave, our consolidated price view needs to reflect that.
+
+7. **Permit2 prevalence** — `Permit2` `0x000000000022D473030F116dDEE9F6B43aC78BA3` (canonical Uniswap address, deployed via deterministic deployer) is on chain. Should the Wave-C swap path use Permit2 signatures + UniversalRouter (single user-confirmation flow) or simpler ERC-20 approve + SwapRouter02? Slight UX-vs-complexity tradeoff for the executor.
+
+8. **Bridging activity validation** — we have the canonical bridge addresses but did not query L1 → L2 deposit volume in the last 7 days. Worth pulling from L1 Etherscan to see whether bridge inflow is accelerating (positive ecosystem signal) or decelerating (capital fleeing) before we assume MegaETH growth narrative.
+
+9. **"Mega Mafia" cohort apps not yet in the verified-contract feed** — the Wave 1 KPI threshold says "10+ live apps" was hit by 2026-04-23. Our enumeration found ~25 protocols but several hyped names (Wheelx, Carrot launch app, several mascot tokens) appear in Twitter chatter without verified contracts. Worth a manual sweep before we promise the agent "complete coverage."
+
+10. **`SAPPHIRE_MEGAETH_WS_URL` mainnet endpoint** — PR #529 default `wss://carrot.megaeth.com/ws` is the **testnet** WSS endpoint. The mainnet WSS endpoint is not enumerated on docs.megaeth.com under a public URL. If `services/megaeth-ingest` is going to soak on mainnet (as the runbook in PR #528 implies), we need either (a) the official mainnet WSS published, or (b) the operator to run a self-hosted node and point `SAPPHIRE_MEGAETH_WSS` at it. Unblocks Wave-B-2's GMX event subscriber.
+
