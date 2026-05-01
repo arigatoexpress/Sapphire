@@ -135,7 +135,16 @@ def test_showcase_metrics_are_derived_from_live_repo_contracts():
 
     assert metrics["Dashboard Routes"]["value"] == str(dashboard_app._dashboard_page_route_count())
     assert int(metrics["Dashboard Routes"]["value"]) >= 48
-    assert metrics["Registry Entries"]["value"] == "67 / 0"
+    # Don't hard-code the registry count — read the live registry yaml so this
+    # assertion stays valid as tools are added or removed. The test verifies
+    # the *contract* (metric format + zero validation errors) rather than
+    # pinning a brittle integer that drifts every time a tool lands.
+    import yaml
+
+    repo_root = Path(__file__).resolve().parents[2]
+    registry = yaml.safe_load((repo_root / "infra" / "tool-registry.yaml").read_text())
+    expected_entries = len(registry.get("tools", []))
+    assert metrics["Registry Entries"]["value"] == f"{expected_entries} / 0"
     assert metrics["Readiness"]["value"].endswith(" FAIL")
     assert metrics["Satellite Frontends"]["value"] == str(len(payload["satellite_dashboards"]))
 

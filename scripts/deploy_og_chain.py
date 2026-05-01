@@ -99,8 +99,9 @@ def _compile_contracts() -> dict[str, dict]:
         log.error("py-solc-x not installed. Run: pip install py-solc-x")
         sys.exit(1)
 
-    solcx.install_solc("0.8.20", show_progress=False)
-    solcx.set_solc_version("0.8.20")
+    # 0.8.24+ for cancun EVM (0G chain's required EVM version per docs.0g.ai).
+    solcx.install_solc("0.8.24", show_progress=False)
+    solcx.set_solc_version("0.8.24")
 
     compiled: dict[str, dict] = {}
     for name in CONTRACTS:
@@ -111,7 +112,7 @@ def _compile_contracts() -> dict[str, dict]:
         result = solcx.compile_source(
             sol_file.read_text(),
             output_values=["abi", "bin"],
-            solc_version="0.8.20",
+            solc_version="0.8.24",
             evm_version="cancun",
         )
         contract_key = next(k for k in result if k.endswith(f":{name}"))

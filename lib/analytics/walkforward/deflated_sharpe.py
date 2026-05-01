@@ -63,15 +63,25 @@ def _moment(xs: Sequence[float], order: int) -> float:
     return sum((x - m) ** order for x in xs) / n
 
 
+# Floor below which the second moment is treated as zero. Without this guard,
+# floating-point summation of a "constant" series (e.g. [0.01]*250) leaves m2
+# at ~1e-33 on Python 3.11 (exact 0 on 3.14), so m3/m2**1.5 explodes into
+# numerical noise (~1.0 instead of the documented Gaussian fallback). The
+# threshold is well above DBL_EPSILON yet far below any realistic return
+# variance — picking 1e-24 leaves >12 orders of magnitude of headroom over
+# the smallest variance ever seen on real OHLCV data.
+_M2_EPSILON = 1e-24
+
+
 def sample_skewness(xs: Sequence[float]) -> float:
     """Biased population skewness — same convention as scipy.stats.skew(bias=True)."""
     n = len(xs)
     if n < 2:
         return 0.0
     m2 = _moment(xs, 2)
-    m3 = _moment(xs, 3)
-    if m2 <= 0:
+    if m2 < _M2_EPSILON:
         return 0.0
+    m3 = _moment(xs, 3)
     return m3 / (m2 ** 1.5)
 
 
@@ -81,9 +91,9 @@ def sample_kurtosis(xs: Sequence[float]) -> float:
     if n < 2:
         return 3.0
     m2 = _moment(xs, 2)
-    m4 = _moment(xs, 4)
-    if m2 <= 0:
+    if m2 < _M2_EPSILON:
         return 3.0
+    m4 = _moment(xs, 4)
     return m4 / (m2 ** 2)
 
 

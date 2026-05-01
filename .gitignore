@@ -55,7 +55,12 @@ configs/pi/shared/trading.env
 
 # Runtime data artifacts (produced by services; not source)
 data/analytics/
-data/chain/
+# data/chain/ excludes runtime artifacts (deployments.json) but keeps the
+# pre-compiled contract ABIs (*.abi.json), since lib/og/chain.py reads them
+# at import time. The pattern uses /* not /, otherwise the negation below
+# wouldn't apply (git can't re-include below an excluded directory).
+data/chain/*
+!data/chain/*.abi.json
 data/content/
 data/events/
 data/health/
