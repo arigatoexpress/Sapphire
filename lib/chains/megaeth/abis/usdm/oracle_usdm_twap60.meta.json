@@ -1,0 +1,12 @@
+{
+  "chain_id": 4326,
+  "address": "0x663b50c9da9bd586f855af13e91ef2f0954c9761",
+  "is_proxy": false,
+  "implementation_address": null,
+  "blockscout_verified_at": "2026-03-23T14:41:00.499671Z",
+  "compiler_version": "v0.8.17+commit.8df45f5f",
+  "contract_name": "MegaEthPriceFeedUsdmTwap60WithoutRoundsV2",
+  "abi_hash_sha256": "7699f810c8b4d16c5a307ee553b085d62884d9251312409bed8bc8b87e4f51f6",
+  "fetched_at": "2026-05-01T02:28:38.298605+00:00",
+  "source": "blockscout"
+}
