@@ -22,7 +22,6 @@ from lib.chains.megaeth.contracts.gmx_v2 import (
     encode_gmx_price,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fakes — small enough that we don't pull in the full StubClient machinery.
 # ---------------------------------------------------------------------------
