@@ -30,80 +30,72 @@ This closes the front-running window: by the time anyone learns the prediction *
 
 ## Architecture
 
+```mermaid
+flowchart TB
+    classDef og fill:#7B61FF,stroke:#3D2DC4,color:#fff
+    classDef sap fill:#1E3A8A,stroke:#0F1F4D,color:#fff
+    classDef ext fill:#0F766E,stroke:#0B5249,color:#fff
+
+    TV([TradingView webhook]):::ext --> SL[signal_logger]:::sap
+    SL --> PT[paper_trader / Hyperliquid / Robinhood Crypto]:::sap
+    SL -. SAPPHIRE_OG_ENABLED=1 .-> OGP[og_publish]:::sap
+
+    OGP --> COMP[0G Compute · TEE-sealed inference]:::og
+    COMP -- chatID + content --> ENV[Signal envelope]:::sap
+    ENV --> STO[0G Storage · merkle rootHash]:::og
+    STO -- rootHash --> CHAIN[SapphireSignalVerifier.publishSignal\non 0G Chain mainnet · 16661]:::og
+
+    CHAIN -. on-chain proof .-> AUD([Anyone: judge / counterparty / regulator]):::ext
+    AUD --> OGV[og_verify]:::sap
+    OGV --> CHAIN
+    OGV --> STO
+    OGV --> COMP
 ```
-TradingView webhook  ─►  signal_logger ─►  paper_trader / Hyperliquid / RH
-        │
-        │  [SAPPHIRE_OG_ENABLED=1]
-        ▼
-┌────────────────────┐    ┌─────────────────────────┐
-│ 0G Compute (TEE)   │ ─► │  signal envelope        │
-│ sealed inference   │    │  {input, reasoning,     │
-└────────────────────┘    │   output, TEE attestn}  │
-                          └────────────┬────────────┘
-                                       │
-                                       ▼
-                          ┌────────────────────────┐
-                          │ 0G Storage             │
-                          │ (merkle rootHash)      │
-                          └────────────┬───────────┘
-                                       │
-                                       ▼
-                          ┌────────────────────────────────┐
-                          │ SapphireSignalVerifier         │
-                          │  .publishSignal(...,            │
-                          │       proofHash=rootHash)       │
-                          │ on 0G Chain mainnet (16661)    │
-                          └────────────────────────────────┘
-                                       │
-                                       ▼
-                          Anyone runs `og_verify` tool to:
-                          1. Read on-chain Signal struct
-                          2. Download blob from 0G Storage by rootHash
-                          3. Verify merkle proof
-                          4. Verify TEE chatID via broker.processResponse
-```
+
+The verifier path (`og_verify`) reads the on-chain signal, downloads the blob from 0G Storage with merkle proof verification, and surfaces the TEE chatID for off-chain `broker.inference.processResponse()` re-verification.
 
 ## Quick start (judges / reviewers)
 
 ```bash
-git clone https://github.com/<your-fork>/Sapphire.git
+git clone https://github.com/arigatoexpress/Sapphire.git
 cd Sapphire
 git checkout feat/0g-integration
 
-# 1. Install Python deps
+# 1. Python + Node deps
 pip install -r requirements.txt web3 eth-account py-solc-x
-
-# 2. Install Node deps for the 0G Storage bridge
 cd lib/og/_ts && npm install && cd ../../..
 
-# 3. Copy + customize the example secrets file (DO NOT COMMIT)
-cp .env.example .env
-# edit .env: set OG_PRIVATE_KEY (testnet wallet), then:
-export $(grep -v '^#' .env | xargs)
-export SAPPHIRE_OG_ENABLED=1
-export SAPPHIRE_OG_NETWORK=testnet
+# 2. Copy the example env, fill in OG_PRIVATE_KEY (a *testnet* hot wallet)
+cp .env.example .env  # then edit it
+# Get testnet 0G from the faucet linked in https://docs.0g.ai
 
-# 4. Get testnet 0G from the faucet — see https://docs.0g.ai
+# 3. One-shot end-to-end smoke test on 0G testnet
+bash scripts/hackathon_smoke.sh
+```
 
-# 5. Preflight + deploy the contracts to 0G testnet
+The smoke script runs the whole flow: preflight → deploy → publish a synthetic signal → verify it round-trips through 0G Storage and 0G Chain.
+
+To run individual steps:
+
+```bash
+# Preflight only (RPC / chain ID / key / balance)
 python3 scripts/deploy_og_chain.py --check --network testnet
-python3 scripts/deploy_og_chain.py --network testnet
-# ABIs land in data/chain/, addresses in data/chain/deployments.json
 
-# 6. Run the test suite
-make test                       # 5,995+ core tests
+# Compile + write ABIs without deploying (no key needed)
+python3 scripts/deploy_og_chain.py --abi-only
+
+# Deploy
+python3 scripts/deploy_og_chain.py --network testnet  # or --network mainnet
+
+# Tests
 pytest tests/unit/og_integration/ -q   # 56 0G integration tests
+make test                               # 5,995+ core tests
 
-# 7. Publish a sample signal
-echo '{
-  "strategy": "kronos_btc_24h",
-  "symbol": "BTC-USD",
-  "action": "buy",
-  "score": 83,
-  "signal": {"price": 65000, "horizon_h": 24}
-}' | python3 plugins/claw-sapphire/tools/og_publish.py
+# Publish a signal
+echo '{"strategy":"kronos_btc_24h","symbol":"BTC-USD","action":"buy","score":83}' \
+  | python3 plugins/claw-sapphire/tools/og_publish.py
 
-# 8. Verify it
+# Verify by signal id (reads on-chain registry, downloads from 0G Storage)
 echo '{"signal_id": 0}' | python3 plugins/claw-sapphire/tools/og_verify.py
 ```
 
