@@ -28,6 +28,13 @@ This closes the front-running window: by the time anyone learns the prediction *
 | **0G Chain (mainnet 16661)** | [`lib/og/chain.py`](../../lib/og/chain.py), [`contracts/SapphireSignalVerifier.sol`](../../contracts/SapphireSignalVerifier.sol) | Immutable, timestamped commitment to each prediction. |
 | **0G payments + agent mandates** | [`contracts/SapphirePaymentGate.sol`](../../contracts/SapphirePaymentGate.sol), [`contracts/SapphireSentinelRegistry.sol`](../../contracts/SapphireSentinelRegistry.sol) | Subscription gating + agent spend mandates with on-chain payment receipts. |
 
+### Live data flows that produce on-chain anchors
+
+| Flow | Trigger | Code |
+|---|---|---|
+| **TradingView webhook signals** | Every TV alert that reaches `signal_logger` | [`lib/og/hooks.py`](../../lib/og/hooks.py) (fire-and-forget from [`services/alpha/src/signal_logger.py`](../../services/alpha/src/signal_logger.py)) |
+| **Kronos daily predictions** | Daily after kronos-daily LaunchAgent completes | [`scripts/og_publish_kronos.py`](../../scripts/og_publish_kronos.py) — reads `data/intelligence/<date>/predictions.json`, publishes one anchor per watchlist asset |
+
 ## Architecture
 
 ```mermaid

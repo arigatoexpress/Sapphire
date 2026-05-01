@@ -86,6 +86,8 @@ Sapphire's existing inference proxy (`services/inference-proxy/`) and signal pip
 | `plugins/claw-sapphire/tools/og_verify.py` | stdin-JSON tool: `{signal_id}` or `{root_hash}` → fetches blob, verifies merkle proof, re-checks TEE attestation. |
 | `tests/unit/og_integration/` | Mocked-SDK tests. |
 | `services/alpha/src/signal_logger.py` (modified) | Optional `og_publish` hook gated by `SAPPHIRE_OG_ENABLED=1`. Fire-and-forget so the trading critical path is unaffected if 0G is degraded. |
+| `scripts/og_publish_kronos.py` | Anchors today's Kronos predictions on-chain — one signal per watchlist asset. Designed to be invoked by a follow-on scheduled task after `kronos-daily` completes. |
+| `scripts/hackathon_smoke.sh` | Single-command end-to-end smoke test against 0G testnet (preflight → deploy → publish → verify). |
 
 ## Safety / blast-radius
 
