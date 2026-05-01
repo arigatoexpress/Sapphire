@@ -613,3 +613,13 @@ tools:
     consumers: [hermes-agent.trading-analysis, claude-code.manual]
     description: |
       Read protocols on MegaETH (chain 4326): Aave V3 lending state, Kumbaya DEX quotes, USDM peg/health, oracle prices. Use for any "what's happening on MegaETH" question. Read-only — no swaps or borrows. Actions: lend_overview, lend_user_position, oracle_price, quote_swap, dex_overview, stable_health, peg_status, is_safe_for_leverage, list_protocols, describe_actions. Composes lib.chains.megaeth.MegaETHProtocols facade (Wave A + B.1 + B.2) behind one dispatcher to keep the LLM tool manifest lean.
+
+  # wildfire-watch drone-fleet → Sapphire bridge — Tranche 7
+  - name: wildfire
+    path: plugins/claw-sapphire/tools/internal/wildfire.py
+    shim: plugins/claw-sapphire/tools/wildfire.py
+    status: internal
+    owner: sapphire
+    consumers: [wildfire-watch.ground-station, services.dashboard, hermes-agent.alerts]
+    description: |
+      Ingest, query, and aggregate wildfire-watch drone signals. Validates a payload against the v1 wildfire_signal schema (~/Code/wildfire-watch/sapphire_integration/wildfire_signal_schema.json), appends to data/wildfire_signals.jsonl with idempotency on signal_id, emits a wildfire.signal.detected event_bus envelope, and exposes list/stats/schema_info actions. Never sends Telegram directly; the operator-supervised hermes wildfire-alert skill consumes the bus event.
