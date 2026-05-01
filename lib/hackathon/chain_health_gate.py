@@ -20,9 +20,10 @@ the gate doesn't know how to read.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any, Callable
+from typing import Any
 
 from lib.chains.megaeth.contracts.peg_monitor import PegBreak
 from lib.chains.megaeth.protocols import MegaETHProtocols
@@ -143,7 +144,7 @@ class ChainHealthGate:
             stable = await asyncio.wait_for(
                 proto.stable_health(), timeout=self._read_timeout_s
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return self._unavailable_verdict(MEGAETH_CHAIN_ID, "rpc timeout (stable_health)")
         except Exception as exc:  # noqa: BLE001
             return self._unavailable_verdict(MEGAETH_CHAIN_ID, f"stable_health failed: {exc}")
@@ -152,7 +153,7 @@ class ChainHealthGate:
             lend = await asyncio.wait_for(
                 proto.lend_overview(), timeout=self._read_timeout_s
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return self._unavailable_verdict(MEGAETH_CHAIN_ID, "rpc timeout (lend_overview)")
         except Exception as exc:  # noqa: BLE001
             return self._unavailable_verdict(MEGAETH_CHAIN_ID, f"lend_overview failed: {exc}")
@@ -289,7 +290,7 @@ def _load_megaeth_rpc_client_class() -> Any:
         )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    klass = getattr(module, "_HttpJsonRpcClient")
+    klass = module._HttpJsonRpcClient
     _load_megaeth_rpc_client_class._cached = klass  # type: ignore[attr-defined]
     return klass
 

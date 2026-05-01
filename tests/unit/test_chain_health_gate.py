@@ -25,7 +25,6 @@ from lib.hackathon.chain_health_gate import (
     default_gate,
 )
 
-
 # ---------------------------------------------------------------------------
 # Mock fixtures — minimal duck-typed objects matching the dataclass surface
 # the classifier reads from. We don't construct real StableHealth /
