@@ -108,6 +108,39 @@ usdm:
     readings on TGE day: Aave $1.0000, TWAP60 $0.99926, Kumbaya
     $0.99951 → max divergence ~7.4 bps. Comfortably HEALTHY.
 
+gmx_v2:
+  name: "GMX V2 (MegaETH)"
+  category: dex_perps
+  priority: 1
+  status: active
+  docs_url: "https://github.com/gmx-io/gmx-synthetics"
+  addresses:
+    reader: "0x0f038EB4a38B08cd3c937a3256b51aa01904a684"
+    data_store: "0xE43C7B694f6b652a9F4A0f275C008d18758Dce35"
+  abi_paths:
+    reader: "gmx_v2/reader.json"
+  notes: >
+    Wave B.3 wires read-only access. Reader (0x0f038EB4…) is the typed
+    aggregator the GMX V2 documentation calls out as the canonical read
+    surface — analogous to Aave V3's UiPoolDataProvider. DataStore
+    (0xE43C7B69…) is the canonical key/value store every Reader method
+    requires as its first argument. Both verified live on chain 4326
+    on 2026-04-30 (eth_getCode non-empty).
+    .
+    Reader.getMarketInfo expects pre-fetched MarketUtils.MarketPrices —
+    callers compose with lib/chains/megaeth/contracts/gmx_price_adapter.py
+    which sources prices from AaveOracle and encodes them via
+    encode_gmx_price (Price.Props is 1e(30-decimals), NOT 1e8).
+    .
+    Live readings on TGE day (2026-04-30): 6 active markets, BTC
+    funding ~ -75% APR (shorts paying longs aggressively),
+    confirming the protocol map's "perp markets running hot" callout.
+    .
+    Write-side contracts (ExchangeRouter, OrderHandler, EventEmitter)
+    are intentionally NOT in this entry — they land in Wave C through
+    plugins/claw-sapphire/tools/internal/megaeth_executor.py with the
+    same fail-closed signing-verified gate stack as Hyperliquid.
+
 usdt0:
   name: "USDT0 (Tether L2)"
   category: stable
