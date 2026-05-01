@@ -1,0 +1,12 @@
+{
+  "chain_id": 4326,
+  "address": "0xd011778057aa740bb3703ad4d78b3c79a1aed1cb",
+  "is_proxy": false,
+  "implementation_address": null,
+  "blockscout_verified_at": "2026-04-27T21:56:53.327554Z",
+  "compiler_version": "v0.8.30+commit.73712a01",
+  "contract_name": "Aggregator_USDM_ETH_megaeth",
+  "abi_hash_sha256": "5577c8db1e1bfcff02d51c0caf765eae0af4c34a51e1ce09a236df5970eed387",
+  "fetched_at": "2026-05-01T02:28:37.778809+00:00",
+  "source": "blockscout"
+}

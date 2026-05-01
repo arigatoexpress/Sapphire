@@ -69,3 +69,56 @@ kumbaya:
     docstring for the full footgun explanation. Wave B step 1 wires
     factory + quoter for read paths; SwapRouter02 ABI is pinned for
     Wave C to bind without a re-fetch.
+
+usdm:
+  name: "MegaUSD (USDM)"
+  category: stable
+  priority: 1
+  status: active
+  docs_url: "https://megaeth.blockscout.com/address/0xFAfDdbb3FC7688494971a79cc65DCa3EF82079E7"
+  addresses:
+    token: "0xFAfDdbb3FC7688494971a79cc65DCa3EF82079E7"
+    twap60_oracle: "0x663B50C9DA9Bd586f855aF13e91EF2f0954c9761"
+    eth_oracle: "0xD011778057AA740BB3703Ad4d78b3c79a1aED1cb"
+  abi_paths:
+    token: "usdm/token.json"
+    twap60_oracle: "usdm/oracle_usdm_twap60.json"
+    eth_oracle: "usdm/oracle_usdm_eth.json"
+  notes: >
+    Native MegaETH stable. Symbol is "USDm" (lowercase 'm'). Token is
+    an ERC1967Proxy whose impl is xUSDOFTUpgradeable (LayerZero V2 OFT) —
+    USDm is bridged in via LayerZero, NOT minted on-chain on MegaETH.
+    Total supply at TGE day (2026-04-30) was 360,753,853 USDm, matching
+    the protocol map's "$360M circulating".
+    .
+    IMPORTANT — protocol-map drift: the map (PR #535) lists Minter_v2 +
+    StabilityPool_v2 + ReservePool_v1 + Genesis_v1 as the "USDM stack".
+    Live probes show those contracts target a DIFFERENT, uninitialized
+    pegged-token (Minter_v2.PEGGED_TOKEN() = 0xbed2c…, NOT 0xFAfDdbb…).
+    They're NOT the live USDm's plumbing and are intentionally OMITTED
+    from this entry. There is therefore no on-chain collateral_ratio
+    to read for the live USDm — collateral lives off-chain at the
+    LayerZero-source issuer. See lib/chains/megaeth/contracts/usdm.py
+    docstring for the full architectural rationale.
+    .
+    Three peg-quote sources are wired into stable_health():
+    (a) Kumbaya USDM/USDT0 0.01% pool (venue-priced, lowest-liquidity
+        canary), (b) MegaEthPriceFeedUsdmTwap60 (on-chain TWAP-60),
+    (c) AaveOracle.getAssetPrice (Aave V3 liquidation pricing). Live
+    readings on TGE day: Aave $1.0000, TWAP60 $0.99926, Kumbaya
+    $0.99951 → max divergence ~7.4 bps. Comfortably HEALTHY.
+
+usdt0:
+  name: "USDT0 (Tether L2)"
+  category: stable
+  priority: 1
+  status: active
+  docs_url: "https://megaeth.blockscout.com/address/0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb"
+  addresses:
+    token: "0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb"
+  abi_paths: {}
+  notes: >
+    Largest stable on chain ($4.06B circulating, 6,409 holders per the
+    protocol map). Standard 6-decimal ERC-20; no custom wrapper needed
+    in Wave B.2. Registered here so the USDM peg-monitor can resolve
+    the USDT0 address without hard-coding it.
