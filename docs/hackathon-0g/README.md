@@ -139,3 +139,7 @@ echo '{"signal_id": 0}' | python3 plugins/claw-sapphire/tools/og_verify.py
 ## Team
 
 Solo builder: Ari Spec ([@arigatoexpress](https://github.com/arigatoexpress)) — building Sapphire OS as a long-running autonomous trading + intelligence stack.
+
+## See also
+
+- **Sapphire Sentinel — London Buildathon submission** ([`docs/hackathon/sapphire-sentinel-london-2026.md`](../hackathon/sapphire-sentinel-london-2026.md)): same Sapphire stack, different hackathon angle. The 0G integration here is the *verifiable-finance* spine; Sentinel is the *agentic-safety* spine. They share contracts (`SapphireSentinelRegistry`) and the same testnet wallet path.
