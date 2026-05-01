@@ -111,7 +111,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `services/security_pipeline/` | service | Scheduled full-system security scan → SOC page. |
 | `services/telegram-bot/` | service | Legacy bot (replaced by hermes-agent gateway). |
 | `services/webhook/` | service | TradingView webhook receiver [Windows:9090]. |
-| `plugins/claw-sapphire/` | plugin | 63 tool scripts on disk (36 at top level + 25 in `internal/` + 2 in `_deprecated/`), 10 libs, 376 collected tests. |
+| `plugins/claw-sapphire/` | plugin | 109 tool scripts on disk (61 at top level + 47 in `internal/` + 1 in `_deprecated/`), 10 libs, 376+ collected tests. |
 | `contracts/` | solidity | **`SapphireSignalVerifier.sol`** (on-chain signal registry with ZK proof hash field), **`SapphirePaymentGate.sol`** (micropayment gate), **`SapphireSentinelRegistry.sol`** (non-custodial agent mandate/payment receipt anchor). Deployed on Robinhood Chain testnet via `scripts/deploy_robinhood_chain.py`. |
 | `pine/` | pine | 5 TradingView strategies (standalone/: v1, v2, v3 Ultra, MultiSymbol Screener, Mac variant). |
 | `skills/` | skills | Agent-executable capabilities. |
@@ -163,9 +163,9 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `~/Code/hermes-agent` | NousResearch/hermes-agent | Conversational framework (Telegram bot) |
 | `~/Code/kimi-tools` | local | Kimi Cloud HTTP client |
 
-## Sapphire Plugin (63 tools on disk, 15 registered in plugin.json)
+## Sapphire Plugin (109 tools on disk, 16 registered in plugin.json)
 
-`plugins/claw-sapphire/plugin.json` declares 15 Claude Code tools (one `sapphire` namespace entry + 14 `sapphire_*` tools, for 16 entries total): `dispatch`, `verify`, `budget`, `state`, `status`, `notify`, `health_check`, `market`, `predict_kronos`, `threat_intel`, `lumo_research`, `starred_repos`, `macro_data`, `lead_engine`, `trading_brain`. The remaining tool scripts are standalone, invoked via stdin JSON by hermes skills, scheduled tasks, dashboards, or other tools.
+`plugins/claw-sapphire/plugin.json` declares 16 Claude Code tools (one `sapphire` namespace entry + 15 `sapphire_*` tools, for 17 entries total): `dispatch`, `verify`, `budget`, `state`, `status`, `notify`, `health_check`, `market`, `predict_kronos`, `threat_intel`, `lumo_research`, `starred_repos`, `macro_data`, `lead_engine`, `trading_brain`, `megaeth_protocols` (Wave B.5 — read-only MegaETH chain-4326 surface). The remaining tool scripts are standalone, invoked via stdin JSON by hermes skills, scheduled tasks, dashboards, or other tools.
 
 ```
 plugins/claw-sapphire/tools/
