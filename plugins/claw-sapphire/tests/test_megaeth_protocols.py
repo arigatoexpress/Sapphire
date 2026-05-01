@@ -502,6 +502,168 @@ def test_main_returns_one_when_action_fails() -> None:
 
 
 # ---------------------------------------------------------------------------
+# 5b. Perps action dispatch (Wave B.3 follow-up)
+# ---------------------------------------------------------------------------
+#
+# These mock the facade method directly rather than going through the StubClient
+# stack — perps_market_info combines list_markets + getMarketInfo + 2x
+# getOpenInterestWithPnl + 3x getAssetPrice (the price adapter), so a raw
+# stub-client fixture would balloon to ~10 ABI-encoded responses per test.
+# The facade is already covered by tests/lib/chains/megaeth/test_protocols_facade_perps.py;
+# these tests assert the plugin-tool routing + JSON shape contract.
+
+
+def test_describe_actions_includes_perps_actions() -> None:
+    """All four perps_* actions must be discoverable via describe_actions."""
+    response = megaeth_protocols.handle({"action": "describe_actions"})
+    listed = set(response["data"]["actions"].keys())
+    assert {
+        "perps_overview",
+        "perps_market_info",
+        "perps_funding_rate_apr",
+        "perps_oi_skew",
+    } <= listed
+
+
+def test_perps_market_info_requires_market_address() -> None:
+    response = megaeth_protocols.handle({"action": "perps_market_info"})
+    assert response["ok"] is False
+    assert "market" in response["error"]
+
+
+@pytest.mark.parametrize(
+    "action", ["perps_market_info", "perps_funding_rate_apr", "perps_oi_skew"]
+)
+def test_perps_actions_reject_short_address(action: str) -> None:
+    response = megaeth_protocols.handle({"action": action, "market": "0x1234"})
+    assert response["ok"] is False
+    # _require_address validation message
+    assert "42-char" in response["error"]
+
+
+def test_perps_overview_routes_through_facade(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Mock MegaETHProtocols.perps_overview at the class level — assert
+    JSON shape contract and that the dispatcher honors include_funding."""
+    from lib.chains.megaeth.protocols import MarketSummary, MegaETHProtocols, PerpsOverview
+
+    fake_overview = PerpsOverview(
+        venue="gmx_v2",
+        market_count=2,
+        markets=[
+            MarketSummary(
+                name="BTC", market_token="0x" + "11" * 20, index_token="0x" + "22" * 20,
+                long_token="0x" + "33" * 20, short_token="0x" + "44" * 20,
+                is_disabled=False,
+            ),
+            MarketSummary(
+                name="ETH", market_token="0x" + "55" * 20, index_token="0x" + "66" * 20,
+                long_token="0x" + "77" * 20, short_token="0x" + "88" * 20,
+                is_disabled=False,
+            ),
+        ],
+        total_oi_usd=Decimal("1234567.89"),
+        funding_extremes={"0x" + "11" * 20: Decimal("-0.75")},
+    )
+
+    captured: dict[str, Any] = {}
+
+    async def fake_perps_overview(self: Any, venue: str = "gmx_v2", *, include_funding: bool = False, token_decimals: Any = None) -> PerpsOverview:
+        captured["venue"] = venue
+        captured["include_funding"] = include_funding
+        return fake_overview
+
+    monkeypatch.setattr(MegaETHProtocols, "perps_overview", fake_perps_overview)
+
+    response = megaeth_protocols.handle(
+        {"action": "perps_overview", "include_funding": True, "_client": StubClient({})}
+    )
+    assert response["ok"] is True, response.get("error")
+    data = response["data"]
+    assert data["venue"] == "gmx_v2"
+    assert data["market_count"] == 2
+    # Decimal serialized as string
+    assert data["total_oi_usd"] == "1234567.89"
+    assert data["funding_extremes"]["0x" + "11" * 20] == "-0.75"
+    # Markets list serialized as plain dicts (dataclass → asdict)
+    assert isinstance(data["markets"][0], dict)
+    assert data["markets"][0]["name"] == "BTC"
+    # Dispatcher honored include_funding=True
+    assert captured["include_funding"] is True
+
+
+def test_perps_market_info_routes_through_facade(monkeypatch: pytest.MonkeyPatch) -> None:
+    from lib.chains.megaeth.contracts.gmx_v2 import Market, MarketInfo
+    from lib.chains.megaeth.protocols import MegaETHProtocols
+
+    btc_market = Market(
+        market_token="0x" + "11" * 20,
+        index_token="0x" + "22" * 20,
+        long_token="0x" + "33" * 20,
+        short_token="0x" + "44" * 20,
+        name="BTC",
+    )
+    fake_info = MarketInfo(
+        market=btc_market,
+        funding_factor_per_second=10**21,
+        longs_pay_shorts=False,
+        borrowing_factor_long=10**18,
+        borrowing_factor_short=10**18,
+        open_interest_long=10**30,
+        open_interest_short=10**30,
+        is_disabled=False,
+    )
+
+    async def fake_perps_market_info(self: Any, market_addr: str, venue: str = "gmx_v2", *, token_decimals: Any = None) -> MarketInfo:
+        return fake_info
+
+    monkeypatch.setattr(MegaETHProtocols, "perps_market_info", fake_perps_market_info)
+
+    response = megaeth_protocols.handle(
+        {"action": "perps_market_info", "market": "0x" + "11" * 20, "_client": StubClient({})}
+    )
+    assert response["ok"] is True, response.get("error")
+    data = response["data"]
+    # Nested Market dataclass → dict
+    assert data["market"]["name"] == "BTC"
+    # bool passes through
+    assert data["longs_pay_shorts"] is False
+    assert data["is_disabled"] is False
+
+
+def test_perps_funding_rate_apr_returns_signed_decimal_string(monkeypatch: pytest.MonkeyPatch) -> None:
+    from lib.chains.megaeth.protocols import MegaETHProtocols
+
+    async def fake_apr(self: Any, market_addr: str, venue: str = "gmx_v2", *, token_decimals: Any = None) -> Decimal:
+        return Decimal("-0.7548")  # ~ -75% APR (matches live BTC funding)
+
+    monkeypatch.setattr(MegaETHProtocols, "perps_funding_rate_apr", fake_apr)
+
+    response = megaeth_protocols.handle(
+        {"action": "perps_funding_rate_apr", "market": "0x" + "11" * 20, "_client": StubClient({})}
+    )
+    assert response["ok"] is True, response.get("error")
+    # Decimal preserved as string for precision
+    assert response["data"]["funding_apr"] == "-0.7548"
+    assert response["data"]["market"] == "0x" + "11" * 20
+    assert response["data"]["venue"] == "gmx_v2"
+
+
+def test_perps_oi_skew_returns_decimal_in_range(monkeypatch: pytest.MonkeyPatch) -> None:
+    from lib.chains.megaeth.protocols import MegaETHProtocols
+
+    async def fake_skew(self: Any, market_addr: str, venue: str = "gmx_v2", *, token_decimals: Any = None) -> Decimal:
+        return Decimal("0.62")
+
+    monkeypatch.setattr(MegaETHProtocols, "perps_oi_skew", fake_skew)
+
+    response = megaeth_protocols.handle(
+        {"action": "perps_oi_skew", "market": "0x" + "11" * 20, "_client": StubClient({})}
+    )
+    assert response["ok"] is True, response.get("error")
+    assert response["data"]["oi_skew"] == "0.62"
+
+
+# ---------------------------------------------------------------------------
 # 6. Live mainnet integration (gated; opt-in via env var)
 # ---------------------------------------------------------------------------
 
@@ -557,3 +719,21 @@ def test_stable_health_live_severity_in_known_band() -> None:
         "CRISIS_500BP",
         "CIRCUIT_BREAKER",
     }
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(
+    not INTEGRATION_ENABLED,
+    reason="set SAPPHIRE_MEGAETH_INTEGRATION=1 to run live mainnet tests",
+)
+def test_perps_overview_live() -> None:
+    """Live: GMX V2 has at least 1 active market on MegaETH mainnet."""
+    response = megaeth_protocols.handle({"action": "perps_overview"})
+    assert response["ok"] is True, response.get("error")
+    assert response["data"]["market_count"] >= 1
+    assert response["data"]["venue"] == "gmx_v2"
+    # Lightweight path → no funding overlay
+    assert response["data"]["funding_extremes"] == {}
+    print(f"\n[live] GMX V2 perps_overview reported {response['data']['market_count']} market(s)")
+    for m in response["data"]["markets"]:
+        print(f"  - {m.get('name', '?')}: {m['market_token']}")
