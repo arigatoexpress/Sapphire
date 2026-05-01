@@ -1,0 +1,12 @@
+{
+  "chain_id": 4326,
+  "address": "0x0f038EB4a38B08cd3c937a3256b51aa01904a684",
+  "name": "Reader",
+  "is_verified": true,
+  "verified_at": "2026-01-15T07:50:00.661616Z",
+  "compiler_version": "v0.8.29+commit.ab55807c",
+  "fetched_at": "2026-05-01T18:25:38.815319+00:00",
+  "source_url": "https://megaeth.blockscout.com/address/0x0f038EB4a38B08cd3c937a3256b51aa01904a684",
+  "function_count": 29,
+  "sha256": "fcf5cd0297e38344515b6fae0cff06f63d2335ffd6ea7f0a5dc1a495c906929b"
+}
