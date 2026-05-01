@@ -58,3 +58,187 @@ The protocol table below is the **integration target list**. Priority is Sapphir
 
 **Subgraphs / indexers:** Goldsky and SubGraph hosted-service indexers for MegaETH are not yet generally available (per docs.megaeth.com). For Wave A/B we ingest via direct RPC + Blockscout v2 API. Treat indexer adapter as Wave B placeholder, real implementation deferred until at least one major protocol publishes a subgraph URL.
 
+
+---
+
+## 2. Protocol categories and Sapphire-relevance
+
+For each category present on chain 4326 today: what Sapphire would do with it, and which existing surface in the monorepo (CLAUDE.md anchored) it composes with.
+
+### 2.1 Lending — Aave V3, Silo v2
+
+- **Read-only ingestion**: `Pool.getReserveData(asset)` → liquidity rate, variable borrow rate, utilization. `UI_POOL_DATA_PROVIDER` (`0x1aB55bBdD5DF0782BBCf73553Af93BC6B29A286B`) returns full reserve list in one call. Stream `Supply` / `Withdraw` / `Borrow` / `Repay` events through the existing `services/megaeth-ingest` WSS subscriber (PR #530) — events get enriched and forwarded to signal-logger.
+- **Sapphire surfaces**:
+  - `lib/chain/intelligence.py` already aggregates supply/borrow rates for other chains; add a MegaETH provider that mirrors `lib/chain/coinmetrics.py` shape.
+  - `services/live_portfolio_daemon/` reads aMegWETH/aMegUSDm balances for any wallet we hold positions in.
+  - `lib/analytics/strategy_lab.py` consumes the rate spread between Aave V3 and Silo for a borrow-rate-arbitrage strategy candidate.
+- **Execution (Wave C only)**: supply WETH, borrow USDM, deposit USDM into Avon MegaVault for carry — fully wired through `lib/trading/megaeth_executor.py` once `signing_verified=True`.
+
+### 2.2 DEX-spot — Kumbaya (UniV3 fork), Prism, Sectorone DLMM
+
+- **Read-only**: `QuoterV2.quoteExactInputSingle(QuoteExactInputSingleParams)` for price discovery. Pool sync events (`Swap`, `Mint`, `Burn`) for liquidity-flow tracking. The UniV3 ABI is already mature in the wider Web3 ecosystem; we lift a pinned version into `lib/chains/megaeth/abis/kumbaya/`.
+- **Sapphire surfaces**:
+  - `lib/analytics/correlator.py` — cross-DEX price divergence (Kumbaya vs Prism vs CEX) feeds the existing `correlation.broken` event-bus topic.
+  - `lib/trading/strategy_lab.py` — Kumbaya/USDT0 vs Kumbaya/USDM vs USDT0/USDM triangle as a stable-arb candidate.
+  - `services/dashboard/` — `/api/megaeth/quote?in=USDT0&out=WETH&amount=1000` panel for at-a-glance routing.
+- **Execution (Wave C)**: `SwapRouter02.exactInputSingle` for atomic swaps; `UniversalRouter` for batched/permitted flows.
+
+### 2.3 DEX-perps — GMX V2, Gains Network
+
+- **Read-only**: GMX `Reader.getMarkets(DataStore, start, end)` enumerates listed markets; `Reader.getMarketTokenPrice(...)` for GLV pricing; `EventEmitter` logs (`OrderCreated`, `OrderExecuted`, `PositionIncrease`, `PositionDecrease`) for OI/funding tracking.
+- **Sapphire surfaces**:
+  - `services/hyperliquid/src/hyperliquid_bot/public_feed.py` is the most directly portable pattern — same job (subscribe, decode, fill `MarketSnapshot`), different chain. Clone its shape into a `services/megaeth-ingest/src/megaeth_ingest/gmx_subscriber.py` (Wave B).
+  - `lib/analytics/regime_aware_rsi.py` and the funding-rate strategy class consume GMX funding rates (read from `EventEmitter` `MarketFunding` event) once a feed exists.
+  - `lib/trading/megaeth_executor.py` (PR #527 scaffold) — wave-C destination is GMX `ExchangeRouter.createOrder(CreateOrderParams)` with the same fail-closed gate stack as Hyperliquid.
+- **Why GMX before Gains**: GMX has 35x the TVL on this chain ($8.6M vs $0.24M) and we already have a parallel-pattern executor.
+
+### 2.4 Stablecoins — USDM (native CDP), USDT0 (Tether), Ethena USDe
+
+- **Read-only**: ERC-20 `totalSupply` time-series from the new `lib/chains/megaeth/contracts/usdm.py` wrapper; CDP solvency checks via `StabilityPool_v2.totalDeposits()` + `ReservePool_v1.collateral()`; PSM peg checks via `Aggregator_USDM_ETH` and `Aggregator_USDM_BTC` oracle feeds.
+- **Sapphire surfaces**: `lib/chain/intelligence.py` adds a "stable health" panel mirroring Lido stETH/eETH monitoring. Peg deviation > 30 bps → `chain.regime.shift` event-bus emit.
+- **Execution**: USDM mint/redeem through `Minter_v2`; not on the priority list.
+
+### 2.5 Bridges — Rabbithole (canonical OP), LiFi, Across V4
+
+- **Read-only**: L2 system contracts at `0x4200…` are predeploys with stable upstream Optimism ABIs. Watch `MessagePassed` events on `L2ToL1MessagePasser` for outgoing-bridge-flow rate tracking.
+- **Sapphire surfaces**:
+  - The canonical bridge feeds `lib/intel/market_intelligence.py` (cross-chain capital flow signal — large outflow == bearish chain-economic indicator).
+  - `lib/trading/` does **not** auto-bridge. Bridging is a manual operator decision (Wave C, behind a separate `bridge_authorized=False` gate).
+
+### 2.6 Yield — Avon MegaVault, Beefy
+
+- Avon MegaVault is the only yield primitive worth integrating today (Beefy is $5K TVL on this chain). Treat it as a passive-yield benchmark in `lib/analytics/run_strategies.py`: any active strategy must beat USDmY APY net of gas after a 30-day soak, otherwise the position should sit in MegaVault.
+
+### 2.7 Oracles — Chainlink-style aggregators
+
+- Sapphire adds a `lib/chains/megaeth/contracts/oracle.py` wrapper around `EACAggregatorProxy` (standard Chainlink ABI: `latestRoundData()`, `decimals()`, `description()`). Poll cadence: 1s (block time supports it; wave-A target). All other on-chain price reads should pull through this wrapper for staleness checks.
+
+### 2.8 Categories that don't exist on MegaETH yet
+
+- **Native CEX-like orderbook DEX** with public ABI: World Markets is the only candidate, source closed. **Gates `lib/trading/megaeth_executor.py`'s spot-orderbook path indefinitely.**
+- **Mature liquid-staking derivative** for ETH/USDM: not present. Compare to Lido / Renzo / EtherFi on L1.
+- **Real-money options venue**: not present.
+- **On-chain ML primitives**: not present, and per Section 6 should not be expected. MegaETH gives us latency + cost — agents do the ML off-chain.
+- **Foundry-style point-of-sale receipt anchors**: out of scope for this map.
+
+---
+
+## 3. Access-layer architecture
+
+Goal: every protocol on chain 4326 reachable from Sapphire through a layered API where higher layers compose without re-knowing addresses or ABIs.
+
+### 3.1 Package layout
+
+```
+lib/chains/megaeth/
+  __init__.py                # re-exports MegaETHClient (PR #529), registry, protocols facade
+  registry.py                # protocol metadata: addresses, categories, ABI paths, chain-id pin
+  abis/                      # ABI JSONs, version-pinned
+    fetcher.py               # Blockscout v2 fetch + cache-on-disk
+    aave_v3/                 # one dir per protocol family
+      Pool.json
+      Oracle.json
+      ...
+    kumbaya/
+      SwapRouter02.json
+      QuoterV2.json
+      UniswapV3Pool.json
+      ...
+    gmx/
+      ExchangeRouter.json
+      Reader.json
+      DataStore.json
+      EventEmitter.json
+    usdm/
+      Minter_v2.json
+      StabilityPool_v2.json
+    bridge/                  # OP Stack predeploys + L1
+      L2ToL1MessagePasser.json
+      OptimismPortal.json
+    oracle/
+      EACAggregatorProxy.json   # standard Chainlink ABI shared across feeds
+  contracts/                 # typed wrappers — one module per protocol
+    __init__.py
+    aave_v3.py               # AaveV3Pool, AaveOracle wrappers
+    kumbaya.py               # KumbayaQuoter, KumbayaRouter
+    gmx_v2.py                # GmxReader, GmxExchangeRouter, GmxEventStream
+    usdm.py                  # UsdmReader (totalSupply, peg, reserve health)
+    rabbithole_bridge.py     # bridge in/out helpers
+    oracle.py                # ChainlinkAggregator (shared)
+  protocols.py               # intent-level facade — see 3.3
+  indexer.py                 # subgraph adapter (placeholder until subgraphs ship)
+
+plugins/claw-sapphire/tools/megaeth_protocols.py        # agent shim (Wave B)
+plugins/claw-sapphire/tools/internal/megaeth_protocols.py  # real impl
+```
+
+### 3.2 Module responsibilities
+
+**`registry.py`**
+
+```python
+@dataclass(frozen=True)
+class ProtocolEntry:
+    name: str
+    category: str       # "lending" | "dex_spot" | "dex_perps" | "stable" | "bridge" | "yield" | "oracle"
+    addresses: dict[str, str]   # role -> 0x address (e.g. "Pool", "Oracle", "Router")
+    abi_paths: dict[str, str]   # role -> "lib/chains/megaeth/abis/<dir>/<name>.json"
+    priority: int       # 1..3
+    docs_url: str
+    notes: str = ""
+
+REGISTRY: dict[str, ProtocolEntry] = { ... }   # keyed by name
+```
+
+Mirrors `data/chain/deployments.json` in `lib/chain/robinhood_chain.py:DEPLOYMENTS_FILE`, but typed and CI-validated. CI guard: `scripts/validate_megaeth_registry.py` checks that every `addresses[role]` matches `eth_getCode != 0x` on mainnet RPC and that every `abi_paths[role]` exists on disk.
+
+**`contracts/aave_v3.py`** (representative — same shape for all)
+
+```python
+class AaveV3Pool:
+    def __init__(self, client: MegaETHClient, address: str | None = None):
+        self._client = client                       # PR #529's MegaETHClient
+        self._address = address or REGISTRY["aave_v3"].addresses["Pool"]
+        self._abi = _load_abi("aave_v3/Pool.json")  # cached, version-pinned
+
+    async def get_reserve_data(self, asset: str) -> ReserveData: ...
+    async def stream_supply_events(
+        self, *, from_block: int | str = "latest"
+    ) -> AsyncIterator[SupplyEvent]: ...
+```
+
+Pattern: every wrapper (a) takes the existing PR #529 `MegaETHClient` (no new HTTP layer), (b) loads its ABI via the central fetcher (no inline JSON), (c) exposes both call-style reads and event-stream readers, (d) **never accepts a `private_key` parameter** — writes go through `megaeth_executor` only.
+
+**`protocols.py` — intent-level facade**
+
+```python
+async def quote_swap(
+    token_in: str, token_out: str, amount_in: int, *,
+    venues: tuple[str, ...] = ("kumbaya", "prism"),
+) -> list[QuoteResult]:
+    """Get best-bid quotes from each enabled venue, ranked by output."""
+
+async def supply_apy(asset: str, *, venues=("aave_v3", "silo")) -> dict[str, float]:
+    """Read current supply APY for one asset across enabled lending venues."""
+
+async def stable_health(stable: str = "USDM") -> StableHealthSnapshot:
+    """For a stable, return total supply, oracle peg deviation, reserve coverage,
+    pool TVL — composed from oracle.py + usdm.py + Aave reserve data."""
+
+async def perp_market_snapshot(
+    base: str, quote: str = "USD", venues=("gmx_v2", "gns"),
+) -> dict[str, PerpMarket]:
+    """Open interest, funding rate, mark, index — one row per venue."""
+```
+
+Composition: each intent function fans out across the contracts/ wrappers, returns a dataclass. Caller never sees an address or ABI.
+
+**`indexer.py`** — placeholder. Implements an `Indexer` Protocol with `query_logs(filter)` and `query_state(call)`. Today: backed by direct `eth_getLogs` against the RPC. When a subgraph ships for any major protocol, swap the backend without touching call sites.
+
+### 3.3 How this composes with PRs #527 / #529 / #530
+
+- **PR #529 (`MegaETHClient` / `MegaETHWSClient`)** is the transport layer. Every wrapper above takes a `MegaETHClient` instance — no new HTTP machinery. The read-method allowlist in `_RPC_READ_METHODS` already covers everything we need (`eth_call`, `eth_getLogs`, etc.).
+- **PR #530 (`services/megaeth-ingest`)** is the WS subscription service. Its forwarder POSTs enriched events to `signal-logger:18081`. The protocol wrappers' `stream_*_events()` async generators sit downstream — the ingest service does the WSS heavy lifting, the wrappers do typed decoding.
+- **PR #527 (`megaeth_executor.py` scaffold)** is the only writer. Wave C wires `protocols.swap()`, `protocols.supply()`, `protocols.create_perp_order()` to call into the executor's `_sign_and_send()` path. **Until then, every public function in `protocols.py` is read-only.** A defense-in-depth assertion in the facade rejects any request with `dry_run=False` while `policy.signing_verified is False`.
+- **PR #528 (docs + integration test harness)** — the new `docs/integrations/megaeth-protocol-map.md` (this file) cross-links to `docs/integrations/megaeth.md`. The `tests/integration/megaeth/` harness gains a `test_registry_addresses_have_code` check (gated by `SAPPHIRE_MEGAETH_INTEGRATION=1`) once Wave A registers anything.
+
