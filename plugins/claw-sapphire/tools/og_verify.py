@@ -74,9 +74,13 @@ def main() -> None:
         print(json.dumps({"ok": False, "error": f"invalid root hash: {target_root}"}))
         sys.exit(1)
 
-    with tempfile.NamedTemporaryFile(prefix="og_verify_", delete=False) as tmp:
-        tmp_path = Path(tmp.name)
-    try:
+    # The 0G SDK's `indexer.download()` refuses any output path that already
+    # exists ("Wrong path, provide a file path which does not exist."). So
+    # we hand it a fresh subpath inside a tmp directory rather than a
+    # NamedTemporaryFile (which materialises the file on creation). The
+    # TemporaryDirectory cleans up the whole directory tree on exit.
+    with tempfile.TemporaryDirectory(prefix="og_verify_") as tmpdir:
+        tmp_path = Path(tmpdir) / "blob"
         try:
             download(target_root, tmp_path, verify=True, network=network)
             merkle_ok = True
@@ -107,11 +111,6 @@ def main() -> None:
                 )
             )
             sys.exit(4)
-    finally:
-        try:
-            tmp_path.unlink()
-        except FileNotFoundError:
-            pass
 
     output: dict = {
         "ok": True,
