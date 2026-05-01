@@ -16,15 +16,21 @@ allow-list in ``_RPC_READ_METHODS``.
 
 Endpoints (research'd from https://docs.megaeth.com on 2026-04-30):
 
-* Testnet HTTPS RPC: ``https://carrot.megaeth.com/rpc``
-* Testnet chain ID: ``6343``  (``0x18c7``)
-* Testnet block explorer: ``https://megaeth-testnet-v2.blockscout.com``
-* Testnet WSS: not currently published; ``wss://carrot.megaeth.com/ws``
-  is the natural sibling of the HTTPS endpoint. Configurable via
+* Mainnet HTTPS RPC: ``https://mainnet.megaeth.com/rpc``
+* Mainnet chain ID: ``4326``  (``0x10e6``)
+* Testnet (carrot) HTTPS RPC: ``https://carrot.megaeth.com/rpc``
+* Testnet (carrot) chain ID: ``6343``  (``0x18c7``)
+* Testnet (carrot) block explorer: ``https://megaeth-testnet-v2.blockscout.com``
+* Mainnet WSS: public mainnet WSS does not exist; set via env or use a
+  partner provider (Alchemy/QuickNode/dRPC API key). Configurable via
   ``SAPPHIRE_MEGAETH_WS_URL``.
 
 All endpoints are read from env / a config dict so they can be swapped
-without code changes.
+without code changes. Defaults target mainnet; override via env to use
+the carrot testnet:
+
+    SAPPHIRE_MEGAETH_RPC_URL=https://carrot.megaeth.com/rpc
+    SAPPHIRE_MEGAETH_CHAIN_ID=6343
 
 stdin JSON shape::
 
@@ -69,10 +75,22 @@ _RPC_READ_METHODS: frozenset[str] = frozenset(
     }
 )
 
-# Default endpoints — see module docstring for sourcing.
-DEFAULT_HTTP_RPC: str = "https://carrot.megaeth.com/rpc"
-DEFAULT_WS_RPC: str = "wss://carrot.megaeth.com/ws"
-DEFAULT_CHAIN_ID: int = 6343
+# Module-level chain ID constants — used as the canonical reference for
+# mainnet/testnet IDs across the RPC tool, executor scaffold, and ingest
+# service. DO NOT inline-hardcode chain IDs elsewhere.
+MAINNET_CHAIN_ID: int = 4326  # 0x10e6
+TESTNET_CHAIN_ID: int = 6343  # 0x18c7 (carrot)
+
+# Default endpoints — see module docstring for sourcing. Defaults target
+# mainnet HTTP. There is no public mainnet WSS — leave WS unset by default
+# so callers must explicitly opt in to a partner-provider URL via env.
+DEFAULT_HTTP_RPC: str = "https://mainnet.megaeth.com/rpc"
+# NOTE: public mainnet WSS does not exist; set ``SAPPHIRE_MEGAETH_WS_URL``
+# via env or use a partner provider (Alchemy/QuickNode/dRPC API key).
+# Empty default avoids a footgun where callers connect to a non-existent
+# endpoint expecting it to work.
+DEFAULT_WS_RPC: str = ""
+DEFAULT_CHAIN_ID: int = MAINNET_CHAIN_ID
 DEFAULT_EXPLORER: str = "https://megaeth-testnet-v2.blockscout.com"
 
 
@@ -264,6 +282,17 @@ class MegaETHWSClient:
     async def _connect(self) -> Any:
         if self._ws_factory is not None:
             return await self._ws_factory(self.config.ws_rpc)
+        # Public mainnet WSS does not exist. If no WS URL is configured we
+        # refuse rather than connecting to an empty string (which surfaces
+        # as a confusing low-level error). Set SAPPHIRE_MEGAETH_WS_URL to a
+        # partner-provider URL (Alchemy/QuickNode/dRPC) or use the carrot
+        # testnet endpoint to enable WS-driven actions.
+        if not self.config.ws_rpc:
+            raise MegaETHError(
+                "no WS endpoint configured; set SAPPHIRE_MEGAETH_WS_URL "
+                "(public mainnet WSS does not exist — use a partner "
+                "provider API key or the carrot testnet ws endpoint)"
+            )
         import websockets  # late import
 
         # ``websockets.connect`` is itself an async context manager; we

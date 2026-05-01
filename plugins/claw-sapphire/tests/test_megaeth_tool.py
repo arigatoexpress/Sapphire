@@ -99,7 +99,7 @@ def test_status_uses_injected_client(monkeypatch):
     fake = _FakeAsyncClient(
         _rpc_responder(
             {
-                "eth_chainId": "0x18c7",  # 6343
+                "eth_chainId": "0x10e6",  # 4326 — mainnet
                 "eth_blockNumber": "0x12d4f0",
                 "eth_gasPrice": "0x3b9aca00",  # 1 gwei
             }
@@ -112,12 +112,50 @@ def test_status_uses_injected_client(monkeypatch):
 
     payload = asyncio.run(_run())
     assert payload["ok"] is True
-    assert payload["chain_id"] == 6343
+    assert payload["chain_id"] == megaeth.MAINNET_CHAIN_ID == 4326
     assert payload["chain_id_matches"] is True
     assert payload["latest_block"] == 0x12D4F0
     assert payload["gas_price_wei"] == 1_000_000_000
     assert payload["gas_price_gwei"] == 1.0
     assert any(call["payload"]["method"] == "eth_chainId" for call in fake.calls)
+
+
+@pytest.mark.parametrize(
+    "env_chain_id, env_rpc_url, expected_chain_hex, expected_chain_int",
+    [
+        # Mainnet path — explicit env (matches default).
+        (str(4326), "https://mainnet.megaeth.com/rpc", "0x10e6", 4326),
+        # Testnet path — operator opts in via env.
+        (str(6343), "https://carrot.megaeth.com/rpc", "0x18c7", 6343),
+    ],
+)
+def test_status_works_for_both_chains(
+    monkeypatch, env_chain_id, env_rpc_url, expected_chain_hex, expected_chain_int
+):
+    """Mainnet is the default; testnet is reachable via env override."""
+    monkeypatch.setenv("SAPPHIRE_MEGAETH_CHAIN_ID", env_chain_id)
+    monkeypatch.setenv("SAPPHIRE_MEGAETH_RPC_URL", env_rpc_url)
+    fake = _FakeAsyncClient(
+        _rpc_responder(
+            {
+                "eth_chainId": expected_chain_hex,
+                "eth_blockNumber": "0x1",
+                "eth_gasPrice": "0x3b9aca00",
+            }
+        )
+    )
+
+    cfg = megaeth.MegaETHConfig()
+    assert cfg.chain_id == expected_chain_int
+    assert cfg.http_rpc == env_rpc_url
+
+    async def _run() -> dict[str, Any]:
+        async with megaeth.MegaETHClient(config=cfg, http_client=fake) as client:
+            return await megaeth._action_status(client)
+
+    payload = asyncio.run(_run())
+    assert payload["chain_id"] == expected_chain_int
+    assert payload["chain_id_matches"] is True
 
 
 def test_get_balance_validates_address():
@@ -356,6 +394,34 @@ def test_config_reads_env(monkeypatch):
     assert cfg.chain_id == 9999
 
 
+def test_default_config_targets_mainnet_with_no_ws():
+    """Defaults must point at mainnet HTTP and leave WS empty.
+
+    Public mainnet WSS does not exist; the default WS URL must be empty so
+    callers don't accidentally hit a non-existent endpoint.
+    """
+    cfg = megaeth.MegaETHConfig()
+    assert cfg.http_rpc == "https://mainnet.megaeth.com/rpc"
+    assert cfg.chain_id == megaeth.MAINNET_CHAIN_ID == 4326
+    assert cfg.ws_rpc == ""
+
+
+def test_ws_client_refuses_when_no_ws_url(monkeypatch):
+    """WS connect path raises a clear error when ``ws_rpc`` is empty."""
+    cfg = megaeth.MegaETHConfig()
+    assert cfg.ws_rpc == ""
+    ws_client = megaeth.MegaETHWSClient(config=cfg)
+
+    async def _run() -> Any:
+        return await ws_client._connect()
+
+    with pytest.raises(megaeth.MegaETHError) as exc_info:
+        asyncio.run(_run())
+    msg = str(exc_info.value).lower()
+    assert "ws" in msg
+    assert "partner" in msg or "set" in msg
+
+
 # ---- integration test (gated) --------------------------------------------
 
 
@@ -364,9 +430,15 @@ def test_config_reads_env(monkeypatch):
     os.getenv("SAPPHIRE_MEGAETH_INTEGRATION") != "1",
     reason="set SAPPHIRE_MEGAETH_INTEGRATION=1 to run real-network test",
 )
-def test_real_testnet_status():  # pragma: no cover - opt-in network test
+def test_real_network_status(monkeypatch):  # pragma: no cover - opt-in network test
+    """Hits whichever network env vars point at; defaults to mainnet.
+
+    Set ``SAPPHIRE_MEGAETH_RPC_URL`` + ``SAPPHIRE_MEGAETH_CHAIN_ID`` to
+    target the carrot testnet instead of mainnet.
+    """
     payload = megaeth.handle({"action": "status"})
     assert payload["ok"] is True, payload
-    # The carrot testnet docs report chain_id 6343.
-    assert payload["chain_id"] == 6343
+    # Default to mainnet; the env var override may have flipped this.
+    expected = int(os.getenv("SAPPHIRE_MEGAETH_CHAIN_ID") or megaeth.MAINNET_CHAIN_ID)
+    assert payload["chain_id"] == expected
     assert payload["latest_block"] >= 0
