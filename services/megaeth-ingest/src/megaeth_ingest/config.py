@@ -193,7 +193,9 @@ def load_config(
         return default
 
     wss_url = str(_pick("SAPPHIRE_MEGAETH_WSS", "wss_url", DEFAULT_WSS)).strip()
-    chain_id = _coerce_int(_pick("SAPPHIRE_MEGAETH_CHAIN_ID", "chain_id", DEFAULT_CHAIN_ID), DEFAULT_CHAIN_ID)
+    chain_id = _coerce_int(
+        _pick("SAPPHIRE_MEGAETH_CHAIN_ID", "chain_id", DEFAULT_CHAIN_ID), DEFAULT_CHAIN_ID
+    )
     health_port = _coerce_int(
         _pick("SAPPHIRE_MEGAETH_HEALTH_PORT", "health_port", DEFAULT_HEALTH_PORT),
         DEFAULT_HEALTH_PORT,
@@ -210,7 +212,11 @@ def load_config(
         _pick("SAPPHIRE_MEGAETH_QUEUE_MAX", "queue_max", DEFAULT_QUEUE_MAX), DEFAULT_QUEUE_MAX
     )
     reconnect_backoff_sec = _coerce_float(
-        _pick("SAPPHIRE_MEGAETH_RECONNECT_BACKOFF", "reconnect_backoff_sec", DEFAULT_RECONNECT_BACKOFF_SEC),
+        _pick(
+            "SAPPHIRE_MEGAETH_RECONNECT_BACKOFF",
+            "reconnect_backoff_sec",
+            DEFAULT_RECONNECT_BACKOFF_SEC,
+        ),
         DEFAULT_RECONNECT_BACKOFF_SEC,
     )
     reconnect_max_sec = _coerce_float(
