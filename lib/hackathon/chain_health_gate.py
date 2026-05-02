@@ -76,7 +76,7 @@ def _to_unified(verdict: object) -> ChainHealthVerdict:
     touching the unifier.
     """
     return ChainHealthVerdict(
-        chain_id=int(getattr(verdict, "chain_id")),
+        chain_id=int(verdict.chain_id),
         chain_name=str(getattr(verdict, "chain_name", "")),
         severity=str(getattr(verdict, "severity", "UNKNOWN")),
         reasons=list(getattr(verdict, "reasons", []) or []),

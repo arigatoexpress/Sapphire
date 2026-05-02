@@ -369,9 +369,11 @@ def test_registry_lists_aave_v3_only() -> None:
 async def test_live_lend_overview_returns_real_reserves() -> None:
     """Live: fetch lend_overview() against Optimism mainnet.
 
-    Asserts the deployment is meaningful (>=3 reserves and >$100M
-    supplied — Optimism's Aave is much larger than MegaETH's). Network
-    flake => skip via the env gate; this is not run in CI.
+    Asserts the deployment is meaningful (>=3 reserves and >$50M
+    supplied — Optimism Aave at the 2026-05-02 snapshot was $82M
+    supplied / $29M borrowed, an order of magnitude below Arbitrum's
+    $1B but still substantial). Network flake => skip via the env gate;
+    this is not run in CI.
     """
     from lib.chains.optimism.client import OptimismClient
     from lib.chains.optimism.protocols import OptimismProtocols
@@ -380,4 +382,4 @@ async def test_live_lend_overview_returns_real_reserves() -> None:
         proto = OptimismProtocols(client)
         overview = await proto.lend_overview()
     assert overview.reserve_count >= 3
-    assert overview.total_supplied_usd > Decimal(100_000_000)
+    assert overview.total_supplied_usd > Decimal(50_000_000)
