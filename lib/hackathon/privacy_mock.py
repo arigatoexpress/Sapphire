@@ -1,8 +1,12 @@
 """Zama/FHEVM-shaped privacy mock for Sapphire Sentinel.
 
-Production swap-in: replace ``FhevmClient`` below with
-``from zama_fhevm import FhevmClient`` once a Zama gateway endpoint
-(e.g. fhevm.zama.ai) is configured for the Sentinel deployment.
+Production swap-in: replace this mock with a TypeScript bridge that uses
+``@zama-fhe/relayer-sdk`` (the canonical Zama Relayer SDK). Pattern: Python
+calls a Node helper subprocess (mirroring ``lib/og/_ts/og_storage.mjs``)
+that wraps the SDK. The Solidity side requires a new contract using
+``FHE.add`` / ``FHE.mul`` on encrypted weights with ``FHE.allow`` ACL and
+``ZamaEthereumConfig`` inheritance. See ``docs/research/hackathon-strategy/zama-deep-dive.md``
+(Lane Z PR #559) for the full migration path.
 
 Today's implementation is a deterministic in-process mock that mirrors
 FHEVM's input-blind / output-opaque shape:
@@ -14,7 +18,7 @@ The mock uses HMAC-SHA256 over a canonical JSON encoding of the weights,
 keyed by a per-basket entropy salt. Real FHEVM would substitute homomorphic
 addition + a re-encryption-under-public-key step; the *interface* (encrypted
 inputs in, opaque commitment out) is identical so call-sites do not change
-when the production client is wired in.
+when the production bridge is wired in.
 """
 
 from __future__ import annotations
