@@ -669,6 +669,35 @@ td.muted { color: var(--text-3); }
   </div>
 </div>
 
+<!-- ========== Prediction accuracy ========== -->
+<div class="section-h" id="prediction-accuracy">
+  <span>Prediction accuracy — rolling 7d / 30d</span>
+  <span class="meta" id="acc-meta">backfilled from realized BTC/ETH/SOL prices</span>
+</div>
+<div class="cols-2">
+  <div class="panel">
+    <h2>
+      <span>Rolling 7d accuracy by model</span>
+      <span class="h-meta" id="chart-acc-meta">—</span>
+    </h2>
+    <div class="chart-wrap"><svg id="chart-accuracy"></svg></div>
+    <div class="legend" id="chart-accuracy-legend"></div>
+  </div>
+  <div class="panel">
+    <h2>
+      <span>By symbol — last 30d</span>
+      <span class="h-meta" id="acc-symbol-meta">—</span>
+    </h2>
+    <table id="acc-symbol">
+      <thead><tr>
+        <th>Symbol</th><th class="num">7d acc</th><th class="num">7d n</th>
+        <th class="num">30d acc</th><th class="num">30d n</th>
+      </tr></thead>
+      <tbody><tr><td colspan="5" class="empty">loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
 <!-- ========== Live threat feed ========== -->
 <div class="section-h" id="threats">
   <span>Live threat intelligence feed</span>
@@ -1004,7 +1033,7 @@ document.addEventListener('keydown', (e) => {
 
 // ========== Refresh ==========
 async function refresh() {
-  const [sum, regime, preds, silos, inference, threatsLive, tsInf, tsThr, tsSvc] = await Promise.all([
+  const [sum, regime, preds, silos, inference, threatsLive, tsInf, tsThr, tsSvc, acc] = await Promise.all([
     safeFetch('/api/summary'),
     safeFetch('/api/regime?limit=8'),
     safeFetch('/api/predictions?limit=8'),
@@ -1014,6 +1043,7 @@ async function refresh() {
     safeFetch('/api/timeseries/inference'),
     safeFetch('/api/timeseries/threats'),
     safeFetch('/api/timeseries/services'),
+    safeFetch('/api/predictions/accuracy'),
   ]);
 
   // ----- THO silo + header health -----
@@ -1308,6 +1338,84 @@ async function refresh() {
     }).join('');
   } else {
     ph.innerHTML = `<tr><td colspan="5"><div class="empty">no predictions in window</div></td></tr>`;
+  }
+
+  // ----- Prediction accuracy -----
+  const accBySymbol = acc?.by_symbol || [];
+  const accByModel = acc?.by_model || [];
+  const accRolling = acc?.rolling || [];
+
+  // Chart: rolling 7d accuracy by model. Build per-model daily series, then
+  // smooth with a 7-day trailing window for readability.
+  const accModelSet = new Set();
+  const accDayMap = {};  // date -> model -> {acc, n}
+  for (const r of accRolling) {
+    const d = (r.date || '').slice(0, 10);
+    const m = r.model || 'unknown';
+    accModelSet.add(m);
+    accDayMap[d] = accDayMap[d] || {};
+    accDayMap[d][m] = { acc: Number(r.accuracy), n: Number(r.n) };
+  }
+  const accDays = Object.keys(accDayMap).sort();
+  const accColors = {
+    'kronos-base': '#4ea8ff', 'kronos': '#4ea8ff',
+    'ta-scanner': '#62ff40', 'ta-consensus': '#62ff40',
+    'unknown': '#6c7891',
+  };
+  const accSeries = Array.from(accModelSet).map(m => {
+    const points = [];
+    // 7-day trailing window smoothing
+    for (let i = 0; i < accDays.length; i++) {
+      let sumAcc = 0, sumN = 0;
+      for (let j = Math.max(0, i - 6); j <= i; j++) {
+        const e = accDayMap[accDays[j]]?.[m];
+        if (e && !isNaN(e.acc) && e.n > 0) {
+          sumAcc += e.acc * e.n;
+          sumN += e.n;
+        }
+      }
+      points.push({
+        x_label: accDays[i].slice(5),
+        y: sumN > 0 ? (sumAcc / sumN) * 100 : 0,  // percent
+      });
+    }
+    return {
+      name: m,
+      color: accColors[m] || '#a371f7',
+      points: points,
+    };
+  });
+  const accSvg = document.getElementById('chart-accuracy');
+  if (accSvg) {
+    drawMultiLine(accSvg, accSeries, {});
+    buildLegend(document.getElementById('chart-accuracy-legend'),
+      accSeries.map(s => ({ name: s.name, color: s.color })));
+    const total7 = accByModel.reduce((a, m) => a + Number(m.scored_7d || 0), 0);
+    document.getElementById('chart-acc-meta').textContent =
+      total7 ? `${fmtN(total7)} scored (7d), 7-day trailing window` : 'awaiting realized prices';
+  }
+
+  // Symbol table
+  const accSymTbody = document.querySelector('#acc-symbol tbody');
+  if (accSymTbody) {
+    if (accBySymbol.length) {
+      accSymTbody.innerHTML = accBySymbol.map(r => {
+        const a7 = r.accuracy_7d != null ? Number(r.accuracy_7d) : null;
+        const a30 = r.accuracy_30d != null ? Number(r.accuracy_30d) : null;
+        const cls7 = a7 == null ? 'gray' : a7 >= 0.6 ? 'green' : a7 >= 0.5 ? 'yellow' : 'red';
+        const cls30 = a30 == null ? 'gray' : a30 >= 0.6 ? 'green' : a30 >= 0.5 ? 'yellow' : 'red';
+        return `<tr>
+          <td class="t1">${r.symbol || '—'}</td>
+          <td class="num">${a7 != null ? pill(cls7, fmtPct(a7, 1)) : '—'}</td>
+          <td class="num muted">${fmtN(r.scored_7d)}</td>
+          <td class="num">${a30 != null ? pill(cls30, fmtPct(a30, 1)) : '—'}</td>
+          <td class="num muted">${fmtN(r.scored_30d)}</td>
+        </tr>`;
+      }).join('');
+      document.getElementById('acc-symbol-meta').textContent = `${accBySymbol.length} symbols`;
+    } else {
+      accSymTbody.innerHTML = '<tr><td colspan="5"><div class="empty">no scored predictions yet — backfill needs ≥24h-old predictions with matching trading_signals</div></td></tr>';
+    }
   }
 
   $('#ts').textContent = isoTs();

@@ -245,6 +245,137 @@ def predictions():
         return jsonify({"rows": []})
 
 
+@app.get("/api/predictions/accuracy")
+def predictions_accuracy():
+    """Rolling 7d/30d prediction accuracy by symbol + by model.
+
+    Backfills accuracy_score for predictions older than 24h on the fly:
+    joins each prediction to the closest trading_signals current_price 24h
+    after the prediction timestamp and computes whether the predicted
+    direction matched the realized move. Materializes the result as the
+    `effective_accuracy` column so callers see a meaningful score even
+    when the writer never set `accuracy_score`.
+
+    Returns:
+        {
+          "by_model":  [{model, scored_7d, accuracy_7d, scored_30d, accuracy_30d}],
+          "by_symbol": [{symbol, scored_7d, accuracy_7d, scored_30d, accuracy_30d}],
+          "rolling":   [{date, model, accuracy, n}],   # daily series, last 30d, by model
+        }
+    Fail-safe: empty payload on any BQ error.
+    """
+    out = {"by_model": [], "by_symbol": [], "rolling": []}
+
+    # Common CTE: backfill `effective_accuracy` for predictions older than 24h.
+    # Strategy: 24h after each prediction, look up the closest BTC/ETH/SOL/etc.
+    # current_price recorded in trading_signals (within +/-1h of the target).
+    # If the realized move sign matches the predicted direction sign, score=1
+    # else 0. If accuracy_score is already set, keep it.
+    backfill_cte = f"""
+        WITH preds AS (
+          SELECT timestamp, symbol, model, direction, confidence,
+                 current_price AS p_price,
+                 predicted_price_24h AS p_target,
+                 predicted_move_pct,
+                 accuracy_score
+          FROM `{PROJECT}.{DATASET}.predictions`
+          WHERE timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 60 DAY)
+            AND timestamp <= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)
+            AND symbol IS NOT NULL
+        ),
+        realized AS (
+          SELECT
+            p.timestamp, p.symbol, p.model, p.direction, p.confidence,
+            p.p_price, p.predicted_move_pct, p.accuracy_score,
+            -- realized 24h price: closest signal within +/-1h of (timestamp+24h)
+            (
+              SELECT s.current_price
+              FROM `{PROJECT}.{DATASET}.trading_signals` s
+              WHERE s.symbol = p.symbol
+                AND s.timestamp BETWEEN TIMESTAMP_ADD(p.timestamp, INTERVAL 23 HOUR)
+                                    AND TIMESTAMP_ADD(p.timestamp, INTERVAL 25 HOUR)
+                AND s.current_price IS NOT NULL
+              ORDER BY ABS(TIMESTAMP_DIFF(s.timestamp,
+                          TIMESTAMP_ADD(p.timestamp, INTERVAL 24 HOUR), SECOND))
+              LIMIT 1
+            ) AS realized_price
+          FROM preds p
+        ),
+        scored AS (
+          SELECT
+            timestamp, symbol, model, direction, confidence, p_price,
+            realized_price,
+            CASE
+              WHEN accuracy_score IS NOT NULL THEN accuracy_score
+              WHEN realized_price IS NULL OR p_price IS NULL OR p_price = 0 THEN NULL
+              WHEN LOWER(IFNULL(direction,'')) IN ('up','bull','long','buy')
+                   AND realized_price > p_price THEN 1.0
+              WHEN LOWER(IFNULL(direction,'')) IN ('down','bear','short','sell')
+                   AND realized_price < p_price THEN 1.0
+              WHEN LOWER(IFNULL(direction,'')) IN ('flat','neutral','hold')
+                   AND ABS(SAFE_DIVIDE(realized_price - p_price, p_price)) < 0.005 THEN 1.0
+              WHEN realized_price IS NOT NULL THEN 0.0
+              ELSE NULL
+            END AS effective_accuracy
+          FROM realized
+        )
+    """
+
+    try:
+        by_model = _rows(backfill_cte + """
+            SELECT model,
+                   COUNTIF(effective_accuracy IS NOT NULL
+                           AND timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)) AS scored_7d,
+                   AVG(IF(effective_accuracy IS NOT NULL
+                          AND timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY),
+                          effective_accuracy, NULL)) AS accuracy_7d,
+                   COUNTIF(effective_accuracy IS NOT NULL) AS scored_30d,
+                   AVG(effective_accuracy) AS accuracy_30d
+            FROM scored
+            GROUP BY model
+            ORDER BY scored_30d DESC
+        """)
+        out["by_model"] = _clean(by_model)
+    except Exception as exc:
+        log.info("predictions_accuracy by_model bq miss: %s", exc)
+
+    try:
+        by_symbol = _rows(backfill_cte + """
+            SELECT symbol,
+                   COUNTIF(effective_accuracy IS NOT NULL
+                           AND timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)) AS scored_7d,
+                   AVG(IF(effective_accuracy IS NOT NULL
+                          AND timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY),
+                          effective_accuracy, NULL)) AS accuracy_7d,
+                   COUNTIF(effective_accuracy IS NOT NULL) AS scored_30d,
+                   AVG(effective_accuracy) AS accuracy_30d
+            FROM scored
+            GROUP BY symbol
+            ORDER BY scored_30d DESC
+        """)
+        out["by_symbol"] = _clean(by_symbol)
+    except Exception as exc:
+        log.info("predictions_accuracy by_symbol bq miss: %s", exc)
+
+    # Rolling daily accuracy by model — for the line chart.
+    try:
+        rolling = _rows(backfill_cte + """
+            SELECT DATE(timestamp) AS date,
+                   IFNULL(model, 'unknown') AS model,
+                   AVG(effective_accuracy) AS accuracy,
+                   COUNTIF(effective_accuracy IS NOT NULL) AS n
+            FROM scored
+            WHERE effective_accuracy IS NOT NULL
+            GROUP BY date, model
+            ORDER BY date ASC, model
+        """)
+        out["rolling"] = _clean(rolling)
+    except Exception as exc:
+        log.info("predictions_accuracy rolling bq miss: %s", exc)
+
+    return jsonify(out)
+
+
 @app.get("/api/threats")
 def threats():
     days = int(request.args.get("days", "30"))
