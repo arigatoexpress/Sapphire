@@ -8,8 +8,8 @@
 
 [![CI](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
 [![Security](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml)
-[![Tests](https://img.shields.io/badge/tests-6%2C526%2B%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
-[![Tools](https://img.shields.io/badge/tools-69-0d9488)](infra/tool-registry.yaml)
+[![Tests](https://img.shields.io/badge/tests-6%2C590%2B%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
+[![Tools](https://img.shields.io/badge/tools-72-0d9488)](infra/tool-registry.yaml)
 [![Dashboard](https://img.shields.io/badge/dashboard-50%20pages-6d28d9)](services/dashboard/templates/pages)
 [![Readiness](https://img.shields.io/badge/readiness-0%20FAIL-2ea44f)](scripts/ops/production_readiness_sweep.py)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3776ab?logo=python&logoColor=white)](https://www.python.org/)
@@ -133,8 +133,8 @@ flowchart LR
 
 | Surface | Count | Detail |
 |---|---:|---|
-| Passing tests | **6,526+** | 6,000+ unit · 526 plugin (`python scripts/ops/test_inventory.py --check-readme`) |
-| Test files | **380+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
+| Passing tests | **6,590+** | 6,023+ unit · 567 plugin (`python scripts/ops/test_inventory.py --check-readme`) |
+| Test files | **382+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
 | Dashboard pages | **50** | Flask + SSE, basic-auth, unified `/showcase`, observability, cross-asset, diligence, threat-intel, dossier, lead-intel, Sentinel pages |
 | Quant strategies | **7** | `lib/analytics/strategies.py` |
 | Pine strategies | **5** | `pine/standalone/` |
