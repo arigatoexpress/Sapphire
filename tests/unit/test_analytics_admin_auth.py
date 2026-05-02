@@ -28,6 +28,13 @@ from pathlib import Path
 
 import pytest
 
+# The whole suite needs the optional `webauthn` + `itsdangerous` packages.
+# When CI is missing them (e.g. early pip-cache misses, partial installs),
+# skip cleanly rather than corrupting sys.modules with a half-loaded
+# _sapphire_test_auth_pkg that breaks every subsequent test.
+pytest.importorskip("webauthn")
+pytest.importorskip("itsdangerous")
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 AUTH_DIR = REPO_ROOT / "services" / "analytics_dashboard" / "auth"
 TEMPLATE_DIR = REPO_ROOT / "services" / "analytics_dashboard" / "templates"
@@ -50,7 +57,15 @@ def _load_pkg():
     )
     pkg = importlib.util.module_from_spec(spec)
     sys.modules[pkg_name] = pkg
-    spec.loader.exec_module(pkg)
+    try:
+        spec.loader.exec_module(pkg)
+    except Exception:
+        # Tear down the half-loaded package so a retry (or another test
+        # importing it) doesn't see a corrupted module with missing
+        # attributes. Without this, the first failure cascades into
+        # AttributeError noise across the whole suite.
+        sys.modules.pop(pkg_name, None)
+        raise
     return pkg
 
 
