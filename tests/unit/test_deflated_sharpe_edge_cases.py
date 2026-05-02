@@ -107,7 +107,6 @@ def test_normal_inputs_unaffected_by_clamp() -> None:
     # Sanity: normal-case correction is well-positive, so the clamp is a no-op.
     expected_inner = (1 - 0.0 * 1.5 + ((3.0 - 1) / 4) * 1.5**2) / 252
     expected_correction = math.sqrt(expected_inner)
-    expected_deflated = (1.5 - max(1.0, 1.2, 0.8, 1.5)) / max(1e-9, expected_correction)
     # The selected (1.5) equals max so deflated should be (1.5 - sr_star) / correction.
     # We don't recompute sr_star here (covered by other tests); just assert finiteness.
     assert math.isfinite(result.deflated_sharpe)
