@@ -454,7 +454,9 @@ def _transform_houston_leads_jsonl(fp: Path, *, now: str) -> Iterator[dict]:
                 "zip": lead.get("zip") or raw.get("zip"),
                 "score": score,
                 "grade": lead.get("grade") or _grade_from_score_value(score),
-                "permit_type": lead.get("permit_type") or lead.get("type") or raw.get("permit_type"),
+                "permit_type": lead.get("permit_type")
+                or lead.get("type")
+                or raw.get("permit_type"),
                 "permit_value_usd": lead.get("permit_value_usd")
                 or raw.get("declared_value")
                 or raw.get("value_usd"),

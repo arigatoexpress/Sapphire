@@ -193,9 +193,7 @@ def test_pine_promote_fails_when_compile_reports_errors(
         if args[:2] == ("pine", "errors"):
             return {
                 "ok": True,
-                "payload": {
-                    "errors": [{"line": 12, "message": "Undeclared identifier 'foo'"}]
-                },
+                "payload": {"errors": [{"line": 12, "message": "Undeclared identifier 'foo'"}]},
             }
         raise AssertionError(f"unexpected _run call after errors: {args}")
 
@@ -213,7 +211,9 @@ def test_pine_promote_fails_when_compile_reports_errors(
 
 
 def test_alerts_list_calls_tv_alert_list(orch: TradingViewOrchestrator):
-    with patch.object(orch, "_run", return_value={"ok": True, "payload": {"alert_count": 7}}) as run:
+    with patch.object(
+        orch, "_run", return_value={"ok": True, "payload": {"alert_count": 7}}
+    ) as run:
         orch.alerts_list()
         run.assert_called_once_with("alert", "list")
 
@@ -232,9 +232,7 @@ def test_alert_create_validates_condition(orch_mutating: TradingViewOrchestrator
 def test_alert_create_passes_args_when_gated(orch_mutating: TradingViewOrchestrator):
     with patch.object(orch_mutating, "_run", return_value={"ok": True}) as run:
         orch_mutating.alert_create(price=100.5, condition="crossing", message="x")
-        run.assert_called_once_with(
-            "alert", "create", "-p", "100.5", "-c", "crossing", "-m", "x"
-        )
+        run.assert_called_once_with("alert", "create", "-p", "100.5", "-c", "crossing", "-m", "x")
 
 
 def test_alert_delete_blocked_without_gate(orch: TradingViewOrchestrator):

@@ -87,9 +87,7 @@ class StubClient:
     """eth_call multi-response router. Same shape as the facade-test stubs."""
 
     def __init__(self, responses: dict[str, list[str]]) -> None:
-        self.responses: dict[str, list[str]] = {
-            k.lower(): list(v) for k, v in responses.items()
-        }
+        self.responses: dict[str, list[str]] = {k.lower(): list(v) for k, v in responses.items()}
         self.calls: list[tuple[str, list[Any]]] = []
 
     async def _call(self, method: str, params: list[Any] | None = None) -> Any:
@@ -197,9 +195,7 @@ def test_list_protocols_enumerates_registered_entries() -> None:
 
 
 def test_list_protocols_filters_by_category() -> None:
-    response = megaeth_protocols.handle(
-        {"action": "list_protocols", "category": "stable"}
-    )
+    response = megaeth_protocols.handle({"action": "list_protocols", "category": "stable"})
     assert response["ok"] is True
     cats = {p["category"] for p in response["data"]["protocols"]}
     assert cats == {"stable"}
@@ -249,9 +245,7 @@ def test_payload_must_be_dict() -> None:
 
 
 def test_lend_user_position_requires_user_address() -> None:
-    response = megaeth_protocols.handle(
-        {"action": "lend_user_position", "_client": StubClient({})}
-    )
+    response = megaeth_protocols.handle({"action": "lend_user_position", "_client": StubClient({})})
     assert response["ok"] is False
     assert "user" in response["error"]
 
@@ -381,9 +375,7 @@ def test_is_safe_for_leverage_returns_bool_and_reason() -> None:
             AAVE_ORACLE: [_aave_price_response(10**8)],
         }
     )
-    response = megaeth_protocols.handle(
-        {"action": "is_safe_for_leverage", "_client": client}
-    )
+    response = megaeth_protocols.handle({"action": "is_safe_for_leverage", "_client": client})
     assert response["ok"] is True, response.get("error")
     assert response["data"]["safe"] is True
     assert response["data"]["reason"] == ""

@@ -133,9 +133,9 @@ def test_fetch_regional_intel_filters_renovation(temp_store, monkeypatch):
 
 def test_ingest_returns_per_source_counts(temp_store, monkeypatch):
     monkeypatch.setattr(
-        houston_leads, "fetch_311_complaints", lambda: [
-            {"id": "311:A", "source": "311", "address": "1 A St", "ingested_at": "x"}
-        ]
+        houston_leads,
+        "fetch_311_complaints",
+        lambda: [{"id": "311:A", "source": "311", "address": "1 A St", "ingested_at": "x"}],
     )
     monkeypatch.setattr(houston_leads, "fetch_permit_activity", lambda: [])
     monkeypatch.setattr(houston_leads, "fetch_regional_intel", lambda region="houston_tx": [])

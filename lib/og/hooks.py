@@ -46,9 +46,7 @@ def publish_signal_async(
 
     if not PUBLISH_TOOL.exists():
         LOG.warning("og_publish tool missing at %s", PUBLISH_TOOL)
-        _record_event(
-            "og.publish.skipped", {"reason": "tool_missing", "path": str(PUBLISH_TOOL)}
-        )
+        _record_event("og.publish.skipped", {"reason": "tool_missing", "path": str(PUBLISH_TOOL)})
         return
 
     if ENV_PRIVATE_KEY not in os.environ:

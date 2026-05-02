@@ -63,19 +63,26 @@ def test_unknown_action():
 
 
 def test_main_invalid_json(capsys):
-    rc = _tool().main(stream_in=type("S", (), {"read": lambda self: "{"})(), stream_out=__import__("sys").stdout)
+    rc = _tool().main(
+        stream_in=type("S", (), {"read": lambda self: "{"})(), stream_out=__import__("sys").stdout
+    )
     assert rc == 2
     assert "invalid JSON" in capsys.readouterr().out
 
 
 def test_main_requires_object(capsys):
-    rc = _tool().main(stream_in=type("S", (), {"read": lambda self: "[]"})(), stream_out=__import__("sys").stdout)
+    rc = _tool().main(
+        stream_in=type("S", (), {"read": lambda self: "[]"})(), stream_out=__import__("sys").stdout
+    )
     assert rc == 2
     assert "JSON object" in capsys.readouterr().out
 
 
 def test_main_success(capsys):
-    rc = _tool().main(stream_in=type("S", (), {"read": lambda self: '{"action":"status"}'})(), stream_out=__import__("sys").stdout)
+    rc = _tool().main(
+        stream_in=type("S", (), {"read": lambda self: '{"action":"status"}'})(),
+        stream_out=__import__("sys").stdout,
+    )
     assert rc == 0
     assert '"public_data_only": true' in capsys.readouterr().out
 

@@ -57,8 +57,36 @@ def _sample_report() -> dict:
             "low_sample_sources_count": 0,
         },
         "snr": {
-            "alpha": {"source": "alpha", "samples": 6, "precision": 0.9, "recall": 0.85, "f1": 0.875, "true_positives": 5, "false_positives": 1, "true_negatives": 0, "false_negatives": 0, "low_sample": False, "notes": [], "window_start": "", "window_end": ""},
-            "beta": {"source": "beta", "samples": 6, "precision": 0.7, "recall": 0.6, "f1": 0.65, "true_positives": 4, "false_positives": 2, "true_negatives": 0, "false_negatives": 0, "low_sample": False, "notes": [], "window_start": "", "window_end": ""},
+            "alpha": {
+                "source": "alpha",
+                "samples": 6,
+                "precision": 0.9,
+                "recall": 0.85,
+                "f1": 0.875,
+                "true_positives": 5,
+                "false_positives": 1,
+                "true_negatives": 0,
+                "false_negatives": 0,
+                "low_sample": False,
+                "notes": [],
+                "window_start": "",
+                "window_end": "",
+            },
+            "beta": {
+                "source": "beta",
+                "samples": 6,
+                "precision": 0.7,
+                "recall": 0.6,
+                "f1": 0.65,
+                "true_positives": 4,
+                "false_positives": 2,
+                "true_negatives": 0,
+                "false_negatives": 0,
+                "low_sample": False,
+                "notes": [],
+                "window_start": "",
+                "window_end": "",
+            },
         },
         "correlation": {
             "sources": ["alpha", "beta"],
@@ -66,10 +94,24 @@ def _sample_report() -> dict:
             "min_overlap": 5,
             "near_duplicate_threshold": 0.87,
             "pairs": [
-                {"source_a": "alpha", "source_b": "beta", "overlap": 6, "agreements": 6, "conflicts": 0, "agreement_rate": 1.0, "conflict_rate": 0.0, "near_duplicate": True}
+                {
+                    "source_a": "alpha",
+                    "source_b": "beta",
+                    "overlap": 6,
+                    "agreements": 6,
+                    "conflicts": 0,
+                    "agreement_rate": 1.0,
+                    "conflict_rate": 0.0,
+                    "near_duplicate": True,
+                }
             ],
             "near_duplicates": [
-                {"source_a": "alpha", "source_b": "beta", "agreement_rate": 1.0, "near_duplicate": True}
+                {
+                    "source_a": "alpha",
+                    "source_b": "beta",
+                    "agreement_rate": 1.0,
+                    "near_duplicate": True,
+                }
             ],
             "notes": [],
         },
@@ -81,7 +123,17 @@ def _sample_report() -> dict:
             "recent_days": 14,
             "window_hours": 24,
             "alerts": [
-                {"source": "alpha", "baseline_f1": 0.875, "recent_f1": 0.5, "delta": 0.375, "baseline_samples": 6, "recent_samples": 6, "decay": True, "low_sample": False, "notes": []}
+                {
+                    "source": "alpha",
+                    "baseline_f1": 0.875,
+                    "recent_f1": 0.5,
+                    "delta": 0.375,
+                    "baseline_samples": 6,
+                    "recent_samples": 6,
+                    "decay": True,
+                    "low_sample": False,
+                    "notes": [],
+                }
             ],
             "decayed_sources": ["alpha"],
             "notes": [],

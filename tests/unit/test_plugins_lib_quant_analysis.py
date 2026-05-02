@@ -148,15 +148,33 @@ def test_find_sr_clusters_within_tolerance(quant_module):
     """Pivots within tolerance% should merge into a single cluster."""
     # Three pivot-lows clustered at ~100, three pivot-highs at ~120.
     prices = [
-        110, 100, 110,
-        110, 100.5, 110,
-        110, 100.2, 110,
-        110, 119.5, 110,
-        110, 120, 110,
-        110, 120.4, 110,
-        110, 100.1, 110,
-        110, 119.9, 110,
-        110, 100.3, 110,
+        110,
+        100,
+        110,
+        110,
+        100.5,
+        110,
+        110,
+        100.2,
+        110,
+        110,
+        119.5,
+        110,
+        110,
+        120,
+        110,
+        110,
+        120.4,
+        110,
+        110,
+        100.1,
+        110,
+        110,
+        119.9,
+        110,
+        110,
+        100.3,
+        110,
     ]
     bars = _make_bars(quant_module, prices)
     supports, resistances = quant_module.find_support_resistance(
@@ -267,16 +285,22 @@ def test_calculate_correlation_perfectly_negative(quant_module):
     a = [
         OHLCV(
             date=(base + timedelta(days=i)).strftime("%Y-%m-%d"),
-            open=a_closes[i], high=a_closes[i], low=a_closes[i],
-            close=a_closes[i], volume=1_000_000,
+            open=a_closes[i],
+            high=a_closes[i],
+            low=a_closes[i],
+            close=a_closes[i],
+            volume=1_000_000,
         )
         for i in range(35)
     ]
     b = [
         OHLCV(
             date=(base + timedelta(days=i)).strftime("%Y-%m-%d"),
-            open=b_closes[i], high=b_closes[i], low=b_closes[i],
-            close=b_closes[i], volume=1_000_000,
+            open=b_closes[i],
+            high=b_closes[i],
+            low=b_closes[i],
+            close=b_closes[i],
+            volume=1_000_000,
         )
         for i in range(35)
     ]
@@ -321,6 +345,7 @@ def test_calculate_correlation_interpretation_buckets(quant_module):
         # Easier: just check the labelling logic on the dataclass output by
         # bypassing the calc with a tightly scoped patch.
         from math import isclose
+
         # A direct unit test of the bucket logic — feed the function known data.
         n = 30
         base_a = [100 * (1 + 0.01 * i) for i in range(n)]
@@ -331,8 +356,7 @@ def test_calculate_correlation_interpretation_buckets(quant_module):
         else:
             # Mix correlated + noise for moderate cases.
             base_b = [
-                100 + i * (0.01 if target > 0 else -0.01) + ((-1) ** i) * 0.5
-                for i in range(n)
+                100 + i * (0.01 if target > 0 else -0.01) + ((-1) ** i) * 0.5 for i in range(n)
             ]
         a_bars = _make_bars(quant, base_a)
         b_bars = _make_bars(quant, base_b)
@@ -413,8 +437,9 @@ def test_analyze_full_returns_none_when_too_few_bars(quant_module):
     """Need at least 14 bars for full analysis."""
     fake_tech = _MakeFakeTechnical(symbol="BTC")
     short_bars = _flat(quant_module, 5)
-    with patch.object(quant_module, "analyze", return_value=fake_tech), patch.object(
-        quant_module, "_fetch_ohlcv", return_value=short_bars
+    with (
+        patch.object(quant_module, "analyze", return_value=fake_tech),
+        patch.object(quant_module, "_fetch_ohlcv", return_value=short_bars),
     ):
         result = quant_module.analyze_full("BTC")
     assert result is None
@@ -424,23 +449,24 @@ def test_analyze_full_happy_path(quant_module):
     """Full path returns a populated QuantProfile with finite numbers."""
     bars = _trending_up(quant_module, 60)
     fake_tech = _MakeFakeTechnical(symbol="BTC")
-    with patch.object(quant_module, "analyze", return_value=fake_tech), patch.object(
-        quant_module, "_fetch_ohlcv", return_value=bars
+    with (
+        patch.object(quant_module, "analyze", return_value=fake_tech),
+        patch.object(quant_module, "_fetch_ohlcv", return_value=bars),
     ):
         profile = quant_module.analyze_full("BTC")
     assert profile is not None
     assert profile.symbol == "BTC"
     assert math.isfinite(profile.price)
     assert math.isfinite(profile.trend_strength)
-    assert profile.trend_direction in {
-        "sideways", "up", "down", "strong_up", "strong_down"
-    }
+    assert profile.trend_direction in {"sideways", "up", "down", "strong_up", "strong_down"}
     # Risk/reward is finite (the source clamps via /max(..., 0.01)).
     assert math.isfinite(profile.risk_reward)
     # Nearest support/resistance default fallbacks are 5% off price when
     # no clusters are found; with synthetic uptrend they may be exact.
-    assert profile.nearest_support <= profile.price <= profile.nearest_resistance or \
-           profile.nearest_support <= profile.nearest_resistance + 1
+    assert (
+        profile.nearest_support <= profile.price <= profile.nearest_resistance
+        or profile.nearest_support <= profile.nearest_resistance + 1
+    )
     assert profile.mtf_signal is None  # caller-set field, never populated by analyze_full
 
 
@@ -515,10 +541,17 @@ def test_dataclass_quant_profile_required_fields(quant_module):
     """QuantProfile dataclass exposes every documented field."""
     fields = quant_module.QuantProfile.__dataclass_fields__
     for name in (
-        "symbol", "price", "timestamp", "technical",
-        "support_levels", "resistance_levels",
-        "nearest_support", "nearest_resistance",
-        "risk_reward", "trend_strength", "trend_direction",
+        "symbol",
+        "price",
+        "timestamp",
+        "technical",
+        "support_levels",
+        "resistance_levels",
+        "nearest_support",
+        "nearest_resistance",
+        "risk_reward",
+        "trend_strength",
+        "trend_direction",
         "mtf_signal",
     ):
         assert name in fields

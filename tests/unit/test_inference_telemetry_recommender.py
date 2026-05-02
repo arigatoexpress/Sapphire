@@ -87,7 +87,9 @@ def test_recommend_t3_to_t1_includes_fallback_caveat():
     ]
     bundle = recommend(_build_report(records))
     rec = next(
-        r for r in bundle.recommendations if r.from_tier == "T3_mac_local" and r.to_tier == "T1_windows_gpu"
+        r
+        for r in bundle.recommendations
+        if r.from_tier == "T3_mac_local" and r.to_tier == "T1_windows_gpu"
     )
     assert any("always-on fallback" in c for c in rec.caveats)
 
@@ -98,7 +100,9 @@ def test_recommend_high_error_rate_emits_routing_warning():
     records = []
     for i in range(25):
         records.append(
-            CallRecord(tier="T1_windows_gpu", ts=base + timedelta(seconds=i), latency_ms=400, ok=True)
+            CallRecord(
+                tier="T1_windows_gpu", ts=base + timedelta(seconds=i), latency_ms=400, ok=True
+            )
         )
     for i in range(5):
         records.append(

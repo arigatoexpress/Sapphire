@@ -125,12 +125,8 @@ def test_strategy_lab_report_keeps_live_trading_off(monkeypatch):
     assert "TRADINGVIEW_EXECUTION_ENABLED=false" in report["safety"]["guards"]
     assert report["tradingview"]["broker_rest_endpoints"][0] == "/config"
     assert "tv watchlist get" in report["tradingview"]["mcp_v2_tool_map"]["read_safe"]
-    assert "tv watchlist add <symbol>" in report["tradingview"]["mcp_v2_tool_map"][
-        "operator_gated"
-    ]
-    assert "alert-to-live-trade bridge" in report["tradingview"]["mcp_v2_tool_map"][
-        "unsupported"
-    ]
+    assert "tv watchlist add <symbol>" in report["tradingview"]["mcp_v2_tool_map"]["operator_gated"]
+    assert "alert-to-live-trade bridge" in report["tradingview"]["mcp_v2_tool_map"]["unsupported"]
     assert report["real_funds_readiness"]["stage"] == "manual_confirmed_crypto_only"
     assert report["real_funds_readiness"]["crypto"]["first_order_max_notional_usd"] == 5.0
     assert (
@@ -177,9 +173,10 @@ def test_tradingview_ta_machine_builds_ranked_watchlist_from_market_universe():
     assert plan["watchlist"]["symbols"][0]["ta_state"] == "pending_tradingview_readback"
     assert plan["indicator_stack"][0]["tradingview_name"] == "Moving Average Exponential"
     assert plan["work_orders"][0]["execution_policy"] == "analysis_only_no_order_submit"
-    assert "tv watchlist add BINANCE:BTCUSDT" in plan["work_orders"][0][
-        "operator_gated_mutation_commands"
-    ]
+    assert (
+        "tv watchlist add BINANCE:BTCUSDT"
+        in plan["work_orders"][0]["operator_gated_mutation_commands"]
+    )
     assert "tv ohlcv --summary -n 120" in plan["work_orders"][0]["read_only_readback_commands"]
     assert "submit/cancel/replace broker orders" in plan["automation_lanes"]["never_automatic"]
 

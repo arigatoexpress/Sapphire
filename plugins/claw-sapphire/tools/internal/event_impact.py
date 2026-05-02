@@ -22,6 +22,7 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+
 def _load_repo_lib_module(qualname: str, relpath: str):
     """Load Sapphire ``lib.*`` modules despite plugin-local ``lib`` shadowing."""
     import importlib.util
@@ -125,7 +126,9 @@ def rebuild_action(payload: dict[str, Any]) -> dict[str, Any]:
     from services.event_impact.build import build
 
     output_dir = Path(payload.get("output_dir") or DEFAULT_MODEL_DIR)
-    assets = tuple(str(a).upper() for a in payload.get("assets", ["BTC", "ETH", "SOL", "SPY", "GLD"]))
+    assets = tuple(
+        str(a).upper() for a in payload.get("assets", ["BTC", "ETH", "SOL", "SPY", "GLD"])
+    )
     path = build(output_dir=output_dir, assets=assets)
     return {"ok": True, "model_path": str(path), "mode": "rebuild", "version": VERSION}
 
@@ -153,7 +156,14 @@ def accuracy_audit_action(payload: dict[str, Any]) -> dict[str, Any]:
         scored += 1
         ok = (pred > 0 and actual > 0) or (pred < 0 and actual < 0)
         correct += int(ok)
-        rows.append({"scored": True, "correct": ok, "actual_return_pct": actual, "predicted_consensus": pred})
+        rows.append(
+            {
+                "scored": True,
+                "correct": ok,
+                "actual_return_pct": actual,
+                "predicted_consensus": pred,
+            }
+        )
     return {
         "ok": True,
         "scored": scored,
@@ -180,8 +190,7 @@ def post_corpus_audit_action(payload: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("bars_json or bars_path is required")
         bars_path = Path(str(bars_raw))
         horizons = tuple(
-            int(h)
-            for h in payload.get("horizons_hours") or payload.get("horizons") or (6, 24)
+            int(h) for h in payload.get("horizons_hours") or payload.get("horizons") or (6, 24)
         )
         if not horizons:
             raise ValueError("horizons_hours must not be empty")

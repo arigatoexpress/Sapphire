@@ -96,7 +96,12 @@ class RateLimiter:
     def rate(self) -> int:
         return self._rate
 
-    def acquire(self, *, sleep: Callable[[float], None] = time.sleep, now: Callable[[], float] = time.monotonic) -> None:
+    def acquire(
+        self,
+        *,
+        sleep: Callable[[float], None] = time.sleep,
+        now: Callable[[], float] = time.monotonic,
+    ) -> None:
         with self._lock:
             elapsed = now() - self._last_call
             wait = self._min_interval - elapsed
@@ -339,8 +344,7 @@ class SECEdgarSource:
                 continue
             payload = self._pull_submissions(cik)
             rows = [
-                row for row in self._flatten_recent_filings(payload)
-                if row["form"] in TARGET_FORMS
+                row for row in self._flatten_recent_filings(payload) if row["form"] in TARGET_FORMS
             ]
             out[ticker] = rows
         snapshot = {

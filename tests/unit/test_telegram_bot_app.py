@@ -113,9 +113,7 @@ def test_health_command_uses_live_brief_profile(monkeypatch, tmp_path):
                 "overall": "RED",
                 "summary": "1 green, 0 yellow, 1 red out of 2 checks",
                 "services": {"dashboard:8080": {"status": "green", "detail": "401 auth"}},
-                "data_freshness": {
-                    "trading_signals": {"status": "red", "detail": "243h old"}
-                },
+                "data_freshness": {"trading_signals": {"status": "red", "detail": "243h old"}},
                 "inference": {"mac_ollama": {"status": "green", "detail": "200 OK"}},
             }
         )

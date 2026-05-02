@@ -97,9 +97,7 @@ def _make_snapshot(
         "correlated_signals": SnapshotEntry(
             scope="correlated_signals", rows=tuple(correlated or [])
         ),
-        "narratives": SnapshotEntry(
-            scope="narratives", rows=tuple(narratives or [])
-        ),
+        "narratives": SnapshotEntry(scope="narratives", rows=tuple(narratives or [])),
     }
     return SystemSnapshot(
         at=at,
@@ -134,9 +132,7 @@ def test_unchanged_when_actual_and_replay_match() -> None:
         correlated=[_correlated()],
         narratives=[_narrative_row()],
     )
-    rep = _make_replay(
-        correlated=[_correlated()], narratives=[_replayed_narrative()]
-    )
+    rep = _make_replay(correlated=[_correlated()], narratives=[_replayed_narrative()])
     diff = diff_actual_vs_replay(snap, rep)
     assert diff.summary["unchanged"] == 1
     assert diff.summary["drifted"] == 0
@@ -303,12 +299,8 @@ def test_summary_counts_match_diffs() -> None:
 
 
 def test_diff_serializes_to_dict() -> None:
-    snap = _make_snapshot(
-        correlated=[_correlated()], narratives=[_narrative_row()]
-    )
-    rep = _make_replay(
-        correlated=[_correlated()], narratives=[_replayed_narrative()]
-    )
+    snap = _make_snapshot(correlated=[_correlated()], narratives=[_narrative_row()])
+    rep = _make_replay(correlated=[_correlated()], narratives=[_replayed_narrative()])
     diff = diff_actual_vs_replay(snap, rep)
     payload = diff.to_dict()
     assert payload["at"] == "2026-04-26T10:30:00+00:00"

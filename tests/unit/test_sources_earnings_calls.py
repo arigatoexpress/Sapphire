@@ -119,9 +119,10 @@ def test_is_earnings_related_filters_non_earnings_items() -> None:
     assert EarningsCallSource._is_earnings_related("Recycling program update") is False
     # Filter is title-only — descriptions can mention "earnings" without the
     # item itself being an earnings event.
-    assert EarningsCallSource._is_earnings_related(
-        "Recycling press release", "Q3 earnings comparison"
-    ) is False
+    assert (
+        EarningsCallSource._is_earnings_related("Recycling press release", "Q3 earnings comparison")
+        is False
+    )
     assert EarningsCallSource._is_earnings_related("Annual results FY26") is True
 
 
@@ -199,9 +200,7 @@ def test_dry_run_returns_empty_when_no_cache_and_no_live(tmp_path: Path, monkeyp
     assert sigs == []
 
 
-def test_live_pull_consumes_rss_and_filters_to_earnings_items(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_live_pull_consumes_rss_and_filters_to_earnings_items(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("SAPPHIRE_EARNINGS_LIVE", "1")
     cfg = tmp_path / "feeds.yaml"
     cfg.write_text(
@@ -230,7 +229,7 @@ def test_fixture_loader_picks_up_local_transcripts(tmp_path: Path, monkeypatch) 
     monkeypatch.setenv("SAPPHIRE_EARNINGS_LIVE", "1")
     cfg = tmp_path / "feeds.yaml"
     cfg.write_text(
-        "feeds:\n  - ticker: NVDA\n    rss_url: \"\"\n",
+        'feeds:\n  - ticker: NVDA\n    rss_url: ""\n',
         encoding="utf-8",
     )
     fixture_dir = tmp_path / "fixtures" / "NVDA"
@@ -342,7 +341,9 @@ def test_cache_used_within_ttl(tmp_path: Path, monkeypatch) -> None:
         fixture_root=tmp_path / "fixtures",
         fetcher=lambda url, headers: fetched.append(url) or "",
     )
-    sentiments = src.list_sentiments(subscriptions=[IRSubscription(ticker="AAPL", rss_url="https://x")])
+    sentiments = src.list_sentiments(
+        subscriptions=[IRSubscription(ticker="AAPL", rss_url="https://x")]
+    )
     assert fetched == [], "cache hit should suppress all live fetches"
     assert len(sentiments) == 1
     assert sentiments[0].direction == "bull"

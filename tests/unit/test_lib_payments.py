@@ -132,10 +132,7 @@ class TestMockVerifier:
     def test_garbage_base64_rejected(self) -> None:
         result = MockVerifier().verify("not-base64$$$", self._reqs())
         assert result.ok is False
-        assert (
-            "bad base64" in result.reason.lower()
-            or "json" in result.reason.lower()
-        )
+        assert "bad base64" in result.reason.lower() or "json" in result.reason.lower()
 
     def test_amount_alias_value_field(self) -> None:
         # The verifier accepts `value` as a fallback alias for `amount`.
@@ -314,16 +311,12 @@ class TestX402MiddlewareEnvConfig:
         # Defaults to base-sepolia → asset is the sepolia USDC contract.
         assert mw.asset == DEFAULT_USDC_CONTRACTS["base-sepolia"]
 
-    def test_disabled_by_default_via_missing_env(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_disabled_by_default_via_missing_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("X402_ENABLED", raising=False)
         mw = X402Middleware()
         assert mw.enabled is False
 
-    def test_explicit_constructor_args_override_env(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_explicit_constructor_args_override_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("X402_NETWORK", "base")
         # Explicit override wins.
         mw = X402Middleware(network="base-sepolia", recipient_address=RECIPIENT)

@@ -90,17 +90,13 @@ class TestSourcePatternsExpansion:
 
     def test_hyperliquid_signal_change_detected(self):
         state = SyncState(files={})
-        current = {
-            "data/hyperliquid_signals.jsonl": {"mtime": 1000, "hash": "h", "size": 50}
-        }
+        current = {"data/hyperliquid_signals.jsonl": {"mtime": 1000, "hash": "h", "size": 50}}
         changes = detect_changes(state, current)
         assert "HyperliquidSignal" in changes
 
     def test_ooda_packet_change_detected(self):
         state = SyncState(files={})
-        current = {
-            "data/gemini_ooda/abcd1234.json": {"mtime": 1000, "hash": "h", "size": 50}
-        }
+        current = {"data/gemini_ooda/abcd1234.json": {"mtime": 1000, "hash": "h", "size": 50}}
         changes = detect_changes(state, current)
         assert "OODAPacket" in changes
 
@@ -167,9 +163,7 @@ class TestWatermarkHelpers:
         )
         loaded = load_watermark("TelegramIntelMessage", base_dir=tmp_path)
         assert "changed_files" in loaded
-        assert loaded["changed_files"] == [
-            "data/telegram_intel/2026-04-27/messages.jsonl"
-        ]
+        assert loaded["changed_files"] == ["data/telegram_intel/2026-04-27/messages.jsonl"]
 
 
 # ---------------------------------------------------------------------------
@@ -210,12 +204,7 @@ class TestRunSyncWatermarkProgression:
     def test_watermark_progresses_after_subsequent_run(self, tmp_path, monkeypatch):
         intel_path = tmp_path / "data" / "intel" / "bq_vector_mock.jsonl"
         intel_path.parent.mkdir(parents=True)
-        intel_path.write_text(
-            json.dumps(
-                {"id": "v1", "text": "a", "embedding": [0.1]}
-            )
-            + "\n"
-        )
+        intel_path.write_text(json.dumps({"id": "v1", "text": "a", "embedding": [0.1]}) + "\n")
         watermark_dir = tmp_path / "_watermark"
         monkeypatch.setenv("SAPPHIRE_FOUNDRY_WATERMARK_DIR", str(watermark_dir))
         monkeypatch.setenv("SAPPHIRE_BQ_VECTOR_MOCK_PATH", str(intel_path))
@@ -225,12 +214,7 @@ class TestRunSyncWatermarkProgression:
 
         # Append a new record + force a second sync run to advance watermark.
         with intel_path.open("a") as fh:
-            fh.write(
-                json.dumps(
-                    {"id": "v2", "text": "b", "embedding": [0.2]}
-                )
-                + "\n"
-            )
+            fh.write(json.dumps({"id": "v2", "text": "b", "embedding": [0.2]}) + "\n")
         run_sync(tmp_path, dry_run=True, force=True)
         second = load_watermark("IntelVectorRecord", base_dir=watermark_dir)
 
@@ -243,10 +227,7 @@ class TestRunSyncWatermarkProgression:
         signals_dir = tmp_path / "data" / "signals"
         signals_dir.mkdir(parents=True)
         (signals_dir / "2026-04-27.jsonl").write_text(
-            json.dumps(
-                {"pipeline_id": "t1", "symbol": "BTC", "timestamp": "2026-04-27"}
-            )
-            + "\n"
+            json.dumps({"pipeline_id": "t1", "symbol": "BTC", "timestamp": "2026-04-27"}) + "\n"
         )
         watermark_dir = tmp_path / "_watermark"
         monkeypatch.setenv("SAPPHIRE_FOUNDRY_WATERMARK_DIR", str(watermark_dir))
@@ -305,12 +286,7 @@ class TestRunSyncWatermarkProgression:
         """
         intel_path = tmp_path / "data" / "intel" / "bq_vector_mock.jsonl"
         intel_path.parent.mkdir(parents=True)
-        intel_path.write_text(
-            json.dumps(
-                {"id": "v1", "text": "a", "embedding": [0.1]}
-            )
-            + "\n"
-        )
+        intel_path.write_text(json.dumps({"id": "v1", "text": "a", "embedding": [0.1]}) + "\n")
         watermark_dir = tmp_path / "_watermark"
         monkeypatch.setenv("SAPPHIRE_FOUNDRY_WATERMARK_DIR", str(watermark_dir))
         monkeypatch.setenv("SAPPHIRE_BQ_VECTOR_MOCK_PATH", str(intel_path))
@@ -340,8 +316,6 @@ class TestLiveModeStillOperatorGated:
         monkeypatch.setenv("PALANTIR_FOUNDRY_URL", "https://f.example.com")
         monkeypatch.setenv("PALANTIR_FOUNDRY_TOKEN", "secret")
 
-        with mock.patch(
-            "lib.foundry.client.FoundryClient.from_env"
-        ) as factory:
+        with mock.patch("lib.foundry.client.FoundryClient.from_env") as factory:
             run_sync(tmp_path, dry_run=True, force=True)
         assert factory.call_count == 0

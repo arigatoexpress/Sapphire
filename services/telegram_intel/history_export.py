@@ -322,7 +322,11 @@ def _published_at(row: dict[str, Any]) -> str:
     unix_value = row.get("date_unixtime")
     if unix_value is not None:
         try:
-            return datetime.fromtimestamp(int(str(unix_value)), tz=UTC).replace(microsecond=0).isoformat()
+            return (
+                datetime.fromtimestamp(int(str(unix_value)), tz=UTC)
+                .replace(microsecond=0)
+                .isoformat()
+            )
         except (TypeError, ValueError, OSError):
             pass
     raw = str(row.get("date") or "").strip()
@@ -450,7 +454,9 @@ def _write_messages(output_dir: Path, records: list[dict[str, Any]]) -> tuple[Pa
     return path, written, duplicates
 
 
-def _write_context(output_dir: Path, records: list[dict[str, Any]], *, files: tuple[Path, ...]) -> Path:
+def _write_context(
+    output_dir: Path, records: list[dict[str, Any]], *, files: tuple[Path, ...]
+) -> Path:
     path = output_dir / "conversation_context.json"
     context = stamp(
         _build_context(records, files=files),

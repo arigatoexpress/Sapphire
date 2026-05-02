@@ -219,7 +219,9 @@ def test_select_metric_value_translates_metric_name() -> None:
 
 
 def test_select_metric_value_handles_none_or_nan() -> None:
-    rep = _FakeReport(sortino=None, sharpe=float("nan"), calmar=1, profit_factor=1, total_return_pct=0)
+    rep = _FakeReport(
+        sortino=None, sharpe=float("nan"), calmar=1, profit_factor=1, total_return_pct=0
+    )
     assert _select_metric_value(rep, "sortino") == float("-inf")
     assert _select_metric_value(rep, "sharpe") == float("-inf")
 
@@ -334,7 +336,13 @@ def test_run_walkforward_with_aux_data(bars_500: list[Bar]) -> None:
 def test_run_walkforward_all_strategy_classes_runnable(bars_500: list[Bar]) -> None:
     aux = {"spy": _make_bars(500, seed=55), "btc": _make_bars(500, seed=44)}
     cfg = WalkforwardConfig(train_bars=90, test_bars=30, advance_bars=30)
-    for cls in (RegimeAwareRSI, FundingRateContrarian, CorrelationBreakout, MultiTFMomentum, SapphireComposite):
+    for cls in (
+        RegimeAwareRSI,
+        FundingRateContrarian,
+        CorrelationBreakout,
+        MultiTFMomentum,
+        SapphireComposite,
+    ):
         result = run_walkforward(cls, bars_500, aux=aux, config=cfg)
         assert result.strategy_cls == cls.__name__
         assert result.n_windows > 0

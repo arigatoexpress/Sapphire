@@ -72,9 +72,7 @@ def test_referenced_test_files_exist():
 
 
 def test_docs_keep_live_stock_automation_blocked():
-    ramp = (ROOT / "docs" / "products" / "live-trading-ramp-memo.md").read_text(
-        encoding="utf-8"
-    )
+    ramp = (ROOT / "docs" / "products" / "live-trading-ramp-memo.md").read_text(encoding="utf-8")
 
     assert "Stock live trading is blocked" in ramp
     assert "TRADINGVIEW_EXECUTION_ENABLED=false" in ramp
@@ -84,9 +82,7 @@ def test_docs_keep_live_stock_automation_blocked():
 
 
 def test_kill_switch_doc_names_all_layers():
-    text = (ROOT / "docs" / "security" / "kill-switch-invariants.md").read_text(
-        encoding="utf-8"
-    )
+    text = (ROOT / "docs" / "security" / "kill-switch-invariants.md").read_text(encoding="utf-8")
 
     for phrase in (
         "Trade-Time Invariants",
@@ -108,17 +104,13 @@ def test_provenance_sidecars_verify():
 
 
 def test_ramp_doc_links_to_current_robinhood_posture():
-    text = (ROOT / "docs" / "products" / "live-trading-ramp-memo.md").read_text(
-        encoding="utf-8"
-    )
+    text = (ROOT / "docs" / "products" / "live-trading-ramp-memo.md").read_text(encoding="utf-8")
 
     assert "docs/ops/robinhood-real-funds-readiness.md" in text
     assert (ROOT / "docs" / "ops" / "robinhood-real-funds-readiness.md").exists()
 
 
 def test_kill_switch_doc_is_honest_about_latency_gap():
-    text = (ROOT / "docs" / "security" / "kill-switch-invariants.md").read_text(
-        encoding="utf-8"
-    )
+    text = (ROOT / "docs" / "security" / "kill-switch-invariants.md").read_text(encoding="utf-8")
 
-    assert "There is no single universal \"latency kill switch\"" in text
+    assert 'There is no single universal "latency kill switch"' in text

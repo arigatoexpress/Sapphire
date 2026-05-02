@@ -105,12 +105,18 @@ def build_parser() -> argparse.ArgumentParser:
     once.add_argument("--assets", default="", help="comma-separated assets, default BTC,ETH,SOL")
     once.add_argument("--backfill-days", type=int, default=30)
     once.add_argument("--no-write", action="store_true", help="do not write latest/archive JSON")
-    once.add_argument("--publish", action="store_true", help="publish event if bus env gate is enabled")
+    once.add_argument(
+        "--publish", action="store_true", help="publish event if bus env gate is enabled"
+    )
 
     daemon_p = sub.add_parser("daemon", help="run continuous snapshot loop")
-    daemon_p.add_argument("--assets", default="", help="comma-separated assets, default BTC,ETH,SOL")
+    daemon_p.add_argument(
+        "--assets", default="", help="comma-separated assets, default BTC,ETH,SOL"
+    )
     daemon_p.add_argument("--backfill-days", type=int, default=30)
-    daemon_p.add_argument("--poll-interval-seconds", type=int, default=DEFAULT_POLL_INTERVAL_SECONDS)
+    daemon_p.add_argument(
+        "--poll-interval-seconds", type=int, default=DEFAULT_POLL_INTERVAL_SECONDS
+    )
     daemon_p.add_argument("--max-iterations", type=int, default=None)
     daemon_p.add_argument("--no-write", action="store_true")
     daemon_p.add_argument("--publish", action="store_true")

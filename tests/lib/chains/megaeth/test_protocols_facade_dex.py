@@ -120,10 +120,13 @@ async def test_dex_overview_lists_kumbaya_with_top_pools() -> None:
     """
     fake_pool = "0x" + "ab" * 20
     pool_resp = "0x" + abi_encode(["address"], [fake_pool]).hex()
-    slot0_resp = "0x" + abi_encode(
-        ["uint160", "int24", "uint16", "uint16", "uint16", "uint8", "bool"],
-        [10**30, 0, 0, 0, 0, 0, True],
-    ).hex()
+    slot0_resp = (
+        "0x"
+        + abi_encode(
+            ["uint160", "int24", "uint16", "uint16", "uint16", "uint8", "bool"],
+            [10**30, 0, 0, 0, 0, 0, True],
+        ).hex()
+    )
     liq_resp = "0x" + abi_encode(["uint128"], [10**18]).hex()
     fee_resp_500 = "0x" + abi_encode(["uint24"], [500]).hex()
     fee_resp_3000 = "0x" + abi_encode(["uint24"], [3000]).hex()
@@ -133,8 +136,7 @@ async def test_dex_overview_lists_kumbaya_with_top_pools() -> None:
     # to iterate. Default candidate set has 11 pairs; we stub the first
     # two as "found" and the rest will fail to fetch (no stub).
     factory_resps = [pool_resp, pool_resp]
-    pool_resps_per_pair = [slot0_resp, liq_resp, fee_resp_500,
-                           slot0_resp, liq_resp, fee_resp_3000]
+    pool_resps_per_pair = [slot0_resp, liq_resp, fee_resp_500, slot0_resp, liq_resp, fee_resp_3000]
     client = StubClient(
         {
             KUMBAYA_FACTORY: factory_resps,

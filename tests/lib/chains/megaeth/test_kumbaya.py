@@ -336,8 +336,14 @@ async def test_pool_state_invalid_pool_address() -> None:
 
 def test_pool_state_price_zero_when_sqrt_zero() -> None:
     state = PoolState(
-        sqrt_price_x96=0, tick=0, observation_index=0, observation_cardinality=0,
-        fee_protocol=0, unlocked=True, liquidity=0, fee_pips=3000,
+        sqrt_price_x96=0,
+        tick=0,
+        observation_index=0,
+        observation_cardinality=0,
+        fee_protocol=0,
+        unlocked=True,
+        liquidity=0,
+        fee_pips=3000,
     )
     assert state.price_token1_per_token0() == Decimal(0)
 
@@ -371,10 +377,13 @@ async def test_top_pools_skips_zero_liquidity_pools() -> None:
     pool_addr = POOL_WETH_USDM_3000
     pool_response = "0x" + abi_encode(["address"], [pool_addr]).hex()
     # slot0 = 7-tuple, liquidity = 0, fee = 3000
-    slot0_resp = "0x" + abi_encode(
-        ["uint160", "int24", "uint16", "uint16", "uint16", "uint8", "bool"],
-        [10**30, 0, 0, 0, 0, 0, True],
-    ).hex()
+    slot0_resp = (
+        "0x"
+        + abi_encode(
+            ["uint160", "int24", "uint16", "uint16", "uint16", "uint8", "bool"],
+            [10**30, 0, 0, 0, 0, 0, True],
+        ).hex()
+    )
     liq_resp_zero = "0x" + abi_encode(["uint128"], [0]).hex()
     fee_resp = "0x" + abi_encode(["uint24"], [3000]).hex()
     client = StubClient(
@@ -395,10 +404,13 @@ async def test_top_pools_orders_by_liquidity_desc() -> None:
     pool_b = "0x" + "bb" * 20
     pool_a_resp = "0x" + abi_encode(["address"], [pool_a]).hex()
     pool_b_resp = "0x" + abi_encode(["address"], [pool_b]).hex()
-    slot0 = lambda: "0x" + abi_encode(  # noqa: E731
-        ["uint160", "int24", "uint16", "uint16", "uint16", "uint8", "bool"],
-        [10**30, 0, 0, 0, 0, 0, True],
-    ).hex()
+    slot0 = lambda: (
+        "0x"
+        + abi_encode(  # noqa: E731
+            ["uint160", "int24", "uint16", "uint16", "uint16", "uint8", "bool"],
+            [10**30, 0, 0, 0, 0, 0, True],
+        ).hex()
+    )
     fee = lambda: "0x" + abi_encode(["uint24"], [3000]).hex()  # noqa: E731
 
     liq_small = "0x" + abi_encode(["uint128"], [100]).hex()
@@ -411,9 +423,7 @@ async def test_top_pools_orders_by_liquidity_desc() -> None:
         }
     )
     kb = Kumbaya(client, ADDRS)
-    pools = await kb.top_pools_by_tvl(
-        [(WETH, USDM, 3000, "A"), (WETH, USDT0, 3000, "B")]
-    )
+    pools = await kb.top_pools_by_tvl([(WETH, USDM, 3000, "A"), (WETH, USDT0, 3000, "B")])
     assert len(pools) == 2
     assert pools[0].label == "B"  # larger liquidity sorts first
     assert pools[1].label == "A"
@@ -471,8 +481,10 @@ def test_pool_info_dataclass_shape() -> None:
 
 def test_quote_result_dataclass_shape() -> None:
     q = QuoteResult(
-        amount_out=10**18, sqrt_price_x96_after=10**30,
-        initialized_ticks_crossed=2, gas_estimate=150_000,
+        amount_out=10**18,
+        sqrt_price_x96_after=10**30,
+        initialized_ticks_crossed=2,
+        gas_estimate=150_000,
     )
     assert q.amount_out == 10**18
     assert q.gas_estimate == 150_000

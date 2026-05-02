@@ -197,8 +197,7 @@ def cmd_pine_generate_screener(args: argparse.Namespace) -> int:
                 {
                     "status": "error",
                     "reason": (
-                        f"--limit {args.limit} exceeds Pine cap "
-                        f"({MAX_SCREENER_SYMBOLS} symbols)"
+                        f"--limit {args.limit} exceeds Pine cap ({MAX_SCREENER_SYMBOLS} symbols)"
                     ),
                 }
             ),
@@ -471,9 +470,7 @@ def main(argv: list[str] | None = None) -> int:
             f"universe (max {MAX_SCREENER_SYMBOLS})"
         ),
     )
-    p_pine_screener.add_argument(
-        "--offline", action="store_true", help="Skip live market fetches"
-    )
+    p_pine_screener.add_argument("--offline", action="store_true", help="Skip live market fetches")
     p_pine_screener.add_argument(
         "--limit",
         type=int,

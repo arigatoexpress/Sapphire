@@ -122,8 +122,7 @@ def test_pine_alerts_decode_to_valid_webhook_payloads(receiver):
     pine_source = render_sapphire_watch_indicator("BINANCE:ETHUSDT")
     templates = _extract_alert_payload_templates(pine_source)
     assert len(templates) == len(_EMITTED_ACTIONS), (
-        f"expected {len(_EMITTED_ACTIONS)} alert calls, found {len(templates)}: "
-        f"{templates!r}"
+        f"expected {len(_EMITTED_ACTIONS)} alert calls, found {len(templates)}: {templates!r}"
     )
 
     seen_actions: set[str] = set()
@@ -160,8 +159,7 @@ def test_pine_alerts_decode_to_valid_webhook_payloads(receiver):
         seen_actions.add(payload["action"])
 
     assert seen_actions == set(_EMITTED_ACTIONS), (
-        f"missing actions in generated indicator: "
-        f"{set(_EMITTED_ACTIONS) - seen_actions}"
+        f"missing actions in generated indicator: {set(_EMITTED_ACTIONS) - seen_actions}"
     )
 
 

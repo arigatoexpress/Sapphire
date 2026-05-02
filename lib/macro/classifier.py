@@ -275,7 +275,9 @@ def _direction(material: str) -> tuple[str, list[str]]:
     hawkish_hits = _contains_any(material, HAWKISH_KEYWORDS)
     dovish_hits = _contains_any(material, DOVISH_KEYWORDS)
     if mixed_hits or (hawkish_hits and dovish_hits):
-        return "mixed", [f"direction:mixed:{','.join((mixed_hits + hawkish_hits + dovish_hits)[:4])}"]
+        return "mixed", [
+            f"direction:mixed:{','.join((mixed_hits + hawkish_hits + dovish_hits)[:4])}"
+        ]
     if hawkish_hits:
         return "hawkish", [f"direction:hawkish:{','.join(hawkish_hits[:3])}"]
     if dovish_hits:

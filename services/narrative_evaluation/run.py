@@ -103,7 +103,9 @@ def load_narratives(
     return rows[-limit:] if limit else rows
 
 
-def load_outcomes(paths: Sequence[Path] = DEFAULT_OUTCOME_PATHS, *, date: str | None = None) -> list[dict[str, Any]]:
+def load_outcomes(
+    paths: Sequence[Path] = DEFAULT_OUTCOME_PATHS, *, date: str | None = None
+) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for root in paths:
         for path in _jsonl_paths(root, date=date):
@@ -142,7 +144,12 @@ def _actual_value(row: dict[str, Any]) -> float | None:
 
 
 def _outcome_ts(row: dict[str, Any]) -> datetime | None:
-    return _parse_ts(row.get("observed_at") or row.get("timestamp") or row.get("closed_at") or row.get("generated_at"))
+    return _parse_ts(
+        row.get("observed_at")
+        or row.get("timestamp")
+        or row.get("closed_at")
+        or row.get("generated_at")
+    )
 
 
 def _find_outcome(
@@ -195,7 +202,9 @@ def load_scores(
     return rows[-max(1, int(limit)) :]
 
 
-def _write_scores(rows: Sequence[dict[str, Any]], *, output_root: Path, now: datetime | None) -> Path | None:
+def _write_scores(
+    rows: Sequence[dict[str, Any]], *, output_root: Path, now: datetime | None
+) -> Path | None:
     if not rows:
         return None
     path = _scores_path(output_root, now=now)
@@ -225,8 +234,14 @@ def run_once(
     outcomes: Sequence[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     now = now or _utc_now()
-    thesis_rows = list(narratives) if narratives is not None else load_narratives(narrative_root=narrative_root, date=date)
-    actual_rows = list(outcomes) if outcomes is not None else load_outcomes(outcome_paths, date=date)
+    thesis_rows = (
+        list(narratives)
+        if narratives is not None
+        else load_narratives(narrative_root=narrative_root, date=date)
+    )
+    actual_rows = (
+        list(outcomes) if outcomes is not None else load_outcomes(outcome_paths, date=date)
+    )
     existing = {row.get("score_id") for row in load_scores(output_root=output_root, limit=5000)}
     new_rows: list[dict[str, Any]] = []
     skipped_existing = 0
@@ -268,7 +283,9 @@ def status(*, output_root: Path = DEFAULT_OUTPUT_ROOT) -> dict[str, Any]:
     }
 
 
-def summary(*, output_root: Path = DEFAULT_OUTPUT_ROOT, date: str | None = None, limit: int = 1000) -> dict[str, Any]:
+def summary(
+    *, output_root: Path = DEFAULT_OUTPUT_ROOT, date: str | None = None, limit: int = 1000
+) -> dict[str, Any]:
     return summary_report(load_scores(output_root=output_root, date=date, limit=limit))
 
 
@@ -279,14 +296,20 @@ def aggregates(
     date: str | None = None,
     limit: int = 1000,
 ) -> dict[str, Any]:
-    return aggregate_scores(load_scores(output_root=output_root, date=date, limit=limit), group_by=group_by)
+    return aggregate_scores(
+        load_scores(output_root=output_root, date=date, limit=limit), group_by=group_by
+    )
 
 
-def diagnostics(*, output_root: Path = DEFAULT_OUTPUT_ROOT, date: str | None = None, limit: int = 1000) -> dict[str, Any]:
+def diagnostics(
+    *, output_root: Path = DEFAULT_OUTPUT_ROOT, date: str | None = None, limit: int = 1000
+) -> dict[str, Any]:
     return diagnostics_report(load_scores(output_root=output_root, date=date, limit=limit))
 
 
-def calibration(*, output_root: Path = DEFAULT_OUTPUT_ROOT, date: str | None = None, limit: int = 1000) -> dict[str, Any]:
+def calibration(
+    *, output_root: Path = DEFAULT_OUTPUT_ROOT, date: str | None = None, limit: int = 1000
+) -> dict[str, Any]:
     return calibration_report(load_scores(output_root=output_root, date=date, limit=limit))
 
 
@@ -314,7 +337,9 @@ def build_parser() -> argparse.ArgumentParser:
     once.add_argument("--date")
     once.add_argument("--horizon", action="append", dest="horizons", type=int)
     daemon_p = sub.add_parser("daemon")
-    daemon_p.add_argument("--poll-interval-seconds", type=float, default=DEFAULT_POLL_INTERVAL_SECONDS)
+    daemon_p.add_argument(
+        "--poll-interval-seconds", type=float, default=DEFAULT_POLL_INTERVAL_SECONDS
+    )
     daemon_p.add_argument("--max-iterations", type=int, default=None)
     sub.add_parser("status")
     sub.add_parser("summary")
@@ -328,7 +353,9 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.action == "run-once":
-        result = run_once(date=args.date, horizons_hours=tuple(args.horizons or DEFAULT_HORIZONS_HOURS))
+        result = run_once(
+            date=args.date, horizons_hours=tuple(args.horizons or DEFAULT_HORIZONS_HOURS)
+        )
     elif args.action == "daemon":
         result = daemon(
             poll_interval_seconds=args.poll_interval_seconds,

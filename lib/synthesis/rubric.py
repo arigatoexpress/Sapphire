@@ -169,7 +169,9 @@ def _citation_density(payload: dict[str, Any]) -> tuple[float, list[str]]:
         return 0.0, ["no_evidence_for_citation_density"]
     source_hits = len(_SOURCE_HINT.findall(blob))
     numeric_hits = len(_NUMERIC_FACT.findall(blob))
-    score = min(1.0, (len(evidence) / 5.0) * 0.45 + (source_hits / 6.0) * 0.35 + (numeric_hits / 6.0) * 0.2)
+    score = min(
+        1.0, (len(evidence) / 5.0) * 0.45 + (source_hits / 6.0) * 0.35 + (numeric_hits / 6.0) * 0.2
+    )
     if score < 0.5:
         notes.append("low_source_or_numeric_density")
     return _clamp(score), notes

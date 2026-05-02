@@ -78,4 +78,3 @@ def test_tabs_are_read_only_and_redacted_to_hosts() -> None:
     assert payload["tabs"][0]["is_tradingview"] is True
     assert payload["tabs"][0]["url_host"] == "www.tradingview.com"
     assert "private-token" not in payload["tabs"][0]["url_host"]
-

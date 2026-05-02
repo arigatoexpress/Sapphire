@@ -937,11 +937,7 @@ def transform_hyperliquid_signals(
             if signal_id in seen_keys:
                 continue
             seen_keys.add(signal_id)
-            source_ref = (
-                str(path.relative_to(root))
-                if path.is_relative_to(root)
-                else str(path)
-            )
+            source_ref = str(path.relative_to(root)) if path.is_relative_to(root) else str(path)
             objects.append(
                 {
                     "id": signal_id,
@@ -995,9 +991,7 @@ def to_HyperliquidSignal(record: dict[str, Any]) -> dict[str, Any]:
     if event_id:
         signal_id = f"hl:{event_id}"
     else:
-        signal_id = "hl:" + _deterministic_id(
-            topic, symbol, signal_type, published_at or ""
-        )
+        signal_id = "hl:" + _deterministic_id(topic, symbol, signal_type, published_at or "")
     return {
         "id": signal_id,
         "event_id": event_id or None,
@@ -1075,9 +1069,7 @@ def transform_ooda_packets(
                 # Skip cache files that aren't an OODA envelope (e.g. counter
                 # files or corrupt-JSON returns from ``_load_json``).
                 continue
-            envelope = (
-                data.get("provenance") if isinstance(data.get("provenance"), dict) else {}
-            )
+            envelope = data.get("provenance") if isinstance(data.get("provenance"), dict) else {}
             cached_at = data.get("_cached_at")
             issued_at = (
                 _normalize_iso(envelope.get("generated_at"))
@@ -1135,12 +1127,8 @@ def to_OODAPacket(record: dict[str, Any]) -> dict[str, Any]:
     request_hash = str(record.get("request_hash") or record.get("topic_hash") or "").strip()
     if not request_hash:
         raise ValueError("OODAPacket requires 'request_hash' or 'topic_hash'")
-    envelope = (
-        record.get("provenance") if isinstance(record.get("provenance"), dict) else {}
-    )
-    metadata = (
-        envelope.get("metadata") if isinstance(envelope.get("metadata"), dict) else {}
-    )
+    envelope = record.get("provenance") if isinstance(record.get("provenance"), dict) else {}
+    metadata = envelope.get("metadata") if isinstance(envelope.get("metadata"), dict) else {}
     tokens = record.get("tokens") if isinstance(record.get("tokens"), dict) else {}
     act_value = ooda.get("act") if isinstance(ooda.get("act"), list) else []
     return {
@@ -1153,9 +1141,7 @@ def to_OODAPacket(record: dict[str, Any]) -> dict[str, Any]:
         "model": str(envelope.get("model") or metadata.get("model") or ""),
         "generator": str(envelope.get("generator") or ""),
         "mode": str(metadata.get("mode") or "live"),
-        "issued_at": _normalize_iso(
-            envelope.get("generated_at") or record.get("_cached_at")
-        ),
+        "issued_at": _normalize_iso(envelope.get("generated_at") or record.get("_cached_at")),
         "ttl_seconds": envelope.get("ttl_seconds"),
         "prompt_tokens": tokens.get("prompt_tokens"),
         "output_tokens": tokens.get("output_tokens"),
@@ -1240,14 +1226,11 @@ def transform_threat_indicators(
             for t in data.get("threats") or []:
                 if not isinstance(t, dict):
                     continue
-                published = _normalize_iso(
-                    t.get("published") or threats_file.parent.name
-                )
+                published = _normalize_iso(t.get("published") or threats_file.parent.name)
                 if since and published and published < since.isoformat():
                     continue
                 base_text = " ".join(
-                    str(v) for v in (t.get("title"), t.get("description"), t.get("link"))
-                    if v
+                    str(v) for v in (t.get("title"), t.get("description"), t.get("link")) if v
                 )
                 iocs = _extract_iocs(base_text)
                 # Merge any author-provided arrays.
@@ -1263,10 +1246,9 @@ def transform_threat_indicators(
                         if s and s not in merged:
                             merged.append(s)
                     iocs[kind] = merged[:32]
-                base_id = (
-                    str(t.get("canonical_id") or t.get("id") or "").strip()
-                    or _deterministic_id(t.get("title", ""), published or "")
-                )
+                base_id = str(
+                    t.get("canonical_id") or t.get("id") or ""
+                ).strip() or _deterministic_id(t.get("title", ""), published or "")
                 indicator_id = f"ti:{base_id}"
                 if indicator_id in seen_ids:
                     continue
@@ -1315,9 +1297,7 @@ def transform_threat_indicators(
                 continue
             seen_ids.add(indicator_id)
             iocs = _extract_iocs(content)
-            published = _normalize_iso(
-                datetime.fromtimestamp(md_file.stat().st_mtime, UTC)
-            )
+            published = _normalize_iso(datetime.fromtimestamp(md_file.stat().st_mtime, UTC))
             if since and published and published < since.isoformat():
                 continue
             objects.append(
@@ -1359,10 +1339,9 @@ def to_ThreatIndicator(record: dict[str, Any]) -> dict[str, Any]:
     title = str(record.get("title") or "").strip()
     if not title:
         raise ValueError("ThreatIndicator requires non-empty 'title'")
-    base_id = (
-        str(record.get("canonical_id") or record.get("id") or "").strip()
-        or _deterministic_id(title, _normalize_iso(record.get("published")) or "")
-    )
+    base_id = str(
+        record.get("canonical_id") or record.get("id") or ""
+    ).strip() or _deterministic_id(title, _normalize_iso(record.get("published")) or "")
     base_text = " ".join(
         str(v)
         for v in (
@@ -1398,10 +1377,7 @@ def to_ThreatIndicator(record: dict[str, Any]) -> dict[str, Any]:
         "domains": iocs["domains"],
         "hashes": iocs["hashes"],
         "ioc_total": (
-            len(iocs["cve_ids"])
-            + len(iocs["ipv4"])
-            + len(iocs["domains"])
-            + len(iocs["hashes"])
+            len(iocs["cve_ids"]) + len(iocs["ipv4"]) + len(iocs["domains"]) + len(iocs["hashes"])
         ),
         "mitre_tactics": record.get("mitre_tactics") or [],
         "affected_products": record.get("affected_products") or [],

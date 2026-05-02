@@ -189,9 +189,8 @@ def estimate_cost_record(record: CallRecord, model: CostModel | None = None) -> 
             return 0.0
         tokens_in_k = float(record.tokens_in or 0) / 1000.0
         tokens_out_k = float(record.tokens_out or 0) / 1000.0
-        return (
-            tokens_in_k * float(model.t4_input_usd_per_1k_tokens)
-            + tokens_out_k * float(model.t4_output_usd_per_1k_tokens)
+        return tokens_in_k * float(model.t4_input_usd_per_1k_tokens) + tokens_out_k * float(
+            model.t4_output_usd_per_1k_tokens
         )
     # Unknown tier: treat as zero so we never silently invent cost.
     return 0.0
@@ -210,9 +209,8 @@ def estimate_tier_unit_cost(tier: str, model: CostModel | None = None) -> float 
         if not model.kimi_rates_supplied:
             return None
         # Approximate: assume 500 in / 250 out tokens average.
-        return (
-            0.5 * float(model.t4_input_usd_per_1k_tokens)
-            + 0.25 * float(model.t4_output_usd_per_1k_tokens)
+        return 0.5 * float(model.t4_input_usd_per_1k_tokens) + 0.25 * float(
+            model.t4_output_usd_per_1k_tokens
         )
     return None
 

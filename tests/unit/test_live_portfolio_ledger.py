@@ -89,7 +89,9 @@ def test_record_rejects_zero_quantity() -> None:
 
 def test_record_rejects_raw_account_alias() -> None:
     with pytest.raises(ValueError):
-        LiveTradeRecord.from_dict({**record().to_dict(), "account": "...5966", "account_hash": None})
+        LiveTradeRecord.from_dict(
+            {**record().to_dict(), "account": "...5966", "account_hash": None}
+        )
 
 
 def test_redact_source_reference_keeps_short_safe_value() -> None:

@@ -90,12 +90,8 @@ async def test_quote_swap_weth_to_usdm_against_live_mainnet() -> None:
     # Both tokens are 18-decimal — amount_out / 1e18 = USDM per 1 WETH.
     # WETH/USDM should be in [$500, $20,000] range; we use a generous band.
     human_price = quote.amount_out / 10**18
-    assert 500 < human_price < 20_000, (
-        f"WETH/USDM price out of plausible range: {human_price}"
-    )
-    assert quote.fee_pips in (100, 500, 3000, 10000), (
-        f"unexpected fee_pips: {quote.fee_pips}"
-    )
+    assert 500 < human_price < 20_000, f"WETH/USDM price out of plausible range: {human_price}"
+    assert quote.fee_pips in (100, 500, 3000, 10000), f"unexpected fee_pips: {quote.fee_pips}"
     assert quote.gas_estimate > 0
     assert quote.raw is not None
     assert quote.raw.sqrt_price_x96_after > 0

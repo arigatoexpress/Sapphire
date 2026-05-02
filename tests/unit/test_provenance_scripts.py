@@ -34,12 +34,8 @@ def test_backfill_repair_invalid_rewrites_hash_mismatch(tmp_path) -> None:
     provenance_backfill.build_report((tmp_path,), apply=True)
     artifact.write_text("hello again", encoding="utf-8")
 
-    dry_run = provenance_backfill.build_report(
-        (tmp_path,), apply=False, repair_invalid=True
-    )
-    repaired = provenance_backfill.build_report(
-        (tmp_path,), apply=True, repair_invalid=True
-    )
+    dry_run = provenance_backfill.build_report((tmp_path,), apply=False, repair_invalid=True)
+    repaired = provenance_backfill.build_report((tmp_path,), apply=True, repair_invalid=True)
     verify = provenance_verify.build_report((tmp_path,), older_than_hours=0)
 
     assert dry_run["sidecars_to_repair"] == 1

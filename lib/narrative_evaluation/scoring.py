@@ -128,7 +128,15 @@ def _sources(thesis: Mapping[str, Any]) -> list[str]:
         found = []
         for item in evidence:
             text = str(item).lower()
-            for name in ("tradingview", "telegram", "hyperliquid", "threat", "kronos", "scanner", "sovereign"):
+            for name in (
+                "tradingview",
+                "telegram",
+                "hyperliquid",
+                "threat",
+                "kronos",
+                "scanner",
+                "sovereign",
+            ):
                 if name in text:
                     found.append(name)
         return sorted(set(found))
@@ -185,7 +193,9 @@ def _confidence(thesis: Mapping[str, Any]) -> float:
     return round(max(0.0, min(1.0, value)), 4)
 
 
-def _coerce_outcome(outcome: Mapping[str, Any] | EvaluationOutcome | None) -> EvaluationOutcome | None:
+def _coerce_outcome(
+    outcome: Mapping[str, Any] | EvaluationOutcome | None,
+) -> EvaluationOutcome | None:
     if outcome is None:
         return None
     raw = outcome.to_dict() if isinstance(outcome, EvaluationOutcome) else dict(outcome)
@@ -194,7 +204,12 @@ def _coerce_outcome(outcome: Mapping[str, Any] | EvaluationOutcome | None) -> Ev
         actual = _float(raw.get(key))
         if actual is not None:
             break
-    observed = raw.get("observed_at") or raw.get("timestamp") or raw.get("closed_at") or raw.get("generated_at")
+    observed = (
+        raw.get("observed_at")
+        or raw.get("timestamp")
+        or raw.get("closed_at")
+        or raw.get("generated_at")
+    )
     if actual is None or not observed:
         return None
     return EvaluationOutcome(
@@ -204,7 +219,11 @@ def _coerce_outcome(outcome: Mapping[str, Any] | EvaluationOutcome | None) -> Ev
         actual_return_pct=actual,
         source=str(raw.get("source") or "inline"),
         regime=str(raw.get("regime") or raw.get("market_regime") or "unknown"),
-        metadata={k: v for k, v in raw.items() if k not in {"symbol", "timeframe", "observed_at", "actual_return_pct"}},
+        metadata={
+            k: v
+            for k, v in raw.items()
+            if k not in {"symbol", "timeframe", "observed_at", "actual_return_pct"}
+        },
     )
 
 

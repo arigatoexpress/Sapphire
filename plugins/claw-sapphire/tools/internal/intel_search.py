@@ -267,7 +267,9 @@ def _records_from_sovereign_thesis(payload: Any, *, root: Path) -> list[dict[str
         if not text:
             text = _coerce_text(entry)
         rec_id = (
-            f"sovereign_thesis:{symbol}" if symbol else f"sovereign_thesis:{abs(hash(text)) % (10**12)}"
+            f"sovereign_thesis:{symbol}"
+            if symbol
+            else f"sovereign_thesis:{abs(hash(text)) % (10**12)}"
         )
         rows.append(
             {

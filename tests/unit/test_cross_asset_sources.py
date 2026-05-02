@@ -143,7 +143,11 @@ def test_hyperliquid_adapter_supports_hype(tmp_path) -> None:
 
 
 def test_openbb_adapter_live_pull_can_be_mocked(tmp_path, monkeypatch) -> None:
-    payload = {"results": [{"date": "2026-04-28", "open": 1, "high": 2, "low": 1, "close": 1.5, "volume": 9}]}
+    payload = {
+        "results": [
+            {"date": "2026-04-28", "open": 1, "high": 2, "low": 1, "close": 1.5, "volume": 9}
+        ]
+    }
 
     class Response:
         def __enter__(self):

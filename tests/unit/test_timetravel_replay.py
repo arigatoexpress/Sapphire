@@ -150,9 +150,7 @@ def test_replay_invokes_correlate_once_per_pair(
         return _fake_correlated_signal(symbol, timeframe)
 
     monkeypatch.setattr(replay_mod, "correlate_once", fake_correlate)
-    monkeypatch.setattr(
-        replay_mod, "synthesize_thesis", lambda sig, **kw: _fake_thesis()
-    )
+    monkeypatch.setattr(replay_mod, "synthesize_thesis", lambda sig, **kw: _fake_thesis())
 
     snap = _snapshot_with(
         [_correlated_row("BTC"), _correlated_row("ETH")],
@@ -199,9 +197,7 @@ def test_replay_uses_snapshot_at_as_now(
     monkeypatch.setattr(replay_mod, "correlate_once", fake_correlate)
     monkeypatch.setattr(replay_mod, "synthesize_thesis", lambda *a, **kw: _fake_thesis())
 
-    snap = _snapshot_with(
-        [_correlated_row("BTC")], at="2026-04-26T10:30:00+00:00"
-    )
+    snap = _snapshot_with([_correlated_row("BTC")], at="2026-04-26T10:30:00+00:00")
     replay(snap)
     assert all(now == datetime(2026, 4, 26, 10, 30, tzinfo=UTC) for now in nows)
 
@@ -212,8 +208,8 @@ def test_replay_reconstructs_source_signals_from_bull_bear_neutral(
     captured = {}
 
     def fake_correlate(*, symbol, timeframe, signals_by_source, config, now):
-        captured["sources_for_btc"] = signals_by_source if symbol == "BTC" else captured.get(
-            "sources_for_btc"
+        captured["sources_for_btc"] = (
+            signals_by_source if symbol == "BTC" else captured.get("sources_for_btc")
         )
         return _fake_correlated_signal(symbol, timeframe)
 
@@ -233,9 +229,7 @@ def test_replay_reconstructs_source_signals_from_bull_bear_neutral(
     )
     replay(snap)
     assert set(captured["sources_for_btc"]) == {"tradingview", "hyperliquid", "telegram"}
-    assert (
-        captured["sources_for_btc"]["tradingview"]["direction"] == "bull"
-    )
+    assert captured["sources_for_btc"]["tradingview"]["direction"] == "bull"
     assert captured["sources_for_btc"]["hyperliquid"]["direction"] == "bear"
     assert captured["sources_for_btc"]["telegram"]["direction"] == "neutral"
 
@@ -250,9 +244,7 @@ def test_replay_provenance_includes_warning(
     )
     monkeypatch.setattr(replay_mod, "synthesize_thesis", lambda *a, **kw: _fake_thesis())
 
-    snap = _snapshot_with(
-        [_correlated_row("BTC")], at="2026-04-26T10:30:00+00:00"
-    )
+    snap = _snapshot_with([_correlated_row("BTC")], at="2026-04-26T10:30:00+00:00")
     result = replay(snap)
     env = result.provenance_envelope
     assert env["generator"] == "lib.timetravel.replay"
@@ -271,9 +263,7 @@ def test_replay_records_pairs_and_sources(
 
     snap = _snapshot_with(
         [
-            _correlated_row(
-                "BTC", bull=("tradingview",), bear=("hyperliquid",)
-            ),
+            _correlated_row("BTC", bull=("tradingview",), bear=("hyperliquid",)),
             _correlated_row("ETH", bull=("kronos",)),
         ],
         at="2026-04-26T10:30:00+00:00",
@@ -334,9 +324,7 @@ def test_replay_handles_synthesize_thesis_exception(
 
     monkeypatch.setattr(replay_mod, "synthesize_thesis", boom)
 
-    snap = _snapshot_with(
-        [_correlated_row("BTC")], at="2026-04-26T10:30:00+00:00"
-    )
+    snap = _snapshot_with([_correlated_row("BTC")], at="2026-04-26T10:30:00+00:00")
     result = replay(snap)
     # Correlated signal still produced; narrative dropped.
     assert len(result.correlated_signals) == 1
@@ -408,9 +396,7 @@ def test_replay_propagates_snapshot_index_signature(
     )
     monkeypatch.setattr(replay_mod, "synthesize_thesis", lambda *a, **kw: _fake_thesis())
 
-    snap = _snapshot_with(
-        [_correlated_row("BTC")], at="2026-04-26T10:30:00+00:00"
-    )
+    snap = _snapshot_with([_correlated_row("BTC")], at="2026-04-26T10:30:00+00:00")
     result = replay(snap)
     assert result.snapshot_index_signature == "testsig"
 
@@ -425,9 +411,7 @@ def test_replay_at_string_round_trips(
     )
     monkeypatch.setattr(replay_mod, "synthesize_thesis", lambda *a, **kw: _fake_thesis())
 
-    snap = _snapshot_with(
-        [_correlated_row("BTC")], at="2026-04-26T10:30:00+00:00"
-    )
+    snap = _snapshot_with([_correlated_row("BTC")], at="2026-04-26T10:30:00+00:00")
     result = replay(snap)
     assert result.at == "2026-04-26T10:30:00+00:00"
 

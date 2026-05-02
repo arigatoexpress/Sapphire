@@ -18,7 +18,9 @@ from typing import Any
 import yaml
 
 #: Default location of the registry yaml. Overridable in tests.
-DEFAULT_REGISTRY_PATH = pathlib.Path(__file__).resolve().parents[3] / "config" / "megaeth_protocols.yaml"
+DEFAULT_REGISTRY_PATH = (
+    pathlib.Path(__file__).resolve().parents[3] / "config" / "megaeth_protocols.yaml"
+)
 
 
 @dataclass(frozen=True)

@@ -133,7 +133,11 @@ def handle(payload: dict[str, Any]) -> dict[str, Any]:
     if action == "latest-report":
         report = _read_report(root)
         if report is None:
-            return {"status": "no_data", "reason": "no report on disk", "report_root": str(root or DEFAULT_REPORT_ROOT)}
+            return {
+                "status": "no_data",
+                "reason": "no report on disk",
+                "report_root": str(root or DEFAULT_REPORT_ROOT),
+            }
         return _truncate({"status": "ok", **report})
     if action == "snr":
         report = _read_report(root)

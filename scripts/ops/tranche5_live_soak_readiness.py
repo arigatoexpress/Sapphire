@@ -284,7 +284,10 @@ SURFACES: tuple[SurfaceSpec, ...] = (
         status_commands=(
             CommandSpec("service status", (PYTHON, "services/adversarial/run.py", "status")),
         ),
-        safety_notes=("quarantine copy requires explicit env gate", "does not mutate upstream signals"),
+        safety_notes=(
+            "quarantine copy requires explicit env gate",
+            "does not mutate upstream signals",
+        ),
     ),
 )
 
@@ -469,9 +472,7 @@ def _surface_status(
     if missing_required:
         return "fail"
     command_failures = [
-        row
-        for row in command_rows
-        if row.get("ran") and row.get("result", {}).get("ok") is False
+        row for row in command_rows if row.get("ran") and row.get("result", {}).get("ok") is False
     ]
     if command_failures:
         return "fail"
@@ -510,9 +511,7 @@ def collect_readiness(
             1 for row in commands if row.get("ran") and row.get("result", {}).get("ok") is False
         )
         artifacts = _latest_artifacts(spec.artifact_globs)
-        missing_artifact_patterns = [
-            row["pattern"] for row in artifacts if row["match_count"] == 0
-        ]
+        missing_artifact_patterns = [row["pattern"] for row in artifacts if row["match_count"] == 0]
         missing_artifact_patterns_total += len(missing_artifact_patterns)
         if missing_artifact_patterns:
             surfaces_missing_artifacts += 1
@@ -535,9 +534,7 @@ def collect_readiness(
             "missing_artifact_patterns": missing_artifact_patterns,
             "required_files": [_path_summary(path) for path in spec.required_files],
             "missing_required_files": missing_required,
-            "launchagent_templates": [
-                _path_summary(path) for path in spec.launchagent_templates
-            ],
+            "launchagent_templates": [_path_summary(path) for path in spec.launchagent_templates],
             "dry_run_status_commands": commands,
             "safety_notes": list(spec.safety_notes),
         }

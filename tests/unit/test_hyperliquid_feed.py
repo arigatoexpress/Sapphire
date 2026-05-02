@@ -218,11 +218,15 @@ async def test_run_forever_blocks_without_live_env(monkeypatch):
 
 async def test_connect_once_sends_subscriptions_and_publishes_signal(tmp_path):
     bus = FakeBus()
-    publisher = feed.SignalPublisher(bus=bus, store=feed.JsonlSignalStore(tmp_path / "signals.jsonl"))
+    publisher = feed.SignalPublisher(
+        bus=bus, store=feed.JsonlSignalStore(tmp_path / "signals.jsonl")
+    )
     subscriber = feed.HyperliquidPublicFeedSubscriber(["BTC"], publisher=publisher)
     trade = {
         "channel": "trades",
-        "data": [{"coin": "BTC", "px": "100000", "sz": "3", "side": "B", "time": 1_700_000_000_000}],
+        "data": [
+            {"coin": "BTC", "px": "100000", "sz": "3", "side": "B", "time": 1_700_000_000_000}
+        ],
     }
     ws = FakeWebSocket([json.dumps(trade)])
 
@@ -234,7 +238,9 @@ async def test_connect_once_sends_subscriptions_and_publishes_signal(tmp_path):
     assert seen == 1
     assert len(ws.sent) == 3
     assert bus.events[0][0] == "hyperliquid.trade"
-    assert feed.JsonlSignalStore(tmp_path / "signals.jsonl").latest(limit=1)[0]["event_id"] == "evt-1"
+    assert (
+        feed.JsonlSignalStore(tmp_path / "signals.jsonl").latest(limit=1)[0]["event_id"] == "evt-1"
+    )
 
 
 async def test_run_forever_stops_when_reconnect_cap_is_hit(monkeypatch):

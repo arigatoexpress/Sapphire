@@ -180,9 +180,7 @@ class AgentHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API.
         path = self.path.split("?", 1)[0].rstrip("/") or "/"
         if path in {"/", "/health", "/status", "/cdp/status"}:
-            self._send_json(
-                build_status_payload(cdp_url=self.cdp_url, timeout=self.cdp_timeout)
-            )
+            self._send_json(build_status_payload(cdp_url=self.cdp_url, timeout=self.cdp_timeout))
             return
         if path == "/tabs":
             self._send_json(
@@ -229,8 +227,7 @@ def main(argv: list[str] | None = None) -> int:
     AgentHandler.cdp_timeout = args.cdp_timeout
     server = ThreadingHTTPServer((args.host, args.port), AgentHandler)
     print(
-        f"{SERVICE_NAME} serving {MODE} on {args.host}:{args.port} "
-        f"(cdp={args.cdp_url})",
+        f"{SERVICE_NAME} serving {MODE} on {args.host}:{args.port} (cdp={args.cdp_url})",
         flush=True,
     )
     try:

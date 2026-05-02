@@ -231,9 +231,7 @@ def load_allowed_user_ids(env_var: str = "SAPPHIRE_PM_BOT_ALLOWED_USER_IDS") -> 
         try:
             allowed.add(int(text))
         except ValueError:
-            logger.warning(
-                "Ignoring invalid Telegram allowlist entry in %s: %r", env_var, text
-            )
+            logger.warning("Ignoring invalid Telegram allowlist entry in %s: %r", env_var, text)
     return allowed
 
 

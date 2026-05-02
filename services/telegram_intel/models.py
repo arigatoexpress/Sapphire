@@ -11,9 +11,7 @@ MAX_MESSAGES_PER_HOUR = 600
 MAX_CLASSIFICATIONS_PER_HOUR = 200
 MAX_MESSAGE_CHARS = 8000
 TRUNCATION_SUFFIX = "[…]"
-VALID_CATEGORIES = frozenset(
-    {"crypto", "macro", "ai", "security", "trading", "governance"}
-)
+VALID_CATEGORIES = frozenset({"crypto", "macro", "ai", "security", "trading", "governance"})
 
 
 def utc_now_iso() -> str:

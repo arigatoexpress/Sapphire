@@ -50,10 +50,30 @@ class _FakeKumbaya:
 async def test_quote_kumbaya_picks_highest_amount_out_across_fee_tiers() -> None:
     fake = _FakeKumbaya(
         {
-            100: QuoteResult(amount_out=2200 * 10**18, sqrt_price_x96_after=1, initialized_ticks_crossed=0, gas_estimate=100_000),
-            500: QuoteResult(amount_out=2255 * 10**18, sqrt_price_x96_after=1, initialized_ticks_crossed=0, gas_estimate=100_000),
-            3000: QuoteResult(amount_out=2256 * 10**18, sqrt_price_x96_after=1, initialized_ticks_crossed=0, gas_estimate=100_000),
-            10000: QuoteResult(amount_out=2100 * 10**18, sqrt_price_x96_after=1, initialized_ticks_crossed=0, gas_estimate=100_000),
+            100: QuoteResult(
+                amount_out=2200 * 10**18,
+                sqrt_price_x96_after=1,
+                initialized_ticks_crossed=0,
+                gas_estimate=100_000,
+            ),
+            500: QuoteResult(
+                amount_out=2255 * 10**18,
+                sqrt_price_x96_after=1,
+                initialized_ticks_crossed=0,
+                gas_estimate=100_000,
+            ),
+            3000: QuoteResult(
+                amount_out=2256 * 10**18,
+                sqrt_price_x96_after=1,
+                initialized_ticks_crossed=0,
+                gas_estimate=100_000,
+            ),
+            10000: QuoteResult(
+                amount_out=2100 * 10**18,
+                sqrt_price_x96_after=1,
+                initialized_ticks_crossed=0,
+                gas_estimate=100_000,
+            ),
         }
     )
     quote = await quote_kumbaya(fake, WETH, USDM, 10**18)  # type: ignore[arg-type]
@@ -69,9 +89,19 @@ async def test_quote_kumbaya_swallows_per_tier_failures() -> None:
     fake = _FakeKumbaya(
         {
             100: RuntimeError("no pool"),
-            500: QuoteResult(amount_out=2255 * 10**18, sqrt_price_x96_after=1, initialized_ticks_crossed=0, gas_estimate=100_000),
+            500: QuoteResult(
+                amount_out=2255 * 10**18,
+                sqrt_price_x96_after=1,
+                initialized_ticks_crossed=0,
+                gas_estimate=100_000,
+            ),
             3000: RuntimeError("revert"),
-            10000: QuoteResult(amount_out=2100 * 10**18, sqrt_price_x96_after=1, initialized_ticks_crossed=0, gas_estimate=100_000),
+            10000: QuoteResult(
+                amount_out=2100 * 10**18,
+                sqrt_price_x96_after=1,
+                initialized_ticks_crossed=0,
+                gas_estimate=100_000,
+            ),
         }
     )
     quote = await quote_kumbaya(fake, WETH, USDM, 10**18)  # type: ignore[arg-type]
@@ -81,8 +111,14 @@ async def test_quote_kumbaya_swallows_per_tier_failures() -> None:
 
 @pytest.mark.asyncio
 async def test_quote_kumbaya_returns_none_when_all_tiers_fail() -> None:
-    fake = _FakeKumbaya({100: RuntimeError("a"), 500: RuntimeError("b"),
-                         3000: RuntimeError("c"), 10000: RuntimeError("d")})
+    fake = _FakeKumbaya(
+        {
+            100: RuntimeError("a"),
+            500: RuntimeError("b"),
+            3000: RuntimeError("c"),
+            10000: RuntimeError("d"),
+        }
+    )
     quote = await quote_kumbaya(fake, WETH, USDM, 10**18)  # type: ignore[arg-type]
     assert quote is None
 
@@ -91,10 +127,30 @@ async def test_quote_kumbaya_returns_none_when_all_tiers_fail() -> None:
 async def test_quote_kumbaya_skips_zero_amount_out() -> None:
     fake = _FakeKumbaya(
         {
-            100: QuoteResult(amount_out=0, sqrt_price_x96_after=1, initialized_ticks_crossed=0, gas_estimate=100_000),
-            500: QuoteResult(amount_out=1, sqrt_price_x96_after=1, initialized_ticks_crossed=0, gas_estimate=100_000),
-            3000: QuoteResult(amount_out=0, sqrt_price_x96_after=1, initialized_ticks_crossed=0, gas_estimate=100_000),
-            10000: QuoteResult(amount_out=0, sqrt_price_x96_after=1, initialized_ticks_crossed=0, gas_estimate=100_000),
+            100: QuoteResult(
+                amount_out=0,
+                sqrt_price_x96_after=1,
+                initialized_ticks_crossed=0,
+                gas_estimate=100_000,
+            ),
+            500: QuoteResult(
+                amount_out=1,
+                sqrt_price_x96_after=1,
+                initialized_ticks_crossed=0,
+                gas_estimate=100_000,
+            ),
+            3000: QuoteResult(
+                amount_out=0,
+                sqrt_price_x96_after=1,
+                initialized_ticks_crossed=0,
+                gas_estimate=100_000,
+            ),
+            10000: QuoteResult(
+                amount_out=0,
+                sqrt_price_x96_after=1,
+                initialized_ticks_crossed=0,
+                gas_estimate=100_000,
+            ),
         }
     )
     quote = await quote_kumbaya(fake, WETH, USDM, 10**18)  # type: ignore[arg-type]
@@ -106,8 +162,14 @@ async def test_quote_kumbaya_skips_zero_amount_out() -> None:
 @pytest.mark.asyncio
 async def test_swap_quote_effective_price_zero_when_amount_in_zero() -> None:
     sq = SwapQuote(
-        venue="x", token_in=WETH, token_out=USDM, amount_in=0, amount_out=0,
-        fee_pips=3000, hops=1, gas_estimate=0,
+        venue="x",
+        token_in=WETH,
+        token_out=USDM,
+        amount_in=0,
+        amount_out=0,
+        fee_pips=3000,
+        hops=1,
+        gas_estimate=0,
     )
     assert sq.effective_price == 0
 
@@ -132,12 +194,28 @@ def test_dex_routing_table_register_appends_in_order() -> None:
 @pytest.mark.asyncio
 async def test_best_quote_returns_largest_amount_out() -> None:
     async def fn_low(*args: Any) -> SwapQuote | None:
-        return SwapQuote(venue="low", token_in=WETH, token_out=USDM, amount_in=10**18,
-                         amount_out=100, fee_pips=3000, hops=1, gas_estimate=100)
+        return SwapQuote(
+            venue="low",
+            token_in=WETH,
+            token_out=USDM,
+            amount_in=10**18,
+            amount_out=100,
+            fee_pips=3000,
+            hops=1,
+            gas_estimate=100,
+        )
 
     async def fn_high(*args: Any) -> SwapQuote | None:
-        return SwapQuote(venue="high", token_in=WETH, token_out=USDM, amount_in=10**18,
-                         amount_out=200, fee_pips=500, hops=1, gas_estimate=100)
+        return SwapQuote(
+            venue="high",
+            token_in=WETH,
+            token_out=USDM,
+            amount_in=10**18,
+            amount_out=200,
+            fee_pips=500,
+            hops=1,
+            gas_estimate=100,
+        )
 
     t = DexRoutingTable()
     t.register("low", fn_low)
@@ -160,8 +238,16 @@ async def test_best_quote_handles_failing_venue() -> None:
         raise RuntimeError("boom")
 
     async def fn_ok(*args: Any) -> SwapQuote | None:
-        return SwapQuote(venue="ok", token_in=WETH, token_out=USDM, amount_in=10**18,
-                         amount_out=42, fee_pips=3000, hops=1, gas_estimate=100)
+        return SwapQuote(
+            venue="ok",
+            token_in=WETH,
+            token_out=USDM,
+            amount_in=10**18,
+            amount_out=42,
+            fee_pips=3000,
+            hops=1,
+            gas_estimate=100,
+        )
 
     t = DexRoutingTable()
     t.register("fail", fn_fail)
@@ -177,8 +263,16 @@ async def test_best_quote_skips_none_venue() -> None:
         return None
 
     async def fn_ok(*args: Any) -> SwapQuote | None:
-        return SwapQuote(venue="ok", token_in=WETH, token_out=USDM, amount_in=10**18,
-                         amount_out=42, fee_pips=3000, hops=1, gas_estimate=100)
+        return SwapQuote(
+            venue="ok",
+            token_in=WETH,
+            token_out=USDM,
+            amount_in=10**18,
+            amount_out=42,
+            fee_pips=3000,
+            hops=1,
+            gas_estimate=100,
+        )
 
     t = DexRoutingTable()
     t.register("none", fn_none)

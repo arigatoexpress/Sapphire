@@ -223,11 +223,11 @@ async def test_get_user_account_data_decodes() -> None:
         ["uint256"] * 6,
         [
             10_000 * 10**8,  # totalCollateralBase $10,000
-            2_000 * 10**8,   # totalDebtBase $2,000
-            5_000 * 10**8,   # availableBorrowsBase $5,000
-            8500,            # currentLiquidationThreshold = 85%
-            8000,            # ltv = 80%
-            5 * 10**18,      # health factor 5.0
+            2_000 * 10**8,  # totalDebtBase $2,000
+            5_000 * 10**8,  # availableBorrowsBase $5,000
+            8500,  # currentLiquidationThreshold = 85%
+            8000,  # ltv = 80%
+            5 * 10**18,  # health factor 5.0
         ],
     )
     user = "0x" + "55" * 20

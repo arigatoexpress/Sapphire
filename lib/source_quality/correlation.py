@@ -78,9 +78,7 @@ class CorrelationPair:
             "agreement_rate": (
                 None if self.agreement_rate is None else round(self.agreement_rate, 6)
             ),
-            "conflict_rate": (
-                None if self.conflict_rate is None else round(self.conflict_rate, 6)
-            ),
+            "conflict_rate": (None if self.conflict_rate is None else round(self.conflict_rate, 6)),
             "near_duplicate": self.near_duplicate,
         }
 
@@ -103,9 +101,7 @@ class CorrelationReport:
             "min_overlap": self.min_overlap,
             "near_duplicate_threshold": self.near_duplicate_threshold,
             "pairs": [p.to_dict() for p in self.pairs],
-            "near_duplicates": [
-                p.to_dict() for p in self.pairs if p.near_duplicate
-            ],
+            "near_duplicates": [p.to_dict() for p in self.pairs if p.near_duplicate],
             "notes": list(self.notes),
         }
 
@@ -136,7 +132,9 @@ def _index_signals(
         prev = per_source.get(cell)
         if prev is None or prev[0] < sig.timestamp:
             per_source[cell] = (sig.timestamp, direction)
-    return {src: {cell: dir_ for cell, (_ts, dir_) in cells.items()} for src, cells in index.items()}
+    return {
+        src: {cell: dir_ for cell, (_ts, dir_) in cells.items()} for src, cells in index.items()
+    }
 
 
 def compute_pairwise_correlation(
@@ -219,8 +217,7 @@ def flag_near_duplicates(
     """Return all pairs whose agreement rate is at or above ``threshold``."""
     cutoff = threshold if threshold is not None else report.near_duplicate_threshold
     return tuple(
-        p for p in report.pairs
-        if p.agreement_rate is not None and p.agreement_rate >= cutoff
+        p for p in report.pairs if p.agreement_rate is not None and p.agreement_rate >= cutoff
     )
 
 
@@ -233,8 +230,7 @@ def correlation_matrix(report: CorrelationReport) -> dict[str, dict[str, float |
     threshold).
     """
     matrix: dict[str, dict[str, float | None]] = {
-        s: {t: (1.0 if s == t else None) for t in report.sources}
-        for s in report.sources
+        s: {t: (1.0 if s == t else None) for t in report.sources} for s in report.sources
     }
     for pair in report.pairs:
         matrix[pair.source_a][pair.source_b] = pair.agreement_rate

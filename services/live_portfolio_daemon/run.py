@@ -86,12 +86,17 @@ def run_once(
         row = _status_with_provenance(status.to_dict())
         path = write_status_jsonl(ledger, status, account_hash=account)
         event_id = _publish_change(row)
-        statuses.append({"account_hash": account, "status": row, "path": str(path), "event_id": event_id})
+        statuses.append(
+            {"account_hash": account, "status": row, "path": str(path), "event_id": event_id}
+        )
     return {
         "ok": True,
         "accounts": accounts,
         "statuses": statuses,
-        "generated_at": (now or datetime.now(UTC)).astimezone(UTC).replace(microsecond=0).isoformat(),
+        "generated_at": (now or datetime.now(UTC))
+        .astimezone(UTC)
+        .replace(microsecond=0)
+        .isoformat(),
     }
 
 

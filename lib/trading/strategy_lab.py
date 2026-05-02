@@ -629,7 +629,7 @@ def build_tradingview_capability_matrix() -> dict[str, Any]:
                 "tv timeframe <resolution>",
                 "tv pane layout 2x2",
                 "tv pane symbol <pane> <symbol>",
-                "tv indicator add \"Relative Strength Index\"",
+                'tv indicator add "Relative Strength Index"',
                 "tv indicator set <entity_id> -i '<json>'",
                 "tv pine set --file <path>",
                 "tv pine compile",

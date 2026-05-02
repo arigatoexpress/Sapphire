@@ -221,9 +221,7 @@ def test_per_tenant_hash_uses_configured_salt_from_secrets(
     assert payload["tenant"]["salt_source"] == "configured"
     # And the resulting hashes must differ from the default-fallback hashes.
     monkeypatch.setattr(dashboard_app, "_DOSSIER_SECRETS_PATH", secrets_path.parent / "missing")
-    fallback = client.get(
-        "/api/customer-dossier?tenant=acme", headers=_auth_header()
-    ).get_json()
+    fallback = client.get("/api/customer-dossier?tenant=acme", headers=_auth_header()).get_json()
     assert fallback["tenant"]["salt_source"] == "default_fallback"
     a_hashes = {h["per_tenant_hash"] for h in payload["customer_hashes"]}
     b_hashes = {h["per_tenant_hash"] for h in fallback["customer_hashes"]}
@@ -233,9 +231,7 @@ def test_per_tenant_hash_uses_configured_salt_from_secrets(
     assert a_hashes.isdisjoint(b_hashes)
 
 
-def test_per_tenant_hash_uses_env_var_when_set(
-    client, dossier_dir, monkeypatch
-):
+def test_per_tenant_hash_uses_env_var_when_set(client, dossier_dir, monkeypatch):
     monkeypatch.setenv("SAPPHIRE_DOSSIER_HASH_SALT_ACME", "env-salt-2026-04-29")
     _write_dossier(
         dossier_dir,
@@ -330,18 +326,14 @@ def test_dossier_route_normalizes_tenant_id(client, dossier_dir):
         "dossier_2026-04-28.json",
         {"customers": _customers_with_status_counts({"X": 2}), "deals": []},
     )
-    response = client.get(
-        "/api/customer-dossier?tenant=../etc/passwd", headers=_auth_header()
-    )
+    response = client.get("/api/customer-dossier?tenant=../etc/passwd", headers=_auth_header())
     payload = response.get_json()
     # Normalized tenant id keeps only [A-Za-z0-9_].
     assert re.fullmatch(r"[A-Za-z0-9_]+", payload["tenant"]["id"]), payload["tenant"]["id"]
 
 
 def test_dossier_empty_customer_list_emits_no_hashes(client, dossier_dir):
-    _write_dossier(
-        dossier_dir, "dossier_2026-04-28.json", {"customers": [], "deals": []}
-    )
+    _write_dossier(dossier_dir, "dossier_2026-04-28.json", {"customers": [], "deals": []})
     response = client.get("/api/customer-dossier?tenant=acme", headers=_auth_header())
     payload = response.get_json()
     assert payload["customer_hashes"] == []

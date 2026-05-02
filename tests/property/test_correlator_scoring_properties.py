@@ -46,12 +46,8 @@ from lib.correlator.scoring import (  # noqa: E402
 _KNOWN_SOURCES = list(DEFAULT_SOURCE_WEIGHTS.keys())
 
 _directions = st.sampled_from(["bull", "bear", "neutral"])
-_confidence = st.floats(
-    min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False
-)
-_age_seconds = st.floats(
-    min_value=0.0, max_value=86_400 * 7, allow_nan=False, allow_infinity=False
-)
+_confidence = st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False)
+_age_seconds = st.floats(min_value=0.0, max_value=86_400 * 7, allow_nan=False, allow_infinity=False)
 
 
 @st.composite
@@ -120,8 +116,7 @@ def test_compose_score_deterministic(payload: dict[str, dict]) -> None:
 def test_direction_flip_symmetry(payload: dict[str, dict]) -> None:
     flip_map = {"bull": "bear", "bear": "bull", "neutral": "neutral"}
     flipped = {
-        src: {**sig, "direction": flip_map[sig["direction"]]}
-        for src, sig in payload.items()
+        src: {**sig, "direction": flip_map[sig["direction"]]} for src, sig in payload.items()
     }
     a = compose_score(payload)
     b = compose_score(flipped)
@@ -157,8 +152,7 @@ def test_agreement_bonus_monotone(sources: list[str], confidence: float) -> None
     score_one = compose_score(one_source)
     score_two = compose_score(two_sources)
     assert score_two.edge_score >= score_one.edge_score - 1e-9, (
-        f"two-source score {score_two.edge_score} regressed below one-source "
-        f"{score_one.edge_score}"
+        f"two-source score {score_two.edge_score} regressed below one-source {score_one.edge_score}"
     )
 
 
@@ -173,10 +167,7 @@ def test_agreement_bonus_monotone(sources: list[str], confidence: float) -> None
 def test_agreement_multiplier_monotone_in_count(sources: list[str]) -> None:
     """``agreement_multiplier`` must be non-decreasing as we add corroborating sources."""
     base_signal = {"direction": "bull", "confidence": 0.8, "age_seconds": 0.0}
-    payloads = [
-        {src: base_signal for src in sources[: i + 1]}
-        for i in range(len(sources))
-    ]
+    payloads = [{src: base_signal for src in sources[: i + 1]} for i in range(len(sources))]
     multipliers = [compose_score(p).agreement_multiplier for p in payloads]
     for prev, curr in zip(multipliers, multipliers[1:]):
         assert curr >= prev - 1e-9
@@ -192,9 +183,7 @@ def test_agreement_multiplier_monotone_in_count(sources: list[str]) -> None:
     st.floats(min_value=0.0, max_value=1e6, allow_nan=False, allow_infinity=False),
     st.floats(min_value=1.0, max_value=86_400, allow_nan=False, allow_infinity=False),
 )
-def test_freshness_factor_monotone_decreasing(
-    a_age: float, b_age: float, half_life: float
-) -> None:
+def test_freshness_factor_monotone_decreasing(a_age: float, b_age: float, half_life: float) -> None:
     if a_age <= b_age:
         younger, older = a_age, b_age
     else:
@@ -208,9 +197,7 @@ def test_freshness_factor_monotone_decreasing(
     st.floats(min_value=0.0, max_value=1e9, allow_nan=False, allow_infinity=False),
     st.floats(min_value=1.0, max_value=86_400, allow_nan=False, allow_infinity=False),
 )
-def test_freshness_factor_bounded_below_zero(
-    age: float, half_life: float
-) -> None:
+def test_freshness_factor_bounded_below_zero(age: float, half_life: float) -> None:
     """Freshness factor is bounded in [0, 1] — never negative, never > 1."""
     f = freshness_factor(age, half_life)
     assert 0.0 <= f <= 1.0
@@ -228,17 +215,11 @@ def test_freshness_factor_bounded_below_zero(
     st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False),
     st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False),
 )
-def test_confidence_monotone_for_single_bull_source(
-    source: str, c1: float, c2: float
-) -> None:
+def test_confidence_monotone_for_single_bull_source(source: str, c1: float, c2: float) -> None:
     if c1 > c2:
         c1, c2 = c2, c1  # ensure c1 <= c2
-    a = compose_score(
-        {source: {"direction": "bull", "confidence": c1, "age_seconds": 0.0}}
-    )
-    b = compose_score(
-        {source: {"direction": "bull", "confidence": c2, "age_seconds": 0.0}}
-    )
+    a = compose_score({source: {"direction": "bull", "confidence": c1, "age_seconds": 0.0}})
+    b = compose_score({source: {"direction": "bull", "confidence": c2, "age_seconds": 0.0}})
     assert b.edge_score >= a.edge_score - 1e-9
 
 
@@ -255,9 +236,7 @@ def test_confidence_monotone_for_single_bull_source(
 def test_contradiction_dampens_score(bull_src: str, bear_src: str) -> None:
     if bull_src == bear_src:
         return
-    bull_only = {
-        bull_src: {"direction": "bull", "confidence": 0.9, "age_seconds": 0.0}
-    }
+    bull_only = {bull_src: {"direction": "bull", "confidence": 0.9, "age_seconds": 0.0}}
     contradicted = {
         bull_src: {"direction": "bull", "confidence": 0.9, "age_seconds": 0.0},
         bear_src: {"direction": "bear", "confidence": 0.9, "age_seconds": 0.0},

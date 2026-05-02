@@ -103,11 +103,11 @@ class ReserveData:
     decimals: int
     supply_apy: float
     borrow_apy: float
-    total_supplied: int           # aTokenSupply, raw token units
-    total_borrowed: int           # totalScaledVariableDebt, raw token units (already wad-converted)
-    available_liquidity: int      # raw token units in the pool
-    utilization: float            # 0.0..1.0
-    ltv: float                    # 0.0..1.0
+    total_supplied: int  # aTokenSupply, raw token units
+    total_borrowed: int  # totalScaledVariableDebt, raw token units (already wad-converted)
+    available_liquidity: int  # raw token units in the pool
+    utilization: float  # 0.0..1.0
+    ltv: float  # 0.0..1.0
     liquidation_threshold: float  # 0.0..1.0
     paused: bool
     frozen: bool
@@ -122,8 +122,8 @@ class UserAccountData:
     total_debt_base: int
     available_borrows_base: int
     current_liquidation_threshold: float  # fraction
-    ltv: float                            # fraction
-    health_factor: Decimal                # ray-encoded; we convert to Decimal for precision
+    ltv: float  # fraction
+    health_factor: Decimal  # ray-encoded; we convert to Decimal for precision
 
 
 # ---------------------------------------------------------------------------

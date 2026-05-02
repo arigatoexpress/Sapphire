@@ -442,8 +442,12 @@ def _build_order_draft(symbol: str, action: str, notional_usd: float) -> dict[st
     try:
         from lib.trading.strategy_lab import build_order_drafts
 
-        drafts = build_order_drafts(normalized_symbol, action, notional_usd=notional_usd, strategy="sentinel")
-        robinhood = next((draft for draft in drafts if draft.get("venue") == "robinhood_crypto"), None)
+        drafts = build_order_drafts(
+            normalized_symbol, action, notional_usd=notional_usd, strategy="sentinel"
+        )
+        robinhood = next(
+            (draft for draft in drafts if draft.get("venue") == "robinhood_crypto"), None
+        )
         return {
             "execution_enabled": False,
             "mode": "draft_only",

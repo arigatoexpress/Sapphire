@@ -243,7 +243,15 @@ def _buyer_safe_requested() -> bool:
         or request.args.get("public")
         or ""
     )
-    return str(raw).strip().lower() in {"1", "true", "yes", "buyer", "buyer_safe", "buyer-safe", "public"}
+    return str(raw).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "buyer",
+        "buyer_safe",
+        "buyer-safe",
+        "public",
+    }
 
 
 def _buyer_safe_payload(payload: Any) -> Any:
@@ -256,7 +264,10 @@ def _buyer_safe_payload(payload: Any) -> Any:
             redacted_fields.add(normalized_key)
             return _BUYER_SAFE_FIELD_REPLACEMENTS[normalized_key]
         if isinstance(value, dict):
-            return {str(child_key): _walk(child_value, str(child_key)) for child_key, child_value in value.items()}
+            return {
+                str(child_key): _walk(child_value, str(child_key))
+                for child_key, child_value in value.items()
+            }
         if isinstance(value, list):
             return [_walk(item, key) for item in value]
         if isinstance(value, str):
@@ -313,7 +324,11 @@ def _extract_diligence_doc(path: Path) -> dict[str, Any]:
     lines = text.splitlines()
     title = next((line.lstrip("# ").strip() for line in lines if line.startswith("# ")), path.stem)
     readout_index = next(
-        (idx + 1 for idx, line in enumerate(lines) if line.strip().lower() == "## diligence readout"),
+        (
+            idx + 1
+            for idx, line in enumerate(lines)
+            if line.strip().lower() == "## diligence readout"
+        ),
         len(lines),
     )
     evidence_index = next(
@@ -584,7 +599,8 @@ def _count_test_functions(path: Path) -> int:
     return sum(
         1
         for node in ast.walk(tree)
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test_")
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name.startswith("test_")
     )
 
 
@@ -646,7 +662,9 @@ def _build_test_suite_health(root: Path | None = None) -> dict[str, Any]:
         "plugin": suite("plugins/claw-sapphire/tests/", plugin_files),
     }
     lastfailed_count = len(lastfailed)
-    status = "pass" if nodeids and lastfailed_count == 0 else ("fail" if lastfailed_count else "warn")
+    status = (
+        "pass" if nodeids and lastfailed_count == 0 else ("fail" if lastfailed_count else "warn")
+    )
     return {
         "mode": "read_only_test_suite_health",
         "status": status,
@@ -736,7 +754,9 @@ def _build_launchagent_summary() -> dict[str, Any]:
     for label in labels:
         live = parsed.get(label)
         if not live:
-            rows.append({"label": label, "status_label": "not_loaded", "pid": None, "last_exit": None})
+            rows.append(
+                {"label": label, "status_label": "not_loaded", "pid": None, "last_exit": None}
+            )
             continue
         pid = live.get("pid")
         last_exit = live.get("last_exit")
@@ -826,7 +846,9 @@ def _tool_registry_metric() -> dict[str, str]:
     try:
         import yaml
 
-        registry = yaml.safe_load((_DASHBOARD_REPO_ROOT / "infra" / "tool-registry.yaml").read_text(encoding="utf-8"))
+        registry = yaml.safe_load(
+            (_DASHBOARD_REPO_ROOT / "infra" / "tool-registry.yaml").read_text(encoding="utf-8")
+        )
         tools = registry.get("tools", []) if isinstance(registry, dict) else []
         fallback_count = str(len(tools))
     except Exception:
@@ -913,14 +935,14 @@ def _org_repo_index() -> dict[str, dict[str, Any]]:
     try:
         import yaml
 
-        manifest = yaml.safe_load((_DASHBOARD_REPO_ROOT / "infra" / "org-repos.yaml").read_text(encoding="utf-8"))
+        manifest = yaml.safe_load(
+            (_DASHBOARD_REPO_ROOT / "infra" / "org-repos.yaml").read_text(encoding="utf-8")
+        )
     except Exception:
         return {}
     repos = manifest.get("repos", []) if isinstance(manifest, dict) else []
     return {
-        str(repo.get("id")): repo
-        for repo in repos
-        if isinstance(repo, dict) and repo.get("id")
+        str(repo.get("id")): repo for repo in repos if isinstance(repo, dict) and repo.get("id")
     }
 
 
@@ -1033,7 +1055,9 @@ def _build_unified_dashboard_payload() -> dict[str, Any]:
                 ],
                 _manifest_repo_link("regional-intel-workbench"),
             ),
-            "tags": _manifest_tags("regional-intel-workbench", ["regional intel", "client feed", "provenance"]),
+            "tags": _manifest_tags(
+                "regional-intel-workbench", ["regional intel", "client feed", "provenance"]
+            ),
         },
         {
             "name": "org-platform",
@@ -1698,9 +1722,7 @@ def api_trading_workbench_watchlist():
     """Read-only TradingView/Sapphire workbench watchlist contract."""
     offline = (request.args.get("offline") or "").strip().lower() in {"1", "true", "yes"}
     symbols = [
-        token.strip()
-        for token in (request.args.get("symbols") or "").split(",")
-        if token.strip()
+        token.strip() for token in (request.args.get("symbols") or "").split(",") if token.strip()
     ]
     try:
         limit = max(1, min(50, int(request.args.get("limit", "18"))))
@@ -6471,9 +6493,7 @@ def _remote_path_label(raw_path: Any) -> str | None:
     text = str(raw_path)
     if text.startswith(".../"):
         return _paste_safe_text(text, limit=120)
-    parts = [
-        part for part in text.replace("\\", "/").split("/") if part and not part.endswith(":")
-    ]
+    parts = [part for part in text.replace("\\", "/").split("/") if part and not part.endswith(":")]
     if not parts:
         return None
     return _paste_safe_text(".../" + "/".join(parts[-3:]), limit=120)
@@ -6511,7 +6531,9 @@ def _normalize_worker_schedule(payload: dict[str, Any]) -> dict[str, Any]:
     last_task_result = _safe_int(schedule.get("last_task_result"))
     last_result_ok = schedule.get("last_result_ok")
     return {
-        "task_name": _paste_safe_text(schedule.get("task_name") or "SapphireResearchWorker", limit=80),
+        "task_name": _paste_safe_text(
+            schedule.get("task_name") or "SapphireResearchWorker", limit=80
+        ),
         "status": _paste_safe_text(schedule.get("status") or "unknown", limit=32),
         "state": _paste_safe_text(schedule.get("state"), limit=32),
         "last_run_time": schedule.get("last_run_time"),

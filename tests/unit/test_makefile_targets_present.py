@@ -22,9 +22,7 @@ def test_fresh_mac_make_targets_are_present() -> None:
 
 def test_fresh_mac_targets_are_phony() -> None:
     makefile = (REPO_ROOT / "Makefile").read_text()
-    phony_line = next(
-        line for line in makefile.splitlines() if line.startswith(".PHONY: install")
-    )
+    phony_line = next(line for line in makefile.splitlines() if line.startswith(".PHONY: install"))
     for target in (
         "sapphire-on-fresh-mac",
         "sapphire-demo-up",

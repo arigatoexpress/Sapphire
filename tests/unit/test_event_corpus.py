@@ -43,7 +43,9 @@ def test_default_corpus_contains_every_required_category():
     assert REQUIRED_CATEGORIES <= set(counts)
 
 
-@pytest.mark.parametrize("field", ["event_id", "timestamp", "category", "sub_category", "title", "assets", "metadata"])
+@pytest.mark.parametrize(
+    "field", ["event_id", "timestamp", "category", "sub_category", "title", "assets", "metadata"]
+)
 def test_validate_event_rejects_missing_required_fields(field):
     raw = _raw_event()
     raw.pop(field)
