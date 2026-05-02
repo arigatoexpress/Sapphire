@@ -53,8 +53,14 @@ def _install_fake_bigquery(monkeypatch) -> tuple[types.ModuleType, list]:
         captured_params.append(sp)
         return sp
 
+    def _aqp(name, kind, value):
+        sp = types.SimpleNamespace(name=name, kind=kind, value=value, array=True)
+        captured_params.append(sp)
+        return sp
+
     fake_bigquery.QueryJobConfig = _qjc
     fake_bigquery.ScalarQueryParameter = _sqp
+    fake_bigquery.ArrayQueryParameter = _aqp
     fake_cloud.bigquery = fake_bigquery
 
     monkeypatch.setitem(sys.modules, "google", fake_google)
@@ -68,6 +74,16 @@ def _install_fake_bigquery(monkeypatch) -> tuple[types.ModuleType, list]:
 def _load_app(monkeypatch):
     """Load app.py fresh against the fake bigquery shim. Returns the module."""
     _install_fake_bigquery(monkeypatch)
+    # app.py imports sibling modules (`auth`, `brain`) by bare name — the
+    # service's own directory is the import root on Cloud Run. Mirror that
+    # here so the brain endpoints actually wire up under test.
+    svc_dir = APP_PATH.parent
+    monkeypatch.syspath_prepend(str(svc_dir))
+    # Drop any stale brain/auth modules from a previous test run so the
+    # next exec_module() picks up our shimmed sys.path.
+    for name in ("brain", "auth"):
+        sys.modules.pop(name, None)
+
     module_name = "sapphire_test_analytics_dashboard_app"
     spec = importlib.util.spec_from_file_location(module_name, APP_PATH)
     assert spec is not None and spec.loader is not None
@@ -537,3 +553,107 @@ def test_summary_endpoint_serializes_datetime_in_response(client, app_module, mo
     body = response.get_json()
 
     assert body["last_seen"] == datetime(2026, 4, 28, 6, 0, tzinfo=UTC).isoformat()
+
+
+# ---------------------------------------------------------------------------
+# Sapphire Brain hero panel — render + endpoint wiring
+# ---------------------------------------------------------------------------
+
+
+def test_brain_endpoints_are_registered_on_app(app_module):
+    """register_brain() should attach the three /api/brain/* routes."""
+    rules = {r.rule for r in app_module.app.url_map.iter_rules()}
+    assert "/api/brain/synthesis" in rules
+    assert "/api/brain/correlate" in rules
+    assert "/api/brain/history" in rules
+
+
+def test_brain_synthesis_endpoint_returns_payload(client, app_module, monkeypatch):
+    """Without persist=1 the endpoint must return health_score + narrative
+    even when every BQ probe fails — the dashboard hero gauge depends on
+    this never returning a non-200.
+    """
+    response = client.get("/api/brain/synthesis")
+    assert response.status_code == 200
+    body = response.get_json()
+    # health_score is required for the gauge to render.
+    assert "health_score" in body
+    assert isinstance(body["health_score"], (int, float))
+    assert "narrative" in body
+    assert "priority_actions" in body
+    assert "degraded_silos" in body
+
+
+def test_brain_history_endpoint_returns_rows_shape(client):
+    """Empty BQ table → endpoint still returns {"rows": []}, not 500."""
+    response = client.get("/api/brain/history?limit=12")
+    assert response.status_code == 200
+    body = response.get_json()
+    assert "rows" in body
+    assert isinstance(body["rows"], list)
+
+
+def test_brain_correlate_endpoint_returns_matches_shape(client):
+    response = client.get("/api/brain/correlate")
+    assert response.status_code == 200
+    body = response.get_json()
+    assert "matches" in body
+    assert isinstance(body["matches"], list)
+    assert "count" in body
+
+
+def test_index_renders_brain_hero_panel_above_kpi_strip():
+    """The hero panel must ship in the rendered template at the canonical
+    location: AFTER the silo grid, BEFORE Production-telemetry KPIs.
+    Smoke-grep against the template file directly so we don't need to
+    spin up the full Flask render path with a fake BQ client.
+    """
+    template_path = (
+        REPO_ROOT
+        / "services"
+        / "analytics_dashboard"
+        / "templates"
+        / "index.html"
+    )
+    html = template_path.read_text(encoding="utf-8")
+
+    # Marker 1: panel exists with the canonical id + section heading text.
+    assert 'id="brain-hero"' in html
+    assert "Sapphire Brain" in html
+    assert "cross-silo synthesis" in html
+
+    # Marker 2: panel sits between silo-grid close and KPI section heading.
+    silo_close_idx = html.find('</div>\n\n<!-- ========== SAPPHIRE BRAIN')
+    kpi_open_idx = html.find("<!-- ========== KPIs with sparklines ========== -->")
+    brain_open_idx = html.find('id="brain-hero"')
+    assert silo_close_idx != -1, "silo grid → brain transition marker missing"
+    assert kpi_open_idx != -1, "Production telemetry KPI marker missing"
+    assert silo_close_idx < brain_open_idx < kpi_open_idx
+
+    # Marker 3: the Persist + Run button links to the canonical endpoint.
+    assert 'href="/api/brain/synthesis?persist=1"' in html
+
+    # Marker 4: the gauge SVG arc id and narrative element id ship.
+    assert 'id="brain-gauge-arc"' in html
+    assert 'id="brain-narrative"' in html
+    assert 'id="brain-degraded"' in html
+    assert 'id="brain-actions"' in html
+    assert 'id="brain-spark-svg"' in html
+
+
+def test_index_brain_panel_fetches_the_three_brain_endpoints():
+    """The refresh() loop must include all three brain endpoints. If a
+    future refactor accidentally drops one we want a hard test failure.
+    """
+    template_path = (
+        REPO_ROOT
+        / "services"
+        / "analytics_dashboard"
+        / "templates"
+        / "index.html"
+    )
+    html = template_path.read_text(encoding="utf-8")
+    assert "/api/brain/synthesis" in html
+    assert "/api/brain/history?limit=48" in html
+    # correlate is exposed via a button — ensure it's reachable from the UI.
+    assert "/api/brain/correlate" in html

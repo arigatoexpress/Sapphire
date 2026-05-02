@@ -408,6 +408,186 @@ td.muted { color: var(--text-3); }
 .pill.blue   { background: rgba(78,168,255,0.16); color: var(--accent); }
 .pill.purple { background: rgba(163,113,247,0.16); color: var(--purple); }
 .pill.gray   { background: rgba(108,120,145,0.14); color: var(--text-3); }
+.pill.orange { background: rgba(255,122,0,0.16); color: var(--orange); }
+
+/* ========== Sapphire Brain hero panel ========== */
+.brain-hero {
+  position: relative;
+  background:
+    linear-gradient(135deg, rgba(78,168,255,0.06) 0%, rgba(163,113,247,0.04) 100%),
+    linear-gradient(180deg, var(--bg-2) 0%, var(--bg-1) 100%);
+  border: 1px solid var(--border-bright);
+  border-radius: var(--r-lg);
+  padding: 22px 26px 20px;
+  margin-bottom: 20px;
+  overflow: hidden;
+  box-shadow: var(--shadow-2);
+}
+.brain-hero::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--accent) 0%, var(--purple) 100%);
+}
+.brain-hero-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.brain-hero-title {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-2);
+  font-weight: 600;
+}
+.brain-hero-title .brain-h1 {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+}
+.brain-hero-title svg { color: var(--accent); }
+.brain-hero-actions {
+  display: flex; align-items: center; gap: 10px;
+}
+.brain-hero-actions a.brain-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-2);
+  text-decoration: none;
+  padding: 6px 12px;
+  border: 1px solid var(--border-bright);
+  border-radius: 999px;
+  transition: border-color var(--t-fast), color var(--t-fast);
+}
+.brain-hero-actions a.brain-btn:hover { border-color: var(--accent); color: var(--accent); }
+.brain-hero-actions .brain-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-4);
+}
+
+.brain-hero-body {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 28px;
+  align-items: start;
+}
+@media (max-width: 800px) {
+  .brain-hero-body { grid-template-columns: 1fr; gap: 16px; }
+}
+
+.brain-gauge {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 10px 0 6px;
+}
+.brain-gauge-svg {
+  width: 180px; height: 110px;
+  display: block;
+}
+.brain-gauge-num {
+  position: absolute;
+  top: 56px; left: 0; right: 0;
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.brain-gauge-num.green  { color: var(--green); }
+.brain-gauge-num.yellow { color: var(--yellow); }
+.brain-gauge-num.red    { color: var(--red); }
+.brain-gauge-num.gray   { color: var(--text-3); }
+.brain-gauge-label {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  font-weight: 600;
+}
+.brain-spark {
+  width: 100%;
+  height: 28px;
+  margin-top: 2px;
+}
+.brain-spark svg { display: block; width: 100%; height: 100%; }
+
+.brain-content {
+  display: flex; flex-direction: column; gap: 12px;
+  min-width: 0;
+}
+.brain-narrative {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-1);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+.brain-narrative.empty { color: var(--text-3); font-style: italic; font-weight: 400; }
+
+.brain-degraded {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  align-items: center;
+}
+.brain-degraded .deg-label {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-right: 4px;
+  font-weight: 600;
+}
+.brain-degraded .deg-empty {
+  font-size: 11px;
+  color: var(--green);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.brain-actions {
+  display: flex; flex-direction: column; gap: 6px;
+  margin-top: 4px;
+}
+.brain-action {
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-2);
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+.brain-action:first-child { border-top: none; padding-top: 2px; }
+.brain-action .b-tag {
+  flex-shrink: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 7px;
+  border-radius: 999px;
+  margin-top: 1px;
+  white-space: nowrap;
+}
+.brain-action .b-tag.regime    { background: rgba(163,113,247,0.18); color: var(--purple); }
+.brain-action .b-tag.trading   { background: var(--green-dim); color: var(--green); }
+.brain-action .b-tag.threat    { background: var(--red-dim); color: var(--red); }
+.brain-action .b-tag.threat_live { background: var(--red-dim); color: var(--red); }
+.brain-action .b-tag.service   { background: rgba(78,168,255,0.16); color: var(--accent); }
+.brain-action .b-tag.services  { background: rgba(78,168,255,0.16); color: var(--accent); }
+.brain-action .b-tag.inference { background: rgba(98,255,64,0.14); color: var(--accent-2); }
+.brain-action .b-tag.tho       { background: var(--yellow-dim); color: var(--yellow); }
+.brain-action .b-tag.other     { background: rgba(108,120,145,0.18); color: var(--text-3); }
+.brain-action .b-text { flex: 1; min-width: 0; word-break: break-word; }
+.brain-actions-empty {
+  font-size: 12.5px;
+  color: var(--green);
+  font-family: 'JetBrains Mono', monospace;
+}
 
 /* ========== Threat feed ========== */
 .feed-row {
@@ -637,6 +817,47 @@ td.muted { color: var(--text-3); }
     <span class="silo-link">Open Sapphire repo ↗</span>
   </a>
 </div>
+
+<!-- ========== SAPPHIRE BRAIN — cross-silo synthesis ========== -->
+<section class="brain-hero" id="brain-hero" aria-labelledby="brain-hero-title">
+  <div class="brain-hero-head">
+    <div class="brain-hero-title">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 2A2.5 2.5 0 0 0 7 4.5V6a3 3 0 0 0-3 3v1.5A2.5 2.5 0 0 0 6.5 13H7v3a3 3 0 0 0 3 3 2.5 2.5 0 0 0 2.5-2.5V19a2.5 2.5 0 0 0 5 0v-2.5a3 3 0 0 0 3-3v-1A2.5 2.5 0 0 0 18 10V8.5A2.5 2.5 0 0 0 15.5 6h-1V4.5A2.5 2.5 0 0 0 12 2"/></svg>
+      <span class="brain-h1" id="brain-hero-title">Sapphire Brain · cross-silo synthesis</span>
+    </div>
+    <div class="brain-hero-actions">
+      <span class="brain-meta" id="brain-meta">—</span>
+      <a class="brain-btn" href="/api/brain/synthesis?persist=1" target="_blank" rel="noopener" title="Run synthesis and persist to BigQuery">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Persist + Run
+      </a>
+      <a class="brain-btn" href="/api/brain/correlate" target="_blank" rel="noopener" title="Cross-silo correlation matches">
+        Correlate ↗
+      </a>
+    </div>
+  </div>
+  <div class="brain-hero-body">
+    <div class="brain-gauge">
+      <svg class="brain-gauge-svg" id="brain-gauge-svg" viewBox="0 0 200 120" aria-hidden="true">
+        <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#1d2331" stroke-width="14" stroke-linecap="round"/>
+        <path id="brain-gauge-arc" d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#6c7891" stroke-width="14" stroke-linecap="round" stroke-dasharray="251.3" stroke-dashoffset="251.3"/>
+      </svg>
+      <div class="brain-gauge-num gray" id="brain-gauge-num">—</div>
+      <div class="brain-gauge-label">Health score</div>
+      <div class="brain-spark"><svg id="brain-spark-svg" preserveAspectRatio="none"></svg></div>
+    </div>
+    <div class="brain-content">
+      <div class="brain-narrative empty" id="brain-narrative">Synthesizing cross-silo state…</div>
+      <div class="brain-degraded" id="brain-degraded">
+        <span class="deg-label">Degraded:</span>
+        <span class="deg-empty mono">none reporting</span>
+      </div>
+      <div class="brain-actions" id="brain-actions">
+        <div class="brain-actions-empty mono">No priority actions queued.</div>
+      </div>
+    </div>
+  </div>
+</section>
 
 <!-- ========== KPIs with sparklines ========== -->
 <div class="section-h">
@@ -1127,9 +1348,138 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') closeHelp();
 });
 
+// ========== Sapphire Brain panel ==========
+const BRAIN_SILO_TAGS = ['regime','trading','threat','threat_live','services','service','inference','tho'];
+function brainTagClass(action) {
+  // Action strings start with "<silo>: ..." per brain.py.
+  const m = (action || '').match(/^([a-z_]+)\s*:/i);
+  const tag = m ? m[1].toLowerCase() : 'other';
+  return BRAIN_SILO_TAGS.includes(tag) ? tag : 'other';
+}
+function brainHealthBucket(score) {
+  if (score == null || isNaN(score)) return 'gray';
+  if (score >= 0.85) return 'green';
+  if (score >= 0.6) return 'yellow';
+  return 'red';
+}
+function brainBucketColor(bucket) {
+  if (bucket === 'green')  return '#3fb950';
+  if (bucket === 'yellow') return '#d29922';
+  if (bucket === 'red')    return '#f85149';
+  return '#6c7891';
+}
+function renderBrainGauge(score) {
+  const bucket = brainHealthBucket(score);
+  const color = brainBucketColor(bucket);
+  // Arc length for 180° semicircle of r=80 = π * r ≈ 251.327
+  const arcLen = 251.327;
+  const pct = Math.max(0, Math.min(1, score == null ? 0 : score));
+  const arc = document.getElementById('brain-gauge-arc');
+  if (arc) {
+    arc.setAttribute('stroke', color);
+    arc.setAttribute('stroke-dashoffset', String(arcLen * (1 - pct)));
+  }
+  const num = document.getElementById('brain-gauge-num');
+  if (num) {
+    num.className = 'brain-gauge-num ' + bucket;
+    num.textContent = score == null ? '—' : Math.round(pct * 100) + '%';
+  }
+}
+function renderBrainPanel(syn) {
+  const narEl = document.getElementById('brain-narrative');
+  const degEl = document.getElementById('brain-degraded');
+  const actEl = document.getElementById('brain-actions');
+  const metaEl = document.getElementById('brain-meta');
+  if (!syn) {
+    if (narEl) {
+      narEl.className = 'brain-narrative empty';
+      narEl.textContent = 'Brain endpoints unreachable — /api/brain/synthesis returned no payload.';
+    }
+    if (degEl) degEl.innerHTML = '<span class="deg-label">Degraded:</span><span class="deg-empty mono">unknown</span>';
+    if (actEl) actEl.innerHTML = '<div class="brain-actions-empty mono" style="color:var(--text-3)">No data.</div>';
+    if (metaEl) metaEl.textContent = '—';
+    renderBrainGauge(null);
+    return;
+  }
+  renderBrainGauge(typeof syn.health_score === 'number' ? syn.health_score : null);
+  if (narEl) {
+    narEl.className = 'brain-narrative';
+    narEl.textContent = syn.narrative || 'No narrative emitted.';
+  }
+  if (degEl) {
+    const list = Array.isArray(syn.degraded_silos) ? syn.degraded_silos : [];
+    if (!list.length) {
+      degEl.innerHTML = '<span class="deg-label">Degraded:</span><span class="deg-empty mono">none reporting</span>';
+    } else {
+      degEl.innerHTML = '<span class="deg-label">Degraded:</span>' +
+        list.map(s => {
+          const tag = BRAIN_SILO_TAGS.includes((s||'').toLowerCase()) ? s.toLowerCase() : 'other';
+          const cls = ({regime:'purple', trading:'green', threat:'red', threat_live:'red', services:'blue', service:'blue', inference:'green', tho:'yellow', other:'gray'})[tag] || 'gray';
+          return `<span class="pill ${cls}">${escapeHtml(String(s))}</span>`;
+        }).join('');
+    }
+  }
+  if (actEl) {
+    const list = Array.isArray(syn.priority_actions) ? syn.priority_actions : [];
+    if (!list.length) {
+      actEl.innerHTML = '<div class="brain-actions-empty mono">No priority actions queued.</div>';
+    } else {
+      actEl.innerHTML = list.map(a => {
+        const tag = brainTagClass(a);
+        const txt = String(a).replace(/^[a-z_]+\s*:\s*/i, '');
+        return `<div class="brain-action"><span class="b-tag ${tag}">${tag.replace('_',' ')}</span><span class="b-text">${escapeHtml(txt)}</span></div>`;
+      }).join('');
+    }
+  }
+  if (metaEl) {
+    const conf = (typeof syn.confidence === 'number') ? syn.confidence.toFixed(2) : '—';
+    const obs = Array.isArray(syn.silos_observed) ? syn.silos_observed.length : 0;
+    metaEl.textContent = `confidence ${conf} · ${obs} silos observed`;
+  }
+}
+function renderBrainSpark(rows) {
+  const svg = document.getElementById('brain-spark-svg');
+  if (!svg) return;
+  svg.innerHTML = '';
+  if (!Array.isArray(rows) || rows.length < 2) {
+    svg.setAttribute('viewBox', '0 0 200 28');
+    const t = svgEl('text', { x: '50%', y: 18, 'text-anchor': 'middle', fill: '#424d65', 'font-size': 9, 'font-family': 'JetBrains Mono' });
+    t.textContent = 'no history yet';
+    svg.appendChild(t);
+    return;
+  }
+  // /api/brain/history returns DESC; reverse for chronological plot.
+  const ordered = [...rows].reverse();
+  const points = ordered
+    .map(r => (typeof r.health_score === 'number' ? r.health_score : null))
+    .filter(v => v != null);
+  if (points.length < 2) {
+    svg.setAttribute('viewBox', '0 0 200 28');
+    return;
+  }
+  const w = 200, h = 28, pad = 2;
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
+  const dx = (w - pad * 2) / Math.max(1, points.length - 1);
+  // Map score 0..1 onto height (full range).
+  const path = points.map((v, i) => {
+    const x = pad + i * dx;
+    const y = h - pad - Math.max(0, Math.min(1, v)) * (h - pad * 2);
+    return (i === 0 ? 'M' : 'L') + x.toFixed(2) + ',' + y.toFixed(2);
+  }).join(' ');
+  const last = points[points.length - 1];
+  const color = brainBucketColor(brainHealthBucket(last));
+  const area = path + ` L ${(w - pad).toFixed(2)},${h - pad} L ${pad},${h - pad} Z`;
+  svg.appendChild(svgEl('path', { d: area, fill: color, 'fill-opacity': '0.16', stroke: 'none' }));
+  svg.appendChild(svgEl('path', { d: path, fill: 'none', stroke: color, 'stroke-width': '1.5', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
 // ========== Refresh ==========
 async function refresh() {
-  const [sum, regime, preds, silos, inference, threatsLive, tsInf, tsThr, tsSvc, vpinResp, dsr] = await Promise.all([
+  const [sum, regime, preds, silos, inference, threatsLive, tsInf, tsThr, tsSvc, vpinResp, dsr, brainSyn, brainHist] = await Promise.all([
     safeFetch('/api/summary'),
     safeFetch('/api/regime?limit=8'),
     safeFetch('/api/predictions?limit=8'),
@@ -1141,7 +1491,13 @@ async function refresh() {
     safeFetch('/api/timeseries/services'),
     safeFetch('/api/vpin?symbol=BTC&buckets=50'),
     safeFetch('/api/deflated-sharpe/rolling?window=90&days=365'),
+    safeFetch('/api/brain/synthesis'),
+    safeFetch('/api/brain/history?limit=48'),
   ]);
+
+  // ----- Sapphire Brain hero panel -----
+  renderBrainPanel(brainSyn);
+  renderBrainSpark((brainHist && brainHist.rows) || []);
 
   // ----- THO silo + header health -----
   const tho = silos?.silos?.tho || {};
