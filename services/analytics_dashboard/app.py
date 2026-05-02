@@ -41,6 +41,21 @@ try:
 except Exception as _admin_exc:  # noqa: BLE001
     log.warning("admin auth scaffold disabled: %s", _admin_exc)
 
+# Sapphire Brain — cross-silo synthesis + correlation (the integration layer).
+# Lazy-wired so a brain module failure can't take down the dashboard.
+try:
+    from brain import register_brain as _register_brain
+
+    _register_brain(
+        app,
+        project=PROJECT,
+        dataset=DATASET,
+        bq_client=bq,
+        query_param_factory=bigquery,
+    )
+except Exception as _brain_exc:  # noqa: BLE001
+    log.warning("brain endpoints disabled: %s", _brain_exc)
+
 _KNOWN_PROBE_PATHS = {
     "/.git/config",
     "/favicon.ico",
