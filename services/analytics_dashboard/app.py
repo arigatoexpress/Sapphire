@@ -31,6 +31,16 @@ log = logging.getLogger("analytics")
 app = Flask(__name__)
 bq = bigquery.Client(project=PROJECT)
 
+# WebAuthn passkey admin scaffold (gated /admin/* + /api/admin/*).
+# Lazily wired so a missing optional dep (webauthn / firestore) doesn't crash
+# the whole dashboard at import time — admin pages will return 503 instead.
+try:
+    from auth import register_blueprint as _register_admin_blueprint
+
+    _register_admin_blueprint(app)
+except Exception as _admin_exc:  # noqa: BLE001
+    log.warning("admin auth scaffold disabled: %s", _admin_exc)
+
 _KNOWN_PROBE_PATHS = {
     "/.git/config",
     "/favicon.ico",
@@ -162,22 +172,41 @@ def performance():
 
 @app.get("/api/regime")
 def regime():
+    """Latest regime snapshots — filtered to rows with REAL data.
+
+    Skips rows where score IS NULL or regime = 'UNKNOWN' (those mean the
+    regime collector ran but couldn't produce a valid snapshot — they
+    pollute the UI with empty cells). Also reports the most recent
+    timestamp from the unfiltered table so the UI can flag staleness.
+    """
     limit = int(request.args.get("limit", "100"))
     try:
         rows = _rows(
             f"""
             SELECT timestamp, regime, score, confidence, btc_price_usd,
-                   btc_dominance, avg_funding_8h_pct, fear_greed_score, fear_greed_label
+                   btc_dominance, avg_funding_8h_pct, fear_greed_score,
+                   fear_greed_label
             FROM `{PROJECT}.{DATASET}.market_regime`
+            WHERE score IS NOT NULL AND regime != 'UNKNOWN'
             ORDER BY timestamp DESC
             LIMIT @limit
         """,
             params=[bigquery.ScalarQueryParameter("limit", "INT64", limit)],
         )
-        return jsonify({"rows": _clean(rows)})
+        # Also fetch the most-recent timestamp (any row) so the UI can
+        # render "regime collector stale for X hours" if no usable rows
+        # have come through recently.
+        meta_rows = _rows(f"""
+            SELECT MAX(timestamp) AS most_recent_any,
+                   COUNTIF(regime != 'UNKNOWN' AND score IS NOT NULL) AS valid_rows,
+                   COUNT(*) AS total_rows
+            FROM `{PROJECT}.{DATASET}.market_regime`
+        """)
+        meta = _clean(meta_rows)[0] if meta_rows else {}
+        return jsonify({"rows": _clean(rows), "meta": meta})
     except Exception as exc:
         log.info("regime bq miss: %s", exc)
-        return jsonify({"rows": []})
+        return jsonify({"rows": [], "meta": {}})
 
 
 @app.get("/api/predictions")
@@ -244,6 +273,86 @@ THREAT_FEED_URL = os.environ.get(
     "THREAT_FEED_URL",
     "https://cyber-threat-bot-691674245427.us-central1.run.app/threats?source=all",
 )
+
+
+@app.get("/api/timeseries/inference")
+def timeseries_inference():
+    """Hourly inference-call counts for the last 24h, grouped by tier.
+
+    Powers the sparkline chart in the dashboard header. Returns a list
+    of {hour, tier, calls, errors} rows ordered by hour ascending so
+    the frontend can plot them directly.
+    """
+    try:
+        rows = _rows(f"""
+            SELECT
+              TIMESTAMP_TRUNC(timestamp, HOUR) AS hour,
+              tier,
+              SUM(requests) AS calls,
+              SUM(errors)   AS errors
+            FROM `{PROJECT}.{DATASET}.inference_metrics`
+            WHERE timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)
+            GROUP BY hour, tier
+            ORDER BY hour ASC
+        """)
+        return jsonify({"rows": _clean(rows)})
+    except Exception as exc:
+        log.info("timeseries_inference bq miss: %s", exc)
+        return jsonify({"rows": []})
+
+
+@app.get("/api/timeseries/threats")
+def timeseries_threats():
+    """Daily threat counts for the last 30 days, grouped by severity."""
+    try:
+        rows = _rows(f"""
+            SELECT date,
+                   IFNULL(severity, 'UNCLASSIFIED') AS severity,
+                   SUM(cves) AS cves,
+                   SUM(kev_cves) AS kev_cves
+            FROM `{PROJECT}.{DATASET}.daily_threats`
+            WHERE date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+            GROUP BY date, severity
+            ORDER BY date ASC
+        """)
+        return jsonify({"rows": _clean(rows)})
+    except Exception as exc:
+        log.info("timeseries_threats bq miss: %s", exc)
+        return jsonify({"rows": []})
+
+
+@app.get("/api/timeseries/services")
+def timeseries_services():
+    """Service-health rollup over the last hour, per service.
+
+    Returns latest status + p50/p95 response_ms aggregated over the
+    window so the UI can show a meaningful response-time bar chart
+    instead of a single instantaneous value.
+    """
+    try:
+        rows = _rows(f"""
+            WITH recent AS (
+              SELECT service_name, host, status, response_ms, timestamp
+              FROM `{PROJECT}.{DATASET}.service_health`
+              WHERE timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 60 MINUTE)
+            )
+            SELECT
+              service_name AS service,
+              ANY_VALUE(host) AS host,
+              COUNTIF(status = 'healthy') AS healthy_n,
+              COUNTIF(status = 'degraded') AS degraded_n,
+              COUNTIF(status = 'down') AS down_n,
+              APPROX_QUANTILES(response_ms, 100)[OFFSET(50)] AS p50_ms,
+              APPROX_QUANTILES(response_ms, 100)[OFFSET(95)] AS p95_ms,
+              MAX(timestamp) AS last_seen
+            FROM recent
+            GROUP BY service_name
+            ORDER BY service_name
+        """)
+        return jsonify({"rows": _clean(rows)})
+    except Exception as exc:
+        log.info("timeseries_services bq miss: %s", exc)
+        return jsonify({"rows": []})
 
 
 @app.get("/api/threats/live")

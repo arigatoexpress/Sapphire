@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Sapphire Admin · Sign in</title>
+  <style>
+    :root {
+      --bg: #06080d;
+      --bg-2: #0d1018;
+      --panel: #11151f;
+      --border: #1c2233;
+      --text: #e7eaf3;
+      --muted: #8a93ab;
+      --accent: #6da7ff;
+      --accent-hot: #4a8aff;
+      --danger: #ff5f6e;
+      --ok: #4cd28b;
+      --shadow: 0 30px 80px rgba(0,0,0,.55);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin:0; padding:0; height:100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+      background:
+        radial-gradient(1100px 700px at 20% -10%, rgba(109,167,255,.18), transparent 65%),
+        radial-gradient(900px 600px at 90% 110%, rgba(76,210,139,.10), transparent 65%),
+        var(--bg);
+      color: var(--text);
+      min-height: 100%;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .card {
+      width: min(440px, 100%);
+      background: linear-gradient(180deg, var(--panel) 0%, var(--bg-2) 100%);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 36px 32px 28px;
+      box-shadow: var(--shadow);
+    }
+    .crest {
+      width: 56px; height: 56px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #4a8aff 0%, #6da7ff 50%, #4cd28b 100%);
+      display: grid; place-items: center;
+      font-weight: 700; font-size: 22px; color: #06080d;
+      box-shadow: 0 8px 30px rgba(109,167,255,.35);
+      letter-spacing: -1px;
+      margin-bottom: 18px;
+    }
+    h1 { font-size: 22px; font-weight: 600; margin: 0 0 6px; letter-spacing: -.01em; }
+    .sub { color: var(--muted); font-size: 13.5px; margin: 0 0 24px; line-height: 1.5; }
+    button {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: .01em;
+      cursor: pointer;
+      transition: transform .08s ease, border-color .15s ease, background .15s ease;
+    }
+    button:hover { border-color: #2c3550; background: #161b29; }
+    button:active { transform: scale(.99); }
+    button.primary {
+      background: linear-gradient(180deg, var(--accent) 0%, var(--accent-hot) 100%);
+      border-color: transparent;
+      color: #06080d;
+      box-shadow: 0 6px 24px rgba(109,167,255,.32);
+    }
+    button.primary:hover { filter: brightness(1.05); }
+    button[disabled] { opacity: .55; cursor: not-allowed; }
+    .stack { display: flex; flex-direction: column; gap: 12px; }
+    .divider {
+      display: flex; align-items: center; gap: 10px;
+      color: var(--muted); font-size: 11.5px; text-transform: uppercase;
+      letter-spacing: .12em; margin: 18px 0;
+    }
+    .divider::before, .divider::after { content:""; flex:1; height:1px; background: var(--border); }
+    .meta { color: var(--muted); font-size: 12px; margin-top: 22px; line-height: 1.55; }
+    .meta code { background: var(--bg-2); padding: 2px 7px; border-radius: 6px; font-size: 11.5px; color: #c8d0e3; }
+    .status {
+      margin-top: 14px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      line-height: 1.4;
+      border: 1px solid var(--border);
+      background: var(--bg-2);
+      display: none;
+    }
+    .status.ok { color: var(--ok); border-color: rgba(76,210,139,.35); }
+    .status.err { color: var(--danger); border-color: rgba(255,95,110,.35); }
+    .status.show { display: block; }
+    a.link { color: var(--accent); text-decoration: none; }
+    a.link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <main class="card" role="main">
+    <div class="crest" aria-hidden="true">S</div>
+    <h1>Admin sign-in</h1>
+    <p class="sub">
+      Passkey-only. Use Proton Pass, iCloud Keychain, 1Password, or any
+      WebAuthn-compatible authenticator. No passwords are stored.
+    </p>
+
+    <div class="stack">
+      <button id="loginBtn" class="primary" type="button">
+        Sign in with passkey
+      </button>
+      <div class="divider"><span>or</span></div>
+      <button id="registerBtn" type="button">
+        Register a new passkey
+      </button>
+    </div>
+
+    <div id="statusBanner" class="status" role="status" aria-live="polite"></div>
+
+    <p class="meta">
+      Relying party: <code id="rpid">{{ rp_id }}</code><br />
+      You can register the first passkey from this page. Once registered,
+      additional passkeys require an authenticated session.
+    </p>
+  </main>
+
+  <script>
+    const RP_ID = {{ rp_id|tojson }};
+
+    const banner = document.getElementById("statusBanner");
+    const loginBtn = document.getElementById("loginBtn");
+    const registerBtn = document.getElementById("registerBtn");
+
+    function show(kind, msg) {
+      banner.className = "status show " + kind;
+      banner.textContent = msg;
+    }
+    function clear() { banner.className = "status"; banner.textContent = ""; }
+
+    function b64urlToBytes(s) {
+      s = s.replace(/-/g, "+").replace(/_/g, "/");
+      const pad = s.length % 4 ? 4 - (s.length % 4) : 0;
+      const padded = s + "=".repeat(pad);
+      const bin = atob(padded);
+      const out = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+      return out;
+    }
+    function bytesToB64url(buf) {
+      const bytes = new Uint8Array(buf);
+      let s = "";
+      for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+      return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    }
+
+    function decodePublicKeyOptions(opts) {
+      const decoded = { ...opts };
+      decoded.challenge = b64urlToBytes(opts.challenge);
+      if (opts.user && opts.user.id) {
+        decoded.user = { ...opts.user, id: b64urlToBytes(opts.user.id) };
+      }
+      if (Array.isArray(opts.excludeCredentials)) {
+        decoded.excludeCredentials = opts.excludeCredentials.map(c => ({
+          ...c, id: b64urlToBytes(c.id),
+        }));
+      }
+      if (Array.isArray(opts.allowCredentials)) {
+        decoded.allowCredentials = opts.allowCredentials.map(c => ({
+          ...c, id: b64urlToBytes(c.id),
+        }));
+      }
+      return decoded;
+    }
+
+    function attestationToWire(cred) {
+      const r = cred.response;
+      return {
+        id: cred.id,
+        rawId: bytesToB64url(cred.rawId),
+        type: cred.type,
+        clientExtensionResults: cred.getClientExtensionResults
+          ? cred.getClientExtensionResults() : {},
+        response: {
+          clientDataJSON: bytesToB64url(r.clientDataJSON),
+          attestationObject: bytesToB64url(r.attestationObject),
+        },
+      };
+    }
+    function assertionToWire(cred) {
+      const r = cred.response;
+      return {
+        id: cred.id,
+        rawId: bytesToB64url(cred.rawId),
+        type: cred.type,
+        clientExtensionResults: cred.getClientExtensionResults
+          ? cred.getClientExtensionResults() : {},
+        response: {
+          clientDataJSON: bytesToB64url(r.clientDataJSON),
+          authenticatorData: bytesToB64url(r.authenticatorData),
+          signature: bytesToB64url(r.signature),
+          userHandle: r.userHandle ? bytesToB64url(r.userHandle) : null,
+        },
+      };
+    }
+
+    async function postJSON(url, body) {
+      const r = await fetch(url, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      let data = {};
+      try { data = await r.json(); } catch (_) { /* may be empty */ }
+      return { ok: r.ok, status: r.status, data };
+    }
+
+    async function handleRegister() {
+      clear();
+      registerBtn.disabled = true;
+      try {
+        const begin = await postJSON("/api/admin/register/begin");
+        if (!begin.ok) throw new Error(begin.data.error || "register_begin_failed");
+        const opts = decodePublicKeyOptions(begin.data.options);
+        const cred = await navigator.credentials.create({ publicKey: opts });
+        if (!cred) throw new Error("no_credential_created");
+        const finish = await postJSON("/api/admin/register/complete", {
+          handle: begin.data.handle,
+          credential: attestationToWire(cred),
+        });
+        if (!finish.ok) throw new Error(finish.data.error || "register_complete_failed");
+        show("ok", "Passkey registered. Redirecting…");
+        setTimeout(() => { window.location.href = "/admin"; }, 700);
+      } catch (e) {
+        show("err", "Registration failed: " + (e.message || e));
+      } finally {
+        registerBtn.disabled = false;
+      }
+    }
+
+    async function handleLogin() {
+      clear();
+      loginBtn.disabled = true;
+      try {
+        const begin = await postJSON("/api/admin/login/begin");
+        if (!begin.ok) throw new Error(begin.data.error || "login_begin_failed");
+        const opts = decodePublicKeyOptions(begin.data.options);
+        const cred = await navigator.credentials.get({ publicKey: opts });
+        if (!cred) throw new Error("no_assertion");
+        const finish = await postJSON("/api/admin/login/complete", {
+          handle: begin.data.handle,
+          credential: assertionToWire(cred),
+        });
+        if (!finish.ok) throw new Error(finish.data.error || "login_complete_failed");
+        show("ok", "Authenticated. Redirecting…");
+        setTimeout(() => { window.location.href = "/admin"; }, 500);
+      } catch (e) {
+        show("err", "Sign-in failed: " + (e.message || e));
+      } finally {
+        loginBtn.disabled = false;
+      }
+    }
+
+    loginBtn.addEventListener("click", handleLogin);
+    registerBtn.addEventListener("click", handleRegister);
+
+    // Show/hide register button based on whether any credential is registered.
+    fetch("/api/admin/status", { credentials: "include" })
+      .then(r => r.json())
+      .then(s => {
+        if (s.registered) {
+          registerBtn.style.display = "none";
+          document.querySelector(".divider").style.display = "none";
+        }
+      })
+      .catch(() => { /* leave both buttons visible — safer default */ });
+  </script>
+</body>
+</html>
