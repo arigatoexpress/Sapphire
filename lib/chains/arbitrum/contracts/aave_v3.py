@@ -1,10 +1,18 @@
 """Aave V3 (Arbitrum One) typed read wrapper.
 
 Mirror of :mod:`lib.chains.megaeth.contracts.aave_v3`. The encode/decode
-plumbing, the ``ReserveData`` dataclass, the ``ray_rate_to_apy`` helper,
-and the ``UiPoolDataProvider`` row schema are all chain-agnostic — we
-re-export them here so callers depending on this module don't have to
-reach into the MegaETH package.
+plumbing, the ``ReserveData`` dataclass, and the ``ray_rate_to_apy``
+helper are all chain-agnostic — re-exported from the MegaETH package so
+callers don't have to reach across packages.
+
+The ``UiPoolDataProvider`` row SCHEMA is chain-specific: Aave's
+deployment on Arbitrum still uses the older 54-field layout with
+``stableBorrowRate``-era fields, while the MegaETH deployment uses the
+post-stable-rate-removal 40-field layout. This module pins Arbitrum's
+schema and provides its own row decoder; field semantics that matter
+to ``ReserveData`` (LTV, rates, supply/borrow totals, paused/frozen)
+are unchanged across the two layouts so the decoded dataclass is
+chain-portable.
 
 Read-only. Write paths (supply / borrow / withdraw / repay) land in a
 separate gated executor — they are deliberately NOT in this module.
@@ -17,22 +25,141 @@ from decimal import Decimal
 from typing import Any
 
 # Re-use the chain-agnostic encode/decode + dataclasses + helpers from
-# the MegaETH wrapper. Aave V3 is the same protocol on both chains; the
-# only chain-specific bit is the address bundle and the RPC transport.
+# the MegaETH wrapper. Only the row schema differs (see below).
 from lib.chains.megaeth.contracts.aave_v3 import (  # noqa: F401 — re-export
     BPS_DENOMINATOR,
     RAY,
     SECONDS_PER_YEAR,
     ReserveData,
     UserAccountData,
-    _AGGREGATED_RESERVE_FIELDS,
     ray_rate_to_apy,
-    reserve_data_from_row,
 )
 
 from ..abis.fetcher import load_pinned_abi
 from ..registry import ProtocolEntry
 from .base import TypedContract, _ChainCallable
+
+# ---------------------------------------------------------------------------
+# Arbitrum-specific UiPoolDataProvider row schema (54 fields).
+#
+# Field order MUST match the on-chain ABI exactly. Sourced from the verified
+# UiPoolDataProviderV3 contract at 0x145dE30c929a065582da84Cf96F88460dB9745A7
+# (see abis/aave_v3/ui_pool_data_provider.json, full-match Sourcify).
+# ---------------------------------------------------------------------------
+
+_AGGREGATED_RESERVE_FIELDS_ARBITRUM: tuple[str, ...] = (
+    "underlyingAsset",
+    "name",
+    "symbol",
+    "decimals",
+    "baseLTVasCollateral",
+    "reserveLiquidationThreshold",
+    "reserveLiquidationBonus",
+    "reserveFactor",
+    "usageAsCollateralEnabled",
+    "borrowingEnabled",
+    "stableBorrowRateEnabled",
+    "isActive",
+    "isFrozen",
+    "liquidityIndex",
+    "variableBorrowIndex",
+    "liquidityRate",
+    "variableBorrowRate",
+    "stableBorrowRate",
+    "lastUpdateTimestamp",
+    "aTokenAddress",
+    "stableDebtTokenAddress",
+    "variableDebtTokenAddress",
+    "interestRateStrategyAddress",
+    "availableLiquidity",
+    "totalPrincipalStableDebt",
+    "averageStableRate",
+    "stableDebtLastUpdateTimestamp",
+    "totalScaledVariableDebt",
+    "priceInMarketReferenceCurrency",
+    "priceOracle",
+    "variableRateSlope1",
+    "variableRateSlope2",
+    "stableRateSlope1",
+    "stableRateSlope2",
+    "baseStableBorrowRate",
+    "baseVariableBorrowRate",
+    "optimalUsageRatio",
+    "isPaused",
+    "isSiloedBorrowing",
+    "accruedToTreasury",
+    "unbacked",
+    "isolationModeTotalDebt",
+    "flashLoanEnabled",
+    "debtCeiling",
+    "debtCeilingDecimals",
+    "eModeCategoryId",
+    "borrowCap",
+    "supplyCap",
+    "eModeLtv",
+    "eModeLiquidationThreshold",
+    "eModeLiquidationBonus",
+    "eModePriceSource",
+    "eModeLabel",
+    "borrowableInIsolation",
+)
+
+
+def _row_to_dict_arbitrum(row: tuple[Any, ...]) -> dict[str, Any]:
+    """Pair an Arbitrum-shaped reserve tuple with the field names above.
+
+    If the on-chain layout adds fields in a future upgrade we zip up to
+    the shorter side and stash the surplus in ``_extra``.
+    """
+    n = min(len(row), len(_AGGREGATED_RESERVE_FIELDS_ARBITRUM))
+    out = {_AGGREGATED_RESERVE_FIELDS_ARBITRUM[i]: row[i] for i in range(n)}
+    if len(row) > n:
+        out["_extra"] = list(row[n:])
+    return out
+
+
+def _to_checksum_lower(addr: Any) -> str:
+    if isinstance(addr, bytes):
+        return "0x" + addr.hex()
+    if isinstance(addr, str):
+        return addr.lower()
+    return str(addr)
+
+
+def reserve_data_from_row_arbitrum(row: tuple[Any, ...]) -> ReserveData:
+    """Decode an Arbitrum UiPoolDataProvider row into :class:`ReserveData`.
+
+    Same output dataclass as the MegaETH decoder — the chain-portable
+    fields (LTV, rates, totals, paused/frozen) are derived identically;
+    Arbitrum-only fields (stable-rate, eMode, isolation-mode) are stashed
+    in ``raw`` for any consumer that wants them.
+    """
+    d = _row_to_dict_arbitrum(row)
+
+    liquidity_rate = int(d.get("liquidityRate", 0))
+    variable_borrow_rate = int(d.get("variableBorrowRate", 0))
+    available = int(d.get("availableLiquidity", 0))
+    total_borrowed = int(d.get("totalScaledVariableDebt", 0))
+    total_supplied = available + total_borrowed
+    utilization = (total_borrowed / total_supplied) if total_supplied else 0.0
+
+    return ReserveData(
+        underlying_asset=_to_checksum_lower(d.get("underlyingAsset", "")),
+        symbol=str(d.get("symbol", "")),
+        name=str(d.get("name", "")),
+        decimals=int(d.get("decimals", 0)),
+        supply_apy=ray_rate_to_apy(liquidity_rate),
+        borrow_apy=ray_rate_to_apy(variable_borrow_rate),
+        total_supplied=total_supplied,
+        total_borrowed=total_borrowed,
+        available_liquidity=available,
+        utilization=float(utilization),
+        ltv=int(d.get("baseLTVasCollateral", 0)) / BPS_DENOMINATOR,
+        liquidation_threshold=int(d.get("reserveLiquidationThreshold", 0)) / BPS_DENOMINATOR,
+        paused=bool(d.get("isPaused", False)),
+        frozen=bool(d.get("isFrozen", False)),
+        raw=d,
+    )
 
 
 @dataclass(frozen=True)
@@ -107,7 +234,7 @@ class AaveV3Arbitrum:
         out: list[ReserveData] = []
         for row in reserves_array or ():
             try:
-                out.append(reserve_data_from_row(row))
+                out.append(reserve_data_from_row_arbitrum(row))
             except Exception:
                 # Skip malformed rows but keep going — production safety.
                 continue
@@ -149,9 +276,9 @@ __all__ = (
     "ReserveData",
     "UserAccountData",
     "ray_rate_to_apy",
-    "reserve_data_from_row",
+    "reserve_data_from_row_arbitrum",
     "BPS_DENOMINATOR",
     "RAY",
     "SECONDS_PER_YEAR",
-    "_AGGREGATED_RESERVE_FIELDS",
+    "_AGGREGATED_RESERVE_FIELDS_ARBITRUM",
 )

@@ -1,8 +1,8 @@
 {
   "chain_id": 42161,
   "address": "0x145de30c929a065582da84cf96f88460db9745a7",
-  "abi_hash_sha256": "c907f564825e4f150b9b43bdc1f625cb1faf4180f226321f7dcccde345180522",
-  "fetched_at": "2026-05-02T13:51:09.567560+00:00",
-  "source": "blockscout+impl (mirrored from MegaETH wave-A; ABI shape identical)",
-  "notes": "Aave V3 protocol ABIs are identical across deployments \u2014 content sourced from the MegaETH wave-A pin (PR #534)."
+  "abi_hash_sha256": "a9d05a11eb8da57af4b6325c9b82ac74055a93fdb198983278cbb7f62e134866",
+  "fetched_at": "2026-05-02T14:02:43.506168+00:00",
+  "source": "sourcify-full-match",
+  "notes": "Arbitrum UiPoolDataProviderV3 has 54 reserve fields (older Aave V3 ABI with stableBorrowRate fields). MegaETH version is post-stable-rate-removal (40 fields)."
 }
