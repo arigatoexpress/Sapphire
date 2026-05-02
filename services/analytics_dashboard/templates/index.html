@@ -1479,6 +1479,21 @@ function escapeHtml(s) {
 
 // ========== Refresh ==========
 async function refresh() {
+  const win = getCurrentWindow();
+  const winQ = '?window=' + encodeURIComponent(win);
+
+  // Update window-aware labels
+  const winLabelMap = { '1h': 'last 1h', '24h': 'last 24h', '7d': 'last 7d', '30d': 'last 30d', '90d': 'last 90d' };
+  const winGranMap = { '1h': 'aggregated by minute', '24h': 'aggregated by hour', '7d': 'aggregated by hour', '30d': 'aggregated by day', '90d': 'aggregated by day' };
+  const lbl = winLabelMap[win] || ('last ' + win);
+  const granLbl = winGranMap[win] || '';
+  ['charts-window-label', 'chart-inference-window-label', 'chart-threats-window-label'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = '— ' + lbl;
+  });
+  const wmeta = document.getElementById('charts-window-meta');
+  if (wmeta) wmeta.textContent = granLbl;
+
   const [sum, regime, preds, silos, inference, threatsLive, tsInf, tsThr, tsSvc, vpinResp, dsr, brainSyn, brainHist] = await Promise.all([
     safeFetch('/api/summary'),
     safeFetch('/api/regime?limit=8'),
@@ -1486,9 +1501,9 @@ async function refresh() {
     safeFetch('/api/silos/health'),
     safeFetch('/api/silos/inference'),
     safeFetch('/api/threats/live'),
-    safeFetch('/api/timeseries/inference'),
-    safeFetch('/api/timeseries/threats'),
-    safeFetch('/api/timeseries/services'),
+    safeFetch('/api/timeseries/inference' + winQ),
+    safeFetch('/api/timeseries/threats' + winQ),
+    safeFetch('/api/timeseries/services' + winQ),
     safeFetch('/api/vpin?symbol=BTC&buckets=50'),
     safeFetch('/api/deflated-sharpe/rolling?window=90&days=365'),
     safeFetch('/api/brain/synthesis'),
