@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import urllib.error
 import urllib.request
@@ -243,6 +244,145 @@ def predictions():
     except Exception as exc:
         log.info("predictions bq miss: %s", exc)
         return jsonify({"rows": []})
+
+
+@app.get("/api/correlation/matrix")
+def correlation_matrix():
+    """Cross-asset Pearson correlation matrix of daily log returns.
+
+    Args (query):
+        symbols: comma-separated list (default BTC,ETH,SOL,SPY,QQQ,GLD).
+        days:    lookback window in days (default 30, max 365).
+
+    Returns:
+        {
+          "symbols": [...],
+          "matrix":  [[1.0, 0.85, ...], ...],   # symmetric, NxN
+          "n_obs":   <int>,                     # min number of return obs across pairs
+          "days":    <int>,
+          "warnings": [...],                    # symbols with insufficient data
+        }
+    Fail-safe to empty matrix on BQ error.
+    """
+    raw_syms = request.args.get("symbols", "BTC,ETH,SOL,SPY,QQQ,GLD")
+    days = max(7, min(365, int(request.args.get("days", "30"))))
+    syms = [s.strip().upper() for s in raw_syms.split(",") if s.strip()]
+    syms = list(dict.fromkeys(syms))[:20]  # dedupe + cap at 20
+    if not syms:
+        return jsonify({"symbols": [], "matrix": [], "n_obs": 0, "days": days, "warnings": []})
+
+    # Pull daily close per symbol — use the last reported current_price per
+    # (symbol, date) bucket from trading_signals. This is robust to whichever
+    # cadence the signal logger fired at.
+    try:
+        rows = _rows(
+            f"""
+            WITH per_day AS (
+              SELECT symbol,
+                     DATE(timestamp) AS day,
+                     ARRAY_AGG(current_price ORDER BY timestamp DESC LIMIT 1)[OFFSET(0)] AS close_px
+              FROM `{PROJECT}.{DATASET}.trading_signals`
+              WHERE symbol IN UNNEST(@syms)
+                AND current_price IS NOT NULL
+                AND timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL @days DAY)
+              GROUP BY symbol, day
+            )
+            SELECT symbol, day, close_px
+            FROM per_day
+            WHERE close_px IS NOT NULL AND close_px > 0
+            ORDER BY symbol, day
+            """,
+            params=[
+                bigquery.ArrayQueryParameter("syms", "STRING", syms),
+                bigquery.ScalarQueryParameter("days", "INT64", days),
+            ],
+        )
+    except Exception as exc:
+        log.info("correlation_matrix bq miss: %s", exc)
+        return jsonify({"symbols": syms, "matrix": [], "n_obs": 0, "days": days, "warnings": ["bq error"]})
+
+    # Group by symbol → list of (day, close)
+    by_sym: dict[str, list[tuple[str, float]]] = {s: [] for s in syms}
+    for r in rows:
+        sym = r.get("symbol")
+        day = r.get("day")
+        px = r.get("close_px")
+        if sym in by_sym and day is not None and px is not None:
+            by_sym[sym].append((str(day), float(px)))
+
+    # Compute log returns aligned on common dates (intersection)
+    returns: dict[str, dict[str, float]] = {}
+    warnings: list[str] = []
+    for s, series in by_sym.items():
+        series.sort(key=lambda x: x[0])
+        if len(series) < 3:
+            warnings.append(f"{s}: only {len(series)} obs")
+            continue
+        ret_map: dict[str, float] = {}
+        for i in range(1, len(series)):
+            d, px = series[i]
+            _, prev = series[i - 1]
+            if prev > 0 and px > 0:
+                ret_map[d] = math.log(px / prev)
+        returns[s] = ret_map
+
+    used_syms = [s for s in syms if s in returns]
+    if len(used_syms) < 2:
+        return jsonify({
+            "symbols": used_syms,
+            "matrix": [[1.0]] if len(used_syms) == 1 else [],
+            "n_obs": 0,
+            "days": days,
+            "warnings": warnings or ["insufficient data"],
+        })
+
+    # Common date intersection
+    common_dates = set(returns[used_syms[0]].keys())
+    for s in used_syms[1:]:
+        common_dates &= set(returns[s].keys())
+    common = sorted(common_dates)
+    n_obs = len(common)
+
+    if n_obs < 3:
+        return jsonify({
+            "symbols": used_syms,
+            "matrix": [[1.0 if i == j else 0.0 for j in range(len(used_syms))] for i in range(len(used_syms))],
+            "n_obs": n_obs,
+            "days": days,
+            "warnings": warnings + [f"only {n_obs} overlapping days"],
+        })
+
+    # Pearson correlation for each pair
+    def _pearson(x: list[float], y: list[float]) -> float:
+        n = len(x)
+        if n < 2:
+            return 0.0
+        mx = sum(x) / n
+        my = sum(y) / n
+        num = sum((x[i] - mx) * (y[i] - my) for i in range(n))
+        denom_x = math.sqrt(sum((v - mx) ** 2 for v in x))
+        denom_y = math.sqrt(sum((v - my) ** 2 for v in y))
+        if denom_x == 0 or denom_y == 0:
+            return 0.0
+        return num / (denom_x * denom_y)
+
+    series_aligned = {s: [returns[s][d] for d in common] for s in used_syms}
+    n = len(used_syms)
+    matrix = [[0.0] * n for _ in range(n)]
+    for i in range(n):
+        matrix[i][i] = 1.0
+        for j in range(i + 1, n):
+            r = _pearson(series_aligned[used_syms[i]], series_aligned[used_syms[j]])
+            matrix[i][j] = round(r, 4)
+            matrix[j][i] = round(r, 4)
+
+    return jsonify({
+        "symbols": used_syms,
+        "matrix": matrix,
+        "n_obs": n_obs,
+        "days": days,
+        "warnings": warnings,
+    })
 
 
 @app.get("/api/threats")
