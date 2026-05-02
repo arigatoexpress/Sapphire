@@ -693,6 +693,35 @@ td.muted { color: var(--text-3); }
   </div>
 </div>
 
+<!-- ========== Strategy quality (Deflated Sharpe) ========== -->
+<div class="section-h" id="strategy-quality">
+  <span>Strategy quality — rolling Deflated Sharpe</span>
+  <span class="meta">90-day window · Bailey & López de Prado 2014</span>
+</div>
+<div class="cols-2">
+  <div class="panel">
+    <h2>
+      <span>Rolling deflated Sharpe by strategy</span>
+      <span class="h-meta" id="chart-dsr-meta">—</span>
+    </h2>
+    <div class="chart-wrap"><svg id="chart-dsr"></svg></div>
+    <div class="legend" id="chart-dsr-legend"></div>
+  </div>
+  <div class="panel">
+    <h2>
+      <span>Latest snapshot</span>
+      <span class="h-meta" id="dsr-summary-meta">—</span>
+    </h2>
+    <table id="dsr-summary">
+      <thead><tr>
+        <th>Strategy</th><th class="num">Sharpe</th><th class="num">DSR</th>
+        <th class="num">Prob</th><th class="num">N</th>
+      </tr></thead>
+      <tbody><tr><td colspan="5" class="empty">loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
 <!-- ========== Live threat feed ========== -->
 <div class="section-h" id="threats">
   <span>Live threat intelligence feed</span>
@@ -1100,7 +1129,7 @@ document.addEventListener('keydown', (e) => {
 
 // ========== Refresh ==========
 async function refresh() {
-  const [sum, regime, preds, silos, inference, threatsLive, tsInf, tsThr, tsSvc, vpinResp] = await Promise.all([
+  const [sum, regime, preds, silos, inference, threatsLive, tsInf, tsThr, tsSvc, vpinResp, dsr] = await Promise.all([
     safeFetch('/api/summary'),
     safeFetch('/api/regime?limit=8'),
     safeFetch('/api/predictions?limit=8'),
@@ -1111,6 +1140,7 @@ async function refresh() {
     safeFetch('/api/timeseries/threats'),
     safeFetch('/api/timeseries/services'),
     safeFetch('/api/vpin?symbol=BTC&buckets=50'),
+    safeFetch('/api/deflated-sharpe/rolling?window=90&days=365'),
   ]);
 
   // ----- THO silo + header health -----
@@ -1432,6 +1462,56 @@ async function refresh() {
     }
     document.getElementById('vpin-meta').textContent =
       `${fmtN(vpinResp?.n_ticks)} ticks · window ${vpinResp?.buckets || 50}`;
+  }
+
+  // ----- Deflated Sharpe rolling -----
+  const dsrSvg = document.getElementById('chart-dsr');
+  if (dsrSvg) {
+    const rolling = dsr?.rolling || [];
+    const summary = dsr?.summary || [];
+    const strategySet = new Set();
+    const dsrByStrat = {};
+    for (const r of rolling) {
+      const s = r.strategy || 'unknown';
+      strategySet.add(s);
+      dsrByStrat[s] = dsrByStrat[s] || [];
+      dsrByStrat[s].push({ date: r.date, value: Number(r.deflated_sharpe) });
+    }
+    const strategies = Array.from(strategySet).slice(0, 8);
+    const palette = ['#4ea8ff', '#62ff40', '#a371f7', '#d29922', '#f85149', '#3fb950', '#ff7a00', '#6c7891'];
+    const dsrSeries = strategies.map((s, i) => {
+      const pts = (dsrByStrat[s] || []).sort((a, b) => a.date.localeCompare(b.date));
+      return {
+        name: s,
+        color: palette[i % palette.length],
+        points: pts.map(p => ({ x_label: (p.date || '').slice(5), y: isNaN(p.value) ? 0 : p.value })),
+      };
+    }).filter(s => s.points.length);
+    drawMultiLine(dsrSvg, dsrSeries, {});
+    buildLegend(document.getElementById('chart-dsr-legend'),
+      dsrSeries.map(s => ({ name: s.name, color: s.color })));
+    document.getElementById('chart-dsr-meta').textContent =
+      strategies.length ? `${strategies.length} strategies · ${rolling.length} rolling points` : 'awaiting closed-trade history';
+
+    const dsrTbody = document.querySelector('#dsr-summary tbody');
+    if (dsrTbody) {
+      if (summary.length) {
+        dsrTbody.innerHTML = summary.map(r => {
+          const prob = Number(r.latest_probability);
+          const cls = prob >= 0.95 ? 'green' : prob >= 0.8 ? 'yellow' : 'red';
+          return `<tr>
+            <td class="t1">${r.strategy}</td>
+            <td class="num">${Number(r.latest_sharpe).toFixed(2)}</td>
+            <td class="num">${Number(r.latest_deflated).toFixed(2)}</td>
+            <td class="num">${pill(cls, fmtPct(prob, 1))}</td>
+            <td class="num muted">${fmtN(r.n_windows)}</td>
+          </tr>`;
+        }).join('');
+        document.getElementById('dsr-summary-meta').textContent = `window=${dsr?.window || 90}d`;
+      } else {
+        dsrTbody.innerHTML = '<tr><td colspan="5"><div class="empty">awaiting strategies with ≥90d closed-trade history</div></td></tr>';
+      }
+    }
   }
 
   $('#ts').textContent = isoTs();
