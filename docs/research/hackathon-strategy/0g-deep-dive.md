@@ -204,3 +204,69 @@ Why this dominates other 1-day options:
 
 If only one thing happens in the next 14 days beyond mainnet deploy + demo video, this is the thing.
 
+---
+
+## 3. Programs beyond the hackathon
+
+The hackathon is the *entry point* to a much larger funding ecosystem. The amounts involved make it worth treating the submission as the first deliverable in a 6-month plan, not a one-shot event.
+
+### 3.1 0G Apollo AI Accelerator — primary post-hackathon target
+
+- **Size:** up to **$2M per project** + $200K Google Cloud credits + Privy wallet integration access. Total program is **$20M** with **only 10 teams selected globally**.
+- **Length:** 10-week intensive program (28 April → 7 July 2026 cohort; **next cohort dates TBD — likely Q3/Q4 2026**).
+- **Built with:** Stanford blockchain veterans / Blockchain Builders Fund.
+- **Verticals explicitly listed:** AI agents, **DeFi + AI solutions** (← Sapphire fit), on-chain data markets, cross-chain infrastructure, gaming/NFTs with AI, decentralized content.
+- **Application:** https://forms.gle/TYM4tZaD1gYrDVdS9 (current cohort closed; check https://apollo.0g.ai for next).
+- **Sapphire fit:** *very high* — Apollo explicitly funds revenue-generating decentralized AI applications. Sapphire's combination of (a) live trading P&L, (b) production user-facing dashboard, (c) deep 0G integration after the hackathon is exactly the founder profile they describe.
+- **Strategy:** the hackathon submission *is* the Apollo application warm-up. Even a non-winning hackathon entry that publishes real on-chain activity is a strong Apollo signal.
+
+Source: [0G Apollo announcement](https://www.globenewswire.com/news-release/2026/02/27/3246238/0/en/0G-and-Stanford-Blockchain-Veterans-Launch-20M-Apollo-AI-Accelerator.html) · [apollo.0g.ai](https://apollo.0g.ai/)
+
+### 3.2 0G Foundation Ecosystem Growth Program — strategic capital
+
+- **Size:** **$88.88M** total across the program; **$8.88M Guild on 0G** sub-fund for early-stage builders going testnet → mainnet.
+- **Funder mix:** Hack VC, Delphi Ventures, Bankless Ventures, OKX Ventures.
+- **Targeted categories:** DeFi + social w/ AI agents, on-chain data marketplaces, AI-driven gaming, AI infrastructure, governance protocols.
+- **Application:** https://app.deform.cc/form/da4fc5f6-1836-42fc-b95b-84f43ce1bdf2/
+- **Sapphire fit:** *medium-high* — Sapphire is more "DeFi+AI" than "AI dApp" (the program emphasizes the latter); the Sentinel registry / agent-mandate layer is the strongest pitch handle here.
+- **Note:** the program emphasizes "purpose-driven" projects addressing climate/automation/healthcare/security. Sapphire could credibly position around the *security* dimension (verifiable-trading-signal as anti-fraud / anti-front-running infrastructure for finance).
+
+Source: [0G $88.88M ecosystem program announcement](https://0g.ai/blog/0g-ecosystem-program)
+
+### 3.3 0G Compute TEE provider network — could Sapphire be a *provider*, not a *consumer*?
+
+This is the most interesting strategic question raised by this research.
+
+**Today:** Sapphire is a 0G Compute *consumer* — `lib/og/compute.py` calls a 0G provider for sealed inference and gets a `chatID` back.
+
+**Could Sapphire become a TEE provider?** Per [0G's inference docs](https://docs.0g.ai/developer-hub/building-on-0g/compute-network/inference), every 0G Compute provider runs a **Confidential Virtual Machine on Intel TDX + NVIDIA H100/H200 in TEE mode**. Two modes are supported:
+
+- **TeeML** — model runs *inside* the TEE on the provider's own hardware
+- **TeeTLS** — Broker is in a TEE and proxies to external LLM providers; the TEE captures TLS cert fingerprints + bundles them into the signed response
+
+**Practical answer:** Sapphire today doesn't have Intel TDX hardware (the closest current asset is the RTX 5070 Ti on Windows, which is *not* TEE-mode capable — and the Mac M-series doesn't expose Intel TDX). Becoming a 0G Compute *provider* therefore requires a hardware investment (~$8–15K for a TDX-capable rack node + H100 lease, or cloud VMs that expose TDX such as Azure DCsv5 / Google C3-attested VMs).
+
+**The realistic Sapphire angle is TeeTLS:** Sapphire could run a **TeeTLS broker that fronts the existing 4-tier inference proxy** (Windows GPU → Pi → Mac → Kimi). Trades latency for verifiability — the request goes through a cloud TEE that signs the response, not the raw GPU. This is a v2 idea; mention in the post-submission narrative (§5) but don't promise it for the submission.
+
+### 3.4 0G Storage node operator — small-scale revenue play
+
+- **Hardware:** 32 GB RAM, 8-core CPU, 500GB–1TB SSD, 100 Mbps. (~$25–50/month if rented, $0 marginal if self-hosted.)
+- **Setup:** clone the repo, `cargo build --release`, configure mainnet contracts (`Flow=0x62D4...`, `Mine=0xCd01...`, `Reward=0x457a...`), run with miner key.
+- **Earnings model:** PoRA (Proof-of-Random-Access) competitive mining. **0G's own docs caution operators may see no rewards for a week or longer** — small operators eat the volatility.
+- **Tracking:** [storagescan.0g.ai](https://storagescan-galileo.0g.ai) has a leaderboard + 24h/3d/7d toggle for miner rewards.
+- **Sapphire fit:** *low strategic value* on its own (the rewards are real but not differentiating — anyone with $50/mo can do this). **However:** running a Sapphire-branded storage node that stores *your own* signal envelopes is a credible "we eat our own dog food" narrative for the post-hackathon write-up. Free brand reinforcement, ~$50/mo cost.
+
+Sources: [0G Storage Node docs](https://docs.0g.ai/run-a-node/storage-node) · [StorageScan miner leaderboard update](https://0g.ai/blog/storagescan-miner-rewards-update)
+
+### 3.5 Validator Node — out of scope
+
+Validator participation requires staking 0G tokens at meaningful scale and has its own selection process (the AI Alignment Node Sale on CoinList raised $33M in initial allocations). Not a hackathon-adjacent program; mentioned only for completeness.
+
+### 3.6 Strategic recommendation — funnel order
+
+1. **Submit hackathon (T-14 days)** — get on-chain activity + a HackQuest record. Even non-winning, this becomes Apollo application evidence.
+2. **Apollo application (next cohort, likely Q3 2026)** — primary $2M target. Use mainnet activity from hackathon as proof.
+3. **Guild on 0G ($8.88M sub-fund, rolling)** — easier bar than Apollo; apply in parallel as a hedge. Position around the Sentinel-registry / agent-mandate angle.
+4. **Run a Sapphire-branded 0G Storage node (post-hackathon)** — $50/mo, free brand reinforcement, "we eat our own dog food."
+5. **TeeTLS broker for Sapphire inference proxy (v2, 6-month horizon)** — only if Apollo or Guild funds it. Don't self-fund the TDX hardware.
+
