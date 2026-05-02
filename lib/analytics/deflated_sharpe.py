@@ -76,8 +76,15 @@ def deflated_sharpe_ratio(
     sr = selected_sharpe if selected_sharpe is not None else max(sharpe_list)
     sr_star = expected_max_sharpe(sharpe_list)
 
-    # Non-Gaussian correction factor (Ledoit-Wolf moments)
-    correction = math.sqrt((1 - skewness * sr + ((kurtosis - 1) / 4) * sr**2) / n_obs)
+    # Non-Gaussian correction factor (Ledoit-Wolf moments).
+    # Defense in depth: the inner expression can go slightly negative on
+    # adversarial inputs (e.g. kurtosis < 1 paired with large positive
+    # skewness * sr) or via floating-point rounding when the upstream caller
+    # supplies moments derived from a near-constant series. Clamp at 0 so
+    # math.sqrt never hits domain error; the downstream `max(1e-9, ...)`
+    # preserves the previous division-safety guarantee.
+    correction_inner = (1 - skewness * sr + ((kurtosis - 1) / 4) * sr**2) / n_obs
+    correction = math.sqrt(max(0.0, correction_inner))
     deflated = (sr - sr_star) / max(1e-9, correction)
     prob = _norm_cdf(deflated)
 
