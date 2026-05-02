@@ -25,4 +25,15 @@ paths = [
     # Doc-fixture curl examples with placeholder bearer tokens — not real keys.
     '''docs/ops/customer-api-runbook\.md''',
     '''docs/products/customer-product-surface-0\.1\.0\.md''',
+    # MegaETH (chain 4326) protocol registry + Aave/Kumbaya/USDM tests —
+    # all `token: "0x…"` values are public on-chain contract addresses
+    # (Aave V3 reserves, USDM stable, Kumbaya pools), cross-checked
+    # against aave-dao/aave-address-book. Gitleaks generic-api-key flags
+    # the YAML/Python `token: "0x…"` shape as a generic API key; these
+    # are not secrets. Landed alongside #536–#538 (MegaETH Wave B).
+    '''config/megaeth_protocols\.yaml''',
+    '''plugins/claw-sapphire/tests/test_megaeth_protocols\.py''',
+    '''plugins/claw-sapphire/tools/internal/megaeth_protocols\.py''',
+    '''tests/lib/chains/megaeth/test_protocols_facade_stable\.py''',
+    '''tests/lib/chains/megaeth/test_usdm\.py''',
 ]
