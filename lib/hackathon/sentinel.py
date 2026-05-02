@@ -388,8 +388,19 @@ def build_demo_state() -> dict[str, Any]:
     }
 
 
-def evaluate_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Evaluate an API payload with conservative defaults."""
+def evaluate_from_payload(
+    payload: dict[str, Any],
+    *,
+    gate: ChainHealthGate | None = None,
+    target_chain_id: int | None = None,
+) -> dict[str, Any]:
+    """Evaluate an API payload with conservative defaults.
+
+    When ``gate`` is provided, the underlying ``evaluate_attempt`` runs the
+    chain-health check on ``target_chain_id`` (defaulting to the mandate's
+    ``chain_id``) and may refuse the payment on a BLOCK verdict. Existing
+    callers that don't pass ``gate=`` keep the legacy policy-only path.
+    """
 
     amount = Decimal(str(payload.get("amount_usdc", "0.012")))
     attempt = PaymentAttempt(
@@ -405,6 +416,8 @@ def evaluate_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
         order_symbol=str(payload.get("order_symbol") or "PLTR"),
         order_action=str(payload.get("order_action") or "buy"),
         notional_usd=float(payload.get("notional_usd") or 25.0),
+        gate=gate,
+        target_chain_id=target_chain_id,
     )
     return decision.to_dict()
 
