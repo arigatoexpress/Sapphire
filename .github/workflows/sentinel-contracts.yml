@@ -39,7 +39,8 @@ permissions:
 jobs:
   forge:
     name: forge build + test (gas report)
-    runs-on: ubuntu-latest
+    if: ${{ vars.SAPPHIRE_RUNNER != '' }}
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -88,7 +89,8 @@ jobs:
 
   slither:
     name: slither (static analysis)
-    runs-on: ubuntu-latest
+    if: ${{ vars.SAPPHIRE_RUNNER != '' }}
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     needs: forge
     steps:
       - name: Checkout
