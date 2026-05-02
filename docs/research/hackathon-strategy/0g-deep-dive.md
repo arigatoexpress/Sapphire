@@ -270,3 +270,55 @@ Validator participation requires staking 0G tokens at meaningful scale and has i
 4. **Run a Sapphire-branded 0G Storage node (post-hackathon)** — $50/mo, free brand reinforcement, "we eat our own dog food."
 5. **TeeTLS broker for Sapphire inference proxy (v2, 6-month horizon)** — only if Apollo or Guild funds it. Don't self-fund the TDX hardware.
 
+---
+
+## 4. Mainnet competitive landscape
+
+### 4.1 0G mainnet (Aristotle, chain 16661) — what's actually live
+
+- **Launched:** 2025-09-22 ("Aristotle Mainnet" — also branded `0g-aristotle` by ThirdWeb).
+- **Stats published by 0G:** 28M+ blocks produced, 346K+ accounts, 300+ ecosystem partners.
+- **Day-one ecosystem partners (named):** Chainlink, Google Cloud, Alibaba Cloud, Coinbase Wallet, Binance Wallet, MetaMask, Ankr, Ledger, Fireblocks, Figment.
+- **Funding to date:** $325M+ committed across 0G Labs and 0G Foundation.
+- **DeFi TVL:** Sapphire could not retrieve a fresh DefiLlama figure during this research (the page returned a 403 from automated fetch). The qualitative read is that DeFi TVL on 0G is small relative to its ecosystem partner list — most "ecosystem partners" are infrastructure providers (wallets, oracles, validators), not deployed apps. As of writing, 0G's published partner count of 300+ should be read as *integration breadth*, not *deployed-DeFi depth*.
+- **Named protocols spotted in research:**
+  - **Gimo Finance** — liquid staking on 0G (announced 2025 day-one, [tweet](https://x.com/0G_labs/status/1964001208332374344))
+  - **Euclid Protocol, Cygnus Finance** — DeFAI category (per 0G Foundation ecosystem page)
+  - **Dormint, HAiO, QuillAI Network** — AI Agents (Guild-funded)
+  - **Balkeum Labs, MeetLinkAI** — AI dApps
+  - **CARV, PlaysOut, PlayArts, Escape Velocity** — gaming
+  - **Phala Network** — privacy/compute
+
+**Read for Sapphire:** the deployed-DeFi field on 0G mainnet is **thin enough that a single live trading-signal verifier with consistent on-chain activity stands out** — there is no announced equivalent. Liquid staking (Gimo) and lending/AMM primitives (Euclid, Cygnus) are different categories. Sapphire would be the visible *trading-grade-proof* primitive on a young chain.
+
+Sources: [0G Aristotle launch coverage](https://www.financemagnates.com/thought-leadership/0g-labs-launches-aristotle-mainnet-with-largest-day-one-ecosystem-for-decentralized-ai/) · [0G Foundation ecosystem page](https://www.0gfoundation.ai/ecosystem) · [DefiLlama 0G chain](https://defillama.com/chain/0g)
+
+### 4.2 Track 2 competition — what's publicly known
+
+Public visibility on Track 2 entries before the 2026-05-16 deadline is **deliberately low** — HackQuest does not surface in-progress submissions, and serious teams rarely tweet pre-deadline.
+
+Indirect signals worth tracking:
+
+- **GitHub `0g`-tagged repos:** search github.com for `topic:0g` filtered to the last 60 days.
+- **`#BuildOn0G` X feed:** main public stream where teams tease entries. Most posts as of late April are infrastructure ports (chain bridges, wallet adapters), not Track 2 trading agents.
+- **OpenAgents (ETHGlobal) sealed-inference winners** — likely overlap pool. The OpenAgents pattern was *"hierarchical planning + reflection loops integrating 0G Compute sealed inference"* — that's an agentic pattern, not a trading-signal pattern.
+- **Lablab.ai AI Trading Agents Hackathon (March 30 → April 12 2026, ERC-8004)** — adjacent hackathon, separate prize pool. Some teams may double-submit a polished trading agent across both. Notable entrant: [JudyaiLab/hackathon-trading-agent](https://github.com/JudyaiLab/hackathon-trading-agent) — claims **82.2% out-of-sample win rate, 7-layer risk management, ERC-8004 on-chain identity**. This is the kind of polish bar Sapphire will be judged against if any of those teams pivot to 0G Track 2.
+
+### 4.3 Where Sapphire stands out
+
+| Dimension | Likely Track 2 average entry | Sapphire |
+|---|---|---|
+| Maturity | 4–8 weeks of build | **18+ months of pre-existing build** |
+| Test count | 10–100 tests | **6,488 tests** |
+| Deployed scope | Single demo path | **50 dashboard pages, 7 strategies, live execution on Hyperliquid + Robinhood Crypto** |
+| 0G components | 1–2 (usually Storage + Chain) | **3 of 4 (Storage + Compute/TEE + Chain)** |
+| Real on-chain activity | None pre-deadline (testnet only) | *Will* have mainnet activity once Ari deploys + publishes (this is the gating step) |
+| Verifier story | Often missing — write-only on-chain | **`og_verify` round-trip read tool exists** |
+| Production safety | Often none | **Feature-flagged + fire-and-forget; trading critical path unaffected** |
+
+**Where Sapphire is at risk:**
+
+- Many entries will be *purpose-built* for the hackathon — leaner, simpler, more demo-friendly. Sapphire's surface area is large; judges who only spend 5 minutes per submission might not see the 0G integration through the noise. **The fix is the §2.4 dashboard page** — one URL that renders the live anchored signals.
+- Several entries will likely have a **flashier consumer-facing UI**. Sapphire's dashboard is functional, not beautiful. UX scoring (criterion #4) is likely the weakest area.
+- Solo team. Some Track 2 entries will be 4–6 person teams with dedicated frontend, design, marketing, and growth. The "Team Capability" criterion (#5) reads as small for a solo, even with strong solo execution.
+
