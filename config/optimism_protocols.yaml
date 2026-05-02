@@ -1,0 +1,54 @@
+# Optimism mainnet protocol registry — source of truth for `lib.chains.optimism.registry`.
+#
+# All addresses cross-checked against the canonical Aave address book
+# (https://github.com/aave-dao/aave-address-book/blob/main/src/AaveV3Optimism.sol)
+# AND live-verified to have non-zero `eth_getCode` against
+# https://mainnet.optimism.io on 2026-05-02.
+#
+# Pool/Oracle/PoolDataProvider addresses were also cross-checked at runtime
+# by querying the PoolAddressesProvider's getPool/getPriceOracle/getPoolDataProvider
+# methods — they match the values pinned here.
+#
+# Schema:
+#   <protocol_key>:
+#     name: human display name
+#     category: lending | dex_spot | dex_perps | stable | bridge | yield | oracle
+#     priority: 1=must, 2=should, 3=nice
+#     status: active | deprecated | pending
+#     docs_url: external link
+#     addresses: role -> 0x address
+#     abi_paths: role -> path relative to `lib/chains/optimism/abis/`
+#     notes: free-form string
+
+aave_v3:
+  name: "Aave V3 (Optimism mainnet)"
+  category: lending
+  priority: 1
+  status: active
+  docs_url: "https://github.com/aave-dao/aave-address-book/blob/main/src/AaveV3Optimism.sol"
+  addresses:
+    pool: "0x794a61358D6845594F94dc1DB02A252b5b4814aD"
+    pool_addresses_provider: "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb"
+    oracle: "0xD81eb3728a631871a7eBBaD631b5f424909f0c77"
+    ui_pool_data_provider: "0xbd83DdBE37fc91923d59C8c1E0bDe0CccCa332d5"
+    protocol_data_provider: "0x243aA95CaC2a25651Eda86E80BEe66114413c43B"
+  abi_paths:
+    pool: "aave_v3/pool_min.json"
+    pool_addresses_provider: "aave_v3/pool_addresses_provider.json"
+    oracle: "aave_v3/oracle.json"
+    ui_pool_data_provider: "aave_v3/ui_pool_data_provider.json"
+    protocol_data_provider: "aave_v3/protocol_data_provider.json"
+  notes: >
+    Aave V3 on Optimism: 14 active reserves verified live 2026-05-02
+    (vs Arbitrum's 20 and MegaETH's 8). Same UiPoolDataProvider
+    .getReservesData(provider) one-call pattern works because the Aave
+    V3 protocol is identical across deployments; only the address
+    bundle and underlying RPC change. The on-chain row schema matches
+    the Arbitrum-style 54-field layout (still has stableBorrowRate /
+    stableDebtTokenAddress / eMode* fields) — verified by decoding a
+    live getReservesData() response with the Arbitrum row decoder.
+    MegaETH uses the post-stable-rate-removal 40-field layout; Optimism
+    and Arbitrum both predate that upgrade. Pool/Oracle/PoolDataProvider
+    addresses are SHARED with Arbitrum's deployment (Aave deploys the
+    same proxy address scheme via deterministic CREATE2 across the L2s),
+    but the UiPoolDataProvider and underlying state are chain-specific.

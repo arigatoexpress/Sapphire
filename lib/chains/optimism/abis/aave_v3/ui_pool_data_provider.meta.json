@@ -1,0 +1,8 @@
+{
+  "chain_id": 10,
+  "address": "0xbd83ddbe37fc91923d59c8c1e0bde0cccca332d5",
+  "abi_hash_sha256": "a9d05a11eb8da57af4b6325c9b82ac74055a93fdb198983278cbb7f62e134866",
+  "fetched_at": "2026-05-02T17:37:28.139339+00:00",
+  "source": "mirrored from arbitrum wave (Aave V3 ABIs identical across deployments)",
+  "notes": "UiPoolDataProviderV3 on Optimism. Aave V3 protocol ABIs are identical across deployments \u2014 content sourced from PR #557 (Arbitrum) which itself mirrored the MegaETH wave-A pin (PR #534)."
+}
