@@ -61,6 +61,9 @@ before a receipt hash is anchored on-chain.
 | Zama/FHEVM mock (Lane A) | `lib/hackathon/privacy_mock.py` |
 | MegaETH chain-health gate (Lane B) | `lib/hackathon/chain_health_gate.py` |
 | MegaETH read-only multi-protocol access (Wave A->B.3) | `lib/chains/megaeth/protocols.py` |
+| Forge test suite (18 cases, gas report) | `tests/forge/SapphireSentinelRegistry.t.sol` |
+| Slither static-analysis config + CI gate | `slither.config.json`, `.github/workflows/sentinel-contracts.yml` |
+| Foundry profile | `foundry.toml` |
 
 ## Safe Defaults
 
@@ -73,13 +76,19 @@ before a receipt hash is anchored on-chain.
 
 ## Next Buildathon Steps
 
-1. Run `python3 scripts/deploy_robinhood_chain.py --dry-run` once `py-solc-x`
-   is available.
-2. Deploy `SapphireSentinelRegistry` to Robinhood Chain testnet with a funded
-   testnet key.
-3. Replace the dry-run anchor preview with a `recordPaymentEvaluation(...)`
-   transaction in testnet mode only.
+1. ~~Run `python3 scripts/deploy_robinhood_chain.py --dry-run` once `py-solc-x`
+   is available.~~ Superseded by the Forge build in CI
+   (`.github/workflows/sentinel-contracts.yml`), which compiles the contract
+   on every PR with the optimizer enabled and publishes a build artifact.
+2. **(Ari)** Deploy `SapphireSentinelRegistry` to Robinhood Chain testnet with
+   a funded testnet key.
+3. **(Ari)** Replace the dry-run anchor preview with a
+   `recordPaymentEvaluation(...)` transaction in testnet mode only.
 4. ✅ Zama/FHEVM privacy mock — see `lib/hackathon/privacy_mock.py` (Lane A PR).
 5. ✅ Multi-chain alpha verification — see `lib/hackathon/chain_health_gate.py` (Lane B PR), wired into `evaluate_attempt()`.
-6. Record a 90-second demo: approved payment, blocked injection attempt,
+6. **(Ari)** Record a 90-second demo: approved payment, blocked injection attempt,
    Robinhood Chain explorer receipt, and non-submitting RWA order draft.
+7. ✅ Forge test suite (18 cases) + Slither static-analysis CI —
+   `tests/forge/SapphireSentinelRegistry.t.sol`,
+   `.github/workflows/sentinel-contracts.yml`. Closes the smart-contract
+   quality criterion gap flagged by Lane R PR #560.
