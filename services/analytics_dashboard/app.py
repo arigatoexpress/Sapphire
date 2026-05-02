@@ -385,6 +385,118 @@ def correlation_matrix():
     })
 
 
+@app.get("/api/vpin")
+def vpin():
+    """VPIN — Volume-Synchronized Probability of Informed Trading.
+
+    Approximates Lee-Ready bulk classification using the tick rule on
+    successive trading_signals current_price snapshots: if price went up,
+    classify the (synthetic unit) volume as buy-initiated; if down, sell.
+    VPIN is the rolling mean of |buy - sell| / total over the last
+    `buckets` ticks.
+
+    Args:
+        symbol:  asset symbol (default BTC).
+        buckets: rolling window size (default 50).
+
+    Returns:
+        {
+          "symbol": "BTC",
+          "buckets": 50,
+          "vpin": 0.42,
+          "toxicity": "normal" | "moderate" | "high" | "extreme",
+          "history": [{ts, vpin}, ...],   # last ~120 readings for sparkline
+          "n_ticks": 380,
+        }
+    Fail-safe to {vpin: null, history: []} on BQ error.
+    """
+    symbol = request.args.get("symbol", "BTC").strip().upper() or "BTC"
+    buckets = max(10, min(500, int(request.args.get("buckets", "50"))))
+    out: dict = {"symbol": symbol, "buckets": buckets, "vpin": None,
+                 "toxicity": "unknown", "history": [], "n_ticks": 0}
+
+    try:
+        rows = _rows(
+            f"""
+            SELECT timestamp, current_price
+            FROM `{PROJECT}.{DATASET}.trading_signals`
+            WHERE symbol = @symbol
+              AND current_price IS NOT NULL
+              AND current_price > 0
+              AND timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
+            ORDER BY timestamp ASC
+            """,
+            params=[bigquery.ScalarQueryParameter("symbol", "STRING", symbol)],
+        )
+    except Exception as exc:
+        log.info("vpin bq miss: %s", exc)
+        return jsonify(out)
+
+    cleaned = _clean(rows)
+    if len(cleaned) < buckets + 1:
+        out["n_ticks"] = len(cleaned)
+        return jsonify(out)
+
+    # Tick-rule classify each price move. Skip identical ticks (zero info).
+    classified: list[tuple[str, float, float]] = []  # (ts, buy_unit, sell_unit)
+    prev_px: float | None = None
+    for r in cleaned:
+        px = float(r["current_price"])
+        ts = r["timestamp"]
+        if prev_px is None:
+            prev_px = px
+            continue
+        # Synthetic unit volume — magnitude proportional to |return| so big
+        # moves count more. Bound at 1.0 to avoid one outlier dominating.
+        ret = (px - prev_px) / prev_px if prev_px > 0 else 0.0
+        unit = min(1.0, abs(ret) * 100)
+        if px > prev_px:
+            classified.append((ts, unit, 0.0))
+        elif px < prev_px:
+            classified.append((ts, 0.0, unit))
+        # equal price → skip
+        prev_px = px
+
+    out["n_ticks"] = len(classified)
+    if len(classified) < buckets:
+        return jsonify(out)
+
+    # Rolling VPIN history
+    history: list[dict] = []
+    for end in range(buckets, len(classified) + 1):
+        window = classified[end - buckets:end]
+        imbalances: list[float] = []
+        for _ts, b, s in window:
+            tot = b + s
+            if tot > 0:
+                imbalances.append(abs(b - s) / tot)
+        if imbalances:
+            score = sum(imbalances) / len(imbalances)
+            history.append({"ts": classified[end - 1][0], "vpin": round(score, 4)})
+
+    if not history:
+        return jsonify(out)
+
+    # Trim to last ~120 points for sparkline
+    sparkline = history[-120:]
+    latest = sparkline[-1]["vpin"]
+
+    # Toxicity classification (lifted from lib/analytics/vpin.py)
+    if latest >= 0.85:
+        toxicity = "extreme"
+    elif latest >= 0.70:
+        toxicity = "high"
+    elif latest >= 0.50:
+        toxicity = "moderate"
+    else:
+        toxicity = "normal"
+
+    out["vpin"] = latest
+    out["toxicity"] = toxicity
+    out["history"] = sparkline
+    return jsonify(out)
+
+
 @app.get("/api/threats")
 def threats():
     days = int(request.args.get("days", "30"))

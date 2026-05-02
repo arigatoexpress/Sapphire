@@ -669,21 +669,27 @@ td.muted { color: var(--text-3); }
   </div>
 </div>
 
-<!-- ========== Cross-asset correlation matrix ========== -->
-<div class="section-h" id="correlation">
-  <span>Cross-asset correlation — 30d log returns</span>
-  <span class="meta" id="corr-meta">Pearson, daily closes from trading_signals</span>
+<!-- ========== VPIN — order-flow toxicity ========== -->
+<div class="section-h" id="vpin">
+  <span>Order-flow toxicity (VPIN)</span>
+  <span class="meta">Volume-Synchronized Probability of Informed Trading</span>
 </div>
 <div class="panel">
   <h2>
-    <span>Correlation heatmap</span>
-    <span class="h-meta" id="chart-corr-meta">—</span>
+    <span>BTC — last 120 buckets <span class="h-meta" id="vpin-meta">—</span></span>
   </h2>
-  <div class="chart-wrap"><svg id="chart-correlation"></svg></div>
-  <div class="legend">
-    <span class="legend-item"><span class="legend-swatch" style="background:#f85149"></span>+1 (perfect positive)</span>
-    <span class="legend-item"><span class="legend-swatch" style="background:#1d2331"></span>0 (decorrelated)</span>
-    <span class="legend-item"><span class="legend-swatch" style="background:#4ea8ff"></span>-1 (perfect negative)</span>
+  <div style="display:flex; align-items:center; gap:24px; flex-wrap:wrap; padding:8px 0;">
+    <div>
+      <div class="kpi-label" style="margin-bottom:6px;">Latest VPIN</div>
+      <div class="kpi-value mono" id="vpin-value" style="font-size:28px;">—</div>
+    </div>
+    <div>
+      <div class="kpi-label" style="margin-bottom:6px;">Toxicity</div>
+      <div id="vpin-tox" style="font-size:14px;">—</div>
+    </div>
+    <div style="flex:1; min-width:280px;">
+      <div class="chart-wrap" style="height:60px;"><svg id="vpin-spark"></svg></div>
+    </div>
   </div>
 </div>
 
@@ -1094,7 +1100,7 @@ document.addEventListener('keydown', (e) => {
 
 // ========== Refresh ==========
 async function refresh() {
-  const [sum, regime, preds, silos, inference, threatsLive, tsInf, tsThr, tsSvc, corr] = await Promise.all([
+  const [sum, regime, preds, silos, inference, threatsLive, tsInf, tsThr, tsSvc, vpinResp] = await Promise.all([
     safeFetch('/api/summary'),
     safeFetch('/api/regime?limit=8'),
     safeFetch('/api/predictions?limit=8'),
@@ -1104,7 +1110,7 @@ async function refresh() {
     safeFetch('/api/timeseries/inference'),
     safeFetch('/api/timeseries/threats'),
     safeFetch('/api/timeseries/services'),
-    safeFetch('/api/correlation/matrix?symbols=BTC,ETH,SOL,SPY,QQQ,GLD&days=30'),
+    safeFetch('/api/vpin?symbol=BTC&buckets=50'),
   ]);
 
   // ----- THO silo + header health -----
@@ -1401,14 +1407,31 @@ async function refresh() {
     ph.innerHTML = `<tr><td colspan="5"><div class="empty">no predictions in window</div></td></tr>`;
   }
 
-  // ----- Correlation heatmap -----
-  const corrSvg = document.getElementById('chart-correlation');
-  if (corrSvg) {
-    const symbols = corr?.symbols || [];
-    const matrix = corr?.matrix || [];
-    drawHeatmap(corrSvg, symbols, matrix);
-    document.getElementById('chart-corr-meta').textContent =
-      symbols.length ? `${symbols.length} symbols × ${corr?.n_obs || 0} overlapping days` : 'awaiting data';
+  // ----- VPIN -----
+  const vpinSpark = document.getElementById('vpin-spark');
+  if (vpinSpark) {
+    const hist = vpinResp?.history || [];
+    const points = hist.map(h => Number(h.vpin)).filter(v => !isNaN(v));
+    const latest = vpinResp?.vpin;
+    const tox = vpinResp?.toxicity || 'unknown';
+    const toxColors = { extreme: '#f85149', high: '#d29922', moderate: '#4ea8ff', normal: '#3fb950', unknown: '#6c7891' };
+    const sparkColor = toxColors[tox] || '#6c7891';
+    if (points.length >= 2) {
+      drawSparkline(vpinSpark, points, sparkColor);
+    } else {
+      vpinSpark.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#6c7891" font-size="11" font-family="Inter">building tick history…</text>';
+      vpinSpark.setAttribute('viewBox', '0 0 600 60');
+    }
+    document.getElementById('vpin-value').textContent =
+      latest != null ? Number(latest).toFixed(3) : '—';
+    const toxEl = document.getElementById('vpin-tox');
+    if (toxEl) {
+      const cls = tox === 'extreme' || tox === 'high' ? 'red'
+                : tox === 'moderate' ? 'yellow' : tox === 'normal' ? 'green' : 'gray';
+      toxEl.innerHTML = pill(cls, tox);
+    }
+    document.getElementById('vpin-meta').textContent =
+      `${fmtN(vpinResp?.n_ticks)} ticks · window ${vpinResp?.buckets || 50}`;
   }
 
   $('#ts').textContent = isoTs();
