@@ -19,6 +19,8 @@ from lib.chains.megaeth.contracts.base import (  # noqa: F401 — re-export
     _AbiFunction,
     _canonicalize_type,
     _index_abi,
+)
+from lib.chains.megaeth.contracts.base import (
     _MegaETHCallable as _ChainCallable,
 )
 
