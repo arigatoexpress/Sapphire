@@ -1,0 +1,55 @@
+# MegaETH ingest service config (example).
+# Copy to config/megaeth.yaml and edit. Env vars override every key here.
+#
+# Defaults target MegaETH MAINNET (chain_id 4326). Public mainnet WSS does
+# NOT exist — operators must either:
+#   (a) set wss_url to a partner-provider URL (Alchemy/QuickNode/dRPC), or
+#   (b) leave wss_url blank to run in HTTP-polling fallback mode.
+#
+# To target the carrot testnet instead, override wss_url + http_rpc_url +
+# chain_id below (env vars take precedence over this file).
+
+# Mainnet HTTP RPC. Polled when no wss_url is set.
+http_rpc_url: "https://mainnet.megaeth.com/rpc"
+
+# Mainnet WSS — leave blank unless you have a partner-provider URL.
+# Carrot testnet (operator-opt-in): wss://carrot.megaeth.com/ws
+wss_url: ""
+
+# Mainnet chain ID. Carrot testnet: 6343.
+chain_id: 4326
+
+# When true, refuse to start unless wss_url is set. Use this in production
+# after you've wired a partner-provider WSS URL — without it the service
+# would silently fall back to HTTP-polling.
+wss_required: false
+
+# HTTP-polling interval. ~1s adds ~1s of latency vs a real WS subscription
+# on a 10ms-block chain. Ignored when wss_url is set.
+poll_interval_sec: 1.0
+
+health_port: 8788
+
+# Where ingested events are POSTed. Defaults to local Sapphire signal-logger.
+signal_logger_url: "http://127.0.0.1:18081/api/signals"
+# Required by signal-logger. Loaded from WEBHOOK_SECRET env in practice.
+# webhook_secret: ""
+
+# Read-only by default — flip to true (or env SAPPHIRE_MEGAETH_INGEST_ENABLED=1)
+# only after you've watched the queue + lag metrics on /health for a soak.
+forwarding_enabled: false
+
+# Bounded queue + drop-oldest. ~10ms blocks → 1s of HTTP backpressure ≈ 100 events.
+queue_max: 4096
+reconnect_backoff_sec: 2.0
+reconnect_max_sec: 60.0
+
+# Optional logs subscriptions. Each entry MUST include addresses (no wide-open
+# logs subscription on a 10ms-block chain). topics is optional.
+# NOTE: log_filters are ignored in HTTP-polling mode — they require WSS.
+log_filters: []
+# log_filters:
+#   - addresses:
+#       - "0x0000000000000000000000000000000000000000"
+#     topics:
+#       - "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"  # Transfer
