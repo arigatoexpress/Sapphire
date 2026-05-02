@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Sapphire Admin</title>
+  <style>
+    :root {
+      --bg: #06080d;
+      --bg-2: #0d1018;
+      --panel: #11151f;
+      --panel-2: #161b29;
+      --border: #1c2233;
+      --border-hot: #2c3550;
+      --text: #e7eaf3;
+      --muted: #8a93ab;
+      --accent: #6da7ff;
+      --ok: #4cd28b;
+      --warn: #ffb454;
+      --danger: #ff5f6e;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin:0; padding:0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+      background:
+        radial-gradient(1200px 800px at 0% -10%, rgba(109,167,255,.10), transparent 60%),
+        radial-gradient(1100px 700px at 100% 110%, rgba(76,210,139,.07), transparent 60%),
+        var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 22px 32px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(6,8,13,.65);
+      backdrop-filter: blur(8px);
+      position: sticky; top: 0; z-index: 10;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .crest {
+      width: 32px; height: 32px; border-radius: 9px;
+      background: linear-gradient(135deg, #4a8aff 0%, #6da7ff 50%, #4cd28b 100%);
+      display: grid; place-items: center;
+      font-weight: 700; font-size: 14px; color: #06080d;
+    }
+    .brand-text { font-weight: 600; letter-spacing: -.005em; }
+    .brand-text small { color: var(--muted); font-weight: 400; margin-left: 8px; font-size: 12px; }
+    .session {
+      display: flex; align-items: center; gap: 12px;
+      color: var(--muted); font-size: 13px;
+    }
+    .session .pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 10px; border-radius: 999px;
+      background: rgba(76,210,139,.10);
+      color: var(--ok);
+      border: 1px solid rgba(76,210,139,.30);
+      font-size: 12px;
+    }
+    .session .pill::before {
+      content: ""; width: 7px; height: 7px; border-radius: 50%;
+      background: var(--ok); box-shadow: 0 0 8px var(--ok);
+    }
+    button.ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 7px 12px; border-radius: 8px; font-size: 13px;
+      cursor: pointer;
+    }
+    button.ghost:hover { color: var(--text); border-color: var(--border-hot); }
+
+    main { max-width: 1100px; margin: 0 auto; padding: 36px 32px; }
+    h1 {
+      font-size: 30px; letter-spacing: -.02em;
+      margin: 0 0 6px; font-weight: 600;
+    }
+    .lede { color: var(--muted); margin: 0 0 28px; max-width: 640px; line-height: 1.55; }
+
+    .grid {
+      display: grid; gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+    a.card {
+      display: block;
+      text-decoration: none; color: var(--text);
+      background: linear-gradient(180deg, var(--panel) 0%, var(--bg-2) 100%);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px 22px 20px;
+      transition: transform .12s ease, border-color .15s ease, box-shadow .15s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    a.card::after {
+      content: "→";
+      position: absolute; right: 18px; top: 18px;
+      color: var(--muted); font-size: 16px;
+      transition: color .15s ease, transform .15s ease;
+    }
+    a.card:hover {
+      border-color: var(--border-hot);
+      transform: translateY(-1px);
+      box-shadow: 0 12px 40px rgba(0,0,0,.35);
+    }
+    a.card:hover::after { color: var(--accent); transform: translateX(2px); }
+    .card .icon {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      display: grid; place-items: center;
+      margin-bottom: 14px;
+      font-size: 18px;
+    }
+    .card h3 {
+      margin: 0 0 4px;
+      font-size: 16px; font-weight: 600; letter-spacing: -.005em;
+    }
+    .card p {
+      margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.5;
+    }
+    .card .tag {
+      display: inline-block; margin-top: 12px;
+      font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+      color: var(--muted);
+      padding: 3px 8px; border-radius: 6px;
+      background: var(--bg-2); border: 1px solid var(--border);
+    }
+    .card.warn { border-color: rgba(255,180,84,.25); }
+    .card.warn .tag { color: var(--warn); border-color: rgba(255,180,84,.35); }
+
+    section.section-head {
+      margin: 32px 0 14px;
+      display: flex; align-items: baseline; justify-content: space-between;
+    }
+    section.section-head h2 {
+      font-size: 13px; text-transform: uppercase; letter-spacing: .12em;
+      color: var(--muted); font-weight: 600; margin: 0;
+    }
+    section.section-head .meta { color: var(--muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="crest">S</div>
+      <div class="brand-text">Sapphire Admin <small>{{ rp_id }}</small></div>
+    </div>
+    <div class="session">
+      <span class="pill">{{ user_id }}</span>
+      <button id="logoutBtn" class="ghost" type="button">Sign out</button>
+    </div>
+  </header>
+
+  <main>
+    <h1>Operator console</h1>
+    <p class="lede">
+      Authenticated control surface for Sapphire-aligned admin tools.
+      Each card opens a dedicated admin frontend; auth carries via passkey
+      session for the current relying party.
+    </p>
+
+    <section class="section-head">
+      <h2>Operations</h2>
+      <span class="meta">passkey-gated</span>
+    </section>
+
+    <div class="grid">
+      <a class="card" href="/admin/wildfire">
+        <div class="icon">🜂</div>
+        <h3>Wildfire Watch</h3>
+        <p>Drone fleet, fire-incident triage, partner agency dashboard.</p>
+        <span class="tag">phase 0</span>
+      </a>
+
+      <a class="card" href="/admin/regional-intel">
+        <div class="icon">◈</div>
+        <h3>Regional Intel</h3>
+        <p>Vote monitor, intel console, source registry, signal review.</p>
+        <span class="tag">live</span>
+      </a>
+
+      <a class="card" href="/admin/tho">
+        <div class="icon">⊡</div>
+        <h3>THO Operations</h3>
+        <p>Customer CRM, document templates, deal pipeline overrides.</p>
+        <span class="tag">production</span>
+      </a>
+
+      <a class="card warn" href="/admin/system">
+        <div class="icon">⚙</div>
+        <h3>System</h3>
+        <p>Service health, kill-switch, routine pause/resume, audit log.</p>
+        <span class="tag">danger</span>
+      </a>
+    </div>
+  </main>
+
+  <script>
+    document.getElementById("logoutBtn").addEventListener("click", async () => {
+      try {
+        await fetch("/api/admin/logout", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Accept": "application/json" },
+        });
+      } catch (_) { /* ignore */ }
+      window.location.href = "/admin/login";
+    });
+  </script>
+</body>
+</html>

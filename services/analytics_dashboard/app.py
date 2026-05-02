@@ -31,6 +31,16 @@ log = logging.getLogger("analytics")
 app = Flask(__name__)
 bq = bigquery.Client(project=PROJECT)
 
+# WebAuthn passkey admin scaffold (gated /admin/* + /api/admin/*).
+# Lazily wired so a missing optional dep (webauthn / firestore) doesn't crash
+# the whole dashboard at import time — admin pages will return 503 instead.
+try:
+    from auth import register_blueprint as _register_admin_blueprint
+
+    _register_admin_blueprint(app)
+except Exception as _admin_exc:  # noqa: BLE001
+    log.warning("admin auth scaffold disabled: %s", _admin_exc)
+
 _KNOWN_PROBE_PATHS = {
     "/.git/config",
     "/favicon.ico",
