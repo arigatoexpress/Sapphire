@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from megaeth_ingest.config import (
     DEFAULT_CHAIN_ID,
     DEFAULT_HEALTH_PORT,
