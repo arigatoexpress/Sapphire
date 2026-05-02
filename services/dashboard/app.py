@@ -2919,19 +2919,58 @@ def api_sentinel_demo():
         return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
 
 
+#: MegaETH mainnet chain id — the canonical chain Sentinel reads through
+#: the chain-health gate today. Lives next to the route so the route file
+#: stays self-describing without hopping into ``lib/hackathon`` to know
+#: which chain it asks the gate to evaluate.
+SENTINEL_CHAIN_HEALTH_TARGET_CHAIN_ID = 4326
+
+
+class _PoisonGate:
+    """Demo-only chain-health gate that returns CRISIS_500BP unconditionally.
+
+    Activated by ``SENTINEL_DEMO_FORCE_DEPEG=1``. Used for demo recordings
+    where Sentinel needs to refuse a payment as the chain "degrades" on
+    camera, without depending on real MegaETH state. Never used unless the
+    operator explicitly opts in — production callers get ``default_gate()``.
+    """
+
+    def evaluate_chain(self, chain_id: int):  # noqa: D401 — duck-typed gate
+        from lib.hackathon.chain_health_gate import ChainHealthVerdict
+
+        return ChainHealthVerdict(
+            chain_id=chain_id,
+            chain_name="MegaETH (DEMO POISON)",
+            severity="BLOCK",
+            reasons=["DEMO POISON: synthetic CRISIS_500BP for recording"],
+            peg_divergence_bps=500,
+            aave_paused_reserves=[],
+        )
+
+
 @app.route("/api/hackathon/sentinel/evaluate", methods=["POST"])
 @requires_auth
 def api_sentinel_evaluate():
     """Evaluate an agent payment attempt without settlement or order submission."""
     try:
         body = request.get_json(silent=True) or {}
+        from lib.hackathon.chain_health_gate import default_gate
         from lib.hackathon.sentinel import evaluate_from_payload
+
+        if os.environ.get("SENTINEL_DEMO_FORCE_DEPEG") == "1":
+            gate = _PoisonGate()
+        else:
+            gate = default_gate()
 
         return jsonify(
             {
                 "execution_enabled": False,
                 "mode": "policy_preview_only",
-                "decision": evaluate_from_payload(body),
+                "decision": evaluate_from_payload(
+                    body,
+                    gate=gate,
+                    target_chain_id=SENTINEL_CHAIN_HEALTH_TARGET_CHAIN_ID,
+                ),
                 "timestamp": datetime.now(UTC).isoformat(),
             }
         )
