@@ -265,7 +265,7 @@ class FaultInjector:
             raise TypeError(f"{name!r} of type {type(prim).__name__} cannot heal")
 
     def reset_all(self) -> None:
-        for name, prim in list(self.primitives.items()):
+        for prim in list(self.primitives.values()):
             if hasattr(prim, "reset"):
                 prim.reset()
         self.transcript.append(("reset_all", self.name, {}))

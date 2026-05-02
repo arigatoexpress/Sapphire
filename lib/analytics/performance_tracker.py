@@ -165,7 +165,7 @@ class PerformanceTracker:
                 by_sym[sym]["losses"] += 1
             if s.get("pnl_pct") is not None:
                 by_sym[sym]["pnl"].append(s["pnl_pct"])
-        for sym, d in by_sym.items():
+        for d in by_sym.values():
             total = d["wins"] + d["losses"]
             d["win_rate"] = d["wins"] / total if total else None
             d["avg_pnl"] = sum(d["pnl"]) / len(d["pnl"]) if d["pnl"] else None
@@ -180,7 +180,7 @@ class PerformanceTracker:
                 by_regime[reg]["wins"] += 1
             else:
                 by_regime[reg]["losses"] += 1
-        for reg, d in by_regime.items():
+        for d in by_regime.values():
             total = d["wins"] + d["losses"]
             d["win_rate"] = d["wins"] / total if total else None
 

@@ -73,7 +73,6 @@ ignore = [
     "E741",   # ambiguous var name `l`
     "SIM102", # nested if — judgment
     "SIM105", # try/except/pass → contextlib.suppress — stylistic
-    "B007",   # unused loop var — rename to `_var` incrementally
     "F811",   # redefinition — three known telegram_bot/executor cases
     "UP038",  # isinstance(x, (A, B)) — removed in ruff 0.10+; tuple form is faster at runtime
     "UP027",  # unpacked list comprehension — pre-existing in tvctl.py
