@@ -209,6 +209,47 @@
         font-size: 11px;
         cursor: pointer;
     }
+    .sentinel-chain-health { display: none; }
+    .sentinel-chain-health.has-data { display: block; }
+    .sentinel-chain-pill {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        border: 1px solid var(--border);
+        margin-bottom: 10px;
+    }
+    .sentinel-chain-pill.healthy {
+        color: #86efac;
+        border-color: rgba(34,197,94,0.45);
+        background: rgba(34,197,94,0.10);
+    }
+    .sentinel-chain-pill.warning {
+        color: #fcd34d;
+        border-color: rgba(245,158,11,0.45);
+        background: rgba(245,158,11,0.10);
+    }
+    .sentinel-chain-pill.block {
+        color: #fca5a5;
+        border-color: rgba(239,68,68,0.5);
+        background: rgba(239,68,68,0.12);
+    }
+    .sentinel-chain-meta {
+        display: grid;
+        gap: 4px;
+        font-size: 12px;
+        color: var(--text-secondary);
+        font-family: var(--font-mono);
+    }
+    .sentinel-chain-meta .reasons {
+        color: var(--text-secondary);
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
 </style>
 
 <div class="sentinel-band">
@@ -252,6 +293,19 @@
                 <div class="sentinel-hash" id="decision-receipt"></div>
             </div>
             <ul class="sentinel-list" id="decision-reasons"></ul>
+        </div>
+
+        <div class="sentinel-band sentinel-chain-health" id="chain-health-band">
+            <div class="sentinel-panel-title">Chain health</div>
+            <div>
+                <span class="sentinel-chain-pill" id="chain-health-pill">...</span>
+            </div>
+            <div class="sentinel-chain-meta">
+                <div>peg divergence: <span id="chain-health-peg">--</span></div>
+                <div>chain: <span id="chain-health-chain">--</span></div>
+                <div>paused reserves: <span id="chain-health-paused">--</span></div>
+                <div>reasons: <span id="chain-health-reasons" class="reasons">--</span></div>
+            </div>
         </div>
 
         <div class="sentinel-band">
@@ -367,6 +421,37 @@ function renderFlow() {
         action: order.action,
         primary_draft: order.primary_draft
     }, null, 2);
+
+    renderChainHealth(flow.chain_health);
+}
+
+function renderChainHealth(ch) {
+    const band = document.getElementById('chain-health-band');
+    if (!ch) {
+        band.classList.remove('has-data');
+        return;
+    }
+    band.classList.add('has-data');
+    const severity = String(ch.severity || 'HEALTHY').toUpperCase();
+    const pill = document.getElementById('chain-health-pill');
+    pill.textContent = severity;
+    pill.className = 'sentinel-chain-pill ' + severity.toLowerCase();
+
+    const peg = ch.peg_divergence_bps;
+    document.getElementById('chain-health-peg').textContent =
+        (peg === null || peg === undefined) ? 'n/a' : (peg + ' bps');
+
+    const chainName = ch.chain_name || ('chain-' + ch.chain_id);
+    document.getElementById('chain-health-chain').textContent =
+        chainName + ' (' + ch.chain_id + ')';
+
+    const paused = Array.isArray(ch.aave_paused_reserves) ? ch.aave_paused_reserves : [];
+    document.getElementById('chain-health-paused').textContent =
+        paused.length ? JSON.stringify(paused) : 'none';
+
+    const reasons = Array.isArray(ch.reasons) ? ch.reasons : [];
+    document.getElementById('chain-health-reasons').textContent =
+        reasons.length ? reasons.join('; ') : '(none reported)';
 }
 
 async function evaluateResource() {
