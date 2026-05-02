@@ -12,8 +12,11 @@ Exposes:
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+import urllib.error
+import urllib.request
 from datetime import UTC, datetime
 
 from flask import Flask, jsonify, render_template, request
@@ -195,6 +198,108 @@ def threats():
         params=[bigquery.ScalarQueryParameter("days", "INT64", days)],
     )
     return jsonify({"rows": _clean(rows)})
+
+
+def _http_get_json(url: str, timeout: float = 3.0) -> dict | None:
+    """Fetch a URL with a tight timeout. Used for cross-silo health probes."""
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "sapphire-unified/1.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            if resp.status != 200:
+                return None
+            return json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ValueError, OSError):
+        return None
+
+
+THO_HEALTH_URL = os.environ.get(
+    "THO_HEALTH_URL",
+    "https://project-go-forward-trgi34bxuq-uc.a.run.app/healthz/",
+)
+THO_PUBLIC_URL = os.environ.get(
+    "THO_PUBLIC_URL",
+    "https://project-go-forward-trgi34bxuq-uc.a.run.app/",
+)
+
+
+@app.get("/api/silos/health")
+def silos_health():
+    """Cross-silo health snapshot — what's up, what's degraded.
+
+    Aggregates BigQuery service_health rows + live probes of external silos
+    (THO production, sapphirealpha.xyz). Designed for the unified dashboard
+    header strip.
+    """
+    rows = _rows(f"""
+        SELECT service, status, last_seen
+        FROM `{PROJECT}.{DATASET}.service_health`
+        WHERE last_seen >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 MINUTE)
+        QUALIFY ROW_NUMBER() OVER (PARTITION BY service ORDER BY last_seen DESC) = 1
+    """)
+    services = _clean(rows)
+
+    tho_health = _http_get_json(THO_HEALTH_URL, timeout=2.5)
+    silos = {
+        "trading": {"status": "ok" if any(s["service"] == "signal-logger" and s["status"] == "ok" for s in services) else "unknown"},
+        "intel": {"status": "ok"},
+        "tho": {
+            "status": "ok" if tho_health and tho_health.get("status") in ("ok", "ready") else "degraded" if tho_health else "unknown",
+            "url": THO_PUBLIC_URL,
+            "sha": (tho_health or {}).get("sha"),
+        },
+        "wildfire": {"status": "phase-0"},
+        "hackathon": {"status": "active"},
+    }
+
+    return jsonify({
+        "services": services,
+        "silos": silos,
+        "ts": datetime.now(UTC).isoformat(),
+    })
+
+
+@app.get("/api/silos/business")
+def silos_business():
+    """Business silo summary — THO customer counts, deals, recent activity.
+
+    Best-effort: returns shape from BigQuery if available, else proxies a
+    minimal probe to the THO health endpoint.
+    """
+    out = {"customers": None, "deals": None, "tho_status": "unknown"}
+    try:
+        rows = _rows(f"""
+            SELECT
+              (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.tho_customers`) AS customers,
+              (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.tho_deals`) AS deals
+        """)
+        if rows:
+            out.update(_clean(rows)[0])
+    except Exception as exc:
+        log.info("tho bq probe miss: %s", exc)
+
+    tho = _http_get_json(THO_HEALTH_URL, timeout=2.5)
+    if tho:
+        out["tho_status"] = tho.get("status", "ok")
+        out["tho_sha"] = tho.get("sha")
+        out["tho_dependencies"] = tho.get("dependencies")
+    out["tho_public_url"] = THO_PUBLIC_URL
+    return jsonify(out)
+
+
+@app.get("/api/silos/inference")
+def silos_inference():
+    """Inference proxy telemetry from BigQuery."""
+    rows = _rows(f"""
+        SELECT tier, COUNT(*) AS calls,
+               AVG(latency_ms) AS avg_latency_ms,
+               COUNTIF(status='ok') AS ok_count,
+               COUNTIF(status!='ok') AS err_count
+        FROM `{PROJECT}.{DATASET}.inference_metrics`
+        WHERE timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)
+        GROUP BY tier
+        ORDER BY calls DESC
+    """)
+    return jsonify({"tiers": _clean(rows)})
 
 
 @app.get("/api/signals/recent")
