@@ -234,12 +234,30 @@ def _http_get_json(url: str, timeout: float = 3.0) -> dict | None:
 
 THO_HEALTH_URL = os.environ.get(
     "THO_HEALTH_URL",
-    "https://project-go-forward-trgi34bxuq-uc.a.run.app/healthz/",
+    "https://tho.sapphirealpha.xyz/healthz/",
 )
 THO_PUBLIC_URL = os.environ.get(
     "THO_PUBLIC_URL",
-    "https://project-go-forward-trgi34bxuq-uc.a.run.app/",
+    "https://tho.sapphirealpha.xyz/",
 )
+THREAT_FEED_URL = os.environ.get(
+    "THREAT_FEED_URL",
+    "https://cyber-threat-bot-691674245427.us-central1.run.app/threats?source=all",
+)
+
+
+@app.get("/api/threats/live")
+def threats_live():
+    """Proxy the cyber-threat-bot live feed so the dashboard fetches it
+    same-origin (no CORS, no extra DNS). Fails-safe to empty list.
+    """
+    feed = _http_get_json(THREAT_FEED_URL, timeout=4.0)
+    if not feed:
+        return jsonify({"records": [], "fetched_at": None})
+    return jsonify({
+        "records": feed.get("records", [])[:25],
+        "fetched_at": feed.get("fetched_at"),
+    })
 
 
 @app.get("/api/silos/health")
