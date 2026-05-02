@@ -186,9 +186,30 @@ class GmxPriceAdapter:
             ) from exc
 
     async def fetch_token_price(self, address: str) -> TokenPrice:
-        """Read one token's price from Aave + return both scales."""
+        """Read one token's price from Aave + return both scales.
+
+        Two failure modes are normalized to :class:`PriceUnavailable` so
+        callers (perps_overview, can_price_market) only have one
+        exception type to catch:
+
+        1. Aave returns 0 — the soft-failure mode (some Aave deployments
+           silently return zero for unknown assets rather than reverting).
+        2. The Aave oracle reverts — the hard-failure mode on Arbitrum,
+           where ``getAssetPrice`` will revert with no data for any
+           asset that doesn't have an oracle source registered. Live
+           Arbitrum behaviour as of 2026-04-30.
+        """
         decimals = self.decimals_for(address)
-        usd = await self._aave.get_asset_price(address)
+        try:
+            usd = await self._aave.get_asset_price(address)
+        except Exception as exc:  # noqa: BLE001 — broad on purpose
+            # Re-raise as PriceUnavailable so the caller's try/except
+            # surface stays narrow. Don't swallow PriceUnavailable
+            # itself (would be redundant) and don't swallow KeyboardInterrupt
+            # (BaseException, not Exception, so already filtered).
+            raise PriceUnavailable(
+                f"Aave oracle reverted for {address!r}: {type(exc).__name__}: {exc}"
+            ) from exc
         if usd <= 0:
             # Aave returns 0 for tokens it has no oracle feed for.
             # Treat that as unavailable rather than $0 — a $0 GMX price
