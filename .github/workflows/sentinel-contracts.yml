@@ -1,0 +1,155 @@
+name: sentinel-contracts
+
+# Runs Forge tests + Slither static analysis on the SapphireSentinelRegistry
+# contract. Triggers only when contracts/, tests/forge/, the Foundry config,
+# the Slither config, or this workflow itself changes — so the rest of the
+# repo's CI matrix is untouched.
+#
+# Both Forge and Slither artifacts are published so London Buildathon judges
+# can browse the gas report and the Slither JSON straight from the PR/Actions
+# UI.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "contracts/**"
+      - "tests/forge/**"
+      - "foundry.toml"
+      - "slither.config.json"
+      - ".github/workflows/sentinel-contracts.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "contracts/**"
+      - "tests/forge/**"
+      - "foundry.toml"
+      - "slither.config.json"
+      - ".github/workflows/sentinel-contracts.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: sentinel-contracts-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  forge:
+    name: forge build + test (gas report)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Show Foundry versions
+        run: |
+          forge --version
+          cast --version
+
+      - name: Install forge-std
+        run: |
+          # Pinned to v1.9.4 (last stable as of 2026-04). Update via
+          #   forge install foundry-rs/forge-std@v1.9.4 --no-commit
+          # then commit the updated submodule SHA. We use --no-commit
+          # because this is CI, not a local checkout.
+          forge install foundry-rs/forge-std@v1.9.4 --no-commit
+          # Sanity check the dependency landed.
+          test -f contracts/lib/forge-std/src/Test.sol
+
+      - name: forge build
+        run: forge build --sizes
+
+      - name: forge test (with gas report)
+        run: |
+          forge test --gas-report -vvv | tee forge-test-output.txt
+          # Capture just the gas report block for the artifact summary.
+          awk '/^\| /{p=1} p' forge-test-output.txt > forge-gas-report.txt || true
+
+      - name: Upload Forge artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-results
+          path: |
+            forge-test-output.txt
+            forge-gas-report.txt
+            out/forge/SapphireSentinelRegistry.sol/SapphireSentinelRegistry.json
+          retention-days: 30
+
+  slither:
+    name: slither (static analysis)
+    runs-on: ubuntu-latest
+    needs: forge
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Foundry
+        # Slither needs the solc binary that Foundry vendors via svm; this
+        # action also makes `forge build` available so Slither can resolve
+        # imports the same way the Forge job does.
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Slither
+        run: |
+          python -m pip install --upgrade pip
+          # Pinned to a recent release for reproducibility. Bump alongside
+          # Foundry upgrades.
+          pip install slither-analyzer==0.10.4 solc-select==1.0.4
+          solc-select install 0.8.20
+          solc-select use 0.8.20
+
+      - name: Run Slither on SapphireSentinelRegistry
+        id: slither_run
+        run: |
+          set +e
+          # The config file gates fail-on at "medium". HIGH and MEDIUM
+          # findings cause a non-zero exit; lower severities are reported
+          # but do not fail the job.
+          slither contracts/SapphireSentinelRegistry.sol \
+            --config-file slither.config.json \
+            --json slither-output.json \
+            --checklist > slither-checklist.md 2>&1
+          echo "slither_exit=$?" >> "$GITHUB_OUTPUT"
+          set -e
+
+      - name: Summarise Slither result
+        if: always()
+        run: |
+          echo "Slither exit code: ${{ steps.slither_run.outputs.slither_exit }}"
+          if [ -f slither-checklist.md ]; then
+            echo '### Slither checklist'
+            head -200 slither-checklist.md
+          fi
+          # Re-emit the failure if Slither found a HIGH or MEDIUM issue.
+          if [ "${{ steps.slither_run.outputs.slither_exit }}" != "0" ]; then
+            echo "::error::Slither reported HIGH or MEDIUM severity findings"
+            exit 1
+          fi
+
+      - name: Upload Slither artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: slither-results
+          path: |
+            slither-output.json
+            slither-checklist.md
+          retention-days: 30
