@@ -1,0 +1,8 @@
+{
+  "chain_id": 42161,
+  "address": "0x243aa95cac2a25651eda86e80bee66114413c43b",
+  "abi_hash_sha256": "994f88408b356bff78c61df926b21ae9ce19e81c40992e19c161436df7a9b921",
+  "fetched_at": "2026-05-02T13:51:09.567560+00:00",
+  "source": "blockscout (mirrored from MegaETH wave-A; ABI shape identical)",
+  "notes": "Aave V3 protocol ABIs are identical across deployments \u2014 content sourced from the MegaETH wave-A pin (PR #534)."
+}
