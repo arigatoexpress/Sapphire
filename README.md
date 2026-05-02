@@ -8,8 +8,8 @@
 
 [![CI](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
 [![Security](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml)
-[![Tests](https://img.shields.io/badge/tests-6%2C526%2B%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
-[![Tools](https://img.shields.io/badge/tools-69-0d9488)](infra/tool-registry.yaml)
+[![Tests](https://img.shields.io/badge/tests-6%2C590%2B%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
+[![Tools](https://img.shields.io/badge/tools-72-0d9488)](infra/tool-registry.yaml)
 [![Dashboard](https://img.shields.io/badge/dashboard-50%20pages-6d28d9)](services/dashboard/templates/pages)
 [![Readiness](https://img.shields.io/badge/readiness-0%20FAIL-2ea44f)](scripts/ops/production_readiness_sweep.py)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3776ab?logo=python&logoColor=white)](https://www.python.org/)
