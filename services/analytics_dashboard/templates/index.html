@@ -3,204 +3,425 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0a0d14">
 <title>Sapphire OS — Unified Operations</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23070711'/%3E%3Cpath d='M32 6 56 24 32 58 8 24Z' fill='none' stroke='%2362ff40' stroke-width='4'/%3E%3Cpath d='M8 24h48M22 24l10 34 10-34M20 8l12 16L44 8' stroke='%2369d6ff' stroke-width='3' fill='none'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230a0d14'/%3E%3Cpath d='M32 6 56 24 32 58 8 24Z' fill='none' stroke='%234ea8ff' stroke-width='4'/%3E%3Cpath d='M8 24h48M22 24l10 34 10-34M20 8l12 16L44 8' stroke='%2362ff40' stroke-width='3' fill='none'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg: #0a0d14;
-  --bg-2: #0f1320;
-  --panel: #131a28;
-  --panel-2: #1a2233;
-  --border: #1f2a3d;
-  --border-bright: #2c3e5c;
-  --text: #e6edf3;
-  --text-2: #b9c5d3;
-  --muted: #7c8ba0;
-  --faint: #4a5670;
+  --bg-0: #07090e;
+  --bg-1: #0b0e16;
+  --bg-2: #11151f;
+  --bg-3: #1a2030;
+  --border: #1d2331;
+  --border-bright: #2c3548;
+  --text-1: #e8eef7;
+  --text-2: #a8b3c7;
+  --text-3: #6c7891;
+  --text-4: #424d65;
   --accent: #4ea8ff;
   --accent-2: #62ff40;
   --green: #3fb950;
+  --green-dim: rgba(63,185,80,0.16);
   --red: #f85149;
+  --red-dim: rgba(248,81,73,0.16);
   --yellow: #d29922;
+  --yellow-dim: rgba(210,153,34,0.16);
   --purple: #a371f7;
-  --radius: 8px;
-  --radius-lg: 12px;
+  --orange: #ff7a00;
+  --r-sm: 6px;
+  --r: 10px;
+  --r-lg: 14px;
+  --shadow-1: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-2: 0 6px 20px rgba(0,0,0,0.35);
+  --t-fast: 120ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; }
-body {
-  font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Inter, sans-serif;
-  background: var(--bg); color: var(--text);
-  font-size: 13px; line-height: 1.5;
+html, body {
+  margin: 0; padding: 0;
+  background: var(--bg-0);
+  color: var(--text-1);
+  font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.55;
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+.mono { font-family: 'JetBrains Mono', ui-monospace, "SF Mono", Menlo, monospace; font-feature-settings: "zero"; }
+
+.wrap {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 28px 32px 80px;
   min-height: 100vh;
 }
-.mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
-.wrap { max-width: 1480px; margin: 0 auto; padding: 24px 28px 64px; }
 
-/* Header */
+/* ========== Header ========== */
 header.top {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 0 22px; border-bottom: 1px solid var(--border);
-  margin-bottom: 24px;
+  padding: 8px 0 28px;
+  margin-bottom: 32px;
+  border-bottom: 1px solid var(--border);
 }
-.brand { display: flex; align-items: center; gap: 14px; }
+.brand { display: flex; align-items: center; gap: 16px; }
 .brand-mark {
-  width: 36px; height: 36px; border-radius: 8px;
-  background: linear-gradient(135deg, #1a2540 0%, #0f1730 100%);
+  width: 44px; height: 44px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #1f2a45 0%, #0d1322 100%);
   border: 1px solid var(--border-bright);
   display: grid; place-items: center;
+  box-shadow: var(--shadow-1), inset 0 1px 0 rgba(255,255,255,0.04);
 }
-.brand-name { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
-.brand-sub { font-size: 11px; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
-.health-strip { display: flex; gap: 8px; align-items: center; font-size: 11px; color: var(--muted); }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
-.dot.ok { background: var(--green); box-shadow: 0 0 8px rgba(63,185,80,0.5); }
-.dot.degraded { background: var(--yellow); }
-.dot.down { background: var(--red); }
-.dot.unknown { background: var(--faint); }
+.brand-name {
+  font-size: 17px; font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--text-1);
+}
+.brand-sub {
+  font-size: 11px;
+  color: var(--text-3);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-top: 2px;
+  font-weight: 500;
+}
+.health-strip {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 12px;
+  color: var(--text-2);
+  padding: 8px 14px;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.dot.ok { background: var(--green); box-shadow: 0 0 8px rgba(63,185,80,0.55); }
+.dot.degraded { background: var(--yellow); box-shadow: 0 0 8px rgba(210,153,34,0.55); }
+.dot.down { background: var(--red); box-shadow: 0 0 8px rgba(248,81,73,0.55); }
+.dot.unknown { background: var(--text-4); }
 
-/* Silo nav cards */
+/* ========== Silo cards ========== */
 .silo-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-  margin-bottom: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+  margin-bottom: 36px;
 }
 .silo-card {
-  background: var(--panel);
+  position: relative;
+  background: linear-gradient(180deg, var(--bg-2) 0%, var(--bg-1) 100%);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 16px 18px;
-  transition: border-color .15s, transform .1s, background .15s;
-  display: flex; flex-direction: column; gap: 6px;
-  position: relative; overflow: hidden;
+  border-radius: var(--r-lg);
+  padding: 18px 20px 16px;
+  display: flex; flex-direction: column; gap: 8px;
   text-decoration: none; color: inherit;
+  overflow: hidden;
+  transition: border-color var(--t-fast), transform var(--t-fast), box-shadow var(--t-fast);
+  cursor: pointer;
 }
 .silo-card:hover {
   border-color: var(--border-bright);
-  background: var(--panel-2);
   transform: translateY(-1px);
+  box-shadow: var(--shadow-2);
 }
-.silo-card.tho { border-color: rgba(78,168,255,0.35); }
 .silo-card.tho:hover { border-color: var(--accent); }
+.silo-card.threat:hover { border-color: var(--red); }
+.silo-card.wildfire:hover { border-color: var(--orange); }
+.silo-card.intel:hover { border-color: var(--purple); }
+.silo-card.regional:hover { border-color: var(--accent-2); }
+.silo-card.hackathon:hover { border-color: var(--yellow); }
+
 .silo-card .accent-bar {
-  position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
-  background: var(--accent);
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--text-4);
+  transition: background var(--t-fast);
 }
 .silo-card.tho .accent-bar { background: var(--accent); }
-.silo-card.trading .accent-bar { background: var(--green); }
-.silo-card.intel .accent-bar { background: var(--purple); }
 .silo-card.threat .accent-bar { background: var(--red); }
-.silo-card.wildfire .accent-bar { background: #ff7a00; }
-.silo-card.hackathon .accent-bar { background: var(--accent-2); }
-.silo-head { display: flex; justify-content: space-between; align-items: center; }
-.silo-title { font-size: 13px; font-weight: 600; letter-spacing: -0.005em; color: var(--text); }
-.silo-status { font-size: 10px; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: .06em; }
-.silo-status.ok { background: rgba(63,185,80,0.12); color: var(--green); }
-.silo-status.degraded { background: rgba(210,153,34,0.12); color: var(--yellow); }
-.silo-status.down { background: rgba(248,81,73,0.12); color: var(--red); }
-.silo-status.unknown { background: rgba(124,139,160,0.12); color: var(--muted); }
-.silo-status.phase-0 { background: rgba(255,122,0,0.12); color: #ff7a00; }
-.silo-status.active { background: rgba(98,255,64,0.12); color: var(--accent-2); }
-.silo-desc { font-size: 11px; color: var(--muted); }
+.silo-card.wildfire .accent-bar { background: var(--orange); }
+.silo-card.intel .accent-bar { background: var(--purple); }
+.silo-card.regional .accent-bar { background: var(--accent-2); }
+.silo-card.hackathon .accent-bar { background: var(--yellow); }
+
+.silo-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px;
+}
+.silo-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-1);
+  letter-spacing: -0.005em;
+}
+.silo-status {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+}
+.silo-status.ok       { background: var(--green-dim); color: var(--green); }
+.silo-status.degraded { background: var(--yellow-dim); color: var(--yellow); }
+.silo-status.down     { background: var(--red-dim); color: var(--red); }
+.silo-status.unknown  { background: rgba(108,120,145,0.14); color: var(--text-3); }
+.silo-status.phase-0  { background: rgba(255,122,0,0.14); color: var(--orange); }
+.silo-status.live     { background: rgba(78,168,255,0.14); color: var(--accent); }
+.silo-status.active   { background: rgba(98,255,64,0.14); color: var(--accent-2); }
+
+.silo-desc {
+  font-size: 12px;
+  color: var(--text-3);
+  line-height: 1.5;
+}
 .silo-link {
-  font-size: 11px; color: var(--accent); margin-top: 6px;
-  display: flex; align-items: center; gap: 4px;
+  font-size: 11px;
+  color: var(--text-2);
+  margin-top: 2px;
+  display: inline-flex; align-items: center; gap: 4px;
+  font-weight: 500;
+}
+.silo-card:hover .silo-link { color: var(--accent); }
+
+/* ========== Section heading ========== */
+.section-h {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-3);
+  margin: 36px 0 14px;
+  font-weight: 600;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.section-h .meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-4);
+  text-transform: none;
+  letter-spacing: 0;
 }
 
-/* KPI grid */
+/* ========== KPI strip ========== */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 10px;
-  margin-bottom: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 8px;
 }
 .kpi {
-  background: var(--panel);
+  background: var(--bg-1);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 14px 16px;
+  border-radius: var(--r);
+  padding: 16px 18px;
   position: relative;
+  transition: border-color var(--t-fast);
 }
-.kpi-label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
-.kpi-value { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.1; letter-spacing: -0.02em; }
-.kpi-value.up { color: var(--green); }
-.kpi-value.down { color: var(--red); }
-.kpi-sub { font-size: 11px; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.kpi:hover { border-color: var(--border-bright); }
+.kpi-label {
+  color: var(--text-3);
+  font-size: 10.5px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+}
+.kpi-value {
+  font-size: 26px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  color: var(--text-1);
+}
+.kpi-sub {
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+}
 
-/* Section panels */
-.section-h {
-  font-size: 11px; text-transform: uppercase; letter-spacing: .12em;
-  color: var(--muted); margin: 32px 0 12px; font-weight: 600;
-}
-.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.cols-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+/* ========== Layout ========== */
+.cols-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.cols-3 { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 16px; }
 @media (max-width: 1100px) { .cols-3 { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 800px) { .cols, .cols-3 { grid-template-columns: 1fr; } }
+@media (max-width: 800px)  { .cols-2, .cols-3 { grid-template-columns: 1fr; } }
 
 .panel {
-  background: var(--panel);
+  background: var(--bg-1);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 16px 18px;
-  margin-bottom: 14px;
+  border-radius: var(--r-lg);
+  padding: 18px 20px;
+  margin-bottom: 16px;
 }
 .panel h2 {
-  font-size: 11px; font-weight: 600; margin: 0 0 14px;
-  text-transform: uppercase; letter-spacing: .1em; color: var(--muted);
-  display: flex; justify-content: space-between; align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  margin: 0 0 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-2);
+  display: flex; align-items: center; justify-content: space-between;
 }
 .panel h2 a {
-  color: var(--accent); text-transform: none; letter-spacing: 0;
-  text-decoration: none; font-weight: 500; font-size: 11px;
+  color: var(--accent);
+  text-transform: none; letter-spacing: 0;
+  text-decoration: none; font-weight: 500;
+  font-size: 11px;
 }
 .panel h2 a:hover { text-decoration: underline; }
-
-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-th, td { text-align: left; padding: 7px 10px 7px 0; border-bottom: 1px solid var(--border); }
-th { color: var(--muted); font-weight: 500; text-transform: uppercase; font-size: 10px; letter-spacing: .06em; }
-tr:last-child td { border-bottom: none; }
-td.num { text-align: right; font-variant-numeric: tabular-nums; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
-td.muted, .muted { color: var(--muted); }
-
-.pill { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 500; letter-spacing: .03em; }
-.pill.green  { background: rgba(63,185,80,0.15); color: var(--green); }
-.pill.red    { background: rgba(248,81,73,0.15); color: var(--red); }
-.pill.yellow { background: rgba(210,153,34,0.15); color: var(--yellow); }
-.pill.blue   { background: rgba(78,168,255,0.15); color: var(--accent); }
-.pill.purple { background: rgba(163,113,247,0.15); color: var(--purple); }
-
-.footer {
-  margin-top: 36px; padding-top: 20px; border-top: 1px solid var(--border);
-  color: var(--muted); font-size: 11px;
-  display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+.panel h2 .h-meta {
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-4);
+  font-size: 10px;
+  font-weight: 400;
 }
-.footer a { color: var(--accent); text-decoration: none; }
-.footer a:hover { text-decoration: underline; }
+
+/* ========== Tables ========== */
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+th, td {
+  text-align: left;
+  padding: 9px 12px 9px 0;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+tr:last-child td { border-bottom: none; }
+th {
+  color: var(--text-3);
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  padding-top: 0;
+  white-space: nowrap;
+}
+td {
+  color: var(--text-2);
+}
+td.t1 { color: var(--text-1); font-weight: 500; }
+td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap;
+}
+td.muted { color: var(--text-3); }
+.empty {
+  text-align: center;
+  padding: 28px 0;
+  color: var(--text-3);
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* ========== Pills ========== */
+.pill {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+}
+.pill.green  { background: var(--green-dim); color: var(--green); }
+.pill.red    { background: var(--red-dim); color: var(--red); }
+.pill.yellow { background: var(--yellow-dim); color: var(--yellow); }
+.pill.blue   { background: rgba(78,168,255,0.16); color: var(--accent); }
+.pill.purple { background: rgba(163,113,247,0.16); color: var(--purple); }
+.pill.gray   { background: rgba(108,120,145,0.14); color: var(--text-3); }
+
+/* ========== Threat feed ========== */
+.feed-row {
+  display: flex; flex-direction: column;
+  gap: 4px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.feed-row:last-child { border-bottom: none; }
+.feed-head {
+  display: flex; align-items: center; gap: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+}
+.feed-id {
+  color: var(--accent);
+  font-weight: 500;
+}
+.feed-source {
+  color: var(--text-3);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.feed-title {
+  color: var(--text-1);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.feed-link {
+  font-size: 10.5px;
+  color: var(--text-3);
+  margin-top: 2px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ========== Footer ========== */
+.footer {
+  margin-top: 48px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+.footer a {
+  color: var(--text-2);
+  text-decoration: none;
+  margin-right: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+}
+.footer a:hover { color: var(--accent); }
 </style>
 </head>
 <body>
 <div class="wrap">
 
+<!-- ========== HEADER ========== -->
 <header class="top">
   <div class="brand">
     <div class="brand-mark">
-      <svg width="22" height="22" viewBox="0 0 64 64">
-        <path d="M32 6 56 24 32 58 8 24Z" fill="none" stroke="#62ff40" stroke-width="4"/>
-        <path d="M8 24h48M22 24l10 34 10-34M20 8l12 16L44 8" stroke="#69d6ff" stroke-width="3" fill="none"/>
+      <svg width="24" height="24" viewBox="0 0 64 64">
+        <path d="M32 6 56 24 32 58 8 24Z" fill="none" stroke="#4ea8ff" stroke-width="4"/>
+        <path d="M8 24h48M22 24l10 34 10-34M20 8l12 16L44 8" stroke="#62ff40" stroke-width="3" fill="none"/>
       </svg>
     </div>
     <div>
-      <div class="brand-name">SAPPHIRE OS</div>
-      <div class="brand-sub">Autonomous Operations · {{ project }}.{{ dataset }}</div>
+      <div class="brand-name">Sapphire OS</div>
+      <div class="brand-sub">Unified Operations</div>
     </div>
   </div>
   <div class="health-strip" id="header-health">
-    <span class="dot unknown"></span><span>loading…</span>
+    <span class="dot unknown"></span>
+    <span>checking systems…</span>
   </div>
 </header>
 
-<!-- Silo navigation -->
+<!-- ========== SILO CARDS ========== -->
 <div class="silo-grid">
   <a class="silo-card tho" href="#" id="silo-tho-link" target="_blank" rel="noopener">
     <span class="accent-bar"></span>
@@ -208,38 +429,18 @@ td.muted, .muted { color: var(--muted); }
       <div class="silo-title">THO Operations</div>
       <span class="silo-status unknown" id="silo-tho-status">…</span>
     </div>
-    <div class="silo-desc">Texas Home Outlet — customer ops, CRM, document center</div>
-    <div class="silo-link">Open production console →</div>
-  </a>
-
-  <a class="silo-card trading" href="#trading">
-    <span class="accent-bar"></span>
-    <div class="silo-head">
-      <div class="silo-title">Trading</div>
-      <span class="silo-status ok" id="silo-trading-status">live</span>
-    </div>
-    <div class="silo-desc">Signals · regime · predictions · paper + live executor</div>
-    <div class="silo-link">View KPIs ↓</div>
-  </a>
-
-  <a class="silo-card intel" href="#intel">
-    <span class="accent-bar"></span>
-    <div class="silo-head">
-      <div class="silo-title">Intelligence</div>
-      <span class="silo-status ok">live</span>
-    </div>
-    <div class="silo-desc">Predictions · regime · cross-asset · sovereign thesis</div>
-    <div class="silo-link">View intel ↓</div>
+    <div class="silo-desc">Texas Home Outlet — CRM, document center, customer ops</div>
+    <span class="silo-link">Open production console →</span>
   </a>
 
   <a class="silo-card threat" href="https://cyber-threat-bot-691674245427.us-central1.run.app/threats?source=all" target="_blank" rel="noopener">
     <span class="accent-bar"></span>
     <div class="silo-head">
       <div class="silo-title">Threat Intel</div>
-      <span class="silo-status ok">live</span>
+      <span class="silo-status live" id="silo-threat-status">live</span>
     </div>
-    <div class="silo-desc">CISA KEV · NVD · MITRE ATT&CK — live feed</div>
-    <div class="silo-link">Open feed ↗</div>
+    <div class="silo-desc">CISA KEV · NVD · MITRE ATT&CK — refreshed every 4h</div>
+    <span class="silo-link">Open feed ↗</span>
   </a>
 
   <a class="silo-card wildfire" href="https://github.com/arigatoexpress/wildfire-watch" target="_blank" rel="noopener">
@@ -248,76 +449,118 @@ td.muted, .muted { color: var(--muted); }
       <div class="silo-title">Wildfire Watch</div>
       <span class="silo-status phase-0">phase-0</span>
     </div>
-    <div class="silo-desc">3D-printed AI drone fleet for wildfire/wildlife monitoring</div>
-    <div class="silo-link">View repo ↗</div>
+    <div class="silo-desc">Autonomous drone fleet — wildfire + ecology monitoring</div>
+    <span class="silo-link">Open repository ↗</span>
   </a>
 
-  <a class="silo-card hackathon" href="https://github.com/arigatoexpress/Sapphire/pulls?q=is%3Aopen+hackathon" target="_blank" rel="noopener">
+  <a class="silo-card intel" href="#predictions">
+    <span class="accent-bar"></span>
+    <div class="silo-head">
+      <div class="silo-title">Intelligence</div>
+      <span class="silo-status live">live</span>
+    </div>
+    <div class="silo-desc">Market regime · ML predictions · cross-asset signals</div>
+    <span class="silo-link">View intel ↓</span>
+  </a>
+
+  <a class="silo-card regional" href="https://github.com/arigatoexpress/regional-intel-workbench" target="_blank" rel="noopener">
+    <span class="accent-bar"></span>
+    <div class="silo-head">
+      <div class="silo-title">Regional Intel</div>
+      <span class="silo-status active">active</span>
+    </div>
+    <div class="silo-desc">Geographic watchlist · vote monitor · DeFi pool snapshots</div>
+    <span class="silo-link">Open workbench ↗</span>
+  </a>
+
+  <a class="silo-card hackathon" href="https://github.com/arigatoexpress/Sapphire" target="_blank" rel="noopener">
     <span class="accent-bar"></span>
     <div class="silo-head">
       <div class="silo-title">Hackathon Lanes</div>
       <span class="silo-status active">active</span>
     </div>
     <div class="silo-desc">0G APAC · MegaETH · Robinhood London · Zama</div>
-    <div class="silo-link">View open PRs ↗</div>
+    <span class="silo-link">Open Sapphire repo ↗</span>
   </a>
 </div>
 
-<!-- KPIs -->
-<div class="section-h">Cross-silo KPIs</div>
+<!-- ========== KPIs (real-data-only, no paper trading) ========== -->
+<div class="section-h">
+  <span>Production telemetry</span>
+  <span class="meta" id="kpi-meta">—</span>
+</div>
 <div class="kpi-grid" id="kpis"></div>
 
-<!-- Trading section -->
-<div class="section-h" id="trading">Trading · regime · signals</div>
-<div class="cols">
-  <div class="panel">
-    <h2>Latest market regime <span id="regime-ts" class="muted mono"></span></h2>
-    <table id="regime"><thead><tr><th>Time</th><th>Regime</th><th class="num">Score</th><th class="num">BTC</th><th class="num">F&G</th></tr></thead><tbody></tbody></table>
-  </div>
-  <div class="panel">
-    <h2>Recent signals <a href="https://github.com/arigatoexpress/Sapphire" target="_blank" rel="noopener">repo ↗</a></h2>
-    <table id="signals"><thead><tr><th>Time</th><th>Sym</th><th>Action</th><th class="num">Conf</th><th class="num">Score</th><th>Regime</th></tr></thead><tbody></tbody></table>
+<!-- ========== Live threat feed ========== -->
+<div class="section-h" id="threats">
+  <span>Live threat intelligence feed</span>
+  <span class="meta" id="threats-meta">—</span>
+</div>
+<div class="cols-2">
+  <div class="panel" style="grid-column: 1 / -1;">
+    <h2>
+      <span>Recent CISA KEV / NVD / MITRE records</span>
+      <a href="https://cyber-threat-bot-691674245427.us-central1.run.app/threats?source=all" target="_blank" rel="noopener">JSON feed ↗</a>
+    </h2>
+    <div id="threats-feed"><div class="empty">loading live feed…</div></div>
   </div>
 </div>
 
-<div class="panel">
-  <h2>Daily performance · last 30 days</h2>
-  <table id="perf"><thead><tr><th>Date</th><th>Symbol</th><th class="num">N</th><th class="num">Win rate</th><th class="num">PnL</th><th class="num">PF</th><th class="num">Avg conf</th></tr></thead><tbody></tbody></table>
+<!-- ========== Service health ========== -->
+<div class="section-h">
+  <span>Service health</span>
+  <span class="meta">most recent heartbeat per service</span>
 </div>
-
-<!-- Intel section -->
-<div class="section-h" id="intel">Intelligence · predictions</div>
-<div class="cols">
+<div class="cols-2">
   <div class="panel">
-    <h2>Latest predictions</h2>
-    <table id="preds"><thead><tr><th>Time</th><th>Sym</th><th>Dir</th><th class="num">Conf</th><th class="num">Price</th><th class="num">Move</th></tr></thead><tbody></tbody></table>
-  </div>
-  <div class="panel" id="threat">
-    <h2>Threat severity · last 30 days</h2>
-    <table id="threats"><thead><tr><th>Date</th><th>Severity</th><th class="num">CVEs</th><th class="num">KEV</th><th class="num">Avg CVSS</th></tr></thead><tbody></tbody></table>
-  </div>
-</div>
-
-<!-- Inference / system section -->
-<div class="section-h">Inference · system telemetry</div>
-<div class="cols">
-  <div class="panel">
-    <h2>Inference proxy · 24h</h2>
-    <table id="inference"><thead><tr><th>Tier</th><th class="num">Calls</th><th class="num">Avg ms</th><th class="num">OK</th><th class="num">Err</th></tr></thead><tbody></tbody></table>
+    <h2>Heartbeats <span class="h-meta">last 60 min</span></h2>
+    <table id="services">
+      <thead><tr><th>Service</th><th>Status</th><th>Host</th><th class="num">Last seen</th></tr></thead>
+      <tbody><tr><td colspan="4" class="empty">loading…</td></tr></tbody>
+    </table>
   </div>
   <div class="panel">
-    <h2>Service heartbeats · last 30 min</h2>
-    <table id="services"><thead><tr><th>Service</th><th>Status</th><th>Last seen</th></tr></thead><tbody></tbody></table>
+    <h2>Inference proxy <span class="h-meta">24h aggregate</span></h2>
+    <table id="inference">
+      <thead><tr><th>Tier</th><th class="num">Calls</th><th class="num">Avg ms</th><th class="num">Errors</th></tr></thead>
+      <tbody><tr><td colspan="4" class="empty">loading…</td></tr></tbody>
+    </table>
   </div>
 </div>
 
+<!-- ========== Intelligence (regime + predictions) ========== -->
+<div class="section-h" id="predictions">
+  <span>Intelligence</span>
+  <span class="meta">read-only research surface — not trading instructions</span>
+</div>
+<div class="cols-2">
+  <div class="panel">
+    <h2>Market regime <span class="h-meta" id="regime-meta">—</span></h2>
+    <table id="regime">
+      <thead><tr><th>Time</th><th>Regime</th><th class="num">Score</th><th class="num">BTC</th><th class="num">F&G</th></tr></thead>
+      <tbody><tr><td colspan="5" class="empty">loading…</td></tr></tbody>
+    </table>
+  </div>
+  <div class="panel">
+    <h2>Latest predictions <span class="h-meta">ML output</span></h2>
+    <table id="preds">
+      <thead><tr><th>Time</th><th>Sym</th><th>Dir</th><th class="num">Conf</th><th class="num">24h move</th></tr></thead>
+      <tbody><tr><td colspan="5" class="empty">loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ========== Footer ========== -->
 <div class="footer">
-  <div>Data source: BigQuery <span class="mono">{{ project }}.{{ dataset }}</span> · refreshed <span id="ts" class="mono">—</span></div>
   <div>
-    <a href="/api/summary">/api/summary</a> ·
-    <a href="/api/silos/health">/api/silos/health</a> ·
-    <a href="/api/performance?days=30">/api/performance</a> ·
+    <span class="mono">{{ project }}.{{ dataset }}</span>
+    · refreshed <span id="ts" class="mono">—</span>
+  </div>
+  <div>
     <a href="/healthz/">/healthz/</a>
+    <a href="/api/silos/health">/api/silos/health</a>
+    <a href="/api/threats/live">/api/threats/live</a>
+    <a href="/api/silos/inference">/api/silos/inference</a>
   </div>
 </div>
 
@@ -325,18 +568,19 @@ td.muted, .muted { color: var(--muted); }
 
 <script>
 const $ = (sel) => document.querySelector(sel);
-const fmt = (n, d=2) => (n == null || isNaN(n)) ? '—' : Number(n).toFixed(d);
 const fmtN = (n) => (n == null || isNaN(n)) ? '—' : Number(n).toLocaleString();
-const fmtUsd = (n) => (n == null || isNaN(n)) ? '—' : '$' + Number(n).toLocaleString(undefined, {maximumFractionDigits: 0});
-const fmtPct = (n, d=1) => (n == null || isNaN(n)) ? '—' : (n * 100).toFixed(d) + '%';
+const fmtPct = (n, d=1) => (n == null || isNaN(n)) ? '—' : (Number(n) * 100).toFixed(d) + '%';
+const fmtMs = (n) => (n == null || isNaN(n)) ? '—' : Math.round(Number(n)).toLocaleString() + 'ms';
+const fmtUsd0 = (n) => (n == null || isNaN(n)) ? '—' : '$' + Math.round(Number(n)).toLocaleString();
 const shortTs = (s) => s ? s.replace('T', ' ').slice(0, 16) : '—';
+const isoTs = () => new Date().toISOString().replace('T', ' ').slice(0, 19);
 
 function pill(cls, txt) { return `<span class="pill ${cls}">${txt}</span>`; }
 function regimeClass(r) {
   if (r === 'RISK_ON') return 'green';
   if (r === 'RISK_OFF') return 'red';
   if (r === 'TRANSITION') return 'yellow';
-  return 'blue';
+  return 'gray';
 }
 
 async function safeFetch(url) {
@@ -348,141 +592,177 @@ async function safeFetch(url) {
 }
 
 async function refresh() {
-  const [sum, regime, perf, preds, threats, signals, silos, inference] = await Promise.all([
+  const [sum, regime, preds, silos, inference, threatsLive] = await Promise.all([
     safeFetch('/api/summary'),
-    safeFetch('/api/regime?limit=10'),
-    safeFetch('/api/performance?days=30'),
-    safeFetch('/api/predictions?limit=10'),
-    safeFetch('/api/threats?days=30'),
-    safeFetch('/api/signals/recent?limit=10'),
+    safeFetch('/api/regime?limit=8'),
+    safeFetch('/api/predictions?limit=8'),
     safeFetch('/api/silos/health'),
     safeFetch('/api/silos/inference'),
+    safeFetch('/api/threats/live'),
   ]);
 
-  // Header health + THO silo card
+  // ----- THO silo card + header health -----
   const tho = silos?.silos?.tho || {};
   const thoStatus = tho.status || 'unknown';
   const thoLink = document.getElementById('silo-tho-link');
   const thoBadge = document.getElementById('silo-tho-status');
-  if (thoLink) thoLink.href = tho.url || 'https://project-go-forward-trgi34bxuq-uc.a.run.app/';
+  if (thoLink) thoLink.href = tho.url || 'https://tho.sapphirealpha.xyz/';
   if (thoBadge) {
     thoBadge.className = 'silo-status ' + thoStatus;
     thoBadge.textContent = thoStatus;
   }
-  const allOk = thoStatus === 'ok';
+
+  // Threat silo: live if we got records
+  const liveCt = (threatsLive?.records || []).length;
+  const threatBadge = document.getElementById('silo-threat-status');
+  if (threatBadge) {
+    threatBadge.className = 'silo-status ' + (liveCt > 0 ? 'live' : 'unknown');
+    threatBadge.textContent = liveCt > 0 ? 'live' : '—';
+  }
+
+  // Header health: aggregate
+  const overall = (thoStatus === 'ok' && liveCt > 0) ? 'ok' : (thoStatus === 'down' ? 'down' : 'degraded');
   $('#header-health').innerHTML =
-    `<span class="dot ${allOk ? 'ok' : 'degraded'}"></span><span>${allOk ? 'all systems nominal' : 'see silo cards'}</span>`;
+    `<span class="dot ${overall}"></span><span>${overall === 'ok' ? 'all systems nominal' : overall === 'degraded' ? 'partial telemetry' : 'check status'}</span>`;
 
-  // KPIs
-  if (sum) {
-    const kpis = [
-      { label: 'Trading signals', value: fmtN(sum.signals) },
-      { label: 'Win rate', value: fmtPct(sum.win_rate) },
-      { label: 'Total PnL', value: fmtUsd(sum.total_pnl_usd), cls: (sum.total_pnl_usd||0) >= 0 ? 'up' : 'down' },
-      { label: 'Regime', value: sum.latest_regime || '—', cls: '' },
-      { label: 'Fear & Greed', value: sum.fear_greed ?? '—' },
-      { label: 'Predictions', value: fmtN(sum.predictions) },
-      { label: 'Threat events', value: fmtN(sum.threats) },
-      { label: 'Leads', value: fmtN(sum.leads) },
-    ];
-    $('#kpis').innerHTML = kpis.map(k =>
-      `<div class="kpi"><div class="kpi-label">${k.label}</div><div class="kpi-value ${k.cls||''}">${k.value}</div></div>`
-    ).join('');
+  // ----- KPI strip (REAL DATA ONLY, NO PAPER PnL) -----
+  const services = silos?.services || [];
+  const okSvcs = services.filter(s => (s.status || '').toLowerCase() === 'healthy' || (s.status || '').toLowerCase() === 'ok').length;
+  const totalCalls24h = (inference?.tiers || []).reduce((a, t) => a + (Number(t.calls) || 0), 0);
+  const totalErr24h = (inference?.tiers || []).reduce((a, t) => a + (Number(t.err_count) || 0), 0);
+  const errRate = totalCalls24h > 0 ? totalErr24h / totalCalls24h : null;
+
+  const kpis = [
+    {
+      label: 'Threat records',
+      value: fmtN(sum?.threats),
+      sub: liveCt > 0 ? `+${liveCt} new today` : 'BigQuery cumulative',
+    },
+    {
+      label: 'Active leads',
+      value: fmtN(sum?.leads),
+      sub: 'CRM pipeline',
+    },
+    {
+      label: 'Inference 24h',
+      value: fmtN(totalCalls24h),
+      sub: errRate != null ? `${fmtPct(errRate, 2)} error rate` : '—',
+    },
+    {
+      label: 'Service heartbeats',
+      value: fmtN(services.length || sum?.service_health),
+      sub: services.length ? `${okSvcs} healthy / ${services.length} reporting` : 'last hour',
+    },
+    {
+      label: 'Predictions',
+      value: fmtN(sum?.predictions),
+      sub: 'ML forecast surface',
+    },
+    {
+      label: 'Regime snapshots',
+      value: fmtN(sum?.regime_snapshots),
+      sub: sum?.fear_greed != null ? `F&G index: ${sum.fear_greed}` : 'BTC + cross-asset',
+    },
+  ];
+  $('#kpis').innerHTML = kpis.map(k =>
+    `<div class="kpi">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value">${k.value}</div>
+      <div class="kpi-sub">${k.sub || ''}</div>
+    </div>`
+  ).join('');
+  $('#kpi-meta').textContent = isoTs();
+
+  // ----- Threat feed (live from cyber-threat-bot) -----
+  const records = threatsLive?.records || [];
+  if (records.length) {
+    $('#threats-feed').innerHTML = records.map(r => {
+      const id = r.canonical_id || '';
+      const title = r.title || id || '(untitled)';
+      const src = (r.source || '').toUpperCase();
+      const url = r.url || '';
+      return `<div class="feed-row">
+        <div class="feed-head">
+          <span class="feed-id">${id}</span>
+          <span class="feed-source">${src}</span>
+        </div>
+        <div class="feed-title">${title}</div>
+        ${url ? `<a class="feed-link" href="${url}" target="_blank" rel="noopener">${url.replace(/^https?:\/\//, '').slice(0, 80)}</a>` : ''}
+      </div>`;
+    }).join('');
+    if (threatsLive?.fetched_at) $('#threats-meta').textContent = `feed @ ${threatsLive.fetched_at.replace('T', ' ').slice(0, 19)}`;
   } else {
-    $('#kpis').innerHTML = `<div class="kpi"><div class="kpi-label">BigQuery</div><div class="kpi-value muted">unavailable</div><div class="kpi-sub">summary endpoint failed — check service IAM</div></div>`;
+    $('#threats-feed').innerHTML = '<div class="empty">live feed unavailable — see /healthz/</div>';
   }
 
-  // Regime
-  if (regime?.rows?.length) {
-    $('#regime tbody').innerHTML = regime.rows.map(r =>
-      `<tr><td class="mono">${shortTs(r.timestamp)}</td><td>${pill(regimeClass(r.regime), r.regime || '—')}</td>
-       <td class="num">${fmt(r.score, 2)}</td>
-       <td class="num">${r.btc_price_usd ? fmtUsd(r.btc_price_usd) : '—'}</td>
-       <td class="num">${r.fear_greed_score ?? '—'}</td></tr>`
-    ).join('');
-    if (regime.rows[0]?.timestamp) $('#regime-ts').textContent = shortTs(regime.rows[0].timestamp);
+  // ----- Service heartbeats -----
+  const sh = $('#services tbody');
+  if (services.length) {
+    sh.innerHTML = services.map(s => {
+      const st = (s.status || 'unknown').toLowerCase();
+      const cls = (st === 'healthy' || st === 'ok') ? 'green' : (st === 'degraded' ? 'yellow' : 'red');
+      return `<tr>
+        <td class="t1">${s.service || '—'}</td>
+        <td>${pill(cls, s.status || '—')}</td>
+        <td class="muted">${s.host || '—'}</td>
+        <td class="num muted">${shortTs(s.last_seen)}</td>
+      </tr>`;
+    }).join('');
   } else {
-    $('#regime tbody').innerHTML = '<tr><td colspan="5" class="muted">no regime data</td></tr>';
+    sh.innerHTML = '<tr><td colspan="4" class="empty">no recent heartbeats — check telemetry collector</td></tr>';
   }
 
-  // Signals
-  if (signals?.rows?.length) {
-    $('#signals tbody').innerHTML = signals.rows.map(r =>
-      `<tr><td class="mono">${shortTs(r.timestamp)}</td><td>${r.symbol || '—'}</td>
-       <td>${r.action ? pill(r.action.toLowerCase().includes('buy') ? 'green' : 'red', r.action) : '—'}</td>
-       <td class="num">${fmt(r.confidence, 2)}</td>
-       <td class="num">${fmt(r.score, 1)}</td>
-       <td>${r.regime ? pill(regimeClass(r.regime), r.regime) : '—'}</td></tr>`
-    ).join('');
+  // ----- Inference -----
+  const ih = $('#inference tbody');
+  const tiers = inference?.tiers || [];
+  if (tiers.length) {
+    ih.innerHTML = tiers.map(t => `<tr>
+      <td class="t1">${t.tier || '—'}</td>
+      <td class="num">${fmtN(t.calls)}</td>
+      <td class="num">${fmtMs(t.avg_latency_ms)}</td>
+      <td class="num">${fmtN(t.err_count)}</td>
+    </tr>`).join('');
   } else {
-    $('#signals tbody').innerHTML = '<tr><td colspan="6" class="muted">no signals yet</td></tr>';
+    ih.innerHTML = '<tr><td colspan="4" class="empty">no telemetry in last 24h</td></tr>';
   }
 
-  // Performance
-  if (perf?.rows?.length) {
-    $('#perf tbody').innerHTML = perf.rows.slice(0, 30).map(r =>
-      `<tr><td>${r.date}</td><td>${r.symbol}</td>
-       <td class="num">${r.total_signals}</td>
-       <td class="num">${fmtPct(r.win_rate)}</td>
-       <td class="num">${fmtUsd(r.daily_pnl_usd)}</td>
-       <td class="num">${fmt(r.profit_factor, 2)}</td>
-       <td class="num">${fmt(r.avg_confidence, 2)}</td></tr>`
-    ).join('');
+  // ----- Regime -----
+  const rh = $('#regime tbody');
+  const rRows = regime?.rows || [];
+  if (rRows.length) {
+    rh.innerHTML = rRows.map(r => `<tr>
+      <td class="num muted">${shortTs(r.timestamp)}</td>
+      <td>${pill(regimeClass(r.regime), r.regime || '—')}</td>
+      <td class="num">${r.score != null ? Number(r.score).toFixed(2) : '—'}</td>
+      <td class="num">${r.btc_price_usd ? fmtUsd0(r.btc_price_usd) : '—'}</td>
+      <td class="num">${r.fear_greed_score ?? '—'}</td>
+    </tr>`).join('');
+    if (rRows[0]?.timestamp) $('#regime-meta').textContent = shortTs(rRows[0].timestamp);
   } else {
-    $('#perf tbody').innerHTML = '<tr><td colspan="7" class="muted">no daily performance data</td></tr>';
+    rh.innerHTML = '<tr><td colspan="5" class="empty">no regime snapshots</td></tr>';
   }
 
-  // Predictions
-  if (preds?.rows?.length) {
-    $('#preds tbody').innerHTML = preds.rows.map(r =>
-      `<tr><td class="mono">${shortTs(r.timestamp)}</td><td>${r.symbol}</td>
-       <td>${r.direction ? pill(r.direction.toLowerCase().includes('up') ? 'green' : 'red', r.direction) : '—'}</td>
-       <td class="num">${fmt(r.confidence, 2)}</td>
-       <td class="num">${r.current_price ? fmtUsd(r.current_price) : '—'}</td>
-       <td class="num">${r.predicted_move_pct ? Number(r.predicted_move_pct).toFixed(2) + '%' : '—'}</td></tr>`
-    ).join('');
+  // ----- Predictions -----
+  const ph = $('#preds tbody');
+  const pRows = preds?.rows || [];
+  if (pRows.length) {
+    ph.innerHTML = pRows.map(r => {
+      const dir = r.direction || '—';
+      const dirCls = String(dir).toLowerCase().includes('up') || String(dir).toLowerCase().includes('long') ? 'green'
+                   : String(dir).toLowerCase().includes('down') || String(dir).toLowerCase().includes('short') ? 'red' : 'gray';
+      return `<tr>
+        <td class="num muted">${shortTs(r.timestamp)}</td>
+        <td class="t1">${r.symbol || '—'}</td>
+        <td>${pill(dirCls, dir)}</td>
+        <td class="num">${r.confidence != null ? Number(r.confidence).toFixed(2) : '—'}</td>
+        <td class="num">${r.predicted_move_pct != null ? Number(r.predicted_move_pct).toFixed(2) + '%' : '—'}</td>
+      </tr>`;
+    }).join('');
   } else {
-    $('#preds tbody').innerHTML = '<tr><td colspan="6" class="muted">no predictions</td></tr>';
+    ph.innerHTML = '<tr><td colspan="5" class="empty">no predictions in window</td></tr>';
   }
 
-  // Threats
-  if (threats?.rows?.length) {
-    $('#threats tbody').innerHTML = threats.rows.slice(0, 30).map(r =>
-      `<tr><td>${r.date}</td>
-       <td>${pill(r.severity === 'CRITICAL' ? 'red' : (r.severity === 'HIGH' ? 'yellow' : 'blue'), r.severity || '—')}</td>
-       <td class="num">${r.cves}</td>
-       <td class="num">${r.kev_cves || 0}</td>
-       <td class="num">${fmt(r.avg_cvss, 1)}</td></tr>`
-    ).join('');
-  } else {
-    $('#threats tbody').innerHTML = '<tr><td colspan="5" class="muted">no threat data</td></tr>';
-  }
-
-  // Inference
-  if (inference?.tiers?.length) {
-    $('#inference tbody').innerHTML = inference.tiers.map(t =>
-      `<tr><td>${t.tier || '—'}</td>
-       <td class="num">${fmtN(t.calls)}</td>
-       <td class="num">${fmt(t.avg_latency_ms, 0)}</td>
-       <td class="num">${fmtN(t.ok_count)}</td>
-       <td class="num">${fmtN(t.err_count)}</td></tr>`
-    ).join('');
-  } else {
-    $('#inference tbody').innerHTML = '<tr><td colspan="5" class="muted">no inference telemetry in last 24h</td></tr>';
-  }
-
-  // Services
-  if (silos?.services?.length) {
-    $('#services tbody').innerHTML = silos.services.map(s =>
-      `<tr><td>${s.service || '—'}</td>
-       <td>${pill(s.status === 'ok' ? 'green' : 'red', s.status || '—')}</td>
-       <td class="mono muted">${shortTs(s.last_seen)}</td></tr>`
-    ).join('');
-  } else {
-    $('#services tbody').innerHTML = '<tr><td colspan="3" class="muted">no recent heartbeats — local services may be offline</td></tr>';
-  }
-
-  $('#ts').textContent = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  $('#ts').textContent = isoTs();
 }
 
 refresh();
