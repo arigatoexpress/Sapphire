@@ -133,8 +133,8 @@ flowchart LR
 
 | Surface | Count | Detail |
 |---|---:|---|
-| Passing tests | **6,526+** | 6,000+ unit · 526 plugin (`python scripts/ops/test_inventory.py --check-readme`) |
-| Test files | **380+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
+| Passing tests | **6,590+** | 6,023+ unit · 567 plugin (`python scripts/ops/test_inventory.py --check-readme`) |
+| Test files | **382+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
 | Dashboard pages | **50** | Flask + SSE, basic-auth, unified `/showcase`, observability, cross-asset, diligence, threat-intel, dossier, lead-intel, Sentinel pages |
 | Quant strategies | **7** | `lib/analytics/strategies.py` |
 | Pine strategies | **5** | `pine/standalone/` |
