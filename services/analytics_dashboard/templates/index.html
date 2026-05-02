@@ -65,6 +65,7 @@ header.top {
   padding: 8px 0 28px;
   margin-bottom: 32px;
   border-bottom: 1px solid var(--border);
+  gap: 20px; flex-wrap: wrap;
 }
 .brand { display: flex; align-items: center; gap: 16px; }
 .brand-mark {
@@ -88,6 +89,7 @@ header.top {
   margin-top: 2px;
   font-weight: 500;
 }
+.header-right { display: flex; gap: 10px; align-items: center; }
 .health-strip {
   display: flex; align-items: center; gap: 10px;
   font-size: 12px;
@@ -97,6 +99,20 @@ header.top {
   border: 1px solid var(--border);
   border-radius: 999px;
 }
+.icon-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color var(--t-fast), color var(--t-fast);
+}
+.icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+
 .dot {
   width: 8px; height: 8px;
   border-radius: 50%;
@@ -107,10 +123,25 @@ header.top {
 .dot.down { background: var(--red); box-shadow: 0 0 8px rgba(248,81,73,0.55); }
 .dot.unknown { background: var(--text-4); }
 
+/* ========== Banner (staleness warning, etc.) ========== */
+.banner {
+  display: none;
+  align-items: center; gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--r);
+  background: var(--yellow-dim);
+  border: 1px solid rgba(210,153,34,0.4);
+  color: var(--yellow);
+  font-size: 12.5px;
+  margin-bottom: 18px;
+}
+.banner.show { display: flex; }
+.banner svg { flex-shrink: 0; }
+
 /* ========== Silo cards ========== */
 .silo-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 14px;
   margin-bottom: 36px;
 }
@@ -211,10 +242,10 @@ header.top {
   letter-spacing: 0;
 }
 
-/* ========== KPI strip ========== */
+/* ========== KPI strip with sparklines ========== */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 12px;
   margin-bottom: 8px;
 }
@@ -222,9 +253,10 @@ header.top {
   background: var(--bg-1);
   border: 1px solid var(--border);
   border-radius: var(--r);
-  padding: 16px 18px;
+  padding: 14px 16px 12px;
   position: relative;
   transition: border-color var(--t-fast);
+  overflow: hidden;
 }
 .kpi:hover { border-color: var(--border-bright); }
 .kpi-label {
@@ -233,10 +265,10 @@ header.top {
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 .kpi-value {
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 600;
   font-family: 'JetBrains Mono', monospace;
   font-variant-numeric: tabular-nums;
@@ -247,13 +279,16 @@ header.top {
 .kpi-sub {
   font-size: 11px;
   color: var(--text-3);
-  margin-top: 6px;
+  margin-top: 4px;
   font-variant-numeric: tabular-nums;
+  display: flex; justify-content: space-between; align-items: center;
 }
+.kpi-spark { margin-top: 6px; height: 32px; }
+.kpi-spark svg { display: block; width: 100%; height: 100%; }
 
 /* ========== Layout ========== */
 .cols-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.cols-3 { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 16px; }
+.cols-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
 @media (max-width: 1100px) { .cols-3 { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 800px)  { .cols-2, .cols-3 { grid-template-columns: 1fr; } }
 
@@ -272,6 +307,7 @@ header.top {
   letter-spacing: 0.12em;
   color: var(--text-2);
   display: flex; align-items: center; justify-content: space-between;
+  gap: 10px;
 }
 .panel h2 a {
   color: var(--accent);
@@ -295,7 +331,7 @@ th, td {
   text-align: left;
   padding: 9px 12px 9px 0;
   border-bottom: 1px solid var(--border);
-  vertical-align: top;
+  vertical-align: middle;
 }
 tr:last-child td { border-bottom: none; }
 th {
@@ -325,6 +361,35 @@ td.muted { color: var(--text-3); }
   font-size: 12px;
   font-style: italic;
 }
+.empty.actionable {
+  background: var(--bg-2);
+  border-radius: var(--r-sm);
+  padding: 16px;
+  text-align: left;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--text-2);
+  border: 1px dashed var(--border-bright);
+}
+
+/* ========== Latency bar ========== */
+.lat-bar {
+  display: inline-block;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--green) 0%, var(--yellow) 50%, var(--red) 100%);
+  position: relative;
+  vertical-align: middle;
+  margin-left: 8px;
+  background: rgba(108,120,145,0.18);
+}
+.lat-bar > i {
+  position: absolute; top: 0; bottom: 0; left: 0;
+  border-radius: 3px;
+  background: var(--green);
+}
+.lat-bar.warn > i { background: var(--yellow); }
+.lat-bar.bad > i { background: var(--red); }
 
 /* ========== Pills ========== */
 .pill {
@@ -356,6 +421,7 @@ td.muted { color: var(--text-3); }
   display: flex; align-items: center; gap: 10px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 11.5px;
+  flex-wrap: wrap;
 }
 .feed-id {
   color: var(--accent);
@@ -377,7 +443,83 @@ td.muted { color: var(--text-3); }
   color: var(--text-3);
   margin-top: 2px;
   font-family: 'JetBrains Mono', monospace;
+  text-decoration: none;
 }
+.feed-link:hover { color: var(--accent); }
+
+/* ========== Charts ========== */
+.chart-wrap { width: 100%; height: 160px; }
+.chart-wrap svg { display: block; width: 100%; height: 100%; }
+.legend {
+  display: flex; gap: 12px; flex-wrap: wrap;
+  margin-top: 8px; font-size: 11px; color: var(--text-3);
+}
+.legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.legend-swatch { width: 10px; height: 10px; border-radius: 2px; }
+
+/* ========== Help modal ========== */
+.modal-backdrop {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  z-index: 99;
+}
+.modal-backdrop.show { display: block; }
+.modal {
+  display: none;
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(92vw, 680px);
+  max-height: 86vh;
+  overflow-y: auto;
+  background: var(--bg-1);
+  border: 1px solid var(--border-bright);
+  border-radius: var(--r-lg);
+  padding: 28px 32px;
+  z-index: 100;
+  box-shadow: var(--shadow-2);
+}
+.modal.show { display: block; }
+.modal h3 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.modal .modal-sub {
+  color: var(--text-3);
+  font-size: 12px;
+  margin-bottom: 22px;
+}
+.modal h4 {
+  margin: 22px 0 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-3);
+}
+.modal p, .modal li {
+  font-size: 13px;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+.modal kbd {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  padding: 1px 6px;
+  background: var(--bg-3);
+  border: 1px solid var(--border-bright);
+  border-radius: 4px;
+  color: var(--text-1);
+}
+.modal-close {
+  position: absolute; top: 14px; right: 16px;
+  background: none; border: none;
+  color: var(--text-3); font-size: 22px;
+  cursor: pointer; line-height: 1;
+}
+.modal-close:hover { color: var(--text-1); }
 
 /* ========== Footer ========== */
 .footer {
@@ -415,11 +557,23 @@ td.muted { color: var(--text-3); }
       <div class="brand-sub">Unified Operations</div>
     </div>
   </div>
-  <div class="health-strip" id="header-health">
-    <span class="dot unknown"></span>
-    <span>checking systems…</span>
+  <div class="header-right">
+    <div class="health-strip" id="header-health">
+      <span class="dot unknown"></span>
+      <span>checking systems…</span>
+    </div>
+    <button class="icon-btn" id="help-btn" title="Quick guide (?)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"/></svg>
+      <span>Help</span>
+    </button>
   </div>
 </header>
+
+<!-- ========== Staleness banner (regime collector) ========== -->
+<div class="banner" id="regime-stale-banner">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+  <span id="regime-stale-msg">Regime collector telemetry is stale.</span>
+</div>
 
 <!-- ========== SILO CARDS ========== -->
 <div class="silo-grid">
@@ -450,14 +604,14 @@ td.muted { color: var(--text-3); }
       <span class="silo-status phase-0">phase-0</span>
     </div>
     <div class="silo-desc">Autonomous drone fleet — wildfire + ecology monitoring</div>
-    <span class="silo-link">Open repository ↗</span>
+    <span class="silo-link">Open admin (passkey) →</span>
   </a>
 
   <a class="silo-card intel" href="#predictions">
     <span class="accent-bar"></span>
     <div class="silo-head">
       <div class="silo-title">Intelligence</div>
-      <span class="silo-status live">live</span>
+      <span class="silo-status live" id="silo-intel-status">live</span>
     </div>
     <div class="silo-desc">Market regime · ML predictions · cross-asset signals</div>
     <span class="silo-link">View intel ↓</span>
@@ -470,7 +624,7 @@ td.muted { color: var(--text-3); }
       <span class="silo-status active">active</span>
     </div>
     <div class="silo-desc">Geographic watchlist · vote monitor · DeFi pool snapshots</div>
-    <span class="silo-link">Open workbench ↗</span>
+    <span class="silo-link">Open admin (passkey) →</span>
   </a>
 
   <a class="silo-card hackathon" href="https://github.com/arigatoexpress/Sapphire" target="_blank" rel="noopener">
@@ -484,48 +638,86 @@ td.muted { color: var(--text-3); }
   </a>
 </div>
 
-<!-- ========== KPIs (real-data-only, no paper trading) ========== -->
+<!-- ========== KPIs with sparklines ========== -->
 <div class="section-h">
   <span>Production telemetry</span>
   <span class="meta" id="kpi-meta">—</span>
 </div>
 <div class="kpi-grid" id="kpis"></div>
 
+<!-- ========== Charts row ========== -->
+<div class="section-h">
+  <span>24-hour signal traffic</span>
+  <span class="meta">aggregated by hour</span>
+</div>
+<div class="cols-2">
+  <div class="panel">
+    <h2>
+      <span>Inference proxy calls — last 24h</span>
+      <span class="h-meta" id="chart-inference-meta">—</span>
+    </h2>
+    <div class="chart-wrap"><svg id="chart-inference"></svg></div>
+    <div class="legend" id="chart-inference-legend"></div>
+  </div>
+  <div class="panel">
+    <h2>
+      <span>Threat severity — last 30d</span>
+      <span class="h-meta" id="chart-threats-meta">—</span>
+    </h2>
+    <div class="chart-wrap"><svg id="chart-threats"></svg></div>
+    <div class="legend" id="chart-threats-legend"></div>
+  </div>
+</div>
+
 <!-- ========== Live threat feed ========== -->
 <div class="section-h" id="threats">
   <span>Live threat intelligence feed</span>
   <span class="meta" id="threats-meta">—</span>
 </div>
-<div class="cols-2">
-  <div class="panel" style="grid-column: 1 / -1;">
-    <h2>
-      <span>Recent CISA KEV / NVD / MITRE records</span>
-      <a href="https://cyber-threat-bot-691674245427.us-central1.run.app/threats?source=all" target="_blank" rel="noopener">JSON feed ↗</a>
-    </h2>
-    <div id="threats-feed"><div class="empty">loading live feed…</div></div>
-  </div>
+<div class="panel">
+  <h2>
+    <span>Recent CISA KEV / NVD / MITRE records</span>
+    <a href="https://cyber-threat-bot-691674245427.us-central1.run.app/threats?source=all" target="_blank" rel="noopener">JSON feed ↗</a>
+  </h2>
+  <div id="threats-feed"><div class="empty">loading live feed…</div></div>
 </div>
 
 <!-- ========== Service health ========== -->
 <div class="section-h">
   <span>Service health</span>
-  <span class="meta">most recent heartbeat per service</span>
+  <span class="meta" id="services-meta">last 60-min rollup</span>
 </div>
-<div class="cols-2">
-  <div class="panel">
-    <h2>Heartbeats <span class="h-meta">last 60 min</span></h2>
-    <table id="services">
-      <thead><tr><th>Service</th><th>Status</th><th>Host</th><th class="num">Last seen</th></tr></thead>
-      <tbody><tr><td colspan="4" class="empty">loading…</td></tr></tbody>
-    </table>
-  </div>
-  <div class="panel">
-    <h2>Inference proxy <span class="h-meta">24h aggregate</span></h2>
-    <table id="inference">
-      <thead><tr><th>Tier</th><th class="num">Calls</th><th class="num">Avg ms</th><th class="num">Errors</th></tr></thead>
-      <tbody><tr><td colspan="4" class="empty">loading…</td></tr></tbody>
-    </table>
-  </div>
+<div class="panel">
+  <h2>
+    <span>Heartbeats by service · p50 / p95 response time</span>
+    <span class="h-meta" id="services-h-meta">—</span>
+  </h2>
+  <table id="services">
+    <thead><tr>
+      <th>Service</th><th>Host</th><th>Status</th>
+      <th class="num">p50 ms</th><th class="num">p95 ms</th><th class="num">Last seen</th>
+    </tr></thead>
+    <tbody><tr><td colspan="6" class="empty">loading…</td></tr></tbody>
+  </table>
+</div>
+
+<!-- ========== Inference proxy ========== -->
+<div class="section-h">
+  <span>Inference proxy</span>
+  <span class="meta">24h tier breakdown</span>
+</div>
+<div class="panel">
+  <h2>
+    <span>By tier</span>
+    <span class="h-meta">aggregated by tier</span>
+  </h2>
+  <table id="inference">
+    <thead><tr>
+      <th>Tier</th><th class="num">Calls</th><th class="num">Avg ms</th>
+      <th class="num">OK</th><th class="num">Errors</th><th class="num">Error rate</th>
+    </tr></thead>
+    <tbody><tr><td colspan="6" class="empty">loading…</td></tr></tbody>
+  </table>
 </div>
 
 <!-- ========== Intelligence (regime + predictions) ========== -->
@@ -535,14 +727,19 @@ td.muted { color: var(--text-3); }
 </div>
 <div class="cols-2">
   <div class="panel">
-    <h2>Market regime <span class="h-meta" id="regime-meta">—</span></h2>
+    <h2>
+      <span>Market regime <span class="h-meta" id="regime-meta">—</span></span>
+    </h2>
     <table id="regime">
       <thead><tr><th>Time</th><th>Regime</th><th class="num">Score</th><th class="num">BTC</th><th class="num">F&G</th></tr></thead>
       <tbody><tr><td colspan="5" class="empty">loading…</td></tr></tbody>
     </table>
   </div>
   <div class="panel">
-    <h2>Latest predictions <span class="h-meta">ML output</span></h2>
+    <h2>
+      <span>Latest predictions</span>
+      <span class="h-meta">ML output (Kronos)</span>
+    </h2>
     <table id="preds">
       <thead><tr><th>Time</th><th>Sym</th><th>Dir</th><th class="num">Conf</th><th class="num">24h move</th></tr></thead>
       <tbody><tr><td colspan="5" class="empty">loading…</td></tr></tbody>
@@ -555,25 +752,81 @@ td.muted { color: var(--text-3); }
   <div>
     <span class="mono">{{ project }}.{{ dataset }}</span>
     · refreshed <span id="ts" class="mono">—</span>
+    · press <kbd style="font-family:'JetBrains Mono',monospace;background:var(--bg-3);padding:1px 5px;border-radius:3px;font-size:10px;border:1px solid var(--border-bright);">?</kbd> for help
   </div>
   <div>
     <a href="/healthz/">/healthz/</a>
     <a href="/api/silos/health">/api/silos/health</a>
     <a href="/api/threats/live">/api/threats/live</a>
-    <a href="/api/silos/inference">/api/silos/inference</a>
+    <a href="/api/timeseries/inference">/api/timeseries/inference</a>
+    <a href="/api/timeseries/threats">/api/timeseries/threats</a>
   </div>
 </div>
 
+</div>
+
+<!-- ========== Help modal ========== -->
+<div class="modal-backdrop" id="modal-backdrop"></div>
+<div class="modal" id="help-modal">
+  <button class="modal-close" id="modal-close">×</button>
+  <h3>Sapphire OS — Quick Guide</h3>
+  <div class="modal-sub">Unified production dashboard at sapphirealpha.xyz</div>
+
+  <h4>Silo cards</h4>
+  <p>The six cards at the top are the high-level entry points. Each shows a status pill (live, ok, degraded, down, phase-0, active). Click a card to dive into that silo:</p>
+  <ul>
+    <li><strong>THO Operations</strong> — Texas Home Outlet production at <span class="mono">tho.sapphirealpha.xyz</span></li>
+    <li><strong>Threat Intel</strong> — opens the live JSON feed from cyber-threat-bot Cloud Run</li>
+    <li><strong>Wildfire Watch</strong> — passkey-gated admin frontend (in build)</li>
+    <li><strong>Intelligence</strong> — scrolls to the regime + predictions panels below</li>
+    <li><strong>Regional Intel</strong> — passkey-gated admin frontend (in build)</li>
+    <li><strong>Hackathon Lanes</strong> — opens the Sapphire monorepo</li>
+  </ul>
+
+  <h4>Production telemetry</h4>
+  <p>Six KPIs with 24h sparkline trends. Each value is real BigQuery data — no paper-trading numbers. Sub-text shows context (error rate, healthy/total, etc.).</p>
+
+  <h4>Charts</h4>
+  <p>Two stacked charts: inference calls per hour over 24h (split by tier), and threat severity per day over 30d. Hover a chart for tooltips.</p>
+
+  <h4>Service health</h4>
+  <p>Each service's p50 + p95 response time over the last 60 minutes, with status pill (healthy / degraded / down). The latency bar visualizes the p50.</p>
+
+  <h4>Banners</h4>
+  <p>Yellow banner appears when a data collector is stale. The regime collector specifically broke around 2026-04-18 — that's why the regime panel shows an "ago" warning.</p>
+
+  <h4>Keyboard shortcuts</h4>
+  <p>
+    <kbd>?</kbd> open help · <kbd>Esc</kbd> close modal
+  </p>
+
+  <h4>Refresh</h4>
+  <p>Every panel auto-refreshes every 60 seconds. The footer shows the last refresh timestamp.</p>
+
+  <h4>Data sources</h4>
+  <p>Footer links expose every backing endpoint. All BigQuery-backed endpoints fail-safe to empty payloads if a table is missing — the dashboard never 500s.</p>
 </div>
 
 <script>
 const $ = (sel) => document.querySelector(sel);
 const fmtN = (n) => (n == null || isNaN(n)) ? '—' : Number(n).toLocaleString();
 const fmtPct = (n, d=1) => (n == null || isNaN(n)) ? '—' : (Number(n) * 100).toFixed(d) + '%';
-const fmtMs = (n) => (n == null || isNaN(n)) ? '—' : Math.round(Number(n)).toLocaleString() + 'ms';
+const fmtMs = (n) => (n == null || isNaN(n)) ? '—' : Math.round(Number(n)).toLocaleString();
 const fmtUsd0 = (n) => (n == null || isNaN(n)) ? '—' : '$' + Math.round(Number(n)).toLocaleString();
 const shortTs = (s) => s ? s.replace('T', ' ').slice(0, 16) : '—';
 const isoTs = () => new Date().toISOString().replace('T', ' ').slice(0, 19);
+const ago = (s) => {
+  if (!s) return '—';
+  const ms = Date.now() - new Date(s).getTime();
+  if (ms < 0) return 'just now';
+  const m = Math.floor(ms / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m} min ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ${m % 60}m ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ${h % 24}h ago`;
+};
 
 function pill(cls, txt) { return `<span class="pill ${cls}">${txt}</span>`; }
 function regimeClass(r) {
@@ -591,17 +844,179 @@ async function safeFetch(url) {
   } catch (_) { return null; }
 }
 
+// ========== SVG chart helpers ==========
+function svgEl(tag, attrs) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [k, v] of Object.entries(attrs || {})) el.setAttribute(k, v);
+  return el;
+}
+
+function drawSparkline(svg, points, color) {
+  if (!points || points.length < 2) return;
+  svg.innerHTML = '';
+  const w = 200, h = 32, pad = 2;
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
+  const max = Math.max(...points), min = Math.min(...points);
+  const span = max - min || 1;
+  const dx = (w - pad * 2) / Math.max(1, points.length - 1);
+  const path = points.map((v, i) => {
+    const x = pad + i * dx;
+    const y = h - pad - ((v - min) / span) * (h - pad * 2);
+    return (i === 0 ? 'M' : 'L') + x.toFixed(2) + ',' + y.toFixed(2);
+  }).join(' ');
+  // Area fill
+  const area = path + ` L ${(w - pad).toFixed(2)},${h - pad} L ${pad},${h - pad} Z`;
+  svg.appendChild(svgEl('path', { d: area, fill: color, 'fill-opacity': '0.16', stroke: 'none' }));
+  svg.appendChild(svgEl('path', { d: path, fill: 'none', stroke: color, 'stroke-width': '1.5', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+}
+
+function drawMultiLine(svg, series, opts) {
+  // series = [{name, color, points: [{x_label, y}]}]
+  if (!series.length || !series[0].points.length) {
+    svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#6c7891" font-size="11" font-family="Inter">no data in window</text>';
+    svg.setAttribute('viewBox', '0 0 600 160');
+    return;
+  }
+  svg.innerHTML = '';
+  const w = 600, h = 160, padL = 32, padR = 8, padT = 8, padB = 22;
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
+
+  const xCount = series[0].points.length;
+  let yMax = 0;
+  for (const s of series) for (const p of s.points) if (p.y > yMax) yMax = p.y;
+  yMax = Math.max(yMax, 1);
+
+  // Y gridlines (4 ticks)
+  for (let t = 0; t <= 4; t++) {
+    const y = padT + (h - padT - padB) * (1 - t / 4);
+    svg.appendChild(svgEl('line', {
+      x1: padL, x2: w - padR, y1: y, y2: y,
+      stroke: '#1d2331', 'stroke-width': 1
+    }));
+    const val = (yMax * t / 4);
+    const label = val >= 1000 ? (val / 1000).toFixed(1) + 'k' : Math.round(val);
+    svg.appendChild(svgEl('text', {
+      x: 4, y: y + 3, fill: '#6c7891', 'font-size': 9, 'font-family': 'JetBrains Mono'
+    })).textContent = label;
+  }
+
+  // X axis labels (first, mid, last)
+  const xs = series[0].points;
+  const labelIdx = [0, Math.floor(xs.length / 2), xs.length - 1];
+  for (const i of labelIdx) {
+    const x = padL + (w - padL - padR) * (xCount === 1 ? 0.5 : i / (xCount - 1));
+    svg.appendChild(svgEl('text', {
+      x, y: h - 6, fill: '#6c7891', 'font-size': 9, 'font-family': 'JetBrains Mono', 'text-anchor': i === 0 ? 'start' : i === xs.length - 1 ? 'end' : 'middle'
+    })).textContent = xs[i].x_label || '';
+  }
+
+  // Lines
+  for (const s of series) {
+    const path = s.points.map((p, i) => {
+      const x = padL + (w - padL - padR) * (xCount === 1 ? 0.5 : i / (xCount - 1));
+      const y = padT + (h - padT - padB) * (1 - p.y / yMax);
+      return (i === 0 ? 'M' : 'L') + x.toFixed(2) + ',' + y.toFixed(2);
+    }).join(' ');
+    svg.appendChild(svgEl('path', {
+      d: path, fill: 'none', stroke: s.color, 'stroke-width': 1.8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round'
+    }));
+    // Last-point dot
+    const last = s.points[s.points.length - 1];
+    const lx = padL + (w - padL - padR) * 1;
+    const ly = padT + (h - padT - padB) * (1 - last.y / yMax);
+    svg.appendChild(svgEl('circle', { cx: lx, cy: ly, r: 2.2, fill: s.color }));
+  }
+}
+
+function drawStackedBars(svg, days, segments, segmentColors) {
+  // days = ['2026-04-21', ...]; segments = [{label, byDay: {date: count}}]
+  if (!days.length) {
+    svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#6c7891" font-size="11" font-family="Inter">no data in window</text>';
+    svg.setAttribute('viewBox', '0 0 600 160');
+    return;
+  }
+  svg.innerHTML = '';
+  const w = 600, h = 160, padL = 32, padR = 8, padT = 8, padB = 22;
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
+
+  const totals = days.map(d => segments.reduce((a, s) => a + (s.byDay[d] || 0), 0));
+  const yMax = Math.max(1, ...totals);
+
+  // Y grid
+  for (let t = 0; t <= 4; t++) {
+    const y = padT + (h - padT - padB) * (1 - t / 4);
+    svg.appendChild(svgEl('line', { x1: padL, x2: w - padR, y1: y, y2: y, stroke: '#1d2331', 'stroke-width': 1 }));
+    const val = yMax * t / 4;
+    const label = val >= 1000 ? (val / 1000).toFixed(1) + 'k' : Math.round(val);
+    svg.appendChild(svgEl('text', { x: 4, y: y + 3, fill: '#6c7891', 'font-size': 9, 'font-family': 'JetBrains Mono' })).textContent = label;
+  }
+
+  const bw = (w - padL - padR) / days.length;
+  for (let i = 0; i < days.length; i++) {
+    const x0 = padL + i * bw;
+    let yCursor = h - padB;
+    for (let j = 0; j < segments.length; j++) {
+      const cnt = segments[j].byDay[days[i]] || 0;
+      if (!cnt) continue;
+      const segH = (cnt / yMax) * (h - padT - padB);
+      svg.appendChild(svgEl('rect', {
+        x: x0 + 1.5, y: yCursor - segH, width: Math.max(1, bw - 3), height: segH,
+        fill: segmentColors[j], 'rx': 1
+      }));
+      yCursor -= segH;
+    }
+  }
+  // X axis labels (first, last)
+  const lbls = [0, days.length - 1];
+  for (const i of lbls) {
+    const x = padL + i * bw + bw / 2;
+    svg.appendChild(svgEl('text', {
+      x, y: h - 6, fill: '#6c7891', 'font-size': 9, 'font-family': 'JetBrains Mono', 'text-anchor': i === 0 ? 'start' : 'end'
+    })).textContent = days[i].slice(5);
+  }
+}
+
+function buildLegend(container, items) {
+  container.innerHTML = items.map(it =>
+    `<span class="legend-item"><span class="legend-swatch" style="background:${it.color}"></span>${it.name}</span>`
+  ).join('');
+}
+
+// ========== Modal ==========
+function openHelp() {
+  document.getElementById('modal-backdrop').classList.add('show');
+  document.getElementById('help-modal').classList.add('show');
+}
+function closeHelp() {
+  document.getElementById('modal-backdrop').classList.remove('show');
+  document.getElementById('help-modal').classList.remove('show');
+}
+document.getElementById('help-btn').addEventListener('click', openHelp);
+document.getElementById('modal-close').addEventListener('click', closeHelp);
+document.getElementById('modal-backdrop').addEventListener('click', closeHelp);
+document.addEventListener('keydown', (e) => {
+  if (e.key === '?') { e.preventDefault(); openHelp(); }
+  if (e.key === 'Escape') closeHelp();
+});
+
+// ========== Refresh ==========
 async function refresh() {
-  const [sum, regime, preds, silos, inference, threatsLive] = await Promise.all([
+  const [sum, regime, preds, silos, inference, threatsLive, tsInf, tsThr, tsSvc] = await Promise.all([
     safeFetch('/api/summary'),
     safeFetch('/api/regime?limit=8'),
     safeFetch('/api/predictions?limit=8'),
     safeFetch('/api/silos/health'),
     safeFetch('/api/silos/inference'),
     safeFetch('/api/threats/live'),
+    safeFetch('/api/timeseries/inference'),
+    safeFetch('/api/timeseries/threats'),
+    safeFetch('/api/timeseries/services'),
   ]);
 
-  // ----- THO silo card + header health -----
+  // ----- THO silo + header health -----
   const tho = silos?.silos?.tho || {};
   const thoStatus = tho.status || 'unknown';
   const thoLink = document.getElementById('silo-tho-link');
@@ -612,7 +1027,6 @@ async function refresh() {
     thoBadge.textContent = thoStatus;
   }
 
-  // Threat silo: live if we got records
   const liveCt = (threatsLive?.records || []).length;
   const threatBadge = document.getElementById('silo-threat-status');
   if (threatBadge) {
@@ -620,23 +1034,88 @@ async function refresh() {
     threatBadge.textContent = liveCt > 0 ? 'live' : '—';
   }
 
-  // Header health: aggregate
-  const overall = (thoStatus === 'ok' && liveCt > 0) ? 'ok' : (thoStatus === 'down' ? 'down' : 'degraded');
+  const intelBadge = document.getElementById('silo-intel-status');
+  const regimeStale = regime?.meta?.most_recent_any
+    ? (Date.now() - new Date(regime.meta.most_recent_any).getTime()) / 60000 > 60
+    : true;
+  if (intelBadge) {
+    intelBadge.className = 'silo-status ' + (regimeStale ? 'degraded' : 'live');
+    intelBadge.textContent = regimeStale ? 'stale' : 'live';
+  }
+
+  const overall = (thoStatus === 'ok' && liveCt > 0 && !regimeStale) ? 'ok'
+                : (thoStatus === 'down' ? 'down' : 'degraded');
   $('#header-health').innerHTML =
     `<span class="dot ${overall}"></span><span>${overall === 'ok' ? 'all systems nominal' : overall === 'degraded' ? 'partial telemetry' : 'check status'}</span>`;
 
-  // ----- KPI strip (REAL DATA ONLY, NO PAPER PnL) -----
+  // ----- Regime staleness banner -----
+  if (regime?.meta?.most_recent_any) {
+    const minsSince = (Date.now() - new Date(regime.meta.most_recent_any).getTime()) / 60000;
+    const validRows = regime.meta.valid_rows ?? 0;
+    if (minsSince > 60 || validRows === 0) {
+      const banner = document.getElementById('regime-stale-banner');
+      banner.classList.add('show');
+      document.getElementById('regime-stale-msg').innerHTML =
+        `Regime collector last reported <span class="mono">${ago(regime.meta.most_recent_any)}</span>. ` +
+        `${fmtN(validRows)} valid snapshots / ${fmtN(regime.meta.total_rows)} total. ` +
+        `Restart <span class="mono">com.sapphire.regime-collector</span> on the Mac to resume.`;
+    } else {
+      document.getElementById('regime-stale-banner').classList.remove('show');
+    }
+  }
+
+  // ----- Sparkline data prep (from tsInf) -----
+  const inf24 = tsInf?.rows || [];
+  const hourMap = {};
+  const tierSet = new Set();
+  for (const r of inf24) {
+    const h = (r.hour || '').replace('T', ' ').slice(0, 13);
+    if (!hourMap[h]) hourMap[h] = {};
+    hourMap[h][r.tier] = (hourMap[h][r.tier] || 0) + Number(r.calls || 0);
+    tierSet.add(r.tier);
+  }
+  const hours = Object.keys(hourMap).sort();
+  const tierColors = {
+    proxy: '#4ea8ff', mac_ollama: '#62ff40', gpu_local: '#a371f7',
+    pi_rpc: '#d29922', kimi: '#ff7a00', claude: '#f85149',
+  };
+  const inferSeries = Array.from(tierSet).map(t => ({
+    name: t,
+    color: tierColors[t] || '#6c7891',
+    points: hours.map(h => ({ x_label: h.slice(11), y: hourMap[h][t] || 0 })),
+  }));
+  const totalPerHour = hours.map(h => Object.values(hourMap[h]).reduce((a, b) => a + b, 0));
+
+  // ----- KPI strip -----
   const services = silos?.services || [];
-  const okSvcs = services.filter(s => (s.status || '').toLowerCase() === 'healthy' || (s.status || '').toLowerCase() === 'ok').length;
+  const okSvcs = services.filter(s => (s.status || '').toLowerCase() === 'healthy').length;
   const totalCalls24h = (inference?.tiers || []).reduce((a, t) => a + (Number(t.calls) || 0), 0);
   const totalErr24h = (inference?.tiers || []).reduce((a, t) => a + (Number(t.err_count) || 0), 0);
-  const errRate = totalCalls24h > 0 ? totalErr24h / totalCalls24h : null;
+  const errRate = totalCalls24h > 0 ? totalErr24h / totalCalls24h : 0;
+
+  // Threats sparkline data
+  const threatsByDay = {};
+  for (const r of (tsThr?.rows || [])) {
+    const d = (r.date || '').slice(0, 10);
+    threatsByDay[d] = (threatsByDay[d] || 0) + Number(r.cves || 0);
+  }
+  const threatDays = Object.keys(threatsByDay).sort();
+  const threatPoints = threatDays.map(d => threatsByDay[d]);
 
   const kpis = [
     {
       label: 'Threat records',
       value: fmtN(sum?.threats),
-      sub: liveCt > 0 ? `+${liveCt} new today` : 'BigQuery cumulative',
+      sub: liveCt > 0 ? `+${liveCt} live now` : 'cumulative',
+      sparkPoints: threatPoints,
+      sparkColor: '#f85149',
+    },
+    {
+      label: 'Inference 24h',
+      value: fmtN(totalCalls24h),
+      sub: errRate > 0 ? fmtPct(errRate, 3) + ' error rate' : '0% errors',
+      sparkPoints: totalPerHour,
+      sparkColor: '#4ea8ff',
     },
     {
       label: 'Active leads',
@@ -644,36 +1123,69 @@ async function refresh() {
       sub: 'CRM pipeline',
     },
     {
-      label: 'Inference 24h',
-      value: fmtN(totalCalls24h),
-      sub: errRate != null ? `${fmtPct(errRate, 2)} error rate` : '—',
-    },
-    {
       label: 'Service heartbeats',
-      value: fmtN(services.length || sum?.service_health),
-      sub: services.length ? `${okSvcs} healthy / ${services.length} reporting` : 'last hour',
+      value: services.length ? `${okSvcs} / ${services.length}` : '—',
+      sub: services.length ? 'healthy / reporting' : 'collector offline',
     },
     {
       label: 'Predictions',
       value: fmtN(sum?.predictions),
-      sub: 'ML forecast surface',
+      sub: 'Kronos ML output',
     },
     {
       label: 'Regime snapshots',
-      value: fmtN(sum?.regime_snapshots),
-      sub: sum?.fear_greed != null ? `F&G index: ${sum.fear_greed}` : 'BTC + cross-asset',
+      value: fmtN(regime?.meta?.valid_rows),
+      sub: sum?.fear_greed != null ? `F&G index: ${sum.fear_greed}` : `${fmtN(regime?.meta?.total_rows)} total rows`,
     },
   ];
-  $('#kpis').innerHTML = kpis.map(k =>
-    `<div class="kpi">
+  $('#kpis').innerHTML = kpis.map((k, i) => `
+    <div class="kpi">
       <div class="kpi-label">${k.label}</div>
       <div class="kpi-value">${k.value}</div>
-      <div class="kpi-sub">${k.sub || ''}</div>
-    </div>`
-  ).join('');
+      <div class="kpi-sub"><span>${k.sub || ''}</span></div>
+      ${k.sparkPoints ? `<div class="kpi-spark"><svg id="spark-${i}"></svg></div>` : ''}
+    </div>
+  `).join('');
+  // Render sparklines
+  kpis.forEach((k, i) => {
+    if (k.sparkPoints) {
+      const svg = document.getElementById(`spark-${i}`);
+      if (svg) drawSparkline(svg, k.sparkPoints, k.sparkColor);
+    }
+  });
   $('#kpi-meta').textContent = isoTs();
 
-  // ----- Threat feed (live from cyber-threat-bot) -----
+  // ----- Inference 24h chart -----
+  const infSvg = document.getElementById('chart-inference');
+  drawMultiLine(infSvg, inferSeries, {});
+  buildLegend(document.getElementById('chart-inference-legend'),
+    inferSeries.map(s => ({ name: s.name, color: s.color })));
+  document.getElementById('chart-inference-meta').textContent =
+    inferSeries.length ? `${fmtN(totalCalls24h)} calls across ${inferSeries.length} tiers` : '';
+
+  // ----- Threats 30d chart (stacked by severity) -----
+  const sevColors = { CRITICAL: '#f85149', HIGH: '#d29922', MEDIUM: '#4ea8ff', LOW: '#3fb950', UNCLASSIFIED: '#6c7891' };
+  const sevSet = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'UNCLASSIFIED'];
+  const dayMap = {};
+  for (const r of (tsThr?.rows || [])) {
+    const d = (r.date || '').slice(0, 10);
+    dayMap[d] = dayMap[d] || {};
+    dayMap[d][r.severity || 'UNCLASSIFIED'] = (dayMap[d][r.severity || 'UNCLASSIFIED'] || 0) + Number(r.cves || 0);
+  }
+  const days30 = Object.keys(dayMap).sort();
+  const segments = sevSet.map(sev => ({
+    label: sev,
+    byDay: Object.fromEntries(days30.map(d => [d, dayMap[d]?.[sev] || 0])),
+  }));
+  const segColors = sevSet.map(s => sevColors[s]);
+  drawStackedBars(document.getElementById('chart-threats'), days30, segments, segColors);
+  buildLegend(document.getElementById('chart-threats-legend'),
+    sevSet.map((s, i) => ({ name: s, color: segColors[i] })));
+  const totalThr30 = (tsThr?.rows || []).reduce((a, r) => a + Number(r.cves || 0), 0);
+  document.getElementById('chart-threats-meta').textContent =
+    days30.length ? `${fmtN(totalThr30)} CVEs across ${days30.length} days` : '';
+
+  // ----- Threat feed -----
   const records = threatsLive?.records || [];
   if (records.length) {
     $('#threats-feed').innerHTML = records.map(r => {
@@ -692,41 +1204,75 @@ async function refresh() {
     }).join('');
     if (threatsLive?.fetched_at) $('#threats-meta').textContent = `feed @ ${threatsLive.fetched_at.replace('T', ' ').slice(0, 19)}`;
   } else {
-    $('#threats-feed').innerHTML = '<div class="empty">live feed unavailable — see /healthz/</div>';
+    $('#threats-feed').innerHTML = '<div class="empty actionable">Live feed unavailable. Check <a class="mono" href="https://cyber-threat-bot-691674245427.us-central1.run.app/healthz/" target="_blank" style="color:#4ea8ff">cyber-threat-bot /healthz/</a> and that the Cloud Scheduler job <span class="mono">cyber-threat-bot-refresh</span> is firing every 4h.</div>';
   }
 
-  // ----- Service heartbeats -----
+  // ----- Service heartbeats (rich rollup) -----
   const sh = $('#services tbody');
-  if (services.length) {
+  const tsSvcRows = tsSvc?.rows || [];
+  if (tsSvcRows.length) {
+    // Build latency-bar widths relative to max p95
+    const maxP95 = Math.max(1, ...tsSvcRows.map(r => Number(r.p95_ms || 0)));
+    sh.innerHTML = tsSvcRows.map(r => {
+      const stat = (r.healthy_n > 0 && r.down_n === 0 && r.degraded_n === 0) ? 'healthy'
+                 : (r.down_n > 0) ? 'down' : 'degraded';
+      const cls = stat === 'healthy' ? 'green' : stat === 'down' ? 'red' : 'yellow';
+      const p50 = r.p50_ms != null ? Number(r.p50_ms) : null;
+      const p95 = r.p95_ms != null ? Number(r.p95_ms) : null;
+      const barCls = (p95 || 0) > 200 ? 'bad' : (p95 || 0) > 50 ? 'warn' : '';
+      const barW = p95 ? Math.max(2, (p95 / maxP95) * 100) : 0;
+      return `<tr>
+        <td class="t1">${r.service || '—'}</td>
+        <td class="muted">${r.host || '—'}</td>
+        <td>${pill(cls, stat)}</td>
+        <td class="num">${p50 != null ? fmtMs(p50) : '—'}</td>
+        <td class="num">${p95 != null ? fmtMs(p95) : '—'} <span class="lat-bar ${barCls}" style="width:80px"><i style="width:${barW}%"></i></span></td>
+        <td class="num muted">${ago(r.last_seen)}</td>
+      </tr>`;
+    }).join('');
+    document.getElementById('services-h-meta').textContent = `${tsSvcRows.length} services tracked`;
+  } else if (services.length) {
+    // fallback: snapshot view
     sh.innerHTML = services.map(s => {
       const st = (s.status || 'unknown').toLowerCase();
-      const cls = (st === 'healthy' || st === 'ok') ? 'green' : (st === 'degraded' ? 'yellow' : 'red');
+      const cls = st === 'healthy' ? 'green' : st === 'degraded' ? 'yellow' : 'red';
       return `<tr>
         <td class="t1">${s.service || '—'}</td>
-        <td>${pill(cls, s.status || '—')}</td>
         <td class="muted">${s.host || '—'}</td>
-        <td class="num muted">${shortTs(s.last_seen)}</td>
+        <td>${pill(cls, s.status || '—')}</td>
+        <td class="num">${s.response_ms ? fmtMs(s.response_ms) : '—'}</td>
+        <td class="num">—</td>
+        <td class="num muted">${ago(s.last_seen)}</td>
       </tr>`;
     }).join('');
   } else {
-    sh.innerHTML = '<tr><td colspan="4" class="empty">no recent heartbeats — check telemetry collector</td></tr>';
+    sh.innerHTML = `<tr><td colspan="6"><div class="empty actionable">No heartbeats in last 60 min. The telemetry collector (<span class="mono">com.sapphire.telemetry-collector</span>) writes every 30 min — check its LaunchAgent on the Mac with <span class="mono">launchctl list | grep telemetry</span>.</div></td></tr>`;
   }
 
-  // ----- Inference -----
+  // ----- Inference (rich) -----
   const ih = $('#inference tbody');
   const tiers = inference?.tiers || [];
   if (tiers.length) {
-    ih.innerHTML = tiers.map(t => `<tr>
-      <td class="t1">${t.tier || '—'}</td>
-      <td class="num">${fmtN(t.calls)}</td>
-      <td class="num">${fmtMs(t.avg_latency_ms)}</td>
-      <td class="num">${fmtN(t.err_count)}</td>
-    </tr>`).join('');
+    ih.innerHTML = tiers.map(t => {
+      const calls = Number(t.calls || 0);
+      const ok = Number(t.ok_count || 0);
+      const errs = Number(t.err_count || 0);
+      const rate = calls > 0 ? errs / calls : 0;
+      const rateCls = rate > 0.05 ? 'red' : rate > 0.01 ? 'yellow' : 'green';
+      return `<tr>
+        <td class="t1">${t.tier || '—'}</td>
+        <td class="num">${fmtN(calls)}</td>
+        <td class="num">${t.avg_latency_ms != null ? fmtMs(t.avg_latency_ms) : '—'}</td>
+        <td class="num">${fmtN(ok)}</td>
+        <td class="num">${fmtN(errs)}</td>
+        <td class="num">${pill(rateCls, fmtPct(rate, 3))}</td>
+      </tr>`;
+    }).join('');
   } else {
-    ih.innerHTML = '<tr><td colspan="4" class="empty">no telemetry in last 24h</td></tr>';
+    ih.innerHTML = `<tr><td colspan="6"><div class="empty actionable">No inference telemetry in last 24h. The proxy writes to BQ via <span class="mono">services/inference-proxy/</span> — verify it's running with <span class="mono">curl -s localhost:11435/health</span>.</div></td></tr>`;
   }
 
-  // ----- Regime -----
+  // ----- Regime (filtered to non-null) -----
   const rh = $('#regime tbody');
   const rRows = regime?.rows || [];
   if (rRows.length) {
@@ -737,9 +1283,10 @@ async function refresh() {
       <td class="num">${r.btc_price_usd ? fmtUsd0(r.btc_price_usd) : '—'}</td>
       <td class="num">${r.fear_greed_score ?? '—'}</td>
     </tr>`).join('');
-    if (rRows[0]?.timestamp) $('#regime-meta').textContent = shortTs(rRows[0].timestamp);
+    if (rRows[0]?.timestamp) $('#regime-meta').textContent = `latest valid: ${shortTs(rRows[0].timestamp)}`;
   } else {
-    rh.innerHTML = '<tr><td colspan="5" class="empty">no regime snapshots</td></tr>';
+    const recent = regime?.meta?.most_recent_any;
+    rh.innerHTML = `<tr><td colspan="5"><div class="empty actionable">No valid regime snapshots${recent ? `. Most recent ANY row: <span class="mono">${shortTs(recent)}</span> (${ago(recent)})` : ''}. Restart <span class="mono">com.sapphire.regime-collector</span> on the Mac to resume.</div></td></tr>`;
   }
 
   // ----- Predictions -----
@@ -748,8 +1295,9 @@ async function refresh() {
   if (pRows.length) {
     ph.innerHTML = pRows.map(r => {
       const dir = r.direction || '—';
-      const dirCls = String(dir).toLowerCase().includes('up') || String(dir).toLowerCase().includes('long') ? 'green'
-                   : String(dir).toLowerCase().includes('down') || String(dir).toLowerCase().includes('short') ? 'red' : 'gray';
+      const lower = String(dir).toLowerCase();
+      const dirCls = lower.includes('bull') || lower.includes('up') || lower.includes('long') ? 'green'
+                   : lower.includes('bear') || lower.includes('down') || lower.includes('short') ? 'red' : 'gray';
       return `<tr>
         <td class="num muted">${shortTs(r.timestamp)}</td>
         <td class="t1">${r.symbol || '—'}</td>
@@ -759,7 +1307,7 @@ async function refresh() {
       </tr>`;
     }).join('');
   } else {
-    ph.innerHTML = '<tr><td colspan="5" class="empty">no predictions in window</td></tr>';
+    ph.innerHTML = `<tr><td colspan="5"><div class="empty">no predictions in window</div></td></tr>`;
   }
 
   $('#ts').textContent = isoTs();
