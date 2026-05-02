@@ -1,0 +1,13 @@
+{
+  "chain_id": 42161,
+  "address": "0xf60becbba223EEA9495Da3f606753867eC10d139",
+  "name": "Reader",
+  "is_verified": true,
+  "verified_at": "2026-04-30T00:00:00Z",
+  "compiler_version": "v0.8.18+commit.87f61d96",
+  "fetched_at": "2026-04-30T00:00:00Z",
+  "source_url": "https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/reader/Reader.sol",
+  "function_count": 29,
+  "abi_source": "gmx-io/gmx-synthetics deployments (canonical) — identical functional ABI to MegaETH chain-4326 deployment at 0x0f038EB4a38B08cd3c937a3256b51aa01904a684 (compiled v0.8.29). Both chains run the same Reader contract source; we re-use the functionally identical pinned ABI. Sourcify lookup at sourcify.dev/server/files/any/42161/0xf60becbba223EEA9495Da3f606753867eC10d139 was the primary source; the gmx-synthetics repo's deployments/arbitrum.json was the fallback per the Wave A footgun lesson.",
+  "notes": "Read aggregator. 29 functions covering markets, positions, orders, deposits/withdrawals, glv, withdrawal info. Wave only binds getMarkets/getMarket/getMarketInfo/getOpenInterestWithPnl. Verify on chain with eth_getCode against 0xf60becbba223EEA9495Da3f606753867eC10d139 before binding."
+}
