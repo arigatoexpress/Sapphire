@@ -388,8 +388,18 @@ def build_demo_state() -> dict[str, Any]:
     }
 
 
-def evaluate_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Evaluate an API payload with conservative defaults."""
+def evaluate_from_payload(
+    payload: dict[str, Any],
+    *,
+    gate: ChainHealthGate | None = None,
+) -> dict[str, Any]:
+    """Evaluate an API payload with conservative defaults.
+
+    Accepts an optional ``gate`` so callers (e.g. the dashboard's
+    ``/api/hackathon/sentinel/evaluate`` route) can plumb a chain-health
+    gate through. Existing tests that don't pass ``gate`` get the
+    legacy policy-only path — no behavioural change.
+    """
 
     amount = Decimal(str(payload.get("amount_usdc", "0.012")))
     attempt = PaymentAttempt(
@@ -405,6 +415,7 @@ def evaluate_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
         order_symbol=str(payload.get("order_symbol") or "PLTR"),
         order_action=str(payload.get("order_action") or "buy"),
         notional_usd=float(payload.get("notional_usd") or 25.0),
+        gate=gate,
     )
     return decision.to_dict()
 
