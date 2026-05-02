@@ -669,6 +669,24 @@ td.muted { color: var(--text-3); }
   </div>
 </div>
 
+<!-- ========== Cross-asset correlation matrix ========== -->
+<div class="section-h" id="correlation">
+  <span>Cross-asset correlation — 30d log returns</span>
+  <span class="meta" id="corr-meta">Pearson, daily closes from trading_signals</span>
+</div>
+<div class="panel">
+  <h2>
+    <span>Correlation heatmap</span>
+    <span class="h-meta" id="chart-corr-meta">—</span>
+  </h2>
+  <div class="chart-wrap"><svg id="chart-correlation"></svg></div>
+  <div class="legend">
+    <span class="legend-item"><span class="legend-swatch" style="background:#f85149"></span>+1 (perfect positive)</span>
+    <span class="legend-item"><span class="legend-swatch" style="background:#1d2331"></span>0 (decorrelated)</span>
+    <span class="legend-item"><span class="legend-swatch" style="background:#4ea8ff"></span>-1 (perfect negative)</span>
+  </div>
+</div>
+
 <!-- ========== Live threat feed ========== -->
 <div class="section-h" id="threats">
   <span>Live threat intelligence feed</span>
@@ -985,6 +1003,78 @@ function buildLegend(container, items) {
   ).join('');
 }
 
+// Diverging colormap for correlation heatmap: -1 (blue) → 0 (dark) → +1 (red).
+function corrColor(v) {
+  if (v == null || isNaN(v)) return '#1d2331';
+  const c = Math.max(-1, Math.min(1, Number(v)));
+  if (c >= 0) {
+    // 0 → dark, +1 → red
+    const r = Math.round(29 + (248 - 29) * c);
+    const g = Math.round(35 + (81 - 35) * c);
+    const b = Math.round(49 + (73 - 49) * c);
+    return `rgb(${r},${g},${b})`;
+  }
+  // 0 → dark, -1 → blue
+  const t = -c;
+  const r = Math.round(29 + (78 - 29) * t);
+  const g = Math.round(35 + (168 - 35) * t);
+  const b = Math.round(49 + (255 - 49) * t);
+  return `rgb(${r},${g},${b})`;
+}
+
+function drawHeatmap(svg, symbols, matrix) {
+  if (!symbols || !symbols.length || !matrix || !matrix.length) {
+    svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#6c7891" font-size="11" font-family="Inter">no overlapping price history yet</text>';
+    svg.setAttribute('viewBox', '0 0 600 200');
+    return;
+  }
+  svg.innerHTML = '';
+  const n = symbols.length;
+  const labelPad = 56;
+  const cell = Math.max(28, Math.min(56, Math.floor((600 - labelPad) / n)));
+  const w = labelPad + cell * n + 8;
+  const h = labelPad + cell * n + 8;
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+  // Top column labels
+  for (let j = 0; j < n; j++) {
+    const x = labelPad + j * cell + cell / 2;
+    svg.appendChild(svgEl('text', {
+      x, y: labelPad - 6, fill: '#a8b3c7', 'font-size': 10, 'font-family': 'JetBrains Mono', 'text-anchor': 'middle',
+    })).textContent = symbols[j];
+  }
+  // Left row labels
+  for (let i = 0; i < n; i++) {
+    const y = labelPad + i * cell + cell / 2 + 3;
+    svg.appendChild(svgEl('text', {
+      x: labelPad - 6, y, fill: '#a8b3c7', 'font-size': 10, 'font-family': 'JetBrains Mono', 'text-anchor': 'end',
+    })).textContent = symbols[i];
+  }
+  // Cells
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const v = matrix[i] && matrix[i][j];
+      const x = labelPad + j * cell;
+      const y = labelPad + i * cell;
+      svg.appendChild(svgEl('rect', {
+        x, y, width: cell - 1, height: cell - 1,
+        fill: corrColor(v), 'stroke': '#0a0d14', 'stroke-width': 0.5,
+      }));
+      // value text — only if cell is wide enough
+      if (cell >= 32 && v != null && !isNaN(v)) {
+        const numv = Number(v);
+        const txtColor = Math.abs(numv) > 0.55 ? '#ffffff' : '#a8b3c7';
+        svg.appendChild(svgEl('text', {
+          x: x + cell / 2, y: y + cell / 2 + 3,
+          fill: txtColor, 'font-size': cell >= 44 ? 10 : 9,
+          'font-family': 'JetBrains Mono', 'text-anchor': 'middle',
+        })).textContent = numv.toFixed(2);
+      }
+    }
+  }
+}
+
 // ========== Modal ==========
 function openHelp() {
   document.getElementById('modal-backdrop').classList.add('show');
@@ -1004,7 +1094,7 @@ document.addEventListener('keydown', (e) => {
 
 // ========== Refresh ==========
 async function refresh() {
-  const [sum, regime, preds, silos, inference, threatsLive, tsInf, tsThr, tsSvc] = await Promise.all([
+  const [sum, regime, preds, silos, inference, threatsLive, tsInf, tsThr, tsSvc, corr] = await Promise.all([
     safeFetch('/api/summary'),
     safeFetch('/api/regime?limit=8'),
     safeFetch('/api/predictions?limit=8'),
@@ -1014,6 +1104,7 @@ async function refresh() {
     safeFetch('/api/timeseries/inference'),
     safeFetch('/api/timeseries/threats'),
     safeFetch('/api/timeseries/services'),
+    safeFetch('/api/correlation/matrix?symbols=BTC,ETH,SOL,SPY,QQQ,GLD&days=30'),
   ]);
 
   // ----- THO silo + header health -----
@@ -1308,6 +1399,16 @@ async function refresh() {
     }).join('');
   } else {
     ph.innerHTML = `<tr><td colspan="5"><div class="empty">no predictions in window</div></td></tr>`;
+  }
+
+  // ----- Correlation heatmap -----
+  const corrSvg = document.getElementById('chart-correlation');
+  if (corrSvg) {
+    const symbols = corr?.symbols || [];
+    const matrix = corr?.matrix || [];
+    drawHeatmap(corrSvg, symbols, matrix);
+    document.getElementById('chart-corr-meta').textContent =
+      symbols.length ? `${symbols.length} symbols × ${corr?.n_obs || 0} overlapping days` : 'awaiting data';
   }
 
   $('#ts').textContent = isoTs();
