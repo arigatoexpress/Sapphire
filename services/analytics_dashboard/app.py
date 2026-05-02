@@ -114,90 +114,110 @@ def firebase_hosting_verification():
 
 @app.get("/api/summary")
 def summary():
-    rows = _rows(f"""
-        SELECT
-          (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.trading_signals`)    AS signals,
-          (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.predictions`)        AS predictions,
-          (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.market_regime`)      AS regime_snapshots,
-          (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.threat_intel`)       AS threats,
-          (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.leads`)              AS leads,
-          (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.inference_metrics`)  AS inference_metrics,
-          (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.service_health`)     AS service_health,
-          (SELECT SUM(pnl_usd) FROM `{PROJECT}.{DATASET}.trading_signals`
-             WHERE outcome IN ('win','loss')) AS total_pnl_usd,
-          (SELECT SAFE_DIVIDE(COUNTIF(outcome='win'), COUNTIF(outcome IN ('win','loss')))
-             FROM `{PROJECT}.{DATASET}.trading_signals`) AS win_rate,
-          (SELECT regime FROM `{PROJECT}.{DATASET}.market_regime`
-             ORDER BY timestamp DESC LIMIT 1) AS latest_regime,
-          (SELECT fear_greed_score FROM `{PROJECT}.{DATASET}.market_regime`
-             WHERE fear_greed_score IS NOT NULL
-             ORDER BY timestamp DESC LIMIT 1) AS fear_greed
-    """)
-    return jsonify(_clean(rows)[0] if rows else {})
+    try:
+        rows = _rows(f"""
+            SELECT
+              (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.trading_signals`)    AS signals,
+              (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.predictions`)        AS predictions,
+              (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.market_regime`)      AS regime_snapshots,
+              (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.threat_intel`)       AS threats,
+              (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.leads`)              AS leads,
+              (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.inference_metrics`)  AS inference_metrics,
+              (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.service_health`)     AS service_health,
+              (SELECT SUM(pnl_usd) FROM `{PROJECT}.{DATASET}.trading_signals`
+                 WHERE outcome IN ('win','loss')) AS total_pnl_usd,
+              (SELECT SAFE_DIVIDE(COUNTIF(outcome='win'), COUNTIF(outcome IN ('win','loss')))
+                 FROM `{PROJECT}.{DATASET}.trading_signals`) AS win_rate,
+              (SELECT regime FROM `{PROJECT}.{DATASET}.market_regime`
+                 ORDER BY timestamp DESC LIMIT 1) AS latest_regime,
+              (SELECT fear_greed_score FROM `{PROJECT}.{DATASET}.market_regime`
+                 WHERE fear_greed_score IS NOT NULL
+                 ORDER BY timestamp DESC LIMIT 1) AS fear_greed
+        """)
+        return jsonify(_clean(rows)[0] if rows else {})
+    except Exception as exc:
+        log.info("summary bq miss: %s", exc)
+        return jsonify({})
 
 
 @app.get("/api/performance")
 def performance():
     days = int(request.args.get("days", "30"))
-    rows = _rows(
-        f"""
-        SELECT date, symbol, total_signals, wins, losses, win_rate,
-               daily_pnl_usd, profit_factor, avg_confidence
-        FROM `{PROJECT}.{DATASET}.daily_performance`
-        WHERE date >= DATE_SUB(CURRENT_DATE(), INTERVAL @days DAY)
-        ORDER BY date DESC, symbol
-    """,
-        params=[bigquery.ScalarQueryParameter("days", "INT64", days)],
-    )
-    return jsonify({"rows": _clean(rows), "days": days})
+    try:
+        rows = _rows(
+            f"""
+            SELECT date, symbol, total_signals, wins, losses, win_rate,
+                   daily_pnl_usd, profit_factor, avg_confidence
+            FROM `{PROJECT}.{DATASET}.daily_performance`
+            WHERE date >= DATE_SUB(CURRENT_DATE(), INTERVAL @days DAY)
+            ORDER BY date DESC, symbol
+        """,
+            params=[bigquery.ScalarQueryParameter("days", "INT64", days)],
+        )
+        return jsonify({"rows": _clean(rows), "days": days})
+    except Exception as exc:
+        log.info("performance bq miss: %s", exc)
+        return jsonify({"rows": [], "days": days})
 
 
 @app.get("/api/regime")
 def regime():
     limit = int(request.args.get("limit", "100"))
-    rows = _rows(
-        f"""
-        SELECT timestamp, regime, score, confidence, btc_price_usd,
-               btc_dominance, avg_funding_8h_pct, fear_greed_score, fear_greed_label
-        FROM `{PROJECT}.{DATASET}.market_regime`
-        ORDER BY timestamp DESC
-        LIMIT @limit
-    """,
-        params=[bigquery.ScalarQueryParameter("limit", "INT64", limit)],
-    )
-    return jsonify({"rows": _clean(rows)})
+    try:
+        rows = _rows(
+            f"""
+            SELECT timestamp, regime, score, confidence, btc_price_usd,
+                   btc_dominance, avg_funding_8h_pct, fear_greed_score, fear_greed_label
+            FROM `{PROJECT}.{DATASET}.market_regime`
+            ORDER BY timestamp DESC
+            LIMIT @limit
+        """,
+            params=[bigquery.ScalarQueryParameter("limit", "INT64", limit)],
+        )
+        return jsonify({"rows": _clean(rows)})
+    except Exception as exc:
+        log.info("regime bq miss: %s", exc)
+        return jsonify({"rows": []})
 
 
 @app.get("/api/predictions")
 def predictions():
     limit = int(request.args.get("limit", "50"))
-    rows = _rows(
-        f"""
-        SELECT timestamp, symbol, model, direction, confidence,
-               current_price, predicted_price_24h, predicted_move_pct,
-               accuracy_score
-        FROM `{PROJECT}.{DATASET}.predictions`
-        ORDER BY timestamp DESC
-        LIMIT @limit
-    """,
-        params=[bigquery.ScalarQueryParameter("limit", "INT64", limit)],
-    )
-    return jsonify({"rows": _clean(rows)})
+    try:
+        rows = _rows(
+            f"""
+            SELECT timestamp, symbol, model, direction, confidence,
+                   current_price, predicted_price_24h, predicted_move_pct,
+                   accuracy_score
+            FROM `{PROJECT}.{DATASET}.predictions`
+            ORDER BY timestamp DESC
+            LIMIT @limit
+        """,
+            params=[bigquery.ScalarQueryParameter("limit", "INT64", limit)],
+        )
+        return jsonify({"rows": _clean(rows)})
+    except Exception as exc:
+        log.info("predictions bq miss: %s", exc)
+        return jsonify({"rows": []})
 
 
 @app.get("/api/threats")
 def threats():
     days = int(request.args.get("days", "30"))
-    rows = _rows(
-        f"""
-        SELECT date, severity, cves, exploited_cves, kev_cves, avg_cvss
-        FROM `{PROJECT}.{DATASET}.daily_threats`
-        WHERE date >= DATE_SUB(CURRENT_DATE(), INTERVAL @days DAY)
-        ORDER BY date DESC, severity
-    """,
-        params=[bigquery.ScalarQueryParameter("days", "INT64", days)],
-    )
-    return jsonify({"rows": _clean(rows)})
+    try:
+        rows = _rows(
+            f"""
+            SELECT date, severity, cves, exploited_cves, kev_cves, avg_cvss
+            FROM `{PROJECT}.{DATASET}.daily_threats`
+            WHERE date >= DATE_SUB(CURRENT_DATE(), INTERVAL @days DAY)
+            ORDER BY date DESC, severity
+        """,
+            params=[bigquery.ScalarQueryParameter("days", "INT64", days)],
+        )
+        return jsonify({"rows": _clean(rows)})
+    except Exception as exc:
+        log.info("threats bq miss: %s", exc)
+        return jsonify({"rows": []})
 
 
 def _http_get_json(url: str, timeout: float = 3.0) -> dict | None:
@@ -230,13 +250,18 @@ def silos_health():
     (THO production, sapphirealpha.xyz). Designed for the unified dashboard
     header strip.
     """
-    rows = _rows(f"""
-        SELECT service, status, last_seen
-        FROM `{PROJECT}.{DATASET}.service_health`
-        WHERE last_seen >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 MINUTE)
-        QUALIFY ROW_NUMBER() OVER (PARTITION BY service ORDER BY last_seen DESC) = 1
-    """)
-    services = _clean(rows)
+    services: list[dict] = []
+    try:
+        rows = _rows(f"""
+            SELECT service_name AS service, status, host, response_ms,
+                   timestamp AS last_seen
+            FROM `{PROJECT}.{DATASET}.service_health`
+            WHERE timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 60 MINUTE)
+            QUALIFY ROW_NUMBER() OVER (PARTITION BY service_name ORDER BY timestamp DESC) = 1
+        """)
+        services = _clean(rows)
+    except Exception as exc:
+        log.info("service_health bq miss: %s", exc)
 
     tho_health = _http_get_json(THO_HEALTH_URL, timeout=2.5)
     silos = {
@@ -288,34 +313,49 @@ def silos_business():
 
 @app.get("/api/silos/inference")
 def silos_inference():
-    """Inference proxy telemetry from BigQuery."""
-    rows = _rows(f"""
-        SELECT tier, COUNT(*) AS calls,
-               AVG(latency_ms) AS avg_latency_ms,
-               COUNTIF(status='ok') AS ok_count,
-               COUNTIF(status!='ok') AS err_count
-        FROM `{PROJECT}.{DATASET}.inference_metrics`
-        WHERE timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)
-        GROUP BY tier
-        ORDER BY calls DESC
-    """)
-    return jsonify({"tiers": _clean(rows)})
+    """Inference proxy telemetry from BigQuery. Fails-safe to empty list.
+
+    Aggregates the requests/success/errors counters that the telemetry
+    collector writes per (tier, model). Latency is the request-weighted
+    average of the per-row avg_latency_ms (good enough for header KPIs).
+    """
+    try:
+        rows = _rows(f"""
+            SELECT tier,
+                   SUM(requests) AS calls,
+                   AVG(avg_latency_ms) AS avg_latency_ms,
+                   AVG(p95_latency_ms) AS p95_latency_ms,
+                   SUM(success) AS ok_count,
+                   SUM(errors) AS err_count
+            FROM `{PROJECT}.{DATASET}.inference_metrics`
+            WHERE timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)
+            GROUP BY tier
+            ORDER BY calls DESC
+        """)
+        return jsonify({"tiers": _clean(rows)})
+    except Exception as exc:
+        log.info("inference_metrics bq miss: %s", exc)
+        return jsonify({"tiers": []})
 
 
 @app.get("/api/signals/recent")
 def signals_recent():
     limit = int(request.args.get("limit", "100"))
-    rows = _rows(
-        f"""
-        SELECT timestamp, signal_id, symbol, action, direction, confidence,
-               score, source, outcome, pnl_usd, regime
-        FROM `{PROJECT}.{DATASET}.trading_signals`
-        ORDER BY timestamp DESC
-        LIMIT @limit
-    """,
-        params=[bigquery.ScalarQueryParameter("limit", "INT64", limit)],
-    )
-    return jsonify({"rows": _clean(rows)})
+    try:
+        rows = _rows(
+            f"""
+            SELECT timestamp, signal_id, symbol, action, direction, confidence,
+                   score, source, outcome, pnl_usd, regime
+            FROM `{PROJECT}.{DATASET}.trading_signals`
+            ORDER BY timestamp DESC
+            LIMIT @limit
+        """,
+            params=[bigquery.ScalarQueryParameter("limit", "INT64", limit)],
+        )
+        return jsonify({"rows": _clean(rows)})
+    except Exception as exc:
+        log.info("signals_recent bq miss: %s", exc)
+        return jsonify({"rows": []})
 
 
 @app.get("/")
