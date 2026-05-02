@@ -16,12 +16,23 @@ import json
 import logging
 import math
 import os
+import sys
 import urllib.error
 import urllib.request
 from datetime import UTC, datetime
+from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request
 from google.cloud import bigquery
+
+# Sibling-import bootstrap: works in Cloud Run (gunicorn cwd is /app where
+# app.py + _deflated_sharpe.py live side-by-side) and in tests where the
+# importlib.util loader walks the file directly.
+_HERE = Path(__file__).resolve().parent
+if str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))
+
+from _deflated_sharpe import annualized_sharpe, deflated_sharpe  # noqa: E402
 
 PROJECT = os.environ.get("GCP_PROJECT", "tho-ai-agent")
 DATASET = os.environ.get("BQ_DATASET", "sapphire")
@@ -494,6 +505,114 @@ def vpin():
     out["vpin"] = latest
     out["toxicity"] = toxicity
     out["history"] = sparkline
+    return jsonify(out)
+
+
+@app.get("/api/deflated-sharpe/rolling")
+def deflated_sharpe_rolling():
+    """Rolling Deflated Sharpe Ratio per strategy.
+
+    Pulls daily P&L per strategy from trading_signals (grouped on
+    `source` as the strategy id), converts to daily returns assuming
+    a notional bankroll, then steps a rolling window across the
+    timeline emitting Sharpe + DSR-corrected probability per window.
+
+    Args (query):
+        strategy: filter to a single source (optional — default all).
+        window:   rolling-window size in days (default 90, min 30, max 365).
+        days:     total lookback (default 365).
+
+    Fail-safe to empty payload on BQ error.
+    """
+    strategy = request.args.get("strategy", "").strip()
+    window = max(30, min(365, int(request.args.get("window", "90"))))
+    lookback = max(window + 30, min(730, int(request.args.get("days", "365"))))
+
+    out = {"window": window, "rolling": [], "summary": []}
+
+    where_strategy = "AND source = @strategy" if strategy else ""
+    params = [bigquery.ScalarQueryParameter("days", "INT64", lookback)]
+    if strategy:
+        params.append(bigquery.ScalarQueryParameter("strategy", "STRING", strategy))
+
+    try:
+        rows = _rows(
+            f"""
+            SELECT
+              DATE(timestamp) AS day,
+              IFNULL(source, 'unknown') AS strategy,
+              SUM(IFNULL(pnl_usd, 0.0)) AS pnl
+            FROM `{PROJECT}.{DATASET}.trading_signals`
+            WHERE timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL @days DAY)
+              AND outcome IN ('win', 'loss')
+              {where_strategy}
+            GROUP BY day, strategy
+            ORDER BY strategy, day
+            """,
+            params=params,
+        )
+    except Exception as exc:
+        log.info("deflated_sharpe_rolling bq miss: %s", exc)
+        return jsonify(out)
+
+    cleaned = _clean(rows)
+
+    # Group by strategy → ordered list of (date, daily_return).
+    # Notional bankroll converts USD pnl → fractional daily returns. Sharpe
+    # is scale-invariant under linear rescaling so this only normalizes
+    # magnitude (10k matches paper portfolio scale).
+    by_strategy: dict[str, list[tuple[str, float]]] = {}
+    NOTIONAL = 10_000.0
+    for r in cleaned:
+        strat = r.get("strategy") or "unknown"
+        day = str(r.get("day"))
+        pnl = float(r.get("pnl") or 0.0)
+        by_strategy.setdefault(strat, []).append((day, pnl / NOTIONAL))
+
+    rolling: list[dict] = []
+    summary: list[dict] = []
+
+    for strat, series in by_strategy.items():
+        series.sort(key=lambda x: x[0])
+        if len(series) < window:
+            continue
+        per_window_sharpes: list[float] = []
+        windows_emitted: list[dict] = []
+        for end in range(window, len(series) + 1):
+            slc = series[end - window:end]
+            rets = [r for _, r in slc]
+            sharpe = annualized_sharpe(rets)
+            per_window_sharpes.append(sharpe)
+            # DSR using running rolling-Sharpe history as the trial set
+            # (selection-from-running-candidates framing).
+            dsr = deflated_sharpe(
+                per_window_sharpes,
+                selected_sharpe=sharpe,
+                n_obs=len(rets),
+            )
+            windows_emitted.append({
+                "date": slc[-1][0],
+                "strategy": strat,
+                "sharpe": round(sharpe, 4),
+                "deflated_sharpe": dsr["deflated_sharpe"],
+                "probability": dsr["probability"],
+                "trials": dsr["trials"],
+                "n_obs": len(rets),
+            })
+        rolling.extend(windows_emitted)
+
+        if windows_emitted:
+            latest = windows_emitted[-1]
+            summary.append({
+                "strategy": strat,
+                "latest_sharpe": latest["sharpe"],
+                "latest_deflated": latest["deflated_sharpe"],
+                "latest_probability": latest["probability"],
+                "n_windows": len(windows_emitted),
+            })
+
+    out["rolling"] = rolling
+    out["summary"] = sorted(summary, key=lambda r: r["latest_probability"], reverse=True)
     return jsonify(out)
 
 
