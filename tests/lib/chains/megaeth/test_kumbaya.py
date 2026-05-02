@@ -404,9 +404,9 @@ async def test_top_pools_orders_by_liquidity_desc() -> None:
     pool_b = "0x" + "bb" * 20
     pool_a_resp = "0x" + abi_encode(["address"], [pool_a]).hex()
     pool_b_resp = "0x" + abi_encode(["address"], [pool_b]).hex()
-    slot0 = lambda: (
+    slot0 = lambda: (  # noqa: E731
         "0x"
-        + abi_encode(  # noqa: E731
+        + abi_encode(
             ["uint160", "int24", "uint16", "uint16", "uint16", "uint8", "bool"],
             [10**30, 0, 0, 0, 0, 0, True],
         ).hex()
