@@ -1,0 +1,457 @@
+# 0G Labs Deep Dive — APAC Hackathon Criteria, Sapphire Pitch Gaps, and Ecosystem Map
+
+**Authored:** 2026-05-02 (T-14 days to 2026-05-16 23:59 UTC+8 submission deadline)
+**Owner:** Ari Spec
+**Inputs:** `docs/hackathon-0g/README.md`, `docs/hackathon-0g/submission-checklist.md`, `docs/hackathon-0g/design.md`, `lib/og/{storage,compute,chain,hooks}.py`, public 0G Labs sources cited inline.
+**Companion PR:** Sapphire × 0G submission lives on `feat/0g-integration` (PR #525, merged).
+
+## Table of Contents
+
+1. [APAC Hackathon judging deep dive](#1-apac-hackathon-judging-deep-dive)
+2. [Sapphire × 0G submission gap analysis](#2-sapphire--0g-submission-gap-analysis)
+3. [Programs beyond the hackathon](#3-programs-beyond-the-hackathon)
+4. [Mainnet competitive landscape](#4-mainnet-competitive-landscape)
+5. [Post-submission narrative](#5-post-submission-narrative)
+6. [Top 3 actionable items](#top-3-actionable-items)
+
+---
+
+## 1. APAC Hackathon judging deep dive
+
+### 1.1 Track structure
+
+The 0G APAC Hackathon (registration 2026-03-19, submission 2026-05-16 23:59 UTC+8) has **5 tracks** (HackQuest's earlier marketing said 4; the live track list is 5 — Sapphire's submission targets Track 2):
+
+| # | Track | What 0G is hoping to see |
+|---|-------|--------------------------|
+| 1 | **Agentic Infrastructure & OpenClaw Lab** | Autonomous-intelligence backbone, orchestration layers. Encourages OpenClaw integration + 0G Compute fine-tuning + 0G Storage state persistence. |
+| 2 | **Agentic Trading Arena (Verifiable Finance)** | "Transitioning from manual DeFi to fully autonomous, verifiable financial logic." Yield optimizers, risk-management bots, perpetual strategy agents. **Explicitly endorses Sealed Inference + TEE-based execution to mitigate front-running.** |
+| 3 | **Agentic Economy & Autonomous Applications** | Financial protocols, AI commerce, SocialFi agents, Agent-as-a-Service, micropayments, automated billing, self-custodial agent wallets. |
+| 4 | **Web 4.0 Open Innovation (Wildcard)** | High-performance scaling for SocialFi, Gaming, DePIN. Decentralized storage required. |
+| 5 | **Privacy & Sovereign Infrastructure** | Privacy-preserving protocols, cross-chain solutions, MEV-resistant infrastructure. |
+
+**Cross-track positioning for Sapphire:** Track 2 is the obvious primary. Track 3 (Agent Economy) is a credible secondary because Sapphire already ships `SapphirePaymentGate` + `SapphireSentinelRegistry` on the same submission — agent mandates and on-chain payment receipts are exactly what Track 3 calls for. **Hackathon rules typically allow a project to be considered for multiple tracks if the form lets you tag them; if HackQuest only allows one, stay on Track 2.** Track 5 has tangential overlap (TEE = privacy infrastructure) but is weaker positioning since Sapphire isn't a privacy protocol per se.
+
+### 1.2 Prize pool
+
+- **Total: $150,000 USDT + 0G Ecosystem Credits**
+- Grand Prizes: 1st **$45,000**, 2nd **$35,000**, 3rd **$20,000** (cross-track — there is no announced track-specific prize split)
+- Excellence Awards: 10 × **$3,700** = $37,000
+- Community Awards: 10 × **$1,300** = $13,000
+
+The prize structure is **cross-track**, meaning a single Track 2 entry competes against the strongest entries from all 5 tracks for grand prizes. There are 23 prize slots in total (3 grand + 10 excellence + 10 community), so roughly 1 in 5 reasonable submissions takes home cash if total entries land in the typical 100–150 range for hackathons of this prize size.
+
+### 1.3 Judging criteria (verbatim from HackQuest)
+
+1. **0G Technical Integration Depth & Innovation** — *most important; "at least one 0G component must be integrated" or face disqualification/deductions.*
+2. **Technical Implementation & Completeness**
+3. **Product Value & Market Potential**
+4. **User Experience & Demo Quality**
+5. **Team Capability & Documentation**
+
+Source: https://www.hackquest.io/hackathons/0G-APAC-Hackathon
+
+**Implication for Sapphire:** criterion #1 dominates. Judges will weigh *how many* 0G components you use and *how deeply* (mainnet activity > testnet > readme claims). Sapphire integrates **3 of 4** primary components (Storage, Compute/TEE, Chain) — that's strong, but missing 0G DA. See §2 for whether to add it.
+
+### 1.4 Submission requirements (form fields)
+
+| # | Required field | Sapphire status |
+|---|----------------|-----------------|
+| 1 | Project name + ≤30-word description + problem statement + 0G components list | DONE in `docs/hackathon-0g/submission-checklist.md` |
+| 2 | Public GitHub repo with substantial dev | DONE — `arigatoexpress/Sapphire`, PR #525 merged |
+| 3 | **0G Mainnet contract address + 0G Explorer link showing on-chain activity** | **MISSING — biggest gap** |
+| 4 | Demo video ≤3 min (YouTube/Loom) showing functionality + 0G usage | MISSING |
+| 5 | README/documentation (English or Chinese) including architecture, deployment steps, test account details | DONE |
+| 6 | Public X post with project name, demo link, hashtags `#0GHackathon #BuildOn0G`, tags `@0G_labs @0g_CN @0g_Eco @HackQuest_` | DRAFT in `x-post.md`, not posted |
+| 7 | Optional bonus: pitch deck, frontend link, user feedback, technical write-ups | OPPORTUNITY (see §2.4) |
+
+### 1.5 Past 0G hackathon winners — pattern analysis
+
+0G has been a sponsor (not solo host) at several recent hackathons before APAC:
+
+| Event | Date | 0G prize pool | Pattern of winning entries |
+|---|---|---|---|
+| **ETHGlobal Cannes** | 2025-07-04→06 | $5,000 (3 bounty teams) | Part of broader $275K ETHGlobal pool. ([Chainwire](https://chainwire.org/2025/07/09/0g-labs-sponsors-ethglobal-cannes-hackathon-and-supports-275k-prize-pool/)) |
+| **ETHGlobal Trifecta** | 2025 | $5,000 | 72-hour invite-only sprint among prior ETHGlobal winners; tight integrations of 0G Storage/Compute. |
+| **HKWeb3 Hackathon** | 2025 | undisclosed | Multi-week marathon; 0G surfaced "elite student" entries from Seoul/Shenzhen/Shanghai per their own recap. ([0G blog mirror](https://www.choosen.systems/blog/0g-latest-hackathon-highlights.html)) |
+| **OpenAgents (ETHGlobal)** | 2025 | undisclosed | Theme: hierarchical planning + reflection loops integrating **0G Compute sealed inference**. ([ETHGlobal OpenAgents](https://ethglobal.com/events/openagents/prizes)) |
+
+**Public winner detail is sparse** — 0G's own recaps don't name the winning projects with deep technical breakdowns, which makes pattern analysis partial. From what *is* public:
+
+- Winners consistently demo **mainnet activity, not testnet promises** — every recap blurb leads with "deployed live on …" or "X transactions anchored."
+- Winners pair **at least 2 0G components** (Storage + Chain is the most common pair; Compute alone is rarer).
+- Winners pitch **a real user/customer**, not just architecture. The OpenAgents winners typically had Discord communities or named pilot users.
+- Winners produce **a live demo video that shows the on-chain footprint**, not just terminal logs.
+
+### 1.6 Scoring rubric inferred (since 0G has not published exact weights)
+
+Given criteria #1–#5 and the consistent pattern across 0G's prior sponsorships, a defensible weight estimate is:
+
+- 0G Integration Depth: ~30%
+- Technical Completeness: ~20%
+- Product/Market Value: ~20%
+- UX/Demo Quality: ~20%
+- Team/Docs: ~10%
+
+A submission that is 90% on integration but 30% on demo will score worse than a balanced 70% across the board.
+
+---
+
+## 2. Sapphire × 0G submission gap analysis
+
+Sapphire's current pitch (`docs/hackathon-0g/README.md`) is **technically excellent and narratively under-tuned for hackathon judges.** The integration depth is real (3 of 4 0G primary components, 56 dedicated tests, fire-and-forget production safety, two live triggers — TradingView webhooks + Kronos daily). The risk is that judges scanning hundreds of submissions read the first 20 lines and don't reach the part where Sapphire is a 6,488-test production trading OS.
+
+### 2.1 Where we're already strong
+
+| Strength | Evidence |
+|---|---|
+| **Component breadth** | Storage + Compute + Chain in one submission, with a verifier round-trip flow that uses all three. Most hackathon entries integrate 1–2. |
+| **Production credibility** | 6,488+ tests, 50 dashboard pages, 7 quant strategies, live Hyperliquid + Robinhood execution. Most hackathon entries are prototypes built that month. |
+| **Safety story** | `SAPPHIRE_OG_ENABLED=1` flag → trading critical path is byte-identical without 0G. Fire-and-forget publish never blocks a trade. This is *exactly* the maturity narrative judges respect. |
+| **Verifier path** | `og_verify` — the round-trip read tool — is what closes the loop and proves the system isn't write-only. Many hackathon entries write to chain but provide no public verifier. |
+| **Track 2 alignment** | Sapphire's TEE-attested signal generation directly answers Track 2's explicit ask: "Sealed Inference and TEE-based execution to ensure execution privacy and mitigate front-running." |
+
+### 2.2 Where we're underselling (text fixes)
+
+These are line-level edits to `docs/hackathon-0g/README.md`. Each is a high-leverage, ≤30-minute change.
+
+#### Edit A — TL;DR is too modest (current line 7–9)
+
+**Before:**
+```
+## One-sentence pitch (≤30 words)
+
+A production trading agent that publishes every signal to 0G Storage and anchors it on 0G Chain, giving traders, auditors, and counterparties on-chain proof of every prediction.
+```
+
+**After:**
+```
+## One-sentence pitch (≤30 words)
+
+The first production-grade trading OS (6,488 tests, live execution) to make every AI prediction cryptographically committed before market impact — sealed by 0G Compute, anchored on 0G Chain.
+```
+
+**Why:** the current pitch reads as descriptive infrastructure. The replacement opens with two scarcity claims ("first," "production-grade with concrete test count") and one mechanism that judges associate with the Track 2 mandate ("before market impact"). Both stay under 30 words.
+
+#### Edit B — Add a "Why this is hard" section directly above "What it does" (insert after line 5)
+
+**Insert:**
+```
+## Why this is hard
+
+Three things have to be true for a verifiable trading signal: (1) the prediction had to exist *before* the move; (2) the model that produced it can't be silently swapped; (3) the operator can't backfill the inputs. Without 0G Storage + 0G Chain + TEE-sealed inference, no public chain offers all three in one round-trip. Sapphire is the integration that proves it.
+```
+
+**Why:** judges' eyes glaze on "what it does" lists. A two-sentence problem statement up top makes the integration feel inevitable rather than additive. This also directly mirrors HackQuest's submission requirement: "problem statement."
+
+#### Edit C — Reframe the "What it does" numbered list as **proofs**, not steps (current lines 13–18)
+
+**Before** (paraphrased): four numbered process steps (Inference → Storage → Chain → Verifier).
+
+**After:** keep the same four bullets but rename the section **"What 0G makes verifiable"** and prefix each bullet with the *property it proves*:
+
+```
+## What 0G makes verifiable
+
+1. **The model wasn't tampered with** — `0G Compute` runs the inference inside a TEE; the returned `chatID` is signed by the enclave key and re-verifiable via `broker.inference.processResponse(provider, chatID)`.
+2. **The prediction was committed before disclosure** — the full envelope (input, reasoning, output, attestation) is uploaded to `0G Storage` returning a content-addressed merkle `rootHash`.
+3. **The timestamp is on a public clock** — `SapphireSignalVerifier.publishSignal(strategyId, symbol, direction, confidence, proofHash=rootHash)` is called on `0G Chain mainnet (16661)`, immutably anchoring the prediction.
+4. **Anyone can replay the proof** — the `og_verify` tool reads the on-chain entry → downloads the blob from 0G Storage with merkle-proof check → re-verifies the TEE attestation. No special access required.
+```
+
+**Why:** the current text describes *mechanism*. The replacement asserts *guarantees* and ties each guarantee to one 0G component. This is what criterion #1 (Integration Depth) is grading.
+
+#### Edit D — Open the "Mainnet contract addresses" section with a live-explorer screenshot reference (current lines 109–117)
+
+**Add directly under the section header:**
+```
+> Live activity: see [chainscan.0g.ai/address/<addr>](https://chainscan.0g.ai/address/0x...) — the `SignalPublished` event log is the running ledger of every prediction this system has committed.
+```
+
+**Why:** judges click *one* link to confirm activity; that link should be the explorer, not the GitHub repo. The README currently buries this under a markdown table that reads as "TBD."
+
+#### Edit E — Promote the test count + production claim into the first 200 words (currently buried under "See also" at line 145)
+
+**Add as a closing line in the TL;DR or as a one-liner after the pitch:**
+
+```
+> **Why we're credible:** 6,488 tests passing, 50 dashboard pages, 7 quant strategies, live Hyperliquid + Robinhood Crypto execution as of 2026-04-30. The 0G integration is the cryptographic settlement layer on top — not a hackathon prototype.
+```
+
+**Why:** Sapphire's strongest non-0G signal is "this is a real working system." Judges grading criterion #5 (Team Capability & Documentation) and #3 (Product Value) should not have to scroll to find it.
+
+### 2.3 What's missing entirely
+
+| Gap | Why it matters | Effort to close |
+|---|---|---|
+| **Live mainnet `SignalPublished` event log** | Criterion #1 weights mainnet activity over testnet. The README has placeholder `0x...` addresses; explorers will show 0 transactions until you deploy + publish. | 1–2 hrs (deploy + 1 real publish) — this is the **single highest-leverage action** before submission. |
+| **Public verifier endpoint (no clone-and-run required)** | Judges should not need to `git clone` + install Node deps to verify a signal. A static page (Cloudflare Pages or Vercel) at e.g. `verify.sapphirealpha.xyz` that takes a `signal_id` and renders the round-trip would dramatically improve UX score. | 4–8 hrs |
+| **0G DA usage** | Sapphire uses Storage + Compute + Chain; **0G DA is unused**. Adding DA for streaming the live signal feed (vs. one anchor per signal) would be a credible "depth" win. Not required, but the only remaining 0G primary-component gap. | 1–2 days (likely too much before deadline) |
+| **At least one named third-party using the verifier** | Even one signed quote ("we audited Sapphire's published signals") from a peer trading-tools team would lift criterion #3 (Market Value). | 1–3 days of outreach |
+| **Pitch deck (optional bonus)** | Listed as optional but in a tied scoring scenario could be the differentiator. The Sapphire dashboard already has the visuals. | 2–4 hrs |
+| **Frontend showing live anchored signals** | A `/0g-feed` dashboard page reading from `SignalPublished` events would be a "show, don't tell" win — judges click one link, see real activity. | 1 day |
+
+### 2.4 The single highest-leverage addition (under 1 day)
+
+**Build `/0g-feed` as a new dashboard page on the existing Flask dashboard that reads `SignalPublished` events from the deployed mainnet contract and renders them as a live table with explorer links + the `og_verify` round-trip output inline.**
+
+Why this dominates other 1-day options:
+
+- **Touches all 5 criteria in one artifact.** Integration (reads on-chain), Implementation (uses existing dashboard), Product Value (a usable consumer of the proof), UX (one URL judges click), Documentation (already a Sapphire pattern).
+- **Replaces the "show me on chain" risk with a live demo URL** judges can hit without setup.
+- **Compounds with Edit D** — instead of "explorer link," the README points to `sapphirealpha.xyz/0g-feed` which then links into the explorer.
+- **Re-uses 90% existing code:** Sapphire already has 50 dashboard pages reading from JSONL/Redis; this just adds an `eth_filter` reader on `lib/og/chain.py` and a Jinja template.
+
+If only one thing happens in the next 14 days beyond mainnet deploy + demo video, this is the thing.
+
+---
+
+## 3. Programs beyond the hackathon
+
+The hackathon is the *entry point* to a much larger funding ecosystem. The amounts involved make it worth treating the submission as the first deliverable in a 6-month plan, not a one-shot event.
+
+### 3.1 0G Apollo AI Accelerator — primary post-hackathon target
+
+- **Size:** up to **$2M per project** + $200K Google Cloud credits + Privy wallet integration access. Total program is **$20M** with **only 10 teams selected globally**.
+- **Length:** 10-week intensive program (28 April → 7 July 2026 cohort; **next cohort dates TBD — likely Q3/Q4 2026**).
+- **Built with:** Stanford blockchain veterans / Blockchain Builders Fund.
+- **Verticals explicitly listed:** AI agents, **DeFi + AI solutions** (← Sapphire fit), on-chain data markets, cross-chain infrastructure, gaming/NFTs with AI, decentralized content.
+- **Application:** https://forms.gle/TYM4tZaD1gYrDVdS9 (current cohort closed; check https://apollo.0g.ai for next).
+- **Sapphire fit:** *very high* — Apollo explicitly funds revenue-generating decentralized AI applications. Sapphire's combination of (a) live trading P&L, (b) production user-facing dashboard, (c) deep 0G integration after the hackathon is exactly the founder profile they describe.
+- **Strategy:** the hackathon submission *is* the Apollo application warm-up. Even a non-winning hackathon entry that publishes real on-chain activity is a strong Apollo signal.
+
+Source: [0G Apollo announcement](https://www.globenewswire.com/news-release/2026/02/27/3246238/0/en/0G-and-Stanford-Blockchain-Veterans-Launch-20M-Apollo-AI-Accelerator.html) · [apollo.0g.ai](https://apollo.0g.ai/)
+
+### 3.2 0G Foundation Ecosystem Growth Program — strategic capital
+
+- **Size:** **$88.88M** total across the program; **$8.88M Guild on 0G** sub-fund for early-stage builders going testnet → mainnet.
+- **Funder mix:** Hack VC, Delphi Ventures, Bankless Ventures, OKX Ventures.
+- **Targeted categories:** DeFi + social w/ AI agents, on-chain data marketplaces, AI-driven gaming, AI infrastructure, governance protocols.
+- **Application:** https://app.deform.cc/form/da4fc5f6-1836-42fc-b95b-84f43ce1bdf2/
+- **Sapphire fit:** *medium-high* — Sapphire is more "DeFi+AI" than "AI dApp" (the program emphasizes the latter); the Sentinel registry / agent-mandate layer is the strongest pitch handle here.
+- **Note:** the program emphasizes "purpose-driven" projects addressing climate/automation/healthcare/security. Sapphire could credibly position around the *security* dimension (verifiable-trading-signal as anti-fraud / anti-front-running infrastructure for finance).
+
+Source: [0G $88.88M ecosystem program announcement](https://0g.ai/blog/0g-ecosystem-program)
+
+### 3.3 0G Compute TEE provider network — could Sapphire be a *provider*, not a *consumer*?
+
+This is the most interesting strategic question raised by this research.
+
+**Today:** Sapphire is a 0G Compute *consumer* — `lib/og/compute.py` calls a 0G provider for sealed inference and gets a `chatID` back.
+
+**Could Sapphire become a TEE provider?** Per [0G's inference docs](https://docs.0g.ai/developer-hub/building-on-0g/compute-network/inference), every 0G Compute provider runs a **Confidential Virtual Machine on Intel TDX + NVIDIA H100/H200 in TEE mode**. Two modes are supported:
+
+- **TeeML** — model runs *inside* the TEE on the provider's own hardware
+- **TeeTLS** — Broker is in a TEE and proxies to external LLM providers; the TEE captures TLS cert fingerprints + bundles them into the signed response
+
+**Practical answer:** Sapphire today doesn't have Intel TDX hardware (the closest current asset is the RTX 5070 Ti on Windows, which is *not* TEE-mode capable — and the Mac M-series doesn't expose Intel TDX). Becoming a 0G Compute *provider* therefore requires a hardware investment (~$8–15K for a TDX-capable rack node + H100 lease, or cloud VMs that expose TDX such as Azure DCsv5 / Google C3-attested VMs).
+
+**The realistic Sapphire angle is TeeTLS:** Sapphire could run a **TeeTLS broker that fronts the existing 4-tier inference proxy** (Windows GPU → Pi → Mac → Kimi). Trades latency for verifiability — the request goes through a cloud TEE that signs the response, not the raw GPU. This is a v2 idea; mention in the post-submission narrative (§5) but don't promise it for the submission.
+
+### 3.4 0G Storage node operator — small-scale revenue play
+
+- **Hardware:** 32 GB RAM, 8-core CPU, 500GB–1TB SSD, 100 Mbps. (~$25–50/month if rented, $0 marginal if self-hosted.)
+- **Setup:** clone the repo, `cargo build --release`, configure mainnet contracts (`Flow=0x62D4...`, `Mine=0xCd01...`, `Reward=0x457a...`), run with miner key.
+- **Earnings model:** PoRA (Proof-of-Random-Access) competitive mining. **0G's own docs caution operators may see no rewards for a week or longer** — small operators eat the volatility.
+- **Tracking:** [storagescan.0g.ai](https://storagescan-galileo.0g.ai) has a leaderboard + 24h/3d/7d toggle for miner rewards.
+- **Sapphire fit:** *low strategic value* on its own (the rewards are real but not differentiating — anyone with $50/mo can do this). **However:** running a Sapphire-branded storage node that stores *your own* signal envelopes is a credible "we eat our own dog food" narrative for the post-hackathon write-up. Free brand reinforcement, ~$50/mo cost.
+
+Sources: [0G Storage Node docs](https://docs.0g.ai/run-a-node/storage-node) · [StorageScan miner leaderboard update](https://0g.ai/blog/storagescan-miner-rewards-update)
+
+### 3.5 Validator Node — out of scope
+
+Validator participation requires staking 0G tokens at meaningful scale and has its own selection process (the AI Alignment Node Sale on CoinList raised $33M in initial allocations). Not a hackathon-adjacent program; mentioned only for completeness.
+
+### 3.6 Strategic recommendation — funnel order
+
+1. **Submit hackathon (T-14 days)** — get on-chain activity + a HackQuest record. Even non-winning, this becomes Apollo application evidence.
+2. **Apollo application (next cohort, likely Q3 2026)** — primary $2M target. Use mainnet activity from hackathon as proof.
+3. **Guild on 0G ($8.88M sub-fund, rolling)** — easier bar than Apollo; apply in parallel as a hedge. Position around the Sentinel-registry / agent-mandate angle.
+4. **Run a Sapphire-branded 0G Storage node (post-hackathon)** — $50/mo, free brand reinforcement, "we eat our own dog food."
+5. **TeeTLS broker for Sapphire inference proxy (v2, 6-month horizon)** — only if Apollo or Guild funds it. Don't self-fund the TDX hardware.
+
+---
+
+## 4. Mainnet competitive landscape
+
+### 4.1 0G mainnet (Aristotle, chain 16661) — what's actually live
+
+- **Launched:** 2025-09-22 ("Aristotle Mainnet" — also branded `0g-aristotle` by ThirdWeb).
+- **Stats published by 0G:** 28M+ blocks produced, 346K+ accounts, 300+ ecosystem partners.
+- **Day-one ecosystem partners (named):** Chainlink, Google Cloud, Alibaba Cloud, Coinbase Wallet, Binance Wallet, MetaMask, Ankr, Ledger, Fireblocks, Figment.
+- **Funding to date:** $325M+ committed across 0G Labs and 0G Foundation.
+- **DeFi TVL:** Sapphire could not retrieve a fresh DefiLlama figure during this research (the page returned a 403 from automated fetch). The qualitative read is that DeFi TVL on 0G is small relative to its ecosystem partner list — most "ecosystem partners" are infrastructure providers (wallets, oracles, validators), not deployed apps. As of writing, 0G's published partner count of 300+ should be read as *integration breadth*, not *deployed-DeFi depth*.
+- **Named protocols spotted in research:**
+  - **Gimo Finance** — liquid staking on 0G (announced 2025 day-one, [tweet](https://x.com/0G_labs/status/1964001208332374344))
+  - **Euclid Protocol, Cygnus Finance** — DeFAI category (per 0G Foundation ecosystem page)
+  - **Dormint, HAiO, QuillAI Network** — AI Agents (Guild-funded)
+  - **Balkeum Labs, MeetLinkAI** — AI dApps
+  - **CARV, PlaysOut, PlayArts, Escape Velocity** — gaming
+  - **Phala Network** — privacy/compute
+
+**Read for Sapphire:** the deployed-DeFi field on 0G mainnet is **thin enough that a single live trading-signal verifier with consistent on-chain activity stands out** — there is no announced equivalent. Liquid staking (Gimo) and lending/AMM primitives (Euclid, Cygnus) are different categories. Sapphire would be the visible *trading-grade-proof* primitive on a young chain.
+
+Sources: [0G Aristotle launch coverage](https://www.financemagnates.com/thought-leadership/0g-labs-launches-aristotle-mainnet-with-largest-day-one-ecosystem-for-decentralized-ai/) · [0G Foundation ecosystem page](https://www.0gfoundation.ai/ecosystem) · [DefiLlama 0G chain](https://defillama.com/chain/0g)
+
+### 4.2 Track 2 competition — what's publicly known
+
+Public visibility on Track 2 entries before the 2026-05-16 deadline is **deliberately low** — HackQuest does not surface in-progress submissions, and serious teams rarely tweet pre-deadline.
+
+Indirect signals worth tracking:
+
+- **GitHub `0g`-tagged repos:** search github.com for `topic:0g` filtered to the last 60 days.
+- **`#BuildOn0G` X feed:** main public stream where teams tease entries. Most posts as of late April are infrastructure ports (chain bridges, wallet adapters), not Track 2 trading agents.
+- **OpenAgents (ETHGlobal) sealed-inference winners** — likely overlap pool. The OpenAgents pattern was *"hierarchical planning + reflection loops integrating 0G Compute sealed inference"* — that's an agentic pattern, not a trading-signal pattern.
+- **Lablab.ai AI Trading Agents Hackathon (March 30 → April 12 2026, ERC-8004)** — adjacent hackathon, separate prize pool. Some teams may double-submit a polished trading agent across both. Notable entrant: [JudyaiLab/hackathon-trading-agent](https://github.com/JudyaiLab/hackathon-trading-agent) — claims **82.2% out-of-sample win rate, 7-layer risk management, ERC-8004 on-chain identity**. This is the kind of polish bar Sapphire will be judged against if any of those teams pivot to 0G Track 2.
+
+### 4.3 Where Sapphire stands out
+
+| Dimension | Likely Track 2 average entry | Sapphire |
+|---|---|---|
+| Maturity | 4–8 weeks of build | **18+ months of pre-existing build** |
+| Test count | 10–100 tests | **6,488 tests** |
+| Deployed scope | Single demo path | **50 dashboard pages, 7 strategies, live execution on Hyperliquid + Robinhood Crypto** |
+| 0G components | 1–2 (usually Storage + Chain) | **3 of 4 (Storage + Compute/TEE + Chain)** |
+| Real on-chain activity | None pre-deadline (testnet only) | *Will* have mainnet activity once Ari deploys + publishes (this is the gating step) |
+| Verifier story | Often missing — write-only on-chain | **`og_verify` round-trip read tool exists** |
+| Production safety | Often none | **Feature-flagged + fire-and-forget; trading critical path unaffected** |
+
+**Where Sapphire is at risk:**
+
+- Many entries will be *purpose-built* for the hackathon — leaner, simpler, more demo-friendly. Sapphire's surface area is large; judges who only spend 5 minutes per submission might not see the 0G integration through the noise. **The fix is the §2.4 dashboard page** — one URL that renders the live anchored signals.
+- Several entries will likely have a **flashier consumer-facing UI**. Sapphire's dashboard is functional, not beautiful. UX scoring (criterion #4) is likely the weakest area.
+- Solo team. Some Track 2 entries will be 4–6 person teams with dedicated frontend, design, marketing, and growth. The "Team Capability" criterion (#5) reads as small for a solo, even with strong solo execution.
+
+---
+
+## 5. Post-submission narrative
+
+Two scenarios. Both have value extraction paths.
+
+### 5.1 If Sapphire wins or places (top-3 grand or excellence award)
+
+**Immediate (week 1 post-result):**
+
+1. **Apollo application** with the prize as proof. The Apollo accelerator (§3.1) is the natural next step — $2M + 10 weeks at Stanford-adjacent. The hackathon win is the strongest single piece of evidence Sapphire could put in front of the Apollo screening committee.
+2. **0G Foundation grant via Guild on 0G** ($8.88M sub-fund, §3.2). Apply in parallel to Apollo as a hedge — different funding mechanics (grant vs. equity-style accelerator).
+3. **0G ecosystem partnership listing** — most published 0G ecosystem partner pages are infrastructure providers and large-name partnerships (Chainlink, Google Cloud). A *visible product* on the partner page would be a credibility multiplier for Sapphire's other pursuits (Palantir Foundry pitch, Robinhood live-capital posture).
+
+**3-month horizon:**
+
+4. **Ship `lib/og/` upstream as `@sapphire/og-verifier-sdk`** — the Python facade + Node helper + Solidity contracts as a reusable verifier SDK. 0G's docs surface third-party libraries in their SDK page; getting listed there is a permanent inbound channel for the Sapphire brand.
+5. **TeeTLS broker fork of the inference proxy** (§3.3) — propose this as the deliverable for an Apollo or Foundation grant. Don't self-fund the TDX hardware.
+6. **Co-marketed case study with 0G Labs** — "How Sapphire Verified $X of Trading Signals on 0G in 90 Days." Win-rate and signal counts are already tracked; this becomes a marketing artifact for both sides.
+
+**6-month horizon:**
+
+7. **Sealed-inference contribution upstream** — if Sapphire builds a TeeTLS broker, propose it as a reference implementation for the 0G TeeTLS docs page. Open-source, MIT-licensed. Establishes Sapphire as a technical voice in the verifiable-AI space, not just a consumer.
+
+### 5.2 If Sapphire does not place
+
+The submission still produces 5 durable assets:
+
+1. **Mainnet-deployed contracts on chain 16661** — same code, same audit surface as the Robinhood Chain deployment. The `SapphireSignalVerifier` becomes a permanent on-chain primitive with a public history.
+2. **A reusable verifier SDK pattern** (`lib/og/`) — the integration design (Python facade + Node helper + content-addressed storage + chain anchor) generalizes to any AI L1 with similar primitives. Future targets: any chain that adds TEE-attested inference (likely several in 2026 given the 0G-Phala-Apollo pattern).
+3. **A "verifiable-trading-signal" product wedge** that has independent commercial value — the integration alone is sellable as **"TEE-attested signal feed"** to:
+   - Other trading-agent teams that want third-party-audit credibility
+   - Quant research firms that need to prove they predicted moves before disclosure (alpha-discovery defensibility)
+   - Compliance-sensitive funds that want immutable signal provenance for regulator audit
+4. **Apollo accelerator application material** — losing the hackathon doesn't disqualify the underlying integration. Apollo screens on revenue-generating decentralized AI; Sapphire has revenue (paper-trading-soak data + live $5/order Hyperliquid + $50 Robinhood Crypto pilot) and decentralized AI integration.
+5. **Foundry diligence acceleration** — the 0G integration adds a "verifiable AI compute" line item to the Palantir Foundry pitch. Foundry buyers care about provenance; Sapphire now has cryptographic provenance, not just operational logs.
+
+### 5.3 The honest extract-value path
+
+The *commercial* upside of the 0G integration is independent of hackathon placement. The hackathon is a **distribution event, not a product validation event**. The product is validated by 18 months of Sapphire build and 6,488 tests; the hackathon is how Sapphire gets that integration in front of:
+
+- 0G Foundation funding (Apollo, Guild)
+- 300+ ecosystem partners (potential pilot users)
+- The X audience following `#BuildOn0G`
+
+Treat placement as a bonus, the integration as the asset, and the funding programs (§3) as the real prize.
+
+---
+
+## Top 3 actionable items
+
+In priority order. Each is achievable inside the T-14-day window.
+
+### Action 1 — Deploy + publish + populate README
+
+> **Owner:** Ari · **Effort:** 1–2 hours · **Blocker risk:** mainnet wallet must be funded.
+
+This is the single highest-leverage action. Without it, the README's contract-address table is empty (`0x...`) and the explorer link is dead. Both are criterion-#1 disqualifiers in the eyes of judges scanning quickly. Steps already documented in `docs/hackathon-0g/submission-checklist.md` lines 22–25.
+
+After deploy:
+- Replace placeholders in `docs/hackathon-0g/README.md` lines 116–118 with the live `SapphireSignalVerifier`, `SapphirePaymentGate`, `SapphireSentinelRegistry` addresses + chainscan.0g.ai links.
+- Publish at least 1 real signal on mainnet so the explorer shows a `SignalPublished` event log.
+- Ideally publish 5–10 signals so the explorer shows a *streak*, not a one-shot.
+
+### Action 2 — Add the 5 README line edits from §2.2
+
+> **Owner:** Ari (or a Codex agent) · **Effort:** 30 minutes total.
+
+The edits A–E are mechanical text changes that materially improve the first-200-words pitch. None require new code. None depend on Action 1.
+
+### Action 3 — Build the `/0g-feed` dashboard page (§2.4)
+
+> **Owner:** Ari · **Effort:** ~1 day · **Depends on:** Action 1 (need a deployed contract to read events from).
+
+This is the highest-leverage *engineering* improvement. A live demo URL replaces "trust the README" with "click and see." It also changes the demo video (`docs/hackathon-0g/demo-script.md`) — the 1:30–2:15 "Why it matters" segment now shows a live page, not raw JSON, which lifts criterion #4 (UX/Demo Quality).
+
+If time runs short, skip the full dashboard page and ship a *static HTML page* hosted on Cloudflare Pages or GitHub Pages that renders the events via 0G's RPC + a tiny JS reader. ~3 hours.
+
+---
+
+## Honest take — does Sapphire × 0G look like a top-3 Track 2 finisher?
+
+**Realistic placement estimate: top-10 Excellence Award range, not top-3 Grand Prize. With the §2.2 + §2.4 fixes, top-5 Excellence is achievable.**
+
+**Why not top-3 Grand Prize:**
+
+1. **Cross-track competition is brutal.** $45K/$35K/$20K go to the *3 best entries across all 5 tracks* — including Track 4 (Wildcard), which historically attracts the most polished consumer-facing demos at hackathons of this size.
+2. **UX gap.** Sapphire is a backend operator's tool. Grand Prize winners typically have a beautiful frontend. Sapphire's dashboard is utilitarian. Without 1–2 weeks of frontend polish, criterion #4 is a real ceiling.
+3. **Solo team narrative.** "Team Capability" criterion #5 is partly a story-judgment. A 4-person team with a designer, a frontend dev, and two backend devs reads as "ready to scale" in a way a solo build does not, even when the solo output is more substantive.
+4. **The integration is *deep* but not *novel*.** Sapphire is a strong execution of the *intended* Track 2 pattern (Sealed Inference + Storage + Chain anchor). It's not a genuinely surprising mechanism. Grand Prizes often go to entries that surprise judges with a mechanism they hadn't seen before.
+
+**Why top-10 Excellence is realistic:**
+
+1. **Production credibility is rare in hackathons.** 6,488 tests on a working trading system is not just rare — at a hackathon judged on completeness and team capability, it's a structural advantage.
+2. **3 of 4 0G components, with a verifier round-trip,** is at or above the median integration depth across published 0G hackathon recaps.
+3. **Track 2 alignment is exact.** Sapphire is *literally* what the track description asks for ("autonomous, verifiable financial logic"; "Sealed Inference and TEE-based execution to ensure execution privacy and mitigate front-running"). Some submissions will be category-stretched; Sapphire is on-target.
+4. **The §2.4 dashboard fix removes the largest scoring risk** (UX/demo) for ~1 day of work.
+
+**What would change this assessment:**
+
+- *Upward to top-5 Grand Prize candidate:* a co-pitch with one named pilot user (a quant team, a DAO treasurer, or a regulated-fund auditor who endorses the verifier). One real outside name moves "promising integration" to "validated infrastructure" in the judges' frame. This is realistically possible if Ari pings the network in the next 48 hours.
+- *Downward to no-placement:* if Action 1 (mainnet deploy) doesn't happen, integration depth is a paper claim. Without the explorer link, judges drop the score on criterion #1 — and that criterion is ~30% of the total.
+
+**The bet that maximizes expected value:** spend the next 14 days on Actions 1 + 2 + 3 from the actionable list. This protects against the no-placement downside and gives a credible top-10 shot. The Apollo / Guild applications (§3) are the *real* prize regardless of hackathon outcome.
+
+---
+
+## Sources
+
+- [HackQuest — 0G APAC Hackathon](https://www.hackquest.io/hackathons/0G-APAC-Hackathon)
+- [0G Documentation — Inference (TEE / Sealed Inference)](https://docs.0g.ai/developer-hub/building-on-0g/compute-network/inference)
+- [0G Documentation — Testnet Overview (Galileo, chain 16602)](https://docs.0g.ai/developer-hub/testnet/testnet-overview)
+- [0G Documentation — Mainnet Overview (Aristotle, chain 16661)](https://docs.0g.ai/developer-hub/mainnet/mainnet-overview)
+- [0G Documentation — Storage SDK](https://docs.0g.ai/developer-hub/building-on-0g/storage/sdk)
+- [0G Documentation — Storage Node](https://docs.0g.ai/run-a-node/storage-node)
+- [0G Apollo Accelerator](https://apollo.0g.ai/)
+- [0G + Stanford Apollo $20M announcement (GlobeNewswire)](https://www.globenewswire.com/news-release/2026/02/27/3246238/0/en/0G-and-Stanford-Blockchain-Veterans-Launch-20M-Apollo-AI-Accelerator.html)
+- [0G $88.88M Ecosystem Program](https://0g.ai/blog/0g-ecosystem-program)
+- [0G Foundation Ecosystem partner page](https://www.0gfoundation.ai/ecosystem)
+- [0G Sealed Inference announcement (GlobeNewswire)](https://www.globenewswire.com/news-release/2026/03/06/3250768/0/en/0G-Introduces-Sealed-Inference-Cryptographically-Private-AI-Where-Every-Response-Is-Verified-Inside-a-Hardware-Enclave.html)
+- [0G Verification Framework for Decentralized AI Training (GlobeNewswire)](https://www.globenewswire.com/news-release/2026/03/27/3264035/0/en/0G-Labs-Publishes-Verification-Framework-for-Decentralized-AI-Training-as-Models-Cross-100-Billion-Parameters.html)
+- [0G ETHGlobal Cannes sponsorship (Chainwire)](https://chainwire.org/2025/07/09/0g-labs-sponsors-ethglobal-cannes-hackathon-and-supports-275k-prize-pool/)
+- [0G hackathon highlights recap](https://www.choosen.systems/blog/0g-latest-hackathon-highlights.html)
+- [Aristotle Mainnet launch coverage (FinanceMagnates)](https://www.financemagnates.com/thought-leadership/0g-labs-launches-aristotle-mainnet-with-largest-day-one-ecosystem-for-decentralized-ai/)
+- [Gimo Finance day-one mainnet partner (X)](https://x.com/0G_labs/status/1964001208332374344)
+- [0G Aristotle on ChainList (16661)](https://chainlist.org/chain/16661)
+- [DefiLlama — 0G chain](https://defillama.com/chain/0g)
+- [ETHGlobal OpenAgents prizes (sealed inference theme)](https://ethglobal.com/events/openagents/prizes)
+- [Lablab.ai AI Trading Agents w/ ERC-8004 hackathon (adjacent comp)](https://lablab.ai/ai-hackathons/ai-trading-agents-erc-8004)
+- [JudyaiLab/hackathon-trading-agent (competitor reference)](https://github.com/JudyaiLab/hackathon-trading-agent)
+- [0G Labs — official X account](https://x.com/0G_labs)
+- [StorageScan miner rewards update](https://0g.ai/blog/storagescan-miner-rewards-update)
+- [GLM-5 on 0G Compute](https://0g.ai/blog/glm-5-live-on-0g-compute)
