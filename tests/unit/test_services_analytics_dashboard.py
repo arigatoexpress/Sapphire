@@ -364,21 +364,43 @@ def _capture_rows_factory(captured: dict):
     return fake_rows
 
 
+def _capture_first_call_factory(captured: dict):
+    """Variant of _capture_rows_factory that only records the FIRST call.
+
+    Some endpoints (regime) make multiple _rows calls — a parameterized
+    main query plus a parameter-less meta query. The original capture
+    overwrote on every call, so subsequent assertions hit the empty
+    meta-call params. This wrapper preserves the first call's wiring.
+    """
+
+    def fake_rows(sql, params=None):
+        if "sql" not in captured:
+            captured["sql"] = sql
+            captured["params"] = params or []
+        return []
+
+    return fake_rows
+
+
 def test_regime_endpoint_passes_limit_param(client, app_module, monkeypatch):
     captured: dict = {}
-    monkeypatch.setattr(app_module, "_rows", _capture_rows_factory(captured))
+    monkeypatch.setattr(app_module, "_rows", _capture_first_call_factory(captured))
 
     response = client.get("/api/regime?limit=25")
 
     assert response.status_code == 200
-    assert response.get_json() == {"rows": []}
+    body = response.get_json()
+    # Endpoint now also returns a meta block alongside rows; assert on the
+    # parts we care about rather than strict equality.
+    assert body["rows"] == []
+    assert "meta" in body
     assert captured["params"][0].name == "limit"
     assert captured["params"][0].value == 25
 
 
 def test_regime_endpoint_default_limit_is_100(client, app_module, monkeypatch):
     captured: dict = {}
-    monkeypatch.setattr(app_module, "_rows", _capture_rows_factory(captured))
+    monkeypatch.setattr(app_module, "_rows", _capture_first_call_factory(captured))
 
     client.get("/api/regime")
 
