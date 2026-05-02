@@ -12,7 +12,7 @@
 # Schema:
 #   <protocol_key>:
 #     name: human display name
-#     category: lending | dex_spot | dex_perps | stable | bridge | yield | oracle
+#     category: lending | dex_spot | dex_perps | perps | stable | bridge | yield | oracle
 #     priority: 1=must, 2=should, 3=nice
 #     status: active | deprecated | pending
 #     docs_url: external link
@@ -48,3 +48,35 @@ aave_v3:
     Pool implementation address can be queried via the EIP-1967
     implementation slot on the Pool proxy if a verified ABI is needed
     beyond the curated pool_min.json.
+
+gmx_v2:
+  name: "GMX V2 (Arbitrum One)"
+  category: perps
+  priority: 1
+  status: active
+  docs_url: "https://docs.gmx.io/docs/api/contracts-v2"
+  addresses:
+    reader: "0xf60becbba223EEA9495Da3f606753867eC10d139"
+    data_store: "0xFD70de6b91282D8017aA4E741e9Ae325CAb992d8"
+    event_emitter: "0xC8ee91A54287DB53897056e12D9819156D3822Fb"
+  abi_paths:
+    reader: "gmx_v2/reader.json"
+    data_store: "gmx_v2/datastore.json"
+    event_emitter: "gmx_v2/event_emitter.json"
+  notes: >
+    GMX V2 is the flagship synthetic-perp venue on Arbitrum One. The
+    Reader contract is the read aggregator (analogous to Aave's
+    UiPoolDataProvider) — every read targets it with the DataStore as
+    the first arg. EventEmitter is pinned for future Wave C event
+    subscribers but not bound for reads here.
+
+    Mainnet reach (verified 2026-04-30): ~50 active markets covering
+    ETH, BTC, ARB, SOL, AVAX, LINK, DOGE, LTC, plus long-tail synthetics.
+    Compare with the GMX V2 deployment on MegaETH — TGE-day, 6 markets.
+
+    Pricing comes from cross-chain composition: the same Aave V3 oracle
+    that powers our lending reads also feeds the GMX Price.Props inputs
+    via lib/chains/arbitrum/contracts/gmx_price_adapter.py. Markets
+    whose index/long/short token has no Aave feed surface in
+    perps_overview() as state="unpriced" rather than being silently
+    dropped.
