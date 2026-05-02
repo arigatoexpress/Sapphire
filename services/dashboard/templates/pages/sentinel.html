@@ -250,6 +250,43 @@
         white-space: pre-wrap;
         word-break: break-word;
     }
+    .sentinel-screening { display: none; }
+    .sentinel-screening.has-data { display: block; }
+    .sentinel-screening-pill {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        border: 1px solid var(--border);
+        margin-bottom: 10px;
+    }
+    .sentinel-screening-pill.approved {
+        color: #86efac;
+        border-color: rgba(34,197,94,0.45);
+        background: rgba(34,197,94,0.10);
+    }
+    .sentinel-screening-pill.blocked {
+        color: #fca5a5;
+        border-color: rgba(239,68,68,0.5);
+        background: rgba(239,68,68,0.12);
+    }
+    .sentinel-screening-meta {
+        display: grid;
+        gap: 4px;
+        font-size: 12px;
+        color: var(--text-secondary);
+        font-family: var(--font-mono);
+    }
+    .sentinel-screening-meta .reasons,
+    .sentinel-screening-meta .anchor {
+        color: var(--text-secondary);
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
 </style>
 
 <div class="sentinel-band">
@@ -305,6 +342,20 @@
                 <div>chain: <span id="chain-health-chain">--</span></div>
                 <div>paused reserves: <span id="chain-health-paused">--</span></div>
                 <div>reasons: <span id="chain-health-reasons" class="reasons">--</span></div>
+            </div>
+        </div>
+
+        <div class="sentinel-band sentinel-screening" id="screening-band">
+            <div class="sentinel-panel-title">Policy screening</div>
+            <div>
+                <span class="sentinel-screening-pill" id="screening-pill">...</span>
+            </div>
+            <div class="sentinel-screening-meta">
+                <div>prompt-injection: <span id="screening-injection">--</span></div>
+                <div>secret-egress hits: <span id="screening-secrets">--</span></div>
+                <div>redactions: <span id="screening-redactions" class="reasons">--</span></div>
+                <div>disposition reasons: <span id="screening-reasons" class="reasons">--</span></div>
+                <div>on-chain anchor: <span id="screening-anchor" class="anchor">--</span></div>
             </div>
         </div>
 
@@ -423,6 +474,51 @@ function renderFlow() {
     }, null, 2);
 
     renderChainHealth(flow.chain_health);
+    renderScreening(flow);
+}
+
+function renderScreening(flow) {
+    // Mirrors renderChainHealth shape so the SENTINEL_DEMO_FORCE_INJECTION
+    // demo beat surfaces alongside the depeg beat. For BLOCKED payments we
+    // also surface the on-chain anchor receipt — the visceral demo point
+    // is that even rejected attacks get a tamper-proof attestation on the
+    // same chain Robinhood operates.
+    const band = document.getElementById('screening-band');
+    if (!flow) {
+        band.classList.remove('has-data');
+        return;
+    }
+    const flags = Array.isArray(flow.risk_flags) ? flow.risk_flags : [];
+    const redactions = Array.isArray(flow.redactions) ? flow.redactions : [];
+    const reasons = Array.isArray(flow.reasons) ? flow.reasons : [];
+    const injectionHit = flags.indexOf('prompt_injection') !== -1;
+    const secretHit = flags.indexOf('secret_egress_risk') !== -1;
+    if (!injectionHit && !secretHit && flow.approved) {
+        band.classList.remove('has-data');
+        return;
+    }
+    band.classList.add('has-data');
+    const pill = document.getElementById('screening-pill');
+    pill.textContent = flow.approved ? 'APPROVED' : 'BLOCKED';
+    pill.className = 'sentinel-screening-pill ' + (flow.approved ? 'approved' : 'blocked');
+    document.getElementById('screening-injection').textContent =
+        injectionHit ? 'TRIPPED (pattern match)' : 'clean';
+    const secretCount = redactions.filter(function (r) {
+        return ['api_key', 'apikey', 'private_key', 'secret', 'seed phrase',
+                'mnemonic', 'telegram_bot_token', 'robinhood_ed25519'].indexOf(r) !== -1;
+    }).length;
+    document.getElementById('screening-secrets').textContent =
+        secretHit ? (secretCount + ' hit' + (secretCount === 1 ? '' : 's')) : '0';
+    document.getElementById('screening-redactions').textContent =
+        redactions.length ? redactions.join(', ') : '(none)';
+    document.getElementById('screening-reasons').textContent =
+        reasons.length ? reasons.join('; ') : '(none reported)';
+    const anchor = flow.chain_anchor || {};
+    document.getElementById('screening-anchor').textContent =
+        anchor.receipt_id
+            ? shortHash(anchor.receipt_id) + ' on chain ' + anchor.chain_id +
+              ' (' + (anchor.mode || 'anchor') + ')'
+            : '(no anchor)';
 }
 
 function renderChainHealth(ch) {
