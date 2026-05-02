@@ -1,0 +1,13 @@
+{
+  "_comment": "Slither config for SapphireSentinelRegistry. HIGH and MEDIUM findings fail the CI job; LOW/INFORMATIONAL/OPTIMIZATION are reported but non-blocking. Add new detectors to exclude_detectors with a justification.",
+  "detectors_to_exclude": "naming-convention,assembly,solc-version,pragma,low-level-calls,similar-names",
+  "exclude_informational": true,
+  "exclude_low": true,
+  "exclude_optimization": true,
+  "exclude_medium": false,
+  "exclude_high": false,
+  "filter_paths": "tests/|contracts/lib/|out/|cache/|node_modules/",
+  "fail_on": "medium",
+  "json": "-",
+  "disable_color": true
+}
