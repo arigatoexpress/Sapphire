@@ -21,6 +21,7 @@ from .contracts.aave_v3 import (
     ReserveData,
     UserAccountData,
 )
+from .contracts.chainlink_oracle import ChainlinkRegistry
 from .contracts.gmx_price_adapter import GmxPriceAdapter, PriceUnavailable
 from .contracts.gmx_v2 import (
     GmxV2Addresses,
@@ -67,12 +68,19 @@ class PerpsMarketState:
     ``state`` is one of:
         * ``"ok"``       — fully priced + read; ``info`` populated
         * ``"disabled"`` — read succeeded but ``info.is_disabled``
-        * ``"unpriced"`` — Aave has no oracle for one of the tokens
+        * ``"unpriced"`` — neither Aave nor Chainlink can price one of
+                           the three tokens
         * ``"error"``    — RPC raised; ``reason`` carries detail
 
     ``info`` is ``None`` for the unpriced/error cases. ``funding_apr``,
     ``oi_skew``, and ``oi_total_usd`` are populated only when ``info``
     is present.
+
+    ``price_sources`` records which oracle served each leg
+    (``("aave"|"chainlink", ...)``) when the market was priced; ``None``
+    for unpriced/error states. ``price_stale`` is True if any priced
+    leg came from a stale Chainlink feed — Sentinel can downweight or
+    refuse signals from stale-priced markets.
     """
 
     market: Market
@@ -82,6 +90,8 @@ class PerpsMarketState:
     oi_skew: Decimal | None
     oi_total_usd: Decimal | None
     reason: str | None = None
+    price_sources: tuple[str, str, str] | None = None
+    price_stale: bool = False
 
 
 @dataclass(frozen=True)
@@ -114,9 +124,29 @@ class ArbitrumProtocols:
         self,
         client: Any,
         registry: ProtocolRegistry | None = None,
+        *,
+        chainlink: ChainlinkRegistry | None = None,
     ) -> None:
+        """Construct the Arbitrum facade.
+
+        ``chainlink`` is optional — when ``None`` (default), a
+        :class:`ChainlinkRegistry` is built lazily on first
+        :meth:`_price_adapter` invocation, using the same client +
+        the canonical Arbitrum feed addresses. Pass an explicit
+        registry to override (e.g. for tests, or to add a custom
+        token feed before any RPC happens).
+
+        Backward-compatible: callers from PR #565 that don't pass
+        ``chainlink`` get the default Chainlink-fallback behaviour
+        wired in. Callers wanting the old Aave-only behaviour can
+        pass ``chainlink=False`` (sentinel — see :meth:`_price_adapter`)
+        to opt out.
+        """
         self._client = client
         self.registry = registry or ProtocolRegistry.from_yaml()
+        # ``False`` is a sentinel meaning "explicit opt-out"; ``None``
+        # means "build the default lazily".
+        self._chainlink: ChainlinkRegistry | None | bool = chainlink
 
     # -- read --------------------------------------------------------------
 
@@ -221,9 +251,30 @@ class ArbitrumProtocols:
             raise ValueError(f"protocol {venue!r} is not a perps venue (category={entry.category})")
         return GmxV2Arbitrum(self._client, GmxV2Addresses.from_registry_entry(entry))
 
+    def _chainlink_registry(self) -> ChainlinkRegistry | None:
+        """Resolve the Chainlink registry, building the default if needed.
+
+        Returns ``None`` when the caller explicitly opted out via
+        ``chainlink=False`` at construction. Otherwise returns either
+        the user-supplied registry or a freshly-built one wrapped
+        around ``self._client``.
+        """
+        if self._chainlink is False:
+            return None
+        if self._chainlink is None:
+            # Build once and cache so repeated reads share lazy-cached
+            # ChainlinkAggregator instances.
+            self._chainlink = ChainlinkRegistry(self._client)
+        # Type narrowing — at this point self._chainlink is a registry.
+        assert isinstance(self._chainlink, ChainlinkRegistry)
+        return self._chainlink
+
     def _price_adapter(self, lend_venue: str = "aave_v3") -> GmxPriceAdapter:
-        """Build a GmxPriceAdapter composed over our Aave wrapper."""
-        return GmxPriceAdapter(self._aave(lend_venue))
+        """Build a GmxPriceAdapter composed over our Aave + Chainlink wrappers."""
+        return GmxPriceAdapter(
+            self._aave(lend_venue),
+            chainlink=self._chainlink_registry(),
+        )
 
     async def perps_overview(
         self,
@@ -247,9 +298,30 @@ class ArbitrumProtocols:
         unpriced_count = 0
         funding_aprs: list[Decimal] = []
 
+        # Adapters built before the Chainlink fallback may only expose
+        # ``market_prices``; the new variant returns ``TokenPrice``
+        # triples carrying source / stale metadata. Probe once.
+        has_meta = hasattr(adapter, "market_prices_with_meta")
+
         for m in markets:
             try:
-                prices = await adapter.market_prices(m)
+                if has_meta:
+                    meta = await adapter.market_prices_with_meta(m)
+                    prices = (
+                        meta[0].as_gmx_props(),
+                        meta[1].as_gmx_props(),
+                        meta[2].as_gmx_props(),
+                    )
+                    sources: tuple[str, str, str] | None = (
+                        meta[0].source,
+                        meta[1].source,
+                        meta[2].source,
+                    )
+                    any_stale = any(p.stale for p in meta)
+                else:
+                    prices = await adapter.market_prices(m)
+                    sources = None
+                    any_stale = False
             except PriceUnavailable as exc:
                 unpriced_count += 1
                 priced.append(
@@ -264,6 +336,7 @@ class ArbitrumProtocols:
                     )
                 )
                 continue
+
             try:
                 info = await gmx.market_info(m.market_token, prices)
             except Exception as exc:  # noqa: BLE001 — surface, don't break loop
@@ -276,6 +349,8 @@ class ArbitrumProtocols:
                         oi_skew=None,
                         oi_total_usd=None,
                         reason=f"{type(exc).__name__}: {exc}",
+                        price_sources=sources,
+                        price_stale=any_stale,
                     )
                 )
                 continue
@@ -296,6 +371,8 @@ class ArbitrumProtocols:
                     oi_skew=skew,
                     oi_total_usd=oi_total_usd,
                     reason=None,
+                    price_sources=sources,
+                    price_stale=any_stale,
                 )
             )
 

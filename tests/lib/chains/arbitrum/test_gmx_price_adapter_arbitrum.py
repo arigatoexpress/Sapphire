@@ -192,3 +192,57 @@ async def test_can_price_market_false_on_missing_oracle() -> None:
     aave = FakeAave({})
     adapter = GmxPriceAdapter(aave)
     assert await adapter.can_price_market(_eth_btc_market()) is False
+
+
+# ---------- Chainlink fallback (added with the Chainlink fallback PR) -------
+
+
+class _StaticChainlinkRegistry:
+    """Stand-in for ChainlinkRegistry that maps known symbols to fixed prices."""
+
+    def __init__(self, prices_by_symbol: dict[str, Decimal], stale: bool = False) -> None:
+        self._prices = {k.upper(): v for k, v in prices_by_symbol.items()}
+        self._stale = stale
+
+    def oracle_for(self, symbol: str):  # type: ignore[no-untyped-def]
+        return self if symbol.upper() in self._prices else None
+
+    async def fetch_price(self, symbol: str, *, now: float | None = None):  # type: ignore[no-untyped-def]
+        from lib.chains.arbitrum.contracts.chainlink_oracle import ChainlinkPrice
+
+        usd = self._prices[symbol.upper()]
+        return ChainlinkPrice(
+            symbol=symbol.upper(),
+            feed_address="0x" + "f" * 40,
+            usd=usd,
+            updated_at=1,
+            stale=self._stale,
+        )
+
+
+@pytest.mark.asyncio
+async def test_fetch_token_price_falls_back_to_chainlink_when_aave_returns_zero() -> None:
+    wbtc = "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f"
+    aave = FakeAave({})  # Aave returns 0 for WBTC
+    chainlink = _StaticChainlinkRegistry({"BTC": Decimal("76774.81")})
+    adapter = GmxPriceAdapter(aave, chainlink=chainlink)
+    p = await adapter.fetch_token_price(wbtc)
+    assert p.source == "chainlink"
+    assert p.usd == Decimal("76774.81")
+
+
+@pytest.mark.asyncio
+async def test_market_prices_with_meta_returns_token_prices_with_source() -> None:
+    """The new meta-bearing variant exposes per-leg source/stale fields."""
+    aave = FakeAave(
+        {
+            "0x82af49447d8a07e3bd95bd0d56f35241523fbab1": Decimal("3500"),  # WETH
+            "0xaf88d065e77c8cc2239327c5edb3a432268e5831": Decimal("1"),  # USDC
+        }
+    )
+    # WBTC is unpriced by Aave but Chainlink can serve it.
+    chainlink = _StaticChainlinkRegistry({"BTC": Decimal("70000")})
+    adapter = GmxPriceAdapter(aave, chainlink=chainlink)
+    triples = await adapter.market_prices_with_meta(_eth_btc_market())
+    sources = tuple(t.source for t in triples)
+    assert sources == ("aave", "chainlink", "aave")
