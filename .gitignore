@@ -50,6 +50,13 @@ data/decisions/
 *.so
 *.dylib
 
+# Foundry / Solidity
+out/
+cache/
+contracts/out/
+contracts/lib/forge-std/
+broadcast/
+
 # Trading secrets
 configs/pi/shared/trading.env
 
