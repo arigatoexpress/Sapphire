@@ -80,9 +80,7 @@ class ArbitrumClient:
         is included so production logs can route on it.
         """
         if self._http is None:
-            raise RuntimeError(
-                "ArbitrumClient not entered: use `async with ArbitrumClient(...)`"
-            )
+            raise RuntimeError("ArbitrumClient not entered: use `async with ArbitrumClient(...)`")
         payload = {
             "jsonrpc": "2.0",
             "id": 1,

@@ -87,9 +87,7 @@ def classify_arbitrum(lend: Any) -> ArbitrumChainHealthVerdict:
 
     if paused_high_util:
         severity = "BLOCK"
-        reasons.append(
-            f"Aave reserves paused with high utilization (>80%): {paused_high_util}"
-        )
+        reasons.append(f"Aave reserves paused with high utilization (>80%): {paused_high_util}")
     elif frozen:
         severity = "WARNING"
         reasons.append(f"Aave reserves frozen: {frozen}")

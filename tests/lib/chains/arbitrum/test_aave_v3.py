@@ -20,6 +20,7 @@ import pytest
 from eth_abi import encode as abi_encode
 
 from lib.chains.arbitrum.contracts.aave_v3 import (
+    _AGGREGATED_RESERVE_FIELDS_ARBITRUM,
     BPS_DENOMINATOR,
     RAY,
     SECONDS_PER_YEAR,
@@ -27,18 +28,12 @@ from lib.chains.arbitrum.contracts.aave_v3 import (
     AaveV3Arbitrum,
     ReserveData,
     UserAccountData,
-    _AGGREGATED_RESERVE_FIELDS_ARBITRUM,
     ray_rate_to_apy,
     reserve_data_from_row_arbitrum,
 )
 from lib.chains.arbitrum.registry import ProtocolRegistry
 
-FIXTURE = (
-    pathlib.Path(__file__).parent
-    / "fixtures"
-    / "aave_v3"
-    / "getReservesData_response.hex"
-)
+FIXTURE = pathlib.Path(__file__).parent / "fixtures" / "aave_v3" / "getReservesData_response.hex"
 
 ADDRS = AaveV3Addresses(
     pool="0x794a61358D6845594F94dc1DB02A252b5b4814aD",
@@ -277,11 +272,11 @@ async def test_get_user_account_data_decodes() -> None:
         ["uint256"] * 6,
         [
             10_000 * 10**8,  # totalCollateralBase $10,000
-            2_000 * 10**8,   # totalDebtBase $2,000
-            5_000 * 10**8,   # availableBorrowsBase $5,000
-            8500,            # currentLiquidationThreshold = 85%
-            8000,            # ltv = 80%
-            5 * 10**18,      # health factor 5.0
+            2_000 * 10**8,  # totalDebtBase $2,000
+            5_000 * 10**8,  # availableBorrowsBase $5,000
+            8500,  # currentLiquidationThreshold = 85%
+            8000,  # ltv = 80%
+            5 * 10**18,  # health factor 5.0
         ],
     )
     user = "0x" + "55" * 20

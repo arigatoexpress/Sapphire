@@ -120,9 +120,7 @@ def test_classify_arbitrum_threshold_constant_is_80_percent() -> None:
 
 def test_classify_arbitrum_threshold_boundary_is_strict() -> None:
     """Exactly-80% utilization paused does NOT BLOCK (strict greater-than)."""
-    overview = _StubOverview(
-        reserves=[_StubReserve(symbol="USDC", paused=True, utilization=0.80)]
-    )
+    overview = _StubOverview(reserves=[_StubReserve(symbol="USDC", paused=True, utilization=0.80)])
     verdict = classify_arbitrum(overview)
     # paused-but-not-high-util => HEALTHY (no frozen present either)
     assert verdict.severity == "HEALTHY"

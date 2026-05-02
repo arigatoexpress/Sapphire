@@ -33,12 +33,12 @@ class LendOverview:
     either chain's overview interchangeably.
     """
 
-    venue: str                    # "aave_v3" — wave 1 is single-venue
+    venue: str  # "aave_v3" — wave 1 is single-venue
     reserve_count: int
-    total_supplied_usd: Decimal   # USD-equivalent (base currency = USD * 1e8)
+    total_supplied_usd: Decimal  # USD-equivalent (base currency = USD * 1e8)
     total_borrowed_usd: Decimal
-    avg_supply_apy: float         # weighted by total_supplied_usd
-    avg_borrow_apy: float         # weighted by total_borrowed_usd
+    avg_supply_apy: float  # weighted by total_supplied_usd
+    avg_borrow_apy: float  # weighted by total_borrowed_usd
     top_supply_apy: list[dict[str, Any]] = field(default_factory=list)
     top_borrow_apy: list[dict[str, Any]] = field(default_factory=list)
     reserves: list[ReserveData] = field(default_factory=list, compare=False, repr=False)
