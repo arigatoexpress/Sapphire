@@ -25,8 +25,22 @@ GMX V2 (perps) tier (added in this PR):
                   last-resort move.
   * ``WARNING`` — any market with ``abs(funding_apr) > 200%``, OR any
                   market with ``abs(oi_skew - 0.5) > 0.45`` (i.e. ≥95%
-                  one-sided) AND total OI > $10M.
+                  one-sided) AND total OI > $10M, OR any market whose
+                  price came from a stale Chainlink feed (added with
+                  the Chainlink fallback PR).
   * ``HEALTHY`` — perps state nominal.
+
+Stale-Chainlink soft-fail (added with the Chainlink fallback PR)
+================================================================
+
+A Chainlink feed that has not updated within
+:class:`~lib.chains.arbitrum.contracts.chainlink_oracle.DEFAULT_MAX_AGE_S`
+(1 hour) is treated as a soft warning here — the price is still surfaced
+but Sentinel can downweight or refuse signals from stale-priced markets.
+A Chainlink feed that *reverts or returns zero* doesn't escalate at all:
+the underlying ``GmxPriceAdapter.fetch_token_price`` already surfaces
+that as ``state="unpriced"`` (which is silently skipped here, mirroring
+the lend tier's "no data → no escalation" behaviour).
 
 Final severity is the max of (Aave severity, GMX severity). The
 classifier is **pure** — it does no I/O. Composition with a live
@@ -102,6 +116,10 @@ class ArbitrumChainHealthVerdict:
     gmx_funding_warning_markets: list[str] = field(default_factory=list)
     gmx_funding_block_markets: list[str] = field(default_factory=list)
     gmx_skewed_markets: list[str] = field(default_factory=list)
+    # Added with the Chainlink fallback PR — markets whose price came
+    # from a stale Chainlink feed (>1h old by default). Always escalates
+    # to at least WARNING.
+    gmx_stale_price_markets: list[str] = field(default_factory=list)
 
 
 def classify_arbitrum_lend(lend: Any) -> tuple[str, list[str], list[str], list[str]]:
@@ -143,27 +161,32 @@ def classify_arbitrum_lend(lend: Any) -> tuple[str, list[str], list[str], list[s
 
 def classify_arbitrum_perps(
     perps: Any,
-) -> tuple[str, list[str], list[str], list[str], list[str]]:
+) -> tuple[str, list[str], list[str], list[str], list[str], list[str]]:
     """Pure GMX-side classifier — turn a ``PerpsOverview`` into a verdict tier.
 
     ``perps`` may be any object satisfying the duck-typed contract:
 
         * ``perps.markets`` is iterable of ``PerpsMarketState``-shaped
           objects with attrs ``state``, ``funding_apr``, ``oi_skew``,
-          ``oi_total_usd``, and a nested ``market.name``.
+          ``oi_total_usd``, optionally ``price_stale`` (added with the
+          Chainlink fallback PR), and a nested ``market.name``.
 
     Returns ``(severity, reasons, funding_warn_names, funding_block_names,
-    skew_warn_names)``.
+    skew_warn_names, stale_price_names)``.
 
     A market in state other than ``"ok"`` is **skipped silently** (we
     don't have data to judge it). The lend tier is the safety floor; if
-    GMX is unreachable the perps verdict simply doesn't escalate.
+    GMX is unreachable the perps verdict simply doesn't escalate. A
+    Chainlink feed that itself reverts/returns zero is captured by the
+    ``"unpriced"`` state at the protocols layer (silent skip here);
+    only successfully-priced-but-stale feeds escalate.
     """
     markets = list(getattr(perps, "markets", []) or [])
 
     funding_warn: list[str] = []
     funding_block: list[str] = []
     skew_warn: list[str] = []
+    stale_price: list[str] = []
 
     for m in markets:
         state = getattr(m, "state", "")
@@ -191,6 +214,13 @@ def classify_arbitrum_perps(
             ):
                 skew_warn.append(name)
 
+        # Stale-price escalation — only meaningful when the protocols
+        # layer surfaced ``price_stale=True``. ``getattr(..., False)``
+        # keeps us back-compat with PerpsMarketState constructions
+        # that pre-date the field.
+        if getattr(m, "price_stale", False):
+            stale_price.append(name)
+
     severity = "HEALTHY"
     reasons: list[str] = []
 
@@ -203,8 +233,11 @@ def classify_arbitrum_perps(
     if skew_warn:
         severity = _max_severity(severity, "WARNING")
         reasons.append(f"GMX markets one-sided (>=95% OI skew with >$10M OI): {skew_warn}")
+    if stale_price:
+        severity = _max_severity(severity, "WARNING")
+        reasons.append(f"GMX markets priced from stale Chainlink feed (>1h old): {stale_price}")
 
-    return severity, reasons, funding_warn, funding_block, skew_warn
+    return severity, reasons, funding_warn, funding_block, skew_warn, stale_price
 
 
 def classify_arbitrum(
@@ -228,6 +261,7 @@ def classify_arbitrum(
     funding_warn: list[str] = []
     funding_block: list[str] = []
     skew_warn: list[str] = []
+    stale_price: list[str] = []
 
     if perps is not None:
         (
@@ -236,6 +270,7 @@ def classify_arbitrum(
             funding_warn,
             funding_block,
             skew_warn,
+            stale_price,
         ) = classify_arbitrum_perps(perps)
 
     severity = _max_severity(lend_sev, perps_sev)
@@ -257,6 +292,7 @@ def classify_arbitrum(
         gmx_funding_warning_markets=funding_warn,
         gmx_funding_block_markets=funding_block,
         gmx_skewed_markets=skew_warn,
+        gmx_stale_price_markets=stale_price,
     )
 
 

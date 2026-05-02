@@ -171,6 +171,11 @@ class _StubPerpsMarketState:
     funding_apr: Decimal | None = None
     oi_skew: Decimal | None = None
     oi_total_usd: Decimal | None = None
+    # Added with the Chainlink fallback PR — present on the real
+    # PerpsMarketState. The classifier defaults to False when absent
+    # so older constructions keep working; we expose it here for the
+    # stale-feed-specific tests.
+    price_stale: bool = False
 
 
 @dataclass
@@ -197,7 +202,7 @@ def test_classify_perps_healthy_when_all_markets_nominal() -> None:
             ),
         ]
     )
-    sev, reasons, warn, block, skew = classify_arbitrum_perps(perps)
+    sev, reasons, warn, block, skew, stale = classify_arbitrum_perps(perps)
     assert sev == "HEALTHY"
     assert warn == [] and block == [] and skew == []
 
@@ -214,7 +219,7 @@ def test_classify_perps_warning_when_funding_apr_above_200pct() -> None:
             ),
         ]
     )
-    sev, reasons, warn, block, skew = classify_arbitrum_perps(perps)
+    sev, reasons, warn, block, skew, stale = classify_arbitrum_perps(perps)
     assert sev == "WARNING"
     assert "ALT-USD" in warn
     assert any("200%" in r for r in reasons)
@@ -232,7 +237,7 @@ def test_classify_perps_block_when_funding_apr_above_500pct() -> None:
             ),
         ]
     )
-    sev, reasons, warn, block, skew = classify_arbitrum_perps(perps)
+    sev, reasons, warn, block, skew, stale = classify_arbitrum_perps(perps)
     assert sev == "BLOCK"
     assert "DEGEN-USD" in block
     assert any("500%" in r for r in reasons)
@@ -250,7 +255,7 @@ def test_classify_perps_warning_on_extreme_oi_skew_with_size_floor() -> None:
             ),
         ]
     )
-    sev, reasons, warn, block, skew = classify_arbitrum_perps(perps)
+    sev, reasons, warn, block, skew, stale = classify_arbitrum_perps(perps)
     assert sev == "WARNING"
     assert "ARB-USD" in skew
     assert any("one-sided" in r for r in reasons)
@@ -269,7 +274,7 @@ def test_classify_perps_skew_ignored_when_below_size_floor() -> None:
             ),
         ]
     )
-    sev, _, _, _, skew = classify_arbitrum_perps(perps)
+    sev, _, _, _, skew, _ = classify_arbitrum_perps(perps)
     assert sev == "HEALTHY"
     assert skew == []
 
@@ -286,8 +291,70 @@ def test_classify_perps_skips_unpriced_and_error_states() -> None:
             ),
         ]
     )
-    sev, _, _, _, _ = classify_arbitrum_perps(perps)
+    sev, _, _, _, _, _ = classify_arbitrum_perps(perps)
     assert sev == "HEALTHY"
+
+
+def test_classify_perps_warning_when_chainlink_feed_stale() -> None:
+    """Stale-Chainlink-priced markets escalate to WARNING but don't BLOCK."""
+    perps = _StubPerpsOverview(
+        markets=[
+            _StubPerpsMarketState(
+                state="ok",
+                market=_StubMarket("BTC-USD"),
+                funding_apr=Decimal("0.05"),  # nominal
+                oi_skew=Decimal("0.5"),
+                oi_total_usd=Decimal("1000000"),
+                price_stale=True,
+            ),
+        ]
+    )
+    sev, reasons, warn, block, skew, stale = classify_arbitrum_perps(perps)
+    assert sev == "WARNING"
+    assert "BTC-USD" in stale
+    assert any("stale Chainlink" in r for r in reasons)
+    # Stale-only does NOT escalate the funding/skew lists.
+    assert warn == [] and block == [] and skew == []
+
+
+def test_classify_perps_stale_does_not_downgrade_higher_severity() -> None:
+    """Stale + extreme funding still BLOCKs; the WARNING from stale doesn't shadow it."""
+    perps = _StubPerpsOverview(
+        markets=[
+            _StubPerpsMarketState(
+                state="ok",
+                market=_StubMarket("DEGEN-USD"),
+                funding_apr=Decimal("8.0"),  # > 500% → BLOCK
+                oi_skew=Decimal("0.5"),
+                oi_total_usd=Decimal("1000"),
+                price_stale=True,
+            ),
+        ]
+    )
+    sev, _, _, block, _, stale = classify_arbitrum_perps(perps)
+    assert sev == "BLOCK"
+    assert "DEGEN-USD" in block
+    assert "DEGEN-USD" in stale
+
+
+def test_classify_arbitrum_verdict_threads_stale_field() -> None:
+    """The new gmx_stale_price_markets field surfaces on the verdict."""
+    lend = _StubOverview(reserves=[_StubReserve(symbol="WETH", utilization=0.5)])
+    perps = _StubPerpsOverview(
+        markets=[
+            _StubPerpsMarketState(
+                state="ok",
+                market=_StubMarket("SOL-USD"),
+                funding_apr=Decimal("0"),
+                oi_skew=Decimal("0.5"),
+                oi_total_usd=Decimal("0"),
+                price_stale=True,
+            ),
+        ]
+    )
+    verdict = classify_arbitrum(lend, perps=perps)
+    assert verdict.severity == "WARNING"
+    assert verdict.gmx_stale_price_markets == ["SOL-USD"]
 
 
 def test_classify_arbitrum_combines_lend_and_perps_max_severity() -> None:
