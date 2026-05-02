@@ -188,12 +188,12 @@ class MarketInfo:
     """
 
     market: Market
-    funding_factor_per_second: int           # 1e30-scaled, abs value
-    longs_pay_shorts: bool                   # direction flag
-    borrowing_factor_long: int               # 1e30-scaled per-second
-    borrowing_factor_short: int              # 1e30-scaled per-second
-    open_interest_long: int                  # 1e30-scaled USD (call-time)
-    open_interest_short: int                 # 1e30-scaled USD (call-time)
+    funding_factor_per_second: int  # 1e30-scaled, abs value
+    longs_pay_shorts: bool  # direction flag
+    borrowing_factor_long: int  # 1e30-scaled per-second
+    borrowing_factor_short: int  # 1e30-scaled per-second
+    open_interest_long: int  # 1e30-scaled USD (call-time)
+    open_interest_short: int  # 1e30-scaled USD (call-time)
     is_disabled: bool
 
 
@@ -209,9 +209,7 @@ _MARKET_PROPS_TYPE = "(address,address,address,address)"
 _PRICE_PROPS_TYPE = "(uint256,uint256)"
 
 # MarketUtils.MarketPrices = (Price idx, Price long, Price short)
-_MARKET_PRICES_TYPE = (
-    f"({_PRICE_PROPS_TYPE},{_PRICE_PROPS_TYPE},{_PRICE_PROPS_TYPE})"
-)
+_MARKET_PRICES_TYPE = f"({_PRICE_PROPS_TYPE},{_PRICE_PROPS_TYPE},{_PRICE_PROPS_TYPE})"
 
 # CollateralType = (uint256 longToken, uint256 shortToken)
 _COLLATERAL_TYPE = "(uint256,uint256)"
@@ -261,7 +259,10 @@ def _market_from_tuple(row: tuple[Any, ...]) -> Market:
     if len(row) < 4:
         raise ValueError(f"Market.Props expected 4 fields, got {len(row)}: {row!r}")
     market_token, index_token, long_token, short_token = (
-        _addr(row[0]), _addr(row[1]), _addr(row[2]), _addr(row[3])
+        _addr(row[0]),
+        _addr(row[1]),
+        _addr(row[2]),
+        _addr(row[3]),
     )
     # Display name: GMX doesn't store names; we derive a deterministic
     # placeholder. Callers wanting human names should resolve via
@@ -284,9 +285,7 @@ def _validate_address(addr: str, name: str) -> None:
 def _validate_prices(prices: Any) -> None:
     """Sanity-check the MarketPrices tuple before encoding."""
     if not isinstance(prices, (tuple, list)) or len(prices) != 3:
-        raise ValueError(
-            f"prices must be 3-tuple of (min,max) pairs, got {prices!r}"
-        )
+        raise ValueError(f"prices must be 3-tuple of (min,max) pairs, got {prices!r}")
     for i, p in enumerate(prices):
         if not isinstance(p, (tuple, list)) or len(p) != 2:
             raise ValueError(f"prices[{i}] must be (min,max) pair, got {p!r}")
@@ -417,14 +416,17 @@ class GmxV2Arbitrum:
         # takes the Market struct (not just the key) and the index price.
         index_price = prices[0]
         market_props = (
-            market_struct[0], market_struct[1], market_struct[2], market_struct[3],
+            market_struct[0],
+            market_struct[1],
+            market_struct[2],
+            market_struct[3],
         )
         oi_long = await self._reader.call(
             "getOpenInterestWithPnl",
             self.addresses.data_store,
             market_props,
             index_price,
-            True,   # isLong
+            True,  # isLong
             False,  # maximize
         )
         oi_short = await self._reader.call(

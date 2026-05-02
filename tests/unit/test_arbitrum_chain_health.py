@@ -245,7 +245,7 @@ def test_classify_perps_warning_on_extreme_oi_skew_with_size_floor() -> None:
                 state="ok",
                 market=_StubMarket("ARB-USD"),
                 funding_apr=Decimal("0.10"),  # not warning on funding
-                oi_skew=Decimal("0.97"),       # 97% long
+                oi_skew=Decimal("0.97"),  # 97% long
                 oi_total_usd=Decimal("50000000"),  # > $10M floor
             ),
         ]

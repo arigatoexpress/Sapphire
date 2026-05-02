@@ -218,9 +218,7 @@ class ArbitrumProtocols:
         """
         entry = self.registry.get(venue)
         if entry.category != "perps":
-            raise ValueError(
-                f"protocol {venue!r} is not a perps venue (category={entry.category})"
-            )
+            raise ValueError(f"protocol {venue!r} is not a perps venue (category={entry.category})")
         return GmxV2Arbitrum(self._client, GmxV2Addresses.from_registry_entry(entry))
 
     def _price_adapter(self, lend_venue: str = "aave_v3") -> GmxPriceAdapter:
@@ -232,7 +230,7 @@ class ArbitrumProtocols:
         venue: str = "gmx_v2",
         *,
         max_markets: int = 50,
-    ) -> "PerpsOverview":
+    ) -> PerpsOverview:
         """Aggregate perps snapshot — markets enumerated, priced where possible.
 
         Returns a :class:`PerpsOverview` with a per-market state list.
@@ -284,7 +282,7 @@ class ArbitrumProtocols:
 
             apr = GmxV2Arbitrum._funding_apr_from_info(info)
             skew = GmxV2Arbitrum._oi_skew_from_info(info)
-            total_oi = (Decimal(info.open_interest_long) + Decimal(info.open_interest_short))
+            total_oi = Decimal(info.open_interest_long) + Decimal(info.open_interest_short)
             # Convert 1e30-scaled USD to plain USD Decimal for callers.
             oi_total_usd = total_oi / (Decimal(10) ** 30)
 

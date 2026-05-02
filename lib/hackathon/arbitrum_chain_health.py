@@ -196,19 +196,13 @@ def classify_arbitrum_perps(
 
     if funding_block:
         severity = "BLOCK"
-        reasons.append(
-            f"GMX markets with extreme funding (>500% APR): {funding_block}"
-        )
+        reasons.append(f"GMX markets with extreme funding (>500% APR): {funding_block}")
     if funding_warn:
         severity = _max_severity(severity, "WARNING")
-        reasons.append(
-            f"GMX markets with elevated funding (>200% APR): {funding_warn}"
-        )
+        reasons.append(f"GMX markets with elevated funding (>200% APR): {funding_warn}")
     if skew_warn:
         severity = _max_severity(severity, "WARNING")
-        reasons.append(
-            f"GMX markets one-sided (>=95% OI skew with >$10M OI): {skew_warn}"
-        )
+        reasons.append(f"GMX markets one-sided (>=95% OI skew with >$10M OI): {skew_warn}")
 
     return severity, reasons, funding_warn, funding_block, skew_warn
 
@@ -248,9 +242,10 @@ def classify_arbitrum(
     reasons = list(lend_reasons) + list(perps_reasons)
 
     if not reasons:
-        reasons = ["chain healthy: Aave reserves nominal" + (
-            ", GMX perps nominal" if perps is not None else ""
-        )]
+        reasons = [
+            "chain healthy: Aave reserves nominal"
+            + (", GMX perps nominal" if perps is not None else "")
+        ]
 
     return ArbitrumChainHealthVerdict(
         chain_id=ARBITRUM_CHAIN_ID,

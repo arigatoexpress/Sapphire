@@ -9,7 +9,6 @@ unpriced-market fail-loud path, decimals registration, and the
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any
 
 import pytest
 
@@ -21,7 +20,6 @@ from lib.chains.arbitrum.contracts.gmx_price_adapter import (
     aave_price_to_gmx,
 )
 from lib.chains.arbitrum.contracts.gmx_v2 import GMX_PRICE_BASE, Market
-
 
 # ---------- Fake AaveV3Arbitrum ---------------------------------------------
 
@@ -135,7 +133,7 @@ def _eth_btc_market() -> Market:
     return Market(
         market_token="0x" + "0" * 40,
         index_token="0x82af49447d8a07e3bd95bd0d56f35241523fbab1",  # WETH
-        long_token="0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f",   # WBTC
+        long_token="0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f",  # WBTC
         short_token="0xaf88d065e77c8cc2239327c5edb3a432268e5831",  # USDC
         name="ETH/WBTC-USDC",
     )
@@ -143,11 +141,13 @@ def _eth_btc_market() -> Market:
 
 @pytest.mark.asyncio
 async def test_market_prices_builds_three_tuple_with_aave_inputs() -> None:
-    aave = FakeAave({
-        "0x82af49447d8a07e3bd95bd0d56f35241523fbab1": Decimal("3500"),
-        "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f": Decimal("70000"),
-        "0xaf88d065e77c8cc2239327c5edb3a432268e5831": Decimal("1"),
-    })
+    aave = FakeAave(
+        {
+            "0x82af49447d8a07e3bd95bd0d56f35241523fbab1": Decimal("3500"),
+            "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f": Decimal("70000"),
+            "0xaf88d065e77c8cc2239327c5edb3a432268e5831": Decimal("1"),
+        }
+    )
     adapter = GmxPriceAdapter(aave)
     prices = await adapter.market_prices(_eth_btc_market())
     assert len(prices) == 3
@@ -163,10 +163,12 @@ async def test_market_prices_builds_three_tuple_with_aave_inputs() -> None:
 @pytest.mark.asyncio
 async def test_market_prices_propagates_unavailable_when_one_token_missing() -> None:
     # ETH + WBTC priced, USDC oracle returns 0 → unavailable.
-    aave = FakeAave({
-        "0x82af49447d8a07e3bd95bd0d56f35241523fbab1": Decimal("3500"),
-        "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f": Decimal("70000"),
-    })
+    aave = FakeAave(
+        {
+            "0x82af49447d8a07e3bd95bd0d56f35241523fbab1": Decimal("3500"),
+            "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f": Decimal("70000"),
+        }
+    )
     adapter = GmxPriceAdapter(aave)
     with pytest.raises(PriceUnavailable):
         await adapter.market_prices(_eth_btc_market())
@@ -174,11 +176,13 @@ async def test_market_prices_propagates_unavailable_when_one_token_missing() -> 
 
 @pytest.mark.asyncio
 async def test_can_price_market_true_when_all_priced() -> None:
-    aave = FakeAave({
-        "0x82af49447d8a07e3bd95bd0d56f35241523fbab1": Decimal("3500"),
-        "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f": Decimal("70000"),
-        "0xaf88d065e77c8cc2239327c5edb3a432268e5831": Decimal("1"),
-    })
+    aave = FakeAave(
+        {
+            "0x82af49447d8a07e3bd95bd0d56f35241523fbab1": Decimal("3500"),
+            "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f": Decimal("70000"),
+            "0xaf88d065e77c8cc2239327c5edb3a432268e5831": Decimal("1"),
+        }
+    )
     adapter = GmxPriceAdapter(aave)
     assert await adapter.can_price_market(_eth_btc_market()) is True
 

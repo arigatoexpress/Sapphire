@@ -29,7 +29,6 @@ from lib.chains.arbitrum.contracts.gmx_v2 import (
 )
 from lib.chains.arbitrum.registry import ProtocolEntry, ProtocolRegistry
 
-
 # ---------- helper stub client ------------------------------------------------
 
 
@@ -155,9 +154,7 @@ def test_market_from_tuple_rejects_short_row() -> None:
 # ---------- funding APR + skew helpers (pure) --------------------------------
 
 
-def _info(
-    *, ff: int, lps: bool, oi_long: int, oi_short: int, disabled: bool = False
-) -> MarketInfo:
+def _info(*, ff: int, lps: bool, oi_long: int, oi_short: int, disabled: bool = False) -> MarketInfo:
     return MarketInfo(
         market=Market(
             market_token="0x" + "a" * 40,
@@ -184,17 +181,13 @@ def test_funding_apr_zero_factor_returns_zero() -> None:
 def test_funding_apr_positive_when_longs_pay_shorts() -> None:
     # 1% per year = 1e30 * 0.01 / SECONDS_PER_YEAR per second
     factor = int(Decimal(10) ** 30 * Decimal("0.01") / Decimal(SECONDS_PER_YEAR))
-    apr = GmxV2Arbitrum._funding_apr_from_info(
-        _info(ff=factor, lps=True, oi_long=0, oi_short=0)
-    )
+    apr = GmxV2Arbitrum._funding_apr_from_info(_info(ff=factor, lps=True, oi_long=0, oi_short=0))
     assert Decimal("0.0099") < apr < Decimal("0.0101")
 
 
 def test_funding_apr_negative_when_shorts_pay_longs() -> None:
     factor = int(Decimal(10) ** 30 * Decimal("0.05") / Decimal(SECONDS_PER_YEAR))
-    apr = GmxV2Arbitrum._funding_apr_from_info(
-        _info(ff=factor, lps=False, oi_long=0, oi_short=0)
-    )
+    apr = GmxV2Arbitrum._funding_apr_from_info(_info(ff=factor, lps=False, oi_long=0, oi_short=0))
     assert Decimal("-0.0501") < apr < Decimal("-0.0499")
 
 
@@ -320,8 +313,8 @@ async def test_market_info_decodes_full_struct(monkeypatch: pytest.MonkeyPatch) 
     virtual_inv = (0, 0, 0)
     market_info_tuple = (
         market_row,
-        100,    # borrowing_factor_long
-        200,    # borrowing_factor_short
+        100,  # borrowing_factor_long
+        200,  # borrowing_factor_short
         base_funding,
         next_funding,
         virtual_inv,

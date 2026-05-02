@@ -23,7 +23,6 @@ from lib.chains.arbitrum.protocols import (
 )
 from lib.chains.arbitrum.registry import ProtocolEntry, ProtocolRegistry
 
-
 # ---------- helpers ----------------------------------------------------------
 
 
@@ -82,10 +81,12 @@ class StubGmx:
         info = self._info[market]
         # Re-use the facade's helper logic via a small inline copy.
         from lib.chains.arbitrum.contracts.gmx_v2 import GmxV2Arbitrum
+
         return GmxV2Arbitrum._funding_apr_from_info(info)
 
     async def oi_skew(self, market: str, prices: Any) -> Decimal:
         from lib.chains.arbitrum.contracts.gmx_v2 import GmxV2Arbitrum
+
         return GmxV2Arbitrum._oi_skew_from_info(self._info[market])
 
 
@@ -239,7 +240,9 @@ async def test_perps_market_info_routes_through_adapter(monkeypatch: pytest.Monk
 
 
 @pytest.mark.asyncio
-async def test_perps_funding_rate_apr_returns_signed_decimal(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_perps_funding_rate_apr_returns_signed_decimal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     m = _market("X")
     factor = int(Decimal(10) ** 30 * Decimal("0.10") / Decimal(31_536_000))
     gmx = StubGmx([m], {m.market_token: _info(ff=factor, lps=True, oi_l=0, oi_s=0)})
