@@ -608,13 +608,7 @@ def test_index_renders_brain_hero_panel_above_kpi_strip():
     Smoke-grep against the template file directly so we don't need to
     spin up the full Flask render path with a fake BQ client.
     """
-    template_path = (
-        REPO_ROOT
-        / "services"
-        / "analytics_dashboard"
-        / "templates"
-        / "index.html"
-    )
+    template_path = REPO_ROOT / "services" / "analytics_dashboard" / "templates" / "index.html"
     html = template_path.read_text(encoding="utf-8")
 
     # Marker 1: panel exists with the canonical id + section heading text.
@@ -623,15 +617,17 @@ def test_index_renders_brain_hero_panel_above_kpi_strip():
     assert "cross-silo synthesis" in html
 
     # Marker 2: panel sits between silo-grid close and KPI section heading.
-    silo_close_idx = html.find('</div>\n\n<!-- ========== SAPPHIRE BRAIN')
+    silo_close_idx = html.find("</div>\n\n<!-- ========== SAPPHIRE BRAIN")
     kpi_open_idx = html.find("<!-- ========== KPIs with sparklines ========== -->")
     brain_open_idx = html.find('id="brain-hero"')
     assert silo_close_idx != -1, "silo grid → brain transition marker missing"
     assert kpi_open_idx != -1, "Production telemetry KPI marker missing"
     assert silo_close_idx < brain_open_idx < kpi_open_idx
 
-    # Marker 3: the Persist + Run button links to the canonical endpoint.
-    assert 'href="/api/brain/synthesis?persist=1"' in html
+    # Marker 3: the Persist + Run button reaches a canonical persist endpoint.
+    # Either GET /api/brain/synthesis?persist=1 (legacy) or
+    # POST /api/brain/llm-refresh?persist=1 (LLM-augmented) is acceptable.
+    assert "/api/brain/synthesis?persist=1" in html or "/api/brain/llm-refresh?persist=1" in html
 
     # Marker 4: the gauge SVG arc id and narrative element id ship.
     assert 'id="brain-gauge-arc"' in html
@@ -645,15 +641,237 @@ def test_index_brain_panel_fetches_the_three_brain_endpoints():
     """The refresh() loop must include all three brain endpoints. If a
     future refactor accidentally drops one we want a hard test failure.
     """
-    template_path = (
-        REPO_ROOT
-        / "services"
-        / "analytics_dashboard"
-        / "templates"
-        / "index.html"
-    )
+    template_path = REPO_ROOT / "services" / "analytics_dashboard" / "templates" / "index.html"
     html = template_path.read_text(encoding="utf-8")
     assert "/api/brain/synthesis" in html
     assert "/api/brain/history?limit=48" in html
     # correlate is exposed via a button — ensure it's reachable from the UI.
     assert "/api/brain/correlate" in html
+
+
+# ---------------------------------------------------------------------------
+# Sapphire Brain — Gemini LLM augmentation (mocked, no Vertex calls)
+# ---------------------------------------------------------------------------
+
+
+def _stub_brain_module(app_module):
+    """Convenience: return the live brain module loaded by app.py."""
+    return sys.modules["brain"]
+
+
+def test_brain_synthesis_includes_narrative_llm_field(client, app_module, monkeypatch):
+    """When LLM_BRAIN_ENABLED=1 and Vertex returns a string, narrative_llm
+    must appear on the synthesis payload — the deterministic narrative
+    field stays untouched.
+    """
+    brain = _stub_brain_module(app_module)
+    monkeypatch.setattr(brain, "LLM_BRAIN_ENABLED", True)
+    monkeypatch.setattr(
+        brain,
+        "_vertex_generate",
+        lambda prompt: {
+            "narrative": "Threat volume nominal; trading silent. Restart signal-logger.",
+            "model": "gemini-2.0-flash-exp",
+            "prompt_tokens": 220,
+            "completion_tokens": 28,
+            "latency_ms": 410,
+        },
+    )
+    # Stomp the cache so we don't pick up a hit from a previous test.
+    with brain._llm_cache_lock:
+        brain._llm_cache.update({"key": None, "ts": 0.0, "value": None})
+
+    response = client.get("/api/brain/synthesis")
+    assert response.status_code == 200
+    body = response.get_json()
+    # Field is always present; non-null when Vertex returned a string.
+    assert "narrative_llm" in body
+    assert body["narrative_llm"] is not None
+    assert "Threat volume" in body["narrative_llm"]
+    # The deterministic narrative is still emitted untouched.
+    assert isinstance(body.get("narrative"), str)
+    assert body["narrative"]
+    # llm_meta exposes the cache + token info for observability.
+    assert isinstance(body.get("llm_meta"), dict)
+    assert body["llm_meta"]["model"] == "gemini-2.0-flash-exp"
+
+
+def test_brain_synthesis_narrative_llm_is_null_when_vertex_unavailable(
+    client, app_module, monkeypatch
+):
+    """If Vertex import or call fails, narrative_llm must be None — the
+    endpoint must NOT fail and the deterministic narrative must remain.
+    """
+    brain = _stub_brain_module(app_module)
+    monkeypatch.setattr(brain, "LLM_BRAIN_ENABLED", True)
+    monkeypatch.setattr(brain, "_vertex_generate", lambda prompt: None)
+    with brain._llm_cache_lock:
+        brain._llm_cache.update({"key": None, "ts": 0.0, "value": None})
+
+    response = client.get("/api/brain/synthesis")
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["narrative_llm"] is None
+    assert isinstance(body["narrative"], str)
+
+
+def test_brain_synthesis_skips_llm_when_disabled(client, app_module, monkeypatch):
+    """LLM_BRAIN_ENABLED=0 should skip the Vertex hop entirely — no call,
+    narrative_llm null.
+    """
+    brain = _stub_brain_module(app_module)
+    monkeypatch.setattr(brain, "LLM_BRAIN_ENABLED", False)
+
+    sentinel = {"called": False}
+
+    def _boom(prompt):
+        sentinel["called"] = True
+        return {"narrative": "should not run", "model": "x"}
+
+    monkeypatch.setattr(brain, "_vertex_generate", _boom)
+
+    response = client.get("/api/brain/synthesis")
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["narrative_llm"] is None
+    assert sentinel["called"] is False
+
+
+def test_brain_synthesis_caches_llm_result(client, app_module, monkeypatch):
+    """Two back-to-back synthesis calls (same observation) must invoke
+    Vertex at most once; the second is served from the in-process cache.
+    """
+    brain = _stub_brain_module(app_module)
+    monkeypatch.setattr(brain, "LLM_BRAIN_ENABLED", True)
+
+    counter = {"n": 0}
+
+    def _gen(prompt):
+        counter["n"] += 1
+        return {
+            "narrative": f"call number {counter['n']}",
+            "model": "gemini-2.0-flash-exp",
+            "prompt_tokens": 100,
+            "completion_tokens": 10,
+            "latency_ms": 200,
+        }
+
+    monkeypatch.setattr(brain, "_vertex_generate", _gen)
+    with brain._llm_cache_lock:
+        brain._llm_cache.update({"key": None, "ts": 0.0, "value": None})
+
+    r1 = client.get("/api/brain/synthesis")
+    r2 = client.get("/api/brain/synthesis")
+    assert r1.status_code == 200 and r2.status_code == 200
+    # Both responses carry a narrative_llm but generate_content fired once.
+    assert counter["n"] == 1
+    assert r1.get_json()["narrative_llm"] == r2.get_json()["narrative_llm"]
+    # Second response carries cached=True.
+    assert r2.get_json()["llm_meta"]["cached"] is True
+
+
+def test_brain_llm_refresh_endpoint_bypasses_cache(client, app_module, monkeypatch):
+    """POST /api/brain/llm-refresh must force a fresh Vertex call even
+    when the cache is warm.
+    """
+    brain = _stub_brain_module(app_module)
+    monkeypatch.setattr(brain, "LLM_BRAIN_ENABLED", True)
+
+    counter = {"n": 0}
+
+    def _gen(prompt):
+        counter["n"] += 1
+        return {
+            "narrative": f"refresh-{counter['n']}",
+            "model": "gemini-2.0-flash-exp",
+            "prompt_tokens": 100,
+            "completion_tokens": 5,
+            "latency_ms": 180,
+        }
+
+    monkeypatch.setattr(brain, "_vertex_generate", _gen)
+    with brain._llm_cache_lock:
+        brain._llm_cache.update({"key": None, "ts": 0.0, "value": None})
+
+    # Warm the cache via the GET endpoint.
+    client.get("/api/brain/synthesis")
+    assert counter["n"] == 1
+
+    # llm-refresh must bypass.
+    r = client.post("/api/brain/llm-refresh")
+    assert r.status_code == 200
+    assert counter["n"] == 2
+    assert r.get_json()["narrative_llm"] == "refresh-2"
+    assert r.get_json()["llm_meta"]["cached"] is False
+
+
+def test_brain_llm_refresh_endpoint_is_registered(app_module):
+    """The new POST /api/brain/llm-refresh route must show up in the URL map."""
+    rules = {(r.rule, frozenset(r.methods or set())) for r in app_module.app.url_map.iter_rules()}
+    matched = [rule for rule, methods in rules if rule == "/api/brain/llm-refresh"]
+    assert matched, "expected /api/brain/llm-refresh in url_map"
+
+
+def test_brain_snapshot_drops_unknown_silo_fields(app_module):
+    """Defense-in-depth: ``_snapshot_for_llm`` is a whitelist — even if a
+    silo dict gains a sensitive key (e.g. ``api_key_demo``) the key is
+    dropped before the snapshot is sent to Gemini.
+    """
+    brain = _stub_brain_module(app_module)
+    obs = {
+        "ts": "2026-05-02T00:00:00+00:00",
+        "silos": {
+            "trading": {"signals_24h": 1, "api_key_demo": "leaked"},
+            "regime": {"latest_valid": None, "latest_any": None},
+            "threat": {"new_24h": 0, "critical_24h": 0, "total": 0},
+            "services": [],
+            "inference": {"calls": 0, "errors": 0},
+            "tho": {"status": "ok"},
+            "threat_live": {"records_now": 0},
+        },
+    }
+    snap = brain._snapshot_for_llm(obs)
+    serialized = repr(snap)
+    assert "leaked" not in serialized
+    assert "api_key_demo" not in serialized
+
+
+def test_brain_blocklist_triggers_on_sensitive_serialization(app_module):
+    """``_has_sensitive_data`` matches every term in the blocklist —
+    api_key / secret / password / token / jwt / ssn / credit_card."""
+    brain = _stub_brain_module(app_module)
+    for term in (
+        "api_key",
+        "api-key",
+        "secret",
+        "password",
+        "TOKEN",
+        "jwt",
+        "ssn",
+        "credit_card",
+        "credit-card",
+    ):
+        assert brain._has_sensitive_data(f"value contains {term} here") is True
+    # Clean strings pass through.
+    assert brain._has_sensitive_data("calls=1234 errors=2") is False
+
+
+def test_brain_synthesize_llm_short_circuits_on_blocklist_hit(app_module, monkeypatch):
+    """If ``_has_sensitive_data`` triggers, _synthesize_llm returns None
+    without ever calling Vertex.
+    """
+    brain = _stub_brain_module(app_module)
+    monkeypatch.setattr(brain, "LLM_BRAIN_ENABLED", True)
+    monkeypatch.setattr(brain, "_has_sensitive_data", lambda blob: True)
+
+    sentinel = {"called": False}
+
+    def _gen(prompt):
+        sentinel["called"] = True
+        return {"narrative": "leaked", "model": "x"}
+
+    monkeypatch.setattr(brain, "_vertex_generate", _gen)
+
+    result = brain._synthesize_llm({"ts": "t", "silos": {}})
+    assert result is None
+    assert sentinel["called"] is False
