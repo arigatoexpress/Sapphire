@@ -28,6 +28,11 @@ REQUIRED_PAYLOAD_FIELDS = ("symbol", "action", "price", "time")
 # Legacy field name we removed — its presence anywhere in the file is an error.
 FORBIDDEN_PAYLOAD_FIELDS = ("ts",)
 
+# Pine has a hard cap on `request.security()` calls per script. Mirrors
+# `lib.trading.pine_templates.MAX_SCREENER_SYMBOLS` so the analyzer stays
+# decoupled from the generator import path.
+MAX_SCREENER_SYMBOLS = 40
+
 # Match top-level indicator(/strategy( call (column 0).
 _INDICATOR_RE = re.compile(r"^indicator\s*\(", re.MULTILINE)
 _STRATEGY_RE = re.compile(r"^strategy\s*\(", re.MULTILINE)
@@ -42,6 +47,14 @@ _ALERT_RE = re.compile(r"alert\s*\(\s*(?P<payload>.+?)\s*,\s*alert\.freq")
 # strategy.entry("Name", ...) / strategy.close("Name") name extraction.
 _ENTRY_RE = re.compile(r'strategy\.entry\s*\(\s*"([^"]+)"')
 _CLOSE_RE = re.compile(r'strategy\.close\s*\(\s*"([^"]+)"')
+
+# `request.security("SYMBOL", ...)` — used by screener detection +
+# tuple-binding validation. The screener generator binds every call to a
+# 5-tuple `[long, short, exit_long, exit_short, close]`.
+_REQUEST_SECURITY_RE = re.compile(r"request\.security\s*\(")
+_TUPLE_BINDING_RE = re.compile(
+    r"\[\s*[A-Za-z_][\w,\s]*\s*\]\s*=\s*request\.security\s*\("
+)
 
 
 def _line_of(text: str, idx: int) -> int:
@@ -136,6 +149,62 @@ def _check_entry_close_pairing(text: str, warnings: list[dict[str, Any]]) -> Non
             )
 
 
+def _check_screener_rules(
+    text: str, errors: list[dict[str, Any]], warnings: list[dict[str, Any]]
+) -> None:
+    """Screener-specific validation (Sapphire-tagged + >1 request.security).
+
+    1. `request.security()` count must not exceed `MAX_SCREENER_SYMBOLS`.
+    2. Every `request.security()` call must bind to a tuple — the screener
+       contract returns OHLCV-shaped tuples; a bare scalar binding can't
+       drive the multi-action alert block.
+    3. Alert payloads must NOT use `syminfo.ticker` for the symbol slot —
+       that resolves to the chart's ticker, not the firing one, so the
+       receiver would route alerts to the wrong symbol.
+    """
+    sec_calls = list(_REQUEST_SECURITY_RE.finditer(text))
+    if len(sec_calls) > MAX_SCREENER_SYMBOLS:
+        over_idx = sec_calls[MAX_SCREENER_SYMBOLS].start()
+        errors.append(
+            {
+                "line": _line_of(text, over_idx),
+                "msg": (
+                    f"screener has {len(sec_calls)} request.security() calls; "
+                    f"Pine cap is {MAX_SCREENER_SYMBOLS} "
+                    f"(MAX_SCREENER_SYMBOLS in lib.trading.pine_templates)"
+                ),
+            }
+        )
+
+    bindings = list(_TUPLE_BINDING_RE.finditer(text))
+    if len(bindings) < len(sec_calls):
+        warnings.append(
+            {
+                "line": _line_of(text, sec_calls[0].start()) if sec_calls else 1,
+                "msg": (
+                    f"screener has {len(sec_calls)} request.security() calls but only "
+                    f"{len(bindings)} tuple bindings — every call must return an "
+                    f"OHLCV-shaped tuple"
+                ),
+            }
+        )
+
+    # syminfo.ticker in a screener alert payload silently misroutes alerts
+    # to the chart's symbol instead of the firing one.
+    for m in _ALERT_RE.finditer(text):
+        if "syminfo.ticker" in m.group(1):
+            errors.append(
+                {
+                    "line": _line_of(text, m.start()),
+                    "msg": (
+                        "screener alert payload uses syminfo.ticker — that resolves "
+                        "to the chart's symbol, not the firing symbol; emit the "
+                        "request.security'd symbol literal instead"
+                    ),
+                }
+            )
+
+
 def analyze_pine_source(text: str) -> dict[str, Any]:
     """Run all static checks on a Pine source string.
 
@@ -157,6 +226,13 @@ def analyze_pine_source(text: str) -> dict[str, Any]:
 
     if kind == "strategy":
         _check_entry_close_pairing(text, warnings)
+
+    # Screener-specific rules: only run for Sapphire-tagged sources where
+    # multiple `request.security()` calls indicate the multi-symbol screener
+    # shape. Hand-authored screeners under `pine/standalone/` are out of scope
+    # (no Sapphire tag → no contract).
+    if is_sapphire and len(_REQUEST_SECURITY_RE.findall(text)) > 1:
+        _check_screener_rules(text, errors, warnings)
 
     return {"ok": not errors, "errors": errors, "warnings": warnings}
 

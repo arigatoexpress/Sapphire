@@ -275,6 +275,28 @@ If `agent_only` is showing as a degraded signal upstream, the upstream
 collector should be treating `agent_only` as healthy on the Mac-only
 topology — that's a collector bug, not an orchestrator issue.
 
+### d) Screener Pine: alerts misroute / `MAX_SCREENER_SYMBOLS` cap
+
+The static analyzer (`lib/pine/static_analyzer.py`) enforces three
+screener-specific rules whenever a Sapphire-tagged Pine source has more
+than one `request.security()` call:
+
+1. The total `request.security()` count must not exceed
+   `MAX_SCREENER_SYMBOLS` (40, mirroring `lib.trading.pine_templates`).
+   Trim the universe or split into two screeners.
+2. Every `request.security()` must bind to a tuple — the screener
+   contract returns OHLCV-shaped tuples that drive the multi-action
+   alert block; a bare scalar binding (`x = request.security(...)`) is
+   warned about.
+3. Alert payloads must hard-code the firing symbol literal. Using
+   `syminfo.ticker` in the JSON `"symbol"` slot resolves to the chart's
+   ticker (not the firing one) and silently misroutes every alert. The
+   analyzer rejects this as an error.
+
+Run `python3 scripts/lint_pine.py --strict <file.pine>` during promotion
+— `--strict` promotes warnings (e.g. unpaired `strategy.entry/close` or
+partial tuple bindings) to errors so pre-promote diffs surface them.
+
 ## 10. Safety
 
 - **Read-only by default.** Every mutation is gated by

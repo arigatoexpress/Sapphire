@@ -8,12 +8,20 @@ pattern-matching path only.
 
 from __future__ import annotations
 
+import subprocess
+import sys
+from pathlib import Path
+
 from lib.pine import analyze_pine_file, analyze_pine_source
+from lib.pine.static_analyzer import MAX_SCREENER_SYMBOLS, SAPPHIRE_HEADER
 from lib.trading.pine_templates import (
     render_sapphire_screener,
     render_sapphire_watch_indicator,
     render_sapphire_watch_strategy,
 )
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_LINT_SCRIPT = _REPO_ROOT / "scripts" / "lint_pine.py"
 
 # ---------------------------------------------------------------------------
 # Generator output: indicator / strategy / screener should pass clean.
@@ -131,3 +139,110 @@ def test_error_and_warning_rows_have_line_and_msg_shape():
         assert row["line"] >= 1
         assert isinstance(row["msg"], str)
         assert row["msg"]
+
+
+# ---------------------------------------------------------------------------
+# Screener-specific rules.
+# ---------------------------------------------------------------------------
+
+
+def test_screener_with_syminfo_ticker_alert_errors():
+    # Hand-canned screener that mistakenly emits syminfo.ticker in the alert
+    # payload. The analyzer should reject it — syminfo.ticker resolves to
+    # the chart's symbol, not the firing one, so alerts misroute.
+    src = (
+        f"{SAPPHIRE_HEADER}\n"
+        "//@version=5\n"
+        'indicator("X", overlay=false)\n'
+        "[s0_long, s0_short, s0_xl, s0_xs, s0_close] = "
+        'request.security("BINANCE:ETHUSDT", timeframe.period, close)\n'
+        "[s1_long, s1_short, s1_xl, s1_xs, s1_close] = "
+        'request.security("BINANCE:BTCUSDT", timeframe.period, close)\n'
+        "if s0_long\n"
+        "    alert('{\"symbol\": \"' + syminfo.ticker + '\", "
+        "\"action\": \"long\", \"price\": ' + str.tostring(s0_close) + "
+        "', \"time\": ' + str.tostring(time) + '}', alert.freq_once_per_bar_close)\n"
+    )
+    result = analyze_pine_source(src)
+    syminfo_errors = [e for e in result["errors"] if "syminfo.ticker" in e["msg"]]
+    assert len(syminfo_errors) == 1
+    assert result["ok"] is False
+
+
+def test_screener_over_max_symbols_errors():
+    # Hand-canned screener with one over the MAX_SCREENER_SYMBOLS cap.
+    over_count = MAX_SCREENER_SYMBOLS + 1
+    sec_lines = [
+        f"[s{i}_long, s{i}_short, s{i}_xl, s{i}_xs, s{i}_close] = "
+        f'request.security("X{i}", timeframe.period, close)'
+        for i in range(over_count)
+    ]
+    alert_line = (
+        "if s0_long\n"
+        '    alert(\'{"symbol": "X0", "action": "long", '
+        '"price": \' + str.tostring(s0_close) + \', '
+        '"time": \' + str.tostring(time) + \'}\', '
+        "alert.freq_once_per_bar_close)"
+    )
+    src = (
+        f"{SAPPHIRE_HEADER}\n"
+        "//@version=5\n"
+        'indicator("X", overlay=false)\n'
+        + "\n".join(sec_lines)
+        + "\n"
+        + alert_line
+        + "\n"
+    )
+    result = analyze_pine_source(src)
+    cap_errors = [e for e in result["errors"] if "request.security() calls" in e["msg"]]
+    assert len(cap_errors) == 1
+    assert str(MAX_SCREENER_SYMBOLS) in cap_errors[0]["msg"]
+    assert result["ok"] is False
+
+
+def test_screener_generator_offline_passes_zero_zero():
+    """Real-world generator output for 3 symbols — must pass 0/0 after the
+    new screener rules land (regression guard for the analyzer change)."""
+    src = render_sapphire_screener(
+        ["BINANCE:ETHUSDT", "BINANCE:BTCUSDT", "BINANCE:SOLUSDT"]
+    )
+    result = analyze_pine_source(src)
+    assert result == {"ok": True, "errors": [], "warnings": []}
+
+
+# ---------------------------------------------------------------------------
+# CLI: --strict mode.
+# ---------------------------------------------------------------------------
+
+
+def test_lint_pine_strict_promotes_warnings_to_errors(tmp_path):
+    """`scripts/lint_pine.py --strict` exits non-zero when any warning is
+    present (e.g. unpaired strategy.entry/close), even with no hard errors.
+    Default (no --strict) still exits zero in that same case.
+    """
+    src = (
+        f"{SAPPHIRE_HEADER}\n"
+        "//@version=5\n"
+        'strategy("X", overlay=true)\n'
+        'strategy.entry("Long", strategy.long)\n'
+        'alert(\'{"symbol": "x", "action": "long", "price": 1.0, '
+        '"time": 1}\', alert.freq_once_per_bar_close)\n'
+    )
+    pine_path = tmp_path / "warn_only.pine"
+    pine_path.write_text(src, encoding="utf-8")
+
+    default_run = subprocess.run(
+        [sys.executable, str(_LINT_SCRIPT), str(pine_path)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert default_run.returncode == 0, default_run.stdout + default_run.stderr
+
+    strict_run = subprocess.run(
+        [sys.executable, str(_LINT_SCRIPT), "--strict", str(pine_path)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert strict_run.returncode != 0, strict_run.stdout + strict_run.stderr
