@@ -6296,6 +6296,121 @@ def api_forecast():
         ), 200
 
 
+@app.route("/api/forecast/explain/<symbol>")
+@requires_auth
+def api_forecast_explain(symbol: str):
+    """Structured rationale for a forecast or quick-signal score, by symbol.
+
+    Closes the loop on B4 (forecast interpretability): the dashboard already
+    surfaces forecasts and scores; this endpoint surfaces *why*.
+
+    Resolution order (no live calls — works on already-captured data):
+      1. ``lib.analytics.forecast.forecast()`` row whose canonical or alias
+         symbol matches the request. This is the Kronos + TA consensus story.
+      2. The latest TradingView orchestrator scoring item (sweep or deep
+         capture) whose ``symbol`` or ``tradingview_symbol`` matches. This is
+         the deterministic ``compute_quick_signal_score`` story.
+
+    Returns 200 with the structured rationale on hit, 404 on miss. Auth-gated
+    via the standard ``requires_auth`` decorator.
+    """
+    sym_raw = (symbol or "").strip()
+    if not sym_raw:
+        return jsonify({"status": "error", "reason": "missing_symbol"}), 400
+    sym_upper = sym_raw.upper()
+
+    try:
+        from lib.analytics.forecast import forecast as _forecast
+        from lib.analytics.forecast_explain import explain_forecast, explain_score
+    except Exception as exc:  # noqa: BLE001 — surface as 500 with reason
+        log.exception("forecast_explain import failure")
+        return (
+            jsonify({"status": "error", "reason": f"import_failure: {exc}"}),
+            500,
+        )
+
+    # 1) Try the forecast row path.
+    try:
+        fc = _forecast()
+        for row in fc.get("rows") or []:
+            candidates = {
+                str(row.get("symbol") or "").upper(),
+                str(row.get("kronos_symbol") or "").upper(),
+                str(row.get("ta_symbol") or "").upper(),
+            }
+            candidates.discard("")
+            if sym_upper in candidates:
+                payload = explain_forecast(row, symbol=row.get("symbol") or sym_upper)
+                return jsonify({"status": "ok", "source": "forecast", "rationale": payload})
+    except Exception as exc:  # noqa: BLE001 — fall through to scoring
+        log.warning("forecast lookup for %s failed: %s", sym_upper, exc)
+
+    # 2) Try the quick-signal score path via the latest TV orchestrator manifest.
+    try:
+        from lib.trading.tradingview_orchestrator import TradingViewOrchestrator
+
+        orch = TradingViewOrchestrator()
+        manifest = orch.latest_manifest() or {}
+    except Exception as exc:  # noqa: BLE001
+        log.warning("orchestrator manifest read failed: %s", exc)
+        manifest = {}
+
+    if manifest:
+        # Sweep shape — symbols[]
+        for row in manifest.get("symbols") or []:
+            candidates = {
+                str(row.get("symbol") or "").upper(),
+                str(row.get("tradingview_symbol") or "").upper(),
+            }
+            candidates.discard("")
+            if sym_upper in candidates:
+                score = row.get("score") or {}
+                if isinstance(score, dict):
+                    rationale = explain_score(
+                        score,
+                        symbol=row.get("symbol") or row.get("tradingview_symbol") or sym_upper,
+                    )
+                    return jsonify(
+                        {
+                            "status": "ok",
+                            "source": "quick_signal_score",
+                            "rationale": rationale,
+                        }
+                    )
+        # Deep-capture shape — symbol + timeframes[]
+        deep_symbol = str(manifest.get("symbol") or "").upper()
+        deep_tv_symbol = str(manifest.get("tradingview_symbol") or "").upper()
+        if sym_upper in {deep_symbol, deep_tv_symbol}:
+            timeframes = manifest.get("timeframes") or []
+            # Pick the first timeframe with a scorable record.
+            for tf in timeframes:
+                score = tf.get("score") or {}
+                if isinstance(score, dict) and score:
+                    rationale = explain_score(
+                        score,
+                        symbol=manifest.get("symbol") or sym_upper,
+                    )
+                    return jsonify(
+                        {
+                            "status": "ok",
+                            "source": "quick_signal_score",
+                            "rationale": rationale,
+                            "timeframe": tf.get("timeframe"),
+                        }
+                    )
+
+    return (
+        jsonify(
+            {
+                "status": "not_found",
+                "symbol": sym_upper,
+                "reason": "no forecast row or scoring record matches this symbol",
+            }
+        ),
+        404,
+    )
+
+
 @app.route("/api/backtest-results")
 @requires_auth
 def api_backtest_results():
