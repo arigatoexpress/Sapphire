@@ -34,12 +34,8 @@ def test_compute_basket_aggregate_differs_for_different_weights():
     client = FhevmClient()
     salt = b"sapphire-test-salt-0001"
 
-    out_a = client.compute_basket_aggregate(
-        {"TSLA": Decimal("0.4"), "AMZN": Decimal("0.6")}, salt
-    )
-    out_b = client.compute_basket_aggregate(
-        {"TSLA": Decimal("0.5"), "AMZN": Decimal("0.5")}, salt
-    )
+    out_a = client.compute_basket_aggregate({"TSLA": Decimal("0.4"), "AMZN": Decimal("0.6")}, salt)
+    out_b = client.compute_basket_aggregate({"TSLA": Decimal("0.5"), "AMZN": Decimal("0.5")}, salt)
 
     assert out_a != out_b
 

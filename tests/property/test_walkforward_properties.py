@@ -72,19 +72,13 @@ from lib.analytics.walkforward.regime_decomp import (  # noqa: E402
 # Per-window Sharpe: bounded so the input is realistic. Walk-forward
 # windows that produce a |Sharpe| > 10 in real data are almost certainly
 # overfit; we restrict to the typical observed range.
-_window_sharpe = st.floats(
-    min_value=-5.0, max_value=5.0, allow_nan=False, allow_infinity=False
-)
+_window_sharpe = st.floats(min_value=-5.0, max_value=5.0, allow_nan=False, allow_infinity=False)
 
 # Per-bar test return: bounded so the synthetic equity curve is realistic.
 # We allow exactly 0 (a flat bar) and small directional moves.
-_bar_return = st.floats(
-    min_value=-0.10, max_value=0.10, allow_nan=False, allow_infinity=False
-)
+_bar_return = st.floats(min_value=-0.10, max_value=0.10, allow_nan=False, allow_infinity=False)
 
-_regime_label = st.sampled_from(
-    ["risk_on", "risk_off", "rangebound", "high_vol", "low_vol"]
-)
+_regime_label = st.sampled_from(["risk_on", "risk_off", "rangebound", "high_vol", "low_vol"])
 
 
 @st.composite
@@ -96,9 +90,7 @@ def _walkforward_payload(draw: st.DrawFn) -> tuple[list[float], list[float], lis
     return stream is much longer than the per-window Sharpe list.
     """
     n_windows = draw(st.integers(min_value=2, max_value=12))
-    sharpes = draw(
-        st.lists(_window_sharpe, min_size=n_windows, max_size=n_windows)
-    )
+    sharpes = draw(st.lists(_window_sharpe, min_size=n_windows, max_size=n_windows))
     n_bars = draw(st.integers(min_value=n_windows * 5, max_value=n_windows * 30))
     returns = draw(st.lists(_bar_return, min_size=n_bars, max_size=n_bars))
     # Anchor the timestamps deterministically — Hypothesis draws the anchor
@@ -106,9 +98,7 @@ def _walkforward_payload(draw: st.DrawFn) -> tuple[list[float], list[float], lis
     # but each example is reproducible.
     anchor_doy = draw(st.integers(min_value=1, max_value=365))
     anchor_hour = draw(st.integers(min_value=0, max_value=23))
-    base = datetime(2026, 1, 1, anchor_hour, tzinfo=UTC) + timedelta(
-        days=anchor_doy - 1
-    )
+    base = datetime(2026, 1, 1, anchor_hour, tzinfo=UTC) + timedelta(days=anchor_doy - 1)
     timestamps = [(base + timedelta(hours=i)).date().isoformat() for i in range(n_bars)]
     return sharpes, returns, timestamps
 
@@ -134,9 +124,7 @@ def _labelled_payload(draw: st.DrawFn) -> tuple[list[float], list[str], dict[str
     )
     labels: dict[str, str] = {}
     for offset in label_dates:
-        labels[(base + timedelta(days=offset)).date().isoformat()] = draw(
-            _regime_label
-        )
+        labels[(base + timedelta(days=offset)).date().isoformat()] = draw(_regime_label)
     return returns, timestamps, labels
 
 
@@ -221,15 +209,11 @@ def test_regime_decomp_pnl_shares_sum_to_one(
     # by more than the per-bucket rounding error.
     n_buckets = len(result.buckets)
     eps = max(5e-4 * n_buckets, 1e-3)
-    assert total <= 1.0 + eps, (
-        f"pnl_share sum {total} > 1 + {eps}; buckets={result.buckets!r}"
-    )
+    assert total <= 1.0 + eps, f"pnl_share sum {total} > 1 + {eps}; buckets={result.buckets!r}"
     # Lower bound: when at least one bucket has non-zero PnL, the sum
     # rounds to 1.0 within the same tolerance.
     if any(abs(b.total_return) > 0 for b in result.buckets):
-        assert total >= 1.0 - eps, (
-            f"pnl_share sum {total} < 1 - {eps}; buckets={result.buckets!r}"
-        )
+        assert total >= 1.0 - eps, f"pnl_share sum {total} < 1 - {eps}; buckets={result.buckets!r}"
 
 
 # ---------------------------------------------------------------------------

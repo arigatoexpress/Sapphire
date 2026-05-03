@@ -16,7 +16,7 @@ def test_tv_agent_launcher_is_repo_owned_and_read_only() -> None:
     script = STARTER.read_text(encoding="utf-8")
 
     assert "services.windows_tv_agent.server" in script
-    assert "$env:SAPPHIRE_TV_AGENT_READ_ONLY = \"1\"" in script
+    assert '$env:SAPPHIRE_TV_AGENT_READ_ONLY = "1"' in script
     assert "Get-NetTCPConnection -LocalPort $Port -State Listen" in script
     assert "Start-ScheduledTask" not in script
 
@@ -24,8 +24,8 @@ def test_tv_agent_launcher_is_repo_owned_and_read_only() -> None:
 def test_tv_agent_task_installer_registers_live_task_names_without_starting_by_default() -> None:
     script = INSTALLER.read_text(encoding="utf-8")
 
-    assert "$TaskName = \"Sapphire-TV-Agent\"" in script
-    assert "$LogonTaskName = \"Sapphire-TV-Agent-Logon\"" in script
+    assert '$TaskName = "Sapphire-TV-Agent"' in script
+    assert '$LogonTaskName = "Sapphire-TV-Agent-Logon"' in script
     assert "start_tv_agent.ps1" in script
     assert "StartNow" in script
     assert "Start-ScheduledTask -TaskName $TaskName" in script

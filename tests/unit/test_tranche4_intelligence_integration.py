@@ -70,7 +70,11 @@ def test_narrative_context_selects_next_macro_event_for_asset() -> None:
         _signal(),
         macro_calendar={
             "events": [
-                {"title": "ECB lending survey", "assets": ["EUR"], "scheduled_at": "2026-04-28T13:00:00+00:00"},
+                {
+                    "title": "ECB lending survey",
+                    "assets": ["EUR"],
+                    "scheduled_at": "2026-04-28T13:00:00+00:00",
+                },
                 {
                     "title": "FOMC decision",
                     "category": "monetary_policy",
@@ -197,7 +201,10 @@ def test_observability_feed_status_reads_all_tranche4_artifacts(tmp_path: Path) 
         "data/narratives/2026-04-28/theses.jsonl": {"generated_at": NOW.isoformat()},
         "data/cross_asset/2026-04-28/regimes.jsonl": {"generated_at": NOW.isoformat()},
         "data/macro/2026-04-28/events.jsonl": {"published_at": NOW.isoformat()},
-        "data/intelligence/latest/onchain_intel.json": {"generated_at": NOW.isoformat(), "assets": []},
+        "data/intelligence/latest/onchain_intel.json": {
+            "generated_at": NOW.isoformat(),
+            "assets": [],
+        },
         "data/event_impact/expected_reactions.jsonl": {"generated_at": NOW.isoformat()},
         "data/counterparty/2026-04-28/counterparty_signals.json": {
             "signals": [{"generated_at": NOW.isoformat(), "asset": "BTC"}]
@@ -214,7 +221,9 @@ def test_observability_feed_status_reads_all_tranche4_artifacts(tmp_path: Path) 
     assert status["mode"] == "read_only_tranche4_feed_status"
     assert status["totals"]["feeds"] == 6
     assert status["totals"]["with_events"] == 6
-    assert all(not p.startswith(str(tmp_path)) for feed in status["feeds"] for p in feed["relative_paths"])
+    assert all(
+        not p.startswith(str(tmp_path)) for feed in status["feeds"] for p in feed["relative_paths"]
+    )
 
 
 def test_acquirer_microsite_lists_all_tranche4_surfaces() -> None:

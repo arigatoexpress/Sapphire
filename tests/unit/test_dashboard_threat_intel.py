@@ -51,9 +51,7 @@ def snapshot_dir(tmp_path, monkeypatch):
     intel = tmp_path / "intelligence"
     intel.mkdir()
     monkeypatch.setattr(dashboard_app, "_THREAT_INTEL_INTELLIGENCE_DIR", intel)
-    monkeypatch.setattr(
-        dashboard_app, "_THREAT_INTEL_LATEST_SYMLINK", intel / "latest"
-    )
+    monkeypatch.setattr(dashboard_app, "_THREAT_INTEL_LATEST_SYMLINK", intel / "latest")
     return intel
 
 
@@ -117,9 +115,7 @@ def test_api_threat_intel_empty_state_when_dir_missing(client, tmp_path, monkeyp
     assert "read_only_endpoint" in payload["safety"]["guards"]
 
 
-def test_api_threat_intel_unreadable_snapshot_returns_safe_envelope(
-    client, snapshot_dir
-):
+def test_api_threat_intel_unreadable_snapshot_returns_safe_envelope(client, snapshot_dir):
     bad = snapshot_dir / "2026-04-28"
     bad.mkdir()
     (bad / "threats.json").write_text("not json", encoding="utf-8")
@@ -204,12 +200,35 @@ def test_api_threat_intel_populated_snapshot(client, snapshot_dir):
 
 def test_api_threat_intel_picks_latest_dated_dir(client, snapshot_dir):
     # Two days of data; the latest should win.
-    _write_snapshot(snapshot_dir, "2026-04-25", [
-        {"canonical_id": "CVE-2026-OLD", "title": "Old", "score": 1.0, "exploited": False, "source": "nvd", "tags": []}
-    ])
-    _write_snapshot(snapshot_dir, "2026-04-28", [
-        {"canonical_id": "CVE-2026-NEW", "title": "New", "score": 9.5, "exploited": True, "source": "cisa-kev", "tags": ["kev"], "metadata": {}}
-    ])
+    _write_snapshot(
+        snapshot_dir,
+        "2026-04-25",
+        [
+            {
+                "canonical_id": "CVE-2026-OLD",
+                "title": "Old",
+                "score": 1.0,
+                "exploited": False,
+                "source": "nvd",
+                "tags": [],
+            }
+        ],
+    )
+    _write_snapshot(
+        snapshot_dir,
+        "2026-04-28",
+        [
+            {
+                "canonical_id": "CVE-2026-NEW",
+                "title": "New",
+                "score": 9.5,
+                "exploited": True,
+                "source": "cisa-kev",
+                "tags": ["kev"],
+                "metadata": {},
+            }
+        ],
+    )
     response = client.get("/api/threat-intel", headers=_auth_header())
     payload = response.get_json()
     assert payload["snapshot_date"] == "2026-04-28"
@@ -244,11 +263,48 @@ def test_api_threat_intel_no_post_or_put(client):
 
 def test_api_threat_intel_severity_classification_maps_correctly(client, snapshot_dir):
     threats = [
-        {"canonical_id": "C1", "title": "kev critical", "score": 9.5, "exploited": True, "source": "cisa-kev", "tags": [], "metadata": {}},
-        {"canonical_id": "C2", "title": "kev high", "score": 8.0, "exploited": True, "source": "cisa-kev", "tags": [], "metadata": {}},
-        {"canonical_id": "N1", "title": "nvd high", "score": 9.0, "exploited": False, "source": "nvd", "tags": []},
-        {"canonical_id": "N2", "title": "nvd medium", "score": 7.5, "exploited": False, "source": "nvd", "tags": []},
-        {"canonical_id": "L1", "title": "low", "score": 3.0, "exploited": False, "source": "nvd", "tags": []},
+        {
+            "canonical_id": "C1",
+            "title": "kev critical",
+            "score": 9.5,
+            "exploited": True,
+            "source": "cisa-kev",
+            "tags": [],
+            "metadata": {},
+        },
+        {
+            "canonical_id": "C2",
+            "title": "kev high",
+            "score": 8.0,
+            "exploited": True,
+            "source": "cisa-kev",
+            "tags": [],
+            "metadata": {},
+        },
+        {
+            "canonical_id": "N1",
+            "title": "nvd high",
+            "score": 9.0,
+            "exploited": False,
+            "source": "nvd",
+            "tags": [],
+        },
+        {
+            "canonical_id": "N2",
+            "title": "nvd medium",
+            "score": 7.5,
+            "exploited": False,
+            "source": "nvd",
+            "tags": [],
+        },
+        {
+            "canonical_id": "L1",
+            "title": "low",
+            "score": 3.0,
+            "exploited": False,
+            "source": "nvd",
+            "tags": [],
+        },
     ]
     _write_snapshot(snapshot_dir, "2026-04-28", threats)
     response = client.get("/api/threat-intel", headers=_auth_header())

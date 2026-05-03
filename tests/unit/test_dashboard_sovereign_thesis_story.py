@@ -96,7 +96,11 @@ def test_existing_sovereign_thesis_matrix_route_still_renders(client):
 
 
 def test_sovereign_thesis_story_route_is_get_only():
-    rules = [rule for rule in dashboard_app.app.url_map.iter_rules() if rule.rule == "/sovereign-thesis/story"]
+    rules = [
+        rule
+        for rule in dashboard_app.app.url_map.iter_rules()
+        if rule.rule == "/sovereign-thesis/story"
+    ]
 
     assert len(rules) == 1
     assert "GET" in rules[0].methods

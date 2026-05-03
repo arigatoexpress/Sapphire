@@ -180,8 +180,8 @@ def test_funding_rate_contrarian_handles_both_directions() -> None:
     spec = PineSpec(strategy="FundingRateContrarian", symbol="SOL-USD")
     src = generate_pine(spec)
     # Both long and short paths must exist (this is a contrarian strategy)
-    assert "strategy.entry(\"Long\"" in src or 'strategy.entry("Long"' in src
-    assert "strategy.entry(\"Short\"" in src or 'strategy.entry("Short"' in src
+    assert 'strategy.entry("Long"' in src or 'strategy.entry("Long"' in src
+    assert 'strategy.entry("Short"' in src or 'strategy.entry("Short"' in src
 
 
 # ---------------------------------------------------------------------------

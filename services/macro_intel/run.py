@@ -86,7 +86,9 @@ def _read_jsonl(path: Path, *, limit: int = 500) -> list[dict[str, Any]]:
     return rows[-max(1, limit) :]
 
 
-def _stamp_payload(payload: dict[str, Any], *, source_paths: tuple[str | Path, ...]) -> dict[str, Any]:
+def _stamp_payload(
+    payload: dict[str, Any], *, source_paths: tuple[str | Path, ...]
+) -> dict[str, Any]:
     if stamp is None:
         return payload
     return stamp(
@@ -163,10 +165,14 @@ async def pull_sources(
         try:
             events.extend(await source.pull(since))
         except SourceError as exc:
-            errors.append({"source": source.name, "error": str(exc), "type": exc.__class__.__name__})
+            errors.append(
+                {"source": source.name, "error": str(exc), "type": exc.__class__.__name__}
+            )
         except Exception as exc:  # noqa: BLE001 - one official source must not kill the lane.
             log.warning("macro source %s failed: %s", source.name, exc)
-            errors.append({"source": source.name, "error": str(exc), "type": exc.__class__.__name__})
+            errors.append(
+                {"source": source.name, "error": str(exc), "type": exc.__class__.__name__}
+            )
     events.sort(key=lambda item: item.published_at, reverse=True)
     return events[:MAX_EVENTS_PER_PULL], errors
 
@@ -311,7 +317,9 @@ def status(*, output_root: str | Path = DEFAULT_OUTPUT_ROOT) -> dict[str, Any]:
     if cache_dir.exists():
         for counters in cache_dir.glob("*/counters.json"):
             try:
-                source_counters[counters.parent.name] = json.loads(counters.read_text(encoding="utf-8"))
+                source_counters[counters.parent.name] = json.loads(
+                    counters.read_text(encoding="utf-8")
+                )
             except (OSError, json.JSONDecodeError):
                 source_counters[counters.parent.name] = {"error": "unreadable"}
     return {
@@ -338,13 +346,19 @@ def build_parser() -> argparse.ArgumentParser:
     run_once_p = sub.add_parser("run-once", help="single macro-intel tick")
     run_once_p.add_argument("--since-hours", type=float, default=24.0)
     run_once_p.add_argument("--live", action="store_true", help="allow official HTTP pulls")
-    run_once_p.add_argument("--publish", action="store_true", help="publish to event bus if env gate is set")
+    run_once_p.add_argument(
+        "--publish", action="store_true", help="publish to event bus if env gate is set"
+    )
 
     daemon_p = sub.add_parser("daemon", help="continuous poll loop")
-    daemon_p.add_argument("--poll-interval-seconds", type=float, default=DEFAULT_POLL_INTERVAL_SECONDS)
+    daemon_p.add_argument(
+        "--poll-interval-seconds", type=float, default=DEFAULT_POLL_INTERVAL_SECONDS
+    )
     daemon_p.add_argument("--max-iterations", type=int, default=None)
     daemon_p.add_argument("--live", action="store_true", help="allow official HTTP pulls")
-    daemon_p.add_argument("--publish", action="store_true", help="publish to event bus if env gate is set")
+    daemon_p.add_argument(
+        "--publish", action="store_true", help="publish to event bus if env gate is set"
+    )
 
     sub.add_parser("status", help="report counters and local artifacts")
     return parser

@@ -14,14 +14,18 @@ if str(ROOT) in sys.path:
     sys.path.remove(str(ROOT))
 sys.path.insert(0, str(ROOT))
 
-_spec = importlib.util.spec_from_file_location("audit_panel_tool", TOOLS / "internal" / "audit_panel.py")
+_spec = importlib.util.spec_from_file_location(
+    "audit_panel_tool", TOOLS / "internal" / "audit_panel.py"
+)
 audit_panel = importlib.util.module_from_spec(_spec)
 assert _spec.loader is not None
 _spec.loader.exec_module(audit_panel)
 
 
 def test_pr_score_action_returns_score_and_findings():
-    result = audit_panel.handle({"action": "pr-score", "number": 1, "title": "feat: audit", "commits": ["feat: audit"]})
+    result = audit_panel.handle(
+        {"action": "pr-score", "number": 1, "title": "feat: audit", "commits": ["feat: audit"]}
+    )
 
     assert result["score"]["pr_number"] == 1
     assert result["findings"][0]["rule_id"] == "ci_skip_dropped"
@@ -29,7 +33,16 @@ def test_pr_score_action_returns_score_and_findings():
 
 
 def test_pr_score_accepts_nested_pr_payload():
-    result = audit_panel.handle({"action": "pr-score", "pr": {"number": 2, "title": "feat: clean [skip ci]", "commits": ["feat: clean [skip ci]"]}})
+    result = audit_panel.handle(
+        {
+            "action": "pr-score",
+            "pr": {
+                "number": 2,
+                "title": "feat: clean [skip ci]",
+                "commits": ["feat: clean [skip ci]"],
+            },
+        }
+    )
 
     assert result["score"]["score"] == 0
 
@@ -39,7 +52,11 @@ def test_histogram_action_scores_pr_list():
         {
             "action": "histogram",
             "prs": [
-                {"number": 1, "title": "feat: clean [skip ci]", "commits": ["feat: clean [skip ci]"]},
+                {
+                    "number": 1,
+                    "title": "feat: clean [skip ci]",
+                    "commits": ["feat: clean [skip ci]"],
+                },
                 {"number": 2, "title": "feat: audit", "commits": ["feat: audit"]},
             ],
         }
@@ -90,7 +107,9 @@ def test_run_once_can_opt_into_issue_publishing(monkeypatch, tmp_path):
             return {"pr_count": 0, "finding_count": 0}
 
     seen = {}
-    monkeypatch.setattr(audit_panel, "run_panel", lambda **kwargs: seen.update(kwargs) or FakeResult())
+    monkeypatch.setattr(
+        audit_panel, "run_panel", lambda **kwargs: seen.update(kwargs) or FakeResult()
+    )
 
     audit_panel.handle({"action": "run-once", "cache_dir": str(tmp_path), "open_issue": True})
 
@@ -105,7 +124,9 @@ def test_unknown_action_returns_error():
 
 
 def test_run_returns_json_string():
-    result = json.loads(audit_panel.run("pr-score", number=1, title="feat: audit", commits=["feat: audit"]))
+    result = json.loads(
+        audit_panel.run("pr-score", number=1, title="feat: audit", commits=["feat: audit"])
+    )
 
     assert result["score"]["pr_number"] == 1
 

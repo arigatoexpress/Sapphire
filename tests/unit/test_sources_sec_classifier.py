@@ -127,10 +127,46 @@ def test_classify_unknown_form_is_low_neutral() -> None:
 
 def test_summarize_severity_buckets() -> None:
     events = [
-        FilingEvent(ticker="A", form="8-K", items="4.01", severity="high", direction="bear", summary="", filed_at="", accession=""),
-        FilingEvent(ticker="A", form="8-K", items="1.01", severity="high", direction="neutral", summary="", filed_at="", accession=""),
-        FilingEvent(ticker="A", form="8-K", items="5.02", severity="medium", direction="neutral", summary="", filed_at="", accession=""),
-        FilingEvent(ticker="A", form="8-K", items="7.01", severity="low", direction="neutral", summary="", filed_at="", accession=""),
+        FilingEvent(
+            ticker="A",
+            form="8-K",
+            items="4.01",
+            severity="high",
+            direction="bear",
+            summary="",
+            filed_at="",
+            accession="",
+        ),
+        FilingEvent(
+            ticker="A",
+            form="8-K",
+            items="1.01",
+            severity="high",
+            direction="neutral",
+            summary="",
+            filed_at="",
+            accession="",
+        ),
+        FilingEvent(
+            ticker="A",
+            form="8-K",
+            items="5.02",
+            severity="medium",
+            direction="neutral",
+            summary="",
+            filed_at="",
+            accession="",
+        ),
+        FilingEvent(
+            ticker="A",
+            form="8-K",
+            items="7.01",
+            severity="low",
+            direction="neutral",
+            summary="",
+            filed_at="",
+            accession="",
+        ),
     ]
     out = summarize_severity(events)
     assert out["high"] == 2
@@ -140,8 +176,26 @@ def test_summarize_severity_buckets() -> None:
 
 def test_summarize_direction_buckets() -> None:
     events = [
-        FilingEvent(ticker="A", form="8-K", items="4.01", severity="high", direction="bear", summary="", filed_at="", accession=""),
-        FilingEvent(ticker="A", form="8-K", items="1.01", severity="high", direction="neutral", summary="", filed_at="", accession=""),
+        FilingEvent(
+            ticker="A",
+            form="8-K",
+            items="4.01",
+            severity="high",
+            direction="bear",
+            summary="",
+            filed_at="",
+            accession="",
+        ),
+        FilingEvent(
+            ticker="A",
+            form="8-K",
+            items="1.01",
+            severity="high",
+            direction="neutral",
+            summary="",
+            filed_at="",
+            accession="",
+        ),
     ]
     out = summarize_direction(events)
     assert out["bear"] == 1
@@ -151,9 +205,36 @@ def test_summarize_direction_buckets() -> None:
 
 def test_filter_high_severity_only_returns_high() -> None:
     events = [
-        FilingEvent(ticker="A", form="8-K", items="4.01", severity="high", direction="bear", summary="", filed_at="", accession=""),
-        FilingEvent(ticker="A", form="8-K", items="5.02", severity="medium", direction="neutral", summary="", filed_at="", accession=""),
-        FilingEvent(ticker="A", form="8-K", items="7.01", severity="low", direction="neutral", summary="", filed_at="", accession=""),
+        FilingEvent(
+            ticker="A",
+            form="8-K",
+            items="4.01",
+            severity="high",
+            direction="bear",
+            summary="",
+            filed_at="",
+            accession="",
+        ),
+        FilingEvent(
+            ticker="A",
+            form="8-K",
+            items="5.02",
+            severity="medium",
+            direction="neutral",
+            summary="",
+            filed_at="",
+            accession="",
+        ),
+        FilingEvent(
+            ticker="A",
+            form="8-K",
+            items="7.01",
+            severity="low",
+            direction="neutral",
+            summary="",
+            filed_at="",
+            accession="",
+        ),
     ]
     assert len(filter_high_severity(events)) == 1
 

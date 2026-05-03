@@ -35,7 +35,12 @@ def _example_report() -> dict:
     return {
         "schema_version": 1,
         "report_date": "2026-04-29",
-        "summary": {"sources_count": 1, "samples_total": 6, "near_duplicate_pairs": 0, "decayed_sources_count": 0},
+        "summary": {
+            "sources_count": 1,
+            "samples_total": 6,
+            "near_duplicate_pairs": 0,
+            "decayed_sources_count": 0,
+        },
         "snr": {
             "alpha": {
                 "source": "alpha",
@@ -148,7 +153,9 @@ def test_recompute_action_returns_memory_only_payload(tmp_path, monkeypatch):
 def test_recompute_with_write_blocked_unless_live_env(tmp_path, monkeypatch):
     monkeypatch.setenv("SAPPHIRE_SOURCE_QUALITY_LIVE", "1")
 
-    response = source_quality.handle({"action": "recompute", "write": True, "report_root": str(tmp_path)})
+    response = source_quality.handle(
+        {"action": "recompute", "write": True, "report_root": str(tmp_path)}
+    )
 
     # Even with the live env flag, the plugin tool refuses to write —
     # the daemon is the only thing that does I/O.

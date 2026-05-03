@@ -933,7 +933,9 @@ def windows_research_worker_check(host: str = DEFAULT_WINDOWS_HOST) -> Check:
         and safety.get("telegram_sends_enabled") is False
     )
     schedule_status = str(schedule.get("status") or "unknown")
-    task_result = str(schedule.get("last_task_result_label") or schedule.get("last_task_result") or "unknown")
+    task_result = str(
+        schedule.get("last_task_result_label") or schedule.get("last_task_result") or "unknown"
+    )
     task_ok = schedule.get("last_result_ok")
 
     status = "PASS" if 200 <= status_code < 300 and worker_status in {"ok", "stale"} else "WARN"

@@ -289,9 +289,7 @@ def action_push_to_tv(payload: dict[str, Any]) -> dict[str, Any]:
     if not confirm:
         return {
             "ok": False,
-            "error": (
-                "refused: payload must include `confirm: true` for a live push."
-            ),
+            "error": ("refused: payload must include `confirm: true` for a live push."),
             "gate": "confirm",
         }
     src = payload.get("pine_source")

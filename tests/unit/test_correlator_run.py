@@ -132,6 +132,7 @@ def test_run_once_rate_limit_blocks_excess(isolated, monkeypatch) -> None:
     counters_path = cache_dir / "counters.json"
     cache_dir.mkdir(parents=True, exist_ok=True)
     import time as _t
+
     counters_path.write_text(
         json.dumps({"emissions": [_t.time()] * runner.MAX_CORRELATIONS_PER_HOUR, "lifetime": 0}),
         encoding="utf-8",

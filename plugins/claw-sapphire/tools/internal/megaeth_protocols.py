@@ -129,9 +129,7 @@ class _HttpJsonRpcClient:
                 f"(read-only); allowed: {sorted(_ALLOWED_RPC_METHODS)}"
             )
         if self._client is None:
-            raise RuntimeError(
-                "_HttpJsonRpcClient not entered; use 'async with' before _call"
-            )
+            raise RuntimeError("_HttpJsonRpcClient not entered; use 'async with' before _call")
         self._req_id += 1
         payload = {
             "jsonrpc": "2.0",
@@ -144,9 +142,7 @@ class _HttpJsonRpcClient:
         body = resp.json()
         if "error" in body:
             err = body["error"]
-            raise RuntimeError(
-                f"JSON-RPC error from {self.rpc_url}: {err.get('message', err)}"
-            )
+            raise RuntimeError(f"JSON-RPC error from {self.rpc_url}: {err.get('message', err)}")
         return body.get("result")
 
 
@@ -210,15 +206,27 @@ ACTION_SCHEMA: dict[str, dict[str, Any]] = {
     },
     "lend_user_position": {
         "description": "Per-account Aave V3 health factor, total collateral/debt, available borrows.",
-        "args": {"user": "str (0x... 42-char address, REQUIRED)", "venue": "str = 'aave_v3' (optional)"},
+        "args": {
+            "user": "str (0x... 42-char address, REQUIRED)",
+            "venue": "str = 'aave_v3' (optional)",
+        },
         "returns": "dict {venue, user, account: {health_factor, total_collateral_base, total_debt_base, available_borrows_base, ltv, liquidation_threshold}}",
-        "example": {"action": "lend_user_position", "user": "0x0000000000000000000000000000000000000001"},
+        "example": {
+            "action": "lend_user_position",
+            "user": "0x0000000000000000000000000000000000000001",
+        },
     },
     "oracle_price": {
         "description": "Aave V3 oracle USD price for an asset (1e8 base currency, returned as Decimal).",
-        "args": {"asset": "str (0x... 42-char token address, REQUIRED)", "venue": "str = 'aave_v3' (optional)"},
+        "args": {
+            "asset": "str (0x... 42-char token address, REQUIRED)",
+            "venue": "str = 'aave_v3' (optional)",
+        },
         "returns": "dict {asset, venue, price_usd}",
-        "example": {"action": "oracle_price", "asset": "0xFAfDdbb3FC7688494971a79cc65DCa3EF82079E7"},
+        "example": {
+            "action": "oracle_price",
+            "asset": "0xFAfDdbb3FC7688494971a79cc65DCa3EF82079E7",
+        },
     },
     "quote_swap": {
         "description": "Best Kumbaya DEX quote across fee tiers for amount_in token_in -> token_out. Read-only.",
@@ -296,9 +304,7 @@ def _require_address(value: Any, name: str) -> str:
     if not isinstance(value, str):
         raise ValueError(f"{name!r} must be a string, got {type(value).__name__}")
     if not value.startswith("0x") or len(value) != 42:
-        raise ValueError(
-            f"{name!r} must be a 0x-prefixed 42-char address, got {value!r}"
-        )
+        raise ValueError(f"{name!r} must be a 0x-prefixed 42-char address, got {value!r}")
     # Hex check — eth_abi will reject anything non-hex on encoding too,
     # but a clean error here is better than an opaque encoding traceback.
     try:
@@ -417,9 +423,7 @@ async def _action_peg_status(proto: MegaETHProtocols, payload: dict[str, Any]) -
     return {"venue": venue, "severity": severity}
 
 
-async def _action_is_safe_for_leverage(
-    proto: MegaETHProtocols, payload: dict[str, Any]
-) -> Any:
+async def _action_is_safe_for_leverage(proto: MegaETHProtocols, payload: dict[str, Any]) -> Any:
     from lib.chains.megaeth.contracts.peg_monitor import PegBreak
 
     venue = str(payload.get("venue", "usdm"))
@@ -592,9 +596,7 @@ def handle(payload: dict[str, Any]) -> dict[str, Any]:
         return {
             "action": action,
             "ok": False,
-            "error": (
-                f"unknown action {action!r}; valid: {list(VALID_ACTIONS)}"
-            ),
+            "error": (f"unknown action {action!r}; valid: {list(VALID_ACTIONS)}"),
         }
 
     try:

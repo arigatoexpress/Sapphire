@@ -84,7 +84,9 @@ def test_gate_satisfied_when_sortino_above_threshold(tmp_path) -> None:
 
 def test_gate_sortino_boundary_149_violates(tmp_path) -> None:
     ledger = ledger_with_record(tmp_path)
-    status = evaluate_ramp_gate(ledger, returns=[0.01, -0.0069] * 7, now=datetime(2026, 4, 30, tzinfo=UTC))
+    status = evaluate_ramp_gate(
+        ledger, returns=[0.01, -0.0069] * 7, now=datetime(2026, 4, 30, tzinfo=UTC)
+    )
     assert status.sortino_14d is not None
     if status.sortino_14d <= SORTINO_THRESHOLD:
         assert status.gate_status == "violated"
@@ -92,7 +94,9 @@ def test_gate_sortino_boundary_149_violates(tmp_path) -> None:
 
 def test_gate_sortino_equal_150_not_satisfied(tmp_path) -> None:
     ledger = ledger_with_record(tmp_path)
-    status = evaluate_ramp_gate(ledger, returns=[0.015, -0.005] * 7, now=datetime(2026, 4, 30, tzinfo=UTC))
+    status = evaluate_ramp_gate(
+        ledger, returns=[0.015, -0.005] * 7, now=datetime(2026, 4, 30, tzinfo=UTC)
+    )
     if status.sortino_14d is not None and status.sortino_14d <= SORTINO_THRESHOLD:
         assert status.gate_status != "satisfied"
 
@@ -119,7 +123,9 @@ def test_gate_target_tier_caps_at_three(tmp_path) -> None:
 
 
 def test_gate_no_records_still_reports_tier_one(tmp_path) -> None:
-    status = evaluate_ramp_gate(LiveLedger(tmp_path), returns=[], now=datetime(2026, 4, 30, tzinfo=UTC))
+    status = evaluate_ramp_gate(
+        LiveLedger(tmp_path), returns=[], now=datetime(2026, 4, 30, tzinfo=UTC)
+    )
     assert status.current_tier == 1
     assert status.gate_status in {"soaking", "blocked"}
 

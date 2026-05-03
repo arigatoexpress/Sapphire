@@ -302,7 +302,9 @@ def compute_source_snr(
             notes.append(f"{unmatched} signal(s) had no outcome inside the {window_hours}h window")
         low_sample = counts.total < MIN_SAMPLES_FOR_HIGH_CONFIDENCE
         if low_sample and counts.total > 0:
-            notes.append(f"sample size {counts.total} < {MIN_SAMPLES_FOR_HIGH_CONFIDENCE}; treat as preliminary")
+            notes.append(
+                f"sample size {counts.total} < {MIN_SAMPLES_FOR_HIGH_CONFIDENCE}; treat as preliminary"
+            )
         out[source] = SourceSNR(
             source=source,
             samples=counts.total,

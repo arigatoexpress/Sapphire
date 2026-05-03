@@ -33,9 +33,7 @@ class TestNoOpWhenDisabled:
             hooks.publish_signal_async({"symbol": "BTC", "action": "buy"})
         assert popen.call_count == 0
 
-    def test_no_subprocess_when_flag_other_value(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_no_subprocess_when_flag_other_value(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv(hooks.ENV_FLAG, "true")
         with patch("subprocess.Popen") as popen:
             hooks.publish_signal_async({"symbol": "BTC", "action": "buy"})

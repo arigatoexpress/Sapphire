@@ -38,6 +38,7 @@ from services.audit_panel.run import (  # noqa: E402
     latest_report,
     run_panel,
 )
+
 for _entry in reversed(_removed_plugin_paths):
     if _entry not in sys.path:
         sys.path.insert(0, _entry)

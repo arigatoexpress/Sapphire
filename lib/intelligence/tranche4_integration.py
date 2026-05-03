@@ -125,17 +125,16 @@ def _extract_macro_event(signal: Mapping[str, Any], macro_calendar: Any) -> dict
         rows = macro_calendar
     else:
         rows = (
-            payload.get("events")
-            or payload.get("calendar_window")
-            or payload.get("upcoming")
-            or []
+            payload.get("events") or payload.get("calendar_window") or payload.get("upcoming") or []
         )
     candidates: list[dict[str, Any]] = []
     for raw in rows:
         row = _coerce_mapping(raw)
         if not row:
             continue
-        assets = {str(a).upper() for a in row.get("assets") or row.get("assets_likely_affected") or []}
+        assets = {
+            str(a).upper() for a in row.get("assets") or row.get("assets_likely_affected") or []
+        }
         if target and assets and target not in assets:
             continue
         candidates.append(row)
@@ -194,7 +193,13 @@ def _extract_counterparty(signal: Mapping[str, Any], counterparty: Any) -> dict[
     target = _symbol(signal)
     payload = _coerce_mapping(counterparty)
     signals = payload.get("signals") if payload else None
-    rows = signals if isinstance(signals, list) else counterparty if isinstance(counterparty, list) else []
+    rows = (
+        signals
+        if isinstance(signals, list)
+        else counterparty
+        if isinstance(counterparty, list)
+        else []
+    )
     best: dict[str, Any] | None = None
     for raw in rows:
         row = _coerce_mapping(raw)
@@ -336,8 +341,17 @@ def _iter_json_rows(path: Path) -> list[dict[str, Any]]:
     return []
 
 
-def _latest_timestamp(rows: Sequence[dict[str, Any]], fallback: datetime | None = None) -> str | None:
-    keys = ("generated_at", "timestamp", "timestamp_iso", "published_at", "scheduled_at", "detected_at")
+def _latest_timestamp(
+    rows: Sequence[dict[str, Any]], fallback: datetime | None = None
+) -> str | None:
+    keys = (
+        "generated_at",
+        "timestamp",
+        "timestamp_iso",
+        "published_at",
+        "scheduled_at",
+        "detected_at",
+    )
     values: list[str] = []
     for row in rows:
         for key in keys:

@@ -42,8 +42,8 @@ def test_newsapi_live_gate_uses_x_api_key_header(tmp_path, monkeypatch) -> None:
         headers_seen.append(dict(headers or {}))
         return {"articles": []}
 
-    NewsAPISource(categories=("business",), cache_path=tmp_path / "n.json", fetcher=fake_fetch).latest_for(
-        "BTC", "1h"
-    )
+    NewsAPISource(
+        categories=("business",), cache_path=tmp_path / "n.json", fetcher=fake_fetch
+    ).latest_for("BTC", "1h")
 
     assert headers_seen == [{"X-Api-Key": "test-key"}]

@@ -120,7 +120,10 @@ def handle(payload: dict[str, Any]) -> dict[str, Any]:
             raw = payload.get("account")
             if raw is None:
                 return {"error": "account is required"}
-            return {"ok": True, "account_hash": hash_account(str(raw), salt=payload.get("account_salt"))}
+            return {
+                "ok": True,
+                "account_hash": hash_account(str(raw), salt=payload.get("account_salt")),
+            }
         if action == "input-provenance":
             trade = payload.get("trade") if isinstance(payload.get("trade"), dict) else payload
             return {"ok": True, "provenance": provenance_for_operator_fill(trade)}

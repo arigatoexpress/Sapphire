@@ -166,9 +166,7 @@ def _score_row(
     interval = expected.confidence_interval_95
     interval_scored = actual is not None and expected.matched_level != "no_data"
     within_interval = (
-        interval[0] <= actual <= interval[1]
-        if actual is not None and interval_scored
-        else None
+        interval[0] <= actual <= interval[1] if actual is not None and interval_scored else None
     )
     sign_scored = (
         actual is not None
@@ -221,8 +219,7 @@ def audit_post_corpus_events(
     """Compare post-cutoff events to model expectations using local bars only."""
     cutoff = _coerce_datetime(after or model.generated_at)
     normalized_bars = {
-        asset.upper(): normalize_bars(bars)
-        for asset, bars in sorted(bars_by_asset.items())
+        asset.upper(): normalize_bars(bars) for asset, bars in sorted(bars_by_asset.items())
     }
     post_events = [
         event

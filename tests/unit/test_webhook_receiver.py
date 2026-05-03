@@ -576,7 +576,10 @@ def test_research_worker_payload_is_path_safe_and_paper_only(receiver, monkeypat
     assert payload["schedule"]["last_task_result_label"] == "not_started"
     assert payload["schedule"]["last_result_ok"] is True
     assert payload["commands"][0]["duration_seconds"] == 5.0
-    assert payload["commands"][0]["log_path_label"] == ".../research-worker/20260429T210424Z/backtest.log"
+    assert (
+        payload["commands"][0]["log_path_label"]
+        == ".../research-worker/20260429T210424Z/backtest.log"
+    )
     assert payload["artifacts"][0]["path_label"] == ".../research-worker/20260429T210424Z/backtest"
 
 

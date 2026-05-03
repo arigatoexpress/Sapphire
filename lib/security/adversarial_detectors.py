@@ -280,7 +280,10 @@ class WashTradeDetector:
                     evidence=evidence,
                     recommended_action="downweight_volume_and_require_independent_venue_confirmation",
                     quarantine_eligible=True,
-                    metadata={"round_trips": len(matches), "window_seconds": self.reciprocal_window_seconds},
+                    metadata={
+                        "round_trips": len(matches),
+                        "window_seconds": self.reciprocal_window_seconds,
+                    },
                 )
             )
 
@@ -586,7 +589,9 @@ class PromptInjectionDetector:
             "jailbreak_persona",
             "high",
             "Prompt attempts to assign an unrestricted or jailbreak persona.",
-            re.compile(r"\byou\s+are\s+now\s+(dan|jailbroken|unrestricted|developer\s+mode)\b", re.I),
+            re.compile(
+                r"\byou\s+are\s+now\s+(dan|jailbroken|unrestricted|developer\s+mode)\b", re.I
+            ),
         ),
         (
             "secret_exfiltration_request",
@@ -660,7 +665,9 @@ class PromptInjectionDetector:
                 )
 
             zero_width_count = len(self.ZERO_WIDTH_RE.findall(text))
-            if zero_width_count >= 3 and re.search(r"(?i)\b(ignore|override|secret|tool|send)\b", text):
+            if zero_width_count >= 3 and re.search(
+                r"(?i)\b(ignore|override|secret|tool|send)\b", text
+            ):
                 findings.append(
                     AdversarialFinding(
                         detector=self.detector_name,
@@ -714,7 +721,9 @@ def _decoded_base64_has_instruction(value: str) -> bool:
         text = decoded.decode("utf-8", errors="ignore")
     except UnicodeDecodeError:
         return False
-    return bool(re.search(r"(?i)\b(ignore|override|system prompt|secret|developer message)\b", text))
+    return bool(
+        re.search(r"(?i)\b(ignore|override|system prompt|secret|developer message)\b", text)
+    )
 
 
 class FalseFlagThreatIntelDetector:
@@ -749,7 +758,9 @@ class FalseFlagThreatIntelDetector:
         findings: list[AdversarialFinding] = []
 
         for index, row in enumerate(rows):
-            item_id = _text(_value(row, ("id", "report_id", "slug"), f"row-{index}")) or f"row-{index}"
+            item_id = (
+                _text(_value(row, ("id", "report_id", "slug"), f"row-{index}")) or f"row-{index}"
+            )
             text = self._report_text(row)
             claimed = _lower_id(_value(row, self.CLAIMED_FIELDS))
             assessed = _lower_id(_value(row, self.ASSESSED_FIELDS))

@@ -528,14 +528,10 @@ class _PlaceholderEmbedder:
     note: str = "placeholder — not implemented"
 
     def embed(self, text: str) -> list[float]:  # pragma: no cover - guard path
-        raise NotImplementedError(
-            f"Embedder '{self.name}' is a placeholder. {self.note}"
-        )
+        raise NotImplementedError(f"Embedder '{self.name}' is a placeholder. {self.note}")
 
     def embed_batch(self, texts: list[str]) -> list[list[float]]:  # pragma: no cover
-        raise NotImplementedError(
-            f"Embedder '{self.name}' is a placeholder. {self.note}"
-        )
+        raise NotImplementedError(f"Embedder '{self.name}' is a placeholder. {self.note}")
 
 
 class EmbedderRegistry:

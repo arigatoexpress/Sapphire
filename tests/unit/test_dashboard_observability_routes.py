@@ -148,10 +148,19 @@ def _stub_snapshot_payload() -> dict:
         "inference_proxy": {
             "cache_dir": "~/.cache/sapphire/inference_proxy",
             "tiers": [
-                {"tier": "T1_GPU", "endpoint": "100.71.10.48:11434", "healthy": True,
-                 "latency_ms": 410, "last_check": "2026-04-28T12:00:00+00:00"}
+                {
+                    "tier": "T1_GPU",
+                    "endpoint": "100.71.10.48:11434",
+                    "healthy": True,
+                    "latency_ms": 410,
+                    "last_check": "2026-04-28T12:00:00+00:00",
+                }
             ],
-            "token_consumption": {"total": 12345, "by_tier": {"T1_GPU": 12345}, "window": "lifetime"},
+            "token_consumption": {
+                "total": 12345,
+                "by_tier": {"T1_GPU": 12345},
+                "window": "lifetime",
+            },
             "last_updated": "2026-04-28T11:00:00+00:00",
             "available": True,
             "note": None,
@@ -424,6 +433,7 @@ def test_build_observability_system_summary_redacts_pii(monkeypatch):
                     "endpoint": "100.71.10.48:11434",
                     "label": "com.sapphire.demo",
                 }
+
         return _Stub()
 
     monkeypatch.setattr(

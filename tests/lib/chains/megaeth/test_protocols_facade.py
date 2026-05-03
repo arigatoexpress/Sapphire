@@ -21,9 +21,7 @@ from lib.chains.megaeth.protocols import (
 )
 from lib.chains.megaeth.registry import ProtocolEntry, ProtocolRegistry
 
-FIXTURE = (
-    pathlib.Path(__file__).parent / "fixtures" / "getReservesData_response.hex"
-)
+FIXTURE = pathlib.Path(__file__).parent / "fixtures" / "getReservesData_response.hex"
 
 UI_POOL = "0x1aB55bBdD5DF0782BBCf73553Af93BC6B29A286B"
 POOL = "0x7e324AbC5De01d112AfC03a584966ff199741C28"

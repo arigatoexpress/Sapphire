@@ -56,7 +56,9 @@ def test_enabled_live_flags_warn_without_rendering_values(monkeypatch) -> None:
 
     report = soak.collect_readiness(run_status=False)
     serialized = json.dumps(report)
-    narrative = next(surface for surface in report["surfaces"] if surface["id"] == "narrative_synthesis")
+    narrative = next(
+        surface for surface in report["surfaces"] if surface["id"] == "narrative_synthesis"
+    )
 
     assert report["status"] == "warn"
     assert narrative["status"] == "warn"

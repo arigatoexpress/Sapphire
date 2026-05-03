@@ -156,9 +156,15 @@ def test_list_filters_signal_type(isolated_paths: Path) -> None:
 
 def test_stats_aggregates_by_zone_type_action_priority(isolated_paths: Path) -> None:
     signals = [
-        _make_signal(zone_id="z1", signal_type="smoke", recommended_action="notify_operator", risk_score=60),
-        _make_signal(zone_id="z1", signal_type="fire", recommended_action="notify_fire_dept", risk_score=95),
-        _make_signal(zone_id="z2", signal_type="wildlife", recommended_action="log_only", risk_score=10),
+        _make_signal(
+            zone_id="z1", signal_type="smoke", recommended_action="notify_operator", risk_score=60
+        ),
+        _make_signal(
+            zone_id="z1", signal_type="fire", recommended_action="notify_fire_dept", risk_score=95
+        ),
+        _make_signal(
+            zone_id="z2", signal_type="wildlife", recommended_action="log_only", risk_score=10
+        ),
     ]
     for sig in signals:
         wildfire.handle({"action": "ingest", "signal": sig})

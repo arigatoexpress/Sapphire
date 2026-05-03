@@ -103,9 +103,7 @@ def test_generate_action_missing_symbol() -> None:
 
 
 def test_generate_action_unsupported_strategy() -> None:
-    out = pg.handle(
-        {"action": "generate", "strategy": "GhostStrategy", "symbol": "BTC"}
-    )
+    out = pg.handle({"action": "generate", "strategy": "GhostStrategy", "symbol": "BTC"})
     assert out["ok"] is False
 
 
@@ -123,8 +121,8 @@ def test_latest_empty_directory(tmp_path: Path) -> None:
 def test_latest_with_files(tmp_path: Path) -> None:
     date_dir = tmp_path / "2026-04-29"
     date_dir.mkdir()
-    (date_dir / "alpha.pine").write_text("//@version=5\nstrategy(\"a\")\nplot(close)\n")
-    (date_dir / "beta.pine").write_text("//@version=5\nstrategy(\"b\")\nplot(close)\n")
+    (date_dir / "alpha.pine").write_text('//@version=5\nstrategy("a")\nplot(close)\n')
+    (date_dir / "beta.pine").write_text('//@version=5\nstrategy("b")\nplot(close)\n')
     out = pg.handle({"action": "latest", "output_root": str(tmp_path)})
     assert out["ok"] is True
     assert len(out["files"]) == 2
@@ -138,8 +136,8 @@ def test_latest_picks_most_recent_date_dir(tmp_path: Path) -> None:
     newer = tmp_path / "2026-04-29"
     older.mkdir()
     newer.mkdir()
-    (older / "old.pine").write_text("//@version=5\nstrategy(\"a\")\nplot(close)\n")
-    (newer / "new.pine").write_text("//@version=5\nstrategy(\"b\")\nplot(close)\n")
+    (older / "old.pine").write_text('//@version=5\nstrategy("a")\nplot(close)\n')
+    (newer / "new.pine").write_text('//@version=5\nstrategy("b")\nplot(close)\n')
     out = pg.handle({"action": "latest", "output_root": str(tmp_path)})
     assert out["directory"] == str(newer)
     assert [f["name"] for f in out["files"]] == ["new.pine"]
@@ -151,7 +149,7 @@ def test_latest_picks_most_recent_date_dir(tmp_path: Path) -> None:
 
 
 def test_validate_action_inline() -> None:
-    src = "//@version=5\nstrategy(\"Test\")\nplot(close)\n"
+    src = '//@version=5\nstrategy("Test")\nplot(close)\n'
     out = pg.handle({"action": "validate", "pine_source": src})
     assert out["ok"] is True
 
@@ -164,7 +162,7 @@ def test_validate_action_rejects_bad() -> None:
 
 def test_validate_action_from_path(tmp_path: Path) -> None:
     p = tmp_path / "x.pine"
-    p.write_text("//@version=5\nstrategy(\"Test\")\nplot(close)\n")
+    p.write_text('//@version=5\nstrategy("Test")\nplot(close)\n')
     out = pg.handle({"action": "validate", "pine_path": str(p)})
     assert out["ok"] is True
 
@@ -242,7 +240,7 @@ def test_push_refused_when_env_flag_unset(monkeypatch) -> None:
     out = pg.handle(
         {
             "action": "push-to-tv",
-            "pine_source": "//@version=5\nstrategy(\"a\")\nplot(close)\n",
+            "pine_source": '//@version=5\nstrategy("a")\nplot(close)\n',
             "confirm": True,
         }
     )
@@ -255,7 +253,7 @@ def test_push_refused_when_confirm_missing(monkeypatch) -> None:
     out = pg.handle(
         {
             "action": "push-to-tv",
-            "pine_source": "//@version=5\nstrategy(\"a\")\nplot(close)\n",
+            "pine_source": '//@version=5\nstrategy("a")\nplot(close)\n',
         }
     )
     assert out["ok"] is False
@@ -267,7 +265,7 @@ def test_push_dry_run_when_gated(monkeypatch) -> None:
     out = pg.handle(
         {
             "action": "push-to-tv",
-            "pine_source": "//@version=5\nstrategy(\"a\")\nplot(close)\n",
+            "pine_source": '//@version=5\nstrategy("a")\nplot(close)\n',
             "confirm": True,
             "dry_run": True,
         }
@@ -282,7 +280,7 @@ def test_push_underscore_alias(monkeypatch) -> None:
     out = pg.handle(
         {
             "action": "push_to_tv",
-            "pine_source": "//@version=5\nstrategy(\"a\")\nplot(close)\n",
+            "pine_source": '//@version=5\nstrategy("a")\nplot(close)\n',
             "confirm": True,
         }
     )
@@ -293,7 +291,7 @@ def test_push_underscore_alias(monkeypatch) -> None:
 def test_push_with_path(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("SAPPHIRE_PINE_TV_PUSH_LIVE", "1")
     p = tmp_path / "x.pine"
-    p.write_text("//@version=5\nstrategy(\"a\")\nplot(close)\n")
+    p.write_text('//@version=5\nstrategy("a")\nplot(close)\n')
     out = pg.handle(
         {
             "action": "push-to-tv",
@@ -319,7 +317,7 @@ def test_push_invokes_mocked_mcp(monkeypatch) -> None:
         return {"ok": True, "status": "mocked", "message": "ok"}
 
     monkeypatch.setattr(pg, "_invoke_tv_mcp", fake_invoke)
-    src = "//@version=5\nstrategy(\"a\")\nplot(close)\n"
+    src = '//@version=5\nstrategy("a")\nplot(close)\n'
     out = pg.handle(
         {
             "action": "push-to-tv",

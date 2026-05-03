@@ -31,7 +31,9 @@ def test_equity_chart_is_deterministic_and_local(tmp_path: Path):
     assert one["point_count"] == 3
     assert one["data_hash_material"] == two["data_hash_material"]
     assert Path(one["path"]).exists()
-    assert "customer" not in Path(one["path"]).read_bytes().decode("latin1", errors="ignore").lower()
+    assert (
+        "customer" not in Path(one["path"]).read_bytes().decode("latin1", errors="ignore").lower()
+    )
 
 
 def test_drawdown_chart_is_deterministic_and_local(tmp_path: Path):
@@ -42,4 +44,3 @@ def test_drawdown_chart_is_deterministic_and_local(tmp_path: Path):
     assert one["point_count"] == 3
     assert one["data_hash_material"] == two["data_hash_material"]
     assert Path(one["path"]).exists()
-

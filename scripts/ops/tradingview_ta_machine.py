@@ -73,7 +73,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--limit", type=int, default=18, help="Max watchlist symbols")
     parser.add_argument("--json-out", help="Write the full plan JSON to this path")
     parser.add_argument("--watchlist-out", help="Write TradingView import TXT to this path")
-    parser.add_argument("--print-commands", action="store_true", help="Print top work-order commands")
+    parser.add_argument(
+        "--print-commands", action="store_true", help="Print top work-order commands"
+    )
     parser.add_argument(
         "--apply-watchlist",
         action="store_true",

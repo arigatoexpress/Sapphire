@@ -101,20 +101,13 @@ def test_sortino_matches_reference_to_one_part_in_a_million(
         assert result.value == math.inf
         return
     assert result.value is not None
-    assert math.isclose(
-        result.value, expected_value, rel_tol=1e-6, abs_tol=1e-9
-    ), (
-        f"value mismatch: ours={result.value} ref={expected_value} "
-        f"for n={len(returns)}"
+    assert math.isclose(result.value, expected_value, rel_tol=1e-6, abs_tol=1e-9), (
+        f"value mismatch: ours={result.value} ref={expected_value} for n={len(returns)}"
     )
     if result.downside_deviation is not None:
-        assert math.isclose(
-            result.downside_deviation, expected_dd, rel_tol=1e-9, abs_tol=1e-12
-        )
+        assert math.isclose(result.downside_deviation, expected_dd, rel_tol=1e-9, abs_tol=1e-12)
     if result.mean_return is not None:
-        assert math.isclose(
-            result.mean_return, expected_mean, rel_tol=1e-9, abs_tol=1e-12
-        )
+        assert math.isclose(result.mean_return, expected_mean, rel_tol=1e-9, abs_tol=1e-12)
 
 
 # ---------------------------------------------------------------------------
@@ -126,9 +119,7 @@ def test_sortino_matches_reference_to_one_part_in_a_million(
     st.lists(_returns, min_size=0, max_size=13),
     st.integers(min_value=14, max_value=30),
 )
-def test_sortino_rejects_short_series_below_minimum(
-    returns: list[float], minimum: int
-) -> None:
+def test_sortino_rejects_short_series_below_minimum(returns: list[float], minimum: int) -> None:
     result = sortino_ratio(returns, minimum_periods=minimum)
     assert result.value is None
     assert result.reason.startswith("insufficient_periods:")
@@ -193,7 +184,8 @@ def test_sortino_deterministic(returns: list[float]) -> None:
     ),
 )
 def test_sortino_skips_unparsable_without_raising(
-    returns: list[float], junk: list,
+    returns: list[float],
+    junk: list,
 ) -> None:
     polluted = list(returns) + junk  # type: ignore[arg-type]
     result = sortino_ratio(polluted, minimum_periods=14)
@@ -216,13 +208,9 @@ def test_sortino_skips_unparsable_without_raising(
     ),
     st.floats(min_value=1.0, max_value=365.0, allow_nan=False, allow_infinity=False),
 )
-def test_sortino_annualisation_factor_applies_sqrt(
-    returns: list[float], factor: float
-) -> None:
+def test_sortino_annualisation_factor_applies_sqrt(returns: list[float], factor: float) -> None:
     base = sortino_ratio(returns, minimum_periods=14)
-    annualised = sortino_ratio(
-        returns, minimum_periods=14, annualization_factor=factor
-    )
+    annualised = sortino_ratio(returns, minimum_periods=14, annualization_factor=factor)
     if base.value is None or base.value == math.inf:
         return
     assert annualised.value is not None
@@ -243,9 +231,7 @@ def test_sortino_annualisation_factor_applies_sqrt(
         max_size=14,
     ),
 )
-def test_last_n_sortino_uses_only_tail(
-    head: list[float], tail: list[float]
-) -> None:
+def test_last_n_sortino_uses_only_tail(head: list[float], tail: list[float]) -> None:
     """The result of last_n_sortino on (head + tail) equals sortino on tail alone."""
     combined = list(head) + list(tail)
     last = last_n_sortino(combined, window=14)
@@ -254,9 +240,7 @@ def test_last_n_sortino_uses_only_tail(
     # because last_n_sortino aggregates skipped from both passes.
     assert last.value == direct.value
     if last.downside_deviation is not None and direct.downside_deviation is not None:
-        assert math.isclose(
-            last.downside_deviation, direct.downside_deviation, abs_tol=1e-12
-        )
+        assert math.isclose(last.downside_deviation, direct.downside_deviation, abs_tol=1e-12)
 
 
 # ---------------------------------------------------------------------------

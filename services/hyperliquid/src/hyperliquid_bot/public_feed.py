@@ -262,7 +262,9 @@ class SignalPublisher:
     store: JsonlSignalStore = field(default_factory=JsonlSignalStore)
     limiter: HourlyLimiter = field(default_factory=lambda: HourlyLimiter(MAX_SIGNALS_PER_HOUR))
 
-    def publish(self, topic: str, payload: dict[str, Any], *, now: float | None = None) -> str | None:
+    def publish(
+        self, topic: str, payload: dict[str, Any], *, now: float | None = None
+    ) -> str | None:
         current = time.time() if now is None else now
         if not self.limiter.allow(current):
             logger.warning("hyperliquid signal cap reached; dropping %s", topic)
@@ -292,7 +294,9 @@ def _level_notional(level: dict[str, Any] | None) -> float:
     return _float(level.get("px")) * _float(level.get("sz"))
 
 
-def _top_depth_notional(levels: Sequence[Sequence[dict[str, Any]]] | None, depth: int = 10) -> float:
+def _top_depth_notional(
+    levels: Sequence[Sequence[dict[str, Any]]] | None, depth: int = 10
+) -> float:
     if not levels or len(levels) != 2:
         return 0.0
     total = 0.0
@@ -317,7 +321,9 @@ class HyperliquidSignalEngine:
     _depth_history: dict[str, deque[tuple[float, float]]] = field(default_factory=dict)
     _last_thin_emit: dict[str, float] = field(default_factory=dict)
 
-    def process_message(self, message: dict[str, Any], *, now: float | None = None) -> list[dict[str, Any]]:
+    def process_message(
+        self, message: dict[str, Any], *, now: float | None = None
+    ) -> list[dict[str, Any]]:
         channel = message.get("channel")
         data = message.get("data")
         if channel == "subscriptionResponse":
@@ -336,7 +342,9 @@ class HyperliquidSignalEngine:
             return self.process_l2_book(data, now=now)
         return []
 
-    def process_trade(self, trade: dict[str, Any], *, now: float | None = None) -> list[dict[str, Any]]:
+    def process_trade(
+        self, trade: dict[str, Any], *, now: float | None = None
+    ) -> list[dict[str, Any]]:
         symbol = str(trade.get("coin") or "").upper()
         price = _float(trade.get("px"))
         size = _float(trade.get("sz"))
@@ -411,7 +419,9 @@ class HyperliquidSignalEngine:
             }
         ]
 
-    def process_l2_book(self, book: dict[str, Any], *, now: float | None = None) -> list[dict[str, Any]]:
+    def process_l2_book(
+        self, book: dict[str, Any], *, now: float | None = None
+    ) -> list[dict[str, Any]]:
         symbol = str(book.get("coin") or "").upper()
         levels = book.get("levels")
         if not symbol or not isinstance(levels, (list, tuple)):
@@ -430,7 +440,9 @@ class HyperliquidSignalEngine:
         signal: dict[str, Any] | None = None
         if history:
             baseline_at, baseline_depth = max(history, key=lambda item: item[1])
-            drop_ratio = (baseline_depth - current_depth) / baseline_depth if baseline_depth else 0.0
+            drop_ratio = (
+                (baseline_depth - current_depth) / baseline_depth if baseline_depth else 0.0
+            )
             last_emit = self._last_thin_emit.get(symbol, 0.0)
             if (
                 drop_ratio > self.depth_drop_ratio_threshold
@@ -468,7 +480,9 @@ def decode_ws_message(raw: str | bytes) -> dict[str, Any] | None:
 
 def _local_routine_pause_active(routine_name: str = ROUTINE_NAME) -> bool:
     pause_dir = Path(
-        os.environ.get("SAPPHIRE_ROUTINE_PAUSE_DIR", str(Path.home() / ".sapphire" / "routine_pause"))
+        os.environ.get(
+            "SAPPHIRE_ROUTINE_PAUSE_DIR", str(Path.home() / ".sapphire" / "routine_pause")
+        )
     )
     return any(
         path.exists()
@@ -498,7 +512,10 @@ def routine_pause_status(routine_name: str = ROUTINE_NAME) -> dict[str, Any]:
         if checker is None:
             continue
         try:
-            return {"paused": bool(checker(routine_name)), "source": f"lib.core.routine_pause.{attr}"}
+            return {
+                "paused": bool(checker(routine_name)),
+                "source": f"lib.core.routine_pause.{attr}",
+            }
         except TypeError:
             try:
                 return {"paused": bool(checker()), "source": f"lib.core.routine_pause.{attr}"}

@@ -82,7 +82,7 @@ def sample_skewness(xs: Sequence[float]) -> float:
     if m2 < _M2_EPSILON:
         return 0.0
     m3 = _moment(xs, 3)
-    return m3 / (m2 ** 1.5)
+    return m3 / (m2**1.5)
 
 
 def sample_kurtosis(xs: Sequence[float]) -> float:
@@ -94,7 +94,7 @@ def sample_kurtosis(xs: Sequence[float]) -> float:
     if m2 < _M2_EPSILON:
         return 3.0
     m4 = _moment(xs, 4)
-    return m4 / (m2 ** 2)
+    return m4 / (m2**2)
 
 
 # ---------------------------------------------------------------------------

@@ -49,9 +49,7 @@ def test_validate_gh_token_success():
 
 
 def test_validate_gh_token_failure_raises_with_clean_detail():
-    runner = make_runner(
-        [fetcher.CommandResult(returncode=1, stderr="not authenticated")]
-    )
+    runner = make_runner([fetcher.CommandResult(returncode=1, stderr="not authenticated")])
     with pytest.raises(fetcher.DependabotFetchError) as exc_info:
         fetcher.validate_gh_token(runner=runner)
     msg = str(exc_info.value)
@@ -117,9 +115,7 @@ def test_fetch_alerts_handles_invalid_json():
 
 
 def test_fetch_alerts_handles_gh_failure():
-    runner = make_runner(
-        [fetcher.CommandResult(returncode=1, stderr="gh: missing scope")]
-    )
+    runner = make_runner([fetcher.CommandResult(returncode=1, stderr="gh: missing scope")])
     with pytest.raises(fetcher.DependabotFetchError) as exc_info:
         fetcher.fetch_alerts(repo="acme/foo", runner=runner)
     assert "gh api dependabot/alerts failed" in str(exc_info.value)
@@ -137,12 +133,30 @@ def test_summarize_empty_returns_zero_buckets():
 
 def test_summarize_buckets_severities_correctly():
     alerts = [
-        {"security_advisory": {"severity": "critical"}, "dependency": {"package": {"ecosystem": "pip", "name": "a"}}},
-        {"security_advisory": {"severity": "high"}, "dependency": {"package": {"ecosystem": "pip", "name": "b"}}},
-        {"security_advisory": {"severity": "high"}, "dependency": {"package": {"ecosystem": "npm", "name": "c"}}},
-        {"security_advisory": {"severity": "medium"}, "dependency": {"package": {"ecosystem": "pip", "name": "a"}}},
-        {"security_advisory": {"severity": "low"}, "dependency": {"package": {"ecosystem": "pip", "name": "d"}}},
-        {"security_advisory": {"severity": "weird"}, "dependency": {"package": {"ecosystem": "go", "name": "e"}}},
+        {
+            "security_advisory": {"severity": "critical"},
+            "dependency": {"package": {"ecosystem": "pip", "name": "a"}},
+        },
+        {
+            "security_advisory": {"severity": "high"},
+            "dependency": {"package": {"ecosystem": "pip", "name": "b"}},
+        },
+        {
+            "security_advisory": {"severity": "high"},
+            "dependency": {"package": {"ecosystem": "npm", "name": "c"}},
+        },
+        {
+            "security_advisory": {"severity": "medium"},
+            "dependency": {"package": {"ecosystem": "pip", "name": "a"}},
+        },
+        {
+            "security_advisory": {"severity": "low"},
+            "dependency": {"package": {"ecosystem": "pip", "name": "d"}},
+        },
+        {
+            "security_advisory": {"severity": "weird"},
+            "dependency": {"package": {"ecosystem": "go", "name": "e"}},
+        },
     ]
     summary = fetcher.summarize(alerts)
     assert summary["total_open_alerts"] == 6
@@ -188,7 +202,11 @@ def test_render_markdown_includes_severity_buckets():
     alerts = [
         {
             "number": 7,
-            "security_advisory": {"ghsa_id": "GHSA-AAAA", "severity": "critical", "summary": "Big problem"},
+            "security_advisory": {
+                "ghsa_id": "GHSA-AAAA",
+                "severity": "critical",
+                "summary": "Big problem",
+            },
             "dependency": {"package": {"ecosystem": "pip", "name": "requests"}},
         },
     ]

@@ -290,7 +290,9 @@ def _action_stats(payload: dict[str, Any]) -> dict[str, Any]:
     max_risk = 0.0
     for row in rows:
         by_zone[row.get("zone_id", "unknown")] = by_zone.get(row.get("zone_id", "unknown"), 0) + 1
-        by_type[row.get("signal_type", "unknown")] = by_type.get(row.get("signal_type", "unknown"), 0) + 1
+        by_type[row.get("signal_type", "unknown")] = (
+            by_type.get(row.get("signal_type", "unknown"), 0) + 1
+        )
         by_action[row.get("recommended_action", "unknown")] = (
             by_action.get(row.get("recommended_action", "unknown"), 0) + 1
         )

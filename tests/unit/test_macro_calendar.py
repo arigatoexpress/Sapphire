@@ -52,8 +52,12 @@ def test_event_to_calendar_ignores_plain_feed_publication():
 
 
 def test_build_calendar_sorts_forward_events():
-    later = macro_event("Treasury auction: 10-Year Note", source="treasury_auctions", when=NOW + timedelta(days=5))
-    sooner = macro_event("FOMC meeting: March 17-18, 2026", source="fed_fomc", when=NOW + timedelta(days=2))
+    later = macro_event(
+        "Treasury auction: 10-Year Note", source="treasury_auctions", when=NOW + timedelta(days=5)
+    )
+    sooner = macro_event(
+        "FOMC meeting: March 17-18, 2026", source="fed_fomc", when=NOW + timedelta(days=2)
+    )
     cal = build_calendar([later, sooner], now=NOW, include_static=False)
     assert [event.title for event in cal.events] == [sooner.title, later.title]
 
@@ -79,7 +83,9 @@ def test_in_next_hours_returns_window_only():
 
 
 def test_next_event_for_asset_matches_assets_case_insensitive():
-    event = macro_event("Treasury auction: 10-Year Note", source="treasury_auctions", when=NOW + timedelta(hours=6))
+    event = macro_event(
+        "Treasury auction: 10-Year Note", source="treasury_auctions", when=NOW + timedelta(hours=6)
+    )
     cal = build_calendar([event], now=NOW, include_static=False)
     assert cal.next_event_for_asset("btc", now=NOW) is not None
 
@@ -91,7 +97,9 @@ def test_next_event_for_asset_returns_none_when_absent():
 
 
 def test_calendar_round_trips_dicts():
-    event = macro_event("FOMC meeting: March 17-18, 2026", source="fed_fomc", when=NOW + timedelta(hours=6))
+    event = macro_event(
+        "FOMC meeting: March 17-18, 2026", source="fed_fomc", when=NOW + timedelta(hours=6)
+    )
     cal = build_calendar([event], now=NOW, include_static=False)
     round_trip = calendar_from_dicts(cal.to_dicts())
     assert round_trip.to_dicts() == cal.to_dicts()

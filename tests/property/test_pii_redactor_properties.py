@@ -81,9 +81,9 @@ _NAME_ALPHABETS = (
 )
 
 # Plausible US digit strings (10-13 digits, possibly with separators).
-_PHONE_DIGITS = st.lists(
-    st.integers(min_value=0, max_value=9), min_size=10, max_size=13
-).map(lambda xs: "".join(str(x) for x in xs))
+_PHONE_DIGITS = st.lists(st.integers(min_value=0, max_value=9), min_size=10, max_size=13).map(
+    lambda xs: "".join(str(x) for x in xs)
+)
 
 # Email locals: lowercase ASCII + dots and hyphens; we sanitise length above 1.
 # NOTE: We require the first character be alphanumeric. The redactor's idempotence
@@ -134,9 +134,7 @@ _US_CITY = st.sampled_from(
         "Miami",
     ]
 )
-_US_STATE = st.sampled_from(
-    ["TX", "NY", "CA", "WA", "FL", "MA", "GA", "AZ", "CO", "OR"]
-)
+_US_STATE = st.sampled_from(["TX", "NY", "CA", "WA", "FL", "MA", "GA", "AZ", "CO", "OR"])
 
 
 # ---------------------------------------------------------------------------
@@ -177,9 +175,7 @@ def test_redact_phone_keeps_at_most_last_4(digits: str) -> None:
     redacted = redact_phone(digits)
     # The redacted form is one of: ***-***-NNNN or ***-***-****.
     visible_digits = re.findall(r"\d", redacted)
-    assert len(visible_digits) <= 4, (
-        f"phone redaction leaked >{4} digits: {redacted!r}"
-    )
+    assert len(visible_digits) <= 4, f"phone redaction leaked >{4} digits: {redacted!r}"
     if redacted != "***-***-****":
         # Last 4 must match the input's last 4, and only those.
         assert digits.endswith("".join(visible_digits))
@@ -205,15 +201,11 @@ def test_redact_email_local_part_is_truncated(local: str, domain: str) -> None:
 
 
 @given(st.integers(min_value=1, max_value=99999), _US_CITY, _US_STATE)
-def test_redact_address_drops_street_number(
-    street_no: int, city: str, state: str
-) -> None:
+def test_redact_address_drops_street_number(street_no: int, city: str, state: str) -> None:
     """Street numbers must never echo back from a redacted address."""
     address = f"{street_no} Main Street, {city}, {state} 77001"
     redacted = redact_address(address)
-    assert str(street_no) not in redacted, (
-        f"street number {street_no} leaked into {redacted!r}"
-    )
+    assert str(street_no) not in redacted, f"street number {street_no} leaked into {redacted!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -392,9 +384,7 @@ def test_redact_text_strips_dot_separated_phones(phone: str) -> None:
     """Dot-separated phones (123.456.7890) must also be redacted."""
     out = redact_text(f"reach out: {phone}")
     digits_in_out = re.findall(r"\d", out)
-    assert len(digits_in_out) <= 4, (
-        f"dot-separated phone leaked digits: {out!r}"
-    )
+    assert len(digits_in_out) <= 4, f"dot-separated phone leaked digits: {out!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -521,9 +511,7 @@ def test_redact_name_never_raises_on_arbitrary_input(name: str) -> None:
     st.sampled_from(["_alice", "+sales", ".bob", "-system"]),
     _EMAIL_DOMAIN,
 )
-def test_redact_email_idempotence_with_special_first_char(
-    local: str, domain: str
-) -> None:
+def test_redact_email_idempotence_with_special_first_char(local: str, domain: str) -> None:
     raw = f"{local}@{domain}"
     once = redact_email(raw)
     twice = redact_email(once)

@@ -212,9 +212,7 @@ def test_evaluate_risk_blocks_unknown_action(policy: HyperliquidLivePolicy) -> N
 def test_evaluate_risk_close_uses_policy_max_when_size_missing(
     policy: HyperliquidLivePolicy,
 ) -> None:
-    verdict = evaluate_risk(
-        {"symbol": "BTC", "action": "close"}, _state(open_positions=1), policy
-    )
+    verdict = evaluate_risk({"symbol": "BTC", "action": "close"}, _state(open_positions=1), policy)
 
     assert verdict.allowed
     assert verdict.bounded_notional_usd == policy.max_order_notional_usd
@@ -254,9 +252,7 @@ def test_load_private_key_falls_back_to_env(
     monkeypatch: pytest.MonkeyPatch, policy: HyperliquidLivePolicy
 ) -> None:
     monkeypatch.setenv("HYPERLIQUID_PRIVATE_KEY", "0xdeadbeef")
-    monkeypatch.setattr(
-        "hyperliquid_bot.risk._load_from_keychain", lambda _policy: None
-    )
+    monkeypatch.setattr("hyperliquid_bot.risk._load_from_keychain", lambda _policy: None)
 
     assert load_private_key(policy) == "0xdeadbeef"
 
@@ -265,9 +261,7 @@ def test_load_private_key_returns_none_when_no_source(
     monkeypatch: pytest.MonkeyPatch, policy: HyperliquidLivePolicy
 ) -> None:
     monkeypatch.delenv("HYPERLIQUID_PRIVATE_KEY", raising=False)
-    monkeypatch.setattr(
-        "hyperliquid_bot.risk._load_from_keychain", lambda _policy: None
-    )
+    monkeypatch.setattr("hyperliquid_bot.risk._load_from_keychain", lambda _policy: None)
 
     assert load_private_key(policy) is None
 
@@ -281,14 +275,10 @@ async def test_executor_blocks_oversize_order_without_calling_client(
     policy: HyperliquidLivePolicy,
 ) -> None:
     client = FakeClient()
-    executor = HyperliquidLiveExecutor(
-        client, policy=policy, testnet=True, trading_enabled=True
-    )
+    executor = HyperliquidLiveExecutor(client, policy=policy, testnet=True, trading_enabled=True)
     Path(policy.killswitch_path).expanduser().write_text("paused")
 
-    result = await executor.execute_signal(
-        {"symbol": "BTC", "action": "buy", "size_usd": 100}
-    )
+    result = await executor.execute_signal({"symbol": "BTC", "action": "buy", "size_usd": 100})
 
     assert result.status == "blocked"
     assert "killswitch_active" in result.verdict.blockers
@@ -299,13 +289,9 @@ async def test_executor_dry_runs_when_trading_disabled(
     policy: HyperliquidLivePolicy,
 ) -> None:
     client = FakeClient()
-    executor = HyperliquidLiveExecutor(
-        client, policy=policy, testnet=True, trading_enabled=False
-    )
+    executor = HyperliquidLiveExecutor(client, policy=policy, testnet=True, trading_enabled=False)
 
-    result = await executor.execute_signal(
-        {"symbol": "BTC", "action": "buy", "size_usd": 5}
-    )
+    result = await executor.execute_signal({"symbol": "BTC", "action": "buy", "size_usd": 5})
 
     assert result.status == "blocked"
     assert "trading_disabled_env_flag" in result.verdict.blockers
@@ -315,13 +301,9 @@ async def test_executor_executes_with_capped_size(
     policy: HyperliquidLivePolicy,
 ) -> None:
     client = FakeClient(mids={"BTC": "50000"})
-    executor = HyperliquidLiveExecutor(
-        client, policy=policy, testnet=True, trading_enabled=True
-    )
+    executor = HyperliquidLiveExecutor(client, policy=policy, testnet=True, trading_enabled=True)
 
-    result = await executor.execute_signal(
-        {"symbol": "BTC", "action": "buy", "size_usd": 50}
-    )
+    result = await executor.execute_signal({"symbol": "BTC", "action": "buy", "size_usd": 50})
 
     assert result.status == "executed"
     assert result.verdict.bounded_notional_usd == 5.0
@@ -337,13 +319,9 @@ async def test_executor_records_error_when_client_fails(
     policy: HyperliquidLivePolicy,
 ) -> None:
     client = FakeClient(raise_on_order=True)
-    executor = HyperliquidLiveExecutor(
-        client, policy=policy, testnet=True, trading_enabled=True
-    )
+    executor = HyperliquidLiveExecutor(client, policy=policy, testnet=True, trading_enabled=True)
 
-    result = await executor.execute_signal(
-        {"symbol": "BTC", "action": "buy", "size_usd": 5}
-    )
+    result = await executor.execute_signal({"symbol": "BTC", "action": "buy", "size_usd": 5})
 
     assert result.status == "error"
     assert "simulated network failure" in (result.error or "")
@@ -353,9 +331,7 @@ async def test_executor_logs_each_result_to_jsonl(
     policy: HyperliquidLivePolicy,
 ) -> None:
     client = FakeClient(mids={"BTC": "50000"})
-    executor = HyperliquidLiveExecutor(
-        client, policy=policy, testnet=True, trading_enabled=True
-    )
+    executor = HyperliquidLiveExecutor(client, policy=policy, testnet=True, trading_enabled=True)
 
     await executor.execute_signal({"symbol": "BTC", "action": "buy", "size_usd": 5})
     await executor.execute_signal({"symbol": "BTC", "action": "yolo", "size_usd": 5})
@@ -375,9 +351,7 @@ async def test_executor_treats_zero_size_position_as_closed(
             {"position": {"coin": "ETH", "szi": "1.5"}},
         ]
     )
-    executor = HyperliquidLiveExecutor(
-        client, policy=policy, testnet=True, trading_enabled=True
-    )
+    executor = HyperliquidLiveExecutor(client, policy=policy, testnet=True, trading_enabled=True)
 
     status = await executor.status()
 
@@ -403,9 +377,7 @@ def test_executor_allows_mainnet_when_signing_marked_verified(
     )
     client = FakeClient()
 
-    executor = HyperliquidLiveExecutor(
-        client, policy=policy, testnet=False, trading_enabled=True
-    )
+    executor = HyperliquidLiveExecutor(client, policy=policy, testnet=False, trading_enabled=True)
 
     assert executor.testnet is False
 
@@ -416,9 +388,7 @@ def test_executor_allows_mainnet_when_signing_marked_verified(
 
 
 def test_execution_result_serializes_to_dict(policy: HyperliquidLivePolicy) -> None:
-    verdict = evaluate_risk(
-        {"symbol": "BTC", "action": "buy", "size_usd": 5}, _state(), policy
-    )
+    verdict = evaluate_risk({"symbol": "BTC", "action": "buy", "size_usd": 5}, _state(), policy)
     result = ExecutionResult(status="dry_run", signal={"symbol": "BTC"}, verdict=verdict)
 
     body = result.to_dict()

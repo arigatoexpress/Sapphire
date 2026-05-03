@@ -56,7 +56,7 @@ def _canonicalize_type(item: dict[str, Any]) -> str:
         components = item.get("components") or []
         rendered = "(" + ",".join(_canonicalize_type(c) for c in components) + ")"
         # base may be "tuple", "tuple[]", "tuple[3]" — preserve the suffix.
-        suffix = base[len("tuple"):]
+        suffix = base[len("tuple") :]
         return rendered + suffix
     return base
 
@@ -140,9 +140,7 @@ class TypedContract:
     def encode_call(self, function_name: str, *args: Any) -> str:
         fn = self._fns.get(function_name)
         if fn is None:
-            raise KeyError(
-                f"function {function_name!r} not in ABI; known: {sorted(self._fns)}"
-            )
+            raise KeyError(f"function {function_name!r} not in ABI; known: {sorted(self._fns)}")
         input_types = tuple(_canonicalize_type(i) for i in fn.inputs)
         if len(args) != len(input_types):
             raise ValueError(

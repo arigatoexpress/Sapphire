@@ -124,7 +124,9 @@ def load_events(path: Path | str = DEFAULT_CORPUS_PATH) -> list[HistoricalEvent]
     """Load and validate a JSONL event corpus."""
     corpus_path = Path(path)
     events: list[HistoricalEvent] = []
-    for lineno, raw_line in enumerate(corpus_path.read_text(encoding="utf-8").splitlines(), start=1):
+    for lineno, raw_line in enumerate(
+        corpus_path.read_text(encoding="utf-8").splitlines(), start=1
+    ):
         line = raw_line.strip()
         if not line or line.startswith("#"):
             continue

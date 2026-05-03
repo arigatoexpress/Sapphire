@@ -42,9 +42,7 @@ def _index_links() -> list[tuple[str, str]]:
     """Parse the index file's main table — return list of (filename, title)."""
     text = INDEX_FILE.read_text()
     # Match a row like: | [0001](0001-foo.md) | Title text | accepted |
-    row_pattern = re.compile(
-        r"\|\s*\[\d{4}\]\(([^)]+)\)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|"
-    )
+    row_pattern = re.compile(r"\|\s*\[\d{4}\]\(([^)]+)\)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|")
     out: list[tuple[str, str]] = []
     for match in row_pattern.finditer(text):
         out.append((match.group(1).strip(), match.group(2).strip()))
@@ -100,8 +98,7 @@ def test_every_adr_status_is_valid():
         status = _status_of(path)
         assert status, f"{path.name}: missing or unparseable Status field"
         assert status in VALID_STATUSES, (
-            f"{path.name}: unknown status {status!r}; "
-            f"expected one of {sorted(VALID_STATUSES)}"
+            f"{path.name}: unknown status {status!r}; expected one of {sorted(VALID_STATUSES)}"
         )
 
 
@@ -113,9 +110,7 @@ def test_every_superseded_adr_points_at_successor():
             continue
         text = path.read_text()
         related_match = re.search(r"\*\*Related\*\*:\s*([^\n]+)", text)
-        assert related_match, (
-            f"{path.name}: status=superseded but no Related line"
-        )
+        assert related_match, f"{path.name}: status=superseded but no Related line"
         related = related_match.group(1)
         # Must mention at least one ADR number that is NOT itself.
         own_number = path.name[:4]
@@ -151,9 +146,7 @@ def test_index_summaries_exist_for_every_listed_adr():
     """The 'One-line summaries' bullets must list every linked ADR."""
     text = INDEX_FILE.read_text()
     summaries_section = text.split("## One-line summaries", 1)
-    assert len(summaries_section) == 2, (
-        "index.md must contain a 'One-line summaries' section"
-    )
+    assert len(summaries_section) == 2, "index.md must contain a 'One-line summaries' section"
     summaries = summaries_section[1]
     # Every linked NNNN-*.md must show up as a bullet `**NNNN ...**`
     for filename, _title in _index_links():
@@ -207,6 +200,4 @@ def test_no_duplicate_adr_numbers():
 def test_lane_spec_adrs_present(expected_filename: str):
     """Every ADR named in the Tranche 6 Lane 2 spec must exist by exact name."""
     target = ADR_DIR / expected_filename
-    assert target.is_file(), (
-        f"Lane 2 spec requires {expected_filename} but file is missing"
-    )
+    assert target.is_file(), f"Lane 2 spec requires {expected_filename} but file is missing"

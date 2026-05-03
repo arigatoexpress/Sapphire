@@ -137,7 +137,9 @@ class HttpPollClient:
         self.stats.last_block_number = block_number
         self.stats.last_block_at = now
 
-        event = enrich_event(kind="newHeads", raw=block, chain_id=self.config.chain_id, received_at=now)
+        event = enrich_event(
+            kind="newHeads", raw=block, chain_id=self.config.chain_id, received_at=now
+        )
         self.forwarder.enqueue(event)
 
 

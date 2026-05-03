@@ -160,10 +160,14 @@ def analyze_regime_stability(
     labels = [str(row["label"]) for row in rows]
     confidences = [float(row["confidence"]) for row in rows]
     label_counts = dict(Counter(labels))
-    transition_count = sum(1 for left, right in zip(labels, labels[1:], strict=False) if left != right)
+    transition_count = sum(
+        1 for left, right in zip(labels, labels[1:], strict=False) if left != right
+    )
     transition_rate = transition_count / max(1, observations - 1)
     runs = _regime_runs(rows)
-    one_sample_flip_count = sum(1 for run in runs if run.length == 1 and run.label != REGIME_UNCERTAIN)
+    one_sample_flip_count = sum(
+        1 for run in runs if run.length == 1 and run.label != REGIME_UNCERTAIN
+    )
     one_sample_flip_rate = one_sample_flip_count / max(1, len(runs))
     uncertainty_rate = label_counts.get(REGIME_UNCERTAIN, 0) / observations
     mean_confidence = sum(confidences) / observations
@@ -388,9 +392,14 @@ def analyze_counterparty_leaderboard_stability(
             notes=["need at least two leaderboard snapshots"],
         )
 
-    adjacent = [_compare_snapshots(left, right) for left, right in zip(snapshots, snapshots[1:], strict=False)]
+    adjacent = [
+        _compare_snapshots(left, right)
+        for left, right in zip(snapshots, snapshots[1:], strict=False)
+    ]
     mean_jaccard = _mean([float(row["jaccard"]) for row in adjacent])
-    spearman_values = [float(row["rank_spearman"]) for row in adjacent if row["rank_spearman"] is not None]
+    spearman_values = [
+        float(row["rank_spearman"]) for row in adjacent if row["rank_spearman"] is not None
+    ]
     mean_spearman = _mean(spearman_values)
     mean_churn = _mean([float(row["churn_rate"]) for row in adjacent])
     trader_rows = _trader_stability(
@@ -398,11 +407,17 @@ def analyze_counterparty_leaderboard_stability(
         min_appearance_rate=min_appearance_rate,
         max_rank_stdev=max_rank_stdev,
     )
-    retention_score = len([row for row in trader_rows if row.stable_watchlist_candidate]) / max(1, len(trader_rows))
+    retention_score = len([row for row in trader_rows if row.stable_watchlist_candidate]) / max(
+        1, len(trader_rows)
+    )
     spearman_score = ((mean_spearman + 1.0) / 2.0) if mean_spearman is not None else 0.0
-    score = _clamp((mean_jaccard or 0.0) * 0.45 + spearman_score * 0.35 + retention_score * 0.20, 0.0, 1.0)
+    score = _clamp(
+        (mean_jaccard or 0.0) * 0.45 + spearman_score * 0.35 + retention_score * 0.20, 0.0, 1.0
+    )
     stable_watchlist = [row for row in trader_rows if row.stable_watchlist_candidate]
-    notes = _counterparty_notes(score=score, mean_churn=mean_churn, stable_watchlist=stable_watchlist)
+    notes = _counterparty_notes(
+        score=score, mean_churn=mean_churn, stable_watchlist=stable_watchlist
+    )
     return CounterpartyLeaderboardStabilityReport(
         generated_at=_now_iso(generated_at),
         snapshots=len(snapshots),
@@ -435,7 +450,9 @@ def normalize_leaderboard_snapshots(
             continue
         leaderboard = _extract_leaderboard(record)
         if leaderboard is not None:
-            snapshot_id = str(record.get("snapshot_id") or record.get("generated_at") or f"snapshot-{index:04d}")
+            snapshot_id = str(
+                record.get("snapshot_id") or record.get("generated_at") or f"snapshot-{index:04d}"
+            )
             timestamp = str(record.get("generated_at") or record.get("timestamp") or snapshot_id)
             snapshots.append(
                 SnapshotLeaderboard(
@@ -449,9 +466,16 @@ def normalize_leaderboard_snapshots(
         address = record.get("address") or record.get("user") or record.get("account")
         if not address:
             continue
-        snapshot_id = str(record.get("snapshot_id") or record.get("generated_at") or record.get("timestamp") or "default")
+        snapshot_id = str(
+            record.get("snapshot_id")
+            or record.get("generated_at")
+            or record.get("timestamp")
+            or "default"
+        )
         grouped_rows[snapshot_id].append(record)
-        grouped_times[snapshot_id] = str(record.get("generated_at") or record.get("timestamp") or snapshot_id)
+        grouped_times[snapshot_id] = str(
+            record.get("generated_at") or record.get("timestamp") or snapshot_id
+        )
 
     for snapshot_id in sorted(grouped_rows):
         snapshots.append(
@@ -491,7 +515,9 @@ def _normalize_leaderboard_rows(rows: Sequence[Any], *, top_n: int) -> list[dict
                 "quality_score": round(stats.quality_score(), 6),
             }
         )
-    normalized.sort(key=lambda row: (_safe_int(row.get("rank"), 999999), -_safe_float(row.get("quality_score"))))
+    normalized.sort(
+        key=lambda row: (_safe_int(row.get("rank"), 999999), -_safe_float(row.get("quality_score")))
+    )
     return normalized[: max(1, int(top_n))]
 
 
@@ -576,11 +602,21 @@ def _trader_stability(
                 worst_rank=max(ranks),
                 latest_rank=int(latest["rank"]),
                 latest_quality_score=round(_safe_float(latest.get("quality_score")), 6),
-                latest_realized_pnl_30d_usd=round(_safe_float(latest.get("realized_pnl_30d_usd")), 2),
+                latest_realized_pnl_30d_usd=round(
+                    _safe_float(latest.get("realized_pnl_30d_usd")), 2
+                ),
                 stable_watchlist_candidate=candidate,
             )
         )
-    return sorted(out, key=lambda row: (not row.stable_watchlist_candidate, row.average_rank, row.rank_stdev, row.address))
+    return sorted(
+        out,
+        key=lambda row: (
+            not row.stable_watchlist_candidate,
+            row.average_rank,
+            row.rank_stdev,
+            row.address,
+        ),
+    )
 
 
 def _mean(values: Sequence[float]) -> float | None:
@@ -602,7 +638,9 @@ def _counterparty_notes(
 ) -> list[str]:
     notes: list[str] = []
     if mean_churn is not None and mean_churn > 0.45:
-        notes.append("leaderboard churn is high; use cohort aggregates instead of trader-level claims")
+        notes.append(
+            "leaderboard churn is high; use cohort aggregates instead of trader-level claims"
+        )
     if not stable_watchlist:
         notes.append("no stable watchlist candidates under current thresholds")
     if score >= 0.76:

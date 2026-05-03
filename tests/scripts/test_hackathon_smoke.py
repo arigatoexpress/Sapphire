@@ -41,7 +41,9 @@ def _make_key(tmp_path: Path, name: str = "test_key") -> Path:
     return key_path
 
 
-def _run(args: list[str], env_overrides: dict[str, str] | None = None) -> subprocess.CompletedProcess:
+def _run(
+    args: list[str], env_overrides: dict[str, str] | None = None
+) -> subprocess.CompletedProcess:
     env = {**os.environ}
     if env_overrides:
         env.update(env_overrides)
@@ -76,8 +78,7 @@ def test_missing_key_returns_exit_2(tmp_path: Path) -> None:
         ["--dry-run", "--force-dirty", "--key-path", str(missing)],
     )
     assert result.returncode == 2, (
-        f"expected exit 2 for missing key; got {result.returncode}\n"
-        f"stderr: {result.stderr}"
+        f"expected exit 2 for missing key; got {result.returncode}\nstderr: {result.stderr}"
     )
     assert "key file not found" in result.stderr
 
@@ -90,8 +91,7 @@ def test_malformed_key_returns_exit_2(tmp_path: Path) -> None:
         ["--dry-run", "--force-dirty", "--key-path", str(bad)],
     )
     assert result.returncode == 2, (
-        f"expected exit 2 for malformed key; got {result.returncode}\n"
-        f"stderr: {result.stderr}"
+        f"expected exit 2 for malformed key; got {result.returncode}\nstderr: {result.stderr}"
     )
     assert "malformed key" in result.stderr or "address derivation failed" in result.stderr
 
@@ -115,8 +115,7 @@ def test_dry_run_completes_with_bypasses(tmp_path: Path) -> None:
         if "RPC eth_getBalance failed" in result.stderr or "rpc error" in result.stderr.lower():
             pytest.skip("RPC unreachable from test environment")
     assert result.returncode == 0, (
-        f"expected exit 0 for dry-run; got {result.returncode}\n"
-        f"stderr: {result.stderr}"
+        f"expected exit 0 for dry-run; got {result.returncode}\nstderr: {result.stderr}"
     )
     assert "DRY-RUN COMPLETE" in result.stderr
 

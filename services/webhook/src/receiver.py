@@ -380,7 +380,9 @@ def _build_research_worker_payload(
     schedule: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     commands = [item for item in manifest.get("commands", []) if isinstance(item, dict)]
-    artifacts = list(manifest.get("artifacts", [])) if isinstance(manifest.get("artifacts"), list) else []
+    artifacts = (
+        list(manifest.get("artifacts", [])) if isinstance(manifest.get("artifacts"), list) else []
+    )
     safety = {
         "paper_only": manifest.get("paper_only") is True,
         "live_trading_enabled": manifest.get("live_trading_enabled") is True,

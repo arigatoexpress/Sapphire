@@ -192,9 +192,7 @@ def load_config(path: str | Path | None = None) -> TelegramIntelConfig:
 
     return TelegramIntelConfig(
         channels=tuple(channels),
-        poll_interval_seconds=_as_int(
-            defaults.get("poll_interval_seconds"), 300, lo=30, hi=3600
-        ),
+        poll_interval_seconds=_as_int(defaults.get("poll_interval_seconds"), 300, lo=30, hi=3600),
         max_messages_per_poll=_as_int(
             defaults.get("max_messages_per_poll", defaults.get("pull_limit_per_channel")),
             25,

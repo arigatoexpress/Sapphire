@@ -76,4 +76,3 @@ def test_compose_research_note_falls_back_without_backtests():
     assert note.strategy_slug == "sapphire-composite"
     assert note.key_metrics["symbol"] == "multi-asset"
     assert "research-only" in note.caveat.lower()
-

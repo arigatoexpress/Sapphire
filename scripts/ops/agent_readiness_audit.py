@@ -71,7 +71,9 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def collect_report(*, root: Path = ROOT, repo: str = DEFAULT_REPO, external: bool = True) -> dict[str, Any]:
+def collect_report(
+    *, root: Path = ROOT, repo: str = DEFAULT_REPO, external: bool = True
+) -> dict[str, Any]:
     started = time.perf_counter()
     findings: list[Finding] = []
     findings.extend(collect_repo_state(root))
@@ -136,16 +138,20 @@ def collect_workflow_readiness(root: Path) -> list[Finding]:
     findings: list[Finding] = []
     workflows = sorted((root / ".github" / "workflows").glob("*.yml"))
     if not workflows:
-        return [
-            Finding("ci", "workflow inventory", "observed", "WARN", "no workflow files found")
-        ]
+        return [Finding("ci", "workflow inventory", "observed", "WARN", "no workflow files found")]
     for path in workflows:
         rel = path.relative_to(root)
         try:
             workflow = yaml.load(path.read_text(encoding="utf-8"), Loader=yaml.BaseLoader) or {}
         except Exception as exc:
             findings.append(
-                Finding("ci", str(rel), "observed", "WARN", f"workflow parse failed: {type(exc).__name__}")
+                Finding(
+                    "ci",
+                    str(rel),
+                    "observed",
+                    "WARN",
+                    f"workflow parse failed: {type(exc).__name__}",
+                )
             )
             continue
         permissions = workflow.get("permissions")
@@ -185,7 +191,9 @@ def collect_workflow_readiness(root: Path) -> list[Finding]:
                     surface,
                     "observed",
                     "PASS" if "ubuntu-latest" not in job_text else "WARN",
-                    "no hosted fallback string" if "ubuntu-latest" not in job_text else "contains ubuntu-latest",
+                    "no hosted fallback string"
+                    if "ubuntu-latest" not in job_text
+                    else "contains ubuntu-latest",
                 )
             )
     return findings
@@ -193,10 +201,16 @@ def collect_workflow_readiness(root: Path) -> list[Finding]:
 
 def permissions_finding(rel: Path, permissions: Any) -> Finding:
     if not isinstance(permissions, dict):
-        return Finding("permissions", str(rel), "observed", "WARN", "top-level permissions not explicit")
+        return Finding(
+            "permissions", str(rel), "observed", "WARN", "top-level permissions not explicit"
+        )
     writes = sorted(key for key, value in permissions.items() if str(value).lower() == "write")
     status = "PASS" if not writes else "WARN"
-    evidence = "all declared permissions read/none" if not writes else f"write_permissions={','.join(writes)}"
+    evidence = (
+        "all declared permissions read/none"
+        if not writes
+        else f"write_permissions={','.join(writes)}"
+    )
     return Finding("permissions", str(rel), "observed", status, evidence)
 
 
@@ -223,14 +237,23 @@ def collect_doc_readiness(root: Path) -> list[Finding]:
         )
     if checks["human approval"].exists():
         text = checks["human approval"].read_text(encoding="utf-8", errors="replace")
-        has_gate = all(term in text for term in ("Human approval is required", "real money movement", "live trade execution"))
+        has_gate = all(
+            term in text
+            for term in (
+                "Human approval is required",
+                "real money movement",
+                "live trade execution",
+            )
+        )
         findings.append(
             Finding(
                 "human approval",
                 "AGENTS.md",
                 "observed",
                 "PASS" if has_gate else "WARN",
-                "explicit high-risk approval gate present" if has_gate else "approval gate text not found",
+                "explicit high-risk approval gate present"
+                if has_gate
+                else "approval gate text not found",
             )
         )
     return findings
@@ -251,7 +274,9 @@ def collect_github_readiness(repo: str) -> list[Finding]:
             )
         )
     else:
-        findings.append(Finding("github", "repository metadata", "unknown", "UNKNOWN", repo_meta.stderr))
+        findings.append(
+            Finding("github", "repository metadata", "unknown", "UNKNOWN", repo_meta.stderr)
+        )
 
     protection = gh_json(["api", f"repos/{repo}/branches/main/protection"])
     if protection.ok:
@@ -293,9 +318,19 @@ def collect_github_readiness(repo: str) -> list[Finding]:
             )
         )
     else:
-        findings.append(Finding("spend controls", "actions variables", "unknown", "UNKNOWN", compact_error(variables.stderr)))
+        findings.append(
+            Finding(
+                "spend controls",
+                "actions variables",
+                "unknown",
+                "UNKNOWN",
+                compact_error(variables.stderr),
+            )
+        )
 
-    secrets = run(["gh", "secret", "list", "--repo", repo, "--json", "name,updatedAt,visibility"], cwd=ROOT)
+    secrets = run(
+        ["gh", "secret", "list", "--repo", repo, "--json", "name,updatedAt,visibility"], cwd=ROOT
+    )
     if secrets.ok:
         payload = json.loads(secrets.stdout or "[]")
         names = sorted(item.get("name", "") for item in payload)
@@ -309,7 +344,11 @@ def collect_github_readiness(repo: str) -> list[Finding]:
             )
         )
     else:
-        findings.append(Finding("secrets", "actions secrets", "unknown", "UNKNOWN", compact_error(secrets.stderr)))
+        findings.append(
+            Finding(
+                "secrets", "actions secrets", "unknown", "UNKNOWN", compact_error(secrets.stderr)
+            )
+        )
 
     environments = gh_json(["api", f"repos/{repo}/environments"])
     if environments.ok:
@@ -321,11 +360,21 @@ def collect_github_readiness(repo: str) -> list[Finding]:
                 "github environments",
                 "observed",
                 "PASS" if names else "WARN",
-                f"names={','.join(name for name in names if name)}" if names else "no environments listed",
+                f"names={','.join(name for name in names if name)}"
+                if names
+                else "no environments listed",
             )
         )
     else:
-        findings.append(Finding("deployment", "github environments", "unknown", "UNKNOWN", compact_error(environments.stderr)))
+        findings.append(
+            Finding(
+                "deployment",
+                "github environments",
+                "unknown",
+                "UNKNOWN",
+                compact_error(environments.stderr),
+            )
+        )
 
     dependabot = gh_json(["api", f"repos/{repo}/dependabot/alerts?state=open&per_page=100"])
     if dependabot.ok:
@@ -341,7 +390,15 @@ def collect_github_readiness(repo: str) -> list[Finding]:
             )
         )
     else:
-        findings.append(Finding("secrets", "dependabot alerts", "unknown", "UNKNOWN", compact_error(dependabot.stderr)))
+        findings.append(
+            Finding(
+                "secrets",
+                "dependabot alerts",
+                "unknown",
+                "UNKNOWN",
+                compact_error(dependabot.stderr),
+            )
+        )
 
     code_scanning = gh_json(["api", f"repos/{repo}/code-scanning/alerts?state=open&per_page=1"])
     if code_scanning.ok:
@@ -357,7 +414,13 @@ def collect_github_readiness(repo: str) -> list[Finding]:
         )
     else:
         findings.append(
-            Finding("observability", "code scanning", "unknown", "UNKNOWN", compact_error(code_scanning.stderr))
+            Finding(
+                "observability",
+                "code scanning",
+                "unknown",
+                "UNKNOWN",
+                compact_error(code_scanning.stderr),
+            )
         )
     return findings
 
@@ -365,10 +428,7 @@ def collect_github_readiness(repo: str) -> list[Finding]:
 def severity_counts(alerts: list[dict[str, Any]]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for alert in alerts:
-        severity = (
-            alert.get("security_vulnerability", {})
-            .get("severity")
-        ) or "unknown"
+        severity = (alert.get("security_vulnerability", {}).get("severity")) or "unknown"
         counts[str(severity)] = counts.get(str(severity), 0) + 1
     return counts
 
@@ -432,7 +492,10 @@ def compact_error(text: str) -> str:
 def redact(text: str) -> str:
     redacted = str(text)
     for pattern in SECRET_PATTERNS:
-        redacted = pattern.sub(lambda match: match.group(1) + "[REDACTED]" if match.groups() else "[REDACTED]", redacted)
+        redacted = pattern.sub(
+            lambda match: match.group(1) + "[REDACTED]" if match.groups() else "[REDACTED]",
+            redacted,
+        )
     return redacted
 
 

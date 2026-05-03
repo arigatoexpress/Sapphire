@@ -67,7 +67,13 @@ def _rpc_responder(method_to_result: dict[str, Any]):
     def respond(payload: dict[str, Any]) -> _FakeResponse:
         method = payload["method"]
         if method not in method_to_result:
-            return _FakeResponse({"jsonrpc": "2.0", "id": payload["id"], "error": {"code": -32601, "message": "not found"}})
+            return _FakeResponse(
+                {
+                    "jsonrpc": "2.0",
+                    "id": payload["id"],
+                    "error": {"code": -32601, "message": "not found"},
+                }
+            )
         result = method_to_result[method]
         return _FakeResponse({"jsonrpc": "2.0", "id": payload["id"], "result": result})
 
@@ -297,9 +303,7 @@ def test_mempool_snapshot_falls_back_to_ws_sample():
 
         async def recv(self) -> str:
             await asyncio.sleep(0.001)
-            return json.dumps(
-                {"jsonrpc": "2.0", "id": 1, "result": "0xdeadbeef"}
-            )
+            return json.dumps({"jsonrpc": "2.0", "id": 1, "result": "0xdeadbeef"})
 
         async def close(self) -> None:
             return None

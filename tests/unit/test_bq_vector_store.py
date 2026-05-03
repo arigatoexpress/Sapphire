@@ -174,9 +174,7 @@ def test_upsert_truncates_at_max_records(tmp_path):
 def test_upsert_keeps_unknown_source_with_warning(tmp_path):
     store = _make_store(tmp_path)
     embedding = store.embedder.embed("custom")
-    rec = VectorRecord(
-        id="x", text="custom intel", embedding=embedding, source="custom_source"
-    )
+    rec = VectorRecord(id="x", text="custom intel", embedding=embedding, source="custom_source")
     result = store.upsert([rec])
     assert result.inserted == 1
     assert any("unknown source" in e for e in result.errors)
@@ -189,9 +187,7 @@ def test_upsert_keeps_unknown_source_with_warning(tmp_path):
 
 def test_query_ranks_by_cosine_similarity(tmp_path):
     store = _make_store(tmp_path)
-    closer = _record(
-        store, "bitcoin is the hardest asset", "sovereign_thesis", asset="BTC"
-    )
+    closer = _record(store, "bitcoin is the hardest asset", "sovereign_thesis", asset="BTC")
     farther = _record(store, "fluffy clouds drift gently", "ad_hoc", asset="CLOUD")
     store.upsert([closer, farther])
     hits = store.query("bitcoin hardest asset", k=2)

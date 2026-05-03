@@ -229,7 +229,11 @@ def active_runs_for_pr(
     payload = _load_json(result.stdout, purpose="gh run list")
     if not isinstance(payload, list):
         raise SafeMergeError("gh run list returned a non-list payload")
-    return [run for run in payload if isinstance(run, dict) and run_matches_pr(run, pr=pr, subject=subject)]
+    return [
+        run
+        for run in payload
+        if isinstance(run, dict) and run_matches_pr(run, pr=pr, subject=subject)
+    ]
 
 
 def cancel_runs(
@@ -309,7 +313,9 @@ def safe_merge(
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("pr", help="Pull request number to squash-merge.")
-    parser.add_argument("--repo", default=DEFAULT_REPO, help=f"GitHub repo, default: {DEFAULT_REPO}")
+    parser.add_argument(
+        "--repo", default=DEFAULT_REPO, help=f"GitHub repo, default: {DEFAULT_REPO}"
+    )
     parser.add_argument("--dry-run", action="store_true", help="Resolve subject without merging.")
     return parser.parse_args(argv)
 

@@ -49,9 +49,7 @@ class CustomerApiConfig:
                 os.getenv("SAPPHIRE_CUSTOMER_PAYMENT_INFRA_VERIFIED", "")
             ),
             rate_limit=int(os.getenv("SAPPHIRE_CUSTOMER_API_RATE_LIMIT", "60")),
-            rate_window_seconds=int(
-                os.getenv("SAPPHIRE_CUSTOMER_API_RATE_WINDOW_SECONDS", "60")
-            ),
+            rate_window_seconds=int(os.getenv("SAPPHIRE_CUSTOMER_API_RATE_WINDOW_SECONDS", "60")),
         )
 
 

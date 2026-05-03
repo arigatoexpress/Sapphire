@@ -338,9 +338,7 @@ def build_index(
     existing = _read_existing_index(cache_path)
     if existing and existing.get("signature") == body["signature"]:
         return existing
-    cache_path.write_text(
-        json.dumps(body, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    cache_path.write_text(json.dumps(body, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return body
 
 
@@ -487,9 +485,7 @@ def take_snapshot(
             if not path.is_file():
                 continue
             files_visited.append(str(path))
-            for ts, row in _stream_rows_at(
-                path, at=at_utc, max_rows=max_rows_per_file
-            ):
+            for ts, row in _stream_rows_at(path, at=at_utc, max_rows=max_rows_per_file):
                 scope_rows.append((ts, row))
         scope_rows.sort(key=lambda kv: kv[0])
         rows = tuple(payload for _, payload in scope_rows)

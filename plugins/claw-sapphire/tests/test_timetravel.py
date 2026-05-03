@@ -73,7 +73,9 @@ def fake_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     # in `sys.modules` with stale `SCOPE_TO_ROOT`. Drop any existing entries
     # so the monkeypatch below applies to the freshly-imported module that
     # the internal tool also uses.
-    for cached in [k for k in list(sys.modules) if k.startswith("lib.timetravel") or k == "timetravel_internal"]:
+    for cached in [
+        k for k in list(sys.modules) if k.startswith("lib.timetravel") or k == "timetravel_internal"
+    ]:
         sys.modules.pop(cached, None)
     import lib.timetravel.snapshot as st_mod
 
@@ -110,16 +112,12 @@ def test_index_status_action_returns_status_when_missing(tmp_path: Path) -> None
 
 
 def test_status_alias(tmp_path: Path) -> None:
-    response = _module.handle(
-        {"action": "status", "cache_path": str(tmp_path / "missing.json")}
-    )
+    response = _module.handle({"action": "status", "cache_path": str(tmp_path / "missing.json")})
     assert response["ok"] is True
 
 
 def test_snapshot_action_requires_at(tmp_path: Path, fake_repo: Path) -> None:
-    response = _module.handle(
-        {"action": "snapshot", "cache_path": str(tmp_path / "idx.json")}
-    )
+    response = _module.handle({"action": "snapshot", "cache_path": str(tmp_path / "idx.json")})
     assert "error" in response
 
 
@@ -151,9 +149,7 @@ def test_snapshot_action_truncates_rows(tmp_path: Path, fake_repo: Path) -> None
     assert cs.get("truncated") is True
 
 
-def test_replay_action_returns_replay_result(
-    tmp_path: Path, fake_repo: Path
-) -> None:
+def test_replay_action_returns_replay_result(tmp_path: Path, fake_repo: Path) -> None:
     response = _module.handle(
         {
             "action": "replay",
@@ -168,9 +164,7 @@ def test_replay_action_returns_replay_result(
     assert ("ETH", "1h") in pairs
 
 
-def test_diff_action_returns_summary(
-    tmp_path: Path, fake_repo: Path
-) -> None:
+def test_diff_action_returns_summary(tmp_path: Path, fake_repo: Path) -> None:
     response = _module.handle(
         {
             "action": "diff",
@@ -212,9 +206,7 @@ def test_unknown_action_returns_valid_actions(tmp_path: Path) -> None:
     assert "snapshot" in response["valid_actions"]
 
 
-def test_main_reads_stdin_and_writes_json(
-    tmp_path: Path, fake_repo: Path
-) -> None:
+def test_main_reads_stdin_and_writes_json(tmp_path: Path, fake_repo: Path) -> None:
     inbuf = io.StringIO(
         json.dumps(
             {

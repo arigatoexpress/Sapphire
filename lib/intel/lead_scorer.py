@@ -60,14 +60,29 @@ HEURISTIC_RULES: list[tuple[tuple[str, ...], int, int, str, str]] = [
     (("water leak", "flooding", "sewer"), 85, 95, "high", "Active water/flood damage"),
     (("unsafe structure", "structural"), 80, 92, "high", "Unsafe / structural condition"),
     (("roof",), 75, 85, "high", "Roof repair / replacement"),
-    (("kitchen", "bathroom", "addition", "remodel", "renovation"), 75, 90, "medium",
-     "Active residential remodel"),
-    (("hvac", "electrical", "plumbing", "ac repair", "heater"), 65, 80, "medium",
-     "Mechanical-system repair"),
+    (
+        ("kitchen", "bathroom", "addition", "remodel", "renovation"),
+        75,
+        90,
+        "medium",
+        "Active residential remodel",
+    ),
+    (
+        ("hvac", "electrical", "plumbing", "ac repair", "heater"),
+        65,
+        80,
+        "medium",
+        "Mechanical-system repair",
+    ),
     (("solar",), 50, 65, "medium", "Solar / energy upgrade"),
     (("repair", "replace"), 40, 55, "medium", "Minor residential repair"),
-    (("commercial", "office", "retail", "restaurant"), 10, 25, "low",
-     "Commercial permit — not a homeowner"),
+    (
+        ("commercial", "office", "retail", "restaurant"),
+        10,
+        25,
+        "low",
+        "Commercial permit — not a homeowner",
+    ),
     (("new construction", "new build"), 5, 15, "low", "New build — not yet a prospect"),
     (("demolition", "demo only"), 5, 10, "low", "Demolition only"),
 ]
@@ -75,9 +90,7 @@ HEURISTIC_RULES: list[tuple[tuple[str, ...], int, int, str, str]] = [
 
 def heuristic_score(lead: dict[str, Any]) -> dict[str, Any]:
     """Heuristic-only scoring — guaranteed to return."""
-    text = " ".join(
-        str(lead.get(k, "")) for k in ("type", "description", "raw_data")
-    ).lower()
+    text = " ".join(str(lead.get(k, "")) for k in ("type", "description", "raw_data")).lower()
     for keywords, lo, hi, urgency, reason in HEURISTIC_RULES:
         if any(kw in text for kw in keywords):
             score = (lo + hi) // 2

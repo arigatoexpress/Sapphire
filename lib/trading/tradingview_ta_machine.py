@@ -445,7 +445,9 @@ def build_trading_workbench_watchlist(
                 "venue_status": {
                     "tradingview": "available",
                     "hyperliquid": "available" if row.get("hyperliquid_symbol") else "unavailable",
-                    "robinhood_crypto": "available" if row.get("robinhood_symbol") else "unavailable",
+                    "robinhood_crypto": "available"
+                    if row.get("robinhood_symbol")
+                    else "unavailable",
                 },
                 "tags": row.get("tags") or [],
                 "priority": round(min(1.0, row["attention_score"] / 100), 3),
@@ -518,17 +520,13 @@ def build_trading_workbench_work_order_preview(
     for row in plan["watchlist"]["symbols"]:
         for timeframe in requested_timeframes:
             steps = [
-                {"kind": job, "status": "planned"}
-                for job in requested_jobs
-                if job != "chart_plan"
+                {"kind": job, "status": "planned"} for job in requested_jobs if job != "chart_plan"
             ]
             steps.append(
                 {
                     "kind": "chart_action",
                     "status": "planned" if allow_browser_mutation else "blocked",
-                    "reason": None
-                    if allow_browser_mutation
-                    else "browser_mutation_disabled",
+                    "reason": None if allow_browser_mutation else "browser_mutation_disabled",
                 }
             )
             work_orders.append(

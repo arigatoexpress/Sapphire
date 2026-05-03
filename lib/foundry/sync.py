@@ -96,9 +96,7 @@ def watermark_path(object_type: str, *, base_dir: Path | None = None) -> Path:
     return base / f"{object_type}.json"
 
 
-def load_watermark(
-    object_type: str, *, base_dir: Path | None = None
-) -> dict[str, Any]:
+def load_watermark(object_type: str, *, base_dir: Path | None = None) -> dict[str, Any]:
     """Load the watermark for ``object_type``. Returns ``{}`` if missing/corrupt."""
     path = watermark_path(object_type, base_dir=base_dir)
     if not path.is_file():

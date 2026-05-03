@@ -98,12 +98,18 @@ DEFAULT_EXPLORER: str = "https://megaeth-testnet-v2.blockscout.com"
 class MegaETHConfig:
     """Endpoint config block — never hardcode endpoints elsewhere."""
 
-    http_rpc: str = field(default_factory=lambda: os.getenv("SAPPHIRE_MEGAETH_RPC_URL") or DEFAULT_HTTP_RPC)
-    ws_rpc: str = field(default_factory=lambda: os.getenv("SAPPHIRE_MEGAETH_WS_URL") or DEFAULT_WS_RPC)
+    http_rpc: str = field(
+        default_factory=lambda: os.getenv("SAPPHIRE_MEGAETH_RPC_URL") or DEFAULT_HTTP_RPC
+    )
+    ws_rpc: str = field(
+        default_factory=lambda: os.getenv("SAPPHIRE_MEGAETH_WS_URL") or DEFAULT_WS_RPC
+    )
     chain_id: int = field(
         default_factory=lambda: int(os.getenv("SAPPHIRE_MEGAETH_CHAIN_ID") or DEFAULT_CHAIN_ID)
     )
-    explorer: str = field(default_factory=lambda: os.getenv("SAPPHIRE_MEGAETH_EXPLORER") or DEFAULT_EXPLORER)
+    explorer: str = field(
+        default_factory=lambda: os.getenv("SAPPHIRE_MEGAETH_EXPLORER") or DEFAULT_EXPLORER
+    )
     request_timeout: float = 10.0
     ws_timeout: float = 30.0
 
@@ -215,7 +221,9 @@ class MegaETHClient:
             raise MegaETHError(f"unparseable block_number: {result!r}")
         return value
 
-    async def get_block(self, number_or_tag: int | str = "latest", *, full: bool = False) -> dict[str, Any]:
+    async def get_block(
+        self, number_or_tag: int | str = "latest", *, full: bool = False
+    ) -> dict[str, Any]:
         if isinstance(number_or_tag, int):
             tag = hex(number_or_tag)
         else:

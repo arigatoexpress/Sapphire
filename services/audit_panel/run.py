@@ -148,8 +148,16 @@ def _file_paths(payload: dict[str, Any]) -> tuple[str, ...]:
 
 def pr_from_gh_payload(payload: dict[str, Any]) -> MergedPR:
     merge_commit = payload.get("mergeCommit") or {}
-    additions = sum(int(item.get("additions") or 0) for item in payload.get("files", []) if isinstance(item, dict))
-    deletions = sum(int(item.get("deletions") or 0) for item in payload.get("files", []) if isinstance(item, dict))
+    additions = sum(
+        int(item.get("additions") or 0)
+        for item in payload.get("files", [])
+        if isinstance(item, dict)
+    )
+    deletions = sum(
+        int(item.get("deletions") or 0)
+        for item in payload.get("files", [])
+        if isinstance(item, dict)
+    )
     labels = tuple(
         str(item.get("name"))
         for item in payload.get("labels", []) or []
@@ -405,7 +413,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--since", default=None)
     parser.add_argument("--limit", type=int, default=MAX_PRS_PER_RUN)
     parser.add_argument("--cache-dir", default=str(DEFAULT_CACHE_DIR))
-    parser.add_argument("--no-issue", action="store_true", help="do not create/comment GitHub issues")
+    parser.add_argument(
+        "--no-issue", action="store_true", help="do not create/comment GitHub issues"
+    )
     args = parser.parse_args(argv)
     result = run_panel(
         repo=args.repo,

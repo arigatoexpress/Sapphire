@@ -270,7 +270,5 @@ def test_deflated_records_provenance_note() -> None:
 
 
 def test_deflated_explicit_inputs_record_note() -> None:
-    result = deflated_sharpe_for_walkforward(
-        window_sharpes=[1.0, 1.2], test_returns=[0.01] * 100
-    )
+    result = deflated_sharpe_for_walkforward(window_sharpes=[1.0, 1.2], test_returns=[0.01] * 100)
     assert "explicit window_sharpes" in result.note
