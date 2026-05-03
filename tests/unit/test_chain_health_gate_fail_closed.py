@@ -23,7 +23,6 @@ from lib.hackathon.chain_health_gate import (
     ChainHealthVerdict,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -55,8 +54,7 @@ def test_factory_init_failure_yields_block_with_original_error():
 
     assert isinstance(verdict, ChainHealthVerdict)
     assert verdict.severity == "BLOCK", (
-        "Construction failure must fail CLOSED, not fail OPEN — "
-        f"got severity={verdict.severity!r}"
+        f"Construction failure must fail CLOSED, not fail OPEN — got severity={verdict.severity!r}"
     )
     assert verdict.chain_id == MEGAETH_CHAIN_ID
     # Reason must mention 'gate unavailable' and preserve the original error.
@@ -137,8 +135,7 @@ def test_factory_failure_is_sticky_block_on_repeated_calls():
     # Factory must be invoked exactly ONCE — sticky cache short-circuits
     # subsequent calls before re-invoking.
     assert call_count["n"] == 1, (
-        "Sticky fail-closed must not re-invoke factory; "
-        f"got {call_count['n']} invocations"
+        f"Sticky fail-closed must not re-invoke factory; got {call_count['n']} invocations"
     )
 
 
