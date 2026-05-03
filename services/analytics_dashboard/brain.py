@@ -106,9 +106,9 @@ def register_brain(app, *, project: str, dataset: str, bq_client, query_param_fa
         try:
             rows = _rows(f"""
                 SELECT
-                  COUNTIF(refreshed_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)) AS new_24h,
+                  COUNTIF(ingested_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)) AS new_24h,
                   COUNTIF(severity = 'CRITICAL'
-                          AND refreshed_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)) AS critical_24h,
+                          AND ingested_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)) AS critical_24h,
                   COUNT(*) AS total
                 FROM `{project}.{dataset}.threat_intel`
             """)
