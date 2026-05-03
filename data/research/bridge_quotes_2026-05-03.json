@@ -1,0 +1,320 @@
+[
+  {
+    "provider": "Across",
+    "direction": "ARB->OP",
+    "notional_usd": 1000,
+    "fee_usd": 0.1483,
+    "fee_bps": 1.4829,
+    "finality_seconds": 2,
+    "note": "output=999.8517 USDC",
+    "raw": {
+      "totalRelayFee_pct": "148288093885505",
+      "lpFee_pct": "48046093885505",
+      "fillDeadline": "1777785959"
+    }
+  },
+  {
+    "provider": "Hop",
+    "direction": "ARB->OP",
+    "notional_usd": 1000,
+    "fee_usd": 0.01,
+    "fee_bps": 0.1,
+    "finality_seconds": 120,
+    "note": "bonderFee=0.0100 USDC",
+    "raw": {
+      "amountIn": 1000000000,
+      "estimatedRecieved": 999990000,
+      "bonderFee": 10000
+    }
+  },
+  {
+    "provider": "Stargate",
+    "direction": "ARB->OP",
+    "notional_usd": 1000,
+    "fee_usd": 1.6,
+    "fee_bps": 16.0,
+    "finality_seconds": 90,
+    "note": "modeled: 6bps protocol + ~$1 LZ gas (no public REST quote API)",
+    "raw": {
+      "base_bps": 6.0,
+      "lz_gas_usd_estimate": 1.0
+    }
+  },
+  {
+    "provider": "CCTP-v1",
+    "direction": "ARB->OP",
+    "notional_usd": 1000,
+    "fee_usd": 0.3,
+    "fee_bps": 3.0,
+    "finality_seconds": 900,
+    "note": "standard CCTP: zero protocol fee + ~$0.30 dest gas; 13-19min finality",
+    "raw": {
+      "protocol": "Circle CCTP v1"
+    }
+  },
+  {
+    "provider": "Across",
+    "direction": "ARB->OP",
+    "notional_usd": 10000,
+    "fee_usd": 1.4842,
+    "fee_bps": 1.4842,
+    "finality_seconds": 2,
+    "note": "output=9998.5158 USDC",
+    "raw": {
+      "totalRelayFee_pct": "148417576788952",
+      "lpFee_pct": "48393276788952",
+      "fillDeadline": "1777785959"
+    }
+  },
+  {
+    "provider": "Hop",
+    "direction": "ARB->OP",
+    "notional_usd": 10000,
+    "fee_usd": 0.01,
+    "fee_bps": 0.01,
+    "finality_seconds": 120,
+    "note": "bonderFee=0.0100 USDC",
+    "raw": {
+      "amountIn": 10000000000,
+      "estimatedRecieved": 9999990000,
+      "bonderFee": 10000
+    }
+  },
+  {
+    "provider": "Stargate",
+    "direction": "ARB->OP",
+    "notional_usd": 10000,
+    "fee_usd": 7.0,
+    "fee_bps": 7.0,
+    "finality_seconds": 90,
+    "note": "modeled: 6bps protocol + ~$1 LZ gas (no public REST quote API)",
+    "raw": {
+      "base_bps": 6.0,
+      "lz_gas_usd_estimate": 1.0
+    }
+  },
+  {
+    "provider": "CCTP-v1",
+    "direction": "ARB->OP",
+    "notional_usd": 10000,
+    "fee_usd": 0.3,
+    "fee_bps": 0.3,
+    "finality_seconds": 900,
+    "note": "standard CCTP: zero protocol fee + ~$0.30 dest gas; 13-19min finality",
+    "raw": {
+      "protocol": "Circle CCTP v1"
+    }
+  },
+  {
+    "provider": "Across",
+    "direction": "ARB->OP",
+    "notional_usd": 100000,
+    "fee_usd": 15.1867,
+    "fee_bps": 1.5187,
+    "finality_seconds": 120,
+    "note": "output=99984.8133 USDC",
+    "raw": {
+      "totalRelayFee_pct": "151867197778688",
+      "lpFee_pct": "51864767778688",
+      "fillDeadline": "1777785959"
+    }
+  },
+  {
+    "provider": "Hop",
+    "direction": "ARB->OP",
+    "notional_usd": 100000,
+    "fee_usd": 0.01,
+    "fee_bps": 0.001,
+    "finality_seconds": 120,
+    "note": "bonderFee=0.0100 USDC",
+    "raw": {
+      "amountIn": 100000000000,
+      "estimatedRecieved": 99999990000,
+      "bonderFee": 10000
+    }
+  },
+  {
+    "provider": "Stargate",
+    "direction": "ARB->OP",
+    "notional_usd": 100000,
+    "fee_usd": 61.0,
+    "fee_bps": 6.1,
+    "finality_seconds": 90,
+    "note": "modeled: 6bps protocol + ~$1 LZ gas (no public REST quote API)",
+    "raw": {
+      "base_bps": 6.0,
+      "lz_gas_usd_estimate": 1.0
+    }
+  },
+  {
+    "provider": "CCTP-v1",
+    "direction": "ARB->OP",
+    "notional_usd": 100000,
+    "fee_usd": 0.3,
+    "fee_bps": 0.03,
+    "finality_seconds": 900,
+    "note": "standard CCTP: zero protocol fee + ~$0.30 dest gas; 13-19min finality",
+    "raw": {
+      "protocol": "Circle CCTP v1"
+    }
+  },
+  {
+    "provider": "Across",
+    "direction": "OP->ARB",
+    "notional_usd": 1000,
+    "fee_usd": 0.1546,
+    "fee_bps": 1.5464,
+    "finality_seconds": 2,
+    "note": "output=999.8454 USDC",
+    "raw": {
+      "totalRelayFee_pct": "154636093885505",
+      "lpFee_pct": "48046093885505",
+      "fillDeadline": "1777785959"
+    }
+  },
+  {
+    "provider": "Hop",
+    "direction": "OP->ARB",
+    "notional_usd": 1000,
+    "fee_usd": 0.01,
+    "fee_bps": 0.1,
+    "finality_seconds": 120,
+    "note": "bonderFee=0.0100 USDC",
+    "raw": {
+      "amountIn": 1000000000,
+      "estimatedRecieved": 999990000,
+      "bonderFee": 10000
+    }
+  },
+  {
+    "provider": "Stargate",
+    "direction": "OP->ARB",
+    "notional_usd": 1000,
+    "fee_usd": 1.6,
+    "fee_bps": 16.0,
+    "finality_seconds": 90,
+    "note": "modeled: 6bps protocol + ~$1 LZ gas (no public REST quote API)",
+    "raw": {
+      "base_bps": 6.0,
+      "lz_gas_usd_estimate": 1.0
+    }
+  },
+  {
+    "provider": "CCTP-v1",
+    "direction": "OP->ARB",
+    "notional_usd": 1000,
+    "fee_usd": 0.3,
+    "fee_bps": 3.0,
+    "finality_seconds": 900,
+    "note": "standard CCTP: zero protocol fee + ~$0.30 dest gas; 13-19min finality",
+    "raw": {
+      "protocol": "Circle CCTP v1"
+    }
+  },
+  {
+    "provider": "Across",
+    "direction": "OP->ARB",
+    "notional_usd": 10000,
+    "fee_usd": 1.4907,
+    "fee_bps": 1.4907,
+    "finality_seconds": 2,
+    "note": "output=9998.5093 USDC",
+    "raw": {
+      "totalRelayFee_pct": "149068176788952",
+      "lpFee_pct": "48393276788952",
+      "fillDeadline": "1777785959"
+    }
+  },
+  {
+    "provider": "Hop",
+    "direction": "OP->ARB",
+    "notional_usd": 10000,
+    "fee_usd": 0.01,
+    "fee_bps": 0.01,
+    "finality_seconds": 120,
+    "note": "bonderFee=0.0100 USDC",
+    "raw": {
+      "amountIn": 10000000000,
+      "estimatedRecieved": 9999990000,
+      "bonderFee": 10000
+    }
+  },
+  {
+    "provider": "Stargate",
+    "direction": "OP->ARB",
+    "notional_usd": 10000,
+    "fee_usd": 7.0,
+    "fee_bps": 7.0,
+    "finality_seconds": 90,
+    "note": "modeled: 6bps protocol + ~$1 LZ gas (no public REST quote API)",
+    "raw": {
+      "base_bps": 6.0,
+      "lz_gas_usd_estimate": 1.0
+    }
+  },
+  {
+    "provider": "CCTP-v1",
+    "direction": "OP->ARB",
+    "notional_usd": 10000,
+    "fee_usd": 0.3,
+    "fee_bps": 0.3,
+    "finality_seconds": 900,
+    "note": "standard CCTP: zero protocol fee + ~$0.30 dest gas; 13-19min finality",
+    "raw": {
+      "protocol": "Circle CCTP v1"
+    }
+  },
+  {
+    "provider": "Across",
+    "direction": "OP->ARB",
+    "notional_usd": 100000,
+    "fee_usd": 15.1932,
+    "fee_bps": 1.5193,
+    "finality_seconds": 120,
+    "note": "output=99984.8068 USDC",
+    "raw": {
+      "totalRelayFee_pct": "151932257778688",
+      "lpFee_pct": "51864767778688",
+      "fillDeadline": "1777785959"
+    }
+  },
+  {
+    "provider": "Hop",
+    "direction": "OP->ARB",
+    "notional_usd": 100000,
+    "fee_usd": 0.01,
+    "fee_bps": 0.001,
+    "finality_seconds": 120,
+    "note": "bonderFee=0.0100 USDC",
+    "raw": {
+      "amountIn": 100000000000,
+      "estimatedRecieved": 99999990000,
+      "bonderFee": 10000
+    }
+  },
+  {
+    "provider": "Stargate",
+    "direction": "OP->ARB",
+    "notional_usd": 100000,
+    "fee_usd": 61.0,
+    "fee_bps": 6.1,
+    "finality_seconds": 90,
+    "note": "modeled: 6bps protocol + ~$1 LZ gas (no public REST quote API)",
+    "raw": {
+      "base_bps": 6.0,
+      "lz_gas_usd_estimate": 1.0
+    }
+  },
+  {
+    "provider": "CCTP-v1",
+    "direction": "OP->ARB",
+    "notional_usd": 100000,
+    "fee_usd": 0.3,
+    "fee_bps": 0.03,
+    "finality_seconds": 900,
+    "note": "standard CCTP: zero protocol fee + ~$0.30 dest gas; 13-19min finality",
+    "raw": {
+      "protocol": "Circle CCTP v1"
+    }
+  }
+]
