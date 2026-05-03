@@ -49,8 +49,26 @@ via `slither.config.json`.
    input inside the contract's domain.
 5. Run `forge test --match-test <new_name> -vvv` until green, then commit.
 
+## Slither status
+
+Local run with `slither 0.11.5 + solc 0.8.20` against all three Sentinel-family
+contracts (2026-05-02):
+
+| Contract | HIGH | MEDIUM | Low (excluded) | Informational (excluded) |
+|---|---|---|---|---|
+| `SapphireSentinelRegistry.sol` | 0 | 0 | 3 (timestamp) | 1 (solc-version) |
+| `SapphirePaymentGate.sol`      | 0 | 0 | 3 (timestamp)   | 2 (solc-version, low-level-calls) |
+| `SapphireSignalVerifier.sol`   | 0 | 0 | 0               | 1 (solc-version) |
+
+The CI gate (`fail_on: medium` in `slither.config.json`) is satisfied by all
+three contracts. The Lows that remain are deliberate timestamp comparisons
+(subscription expiry, mandate expiry); the `low-level-calls` Informational on
+PaymentGate is the deliberate `.call{value:}` migration in `withdraw()` (see
+`PR feat/sentinel-slither-patches`).
+
 ## Files
 
 | File | Purpose |
 |---|---|
 | `SapphireSentinelRegistry.t.sol` | 18 cases: ACL, replay protection, hash binding, spend cap, expiry, two-step operator transfer, view sentinels, fuzz harness. |
+| `SapphirePaymentGate.t.sol` | 8 cases: `.call{value:}` happy path, gas-hungry contract treasury, reentrancy guard against malicious treasury, setter events, ACL, zero-balance + zero-price guards. |
