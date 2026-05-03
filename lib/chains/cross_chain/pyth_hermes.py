@@ -267,7 +267,7 @@ class PythHermesClient:
             )
             self._owns_client = True
 
-    def __enter__(self) -> "PythHermesClient":
+    def __enter__(self) -> PythHermesClient:
         return self
 
     def __exit__(self, *exc: object) -> None:
