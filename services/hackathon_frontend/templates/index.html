@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sapphire OS — Hackathon Submissions</title>
+  <meta name="description" content="Sapphire OS hackathon submissions — 0G APAC, MegaETH/Arbitrum, Robinhood London, Zama. Cite-able PRs, live testnet contracts, demo videos.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <div class="hero-eyebrow">SAPPHIRE OS · HACKATHON SUBMISSIONS</div>
+      <h1 class="hero-title">Verifiable autonomous trading,<br>built in the open.</h1>
+      <p class="hero-pitch">
+        Sapphire is a production trading + intelligence OS — 6,567 collected tests, live execution.
+        These are the four hackathon submissions where we prove each property cryptographically:
+        sealed inference, on-chain anchoring, multi-chain alpha verification, and confidential
+        compute. Every claim links back to a merged PR.
+      </p>
+      <div class="hero-meta">
+        <a class="hero-link" href="{{ repo_url }}" target="_blank" rel="noopener">github.com/arigatoexpress/Sapphire</a>
+        <span class="hero-dot">·</span>
+        <a class="hero-link" href="https://sapphirealpha.xyz" target="_blank" rel="noopener">sapphirealpha.xyz</a>
+        <span class="hero-dot">·</span>
+        <span class="hero-link muted">aristotlespec@gmail.com</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="cards">
+    {% for s in submissions %}
+    <article class="card card-{{ s.slug }}">
+      <header class="card-head">
+        <div class="card-titles">
+          <div class="card-sponsor">{{ s.sponsor }}</div>
+          <h2 class="card-title">{{ s.title }}</h2>
+          <div class="card-subtitle">{{ s.subtitle }}</div>
+        </div>
+        <span class="status status-{{ s.status }}">{{ s.status }}</span>
+      </header>
+
+      <div class="card-track">{{ s.track }}</div>
+
+      <p class="card-pitch">{{ s.pitch }}</p>
+
+      <ul class="card-bullets">
+        {% for b in s.bullets %}<li>{{ b }}</li>{% endfor %}
+      </ul>
+
+      {% if s.contracts %}
+      <div class="card-section">
+        <div class="section-label">Contracts</div>
+        {% for label, network, url in s.contracts %}
+        <div class="contract">
+          <a href="{{ url }}" target="_blank" rel="noopener" class="contract-name">{{ label }}</a>
+          <span class="contract-net">{{ network }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="card-section">
+        <div class="section-label">Pull requests</div>
+        <div class="pr-list">
+          {% for num, label in s.prs %}
+          <a class="pr" href="{{ repo_url }}/pull/{{ num }}" target="_blank" rel="noopener">
+            <span class="pr-num">#{{ num }}</span>
+            <span class="pr-label">{{ label }}</span>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="card-section">
+        <div class="section-label">Code paths</div>
+        <ul class="code-list">
+          {% for p in s.code_paths %}<li><code>{{ p }}</code></li>{% endfor %}
+        </ul>
+      </div>
+
+      <footer class="card-foot">
+        <div class="live-status">
+          <span class="dot dot-{{ s.status }}"></span>
+          {{ s.live_status }}
+        </div>
+        <a class="demo-btn" href="{{ s.demo_url }}" target="_blank" rel="noopener">
+          {{ s.demo_label }} →
+        </a>
+      </footer>
+    </article>
+    {% endfor %}
+  </main>
+
+  <footer class="page-foot">
+    <div class="foot-inner">
+      <div class="foot-col">
+        <div class="foot-label">WHO</div>
+        <div>Ari Spector — Sapphire OS, solo founder/operator.</div>
+      </div>
+      <div class="foot-col">
+        <div class="foot-label">WHY</div>
+        <div>If a trading agent makes a claim, it should be cryptographically committed before market impact. Provable, not promised.</div>
+      </div>
+      <div class="foot-col">
+        <div class="foot-label">CONTACT</div>
+        <div>
+          <a href="mailto:aristotlespec@gmail.com">aristotlespec@gmail.com</a><br>
+          <a href="{{ repo_url }}" target="_blank" rel="noopener">github.com/arigatoexpress/Sapphire</a>
+        </div>
+      </div>
+    </div>
+    <div class="foot-fine">
+      Last updated 2026-05-02 · all status pulled from merged PR descriptions ·
+      this page is itself open source at <code>services/hackathon_frontend/</code>
+    </div>
+  </footer>
+</body>
+</html>
