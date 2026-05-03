@@ -246,3 +246,208 @@ async def test_market_prices_with_meta_returns_token_prices_with_source() -> Non
     triples = await adapter.market_prices_with_meta(_eth_btc_market())
     sources = tuple(t.source for t in triples)
     assert sources == ("aave", "chainlink", "aave")
+
+
+# ---------- Pyth tertiary fallback ------------------------------------------
+
+
+class _StaticPythRegistry:
+    """Stand-in for PythRegistry that maps known symbols to fixed prices.
+
+    Mirrors the shape of :class:`_StaticChainlinkRegistry` so the test
+    surface stays uniform.
+    """
+
+    def __init__(
+        self,
+        prices_by_symbol: dict[str, Decimal],
+        *,
+        stale: bool = False,
+        raise_on_fetch: bool = False,
+    ) -> None:
+        self._prices = {k.upper(): v for k, v in prices_by_symbol.items()}
+        self._stale = stale
+        self._raise = raise_on_fetch
+
+    def oracle_for(self, symbol: str):  # type: ignore[no-untyped-def]
+        if symbol.upper() not in self._prices:
+            return None
+        # Real PythRegistry returns (aggregator, priceId); stand-in
+        # just needs a truthy non-None return — the adapter checks
+        # truthiness then calls .fetch_price().
+        return (self, "0x" + "ab" * 32)
+
+    async def fetch_price(self, symbol: str, *, now: float | None = None):  # type: ignore[no-untyped-def]
+        from lib.chains.arbitrum.contracts.pyth_oracle import PythRegistryPrice
+
+        if self._raise:
+            raise RuntimeError("simulated Pyth RPC failure")
+        usd = self._prices[symbol.upper()]
+        return PythRegistryPrice(
+            symbol=symbol.upper(),
+            price_id="0x" + "ab" * 32,
+            usd=usd,
+            publish_time=1,
+            stale=self._stale,
+        )
+
+
+@pytest.mark.asyncio
+async def test_fetch_token_price_falls_back_to_pyth_when_aave_and_chainlink_unavailable() -> None:
+    """Aave returns 0 + Chainlink unconfigured for the symbol → Pyth wins."""
+    wbtc = "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f"
+    aave = FakeAave({})  # Aave returns 0 for WBTC
+    # Chainlink registry exists but maps no symbols (won't price BTC).
+    chainlink = _StaticChainlinkRegistry({})
+    pyth = _StaticPythRegistry({"BTC": Decimal("76800.50")})
+    adapter = GmxPriceAdapter(aave, chainlink=chainlink, pyth=pyth)
+    p = await adapter.fetch_token_price(wbtc)
+    assert p.source == "pyth"
+    assert p.usd == Decimal("76800.50")
+
+
+@pytest.mark.asyncio
+async def test_fetch_token_price_falls_back_to_pyth_when_chainlink_raises() -> None:
+    """Aave reverts + Chainlink raises (RPC error) → Pyth saves the day.
+
+    This is the headline scenario for the secondary→tertiary chain:
+    the chain-side oracle layer (Aave + Chainlink, both gas-paid /
+    on-chain) has a correlated failure but Pyth's pull-based
+    architecture (off-chain publishers, anyone can refresh on-chain)
+    still serves a price.
+    """
+    wbtc = "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f"
+
+    class RevertingAave:
+        async def get_asset_price(self, asset: str) -> Decimal:
+            raise RuntimeError("execution reverted")
+
+    chainlink = _StaticChainlinkRegistry({"BTC": Decimal("0")})  # placeholder
+    chainlink._raise = True  # type: ignore[attr-defined]
+    # Patch the static stub to also raise — easiest via subclass.
+
+    class RaisingChainlink(_StaticChainlinkRegistry):
+        async def fetch_price(self, symbol, *, now=None):  # type: ignore[no-untyped-def]
+            raise RuntimeError("simulated Chainlink RPC error")
+
+    cl = RaisingChainlink({"BTC": Decimal("0")})
+    pyth = _StaticPythRegistry({"BTC": Decimal("76800")})
+    adapter = GmxPriceAdapter(RevertingAave(), chainlink=cl, pyth=pyth)  # type: ignore[arg-type]
+    p = await adapter.fetch_token_price(wbtc)
+    assert p.source == "pyth"
+    assert p.usd == Decimal("76800")
+
+
+@pytest.mark.asyncio
+async def test_fetch_token_price_chainlink_stale_still_used_pyth_not_consulted() -> None:
+    """A stale Chainlink price still wins — Pyth is only the LAST resort.
+
+    Stale is a soft policy signal (Sentinel can downweight) — the
+    adapter doesn't drop a stale Chainlink result in favour of a
+    fresh Pyth one. This keeps the resolution order strict and lets
+    callers reason about which oracle answered without secondary
+    re-ranking surprises.
+    """
+    wbtc = "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f"
+    aave = FakeAave({})  # Aave returns 0
+    chainlink = _StaticChainlinkRegistry({"BTC": Decimal("70000")}, stale=True)
+    pyth = _StaticPythRegistry({"BTC": Decimal("76800")})
+    adapter = GmxPriceAdapter(aave, chainlink=chainlink, pyth=pyth)
+    p = await adapter.fetch_token_price(wbtc)
+    assert p.source == "chainlink"
+    assert p.stale is True
+    assert p.usd == Decimal("70000")
+
+
+@pytest.mark.asyncio
+async def test_fetch_token_price_propagates_pyth_staleness_flag() -> None:
+    """When Pyth serves the answer, its stale flag is surfaced on TokenPrice."""
+    wbtc = "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f"
+    aave = FakeAave({})
+    pyth = _StaticPythRegistry({"BTC": Decimal("76000")}, stale=True)
+    adapter = GmxPriceAdapter(aave, pyth=pyth)
+    p = await adapter.fetch_token_price(wbtc)
+    assert p.source == "pyth"
+    assert p.stale is True
+
+
+@pytest.mark.asyncio
+async def test_fetch_token_price_all_three_unavailable_raises_with_full_summary() -> None:
+    """Every oracle either rejects or returns non-positive → PriceUnavailable."""
+    wbtc = "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f"
+    aave = FakeAave({})  # Aave returns 0
+    chainlink = _StaticChainlinkRegistry({})  # symbol unknown
+    pyth = _StaticPythRegistry({})  # symbol unknown
+    adapter = GmxPriceAdapter(aave, chainlink=chainlink, pyth=pyth)
+    with pytest.raises(PriceUnavailable) as excinfo:
+        await adapter.fetch_token_price(wbtc)
+    msg = str(excinfo.value)
+    # Per-oracle summary: aave=, chainlink=, pyth= all present so the
+    # live debug path can see exactly which leg failed and why.
+    assert "aave=" in msg
+    assert "chainlink=" in msg
+    assert "pyth=" in msg
+
+
+@pytest.mark.asyncio
+async def test_fetch_token_price_pyth_failure_falls_through_to_unavailable() -> None:
+    """Pyth raising on fetch is handled — no exception escape, just unavailable."""
+    wbtc = "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f"
+    aave = FakeAave({})
+    pyth = _StaticPythRegistry({"BTC": Decimal("76000")}, raise_on_fetch=True)
+    adapter = GmxPriceAdapter(aave, pyth=pyth)
+    with pytest.raises(PriceUnavailable) as excinfo:
+        await adapter.fetch_token_price(wbtc)
+    msg = str(excinfo.value)
+    assert "pyth=" in msg
+    assert "RuntimeError" in msg
+
+
+@pytest.mark.asyncio
+async def test_market_prices_with_meta_tags_pyth_for_uncovered_token() -> None:
+    """A market where one leg only Pyth can price tags that leg ``source=\"pyth\"``."""
+    aave = FakeAave(
+        {
+            "0x82af49447d8a07e3bd95bd0d56f35241523fbab1": Decimal("3500"),  # WETH
+            "0xaf88d065e77c8cc2239327c5edb3a432268e5831": Decimal("1"),  # USDC
+        }
+    )
+    # No Chainlink, only Pyth covers BTC.
+    pyth = _StaticPythRegistry({"BTC": Decimal("76800")})
+    adapter = GmxPriceAdapter(aave, pyth=pyth)
+    triples = await adapter.market_prices_with_meta(_eth_btc_market())
+    sources = tuple(t.source for t in triples)
+    # WETH (Aave), WBTC (Pyth), USDC (Aave)
+    assert sources == ("aave", "pyth", "aave")
+
+
+def test_register_pyth_symbol_extends_runtime_map() -> None:
+    """register_pyth_symbol mirrors register_chainlink_symbol."""
+    adapter = GmxPriceAdapter(FakeAave({}))
+    new_addr = "0x" + "9" * 40
+    adapter.register_pyth_symbol(new_addr, "ARB")
+    assert adapter.pyth_symbol_for(new_addr) == "ARB"
+
+
+def test_register_pyth_symbol_rejects_invalid_address() -> None:
+    adapter = GmxPriceAdapter(FakeAave({}))
+    with pytest.raises(ValueError, match="invalid token"):
+        adapter.register_pyth_symbol("nope", "BTC")
+
+
+def test_token_to_pyth_symbol_kwarg_overrides_default() -> None:
+    """Constructor kwarg can override the default Chainlink-derived map."""
+    addr = "0x" + "1" * 40
+    adapter = GmxPriceAdapter(
+        FakeAave({}),
+        token_to_pyth_symbol={addr: "PEPE"},
+    )
+    assert adapter.pyth_symbol_for(addr) == "PEPE"
+
+
+def test_pyth_symbol_defaults_to_chainlink_map_when_unset() -> None:
+    """Without a token_to_pyth_symbol kwarg, Pyth reuses the Chainlink mapping."""
+    wbtc = "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f"
+    adapter = GmxPriceAdapter(FakeAave({}))
+    assert adapter.chainlink_symbol_for(wbtc) == "BTC"
+    assert adapter.pyth_symbol_for(wbtc) == "BTC"
