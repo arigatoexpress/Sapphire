@@ -120,7 +120,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `services/security_pipeline/` | service | Scheduled full-system security scan → SOC page. |
 | `services/telegram-bot/` | service | Legacy bot (replaced by hermes-agent gateway). |
 | `services/webhook/` | service | TradingView webhook receiver [Windows:9090]. |
-| `plugins/claw-sapphire/` | plugin | 109 tool scripts on disk (61 at top level + 47 in `internal/` + 1 in `_deprecated/`), 10 libs, 376+ collected tests. |
+| `plugins/claw-sapphire/` | plugin | 113 tool scripts on disk (63 at top level + 49 in `internal/` + 1 in `_deprecated/`), 10 libs, 567 collected tests. |
 | `contracts/` | solidity | **`SapphireSignalVerifier.sol`** (on-chain signal registry with ZK proof hash field), **`SapphirePaymentGate.sol`** (micropayment gate), **`SapphireSentinelRegistry.sol`** (non-custodial agent mandate/payment receipt anchor). Deployed on Robinhood Chain testnet via `scripts/deploy_robinhood_chain.py`. |
 | `pine/` | pine | 5 TradingView strategies (standalone/: v1, v2, v3 Ultra, MultiSymbol Screener, Mac variant). |
 | `skills/` | skills | Agent-executable capabilities. |
@@ -203,6 +203,40 @@ Tool groups:
 - `router.py`, `runtime_policy.py`, `token_governor.py` — dispatch policy + budget
 - `sensitivity_classifier.py` — PII/secret regex (used by dispatch, not proxy)
 - `market_data.py`, `nvidia_agents.py` — shared market + NeMo helpers
+
+## Multi-chain protocol-access stack (as of 2026-05-03)
+
+Sapphire ships read-only typed access to live mainnet protocols across 3 chains:
+
+| Chain | Aave V3 | GMX V2 | Other |
+|---|---|---|---|
+| MegaETH (4326) | yes ($450M) | yes (6 markets, BTC funding via Pyth) | Kumbaya DEX, USDM |
+| Arbitrum (42161) | yes ($1.06B) | yes (60 markets, BTC funding via Chainlink) | - |
+| Optimism (10) | yes ($82M) | - | - |
+
+Cross-chain primitives:
+- `lib/chains/cross_chain/aave_apy_arb.py` — APY divergence detector (live: USDC 232bps spread Arb<->Optimism)
+- `lib/hackathon/chain_health_gate.py` — multi-chain alpha-verification gate
+
+Source: `lib/chains/{megaeth,arbitrum,optimism,cross_chain}/`. ~283 lib tests + 43 plugin tests for chain-specific surface.
+
+## Active hackathon submissions (as of 2026-05-03)
+
+- **0G APAC Hackathon** Track 2 — submission deadline 2026-05-16 23:59 UTC+8. Engineering complete (PR #525 merged); mainnet deploy + demo + form pending Ari.
+- **Arbitrum London Buildathon** Best Agentic Project — registration 2026-05-25, submission 2026-06-14. Sapphire Sentinel; multi-chain chain-health gate; Forge tests for 3 contracts.
+- **Mega Mafia 2.0** application drafted (PR #566) — file via Google Form: https://forms.gle/m6HSvpZ2Q24fB9Cc6
+- **Zama AI Agent Skills bounty** — submission deadline 2026-05-10. SKILL.md scaffold drafted (PR #564); ~3-4hr polish before submit.
+
+## Active routines (deployed 2026-05-01)
+
+| Routine | Schedule |
+|---|---|
+| MegaETH PR queue triage | hourly |
+| Hackathon submission daily digest | daily 9am MDT |
+| MegaETH live alpha monitor | every 3h |
+| EOD wrap-up (one-time per day) | 5:30pm MDT |
+
+Manage at https://claude.ai/code/routines.
 
 ## Inference Proxy (`services/inference-proxy/`)
 
