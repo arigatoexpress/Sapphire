@@ -28,6 +28,13 @@ before a receipt hash is anchored on-chain.
   encrypted-input claim isn't hand-waving.
 - The demo is safe by default: no live Robinhood orders, no real Telegram
   sends, no secret reads, and no production funds.
+- **Smart-contract quality is provable**: 3 contracts, 26 Forge cases (18
+  SentinelRegistry + 8 PaymentGate, all green locally), Slither HIGH/MEDIUM
+  clean (0/0/0 across all three contracts using slither 0.11.5 + solc 0.8.20),
+  3 best-practice patches applied per Slither findings (`.transfer()` →
+  `.call{value:}` with explicit return-value check, inline non-reentrancy
+  guard on `withdraw()`, `events-maths` setter events on
+  `setPricePerSignal` / `setMonthlySubscription`).
 
 ## Demo Flow
 
