@@ -27,9 +27,20 @@ from typing import Any
 
 from lib.chains.megaeth.contracts.peg_monitor import PegBreak
 from lib.chains.megaeth.protocols import MegaETHProtocols
+from lib.hackathon.chain_health_price_source import (
+    ChainHealthPriceResolver,
+    PriceSource,
+    ResolvedPrice,
+)
 
 #: Chain IDs the gate knows how to evaluate. Anything else returns HEALTHY.
 MEGAETH_CHAIN_ID = 4326
+
+#: Symbols the gate consults for price-source freshness on MegaETH.
+#: Wave A only checks BTC because that was the asset PR #621 surfaced as
+#: 25-day-stale on Optimism — extending to ETH/SOL is a one-line change
+#: but adds extra Hermes round-trips on the gate critical path.
+MEGAETH_PRICE_SOURCE_SYMBOL = "BTC"
 
 #: Per-read timeout. The gate calls 2 reads (stable_health, lend_overview).
 #: Keep this small — the gate sits in the Sentinel critical path and a slow
@@ -91,10 +102,22 @@ class ChainHealthGate:
         allow_when_unavailable: bool = True,
         *,
         read_timeout_s: float = DEFAULT_READ_TIMEOUT_S,
+        price_resolver: ChainHealthPriceResolver | None = None,
     ) -> None:
+        """Construct the gate.
+
+        ``price_resolver`` is the Hermes-primary + on-chain-fallback
+        price resolver shared across every per-chain branch — when the
+        gate process owns a single resolver, all branches see the same
+        Hermes connection pool and the same fresh / stale decision
+        timeline. ``None`` means no price-source axis is consulted (the
+        gate falls back to peg + Aave classification only); pass
+        :func:`shared_price_resolver` to wire the singleton in.
+        """
         self._client_factory = client_factory
         self._allow_when_unavailable = allow_when_unavailable
         self._read_timeout_s = read_timeout_s
+        self._price_resolver = price_resolver
 
     def evaluate_chain(self, chain_id: int) -> ChainHealthVerdict:
         """Classify a chain's current health.
@@ -137,7 +160,13 @@ class ChainHealthGate:
             return self._unavailable_verdict(MEGAETH_CHAIN_ID, f"rpc error: {exc}")
 
     async def _read_with_client(self, client: Any) -> ChainHealthVerdict:
-        """Pull stable_health + lend_overview, classify, return verdict."""
+        """Pull stable_health + lend_overview, classify, return verdict.
+
+        If a price resolver is wired, it is consulted in parallel with
+        the on-chain reads (Hermes is HTTP, the on-chain reads are
+        JSON-RPC — they share no resources) and its severity
+        contribution is composed into the final verdict.
+        """
         proto = MegaETHProtocols(client)
 
         try:
@@ -158,7 +187,29 @@ class ChainHealthGate:
         except Exception as exc:  # noqa: BLE001
             return self._unavailable_verdict(MEGAETH_CHAIN_ID, f"lend_overview failed: {exc}")
 
-        return _classify(stable, lend)
+        # Price-source resolution is *additive* — it never overrides the
+        # peg + Aave verdict, only augments it. Run after the on-chain
+        # reads (rather than concurrently) because the resolver is
+        # already fail-open and quick (5s Hermes timeout, no on-chain
+        # call when use_onchain_only=False), and serial keeps the
+        # exception story straightforward.
+        resolved = self._resolve_price_or_none()
+        return _classify(stable, lend, resolved=resolved)
+
+    def _resolve_price_or_none(self) -> ResolvedPrice | None:
+        """Consult the resolver if one is wired, swallow defensively.
+
+        The resolver is *itself* fail-open, but a misconfigured resolver
+        (e.g. wrong symbol map, broken httpx wiring) must still never
+        propagate an exception out of the gate. This method is the
+        last-line catch.
+        """
+        if self._price_resolver is None:
+            return None
+        try:
+            return self._price_resolver.resolve(MEGAETH_PRICE_SOURCE_SYMBOL)
+        except Exception:  # noqa: BLE001 — resolver should not raise; if it does, drop the axis
+            return None
 
     def _unavailable_verdict(self, chain_id: int, reason: str) -> ChainHealthVerdict:
         """Return the configured fail-open / fail-closed verdict."""
@@ -183,7 +234,12 @@ def _chain_name_for(chain_id: int) -> str:
     return f"chain-{chain_id}"
 
 
-def _classify(stable: Any, lend: Any) -> ChainHealthVerdict:
+def _classify(
+    stable: Any,
+    lend: Any,
+    *,
+    resolved: ResolvedPrice | None = None,
+) -> ChainHealthVerdict:
     """Pure classifier — composes ``stable_health`` + ``lend_overview`` into a verdict.
 
     Severity ladder (highest wins):
@@ -193,6 +249,17 @@ def _classify(stable: Any, lend: Any) -> ChainHealthVerdict:
     * ``WARNING`` if stable severity == ``WARNING_50BP`` OR any reserve
       is frozen.
     * ``HEALTHY`` otherwise.
+
+    When a :class:`ResolvedPrice` is provided, its
+    ``severity_contribution`` is composed with the same highest-wins
+    ladder — a price-source ``WARNING`` lifts a ``HEALTHY`` verdict to
+    ``WARNING`` but never lowers a ``BLOCK``. Price-source reasons are
+    appended to the verdict reasons so the dashboard can render *which
+    source* is in use (HERMES_PRIMARY in the canonical case;
+    ON_CHAIN_FALLBACK / BOTH_STALE / NO_FALLBACK_AVAILABLE in degraded
+    cases). This is the fix for the PR #621 false-positive scenario:
+    when Hermes is fresh, the verdict no longer flags WARNING for a
+    25-day-stale on-chain cache because Hermes is the ground truth.
     """
     reasons: list[str] = []
     paused_reserves: list[str] = []
@@ -245,6 +312,31 @@ def _classify(stable: Any, lend: Any) -> ChainHealthVerdict:
     if not reasons:
         reasons.append("chain healthy: USDM peg within tolerance, Aave reserves nominal")
 
+    # --- price-source augmentation -----------------------------------------
+    # The resolver's severity contribution is composed with the same
+    # highest-wins ladder. We *only* accept HEALTHY / WARNING from the
+    # resolver — price-source degradation is never grounds for BLOCK
+    # (the chain may still be perfectly tradeable on the peg + Aave
+    # axes; refusing payments because hermes.pyth.network is down is a
+    # bigger user-impact incident than the data-quality problem we'd be
+    # protecting against).
+    if resolved is not None:
+        if resolved.severity_contribution == "WARNING" and severity == "HEALTHY":
+            severity = "WARNING"
+        # Always append the price-source reasons so the dashboard can
+        # render the source state, even when severity didn't change.
+        # In the canonical Hermes-fresh case ``resolved.reasons`` is
+        # empty — append a single-line "using Hermes" so the dashboard
+        # still reflects which source the gate trusted, which closes
+        # the PR #621 loop visibly to the operator.
+        if resolved.reasons:
+            reasons.extend(resolved.reasons)
+        elif resolved.source == PriceSource.HERMES_PRIMARY:
+            reasons.append(
+                f"price-source: Hermes primary ({resolved.symbol} fresh, "
+                f"age {resolved.age_s}s)"
+            )
+
     return ChainHealthVerdict(
         chain_id=MEGAETH_CHAIN_ID,
         chain_name=_chain_name_for(MEGAETH_CHAIN_ID),
@@ -295,6 +387,43 @@ def _load_megaeth_rpc_client_class() -> Any:
     return klass
 
 
+#: Module-level price resolver, shared across every per-chain gate
+#: constructed via :func:`shared_price_resolver`. Lazily constructed on
+#: first access so a unit test that never exercises price-source logic
+#: doesn't pay the (tiny) cost of building a Hermes client.
+_SHARED_PRICE_RESOLVER: ChainHealthPriceResolver | None = None
+
+
+def shared_price_resolver() -> ChainHealthPriceResolver:
+    """Return the process-wide price resolver, constructing on first call.
+
+    The lane prompt explicitly calls for the Hermes client to be
+    *singleton, shared across all 3 chain gates* — this is the
+    accessor that the per-chain gate factories call in. Threading the
+    same resolver instance through every gate means every chain's
+    evaluation sees the same ``httpx.Client`` connection pool and the
+    same Hermes responses (within the resolver's own freshness window).
+
+    Tests can replace the singleton via :func:`reset_price_resolver` to
+    avoid leaking a real Hermes client into the test process.
+    """
+    global _SHARED_PRICE_RESOLVER
+    if _SHARED_PRICE_RESOLVER is None:
+        _SHARED_PRICE_RESOLVER = ChainHealthPriceResolver()
+    return _SHARED_PRICE_RESOLVER
+
+
+def reset_price_resolver(resolver: ChainHealthPriceResolver | None = None) -> None:
+    """Replace (or clear) the shared price resolver — testing only.
+
+    Pass a pre-built resolver to inject a fake Hermes client; pass
+    ``None`` to clear the singleton (the next ``shared_price_resolver``
+    call will rebuild a default).
+    """
+    global _SHARED_PRICE_RESOLVER
+    _SHARED_PRICE_RESOLVER = resolver
+
+
 def default_gate(rpc_url: str = DEFAULT_MEGAETH_RPC_URL) -> ChainHealthGate:
     """Construct a gate against the production MegaETH mainnet RPC.
 
@@ -302,10 +431,19 @@ def default_gate(rpc_url: str = DEFAULT_MEGAETH_RPC_URL) -> ChainHealthGate:
     call — each call gets a fresh httpx ``AsyncClient`` rather than
     reusing one across long-lived processes, which sidesteps the
     'closed-loop' httpx footgun in test runners.
+
+    The default gate also wires the shared :func:`shared_price_resolver`
+    into the ``price_resolver`` slot, so every chain branch the gate
+    evaluates consults the same Hermes client. Callers that don't want
+    the price-source axis (e.g. environments without internet egress)
+    can construct ``ChainHealthGate`` directly with ``price_resolver=None``.
     """
     client_cls = _load_megaeth_rpc_client_class()
 
     def _factory() -> Any:
         return client_cls(rpc_url=rpc_url)
 
-    return ChainHealthGate(client_factory=_factory)
+    return ChainHealthGate(
+        client_factory=_factory,
+        price_resolver=shared_price_resolver(),
+    )

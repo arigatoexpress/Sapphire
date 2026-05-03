@@ -29,12 +29,24 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from lib.hackathon.chain_health_price_source import (
+    ChainHealthPriceResolver,
+    PriceSource,
+    ResolvedPrice,
+)
+
 #: Arbitrum One chain id (hex 0xa4b1).
 ARBITRUM_CHAIN_ID = 42161
 
 #: BLOCK threshold for paused-reserve utilization. Mirrors the MegaETH
 #: gate's threshold so behaviour is consistent across chains.
 HIGH_UTILIZATION_BLOCK_THRESHOLD = 0.80
+
+#: Symbol the Arbitrum branch resolves on the Hermes-primary path.
+#: Mirrors the MegaETH choice (BTC) for behavioural parity — Arbitrum
+#: has plenty of TVL on every Pyth feed but BTC is the canonical
+#: PR #621 reference asset that surfaced the stale-cache failure mode.
+ARBITRUM_PRICE_SOURCE_SYMBOL = "BTC"
 
 
 @dataclass(frozen=True)
@@ -56,7 +68,11 @@ class ArbitrumChainHealthVerdict:
     aave_frozen_reserves: list[str] = field(default_factory=list)
 
 
-def classify_arbitrum(lend: Any) -> ArbitrumChainHealthVerdict:
+def classify_arbitrum(
+    lend: Any,
+    *,
+    resolved: ResolvedPrice | None = None,
+) -> ArbitrumChainHealthVerdict:
     """Pure classifier — turn an Arbitrum ``LendOverview`` into a verdict.
 
     ``lend`` may be any object satisfying the duck-typed contract:
@@ -67,6 +83,14 @@ def classify_arbitrum(lend: Any) -> ArbitrumChainHealthVerdict:
 
     USDM doesn't exist on Arbitrum — Aave V3 reserve state is the only
     chain-distress axis we evaluate.
+
+    When a :class:`ResolvedPrice` is provided, its
+    ``severity_contribution`` is composed with the same highest-wins
+    ladder the MegaETH classifier uses — a price-source ``WARNING``
+    lifts ``HEALTHY`` to ``WARNING`` but never lowers a ``BLOCK``.
+    Closes the PR #621 loop on Arbitrum: a fresh Hermes price means the
+    gate no longer treats Arbitrum's on-chain Pyth cache as the source
+    of truth for severity calculations.
     """
     reserves = list(getattr(lend, "reserves", []) or [])
 
@@ -94,6 +118,21 @@ def classify_arbitrum(lend: Any) -> ArbitrumChainHealthVerdict:
     else:
         reasons.append("chain healthy: Aave reserves nominal")
 
+    # --- price-source augmentation -----------------------------------------
+    # Identical composition rules to the MegaETH gate — keeps cross-chain
+    # behaviour predictable for a Sentinel operator looking at two
+    # adjacent verdicts.
+    if resolved is not None:
+        if resolved.severity_contribution == "WARNING" and severity == "HEALTHY":
+            severity = "WARNING"
+        if resolved.reasons:
+            reasons.extend(resolved.reasons)
+        elif resolved.source == PriceSource.HERMES_PRIMARY:
+            reasons.append(
+                f"price-source: Hermes primary ({resolved.symbol} fresh, "
+                f"age {resolved.age_s}s)"
+            )
+
     return ArbitrumChainHealthVerdict(
         chain_id=ARBITRUM_CHAIN_ID,
         chain_name="Arbitrum One",
@@ -104,13 +143,26 @@ def classify_arbitrum(lend: Any) -> ArbitrumChainHealthVerdict:
     )
 
 
-async def evaluate_arbitrum_chain_health(client: Any) -> ArbitrumChainHealthVerdict:
+async def evaluate_arbitrum_chain_health(
+    client: Any,
+    *,
+    price_resolver: ChainHealthPriceResolver | None = None,
+) -> ArbitrumChainHealthVerdict:
     """Compose the live read with the pure classifier.
 
     Builds an :class:`ArbitrumProtocols` against the supplied client,
     pulls ``lend_overview()``, and runs the classifier. The gate shell
     in PR #546 is responsible for the timeout-wrapping +
     fail-open/fail-closed behaviour around this call.
+
+    When ``price_resolver`` is provided, the resolver is consulted for
+    :data:`ARBITRUM_PRICE_SOURCE_SYMBOL` and its severity contribution
+    is composed into the verdict. The resolver itself is fail-open and
+    catches its own exceptions; a misconfigured resolver still won't
+    propagate up to the gate. This is the Arbitrum-side fix for the
+    PR #621 stale-cache failure mode — once Hermes is wired, a 25-day-
+    stale on-chain Pyth cache no longer biases the gate verdict
+    because Hermes is the ground truth.
     """
     # Late import — keeps ``lib.hackathon`` from pulling the chain
     # access layer at module import time.
@@ -118,4 +170,14 @@ async def evaluate_arbitrum_chain_health(client: Any) -> ArbitrumChainHealthVerd
 
     proto = ArbitrumProtocols(client)
     lend = await proto.lend_overview()
-    return classify_arbitrum(lend)
+
+    resolved: ResolvedPrice | None = None
+    if price_resolver is not None:
+        try:
+            resolved = price_resolver.resolve(ARBITRUM_PRICE_SOURCE_SYMBOL)
+        except Exception:  # noqa: BLE001 — last-line resolver defence
+            # The resolver is itself fail-open; this is the belt-and-
+            # braces catch for a misconfigured injected resolver.
+            resolved = None
+
+    return classify_arbitrum(lend, resolved=resolved)
