@@ -10,9 +10,7 @@ the underlying code.
 """
 from __future__ import annotations
 
-import json
 import os
-from pathlib import Path
 
 from flask import Flask, render_template
 
