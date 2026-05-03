@@ -1,0 +1,101 @@
+{% extends "_base_subpage.html" %}
+{% block title %}Help{% endblock %}
+{% block crumb %}p/help{% endblock %}
+{% block meta %}per-tab guide{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <h1>Operator Manual</h1>
+  <div class="typed" id="typed-line">$ man sapphire</div>
+</section>
+
+<section class="box">
+  <h2 class="section">EACH_TAB</h2>
+  <table class="term">
+    <thead><tr><th>tab</th><th>route</th><th>what it shows</th><th>data source</th></tr></thead>
+    <tbody>
+      <tr><td>Brain</td><td><a href="/p/brain">/p/brain</a></td><td>cross-silo synthesis: health 0..1, regime, narrative, priority actions, correlations</td><td>BQ <code>brain_synthesis</code> + <code>/api/brain/*</code></td></tr>
+      <tr><td>Markets</td><td><a href="/p/markets">/p/markets</a></td><td>top 10 crypto by mcap, sparklines, total mcap, BTC dominance, 24h change</td><td>CoinGecko (60s cache)</td></tr>
+      <tr><td>Threats</td><td><a href="/p/threats">/p/threats</a></td><td>live CVE feed, 30d severity stack, prioritized actions</td><td>cyber-threat-bot (CISA KEV + NVD + MITRE + EPSS)</td></tr>
+      <tr><td>System</td><td><a href="/p/system">/p/system</a></td><td>service health (60min), 24h inference per tier, deploy revisions</td><td>BQ <code>service_health</code> + <code>inference_metrics</code></td></tr>
+      <tr><td>Hackathon</td><td><a href="/p/hackathon">/p/hackathon</a></td><td>4 submissions: 0G APAC, MegaETH, Robinhood London, Zama</td><td>hack.sapphirealpha.xyz (fallback: baked-in)</td></tr>
+      <tr><td>Wildfire</td><td><a href="/p/wildfire">/p/wildfire</a></td><td>signal map + KPI strip + Phase-0 status</td><td>wildfire.sapphirealpha.xyz <code>/api/sensors/health</code></td></tr>
+      <tr><td>THO</td><td><a href="/p/tho">/p/tho</a></td><td>retail-brand info card &rarr; OPEN OPERATIONS CONSOLE</td><td>tho.sapphirealpha.xyz <code>/healthz/</code></td></tr>
+      <tr><td>Regional</td><td><a href="/p/regional">/p/regional</a></td><td>configured regions, intel feed sample, admin link</td><td>regional.sapphirealpha.xyz <code>/api/health</code></td></tr>
+      <tr><td>About</td><td><a href="/p/about">/p/about</a></td><td>manifesto, comparison vs Bloomberg/Glassnode/Recorded Future</td><td>static (Sapphire README)</td></tr>
+      <tr><td>Help</td><td><a href="/p/help">/p/help</a></td><td>this page</td><td>static</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="box">
+  <h2 class="section">KEYBOARD_SHORTCUTS</h2>
+  <table class="term">
+    <thead><tr><th>key</th><th>action</th></tr></thead>
+    <tbody>
+      <tr><td><code>g h</code></td><td>go home (shell)</td></tr>
+      <tr><td><code>g b</code></td><td>brain</td></tr>
+      <tr><td><code>g m</code></td><td>markets</td></tr>
+      <tr><td><code>g t</code></td><td>threats</td></tr>
+      <tr><td><code>g s</code></td><td>system</td></tr>
+      <tr><td><code>?</code></td><td>this page</td></tr>
+      <tr><td><code>esc</code></td><td>back to home shell</td></tr>
+    </tbody>
+  </table>
+  <div class="muted" style="margin-top:10px;">// shortcuts wired by the home shell — sub-pages support [&lt; back] crumb at top-left.</div>
+</section>
+
+<section class="box">
+  <h2 class="section">DATA_PROVENANCE</h2>
+  <p style="line-height: 1.8;">
+    <strong>Trading signals.</strong> TradingView (Mac orchestrator) → webhook (Windows :9090) → signal logger (Mac :18081) → BigQuery <code>trading_signals</code>. Live BTC fills via Robinhood Crypto API (Ed25519-signed REST).
+  </p>
+  <p style="line-height: 1.8;">
+    <strong>Threat intel.</strong> cyber-threat-bot (Cloud Run, us-central1) pulls CISA Known Exploited Vulnerabilities, NVD, MITRE ATT&amp;CK, scores with EPSS + composite actionability. We proxy <code>/api/threats/live</code> same-origin to dodge CORS.
+  </p>
+  <p style="line-height: 1.8;">
+    <strong>Regime.</strong> Daily collector emits regime label (RISK_ON / RISK_OFF / TRANSITION), score, BTC dominance, fear/greed, average funding. We surface valid (non-UNKNOWN) rows + a staleness watermark.
+  </p>
+  <p style="line-height: 1.8;">
+    <strong>Markets.</strong> CoinGecko free tier with 60s in-process cache (Cloud Run instances are ephemeral so per-instance cache is sufficient). Top 10 by market cap with 7-day sparkline.
+  </p>
+  <p style="line-height: 1.8;">
+    <strong>Service health.</strong> Telemetry collector LaunchAgent on the Mac writes heartbeat rows to BQ <code>service_health</code> every 60s. The dashboard rolls up the last 60min and reports p50/p95 response times.
+  </p>
+</section>
+
+<section class="box">
+  <h2 class="section">USING_THE_BRAIN</h2>
+  <ol style="line-height: 1.85;">
+    <li>Visit <a href="/p/brain">/p/brain</a> — health score, regime, signals/24h, CVEs/24h are at the top.</li>
+    <li><strong>Narrative</strong> is a plain-English sentence per silo. If a silo is degraded, it's omitted from the narrative and added to <strong>priority actions</strong>.</li>
+    <li><strong>Priority actions</strong> are concrete: "trading: 0 signals in last 24h — check signal-logger LaunchAgent on Mac".</li>
+    <li><strong>Correlations</strong> match against a deterministic catalog: telemetry_collapse, service_inference_failover, threat_with_silent_trading, tho_health_degraded.</li>
+    <li>To seed the rolling sparkline: <code>curl /api/brain/synthesis?persist=1</code> writes a row to <code>brain_synthesis</code>.</li>
+  </ol>
+</section>
+
+<section class="box">
+  <h2 class="section">INTERPRETING</h2>
+  <p style="line-height: 1.8;">
+    <strong>Regime.</strong> RISK_ON boosts long signals (×1.05), RISK_OFF penalizes them (×0.80) — see <code>SignalEnhancer</code>. TRANSITION is neutral. Score is in [-1, +1]; magnitude is conviction. Fear/greed is the Crypto Fear &amp; Greed Index 0..100.
+  </p>
+  <p style="line-height: 1.8;">
+    <strong>Threats.</strong> Severity ranks by CVSS bucket (CRITICAL ≥ 9.0, HIGH 7.0–8.9, etc.). KEV-tagged means it's been observed exploited in the wild — patch first. EPSS is the exploit-probability score in [0, 1] from the FIRST.org model.
+  </p>
+  <p style="line-height: 1.8;">
+    <strong>Markets.</strong> Sparkline color: green = +24h, red = -24h. Mcap shows USD; BTC dominance is BTC mcap / total crypto mcap.
+  </p>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  var line = document.getElementById('typed-line');
+  if (!line) return;
+  var full = line.textContent; line.textContent = ''; var i=0;
+  (function tick(){ if (i>=full.length) return; line.textContent += full.charAt(i++); setTimeout(tick, 28); })();
+})();
+</script>
+{% endblock %}
