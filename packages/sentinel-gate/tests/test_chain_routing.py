@@ -11,15 +11,12 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-import pytest
-
 from sentinel_gate import (
     ARBITRUM_CHAIN_ID,
     MEGAETH_CHAIN_ID,
     OPTIMISM_CHAIN_ID,
     ChainHealthGate,
     ChainHealthVerdict,
-    PegBreak,
     register_chain,
     supported_chains,
 )

@@ -18,8 +18,6 @@ from __future__ import annotations
 from decimal import Decimal
 from types import SimpleNamespace
 
-import pytest
-
 from sentinel_gate import (
     MEGAETH_CHAIN_ID,
     ChainHealthGate,
