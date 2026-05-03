@@ -118,6 +118,13 @@ class ChainHealthGate:
         self._allow_when_unavailable = allow_when_unavailable
         self._read_timeout_s = read_timeout_s
         self._price_resolver = price_resolver
+        # Sticky map of chains whose per-chain factory / construction
+        # failed. Once a chain is recorded here, every subsequent
+        # ``evaluate_chain`` for that chain returns BLOCK regardless of
+        # ``allow_when_unavailable`` — a chain we cannot construct a
+        # client against is unsafe to approve, full stop. This is
+        # fail-CLOSED by construction (mirrors PR #617's discipline).
+        self._unavailable_chains: dict[int, str] = {}
 
     def evaluate_chain(self, chain_id: int) -> ChainHealthVerdict:
         """Classify a chain's current health.
@@ -126,6 +133,19 @@ class ChainHealthGate:
         ``evaluate_attempt`` is sync today and we don't want this gate
         to force a refactor of every existing caller.
         """
+        # Sticky fail-closed: a chain whose factory previously raised
+        # is permanently un-evaluable for this gate instance. Refuse
+        # without re-attempting — never silently fall through to
+        # fail-open.
+        if chain_id in self._unavailable_chains:
+            return ChainHealthVerdict(
+                chain_id=chain_id,
+                chain_name=_chain_name_for(chain_id),
+                severity="BLOCK",
+                reasons=[
+                    f"gate unavailable: {self._unavailable_chains[chain_id]}"
+                ],
+            )
         if chain_id != MEGAETH_CHAIN_ID:
             return ChainHealthVerdict(
                 chain_id=chain_id,
@@ -143,7 +163,25 @@ class ChainHealthGate:
 
     async def _evaluate_megaeth(self) -> ChainHealthVerdict:
         """Run the two reads against MegaETH and compose a verdict."""
-        client_cm = self._client_factory()
+        # Factory invocation itself can fail (RPC URL unreachable, env var
+        # missing, missing dep, etc). An unwrapped raise here would bubble
+        # past ``evaluate_chain`` (which only catches ``RuntimeError`` from
+        # ``asyncio.run``) and into the Sentinel caller — and nothing in
+        # the call chain promises to convert that into a BLOCK. That's
+        # the silent-fail-open footgun PR #617 caught at packaging time.
+        # Record the chain as unavailable and return BLOCK unconditionally
+        # — fail-CLOSED by construction.
+        try:
+            client_cm = self._client_factory()
+        except Exception as exc:  # noqa: BLE001 — last-line construction defence
+            reason = f"gate construction failed: {exc}"
+            self._unavailable_chains[MEGAETH_CHAIN_ID] = reason
+            return ChainHealthVerdict(
+                chain_id=MEGAETH_CHAIN_ID,
+                chain_name=_chain_name_for(MEGAETH_CHAIN_ID),
+                severity="BLOCK",
+                reasons=[f"gate unavailable: {reason}"],
+            )
         # Two transport shapes are accepted: an async-context-manager (the
         # production HTTP client) and a plain duck-typed client (the test
         # mock — already 'open'). Both reach the same ``MegaETHProtocols``
