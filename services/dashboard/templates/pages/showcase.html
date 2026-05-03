@@ -618,6 +618,18 @@
                 status so each link carries the right expectation.
             </p>
         </div>
+        <details class="tech-disclosure">
+            <summary>How does this work?</summary>
+            <div class="disclosure-body">
+                <p>Each satellite is a separate repo with its own deploy target — listed in CLAUDE.md under "Satellite Repos". The status chip indicates wiring state:</p>
+                <ul>
+                    <li><strong>Production</strong> — Cloud Run / Cloud-deployed and customer-facing (e.g. Project-Go-Forward at <code>project-go-forward-...run.app</code>).</li>
+                    <li><strong>Protected</strong> — auth-gated internal surface (Cyber Threat Bot, Regional Intel Workbench).</li>
+                    <li><strong>Local</strong> — dev demo only, runs from the operator's machine.</li>
+                </ul>
+                <p>Adjacent project coverage (table below) tracks documentation depth across the satellite repos.</p>
+            </div>
+        </details>
         <div class="satellite-grid">
             {% for satellite in dashboard.satellite_dashboards %}
             <article class="satellite-card">
