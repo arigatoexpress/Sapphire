@@ -589,6 +589,60 @@ td.muted { color: var(--text-3); }
   font-family: 'JetBrains Mono', monospace;
 }
 
+/* ========== ASFAO decisions panel ========== */
+.asfao-panel {
+  margin: 22px 0 30px;
+  padding: 18px 20px 14px;
+  background: linear-gradient(180deg, rgba(120, 80, 220, 0.04), rgba(0,0,0,0));
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.asfao-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 12px;
+}
+.asfao-title { font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-2); }
+.asfao-title strong { color: var(--accent); margin-right: 6px; }
+.asfao-meta { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-3); }
+.asfao-list { display: flex; flex-direction: column; gap: 8px; }
+.asfao-row {
+  display: grid;
+  grid-template-columns: 88px 1fr 1fr 110px auto;
+  gap: 12px; align-items: center;
+  padding: 10px 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12.5px;
+}
+@media (max-width: 880px) { .asfao-row { grid-template-columns: 1fr; } }
+.asfao-role {
+  display: inline-block; padding: 2px 8px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  border-radius: 4px; text-align: center;
+  background: rgba(120, 80, 220, 0.18); color: #b394ff;
+}
+.asfao-trigger, .asfao-action { color: var(--text-2); word-break: break-word; }
+.asfao-trigger .mono, .asfao-action .mono { color: var(--text-3); font-size: 11px; }
+.asfao-status {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  padding: 2px 8px; border-radius: 4px; text-align: center;
+}
+.asfao-status.proposed { background: rgba(220,180,40,0.18); color: var(--yellow, #e8c45a); }
+.asfao-status.executed { background: rgba(64,180,90,0.18); color: var(--green); }
+.asfao-status.approved { background: rgba(64,180,90,0.18); color: var(--green); }
+.asfao-status.rejected { background: rgba(180,64,64,0.18); color: var(--red, #e26464); }
+.asfao-actions { display: flex; gap: 6px; }
+.asfao-btn {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  padding: 4px 10px; border-radius: 4px;
+  background: var(--bg-3); border: 1px solid var(--border); color: var(--text-2);
+  cursor: pointer;
+}
+.asfao-btn:hover { border-color: var(--accent); color: var(--accent); }
+.asfao-btn.reject:hover { border-color: var(--red, #e26464); color: var(--red, #e26464); }
+.asfao-empty { color: var(--text-3); font-family: 'JetBrains Mono', monospace; font-size: 12px; padding: 6px 4px; }
+
 /* ========== Threat feed ========== */
 .feed-row {
   display: flex; flex-direction: column;
@@ -912,6 +966,19 @@ select.icon-btn:focus { outline: none; border-color: var(--accent); }
         <div class="brain-actions-empty mono">No priority actions queued.</div>
       </div>
     </div>
+  </div>
+</section>
+
+<!-- ========== ASFAO decisions panel — autonomous-action layer ========== -->
+<section class="asfao-panel" id="asfao-panel" aria-labelledby="asfao-title">
+  <div class="asfao-head">
+    <div class="asfao-title" id="asfao-title">
+      <strong>ASFAO</strong>autonomous decisions
+    </div>
+    <div class="asfao-meta" id="asfao-meta">—</div>
+  </div>
+  <div class="asfao-list" id="asfao-list">
+    <div class="asfao-empty">Loading decisions…</div>
   </div>
 </section>
 
@@ -2050,6 +2117,100 @@ async function refresh() {
 
   $('#ts').textContent = isoTs();
 }
+
+// ========== ASFAO decisions panel ==========
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function asfaoTriggerSummary(t) {
+  if (!t) return '<span class="mono">—</span>';
+  if (typeof t === 'string') { try { t = JSON.parse(t); } catch { return escapeHtml(t); } }
+  const rule = t.rule || t.rule_name || 'rule';
+  const bits = [];
+  if (t.silo) bits.push(`silo=${t.silo}`);
+  if (t.hours_silent != null) bits.push(`${t.hours_silent}h`);
+  if (t.primary_cve) bits.push(t.primary_cve);
+  if (t.matched_count != null) bits.push(`${t.matched_count} match`);
+  if (t.region_id) bits.push(`region=${t.region_id}`);
+  if (t.z_score != null) bits.push(`z=${(+t.z_score).toFixed(1)}`);
+  if (t.stale_leads_count != null) bits.push(`${t.stale_leads_count} leads`);
+  return `<span><b>${escapeHtml(rule)}</b></span>${bits.length ? ' <span class="mono">' + escapeHtml(bits.join(' · ')) + '</span>' : ''}`;
+}
+function asfaoActionSummary(a) {
+  if (!a) return '<span class="mono">—</span>';
+  if (typeof a === 'string') { try { a = JSON.parse(a); } catch { return escapeHtml(a); } }
+  const kind = a.kind || '?';
+  if (kind === 'github_issue') return `file <span class="mono">${escapeHtml(a.repo || '?')}</span> issue: <span class="mono">${escapeHtml(a.title || '')}</span>`;
+  if (kind === 'telegram_alert') return `Telegram: <span class="mono">${escapeHtml((a.text || '').slice(0, 80))}</span>`;
+  if (kind === 'scheduler_refresh') return `refresh job <span class="mono">${escapeHtml(a.job || '?')}</span>`;
+  if (kind === 'noop') return `recommend: <span class="mono">${escapeHtml(a.recommendation || a.endpoint || '')}</span>`;
+  return escapeHtml(kind);
+}
+async function asfaoExecute(decisionId, approve) {
+  try {
+    const r = await fetch(`/api/asfao/execute/${encodeURIComponent(decisionId)}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({approve}),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      toast({title: approve ? 'Approve failed' : 'Reject failed', body: d.error || `HTTP ${r.status}`, kind: 'err'});
+      return;
+    }
+    toast({
+      title: `Decision ${d.status}`,
+      body: d.result && d.result.issue_url ? d.result.issue_url : (d.result && d.result.error) || '',
+      meta: `id: ${decisionId}`,
+      kind: d.status === 'executed' || d.status === 'rejected' ? 'ok' : 'warn',
+      ttl: 7000,
+    });
+    asfaoRefresh();
+  } catch (e) {
+    toast({title: 'ASFAO action error', body: String(e), kind: 'err'});
+  }
+}
+async function asfaoRefresh() {
+  const list = document.getElementById('asfao-list');
+  const meta = document.getElementById('asfao-meta');
+  if (!list) return;
+  try {
+    const r = await fetch('/api/asfao/decisions?limit=10');
+    if (!r.ok) {
+      list.innerHTML = '<div class="asfao-empty">decisions endpoint unreachable.</div>';
+      return;
+    }
+    const d = await r.json();
+    const rows = d.rows || [];
+    if (rows.length === 0) {
+      list.innerHTML = '<div class="asfao-empty">No autonomous decisions yet — Brain is observing.</div>';
+      meta.textContent = '0 decisions';
+      return;
+    }
+    list.innerHTML = rows.map(row => {
+      const status = (row.status || 'proposed').toLowerCase();
+      const showActions = status === 'proposed';
+      const btns = showActions
+        ? `<button class="asfao-btn" onclick="asfaoExecute('${row.decision_id}', true)">Approve</button>
+           <button class="asfao-btn reject" onclick="asfaoExecute('${row.decision_id}', false)">Reject</button>`
+        : '';
+      return `<div class="asfao-row">
+        <span class="asfao-role">${escapeHtml(row.role || '?')}</span>
+        <div class="asfao-trigger">${asfaoTriggerSummary(row.trigger)}</div>
+        <div class="asfao-action">${asfaoActionSummary(row.action)}</div>
+        <span class="asfao-status ${status}">${escapeHtml(status)}</span>
+        <div class="asfao-actions">${btns}</div>
+      </div>`;
+    }).join('');
+    meta.textContent = `${rows.length} decision${rows.length === 1 ? '' : 's'} · last ${(rows[0].proposed_at || '').slice(0, 19).replace('T', ' ')}`;
+  } catch (e) {
+    list.innerHTML = `<div class="asfao-empty">${escapeHtml(String(e))}</div>`;
+  }
+}
+asfaoRefresh();
+setInterval(asfaoRefresh, 60_000);
 
 refresh();
 setInterval(refresh, 60_000);

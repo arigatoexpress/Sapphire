@@ -68,6 +68,22 @@ try:
 except Exception as _brain_exc:  # noqa: BLE001
     log.warning("brain endpoints disabled: %s", _brain_exc)
 
+# Sapphire ASFAO — promotes Brain (passive observe) to action layer.
+# Lazy-wired so a missing google-cloud-secretmanager / scheduler doesn't
+# crash the whole dashboard.
+try:
+    from asfao import register_asfao as _register_asfao
+
+    _register_asfao(
+        app,
+        project=PROJECT,
+        dataset=DATASET,
+        bq_client=bq,
+        query_param_factory=bigquery,
+    )
+except Exception as _asfao_exc:  # noqa: BLE001
+    log.warning("asfao endpoints disabled: %s", _asfao_exc)
+
 # Live global market feed (CoinGecko free tier, 60s in-process cache).
 # /api/markets/snapshot powers the "Global Markets" hero strip so the
 # dashboard never shows "0 signals" — even when our local trading
