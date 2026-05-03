@@ -291,3 +291,31 @@ topology — that's a collector bug, not an orchestrator issue.
   for downstream consumers to assert against.
 - **Path-traversal guard.** The dashboard artifact endpoint resolves and
   validates that the requested path stays under `data/tradingview_ta/`.
+
+## 11. Hermes Skill
+
+A Hermes skill stub for this orchestrator is delivered as an in-repo template
+at `docs/hermes/skills/tradingview-orchestrator/`. It is **read-only by
+construction** — it wraps the `sapphire_tradingview` plugin tool, which
+forces `mutation_enabled=False` regardless of the env gate. The skill exposes
+six actions: `probe`, `score`, `list_pine`, `list_alerts`, `generate_pine`,
+`sweep`. Mutation actions are intentionally absent and live behind
+`scripts/ops/tradingview_ta_capture.py` (this file, §3-§4).
+
+Example Telegram prompts that should trigger the skill:
+
+- "What's the latest TA score for ETH?"
+- "List my saved Pine scripts."
+- "Probe TradingView state."
+- "Generate a Sapphire Pine indicator for BINANCE:BTCUSDT."
+- "Run a TV sweep for the top 6 symbols on the 60m."
+
+Deployment (operator-supervised — never automated from CI):
+
+```bash
+cp -R ~/Code/Sapphire/docs/hermes/skills/tradingview-orchestrator \
+      ~/.hermes/skills/sapphire/tradingview-orchestrator && \
+  ~/.local/bin/hermes gateway restart
+```
+
+See `docs/hermes/README.md` for the general Hermes-skill delivery contract.
