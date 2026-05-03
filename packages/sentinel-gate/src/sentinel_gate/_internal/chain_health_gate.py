@@ -227,9 +227,7 @@ class ChainHealthGate:
             # predictable.
             return self._unavailable_verdict(chain_id, f"event-loop conflict: {exc}")
 
-    async def _evaluate_with(
-        self, chain_id: int, evaluator: ChainEvaluator
-    ) -> ChainHealthVerdict:
+    async def _evaluate_with(self, chain_id: int, evaluator: ChainEvaluator) -> ChainHealthVerdict:
         """Run the chain-specific evaluator with timeout + transport defence."""
         # Factory invocation itself can fail (RPC URL unreachable, env var
         # missing, etc) — wrap from the very first line so the fail-open /
@@ -246,17 +244,13 @@ class ChainHealthGate:
         if hasattr(client_cm, "__aenter__"):
             try:
                 async with client_cm as client:
-                    return await asyncio.wait_for(
-                        evaluator(client), timeout=self._read_timeout_s
-                    )
+                    return await asyncio.wait_for(evaluator(client), timeout=self._read_timeout_s)
             except TimeoutError:
                 return self._unavailable_verdict(chain_id, "rpc timeout")
             except Exception as exc:  # noqa: BLE001 — last-line transport defence
                 return self._unavailable_verdict(chain_id, f"rpc error: {exc}")
         try:
-            return await asyncio.wait_for(
-                evaluator(client_cm), timeout=self._read_timeout_s
-            )
+            return await asyncio.wait_for(evaluator(client_cm), timeout=self._read_timeout_s)
         except TimeoutError:
             return self._unavailable_verdict(chain_id, "rpc timeout")
         except Exception as exc:  # noqa: BLE001 — last-line transport defence
@@ -312,14 +306,12 @@ def _classify_megaeth(stable: Any, lend: Any) -> ChainHealthVerdict:
     ):
         severity = "BLOCK"
         reasons.append(
-            f"USDM depegging: severity={stable_severity.name}, "
-            f"divergence={peg_divergence} bps"
+            f"USDM depegging: severity={stable_severity.name}, divergence={peg_divergence} bps"
         )
     elif stable_severity is PegBreak.WARNING_50BP:
         severity = "WARNING"
         reasons.append(
-            f"USDM peg drift: severity={stable_severity.name}, "
-            f"divergence={peg_divergence} bps"
+            f"USDM peg drift: severity={stable_severity.name}, divergence={peg_divergence} bps"
         )
 
     # --- aave-side classification ------------------------------------------
@@ -336,9 +328,7 @@ def _classify_megaeth(stable: Any, lend: Any) -> ChainHealthVerdict:
 
     if paused_high_util:
         severity = "BLOCK"
-        reasons.append(
-            f"Aave reserves paused with high utilization (>80%): {paused_high_util}"
-        )
+        reasons.append(f"Aave reserves paused with high utilization (>80%): {paused_high_util}")
     elif severity != "BLOCK" and frozen:
         severity = "WARNING"
         reasons.append(f"Aave reserves frozen: {frozen}")
