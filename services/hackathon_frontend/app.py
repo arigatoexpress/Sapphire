@@ -419,9 +419,23 @@ SUBMISSIONS = [
 # ---------------------------------------------------------------------------
 
 def _hydrate_addresses() -> None:
-    """If a deployments.json is present, fill in `address` fields in-place."""
-    deployments_file = Path(__file__).resolve().parents[2] / "data" / "chain" / "deployments.json"
-    if not deployments_file.exists():
+    """If a deployments.json is present, fill in `address` fields in-place.
+
+    Looks for `data/chain/deployments.json` at the repo root. In the
+    Cloud Run container the service is copied to `/app/` (no parent repo
+    structure), so we check several candidate paths and silently no-op
+    if none exists.
+    """
+    here = Path(__file__).resolve()
+    candidates: list[Path] = []
+    for n in (1, 2, 3):
+        try:
+            candidates.append(here.parents[n] / "data" / "chain" / "deployments.json")
+        except IndexError:
+            break
+
+    deployments_file: Path | None = next((p for p in candidates if p.exists()), None)
+    if deployments_file is None:
         return
     try:
         deployments = json.loads(deployments_file.read_text())
