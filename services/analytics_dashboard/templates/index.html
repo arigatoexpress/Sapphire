@@ -764,6 +764,425 @@ select.icon-btn:focus { outline: none; border-color: var(--accent); }
   font-size: 11px;
 }
 .footer a:hover { color: var(--accent); }
+
+/* ========== Section subtitle (per-section explainers) ========== */
+.section-sub {
+  font-size: 12px;
+  color: var(--text-3);
+  margin: -8px 0 16px;
+  line-height: 1.5;
+  max-width: 920px;
+  font-weight: 400;
+}
+.section-sub .mono { font-size: 11px; color: var(--text-2); }
+.section-sub .why-link {
+  color: var(--accent);
+  cursor: pointer;
+  margin-left: 6px;
+  font-size: 11px;
+  text-decoration: none;
+  border-bottom: 1px dashed var(--accent);
+}
+.section-sub .why-link:hover { color: var(--text-1); border-bottom-color: var(--text-1); }
+
+/* ========== Global Markets hero strip ========== */
+.markets-hero {
+  background: linear-gradient(180deg, var(--bg-2) 0%, var(--bg-1) 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 16px 18px;
+  margin-bottom: 20px;
+  position: relative;
+}
+.markets-hero-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.markets-globals {
+  display: flex; gap: 22px; flex-wrap: wrap;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+}
+.markets-globals .mg-item {
+  display: flex; flex-direction: column; gap: 2px;
+}
+.markets-globals .mg-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+}
+.markets-globals .mg-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+.markets-globals .mg-delta {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.markets-globals .mg-delta.green { color: var(--green); }
+.markets-globals .mg-delta.red   { color: var(--red); }
+
+.markets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+}
+.market-card {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 6px;
+  transition: border-color var(--t-fast), transform var(--t-fast);
+  cursor: pointer;
+  position: relative;
+}
+.market-card:hover {
+  border-color: var(--border-bright);
+  transform: translateY(-1px);
+}
+.market-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 6px;
+}
+.market-sym {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-1);
+  letter-spacing: 0.04em;
+}
+.market-rank {
+  font-size: 9.5px;
+  color: var(--text-4);
+  font-family: 'JetBrains Mono', monospace;
+}
+.market-price {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.market-row {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 10.5px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.market-delta { font-variant-numeric: tabular-nums; font-weight: 600; }
+.market-delta.green { color: var(--green); }
+.market-delta.red   { color: var(--red); }
+.market-spark { height: 24px; }
+.market-spark svg { display: block; width: 100%; height: 100%; }
+
+/* ========== Command palette ========== */
+.cmdk-backdrop {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(6px);
+  z-index: 200;
+}
+.cmdk-backdrop.show { display: block; }
+.cmdk-panel {
+  display: none;
+  position: fixed;
+  top: 12vh; left: 50%;
+  transform: translateX(-50%);
+  width: min(92vw, 600px);
+  background: var(--bg-1);
+  border: 1px solid var(--border-bright);
+  border-radius: var(--r-lg);
+  box-shadow: 0 24px 64px rgba(0,0,0,0.55);
+  z-index: 201;
+  overflow: hidden;
+}
+.cmdk-panel.show { display: block; }
+.cmdk-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-1);
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  padding: 16px 20px;
+  outline: none;
+}
+.cmdk-input::placeholder { color: var(--text-4); }
+.cmdk-list {
+  max-height: 56vh;
+  overflow-y: auto;
+  padding: 6px 0;
+}
+.cmdk-section {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-4);
+  padding: 10px 20px 4px;
+  font-weight: 600;
+}
+.cmdk-item {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+  padding: 9px 20px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-2);
+  transition: background var(--t-fast);
+  border-left: 2px solid transparent;
+}
+.cmdk-item:hover, .cmdk-item.active {
+  background: var(--bg-2);
+  color: var(--text-1);
+  border-left-color: var(--accent);
+}
+.cmdk-item .cmdk-icon {
+  width: 22px; flex-shrink: 0; color: var(--text-3);
+}
+.cmdk-item .cmdk-name { flex: 1; min-width: 0; }
+.cmdk-item .cmdk-hint {
+  font-size: 10px;
+  color: var(--text-4);
+  font-family: 'JetBrains Mono', monospace;
+}
+.cmdk-footer {
+  display: flex; gap: 14px; padding: 8px 20px;
+  border-top: 1px solid var(--border);
+  font-size: 10px;
+  color: var(--text-4);
+  font-family: 'JetBrains Mono', monospace;
+}
+.cmdk-footer kbd {
+  padding: 1px 5px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-2);
+  margin-right: 4px;
+}
+
+/* ========== Density toggle ========== */
+.density-toggle {
+  display: inline-flex;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px;
+  font-size: 10.5px;
+  font-family: 'Inter', sans-serif;
+}
+.density-toggle button {
+  background: transparent;
+  border: none;
+  color: var(--text-3);
+  padding: 5px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: color var(--t-fast), background var(--t-fast);
+}
+.density-toggle button.active {
+  background: var(--bg-3);
+  color: var(--text-1);
+}
+
+body.density-compact .wrap { padding: 16px 20px 60px; }
+body.density-compact .panel { padding: 12px 14px; margin-bottom: 10px; }
+body.density-compact .silo-card { padding: 12px 14px 10px; }
+body.density-compact .kpi { padding: 10px 12px 8px; }
+body.density-compact .kpi-value { font-size: 20px; }
+body.density-compact .section-h { margin: 22px 0 10px; }
+body.density-compact .markets-hero { padding: 12px 14px; margin-bottom: 14px; }
+
+body.density-roomy .wrap { padding: 36px 40px 96px; }
+body.density-roomy .panel { padding: 24px 26px; margin-bottom: 22px; }
+body.density-roomy .silo-card { padding: 22px 24px 20px; }
+body.density-roomy .kpi { padding: 18px 20px 16px; }
+body.density-roomy .kpi-value { font-size: 28px; }
+body.density-roomy .section-h { margin: 44px 0 18px; }
+
+/* ========== Onboarding tour ========== */
+.tour-backdrop {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.55);
+  z-index: 150;
+}
+.tour-backdrop.show { display: block; }
+.tour-pop {
+  display: none;
+  position: fixed;
+  background: var(--bg-1);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-lg);
+  padding: 18px 20px;
+  width: min(92vw, 360px);
+  z-index: 151;
+  box-shadow: 0 12px 40px rgba(78,168,255,0.3), 0 0 0 1px var(--accent);
+}
+.tour-pop.show { display: block; }
+.tour-pop h4 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+  display: flex; align-items: center; gap: 8px;
+}
+.tour-pop .tour-step {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--accent);
+  background: rgba(78,168,255,0.14);
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+.tour-pop p {
+  font-size: 12.5px;
+  color: var(--text-2);
+  line-height: 1.5;
+  margin: 0 0 14px;
+}
+.tour-actions {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px;
+}
+.tour-btn {
+  padding: 6px 14px;
+  background: var(--accent);
+  color: #0a0d14;
+  border: none;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+}
+.tour-btn:hover { filter: brightness(1.1); }
+.tour-skip {
+  background: transparent;
+  border: none;
+  color: var(--text-3);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 6px 8px;
+}
+.tour-skip:hover { color: var(--text-1); }
+.tour-highlight {
+  position: relative;
+  z-index: 152 !important;
+  box-shadow: 0 0 0 4px rgba(78,168,255,0.45), 0 0 0 9999px rgba(0,0,0,0.55) !important;
+  border-radius: var(--r-lg);
+}
+
+/* ========== Why-these-numbers popover ========== */
+.why-modal {
+  display: none;
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(92vw, 560px);
+  max-height: 80vh;
+  overflow-y: auto;
+  background: var(--bg-1);
+  border: 1px solid var(--border-bright);
+  border-radius: var(--r-lg);
+  padding: 24px 28px;
+  z-index: 110;
+  box-shadow: var(--shadow-2);
+}
+.why-modal.show { display: block; }
+.why-modal h3 { margin: 0 0 6px; font-size: 16px; font-weight: 600; }
+.why-modal .why-sub {
+  color: var(--text-3); font-size: 12px; margin-bottom: 18px;
+}
+.why-modal h4 {
+  margin: 18px 0 6px; font-size: 11px;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-3);
+}
+.why-modal pre {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+  color: var(--text-1);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.55;
+}
+.why-modal p { font-size: 13px; color: var(--text-2); line-height: 1.6; }
+.kpi.why-clickable { cursor: help; }
+.kpi.why-clickable:hover { border-color: var(--accent); }
+.kpi.why-clickable::after {
+  content: '?';
+  position: absolute; top: 8px; right: 10px;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--bg-3);
+  color: var(--text-3);
+  font-size: 9px; font-weight: 700;
+  display: grid; place-items: center;
+  font-family: 'Inter', sans-serif;
+  opacity: 0;
+  transition: opacity var(--t-fast);
+}
+.kpi.why-clickable:hover::after { opacity: 1; }
+
+/* ========== Help modal v2 sections ========== */
+.modal table.silo-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 12px; margin-top: 6px;
+}
+.modal table.silo-table th,
+.modal table.silo-table td {
+  padding: 7px 8px; border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+.modal table.silo-table th {
+  font-size: 10px; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--text-3); font-weight: 600;
+}
+.modal table.silo-table td.t1 { color: var(--text-1); font-weight: 500; }
+.modal .help-actions {
+  display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap;
+}
+.modal .help-btn {
+  padding: 7px 14px;
+  background: var(--bg-2);
+  border: 1px solid var(--border-bright);
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+}
+.modal .help-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.brain-diagram {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 10px;
+  margin: 8px 0;
+}
+
+/* ========== Mobile tweaks ========== */
+@media (max-width: 600px) {
+  .wrap { padding: 16px 14px 60px; }
+  .markets-grid { grid-template-columns: repeat(2, 1fr); }
+  .markets-globals { gap: 12px; font-size: 11px; }
+  .density-toggle { display: none; }
+  .cmdk-panel { width: 96vw; top: 4vh; }
+}
 </style>
 </head>
 <body>
@@ -788,6 +1207,11 @@ select.icon-btn:focus { outline: none; border-color: var(--accent); }
       <span class="dot unknown"></span>
       <span>checking systems…</span>
     </div>
+    <div class="density-toggle" role="group" aria-label="Information density">
+      <button data-density="compact" title="Compact density">Compact</button>
+      <button data-density="comfortable" class="active" title="Comfortable density (default)">Comfort</button>
+      <button data-density="roomy" title="Roomy density">Roomy</button>
+    </div>
     <select id="time-range-select" class="icon-btn" title="Time range for charts" aria-label="Time range">
       <option value="1h">1h</option>
       <option value="24h" selected>24h</option>
@@ -795,6 +1219,11 @@ select.icon-btn:focus { outline: none; border-color: var(--accent); }
       <option value="30d">30d</option>
       <option value="90d">90d</option>
     </select>
+    <button class="icon-btn" id="cmdk-btn" title="Open command palette (⌘K / Ctrl+K)">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <span>Jump</span>
+      <kbd style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-4);background:var(--bg-3);padding:1px 5px;border-radius:3px;border:1px solid var(--border);margin-left:4px;">⌘K</kbd>
+    </button>
     <button class="icon-btn" id="help-btn" title="Quick guide (?)">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"/></svg>
       <span>Help</span>
@@ -811,7 +1240,54 @@ select.icon-btn:focus { outline: none; border-color: var(--accent); }
   <span id="regime-stale-msg">Regime collector telemetry is stale.</span>
 </div>
 
+<!-- ========== GLOBAL MARKETS HERO STRIP ========== -->
+<section class="markets-hero" id="markets-hero" aria-labelledby="markets-hero-title">
+  <div class="markets-hero-head">
+    <div>
+      <div class="brain-hero-title" style="margin-bottom:4px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <span id="markets-hero-title">Global Markets · live crypto snapshot</span>
+      </div>
+      <div class="section-sub" style="margin:0;">
+        Top 10 by market cap from CoinGecko · price + 24h delta + 7d sparkline · cached 60s.
+      </div>
+    </div>
+    <div class="markets-globals" id="markets-globals">
+      <div class="mg-item">
+        <span class="mg-label">Total mkt cap</span>
+        <span class="mg-value" id="mg-mcap">—</span>
+        <span class="mg-delta" id="mg-mcap-delta">—</span>
+      </div>
+      <div class="mg-item">
+        <span class="mg-label">24h volume</span>
+        <span class="mg-value" id="mg-vol">—</span>
+        <span class="mg-delta">&nbsp;</span>
+      </div>
+      <div class="mg-item">
+        <span class="mg-label">BTC dom</span>
+        <span class="mg-value" id="mg-btcdom">—</span>
+        <span class="mg-delta">&nbsp;</span>
+      </div>
+      <div class="mg-item">
+        <span class="mg-label">ETH dom</span>
+        <span class="mg-value" id="mg-ethdom">—</span>
+        <span class="mg-delta">&nbsp;</span>
+      </div>
+    </div>
+  </div>
+  <div class="markets-grid" id="markets-grid">
+    <div class="empty" style="grid-column:1/-1;">loading top 10 crypto…</div>
+  </div>
+</section>
+
 <!-- ========== SILO CARDS ========== -->
+<div class="section-h" id="silos-section-h">
+  <span>Operational silos</span>
+  <span class="meta">six production surfaces</span>
+</div>
+<div class="section-sub">
+  Each card opens its own console: THO production, threat feed, wildfire admin, intel page, regional admin, hackathon submissions. Status pill = live health.
+</div>
 <div class="silo-grid">
   <a class="silo-card tho" href="#" id="silo-tho-link" target="_blank" rel="noopener">
     <span class="accent-bar"></span>
@@ -875,6 +1351,13 @@ select.icon-btn:focus { outline: none; border-color: var(--accent); }
 </div>
 
 <!-- ========== SAPPHIRE BRAIN — cross-silo synthesis ========== -->
+<div class="section-h" id="brain-section-h">
+  <span>Sapphire Brain · cross-silo synthesis</span>
+  <span class="meta" id="brain-section-meta">regenerated every 15 min</span>
+</div>
+<div class="section-sub">
+  Health score across 7 silos · regenerated every 15 min · click <span class="mono">Persist + Run</span> to capture a snapshot to BigQuery, or <span class="mono">Correlate</span> to surface cross-silo pattern matches.
+</div>
 <section class="brain-hero" id="brain-hero" aria-labelledby="brain-hero-title">
   <div class="brain-hero-head">
     <div class="brain-hero-title">
@@ -920,12 +1403,20 @@ select.icon-btn:focus { outline: none; border-color: var(--accent); }
   <span>Production telemetry</span>
   <span class="meta" id="kpi-meta">—</span>
 </div>
+<div class="section-sub">
+  Six KPIs sourced from BigQuery · click any value to see the SQL behind it.
+  <a class="why-link" data-why="kpis">why these numbers?</a>
+</div>
 <div class="kpi-grid" id="kpis"></div>
 
 <!-- ========== Charts row ========== -->
 <div class="section-h">
   <span>24-hour signal traffic</span>
   <span class="meta">aggregated by hour</span>
+</div>
+<div class="section-sub">
+  Inference proxy: 4-tier failover (proxy / mac_ollama / gpu_local / kimi). Calls + error rate per tier last 24h.
+  Threat severity: CISA KEV + NVD + MITRE ATT&CK CVEs by day, stacked by severity.
 </div>
 <div class="cols-2">
   <div class="panel">
@@ -951,6 +1442,13 @@ select.icon-btn:focus { outline: none; border-color: var(--accent); }
   <span>Order-flow toxicity (VPIN)</span>
   <span class="meta">Volume-Synchronized Probability of Informed Trading</span>
 </div>
+<div class="section-sub">
+  Toxicity = how much informed-trader flow is poisoning the order book. Bucketed by 50-tick volume slices.
+  <span style="color:var(--green)">normal</span> &lt; 0.3 ·
+  <span style="color:var(--accent)">moderate</span> 0.3-0.5 ·
+  <span style="color:var(--yellow)">high</span> 0.5-0.7 ·
+  <span style="color:var(--red)">extreme</span> &gt; 0.7.
+</div>
 <div class="panel">
   <h2>
     <span>BTC — last 120 buckets <span class="h-meta" id="vpin-meta">—</span></span>
@@ -974,6 +1472,9 @@ select.icon-btn:focus { outline: none; border-color: var(--accent); }
 <div class="section-h" id="strategy-quality">
   <span>Strategy quality — rolling Deflated Sharpe</span>
   <span class="meta">90-day window · Bailey & López de Prado 2014</span>
+</div>
+<div class="section-sub">
+  Deflated Sharpe penalizes Sharpe for the number of strategy trials. Probability ≥ 95% means the strategy is statistically significant after multiple-testing correction.
 </div>
 <div class="cols-2">
   <div class="panel">
@@ -1001,8 +1502,11 @@ select.icon-btn:focus { outline: none; border-color: var(--accent); }
 
 <!-- ========== Live threat feed ========== -->
 <div class="section-h" id="threats">
-  <span>Live threat intelligence feed</span>
+  <span>Threat Intelligence</span>
   <span class="meta" id="threats-meta">—</span>
+</div>
+<div class="section-sub">
+  Live CVEs from CISA KEV · NVD · MITRE ATT&CK, scored with EPSS exploit-prediction + composite actionability. Refreshed every 4h via Cloud Scheduler.
 </div>
 <div class="panel">
   <h2>
@@ -1016,6 +1520,10 @@ select.icon-btn:focus { outline: none; border-color: var(--accent); }
 <div class="section-h">
   <span>Service health</span>
   <span class="meta" id="services-meta">last 60-min rollup</span>
+</div>
+<div class="section-sub">
+  Mac + Cloud Run heartbeat last 60 min. p50/p95 response time per service.
+  <span style="color:var(--green)">healthy</span> · <span style="color:var(--yellow)">degraded</span> · <span style="color:var(--red)">down</span>.
 </div>
 <div class="panel">
   <h2>
@@ -1036,6 +1544,9 @@ select.icon-btn:focus { outline: none; border-color: var(--accent); }
   <span>Inference proxy</span>
   <span class="meta">24h tier breakdown</span>
 </div>
+<div class="section-sub">
+  4-tier failover (proxy / mac_ollama / gpu_local / kimi). Calls + error rate per tier last 24h. T1 GPU is fast Ollama on RTX 5070 Ti; T4 Kimi is non-sensitive cloud fallback.
+</div>
 <div class="panel">
   <h2>
     <span>By tier</span>
@@ -1052,8 +1563,15 @@ select.icon-btn:focus { outline: none; border-color: var(--accent); }
 
 <!-- ========== Intelligence (regime + predictions) ========== -->
 <div class="section-h" id="predictions">
-  <span>Intelligence</span>
+  <span>Intelligence — Market regime &amp; predictions</span>
   <span class="meta">read-only research surface — not trading instructions</span>
+</div>
+<div class="section-sub">
+  <strong>Market regime:</strong> macro state machine, BTC funding × Fear &amp; Greed × dominance. Output:
+  <span style="color:var(--green)">RISK_ON</span> /
+  <span style="color:var(--yellow)">TRANSITION</span> /
+  <span style="color:var(--red)">RISK_OFF</span>.
+  <strong>Predictions:</strong> Kronos ML 24-bar forecasts for BTC/ETH/SOL/SPY/TSLA — directional + confidence + expected % move.
 </div>
 <div class="cols-2">
   <div class="panel">
@@ -1095,46 +1613,109 @@ select.icon-btn:focus { outline: none; border-color: var(--accent); }
 
 </div>
 
-<!-- ========== Help modal ========== -->
+<!-- ========== Help modal v2 ========== -->
 <div class="modal-backdrop" id="modal-backdrop"></div>
-<div class="modal" id="help-modal">
-  <button class="modal-close" id="modal-close">×</button>
-  <h3>Sapphire OS — Quick Guide</h3>
-  <div class="modal-sub">Unified production dashboard at sapphirealpha.xyz</div>
+<div class="modal" id="help-modal" role="dialog" aria-labelledby="help-title">
+  <button class="modal-close" id="modal-close" aria-label="Close help">×</button>
+  <h3 id="help-title">Sapphire OS — Operator Guide</h3>
+  <div class="modal-sub">Unified production dashboard at <span class="mono">sapphirealpha.xyz</span> · auto-refresh every 60s</div>
 
-  <h4>Silo cards</h4>
-  <p>The six cards at the top are the high-level entry points. Each shows a status pill (live, ok, degraded, down, phase-0, active). Click a card to dive into that silo:</p>
-  <ul>
-    <li><strong>THO Operations</strong> — Texas Home Outlet production at <span class="mono">tho.sapphirealpha.xyz</span></li>
-    <li><strong>Threat Intel</strong> — opens the live JSON feed from cyber-threat-bot Cloud Run</li>
-    <li><strong>Wildfire Watch</strong> — passkey-gated admin frontend (in build)</li>
-    <li><strong>Intelligence</strong> — scrolls to the regime + predictions panels below</li>
-    <li><strong>Regional Intel</strong> — passkey-gated admin frontend (in build)</li>
-    <li><strong>Hackathon Lanes</strong> — opens the Sapphire monorepo</li>
-  </ul>
+  <h4>What is Sapphire OS</h4>
+  <p>An autonomous trading + intelligence + content operating system. Six independent <em>silos</em> (THO production, Threat Intel, Wildfire, Intelligence, Regional, Hackathons) feed a synthesis layer ("Sapphire Brain") that scores cross-silo health every 15 minutes and surfaces priority actions. All telemetry is real — no paper numbers — and BigQuery-backed.</p>
 
-  <h4>Production telemetry</h4>
-  <p>Six KPIs with 24h sparkline trends. Each value is real BigQuery data — no paper-trading numbers. Sub-text shows context (error rate, healthy/total, etc.).</p>
+  <h4>How to read the brain panel</h4>
+  <p>The Sapphire Brain hero shows three things side-by-side:</p>
+  <div class="brain-diagram mono" style="font-size:11.5px;line-height:1.7;">
+    [ gauge 0–100% ]   [ narrative · plain English ]<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|<br>
+    &nbsp;48h spark&nbsp;&nbsp;&nbsp;degraded silos<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;priority actions (silo: …)
+  </div>
+  <p>Click <span class="mono">Persist + Run</span> to capture the current state to BigQuery (<span class="mono">brain_synthesis</span> table). Click <span class="mono">Correlate</span> for cross-silo pattern matches.</p>
 
-  <h4>Charts</h4>
-  <p>Two stacked charts: inference calls per hour over 24h (split by tier), and threat severity per day over 30d. Hover a chart for tooltips.</p>
+  <h4>What each silo means</h4>
+  <table class="silo-table">
+    <thead><tr><th>Silo</th><th>What</th><th>Where</th></tr></thead>
+    <tbody>
+      <tr><td class="t1">THO Operations</td><td>Texas Home Outlet production: CRM, document center, customer ops</td><td><span class="mono">tho.sapphirealpha.xyz</span></td></tr>
+      <tr><td class="t1">Threat Intel</td><td>CISA KEV + NVD + MITRE ATT&amp;CK CVE feed, EPSS-scored</td><td>cyber-threat-bot Cloud Run</td></tr>
+      <tr><td class="t1">Wildfire Watch</td><td>Autonomous drone fleet (Phase 0 — Mavic Mini + Pi)</td><td><span class="mono">wildfire.sapphirealpha.xyz</span></td></tr>
+      <tr><td class="t1">Intelligence</td><td>Market regime · Kronos ML predictions · cross-asset signals</td><td>scrolls below</td></tr>
+      <tr><td class="t1">Regional</td><td>Geographic watchlist · vote monitor · DeFi pool snapshots</td><td><span class="mono">regional.sapphirealpha.xyz</span></td></tr>
+      <tr><td class="t1">Hackathon Lanes</td><td>0G APAC · MegaETH · Robinhood London · Zama</td><td><span class="mono">hack.sapphirealpha.xyz</span></td></tr>
+    </tbody>
+  </table>
 
-  <h4>Service health</h4>
-  <p>Each service's p50 + p95 response time over the last 60 minutes, with status pill (healthy / degraded / down). The latency bar visualizes the p50.</p>
-
-  <h4>Banners</h4>
-  <p>Yellow banner appears when a data collector is stale. The regime collector specifically broke around 2026-04-18 — that's why the regime panel shows an "ago" warning.</p>
+  <h4>Color hierarchy</h4>
+  <p>
+    <span class="pill green">green</span> healthy / RISK_ON / live ·
+    <span class="pill yellow">yellow</span> degraded / TRANSITION / stale ·
+    <span class="pill red">red</span> down / RISK_OFF / critical ·
+    <span class="pill blue">blue</span> informational / predictions ·
+    <span class="pill purple">purple</span> regional / intel ·
+    <span class="pill orange">orange</span> wildfire / phase-0
+  </p>
 
   <h4>Keyboard shortcuts</h4>
   <p>
-    <kbd>?</kbd> open help · <kbd>Esc</kbd> close modal
+    <kbd>?</kbd> open this guide ·
+    <kbd>⌘K</kbd> / <kbd>Ctrl+K</kbd> command palette (jump anywhere) ·
+    <kbd>Esc</kbd> close any modal ·
+    <kbd>↑</kbd> <kbd>↓</kbd> navigate command palette ·
+    <kbd>Enter</kbd> activate
   </p>
 
-  <h4>Refresh</h4>
-  <p>Every panel auto-refreshes every 60 seconds. The footer shows the last refresh timestamp.</p>
+  <h4>Where the data comes from</h4>
+  <p>Every panel maps to one <span class="mono">/api/*</span> endpoint. They all fail-safe to empty payloads — the dashboard never 500s. Top sources:</p>
+  <p style="font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.8;color:var(--text-2);">
+    /api/markets/snapshot · /api/brain/synthesis · /api/silos/health<br>
+    /api/timeseries/inference · /api/timeseries/threats · /api/timeseries/services<br>
+    /api/regime · /api/predictions · /api/threats/live · /api/vpin · /api/deflated-sharpe/rolling
+  </p>
 
-  <h4>Data sources</h4>
-  <p>Footer links expose every backing endpoint. All BigQuery-backed endpoints fail-safe to empty payloads if a table is missing — the dashboard never 500s.</p>
+  <h4>Information density</h4>
+  <p>The header has a <strong>Compact / Comfort / Roomy</strong> toggle. Compact compresses padding for power users; Roomy is presentation-friendly. Saved to localStorage.</p>
+
+  <div class="help-actions">
+    <button class="help-btn" id="help-show-tour">Show onboarding tour again</button>
+    <button class="help-btn" id="help-open-cmdk">Open command palette</button>
+    <a class="help-btn" href="/healthz/" target="_blank" rel="noopener">/healthz/</a>
+    <a class="help-btn" href="https://github.com/arigatoexpress" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</div>
+
+<!-- ========== Command palette ========== -->
+<div class="cmdk-backdrop" id="cmdk-backdrop"></div>
+<div class="cmdk-panel" id="cmdk-panel" role="dialog" aria-label="Command palette">
+  <input id="cmdk-input" class="cmdk-input" placeholder="Jump to a section, run an action, or search…" autocomplete="off" spellcheck="false">
+  <div class="cmdk-list" id="cmdk-list"></div>
+  <div class="cmdk-footer">
+    <span><kbd>↑↓</kbd>navigate</span>
+    <span><kbd>↵</kbd>open</span>
+    <span><kbd>Esc</kbd>close</span>
+  </div>
+</div>
+
+<!-- ========== Onboarding tour ========== -->
+<div class="tour-backdrop" id="tour-backdrop"></div>
+<div class="tour-pop" id="tour-pop">
+  <h4>
+    <span id="tour-title">Welcome to Sapphire OS</span>
+    <span class="tour-step" id="tour-step-num">1 / 5</span>
+  </h4>
+  <p id="tour-body">Loading…</p>
+  <div class="tour-actions">
+    <button class="tour-skip" id="tour-skip-btn">Skip tour</button>
+    <button class="tour-btn" id="tour-next-btn">Next →</button>
+  </div>
+</div>
+
+<!-- ========== Why-these-numbers modal ========== -->
+<div class="why-modal" id="why-modal" role="dialog" aria-labelledby="why-title">
+  <button class="modal-close" id="why-close" aria-label="Close" style="position:absolute;top:14px;right:16px;background:none;border:none;color:var(--text-3);font-size:22px;cursor:pointer;">×</button>
+  <h3 id="why-title">Why this number?</h3>
+  <div class="why-sub" id="why-sub">—</div>
+  <div id="why-body"></div>
 </div>
 
 <script>
@@ -1968,7 +2549,7 @@ async function refresh() {
       </tr>`;
     }).join('');
   } else {
-    ph.innerHTML = `<tr><td colspan="5"><div class="empty">no predictions in window</div></td></tr>`;
+    ph.innerHTML = `<tr><td colspan="5"><div class="empty actionable"><strong>No predictions in window.</strong> Kronos runs daily at 7 AM CT. Check <span class="mono">com.sapphire.kronos-daily</span> LaunchAgent — output lands in <span class="mono">data/intelligence/&lt;date&gt;/predictions.json</span>.</div></td></tr>`;
   }
 
   // ----- VPIN -----
@@ -2043,7 +2624,7 @@ async function refresh() {
         }).join('');
         document.getElementById('dsr-summary-meta').textContent = `window=${dsr?.window || 90}d`;
       } else {
-        dsrTbody.innerHTML = '<tr><td colspan="5"><div class="empty">awaiting strategies with ≥90d closed-trade history</div></td></tr>';
+        dsrTbody.innerHTML = '<tr><td colspan="5"><div class="empty actionable"><strong>Awaiting closed-trade history.</strong> Deflated Sharpe needs ≥90 days of closed trades per strategy. Generate via <span class="mono">python3 -m lib.analytics.run_strategies --days 90</span>.</div></td></tr>';
       }
     }
   }
@@ -2053,6 +2634,436 @@ async function refresh() {
 
 refresh();
 setInterval(refresh, 60_000);
+
+// ====================================================================
+// =========== UX OVERHAUL v2 (markets, cmdk, tour, density) ===========
+// ====================================================================
+
+// ---------- Markets hero ----------
+function fmtUsdShort(n) {
+  if (n == null || isNaN(n)) return '—';
+  const abs = Math.abs(Number(n));
+  if (abs >= 1e12) return '$' + (n / 1e12).toFixed(2) + 'T';
+  if (abs >= 1e9)  return '$' + (n / 1e9).toFixed(2)  + 'B';
+  if (abs >= 1e6)  return '$' + (n / 1e6).toFixed(2)  + 'M';
+  if (abs >= 1e3)  return '$' + (n / 1e3).toFixed(2)  + 'K';
+  return '$' + Number(n).toFixed(2);
+}
+function fmtPrice(n) {
+  if (n == null || isNaN(n)) return '—';
+  const v = Number(n);
+  if (v >= 1000) return '$' + v.toLocaleString(undefined, {maximumFractionDigits: 0});
+  if (v >= 1)    return '$' + v.toLocaleString(undefined, {maximumFractionDigits: 2});
+  if (v >= 0.01) return '$' + v.toFixed(4);
+  return '$' + v.toExponential(2);
+}
+function drawMarketSpark(svg, points, color) {
+  if (!svg || !points || points.length < 2) return;
+  svg.innerHTML = '';
+  const w = 100, h = 24, pad = 1;
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
+  const max = Math.max(...points), min = Math.min(...points);
+  const span = max - min || 1;
+  const step = points.length > 60 ? Math.ceil(points.length / 60) : 1;
+  const trimmed = points.filter((_, i) => i % step === 0);
+  const dx = (w - pad * 2) / Math.max(1, trimmed.length - 1);
+  const path = trimmed.map((v, i) => {
+    const x = pad + i * dx;
+    const y = h - pad - ((v - min) / span) * (h - pad * 2);
+    return (i === 0 ? 'M' : 'L') + x.toFixed(2) + ',' + y.toFixed(2);
+  }).join(' ');
+  svg.appendChild(svgEl('path', { d: path, fill: 'none', stroke: color, 'stroke-width': '1.2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+}
+async function refreshMarkets() {
+  const data = await safeFetch('/api/markets/snapshot');
+  const grid = document.getElementById('markets-grid');
+  if (!data || !data.crypto || !data.crypto.length) {
+    if (grid) grid.innerHTML = '<div class="empty actionable" style="grid-column:1/-1;"><strong>Markets feed unavailable.</strong> CoinGecko upstream may be rate-limited (free tier ~30 req/min). Will retry on next 60s refresh. Endpoint: <span class="mono">/api/markets/snapshot</span>.</div>';
+    return;
+  }
+  const g = data.global || {};
+  document.getElementById('mg-mcap').textContent = fmtUsdShort(g.total_market_cap_usd);
+  const mcapDelta = document.getElementById('mg-mcap-delta');
+  if (g.market_cap_change_24h_pct != null) {
+    const v = Number(g.market_cap_change_24h_pct);
+    mcapDelta.textContent = (v >= 0 ? '+' : '') + v.toFixed(2) + '%  24h';
+    mcapDelta.className = 'mg-delta ' + (v >= 0 ? 'green' : 'red');
+  } else {
+    mcapDelta.textContent = '—';
+  }
+  document.getElementById('mg-vol').textContent = fmtUsdShort(g.total_volume_24h_usd);
+  document.getElementById('mg-btcdom').textContent = g.btc_dominance_pct != null ? Number(g.btc_dominance_pct).toFixed(1) + '%' : '—';
+  document.getElementById('mg-ethdom').textContent = g.eth_dominance_pct != null ? Number(g.eth_dominance_pct).toFixed(1) + '%' : '—';
+
+  grid.innerHTML = data.crypto.map((c, i) => {
+    const ch = Number(c.change_24h_pct || 0);
+    const cls = ch >= 0 ? 'green' : 'red';
+    const sign = ch >= 0 ? '+' : '';
+    const sparkColor = ch >= 0 ? '#3fb950' : '#f85149';
+    return `<div class="market-card" data-market-i="${i}" tabindex="0" role="button" aria-label="${c.symbol} price ${fmtPrice(c.price_usd)}">
+      <div class="market-head">
+        <span class="market-sym">${escapeHtml(c.symbol || '—')}</span>
+        <span class="market-rank">#${c.rank ?? '—'}</span>
+      </div>
+      <div class="market-price">${fmtPrice(c.price_usd)}</div>
+      <div class="market-spark"><svg id="market-spark-${i}"></svg></div>
+      <div class="market-row">
+        <span class="market-delta ${cls}">${sign}${ch.toFixed(2)}%</span>
+        <span style="color:var(--text-4);">24h</span>
+      </div>
+    </div>`;
+  }).join('');
+  // Render sparklines
+  data.crypto.forEach((c, i) => {
+    const svg = document.getElementById('market-spark-' + i);
+    const ch = Number(c.change_24h_pct || 0);
+    const sparkColor = ch >= 0 ? '#3fb950' : '#f85149';
+    if (svg && c.sparkline_7d && c.sparkline_7d.length >= 2) {
+      drawMarketSpark(svg, c.sparkline_7d, sparkColor);
+    }
+  });
+}
+refreshMarkets();
+setInterval(refreshMarkets, 60_000);
+
+// ---------- Density toggle ----------
+function applyDensity(d) {
+  document.body.classList.remove('density-compact', 'density-comfortable', 'density-roomy');
+  document.body.classList.add('density-' + d);
+  document.querySelectorAll('.density-toggle button').forEach(b => {
+    b.classList.toggle('active', b.dataset.density === d);
+  });
+  try { localStorage.setItem('sapphire-density', d); } catch (_) {}
+}
+(function initDensity() {
+  let d = 'comfortable';
+  try { d = localStorage.getItem('sapphire-density') || 'comfortable'; } catch (_) {}
+  applyDensity(d);
+  document.querySelectorAll('.density-toggle button').forEach(b => {
+    b.addEventListener('click', () => applyDensity(b.dataset.density));
+  });
+})();
+
+// ---------- Command palette ----------
+const CMDK_ITEMS = [
+  { type: 'jump', name: 'Brain · cross-silo synthesis', hint: '#brain-section-h', target: '#brain-section-h' },
+  { type: 'jump', name: 'Global Markets', hint: '#markets-hero', target: '#markets-hero' },
+  { type: 'jump', name: 'Operational silos', hint: '#silos-section-h', target: '#silos-section-h' },
+  { type: 'jump', name: 'Threat intelligence feed', hint: '#threats', target: '#threats' },
+  { type: 'jump', name: 'Service health', hint: 'service heartbeats', target: '#services' },
+  { type: 'jump', name: 'Inference proxy tiers', hint: '4-tier failover', target: '#inference' },
+  { type: 'jump', name: 'Predictions (Kronos)', hint: '#predictions', target: '#predictions' },
+  { type: 'jump', name: 'Order-flow toxicity (VPIN)', hint: '#vpin', target: '#vpin' },
+  { type: 'jump', name: 'Strategy quality (Deflated Sharpe)', hint: '#strategy-quality', target: '#strategy-quality' },
+  { type: 'open', name: 'THO production console', hint: 'tho.sapphirealpha.xyz', url: 'https://tho.sapphirealpha.xyz/' },
+  { type: 'open', name: 'Wildfire admin', hint: 'wildfire.sapphirealpha.xyz', url: 'https://wildfire.sapphirealpha.xyz/' },
+  { type: 'open', name: 'Regional admin', hint: 'regional.sapphirealpha.xyz', url: 'https://regional.sapphirealpha.xyz/admin' },
+  { type: 'open', name: 'Hackathon submissions', hint: 'hack.sapphirealpha.xyz', url: 'https://hack.sapphirealpha.xyz/' },
+  { type: 'action', name: 'Persist brain snapshot', hint: 'capture to BigQuery', action: () => document.getElementById('brain-persist-btn')?.click() },
+  { type: 'action', name: 'Run cross-silo correlation', hint: 'pattern matches', action: () => document.getElementById('brain-correlate-btn')?.click() },
+  { type: 'action', name: 'Refresh data now', hint: 'force refresh', action: () => { refresh(); refreshMarkets(); } },
+  { type: 'action', name: 'Show onboarding tour', hint: 'restart tour', action: () => { closeCmdk(); startTour(true); } },
+  { type: 'action', name: 'Show help guide', hint: '? key', action: () => { closeCmdk(); openHelp(); } },
+  { type: 'action', name: 'Density: Compact', hint: 'tighter UI', action: () => applyDensity('compact') },
+  { type: 'action', name: 'Density: Comfortable', hint: 'default', action: () => applyDensity('comfortable') },
+  { type: 'action', name: 'Density: Roomy', hint: 'roomier UI', action: () => applyDensity('roomy') },
+];
+let cmdkActive = 0;
+let cmdkFiltered = CMDK_ITEMS;
+function openCmdk() {
+  document.getElementById('cmdk-backdrop').classList.add('show');
+  document.getElementById('cmdk-panel').classList.add('show');
+  const inp = document.getElementById('cmdk-input');
+  inp.value = '';
+  cmdkFiltered = CMDK_ITEMS;
+  cmdkActive = 0;
+  renderCmdk();
+  setTimeout(() => inp.focus(), 0);
+}
+function closeCmdk() {
+  document.getElementById('cmdk-backdrop').classList.remove('show');
+  document.getElementById('cmdk-panel').classList.remove('show');
+}
+function renderCmdk() {
+  const list = document.getElementById('cmdk-list');
+  if (!cmdkFiltered.length) {
+    list.innerHTML = '<div class="cmdk-section">No matches</div>';
+    return;
+  }
+  const groups = {};
+  cmdkFiltered.forEach((it, i) => {
+    const g = it.type === 'jump' ? 'Jump to' : it.type === 'open' ? 'Open in new tab' : 'Quick actions';
+    if (!groups[g]) groups[g] = [];
+    groups[g].push({...it, _idx: i});
+  });
+  let html = '';
+  for (const [g, items] of Object.entries(groups)) {
+    html += `<div class="cmdk-section">${g}</div>`;
+    for (const it of items) {
+      const icon = it.type === 'jump' ? '↓' : it.type === 'open' ? '↗' : '▸';
+      html += `<div class="cmdk-item${it._idx === cmdkActive ? ' active' : ''}" data-cmdk-i="${it._idx}">
+        <span class="cmdk-icon">${icon}</span>
+        <span class="cmdk-name">${escapeHtml(it.name)}</span>
+        <span class="cmdk-hint">${escapeHtml(it.hint || '')}</span>
+      </div>`;
+    }
+  }
+  list.innerHTML = html;
+  list.querySelectorAll('.cmdk-item').forEach(el => {
+    el.addEventListener('click', () => {
+      cmdkActive = Number(el.dataset.cmdkI);
+      activateCmdk();
+    });
+  });
+}
+function filterCmdk(q) {
+  q = (q || '').trim().toLowerCase();
+  if (!q) { cmdkFiltered = CMDK_ITEMS; }
+  else {
+    cmdkFiltered = CMDK_ITEMS.filter(it =>
+      (it.name + ' ' + (it.hint || '')).toLowerCase().includes(q)
+    );
+  }
+  cmdkActive = 0;
+  renderCmdk();
+}
+function activateCmdk() {
+  const it = cmdkFiltered[cmdkActive];
+  if (!it) return;
+  if (it.type === 'jump' && it.target) {
+    closeCmdk();
+    const el = document.querySelector(it.target);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } else if (it.type === 'open' && it.url) {
+    closeCmdk();
+    window.open(it.url, '_blank', 'noopener');
+  } else if (it.type === 'action' && it.action) {
+    it.action();
+    if (it.name.startsWith('Density:') || it.name === 'Refresh data now') {
+      // keep palette open for these
+    } else {
+      closeCmdk();
+    }
+  }
+}
+document.getElementById('cmdk-btn').addEventListener('click', openCmdk);
+document.getElementById('cmdk-backdrop').addEventListener('click', closeCmdk);
+document.getElementById('cmdk-input').addEventListener('input', e => filterCmdk(e.target.value));
+document.getElementById('cmdk-input').addEventListener('keydown', e => {
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    cmdkActive = Math.min(cmdkFiltered.length - 1, cmdkActive + 1);
+    renderCmdk();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    cmdkActive = Math.max(0, cmdkActive - 1);
+    renderCmdk();
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    activateCmdk();
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    closeCmdk();
+  }
+});
+document.addEventListener('keydown', (e) => {
+  const isMeta = e.metaKey || e.ctrlKey;
+  if (isMeta && (e.key === 'k' || e.key === 'K')) {
+    e.preventDefault();
+    if (document.getElementById('cmdk-panel').classList.contains('show')) closeCmdk();
+    else openCmdk();
+  }
+});
+
+// ---------- Onboarding tour ----------
+const TOUR_STEPS = [
+  {
+    target: '#brain-hero',
+    title: 'Sapphire Brain',
+    body: 'Cross-silo health score (0–100%). The gauge regenerates every 15 min. Click Persist + Run to capture a snapshot to BigQuery; click Correlate for cross-silo pattern matches.',
+  },
+  {
+    target: '#markets-hero',
+    title: 'Global Markets',
+    body: 'Top 10 crypto by market cap with 7d sparklines. Total market cap, BTC and ETH dominance refresh every 60s from CoinGecko.',
+  },
+  {
+    target: '#silos-section-h',
+    title: 'Six operational silos',
+    body: 'Each card opens a production surface in a new tab. Status pills show live health: green = ok, yellow = degraded, red = down, orange = phase-0 / experimental.',
+  },
+  {
+    target: '#threats',
+    title: 'Live threat feed',
+    body: 'CISA KEV + NVD + MITRE ATT&CK CVEs, scored with EPSS exploit-prediction. Refreshed every 4h via Cloud Scheduler.',
+  },
+  {
+    target: '.footer',
+    title: 'You\'re ready.',
+    body: 'Press ⌘K (or Ctrl+K) to jump anywhere. Press ? for the full operator guide. The dashboard auto-refreshes every 60s — no need to reload.',
+  },
+];
+let tourIdx = 0;
+let tourActive = false;
+let tourPrevTarget = null;
+function startTour(force=false) {
+  if (!force) {
+    try { if (localStorage.getItem('sapphire-onboarded')) return; } catch (_) {}
+  }
+  tourIdx = 0;
+  tourActive = true;
+  showTourStep();
+}
+function endTour() {
+  tourActive = false;
+  document.getElementById('tour-backdrop').classList.remove('show');
+  document.getElementById('tour-pop').classList.remove('show');
+  if (tourPrevTarget) tourPrevTarget.classList.remove('tour-highlight');
+  tourPrevTarget = null;
+  try { localStorage.setItem('sapphire-onboarded', '1'); } catch (_) {}
+}
+function showTourStep() {
+  if (tourPrevTarget) tourPrevTarget.classList.remove('tour-highlight');
+  const s = TOUR_STEPS[tourIdx];
+  if (!s) { endTour(); return; }
+  const target = document.querySelector(s.target);
+  if (!target) { tourIdx++; showTourStep(); return; }
+  tourPrevTarget = target;
+  target.classList.add('tour-highlight');
+  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  document.getElementById('tour-backdrop').classList.add('show');
+  const pop = document.getElementById('tour-pop');
+  pop.classList.add('show');
+  document.getElementById('tour-title').textContent = s.title;
+  document.getElementById('tour-body').textContent = s.body;
+  document.getElementById('tour-step-num').textContent = `${tourIdx + 1} / ${TOUR_STEPS.length}`;
+  document.getElementById('tour-next-btn').textContent = tourIdx === TOUR_STEPS.length - 1 ? 'Done ✓' : 'Next →';
+  // Position popover near target
+  setTimeout(() => {
+    const r = target.getBoundingClientRect();
+    const popW = pop.offsetWidth, popH = pop.offsetHeight;
+    let top = r.bottom + 12;
+    let left = r.left + r.width / 2 - popW / 2;
+    if (top + popH > window.innerHeight - 16) top = Math.max(16, r.top - popH - 12);
+    if (left < 16) left = 16;
+    if (left + popW > window.innerWidth - 16) left = window.innerWidth - popW - 16;
+    pop.style.top = top + 'px';
+    pop.style.left = left + 'px';
+    pop.style.transform = 'none';
+  }, 200);
+}
+document.getElementById('tour-next-btn').addEventListener('click', () => {
+  tourIdx++;
+  if (tourIdx >= TOUR_STEPS.length) endTour();
+  else showTourStep();
+});
+document.getElementById('tour-skip-btn').addEventListener('click', endTour);
+document.getElementById('tour-backdrop').addEventListener('click', endTour);
+// Auto-start tour on first visit (small delay to let dashboard render).
+setTimeout(() => startTour(false), 1200);
+
+// Help-modal action buttons
+document.getElementById('help-show-tour')?.addEventListener('click', () => { closeHelp(); startTour(true); });
+document.getElementById('help-open-cmdk')?.addEventListener('click', () => { closeHelp(); openCmdk(); });
+
+// ---------- Why-these-numbers modal ----------
+const WHY_DEFS = {
+  'kpis': {
+    title: 'Production telemetry KPIs',
+    sub: 'How each KPI is computed.',
+    body: `<h4>Threat records</h4>
+<pre>SELECT COUNT(DISTINCT canonical_id)
+FROM &lt;dataset&gt;.threats_unified
+WHERE source IN ('cisa_kev','nvd','mitre_attack')</pre>
+<h4>Inference 24h</h4>
+<pre>SELECT SUM(calls) FROM &lt;dataset&gt;.inference_calls_hourly
+WHERE hour &gt;= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)</pre>
+<h4>Active leads</h4>
+<pre>SELECT COUNT(*) FROM &lt;dataset&gt;.leads
+WHERE status NOT IN ('CLOSED_LOST','REJECTED')</pre>
+<h4>Service heartbeats</h4>
+<pre>SELECT COUNTIF(status='healthy'), COUNT(DISTINCT service)
+FROM &lt;dataset&gt;.service_heartbeats
+WHERE last_seen &gt;= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 60 MINUTE)</pre>
+<h4>Predictions</h4>
+<pre>SELECT COUNT(*) FROM &lt;dataset&gt;.predictions
+WHERE source='kronos'</pre>
+<h4>Regime snapshots</h4>
+<pre>SELECT COUNTIF(regime IS NOT NULL)
+FROM &lt;dataset&gt;.regime_snapshots</pre>
+<p style="margin-top:14px;color:var(--text-3);font-size:11.5px;">All endpoints fail-safe to empty payloads if a table is missing. Source: <span class="mono">/api/summary</span>.</p>`,
+  },
+  'brain': {
+    title: 'Sapphire Brain health score',
+    sub: 'Cross-silo synthesis logic.',
+    body: `<p>Score = weighted average of per-silo health probabilities, computed by <span class="mono">services/analytics_dashboard/brain.py</span>.</p>
+<pre>health = Σ (silo_weight × silo_status_prob)
+       / Σ silo_weight</pre>
+<p>Silos: regime, trading, threat_live, services, inference, tho, content. Each contributes a 0–1 status probability based on its own freshness + error rate.</p>
+<p>Source: <span class="mono">/api/brain/synthesis</span> · history at <span class="mono">/api/brain/history</span>.</p>`,
+  },
+  'markets': {
+    title: 'Global markets snapshot',
+    sub: 'CoinGecko free tier, cached 60s.',
+    body: `<p>Endpoint: <span class="mono">/api/markets/snapshot</span> — single round-trip returning top 10 by market cap + global aggregates + trending list.</p>
+<pre>GET /coins/markets?vs_currency=usd
+   &amp;order=market_cap_desc&amp;per_page=10
+   &amp;sparkline=true&amp;price_change_percentage=1h,24h,7d</pre>
+<p>Plus <span class="mono">/global</span> for total market cap, 24h volume, and BTC/ETH dominance.</p>
+<p style="color:var(--text-3);font-size:11.5px;">Cached for 60s in-process per Cloud Run instance to respect CoinGecko's ~30 req/min unauthenticated rate limit. Falls back to <span class="mono">stale: true</span> on any upstream failure.</p>`,
+  },
+};
+function openWhy(key) {
+  const def = WHY_DEFS[key];
+  if (!def) return;
+  document.getElementById('why-title').textContent = def.title;
+  document.getElementById('why-sub').textContent = def.sub;
+  document.getElementById('why-body').innerHTML = def.body;
+  document.getElementById('modal-backdrop').classList.add('show');
+  document.getElementById('why-modal').classList.add('show');
+}
+function closeWhy() {
+  document.getElementById('why-modal').classList.remove('show');
+  if (!document.getElementById('help-modal').classList.contains('show')) {
+    document.getElementById('modal-backdrop').classList.remove('show');
+  }
+}
+document.getElementById('why-close').addEventListener('click', closeWhy);
+document.querySelectorAll('.why-link').forEach(a => {
+  a.addEventListener('click', (e) => {
+    e.preventDefault();
+    openWhy(a.dataset.why);
+  });
+});
+// Wire KPI clicks to "why" modal
+document.addEventListener('click', (e) => {
+  const k = e.target.closest('.kpi.why-clickable');
+  if (k) openWhy('kpis');
+});
+// Wire brain hero header click
+document.getElementById('brain-section-h')?.addEventListener('click', (e) => {
+  if (e.target.tagName === 'BUTTON') return;
+  // do nothing on regular header click
+});
+
+// Mark KPI cards why-clickable whenever the kpis grid mutates.
+(function observeKpis() {
+  const grid = document.getElementById('kpis');
+  if (!grid) return;
+  const tag = () => grid.querySelectorAll('.kpi').forEach(k => k.classList.add('why-clickable'));
+  tag();
+  const mo = new MutationObserver(tag);
+  mo.observe(grid, { childList: true });
+})();
+
+// Esc closes the why-modal too
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeWhy();
+    if (tourActive) endTour();
+  }
+});
 </script>
 </body>
 </html>
