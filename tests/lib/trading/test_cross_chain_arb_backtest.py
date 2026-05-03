@@ -25,7 +25,9 @@ from lib.chains.cross_chain.aave_apy_arb import (
     AaveApyArbSignal,
 )
 from lib.trading.cross_chain_arb_backtest import (
+    BRIDGE_COST_TIERS,
     CrossChainArbBacktest,
+    bridge_cost_bps_for_capital,
     project_pnl_for_signal,
 )
 
@@ -309,6 +311,88 @@ def test_to_dict_serializes_inf_safely() -> None:
     import json
     json.dumps(d)  # should not raise
     assert d["sortino"] in ("inf", "-inf") or isinstance(d["sortino"], (int, float))
+
+
+# ---------------------------------------------------------------------------
+# Tiered bridge cost calibration (PR #606 follow-up: live Across/Hop quotes)
+# ---------------------------------------------------------------------------
+
+
+def test_bridge_cost_tiers_are_monotone_non_decreasing() -> None:
+    """Tier table must be sorted by ascending threshold + bps must not drop.
+
+    A drop in bps as capital grows would imply a *cheaper* bridge at
+    larger size, which contradicts the LP-fee creep observed in live
+    Across quotes (Capital Fee % rises with notional). Catches typos
+    when re-surveying.
+    """
+    thresholds = [t for t, _ in BRIDGE_COST_TIERS]
+    bps_values = [b for _, b in BRIDGE_COST_TIERS]
+    assert thresholds == sorted(thresholds), "tiers must be sorted by threshold"
+    assert bps_values == sorted(bps_values), "bps must be non-decreasing with size"
+    assert math.isinf(thresholds[-1]), "tail tier must be math.inf to catch all"
+
+
+def test_bridge_cost_lookup_buckets() -> None:
+    """Verify each notional bucket maps to the calibrated tier value."""
+    # $1k and $10k both fall in the small bucket (≤ $10k → 3.0 bps)
+    assert bridge_cost_bps_for_capital(1_000) == 3.0
+    assert bridge_cost_bps_for_capital(10_000) == 3.0
+    # $50k falls in the medium bucket (≤ $100k → 3.5 bps)
+    assert bridge_cost_bps_for_capital(50_000) == 3.5
+    assert bridge_cost_bps_for_capital(100_000) == 3.5
+    # $500k falls in the large bucket (≤ $1M → 4.0 bps)
+    assert bridge_cost_bps_for_capital(500_000) == 4.0
+    assert bridge_cost_bps_for_capital(1_000_000) == 4.0
+    # Whale tier (> $1M → 5.0 bps)
+    assert bridge_cost_bps_for_capital(10_000_000) == 5.0
+    assert bridge_cost_bps_for_capital(1e15) == 5.0
+
+
+def test_bridge_cost_lookup_rejects_negative() -> None:
+    with pytest.raises(ValueError, match="capital_usd"):
+        bridge_cost_bps_for_capital(-1)
+
+
+def test_constructor_uses_tiered_default_when_unset() -> None:
+    """Omitting bridge_cost_bps_per_round_trip → tiered lookup kicks in.
+
+    This is the calibration's user-facing payoff: callers who don't pass
+    a cost get the right cost for their capital, instead of the legacy
+    one-size-fits-all 5 bps.
+    """
+    bt_small = CrossChainArbBacktest(capital_usd=10_000.0)
+    assert bt_small.bridge_cost_bps_per_round_trip == 3.0
+    bt_medium = CrossChainArbBacktest(capital_usd=100_000.0)
+    assert bt_medium.bridge_cost_bps_per_round_trip == 3.5
+    bt_large = CrossChainArbBacktest(capital_usd=1_000_000.0)
+    assert bt_large.bridge_cost_bps_per_round_trip == 4.0
+    bt_whale = CrossChainArbBacktest(capital_usd=10_000_000.0)
+    assert bt_whale.bridge_cost_bps_per_round_trip == 5.0
+
+
+def test_constructor_explicit_bridge_cost_overrides_tier() -> None:
+    """Explicit override wins, including 0 (used by decay-isolation tests)."""
+    bt = CrossChainArbBacktest(
+        capital_usd=10_000.0, bridge_cost_bps_per_round_trip=42.0,
+    )
+    assert bt.bridge_cost_bps_per_round_trip == 42.0
+    bt_zero = CrossChainArbBacktest(
+        capital_usd=10_000.0, bridge_cost_bps_per_round_trip=0.0,
+    )
+    assert bt_zero.bridge_cost_bps_per_round_trip == 0.0
+
+
+def test_calibrated_costs_lower_than_legacy_5bps_for_typical_capital() -> None:
+    """Calibrated tiers must be <= the legacy hardcoded 5 bps for capital ≤ $1M.
+
+    The whole point of this PR: live Across quotes are ~1.5 bps per leg
+    (~3 bps round-trip), not 5 bps. Anything ≤ $1M should get a strictly
+    cheaper default than the legacy assumption.
+    """
+    for capital in (1_000, 10_000, 100_000, 1_000_000):
+        bps = bridge_cost_bps_for_capital(capital)
+        assert bps <= 5.0, f"calibrated cost at ${capital} = {bps} > 5"
 
 
 # ---------------------------------------------------------------------------
