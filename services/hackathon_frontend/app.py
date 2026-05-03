@@ -19,7 +19,6 @@ Routes:
 """
 from __future__ import annotations
 
-import json
 import os
 import urllib.request
 from pathlib import Path
