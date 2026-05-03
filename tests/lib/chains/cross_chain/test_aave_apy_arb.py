@@ -452,18 +452,28 @@ async def test_live_scan_top_assets_returns_at_least_one_usdc_signal() -> None:
     """
     from lib.chains.arbitrum.client import ArbitrumClient
     from lib.chains.arbitrum.protocols import ArbitrumProtocols
-    from lib.chains.megaeth.client import MegaETHClient
-    from lib.chains.megaeth.protocols import MegaETHProtocols
     from lib.chains.optimism.client import OptimismClient
     from lib.chains.optimism.protocols import OptimismProtocols
 
+    # MegaETH transport ships in PR #529; until that merges we wire only
+    # Arbitrum + Optimism for the live test. The cross-chain spread math
+    # works the same with 2 chains as with 3 (it just sees fewer signals).
+    megaeth_protocols: Any | None = None
+    try:
+        from lib.chains.megaeth.client import MegaETHClient
+        from lib.chains.megaeth.protocols import MegaETHProtocols
+
+        megaeth_client = MegaETHClient()
+        megaeth_protocols = MegaETHProtocols(megaeth_client)
+    except ImportError:
+        pass
+
     async with (
-        MegaETHClient() as megaeth_client,
         ArbitrumClient() as arbitrum_client,
         OptimismClient() as optimism_client,
     ):
         scanner = CrossChainAaveScanner(
-            megaeth_protocols=MegaETHProtocols(megaeth_client),
+            megaeth_protocols=megaeth_protocols,
             arbitrum_protocols=ArbitrumProtocols(arbitrum_client),
             optimism_protocols=OptimismProtocols(optimism_client),
         )

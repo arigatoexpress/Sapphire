@@ -52,11 +52,29 @@ def _build_scanner_from_default_clients() -> CrossChainAaveScanner:
     arbitrum_protocols: Any | None = None
     optimism_protocols: Any | None = None
 
+    # MegaETH transport ships in PR #529 (lib.chains.megaeth.client). Until
+    # that lands, the client lives at plugins/claw-sapphire/tools/internal/
+    # megaeth.py — try the post-merge path first, then the plugin path.
     try:
-        from lib.chains.megaeth.client import MegaETHClient  # noqa: PLC0415
         from lib.chains.megaeth.protocols import MegaETHProtocols  # noqa: PLC0415
 
-        megaeth_protocols = MegaETHProtocols(MegaETHClient())
+        megaeth_client = None
+        try:
+            from lib.chains.megaeth.client import MegaETHClient  # noqa: PLC0415
+
+            megaeth_client = MegaETHClient()
+        except ImportError:
+            try:
+                # Fallback to the plugin-tool location.
+                from plugins.claw_sapphire.tools.internal.megaeth import (  # noqa: PLC0415
+                    MegaETHClient as _PluginMegaETHClient,
+                )
+
+                megaeth_client = _PluginMegaETHClient()
+            except Exception:
+                megaeth_client = None
+        if megaeth_client is not None:
+            megaeth_protocols = MegaETHProtocols(megaeth_client)
     except Exception as exc:  # pragma: no cover - exercised by integration test
         logger.warning("megaeth facade unavailable: %s", exc)
 
