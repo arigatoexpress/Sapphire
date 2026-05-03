@@ -239,7 +239,7 @@ Prediction accuracy: 61.1% overall, BTC 83.3% (n=36 scored of 42)
 hermes-agent (NousResearch) replaced custom bot. Installed at ~/.hermes/.
 - Config: ~/.hermes/config.yaml (model: hermes3:8b, provider: custom, base_url: proxy)
 - Env: ~/.hermes/.env (TELEGRAM_BOT_TOKEN, OPENAI_BASE_URL → proxy)
-- Skills: ~/.hermes/skills/sapphire/ (14 skills: cyber-intel, inference-tier, kimi-delegate, macro-data, paper-trading, regional-intel, repo-discovery, system-health, system-ops, tho-operations, threat-intel, trading-analysis, trading-brain, trading-signals)
+- Skills: ~/.hermes/skills/sapphire/ (14 skills: cyber-intel, inference-tier, kimi-delegate, macro-data, paper-trading, regional-intel, repo-discovery, system-health, system-ops, tho-operations, threat-intel, trading-analysis, trading-brain, trading-signals; pending deploy: `tradingview-orchestrator` — read-only orchestrator wrapper, template at `docs/hermes/skills/tradingview-orchestrator/`)
 - Gateway: ai.hermes.gateway LaunchAgent (always-on Telegram polling)
 - Restart: `~/.local/bin/hermes gateway restart`
 
