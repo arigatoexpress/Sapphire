@@ -2919,64 +2919,93 @@ def api_sentinel_demo():
         return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
 
 
-#: MegaETH mainnet chain id — the canonical chain Sentinel reads through
-#: the chain-health gate today. Lives next to the route so the route file
-#: stays self-describing without hopping into ``lib/hackathon`` to know
-#: which chain it asks the gate to evaluate.
-SENTINEL_CHAIN_HEALTH_TARGET_CHAIN_ID = 4326
-
-
-class _PoisonGate:
-    """Demo-only chain-health gate that returns CRISIS_500BP unconditionally.
-
-    Activated by ``SENTINEL_DEMO_FORCE_DEPEG=1``. Used for demo recordings
-    where Sentinel needs to refuse a payment as the chain "degrades" on
-    camera, without depending on real MegaETH state. Never used unless the
-    operator explicitly opts in — production callers get ``default_gate()``.
-    """
-
-    def evaluate_chain(self, chain_id: int):  # noqa: D401 — duck-typed gate
-        from lib.hackathon.chain_health_gate import ChainHealthVerdict
-
-        return ChainHealthVerdict(
-            chain_id=chain_id,
-            chain_name="MegaETH (DEMO POISON)",
-            severity="BLOCK",
-            reasons=["DEMO POISON: synthetic CRISIS_500BP for recording"],
-            peg_divergence_bps=500,
-            aave_paused_reserves=[],
-        )
-
-
 @app.route("/api/hackathon/sentinel/evaluate", methods=["POST"])
 @requires_auth
 def api_sentinel_evaluate():
     """Evaluate an agent payment attempt without settlement or order submission."""
     try:
         body = request.get_json(silent=True) or {}
-        from lib.hackathon.chain_health_gate import default_gate
         from lib.hackathon.sentinel import evaluate_from_payload
-
-        if os.environ.get("SENTINEL_DEMO_FORCE_DEPEG") == "1":
-            gate = _PoisonGate()
-        else:
-            gate = default_gate()
 
         return jsonify(
             {
                 "execution_enabled": False,
                 "mode": "policy_preview_only",
-                "decision": evaluate_from_payload(
-                    body,
-                    gate=gate,
-                    target_chain_id=SENTINEL_CHAIN_HEALTH_TARGET_CHAIN_ID,
-                ),
+                "decision": evaluate_from_payload(body),
                 "timestamp": datetime.now(UTC).isoformat(),
             }
         )
     except Exception as e:
         log.exception("sentinel evaluation failed")
         return jsonify({"error": f"{type(e).__name__}: {e}"}), 400
+
+
+# Cross-chain Aave APY arbitrage scanner: ~1-2s per scan in production
+# (3 RPC fan-outs across 5 candidate assets). 30s server-side cache
+# keeps the panel snappy and avoids hammering chain RPCs from a 60s
+# auto-refreshing dashboard panel.
+CROSS_CHAIN_ARB_CACHE_DURATION = 30
+
+
+@app.route("/api/cross_chain/aave_arb")
+@requires_auth
+def api_cross_chain_aave_arb():
+    """Live cross-chain Aave V3 supply/borrow APY arbitrage opportunities.
+
+    Returns the JSON shape produced by
+    :func:`lib.hackathon.cross_chain_alpha.scan_aave_arb` plus a
+    ``generated_at`` ISO-8601 UTC timestamp so the panel can render an
+    accurate "Last scan" label even when responses come from cache.
+    """
+
+    def fetch():
+        from lib.hackathon.cross_chain_alpha import scan_aave_arb
+
+        payload = scan_aave_arb(top_n=5)
+        payload["generated_at"] = datetime.now(UTC).isoformat()
+        return payload
+
+    try:
+        return jsonify(get_cached("cross_chain_aave_arb", fetch, ttl=CROSS_CHAIN_ARB_CACHE_DURATION))
+    except Exception as e:
+        log.exception("cross-chain aave arb scan failed")
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+
+
+# Cross-chain GMX V2 perps overview: per-chain funding APR + OI skew
+# + same-underlying divergence. Same 30s server-side cache contract as
+# the Aave arb panel above so a 60s auto-refresh polls the endpoint
+# twice between actual chain RPC fan-outs.
+PERPS_OVERVIEW_CACHE_DURATION = 30
+
+
+@app.route("/api/perps/overview")
+@requires_auth
+def api_perps_overview():
+    """Live cross-chain GMX V2 perps funding-rate + OI-skew overview.
+
+    Returns the JSON shape produced by
+    :func:`lib.perps.gmx_v2_overview.scan_perps_overview` plus a
+    ``generated_at`` ISO-8601 UTC timestamp so the panel can render an
+    accurate "Last refresh" label even when responses come from cache.
+    """
+
+    def fetch():
+        from lib.perps.gmx_v2_overview import scan_perps_overview
+
+        payload = scan_perps_overview()
+        payload["generated_at"] = datetime.now(UTC).isoformat()
+        return payload
+
+    try:
+        return jsonify(
+            get_cached(
+                "perps_overview", fetch, ttl=PERPS_OVERVIEW_CACHE_DURATION
+            )
+        )
+    except Exception as e:
+        log.exception("perps overview scan failed")
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
 
 
 @app.route("/risk")
@@ -6077,106 +6106,6 @@ def api_strategy_performance():
         ), 200
 
 
-# ── Production readiness SLO panel ─────────────────────────────────────────
-# The cached sweep output is produced by the com.sapphire.readiness-cache
-# LaunchAgent every 15 minutes. The dashboard intentionally never invokes the
-# sweep live — the sweep can take ~10s+ and we don't want a blocking call on
-# the request path. If the cache is missing, the endpoint returns a soft note
-# rather than 500-ing.
-_READINESS_CACHE_PATH = Path.home() / "autonomy-status" / "logs" / "readiness-sweep-latest.json"
-_READINESS_STALE_SECONDS = 3600  # 1h
-
-
-def _readiness_cache_path() -> Path:
-    """Resolve the cache file path. Indirected so tests can monkeypatch."""
-    return _READINESS_CACHE_PATH
-
-
-@app.route("/api/readiness/latest")
-@requires_auth
-def api_readiness_latest():
-    """Return the latest cached production readiness sweep JSON.
-
-    The com.sapphire.readiness-cache LaunchAgent runs the sweep every 15 minutes
-    and writes the JSON output to ~/autonomy-status/logs/readiness-sweep-latest.json.
-    This endpoint returns that file with a freshness header. It does NOT invoke
-    the sweep live.
-
-    Response shape (cache present):
-      {status: "ok", cache_age_seconds: int, cache_stale: bool, ...sweep_payload}
-
-    Response shape (no cache yet):
-      {status: "ok", note: "no cache yet", cache_age_seconds: null}
-    """
-    path = _readiness_cache_path()
-    try:
-        if not path.exists():
-            return jsonify(
-                {
-                    "status": "ok",
-                    "note": "no cache yet",
-                    "cache_age_seconds": None,
-                    "summary": {"pass": 0, "warn": 0, "fail": 0, "skip": 0, "total": 0},
-                    "checks": [],
-                }
-            )
-        mtime = path.stat().st_mtime
-        cache_age = int(time.time() - mtime)
-        try:
-            payload = json.loads(path.read_text())
-        except (OSError, json.JSONDecodeError) as e:
-            log.warning("readiness cache read failed: %s", e)
-            return jsonify(
-                {
-                    "status": "ok",
-                    "note": "cache unreadable",
-                    "cache_age_seconds": cache_age,
-                    "summary": {"pass": 0, "warn": 0, "fail": 0, "skip": 0, "total": 0},
-                    "checks": [],
-                }
-            )
-        out = {
-            "status": "ok",
-            "cache_age_seconds": cache_age,
-            "cache_stale": cache_age > _READINESS_STALE_SECONDS,
-        }
-        if isinstance(payload, dict):
-            out.update(payload)
-        return jsonify(out)
-    except Exception as e:  # pragma: no cover - defensive
-        log.warning("readiness latest API error: %s", e)
-        return jsonify({"status": "error", "error": str(e)}), 200
-
-
-@app.route("/api/readiness/check/<section>/<name>")
-@requires_auth
-def api_readiness_check(section: str, name: str):
-    """Return a single named check from the cached readiness sweep.
-
-    404 if the cache is missing or the (section, name) pair isn't present.
-    """
-    path = _readiness_cache_path()
-    if not path.exists():
-        return jsonify({"status": "error", "error": "cache missing"}), 404
-    try:
-        payload = json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError) as e:
-        return jsonify({"status": "error", "error": f"cache unreadable: {e}"}), 404
-    checks = payload.get("checks", []) if isinstance(payload, dict) else []
-    for check in checks:
-        if not isinstance(check, dict):
-            continue
-        if check.get("section") == section and check.get("name") == name:
-            return jsonify(
-                {
-                    "status": "ok",
-                    "check": check,
-                    "generated_at": payload.get("generated_at") if isinstance(payload, dict) else None,
-                }
-            )
-    return jsonify({"status": "error", "error": "check not found"}), 404
-
-
 @app.route("/api/hyperliquid/live-status")
 @requires_auth
 def api_hyperliquid_live_status():
@@ -6294,121 +6223,6 @@ def api_forecast():
                 "kronos_source": None,
             }
         ), 200
-
-
-@app.route("/api/forecast/explain/<symbol>")
-@requires_auth
-def api_forecast_explain(symbol: str):
-    """Structured rationale for a forecast or quick-signal score, by symbol.
-
-    Closes the loop on B4 (forecast interpretability): the dashboard already
-    surfaces forecasts and scores; this endpoint surfaces *why*.
-
-    Resolution order (no live calls — works on already-captured data):
-      1. ``lib.analytics.forecast.forecast()`` row whose canonical or alias
-         symbol matches the request. This is the Kronos + TA consensus story.
-      2. The latest TradingView orchestrator scoring item (sweep or deep
-         capture) whose ``symbol`` or ``tradingview_symbol`` matches. This is
-         the deterministic ``compute_quick_signal_score`` story.
-
-    Returns 200 with the structured rationale on hit, 404 on miss. Auth-gated
-    via the standard ``requires_auth`` decorator.
-    """
-    sym_raw = (symbol or "").strip()
-    if not sym_raw:
-        return jsonify({"status": "error", "reason": "missing_symbol"}), 400
-    sym_upper = sym_raw.upper()
-
-    try:
-        from lib.analytics.forecast import forecast as _forecast
-        from lib.analytics.forecast_explain import explain_forecast, explain_score
-    except Exception as exc:  # noqa: BLE001 — surface as 500 with reason
-        log.exception("forecast_explain import failure")
-        return (
-            jsonify({"status": "error", "reason": f"import_failure: {exc}"}),
-            500,
-        )
-
-    # 1) Try the forecast row path.
-    try:
-        fc = _forecast()
-        for row in fc.get("rows") or []:
-            candidates = {
-                str(row.get("symbol") or "").upper(),
-                str(row.get("kronos_symbol") or "").upper(),
-                str(row.get("ta_symbol") or "").upper(),
-            }
-            candidates.discard("")
-            if sym_upper in candidates:
-                payload = explain_forecast(row, symbol=row.get("symbol") or sym_upper)
-                return jsonify({"status": "ok", "source": "forecast", "rationale": payload})
-    except Exception as exc:  # noqa: BLE001 — fall through to scoring
-        log.warning("forecast lookup for %s failed: %s", sym_upper, exc)
-
-    # 2) Try the quick-signal score path via the latest TV orchestrator manifest.
-    try:
-        from lib.trading.tradingview_orchestrator import TradingViewOrchestrator
-
-        orch = TradingViewOrchestrator()
-        manifest = orch.latest_manifest() or {}
-    except Exception as exc:  # noqa: BLE001
-        log.warning("orchestrator manifest read failed: %s", exc)
-        manifest = {}
-
-    if manifest:
-        # Sweep shape — symbols[]
-        for row in manifest.get("symbols") or []:
-            candidates = {
-                str(row.get("symbol") or "").upper(),
-                str(row.get("tradingview_symbol") or "").upper(),
-            }
-            candidates.discard("")
-            if sym_upper in candidates:
-                score = row.get("score") or {}
-                if isinstance(score, dict):
-                    rationale = explain_score(
-                        score,
-                        symbol=row.get("symbol") or row.get("tradingview_symbol") or sym_upper,
-                    )
-                    return jsonify(
-                        {
-                            "status": "ok",
-                            "source": "quick_signal_score",
-                            "rationale": rationale,
-                        }
-                    )
-        # Deep-capture shape — symbol + timeframes[]
-        deep_symbol = str(manifest.get("symbol") or "").upper()
-        deep_tv_symbol = str(manifest.get("tradingview_symbol") or "").upper()
-        if sym_upper in {deep_symbol, deep_tv_symbol}:
-            timeframes = manifest.get("timeframes") or []
-            # Pick the first timeframe with a scorable record.
-            for tf in timeframes:
-                score = tf.get("score") or {}
-                if isinstance(score, dict) and score:
-                    rationale = explain_score(
-                        score,
-                        symbol=manifest.get("symbol") or sym_upper,
-                    )
-                    return jsonify(
-                        {
-                            "status": "ok",
-                            "source": "quick_signal_score",
-                            "rationale": rationale,
-                            "timeframe": tf.get("timeframe"),
-                        }
-                    )
-
-    return (
-        jsonify(
-            {
-                "status": "not_found",
-                "symbol": sym_upper,
-                "reason": "no forecast row or scoring record matches this symbol",
-            }
-        ),
-        404,
-    )
 
 
 @app.route("/api/backtest-results")
