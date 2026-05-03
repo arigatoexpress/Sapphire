@@ -80,7 +80,10 @@ class HyperliquidCounterpartyClient:
         req = urllib.request.Request(
             self.config.api_url,
             data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json", "User-Agent": "SapphireCounterpartyIntel/0.1"},
+            headers={
+                "Content-Type": "application/json",
+                "User-Agent": "SapphireCounterpartyIntel/0.1",
+            },
             method="POST",
         )
         try:
@@ -119,9 +122,29 @@ def _prune(counters: dict[str, Any]) -> dict[str, Any]:
 
 def _mock_leaderboard() -> list[dict[str, Any]]:
     return [
-        {"address": "0xaaa", "display_name": "dry-alpha", "realized_pnl_30d_usd": 250000, "realized_pnl_90d_usd": 900000, "sharpe_30d": 2.1, "win_rate_30d": 0.62},
-        {"address": "0xbbb", "display_name": "dry-beta", "realized_pnl_30d_usd": 120000, "realized_pnl_90d_usd": 300000, "sharpe_30d": 1.4, "win_rate_30d": 0.55},
-        {"address": "0xccc", "display_name": "small", "realized_pnl_30d_usd": 1000, "realized_pnl_90d_usd": 5000, "sharpe_30d": 4.0},
+        {
+            "address": "0xaaa",
+            "display_name": "dry-alpha",
+            "realized_pnl_30d_usd": 250000,
+            "realized_pnl_90d_usd": 900000,
+            "sharpe_30d": 2.1,
+            "win_rate_30d": 0.62,
+        },
+        {
+            "address": "0xbbb",
+            "display_name": "dry-beta",
+            "realized_pnl_30d_usd": 120000,
+            "realized_pnl_90d_usd": 300000,
+            "sharpe_30d": 1.4,
+            "win_rate_30d": 0.55,
+        },
+        {
+            "address": "0xccc",
+            "display_name": "small",
+            "realized_pnl_30d_usd": 1000,
+            "realized_pnl_90d_usd": 5000,
+            "sharpe_30d": 4.0,
+        },
     ]
 
 

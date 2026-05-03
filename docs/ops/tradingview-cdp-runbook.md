@@ -1,6 +1,34 @@
 # TradingView CDP Runbook
 
-Last reviewed: 2026-04-29
+Last reviewed: 2026-04-30
+
+## Triage Quickstart
+
+Failure mode addressed: TradingView MCP tools return CDP-not-reachable errors,
+or dashboard `/api/system` shows the CDP probe as down.
+
+```bash
+launchctl list com.sapphire.tradingview-cdp
+```
+
+```bash
+curl -fsS http://127.0.0.1:9222/json/version | python3 -m json.tool
+```
+
+```bash
+tail -n 200 /Users/aribs/autonomy-status/logs/tradingview-cdp.err
+```
+
+If `/json/version` returns valid JSON, CDP is healthy and the failure is in
+the MCP layer. If it errors with connection refused, the desktop app is not
+running with `--remote-debugging-port`. DO NOT kickstart the LaunchAgent while
+the operator has live chart work — kickstart kills and reopens the app.
+Confirm the operator is not at the chart before restart.
+
+Live monitors: dashboard `/api/system` `cdp` field.
+On-call escalation: operator (this is workbench infrastructure, not
+production); p4 unless a scheduled MCP capture is blocked, then p3. This
+runbook explicitly does not cover live trading paths.
 
 This runbook covers `com.sapphire.tradingview-cdp`, the local macOS
 LaunchAgent that starts TradingView Desktop with Chrome DevTools Protocol

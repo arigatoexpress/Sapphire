@@ -140,8 +140,7 @@ def test_normalize_leaderboard_snapshots_groups_jsonl_rows() -> None:
 def test_cli_loads_jsonl_and_prints_regime_report(tmp_path: Path, capsys) -> None:
     path = tmp_path / "regimes.jsonl"
     path.write_text(
-        "\n".join(json.dumps(_regime("risk_on_correlated", 0.9, idx)) for idx in range(3))
-        + "\n",
+        "\n".join(json.dumps(_regime("risk_on_correlated", 0.9, idx)) for idx in range(3)) + "\n",
         encoding="utf-8",
     )
 

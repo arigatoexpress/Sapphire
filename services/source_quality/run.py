@@ -203,7 +203,9 @@ def _extract_outcome(row: dict) -> Outcome | None:
     if ts is None:
         return None
     try:
-        return Outcome(symbol=str(sym).strip().upper(), timestamp=ts, realised_return=float(ret_raw))
+        return Outcome(
+            symbol=str(sym).strip().upper(), timestamp=ts, realised_return=float(ret_raw)
+        )
     except (TypeError, ValueError):
         return None
 

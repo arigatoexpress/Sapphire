@@ -1,6 +1,33 @@
 # Control Plane Runbook
 
-Last reviewed: 2026-04-29
+Last reviewed: 2026-04-30
+
+## Triage Quickstart
+
+Failure mode addressed: control-plane `/health` does not respond on
+`127.0.0.1:8082`, or a mutation route is returning unexpected status codes.
+
+```bash
+launchctl list com.sapphire.control-plane
+```
+
+```bash
+curl -fsS http://127.0.0.1:8082/health | python3 -m json.tool
+```
+
+```bash
+tail -n 200 /Users/aribs/autonomy-status/logs/control_plane.err
+```
+
+If `/health` returns `{"status":"ok"}`, the daemon is healthy. If a mutation
+route is returning `503`, that is the FAIL-CLOSED behavior when
+`CONTROL_PLANE_TOKEN` is unset — that is a security feature, not a bug. A
+`200` from a token-gated mutation route WITHOUT a valid header is a release
+blocker (write-gate regression).
+
+Live monitors: dashboard `/api/control/overview`; routine-health badge.
+On-call escalation: ops owner; p2 if write-gate regression observed (this is a
+security failure mode), p3 for read-side outage.
 
 This runbook covers `services/control-plane/` and
 `com.sapphire.control-plane`, the local-first FastAPI service that backs the

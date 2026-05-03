@@ -91,9 +91,7 @@ def test_network_partition_custom_exception_factory():
     class CustomErr(Exception):
         pass
 
-    p = NetworkPartition(
-        name="x", exception_factory=lambda m: CustomErr(f"boom: {m}")
-    )
+    p = NetworkPartition(name="x", exception_factory=lambda m: CustomErr(f"boom: {m}"))
     wrapped = p.protect(lambda: None)
     p.trip()
     with pytest.raises(CustomErr):

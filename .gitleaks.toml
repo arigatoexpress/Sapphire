@@ -6,8 +6,11 @@
 useDefault = true
 
 [allowlist]
-description = "Red-team corpus + onboarding prose — adversarial token shapes are test fixtures, not real leaks"
+description = "Red-team corpus + onboarding prose + pycache — adversarial token shapes are test fixtures, not real leaks"
 paths = [
+    # Compiled Python bytecode contains literal strings from test fixtures.
+    '''__pycache__/.*''',
+    '''.*__pycache__/.*''',
     '''tests/fixtures/redteam/.*\.json''',
     '''tests/unit/test_redteam_corpus\.py''',
     '''docs/onboarding/ai-redteam-.*\.md''',
@@ -25,4 +28,42 @@ paths = [
     # Doc-fixture curl examples with placeholder bearer tokens — not real keys.
     '''docs/ops/customer-api-runbook\.md''',
     '''docs/products/customer-product-surface-0\.1\.0\.md''',
+    # MegaETH (chain 4326) protocol registry + Aave/Kumbaya/USDM tests —
+    # all `token: "0x…"` values are public on-chain contract addresses
+    # (Aave V3 reserves, USDM stable, Kumbaya pools), cross-checked
+    # against aave-dao/aave-address-book. Gitleaks generic-api-key flags
+    # the YAML/Python `token: "0x…"` shape as a generic API key; these
+    # are not secrets. Landed alongside #536–#538 (MegaETH Wave B).
+    '''config/megaeth_protocols\.yaml''',
+    '''plugins/claw-sapphire/tests/test_megaeth_protocols\.py''',
+    '''plugins/claw-sapphire/tools/internal/megaeth_protocols\.py''',
+    '''tests/lib/chains/megaeth/test_protocols_facade_stable\.py''',
+    '''tests/lib/chains/megaeth/test_usdm\.py''',
+    # Arbitrum (chain 42161) protocol tests — all `token: "0x…"` and
+    # `index_token="0x…"` values are public on-chain contract addresses
+    # (GMX V2 markets, Chainlink feeds, Aave V3 reserves). Gitleaks
+    # generic-api-key flags the Python string-literal shape; these are
+    # not secrets. Landed alongside #557 + #609 (Arbitrum stack).
+    '''tests/lib/chains/arbitrum/test_gmx_price_adapter_arbitrum\.py''',
+    '''tests/lib/chains/arbitrum/test_gmx_v2\.py''',
+    '''tests/lib/chains/arbitrum/test_protocols_facade_perps\.py''',
+    '''tests/lib/chains/arbitrum/test_pyth_oracle_arbitrum\.py''',
+    '''tests/lib/chains/arbitrum/test_chainlink_oracle\.py''',
+    '''tests/integration/arbitrum/test_gmx_v2_live\.py''',
+    # Optimism (chain 10) protocol tests — same on-chain address story.
+    '''tests/lib/chains/optimism/test_pyth_oracle_optimism\.py''',
+    '''lib/chains/optimism/protocols\.py''',
+    '''lib/chains/arbitrum/protocols\.py''',
+    '''lib/chains/arbitrum/contracts/gmx_price_adapter\.py''',
+    '''lib/chains/arbitrum/contracts/gmx_v2\.py''',
+    '''lib/chains/arbitrum/contracts/pyth_oracle\.py''',
+    '''lib/chains/arbitrum/contracts/chainlink_oracle\.py''',
+    '''lib/perps/gmx_v2_overview\.py''',
+    '''lib/hackathon/arbitrum_chain_health\.py''',
+    '''lib/hackathon/optimism_chain_health\.py''',
+    '''lib/hackathon/cross_chain_alpha\.py''',
+    '''lib/trading/pyth_divergence_arb_backtest\.py''',
+    '''tests/lib/chains/cross_chain/test_pyth_divergence\.py''',
+    '''tests/lib/trading/test_pyth_divergence_arb_backtest\.py''',
+    '''tests/unit/test_dashboard_perps_panel\.py''',
 ]

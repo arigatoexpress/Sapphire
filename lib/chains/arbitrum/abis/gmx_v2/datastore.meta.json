@@ -1,0 +1,11 @@
+{
+  "chain_id": 42161,
+  "address": "0xFD70de6b91282D8017aA4E741e9Ae325CAb992d8",
+  "name": "DataStore",
+  "is_verified": true,
+  "verified_at": "2026-04-30T00:00:00Z",
+  "fetched_at": "2026-04-30T00:00:00Z",
+  "source_url": "https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/data/DataStore.sol",
+  "abi_source": "Curated minimal subset (getUint/getInt/getAddress/getBool/RoleStore). Wave does NOT bind DataStore directly — every read flows through Reader, which takes the DataStore address as the first argument. Pinned here for completeness so a future Wave that needs raw key/value reads has the binding point. Full ABI available via Sourcify at sourcify.dev/server/files/any/42161/0xFD70de6b91282D8017aA4E741e9Ae325CAb992d8 if needed.",
+  "notes": "Canonical key/value store. Reader.* methods take this address as their first param."
+}

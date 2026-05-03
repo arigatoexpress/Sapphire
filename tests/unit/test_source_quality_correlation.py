@@ -15,7 +15,9 @@ from lib.source_quality.correlation import (
 from lib.source_quality.snr import SignalRecord
 
 
-def _sig(source: str, direction: str, day: int, *, symbol: str = "BTC", hour: int = 12) -> SignalRecord:
+def _sig(
+    source: str, direction: str, day: int, *, symbol: str = "BTC", hour: int = 12
+) -> SignalRecord:
     return SignalRecord(
         source=source,
         symbol=symbol,
@@ -35,11 +37,7 @@ def test_compute_correlation_emits_zero_pairs_when_only_one_source():
 
 
 def test_perfect_duplicate_sources_are_flagged_near_duplicate():
-    sigs = [
-        sig
-        for d in range(1, 9)
-        for sig in (_sig("alpha", "bull", d), _sig("beta", "bull", d))
-    ]
+    sigs = [sig for d in range(1, 9) for sig in (_sig("alpha", "bull", d), _sig("beta", "bull", d))]
 
     report = compute_pairwise_correlation(sigs)
     pair = report.pairs[0]
@@ -51,11 +49,7 @@ def test_perfect_duplicate_sources_are_flagged_near_duplicate():
 
 
 def test_anticorrelated_sources_have_low_agreement_and_no_flag():
-    sigs = [
-        sig
-        for d in range(1, 9)
-        for sig in (_sig("alpha", "bull", d), _sig("beta", "bear", d))
-    ]
+    sigs = [sig for d in range(1, 9) for sig in (_sig("alpha", "bull", d), _sig("beta", "bear", d))]
 
     report = compute_pairwise_correlation(sigs)
     pair = report.pairs[0]
@@ -128,11 +122,7 @@ def test_correlation_matrix_round_trip_symmetric_with_diagonal_one():
 
 
 def test_flag_near_duplicates_uses_report_threshold_when_unspecified():
-    sigs = [
-        s
-        for d in range(1, 9)
-        for s in (_sig("alpha", "bull", d), _sig("beta", "bull", d))
-    ]
+    sigs = [s for d in range(1, 9) for s in (_sig("alpha", "bull", d), _sig("beta", "bull", d))]
 
     report = compute_pairwise_correlation(sigs)
     flagged = flag_near_duplicates(report)
@@ -200,8 +190,20 @@ def test_compute_correlation_buckets_signals_within_minute_window():
 def test_latest_signal_in_bucket_wins_when_source_emits_twice():
     # Same source emits BULL then BEAR in the same bucket; latest wins.
     sigs = [
-        SignalRecord(source="alpha", symbol="BTC", timestamp=datetime(2026, 4, 1, 12, 5, tzinfo=UTC), direction="bull", confidence=0.9),
-        SignalRecord(source="alpha", symbol="BTC", timestamp=datetime(2026, 4, 1, 12, 50, tzinfo=UTC), direction="bear", confidence=0.9),
+        SignalRecord(
+            source="alpha",
+            symbol="BTC",
+            timestamp=datetime(2026, 4, 1, 12, 5, tzinfo=UTC),
+            direction="bull",
+            confidence=0.9,
+        ),
+        SignalRecord(
+            source="alpha",
+            symbol="BTC",
+            timestamp=datetime(2026, 4, 1, 12, 50, tzinfo=UTC),
+            direction="bear",
+            confidence=0.9,
+        ),
     ]
     # And six more bear-vs-bear days for beta to get overlap.
     for d in range(1, 8):

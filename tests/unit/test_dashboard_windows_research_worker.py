@@ -117,9 +117,7 @@ def test_windows_research_worker_api_requires_auth(client):
     assert response.status_code == 401
 
 
-def test_windows_research_worker_api_summarizes_worker_payload(
-    client, monkeypatch
-):
+def test_windows_research_worker_api_summarizes_worker_payload(client, monkeypatch):
     def fake_urlopen(url: str, timeout: float) -> _FakeHTTPResponse:
         assert "windows/research-worker/latest" in url
         assert timeout == 5.0
@@ -144,13 +142,14 @@ def test_windows_research_worker_api_summarizes_worker_payload(
     assert payload["safety"]["paper_only"] is True
     assert payload["safety"]["live_trading_enabled"] is False
     assert payload["commands"][0]["name"] == "strategy_sweep"
-    assert payload["commands"][0]["log_path_label"] == ".../research-worker/20260429T210424Z/backtest.log"
+    assert (
+        payload["commands"][0]["log_path_label"]
+        == ".../research-worker/20260429T210424Z/backtest.log"
+    )
     assert payload["artifacts"][0]["path_label"] == ".../research-worker/run/backtest"
 
 
-def test_windows_research_worker_api_falls_back_to_webhook_health(
-    client, monkeypatch
-):
+def test_windows_research_worker_api_falls_back_to_webhook_health(client, monkeypatch):
     calls: list[str] = []
 
     def fake_urlopen(url: str, timeout: float) -> _FakeHTTPResponse:

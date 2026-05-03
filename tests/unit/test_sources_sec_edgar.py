@@ -142,7 +142,7 @@ def test_load_tickers_config_parses_json(tmp_path: Path) -> None:
 
 def test_minimal_yaml_handles_scalars_and_bools() -> None:
     parsed = _parse_minimal_yaml(
-        "tickers:\n  - AAPL\nmax_per_pull: 3\nflag_true: true\nflag_false: false\nname: \"hello\"\n"
+        'tickers:\n  - AAPL\nmax_per_pull: 3\nflag_true: true\nflag_false: false\nname: "hello"\n'
     )
     assert parsed["tickers"] == ["AAPL"]
     assert parsed["max_per_pull"] == 3
@@ -174,7 +174,10 @@ def test_user_agent_falls_back_to_default(monkeypatch) -> None:
 def test_user_agent_override_wins(monkeypatch) -> None:
     monkeypatch.setenv("SAPPHIRE_SEC_UA_NAME", "AcmeQuant")
     monkeypatch.setenv("SAPPHIRE_SEC_UA_EMAIL", "ops@acme.example")
-    assert _user_agent(override="ZetaResearch/1.0 (ops@zeta.example)") == "ZetaResearch/1.0 (ops@zeta.example)"
+    assert (
+        _user_agent(override="ZetaResearch/1.0 (ops@zeta.example)")
+        == "ZetaResearch/1.0 (ops@zeta.example)"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -328,21 +331,25 @@ def test_cache_used_within_ttl(
     assert events[0].ticker == "AAPL" and "5.02" in events[0].items
 
 
-def test_stale_cache_used_in_dry_run(
-    tmp_path: Path, tmp_config: Path, monkeypatch
-) -> None:
+def test_stale_cache_used_in_dry_run(tmp_path: Path, tmp_config: Path, monkeypatch) -> None:
     monkeypatch.delenv("SAPPHIRE_SEC_LIVE", raising=False)
     cache_path = tmp_path / "filings.json"
     # Older than 1h (TTL boundary)
     old_iso = (datetime.now(UTC) - timedelta(hours=8)).isoformat()
     cache_path.write_text(
-        json.dumps({"retrieved_at": old_iso, "filings": {"AAPL": [{"form": "10-K", "filed": "2024-09-30"}]}}),
+        json.dumps(
+            {
+                "retrieved_at": old_iso,
+                "filings": {"AAPL": [{"form": "10-K", "filed": "2024-09-30"}]},
+            }
+        ),
         encoding="utf-8",
     )
     # Force mtime to be old so read_fresh_json returns None.
     old = time.time() - 10000
     Path(cache_path).touch()
     import os
+
     os.utime(cache_path, (old, old))
     src = SECEdgarSource(
         config_path=tmp_config,
@@ -423,9 +430,36 @@ def test_latest_for_dry_run_no_live_returns_none_when_no_cache(
 
 def test_filter_events_by_form_and_severity() -> None:
     events = [
-        FilingEvent(ticker="A", form="8-K", items="1.01", severity="high", direction="neutral", summary="", filed_at="", accession=""),
-        FilingEvent(ticker="A", form="10-Q", items="", severity="high", direction="neutral", summary="", filed_at="", accession=""),
-        FilingEvent(ticker="A", form="8-K", items="7.01", severity="low", direction="neutral", summary="", filed_at="", accession=""),
+        FilingEvent(
+            ticker="A",
+            form="8-K",
+            items="1.01",
+            severity="high",
+            direction="neutral",
+            summary="",
+            filed_at="",
+            accession="",
+        ),
+        FilingEvent(
+            ticker="A",
+            form="10-Q",
+            items="",
+            severity="high",
+            direction="neutral",
+            summary="",
+            filed_at="",
+            accession="",
+        ),
+        FilingEvent(
+            ticker="A",
+            form="8-K",
+            items="7.01",
+            severity="low",
+            direction="neutral",
+            summary="",
+            filed_at="",
+            accession="",
+        ),
     ]
     only_8k = filter_events(events, forms=["8-K"])
     assert len(only_8k) == 2
@@ -435,10 +469,46 @@ def test_filter_events_by_form_and_severity() -> None:
 
 def test_severity_breakdown_aggregates_correctly() -> None:
     events = [
-        FilingEvent(ticker="A", form="8-K", items="1.01", severity="high", direction="neutral", summary="", filed_at="", accession=""),
-        FilingEvent(ticker="A", form="8-K", items="5.02", severity="medium", direction="neutral", summary="", filed_at="", accession=""),
-        FilingEvent(ticker="A", form="8-K", items="7.01", severity="low", direction="neutral", summary="", filed_at="", accession=""),
-        FilingEvent(ticker="A", form="8-K", items="7.01", severity="low", direction="neutral", summary="", filed_at="", accession=""),
+        FilingEvent(
+            ticker="A",
+            form="8-K",
+            items="1.01",
+            severity="high",
+            direction="neutral",
+            summary="",
+            filed_at="",
+            accession="",
+        ),
+        FilingEvent(
+            ticker="A",
+            form="8-K",
+            items="5.02",
+            severity="medium",
+            direction="neutral",
+            summary="",
+            filed_at="",
+            accession="",
+        ),
+        FilingEvent(
+            ticker="A",
+            form="8-K",
+            items="7.01",
+            severity="low",
+            direction="neutral",
+            summary="",
+            filed_at="",
+            accession="",
+        ),
+        FilingEvent(
+            ticker="A",
+            form="8-K",
+            items="7.01",
+            severity="low",
+            direction="neutral",
+            summary="",
+            filed_at="",
+            accession="",
+        ),
     ]
     breakdown = severity_breakdown(events)
     assert breakdown["high"] == 1

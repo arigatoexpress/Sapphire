@@ -1,0 +1,20 @@
+{
+  "chain_id": 42161,
+  "interface": "AggregatorV3Interface",
+  "source": "https://docs.chain.link/data-feeds/api-reference#aggregatorv3interface",
+  "source_solidity": "https://github.com/smartcontractkit/chainlink/blob/develop/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol",
+  "fetched_at": "2026-05-02T00:00:00+00:00",
+  "notes": "Standard Chainlink AggregatorV3Interface ABI. The same ABI is used by every Chainlink Data Feed on every chain (the implementation contract behind each feed proxy implements this interface). We pin only the methods we actually call (latestRoundData, decimals, description, version) — the proxy also exposes getRoundData, latestAnswer, latestTimestamp, latestRound and admin/owner methods, but those are not used by the GMX fallback path.",
+  "verified_against": [
+    {
+      "feed": "BTC/USD",
+      "address": "0x6ce185860a4963106506C203335A2910413708e9",
+      "chain_id": 42161
+    },
+    {
+      "feed": "ETH/USD",
+      "address": "0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612",
+      "chain_id": 42161
+    }
+  ]
+}

@@ -1,6 +1,31 @@
 # Market Intel Runbook
 
-Last reviewed: 2026-04-29
+Last reviewed: 2026-04-30
+
+## Triage Quickstart
+
+Failure mode addressed: the daily brief reports a missing `market_intel`
+section, or downstream signal-enhancement is operating on stale snapshots.
+
+```bash
+launchctl print gui/$(id -u)/com.sapphire.market-intel
+```
+
+```bash
+stat -f '%Sm %N' data/intelligence/latest/market_intel.json
+```
+
+```bash
+jq '{timestamp, errors}' data/intelligence/latest/market_intel.json
+```
+
+If the file is older than 45 minutes, the snapshot is stale by contract — check
+launchd, then logs. If `errors` is non-empty, individual feeds failed but the
+artifact may still be partially usable.
+
+Live monitors: dashboard `/observability` market-intel freshness card.
+On-call escalation: intel owner; p3 unless brief generation is blocked, then
+p2.
 
 This runbook covers `com.sapphire.market-intel`, the local LaunchAgent that
 refreshes the market-intelligence snapshot consumed by daily briefs and signal

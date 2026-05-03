@@ -141,8 +141,7 @@ def test_tools_schema_well_formed(nvidia):
 def test_send_telegram_priority_enum_is_p_levels(nvidia):
     """send_telegram tool restricts priority to p0/p1/p2 strings."""
     tool = next(
-        t["function"] for t in nvidia.SAPPHIRE_TOOLS
-        if t["function"]["name"] == "send_telegram"
+        t["function"] for t in nvidia.SAPPHIRE_TOOLS if t["function"]["name"] == "send_telegram"
     )
     enum = tool["parameters"]["properties"]["priority"]["enum"]
     assert enum == ["p0", "p1", "p2"]
@@ -151,8 +150,12 @@ def test_send_telegram_priority_enum_is_p_levels(nvidia):
 def test_agent_response_dataclass_shape(nvidia):
     fields = nvidia.AgentResponse.__dataclass_fields__
     for name in (
-        "query", "tool_calls", "tool_results",
-        "synthesis", "model_used", "timestamp",
+        "query",
+        "tool_calls",
+        "tool_results",
+        "synthesis",
+        "model_used",
+        "timestamp",
     ):
         assert name in fields
 
@@ -187,9 +190,7 @@ def test_ollama_chat_falls_through_to_second_endpoint(nvidia):
 
 def test_ollama_chat_all_endpoints_fail(nvidia):
     """All endpoints fail → returns the documented error sentinel."""
-    with patch.object(
-        nvidia.urllib.request, "urlopen", side_effect=urllib.error.URLError("down")
-    ):
+    with patch.object(nvidia.urllib.request, "urlopen", side_effect=urllib.error.URLError("down")):
         result = nvidia._ollama_chat("hermes3:8b", [{"role": "user", "content": "hi"}])
     assert "error" in result
     assert "unavailable" in result["error"].lower()
@@ -206,7 +207,8 @@ def test_ollama_chat_tool_payload_only_when_supplied(nvidia):
 
     with patch.object(nvidia.urllib.request, "urlopen", side_effect=_capture):
         nvidia._ollama_chat(
-            "hermes3:8b", [{"role": "user", "content": "hi"}],
+            "hermes3:8b",
+            [{"role": "user", "content": "hi"}],
             tools=[{"type": "function", "function": {"name": "noop", "parameters": {}}}],
         )
     assert "tools" in captured["body"]
@@ -240,10 +242,18 @@ def test_ollama_chat_request_targets_chat_endpoint(nvidia):
 def test_execute_tool_get_technical_analysis_happy(nvidia):
     """Happy path: returns JSON-encoded fields from the technical profile."""
     fake_profile = MagicMock(
-        symbol="BTC", price=50000.0, rsi_14=60.0, rsi_zone="neutral",
-        macd_cross="none", ma_trend="bullish", bb_position="upper_half",
-        net_signal="bullish", signal_count_bullish=3, signal_count_bearish=1,
-        atr_pct=2.5, volume_signal="normal",
+        symbol="BTC",
+        price=50000.0,
+        rsi_14=60.0,
+        rsi_zone="neutral",
+        macd_cross="none",
+        ma_trend="bullish",
+        bb_position="upper_half",
+        net_signal="bullish",
+        signal_count_bullish=3,
+        signal_count_bearish=1,
+        atr_pct=2.5,
+        volume_signal="normal",
     )
 
     fake_module = MagicMock()
@@ -275,10 +285,15 @@ def test_execute_tool_get_quant_analysis_happy(nvidia):
     sup = MagicMock(price=49000.0, strength=3)
     res = MagicMock(price=51000.0, strength=2)
     fake_profile = MagicMock(
-        symbol="BTC", price=50000.0,
-        nearest_support=49000.0, nearest_resistance=51000.0,
-        risk_reward=1.5, trend_strength=70.0, trend_direction="up",
-        support_levels=[sup], resistance_levels=[res],
+        symbol="BTC",
+        price=50000.0,
+        nearest_support=49000.0,
+        nearest_resistance=51000.0,
+        risk_reward=1.5,
+        trend_strength=70.0,
+        trend_direction="up",
+        support_levels=[sup],
+        resistance_levels=[res],
     )
     fake_module = MagicMock()
     fake_module.analyze_full.return_value = fake_profile
@@ -304,8 +319,12 @@ def test_execute_tool_get_quant_analysis_no_data(nvidia):
 
 
 def test_execute_tool_get_correlation(nvidia):
-    pair_a = MagicMock(asset_a="BTC", asset_b="ETH", correlation=0.85, interpretation="strong_positive")
-    pair_b = MagicMock(asset_a="BTC", asset_b="SOL", correlation=0.5, interpretation="moderate_positive")
+    pair_a = MagicMock(
+        asset_a="BTC", asset_b="ETH", correlation=0.85, interpretation="strong_positive"
+    )
+    pair_b = MagicMock(
+        asset_a="BTC", asset_b="SOL", correlation=0.5, interpretation="moderate_positive"
+    )
     fake_module = MagicMock()
     fake_module.correlation_matrix.return_value = [pair_a, pair_b]
     with patch.dict(sys.modules, {"quant_analysis": fake_module}):
@@ -320,11 +339,7 @@ def test_execute_tool_get_correlation(nvidia):
 
 
 def test_execute_tool_get_equity_quote_happy(nvidia):
-    payload = {
-        "results": [
-            {"symbol": "AAPL", "last_price": 175.0, "volume": 1000000}
-        ]
-    }
+    payload = {"results": [{"symbol": "AAPL", "last_price": 175.0, "volume": 1000000}]}
     with patch.object(nvidia.urllib.request, "urlopen", return_value=_success_response(payload)):
         result = nvidia._execute_tool("get_equity_quote", {"symbol": "AAPL"})
     parsed = json.loads(result)
@@ -340,7 +355,9 @@ def test_execute_tool_get_equity_quote_url_encodes_symbol(nvidia):
     def _capture(url, timeout):
         # urllib.request.urlopen accepts a string URL here (not Request).
         captured["url"] = url
-        return _success_response({"results": [{"symbol": "TSLA", "last_price": 200.0, "volume": 5000}]})
+        return _success_response(
+            {"results": [{"symbol": "TSLA", "last_price": 200.0, "volume": 5000}]}
+        )
 
     with patch.object(nvidia.urllib.request, "urlopen", side_effect=_capture):
         nvidia._execute_tool("get_equity_quote", {"symbol": "TSLA"})
@@ -350,7 +367,8 @@ def test_execute_tool_get_equity_quote_url_encodes_symbol(nvidia):
 def test_execute_tool_get_equity_quote_network_error(nvidia):
     """Network failures surface as a JSON-encoded error, not an exception."""
     with patch.object(
-        nvidia.urllib.request, "urlopen",
+        nvidia.urllib.request,
+        "urlopen",
         side_effect=urllib.error.URLError("connection refused"),
     ):
         result = nvidia._execute_tool("get_equity_quote", {"symbol": "AAPL"})
@@ -375,12 +393,16 @@ def test_execute_tool_get_prediction_history_with_file(nvidia, tmp_path, monkeyp
     monkeypatch.setenv("HOME", str(tmp_path))
     target = tmp_path / "Code" / "Sapphire" / "data" / "trading_predictions.jsonl"
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text("\n".join([
-        json.dumps({"correct": True}),
-        json.dumps({"correct": True}),
-        json.dumps({"correct": False}),
-        json.dumps({"correct": None}),  # unscored
-    ]))
+    target.write_text(
+        "\n".join(
+            [
+                json.dumps({"correct": True}),
+                json.dumps({"correct": True}),
+                json.dumps({"correct": False}),
+                json.dumps({"correct": None}),  # unscored
+            ]
+        )
+    )
     result = nvidia._execute_tool("get_prediction_history", {})
     parsed = json.loads(result)
     assert parsed["total"] == 4
@@ -399,7 +421,8 @@ def test_execute_tool_send_telegram(nvidia):
 
     with patch.dict(sys.modules, {"notify": fake_notify}):
         result = nvidia._execute_tool(
-            "send_telegram", {"message": "hello", "priority": "p2"},
+            "send_telegram",
+            {"message": "hello", "priority": "p2"},
         )
     parsed = json.loads(result)
     assert parsed == {"sent": True}
@@ -466,9 +489,10 @@ def test_run_agent_invokes_tool_then_synthesizes(nvidia):
         return synthesis_response
 
     fake_tool_result = json.dumps({"symbol": "BTC", "price": 50000.0})
-    with patch.object(nvidia, "_ollama_chat", side_effect=_fake_chat), patch.object(
-        nvidia, "_execute_tool", return_value=fake_tool_result
-    ) as exec_mock:
+    with (
+        patch.object(nvidia, "_ollama_chat", side_effect=_fake_chat),
+        patch.object(nvidia, "_execute_tool", return_value=fake_tool_result) as exec_mock,
+    ):
         result = nvidia.run_agent("How is BTC doing?")
 
     assert any(tc["name"] == "get_technical_analysis" for tc in result.tool_calls)
@@ -483,9 +507,7 @@ def test_run_agent_respects_max_turns(nvidia):
     """When tool-calls keep coming, we stop after max_turns."""
     forever_tool = {
         "message": {
-            "tool_calls": [
-                {"function": {"name": "get_correlation", "arguments": {}}}
-            ],
+            "tool_calls": [{"function": {"name": "get_correlation", "arguments": {}}}],
             "content": "",
         }
     }
@@ -500,9 +522,10 @@ def test_run_agent_respects_max_turns(nvidia):
             return synthesis
         return forever_tool
 
-    with patch.object(nvidia, "_ollama_chat", side_effect=_fake_chat), patch.object(
-        nvidia, "_execute_tool", return_value=json.dumps([])
-    ) as exec_mock:
+    with (
+        patch.object(nvidia, "_ollama_chat", side_effect=_fake_chat),
+        patch.object(nvidia, "_execute_tool", return_value=json.dumps([])) as exec_mock,
+    ):
         result = nvidia.run_agent("loop me", max_turns=2)
     # 2 agent-loop iterations × 1 tool call each = 2 calls.
     assert exec_mock.call_count == 2
@@ -597,15 +620,14 @@ def test_run_agent_synthesis_truncates_large_tool_payloads(nvidia):
             return tool_call_response
         return no_more
 
-    with patch.object(nvidia, "_ollama_chat", side_effect=_fake_chat), patch.object(
-        nvidia, "_execute_tool", return_value=huge_payload
+    with (
+        patch.object(nvidia, "_ollama_chat", side_effect=_fake_chat),
+        patch.object(nvidia, "_execute_tool", return_value=huge_payload),
     ):
         nvidia.run_agent("ping")
 
     # Last call is the synthesis prompt → the user-content body should be ≤
     # the upper bound the source documents (3000 char cap on dumped results +
     # constant prefix). Anything massively over implies the cap is ineffective.
-    synthesis_user = next(
-        m for m in captured_messages[-1] if m["role"] == "user"
-    )
+    synthesis_user = next(m for m in captured_messages[-1] if m["role"] == "user")
     assert len(synthesis_user["content"]) < 5_000

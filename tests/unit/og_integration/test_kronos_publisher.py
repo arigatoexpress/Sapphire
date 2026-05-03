@@ -87,7 +87,9 @@ class TestSummarise:
 
 
 class TestLatestPredictions:
-    def test_finds_latest_dated_dir(self, kp, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_finds_latest_dated_dir(
+        self, kp, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         intel = tmp_path / "intelligence"
         for date in ("2026-04-28", "2026-04-29", "2026-04-30"):
             d = intel / date
@@ -98,7 +100,9 @@ class TestLatestPredictions:
         assert latest is not None
         assert latest.parent.name == "2026-04-30"
 
-    def test_returns_none_when_missing(self, kp, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_returns_none_when_missing(
+        self, kp, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setattr(kp, "INTELLIGENCE_DIR", tmp_path / "nonexistent")
         assert kp._latest_predictions() is None
 

@@ -103,9 +103,7 @@ def test_live_status_passes_through_limit_query(client):
         patch("importlib.util.spec_from_file_location", side_effect=spec_fn),
         patch("importlib.util.module_from_spec", side_effect=mod_fn),
     ):
-        response = client.get(
-            "/api/hyperliquid/live-status?limit=10", headers=_auth_header()
-        )
+        response = client.get("/api/hyperliquid/live-status?limit=10", headers=_auth_header())
 
     assert response.status_code == 200
     assert captured["limit"] == 10

@@ -195,9 +195,7 @@ def test_eval_live_skips_sensitive_prompts(isolated_cache, monkeypatch):
         context="OI up 3% on Binance perpetuals",
     )
 
-    monkeypatch.setitem(
-        vertex_eval.EVAL_PROMPT_SETS, fake_set, (sensitive_case, safe_case)
-    )
+    monkeypatch.setitem(vertex_eval.EVAL_PROMPT_SETS, fake_set, (sensitive_case, safe_case))
 
     def fake_sdk(prompt: str, *, model: str, max_output_tokens: int, api_key: str):
         return _high_quality_sdk()
@@ -209,9 +207,9 @@ def test_eval_live_skips_sensitive_prompts(isolated_cache, monkeypatch):
         sdk_call=fake_sdk,
     )
     assert result["metadata"]["mode_actual"] == "dry-run-safety"
-    assert any(c["prompt_id"] == sensitive_case.prompt_id for c in result["metadata"][
-        "sensitive_cases"
-    ])
+    assert any(
+        c["prompt_id"] == sensitive_case.prompt_id for c in result["metadata"]["sensitive_cases"]
+    )
     sections = {s["generator"] for s in result["generators"]}
     assert sections == {"dry-run"}
 

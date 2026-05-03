@@ -1,0 +1,124 @@
+# MegaETH protocol registry — source of truth for `lib.chains.megaeth.registry`.
+#
+# All addresses cross-checked against the canonical Aave address book
+# (https://github.com/aave-dao/aave-address-book/blob/main/src/AaveV3MegaEth.sol)
+# AND live-verified to have non-zero `eth_getCode` against
+# https://mainnet.megaeth.com/rpc on 2026-04-30.
+#
+# Schema:
+#   <protocol_key>:
+#     name: human display name
+#     category: lending | dex_spot | dex_perps | stable | bridge | yield | oracle
+#     priority: 1=must, 2=should, 3=nice
+#     status: active | deprecated | pending
+#     docs_url: external link
+#     addresses: role -> 0x address
+#     abi_paths: role -> path relative to `lib/chains/megaeth/abis/`
+#     notes: free-form string
+
+aave_v3:
+  name: "Aave V3 (MegaETH)"
+  category: lending
+  priority: 1
+  status: active
+  docs_url: "https://github.com/aave-dao/aave-address-book/blob/main/src/AaveV3MegaEth.sol"
+  addresses:
+    pool: "0x7e324AbC5De01d112AfC03a584966ff199741C28"
+    pool_addresses_provider: "0x46Dcd5F4600319b02649Fd76B55aA6c1035CA478"
+    oracle: "0x421117D7319E96d831972b3F7e970bbfe29C4F21"
+    ui_pool_data_provider: "0x1aB55bBdD5DF0782BBCf73553Af93BC6B29A286B"
+    protocol_data_provider: "0x9588b453A4EE24a420830CB3302195cA7aA3b403"
+  abi_paths:
+    pool: "aave_v3/pool_min.json"
+    pool_addresses_provider: "aave_v3/pool_addresses_provider.json"
+    oracle: "aave_v3/oracle.json"
+    ui_pool_data_provider: "aave_v3/ui_pool_data_provider.json"
+    protocol_data_provider: "aave_v3/protocol_data_provider.json"
+  notes: >
+    80% of MegaETH chain TVL ($392.4M of $490.1M as of 2026-04-30 TGE).
+    Pool (proxy 0x7e32…) has impl 0xc74c…44da4D which is NOT verified on
+    Blockscout, so pool_min.json is a hand-curated subset of read methods
+    sourced from aave-dao/aave-v3-origin/src/contracts/interfaces/IPool.sol.
+    UiPoolDataProvider is the canonical aggregate read entrypoint —
+    `getReservesData(provider)` returns every reserve in one call.
+
+kumbaya:
+  name: "Kumbaya (UniswapV3 fork)"
+  category: dex_spot
+  priority: 1
+  status: active
+  docs_url: "https://github.com/zgos/Kumbaya-xyz-integrator-kit"
+  addresses:
+    factory: "0x68b34591f662508076927803c567Cc8006988a09"
+    quoter_v2: "0x1F1a8dC7E138C34b503Ca080962aC10B75384a27"
+    swap_router: "0xE5BbEF8De2DB447a7432A47EBa58924d94eE470e"
+  abi_paths:
+    factory: "kumbaya/factory.json"
+    quoter_v2: "kumbaya/quoter_v2.json"
+    swap_router: "kumbaya/swap_router.json"
+    pool: "kumbaya/pool.json"
+  notes: >
+    Second-largest spot venue on MegaETH ($74.8M TVL as of 2026-04-30).
+    Factory, QuoterV2, SwapRouter02 are all VERIFIED on Blockscout
+    (cross-checked 2026-04-30). Pool contracts are CREATE2-deployed
+    clones and NOT verified — pool.json is the canonical UniswapV3Pool
+    read-method subset lifted from Uniswap/v3-core (mirrors Wave A's
+    pool_min.json workaround for the unverified Aave Pool impl).
+    QuoterV2 is `stateMutability: nonpayable` (not view) — it works
+    via eth_call but NOT via on-chain staticcall; see the wrapper
+    docstring for the full footgun explanation. Wave B step 1 wires
+    factory + quoter for read paths; SwapRouter02 ABI is pinned for
+    Wave C to bind without a re-fetch.
+
+usdm:
+  name: "MegaUSD (USDM)"
+  category: stable
+  priority: 1
+  status: active
+  docs_url: "https://megaeth.blockscout.com/address/0xFAfDdbb3FC7688494971a79cc65DCa3EF82079E7"
+  addresses:
+    token: "0xFAfDdbb3FC7688494971a79cc65DCa3EF82079E7"
+    twap60_oracle: "0x663B50C9DA9Bd586f855aF13e91EF2f0954c9761"
+    eth_oracle: "0xD011778057AA740BB3703Ad4d78b3c79a1aED1cb"
+  abi_paths:
+    token: "usdm/token.json"
+    twap60_oracle: "usdm/oracle_usdm_twap60.json"
+    eth_oracle: "usdm/oracle_usdm_eth.json"
+  notes: >
+    Native MegaETH stable. Symbol is "USDm" (lowercase 'm'). Token is
+    an ERC1967Proxy whose impl is xUSDOFTUpgradeable (LayerZero V2 OFT) —
+    USDm is bridged in via LayerZero, NOT minted on-chain on MegaETH.
+    Total supply at TGE day (2026-04-30) was 360,753,853 USDm, matching
+    the protocol map's "$360M circulating".
+    .
+    IMPORTANT — protocol-map drift: the map (PR #535) lists Minter_v2 +
+    StabilityPool_v2 + ReservePool_v1 + Genesis_v1 as the "USDM stack".
+    Live probes show those contracts target a DIFFERENT, uninitialized
+    pegged-token (Minter_v2.PEGGED_TOKEN() = 0xbed2c…, NOT 0xFAfDdbb…).
+    They're NOT the live USDm's plumbing and are intentionally OMITTED
+    from this entry. There is therefore no on-chain collateral_ratio
+    to read for the live USDm — collateral lives off-chain at the
+    LayerZero-source issuer. See lib/chains/megaeth/contracts/usdm.py
+    docstring for the full architectural rationale.
+    .
+    Three peg-quote sources are wired into stable_health():
+    (a) Kumbaya USDM/USDT0 0.01% pool (venue-priced, lowest-liquidity
+        canary), (b) MegaEthPriceFeedUsdmTwap60 (on-chain TWAP-60),
+    (c) AaveOracle.getAssetPrice (Aave V3 liquidation pricing). Live
+    readings on TGE day: Aave $1.0000, TWAP60 $0.99926, Kumbaya
+    $0.99951 → max divergence ~7.4 bps. Comfortably HEALTHY.
+
+usdt0:
+  name: "USDT0 (Tether L2)"
+  category: stable
+  priority: 1
+  status: active
+  docs_url: "https://megaeth.blockscout.com/address/0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb"
+  addresses:
+    token: "0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb"
+  abi_paths: {}
+  notes: >
+    Largest stable on chain ($4.06B circulating, 6,409 holders per the
+    protocol map). Standard 6-decimal ERC-20; no custom wrapper needed
+    in Wave B.2. Registered here so the USDM peg-monitor can resolve
+    the USDT0 address without hard-coding it.

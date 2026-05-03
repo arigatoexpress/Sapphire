@@ -213,21 +213,28 @@ def test_handle_unknown_action_lists_valid_actions():
 
 
 def test_main_rejects_invalid_json(capsys):
-    rc = _tool().main(stream_in=type("S", (), {"read": lambda self: "{"})(), stream_out=__import__("sys").stdout)
+    rc = _tool().main(
+        stream_in=type("S", (), {"read": lambda self: "{"})(), stream_out=__import__("sys").stdout
+    )
     captured = capsys.readouterr()
     assert rc == 2
     assert "invalid JSON" in captured.out
 
 
 def test_main_accepts_json_object(capsys):
-    rc = _tool().main(stream_in=type("S", (), {"read": lambda self: '{"action":"corpus"}'})(), stream_out=__import__("sys").stdout)
+    rc = _tool().main(
+        stream_in=type("S", (), {"read": lambda self: '{"action":"corpus"}'})(),
+        stream_out=__import__("sys").stdout,
+    )
     captured = capsys.readouterr()
     assert rc == 0
     assert '"ok": true' in captured.out
 
 
 def test_main_rejects_json_array(capsys):
-    rc = _tool().main(stream_in=type("S", (), {"read": lambda self: "[]"})(), stream_out=__import__("sys").stdout)
+    rc = _tool().main(
+        stream_in=type("S", (), {"read": lambda self: "[]"})(), stream_out=__import__("sys").stdout
+    )
     captured = capsys.readouterr()
     assert rc == 2
     assert "JSON object" in captured.out

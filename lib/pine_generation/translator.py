@@ -232,9 +232,7 @@ class PineSpec:
         if self.initial_capital <= 0:
             raise ValueError(f"initial_capital must be > 0; got {self.initial_capital}")
         if not 0 <= self.commission_pct <= 1.0:
-            raise ValueError(
-                f"commission_pct must be in [0, 1.0]; got {self.commission_pct}"
-            )
+            raise ValueError(f"commission_pct must be in [0, 1.0]; got {self.commission_pct}")
 
     @property
     def resolved_title(self) -> str:
@@ -436,9 +434,7 @@ def generate_pine(spec: PineSpec) -> str:
     template_name = STRATEGY_TEMPLATE_MAP[spec.strategy]
     template_path = TEMPLATE_DIR / template_name
     if not template_path.exists():
-        raise ValueError(
-            f"template not found for strategy '{spec.strategy}': {template_path}"
-        )
+        raise ValueError(f"template not found for strategy '{spec.strategy}': {template_path}")
 
     context = _build_template_context(spec)
 

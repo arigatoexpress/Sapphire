@@ -1,0 +1,123 @@
+{% extends "_base_subpage.html" %}
+{% block title %}Threat Intel{% endblock %}
+{% block crumb %}p/threats{% endblock %}
+{% block meta %}live cve feed{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <h1>Global Threat Intelligence</h1>
+  <div class="typed" id="typed-line">$ ./sapphire threats --live --explain</div>
+</section>
+
+<section class="box">
+  <h2 class="section">PLAIN_ENGLISH</h2>
+  <p style="margin: 4px 0 0; line-height: 1.7;">
+    Live CVEs from <strong style="color:var(--green)">CISA KEV</strong> + <strong style="color:var(--green)">NVD</strong> + <strong style="color:var(--green)">MITRE ATT&amp;CK</strong>,
+    scored with <strong style="color:var(--green)">EPSS</strong> (exploit probability) plus our composite <em>actionability</em> ranking
+    (severity × exposure × exploited-in-wild × patch availability). This is our deepest data right now.
+  </p>
+</section>
+
+<section class="grid cols-3">
+  <div class="card"><div class="muted">CVES_LIVE</div><h3 id="kpi-live">--</h3><div class="muted">records returned now</div></div>
+  <div class="card"><div class="muted">CRITICAL_24H</div><h3 id="kpi-crit">--</h3><div class="muted">cisa kev tagged</div></div>
+  <div class="card"><div class="muted">FETCHED_AT</div><h3 id="kpi-fetched" class="dim" style="font-size: 13px;">--</h3><div class="muted">upstream snapshot</div></div>
+</section>
+
+<section class="box" style="margin-top: 14px;">
+  <h2 class="section">SEVERITY_30D</h2>
+  <div id="severity-chart" style="height: 220px; border: 1px solid var(--line); padding: 14px;">
+    <pre id="severity-ascii" style="margin:0; background:transparent; border:0; color:var(--green); font-size: 11px; line-height: 1.3;">  loading 30d severity stack ...</pre>
+  </div>
+</section>
+
+<section class="box">
+  <h2 class="section">LIVE_FEED</h2>
+  <table class="term">
+    <thead><tr><th>cve</th><th>sev</th><th>source</th><th>summary</th><th>epss</th></tr></thead>
+    <tbody id="live-rows">
+      <tr><td colspan="5" class="muted">// fetching from cyber-threat-bot</td></tr>
+    </tbody>
+  </table>
+  <div class="muted" style="margin-top: 10px;">upstream: <code>{{ threat_bot_url }}</code></div>
+</section>
+
+<section class="box">
+  <h2 class="section">PRIORITIZED_ACTIONS</h2>
+  <ol id="prio-list" class="dim" style="margin: 0; padding-left: 22px;">
+    <li class="muted">// ranked by composite actionability</li>
+  </ol>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  var line = document.getElementById('typed-line');
+  if (line) {
+    var full = line.textContent; line.textContent = ''; var i=0;
+    (function tick(){ if (i>=full.length) return; line.textContent += full.charAt(i++); setTimeout(tick, 28); })();
+  }
+
+  function esc(s){ return String(s||'').replace(/[<>&]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
+
+  fetch('/api/threats/live').then(r=>r.json()).then(d=>{
+    var rows = d.records || [];
+    document.getElementById('kpi-live').textContent = rows.length;
+    document.getElementById('kpi-fetched').textContent = d.fetched_at || '--';
+    var crit = rows.filter(r => (r.severity||'').toUpperCase() === 'CRITICAL' || r.kev).length;
+    document.getElementById('kpi-crit').textContent = crit;
+    var tb = document.getElementById('live-rows');
+    if (!rows.length) { tb.innerHTML = '<tr><td colspan="5" class="muted">// no records returned</td></tr>'; return; }
+    tb.innerHTML = rows.slice(0, 25).map(r => {
+      var sev = (r.severity||'').toUpperCase();
+      var pillCls = sev === 'CRITICAL' ? 'red' : sev === 'HIGH' ? 'amber' : 'green';
+      return '<tr>' +
+        '<td><code>' + esc(r.cve_id || r.id || '') + '</code></td>' +
+        '<td><span class="pill ' + pillCls + '">' + esc(sev || 'N/A') + '</span></td>' +
+        '<td class="dim">' + esc(r.source || 'nvd') + '</td>' +
+        '<td>' + esc((r.summary || r.description || '').slice(0, 110)) + '</td>' +
+        '<td class="dim">' + (r.epss != null ? Number(r.epss).toFixed(3) : '--') + '</td>' +
+      '</tr>';
+    }).join('');
+  }).catch(()=>{
+    document.getElementById('live-rows').innerHTML = '<tr><td colspan="5" class="muted">// upstream unreachable</td></tr>';
+  });
+
+  fetch('/api/timeseries/threats').then(r=>r.json()).then(d=>{
+    var rows = d.rows || [];
+    if (!rows.length) { document.getElementById('severity-ascii').textContent = '  no 30d data'; return; }
+    var byDate = {};
+    rows.forEach(r => {
+      var dt = (r.date||'').slice(5);
+      if (!byDate[dt]) byDate[dt] = {CRITICAL:0,HIGH:0,MEDIUM:0,LOW:0};
+      byDate[dt][(r.severity||'UNCLASSIFIED').toUpperCase()] = (byDate[dt][(r.severity||'').toUpperCase()] || 0) + Number(r.cves||0);
+    });
+    var dates = Object.keys(byDate).sort();
+    var lines = [];
+    dates.slice(-30).forEach(d => {
+      var v = byDate[d];
+      var c = v.CRITICAL||0, h = v.HIGH||0, m = v.MEDIUM||0;
+      var bar = '#'.repeat(Math.min(40, c)) + '='.repeat(Math.min(40, h)) + '-'.repeat(Math.min(40, m));
+      lines.push('  ' + d + '  ' + bar + '  ' + (c+h+m));
+    });
+    lines.push('');
+    lines.push('  legend: # critical  = high  - medium');
+    document.getElementById('severity-ascii').textContent = lines.join('\n');
+  }).catch(()=>{
+    document.getElementById('severity-ascii').textContent = '  // /api/timeseries/threats unreachable';
+  });
+
+  fetch('{{ threat_bot_url }}/threats/prioritized').then(r=>r.ok?r.json():null).then(d=>{
+    if (!d) return;
+    var items = (d.records || d.items || d.threats || []).slice(0, 8);
+    if (!items.length) return;
+    document.getElementById('prio-list').innerHTML = items.map(it => {
+      var label = it.cve_id || it.id || '';
+      var s = it.summary || it.description || '';
+      return '<li><code>' + esc(label) + '</code> &mdash; ' + esc(s.slice(0,140)) + '</li>';
+    }).join('');
+  }).catch(()=>{});
+})();
+</script>
+{% endblock %}

@@ -21,7 +21,9 @@ def test_status_is_non_mutating_by_default(monkeypatch: pytest.MonkeyPatch) -> N
     assert status["safety"]["trading_critical_path"] is False
 
 
-def test_scan_file_does_not_quarantine_without_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_scan_file_does_not_quarantine_without_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.delenv("SAPPHIRE_ADVERSARIAL_QUARANTINE", raising=False)
     input_path = tmp_path / "messages.jsonl"
     input_path.write_text(

@@ -1,0 +1,12 @@
+{
+  "chain_id": 4326,
+  "address": "0xfafddbb3fc7688494971a79cc65dca3ef82079e7",
+  "is_proxy": true,
+  "implementation_address": "0xac37677261885fdb372a37ac8d5d47044196073c",
+  "blockscout_verified_at": "2026-01-04T09:24:54.109756Z",
+  "compiler_version": "v0.8.30+commit.73712a01",
+  "contract_name": "ERC1967Proxy",
+  "abi_hash_sha256": "0cbd2f15f341514fcef1b9f4c9199256328a7335fac222ed0ea0ef93a76fdf23",
+  "fetched_at": "2026-05-01T02:28:32.808239+00:00",
+  "source": "blockscout+impl"
+}

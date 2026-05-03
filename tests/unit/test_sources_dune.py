@@ -44,7 +44,9 @@ def test_dune_dry_run_uses_cached_named_query(tmp_path, monkeypatch) -> None:
     assert sig.raw["query_name"] == "btc_flow"
 
 
-def test_dune_live_gate_runs_operator_config_and_writes_one_hour_cache(tmp_path, monkeypatch) -> None:
+def test_dune_live_gate_runs_operator_config_and_writes_one_hour_cache(
+    tmp_path, monkeypatch
+) -> None:
     monkeypatch.setenv("SAPPHIRE_DUNE_LIVE", "1")
     config = tmp_path / "dune_named_queries.json"
     config.write_text(

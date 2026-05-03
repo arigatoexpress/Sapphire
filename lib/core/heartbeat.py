@@ -133,14 +133,14 @@ def _build_components() -> list[ComponentStatus]:
         ("openbb", "http://127.0.0.1:6900/api/v1/equity/price/quote?symbol=AAPL&provider=yfinance"),
         ("ollama-mac", "http://127.0.0.1:11434/api/version"),
     ]
-    for name, url in http_checks:
+    for name, _url in http_checks:
         comps.append(ComponentStatus(name=name))
 
     # TCP-only
     tcp_checks = [
         ("redis", "127.0.0.1", 6379),
     ]
-    for name, host, port in tcp_checks:
+    for name, _host, _port in tcp_checks:
         comps.append(ComponentStatus(name=name))
 
     # LaunchAgent-backed (self-healable)

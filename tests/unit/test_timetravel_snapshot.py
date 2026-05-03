@@ -165,9 +165,7 @@ def test_load_index_builds_on_first_call(fake_repo: Path, tmp_path: Path) -> Non
     assert body["schema_version"] == 1
 
 
-def test_take_snapshot_returns_empty_for_empty_repo(
-    fake_repo: Path, tmp_path: Path
-) -> None:
+def test_take_snapshot_returns_empty_for_empty_repo(fake_repo: Path, tmp_path: Path) -> None:
     cache = tmp_path / "index.json"
     snap = take_snapshot(
         datetime(2026, 4, 26, 12, 0, tzinfo=UTC),
@@ -179,9 +177,7 @@ def test_take_snapshot_returns_empty_for_empty_repo(
         assert snap.by_scope(sc).empty
 
 
-def test_take_snapshot_includes_only_pre_at_rows(
-    fake_repo: Path, tmp_path: Path
-) -> None:
+def test_take_snapshot_includes_only_pre_at_rows(fake_repo: Path, tmp_path: Path) -> None:
     path = fake_repo / "data" / "correlated_signals" / "2026-04-26" / "signals.jsonl"
     _write_jsonl(
         path,
@@ -193,9 +189,7 @@ def test_take_snapshot_includes_only_pre_at_rows(
         ],
     )
     cache = tmp_path / "index.json"
-    snap = take_snapshot(
-        datetime(2026, 4, 26, 10, 30, tzinfo=UTC), cache_path=cache
-    )
+    snap = take_snapshot(datetime(2026, 4, 26, 10, 30, tzinfo=UTC), cache_path=cache)
     rows = snap.by_scope("correlated_signals").rows
     # Should include 09:00 + 10:00 only.
     assert len(rows) == 2
@@ -203,9 +197,7 @@ def test_take_snapshot_includes_only_pre_at_rows(
     assert "2026-04-26T11:00:00+00:00" not in timestamps
 
 
-def test_take_snapshot_naive_datetime_is_treated_as_utc(
-    fake_repo: Path, tmp_path: Path
-) -> None:
+def test_take_snapshot_naive_datetime_is_treated_as_utc(fake_repo: Path, tmp_path: Path) -> None:
     path = fake_repo / "data" / "correlated_signals" / "2026-04-26" / "signals.jsonl"
     _write_jsonl(path, [_row("BTC", "2026-04-26T10:00:00+00:00")])
     cache = tmp_path / "index.json"
@@ -222,26 +214,12 @@ def test_take_snapshot_naive_datetime_is_treated_as_utc(
 def test_take_snapshot_filters_files_with_first_ts_after_at(
     fake_repo: Path, tmp_path: Path
 ) -> None:
-    early = (
-        fake_repo
-        / "data"
-        / "correlated_signals"
-        / "2026-04-26"
-        / "signals.jsonl"
-    )
-    late = (
-        fake_repo
-        / "data"
-        / "correlated_signals"
-        / "2026-04-27"
-        / "signals.jsonl"
-    )
+    early = fake_repo / "data" / "correlated_signals" / "2026-04-26" / "signals.jsonl"
+    late = fake_repo / "data" / "correlated_signals" / "2026-04-27" / "signals.jsonl"
     _write_jsonl(early, [_row("BTC", "2026-04-26T10:00:00+00:00")])
     _write_jsonl(late, [_row("BTC", "2026-04-27T10:00:00+00:00")])
     cache = tmp_path / "index.json"
-    snap = take_snapshot(
-        datetime(2026, 4, 26, 23, 0, tzinfo=UTC), cache_path=cache
-    )
+    snap = take_snapshot(datetime(2026, 4, 26, 23, 0, tzinfo=UTC), cache_path=cache)
     files = snap.by_scope("correlated_signals").files_visited
     assert any("2026-04-26" in f for f in files)
     assert all("2026-04-27" not in f for f in files)
@@ -253,22 +231,16 @@ def test_take_snapshot_out_of_range_before_earliest_is_empty(
     path = fake_repo / "data" / "correlated_signals" / "2026-04-26" / "signals.jsonl"
     _write_jsonl(path, [_row("BTC", "2026-04-26T10:00:00+00:00")])
     cache = tmp_path / "index.json"
-    snap = take_snapshot(
-        datetime(2025, 12, 31, tzinfo=UTC), cache_path=cache
-    )
+    snap = take_snapshot(datetime(2025, 12, 31, tzinfo=UTC), cache_path=cache)
     entry = snap.by_scope("correlated_signals")
     assert entry.empty
     # Empty entry must still be a valid SnapshotEntry.
     assert isinstance(entry, SnapshotEntry)
 
 
-def test_take_snapshot_provenance_envelope_has_warning(
-    fake_repo: Path, tmp_path: Path
-) -> None:
+def test_take_snapshot_provenance_envelope_has_warning(fake_repo: Path, tmp_path: Path) -> None:
     cache = tmp_path / "index.json"
-    snap = take_snapshot(
-        datetime(2026, 4, 26, 10, 0, tzinfo=UTC), cache_path=cache
-    )
+    snap = take_snapshot(datetime(2026, 4, 26, 10, 0, tzinfo=UTC), cache_path=cache)
     env = snap.provenance_envelope
     assert env["generator"] == "lib.timetravel.snapshot"
     assert env["version"] == "0.1.0"
@@ -285,9 +257,7 @@ def test_take_snapshot_handles_unreadable_file(
     build_index(scopes=DEFAULT_SCOPE, cache_path=cache)
     # Now nuke the file but keep it in the index.
     path.unlink()
-    snap = take_snapshot(
-        datetime(2026, 4, 26, 12, 0, tzinfo=UTC), cache_path=cache
-    )
+    snap = take_snapshot(datetime(2026, 4, 26, 12, 0, tzinfo=UTC), cache_path=cache)
     assert snap.by_scope("correlated_signals").empty
 
 
@@ -321,9 +291,7 @@ def test_index_status_reports_missing_index(tmp_path: Path) -> None:
     assert status["signature"] is None
 
 
-def test_index_status_reports_built_index(
-    fake_repo: Path, tmp_path: Path
-) -> None:
+def test_index_status_reports_built_index(fake_repo: Path, tmp_path: Path) -> None:
     path = fake_repo / "data" / "correlated_signals" / "2026-04-26" / "signals.jsonl"
     _write_jsonl(path, [_row("BTC", "2026-04-26T10:00:00+00:00")])
     cache = tmp_path / "index.json"
@@ -335,9 +303,7 @@ def test_index_status_reports_built_index(
     assert status["signature"] is not None
 
 
-def test_event_bus_scope_uses_flat_jsonl(
-    fake_repo: Path, tmp_path: Path
-) -> None:
+def test_event_bus_scope_uses_flat_jsonl(fake_repo: Path, tmp_path: Path) -> None:
     bus_path = fake_repo / "data" / "events" / "bus.jsonl"
     _write_jsonl(
         bus_path,
@@ -366,9 +332,7 @@ def test_event_bus_scope_uses_flat_jsonl(
     assert rows[0]["id"] == "evt-1"
 
 
-def test_row_timestamp_falls_through_to_payload_ts(
-    fake_repo: Path, tmp_path: Path
-) -> None:
+def test_row_timestamp_falls_through_to_payload_ts(fake_repo: Path, tmp_path: Path) -> None:
     bus_path = fake_repo / "data" / "events" / "bus.jsonl"
     # Row has no top-level timestamp_iso/generated_at, only payload.ts.
     bus_path.parent.mkdir(parents=True, exist_ok=True)
@@ -383,26 +347,20 @@ def test_row_timestamp_falls_through_to_payload_ts(
         encoding="utf-8",
     )
     cache = tmp_path / "index.json"
-    snap = take_snapshot(
-        datetime(2026, 4, 26, 11, 0, tzinfo=UTC), cache_path=cache
-    )
+    snap = take_snapshot(datetime(2026, 4, 26, 11, 0, tzinfo=UTC), cache_path=cache)
     assert len(snap.by_scope("events_bus").rows) == 1
 
 
 def test_snapshot_serializes_to_dict(fake_repo: Path, tmp_path: Path) -> None:
     cache = tmp_path / "index.json"
-    snap = take_snapshot(
-        datetime(2026, 4, 26, 12, 0, tzinfo=UTC), cache_path=cache
-    )
+    snap = take_snapshot(datetime(2026, 4, 26, 12, 0, tzinfo=UTC), cache_path=cache)
     payload = snap.to_dict()
     assert payload["at"] == "2026-04-26T12:00:00+00:00"
     assert isinstance(payload["entries"], dict)
     assert isinstance(payload["provenance_envelope"], dict)
 
 
-def test_rebuild_index_is_idempotent_signature(
-    fake_repo: Path, tmp_path: Path
-) -> None:
+def test_rebuild_index_is_idempotent_signature(fake_repo: Path, tmp_path: Path) -> None:
     path = fake_repo / "data" / "correlated_signals" / "2026-04-26" / "signals.jsonl"
     _write_jsonl(path, [_row("BTC", "2026-04-26T10:00:00+00:00")])
     cache = tmp_path / "index.json"
@@ -411,9 +369,7 @@ def test_rebuild_index_is_idempotent_signature(
     assert a["signature"] == b["signature"]
     # Append a new row → signature must change.
     with path.open("a", encoding="utf-8") as fh:
-        fh.write(
-            json.dumps(_row("ETH", "2026-04-26T11:00:00+00:00"), default=str) + "\n"
-        )
+        fh.write(json.dumps(_row("ETH", "2026-04-26T11:00:00+00:00"), default=str) + "\n")
     c = build_index(scopes=DEFAULT_SCOPE, cache_path=cache)
     assert c["signature"] != a["signature"]
 
@@ -437,13 +393,9 @@ def test_index_skips_oversized_file(
     assert body["totals"]["files"] == 0
 
 
-def test_take_snapshot_within_seconds_window(
-    fake_repo: Path, tmp_path: Path
-) -> None:
+def test_take_snapshot_within_seconds_window(fake_repo: Path, tmp_path: Path) -> None:
     base = datetime(2026, 4, 26, 10, 0, tzinfo=UTC)
-    rows = [
-        _row("BTC", (base + timedelta(seconds=i)).isoformat()) for i in range(10)
-    ]
+    rows = [_row("BTC", (base + timedelta(seconds=i)).isoformat()) for i in range(10)]
     path = fake_repo / "data" / "correlated_signals" / "2026-04-26" / "signals.jsonl"
     _write_jsonl(path, rows)
     cache = tmp_path / "index.json"

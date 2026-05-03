@@ -16,9 +16,10 @@ from lib.og import chain
 
 class TestStrategyIdHashing:
     def test_deterministic(self) -> None:
-        assert chain.strategy_id_from_name("kronos_btc_24h") == hashlib.sha256(
-            b"kronos_btc_24h"
-        ).digest()
+        assert (
+            chain.strategy_id_from_name("kronos_btc_24h")
+            == hashlib.sha256(b"kronos_btc_24h").digest()
+        )
 
     def test_different_strategies_different_ids(self) -> None:
         a = chain.strategy_id_from_name("rsi_cross")

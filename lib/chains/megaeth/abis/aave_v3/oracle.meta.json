@@ -1,0 +1,12 @@
+{
+  "chain_id": 4326,
+  "address": "0x421117d7319e96d831972b3f7e970bbfe29c4f21",
+  "is_proxy": false,
+  "implementation_address": null,
+  "blockscout_verified_at": "2026-01-27T03:55:35.720162Z",
+  "compiler_version": "v0.8.27+commit.40a35a09",
+  "contract_name": "AaveOracle",
+  "abi_hash_sha256": "bd4f5e653cf3f3b50710c66b33d286cc7bec978be05da6b1bd75e7e0f1573537",
+  "fetched_at": "2026-05-01T01:51:44.286253+00:00",
+  "source": "blockscout"
+}

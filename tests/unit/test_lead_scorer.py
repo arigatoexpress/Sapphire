@@ -56,27 +56,19 @@ def test_parse_response_rejects_invalid():
     assert lead_scorer._parse_response("") is None
     assert lead_scorer._parse_response('{"score": "high"}') is None
     assert lead_scorer._parse_response('{"score": 50}') is None  # missing reason
-    assert (
-        lead_scorer._parse_response('{"score": 50, "reason": "x", "urgency": "extreme"}') is None
-    )
+    assert lead_scorer._parse_response('{"score": 50, "reason": "x", "urgency": "extreme"}') is None
 
 
 def test_parse_response_clamps_score():
-    parsed = lead_scorer._parse_response(
-        '{"score": 150, "reason": "max", "urgency": "high"}'
-    )
+    parsed = lead_scorer._parse_response('{"score": 150, "reason": "max", "urgency": "high"}')
     assert parsed["score"] == 100
-    parsed_neg = lead_scorer._parse_response(
-        '{"score": -10, "reason": "min", "urgency": "low"}'
-    )
+    parsed_neg = lead_scorer._parse_response('{"score": -10, "reason": "min", "urgency": "low"}')
     assert parsed_neg["score"] == 0
 
 
 def test_score_lead_falls_back_when_proxy_down(monkeypatch):
     monkeypatch.setattr(lead_scorer, "_infer", lambda *a, **k: None)
-    out = lead_scorer.score_lead(
-        {"type": "Roof Damage", "description": "shingles missing"}
-    )
+    out = lead_scorer.score_lead({"type": "Roof Damage", "description": "shingles missing"})
     assert out["score_engine"] == "heuristic"
     assert out["score"] >= 75
 

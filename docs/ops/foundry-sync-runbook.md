@@ -1,6 +1,35 @@
 # Foundry Sync Runbook
 
-Last reviewed: 2026-04-29
+Last reviewed: 2026-04-30
+
+## Triage Quickstart
+
+Failure mode addressed: foundry-sync history shows repeated failures, OR
+watermarks are stale, OR the dry-run reports unexpected transform errors.
+
+```bash
+launchctl list com.sapphire.foundry-sync
+```
+
+```bash
+tail -n 200 data/logs/foundry-sync-err.log
+```
+
+```bash
+/usr/local/bin/python3 -m lib.foundry.sync --dry-run --force
+```
+
+The dry-run does not touch credentials and does not upload to Foundry — it
+exercises only the transform path. If it succeeds and the LaunchAgent is
+failing, the fault is in the credential / write path. Do NOT print credential
+contents in incident reports; the readiness helper at `lib/foundry/readiness.py`
+returns redacted status.
+
+Live monitors: `data/foundry_sync_history.jsonl` (per-run record);
+provenance sidecars under `data/foundry_sync_state.json`.
+On-call escalation: data owner / Foundry POC; p3 unless Palantir-side stake-
+holders are blocked, then p2. Pre-pilot: do not enable live writes without an
+explicit operator-approved PR.
 
 This runbook covers `services/foundry_sync/`,
 `infra/launchagents/com.sapphire.foundry-sync.plist`, and

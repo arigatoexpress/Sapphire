@@ -1,0 +1,11 @@
+{
+  "chain_id": 4326,
+  "address": "0x7e324abc5de01d112afc03a584966ff199741c28",
+  "is_proxy": true,
+  "implementation_address": "0xc74c6a98593214934e6f9c88c43c3a696c44da4d",
+  "blockscout_verified_at": null,
+  "contract_name": "Pool (minimal hand-curated subset)",
+  "abi_hash_sha256": "bba2021673cc7116a6275755a0e910a7cff3aff19676b381426403656073b631",
+  "fetched_at": "2026-05-01T01:52:03.316152+00:00",
+  "source": "manual:aave-v3-origin/src/contracts/interfaces/IPool.sol \u2014 Pool implementation 0xc74c6a... is unverified on Blockscout, so this is a minimal subset for read-only Wave A. Wave C must replace with full ABI once impl is verified."
+}

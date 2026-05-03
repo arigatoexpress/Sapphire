@@ -17,14 +17,14 @@ pip install -e '.[dev]'
 pip install -r requirements-test.txt   # test deps
 make install-hooks                     # pre-commit + commit-msg
 make doctor                            # env health check — read every line
-make test-all                          # 1,967 tests — must pass before any PR
+make test-all                          # 6,735 tests — must pass before any PR
 ```
 
 ## Core rules
 
 - **Services never import from other services.** Cross-service reuse goes through `lib/`.
 - **Every module has a `SKILL.md`.** Read it before working on that module.
-- **Never reduce the test suite.** Today: 1,932 core + 35 plugin = 1,967 passing. Your PR should leave it at ≥ 1,967.
+- **Never reduce the test suite.** Today: 6,140 core + 595 plugin = 6,735 passing. Your PR should leave it at ≥ 6,735.
 - **PnL is king.** Sortino / Calmar over Sharpe. 80 % win rate target.
 - **No AI slop.** Every claim in a PR or doc must be verifiable from the diff or the data.
 

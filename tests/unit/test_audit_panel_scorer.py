@@ -33,7 +33,9 @@ def test_score_findings_caps_at_one():
 
 
 def test_score_findings_preserves_rule_ids():
-    score = score_findings(1, [_finding("oversize_diff", "medium"), _finding("ci_skip_dropped", "medium")])
+    score = score_findings(
+        1, [_finding("oversize_diff", "medium"), _finding("ci_skip_dropped", "medium")]
+    )
 
     assert score.rule_ids == ("oversize_diff", "ci_skip_dropped")
 
@@ -82,7 +84,12 @@ def test_score_panel_counts_clean_and_findings():
 def test_score_panel_counts_severity_buckets():
     prs = (
         MergedPR(1, "feat: missing skip", commits=("feat: missing skip",)),
-        MergedPR(2, "fix: safety [skip ci]", commits=("fix: safety [skip ci]",), changed_files=("lib/core/kill_switch.py",)),
+        MergedPR(
+            2,
+            "fix: safety [skip ci]",
+            commits=("fix: safety [skip ci]",),
+            changed_files=("lib/core/kill_switch.py",),
+        ),
     )
 
     histogram = score_panel(prs)
@@ -94,7 +101,12 @@ def test_score_panel_counts_severity_buckets():
 def test_score_panel_average_and_max():
     prs = (
         MergedPR(1, "feat: clean [skip ci]", commits=("feat: clean [skip ci]",)),
-        MergedPR(2, "fix: safety [skip ci]", commits=("fix: safety [skip ci]",), changed_files=("lib/core/kill_switch.py",)),
+        MergedPR(
+            2,
+            "fix: safety [skip ci]",
+            commits=("fix: safety [skip ci]",),
+            changed_files=("lib/core/kill_switch.py",),
+        ),
     )
 
     histogram = score_panel(prs)
@@ -116,6 +128,8 @@ def test_histogram_to_dict_rounds():
 
 
 def test_score_findings_severity_uses_highest_seen():
-    score = score_findings(1, [_finding("a", "low"), _finding("b", "high"), _finding("c", "medium")])
+    score = score_findings(
+        1, [_finding("a", "low"), _finding("b", "high"), _finding("c", "medium")]
+    )
 
     assert score.severity == "high"

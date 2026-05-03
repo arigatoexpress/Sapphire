@@ -16,7 +16,11 @@ QUALITY_CASES = [
         "security",
     ),
     ("BTC funding flipped negative while spot demand rose 4.2% across majors.", True, "markets"),
-    ("New open model inference benchmark shows GPU latency down 18% in agent workloads.", True, "ai"),
+    (
+        "New open model inference benchmark shows GPU latency down 18% in agent workloads.",
+        True,
+        "ai",
+    ),
     ("Fed policy minutes mention liquidity stress and treasury issuance timing.", True, "policy"),
     ("Cloud DNS outage investigation published with mitigation steps.", True, "infra"),
     ("Validator bridge exploit drained token liquidity from a DeFi pool.", True, "onchain"),
@@ -30,11 +34,19 @@ QUALITY_CASES = [
     ("Photo", False, None),
     ("Video", False, None),
     ("ok", False, None),
-    ("Security team published IOC list at https://example.com/iocs for CVE-2026-2222.", True, "security"),
+    (
+        "Security team published IOC list at https://example.com/iocs for CVE-2026-2222.",
+        True,
+        "security",
+    ),
     ("ETH validators saw 3.1% participation drop after client release.", True, "markets"),
     ("Kubernetes incident: latency above 900ms after DNS cache regression.", True, "infra"),
     ("SEC court filing changes token policy posture for exchanges.", True, "policy"),
-    ("AI agent framework patched prompt injection vulnerability with sandboxing.", True, "security"),
+    (
+        "AI agent framework patched prompt injection vulnerability with sandboxing.",
+        True,
+        "security",
+    ),
     ("Ransomware group exploited zero-day; mitigation playbook released.", True, "security"),
     ("Treasury yield curve steepened as inflation swaps repriced.", True, "markets"),
     ("Smart contract bridge monitor detected suspicious wallet movement.", True, "onchain"),
@@ -87,7 +99,9 @@ def test_truncate_text_uses_requested_suffix() -> None:
 
 
 def test_quality_decision_serializes_without_text() -> None:
-    decision = quality_filter("CVE-2026-3333 patch released with mitigation guidance.", channel_id="c")
+    decision = quality_filter(
+        "CVE-2026-3333 patch released with mitigation guidance.", channel_id="c"
+    )
     payload = decision.to_dict()
     assert payload["keep"] is True
     assert "sanitized_text" not in payload
@@ -106,5 +120,7 @@ def test_repetitive_text_is_penalized() -> None:
 
 
 def test_channel_attribution_adds_reason() -> None:
-    decision = quality_filter("CVE-2026-4444 exploit detected and mitigation published.", channel_id="c")
+    decision = quality_filter(
+        "CVE-2026-4444 exploit detected and mitigation published.", channel_id="c"
+    )
     assert "attributed-channel" in decision.reasons

@@ -141,8 +141,7 @@ def test_weak_commit_message_catches_short_subjects(commits: list[str]) -> None:
     pr = _clean_pr(commits=tuple(commits))
     finding = weak_commit_message(pr)
     has_weak = any(
-        len(subject.strip()) < 10
-        or subject.strip().lower() in {"wip", "fix", "update", "misc"}
+        len(subject.strip()) < 10 or subject.strip().lower() in {"wip", "fix", "update", "misc"}
         for subject in commits
     )
     if has_weak:
@@ -171,9 +170,9 @@ def test_kill_switch_finding_requires_owner_review(
     touched: list[str], owner_approved: bool
 ) -> None:
     reviews = (
-        Review(author="arigatoexpress", state="APPROVED"),
-    ) if owner_approved else (
-        Review(author="someotheruser", state="APPROVED"),
+        (Review(author="arigatoexpress", state="APPROVED"),)
+        if owner_approved
+        else (Review(author="someotheruser", state="APPROVED"),)
     )
     pr = _clean_pr(changed_files=tuple(touched), reviews=reviews)
     finding = kill_switch_touched_without_review(pr)
@@ -273,9 +272,7 @@ def test_ci_skip_dropped_finding(in_title: bool, in_commits: bool) -> None:
     title = "feat: shipped new thing"
     if in_title:
         title += " [skip ci]"
-    commits = (
-        ("real subject\n\n[skip ci]" if in_commits else "real subject"),
-    )
+    commits = (("real subject\n\n[skip ci]" if in_commits else "real subject"),)
     pr = _clean_pr(title=title, commits=commits)
     finding = ci_skip_dropped(pr)
     if in_title or in_commits:

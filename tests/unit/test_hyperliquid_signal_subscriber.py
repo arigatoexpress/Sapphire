@@ -28,9 +28,7 @@ from hyperliquid_bot.signal_subscriber import (  # noqa: E402
 
 
 def test_translate_signal_normalizes_uppercase_action() -> None:
-    out = translate_signal(
-        {"symbol": "BTC", "action": "BUY", "price": 50000}, default_size_usd=5.0
-    )
+    out = translate_signal({"symbol": "BTC", "action": "BUY", "price": 50000}, default_size_usd=5.0)
 
     assert out is not None
     assert out["symbol"] == "BTC"
@@ -38,9 +36,7 @@ def test_translate_signal_normalizes_uppercase_action() -> None:
 
 
 def test_translate_signal_accepts_side_alias() -> None:
-    out = translate_signal(
-        {"symbol": "eth", "side": "long"}, default_size_usd=5.0
-    )
+    out = translate_signal({"symbol": "eth", "side": "long"}, default_size_usd=5.0)
 
     assert out is not None
     assert out["symbol"] == "ETH"
@@ -49,17 +45,13 @@ def test_translate_signal_accepts_side_alias() -> None:
 
 def test_translate_signal_maps_close_aliases() -> None:
     for raw_action in ("close", "exit", "flatten"):
-        out = translate_signal(
-            {"symbol": "SOL", "action": raw_action}, default_size_usd=5.0
-        )
+        out = translate_signal({"symbol": "SOL", "action": raw_action}, default_size_usd=5.0)
         assert out is not None
         assert out["action"] == "close"
 
 
 def test_translate_signal_drops_unknown_action() -> None:
-    out = translate_signal(
-        {"symbol": "BTC", "action": "yolo"}, default_size_usd=5.0
-    )
+    out = translate_signal({"symbol": "BTC", "action": "yolo"}, default_size_usd=5.0)
 
     assert out is None
 
@@ -71,9 +63,7 @@ def test_translate_signal_drops_missing_symbol() -> None:
 
 
 def test_translate_signal_uses_default_size_when_missing() -> None:
-    out = translate_signal(
-        {"symbol": "BTC", "action": "buy"}, default_size_usd=5.0
-    )
+    out = translate_signal({"symbol": "BTC", "action": "buy"}, default_size_usd=5.0)
 
     assert out is not None
     assert out["size_usd"] == 5.0

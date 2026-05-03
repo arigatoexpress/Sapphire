@@ -6,8 +6,8 @@ Autonomous trading + intelligence + content ops. Telegram-first, agent-driven, e
 
 ```bash
 # Test
-pytest tests/unit/ --tb=short -q           # 5,995 collected by test_inventory.py
-pytest plugins/claw-sapphire/tests/ -q     # 493 collected by test_inventory.py
+pytest tests/unit/ --tb=short -q           # 6,140 collected by test_inventory.py
+pytest plugins/claw-sapphire/tests/ -q     # 595 collected by test_inventory.py
 
 # Lint
 ruff check .                          # pyproject.toml rules (E501 ignored)
@@ -26,8 +26,15 @@ tv status && tv quote && tv pine compile && tv stream all
 python3 scripts/ops/tradingview_ta_capture.py probe                           # read-only state snapshot
 python3 scripts/ops/tradingview_ta_capture.py sweep --offline --limit 6       # capture screenshots + ohlcv
 python3 scripts/ops/tradingview_ta_capture.py pine-generate-batch --validate  # emit Sapphire Pine for top-N + server-side check
+python3 scripts/ops/tradingview_ta_capture.py pine-generate-batch --kind strategy --validate  # batch-generate strategy variant
+python3 scripts/ops/tradingview_ta_capture.py pine-generate-strategy BINANCE:BTCUSDT          # single-symbol strategy
+python3 scripts/ops/tradingview_ta_capture.py pine-generate-screener                          # multi-symbol screener
+python3 scripts/ops/tradingview_ta_capture.py pine-promote pine/generated/<file>.pine --mutate  # promote validated → standalone (mutation-gated)
 SAPPHIRE_TV_MUTATION_ENABLED=1 python3 scripts/ops/tradingview_ta_capture.py --mutate sweep  # mutation-enabled
-# Scheduled: com.sapphire.tradingview-ta-capture LaunchAgent runs sweep every 4h, read-only
+# Scheduled: com.sapphire.tradingview-ta-capture (every 4h, read-only sweep) + com.sapphire.tradingview-pine-batch (daily 13:00 UTC, read-only Pine batch)
+
+# Production readiness sweep
+python3 scripts/ops/production_readiness_sweep.py --json   # machine-readable PASS/WARN/FAIL rows
 
 # OpenBB
 curl "http://localhost:6900/api/v1/equity/price/quote?symbol=AAPL&provider=yfinance"
@@ -35,6 +42,7 @@ curl "http://localhost:6900/api/v1/equity/price/quote?symbol=AAPL&provider=yfina
 # Sapphire plugin tools (stdin JSON)
 echo '{"action":"quote","symbol":"AAPL"}' | python3 plugins/claw-sapphire/tools/market.py
 echo '{"all": true}' | python3 plugins/claw-sapphire/tools/verify.py
+echo '{"action": "list_pine"}' | python3 plugins/claw-sapphire/tools/tradingview.py  # read-only TV orchestrator surface
 
 # Content engine
 python3 -m lib.content generate                               # render weekly report from events+signals
@@ -80,7 +88,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 
 ## Module Map
 
-**Key counts (verified 2026-04-30 after `/showcase`):** 6,488+ collected tests (5,995+ core + 493 plugin, per `scripts/ops/test_inventory.py --check-readme`) · 50 dashboard pages · 7 quant strategies · 20 active LaunchAgents (folded in by the 2026-04-21 audit; tracked definitions remain operator-controlled; see `docs/archive/2026/audits/launchagents-audit-2026-04-21.md`) · 21 scheduled tasks · 3 smart contracts.
+**Key counts (verified 2026-05-03 via `scripts/ops/test_inventory.py --check-readme`):** 6,735 collected tests (6,140 core + 595 plugin) across 392 files · 50 dashboard pages · 7 quant strategies · 27 LaunchAgent plists in `infra/launchagents/` (TV pair added in PRs #505/#506; tracked definitions remain operator-controlled; see `docs/archive/2026/audits/launchagents-audit-2026-04-21.md`) · 22 scheduled tasks · 3 smart contracts.
 
 | Path | Type | Description |
 |------|------|-------------|
@@ -95,7 +103,8 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `lib/payments/` | library | `x402_middleware.py` — HTTP 402 micropayment gate (Flask + raw-socket), EVM signature verification. |
 | `lib/agents/` | library | Paper-only autonomous harness (`base.py`, `alpha_agent.py`, `runner.py`) plus the broader OpenClaw/NemoClaw dispatch stack under `src/sapphire_agents/`. |
 | `lib/telegram/` | library | `kimi_relay.py`, `login_widget.py` (HMAC-SHA256 Login Widget verifier). |
-| `lib/trading/` | library | `solana_wallet.py`, `tradingview_orchestrator.py` (drives `tv` CLI on Mac, mutation-gated by `SAPPHIRE_TV_MUTATION_ENABLED=1`), `pine_templates.py` (Sapphire Pine v5 indicator generator emitting webhook-format JSON), `tradingview_ta_machine.py`, `strategy_lab.py`, `shadow_controller.py`. |
+| `lib/trading/` | library | `tradingview_orchestrator.py` (drives `tv` CLI on Mac, mutation-gated by `SAPPHIRE_TV_MUTATION_ENABLED=1`), `pine_templates.py` (Sapphire Pine v5 indicator/strategy/screener generator emitting webhook-format JSON), `tradingview_ta_machine.py`, `strategy_lab.py`, `shadow_controller.py`, `solana_wallet.py`. |
+| `lib/pine/` | library | Pine v5 static analyzer for Sapphire-tagged Pine sources; offline checks for `//@version=5`, top-level call, webhook contract field names, strategy entry/close pairing. Used by the TV orchestrator validate path and CI; runs without the `tv` CLI. |
 | `services/alpha/` | service | Trading engine + signal logger [Mac:18081]. |
 | `services/analytics_dashboard/` | service | Analytics-focused dashboard variant. |
 | `services/aster/` | service | Aster DEX bot — Solana perps (paused). |
@@ -111,14 +120,14 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `services/security_pipeline/` | service | Scheduled full-system security scan → SOC page. |
 | `services/telegram-bot/` | service | Legacy bot (replaced by hermes-agent gateway). |
 | `services/webhook/` | service | TradingView webhook receiver [Windows:9090]. |
-| `plugins/claw-sapphire/` | plugin | 63 tool scripts on disk (36 at top level + 25 in `internal/` + 2 in `_deprecated/`), 10 libs, 376 collected tests. |
+| `plugins/claw-sapphire/` | plugin | 113 tool scripts on disk (63 at top level + 49 in `internal/` + 1 in `_deprecated/`), 10 libs, 567 collected tests. |
 | `contracts/` | solidity | **`SapphireSignalVerifier.sol`** (on-chain signal registry with ZK proof hash field), **`SapphirePaymentGate.sol`** (micropayment gate), **`SapphireSentinelRegistry.sol`** (non-custodial agent mandate/payment receipt anchor). Deployed on Robinhood Chain testnet via `scripts/deploy_robinhood_chain.py`. |
 | `pine/` | pine | 5 TradingView strategies (standalone/: v1, v2, v3 Ultra, MultiSymbol Screener, Mac variant). |
 | `skills/` | skills | Agent-executable capabilities. |
 | `data/content/` | data | Content engine drafts + ready/ queue. |
 | `data/chain/` | data | Deployed contract addresses (`deployments.json`), chain snapshots. |
 | `data/benchmarks/kadima-labs/` | data | Kadima Labs AI benchmark (v1–v3). |
-| `infra/launchagents/` | infra | 20 macOS LaunchAgent plists (folded in by the 2026-04-21 audit: chain-refresh, control-plane, correlation-refresh, daily-brief, gcp-sync, logrotate, openbb-api, signal-logger, telemetry-collector, threat-refresh) plus 1 disabled template. |
+| `infra/launchagents/` | infra | 27 macOS LaunchAgent plists (folded in by the 2026-04-21 audit: chain-refresh, control-plane, correlation-refresh, daily-brief, gcp-sync, logrotate, openbb-api, signal-logger, telemetry-collector, threat-refresh; TV pair `tradingview-ta-capture` (every 4h) + `tradingview-pine-batch` (daily 13:00 UTC) added 2026-04-30, both read-only) plus 1 disabled template. |
 | `infra/agent-manifest.yaml` | infra | Lean 5-tool subset the LLM sees. |
 | `infra/tool-registry.yaml` | infra | Full plugin tool registry (CI-enforced by `scripts/validate_tool_registry.py`). |
 | `infra/tailscale-acl.json` | infra | Tailscale mesh ACL. |
@@ -163,9 +172,9 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `~/Code/hermes-agent` | NousResearch/hermes-agent | Conversational framework (Telegram bot) |
 | `~/Code/kimi-tools` | local | Kimi Cloud HTTP client |
 
-## Sapphire Plugin (63 tools on disk, 15 registered in plugin.json)
+## Sapphire Plugin (117 tools on disk, 17 registered in plugin.json)
 
-`plugins/claw-sapphire/plugin.json` declares 15 Claude Code tools (one `sapphire` namespace entry + 14 `sapphire_*` tools, for 16 entries total): `dispatch`, `verify`, `budget`, `state`, `status`, `notify`, `health_check`, `market`, `predict_kronos`, `threat_intel`, `lumo_research`, `starred_repos`, `macro_data`, `lead_engine`, `trading_brain`. The remaining tool scripts are standalone, invoked via stdin JSON by hermes skills, scheduled tasks, dashboards, or other tools.
+`plugins/claw-sapphire/plugin.json` declares 17 Claude Code tools: `dispatch`, `verify`, `budget`, `state`, `status`, `notify`, `health_check`, `market`, `predict_kronos`, `threat_intel`, `lumo_research`, `starred_repos`, `macro_data`, `lead_engine`, `trading_brain`, `megaeth_protocols` (Wave B.5 — read-only MegaETH chain-4326 surface), `tradingview` (read-only TV orchestrator surface — probe / list_pine / list_alerts / generate_pine / sweep; mutation paths intentionally NOT exposed and live in `scripts/ops/tradingview_ta_capture.py`). The remaining tool scripts are standalone, invoked via stdin JSON by hermes skills, scheduled tasks, dashboards, or other tools.
 
 ```
 plugins/claw-sapphire/tools/
@@ -176,7 +185,7 @@ plugins/claw-sapphire/tools/
 
 Tool groups:
 - **Intel / analytics (6):** `vote_monitor`, `watchdog`, `digest`, `research`, `events`, `qa_aware_factory`
-- **Trading (8):** `predict` (6-factor TA, **verified 61.1% overall, BTC 83.3%, ETH 50.0%, SOL 50.0% on 36 scored of 42 predictions**), `signal_generator`, `paper_trader`, `crypto_portfolio`, `backtest`, `macro_data` (graceful error when FRED key is missing), `trading_brain`, `market_sentiment`
+- **Trading (9):** `predict` (6-factor TA, **verified 61.1% overall, BTC 83.3%, ETH 50.0%, SOL 50.0% on 36 scored of 42 predictions**), `signal_generator`, `paper_trader`, `crypto_portfolio`, `backtest`, `macro_data` (graceful error when FRED key is missing), `trading_brain`, `market_sentiment`, `tradingview` (read-only orchestrator: probe / list_pine / list_alerts / generate_pine / sweep)
 - **Other (5 + 1 legacy alias):** `lead_engine`, `lead_enrich`, `lumo`, `tho_intel`, `solana_wallet`, `kronos_predict` (legacy wrapper — prefer `predict_kronos`)
 
 **Agent manifest** (`infra/agent-manifest.yaml`) — the lean 5-tool subset the LLM actually sees: `sapphire_market`, `sapphire_dispatch`, `sapphire_notify`, `sapphire_verify`, `sapphire_state`.
@@ -194,6 +203,40 @@ Tool groups:
 - `router.py`, `runtime_policy.py`, `token_governor.py` — dispatch policy + budget
 - `sensitivity_classifier.py` — PII/secret regex (used by dispatch, not proxy)
 - `market_data.py`, `nvidia_agents.py` — shared market + NeMo helpers
+
+## Multi-chain protocol-access stack (as of 2026-05-03)
+
+Sapphire ships read-only typed access to live mainnet protocols across 3 chains:
+
+| Chain | Aave V3 | GMX V2 | Other |
+|---|---|---|---|
+| MegaETH (4326) | yes ($450M) | yes (6 markets, BTC funding via Pyth) | Kumbaya DEX, USDM |
+| Arbitrum (42161) | yes ($1.06B) | yes (60 markets, BTC funding via Chainlink) | - |
+| Optimism (10) | yes ($82M) | - | - |
+
+Cross-chain primitives:
+- `lib/chains/cross_chain/aave_apy_arb.py` — APY divergence detector (live: USDC 232bps spread Arb<->Optimism)
+- `lib/hackathon/chain_health_gate.py` — multi-chain alpha-verification gate
+
+Source: `lib/chains/{megaeth,arbitrum,optimism,cross_chain}/`. ~283 lib tests + 43 plugin tests for chain-specific surface.
+
+## Active hackathon submissions (as of 2026-05-03)
+
+- **0G APAC Hackathon** Track 2 — submission deadline 2026-05-16 23:59 UTC+8. Engineering complete (PR #525 merged); mainnet deploy + demo + form pending Ari.
+- **Arbitrum London Buildathon** Best Agentic Project — registration 2026-05-25, submission 2026-06-14. Sapphire Sentinel; multi-chain chain-health gate; Forge tests for 3 contracts.
+- **Mega Mafia 2.0** application drafted (PR #566) — file via Google Form: https://forms.gle/m6HSvpZ2Q24fB9Cc6
+- **Zama AI Agent Skills bounty** — submission deadline 2026-05-10. SKILL.md scaffold drafted (PR #564); ~3-4hr polish before submit.
+
+## Active routines (deployed 2026-05-01)
+
+| Routine | Schedule |
+|---|---|
+| MegaETH PR queue triage | hourly |
+| Hackathon submission daily digest | daily 9am MDT |
+| MegaETH live alpha monitor | every 3h |
+| EOD wrap-up (one-time per day) | 5:30pm MDT |
+
+Manage at https://claude.ai/code/routines.
 
 ## Inference Proxy (`services/inference-proxy/`)
 
@@ -230,7 +273,7 @@ Prediction accuracy: 61.1% overall, BTC 83.3% (n=36 scored of 42)
 hermes-agent (NousResearch) replaced custom bot. Installed at ~/.hermes/.
 - Config: ~/.hermes/config.yaml (model: hermes3:8b, provider: custom, base_url: proxy)
 - Env: ~/.hermes/.env (TELEGRAM_BOT_TOKEN, OPENAI_BASE_URL → proxy)
-- Skills: ~/.hermes/skills/sapphire/ (14 skills: cyber-intel, inference-tier, kimi-delegate, macro-data, paper-trading, regional-intel, repo-discovery, system-health, system-ops, tho-operations, threat-intel, trading-analysis, trading-brain, trading-signals)
+- Skills: ~/.hermes/skills/sapphire/ (14 skills: cyber-intel, inference-tier, kimi-delegate, macro-data, paper-trading, regional-intel, repo-discovery, system-health, system-ops, tho-operations, threat-intel, trading-analysis, trading-brain, trading-signals; pending deploy: `tradingview-orchestrator` — read-only orchestrator wrapper, template at `docs/hermes/skills/tradingview-orchestrator/`)
 - Gateway: ai.hermes.gateway LaunchAgent (always-on Telegram polling)
 - Restart: `~/.local/bin/hermes gateway restart`
 
@@ -313,6 +356,7 @@ All in `~/.claude/scheduled-tasks/`. Run when Claude Code is open. Tasks marked 
 - Prediction scoring is timeframe-aware — a 24h forecast written at 12:00 won't score until 12:00 next day.
 - Windows SSH user is `aribs`, not `aspec`.
 - cyber-threat-bot: `PYTHONPATH=src python3 -m cyber_threat_bot ...` (editable install unreliable).
+- TradingView Pine generator emits payload with `time` (not `ts`); webhook contract pinned by `tests/unit/test_pine_to_webhook_contract.py`. Drift fails CI via the analyzer in `lib/pine/static_analyzer.py` (forbidden-field rule on `"ts":`).
 
 ## Authoritative Docs
 
@@ -328,6 +372,8 @@ All in `~/.claude/scheduled-tasks/`. Run when Claude Code is open. Tasks marked 
 - `docs/tradingview-cdp-setup.md` — TradingView CDP setup
 - `docs/ops/tradingview-orchestrator-runbook.md` — TV orchestrator operator runbook (CLI, dashboard endpoints, mutation gate, scheduled jobs)
 - `docs/adr/0012-tradingview-orchestrator-architecture.md` — ADR 0012: TV orchestrator design decisions (mutation gate, read-only-by-default scheduled jobs, Pine ↔ webhook contract, agent_only state, artifact path-traversal guard)
+- `docs/ops/readiness-warn-state-2026-04-30.md` — one-shot WARN-row classification of `production_readiness_sweep.py` output (by-design vs stale vs real)
+- `docs/ops/threat-intel-sweep-runbook.md` — threat-intel cloud routine; auto-supersede rule added in PR #615
 - `docs/QUICK_START_GUIDE.md` — first-run setup
 - `docs/LOGGING.md` — event + audit log schema
 - `docs/CLOUDFLARE_DNS_SETUP.md` — tunnel config

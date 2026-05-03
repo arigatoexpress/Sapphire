@@ -81,13 +81,7 @@ _RATE_LIMITER = safety.RateLimiter()
 # Scheduled tasks read these flags at startup and skip if present.
 _ROUTINE_PAUSE_DIR = Path.home() / ".sapphire" / "routine_pause"
 _SCHEDULED_TASKS_DIR = Path.home() / ".claude" / "scheduled-tasks"
-_MORNING_DIGEST_LOG = (
-    Path.home()
-    / "Code"
-    / "Sapphire"
-    / "data"
-    / "morning_digest"
-)
+_MORNING_DIGEST_LOG = Path.home() / "Code" / "Sapphire" / "data" / "morning_digest"
 
 SAPPHIRE_ROOT = Path.home() / "Code" / "Sapphire"
 THO_FIRESTORE_PROJECT = os.getenv("THO_FIRESTORE_PROJECT", "tho-ai-agent")
@@ -820,8 +814,7 @@ def _handle_health() -> dict[str, Any]:
         overall = "GREEN"
 
     summary = (
-        f"health: {overall} | green={counts['green']} "
-        f"yellow={counts['yellow']} red={counts['red']}"
+        f"health: {overall} | green={counts['green']} yellow={counts['yellow']} red={counts['red']}"
     )
     return _response(escape_markdown_v2(summary), "MarkdownV2")
 
@@ -905,9 +898,7 @@ def _handle_routines_list() -> dict[str, Any]:
             "MarkdownV2",
         )
     if not items:
-        return _response(
-            escape_markdown_v2("No scheduled tasks found."), "MarkdownV2"
-        )
+        return _response(escape_markdown_v2("No scheduled tasks found."), "MarkdownV2")
     lines = [f"Scheduled tasks ({len(items)})"]
     for item in items:
         flag = ""
@@ -915,9 +906,7 @@ def _handle_routines_list() -> dict[str, Any]:
             paused_at = item.get("paused_at") or "unknown"
             flag = f" (paused at {paused_at})"
         lines.append(f"• {item['name']} | last_mtime={item['last_modified']}{flag}")
-    return _response(
-        "\n".join(escape_markdown_v2(line) for line in lines), "MarkdownV2"
-    )
+    return _response("\n".join(escape_markdown_v2(line) for line in lines), "MarkdownV2")
 
 
 def _handle_routines_status() -> dict[str, Any]:
@@ -935,9 +924,7 @@ def _handle_routines_status() -> dict[str, Any]:
     lines = [f"Paused routines ({len(rows)})"]
     for row in rows:
         lines.append(f"• {row.name} | paused_at={row.paused_at}")
-    return _response(
-        "\n".join(escape_markdown_v2(line) for line in lines), "MarkdownV2"
-    )
+    return _response("\n".join(escape_markdown_v2(line) for line in lines), "MarkdownV2")
 
 
 def _routine_pause_path(name: str) -> Path:
@@ -963,9 +950,7 @@ def _handle_routines_pause(text: str) -> dict[str, Any]:
 
     available = {item["name"] for item in _list_scheduled_tasks()}
     if name not in available:
-        return _response(
-            escape_markdown_v2(f"Unknown routine: {name}"), "MarkdownV2"
-        )
+        return _response(escape_markdown_v2(f"Unknown routine: {name}"), "MarkdownV2")
 
     try:
         _ROUTINE_PAUSE_DIR.mkdir(parents=True, exist_ok=True)
@@ -978,7 +963,9 @@ def _handle_routines_pause(text: str) -> dict[str, Any]:
         )
 
     return _response(
-        escape_markdown_v2(f"Paused routine: {name}. Use /routines resume {name} CONFIRM to re-enable."),
+        escape_markdown_v2(
+            f"Paused routine: {name}. Use /routines resume {name} CONFIRM to re-enable."
+        ),
         "MarkdownV2",
     )
 
@@ -992,9 +979,7 @@ def _handle_routines_resume(text: str) -> dict[str, Any]:
     finger reactivation of a routine that was paused for a reason.
     """
     safety.assert_no_live_trading()
-    match = re.match(
-        r"^/routines\s+resume\s+(\S+)(?:\s+(\S+))?\s*$", text, re.IGNORECASE
-    )
+    match = re.match(r"^/routines\s+resume\s+(\S+)(?:\s+(\S+))?\s*$", text, re.IGNORECASE)
     if not match:
         return _response("Usage: /routines resume <name> CONFIRM", None)
     name = match.group(1).strip()
@@ -1003,16 +988,12 @@ def _handle_routines_resume(text: str) -> dict[str, Any]:
         return _response(safety.GENERIC_REFUSAL_TEXT, None)
     if confirm != safety.CONFIRM_TOKEN:
         return _response(
-            escape_markdown_v2(
-                f"Confirmation required. Re-send: /routines resume {name} CONFIRM"
-            ),
+            escape_markdown_v2(f"Confirmation required. Re-send: /routines resume {name} CONFIRM"),
             "MarkdownV2",
         )
     flag = _routine_pause_path(name)
     if not flag.exists():
-        return _response(
-            escape_markdown_v2(f"No pause flag set for: {name}"), "MarkdownV2"
-        )
+        return _response(escape_markdown_v2(f"No pause flag set for: {name}"), "MarkdownV2")
     try:
         flag.unlink()
     except OSError as e:
@@ -1020,9 +1001,7 @@ def _handle_routines_resume(text: str) -> dict[str, Any]:
             escape_markdown_v2(f"Failed to resume: {type(e).__name__}")[:200],
             "MarkdownV2",
         )
-    return _response(
-        escape_markdown_v2(f"Resumed routine: {name}."), "MarkdownV2"
-    )
+    return _response(escape_markdown_v2(f"Resumed routine: {name}."), "MarkdownV2")
 
 
 def _handle_cancel_routine(text: str) -> dict[str, Any]:
@@ -1035,9 +1014,7 @@ def _handle_cancel_routine(text: str) -> dict[str, Any]:
     symmetric: ``/routines resume <name> CONFIRM`` reverses it.
     """
     safety.assert_no_live_trading()
-    match = re.match(
-        r"^/cancel-routine\s+(\S+)(?:\s+(\S+))?\s*$", text, re.IGNORECASE
-    )
+    match = re.match(r"^/cancel-routine\s+(\S+)(?:\s+(\S+))?\s*$", text, re.IGNORECASE)
     if not match:
         return _response("Usage: /cancel-routine <name> CONFIRM", None)
     name = match.group(1).strip()
@@ -1046,17 +1023,13 @@ def _handle_cancel_routine(text: str) -> dict[str, Any]:
         return _response(safety.GENERIC_REFUSAL_TEXT, None)
     if confirm != safety.CONFIRM_TOKEN:
         return _response(
-            escape_markdown_v2(
-                f"Confirmation required. Re-send: /cancel-routine {name} CONFIRM"
-            ),
+            escape_markdown_v2(f"Confirmation required. Re-send: /cancel-routine {name} CONFIRM"),
             "MarkdownV2",
         )
 
     available = {item["name"] for item in _list_scheduled_tasks()}
     if name not in available:
-        return _response(
-            escape_markdown_v2(f"Unknown routine: {name}"), "MarkdownV2"
-        )
+        return _response(escape_markdown_v2(f"Unknown routine: {name}"), "MarkdownV2")
     try:
         _ROUTINE_PAUSE_DIR.mkdir(parents=True, exist_ok=True)
         flag = _routine_pause_path(name)
@@ -1143,9 +1116,7 @@ def _handle_whoami(update: dict[str, Any]) -> dict[str, Any]:
         f"username: {username}",
         f"chat_id: {chat_id if chat_id is not None else 'unknown'}",
     ]
-    return _response(
-        "\n".join(escape_markdown_v2(line) for line in lines), "MarkdownV2"
-    )
+    return _response("\n".join(escape_markdown_v2(line) for line in lines), "MarkdownV2")
 
 
 def _dispatch(text: str, update: dict[str, Any]) -> dict[str, Any]:

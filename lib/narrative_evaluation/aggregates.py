@@ -18,7 +18,9 @@ def _metric(rows: list[dict[str, Any]]) -> dict[str, Any]:
     correct = [r for r in scored if r.get("correct") is True]
     false_positive = [r for r in scored if r.get("false_positive") is True]
     confidence = [float(r.get("confidence") or 0.0) for r in scored]
-    returns = [float(r["actual_return_pct"]) for r in scored if r.get("actual_return_pct") is not None]
+    returns = [
+        float(r["actual_return_pct"]) for r in scored if r.get("actual_return_pct") is not None
+    ]
     cal = [float(r["calibration_error"]) for r in scored if r.get("calibration_error") is not None]
     brier = [float(r["brier_score"]) for r in scored if r.get("brier_score") is not None]
     return {
@@ -37,7 +39,9 @@ def _metric(rows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def aggregate_scores(scores: list[dict[str, Any]], *, group_by: str | None = None) -> dict[str, Any]:
+def aggregate_scores(
+    scores: list[dict[str, Any]], *, group_by: str | None = None
+) -> dict[str, Any]:
     rows = _rows(scores)
     generated_at = datetime.now(UTC).replace(microsecond=0).isoformat()
     if group_by is None:
@@ -50,10 +54,7 @@ def aggregate_scores(scores: list[dict[str, Any]], *, group_by: str | None = Non
     return {
         "generated_at": generated_at,
         "group_by": group_by,
-        "groups": {
-            key: {"key": key, **_metric(bucket)}
-            for key, bucket in sorted(buckets.items())
-        },
+        "groups": {key: {"key": key, **_metric(bucket)} for key, bucket in sorted(buckets.items())},
     }
 
 
@@ -73,10 +74,7 @@ def summary_report(scores: list[dict[str, Any]]) -> dict[str, Any]:
 def diagnostics_report(scores: list[dict[str, Any]], *, limit: int = 20) -> dict[str, Any]:
     rows = _rows(scores)
     false_positive = [r for r in rows if r.get("false_positive") is True]
-    overconfident = [
-        r for r in rows
-        if "overconfident_miss" in (r.get("diagnostics") or [])
-    ]
+    overconfident = [r for r in rows if "overconfident_miss" in (r.get("diagnostics") or [])]
     pending = [r for r in rows if r.get("status") in {"pending_horizon", "no_outcome"}]
     return {
         "ok": True,

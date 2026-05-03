@@ -153,9 +153,7 @@ def register_source(entry: SourceQualityEntry) -> None:
     observed half-life).
     """
     if not isinstance(entry, SourceQualityEntry):
-        raise TypeError(
-            f"register_source expects SourceQualityEntry, got {type(entry)!r}"
-        )
+        raise TypeError(f"register_source expects SourceQualityEntry, got {type(entry)!r}")
     _REGISTRY[entry.name] = entry
 
 
@@ -198,8 +196,7 @@ def source_signal_to_record(
         timestamp=ts,
         direction=str(getattr(source_signal, "direction", "neutral")),
         confidence=float(
-            getattr(source_signal, "confidence", confidence_default)
-            or confidence_default
+            getattr(source_signal, "confidence", confidence_default) or confidence_default
         ),
     )
 

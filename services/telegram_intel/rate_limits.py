@@ -29,7 +29,9 @@ class CounterState:
 class HourlyRateLimiter:
     """JSON-backed per-hour event limiter."""
 
-    def __init__(self, path: Path | str = DEFAULT_COUNTER_PATH, *, now: float | None = None) -> None:
+    def __init__(
+        self, path: Path | str = DEFAULT_COUNTER_PATH, *, now: float | None = None
+    ) -> None:
         self.path = Path(path).expanduser()
         self._fixed_now = now
 

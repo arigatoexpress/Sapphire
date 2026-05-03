@@ -83,9 +83,7 @@ def _load_state(cache_dir: Path) -> dict[str, float]:
 
 def _save_state(cache_dir: Path, state: dict[str, float]) -> None:
     cache_dir.mkdir(parents=True, exist_ok=True)
-    _state_path(cache_dir).write_text(
-        json.dumps(state, indent=2, sort_keys=True), encoding="utf-8"
-    )
+    _state_path(cache_dir).write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
 
 
 def _pair_key(signal: dict[str, Any]) -> str:
@@ -153,7 +151,9 @@ def changed_signals(
     return selected
 
 
-def _write_jsonl(rows: Sequence[dict[str, Any]], *, output_root: Path, now: datetime | None) -> Path:
+def _write_jsonl(
+    rows: Sequence[dict[str, Any]], *, output_root: Path, now: datetime | None
+) -> Path:
     path = _output_path(output_root, now=now)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as fh:
@@ -203,8 +203,8 @@ def run_once(
 ) -> dict[str, Any]:
     """Single synthesis tick."""
     state = _load_state(cache_dir)
-    source_rows = list(signals) if signals is not None else latest_signal_rows(
-        input_root=input_root, now=now
+    source_rows = (
+        list(signals) if signals is not None else latest_signal_rows(input_root=input_root, now=now)
     )
     selected = changed_signals(source_rows, state=state, min_edge_delta=min_edge_delta)
     publishable: list[dict[str, Any]] = []
@@ -292,7 +292,9 @@ def build_parser() -> argparse.ArgumentParser:
     once.add_argument("--min-edge-delta", type=float, default=DEFAULT_EDGE_DELTA)
     daemon_p = sub.add_parser("daemon", help="continuous poll loop")
     daemon_p.add_argument("--mode", default="dry-run", choices=["dry-run", "live"])
-    daemon_p.add_argument("--poll-interval-seconds", type=float, default=DEFAULT_POLL_INTERVAL_SECONDS)
+    daemon_p.add_argument(
+        "--poll-interval-seconds", type=float, default=DEFAULT_POLL_INTERVAL_SECONDS
+    )
     daemon_p.add_argument("--max-iterations", type=int, default=None)
     sub.add_parser("status", help="read-only service status")
     return parser

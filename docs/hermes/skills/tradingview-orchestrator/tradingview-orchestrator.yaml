@@ -1,0 +1,74 @@
+# Hermes skill wiring template — tradingview-orchestrator
+#
+# Delivery template, not a live config. The Hermes gateway loads skills from
+# ~/.hermes/skills/sapphire/<skill>/SKILL.md (frontmatter-driven). Operators
+# copy this directory there (see ../../README.md) and restart the gateway.
+# Source-of-truth for action wiring if/when Hermes adopts a structured manifest
+# alongside SKILL.md.
+#
+# Plugin contract: each `action` here maps 1:1 to the `action` key in the
+# stdin JSON consumed by `plugins/claw-sapphire/tools/tradingview.py`. The
+# tool returns `{action, ok, data|error}`.
+
+schema_version: 1
+skill_id: tradingview-orchestrator
+skill_class: read_only
+production_adjacent: false
+
+invocation:
+  cwd: ~/Code/Sapphire
+  command: python3 plugins/claw-sapphire/tools/tradingview.py
+  protocol: stdin_json
+  response_shape: '{action: string, ok: bool, data?: object, error?: string}'
+
+actions:
+  - id: probe
+    inputs: { symbol: { type: string, required: false } }
+    example_payload: { action: probe }
+  - id: score
+    inputs: { limit: { type: integer, required: false, default: 10 } }
+    example_payload: { action: score, limit: 5 }
+  - id: list_pine
+    example_payload: { action: list_pine }
+  - id: list_alerts
+    example_payload: { action: list_alerts }
+  - id: generate_pine
+    inputs:
+      symbol: { type: string, required: true, example: BINANCE:BTCUSDT }
+      kind: { type: string, required: false, default: indicator, enum: [indicator, strategy] }
+      name: { type: string, required: false }
+    example_payload: { action: generate_pine, symbol: BINANCE:BTCUSDT, kind: indicator }
+  - id: sweep
+    inputs:
+      limit: { type: integer, required: false, default: 6 }
+      timeframe: { type: string, required: false, default: "60" }
+      offline: { type: boolean, required: false, default: true }
+    example_payload: { action: sweep, limit: 6, timeframe: "60" }
+
+# Mutation actions intentionally NOT exposed. The dispatcher returns ok=false
+# with a "this plugin tool is read-only" error if any of these are requested.
+blocked_mutation_actions:
+  [set_symbol, set_timeframe, setup_chart, apply_indicator_stack,
+   pine_set_from_file, pine_compile, pine_save, pine_promote, pine_open,
+   alert_create, alert_delete, add_indicator, remove_indicator, clear_indicators]
+
+triggers:
+  - "what's the latest TA score for {symbol}"
+  - "top scoring symbols"
+  - "list my saved pine scripts"
+  - "probe tradingview" / "current tv state"
+  - "list active tv alerts"
+  - "generate a sapphire pine indicator for {symbol}"
+  - "generate a sapphire pine strategy for {symbol}"
+  - "run a tv sweep" / "capture the current ta snapshot"
+
+safety:
+  read_only: true
+  mutation_enabled: false
+  live_trading_enabled: false
+  telegram_sends_enabled: false
+  notes: |
+    Even with SAPPHIRE_TV_MUTATION_ENABLED=1 in the operator's shell, this
+    plugin tool constructs the orchestrator with mutation_enabled=False
+    unconditionally. Mutation lives behind scripts/ops/tradingview_ta_capture.py
+    and requires both the env flag and an explicit --mutate CLI flag.

@@ -138,13 +138,8 @@ class SlowDisk:
 
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             self._writes += 1
-            if (
-                self.error_after_n_writes is not None
-                and self._writes > self.error_after_n_writes
-            ):
-                raise OSError(
-                    f"simulated disk full after {self.error_after_n_writes} writes"
-                )
+            if self.error_after_n_writes is not None and self._writes > self.error_after_n_writes:
+                raise OSError(f"simulated disk full after {self.error_after_n_writes} writes")
             if self.write_latency_ms:
                 self.sleep_fn(self.write_latency_ms / 1000.0)
             return fn(*args, **kwargs)
@@ -265,7 +260,7 @@ class FaultInjector:
             raise TypeError(f"{name!r} of type {type(prim).__name__} cannot heal")
 
     def reset_all(self) -> None:
-        for name, prim in list(self.primitives.items()):
+        for prim in list(self.primitives.values()):
             if hasattr(prim, "reset"):
                 prim.reset()
         self.transcript.append(("reset_all", self.name, {}))

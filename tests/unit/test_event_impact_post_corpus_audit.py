@@ -161,20 +161,23 @@ def test_post_corpus_audit_cli_writes_deterministic_json(tmp_path) -> None:
         encoding="utf-8",
     )
 
-    assert main(
-        [
-            "--model",
-            str(model_path),
-            "--events",
-            str(events_path),
-            "--bars-json",
-            str(bars_path),
-            "--horizon",
-            "6",
-            "--output",
-            str(output_path),
-        ]
-    ) == 0
+    assert (
+        main(
+            [
+                "--model",
+                str(model_path),
+                "--events",
+                str(events_path),
+                "--bars-json",
+                str(bars_path),
+                "--horizon",
+                "6",
+                "--output",
+                str(output_path),
+            ]
+        )
+        == 0
+    )
     rendered = json.loads(output_path.read_text(encoding="utf-8"))
     assert rendered["ok"] is True
     assert rendered["audit_cutoff"] == "2024-01-02T00:00:00+00:00"

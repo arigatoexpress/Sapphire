@@ -20,7 +20,7 @@ def test_research_worker_runs_paper_only_backtest_and_walkforward() -> None:
     assert '"synthetic"' in script
     assert '$env:PYTHONUTF8 = "1"' in script
     assert '$env:PYTHONIOENCODING = "utf-8"' in script
-    assert "$ErrorActionPreference = \"Continue\"" in script
+    assert '$ErrorActionPreference = "Continue"' in script
     assert "$exitCode = $LASTEXITCODE" in script
     assert "Out-File -FilePath $LogPath" in script
     assert "Start-ScheduledTask" not in script
@@ -34,7 +34,7 @@ def test_research_worker_installer_registers_but_does_not_start_task() -> None:
         if line.strip() and not line.strip().startswith("#")
     ]
 
-    assert "$TaskName = \"SapphireResearchWorker\"" in script
+    assert '$TaskName = "SapphireResearchWorker"' in script
     assert "Register-ScheduledTask" in script
     assert "run_research_worker.ps1" in script
     assert "Start-ScheduledTask -TaskName $TaskName" in script

@@ -247,16 +247,21 @@ def review_false_positive(item: dict[str, Any]) -> dict[str, Any]:
 
 
 def build_report(packet: dict[str, Any], *, generated_at: str | None = None) -> dict[str, Any]:
-    candidates = [evaluate_candidate(_as_mapping(item)) for item in _as_list(packet.get("candidates"))]
+    candidates = [
+        evaluate_candidate(_as_mapping(item)) for item in _as_list(packet.get("candidates"))
+    ]
     reviews = [
-        review_false_positive(_as_mapping(item)) for item in _as_list(packet.get("bot_pump_reviews"))
+        review_false_positive(_as_mapping(item))
+        for item in _as_list(packet.get("bot_pump_reviews"))
     ]
     decision_counts = Counter(item["decision"] for item in candidates)
     held = sum(1 for item in candidates if item["decision"].startswith("hold_"))
     return {
         "schema_version": SCHEMA_VERSION,
         "generated_at": generated_at or utc_now_iso(),
-        "run_id": _safe_identifier(packet.get("run_id") or "telegram-curation-dry-run", fallback="run"),
+        "run_id": _safe_identifier(
+            packet.get("run_id") or "telegram-curation-dry-run", fallback="run"
+        ),
         "mode": "dry_run",
         "safety": {
             "telegram_contacted": False,
@@ -290,7 +295,9 @@ def load_packet(path: Path) -> dict[str, Any]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input", required=True, type=Path, help="Local candidate/review JSON packet")
+    parser.add_argument(
+        "--input", required=True, type=Path, help="Local candidate/review JSON packet"
+    )
     parser.add_argument("--output", type=Path, help="Optional report output path")
     parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON")
     return parser

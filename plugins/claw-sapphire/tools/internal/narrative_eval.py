@@ -54,10 +54,16 @@ def _load_repo_module(name: str, relpath: str) -> Any:
 
 
 _load_repo_module("lib.core.provenance", "lib/core/provenance.py")
-_scoring = _load_repo_module("lib.narrative_evaluation.scoring", "lib/narrative_evaluation/scoring.py")
-_aggregates = _load_repo_module("lib.narrative_evaluation.aggregates", "lib/narrative_evaluation/aggregates.py")
+_scoring = _load_repo_module(
+    "lib.narrative_evaluation.scoring", "lib/narrative_evaluation/scoring.py"
+)
+_aggregates = _load_repo_module(
+    "lib.narrative_evaluation.aggregates", "lib/narrative_evaluation/aggregates.py"
+)
 _load_repo_module("lib.narrative_evaluation", "lib/narrative_evaluation/__init__.py")
-_service = _load_repo_module("services.narrative_evaluation.run", "services/narrative_evaluation/run.py")
+_service = _load_repo_module(
+    "services.narrative_evaluation.run", "services/narrative_evaluation/run.py"
+)
 
 GENERATOR = "plugins.claw_sapphire.narrative_eval"
 VERSION = "0.1.0"
@@ -85,11 +91,16 @@ def _scores_from_payload(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 def aggregates_action(payload: dict[str, Any]) -> dict[str, Any]:
     group_by = str(payload.get("group_by") or "symbol")
-    return {"ok": True, **_aggregates.aggregate_scores(_scores_from_payload(payload), group_by=group_by)}
+    return {
+        "ok": True,
+        **_aggregates.aggregate_scores(_scores_from_payload(payload), group_by=group_by),
+    }
 
 
 def diagnostics_action(payload: dict[str, Any]) -> dict[str, Any]:
-    return _aggregates.diagnostics_report(_scores_from_payload(payload), limit=int(payload.get("limit") or 20))
+    return _aggregates.diagnostics_report(
+        _scores_from_payload(payload), limit=int(payload.get("limit") or 20)
+    )
 
 
 def calibration_action(payload: dict[str, Any]) -> dict[str, Any]:

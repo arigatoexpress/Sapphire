@@ -599,3 +599,50 @@ tools:
     consumers: [services.dashboard, hermes-agent.trading, audit]
     description: |
       Verify a previously-published Sapphire signal against 0G state. Reads the on-chain entry from SapphireSignalVerifier, downloads the blob from 0G Storage with merkle proof verification, and surfaces the TEE attestation chatID for off-chain re-verification. Read-only — no key required.
+
+  # MegaETH Wave B.5 — agent-facing read-only protocol surface (Tranche 7)
+  # Registry path points at the internal impl; the top-level shim is
+  # auto-detected by validate_tool_registry.py's compat-shim rule. Mirrors
+  # the sapphire_health_check pattern (registered + agent_facing, internal
+  # impl + top-level shim).
+  - name: sapphire_megaeth_protocols
+    path: plugins/claw-sapphire/tools/internal/megaeth_protocols.py
+    status: registered
+    agent_facing: true
+    owner: sapphire
+    consumers: [hermes-agent.trading-analysis, claude-code.manual]
+    description: |
+      Read protocols on MegaETH (chain 4326): Aave V3 lending state, Kumbaya DEX quotes, USDM peg/health, oracle prices. Use for any "what's happening on MegaETH" question. Read-only — no swaps or borrows. Actions: lend_overview, lend_user_position, oracle_price, quote_swap, dex_overview, stable_health, peg_status, is_safe_for_leverage, list_protocols, describe_actions. Composes lib.chains.megaeth.MegaETHProtocols facade (Wave A + B.1 + B.2) behind one dispatcher to keep the LLM tool manifest lean.
+
+  # wildfire-watch drone-fleet → Sapphire bridge — Tranche 7
+  - name: wildfire
+    path: plugins/claw-sapphire/tools/internal/wildfire.py
+    shim: plugins/claw-sapphire/tools/wildfire.py
+    status: internal
+    owner: sapphire
+    consumers: [wildfire-watch.ground-station, services.dashboard, hermes-agent.alerts]
+    description: |
+      Ingest, query, and aggregate wildfire-watch drone signals. Validates a payload against the v1 wildfire_signal schema (~/Code/wildfire-watch/sapphire_integration/wildfire_signal_schema.json), appends to data/wildfire_signals.jsonl with idempotency on signal_id, emits a wildfire.signal.detected event_bus envelope, and exposes list/stats/schema_info actions. Never sends Telegram directly; the operator-supervised hermes wildfire-alert skill consumes the bus event.
+
+  # MegaETH read-only RPC client (real-time L2, ~10ms blocks) — Tranche 7
+  - name: megaeth
+    path: plugins/claw-sapphire/tools/internal/megaeth.py
+    status: internal
+    owner: sapphire
+    consumers: [hermes-agent.trading-analysis, services.intelligence]
+    description: |
+      Read-only MegaETH JSON-RPC client + plugin tool. Actions, status (chain_id + latest block + gas_price), balance <address> (wei + ETH-equivalent), tx <hash> (receipt summary + explorer URL), mempool_snapshot (txpool_status preferred, falls back to newPendingTransactions WS sample). RPC method allow-list enforced — no signing, no private keys, no state-changing calls. Endpoints configurable via SAPPHIRE_MEGAETH_RPC_URL / SAPPHIRE_MEGAETH_WS_URL / SAPPHIRE_MEGAETH_CHAIN_ID; defaults are MegaETH testnet (carrot.megaeth.com, chain_id 6343).
+
+  # TradingView orchestrator agent-facing read-only surface — Tranche 7
+  # Registry path points at the internal impl; the top-level shim is
+  # auto-detected by validate_tool_registry.py's compat-shim rule. Mirrors
+  # the sapphire_megaeth_protocols pattern (registered + agent_facing,
+  # internal impl + top-level shim).
+  - name: sapphire_tradingview
+    path: plugins/claw-sapphire/tools/internal/tradingview.py
+    status: registered
+    agent_facing: true
+    owner: sapphire
+    consumers: [hermes-agent.trading-analysis, claude-code.manual]
+    description: |
+      Read-only TradingView orchestrator surface. Wraps lib.trading.tradingview_orchestrator + lib.trading.pine_templates behind one dispatcher; mutation paths (set_symbol/timeframe, setup_chart, apply_indicator_stack, pine_compile/save/promote/set_from_file, alert_create/delete) are intentionally NOT exposed and the dispatcher constructs the orchestrator with mutation_enabled=False regardless of the SAPPHIRE_TV_MUTATION_ENABLED env var. Actions, probe (state+quote+values), score (latest scoring rows from the most recent capture manifest), list_pine (TV account scripts + local generated under pine/generated/), list_alerts (active TV alerts), generate_pine (symbol, kind=indicator|strategy — emits a Sapphire Pine v5 file under pine/generated/, no TV push), sweep (offline=true, limit=N — read-only TA sweep, returns manifest summary). Mutation lives in scripts/ops/tradingview_ta_capture.py under operator supervision; see docs/ops/tradingview-orchestrator-runbook.md.

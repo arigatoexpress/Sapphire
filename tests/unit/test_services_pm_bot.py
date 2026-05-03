@@ -151,17 +151,13 @@ def test_process_update_returns_false_when_chat_id_missing(reload_server, monkey
     assert sent == []
 
 
-def test_process_update_returns_false_when_handler_returns_empty_text(
-    reload_server, monkeypatch
-):
+def test_process_update_returns_false_when_handler_returns_empty_text(reload_server, monkeypatch):
     server = reload_server()
     if str(TOOL_DIR) not in sys.path:
         sys.path.insert(0, str(TOOL_DIR))
     import sapphire_pm_bot
 
-    monkeypatch.setattr(
-        sapphire_pm_bot, "handle_telegram_command", lambda upd: {"text": "   "}
-    )
+    monkeypatch.setattr(sapphire_pm_bot, "handle_telegram_command", lambda upd: {"text": "   "})
     sent: list[dict] = []
     monkeypatch.setattr(server.TELEGRAM_API, "send_message", lambda **kw: sent.append(kw))
 
@@ -186,9 +182,7 @@ def test_process_update_returns_false_for_non_dict_payload(reload_server, monkey
 
 
 class _FakeResponse:
-    def __init__(
-        self, *, status_code: int = 200, json_payload: Any | None = None, text: str = ""
-    ):
+    def __init__(self, *, status_code: int = 200, json_payload: Any | None = None, text: str = ""):
         self.status_code = status_code
         self._json = json_payload
         self.text = text

@@ -80,9 +80,7 @@ def infer(
     try:
         from openai import OpenAI  # type: ignore[import]
     except ImportError as exc:
-        raise OGComputeError(
-            "openai SDK not installed. Run: pip install openai>=1.0"
-        ) from exc
+        raise OGComputeError("openai SDK not installed. Run: pip install openai>=1.0") from exc
 
     client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
     response = client.chat.completions.create(

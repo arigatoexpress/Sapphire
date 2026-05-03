@@ -155,7 +155,9 @@ def _int(signal: Mapping[str, Any], key: str, default: int = 0) -> int:
         return default
 
 
-def implied_position_for_edge(signal_or_edge: Any, *, consensus: str | None = None) -> ImpliedPosition:
+def implied_position_for_edge(
+    signal_or_edge: Any, *, consensus: str | None = None
+) -> ImpliedPosition:
     """Map ``edge_score`` into the six narrative position buckets."""
     if isinstance(signal_or_edge, Mapping):
         signal = signal_or_edge
@@ -207,11 +209,15 @@ def _confidence(signal: Mapping[str, Any], position: str) -> float:
     contributing = min(1.0, _int(signal, "contributing") / 4.0)
     contradiction_penalty = 0.12 if str(signal.get("consensus") or "") == "CONTRADICT" else 0.0
     no_position_penalty = 0.18 if position == "no_position" else 0.0
-    confidence = 0.2 + edge * 0.52 + contributing * 0.22 - contradiction_penalty - no_position_penalty
+    confidence = (
+        0.2 + edge * 0.52 + contributing * 0.22 - contradiction_penalty - no_position_penalty
+    )
     return round(_clamp(confidence), 4)
 
 
-def _provenance(signal: Mapping[str, Any], *, mode_actual: str, model: str, now: str) -> dict[str, Any]:
+def _provenance(
+    signal: Mapping[str, Any], *, mode_actual: str, model: str, now: str
+) -> dict[str, Any]:
     sources = _as_str_list(signal.get("corroborated_by"))
     return {
         "generator": GENERATOR,
@@ -576,7 +582,9 @@ def synthesize_thesis(
             sdk_call=sdk_call,
         )
     except Exception as exc:  # noqa: BLE001 - live failures are soft fallbacks.
-        thesis = _mock_thesis(signal_payload, mode_actual="dry-run-live-error", model=model, now=now)
+        thesis = _mock_thesis(
+            signal_payload, mode_actual="dry-run-live-error", model=model, now=now
+        )
         thesis.provenance_envelope["live_error"] = type(exc).__name__
         return thesis
 

@@ -211,9 +211,7 @@ def test_correlate_once_live_bus_off_when_env_unset(isolated_cache, monkeypatch)
     assert publishes == []
 
 
-def test_correlate_once_live_bus_on_when_env_and_request_set(
-    isolated_cache, monkeypatch
-) -> None:
+def test_correlate_once_live_bus_on_when_env_and_request_set(isolated_cache, monkeypatch) -> None:
     publishes: list[Any] = []
 
     class _Bus:

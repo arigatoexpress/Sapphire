@@ -126,7 +126,5 @@ class TestEnvelope:
         assert loaded["inference"]["provider_address"] == "0xabc"
 
     def test_envelope_version_is_pinned(self) -> None:
-        e = build_envelope(
-            strategy="s", symbol="BTC", direction=0, confidence_bp=0
-        )
+        e = build_envelope(strategy="s", symbol="BTC", direction=0, confidence_bp=0)
         assert e.version == ENVELOPE_VERSION

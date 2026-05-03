@@ -549,9 +549,7 @@ class BQVectorStore:
         if not project or not dataset or not table:
             raise ValueError("project, dataset, and table are required")
         if dims < 8 or dims > EMBEDDING_DIMS_HARD:
-            raise ValueError(
-                f"dims={dims} must be in [8, {EMBEDDING_DIMS_HARD}]"
-            )
+            raise ValueError(f"dims={dims} must be in [8, {EMBEDDING_DIMS_HARD}]")
         self.project = project
         self.dataset = dataset
         self.table = table
@@ -585,10 +583,14 @@ class BQVectorStore:
         data = _load_live_rate(self._rate_path)
         calls = _prune_calls(list(data.get("calls", [])), now=time.time())
         if len(calls) >= MAX_LIVE_INDEX_PER_HOUR:
-            return False, (
-                f"live index rate limit hit: {len(calls)}/{MAX_LIVE_INDEX_PER_HOUR}"
-                " in the last hour"
-            ), calls
+            return (
+                False,
+                (
+                    f"live index rate limit hit: {len(calls)}/{MAX_LIVE_INDEX_PER_HOUR}"
+                    " in the last hour"
+                ),
+                calls,
+            )
         return True, "ok", calls
 
     def _record_live_call(self, calls: list[float]) -> None:
@@ -598,9 +600,7 @@ class BQVectorStore:
     def _embed_query(self, text: str | None, embedding: list[float] | None) -> list[float]:
         if embedding is not None:
             if len(embedding) != self.dims:
-                raise ValueError(
-                    f"query embedding dims {len(embedding)} != store dims {self.dims}"
-                )
+                raise ValueError(f"query embedding dims {len(embedding)} != store dims {self.dims}")
             return list(embedding)
         if text is None or not text.strip():
             raise ValueError("either text or embedding is required for query")
@@ -932,9 +932,7 @@ WHEN NOT MATCHED THEN
                 if not ok:
                     continue
             score = cosine_similarity(query_vec, record.embedding)
-            created_iso = (
-                record.created_at.isoformat() if record.created_at else _now_iso()
-            )
+            created_iso = record.created_at.isoformat() if record.created_at else _now_iso()
             hits.append(
                 QueryHit(
                     id=record.id,

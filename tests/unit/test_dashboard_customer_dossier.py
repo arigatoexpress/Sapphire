@@ -142,9 +142,7 @@ def test_customer_dossier_page_renders_with_auth(client):
 
 
 def test_api_customer_dossier_empty_state_when_dir_missing(client, tmp_path, monkeypatch):
-    monkeypatch.setattr(
-        dashboard_app, "_TARGET_TH_INTEL_DIR", tmp_path / "missing-tho-intel"
-    )
+    monkeypatch.setattr(dashboard_app, "_TARGET_TH_INTEL_DIR", tmp_path / "missing-tho-intel")
     response = client.get("/api/customer-dossier", headers=_auth_header())
     assert response.status_code == 200
     payload = response.get_json()
@@ -159,9 +157,7 @@ def test_api_customer_dossier_empty_state_when_dir_missing(client, tmp_path, mon
     assert "pii_redaction_required" in payload["safety"]["guards"]
 
 
-def test_api_customer_dossier_unreadable_snapshot_returns_safe_envelope(
-    client, dossier_dir
-):
+def test_api_customer_dossier_unreadable_snapshot_returns_safe_envelope(client, dossier_dir):
     bad = dossier_dir / "dossier_2026-04-28.json"
     bad.write_text("{not json", encoding="utf-8")
     response = client.get("/api/customer-dossier", headers=_auth_header())
@@ -312,8 +308,16 @@ def test_api_customer_dossier_safety_envelope_always_present(client, dossier_dir
 
 
 def test_api_customer_dossier_picks_latest_dossier_file(client, dossier_dir):
-    _write_dossier(dossier_dir, "dossier_2026-04-25.json", {"customers": [{"customer_name": "Old", "status": "OLD"}], "deals": []})
-    _write_dossier(dossier_dir, "dossier_2026-04-28.json", {"customers": [{"customer_name": "New", "status": "NEW"}], "deals": []})
+    _write_dossier(
+        dossier_dir,
+        "dossier_2026-04-25.json",
+        {"customers": [{"customer_name": "Old", "status": "OLD"}], "deals": []},
+    )
+    _write_dossier(
+        dossier_dir,
+        "dossier_2026-04-28.json",
+        {"customers": [{"customer_name": "New", "status": "NEW"}], "deals": []},
+    )
     response = client.get("/api/customer-dossier", headers=_auth_header())
     payload = response.get_json()
     assert payload["snapshot_path_basename"] == "dossier_2026-04-28.json"

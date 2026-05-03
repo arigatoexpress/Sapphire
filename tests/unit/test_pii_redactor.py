@@ -222,10 +222,7 @@ def test_redact_text_empty_and_none() -> None:
 
 
 def test_redact_text_idempotent_on_paragraph() -> None:
-    src = (
-        "John Doe at john.doe@example.com / 555-123-4567 — "
-        "PO Box 42, Austin, TX 78701"
-    )
+    src = "John Doe at john.doe@example.com / 555-123-4567 — PO Box 42, Austin, TX 78701"
     once = redact_text(src)
     twice = redact_text(once)
     assert once == twice

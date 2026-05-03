@@ -134,22 +134,18 @@ def test_index_references_og_image(index_body: str) -> None:
     """index.html declares the OG image meta tag pointing at the brand asset."""
     assert "og-image.png" in index_body, "index.html missing og-image.png reference"
     # Confirm a meta og:image tag exists.
-    assert re.search(
-        r'<meta[^>]+property=["\']og:image["\']', index_body, re.IGNORECASE
-    ), "index.html missing <meta property=og:image>"
+    assert re.search(r'<meta[^>]+property=["\']og:image["\']', index_body, re.IGNORECASE), (
+        "index.html missing <meta property=og:image>"
+    )
 
 
 def test_index_inlines_hero_illustration(index_body: str) -> None:
     """The mission section embeds the hero signal-flow SVG inline."""
-    assert "hero-illustration" in index_body, (
-        "index.html missing hero-illustration figure wrapper"
-    )
+    assert "hero-illustration" in index_body, "index.html missing hero-illustration figure wrapper"
     assert "Sapphire signal-flow architecture" in index_body, (
         "hero illustration <title> not present in index.html"
     )
-    assert "CORRELATION HUB" in index_body, (
-        "hero illustration central label not present"
-    )
+    assert "CORRELATION HUB" in index_body, "hero illustration central label not present"
 
 
 def test_index_inlines_capability_icons(index_body: str) -> None:
@@ -172,14 +168,10 @@ def test_envelope_sidecar_present_and_well_formed() -> None:
     )
     for entry in assets:
         for key in ("path", "prompt", "skill"):
-            assert key in entry and entry[key], (
-                f"envelope entry missing {key!r}: {entry}"
-            )
+            assert key in entry and entry[key], f"envelope entry missing {key!r}: {entry}"
         # Every listed asset path should resolve under the branding dir.
         target = BRAND_DIR / entry["path"]
-        assert target.exists(), (
-            f"envelope references non-existent asset: {entry['path']}"
-        )
+        assert target.exists(), f"envelope references non-existent asset: {entry['path']}"
 
 
 # ---- SVG validity sweep -----------------------------------------------------

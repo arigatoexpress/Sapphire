@@ -153,8 +153,7 @@ def _check_version_directive(source: str) -> tuple[list[str], list[str]]:
             stripped = line.strip()
             if stripped and not stripped.startswith("//"):
                 warnings.append(
-                    f"`//@version=5` should appear before any code "
-                    f"(found code on line {i})"
+                    f"`//@version=5` should appear before any code (found code on line {i})"
                 )
                 break
     if source.count("//@version=5") > 1:
@@ -200,13 +199,9 @@ def _check_strategy_decl(source: str) -> tuple[list[str], list[str]]:
     has_strategy = bool(re.search(r"^\s*strategy\s*\(", source, re.MULTILINE))
     has_indicator = bool(re.search(r"^\s*indicator\s*\(", source, re.MULTILINE))
     if not has_strategy and not has_indicator:
-        errors.append(
-            "missing top-level `strategy(...)` or `indicator(...)` declaration"
-        )
+        errors.append("missing top-level `strategy(...)` or `indicator(...)` declaration")
     if has_strategy and has_indicator:
-        errors.append(
-            "both `strategy(...)` and `indicator(...)` present (Pine allows only one)"
-        )
+        errors.append("both `strategy(...)` and `indicator(...)` present (Pine allows only one)")
     if has_strategy:
         # Count occurrences. Multiple strategy() calls are a hard error.
         stripped = _strip_comments_and_strings(source)
@@ -286,9 +281,7 @@ def _check_request_security(source: str) -> tuple[list[str], list[str]]:
             )
         # The first arg should be a quoted string in the original (we verify
         # against the original source, not the stripped one).
-        original_match = re.search(
-            r"request\.security\s*\(\s*([^,]+)", source, re.MULTILINE
-        )
+        original_match = re.search(r"request\.security\s*\(\s*([^,]+)", source, re.MULTILINE)
         if original_match:
             first_arg = original_match.group(1).strip()
             if not (
@@ -374,9 +367,7 @@ def _check_strategy_args(source: str) -> tuple[list[str], list[str]]:
                 break
         first_arg = args_blob[:first_comma].strip() if first_comma != -1 else args_blob.strip()
         if not first_arg.startswith('"') or len(first_arg) < 3:
-            warnings.append(
-                "`strategy(...)` first positional arg should be a quoted title string"
-            )
+            warnings.append("`strategy(...)` first positional arg should be a quoted title string")
         if "initial_capital" in args_blob:
             ic = re.search(r"initial_capital\s*=\s*(-?\d+(?:\.\d+)?)", args_blob)
             if ic and float(ic.group(1)) <= 0:

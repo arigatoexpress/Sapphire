@@ -1,6 +1,37 @@
 # Security Pipeline Runbook
 
-Last reviewed: 2026-04-29
+Last reviewed: 2026-04-30
+
+## Triage Quickstart
+
+Failure mode addressed: the daily security sweep did not produce a fresh
+report, OR the latest report shows posture grade D/F that needs immediate
+operator attention.
+
+```bash
+launchctl list com.sapphire.security-pipeline
+```
+
+```bash
+tail -n 200 data/logs/security-pipeline-err.log
+```
+
+```bash
+latest_dir="$(ls -td data/security/* 2>/dev/null | head -1)"
+test -n "$latest_dir" && python3 -m json.tool "$latest_dir/pipeline.json" | head -40
+```
+
+If the third command shows `secrets_found > 0` or grade `D`/`F`, escalate
+immediately — do not paste secret-match output into issues. If no fresh report
+exists for today, check the pause flag at
+`/Users/aribs/.sapphire/routine_pause/security-pipeline` and stderr for
+pip-audit failures (the most common cause).
+
+Live monitors: `security.pipeline.completed` event; SOC dashboard tile;
+`data/security/YYYY-MM-DD/pipeline.json` artifact.
+On-call escalation: security owner; p1 when secrets are found in committed
+files (action item: rotate before triage); p2 for grade D/F dependency
+posture; p3 for pipeline outage with no findings.
 
 This runbook covers `services/security_pipeline/` and
 `com.sapphire.security-pipeline`, the daily local security sweep that scans

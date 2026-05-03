@@ -1,0 +1,14 @@
+{
+  "chain_id": 4326,
+  "address": "0x68b34591f662508076927803c567cc8006988a09",
+  "contract_name": "UniswapV3Factory",
+  "is_proxy": false,
+  "implementation_address": null,
+  "blockscout_verified_at": "2025-12-26T17:27:21.237305Z",
+  "compiler_version": "v0.7.6+commit.7338295f",
+  "abi_function_count": 7,
+  "fetched_at": "2026-05-01T02:10:44.229683+00:00",
+  "verified_at": "2026-05-01T02:10:44.229683+00:00",
+  "source_url": "https://megaeth.blockscout.com/address/0x68b34591f662508076927803c567Cc8006988a09",
+  "source": "blockscout"
+}

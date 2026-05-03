@@ -1,0 +1,11 @@
+{
+  "chain_id": 42161,
+  "address": "0xC8ee91A54287DB53897056e12D9819156D3822Fb",
+  "name": "EventEmitter",
+  "is_verified": true,
+  "verified_at": "2026-04-30T00:00:00Z",
+  "fetched_at": "2026-04-30T00:00:00Z",
+  "source_url": "https://github.com/gmx-io/gmx-synthetics/blob/main/contracts/event/EventEmitter.sol",
+  "abi_source": "Curated minimal subset of indexed event signatures (EventLog/EventLog1/EventLog2). Wave does NOT bind EventEmitter directly — only Reader is read in this PR. Pinned here for completeness so a future Wave (e.g. WebSocket subscription to position events for live PnL streaming) has the binding point.",
+  "notes": "GMX V2's diamond-style event hub. Indexed by eventNameHash for filtering."
+}

@@ -172,9 +172,7 @@ def detect_decay(
                     recent_samples=0 if recent is None else recent.samples,
                     decay=False,
                     low_sample=True,
-                    notes=(
-                        "insufficient recent samples to compute decay",
-                    ),
+                    notes=("insufficient recent samples to compute decay",),
                 )
             )
             continue
@@ -196,9 +194,7 @@ def detect_decay(
                 notes=notes_t,
             )
         )
-    alerts.sort(
-        key=lambda a: (-(abs(a.delta) if a.delta is not None else -1.0), a.source)
-    )
+    alerts.sort(key=lambda a: (-(abs(a.delta) if a.delta is not None else -1.0), a.source))
     decayed_sources = tuple(a.source for a in alerts if a.decay)
     return DecayReport(
         alerts=tuple(alerts),

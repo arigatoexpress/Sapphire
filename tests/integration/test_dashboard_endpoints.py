@@ -797,11 +797,15 @@ def test_narrative_eval_page_and_endpoints_render_empty_state(app_client):
     assert body["ok"] is True
     assert body["overall"]["scored"] == 0
 
-    aggregates = client.get("/api/narrative-eval-aggregates?group_by=symbol", headers={"Authorization": _AUTH})
+    aggregates = client.get(
+        "/api/narrative-eval-aggregates?group_by=symbol", headers={"Authorization": _AUTH}
+    )
     assert aggregates.status_code == 200
     assert aggregates.get_json()["groups"] == {}
 
-    diagnostics = client.get("/api/narrative-eval-aggregates?view=diagnostics", headers={"Authorization": _AUTH})
+    diagnostics = client.get(
+        "/api/narrative-eval-aggregates?view=diagnostics", headers={"Authorization": _AUTH}
+    )
     assert diagnostics.status_code == 200
     assert diagnostics.get_json()["false_positives"] == []
 
@@ -845,7 +849,6 @@ def test_gemini_ooda_endpoint_can_return_daily_diff(app_client, tmp_path, monkey
     assert mutated["tool_response.ooda.decide"]["after"] == "watch deltas"
 
 
-
 def test_tradingview_orchestrator_sessions_endpoint(app_client, monkeypatch):
     _, client = app_client
     from lib.trading import tradingview_orchestrator
@@ -864,7 +867,9 @@ def test_tradingview_orchestrator_sessions_endpoint(app_client, monkeypatch):
         ],
     )
 
-    r = client.get("/api/tradingview/orchestrator/sessions?limit=5", headers={"Authorization": _AUTH})
+    r = client.get(
+        "/api/tradingview/orchestrator/sessions?limit=5", headers={"Authorization": _AUTH}
+    )
     assert r.status_code == 200
     body = r.get_json()
     assert body["status"] == "ok"
@@ -938,7 +943,6 @@ def test_tradingview_orchestrator_probe_endpoint(app_client, monkeypatch):
     assert body["state"]["payload"]["symbol"] == "BINANCE:ETHUSDT"
 
 
-
 def test_tradingview_orchestrator_artifact_endpoint_blocks_traversal(app_client, monkeypatch):
     _, client = app_client
     r = client.get(
@@ -993,7 +997,9 @@ def test_tradingview_orchestrator_artifact_endpoint_returns_json(app_client, mon
     assert r.get_json()["ok"] is True
 
 
-def test_tradingview_orchestrator_artifact_endpoint_404_for_missing(app_client, monkeypatch, tmp_path):
+def test_tradingview_orchestrator_artifact_endpoint_404_for_missing(
+    app_client, monkeypatch, tmp_path
+):
     _, client = app_client
     from lib.trading import tradingview_orchestrator
 
@@ -1077,12 +1083,24 @@ def test_tradingview_orchestrator_scoring_latest_endpoint(app_client, monkeypatc
             "generated_at": "2026-01-01T00:00:00+00:00",
             "scored_at": "2026-01-01T00:01:00+00:00",
             "items": [
-                {"symbol": "BTC", "tradingview_symbol": "BINANCE:BTCUSDT",
-                 "timeframe": "60", "rank": 2,
-                 "score": -0.8, "regime": "RISK_OFF", "rationale": "RSI=20; Δ=-8%"},
-                {"symbol": "SOL", "tradingview_symbol": "BINANCE:SOLUSDT",
-                 "timeframe": "60", "rank": 3,
-                 "score": 0.5, "regime": "RISK_ON", "rationale": "RSI=70; Δ=+6%"},
+                {
+                    "symbol": "BTC",
+                    "tradingview_symbol": "BINANCE:BTCUSDT",
+                    "timeframe": "60",
+                    "rank": 2,
+                    "score": -0.8,
+                    "regime": "RISK_OFF",
+                    "rationale": "RSI=20; Δ=-8%",
+                },
+                {
+                    "symbol": "SOL",
+                    "tradingview_symbol": "BINANCE:SOLUSDT",
+                    "timeframe": "60",
+                    "rank": 3,
+                    "score": 0.5,
+                    "regime": "RISK_ON",
+                    "rationale": "RSI=70; Δ=+6%",
+                },
             ],
         },
     )
@@ -1150,3 +1168,102 @@ def test_tradingview_orchestrator_alerts_endpoint_handles_failure(app_client, mo
     assert body["status"] == "fail"
     assert body["alert_count"] is None
     assert body["alerts"] == []
+
+
+# ── Production readiness SLO panel ────────────────────────────────────────
+
+
+def _readiness_sample_payload() -> dict:
+    """A minimal but realistic sweep JSON shape used by the readiness tests."""
+    return {
+        "schema_version": "1",
+        "mode": "json",
+        "duration_ms": 1234,
+        "generated_at": "2026-04-30T00:00:00+00:00",
+        "summary": {"pass": 36, "warn": 5, "fail": 0, "skip": 2, "total": 43},
+        "checks": [
+            {
+                "category": "repo",
+                "section": "repo",
+                "name": "canonical_checkout_clean",
+                "status": "PASS",
+                "evidence": "## main...origin/main",
+                "duration_ms": 87,
+            },
+            {
+                "category": "routines",
+                "section": "routines",
+                "name": "backtest-weekly",
+                "status": "WARN",
+                "evidence": "gate=collecting; latest=workflow_dispatch/success 2026-04-28T00:14:28Z",
+                "duration_ms": 412,
+            },
+        ],
+    }
+
+
+def test_readiness_latest_returns_cached_payload(app_client, tmp_path, monkeypatch):
+    dash_app, client = app_client
+    cache_path = tmp_path / "readiness-sweep-latest.json"
+    cache_path.write_text(json.dumps(_readiness_sample_payload()))
+    monkeypatch.setattr(dash_app, "_readiness_cache_path", lambda: cache_path)
+
+    r = client.get("/api/readiness/latest", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["status"] == "ok"
+    assert body["cache_age_seconds"] is not None and body["cache_age_seconds"] >= 0
+    assert body["cache_stale"] is False
+    assert body["summary"] == {"pass": 36, "warn": 5, "fail": 0, "skip": 2, "total": 43}
+    assert len(body["checks"]) == 2
+    assert body["generated_at"] == "2026-04-30T00:00:00+00:00"
+
+
+def test_readiness_latest_missing_cache_returns_note(app_client, tmp_path, monkeypatch):
+    dash_app, client = app_client
+    cache_path = tmp_path / "missing-readiness-cache.json"
+    assert not cache_path.exists()
+    monkeypatch.setattr(dash_app, "_readiness_cache_path", lambda: cache_path)
+
+    r = client.get("/api/readiness/latest", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["status"] == "ok"
+    assert body["note"] == "no cache yet"
+    assert body["cache_age_seconds"] is None
+    assert body["summary"] == {"pass": 0, "warn": 0, "fail": 0, "skip": 0, "total": 0}
+    assert body["checks"] == []
+
+
+def test_readiness_check_endpoint_happy_path(app_client, tmp_path, monkeypatch):
+    dash_app, client = app_client
+    cache_path = tmp_path / "readiness-sweep-latest.json"
+    cache_path.write_text(json.dumps(_readiness_sample_payload()))
+    monkeypatch.setattr(dash_app, "_readiness_cache_path", lambda: cache_path)
+
+    r = client.get(
+        "/api/readiness/check/routines/backtest-weekly",
+        headers={"Authorization": _AUTH},
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["status"] == "ok"
+    assert body["check"]["name"] == "backtest-weekly"
+    assert body["check"]["status"] == "WARN"
+    assert body["generated_at"] == "2026-04-30T00:00:00+00:00"
+
+
+def test_readiness_check_endpoint_404_when_missing(app_client, tmp_path, monkeypatch):
+    dash_app, client = app_client
+    cache_path = tmp_path / "readiness-sweep-latest.json"
+    cache_path.write_text(json.dumps(_readiness_sample_payload()))
+    monkeypatch.setattr(dash_app, "_readiness_cache_path", lambda: cache_path)
+
+    r = client.get(
+        "/api/readiness/check/repo/does_not_exist",
+        headers={"Authorization": _AUTH},
+    )
+    assert r.status_code == 404
+    body = r.get_json()
+    assert body["status"] == "error"
+    assert body["error"] == "check not found"

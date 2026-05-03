@@ -7,6 +7,7 @@ on top.
 
 from __future__ import annotations
 
+import math
 import sys
 from pathlib import Path
 
@@ -60,6 +61,30 @@ def test_sample_kurtosis_about_three_for_uniform_normalish_set() -> None:
 def test_sample_kurtosis_default_three_for_too_few_obs() -> None:
     assert sample_kurtosis([]) == 3.0
     assert sample_kurtosis([1.0]) == 3.0
+
+
+def test_skew_kurt_fallback_for_constant_returns() -> None:
+    """A constant return series must fall back to the Gaussian defaults.
+
+    Floating-point summation leaves ``m2`` at ~1e-33 on Python 3.11 even when
+    the inputs are mathematically identical (e.g. [0.01]*250). Without an
+    epsilon guard the m2<=0 fallback is bypassed and ``m3/m2**1.5`` collapses
+    to numerical noise (~1.0), which then makes the Bailey-López de Prado
+    correction term inside ``deflated_sharpe_ratio`` go negative and crashes
+    ``math.sqrt`` with a domain error. This test pins the expected behaviour.
+    """
+    constant = [0.01] * 250
+    assert sample_skewness(constant) == 0.0
+    assert sample_kurtosis(constant) == 3.0
+    # And — crucially — the wrapper must not raise.
+    from lib.analytics.walkforward.deflated_sharpe import deflated_sharpe_for_walkforward
+
+    result = deflated_sharpe_for_walkforward(window_sharpes=[1.0, 1.2], test_returns=constant)
+    assert result.skewness == 0.0
+    assert result.kurtosis == 3.0
+    # And the deflated value is finite + the probability is in [0, 1].
+    assert math.isfinite(result.base.deflated_sharpe)
+    assert 0.0 <= result.base.probability <= 1.0
 
 
 # ── _coerce_sharpes ────────────────────────────────────────────────────────
@@ -245,7 +270,5 @@ def test_deflated_records_provenance_note() -> None:
 
 
 def test_deflated_explicit_inputs_record_note() -> None:
-    result = deflated_sharpe_for_walkforward(
-        window_sharpes=[1.0, 1.2], test_returns=[0.01] * 100
-    )
+    result = deflated_sharpe_for_walkforward(window_sharpes=[1.0, 1.2], test_returns=[0.01] * 100)
     assert "explicit window_sharpes" in result.note

@@ -463,9 +463,9 @@ def _delta(
     return {k: round(float(a.get(k, 0.0)) - float(b.get(k, 0.0)), 4) for k in keys}
 
 
-def _generate_dry_run(cases: list[PromptCase]) -> tuple[
-    list[dict[str, Any]], list[RubricScores], list[str | None]
-]:
+def _generate_dry_run(
+    cases: list[PromptCase],
+) -> tuple[list[dict[str, Any]], list[RubricScores], list[str | None]]:
     responses: list[dict[str, Any]] = []
     rubrics: list[RubricScores] = []
     errors: list[str | None] = []
@@ -636,9 +636,7 @@ def _persist_run(
     )
     artifact = RUNS_DIR / f"{run_id}.json"
     try:
-        artifact.write_text(
-            json.dumps(stamped, indent=2, sort_keys=True), encoding="utf-8"
-        )
+        artifact.write_text(json.dumps(stamped, indent=2, sort_keys=True), encoding="utf-8")
     except OSError:
         return stamped
     try:
@@ -931,17 +929,11 @@ def compare(
     aggregates = {sec["generator"]: sec["aggregate"] for sec in sections}
     deltas: dict[str, dict[str, float]] = {}
     if "gemini-live" in aggregates and "local-mesh" in aggregates:
-        deltas["live_minus_local"] = _delta(
-            aggregates["gemini-live"], aggregates["local-mesh"]
-        )
+        deltas["live_minus_local"] = _delta(aggregates["gemini-live"], aggregates["local-mesh"])
     if "gemini-live" in aggregates and "dry-run" in aggregates:
-        deltas["live_minus_dry"] = _delta(
-            aggregates["gemini-live"], aggregates["dry-run"]
-        )
+        deltas["live_minus_dry"] = _delta(aggregates["gemini-live"], aggregates["dry-run"])
     if "local-mesh" in aggregates and "dry-run" in aggregates:
-        deltas["local_minus_dry"] = _delta(
-            aggregates["local-mesh"], aggregates["dry-run"]
-        )
+        deltas["local_minus_dry"] = _delta(aggregates["local-mesh"], aggregates["dry-run"])
 
     counters["runs"] = counters.get("runs", 0) + 1
     _save_counters(counters)
@@ -1022,8 +1014,7 @@ def handle(payload: dict[str, Any]) -> dict[str, Any]:
             prompt_ids=payload.get("prompt_ids"),
             mode=payload.get("mode") or "dry-run",
             model=payload.get("model") or DEFAULT_MODEL,
-            local_model_alias=payload.get("local_model_alias")
-            or DEFAULT_LOCAL_MODEL_ALIAS,
+            local_model_alias=payload.get("local_model_alias") or DEFAULT_LOCAL_MODEL_ALIAS,
             proxy_url=payload.get("proxy_url") or DEFAULT_LOCAL_PROXY_URL,
             max_output_tokens=int(payload.get("max_output_tokens") or 512),
         )

@@ -205,14 +205,8 @@ def build_report(
     manifest = load_manifest(manifest_path)
     source_rows = scan_sources(manifest)
     screenshot_rows = inspect_screenshot_placeholders(manifest)
-    failures = [
-        f"source:{row['path']}"
-        for row in source_rows
-        if row.get("status") != "pass"
-    ] + [
-        f"screenshot:{row['path']}"
-        for row in screenshot_rows
-        if row.get("status") != "pass"
+    failures = [f"source:{row['path']}" for row in source_rows if row.get("status") != "pass"] + [
+        f"screenshot:{row['path']}" for row in screenshot_rows if row.get("status") != "pass"
     ]
     totals = {
         "routes": len(manifest.get("safe_routes", [])),

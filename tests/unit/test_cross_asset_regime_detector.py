@@ -9,7 +9,9 @@ FROZEN_NOW = datetime(2026, 4, 28, 12, 0, tzinfo=UTC)
 ASSETS = ["BTC", "ETH", "SOL", "SPY", "QQQ", "DXY", "XAUUSD", "VIX"]
 
 
-def _matrix(default: float | None = 0.0, overrides: dict[tuple[str, str], float] | None = None) -> MethodMatrix:
+def _matrix(
+    default: float | None = 0.0, overrides: dict[tuple[str, str], float] | None = None
+) -> MethodMatrix:
     overrides = overrides or {}
     values = [[1.0 if i == j else default for j in range(len(ASSETS))] for i in range(len(ASSETS))]
     index = {asset: idx for idx, asset in enumerate(ASSETS)}
@@ -34,7 +36,9 @@ def _risk_overrides(value: float) -> dict[tuple[str, str], float]:
 
 
 def _risk_dollar_overrides(value: float) -> dict[tuple[str, str], float]:
-    return {(risk, dollar): value for risk in ["BTC", "ETH", "SOL", "SPY", "QQQ"] for dollar in ["DXY"]}
+    return {
+        (risk, dollar): value for risk in ["BTC", "ETH", "SOL", "SPY", "QQQ"] for dollar in ["DXY"]
+    }
 
 
 def test_label_set_contains_all_lane_regimes() -> None:
@@ -151,7 +155,9 @@ def test_history_without_smoothing_keeps_raw_labels() -> None:
 
 
 def test_history_handles_gaps_in_input() -> None:
-    labels = label_regime_history([None, _matrix(overrides=_risk_overrides(0.72))], min_persistence=1)
+    labels = label_regime_history(
+        [None, _matrix(overrides=_risk_overrides(0.72))], min_persistence=1
+    )
     assert labels[0].label == "regime_uncertain"
     assert labels[1].label == "risk_on_correlated"
 

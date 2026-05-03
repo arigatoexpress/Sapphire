@@ -225,7 +225,9 @@ class LiveLedger:
             return
         yield from sorted(self.root.glob("*/20*/trades.jsonl"))
 
-    def load(self, account_hash: str | None = None, *, strict: bool = False) -> list[LiveTradeRecord]:
+    def load(
+        self, account_hash: str | None = None, *, strict: bool = False
+    ) -> list[LiveTradeRecord]:
         records: list[LiveTradeRecord] = []
         for path in self.iter_paths(account_hash):
             try:

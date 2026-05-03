@@ -66,7 +66,9 @@ def test_score_thesis_keeps_unelapsed_horizon_out_of_accuracy() -> None:
 
 
 def test_score_thesis_scores_zero_return_as_neutral_outcome() -> None:
-    score = score_thesis(_thesis("neutral", 0.55), _outcome(0.0), horizon_hours=24, scored_at=NOW).to_dict()
+    score = score_thesis(
+        _thesis("neutral", 0.55), _outcome(0.0), horizon_hours=24, scored_at=NOW
+    ).to_dict()
     assert score["status"] == "scored"
     assert score["actual_return_pct"] == 0.0
     assert score["correct"] is True
@@ -75,7 +77,9 @@ def test_score_thesis_scores_zero_return_as_neutral_outcome() -> None:
 def test_aggregates_diagnostics_and_calibration() -> None:
     rows = [
         score_thesis(_thesis(), _outcome(), horizon_hours=24, scored_at=NOW).to_dict(),
-        score_thesis(_thesis("short_mild", 0.8), _outcome(), horizon_hours=24, scored_at=NOW).to_dict(),
+        score_thesis(
+            _thesis("short_mild", 0.8), _outcome(), horizon_hours=24, scored_at=NOW
+        ).to_dict(),
     ]
     agg = aggregate_scores(rows, group_by="symbol")
     assert agg["groups"]["BTC"]["scored"] == 2

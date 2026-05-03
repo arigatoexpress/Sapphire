@@ -21,9 +21,7 @@ def test_missing_optional_deps_handles_missing_parent_package(monkeypatch):
 
     collection_path = root_conftest.REPO_ROOT / "tests/unit/test_chat_intent.py"
 
-    assert root_conftest._missing_optional_test_deps(collection_path) == [
-        "google.generativeai"
-    ]
+    assert root_conftest._missing_optional_test_deps(collection_path) == ["google.generativeai"]
 
 
 def test_missing_optional_deps_ignores_paths_outside_repo(tmp_path):

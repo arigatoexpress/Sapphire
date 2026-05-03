@@ -243,7 +243,15 @@ def _buyer_safe_requested() -> bool:
         or request.args.get("public")
         or ""
     )
-    return str(raw).strip().lower() in {"1", "true", "yes", "buyer", "buyer_safe", "buyer-safe", "public"}
+    return str(raw).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "buyer",
+        "buyer_safe",
+        "buyer-safe",
+        "public",
+    }
 
 
 def _buyer_safe_payload(payload: Any) -> Any:
@@ -256,7 +264,10 @@ def _buyer_safe_payload(payload: Any) -> Any:
             redacted_fields.add(normalized_key)
             return _BUYER_SAFE_FIELD_REPLACEMENTS[normalized_key]
         if isinstance(value, dict):
-            return {str(child_key): _walk(child_value, str(child_key)) for child_key, child_value in value.items()}
+            return {
+                str(child_key): _walk(child_value, str(child_key))
+                for child_key, child_value in value.items()
+            }
         if isinstance(value, list):
             return [_walk(item, key) for item in value]
         if isinstance(value, str):
@@ -313,7 +324,11 @@ def _extract_diligence_doc(path: Path) -> dict[str, Any]:
     lines = text.splitlines()
     title = next((line.lstrip("# ").strip() for line in lines if line.startswith("# ")), path.stem)
     readout_index = next(
-        (idx + 1 for idx, line in enumerate(lines) if line.strip().lower() == "## diligence readout"),
+        (
+            idx + 1
+            for idx, line in enumerate(lines)
+            if line.strip().lower() == "## diligence readout"
+        ),
         len(lines),
     )
     evidence_index = next(
@@ -584,7 +599,8 @@ def _count_test_functions(path: Path) -> int:
     return sum(
         1
         for node in ast.walk(tree)
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test_")
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name.startswith("test_")
     )
 
 
@@ -646,7 +662,9 @@ def _build_test_suite_health(root: Path | None = None) -> dict[str, Any]:
         "plugin": suite("plugins/claw-sapphire/tests/", plugin_files),
     }
     lastfailed_count = len(lastfailed)
-    status = "pass" if nodeids and lastfailed_count == 0 else ("fail" if lastfailed_count else "warn")
+    status = (
+        "pass" if nodeids and lastfailed_count == 0 else ("fail" if lastfailed_count else "warn")
+    )
     return {
         "mode": "read_only_test_suite_health",
         "status": status,
@@ -736,7 +754,9 @@ def _build_launchagent_summary() -> dict[str, Any]:
     for label in labels:
         live = parsed.get(label)
         if not live:
-            rows.append({"label": label, "status_label": "not_loaded", "pid": None, "last_exit": None})
+            rows.append(
+                {"label": label, "status_label": "not_loaded", "pid": None, "last_exit": None}
+            )
             continue
         pid = live.get("pid")
         last_exit = live.get("last_exit")
@@ -826,7 +846,9 @@ def _tool_registry_metric() -> dict[str, str]:
     try:
         import yaml
 
-        registry = yaml.safe_load((_DASHBOARD_REPO_ROOT / "infra" / "tool-registry.yaml").read_text(encoding="utf-8"))
+        registry = yaml.safe_load(
+            (_DASHBOARD_REPO_ROOT / "infra" / "tool-registry.yaml").read_text(encoding="utf-8")
+        )
         tools = registry.get("tools", []) if isinstance(registry, dict) else []
         fallback_count = str(len(tools))
     except Exception:
@@ -913,14 +935,14 @@ def _org_repo_index() -> dict[str, dict[str, Any]]:
     try:
         import yaml
 
-        manifest = yaml.safe_load((_DASHBOARD_REPO_ROOT / "infra" / "org-repos.yaml").read_text(encoding="utf-8"))
+        manifest = yaml.safe_load(
+            (_DASHBOARD_REPO_ROOT / "infra" / "org-repos.yaml").read_text(encoding="utf-8")
+        )
     except Exception:
         return {}
     repos = manifest.get("repos", []) if isinstance(manifest, dict) else []
     return {
-        str(repo.get("id")): repo
-        for repo in repos
-        if isinstance(repo, dict) and repo.get("id")
+        str(repo.get("id")): repo for repo in repos if isinstance(repo, dict) and repo.get("id")
     }
 
 
@@ -1033,7 +1055,9 @@ def _build_unified_dashboard_payload() -> dict[str, Any]:
                 ],
                 _manifest_repo_link("regional-intel-workbench"),
             ),
-            "tags": _manifest_tags("regional-intel-workbench", ["regional intel", "client feed", "provenance"]),
+            "tags": _manifest_tags(
+                "regional-intel-workbench", ["regional intel", "client feed", "provenance"]
+            ),
         },
         {
             "name": "org-platform",
@@ -1698,9 +1722,7 @@ def api_trading_workbench_watchlist():
     """Read-only TradingView/Sapphire workbench watchlist contract."""
     offline = (request.args.get("offline") or "").strip().lower() in {"1", "true", "yes"}
     symbols = [
-        token.strip()
-        for token in (request.args.get("symbols") or "").split(",")
-        if token.strip()
+        token.strip() for token in (request.args.get("symbols") or "").split(",") if token.strip()
     ]
     try:
         limit = max(1, min(50, int(request.args.get("limit", "18"))))
@@ -2938,6 +2960,74 @@ def api_sentinel_evaluate():
     except Exception as e:
         log.exception("sentinel evaluation failed")
         return jsonify({"error": f"{type(e).__name__}: {e}"}), 400
+
+
+# Cross-chain Aave APY arbitrage scanner: ~1-2s per scan in production
+# (3 RPC fan-outs across 5 candidate assets). 30s server-side cache
+# keeps the panel snappy and avoids hammering chain RPCs from a 60s
+# auto-refreshing dashboard panel.
+CROSS_CHAIN_ARB_CACHE_DURATION = 30
+
+
+@app.route("/api/cross_chain/aave_arb")
+@requires_auth
+def api_cross_chain_aave_arb():
+    """Live cross-chain Aave V3 supply/borrow APY arbitrage opportunities.
+
+    Returns the JSON shape produced by
+    :func:`lib.hackathon.cross_chain_alpha.scan_aave_arb` plus a
+    ``generated_at`` ISO-8601 UTC timestamp so the panel can render an
+    accurate "Last scan" label even when responses come from cache.
+    """
+
+    def fetch():
+        from lib.hackathon.cross_chain_alpha import scan_aave_arb
+
+        payload = scan_aave_arb(top_n=5)
+        payload["generated_at"] = datetime.now(UTC).isoformat()
+        return payload
+
+    try:
+        return jsonify(get_cached("cross_chain_aave_arb", fetch, ttl=CROSS_CHAIN_ARB_CACHE_DURATION))
+    except Exception as e:
+        log.exception("cross-chain aave arb scan failed")
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+
+
+# Cross-chain GMX V2 perps overview: per-chain funding APR + OI skew
+# + same-underlying divergence. Same 30s server-side cache contract as
+# the Aave arb panel above so a 60s auto-refresh polls the endpoint
+# twice between actual chain RPC fan-outs.
+PERPS_OVERVIEW_CACHE_DURATION = 30
+
+
+@app.route("/api/perps/overview")
+@requires_auth
+def api_perps_overview():
+    """Live cross-chain GMX V2 perps funding-rate + OI-skew overview.
+
+    Returns the JSON shape produced by
+    :func:`lib.perps.gmx_v2_overview.scan_perps_overview` plus a
+    ``generated_at`` ISO-8601 UTC timestamp so the panel can render an
+    accurate "Last refresh" label even when responses come from cache.
+    """
+
+    def fetch():
+        from lib.perps.gmx_v2_overview import scan_perps_overview
+
+        payload = scan_perps_overview()
+        payload["generated_at"] = datetime.now(UTC).isoformat()
+        return payload
+
+    try:
+        return jsonify(
+            get_cached(
+                "perps_overview", fetch, ttl=PERPS_OVERVIEW_CACHE_DURATION
+            )
+        )
+    except Exception as e:
+        log.exception("perps overview scan failed")
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
 
 
 @app.route("/risk")
@@ -4397,6 +4487,195 @@ def narrative_eval_page():
         current_page="narrative-eval",
         page_title="Narrative Eval",
     )
+
+
+# ---------------------------------------------------------------------------
+# /timetravel — operator-facing as-of-T snapshot view (Tranche 7-G).
+# ---------------------------------------------------------------------------
+#
+# Reads ``lib.timetravel.snapshot.take_snapshot`` to answer "what was the
+# correlator + narrative state at T?". Read-only research tool — never writes
+# back to ``data/``, never publishes to the event bus, never places orders or
+# alerts. The link is opt-in (operator-only) and surfaced from the Ops nav.
+
+# Default per-scope row cap. Snapshots for older timestamps can exceed
+# 100k rows per scope; cap before serialising to keep responses bounded.
+_TIMETRAVEL_DEFAULT_ROW_CAP = 200
+_TIMETRAVEL_MAX_ROW_CAP = 2000
+
+
+def _timetravel_parse_at(raw: str | None) -> datetime | None:
+    """Coerce a user-supplied ISO/datetime-local string to UTC datetime.
+
+    Accepts ``YYYY-MM-DDTHH:MM`` (HTML datetime-local), ``YYYY-MM-DDTHH:MM:SS``,
+    full ISO-8601 with offset, or trailing ``Z``. Returns ``None`` on failure.
+    """
+    if not raw:
+        return None
+    candidate = str(raw).strip()
+    if not candidate:
+        return None
+    if candidate.endswith("Z"):
+        candidate = candidate[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(candidate)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
+
+
+def _timetravel_truncate(snapshot_dict: dict[str, Any], cap: int) -> dict[str, Any]:
+    """Cap each scope's ``rows`` list at ``cap`` (most-recent kept)."""
+    entries = snapshot_dict.get("entries") or {}
+    truncated: dict[str, Any] = {}
+    for name, entry in entries.items():
+        rows = list(entry.get("rows") or [])
+        if cap > 0 and len(rows) > cap:
+            entry = dict(entry)
+            entry["rows"] = rows[-cap:]
+            entry["truncated"] = True
+            entry["truncated_to"] = cap
+            entry["original_row_count"] = len(rows)
+        truncated[name] = entry
+    snapshot_dict["entries"] = truncated
+    return snapshot_dict
+
+
+def _timetravel_index_summary() -> dict[str, Any]:
+    """Return a small, safe summary of the on-disk index for the UI."""
+    try:
+        from lib.timetravel.snapshot import index_status as _index_status
+
+        return _index_status()
+    except Exception as exc:  # pragma: no cover - defensive
+        log.warning("timetravel index summary error: %s", exc)
+        return {
+            "exists": False,
+            "files": 0,
+            "rows": 0,
+            "signature": None,
+            "built_at": None,
+            "error": f"{exc.__class__.__name__}: {exc}",
+        }
+
+
+def _timetravel_build_payload(
+    *,
+    at: datetime,
+    scope_filter: tuple[str, ...] | None,
+    cap: int,
+) -> dict[str, Any]:
+    """Build a single ``take_snapshot`` payload, with row-cap + no-data path."""
+    from lib.timetravel.snapshot import DEFAULT_SCOPE, take_snapshot
+
+    requested_scope = scope_filter or DEFAULT_SCOPE
+    snap = take_snapshot(at, scope=requested_scope)
+    snapshot_dict = _timetravel_truncate(snap.to_dict(), cap)
+
+    # "No data this far back" detection: every scope is empty.
+    entries = snapshot_dict.get("entries") or {}
+    all_empty = bool(entries) and all(
+        bool((entry or {}).get("empty", True)) for entry in entries.values()
+    )
+    return {
+        "ok": True,
+        "at": snapshot_dict.get("at"),
+        "scope": snapshot_dict.get("scope"),
+        "snapshot": snapshot_dict,
+        "no_data": all_empty,
+        "row_cap": cap,
+        "index": _timetravel_index_summary(),
+    }
+
+
+@app.route("/timetravel")
+@requires_auth
+def timetravel_page():
+    """Render the operator-facing as-of-T snapshot debug page."""
+    from lib.timetravel.snapshot import DEFAULT_SCOPE
+
+    return render_template(
+        "pages/timetravel.html",
+        current_page="timetravel",
+        page_title="Time Travel",
+        default_scopes=list(DEFAULT_SCOPE),
+        index_summary=_timetravel_index_summary(),
+    )
+
+
+@app.route("/api/timetravel-snapshot")
+@requires_auth
+def api_timetravel_snapshot():
+    """Return the as-of-T snapshot (and optionally a 'now' comparison).
+
+    Query params:
+      ``at`` — ISO-8601 / datetime-local string, defaults to ``utcnow()``
+      ``compare_to_now`` — when truthy (``1``/``true``), include a second
+        snapshot anchored at ``utcnow()`` for side-by-side rendering
+      ``scope`` — optional comma-separated list (defaults to all scopes)
+      ``max_rows_per_scope`` — int, default 200, max 2000
+    """
+    raw_at = request.args.get("at")
+    parsed_at = _timetravel_parse_at(raw_at) if raw_at else datetime.now(UTC)
+    if parsed_at is None:
+        return jsonify(
+            {
+                "ok": False,
+                "error": (
+                    "invalid 'at' — expected ISO-8601 / datetime-local "
+                    "(e.g. 2026-04-30T12:00 or 2026-04-30T12:00:00+00:00)"
+                ),
+                "at": raw_at,
+            }
+        ), 400
+
+    raw_compare = (request.args.get("compare_to_now") or "").strip().lower()
+    compare_to_now = raw_compare in {"1", "true", "yes", "on"}
+
+    raw_scope = request.args.get("scope")
+    scope_filter: tuple[str, ...] | None = None
+    if raw_scope:
+        scope_filter = tuple(s.strip() for s in raw_scope.split(",") if s.strip())
+        if not scope_filter:
+            scope_filter = None
+
+    try:
+        cap = int(request.args.get("max_rows_per_scope") or _TIMETRAVEL_DEFAULT_ROW_CAP)
+    except (TypeError, ValueError):
+        cap = _TIMETRAVEL_DEFAULT_ROW_CAP
+    cap = max(1, min(cap, _TIMETRAVEL_MAX_ROW_CAP))
+
+    try:
+        primary = _timetravel_build_payload(at=parsed_at, scope_filter=scope_filter, cap=cap)
+    except Exception as exc:  # noqa: BLE001 - return clean JSON, don't crash.
+        log.warning("timetravel snapshot error (at=%s): %s", parsed_at, exc)
+        return jsonify(
+            {
+                "ok": False,
+                "error": f"{exc.__class__.__name__}: {exc}"[:300],
+                "at": parsed_at.isoformat(),
+            }
+        ), 500
+
+    payload: dict[str, Any] = {
+        "ok": True,
+        "primary": primary,
+        "compare_to_now": compare_to_now,
+    }
+    if compare_to_now:
+        try:
+            payload["now"] = _timetravel_build_payload(
+                at=datetime.now(UTC), scope_filter=scope_filter, cap=cap
+            )
+        except Exception as exc:  # noqa: BLE001 - 'now' is best-effort.
+            log.warning("timetravel 'now' snapshot error: %s", exc)
+            payload["now"] = {
+                "ok": False,
+                "error": f"{exc.__class__.__name__}: {exc}"[:300],
+            }
+    return jsonify(payload)
 
 
 @app.route("/api/diligence-summary")
@@ -6471,9 +6750,7 @@ def _remote_path_label(raw_path: Any) -> str | None:
     text = str(raw_path)
     if text.startswith(".../"):
         return _paste_safe_text(text, limit=120)
-    parts = [
-        part for part in text.replace("\\", "/").split("/") if part and not part.endswith(":")
-    ]
+    parts = [part for part in text.replace("\\", "/").split("/") if part and not part.endswith(":")]
     if not parts:
         return None
     return _paste_safe_text(".../" + "/".join(parts[-3:]), limit=120)
@@ -6511,7 +6788,9 @@ def _normalize_worker_schedule(payload: dict[str, Any]) -> dict[str, Any]:
     last_task_result = _safe_int(schedule.get("last_task_result"))
     last_result_ok = schedule.get("last_result_ok")
     return {
-        "task_name": _paste_safe_text(schedule.get("task_name") or "SapphireResearchWorker", limit=80),
+        "task_name": _paste_safe_text(
+            schedule.get("task_name") or "SapphireResearchWorker", limit=80
+        ),
         "status": _paste_safe_text(schedule.get("status") or "unknown", limit=32),
         "state": _paste_safe_text(schedule.get("state"), limit=32),
         "last_run_time": schedule.get("last_run_time"),

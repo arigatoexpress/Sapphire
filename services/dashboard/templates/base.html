@@ -14,7 +14,7 @@
            SAPPHIRE TERMINAL INTERFACE
            Fallout-inspired Tactical Command System
            ============================================ */
-        
+
         :root {
             /* High-vis green Fallout terminal theme */
             --amber: #62ff40;
@@ -124,7 +124,7 @@
             min-height: 100vh;
             display: flex;
             flex-direction: column;
-            background: 
+            background:
                 linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
                 linear-gradient(var(--grid-line) 1px, transparent 1px),
                 radial-gradient(1400px 600px at 80% -10%, rgba(98, 255, 64, 0.10), transparent 52%),
@@ -784,7 +784,7 @@
             .mobile-toggle {
                 display: block;
             }
-            
+
             .terminal-nav {
                 display: none;
                 position: fixed;
@@ -797,7 +797,7 @@
                 flex-direction: column;
                 padding: var(--space-xl);
             }
-            
+
             .terminal-nav.open {
                 display: flex;
             }
@@ -1036,6 +1036,7 @@
                 <span class="nav-group-label">Ops</span>
                 <a href="/content" class="nav-item {% if current_page == 'content' %}active{% endif %}">Content</a>
                 <a href="/observability" class="nav-item {% if current_page == 'observability' %}active{% endif %}">Observability</a>
+                <a href="/timetravel" class="nav-item {% if current_page == 'timetravel' %}active{% endif %}">Time Travel</a>
                 <a href="/inference-telemetry" class="nav-item {% if current_page == 'inference-telemetry' %}active{% endif %}">Inference</a>
                 <a href="/organization" class="nav-item {% if current_page == 'organization' %}active{% endif %}">Org</a>
                 <a href="/security" class="nav-item {% if current_page == 'security' %}active{% endif %}">Security</a>
@@ -1045,13 +1046,18 @@
                 <span class="nav-group-label">Products</span>
                 <a href="/threat-intel" class="nav-item {% if current_page == 'threat-intel' %}active{% endif %}">Threat Intel</a>
                 <a href="/customer-dossier" class="nav-item {% if current_page == 'customer-dossier' %}active{% endif %}">Customer Dossier</a>
+                <a href="/wildfire" class="nav-item {% if current_page == 'wildfire' %}active{% endif %}">Wildfire</a>
+            </div>
+            <div class="nav-group">
+                <span class="nav-group-label">Business</span>
+                <a href="https://project-go-forward-trgi34bxuq-uc.a.run.app/" target="_blank" rel="noopener" class="nav-item">THO Operations ↗</a>
             </div>
         </nav>
 
         <!-- Main Content -->
         <main class="terminal-main">
             <div class="terminal-prompt blink">system.status --verbose</div>
-            
+
             {% block content %}{% endblock %}
         </main>
 
@@ -1073,7 +1079,7 @@
             const timeStr = now.toISOString().replace('T', ' ').slice(0, 19);
             document.getElementById('system-time').textContent = timeStr;
         }
-        
+
         setInterval(updateTime, 1000);
         updateTime();
 
@@ -1095,7 +1101,7 @@
             try {
                 const data = await window.platformApi.getStatus();
                 const indicator = document.getElementById('system-status');
-                
+
                 const healthy = data.summary?.service_healthy === data.summary?.service_total;
                 if (healthy) {
                     indicator.textContent = 'ONLINE';
@@ -1109,11 +1115,11 @@
                 document.getElementById('system-status').className = 'status-indicator error';
             }
         }
-        
+
         checkStatus();
         setInterval(checkStatus, 30000);
     </script>
-    
+
     {% block extra_js %}{% endblock %}
 </body>
 </html>

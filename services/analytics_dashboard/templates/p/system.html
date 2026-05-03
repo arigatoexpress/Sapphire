@@ -1,0 +1,120 @@
+{% extends "_base_subpage.html" %}
+{% block title %}System Health{% endblock %}
+{% block crumb %}p/system{% endblock %}
+{% block meta %}operator console{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <h1>System Health</h1>
+  <div class="typed" id="typed-line">$ ./sapphire system --health --inference --deploys</div>
+</section>
+
+<section class="box">
+  <h2 class="section">SERVICE_HEALTH_60M</h2>
+  <table class="term">
+    <thead><tr><th>service</th><th>host</th><th>healthy</th><th>degraded</th><th>down</th><th>p50 ms</th><th>p95 ms</th><th>last seen</th></tr></thead>
+    <tbody id="services"><tr><td colspan="8" class="muted">// loading service health ...</td></tr></tbody>
+  </table>
+  <div class="muted" style="margin-top:10px;">// pi nodes (rari1, rari2) filtered out — pi cluster on hold since 2026-05-03</div>
+</section>
+
+<section class="box">
+  <h2 class="section">INFERENCE_24H_BY_TIER</h2>
+  <table class="term">
+    <thead><tr><th>tier</th><th>calls</th><th>ok</th><th>err</th><th>err_rate</th><th>avg latency</th><th>p95 latency</th></tr></thead>
+    <tbody id="inference"><tr><td colspan="7" class="muted">// loading inference metrics ...</td></tr></tbody>
+  </table>
+</section>
+
+<section class="grid cols-2">
+  <div class="card">
+    <h3>DEPLOY_REVISIONS</h3>
+    <div class="kv">
+      <div class="k">analytics-dashboard</div><div class="v">cloud run, us-central1</div>
+      <div class="k">project</div><div class="v"><code>{{ project }}</code></div>
+      <div class="k">dataset</div><div class="v"><code>{{ dataset }}</code></div>
+      <div class="k">tho</div><div class="v">rev 92+ &middot; <a href="https://tho.sapphirealpha.xyz/healthz/" target="_blank" rel="noopener">[healthz]</a></div>
+      <div class="k">cyber-threat-bot</div><div class="v">cloud run, us-central1</div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>DEGRADATIONS</h3>
+    <ol id="degraded" style="margin: 4px 0 0; padding-left: 22px;">
+      <li class="muted">// fetching from /api/brain/synthesis ...</li>
+    </ol>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  var line = document.getElementById('typed-line');
+  if (line) {
+    var full = line.textContent; line.textContent = ''; var i=0;
+    (function tick(){ if (i>=full.length) return; line.textContent += full.charAt(i++); setTimeout(tick, 28); })();
+  }
+  function esc(s){ return String(s||'').replace(/[<>&]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
+
+  fetch('/api/timeseries/services').then(r=>r.json()).then(d=>{
+    var rows = d.rows || [];
+    var tb = document.getElementById('services');
+    if (!rows.length) { tb.innerHTML = '<tr><td colspan="8" class="muted">// no service heartbeats in last 60min</td></tr>'; return; }
+    tb.innerHTML = rows.map(r => {
+      var down = Number(r.down_n||0), deg = Number(r.degraded_n||0);
+      var pillCls = down ? 'red' : deg ? 'amber' : 'green';
+      var pillTxt = down ? 'DOWN' : deg ? 'DEGRADED' : 'OK';
+      return '<tr>' +
+        '<td><code>' + esc(r.service) + '</code> <span class="pill ' + pillCls + '">' + pillTxt + '</span></td>' +
+        '<td class="dim">' + esc(r.host || '--') + '</td>' +
+        '<td>' + (r.healthy_n || 0) + '</td>' +
+        '<td>' + (r.degraded_n || 0) + '</td>' +
+        '<td>' + (r.down_n || 0) + '</td>' +
+        '<td>' + (r.p50_ms != null ? Math.round(r.p50_ms) : '--') + '</td>' +
+        '<td>' + (r.p95_ms != null ? Math.round(r.p95_ms) : '--') + '</td>' +
+        '<td class="dim">' + ((r.last_seen||'').slice(11,19)) + '</td>' +
+      '</tr>';
+    }).join('');
+  }).catch(()=>{
+    document.getElementById('services').innerHTML = '<tr><td colspan="8" class="muted">// /api/timeseries/services unreachable</td></tr>';
+  });
+
+  fetch('/api/silos/inference').then(r=>r.json()).then(d=>{
+    var rows = d.tiers || [];
+    var tb = document.getElementById('inference');
+    if (!rows.length) { tb.innerHTML = '<tr><td colspan="7" class="muted">// no inference metrics in last 24h</td></tr>'; return; }
+    tb.innerHTML = rows.map(r => {
+      var calls = Number(r.calls||0);
+      var errs = Number(r.err_count||0);
+      var rate = calls > 0 ? (errs/calls*100).toFixed(2) + '%' : '--';
+      var bad = calls > 0 && (errs/calls) > 0.05;
+      return '<tr>' +
+        '<td><code>' + esc(r.tier) + '</code></td>' +
+        '<td>' + calls.toLocaleString() + '</td>' +
+        '<td>' + (Number(r.ok_count||0)).toLocaleString() + '</td>' +
+        '<td>' + errs + '</td>' +
+        '<td' + (bad ? ' class="delta-down"' : '') + '>' + rate + '</td>' +
+        '<td>' + (r.avg_latency_ms != null ? Math.round(r.avg_latency_ms) + 'ms' : '--') + '</td>' +
+        '<td>' + (r.p95_latency_ms != null ? Math.round(r.p95_latency_ms) + 'ms' : '--') + '</td>' +
+      '</tr>';
+    }).join('');
+  }).catch(()=>{
+    document.getElementById('inference').innerHTML = '<tr><td colspan="7" class="muted">// /api/silos/inference unreachable</td></tr>';
+  });
+
+  fetch('/api/brain/synthesis').then(r=>r.json()).then(d=>{
+    var actions = d.priority_actions || [];
+    var degraded = d.degraded_silos || [];
+    var $list = document.getElementById('degraded');
+    if (!actions.length && !degraded.length) {
+      $list.innerHTML = '<li class="dim">none — all silos green</li>';
+      return;
+    }
+    var lines = [];
+    if (degraded.length) lines.push('<li class="muted">degraded: ' + esc(degraded.join(', ')) + '</li>');
+    actions.slice(0, 8).forEach(a => lines.push('<li>' + esc(a) + '</li>'));
+    $list.innerHTML = lines.join('');
+  }).catch(()=>{});
+})();
+</script>
+{% endblock %}

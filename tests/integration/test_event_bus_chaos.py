@@ -106,18 +106,14 @@ def test_redis_dies_mid_subscribe_subscriber_observes_post_events(tmp_path: Path
 
 
 def test_jsonl_fallback_disk_full_does_not_crash(tmp_path: Path):
-    sc = JsonlDiskFullScenario(
-        n_pre_events=3, n_disk_full_events=4, error_after_n_writes=2
-    )
+    sc = JsonlDiskFullScenario(n_pre_events=3, n_disk_full_events=4, error_after_n_writes=2)
     # Should not raise even though disk goes bad mid-fallback.
     transcript = sc.run(tmp_path / "bus.jsonl")
     assert len(transcript.errors) == 0
 
 
 def test_jsonl_fallback_disk_full_quantifies_loss(tmp_path: Path):
-    sc = JsonlDiskFullScenario(
-        n_pre_events=2, n_disk_full_events=5, error_after_n_writes=2
-    )
+    sc = JsonlDiskFullScenario(n_pre_events=2, n_disk_full_events=5, error_after_n_writes=2)
     transcript = sc.run(tmp_path / "bus.jsonl")
     # First 2 → redis. Of the 5 fallback events, only 2 should land before
     # the disk fills (slow_disk fires its OSError on the 3rd write).
@@ -134,17 +130,13 @@ def test_jsonl_fallback_disk_full_quantifies_loss(tmp_path: Path):
 
 
 def test_redis_recovers_zero_loss(tmp_path: Path):
-    sc = RedisRecoversAfterScenario(
-        n_phase_one=3, n_partition_phase=4, n_phase_three=3
-    )
+    sc = RedisRecoversAfterScenario(n_phase_one=3, n_partition_phase=4, n_phase_three=3)
     transcript = sc.run(tmp_path / "bus.jsonl")
     transcript.assert_zero_loss()
 
 
 def test_redis_recovers_phases_partition_correctly(tmp_path: Path):
-    sc = RedisRecoversAfterScenario(
-        n_phase_one=3, n_partition_phase=4, n_phase_three=3
-    )
+    sc = RedisRecoversAfterScenario(n_phase_one=3, n_partition_phase=4, n_phase_three=3)
     transcript = sc.run(tmp_path / "bus.jsonl")
     # 3 + 3 = 6 events should land in Redis (phase one + phase three).
     # 4 events should land in JSONL (partition phase).
@@ -153,9 +145,7 @@ def test_redis_recovers_phases_partition_correctly(tmp_path: Path):
 
 
 def test_redis_recovers_ordering_preserved_across_boundary(tmp_path: Path):
-    sc = RedisRecoversAfterScenario(
-        n_phase_one=2, n_partition_phase=3, n_phase_three=2
-    )
+    sc = RedisRecoversAfterScenario(n_phase_one=2, n_partition_phase=3, n_phase_three=2)
     transcript = sc.run(tmp_path / "bus.jsonl")
     transcript.assert_ordering_preserved()
 
@@ -282,9 +272,7 @@ def test_event_bus_publish_on_dead_redis_uses_fallback(tmp_path: Path):
         bus.publish("signal.generated", {"i": i})
 
     assert fallback.exists()
-    lines = [
-        line for line in fallback.read_text().splitlines() if line.strip()
-    ]
+    lines = [line for line in fallback.read_text().splitlines() if line.strip()]
     assert len(lines) == 5
 
 

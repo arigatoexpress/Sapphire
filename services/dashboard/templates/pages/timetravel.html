@@ -1,0 +1,422 @@
+{% extends "base.html" %}
+
+{% block title %}Time Travel{% endblock %}
+
+{% block extra_css %}
+.tt-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-end;
+    margin-bottom: 20px;
+}
+.tt-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.tt-field label {
+    color: var(--text-muted);
+    font-size: 10px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+.tt-input,
+.tt-select {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    min-width: 220px;
+}
+.tt-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+.tt-button {
+    background: var(--accent, #4a9eff);
+    border: 1px solid var(--accent, #4a9eff);
+    color: var(--bg-primary, #0a0a0a);
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+.tt-button:hover {
+    opacity: .9;
+}
+.tt-warning {
+    background: rgba(255, 184, 0, .08);
+    border: 1px solid rgba(255, 184, 0, .35);
+    color: var(--text-primary);
+    padding: 12px 14px;
+    border-radius: var(--radius-lg, 8px);
+    margin-bottom: 18px;
+    font-size: 12px;
+}
+.tt-warning .tt-warning-title {
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    font-size: 11px;
+    margin-bottom: 4px;
+    color: rgba(255, 184, 0, .9);
+}
+.tt-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg, 8px);
+    overflow: hidden;
+    margin-bottom: 20px;
+}
+.tt-metric {
+    background: var(--bg-card);
+    padding: 14px 16px;
+    min-height: 74px;
+}
+.tt-label {
+    color: var(--text-muted);
+    font-size: 10px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+.tt-value {
+    margin-top: 7px;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 18px;
+    word-break: break-all;
+}
+.tt-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+}
+.tt-grid.tt-compare {
+    grid-template-columns: 1fr 1fr;
+}
+.tt-column-header {
+    color: var(--text-muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin-bottom: 6px;
+}
+.tt-empty {
+    padding: 16px;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-style: italic;
+}
+.tt-no-data {
+    background: rgba(74, 158, 255, .06);
+    border: 1px solid rgba(74, 158, 255, .35);
+    color: var(--text-primary);
+    padding: 14px 16px;
+    border-radius: var(--radius-lg, 8px);
+    margin-bottom: 18px;
+    font-size: 12px;
+}
+.tt-error {
+    background: rgba(255, 80, 80, .06);
+    border: 1px solid rgba(255, 80, 80, .35);
+    color: var(--text-primary);
+    padding: 14px 16px;
+    border-radius: var(--radius-lg, 8px);
+    margin-bottom: 18px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+}
+.tt-scope-card {
+    margin-bottom: 14px;
+}
+.tt-scope-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+.tt-chip {
+    display: inline-block;
+    padding: 3px 6px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, .05);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 11px;
+}
+.tt-rows {
+    max-height: 360px;
+    overflow: auto;
+    padding: 10px 12px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.5;
+    background: var(--bg-input, rgba(0, 0, 0, .25));
+}
+.tt-row-pre {
+    margin: 0 0 8px 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text-secondary);
+}
+.tt-row-pre + .tt-row-pre {
+    border-top: 1px dashed var(--border);
+    padding-top: 8px;
+}
+.tt-truncated {
+    color: rgba(255, 184, 0, .9);
+    font-size: 11px;
+    padding: 4px 12px;
+    border-top: 1px solid var(--border);
+}
+@media (max-width: 1100px) {
+    .tt-metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .tt-grid.tt-compare {
+        grid-template-columns: 1fr;
+    }
+}
+{% endblock %}
+
+{% block content %}
+
+<div class="tt-warning">
+    <div class="tt-warning-title">Read-only research view</div>
+    Time-travel snapshots are <strong>read-only</strong>. They reconstruct prior
+    state from append-only JSONL artifacts and never place trades, send alerts,
+    publish to the event bus, or mutate <code>data/</code>.
+</div>
+
+<div class="tt-metrics">
+    <div class="tt-metric">
+        <div class="tt-label">Index files</div>
+        <div class="tt-value" id="tt-index-files">{{ index_summary.files | default(0) }}</div>
+    </div>
+    <div class="tt-metric">
+        <div class="tt-label">Index rows</div>
+        <div class="tt-value" id="tt-index-rows">{{ index_summary.rows | default(0) }}</div>
+    </div>
+    <div class="tt-metric">
+        <div class="tt-label">Index built at</div>
+        <div class="tt-value" id="tt-index-built">{{ index_summary.built_at | default('--') }}</div>
+    </div>
+    <div class="tt-metric">
+        <div class="tt-label">Index signature</div>
+        <div class="tt-value" id="tt-index-signature">{{ index_summary.signature | default('--') }}</div>
+    </div>
+</div>
+
+<form id="tt-form" class="card" onsubmit="return ttSubmit(event)">
+    <div class="card-body">
+        <div class="tt-toolbar">
+            <div class="tt-field">
+                <label for="tt-at">As of (UTC)</label>
+                <input type="datetime-local" id="tt-at" name="at" class="tt-input" step="1" />
+            </div>
+            <div class="tt-field">
+                <label for="tt-cap">Rows per scope</label>
+                <select id="tt-cap" name="max_rows_per_scope" class="tt-select">
+                    <option value="50">50</option>
+                    <option value="200" selected>200</option>
+                    <option value="500">500</option>
+                    <option value="2000">2000</option>
+                </select>
+            </div>
+            <label class="tt-checkbox">
+                <input type="checkbox" id="tt-compare" /> Compare to now
+            </label>
+            <button type="submit" class="tt-button">Snapshot</button>
+        </div>
+    </div>
+</form>
+
+<div id="tt-message"></div>
+
+<div id="tt-grid" class="tt-grid">
+    <div id="tt-primary" class="tt-column">
+        <div class="tt-column-header" id="tt-primary-header">As-of-T</div>
+        <div id="tt-primary-body"><div class="tt-empty">Pick a UTC timestamp and press Snapshot.</div></div>
+    </div>
+    <div id="tt-now" class="tt-column" style="display:none">
+        <div class="tt-column-header">Now (live)</div>
+        <div id="tt-now-body"></div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const SCOPES = {{ default_scopes | tojson }};
+
+    function esc(value) {
+        return String(value === null || value === undefined ? '' : value)
+            .replace(/[&<>"']/g, c => ({
+                '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+            }[c]));
+    }
+
+    function formatRow(row) {
+        try {
+            return JSON.stringify(row, null, 2);
+        } catch (err) {
+            return String(row);
+        }
+    }
+
+    function defaultDatetimeLocal() {
+        const now = new Date();
+        // datetime-local wants UTC components in the value (we treat input as UTC).
+        const pad = n => String(n).padStart(2, '0');
+        return now.getUTCFullYear() + '-' +
+            pad(now.getUTCMonth() + 1) + '-' +
+            pad(now.getUTCDate()) + 'T' +
+            pad(now.getUTCHours()) + ':' +
+            pad(now.getUTCMinutes());
+    }
+
+    function renderScope(scope, entry) {
+        const rows = entry.rows || [];
+        const fileCount = (entry.files_visited || []).length;
+        const rowsHtml = rows.length === 0
+            ? '<div class="tt-empty">No rows in this scope at this timestamp.</div>'
+            : '<div class="tt-rows">' + rows.map(r => `<pre class="tt-row-pre">${esc(formatRow(r))}</pre>`).join('') + '</div>';
+        const truncated = entry.truncated
+            ? `<div class="tt-truncated">Truncated to last ${esc(entry.truncated_to)} rows of ${esc(entry.original_row_count || rows.length)}.</div>`
+            : '';
+        const earliest = entry.earliest_ts ? esc(entry.earliest_ts) : '—';
+        const latest = entry.latest_ts ? esc(entry.latest_ts) : '—';
+        return `
+            <div class="card tt-scope-card">
+                <div class="card-header">
+                    <div class="tt-scope-title">
+                        <span class="card-title">${esc(scope)}</span>
+                        <span class="tt-chip">${rows.length} rows · ${fileCount} files</span>
+                    </div>
+                </div>
+                <div class="card-body no-pad">
+                    <div style="padding:8px 12px;font-size:11px;color:var(--text-muted)">
+                        earliest <span class="tt-chip">${earliest}</span>
+                        latest <span class="tt-chip">${latest}</span>
+                    </div>
+                    ${rowsHtml}
+                    ${truncated}
+                </div>
+            </div>`;
+    }
+
+    function renderColumn(payload) {
+        if (!payload || payload.ok === false) {
+            const err = payload && payload.error ? payload.error : 'snapshot failed';
+            return `<div class="tt-error">Snapshot error: ${esc(err)}</div>`;
+        }
+        const snapshot = payload.snapshot || {};
+        const entries = snapshot.entries || {};
+        const blocks = SCOPES.map(s => renderScope(s, entries[s] || { scope: s, rows: [] })).join('');
+        const noData = payload.no_data
+            ? `<div class="tt-no-data">
+                   <strong>No data this far back.</strong>
+                   The selected timestamp (${esc(snapshot.at)}) is before the earliest indexed snapshot,
+                   or the index is empty. Try a more recent timestamp.
+               </div>`
+            : '';
+        const header = `<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">
+            at <span class="tt-chip">${esc(snapshot.at)}</span>
+            scope <span class="tt-chip">${esc((snapshot.scope || []).join(', '))}</span>
+            row cap <span class="tt-chip">${esc(payload.row_cap)}</span>
+        </div>`;
+        return header + noData + blocks;
+    }
+
+    function setMessage(html) {
+        document.getElementById('tt-message').innerHTML = html || '';
+    }
+
+    async function fetchSnapshot(atValue, compareToNow, cap) {
+        const params = new URLSearchParams();
+        if (atValue) params.set('at', atValue);
+        if (compareToNow) params.set('compare_to_now', '1');
+        if (cap) params.set('max_rows_per_scope', cap);
+        const res = await fetch('/api/timetravel-snapshot?' + params.toString(), {
+            credentials: 'same-origin',
+        });
+        if (!res.ok && res.status !== 400) {
+            return { ok: false, error: 'HTTP ' + res.status };
+        }
+        return res.json();
+    }
+
+    async function refresh() {
+        const atInput = document.getElementById('tt-at');
+        const compareInput = document.getElementById('tt-compare');
+        const capInput = document.getElementById('tt-cap');
+        const atValue = atInput.value;
+        const compare = !!compareInput.checked;
+        const cap = capInput.value;
+
+        setMessage('<div class="tt-empty">Loading snapshot…</div>');
+        const grid = document.getElementById('tt-grid');
+        const nowCol = document.getElementById('tt-now');
+        if (compare) {
+            grid.classList.add('tt-compare');
+            nowCol.style.display = '';
+        } else {
+            grid.classList.remove('tt-compare');
+            nowCol.style.display = 'none';
+        }
+
+        let payload;
+        try {
+            payload = await fetchSnapshot(atValue, compare, cap);
+        } catch (err) {
+            setMessage(`<div class="tt-error">Network error: ${esc(err.message || err)}</div>`);
+            return;
+        }
+        setMessage('');
+
+        if (!payload || payload.ok === false) {
+            const err = payload && payload.error ? payload.error : 'request failed';
+            setMessage(`<div class="tt-error">${esc(err)}</div>`);
+            return;
+        }
+
+        const headerEl = document.getElementById('tt-primary-header');
+        const primary = payload.primary || {};
+        const at = (primary.snapshot && primary.snapshot.at) || atValue || '—';
+        headerEl.textContent = 'As-of-T · ' + at;
+        document.getElementById('tt-primary-body').innerHTML = renderColumn(primary);
+
+        if (compare && payload.now) {
+            document.getElementById('tt-now-body').innerHTML = renderColumn(payload.now);
+        }
+    }
+
+    window.ttSubmit = function (event) {
+        event.preventDefault();
+        refresh();
+        return false;
+    };
+
+    // Initial: default the input to "now" but don't auto-fetch — let the
+    // operator pick the timestamp. (Avoid hammering the index on page load.)
+    document.addEventListener('DOMContentLoaded', function () {
+        const atInput = document.getElementById('tt-at');
+        if (atInput && !atInput.value) {
+            atInput.value = defaultDatetimeLocal();
+        }
+    });
+})();
+</script>
+{% endblock %}

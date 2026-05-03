@@ -11,7 +11,7 @@ apply to any new collaborator.
 - [ ] Install: `pip install -e '.[dev]'`
 - [ ] Hooks: `make install-hooks`
 - [ ] Doctor: `make doctor` — read every line
-- [ ] Tests: `make test-all` — must be 1,967 passing (1,932 core + 35 plugin)
+- [ ] Tests: `make test-all` — must be 6,735 passing (6,140 core + 595 plugin)
 - [ ] Read [collaborator-pack.md](collaborator-pack.md) end-to-end
 - [ ] Read [CLAUDE.md](../../CLAUDE.md) — the project map
 

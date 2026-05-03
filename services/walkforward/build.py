@@ -73,9 +73,7 @@ def _resolve_strategy(name: str) -> type[Strategy]:
     for cname, cls in STRATEGY_REGISTRY.items():
         if cname.lower() == lowered:
             return cls
-    raise ValueError(
-        f"unknown strategy '{name}' (known: {sorted(STRATEGY_REGISTRY)})"
-    )
+    raise ValueError(f"unknown strategy '{name}' (known: {sorted(STRATEGY_REGISTRY)})")
 
 
 # ---------------------------------------------------------------------------
@@ -312,9 +310,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         choices=["sortino", "sharpe", "calmar", "profit_factor", "total_return"],
     )
     parser.add_argument("--bankroll", type=float, default=10_000.0)
-    parser.add_argument(
-        "--bars-source", choices=["synthetic", "yfinance"], default="synthetic"
-    )
+    parser.add_argument("--bars-source", choices=["synthetic", "yfinance"], default="synthetic")
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT_ROOT))
     parser.add_argument("--quiet", action="store_true")
     return parser.parse_args(argv)

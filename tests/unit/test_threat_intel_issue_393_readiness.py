@@ -90,7 +90,9 @@ def test_classify_kev_candidates_marks_dependency_matches():
 def test_deployment_footprint_ignores_docs_and_reports_config_matches(tmp_path: Path):
     docs = tmp_path / "docs"
     docs.mkdir()
-    (docs / "handoff.md").write_text("PaperCut TeamCity Exchange Server Cisco FMC", encoding="utf-8")
+    (docs / "handoff.md").write_text(
+        "PaperCut TeamCity Exchange Server Cisco FMC", encoding="utf-8"
+    )
     infra = tmp_path / "infra"
     infra.mkdir()
     (infra / "ci.yaml").write_text("runner: teamcity\n", encoding="utf-8")
@@ -166,7 +168,9 @@ def test_build_report_keeps_close_false_when_dependabot_unavailable(monkeypatch,
 
     assert report["readiness"]["ready_to_comment"] is True
     assert report["readiness"]["ready_to_close"] is False
-    assert report["readiness"]["recommendation"] == "comment_with_evidence_ghas_unavailable_or_nonzero"
+    assert (
+        report["readiness"]["recommendation"] == "comment_with_evidence_ghas_unavailable_or_nonzero"
+    )
 
 
 def test_fetch_dependabot_status_sanitizes_unavailable_errors(monkeypatch):

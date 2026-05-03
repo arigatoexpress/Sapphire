@@ -50,12 +50,24 @@ data/decisions/
 *.so
 *.dylib
 
+# Foundry / Solidity
+out/
+cache/
+contracts/out/
+contracts/lib/forge-std/
+broadcast/
+
 # Trading secrets
 configs/pi/shared/trading.env
 
 # Runtime data artifacts (produced by services; not source)
 data/analytics/
-data/chain/
+# data/chain/ excludes runtime artifacts (deployments.json) but keeps the
+# pre-compiled contract ABIs (*.abi.json), since lib/og/chain.py reads them
+# at import time. The pattern uses /* not /, otherwise the negation below
+# wouldn't apply (git can't re-include below an excluded directory).
+data/chain/*
+!data/chain/*.abi.json
 data/content/
 data/events/
 data/health/
@@ -70,6 +82,7 @@ data/.gcp_sync_state.json
 data/.watchdog_state.json
 data/foundry/
 data/google/
+data/hackathon/
 data/media/
 data/readiness/
 data/*.envelope.json

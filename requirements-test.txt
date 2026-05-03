@@ -16,13 +16,20 @@ pytest-cov==7.1.0
 # docs/products/test-rigor-0.1.0.md). Authorized for the test-rigor lane only;
 # do not leak into runtime requirements.
 hypothesis>=6.130,<7
-mutmut>=2.5,<3
+# mutmut 3.x dropped the glob2 transitive (glob2 setup.py imports
+# distutils.command.install.install_layout, removed in setuptools 74+, which
+# bricks `pip install -r requirements-test.txt` in clean cloud envs and
+# blocks flask/pandas/reportlab from installing — see issue #539).
+mutmut>=3,<4
 
 # web / http
 aiohttp==3.13.5
 annotated-doc==0.0.4
 fastapi==0.136.1
-feedparser==6.0.11
+# feedparser intentionally omitted: lib/macro/feedparser_compat.py falls back
+# to stdlib XML parsing when feedparser/sgmllib is missing. Including
+# feedparser==6.0.11 here pulled sgmllib3k, an unmaintained 2009 SGML backport
+# whose setup.py also breaks on setuptools 74+ — see issue #539.
 flask==3.1.3
 httpx==0.28.1
 requests==2.33.1
@@ -61,3 +68,7 @@ web3>=7.0,<8
 eth-account>=0.13.7,<1
 cryptography==47.0.0
 certifi==2026.4.22
+
+# webauthn admin scaffold (services/analytics_dashboard/auth)
+webauthn==2.7.1
+itsdangerous==2.2.0

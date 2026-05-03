@@ -1,6 +1,33 @@
 # Heartbeat Runbook
 
-Last reviewed: 2026-04-29
+Last reviewed: 2026-04-30
+
+## Triage Quickstart
+
+Failure mode addressed: the heartbeat daemon stopped sampling, or it is
+sampling but reporting one or more services down.
+
+```bash
+launchctl list com.sapphire.heartbeat
+```
+
+```bash
+tail -n 20 /Users/aribs/Code/Sapphire/data/health/heartbeat.jsonl
+```
+
+```bash
+tail -n 100 /Users/aribs/Code/Sapphire/data/logs/heartbeat-err.log
+```
+
+If the JSONL has a fresh record with `down: 0`, the daemon is healthy and the
+issue is downstream. If `down > 0`, jump to `Service Shows Down`. If the JSONL
+is stale or the launchd entry is missing, jump to `Heartbeat Log Stops
+Updating`.
+
+Live monitors: dashboard `/observability` SSE feed; production-readiness
+matrix at `/readiness`.
+On-call escalation: service owner per `Escalation` section. p2 unless `down >
+0` for ≥ 3 consecutive sweeps, then p1.
 
 This runbook covers the local Sapphire heartbeat daemon launched by
 `infra/launchagents/com.sapphire.heartbeat.plist`. Its job is to sample the

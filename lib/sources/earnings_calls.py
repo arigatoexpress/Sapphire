@@ -142,7 +142,12 @@ class RateLimiter:
     def rate(self) -> int:
         return self._rate
 
-    def acquire(self, *, sleep: Callable[[float], None] = time.sleep, now: Callable[[], float] = time.monotonic) -> None:
+    def acquire(
+        self,
+        *,
+        sleep: Callable[[float], None] = time.sleep,
+        now: Callable[[], float] = time.monotonic,
+    ) -> None:
         with self._lock:
             wait = self._min_interval - (now() - self._last)
             if wait > 0:
@@ -208,8 +213,8 @@ def load_ir_config(path: Path = DEFAULT_RSS_CONFIG) -> list[IRSubscription]:
 
 def _parse_minimal_yaml(text: str) -> dict[str, Any]:
     """Minimal YAML parser supporting:
-       - top-level ``key: value`` scalars
-       - top-level ``key:`` followed by indented ``- key: value`` mappings
+    - top-level ``key: value`` scalars
+    - top-level ``key:`` followed by indented ``- key: value`` mappings
     """
     result: dict[str, Any] = {}
     current_list_key: str | None = None
@@ -348,7 +353,9 @@ class EarningsCallSource:
         directory = base or (self.fixture_root / ticker.upper())
         if not directory.exists() or not directory.is_dir():
             return []
-        files = sorted(p for p in directory.iterdir() if p.is_file() and p.suffix in {".json", ".txt"})
+        files = sorted(
+            p for p in directory.iterdir() if p.is_file() and p.suffix in {".json", ".txt"}
+        )
         return files
 
     @staticmethod
@@ -379,7 +386,11 @@ class EarningsCallSource:
             stale = read_json(self.cache_path)
             if isinstance(stale, dict):
                 return stale
-            return {"retrieved_at": utc_now().isoformat(), "entries": {}, "subs": [s.to_dict() for s in subs]}
+            return {
+                "retrieved_at": utc_now().isoformat(),
+                "entries": {},
+                "subs": [s.to_dict() for s in subs],
+            }
         entries: dict[str, list[dict[str, Any]]] = {}
         for sub in subs:
             ticker = sub.ticker.upper()
@@ -397,7 +408,9 @@ class EarningsCallSource:
                 except Exception:  # noqa: BLE001 — never fail closed
                     text = ""
                 for row in self._parse_rss(text):
-                    if not self._is_earnings_related(row.get("title") or "", row.get("description") or ""):
+                    if not self._is_earnings_related(
+                        row.get("title") or "", row.get("description") or ""
+                    ):
                         continue
                     row["source_kind"] = "rss"
                     row["source_url"] = sub.rss_url
@@ -463,7 +476,9 @@ class EarningsCallSource:
 
     # --- Public reads ---
 
-    def list_sentiments(self, *, subscriptions: Sequence[IRSubscription] | None = None) -> list[TranscriptSentiment]:
+    def list_sentiments(
+        self, *, subscriptions: Sequence[IRSubscription] | None = None
+    ) -> list[TranscriptSentiment]:
         snapshot = self._snapshot(subscriptions=subscriptions)
         out: list[TranscriptSentiment] = []
         for ticker, entries in (snapshot.get("entries") or {}).items():

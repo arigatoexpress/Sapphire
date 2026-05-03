@@ -309,13 +309,22 @@ def _severity_from_score(score: Any) -> str | None:
 
 
 def transform_regime(files: list[Path]) -> Iterator[dict]:
-    """data/chain/*.json snapshots → market_regime rows."""
+    """data/chain/*.json snapshots → market_regime rows.
+
+    Some legacy snapshot files were written as a top-level list (one
+    older codepath), not a dict. Skip those instead of crashing the
+    whole sync — that's what was wedging the regime BQ pipeline since
+    2026-05-01.
+    """
     now = _now_iso()
     for fp in files:
         try:
             snap = json.loads(fp.read_text())
         except (OSError, json.JSONDecodeError) as e:
             log.warning("regime read failed %s: %s", fp, e)
+            continue
+        if not isinstance(snap, dict):
+            log.info("regime snapshot is not a dict (got %s) — skipping %s", type(snap).__name__, fp.name)
             continue
         ts = _parse_ts(snap.get("timestamp") or snap.get("generated_at"))
         _raw_regime = snap.get("regime") or {}
@@ -454,7 +463,9 @@ def _transform_houston_leads_jsonl(fp: Path, *, now: str) -> Iterator[dict]:
                 "zip": lead.get("zip") or raw.get("zip"),
                 "score": score,
                 "grade": lead.get("grade") or _grade_from_score_value(score),
-                "permit_type": lead.get("permit_type") or lead.get("type") or raw.get("permit_type"),
+                "permit_type": lead.get("permit_type")
+                or lead.get("type")
+                or raw.get("permit_type"),
                 "permit_value_usd": lead.get("permit_value_usd")
                 or raw.get("declared_value")
                 or raw.get("value_usd"),

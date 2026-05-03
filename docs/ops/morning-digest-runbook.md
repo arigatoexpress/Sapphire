@@ -1,6 +1,36 @@
 # Morning Digest Runbook
 
-Last reviewed: 2026-04-29
+Last reviewed: 2026-04-30
+
+## Triage Quickstart
+
+Failure mode addressed: morning digest did not send to Telegram, or its content
+is missing one of the cross-repo state sections (CI, Cloud Run, launchctl,
+paper trading).
+
+```bash
+launchctl print gui/$(id -u)/com.sapphire.morning-digest
+```
+
+```bash
+tail -n 120 /Users/aribs/Library/Logs/sapphire-morning-digest.log
+```
+
+```bash
+services/morning_digest/run_once.sh --dry-run
+```
+
+The dry-run renders the digest without sending Telegram and is the fastest way
+to confirm the pipeline still produces a valid message. If a section is empty
+or shows `error`, fix the upstream producer (do not patch the digest text to
+hide the gap).
+
+Live monitors: dashboard `/observability` morning-digest tile; routine-health
+badge.
+On-call escalation: ops/intel owner; p3 by default. Note: archive expectation
+for `data/morning_digest/YYYY-MM-DD.md` is currently mismatched with the
+send-only LaunchAgent — do not raise priority for missing archive files until
+that integration is closed.
 
 This runbook covers `com.sapphire.morning-digest`, the service-local LaunchAgent
 for the cross-repo Sapphire morning operational digest. It reads repo, CI, Cloud

@@ -252,9 +252,7 @@ def build_live_system_prompt() -> str:
 
     health = _json_object(run_tool_direct("health_check.py", {"profile": "brief"}))
     status = _json_object(run_tool_direct("status.py"))
-    ctx = build_health_context(
-        "telegram", health_payload=health, status_payload=status
-    )
+    ctx = build_health_context("telegram", health_payload=health, status_payload=status)
     return "\n".join(ctx.rendered_lines)
 
 
@@ -469,6 +467,7 @@ def handle_message(msg: dict, sender: Sender | None = None) -> None:
 # Per-user conversation history (last N messages)
 _chat_history: dict[str, list[dict]] = {}
 _MAX_HISTORY = 10
+
 
 def chat_with_hermes(user_text: str, chat_id: str) -> str:
     """Send a conversational message to Hermes 3 on Windows GPU."""

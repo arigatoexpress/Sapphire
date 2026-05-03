@@ -37,7 +37,7 @@ High-level system map for Sapphire — an autonomous trading + project-managemen
   ┌──────────────┐   ┌─────────────────────┐     ┌──────────────────┐ │
   │ plugin       │   │ services/alpha      │     │ services/        │ │
   │ claw-sapphire│   │ (trading engine,    │     │ control-plane    │ │
-  │ (26 tools)   │   │  uvloop, 150KB      │     │ (PM hub :8082)   │ │
+  │ (72 tools)   │   │  uvloop, 150KB      │     │ (PM hub :8082)   │ │
   │              │   │  main.py)           │     │ FastAPI + SQLite │ │
   └──────┬───────┘   └──────┬──────────────┘     └──────┬───────────┘ │
          │                  │                           │             │
@@ -71,7 +71,7 @@ High-level system map for Sapphire — an autonomous trading + project-managemen
                                                                       │
   ┌────────────────────────────────────────────────────────────┐      │
   │  services/dashboard (Flask :8080)                          │◀─────┘
-  │  20+ pages / 20+ APIs. Basic-auth. 10s cached fetchers.    │
+  │  50 pages / 20+ APIs. Basic-auth. 10s cached fetchers.     │
   │  /architecture /intelligence /chain /risk /soc /signals    │
   └────────────────────────────────────────────────────────────┘
 
@@ -133,7 +133,7 @@ trading-research (5:42 AM)
                                          │
                                          ▼ 24h later
                            predict.py "score"    ── accuracy history
-                                                   58% overall, BTC 75%
+                                                   61.1% overall, BTC 83.3%
                                          │
                                          ▼
                              trading_brain.py "dashboard"

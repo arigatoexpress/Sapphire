@@ -320,9 +320,7 @@ def aggregate(
             with target.open("r", encoding="utf-8", errors="replace") as fh:
                 for i, line in enumerate(fh):
                     if i >= MAX_LINES_PER_READ:
-                        report.notes.append(
-                            f"truncated at MAX_LINES_PER_READ={MAX_LINES_PER_READ}"
-                        )
+                        report.notes.append(f"truncated at MAX_LINES_PER_READ={MAX_LINES_PER_READ}")
                         break
                     line = line.strip()
                     if not line:
@@ -451,7 +449,9 @@ def synthetic_fixture_report(
             )
         )
     rep = aggregate(fixture_records=fixtures, cost_model=cost_model)
-    rep.notes.append("synthetic-only fixture: real ~/.cache/sapphire/inference_proxy/calls.jsonl absent")
+    rep.notes.append(
+        "synthetic-only fixture: real ~/.cache/sapphire/inference_proxy/calls.jsonl absent"
+    )
     rep.has_real_data = False
     return rep
 

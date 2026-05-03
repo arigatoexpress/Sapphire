@@ -6,16 +6,21 @@ Sapphire is a production autonomous trading + intelligence OS. For the 0G hackat
 
 ## One-sentence pitch (≤30 words)
 
-A production trading agent that publishes every signal to 0G Storage and anchors it on 0G Chain, giving traders, auditors, and counterparties on-chain proof of every prediction.
+<!-- Test count sourced from `python3 scripts/ops/test_inventory.py --check-readme` on 2026-05-02 (6,567 tests collected: 6,000 core + 567 plugin). -->
+The first production-grade trading OS (6,567 tests, live execution) to make every AI prediction cryptographically committed before market impact — sealed by 0G Compute, anchored on 0G Chain.
 
-## What it does
+## Why this is hard
+
+When a trading agent claims it predicted BTC at $76,774, three properties must all be true: the prediction **existed before** the move, the model that produced it was **not tampered with**, and the inputs were **not backdated**. Without 0G, none of these are publicly verifiable — operators are trusted, not proven. Sapphire × 0G replaces that trust with cryptographic commitment: 0G Storage proves existed-before, 0G Compute (TEE) proves no-tampering, 0G Chain proves no-backdating.
+
+## What 0G makes verifiable
 
 For each trading signal the system generates:
 
-1. **Inference under TEE** — the prediction is produced by a 0G Compute provider running in a Trusted Execution Environment. The provider returns a `chatID` that anyone can later use to verify the response was signed by the attested TEE (`broker.inference.processResponse(provider, chatID)`).
-2. **Storage commit** — the full signal envelope (input, reasoning, output, TEE attestation) is uploaded to **0G Storage** and content-addressed by merkle `rootHash`.
-3. **Chain anchor** — `SapphireSignalVerifier.publishSignal(strategyId, symbol, direction, confidence, proofHash=rootHash)` is called on **0G Chain mainnet (chainId 16661)**, immutably committing to the prediction.
-4. **Verifier path** — anyone can recover the full audit trail with the `og_verify` tool: read the on-chain entry → download the blob from 0G Storage → re-verify the merkle proof → re-verify the TEE attestation.
+1. **Untampered inference** — produced under TEE attestation (`broker.inference.processResponse(provider, chatID)`). The 0G Compute provider runs in a Trusted Execution Environment and returns a `chatID` that anyone can later use to verify the response was signed by the attested TEE.
+2. **Existed-before-the-move** — content-addressed merkle commit on **0G Storage**. The full signal envelope (input, reasoning, output, TEE attestation) is uploaded and addressed by merkle `rootHash`.
+3. **Not-backdated** — `SapphireSignalVerifier.publishSignal(strategyId, symbol, direction, confidence, proofHash=rootHash)` on **0G Chain mainnet (chainId 16661)** with block timestamp, immutably committing to the prediction.
+4. **Independently verifiable** — anyone can re-derive the audit trail with the `og_verify` tool: read the on-chain entry → download the blob from 0G Storage → re-verify the merkle proof → re-verify the TEE attestation.
 
 This closes the front-running window: by the time anyone learns the prediction *exists* (the on-chain anchor is public), the prediction is already cryptographically committed.
 
@@ -139,3 +144,7 @@ echo '{"signal_id": 0}' | python3 plugins/claw-sapphire/tools/og_verify.py
 ## Team
 
 Solo builder: Ari Spec ([@arigatoexpress](https://github.com/arigatoexpress)) — building Sapphire OS as a long-running autonomous trading + intelligence stack.
+
+## See also
+
+- **Sapphire Sentinel — London Buildathon submission** ([`docs/hackathon/sapphire-sentinel-london-2026.md`](../hackathon/sapphire-sentinel-london-2026.md)): same Sapphire stack, different hackathon angle. The 0G integration here is the *verifiable-finance* spine; Sentinel is the *agentic-safety* spine. They share contracts (`SapphireSentinelRegistry`) and the same testnet wallet path.
