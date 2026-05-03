@@ -530,6 +530,42 @@ td.muted { color: var(--text-3); }
 }
 .brain-narrative.empty { color: var(--text-3); font-style: italic; font-weight: 400; }
 
+/* AI brief — Gemini-augmented narrative shown beneath the deterministic one. */
+.brain-narrative-llm {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-left: 2px solid rgba(163,113,247,0.65);
+  background: rgba(163,113,247,0.06);
+  border-radius: 0 4px 4px 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-2);
+  letter-spacing: -0.005em;
+}
+.brain-narrative-llm.hidden { display: none; }
+.brain-narrative-llm .llm-label {
+  display: block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--purple);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.brain-narrative-llm .llm-foot {
+  display: block;
+  margin-top: 6px;
+  font-size: 10.5px;
+  color: var(--text-3);
+}
+.brain-narrative-llm .llm-foot a {
+  color: var(--text-3);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--text-3);
+}
+.brain-narrative-llm .llm-foot a:hover { color: var(--purple); border-color: var(--purple); }
+
 .brain-degraded {
   display: flex; flex-wrap: wrap; gap: 6px;
   align-items: center;
@@ -958,6 +994,11 @@ select.icon-btn:focus { outline: none; border-color: var(--accent); }
     </div>
     <div class="brain-content">
       <div class="brain-narrative empty" id="brain-narrative">Synthesizing cross-silo state…</div>
+      <div class="brain-narrative-llm hidden" id="brain-narrative-llm" aria-live="polite">
+        <span class="llm-label">AI brief</span>
+        <span class="llm-text" id="brain-narrative-llm-text"></span>
+        <span class="llm-foot">Powered by <a href="https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models#gemini-models" target="_blank" rel="noopener">Gemini</a> · <span id="brain-narrative-llm-meta">cached</span></span>
+      </div>
       <div class="brain-degraded" id="brain-degraded">
         <span class="deg-label">Degraded:</span>
         <span class="deg-empty mono">none reporting</span>
@@ -1520,7 +1561,10 @@ if (persistBtn) {
     persistBtn.disabled = true;
     persistBtn.style.opacity = '0.6';
     try {
-      const r = await fetch('/api/brain/synthesis?persist=1');
+      // POST /api/brain/llm-refresh bypasses the 60s Gemini cache so
+      // the operator gets a fresh AI brief on demand. It also persists
+      // when ?persist=1 is set — same payload shape as the GET endpoint.
+      const r = await fetch('/api/brain/llm-refresh?persist=1', {method: 'POST'});
       if (!r.ok) {
         toast({title: 'Persist failed', body: `HTTP ${r.status}`, kind: 'err'});
         return;
@@ -1615,6 +1659,29 @@ function renderBrainGauge(score) {
     num.textContent = score == null ? '—' : Math.round(pct * 100) + '%';
   }
 }
+function renderBrainLlm(syn) {
+  const wrap = document.getElementById('brain-narrative-llm');
+  const txt = document.getElementById('brain-narrative-llm-text');
+  const meta = document.getElementById('brain-narrative-llm-meta');
+  if (!wrap || !txt) return;
+  const llm = syn && typeof syn.narrative_llm === 'string' ? syn.narrative_llm.trim() : '';
+  if (!llm) {
+    wrap.classList.add('hidden');
+    txt.textContent = '';
+    if (meta) meta.textContent = '';
+    return;
+  }
+  wrap.classList.remove('hidden');
+  txt.textContent = llm;
+  if (meta) {
+    const m = (syn && syn.llm_meta) || {};
+    const parts = [];
+    if (m.model) parts.push(m.model);
+    if (typeof m.cached === 'boolean') parts.push(m.cached ? 'cached' : 'fresh');
+    if (typeof m.latency_ms === 'number') parts.push(m.latency_ms + 'ms');
+    meta.textContent = parts.join(' · ') || '—';
+  }
+}
 function renderBrainPanel(syn) {
   const narEl = document.getElementById('brain-narrative');
   const degEl = document.getElementById('brain-degraded');
@@ -1629,9 +1696,11 @@ function renderBrainPanel(syn) {
     if (actEl) actEl.innerHTML = '<div class="brain-actions-empty mono" style="color:var(--text-3)">No data.</div>';
     if (metaEl) metaEl.textContent = '—';
     renderBrainGauge(null);
+    renderBrainLlm(null);
     return;
   }
   renderBrainGauge(typeof syn.health_score === 'number' ? syn.health_score : null);
+  renderBrainLlm(syn);
   if (narEl) {
     narEl.className = 'brain-narrative';
     narEl.textContent = syn.narrative || 'No narrative emitted.';
