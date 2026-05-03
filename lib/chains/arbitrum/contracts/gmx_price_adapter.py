@@ -46,6 +46,7 @@ from decimal import Decimal
 from .aave_v3 import AaveV3Arbitrum
 from .chainlink_oracle import ChainlinkPrice, ChainlinkRegistry
 from .gmx_v2 import GMX_PRICE_BASE, Market, encode_gmx_price
+from .pyth_oracle import PythRegistry, PythRegistryPrice
 
 #: Aave V3 oracle base-currency exponent on Arbitrum One.
 #: ``getAssetPrice`` returns USD * 1e8 (verified against
@@ -105,12 +106,13 @@ class TokenPrice:
     bid/ask spread; if a future caller wants min<max, they can override
     by widening here.
 
-    ``source`` is ``"aave"`` for the primary path or ``"chainlink"``
-    when the Chainlink fallback served the price. ``stale`` is only
-    meaningful for ``source="chainlink"`` — Aave reads have no
-    independent staleness signal at this layer (their freshness is
-    enforced by Aave's own oracle gating). Sentinel / chain-health gate
-    can downweight or refuse a result with ``stale=True``.
+    ``source`` is one of ``"aave"`` (primary), ``"chainlink"``
+    (secondary), or ``"pyth"`` (tertiary) — whichever oracle answered.
+    ``stale`` is only meaningful for ``source`` in ``{"chainlink",
+    "pyth"}`` — Aave reads have no independent staleness signal at
+    this layer (their freshness is enforced by Aave's own oracle
+    gating). Sentinel / chain-health gate can downweight or refuse a
+    result with ``stale=True`` regardless of which oracle served it.
     """
 
     address: str
@@ -177,11 +179,11 @@ class GmxPriceAdapter:
     COMMON_DECIMALS: dict[str, int] = {
         # Aave-overlapping reserves (verified against Arbiscan).
         "0x82af49447d8a07e3bd95bd0d56f35241523fbab1": 18,  # WETH
-        "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f": 8,   # WBTC
+        "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f": 8,  # WBTC
         "0x912ce59144191c1204e64559fe8253a0e49e6548": 18,  # ARB
-        "0xff970a61a04b1ca14834a43f5de4533ebddb5cc8": 6,   # USDC.e
-        "0xaf88d065e77c8cc2239327c5edb3a432268e5831": 6,   # USDC
-        "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9": 6,   # USDT
+        "0xff970a61a04b1ca14834a43f5de4533ebddb5cc8": 6,  # USDC.e
+        "0xaf88d065e77c8cc2239327c5edb3a432268e5831": 6,  # USDC
+        "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9": 6,  # USDT
         "0xf97f4df75117a78c1a5a0dbb814af92458539fb4": 18,  # LINK
         "0xda10009cbd5d07dd0cecc66161fc93d7c9000da1": 18,  # DAI
         "0xfc5a1a6eb076a2c7ad06ed22c90d7e710e35ad0a": 18,  # GMX
@@ -194,11 +196,11 @@ class GmxPriceAdapter:
         # on-chain ``decimals()`` use the natural precision GMX V2
         # documents for that index (BTC=8 from the protocol spec).
         "0x6c84a8f1c29108f47a79964b5fe888d4f4d0de40": 18,  # tBTC
-        "0x2bcc6d6cdbbdc0a4071e48bb3b969b06b3330c07": 9,   # SOL (Wormhole)
-        "0xb74da9fe2f96b9e0a5f4a3cf0b92dd2bec617124": 9,   # SOL (alt)
+        "0x2bcc6d6cdbbdc0a4071e48bb3b969b06b3330c07": 9,  # SOL (Wormhole)
+        "0xb74da9fe2f96b9e0a5f4a3cf0b92dd2bec617124": 9,  # SOL (alt)
         "0x565609faf65b92f7be02468acf86f8979423e514": 18,  # WAVAX
-        "0xc4da4c24fd591125c3f47b340b6f4f76111883d8": 8,   # DOGE
-        "0x47904963fc8b2340414262125af798b9655e58cd": 8,   # BTC synthetic
+        "0xc4da4c24fd591125c3f47b340b6f4f76111883d8": 8,  # DOGE
+        "0x47904963fc8b2340414262125af798b9655e58cd": 8,  # BTC synthetic
     }
 
     def __init__(
@@ -208,8 +210,10 @@ class GmxPriceAdapter:
         *,
         chainlink: ChainlinkRegistry | None = None,
         token_to_chainlink_symbol: dict[str, str] | None = None,
+        pyth: PythRegistry | None = None,
+        token_to_pyth_symbol: dict[str, str] | None = None,
     ) -> None:
-        """Compose Aave V3 oracle reads into GMX MarketPrices tuples.
+        """Compose Aave V3 + Chainlink + Pyth oracle reads into GMX MarketPrices.
 
         Parameters
         ----------
@@ -219,17 +223,34 @@ class GmxPriceAdapter:
             Optional override / extension to :attr:`COMMON_DECIMALS`.
         chainlink:
             Optional :class:`ChainlinkRegistry` — when supplied, used as
-            a fallback for tokens that Aave returns ``PriceUnavailable``
-            for. Lane I (PR #565) shipped this adapter without Chainlink;
-            this PR wires it in. Backward-compatible: if not supplied,
-            behaviour is identical to the pre-extension version.
+            a SECONDARY fallback for tokens that Aave returns
+            ``PriceUnavailable`` for. Lane I (PR #565) shipped this
+            adapter without Chainlink; PR #570 wired it in.
+            Backward-compatible: if not supplied, behaviour is
+            identical to the pre-extension version.
         token_to_chainlink_symbol:
             Optional override / extension to
             :data:`TOKEN_ADDRESS_TO_CHAINLINK_SYMBOL`. Lowercased
             address keys, uppercase symbol values.
+        pyth:
+            Optional :class:`PythRegistry` — when supplied, used as a
+            TERTIARY fallback after Chainlink. Independent oracle
+            infrastructure (pull-based, off-chain publishers) so a
+            chain-side oracle issue (Aave + Chainlink both stale) can
+            still be served. Backward-compatible: if not supplied, the
+            adapter still works exactly as the Chainlink-only build.
+        token_to_pyth_symbol:
+            Optional override / extension to the Pyth address→symbol
+            map. By default this layer reuses the Chainlink address→symbol
+            mapping (since Pyth and Chainlink both key by underlying
+            asset symbol — ``"BTC"`` not ``"WBTC"``); pass this kwarg
+            only when a token's Pyth symbol differs from its Chainlink
+            symbol (rare). Lowercased address keys, uppercase symbol
+            values.
         """
         self._aave = aave
         self._chainlink = chainlink
+        self._pyth = pyth
         # Defensive copy + lowercase keys — ERC-20 addresses are
         # case-insensitive but the registry sometimes has checksummed.
         merged = dict(self.COMMON_DECIMALS)
@@ -243,6 +264,15 @@ class GmxPriceAdapter:
             for k, v in token_to_chainlink_symbol.items():
                 sym_map[k.lower()] = v.upper()
         self._token_symbols = sym_map
+        # Token-address → Pyth symbol. Defaults to the Chainlink map
+        # since Pyth and Chainlink both key on the underlying asset
+        # symbol — this is the "happy path" and avoids forcing callers
+        # to define the same mapping twice.
+        pyth_sym_map = dict(sym_map)
+        if token_to_pyth_symbol:
+            for k, v in token_to_pyth_symbol.items():
+                pyth_sym_map[k.lower()] = v.upper()
+        self._token_pyth_symbols = pyth_sym_map
 
     def register_token(self, address: str, decimals: int) -> None:
         """Allow callers to extend the decimals map at runtime.
@@ -274,6 +304,23 @@ class GmxPriceAdapter:
         """Return the Chainlink symbol mapped to ``address`` (or ``None``)."""
         return self._token_symbols.get(address.lower())
 
+    def register_pyth_symbol(self, address: str, symbol: str) -> None:
+        """Map a token address to a Pyth symbol for the tertiary fallback path.
+
+        Mirrors :meth:`register_chainlink_symbol`. Useful when a
+        token's Pyth symbol differs from its Chainlink symbol (rare —
+        defaults to the Chainlink map at construction).
+        """
+        if not isinstance(address, str) or not address.startswith("0x"):
+            raise ValueError(f"invalid token address: {address!r}")
+        if not symbol or not isinstance(symbol, str):
+            raise ValueError(f"invalid symbol: {symbol!r}")
+        self._token_pyth_symbols[address.lower()] = symbol.upper()
+
+    def pyth_symbol_for(self, address: str) -> str | None:
+        """Return the Pyth symbol mapped to ``address`` (or ``None``)."""
+        return self._token_pyth_symbols.get(address.lower())
+
     def known_tokens(self) -> list[str]:
         """Return the lowercased addresses we have decimals for, sorted."""
         return sorted(self._decimals)
@@ -289,25 +336,36 @@ class GmxPriceAdapter:
             ) from exc
 
     async def fetch_token_price(self, address: str) -> TokenPrice:
-        """Read one token's price, preferring Aave then falling back to Chainlink.
+        """Read one token's price, walking Aave → Chainlink → Pyth → unpriced.
 
-        Two failure modes from Aave are normalized — and now, when a
-        :class:`ChainlinkRegistry` was supplied at construction, the
-        Chainlink fallback runs before raising :class:`PriceUnavailable`:
+        Resolution order (each step tried, falls through on revert / zero
+        / unconfigured):
 
-        1. Aave returns 0 — the soft-failure mode (some Aave deployments
-           silently return zero for unknown assets rather than reverting).
-        2. The Aave oracle reverts — the hard-failure mode on Arbitrum,
-           where ``getAssetPrice`` will revert with no data for any
-           asset that doesn't have an oracle source registered. Live
-           Arbitrum behaviour as of 2026-04-30.
+        1. **Aave V3 oracle (primary).** Two failure modes normalized:
+           returns ``0`` (soft-fail mode some deployments use) OR reverts
+           (live Arbitrum behaviour for assets not in the reserve list).
+        2. **Chainlink Data Feed (secondary, optional).** Only tried if
+           a :class:`ChainlinkRegistry` was supplied at construction
+           AND the token address maps to a Chainlink symbol AND the
+           registry has a feed for that symbol.
+        3. **Pyth Network (tertiary, optional).** Only tried if a
+           :class:`PythRegistry` was supplied at construction AND the
+           token address maps to a Pyth symbol AND the registry has a
+           priceId for that symbol. Pyth is independent of both Aave
+           and Chainlink (different keepers, different incentive model)
+           so it survives correlated chain-side oracle outages.
 
-        On the Chainlink fallback path we still need decimals from
+        On any fallback path we still need decimals from
         :attr:`COMMON_DECIMALS` (or a runtime registration) to encode
         the GMX ``Price.Props`` field — ``decimals_for`` is called
-        first, before either oracle. A token without registered
-        decimals will raise :class:`PriceUnavailable` regardless of
-        whether Chainlink could price it.
+        first, before any oracle. A token without registered decimals
+        will raise :class:`PriceUnavailable` regardless of whether
+        another oracle could price it.
+
+        Raises :class:`PriceUnavailable` if every configured oracle
+        either rejected the asset or returned a non-positive value.
+        The error message includes a per-oracle failure summary so the
+        live debugging path is straightforward.
         """
         decimals = self.decimals_for(address)
 
@@ -316,7 +374,7 @@ class GmxPriceAdapter:
         try:
             usd = await self._aave.get_asset_price(address)
         except Exception as exc:  # noqa: BLE001 — broad on purpose
-            # Don't immediately re-raise — try Chainlink before failing.
+            # Don't immediately re-raise — try fallback oracles before failing.
             aave_failure = f"{type(exc).__name__}: {exc}"
 
         if aave_failure is None and usd > 0:
@@ -334,7 +392,8 @@ class GmxPriceAdapter:
                 stale=False,
             )
 
-        # Aave didn't price the token — try Chainlink fallback.
+        # Aave didn't price the token — try Chainlink fallback (secondary).
+        chainlink_failure: str | None = None
         if self._chainlink is not None:
             symbol = self.chainlink_symbol_for(address)
             if symbol is not None:
@@ -343,47 +402,77 @@ class GmxPriceAdapter:
                     try:
                         cl: ChainlinkPrice = await self._chainlink.fetch_price(symbol)
                     except Exception as exc:  # noqa: BLE001 — Chainlink is best-effort
-                        # Both oracles failed — preserve Lane I's
-                        # PriceUnavailable contract, but include both
-                        # failure summaries so debugging the live path
-                        # is straightforward.
-                        raise PriceUnavailable(
-                            f"both oracles failed for {address!r}: "
-                            f"aave={aave_failure or f'returned {usd}'}; "
-                            f"chainlink={type(exc).__name__}: {exc}"
-                        ) from exc
-                    if cl.usd > 0:
-                        gmx_scaled = encode_gmx_price(cl.usd, decimals)
-                        aave_raw = int(cl.usd * (Decimal(10) ** AAVE_PRICE_DECIMALS))
-                        return TokenPrice(
-                            address=address.lower(),
-                            decimals=decimals,
-                            usd=cl.usd,
-                            aave_raw=aave_raw,
-                            gmx_min=gmx_scaled,
-                            gmx_max=gmx_scaled,
-                            source="chainlink",
-                            stale=cl.stale,
-                        )
+                        # DON'T re-raise — fall through to Pyth before failing.
+                        chainlink_failure = f"{type(exc).__name__}: {exc}"
+                    else:
+                        if cl.usd > 0:
+                            gmx_scaled = encode_gmx_price(cl.usd, decimals)
+                            aave_raw = int(cl.usd * (Decimal(10) ** AAVE_PRICE_DECIMALS))
+                            return TokenPrice(
+                                address=address.lower(),
+                                decimals=decimals,
+                                usd=cl.usd,
+                                aave_raw=aave_raw,
+                                gmx_min=gmx_scaled,
+                                gmx_max=gmx_scaled,
+                                source="chainlink",
+                                stale=cl.stale,
+                            )
+                        chainlink_failure = f"non-positive price: {cl.usd}"
+                else:
+                    chainlink_failure = f"no Chainlink feed registered for symbol {symbol!r}"
+            else:
+                chainlink_failure = "no Chainlink symbol mapped for this token"
 
-        # Both oracles unavailable — surface the original Aave failure
-        # mode so existing tests / callers see no behavior drift.
-        if aave_failure is not None:
-            raise PriceUnavailable(
-                f"Aave oracle reverted for {address!r}: {aave_failure}"
-                + (
-                    " (no Chainlink fallback configured)"
-                    if self._chainlink is None
-                    else " (no Chainlink feed for this token)"
-                )
-            )
+        # Aave + Chainlink both failed — try Pyth fallback (tertiary).
+        pyth_failure: str | None = None
+        if self._pyth is not None:
+            pyth_symbol = self.pyth_symbol_for(address)
+            if pyth_symbol is not None:
+                resolved = self._pyth.oracle_for(pyth_symbol)
+                if resolved is not None:
+                    try:
+                        py: PythRegistryPrice = await self._pyth.fetch_price(pyth_symbol)
+                    except Exception as exc:  # noqa: BLE001 — Pyth is best-effort
+                        pyth_failure = f"{type(exc).__name__}: {exc}"
+                    else:
+                        if py.usd > 0:
+                            gmx_scaled = encode_gmx_price(py.usd, decimals)
+                            aave_raw = int(py.usd * (Decimal(10) ** AAVE_PRICE_DECIMALS))
+                            return TokenPrice(
+                                address=address.lower(),
+                                decimals=decimals,
+                                usd=py.usd,
+                                aave_raw=aave_raw,
+                                gmx_min=gmx_scaled,
+                                gmx_max=gmx_scaled,
+                                source="pyth",
+                                stale=py.stale,
+                            )
+                        pyth_failure = f"non-positive price: {py.usd}"
+                else:
+                    pyth_failure = f"no Pyth priceId registered for symbol {pyth_symbol!r}"
+            else:
+                pyth_failure = "no Pyth symbol mapped for this token"
+
+        # Every oracle either rejected or returned non-positive.
+        # Compose a per-oracle summary for the live debug path. The
+        # word "non-positive" is preserved in the message when Aave
+        # returned <= 0 so the long-standing regex contract from the
+        # Lane I tests (PR #565) keeps matching.
+        if aave_failure is None:
+            aave_summary = f"non-positive price {usd}"
+        else:
+            aave_summary = aave_failure
+        cl_summary = (
+            chainlink_failure if self._chainlink is not None else "no Chainlink registry configured"
+        )
+        py_summary = pyth_failure if self._pyth is not None else "no Pyth registry configured"
         raise PriceUnavailable(
-            f"Aave oracle returned non-positive price for {address!r}: {usd}"
-            + (
-                " (no Chainlink fallback configured)"
-                if self._chainlink is None
-                else " (no Chainlink feed for this token)"
-            )
+            f"every oracle failed for {address!r}: "
+            f"aave={aave_summary}; "
+            f"chainlink={cl_summary}; "
+            f"pyth={py_summary}"
         )
 
     async def market_prices(
