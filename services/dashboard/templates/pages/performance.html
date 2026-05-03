@@ -313,6 +313,86 @@
     #strategyTimeframeTable thead tr:first-child th:not(:first-child) {
         border-left: 1px solid var(--border-dim);
     }
+
+    /* ── System Readiness panel ── */
+    .readiness-summary {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1px;
+        background: var(--border-color);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 14px;
+    }
+    .readiness-cell {
+        background: rgba(11, 11, 26, 0.85);
+        padding: 14px 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .readiness-cell .rd-label {
+        font-size: 11px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+    }
+    .readiness-cell .rd-value {
+        font-size: 28px;
+        font-weight: 600;
+        font-family: var(--font-terminal);
+        font-variant-numeric: tabular-nums;
+    }
+    .readiness-cell.rd-pass .rd-value { color: var(--green); text-shadow: var(--glow-green); }
+    .readiness-cell.rd-warn .rd-value { color: var(--amber); text-shadow: var(--glow-amber); }
+    .readiness-cell.rd-fail .rd-value { color: var(--red); }
+    .readiness-cell.rd-skip .rd-value { color: var(--text-muted); }
+
+    @media (max-width: 720px) {
+        .readiness-summary { grid-template-columns: 1fr 1fr; }
+    }
+
+    .readiness-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+    .readiness-meta .rd-stale {
+        color: var(--amber);
+        text-shadow: var(--glow-amber);
+    }
+
+    .readiness-table th { font-size: 0.7rem; }
+    .readiness-table td { font-size: 0.78rem; }
+    .readiness-evidence {
+        max-width: 480px;
+        font-family: var(--font-terminal);
+        font-size: 0.72rem;
+        color: #9fd89c;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .rd-badge {
+        display: inline-block;
+        padding: 1px 8px;
+        font-size: 0.66rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        border: 1px solid;
+        border-radius: 2px;
+        font-family: var(--font-terminal);
+    }
+    .rd-badge.pass { color: var(--green); border-color: var(--green); background: rgba(51, 255, 0, 0.06); }
+    .rd-badge.warn { color: var(--amber); border-color: var(--amber); background: rgba(255, 192, 0, 0.06); }
+    .rd-badge.fail { color: var(--red); border-color: var(--red); background: rgba(255, 64, 64, 0.06); }
+    .rd-badge.skip { color: var(--text-muted); border-color: var(--text-muted); }
 </style>
 {% endblock %}
 
@@ -403,6 +483,51 @@
                 </thead>
                 <tbody id="strategyTimeframeBody">
                     <tr><td colspan="13" style="text-align:center; padding:24px; color: var(--text-muted);">Loading timeframe data…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- System Readiness (cached production_readiness_sweep.py output) -->
+<div class="perf-section">
+    <div class="perf-section-title">System Readiness</div>
+    <div class="readiness-meta">
+        <span id="readinessCacheAge">Cache: &mdash;</span>
+        <span id="readinessGenerated" style="font-family: var(--font-terminal);">&mdash;</span>
+    </div>
+    <div class="readiness-summary">
+        <div class="readiness-cell rd-pass">
+            <span class="rd-label">Pass</span>
+            <span class="rd-value" id="rdPass">&mdash;</span>
+        </div>
+        <div class="readiness-cell rd-warn">
+            <span class="rd-label">Warn (Class A/B/C)</span>
+            <span class="rd-value" id="rdWarn">&mdash;</span>
+        </div>
+        <div class="readiness-cell rd-fail">
+            <span class="rd-label">Fail</span>
+            <span class="rd-value" id="rdFail">&mdash;</span>
+        </div>
+        <div class="readiness-cell rd-skip">
+            <span class="rd-label">Skip</span>
+            <span class="rd-value" id="rdSkip">&mdash;</span>
+        </div>
+    </div>
+    <div class="panel" style="padding: 0; margin-bottom: 0;">
+        <div class="table-scroll">
+            <table class="strat-table readiness-table">
+                <thead>
+                    <tr>
+                        <th>Section</th>
+                        <th>Check</th>
+                        <th>Status</th>
+                        <th>Evidence</th>
+                        <th style="text-align:right;">Duration</th>
+                    </tr>
+                </thead>
+                <tbody id="readinessTableBody">
+                    <tr><td colspan="5" style="text-align:center; padding:24px; color: var(--text-muted);">Loading readiness checks…</td></tr>
                 </tbody>
             </table>
         </div>
@@ -1299,8 +1424,108 @@
         }
     }
 
+    /* ── Render System Readiness panel from /api/readiness/latest ── */
+    function _truncate(s, n) {
+        if (s == null) return '';
+        s = String(s);
+        if (s.length <= n) return s;
+        return s.slice(0, n - 1) + '…';
+    }
+
+    function _formatCacheAge(seconds) {
+        if (seconds == null) return 'no cache yet';
+        var total = Math.max(0, Math.floor(Number(seconds)));
+        var hours = Math.floor(total / 3600);
+        var mins = Math.floor((total % 3600) / 60);
+        var secs = total % 60;
+        if (hours > 0) return hours + 'h ' + mins + 'm ago';
+        if (mins > 0) return mins + 'm ' + secs + 's ago';
+        return secs + 's ago';
+    }
+
+    function renderReadiness(payload) {
+        if (!payload) payload = {};
+        var summary = payload.summary || {pass: 0, warn: 0, fail: 0, skip: 0, total: 0};
+        var checks = payload.checks || [];
+
+        var passEl = document.getElementById('rdPass');
+        var warnEl = document.getElementById('rdWarn');
+        var failEl = document.getElementById('rdFail');
+        var skipEl = document.getElementById('rdSkip');
+        if (passEl) passEl.textContent = summary.pass != null ? summary.pass : '—';
+        if (warnEl) warnEl.textContent = summary.warn != null ? summary.warn : '—';
+        if (failEl) failEl.textContent = summary.fail != null ? summary.fail : '—';
+        if (skipEl) skipEl.textContent = summary.skip != null ? summary.skip : '—';
+
+        var ageEl = document.getElementById('readinessCacheAge');
+        if (ageEl) {
+            var stale = !!payload.cache_stale;
+            var ageText = 'Cache: ' + _formatCacheAge(payload.cache_age_seconds);
+            if (stale) ageText += '  ⚠ stale (>1h)';
+            ageEl.textContent = ageText;
+            ageEl.className = stale ? 'rd-stale' : '';
+        }
+        var genEl = document.getElementById('readinessGenerated');
+        if (genEl) {
+            if (payload.note) {
+                genEl.textContent = payload.note;
+            } else if (payload.generated_at) {
+                genEl.textContent = 'generated ' + payload.generated_at;
+            } else {
+                genEl.textContent = '—';
+            }
+        }
+
+        var body = document.getElementById('readinessTableBody');
+        if (!body) return;
+        if (!checks.length) {
+            body.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color: var(--text-muted);">' +
+                escapeHtml(payload.note || 'No checks in cache yet — run the readiness-cache LaunchAgent.') +
+                '</td></tr>';
+            return;
+        }
+
+        // Sort by section, then status (FAIL > WARN > SKIP > PASS), then name.
+        var statusOrder = {FAIL: 0, WARN: 1, SKIP: 2, PASS: 3};
+        var sorted = checks.slice().sort(function (a, b) {
+            var sa = String(a.section || ''), sb = String(b.section || '');
+            if (sa !== sb) return sa < sb ? -1 : 1;
+            var oa = statusOrder[String(a.status || '').toUpperCase()];
+            var ob = statusOrder[String(b.status || '').toUpperCase()];
+            if (oa == null) oa = 9;
+            if (ob == null) ob = 9;
+            if (oa !== ob) return oa - ob;
+            return String(a.name || '') < String(b.name || '') ? -1 : 1;
+        });
+
+        var rows = sorted.map(function (c) {
+            var status = String(c.status || '').toUpperCase();
+            var badgeCls = 'skip';
+            if (status === 'PASS') badgeCls = 'pass';
+            else if (status === 'WARN') badgeCls = 'warn';
+            else if (status === 'FAIL') badgeCls = 'fail';
+            var dur = (c.duration_ms != null) ? c.duration_ms + ' ms' : '—';
+            var evidence = _truncate(c.evidence, 80);
+            return '<tr>' +
+                '<td style="color: var(--cyan);">' + escapeHtml(c.section) + '</td>' +
+                '<td>' + escapeHtml(c.name) + '</td>' +
+                '<td><span class="rd-badge ' + badgeCls + '">' + escapeHtml(status || '—') + '</span></td>' +
+                '<td class="readiness-evidence" title="' + escapeHtml(c.evidence || '') + '">' + escapeHtml(evidence) + '</td>' +
+                '<td style="text-align:right; color: var(--text-muted);">' + escapeHtml(dur) + '</td>' +
+                '</tr>';
+        }).join('');
+        body.innerHTML = rows;
+    }
+
     /* ── Main refresh — pulls /api/strategy-performance + /api/performance-timeseries ── */
     function refreshPerformance() {
+        fetch('/api/readiness/latest', {credentials: 'same-origin'})
+            .then(function (r) { return r.json(); })
+            .then(renderReadiness)
+            .catch(function (err) {
+                console.warn('readiness/latest fetch failed', err);
+            });
+
         fetch('/api/strategy-performance', {credentials: 'same-origin'})
             .then(function (r) { return r.json(); })
             .then(function (data) {

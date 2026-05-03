@@ -1055,3 +1055,28 @@ class TestX402Gate:
         handler.do_POST()
         # 402 would mean the gate fired despite being disabled.
         assert handler._captured_status == 400
+
+
+# ─── Client-disconnect handling ───────────────────────────────────────────────
+# A client may close the TCP connection mid-response (BrokenPipeError on macOS,
+# ConnectionResetError on hard resets). _respond_raw must swallow both so the
+# request thread does not surface an uncaught traceback. Inference proxy err
+# logs (2026-04-26 and earlier) showed dozens of unhandled tracebacks from this
+# exact path; those went away when BrokenPipeError was caught — but
+# ConnectionResetError stayed unguarded. This test pins both.
+
+
+class TestClientDisconnect:
+    @pytest.mark.parametrize("exc_cls", [BrokenPipeError, ConnectionResetError])
+    def test_respond_raw_swallows_disconnect(self, app_module, exc_cls):
+        body = json.dumps({"model": "auto", "messages": []}).encode()
+        handler = _make_handler(app_module, path="/v1/chat/completions", body=body)
+
+        class _ExplodingWFile:
+            def write(self, _data):
+                raise exc_cls("client gone")
+
+        handler.wfile = _ExplodingWFile()
+        # Must not raise; must report a sent=False outcome to the caller.
+        sent = handler._respond_raw(200, b'{"ok": true}', tier="mac-local")
+        assert sent is False

@@ -275,6 +275,28 @@ If `agent_only` is showing as a degraded signal upstream, the upstream
 collector should be treating `agent_only` as healthy on the Mac-only
 topology — that's a collector bug, not an orchestrator issue.
 
+### d) Screener Pine: alerts misroute / `MAX_SCREENER_SYMBOLS` cap
+
+The static analyzer (`lib/pine/static_analyzer.py`) enforces three
+screener-specific rules whenever a Sapphire-tagged Pine source has more
+than one `request.security()` call:
+
+1. The total `request.security()` count must not exceed
+   `MAX_SCREENER_SYMBOLS` (40, mirroring `lib.trading.pine_templates`).
+   Trim the universe or split into two screeners.
+2. Every `request.security()` must bind to a tuple — the screener
+   contract returns OHLCV-shaped tuples that drive the multi-action
+   alert block; a bare scalar binding (`x = request.security(...)`) is
+   warned about.
+3. Alert payloads must hard-code the firing symbol literal. Using
+   `syminfo.ticker` in the JSON `"symbol"` slot resolves to the chart's
+   ticker (not the firing one) and silently misroutes every alert. The
+   analyzer rejects this as an error.
+
+Run `python3 scripts/lint_pine.py --strict <file.pine>` during promotion
+— `--strict` promotes warnings (e.g. unpaired `strategy.entry/close` or
+partial tuple bindings) to errors so pre-promote diffs surface them.
+
 ## 10. Safety
 
 - **Read-only by default.** Every mutation is gated by
@@ -291,3 +313,31 @@ topology — that's a collector bug, not an orchestrator issue.
   for downstream consumers to assert against.
 - **Path-traversal guard.** The dashboard artifact endpoint resolves and
   validates that the requested path stays under `data/tradingview_ta/`.
+
+## 11. Hermes Skill
+
+A Hermes skill stub for this orchestrator is delivered as an in-repo template
+at `docs/hermes/skills/tradingview-orchestrator/`. It is **read-only by
+construction** — it wraps the `sapphire_tradingview` plugin tool, which
+forces `mutation_enabled=False` regardless of the env gate. The skill exposes
+six actions: `probe`, `score`, `list_pine`, `list_alerts`, `generate_pine`,
+`sweep`. Mutation actions are intentionally absent and live behind
+`scripts/ops/tradingview_ta_capture.py` (this file, §3-§4).
+
+Example Telegram prompts that should trigger the skill:
+
+- "What's the latest TA score for ETH?"
+- "List my saved Pine scripts."
+- "Probe TradingView state."
+- "Generate a Sapphire Pine indicator for BINANCE:BTCUSDT."
+- "Run a TV sweep for the top 6 symbols on the 60m."
+
+Deployment (operator-supervised — never automated from CI):
+
+```bash
+cp -R ~/Code/Sapphire/docs/hermes/skills/tradingview-orchestrator \
+      ~/.hermes/skills/sapphire/tradingview-orchestrator && \
+  ~/.local/bin/hermes gateway restart
+```
+
+See `docs/hermes/README.md` for the general Hermes-skill delivery contract.
