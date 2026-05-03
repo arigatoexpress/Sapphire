@@ -80,7 +80,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 
 ## Module Map
 
-**Key counts (verified 2026-04-30 after `/showcase`):** 6,488+ collected tests (5,995+ core + 493 plugin, per `scripts/ops/test_inventory.py --check-readme`) · 50 dashboard pages · 7 quant strategies · 20 active LaunchAgents (folded in by the 2026-04-21 audit; tracked definitions remain operator-controlled; see `docs/archive/2026/audits/launchagents-audit-2026-04-21.md`) · 21 scheduled tasks · 3 smart contracts.
+**Key counts (verified 2026-05-02 via `scripts/ops/test_inventory.py --check-readme`):** 6,626 collected tests (6,059 core + 567 plugin) · 50 dashboard pages · 7 quant strategies · 20 active LaunchAgents (folded in by the 2026-04-21 audit; tracked definitions remain operator-controlled; see `docs/archive/2026/audits/launchagents-audit-2026-04-21.md`) · 21 scheduled tasks · 3 smart contracts.
 
 | Path | Type | Description |
 |------|------|-------------|
@@ -111,7 +111,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `services/security_pipeline/` | service | Scheduled full-system security scan → SOC page. |
 | `services/telegram-bot/` | service | Legacy bot (replaced by hermes-agent gateway). |
 | `services/webhook/` | service | TradingView webhook receiver [Windows:9090]. |
-| `plugins/claw-sapphire/` | plugin | 109 tool scripts on disk (61 at top level + 47 in `internal/` + 1 in `_deprecated/`), 10 libs, 376+ collected tests. |
+| `plugins/claw-sapphire/` | plugin | 113 tool scripts on disk (63 at top level + 49 in `internal/` + 1 in `_deprecated/`), 10 libs, 567 collected tests. |
 | `contracts/` | solidity | **`SapphireSignalVerifier.sol`** (on-chain signal registry with ZK proof hash field), **`SapphirePaymentGate.sol`** (micropayment gate), **`SapphireSentinelRegistry.sol`** (non-custodial agent mandate/payment receipt anchor). Deployed on Robinhood Chain testnet via `scripts/deploy_robinhood_chain.py`. |
 | `pine/` | pine | 5 TradingView strategies (standalone/: v1, v2, v3 Ultra, MultiSymbol Screener, Mac variant). |
 | `skills/` | skills | Agent-executable capabilities. |
@@ -163,7 +163,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `~/Code/hermes-agent` | NousResearch/hermes-agent | Conversational framework (Telegram bot) |
 | `~/Code/kimi-tools` | local | Kimi Cloud HTTP client |
 
-## Sapphire Plugin (109 tools on disk, 16 registered in plugin.json)
+## Sapphire Plugin (113 tools on disk, 16 registered in plugin.json)
 
 `plugins/claw-sapphire/plugin.json` declares 16 Claude Code tools (one `sapphire` namespace entry + 15 `sapphire_*` tools, for 17 entries total): `dispatch`, `verify`, `budget`, `state`, `status`, `notify`, `health_check`, `market`, `predict_kronos`, `threat_intel`, `lumo_research`, `starred_repos`, `macro_data`, `lead_engine`, `trading_brain`, `megaeth_protocols` (Wave B.5 — read-only MegaETH chain-4326 surface). The remaining tool scripts are standalone, invoked via stdin JSON by hermes skills, scheduled tasks, dashboards, or other tools.
 
@@ -194,6 +194,40 @@ Tool groups:
 - `router.py`, `runtime_policy.py`, `token_governor.py` — dispatch policy + budget
 - `sensitivity_classifier.py` — PII/secret regex (used by dispatch, not proxy)
 - `market_data.py`, `nvidia_agents.py` — shared market + NeMo helpers
+
+## Multi-chain protocol-access stack (as of 2026-05-03)
+
+Sapphire ships read-only typed access to live mainnet protocols across 3 chains:
+
+| Chain | Aave V3 | GMX V2 | Other |
+|---|---|---|---|
+| MegaETH (4326) | yes ($450M) | yes (6 markets, BTC funding via Pyth) | Kumbaya DEX, USDM |
+| Arbitrum (42161) | yes ($1.06B) | yes (60 markets, BTC funding via Chainlink) | - |
+| Optimism (10) | yes ($82M) | - | - |
+
+Cross-chain primitives:
+- `lib/chains/cross_chain/aave_apy_arb.py` — APY divergence detector (live: USDC 232bps spread Arb<->Optimism)
+- `lib/hackathon/chain_health_gate.py` — multi-chain alpha-verification gate
+
+Source: `lib/chains/{megaeth,arbitrum,optimism,cross_chain}/`. ~283 lib tests + 43 plugin tests for chain-specific surface.
+
+## Active hackathon submissions (as of 2026-05-03)
+
+- **0G APAC Hackathon** Track 2 — submission deadline 2026-05-16 23:59 UTC+8. Engineering complete (PR #525 merged); mainnet deploy + demo + form pending Ari.
+- **Arbitrum London Buildathon** Best Agentic Project — registration 2026-05-25, submission 2026-06-14. Sapphire Sentinel; multi-chain chain-health gate; Forge tests for 3 contracts.
+- **Mega Mafia 2.0** application drafted (PR #566) — file via Google Form: https://forms.gle/m6HSvpZ2Q24fB9Cc6
+- **Zama AI Agent Skills bounty** — submission deadline 2026-05-10. SKILL.md scaffold drafted (PR #564); ~3-4hr polish before submit.
+
+## Active routines (deployed 2026-05-01)
+
+| Routine | Schedule |
+|---|---|
+| MegaETH PR queue triage | hourly |
+| Hackathon submission daily digest | daily 9am MDT |
+| MegaETH live alpha monitor | every 3h |
+| EOD wrap-up (one-time per day) | 5:30pm MDT |
+
+Manage at https://claude.ai/code/routines.
 
 ## Inference Proxy (`services/inference-proxy/`)
 
@@ -230,7 +264,7 @@ Prediction accuracy: 61.1% overall, BTC 83.3% (n=36 scored of 42)
 hermes-agent (NousResearch) replaced custom bot. Installed at ~/.hermes/.
 - Config: ~/.hermes/config.yaml (model: hermes3:8b, provider: custom, base_url: proxy)
 - Env: ~/.hermes/.env (TELEGRAM_BOT_TOKEN, OPENAI_BASE_URL → proxy)
-- Skills: ~/.hermes/skills/sapphire/ (14 skills: cyber-intel, inference-tier, kimi-delegate, macro-data, paper-trading, regional-intel, repo-discovery, system-health, system-ops, tho-operations, threat-intel, trading-analysis, trading-brain, trading-signals)
+- Skills: ~/.hermes/skills/sapphire/ (35 skills as of 2026-05-02 — verified via `ls ~/.hermes/skills/sapphire/`; PR #601 reported 33)
 - Gateway: ai.hermes.gateway LaunchAgent (always-on Telegram polling)
 - Restart: `~/.local/bin/hermes gateway restart`
 
