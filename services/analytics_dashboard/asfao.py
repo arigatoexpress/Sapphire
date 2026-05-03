@@ -611,8 +611,8 @@ def register_asfao(app, *, project: str, dataset: str, bq_client, query_param_fa
             INSERT INTO `{project}.{dataset}.decisions`
             (decision_id, role, trigger, action, confidence, status,
              proposed_at, executed_at, result)
-            VALUES (@id, @role, JSON @trigger, JSON @action, @conf, @status,
-                    @proposed, NULL, NULL)
+            VALUES (@id, @role, PARSE_JSON(@trigger), PARSE_JSON(@action),
+                    @conf, @status, @proposed, NULL, NULL)
         """
         params = [
             bigquery.ScalarQueryParameter("id", "STRING", decision_id),
@@ -668,7 +668,7 @@ def register_asfao(app, *, project: str, dataset: str, bq_client, query_param_fa
             UPDATE `{project}.{dataset}.decisions`
             SET status = @status,
                 executed_at = @executed,
-                result = JSON @result
+                result = PARSE_JSON(@result)
             WHERE decision_id = @id
         """
         params = [
