@@ -43,18 +43,17 @@ from lib.chains.optimism.contracts.pyth_oracle import (
     DEFAULT_MAX_AGE_S,
     OPTIMISM_PRICE_IDS,
     OPTIMISM_PYTH_ADDRESS,
+    WRAPPED_TO_UNDERLYING,
     PythAggregator,
     PythPrice,
     PythRegistry,
     PythRegistryPrice,
-    WRAPPED_TO_UNDERLYING,
 )
 from lib.hackathon.optimism_chain_health import (
     PYTH_PROBE_SYMBOLS,
     classify_optimism,
     evaluate_optimism_chain_health,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fake RPC client — encodes the (price, conf, expo, publishTime) tuple

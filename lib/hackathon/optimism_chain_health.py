@@ -149,9 +149,7 @@ def classify_optimism(
 
     # If we BLOCKed on Aave but Pyth is also stale, still surface Pyth
     # in reasons — operators want both axes when triaging.
-    if severity == "BLOCK" and pyth_stale:
-        reasons.append(f"Pyth fallback also stale on {pyth_stale}")
-    elif severity == "WARNING" and frozen and pyth_stale:
+    if severity == "BLOCK" and pyth_stale or severity == "WARNING" and frozen and pyth_stale:
         reasons.append(f"Pyth fallback also stale on {pyth_stale}")
 
     return OptimismChainHealthVerdict(

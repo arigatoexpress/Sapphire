@@ -72,7 +72,6 @@ from typing import Any
 from ..abis import load_pinned_abi
 from .base import TypedContract, _ChainCallable
 
-
 #: Default staleness threshold for Pyth feed reads (seconds).
 #:
 #: Pyth publishes off-chain at sub-second cadence, but the on-chain
