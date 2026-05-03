@@ -1,0 +1,13 @@
+{
+  "chain_id": 4326,
+  "address": "0x2880aB155794e7179c9eE2e38200202908C17B43",
+  "is_proxy": false,
+  "implementation_address": null,
+  "blockscout_verified_at": null,
+  "compiler_version": null,
+  "contract_name": "IPyth",
+  "abi_hash_sha256": null,
+  "fetched_at": "2026-05-02T00:00:00+00:00",
+  "source": "hand-curated:pyth-network/pyth-sdk-solidity",
+  "notes": "Minimal IPyth interface — getPriceUnsafe (read-only, no fee) + getPriceNoOlderThan (built-in staleness gate). Pyth on MegaETH is a single contract; per-asset feeds are addressed by bytes32 priceId, NOT by separate contract addresses. Address verified live on MegaETH mainnet AND testnet (same contract address by design — Pyth uses CREATE2). Reference: https://docs.pyth.network/price-feeds/contract-addresses/evm and https://github.com/pyth-network/pyth-sdk-solidity/blob/main/IPyth.sol"
+}
