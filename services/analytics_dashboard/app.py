@@ -856,6 +856,8 @@ def timeseries_services():
               SELECT service_name, host, status, response_ms, timestamp
               FROM `{PROJECT}.{DATASET}.service_health`
               WHERE timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 60 MINUTE)
+                AND host NOT IN ('rari1', 'rari2')
+                AND service_name NOT LIKE 'ollama-rari%'
             )
             SELECT
               service_name AS service,
@@ -900,11 +902,16 @@ def silos_health():
     """
     services: list[dict] = []
     try:
+        # Pi nodes (rari1/rari2) are filtered out — Pi cluster removed
+        # from the active inference fleet 2026-05-03; their entries
+        # were perpetual-down noise.
         rows = _rows(f"""
             SELECT service_name AS service, status, host, response_ms,
                    timestamp AS last_seen
             FROM `{PROJECT}.{DATASET}.service_health`
             WHERE timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 60 MINUTE)
+              AND host NOT IN ('rari1', 'rari2')
+              AND service_name NOT LIKE 'ollama-rari%'
             QUALIFY ROW_NUMBER() OVER (PARTITION BY service_name ORDER BY timestamp DESC) = 1
         """)
         services = _clean(rows)

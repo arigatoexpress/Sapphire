@@ -117,10 +117,17 @@ def register_brain(app, *, project: str, dataset: str, bq_client, query_param_fa
             obs["silos"]["threat"] = {"error": "bq_miss"}
 
         try:
+            # Pi nodes (rari1/rari2) are removed from the brain's
+            # service-health observation as of 2026-05-03 — they were
+            # surfacing as perpetually-down noise after the Pi cluster
+            # was put on hold. Filter at the BQ-query level so we
+            # never report on them.
             rows = _rows(f"""
                 SELECT service_name, status, host, MAX(timestamp) AS last_seen
                 FROM `{project}.{dataset}.service_health`
                 WHERE timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 60 MINUTE)
+                  AND host NOT IN ('rari1', 'rari2')
+                  AND service_name NOT LIKE 'ollama-rari%'
                 GROUP BY service_name, status, host
                 QUALIFY ROW_NUMBER() OVER (PARTITION BY service_name ORDER BY MAX(timestamp) DESC) = 1
             """)
