@@ -325,7 +325,7 @@ class PythRegistry:
             for k, v in price_ids.items():
                 merged[k.upper()] = v
         # Validate every priceId at construction — fail fast on a typo.
-        for sym, pid in merged.items():
+        for _sym, pid in merged.items():
             _normalize_price_id(pid)
         self._price_ids = merged
         self._aggregator: PythAggregator | None = None

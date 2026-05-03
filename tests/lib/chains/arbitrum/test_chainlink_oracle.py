@@ -24,14 +24,12 @@ from eth_abi import encode as abi_encode
 
 from lib.chains.arbitrum.contracts.chainlink_oracle import (
     ARBITRUM_FEEDS,
-    DEFAULT_MAX_AGE_S,
     WRAPPED_TO_UNDERLYING,
     ChainlinkAggregator,
     ChainlinkPrice,
     ChainlinkRegistry,
     ChainlinkRound,
 )
-
 
 # ---------- Fake client ------------------------------------------------------
 
@@ -76,9 +74,7 @@ class FakeClient:
         selector = data[:10] if isinstance(data, str) else ""
         per_addr = self._responses.get(addr, {})
         if selector not in per_addr:
-            raise ValueError(
-                f"FakeClient: no response wired for addr={addr} selector={selector}"
-            )
+            raise ValueError(f"FakeClient: no response wired for addr={addr} selector={selector}")
         return per_addr[selector]
 
 
@@ -111,11 +107,17 @@ def _encode_latest_round_data(
 def test_chainlink_round_is_stale_when_older_than_threshold() -> None:
     now = 1_800_000_000.0
     fresh = ChainlinkRound(
-        round_id=1, answer=100, started_at=int(now - 100), updated_at=int(now - 100),
+        round_id=1,
+        answer=100,
+        started_at=int(now - 100),
+        updated_at=int(now - 100),
         answered_in_round=1,
     )
     stale = ChainlinkRound(
-        round_id=2, answer=100, started_at=int(now - 7200), updated_at=int(now - 7200),
+        round_id=2,
+        answer=100,
+        started_at=int(now - 7200),
+        updated_at=int(now - 7200),
         answered_in_round=2,
     )
     assert fresh.is_stale(max_age_s=3600, now=now) is False
@@ -158,7 +160,10 @@ async def test_aggregator_latest_round_data_decodes_5_tuple() -> None:
         {
             addr: {
                 FakeClient.LATEST_ROUND_DATA_SELECTOR: _encode_latest_round_data(
-                    round_id=42, answer=7677481000000, started_at=100, updated_at=200,
+                    round_id=42,
+                    answer=7677481000000,
+                    started_at=100,
+                    updated_at=200,
                     answered_in_round=42,
                 ),
             }
@@ -181,7 +186,10 @@ async def test_aggregator_latest_price_applies_decimals_scaling() -> None:
             addr: {
                 FakeClient.DECIMALS_SELECTOR: _encode_decimals(8),
                 FakeClient.LATEST_ROUND_DATA_SELECTOR: _encode_latest_round_data(
-                    round_id=1, answer=7677481000000, started_at=100, updated_at=200,
+                    round_id=1,
+                    answer=7677481000000,
+                    started_at=100,
+                    updated_at=200,
                     answered_in_round=1,
                 ),
             }
@@ -200,7 +208,10 @@ async def test_aggregator_latest_price_raises_on_non_positive_answer() -> None:
         {
             addr: {
                 FakeClient.LATEST_ROUND_DATA_SELECTOR: _encode_latest_round_data(
-                    round_id=1, answer=0, started_at=100, updated_at=200,
+                    round_id=1,
+                    answer=0,
+                    started_at=100,
+                    updated_at=200,
                     answered_in_round=1,
                 ),
             }
@@ -214,9 +225,7 @@ async def test_aggregator_latest_price_raises_on_non_positive_answer() -> None:
 @pytest.mark.asyncio
 async def test_aggregator_description_decodes_string() -> None:
     addr = "0x" + "a" * 40
-    client = FakeClient(
-        {addr: {FakeClient.DESCRIPTION_SELECTOR: _encode_description("BTC / USD")}}
-    )
+    client = FakeClient({addr: {FakeClient.DESCRIPTION_SELECTOR: _encode_description("BTC / USD")}})
     agg = ChainlinkAggregator(client, addr)
     assert await agg.description() == "BTC / USD"
 
@@ -274,8 +283,10 @@ async def test_registry_fetch_price_returns_typed_chainlink_price() -> None:
             btc_addr: {
                 FakeClient.DECIMALS_SELECTOR: _encode_decimals(8),
                 FakeClient.LATEST_ROUND_DATA_SELECTOR: _encode_latest_round_data(
-                    round_id=1, answer=7677481000000,
-                    started_at=int(now - 60), updated_at=int(now - 60),
+                    round_id=1,
+                    answer=7677481000000,
+                    started_at=int(now - 60),
+                    updated_at=int(now - 60),
                     answered_in_round=1,
                 ),
             }
@@ -299,7 +310,8 @@ async def test_registry_fetch_price_flags_stale_feed() -> None:
             btc_addr: {
                 FakeClient.DECIMALS_SELECTOR: _encode_decimals(8),
                 FakeClient.LATEST_ROUND_DATA_SELECTOR: _encode_latest_round_data(
-                    round_id=1, answer=7000000000000,
+                    round_id=1,
+                    answer=7000000000000,
                     started_at=int(now - 7200),  # 2 hours ago — stale
                     updated_at=int(now - 7200),
                     answered_in_round=1,
@@ -341,8 +353,10 @@ async def test_gmx_adapter_falls_back_to_chainlink_when_aave_returns_zero() -> N
             btc_feed: {
                 FakeClient.DECIMALS_SELECTOR: _encode_decimals(8),
                 FakeClient.LATEST_ROUND_DATA_SELECTOR: _encode_latest_round_data(
-                    round_id=1, answer=7677481000000,
-                    started_at=int(now - 60), updated_at=int(now - 60),
+                    round_id=1,
+                    answer=7677481000000,
+                    started_at=int(now - 60),
+                    updated_at=int(now - 60),
                     answered_in_round=1,
                 ),
             }
@@ -374,8 +388,10 @@ async def test_gmx_adapter_falls_back_to_chainlink_when_aave_reverts() -> None:
             btc_feed: {
                 FakeClient.DECIMALS_SELECTOR: _encode_decimals(8),
                 FakeClient.LATEST_ROUND_DATA_SELECTOR: _encode_latest_round_data(
-                    round_id=1, answer=7000000000000,
-                    started_at=int(now - 60), updated_at=int(now - 60),
+                    round_id=1,
+                    answer=7000000000000,
+                    started_at=int(now - 60),
+                    updated_at=int(now - 60),
                     answered_in_round=1,
                 ),
             }
@@ -409,7 +425,8 @@ async def test_gmx_adapter_propagates_stale_flag_from_chainlink() -> None:
             btc_feed: {
                 FakeClient.DECIMALS_SELECTOR: _encode_decimals(8),
                 FakeClient.LATEST_ROUND_DATA_SELECTOR: _encode_latest_round_data(
-                    round_id=1, answer=7000000000000,
+                    round_id=1,
+                    answer=7000000000000,
                     started_at=1,
                     updated_at=1,  # 1970 → unconditionally stale at runtime
                     answered_in_round=1,
@@ -464,7 +481,10 @@ async def test_gmx_adapter_uses_aave_when_aave_priced_even_with_chainlink_presen
             btc_feed: {
                 FakeClient.DECIMALS_SELECTOR: _encode_decimals(8),
                 FakeClient.LATEST_ROUND_DATA_SELECTOR: _encode_latest_round_data(
-                    round_id=1, answer=7000000000000, started_at=100, updated_at=200,
+                    round_id=1,
+                    answer=7000000000000,
+                    started_at=100,
+                    updated_at=200,
                     answered_in_round=1,
                 ),
             }

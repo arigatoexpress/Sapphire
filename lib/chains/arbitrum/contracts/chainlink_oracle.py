@@ -57,11 +57,9 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
 
 from ..abis.fetcher import load_pinned_abi
 from .base import TypedContract, _ChainCallable
-
 
 #: Default staleness threshold for Chainlink feed reads (seconds).
 #:

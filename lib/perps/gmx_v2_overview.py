@@ -308,12 +308,11 @@ def _build_megaeth_wiring() -> _ChainWiring:
 def _build_arbitrum_wiring() -> _ChainWiring:
     wiring = _ChainWiring(chain_id=CHAIN_ID_ARBITRUM, chain_name="Arbitrum")
     try:
+        from lib.chains.arbitrum.client import ArbitrumClient  # noqa: PLC0415
         from lib.chains.arbitrum.contracts.gmx_v2 import (  # noqa: PLC0415
             GmxV2,
             GmxV2Addresses,
         )
-
-        from lib.chains.arbitrum.client import ArbitrumClient  # noqa: PLC0415
         from lib.chains.arbitrum.registry import ProtocolRegistry  # noqa: PLC0415
 
         registry = ProtocolRegistry.from_yaml()

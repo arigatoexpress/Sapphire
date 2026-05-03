@@ -307,7 +307,7 @@ class PythRegistry:
             for k, v in price_ids.items():
                 merged[k.upper()] = v
         # Validate every priceId at construction — fail fast on a typo.
-        for sym, pid in merged.items():
+        for _sym, pid in merged.items():
             _normalize_price_id(pid)
         self._price_ids = merged
         self._aggregator: PythAggregator | None = None
@@ -351,9 +351,7 @@ class PythRegistry:
             return None
         return self.aggregator(), pid
 
-    async def fetch_price(
-        self, symbol: str, *, now: float | None = None
-    ) -> PythRegistryPrice:
+    async def fetch_price(self, symbol: str, *, now: float | None = None) -> PythRegistryPrice:
         """Fetch a typed :class:`PythRegistryPrice` (USD + staleness) for ``symbol``.
 
         Raises ``LookupError`` if the symbol isn't in the registry —

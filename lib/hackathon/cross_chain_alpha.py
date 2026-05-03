@@ -85,6 +85,7 @@ def _build_pyth_scanner_from_default_clients() -> CrossChainPythScanner:
 
     try:
         from lib.chains.optimism.client import OptimismClient  # noqa: PLC0415
+
         from lib.chains.optimism.contracts.pyth_oracle import (  # noqa: PLC0415
             PythRegistry as OpPythRegistry,
         )
