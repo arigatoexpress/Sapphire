@@ -32,7 +32,12 @@ contract SapphireSentinelRegistryTest is Test {
     bytes32 internal constant RISK_HASH = keccak256("risk:nominal");
 
     uint96 internal constant MAX_SPEND = 1_000_000; // 1.0 in 6-decimal atomic units
-    uint64 internal constant FUTURE_EXPIRY = 1_000_000_000;
+    // 2_000_000_000 = 2033-05-18, comfortably past the 2026 vm.warp baseline
+    // below. The previous value (1e9 = 2001-09-09) was older than the warp,
+    // which made every register/payment test revert with `Expired mandate`
+    // once anyone ran the suite locally — silently OK in CI because the
+    // sentinel-contracts workflow is gated on `vars.SAPPHIRE_RUNNER`.
+    uint64 internal constant FUTURE_EXPIRY = 2_000_000_000;
 
     // Mirror events for vm.expectEmit. Solidity does not allow event
     // imports across contracts, so we redeclare them.
