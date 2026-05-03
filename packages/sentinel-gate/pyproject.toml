@@ -1,0 +1,69 @@
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sapphire-sentinel-gate"
+version = "0.1.0"
+description = "Multi-chain agent-safety gate: refuse alpha-paid actions when on-chain protocols are degraded (peg break, frozen reserves, oracle staleness)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "Ari Spec", email = "aristotlespec@gmail.com" },
+]
+keywords = [
+    "defi",
+    "multi-chain",
+    "agent-safety",
+    "fhe",
+    "autonomous-agents",
+    "sentinel",
+    "chain-health",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+# Minimal runtime deps — users shouldn't pull in all of Sapphire just to
+# embed a pre-trade safety gate. ``httpx`` powers the optional default
+# JSON-RPC client; ``eth-abi`` is used to encode/decode the contract
+# calls the live MegaETH/Arbitrum readers issue.
+dependencies = [
+    "httpx>=0.27",
+    "eth-abi>=5.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "build>=1.2",
+]
+
+[project.urls]
+Homepage = "https://github.com/arigatoexpress/Sapphire"
+Repository = "https://github.com/arigatoexpress/Sapphire"
+Issues = "https://github.com/arigatoexpress/Sapphire/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sentinel_gate"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/",
+    "tests/",
+    "README.md",
+    "LICENSE",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
