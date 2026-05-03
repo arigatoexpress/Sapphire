@@ -637,6 +637,52 @@ td.muted { color: var(--text-3); }
 .legend-item { display: inline-flex; align-items: center; gap: 6px; }
 .legend-swatch { width: 10px; height: 10px; border-radius: 2px; }
 
+/* ========== Toast ========== */
+#toast-host {
+  position: fixed; top: 16px; right: 16px;
+  display: flex; flex-direction: column; gap: 8px;
+  z-index: 200; pointer-events: none;
+  max-width: min(420px, 92vw);
+}
+.toast {
+  background: var(--bg-1);
+  border: 1px solid var(--border-bright);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r);
+  padding: 12px 14px 12px 14px;
+  box-shadow: var(--shadow-2);
+  font-size: 12.5px;
+  color: var(--text-1);
+  pointer-events: auto;
+  display: flex; flex-direction: column; gap: 4px;
+  animation: toast-in 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.toast.ok { border-left-color: var(--green); }
+.toast.warn { border-left-color: var(--yellow); }
+.toast.err { border-left-color: var(--red); }
+.toast .toast-title { font-weight: 600; font-size: 12.5px; }
+.toast .toast-body { color: var(--text-2); font-size: 12px; line-height: 1.45; }
+.toast .toast-meta { color: var(--text-3); font-size: 10.5px; font-family: 'JetBrains Mono', monospace; margin-top: 2px; }
+.toast.fade { animation: toast-out 200ms cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+@keyframes toast-in {
+  from { transform: translateX(20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes toast-out {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(20px); opacity: 0; }
+}
+select.icon-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 28px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%237c8ba0' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  cursor: pointer;
+}
+select.icon-btn:focus { outline: none; border-color: var(--accent); }
+
 /* ========== Help modal ========== */
 .modal-backdrop {
   display: none;
@@ -742,12 +788,22 @@ td.muted { color: var(--text-3); }
       <span class="dot unknown"></span>
       <span>checking systems…</span>
     </div>
+    <select id="time-range-select" class="icon-btn" title="Time range for charts" aria-label="Time range">
+      <option value="1h">1h</option>
+      <option value="24h" selected>24h</option>
+      <option value="7d">7d</option>
+      <option value="30d">30d</option>
+      <option value="90d">90d</option>
+    </select>
     <button class="icon-btn" id="help-btn" title="Quick guide (?)">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"/></svg>
       <span>Help</span>
     </button>
   </div>
 </header>
+
+<!-- Toast notification host -->
+<div id="toast-host" aria-live="polite" aria-atomic="true"></div>
 
 <!-- ========== Staleness banner (regime collector) ========== -->
 <div class="banner" id="regime-stale-banner">
@@ -827,13 +883,13 @@ td.muted { color: var(--text-3); }
     </div>
     <div class="brain-hero-actions">
       <span class="brain-meta" id="brain-meta">—</span>
-      <a class="brain-btn" href="/api/brain/synthesis?persist=1" target="_blank" rel="noopener" title="Run synthesis and persist to BigQuery">
+      <button type="button" class="brain-btn" id="brain-persist-btn" title="Run synthesis and persist to BigQuery">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
         Persist + Run
-      </a>
-      <a class="brain-btn" href="/api/brain/correlate" target="_blank" rel="noopener" title="Cross-silo correlation matches">
-        Correlate ↗
-      </a>
+      </button>
+      <button type="button" class="brain-btn" id="brain-correlate-btn" title="Cross-silo correlation matches">
+        Correlate
+      </button>
     </div>
   </div>
   <div class="brain-hero-body">
@@ -1347,6 +1403,113 @@ document.addEventListener('keydown', (e) => {
   if (e.key === '?') { e.preventDefault(); openHelp(); }
   if (e.key === 'Escape') closeHelp();
 });
+
+// ========== Time-range selector ==========
+function getCurrentWindow() {
+  try {
+    const sel = document.getElementById('time-range-select');
+    if (sel && sel.value) return sel.value;
+  } catch (_) {}
+  try {
+    return localStorage.getItem('sapphire-time-range') || '24h';
+  } catch (_) {
+    return '24h';
+  }
+}
+(function initTimeRange() {
+  const sel = document.getElementById('time-range-select');
+  if (!sel) return;
+  let saved = '24h';
+  try { saved = localStorage.getItem('sapphire-time-range') || '24h'; } catch (_) {}
+  if ([...sel.options].some(o => o.value === saved)) sel.value = saved;
+  sel.addEventListener('change', () => {
+    try { localStorage.setItem('sapphire-time-range', sel.value); } catch (_) {}
+    refresh();
+  });
+})();
+
+// ========== Toast ==========
+function toast({title, body, meta, kind = 'ok', ttl = 5000}) {
+  const host = document.getElementById('toast-host');
+  if (!host) return;
+  const el = document.createElement('div');
+  el.className = 'toast ' + kind;
+  let html = '';
+  if (title) html += `<div class="toast-title">${title}</div>`;
+  if (body) html += `<div class="toast-body">${body}</div>`;
+  if (meta) html += `<div class="toast-meta">${meta}</div>`;
+  el.innerHTML = html;
+  host.appendChild(el);
+  setTimeout(() => {
+    el.classList.add('fade');
+    setTimeout(() => el.remove(), 220);
+  }, ttl);
+}
+
+// ========== Brain action buttons ==========
+const persistBtn = document.getElementById('brain-persist-btn');
+if (persistBtn) {
+  persistBtn.addEventListener('click', async () => {
+    persistBtn.disabled = true;
+    persistBtn.style.opacity = '0.6';
+    try {
+      const r = await fetch('/api/brain/synthesis?persist=1');
+      if (!r.ok) {
+        toast({title: 'Persist failed', body: `HTTP ${r.status}`, kind: 'err'});
+        return;
+      }
+      const d = await r.json();
+      const sid = d.synthesis_id || '(no id returned)';
+      toast({
+        title: d.persisted ? 'Synthesis persisted' : 'Synthesis ran (not persisted)',
+        body: d.narrative || '',
+        meta: `id: ${sid} · health: ${d.health_score} · degraded: ${(d.degraded_silos || []).length}`,
+        kind: d.persisted ? 'ok' : 'warn',
+        ttl: 7000,
+      });
+      // Refresh dashboard so new row + brain panel update.
+      refresh();
+    } catch (e) {
+      toast({title: 'Persist error', body: String(e), kind: 'err'});
+    } finally {
+      persistBtn.disabled = false;
+      persistBtn.style.opacity = '';
+    }
+  });
+}
+const correlateBtn = document.getElementById('brain-correlate-btn');
+if (correlateBtn) {
+  correlateBtn.addEventListener('click', async () => {
+    correlateBtn.disabled = true;
+    correlateBtn.style.opacity = '0.6';
+    try {
+      const r = await fetch('/api/brain/correlate');
+      if (!r.ok) {
+        toast({title: 'Correlate failed', body: `HTTP ${r.status}`, kind: 'err'});
+        return;
+      }
+      const d = await r.json();
+      const matches = d.matches || [];
+      if (matches.length === 0) {
+        toast({title: 'No correlations', body: 'No cross-silo patterns matched.', meta: `ts: ${(d.ts || '').slice(0, 19)}`, kind: 'ok'});
+      } else {
+        const top = matches.slice(0, 3).map(m => `<div style="margin-top:4px"><span style="color:var(--accent)">${m.pattern_name}</span> · ${m.severity}<br><span style="color:var(--text-3);font-size:11px">${m.recommendation || ''}</span></div>`).join('');
+        toast({
+          title: `${matches.length} correlation${matches.length === 1 ? '' : 's'}`,
+          body: top,
+          meta: `score range ${matches[matches.length - 1].score.toFixed(2)} – ${matches[0].score.toFixed(2)}`,
+          kind: matches[0].severity === 'HIGH' ? 'err' : 'warn',
+          ttl: 9000,
+        });
+      }
+    } catch (e) {
+      toast({title: 'Correlate error', body: String(e), kind: 'err'});
+    } finally {
+      correlateBtn.disabled = false;
+      correlateBtn.style.opacity = '';
+    }
+  });
+}
 
 // ========== Sapphire Brain panel ==========
 const BRAIN_SILO_TAGS = ['regime','trading','threat','threat_live','services','service','inference','tho'];
