@@ -79,6 +79,16 @@ try:
 except Exception as _markets_exc:  # noqa: BLE001
     log.warning("markets endpoints disabled: %s", _markets_exc)
 
+# Sub-pages — the per-project deep-dive routes that the home shell's
+# vertical tabs link to. Lazy-wired so a template/import error can't
+# kill the dashboard.
+try:
+    from subpages import register_subpages as _register_subpages
+
+    _register_subpages(app, project=PROJECT, dataset=DATASET)
+except Exception as _subpages_exc:  # noqa: BLE001
+    log.warning("subpages disabled: %s", _subpages_exc)
+
 _KNOWN_PROBE_PATHS = {
     "/.git/config",
     "/favicon.ico",
