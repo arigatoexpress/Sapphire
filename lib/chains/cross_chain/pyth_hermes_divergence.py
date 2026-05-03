@@ -235,9 +235,7 @@ def _classify_with_hermes(
     # individual on-chain read. We want the *worst-case* gap to drive
     # severity, so reduce over all on-chain reads.
     hermes_vs_onchain = _max_pairwise_bps([hermes_price, on_chain_min])
-    hermes_vs_onchain = max(
-        hermes_vs_onchain, _max_pairwise_bps([hermes_price, on_chain_max])
-    )
+    hermes_vs_onchain = max(hermes_vs_onchain, _max_pairwise_bps([hermes_price, on_chain_max]))
 
     bracketed = on_chain_min <= hermes_price <= on_chain_max
     on_chain_disagree = on_chain_max_bps >= threshold_bps
@@ -348,17 +346,13 @@ class HermesAugmentedScanner:
         )
         hermes_task = asyncio.to_thread(self._fetch_hermes, sym)
 
-        chain_results, hermes_price = await asyncio.gather(
-            chain_task, hermes_task
-        )
+        chain_results, hermes_price = await asyncio.gather(chain_task, hermes_task)
 
         if hermes_price is None:
             # Hermes itself failed — fall back to no signal rather
             # than synthesizing one without ground truth. The base
             # scanner is the correct tool when Hermes isn't available.
-            logger.warning(
-                "Hermes fetch for %s failed; returning no signal", sym
-            )
+            logger.warning("Hermes fetch for %s failed; returning no signal", sym)
             return None
 
         on_chain: dict[str, dict[str, Any]] = {}
@@ -409,9 +403,7 @@ class HermesAugmentedScanner:
             any_stale=any_stale,
         )
 
-    async def scan_top_assets(
-        self, n: int = 5
-    ) -> list[HermesAugmentedSignal]:
+    async def scan_top_assets(self, n: int = 5) -> list[HermesAugmentedSignal]:
         """Scan top-N candidate assets, return only emitted signals.
 
         Walks :data:`HERMES_PRICE_IDS` keys in their declared order
@@ -450,9 +442,7 @@ class HermesAugmentedScanner:
         for that asset.
         """
         try:
-            prices = self._hermes.latest_prices_by_symbol(
-                [symbol], include_vaa=False
-            )
+            prices = self._hermes.latest_prices_by_symbol([symbol], include_vaa=False)
         except Exception as exc:
             logger.warning("Hermes fetch %s failed: %s", symbol, exc)
             return None

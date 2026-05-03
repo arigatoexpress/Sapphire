@@ -130,9 +130,7 @@ def _normalize_price_id(price_id: str | bytes) -> bytes:
         except ValueError as exc:
             raise ValueError(f"invalid Pyth priceId hex: {price_id!r}") from exc
     else:
-        raise TypeError(
-            f"priceId must be str or bytes, got {type(price_id).__name__}"
-        )
+        raise TypeError(f"priceId must be str or bytes, got {type(price_id).__name__}")
     if len(raw) != 32:
         raise ValueError(f"Pyth priceId must be 32 bytes, got {len(raw)}")
     return raw
@@ -317,8 +315,7 @@ class PythHermesClient:
             return results[key]
         except KeyError as exc:
             raise LookupError(
-                f"Hermes returned no parsed entry for priceId "
-                f"{_price_id_hex(price_id)!r}"
+                f"Hermes returned no parsed entry for priceId {_price_id_hex(price_id)!r}"
             ) from exc
 
     def latest_prices(
@@ -370,9 +367,7 @@ class PythHermesClient:
         # in the per-chain wrapper registries. ``parsed=true`` is the
         # default but pin it explicitly — defensive against future
         # API drift.
-        params: list[tuple[str, str]] = [
-            ("ids[]", "0x" + key.hex()) for key in ordered
-        ]
+        params: list[tuple[str, str]] = [("ids[]", "0x" + key.hex()) for key in ordered]
         params.append(("parsed", "true"))
         if not include_vaa:
             params.append(("encoding", "hex"))
@@ -418,8 +413,7 @@ class PythHermesClient:
         unknown = [s for s in normalized if s not in HERMES_PRICE_IDS]
         if unknown:
             raise KeyError(
-                f"unknown Hermes symbol(s): {unknown}. Known: "
-                f"{sorted(HERMES_PRICE_IDS)}"
+                f"unknown Hermes symbol(s): {unknown}. Known: {sorted(HERMES_PRICE_IDS)}"
             )
 
         # Build the priceId list in the same order as ``normalized``
@@ -473,9 +467,7 @@ class PythHermesClient:
         """
         parsed = body.get("parsed") or []
         if not isinstance(parsed, list):
-            raise ValueError(
-                f"Hermes response missing 'parsed' list (got {type(parsed).__name__})"
-            )
+            raise ValueError(f"Hermes response missing 'parsed' list (got {type(parsed).__name__})")
 
         # Combined VAA payload — Hermes returns a single hex string
         # in ``binary.data[0]`` covering every requested feed. The
@@ -494,9 +486,7 @@ class PythHermesClient:
                 try:
                     vaa_bytes = bytes.fromhex(data[0])
                 except (TypeError, ValueError) as exc:
-                    logger.warning(
-                        "Hermes binary.data[0] not valid hex: %s", exc
-                    )
+                    logger.warning("Hermes binary.data[0] not valid hex: %s", exc)
                     vaa_bytes = b""
 
         out: dict[bytes, PythHermesPrice] = {}
@@ -517,9 +507,7 @@ class PythHermesClient:
                 expo = int(price_obj["expo"])
                 publish_time = int(price_obj["publish_time"])
             except (KeyError, TypeError, ValueError) as exc:
-                logger.warning(
-                    "Hermes parsed entry %s missing fields: %s", id_hex, exc
-                )
+                logger.warning("Hermes parsed entry %s missing fields: %s", id_hex, exc)
                 continue
 
             # Decimal math: int64 * 10**expo. expo is typically

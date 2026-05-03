@@ -25,12 +25,12 @@ from lib.chains.cross_chain.pyth_hermes import (
 )
 from lib.chains.cross_chain.pyth_hermes_divergence import (
     HERMES_CHAIN_NAME,
-    HermesAugmentedScanner,
-    HermesAugmentedSignal,
     SEVERITY_MIXED,
     SEVERITY_NORMAL,
     SEVERITY_REAL_DIVERGENCE,
     SEVERITY_STALE_CACHE,
+    HermesAugmentedScanner,
+    HermesAugmentedSignal,
     _classify_with_hermes,
     _max_pairwise_bps,
 )
@@ -191,12 +191,8 @@ class TestHermesAugmentedScanner:
     async def test_stale_cache_reproduction(self):
         # Two chains, Hermes between them — the canonical stale-cache
         # case. Verify the scanner correctly classifies it.
-        arbitrum = _stub_registry(
-            {"BTC": _StubOnChainPrice(Decimal("78700"), 1000)}
-        )
-        optimism = _stub_registry(
-            {"BTC": _StubOnChainPrice(Decimal("70250"), 1)}
-        )
+        arbitrum = _stub_registry({"BTC": _StubOnChainPrice(Decimal("78700"), 1000)})
+        optimism = _stub_registry({"BTC": _StubOnChainPrice(Decimal("70250"), 1)})
         hermes = _stub_hermes("BTC", Decimal("78671"))
 
         scanner = HermesAugmentedScanner(
@@ -220,12 +216,8 @@ class TestHermesAugmentedScanner:
     async def test_real_divergence_reproduction(self):
         # Two chains agree, Hermes outside their range → real off-chain
         # move that no chain has refreshed yet.
-        arbitrum = _stub_registry(
-            {"BTC": _StubOnChainPrice(Decimal("78000"), 1000)}
-        )
-        megaeth = _stub_registry(
-            {"BTC": _StubOnChainPrice(Decimal("78010"), 1000)}
-        )
+        arbitrum = _stub_registry({"BTC": _StubOnChainPrice(Decimal("78000"), 1000)})
+        megaeth = _stub_registry({"BTC": _StubOnChainPrice(Decimal("78010"), 1000)})
         hermes = _stub_hermes("BTC", Decimal("78500"))
 
         scanner = HermesAugmentedScanner(
@@ -254,9 +246,7 @@ class TestHermesAugmentedScanner:
         # A chain that doesn't carry the symbol raises LookupError.
         # That should not appear in chains_unavailable — it's not a
         # failure, just absent.
-        arbitrum = _stub_registry(
-            {"ETH": _StubOnChainPrice(Decimal("2300"), 1000)}
-        )  # no BTC
+        arbitrum = _stub_registry({"ETH": _StubOnChainPrice(Decimal("2300"), 1000)})  # no BTC
         hermes = _stub_hermes("BTC", Decimal("78000"))
 
         scanner = HermesAugmentedScanner(
@@ -298,9 +288,7 @@ class TestHermesAugmentedScanner:
         # returns None — the caller should fall back to the base
         # scanner. The augmented flow without Hermes is meaningless.
         bad_hermes = MagicMock()
-        bad_hermes.latest_prices_by_symbol = MagicMock(
-            side_effect=RuntimeError("hermes timeout")
-        )
+        bad_hermes.latest_prices_by_symbol = MagicMock(side_effect=RuntimeError("hermes timeout"))
         scanner = HermesAugmentedScanner(hermes=bad_hermes)
         sig = await scanner.scan_asset("BTC")
         assert sig is None

@@ -29,7 +29,6 @@ from lib.chains.cross_chain.pyth_hermes import (
     _price_id_key,
 )
 
-
 # -- fixtures ----------------------------------------------------------------
 
 
@@ -146,9 +145,7 @@ class TestLatestPrice:
         def handler(request: httpx.Request) -> httpx.Response:
             captured["url"] = str(request.url)
             captured["params"] = list(request.url.params.multi_items())
-            body = _hermes_response(
-                [(_btc_id(), 7867149999999, 2311757388, -8, 1777818484)]
-            )
+            body = _hermes_response([(_btc_id(), 7867149999999, 2311757388, -8, 1777818484)])
             return httpx.Response(200, json=body)
 
         with _make_client(handler) as client:
@@ -170,9 +167,7 @@ class TestLatestPrice:
 
     def test_accepts_unprefixed_hex(self):
         def handler(request):
-            body = _hermes_response(
-                [(_btc_id(), 100, 1, -2, 1000)]
-            )
+            body = _hermes_response([(_btc_id(), 100, 1, -2, 1000)])
             return httpx.Response(200, json=body)
 
         with _make_client(handler) as client:
@@ -186,7 +181,9 @@ class TestLatestPrice:
         # can distinguish "Hermes itself failed" (HTTPError) from
         # "this feed isn't on Hermes" (LookupError).
         def handler(request):
-            return httpx.Response(200, json={"binary": {"encoding": "hex", "data": []}, "parsed": []})
+            return httpx.Response(
+                200, json={"binary": {"encoding": "hex", "data": []}, "parsed": []}
+            )
 
         with _make_client(handler) as client:
             with pytest.raises(LookupError, match="no parsed entry"):
@@ -251,18 +248,14 @@ class TestLatestPricesBatch:
 
         def handler(request):
             captured["params"] = list(request.url.params.multi_items())
-            body = _hermes_response(
-                [(_btc_id(), 100, 1, -2, 1000)]
-            )
+            body = _hermes_response([(_btc_id(), 100, 1, -2, 1000)])
             return httpx.Response(200, json=body)
 
         with _make_client(handler) as client:
             client.latest_prices([_btc_id(), _btc_id(), _btc_id()])
 
         # Only one ids[] param sent, despite the input having three.
-        ids_params = [
-            v for k, v in captured["params"] if k == "ids[]"
-        ]
+        ids_params = [v for k, v in captured["params"] if k == "ids[]"]
         assert len(ids_params) == 1
 
     def test_batch_empty_list_returns_empty_dict(self):
@@ -377,9 +370,7 @@ def test_integration_real_hermes_returns_fresh_majors():
     a market-aware test that flakes on every regime change.
     """
     with PythHermesClient(timeout_s=10.0) as client:
-        prices = client.latest_prices_by_symbol(
-            ["BTC", "ETH", "SOL", "USDC", "USDT"]
-        )
+        prices = client.latest_prices_by_symbol(["BTC", "ETH", "SOL", "USDC", "USDT"])
 
     assert set(prices) == {"BTC", "ETH", "SOL", "USDC", "USDT"}
 
