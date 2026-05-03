@@ -214,7 +214,102 @@ def is_integration_enabled() -> bool:
     return os.getenv("SAPPHIRE_CROSS_CHAIN_INTEGRATION") == "1"
 
 
+def backtest_aave_arb(
+    asset: str = "USDC",
+    capital_usd: float = 10_000.0,
+    days: int = 30,
+    *,
+    scanner: CrossChainAaveScanner | None = None,
+    bridge_cost_bps_per_round_trip: float = 5.0,
+    gas_cost_usd_per_action: float = 2.50,
+    holding_period_hours: float = 24.0,
+    decay_days: float = 7.0,
+) -> dict[str, Any]:
+    """Synchronous JSON-friendly cross-chain Aave APY arb PnL projection.
+
+    Convenience wrapper that fetches the live cross-chain spread for
+    ``asset`` and runs it through
+    :class:`lib.trading.cross_chain_arb_backtest.CrossChainArbBacktest`
+    at the requested capital + horizon, with all cost knobs surfaced as
+    keyword args so the dashboard can sweep them without touching the
+    underlying class.
+
+    Designed for:
+
+    * the dashboard (``/api/cross-chain/backtest`` endpoint, future)
+    * a Sapphire plugin tool (``cross_chain_alpha.py``, future)
+    * the agent's ``project_pnl`` skill
+
+    Returns a dict with this shape::
+
+        {
+            "asset": "USDC",
+            "capital_usd": 10000.0,
+            "days": 30,
+            "result": <BacktestResult.to_dict()>,
+            "signal": <signal-summary> | None,
+            "error": "<str>" | not present,
+        }
+
+    On any uncaught failure (entire chain stack offline, RPC timeout)
+    returns a structured error dict so the dashboard / plugin tool
+    surface a graceful empty state rather than a 500.
+
+    ``scanner`` is injectable for tests; production callers pass nothing
+    and accept the default chain-client wiring.
+    """
+    # Local import keeps the module load-light when the backtester isn't
+    # used (cross_chain_alpha is also imported by the live signal path).
+    from lib.trading.cross_chain_arb_backtest import (  # noqa: PLC0415
+        CrossChainArbBacktest,
+    )
+
+    s = scanner if scanner is not None else _build_scanner_from_default_clients()
+    try:
+        sig = asyncio.run(s.scan_asset(asset))
+    except Exception as exc:
+        logger.exception("backtest_aave_arb scan_asset(%s) failed", asset)
+        return {
+            "asset": asset,
+            "capital_usd": capital_usd,
+            "days": days,
+            "result": None,
+            "signal": None,
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+
+    bt = CrossChainArbBacktest(
+        capital_usd=capital_usd,
+        days=days,
+        bridge_cost_bps_per_round_trip=bridge_cost_bps_per_round_trip,
+        gas_cost_usd_per_action=gas_cost_usd_per_action,
+        holding_period_hours=holding_period_hours,
+        decay_days=decay_days,
+    )
+    if sig is None:
+        # No live signal — surface a flat zero-PnL result so the dashboard
+        # tile renders an "all quiet" state instead of an error.
+        result = bt.simulate_with_spread(asset=asset, initial_spread_bps=0.0)
+        return {
+            "asset": asset,
+            "capital_usd": capital_usd,
+            "days": days,
+            "result": result.to_dict(),
+            "signal": None,
+        }
+
+    result = bt.simulate_from_signal(sig)
+    return {
+        "asset": asset,
+        "capital_usd": capital_usd,
+        "days": days,
+        "result": result.to_dict(),
+        "signal": _signal_to_summary(sig),
+    }
+
+
 __all__ = (
+    "backtest_aave_arb",
     "is_integration_enabled",
     "scan_aave_arb",
 )
