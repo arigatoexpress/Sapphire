@@ -209,46 +209,224 @@
         font-size: 11px;
         cursor: pointer;
     }
-    .sentinel-chain-health { display: none; }
-    .sentinel-chain-health.has-data { display: block; }
-    .sentinel-chain-pill {
-        display: inline-block;
-        padding: 4px 10px;
-        border-radius: 4px;
+    /* Cross-chain Aave APY arbitrage panel — Lane Inject offensive
+       counterpart to the BLOCKED defensive beat. Same band styling +
+       severity badge palette mirrored from sentinel-decision.state. */
+    .arb-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
         font-family: var(--font-mono);
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.06em;
+    }
+    .arb-table th {
+        text-align: left;
+        color: var(--text-muted);
+        font-size: 10px;
         text-transform: uppercase;
-        border: 1px solid var(--border);
-        margin-bottom: 10px;
+        letter-spacing: 0.06em;
+        padding: 8px 8px;
+        border-bottom: 1px solid var(--border);
+        font-weight: 600;
     }
-    .sentinel-chain-pill.healthy {
-        color: #86efac;
-        border-color: rgba(34,197,94,0.45);
-        background: rgba(34,197,94,0.10);
+    .arb-table td {
+        padding: 9px 8px;
+        border-bottom: 1px solid rgba(255,255,255,0.04);
+        color: var(--text-secondary);
+        vertical-align: middle;
     }
-    .sentinel-chain-pill.warning {
-        color: #fcd34d;
-        border-color: rgba(245,158,11,0.45);
+    .arb-table tr:last-child td { border-bottom: none; }
+    .arb-asset { color: var(--text-primary); font-weight: 600; }
+    .arb-apy { white-space: nowrap; }
+    .arb-apy.best { color: #4ade80; }
+    .arb-apy.worst { color: #f87171; }
+    .arb-spread { font-weight: 600; }
+    .arb-direction { color: var(--text-muted); font-size: 11px; }
+    .arb-badge {
+        display: inline-block;
+        border-radius: 4px;
+        padding: 3px 8px;
+        font-size: 10px;
+        font-family: var(--font-mono);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    .arb-badge.normal {
+        border: 1px solid rgba(148,163,184,0.35);
+        background: rgba(148,163,184,0.08);
+        color: #94a3b8;
+    }
+    .arb-badge.opportunity {
+        border: 1px solid rgba(245,158,11,0.45);
         background: rgba(245,158,11,0.10);
+        color: #fbbf24;
     }
-    .sentinel-chain-pill.block {
-        color: #fca5a5;
-        border-color: rgba(239,68,68,0.5);
+    .arb-badge.extreme {
+        border: 1px solid rgba(239,68,68,0.45);
         background: rgba(239,68,68,0.12);
+        color: #f87171;
     }
-    .sentinel-chain-meta {
-        display: grid;
-        gap: 4px;
+    .arb-empty {
+        padding: 18px;
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 12px;
+        font-family: var(--font-mono);
+    }
+    .arb-controls {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    .arb-meta {
+        color: var(--text-muted);
+        font-size: 11px;
+        font-family: var(--font-mono);
+    }
+    .arb-error {
+        color: #f87171;
+        font-size: 11px;
+        font-family: var(--font-mono);
+        padding: 8px 0;
+    }
+    /* GMX V2 perps panel — funding rate + OI skew across MegaETH and
+       Arbitrum. Mirrors the arb-table palette + severity badge classes
+       above so the two cross-chain panels read as a unified surface. */
+    .perps-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+        font-family: var(--font-mono);
+    }
+    .perps-table th {
+        text-align: left;
+        color: var(--text-muted);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding: 8px 8px;
+        border-bottom: 1px solid var(--border);
+        font-weight: 600;
+    }
+    .perps-table td {
+        padding: 9px 8px;
+        border-bottom: 1px solid rgba(255,255,255,0.04);
+        color: var(--text-secondary);
+        vertical-align: middle;
+    }
+    .perps-table tr:last-child td { border-bottom: none; }
+    .perps-market { color: var(--text-primary); font-weight: 600; }
+    .perps-funding { white-space: nowrap; font-weight: 600; }
+    .perps-funding.extreme-pos { color: #4ade80; }
+    .perps-funding.extreme-neg { color: #f87171; }
+    .perps-funding.warn-pos { color: #86efac; }
+    .perps-funding.warn-neg { color: #fca5a5; }
+    .perps-funding.neutral { color: var(--text-muted); }
+    .perps-skew { font-family: var(--font-mono); }
+    .perps-skew.extreme { color: #f87171; font-weight: 600; }
+    .perps-skew.warn { color: #fbbf24; }
+    .perps-mark { color: var(--text-secondary); font-family: var(--font-mono); }
+    .perps-side { color: var(--text-muted); font-size: 11px; }
+    .perps-badge {
+        display: inline-block;
+        border-radius: 4px;
+        padding: 3px 8px;
+        font-size: 10px;
+        font-family: var(--font-mono);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    .perps-badge.normal {
+        border: 1px solid rgba(148,163,184,0.35);
+        background: rgba(148,163,184,0.08);
+        color: #94a3b8;
+    }
+    .perps-badge.warn {
+        border: 1px solid rgba(245,158,11,0.45);
+        background: rgba(245,158,11,0.10);
+        color: #fbbf24;
+    }
+    .perps-badge.extreme {
+        border: 1px solid rgba(239,68,68,0.45);
+        background: rgba(239,68,68,0.12);
+        color: #f87171;
+    }
+    .perps-chain-block {
+        margin-top: 14px;
+    }
+    .perps-chain-header {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+        font-family: var(--font-mono);
+        margin-bottom: 6px;
+        font-weight: 600;
+    }
+    .perps-divergence-row {
+        margin-top: 14px;
+        padding: 10px 12px;
+        background: rgba(245,158,11,0.05);
+        border: 1px solid rgba(245,158,11,0.20);
+        border-radius: 6px;
+        font-family: var(--font-mono);
         font-size: 12px;
         color: var(--text-secondary);
+    }
+    .perps-divergence-row strong {
+        color: #fbbf24;
+    }
+    .perps-empty {
+        padding: 18px;
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 12px;
         font-family: var(--font-mono);
     }
-    .sentinel-chain-meta .reasons {
-        color: var(--text-secondary);
-        white-space: pre-wrap;
-        word-break: break-word;
+    .perps-controls {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    .perps-meta {
+        color: var(--text-muted);
+        font-size: 11px;
+        font-family: var(--font-mono);
+    }
+    .perps-error {
+        color: #f87171;
+        font-size: 11px;
+        font-family: var(--font-mono);
+        padding: 8px 0;
+    }
+    .perps-mode-tag {
+        display: inline-block;
+        border-radius: 3px;
+        padding: 1px 6px;
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-left: 8px;
+        vertical-align: middle;
+    }
+    .perps-mode-tag.live {
+        background: rgba(74,222,128,0.10);
+        color: #4ade80;
+        border: 1px solid rgba(74,222,128,0.30);
+    }
+    .perps-mode-tag.sample {
+        background: rgba(148,163,184,0.10);
+        color: #94a3b8;
+        border: 1px solid rgba(148,163,184,0.30);
     }
 </style>
 
@@ -295,19 +473,6 @@
             <ul class="sentinel-list" id="decision-reasons"></ul>
         </div>
 
-        <div class="sentinel-band sentinel-chain-health" id="chain-health-band">
-            <div class="sentinel-panel-title">Chain health</div>
-            <div>
-                <span class="sentinel-chain-pill" id="chain-health-pill">...</span>
-            </div>
-            <div class="sentinel-chain-meta">
-                <div>peg divergence: <span id="chain-health-peg">--</span></div>
-                <div>chain: <span id="chain-health-chain">--</span></div>
-                <div>paused reserves: <span id="chain-health-paused">--</span></div>
-                <div>reasons: <span id="chain-health-reasons" class="reasons">--</span></div>
-            </div>
-        </div>
-
         <div class="sentinel-band">
             <div class="sentinel-panel-title">x402 Payment Requirement</div>
             <div class="sentinel-rows">
@@ -328,6 +493,37 @@
                 <div class="sentinel-row"><span>risk hash</span><span id="anchor-risk">...</span></div>
                 <div class="sentinel-row"><span>broadcast</span><span id="anchor-broadcast">...</span></div>
             </div>
+        </div>
+
+        <div class="sentinel-band" id="cross-chain-arb-panel">
+            <div class="sentinel-header" style="margin-bottom: 10px;">
+                <div class="sentinel-title">
+                    <h2>Cross-chain Aave V3 APY arbitrage &mdash; live</h2>
+                    <p>Live spread between MegaETH / Arbitrum / Optimism per asset. Severity: <strong>NORMAL</strong> &lt; 50 bps, <strong>OPPORTUNITY</strong> 50&ndash;200 bps, <strong>EXTREME</strong> &ge; 200 bps. Read-only signal &mdash; no execution.</p>
+                </div>
+                <div class="sentinel-badge">offensive alpha</div>
+            </div>
+            <div class="arb-controls">
+                <div class="arb-meta" id="arb-meta">Loading...</div>
+                <button class="sentinel-run" id="arb-refresh-btn" onclick="loadCrossChainArb()">refresh</button>
+            </div>
+            <div id="arb-content"></div>
+        </div>
+
+        <div class="sentinel-band" id="perps-overview-panel">
+            <div class="sentinel-header" style="margin-bottom: 10px;">
+                <div class="sentinel-title">
+                    <h2>GMX V2 perps &mdash; live funding rate + open interest <span id="perps-mode-tag" class="perps-mode-tag sample">sample</span></h2>
+                    <p>Per-market funding APR + OI skew across MegaETH (4326) and Arbitrum (42161). Severity: <strong>NORMAL</strong>, <strong>WARN</strong> when |APR| &gt; 20% or |skew &minus; 0.5| &gt; 0.10, <strong>EXTREME</strong> when |APR| &gt; 50% or |skew &minus; 0.5| &gt; 0.20. Read-only signal &mdash; no execution.</p>
+                </div>
+                <div class="sentinel-badge">offensive alpha</div>
+            </div>
+            <div class="perps-controls">
+                <div class="perps-meta" id="perps-meta">Loading...</div>
+                <button class="sentinel-run" id="perps-refresh-btn" onclick="loadPerpsOverview()">refresh</button>
+            </div>
+            <div id="perps-divergence"></div>
+            <div id="perps-content"></div>
         </div>
     </section>
 
@@ -421,37 +617,6 @@ function renderFlow() {
         action: order.action,
         primary_draft: order.primary_draft
     }, null, 2);
-
-    renderChainHealth(flow.chain_health);
-}
-
-function renderChainHealth(ch) {
-    const band = document.getElementById('chain-health-band');
-    if (!ch) {
-        band.classList.remove('has-data');
-        return;
-    }
-    band.classList.add('has-data');
-    const severity = String(ch.severity || 'HEALTHY').toUpperCase();
-    const pill = document.getElementById('chain-health-pill');
-    pill.textContent = severity;
-    pill.className = 'sentinel-chain-pill ' + severity.toLowerCase();
-
-    const peg = ch.peg_divergence_bps;
-    document.getElementById('chain-health-peg').textContent =
-        (peg === null || peg === undefined) ? 'n/a' : (peg + ' bps');
-
-    const chainName = ch.chain_name || ('chain-' + ch.chain_id);
-    document.getElementById('chain-health-chain').textContent =
-        chainName + ' (' + ch.chain_id + ')';
-
-    const paused = Array.isArray(ch.aave_paused_reserves) ? ch.aave_paused_reserves : [];
-    document.getElementById('chain-health-paused').textContent =
-        paused.length ? JSON.stringify(paused) : 'none';
-
-    const reasons = Array.isArray(ch.reasons) ? ch.reasons : [];
-    document.getElementById('chain-health-reasons').textContent =
-        reasons.length ? reasons.join('; ') : '(none reported)';
 }
 
 async function evaluateResource() {
@@ -500,5 +665,302 @@ async function loadSentinel() {
 }
 
 loadSentinel();
+
+// ── Cross-chain Aave APY arbitrage panel ────────────────────────────────
+// Polls /api/cross_chain/aave_arb every 60s. Server caches at 30s so
+// two refreshes back-to-back will not re-hit the chain RPCs.
+const ARB_REFRESH_MS = 60000;
+let arbRefreshTimer = null;
+
+function arbBadgeClass(severity) {
+    if (severity === 'EXTREME') return 'extreme';
+    if (severity === 'OPPORTUNITY') return 'opportunity';
+    return 'normal';
+}
+
+function arbFormatApy(value) {
+    // Source values are Decimal-as-string fractions (e.g. "0.0532").
+    const f = parseFloat(value);
+    if (!Number.isFinite(f)) return '-';
+    return (f * 100).toFixed(2) + '%';
+}
+
+function arbRenderRow(signal) {
+    const chains = signal.chains || {};
+    const chainNames = Object.keys(chains);
+    // Color-code best/worst on supply side.
+    const supplyEntries = chainNames.map(n => [n, parseFloat(chains[n].supply_apy)]);
+    const borrowEntries = chainNames.map(n => [n, parseFloat(chains[n].borrow_apy)]);
+    let bestSupply = -Infinity, worstSupply = Infinity;
+    let bestBorrow = -Infinity, worstBorrow = Infinity;
+    supplyEntries.forEach(([, v]) => { if (v > bestSupply) bestSupply = v; if (v < worstSupply) worstSupply = v; });
+    borrowEntries.forEach(([, v]) => { if (v > bestBorrow) bestBorrow = v; if (v < worstBorrow) worstBorrow = v; });
+
+    const supplyCells = chainNames.map(n => {
+        const v = parseFloat(chains[n].supply_apy);
+        let cls = 'arb-apy';
+        if (chainNames.length > 1 && v === bestSupply) cls += ' best';
+        else if (chainNames.length > 1 && v === worstSupply) cls += ' worst';
+        return `<div class="${cls}">${n}: ${arbFormatApy(chains[n].supply_apy)}</div>`;
+    }).join('');
+    const borrowCells = chainNames.map(n => {
+        const v = parseFloat(chains[n].borrow_apy);
+        let cls = 'arb-apy';
+        if (chainNames.length > 1 && v === bestBorrow) cls += ' best';
+        else if (chainNames.length > 1 && v === worstBorrow) cls += ' worst';
+        return `<div class="${cls}">${n}: ${arbFormatApy(chains[n].borrow_apy)}</div>`;
+    }).join('');
+
+    const supplySpread = parseFloat(signal.max_supply_spread_bps);
+    const borrowSpread = parseFloat(signal.max_borrow_spread_bps);
+    const maxSpread = Math.max(supplySpread, borrowSpread);
+    const badgeClass = arbBadgeClass(signal.severity);
+
+    return `
+        <tr>
+            <td class="arb-asset">${signal.asset}</td>
+            <td>${supplyCells}</td>
+            <td>${borrowCells}</td>
+            <td class="arb-spread">${maxSpread.toFixed(0)} bps</td>
+            <td><span class="arb-badge ${badgeClass}">${signal.severity}</span></td>
+            <td class="arb-direction">${signal.direction || ''}</td>
+        </tr>
+    `;
+}
+
+function arbRenderEmpty(payload) {
+    const ts = payload && payload.generated_at ? payload.generated_at : '-';
+    return `<div class="arb-empty">No EXTREME opportunities currently &mdash; chains in equilibrium. Last scan: ${ts}</div>`;
+}
+
+function arbRender(payload) {
+    const meta = document.getElementById('arb-meta');
+    const content = document.getElementById('arb-content');
+
+    if (payload && payload.error) {
+        meta.textContent = 'scan error';
+        content.innerHTML = `<div class="arb-error">scan failed: ${payload.error}</div>`;
+        return;
+    }
+
+    const signals = (payload && payload.signals) || [];
+    const ts = payload && payload.generated_at ? payload.generated_at : '-';
+    const count = signals.length;
+    const maxBps = payload && payload.max_spread_bps ? payload.max_spread_bps : '-';
+    meta.textContent = `${count} signal(s) · max spread ${maxBps !== '-' ? parseFloat(maxBps).toFixed(0) + ' bps' : '-'} · scanned ${ts}`;
+
+    if (signals.length === 0) {
+        content.innerHTML = arbRenderEmpty(payload);
+        return;
+    }
+
+    const rows = signals.map(arbRenderRow).join('');
+    content.innerHTML = `
+        <table class="arb-table">
+            <thead>
+                <tr>
+                    <th>asset</th>
+                    <th>supply APY</th>
+                    <th>borrow APY</th>
+                    <th>max spread</th>
+                    <th>severity</th>
+                    <th>direction</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+    `;
+}
+
+async function loadCrossChainArb() {
+    try {
+        const response = await fetch('/api/cross_chain/aave_arb');
+        if (!response.ok) {
+            arbRender({ error: `HTTP ${response.status}` });
+            return;
+        }
+        const payload = await response.json();
+        arbRender(payload);
+    } catch (e) {
+        arbRender({ error: String(e) });
+    }
+}
+
+loadCrossChainArb();
+arbRefreshTimer = setInterval(loadCrossChainArb, ARB_REFRESH_MS);
+
+// ── GMX V2 perps overview panel ─────────────────────────────────────────
+// Polls /api/perps/overview every 60s. Server caches at 30s so two
+// refreshes back-to-back will not re-hit the chain RPCs.
+const PERPS_REFRESH_MS = 60000;
+let perpsRefreshTimer = null;
+
+function perpsBadgeClass(severity) {
+    if (severity === 'EXTREME') return 'extreme';
+    if (severity === 'WARN') return 'warn';
+    return 'normal';
+}
+
+function perpsFundingClass(aprFraction, severity) {
+    if (severity === 'EXTREME') {
+        return aprFraction >= 0 ? 'perps-funding extreme-pos' : 'perps-funding extreme-neg';
+    }
+    if (severity === 'WARN') {
+        return aprFraction >= 0 ? 'perps-funding warn-pos' : 'perps-funding warn-neg';
+    }
+    return 'perps-funding neutral';
+}
+
+function perpsSkewClass(skew) {
+    const f = parseFloat(skew);
+    if (!Number.isFinite(f)) return 'perps-skew';
+    if (f > 0.7 || f < 0.3) return 'perps-skew extreme';
+    if (f > 0.6 || f < 0.4) return 'perps-skew warn';
+    return 'perps-skew';
+}
+
+function perpsFormatApr(value) {
+    const f = parseFloat(value);
+    if (!Number.isFinite(f)) return '-';
+    const pct = f * 100;
+    return (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%';
+}
+
+function perpsFormatUsd(value) {
+    const f = parseFloat(value);
+    if (!Number.isFinite(f)) return '-';
+    if (f >= 1_000_000) return '$' + (f / 1_000_000).toFixed(2) + 'M';
+    if (f >= 1_000) return '$' + (f / 1_000).toFixed(1) + 'K';
+    return '$' + f.toFixed(2);
+}
+
+function perpsFormatPrice(value) {
+    if (value === null || value === undefined) return '-';
+    const f = parseFloat(value);
+    if (!Number.isFinite(f)) return '-';
+    if (f >= 1000) return '$' + f.toFixed(2);
+    if (f >= 1) return '$' + f.toFixed(4);
+    return '$' + f.toFixed(6);
+}
+
+function perpsRenderRow(market) {
+    const apr = parseFloat(market.funding_apr);
+    const aprClass = perpsFundingClass(apr, market.severity);
+    const skewClass = perpsSkewClass(market.skew);
+    const badgeClass = perpsBadgeClass(market.severity);
+    return `
+        <tr>
+            <td class="perps-market">${market.market_name || ''}</td>
+            <td class="${aprClass}">${perpsFormatApr(market.funding_apr)}</td>
+            <td>${perpsFormatUsd(market.open_interest_long_usd)}</td>
+            <td>${perpsFormatUsd(market.open_interest_short_usd)}</td>
+            <td class="${skewClass}">${parseFloat(market.skew).toFixed(2)}</td>
+            <td class="perps-mark">${perpsFormatPrice(market.mark_price_usd)}</td>
+            <td class="perps-side">${market.side_recommendation || ''}</td>
+            <td><span class="perps-badge ${badgeClass}">${market.severity}</span></td>
+        </tr>
+    `;
+}
+
+function perpsRenderChainBlock(chainName, markets) {
+    const rows = markets.map(perpsRenderRow).join('');
+    return `
+        <div class="perps-chain-block">
+            <div class="perps-chain-header">${chainName} (${markets.length} markets)</div>
+            <table class="perps-table">
+                <thead>
+                    <tr>
+                        <th>market</th>
+                        <th>funding APR</th>
+                        <th>OI long</th>
+                        <th>OI short</th>
+                        <th>skew</th>
+                        <th>mark</th>
+                        <th>side</th>
+                        <th>severity</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+    `;
+}
+
+function perpsRenderDivergence(divergences) {
+    if (!divergences || divergences.length === 0) return '';
+    const items = divergences.map(d => {
+        const aBps = (parseFloat(d.apr_a) * 100).toFixed(2);
+        const bBps = (parseFloat(d.apr_b) * 100).toFixed(2);
+        const div = parseFloat(d.divergence_bps);
+        return `${d.underlying} funding: <strong>${aBps}%</strong> ${d.chain_a} vs <strong>${bBps}%</strong> ${d.chain_b} &mdash; divergence <strong>${div.toFixed(0)}bps</strong>`;
+    }).join('<br>');
+    return `<div class="perps-divergence-row">${items}</div>`;
+}
+
+function perpsRenderEmpty(payload) {
+    const ts = payload && payload.generated_at ? payload.generated_at : '-';
+    return `<div class="perps-empty">No priced perps markets currently &mdash; both chains returned empty. Last refresh: ${ts}</div>`;
+}
+
+function perpsRender(payload) {
+    const meta = document.getElementById('perps-meta');
+    const content = document.getElementById('perps-content');
+    const divEl = document.getElementById('perps-divergence');
+    const modeTag = document.getElementById('perps-mode-tag');
+
+    if (payload && payload.error) {
+        meta.textContent = 'scan error';
+        content.innerHTML = `<div class="perps-error">scan failed: ${payload.error}</div>`;
+        divEl.innerHTML = '';
+        return;
+    }
+
+    const markets = (payload && payload.markets) || [];
+    const ts = payload && payload.generated_at ? payload.generated_at : '-';
+    const mode = (payload && payload.mode) || 'sample';
+    const extremeCount = (payload && payload.extreme_count) || 0;
+
+    if (modeTag) {
+        modeTag.textContent = mode;
+        modeTag.className = 'perps-mode-tag ' + (mode === 'live' ? 'live' : 'sample');
+    }
+
+    meta.textContent = `${markets.length} market(s) · ${extremeCount} EXTREME · last refresh ${ts}`;
+
+    if (markets.length === 0) {
+        content.innerHTML = perpsRenderEmpty(payload);
+        divEl.innerHTML = '';
+        return;
+    }
+
+    // Render same-underlying divergence row first, then per-chain blocks
+    divEl.innerHTML = perpsRenderDivergence(payload.cross_chain_funding_divergence || []);
+
+    // Group by chain id (string keys per JSON shape).
+    const chainNames = (payload && payload.chain_names) || {};
+    const byChain = (payload && payload.by_chain) || {};
+    const chainOrder = Object.keys(byChain).sort();
+    content.innerHTML = chainOrder.map(cid => {
+        const name = chainNames[cid] || ('chain ' + cid);
+        return perpsRenderChainBlock(name, byChain[cid]);
+    }).join('');
+}
+
+async function loadPerpsOverview() {
+    try {
+        const response = await fetch('/api/perps/overview');
+        if (!response.ok) {
+            perpsRender({ error: `HTTP ${response.status}` });
+            return;
+        }
+        const payload = await response.json();
+        perpsRender(payload);
+    } catch (e) {
+        perpsRender({ error: String(e) });
+    }
+}
+
+loadPerpsOverview();
+perpsRefreshTimer = setInterval(loadPerpsOverview, PERPS_REFRESH_MS);
 </script>
 {% endblock %}
