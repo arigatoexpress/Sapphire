@@ -29,7 +29,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 # Token addresses (native USDC, not bridged USDC.e where possible)
 USDC_ARBITRUM = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"  # native USDC
@@ -229,7 +229,7 @@ def emit_markdown(quotes: list[Quote]) -> str:
     lines = [
         "# USDC L2-L2 Bridge Fee Survey",
         "",
-        f"_Surveyed: {datetime.now(timezone.utc).isoformat()}_",
+        f"_Surveyed: {datetime.now(UTC).isoformat()}_",
         "",
         "## Live quotes (Arbitrum <-> Optimism, USDC native)",
         "",

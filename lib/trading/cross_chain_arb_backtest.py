@@ -70,7 +70,6 @@ from lib.chains.cross_chain.aave_apy_arb import (
     CrossChainAaveScanner,
 )
 
-
 # ---------------------------------------------------------------------------
 # Bridge cost tiers — calibrated 2026-05-03 from live Across/Hop/Stargate/CCTP
 # quotes for USDC ARB↔OP. See scripts/research/bridge_cost_survey.py + the
