@@ -1,0 +1,72 @@
+{% extends "_base_subpage.html" %}
+{% block title %}Hackathon Submissions{% endblock %}
+{% block crumb %}p/hackathon{% endblock %}
+{% block meta %}{{ submissions|length }} submissions{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <h1>Sapphire OS — Hackathon Submissions</h1>
+  <div class="typed" id="typed-line">$ ./sapphire submit --all</div>
+</section>
+
+<section class="box">
+  <h2 class="section">SUBMISSION_INDEX</h2>
+  <div class="grid cols-2">
+    {% for s in submissions %}
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:8px;">
+        <h3 style="margin:0;">{{ s.name }}</h3>
+        <span class="pill {% if s.status == 'live' or s.status == 'submitted' %}green{% elif s.status == 'active' %}amber{% else %}{% endif %}">{{ s.status_label }}</span>
+      </div>
+      <div class="dim" style="margin-bottom:10px;">{{ s.tagline }}</div>
+      <div class="kv" style="margin-bottom:10px;">
+        <div class="k">judging</div><div class="v">{{ s.judging }}</div>
+        <div class="k">tests</div><div class="v">{{ s.tests }}</div>
+        {% if s.contract %}
+        <div class="k">contract</div><div class="v">{{ s.contract }}</div>
+        {% endif %}
+        <div class="k">branch</div><div class="v"><code>{{ s.branch }}</code></div>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        {% if s.pr %}<a class="btn" href="{{ s.pr }}" target="_blank" rel="noopener">[PR / branch]</a>{% endif %}
+        {% if s.demo %}<a class="btn" href="{{ s.demo }}">[demo]</a>{% endif %}
+        {% if s.explorer %}<a class="btn" href="{{ s.explorer }}" target="_blank" rel="noopener">[explorer]</a>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% if fallback %}
+  <p class="muted" style="margin-top:14px;">// hack.sapphirealpha.xyz live feed unreachable — showing reference manifest</p>
+  {% endif %}
+</section>
+
+<section class="box">
+  <h2 class="section">CRITERIA_MATRIX</h2>
+  <table class="term">
+    <thead><tr><th>track</th><th>thesis</th><th>edge</th><th>reach</th></tr></thead>
+    <tbody>
+      <tr><td>0G APAC</td><td>agentic AI on decentralized DA</td><td>full mesh: signals, threat intel, brain synth</td><td>multi-region</td></tr>
+      <tr><td>MegaETH</td><td>sub-10ms execution venue</td><td>shadow controller + Pine v5 templates</td><td>chain-4326</td></tr>
+      <tr><td>Robinhood</td><td>regulated retail-on-chain</td><td>live $5 BTC fills, fail-closed killswitch</td><td>chain-46630</td></tr>
+      <tr><td>Zama</td><td>FHE/ZK for opaque alpha</td><td>signal hash registry contract live on testnet</td><td>EVM</td></tr>
+    </tbody>
+  </table>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  var line = document.getElementById('typed-line');
+  if (!line) return;
+  var full = line.textContent;
+  line.textContent = '';
+  var i = 0;
+  (function tick(){
+    if (i >= full.length) return;
+    line.textContent += full.charAt(i++);
+    setTimeout(tick, 28);
+  })();
+})();
+</script>
+{% endblock %}

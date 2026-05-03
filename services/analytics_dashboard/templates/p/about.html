@@ -1,0 +1,114 @@
+{% extends "_base_subpage.html" %}
+{% block title %}About{% endblock %}
+{% block crumb %}p/about{% endblock %}
+{% block meta %}manifesto{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <h1>What is Sapphire OS</h1>
+  <div class="typed" id="typed-line">$ cat MANIFESTO.md</div>
+</section>
+
+<section class="box">
+  <h2 class="section">THE_THESIS</h2>
+  <p style="line-height: 1.8;">
+    Trading desks watch one screen. Threat-intel desks watch another. Compliance, regional intel, on-chain analytics, customer ops — each in its own silo, each producing data the others would die for. Sapphire OS is the integration layer: a single decision surface that observes every silo, correlates across them, and emits actions you can read in plain English.
+  </p>
+  <p style="line-height: 1.8;">
+    Telegram-first. Agent-driven. Event-bus mediated. Built on top of <code>claw-code</code> (Rust agent runtime) with a Python plugin layer. Pure deterministic synthesis at the core — no LLM hop in the critical path. Fast, predictable, auditable.
+  </p>
+</section>
+
+<section class="box">
+  <h2 class="section">CROSS_SILO_SYNTHESIS</h2>
+  <pre style="margin:0; line-height:1.5;">
+  ┌─ trading ─┐  ┌─ regime ─┐  ┌─ threat ──┐  ┌─ services ┐  ┌─ inference ┐
+  │ signals   │  │ btc dom  │  │ cves+kev  │  │ heartbeat │  │ 4-tier mesh │
+  └─────┬─────┘  └────┬─────┘  └─────┬─────┘  └─────┬─────┘  └──────┬─────┘
+        │             │              │              │               │
+        └─────────────┴────────── BRAIN ────────────┴───────────────┘
+                                    │
+        ┌────────────────┬──────────┼──────────────────┐
+        │                │          │                  │
+   narrative       priority      health-score      correlations
+   (plain EN)       actions       (0..1)         (cross-silo patterns)
+  </pre>
+</section>
+
+<section class="box">
+  <h2 class="section">VS_THE_INCUMBENTS</h2>
+  <table class="term">
+    <thead><tr><th>capability</th><th>bloomberg</th><th>glassnode</th><th>recorded future</th><th>sapphire os</th></tr></thead>
+    <tbody>
+      <tr><td>price + macro</td><td><span class="pill green">YES</span></td><td>btc-only</td><td>--</td><td>OpenBB + CG live</td></tr>
+      <tr><td>on-chain + funding</td><td>--</td><td><span class="pill green">YES</span></td><td>--</td><td>coinglass + dune + santiment</td></tr>
+      <tr><td>cve + threat intel</td><td>--</td><td>--</td><td><span class="pill green">YES</span></td><td>cisa kev + nvd + mitre + epss</td></tr>
+      <tr><td>cross-silo correlation</td><td>--</td><td>--</td><td>--</td><td><span class="pill green">YES</span> (the Brain)</td></tr>
+      <tr><td>agent-driven actions</td><td>--</td><td>--</td><td>--</td><td><span class="pill green">YES</span> (telegram-first)</td></tr>
+      <tr><td>open source</td><td>--</td><td>--</td><td>--</td><td><span class="pill green">YES</span></td></tr>
+      <tr><td>annual cost</td><td>$24k+</td><td>$840+</td><td>$10k+</td><td><strong>$0</strong></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="box">
+  <h2 class="section">THE_BRAIN</h2>
+  <p style="line-height: 1.8;">
+    Three deterministic endpoints behind <code>/api/brain/*</code>:
+    <code>synthesis</code> observes every silo and emits a single situational-awareness brief (degraded silos, top priority actions, health score 0..1);
+    <code>correlate</code> runs a pattern catalog over the latest silo state for ranked cross-silo correlations;
+    <code>history</code> backs the rolling sparkline so you can see the system's mood drift over 48 hours.
+  </p>
+  <p style="line-height: 1.8;">
+    No LLM hop in v0. Predictable. Auditable. The <code>/p/brain</code> page is the live view.
+  </p>
+</section>
+
+<section class="box">
+  <h2 class="section">PROOF_OF_WORK</h2>
+  <ul style="line-height: 1.85;">
+    <li>6,488+ collected tests across core + plugin (verified by <code>scripts/ops/test_inventory.py --check-readme</code>).</li>
+    <li>22 scheduled tasks + 8 cloud routines (claude.ai/code/routines).</li>
+    <li>20 macOS LaunchAgents in production on the Mac commander.</li>
+    <li>3 deployed smart contracts: <code>SapphireSignalVerifier</code> (zk hash), <code>SapphirePaymentGate</code> (x402), <code>SapphireSentinelRegistry</code> (mandate anchor).</li>
+    <li>First $5 BTC live fill on Robinhood Crypto: 2026-04-28 04:06 UTC at $76,774.81.</li>
+    <li>Hyperliquid live executor with $5/order, 3x lev, $25/day kill cap, file-killswitch.</li>
+    <li>Wildfire Watch: 3D-printed AI drones for fire-dept partnership (Phase 0 live).</li>
+  </ul>
+</section>
+
+<section class="box">
+  <h2 class="section">PHILOSOPHY</h2>
+  <ul style="line-height: 1.85;">
+    <li><strong>PnL is king.</strong> Sortino + Calmar over Sharpe. Live capital with hard caps before live capital scaling.</li>
+    <li><strong>Fail closed.</strong> Mainnet refused until signing is verified on testnet. Killswitch files block every order.</li>
+    <li><strong>Mac is commander.</strong> No Pi dependency — system must be resilient without them.</li>
+    <li><strong>Autonomous.</strong> System should work even when the operator is away.</li>
+    <li><strong>Cypherpunk first.</strong> Open-source, self-hostable, no telemetry, no vendor lock-in.</li>
+  </ul>
+</section>
+
+<section class="box">
+  <h2 class="section">JOIN</h2>
+  <p style="margin: 6px 0 12px;">
+    This is a single-operator system today. If you want to read the source, follow the threads.
+  </p>
+  <div style="display:flex; gap: 8px; flex-wrap: wrap;">
+    <a class="btn" href="https://github.com/arigatoexpress" target="_blank" rel="noopener">[github]</a>
+    <a class="btn" href="/p/help">[help]</a>
+    <a class="btn" href="/p/brain">[live brain]</a>
+    <a class="btn" href="/p/system">[system health]</a>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  var line = document.getElementById('typed-line');
+  if (!line) return;
+  var full = line.textContent; line.textContent = ''; var i=0;
+  (function tick(){ if (i>=full.length) return; line.textContent += full.charAt(i++); setTimeout(tick, 28); })();
+})();
+</script>
+{% endblock %}
