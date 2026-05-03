@@ -39,11 +39,18 @@ Defaults reflect *small-scale* (Sapphire-typical) conditions:
 
 * ``capital_usd = 10_000`` — Sapphire's actual operating scale; do NOT
   bake in $1M-style assumptions that hide cost dominance.
-* ``bridge_cost_bps_per_round_trip = 5`` — USDC L2↔L2 via Across or
-  similar (~0.05 % round-trip).
+* ``bridge_cost_bps_per_round_trip`` — defaults to a *tiered lookup*
+  (:data:`BRIDGE_COST_TIERS`) calibrated 2026-05-03 from live Across,
+  Hop, Stargate, and CCTP quotes for USDC ARB↔OP. The single 5 bps
+  legacy default was ~3× too high; live Across is ~1.5 bps round-trip
+  per leg, ~3 bps round-trip. Override by passing an explicit float.
 * ``gas_cost_usd_per_action = 2.50`` — average of L2 gas for an Aave
   withdraw + bridge + Aave deposit (Optimism cheap, Arbitrum mid).
 * ``holding_period_hours = 24`` — daily rebalance frequency.
+
+Re-survey the bridge quotes monthly via
+``scripts/research/bridge_cost_survey.py`` and refresh
+:data:`BRIDGE_COST_TIERS` if any tier shifts more than 0.5 bps.
 
 The output is a :class:`BacktestResult` dataclass whose key headline
 metric is ``cost_basis_pct_of_pnl`` — what fraction of the *gross*
@@ -62,6 +69,62 @@ from lib.chains.cross_chain.aave_apy_arb import (
     AaveApyArbSignal,
     CrossChainAaveScanner,
 )
+
+
+# ---------------------------------------------------------------------------
+# Bridge cost tiers — calibrated 2026-05-03 from live Across/Hop/Stargate/CCTP
+# quotes for USDC ARB↔OP. See scripts/research/bridge_cost_survey.py + the
+# raw quote dump under data/research/bridge_quotes_2026-05-03.json.
+#
+# Each tier = (max_capital_usd_inclusive, round_trip_bps). Lookup picks the
+# *first* tier whose threshold is >= capital_usd. The tail tier (math.inf)
+# captures whale-scale capital where Across LP fees creep up to ~2 bps per
+# leg (~4 bps round-trip).
+#
+# Per leg ≈ Across one-way fee (~1.5 bps observed). Round-trip = 2x leg.
+# Hop's bonderFee is structurally fixed at $0.01 (~0 bps for $10k+) but its
+# hAMM destination swap can add 1-3 bps under thin liquidity, so we don't
+# default to Hop's headline number — Across is the operational pick.
+# Stargate at ~6-7 bps is too expensive; CCTP at near-zero is too slow
+# (15+ min) for daily rebalancing.
+#
+# Re-survey monthly. Update tiers if any value shifts more than 0.5 bps.
+# ---------------------------------------------------------------------------
+BRIDGE_COST_TIERS: tuple[tuple[float, float], ...] = (
+    (10_000.0, 3.0),       # ≤ $10k:    ~1.5 bps × 2 legs (Across)
+    (100_000.0, 3.5),      # ≤ $100k:   ~1.5-1.75 bps × 2 legs (Across)
+    (1_000_000.0, 4.0),    # ≤ $1M:     ~2 bps × 2 legs (LP fee creep)
+    (math.inf, 5.0),       # >  $1M:    ~2.5 bps × 2 legs (whale, slippage)
+)
+
+
+def bridge_cost_bps_for_capital(capital_usd: float) -> float:
+    """Return calibrated round-trip bridge cost in bps for ``capital_usd``.
+
+    Looks up :data:`BRIDGE_COST_TIERS` and picks the first tier whose
+    inclusive threshold is ≥ ``capital_usd``. The tail tier (``math.inf``)
+    guarantees a value is always returned.
+
+    Examples
+    --------
+    >>> bridge_cost_bps_for_capital(1_000)
+    3.0
+    >>> bridge_cost_bps_for_capital(10_000)
+    3.0
+    >>> bridge_cost_bps_for_capital(50_000)
+    3.5
+    >>> bridge_cost_bps_for_capital(500_000)
+    4.0
+    >>> bridge_cost_bps_for_capital(10_000_000)
+    5.0
+    """
+    if capital_usd < 0:
+        raise ValueError("capital_usd must be non-negative")
+    for threshold, bps in BRIDGE_COST_TIERS:
+        if capital_usd <= threshold:
+            return bps
+    # Unreachable given math.inf tail, but defensive:
+    return BRIDGE_COST_TIERS[-1][1]
 
 
 @dataclass(frozen=True)
@@ -226,7 +289,7 @@ class CrossChainArbBacktest:
         scanner: CrossChainAaveScanner | None = None,
         capital_usd: float = 10_000.0,
         days: int = 30,
-        bridge_cost_bps_per_round_trip: float = 5.0,
+        bridge_cost_bps_per_round_trip: float | None = None,
         gas_cost_usd_per_action: float = 2.50,
         holding_period_hours: float = 24.0,
         decay_days: float = 7.0,
@@ -237,7 +300,10 @@ class CrossChainArbBacktest:
             raise ValueError("days must be positive")
         if holding_period_hours <= 0:
             raise ValueError("holding_period_hours must be positive")
-        if bridge_cost_bps_per_round_trip < 0:
+        if (
+            bridge_cost_bps_per_round_trip is not None
+            and bridge_cost_bps_per_round_trip < 0
+        ):
             raise ValueError("bridge_cost_bps_per_round_trip must be non-negative")
         if gas_cost_usd_per_action < 0:
             raise ValueError("gas_cost_usd_per_action must be non-negative")
@@ -245,7 +311,17 @@ class CrossChainArbBacktest:
         self.scanner = scanner
         self.capital_usd = float(capital_usd)
         self.days = int(days)
-        self.bridge_cost_bps_per_round_trip = float(bridge_cost_bps_per_round_trip)
+        # Tiered default: when caller doesn't specify, look up the calibrated
+        # cost for this capital level. Explicit overrides still win — the
+        # backtester's tests pass synthetic costs (incl. zero) to isolate
+        # decay vs cost behavior, and the dashboard's "what-if" panel may
+        # want to ask "what bridge cost would make this viable?".
+        if bridge_cost_bps_per_round_trip is None:
+            self.bridge_cost_bps_per_round_trip = bridge_cost_bps_for_capital(
+                self.capital_usd
+            )
+        else:
+            self.bridge_cost_bps_per_round_trip = float(bridge_cost_bps_per_round_trip)
         self.gas_cost_usd_per_action = float(gas_cost_usd_per_action)
         self.holding_period_hours = float(holding_period_hours)
         self.decay_days = float(decay_days)
@@ -431,8 +507,10 @@ def project_pnl_for_signal(
 
 # Re-export Decimal for callers building synthetic signals.
 __all__ = (
+    "BRIDGE_COST_TIERS",
     "BacktestResult",
     "CrossChainArbBacktest",
     "Decimal",
+    "bridge_cost_bps_for_capital",
     "project_pnl_for_signal",
 )
