@@ -640,10 +640,11 @@ def test_research_worker_task_query_parses_powershell_json(receiver, monkeypatch
 
 
 def test_research_worker_status_accepts_powershell_utf8_bom(receiver, tmp_path, monkeypatch):
+    from datetime import UTC, datetime
     run_dir = tmp_path / "20260429T212042Z"
     run_dir.mkdir()
     manifest = {
-        "generated_at": "2026-04-29T21:20:42Z",
+        "generated_at": datetime.now(UTC).isoformat(),
         "paper_only": True,
         "live_trading_enabled": False,
         "telegram_sends_enabled": False,

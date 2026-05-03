@@ -1623,7 +1623,7 @@ if __name__ == "__main__":
     probe_thread = threading.Thread(target=_background_health_probe, daemon=True)
     probe_thread.start()
 
-    server = ThreadedHTTPServer(("127.0.0.1", PORT), ProxyHandler)
+    server = ThreadedHTTPServer(("0.0.0.0", PORT), ProxyHandler)
     log.info("Sapphire Inference Proxy :%d — 4-tier failover (threaded)", PORT)
     log.info("T1 Windows GPU : %s (native /api/chat)", WINDOWS_GPU)
     log.info("T2 Pi rari1    : %s enabled=%s", PI_RARI1, PI_RARI1_ENABLED)

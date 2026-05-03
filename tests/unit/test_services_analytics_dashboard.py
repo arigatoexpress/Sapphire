@@ -602,49 +602,42 @@ def test_brain_correlate_endpoint_returns_matches_shape(client):
     assert "count" in body
 
 
-def test_index_renders_brain_hero_panel_above_kpi_strip():
-    """The hero panel must ship in the rendered template at the canonical
-    location: AFTER the silo grid, BEFORE Production-telemetry KPIs.
+def test_index_renders_brain_panel_in_terminal_tab():
+    """The brain panel ships inside the cypherpunk terminal's Brain tab pane.
     Smoke-grep against the template file directly so we don't need to
     spin up the full Flask render path with a fake BQ client.
     """
     template_path = REPO_ROOT / "services" / "analytics_dashboard" / "templates" / "index.html"
     html = template_path.read_text(encoding="utf-8")
 
-    # Marker 1: panel exists with the canonical id + section heading text.
-    assert 'id="brain-hero"' in html
+    # Marker 1: brain tab and pane exist.
+    assert 'data-tab="brain"' in html
+    assert 'data-pane="brain"' in html
     assert "Sapphire Brain" in html
     assert "cross-silo synthesis" in html
 
-    # Marker 2: panel sits between silo-grid close and KPI section heading.
-    silo_close_idx = html.find("</div>\n\n<!-- ========== SAPPHIRE BRAIN")
-    kpi_open_idx = html.find("<!-- ========== KPIs with sparklines ========== -->")
-    brain_open_idx = html.find('id="brain-hero"')
-    assert silo_close_idx != -1, "silo grid → brain transition marker missing"
-    assert kpi_open_idx != -1, "Production telemetry KPI marker missing"
-    assert silo_close_idx < brain_open_idx < kpi_open_idx
+    # Marker 2: brain tab pane contains the composite gauge and narrative.
+    pane_open_idx = html.find('<section class="tab-pane" data-pane="brain">')
+    assert pane_open_idx != -1, "Brain tab pane missing"
 
     # Marker 3: the Persist + Run button reaches a canonical persist endpoint.
-    # Either GET /api/brain/synthesis?persist=1 (legacy) or
-    # POST /api/brain/llm-refresh?persist=1 (LLM-augmented) is acceptable.
     assert "/api/brain/synthesis?persist=1" in html or "/api/brain/llm-refresh?persist=1" in html
 
-    # Marker 4: the gauge SVG arc id and narrative element id ship.
-    assert 'id="brain-gauge-arc"' in html
+    # Marker 4: narrative, actions, and degraded element ids ship.
     assert 'id="brain-narrative"' in html
     assert 'id="brain-degraded"' in html
     assert 'id="brain-actions"' in html
-    assert 'id="brain-spark-svg"' in html
+    assert 'id="brain-score"' in html
 
 
-def test_index_brain_panel_fetches_the_three_brain_endpoints():
-    """The refresh() loop must include all three brain endpoints. If a
-    future refactor accidentally drops one we want a hard test failure.
+def test_index_brain_panel_fetches_core_brain_endpoints():
+    """The brain data-loader hits synthesis and correlate.  history is
+    backend-only today (no UI sparkline) — if a future refactor wires
+    it into the tab loader this test should be expanded.
     """
     template_path = REPO_ROOT / "services" / "analytics_dashboard" / "templates" / "index.html"
     html = template_path.read_text(encoding="utf-8")
     assert "/api/brain/synthesis" in html
-    assert "/api/brain/history?limit=48" in html
     # correlate is exposed via a button — ensure it's reachable from the UI.
     assert "/api/brain/correlate" in html
 
