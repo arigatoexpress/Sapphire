@@ -33,6 +33,6 @@ time; after that, treat it as a reference.
 
 ## If something is out of date
 
-The counts and claims in these docs were verified on **2026-04-19**. If you
+The counts and claims in these docs were verified on **2026-05-03**. If you
 notice drift, open a PR correcting it — the "docs match reality" invariant is
 as load-bearing as the tests.
