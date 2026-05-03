@@ -632,3 +632,17 @@ tools:
     consumers: [hermes-agent.trading-analysis, services.intelligence]
     description: |
       Read-only MegaETH JSON-RPC client + plugin tool. Actions, status (chain_id + latest block + gas_price), balance <address> (wei + ETH-equivalent), tx <hash> (receipt summary + explorer URL), mempool_snapshot (txpool_status preferred, falls back to newPendingTransactions WS sample). RPC method allow-list enforced — no signing, no private keys, no state-changing calls. Endpoints configurable via SAPPHIRE_MEGAETH_RPC_URL / SAPPHIRE_MEGAETH_WS_URL / SAPPHIRE_MEGAETH_CHAIN_ID; defaults are MegaETH testnet (carrot.megaeth.com, chain_id 6343).
+
+  # TradingView orchestrator agent-facing read-only surface — Tranche 7
+  # Registry path points at the internal impl; the top-level shim is
+  # auto-detected by validate_tool_registry.py's compat-shim rule. Mirrors
+  # the sapphire_megaeth_protocols pattern (registered + agent_facing,
+  # internal impl + top-level shim).
+  - name: sapphire_tradingview
+    path: plugins/claw-sapphire/tools/internal/tradingview.py
+    status: registered
+    agent_facing: true
+    owner: sapphire
+    consumers: [hermes-agent.trading-analysis, claude-code.manual]
+    description: |
+      Read-only TradingView orchestrator surface. Wraps lib.trading.tradingview_orchestrator + lib.trading.pine_templates behind one dispatcher; mutation paths (set_symbol/timeframe, setup_chart, apply_indicator_stack, pine_compile/save/promote/set_from_file, alert_create/delete) are intentionally NOT exposed and the dispatcher constructs the orchestrator with mutation_enabled=False regardless of the SAPPHIRE_TV_MUTATION_ENABLED env var. Actions, probe (state+quote+values), score (latest scoring rows from the most recent capture manifest), list_pine (TV account scripts + local generated under pine/generated/), list_alerts (active TV alerts), generate_pine (symbol, kind=indicator|strategy — emits a Sapphire Pine v5 file under pine/generated/, no TV push), sweep (offline=true, limit=N — read-only TA sweep, returns manifest summary). Mutation lives in scripts/ops/tradingview_ta_capture.py under operator supervision; see docs/ops/tradingview-orchestrator-runbook.md.
