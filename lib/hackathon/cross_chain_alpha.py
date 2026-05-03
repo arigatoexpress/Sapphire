@@ -26,11 +26,11 @@ import os
 from typing import Any
 
 from lib.chains.cross_chain.aave_apy_arb import (
-    AaveApyArbSignal,
-    CrossChainAaveScanner,
     DEFAULT_TOP_ASSETS,
     EXTREME_SPREAD_BPS,
     MIN_SIGNAL_SPREAD_BPS,
+    AaveApyArbSignal,
+    CrossChainAaveScanner,
 )
 
 logger = logging.getLogger(__name__)
