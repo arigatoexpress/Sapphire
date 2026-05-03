@@ -1,6 +1,35 @@
 # Backtest Weekly Runbook
 
-Last reviewed: 2026-04-29
+Last reviewed: 2026-04-30
+
+## Triage Quickstart
+
+Failure mode addressed: the weekly sweep did not produce a fresh
+`strategy_sweep_*.json` artifact, or the dashboard `/api/backtest-results`
+endpoint reports stale rankings.
+
+```bash
+launchctl print gui/$(id -u)/com.sapphire.backtest-weekly
+```
+
+```bash
+ls -lt data/backtests/strategies/strategy_sweep_*.json | head
+```
+
+```bash
+tail -n 200 /Users/aribs/Library/Logs/sapphire/backtest-weekly.err
+```
+
+If no artifact newer than the last Saturday 22:00 exists, the sweep did not
+run. Check the pause flag at `/Users/aribs/.sapphire/routine_pause/backtest-weekly`,
+then stderr for yfinance failures (the most common cause is rate-limit or
+symbol-resolution drift).
+
+Live monitors: dashboard `/performance` and `/api/backtest-results`; remote
+workflow `.github/workflows/weekly-backtest.yml`.
+On-call escalation: analytics owner; p3 unless two consecutive Saturdays are
+missed, then p2. Do not treat sweep output as trade authorization — strategy
+selection still flows through paper trading and operator review.
 
 This runbook covers `com.sapphire.backtest-weekly`, the local weekly
 LaunchAgent that runs the Sapphire strategy sweep and writes ranked backtest

@@ -1,6 +1,32 @@
 # OpenBB API Runbook
 
-Last reviewed: 2026-04-29
+Last reviewed: 2026-04-30
+
+## Triage Quickstart
+
+Failure mode addressed: the OpenBB compatibility API on `127.0.0.1:6900` is
+unreachable, returning errors, or a downstream dashboard reports stale data.
+
+```bash
+launchctl list com.sapphire.openbb-api
+```
+
+```bash
+curl -fsS http://127.0.0.1:6900/api/v1/openbb/providers | python3 -m json.tool
+```
+
+```bash
+tail -n 100 /Users/aribs/autonomy-status/logs/openbb_api.err
+```
+
+If the providers route returns HTTP 200 with a non-empty list, the daemon is
+healthy; the failure is on a specific provider route, not the daemon. If the
+TCP port is closed, jump to `TCP Port Is Closed`.
+
+Live monitors: `/readiness` matrix; production-readiness sweep TCP probe on
+`127.0.0.1:6900`.
+On-call escalation: data/intel owner; p3 unless dashboard pages are degraded,
+then p2.
 
 This runbook covers the local OpenBB compatibility REST API launched by
 `infra/launchagents/com.sapphire.openbb-api.plist` on `127.0.0.1:6900`.

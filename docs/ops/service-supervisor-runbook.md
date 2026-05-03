@@ -1,6 +1,36 @@
 # Service Supervisor Runbook
 
-Last reviewed: 2026-04-29
+Last reviewed: 2026-04-30
+
+## Triage Quickstart
+
+Failure mode addressed: a monitored LaunchAgent is repeatedly unloading and
+the supervisor is either failing to recover it OR has hit its hourly restart
+cap.
+
+```bash
+launchctl list com.sapphire.service-supervisor
+```
+
+```bash
+PYTHONPATH=/Users/aribs/Code/Sapphire/plugins/claw-sapphire/tools \
+  /usr/local/bin/python3 -m service_supervisor --dry-run
+```
+
+```bash
+tail -n 200 ~/Library/Logs/sapphire-service-supervisor.log
+```
+
+The dry-run is read-only: it reports what the supervisor WOULD do without
+making any changes. If `skipped_cooldown` is populated, a label has hit the
+hourly restart cap — the supervisor is intentionally backing off, not broken.
+For underlying daemon failures, escalate to the failing label's runbook
+rather than retargeting the supervisor.
+
+Live monitors: Telegram PM bot `/svc status` command (the same dry-run
+output); dashboard `/observability` supervisor tile.
+On-call escalation: ops owner; p3 unless multiple monitored labels are
+flapping simultaneously, then p2.
 
 This runbook covers `com.sapphire.service-supervisor`, the one-shot local
 LaunchAgent that checks selected Sapphire LaunchAgents every minute and attempts

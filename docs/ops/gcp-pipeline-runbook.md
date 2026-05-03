@@ -1,6 +1,36 @@
 # GCP Pipeline Sync Runbook
 
-Last reviewed: 2026-04-29
+Last reviewed: 2026-04-30
+
+## Triage Quickstart
+
+Failure mode addressed: BigQuery tables are stale or partial, OR the local
+`.gcp_sync_state.json` watermark has not advanced, OR the GCS bucket is not
+receiving fresh staging files.
+
+```bash
+launchctl list com.sapphire.gcp-sync
+```
+
+```bash
+python3 -m json.tool data/.gcp_sync_state.json
+```
+
+```bash
+/usr/local/bin/python3 -m services.pipeline.gcp_sync --dry-run --source signals
+```
+
+The dry-run does not write to GCS. If it succeeds and the watermark looks
+recent, the sync is healthy and the staleness is downstream (Cloud Function
+loader or BigQuery view). If watermark is stale, check the pause flag at
+`/Users/aribs/.sapphire/routine_pause/gcp-sync` and stderr for credential or
+network failures. Do NOT print service-account JSON contents into incident
+issues.
+
+Live monitors: BigQuery `tho-ai-agent.sapphire.*` table freshness; GCS
+`sapphire-data-lake/raw/` listing; Cloud Function logs.
+On-call escalation: data owner; p3 unless dashboards or downstream consumers
+go silent for more than two consecutive operating windows, then p2.
 
 This runbook covers the local Sapphire-to-GCP batch sync launched by
 `infra/launchagents/com.sapphire.gcp-sync.plist`. The sync transforms selected

@@ -1,6 +1,33 @@
 # Telemetry Collector Runbook
 
-Last reviewed: 2026-04-29
+Last reviewed: 2026-04-30
+
+## Triage Quickstart
+
+Failure mode addressed: telemetry NDJSON files have stopped growing, or
+downstream BigQuery/dashboard tiles report missing 5-minute samples.
+
+```bash
+launchctl print gui/$(id -u)/com.sapphire.telemetry-collector
+```
+
+```bash
+ls -lt data/metrics/ data/health/ 2>/dev/null | head -10
+```
+
+```bash
+tail -n 200 /Users/aribs/autonomy-status/logs/telemetry-collector.err
+```
+
+If the most recent NDJSON file in `data/metrics/` has not been touched in the
+past 6 minutes (one collector cycle plus jitter), the collector is stuck.
+Check launchd, then stderr for HTTP errors against `127.0.0.1:11435/metrics`.
+
+Live monitors: dashboard `/observability` telemetry tile; BigQuery
+`analytics.health_minute` and `analytics.metrics_minute` views (delayed by GCP
+sync).
+On-call escalation: ops owner; p3 unless dashboards lose live status more than
+two consecutive operating windows, then p2.
 
 This runbook covers `com.sapphire.telemetry-collector`, the local LaunchAgent
 that snapshots inference-proxy metrics and service health every five minutes.

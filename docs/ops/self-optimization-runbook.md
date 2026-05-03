@@ -1,6 +1,35 @@
 # Self-Optimization Runbook
 
-Last reviewed: 2026-04-29
+Last reviewed: 2026-04-30
+
+## Triage Quickstart
+
+Failure mode addressed: the weekly self-optimization job did not run, OR
+`data/enhancer_weights.json` looks suspiciously different from the last known
+good state, OR signal-enhancer downstream behavior changed unexpectedly.
+
+```bash
+launchctl print gui/$(id -u)/com.sapphire.self-optimization
+```
+
+```bash
+test -f data/enhancer_weights.json && python3 -m json.tool data/enhancer_weights.json
+```
+
+```bash
+tail -n 50 /Users/aribs/Library/Logs/sapphire/self-optimization.log
+```
+
+The optimizer only writes weights when it has ≥ 10 decisive trades and the
+adjustment is damped (0.25 learning rate). If the weights file is missing,
+the job has either never accumulated enough decisive trades or has been
+paused. If weights look wrong, the rollback path is `git checkout
+data/enhancer_weights.json`.
+
+Live monitors: `optimization.completed` event in `data/system_events.jsonl`;
+dashboard `/observability` self-optimization tile.
+On-call escalation: analytics owner; p3 unless weights drift correlates with
+a paper-trading regression, then p2. This is not trade authorization.
 
 This runbook covers `com.sapphire.self-optimization`, the weekly local
 LaunchAgent that reviews closed signal outcomes and adjusts signal-enhancer

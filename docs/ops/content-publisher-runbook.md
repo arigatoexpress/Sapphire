@@ -1,6 +1,36 @@
 # Content Publisher Runbook
 
-Last reviewed: 2026-04-29
+Last reviewed: 2026-04-30
+
+## Triage Quickstart
+
+Failure mode addressed: drafts are not being published, OR the ledger shows
+duplicate `(platform, kind)` entries, OR a stuck publish is repeatedly retrying
+the same payload.
+
+```bash
+launchctl print gui/$(id -u)/com.sapphire.content-publisher
+```
+
+```bash
+tail -n 200 /Users/aribs/Library/Logs/sapphire/content-publisher.err
+```
+
+```bash
+test -f data/content/published_ledger.json && \
+  jq 'group_by(.platform + .kind) | map(select(length > 1))' \
+  data/content/published_ledger.json
+```
+
+The third command flags duplicate ledger entries that should not exist with the
+idempotency contract — non-empty output means the ledger has drifted and needs
+a manual review before unblocking. To rerun a stuck publish, drop the pause
+flag at `/Users/aribs/.sapphire/routine_pause/content-publisher` first.
+
+Live monitors: dashboard `/observability` content-publisher tile;
+`content.published` event stream.
+On-call escalation: content owner; p3 unless live posts go out unintentionally
+(SAPPHIRE_PUBLISH_LIVE=1) — that is p1 since it is a public-surface mistake.
 
 This runbook covers `com.sapphire.content-publisher`, the scheduled local
 publisher that reads rendered content from `data/content/ready/`, dispatches it
