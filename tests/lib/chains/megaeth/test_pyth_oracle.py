@@ -316,6 +316,60 @@ def test_registry_is_stale_helper_uses_default_threshold() -> None:
     assert reg.is_stale(p_old, now=1000.0) is True
 
 
+@pytest.mark.asyncio
+async def test_adapter_falls_back_to_pyth_when_aave_reverts() -> None:
+    """Real bug caught from live MegaETH: Aave reverts on unknown assets.
+
+    The first cut of the adapter only checked ``aave_usd > 0`` —
+    fine for tokens Aave returns 0 for, but on the live MegaETH
+    deployment the Aave oracle REVERTS for assets that aren't in
+    the reserve list. We now wrap the Aave call in try/except so
+    a revert also falls through to Pyth.
+    """
+    from lib.chains.megaeth.contracts.gmx_price_adapter import GmxPriceAdapter
+    from lib.chains.megaeth.contracts.gmx_v2 import Market
+
+    class RevertingAave:
+        async def get_asset_price(self, asset: str) -> Decimal:
+            raise RuntimeError("execution reverted")
+
+    class FakeGmx:
+        async def list_markets(self, *, start: int = 0, end: int = 200) -> list[Market]:
+            return []
+
+    addr_btc = "0x" + "11" * 20
+    addr_weth = "0x" + "22" * 20
+    addr_usdc = "0x" + "33" * 20
+    market = Market(
+        market_token="0x" + "44" * 20,
+        index_token=addr_btc,
+        long_token=addr_weth,
+        short_token=addr_usdc,
+        name="WBTC/WETH-USDC",
+    )
+
+    pyth_client = FakePythClient(
+        _encode_price_tuple(7300000000000, 1000000, -8, 1700000000)
+    )
+    pyth_reg = PythRegistry(pyth_client)
+    address_to_symbol = {addr_btc: "BTC", addr_weth: "ETH", addr_usdc: "USDC"}
+
+    adapter = GmxPriceAdapter(
+        aave_v3=RevertingAave(),  # type: ignore[arg-type]
+        gmx=FakeGmx(),  # type: ignore[arg-type]
+        pyth=pyth_reg,
+        address_to_symbol=address_to_symbol,
+    )
+
+    # All three tokens fall back to Pyth — every leg priced.
+    prices = await adapter.prices_for_market(market)
+    assert len(prices) == 3
+    assert all(p[0] > 0 for p in prices)
+    # Observability: every source tagged as "pyth".
+    sources = adapter.last_sources
+    assert all(s.source == "pyth" for s in sources)
+
+
 def test_module_constants_are_well_formed() -> None:
     """Sanity: the canonical priceIds are 0x + 64 hex chars (32 bytes)."""
     for sym, pid in MEGAETH_PRICE_IDS.items():

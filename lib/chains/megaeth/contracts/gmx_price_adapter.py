@@ -192,9 +192,20 @@ class GmxPriceAdapter:
 
         ``role`` is just a label for the source tag ("index", "long",
         "short") so the observability tuple stays human-readable.
+
+        Aave failure modes covered:
+          * Returns 0  → token unknown to the oracle (typical case).
+          * Reverts    → on some deployments, ``getAssetPrice`` reverts
+                         instead of returning 0 (caught + treated as
+                         "Aave miss" so we fall through to Pyth).
         """
-        # Primary: Aave oracle.
-        aave_usd = await self._aave.get_asset_price(token_address)
+        # Primary: Aave oracle. Wrap in try/except — some MegaETH Aave
+        # deployments revert on unknown assets instead of returning 0.
+        aave_usd = Decimal(0)
+        try:
+            aave_usd = await self._aave.get_asset_price(token_address)
+        except Exception:  # noqa: BLE001 — any Aave failure → fall through
+            aave_usd = Decimal(0)
         if aave_usd > 0:
             return aave_usd, TokenPriceSource(token=token_address, source="aave", stale=False)
 
