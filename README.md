@@ -8,7 +8,7 @@
 
 [![CI](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
 [![Security](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml)
-[![Tests](https://img.shields.io/badge/tests-6%2C730%2B%20passing-2ea44f)](scripts/ops/test_inventory.py)
+[![Tests](https://img.shields.io/badge/tests-6%2C735%2B%20passing-2ea44f)](scripts/ops/test_inventory.py)
 [![Tools](https://img.shields.io/badge/tools-72-0d9488)](infra/tool-registry.yaml)
 [![Dashboard](https://img.shields.io/badge/dashboard-50%20pages-6d28d9)](services/dashboard/templates/pages)
 [![Brain](https://img.shields.io/badge/brain-live-2ea44f)](https://sapphirealpha.xyz/api/brain/synthesis)
@@ -54,8 +54,8 @@ The differentiator is **integration discipline**. Most stacks sit beside each ot
 
 | Surface | Count | Detail |
 |---|---:|---|
-| Passing tests | **6,730+** | 6,135+ unit · 595 plugin (`scripts/ops/test_inventory.py --check-readme`) |
-| Test files | **391+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
+| Passing tests | **6,735+** | 6,140+ unit · 595 plugin (`scripts/ops/test_inventory.py --check-readme`) |
+| Test files | **392+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
 | Plugin tools | **72** | CI-enforced via `scripts/validate_tool_registry.py` |
 | Dashboard pages | **50** | Flask + SSE + basic-auth, unified `/showcase` |
 | LaunchAgent definitions | **34** | Routines + soak gates |
@@ -202,7 +202,7 @@ flowchart LR
 ## Testing
 
 ```bash
-# 6,729 tests · 390 files · CI-enforced
+# 6,735 tests · 392 files · CI-enforced
 /usr/local/bin/python3 -m pytest tests/unit/ --tb=short -q
 /usr/local/bin/python3 -m pytest plugins/claw-sapphire/tests/ -q
 

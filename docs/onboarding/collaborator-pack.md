@@ -98,14 +98,14 @@ ships without explicit Telegram approval.**
 
 | | |
 |---|---|
-| Python tests passing | **1,967** (1,932 core + 35 plugin) |
-| Dashboard pages | 43, including the unified `/showcase` front door |
-| Plugin tools | 32 (8 agent-facing, 24 internal, 1 deprecated) |
+| Python tests passing | **6,735** (6,140 core + 595 plugin) |
+| Dashboard pages | 50, including the unified `/showcase` front door |
+| Plugin tools | 72 (17 agent-facing, 55 internal) |
 | Quant strategies | 7 |
-| Scheduled tasks | 21 |
-| LaunchAgents (on disk, enabled) | 10 |
+| Scheduled tasks | 22 |
+| LaunchAgents (on disk, enabled) | 27 |
 | Inference tiers / models (GPU) | 4 / 28 |
-| Data providers | 13 |
+| Data providers | 20+ |
 | Content publishers | 4 |
 | Smart contracts | 2 Solidity |
 | Tailscale ACL trust zones | 6 |
@@ -298,6 +298,6 @@ and replay the sensitivity classifier and Jinja2 scanner on a laptop. See
    ask before destructive or cross-cutting ones.
 3. **No AI slop.** Every claim in a PR or doc must be verifiable from the
    diff or the data.
-4. **Never reduce the test suite.** 1,967 passing today — your PR should leave
-   it at ≥ 1,967.
+4. **Never reduce the test suite.** 6,735 passing today — your PR should leave
+   it at ≥ 6,735.
 5. **Go deep, not shallow.** Production-grade or don't ship.
