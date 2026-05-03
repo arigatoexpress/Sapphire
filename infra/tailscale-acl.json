@@ -1,6 +1,6 @@
 // Sapphire mesh Tailscale ACL policy
 // Owner: aristotlespec@
-// Last updated: 2026-04-18
+// Last updated: 2026-05-03
 //
 // Nodes:
 //   macbook-pro-8    100.67.171.79  — Mac commander (all services)
@@ -13,6 +13,11 @@
 //   - Pis and Windows only accept inbound on Ollama (11434) and SSH (22)
 //   - All 4 nodes can reach each other freely (mesh for service-to-service calls)
 //   - No inbound from external Tailscale nodes beyond what is explicitly allowed
+//
+// NOTE (2026-05-03): This file must be pushed to Tailscale admin console.
+//   The active ACL is currently OUT OF SYNC — Windows (tag:gpu-worker) cannot
+//   reach Mac (tag:commander) on ports 6900 and 8080 despite being listed here.
+//   Use https://login.tailscale.com/admin/acls to upload this file.
 {
   // -------------------------------------------------------------------------
   // Groups: logical node sets for readable rules
@@ -28,7 +33,12 @@
     "group:pi-nodes": ["aristotlespec@"],
 
     // All Sapphire mesh nodes
-    "group:sapphire-mesh": ["aristotlespec@"]
+    "group:sapphire-mesh": ["aristotlespec@"],
+
+    // Tagged node groups (used in tag-based rules below)
+    "group:tagged-commander": ["tag:commander"],
+    "group:tagged-gpu":       ["tag:gpu-worker"],
+    "group:tagged-pi":        ["tag:edge-node"]
   },
 
   // -------------------------------------------------------------------------
@@ -92,6 +102,7 @@
       ],
       "dst": [
         // Mac services — reachable by all mesh nodes
+    // NOTE: 6900 (OpenBB) and 8080 (Dashboard) added 2026-05-03
         "macbook-pro-8:22,6379,6900,8080,8082,11434,11435,18081",
 
         // Windows GPU — Ollama + SSH + inference-proxy only inbound
@@ -125,6 +136,23 @@
 
     // Note: Tailscale's implicit deny covers everything not matched above.
     // No explicit deny rule is needed in Tailscale ACL JSON syntax.
+
+    // ------------------------------------------------------------------
+    // Rule 5: Tag-based fallback for tagged nodes (2026-05-03)
+    // Hostname-based rules may not fully apply when nodes are tagged.
+    // These explicit tag-to-tag rules ensure Windows (tag:gpu-worker)
+    // can reach Mac (tag:commander) on all service ports.
+    // ------------------------------------------------------------------
+    {
+      "action": "accept",
+      "src":    ["tag:gpu-worker"],
+      "dst":    ["tag:commander:22,6379,6900,8080,8082,11434,11435,18081"]
+    },
+    {
+      "action": "accept",
+      "src":    ["tag:edge-node"],
+      "dst":    ["tag:commander:22,6379,6900,8080,8082,11434,11435,18081"]
+    }
   ],
 
   // -------------------------------------------------------------------------
@@ -183,6 +211,11 @@
   // Tags allow attribute-based rules decoupled from specific IPs.
   // -------------------------------------------------------------------------
   "tagOwners": {
+    // Real tags as observed in tailscale debug netmap (2026-05-03)
+    "tag:commander":  ["aristotlespec@"],
+    "tag:gpu-worker": ["aristotlespec@"],
+    "tag:edge-node":  ["aristotlespec@"],
+    // Legacy tags (kept for compatibility if referenced elsewhere)
     "tag:sapphire-commander": ["aristotlespec@"],
     "tag:sapphire-gpu":       ["aristotlespec@"],
     "tag:sapphire-pi":        ["aristotlespec@"],
@@ -214,6 +247,11 @@
     {
       "src":    "desktop-hfck6u9",
       "accept": ["macbook-pro-8:11435"]
+    },
+    // Windows can reach Mac Dashboard and OpenBB (added 2026-05-03)
+    {
+      "src":    "desktop-hfck6u9",
+      "accept": ["macbook-pro-8:8080", "macbook-pro-8:6900"]
     },
     // Pi can reach Mac inference-proxy
     {
