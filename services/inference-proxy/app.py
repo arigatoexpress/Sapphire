@@ -1305,11 +1305,11 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 header_value=header,
             )
             if not allowed:
-                self.send_response(402)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("X-Payment-Required", "true")
-                self.end_headers()
-                self.wfile.write(json.dumps(body_402).encode())
+                self._respond_raw(
+                    402,
+                    json.dumps(body_402).encode(),
+                    headers={"X-Payment-Required": "true"},
+                )
                 return
 
         try:
@@ -1582,8 +1582,12 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 self.send_header(key, value)
             self.end_headers()
             self.wfile.write(body)
-        except BrokenPipeError:
-            log.warning("client disconnected before %s response could be sent", self.path)
+        except (BrokenPipeError, ConnectionResetError) as exc:
+            log.warning(
+                "client disconnected before %s response could be sent: %s",
+                self.path,
+                type(exc).__name__,
+            )
             if self.command == "POST":
                 _record("proxy", False, 0)
             return False
