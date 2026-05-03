@@ -424,6 +424,15 @@ body.booted .boot { opacity: 0; pointer-events: none; transition: opacity 200ms 
 .empty-desc { font-size: 11px; color: var(--text-3); max-width: 56ch; margin: 0 auto 14px; line-height: 1.5; }
 
 .market-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.market-hero { margin: 0 0 24px; }
+.market-hero-stats { display: flex; gap: 20px; margin-bottom: 12px; font: 500 10px/1 'JetBrains Mono'; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
+.market-hero-stats b { color: var(--text-1); font-weight: 600; }
+.market-hero-scroll { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
+.market-hero-scroll::-webkit-scrollbar { display: none; }
+.market-hero-card { flex: 0 0 160px; padding: 12px; background: var(--bg-1); border: 1px solid var(--border); border-radius: var(--r); display: flex; flex-direction: column; gap: 4px; transition: all var(--t-fast); }
+.market-hero-card:hover { border-color: var(--green-edge); background: var(--bg-2); }
+.market-hero-spark { display: block; width: 60px; height: 20px; }
+.proj-subtitle { font: 500 10px/1 'JetBrains Mono'; color: var(--green-dim); margin: -4px 0 12px; letter-spacing: 0.02em; text-transform: uppercase; }
 .market-cell {
   padding: 12px;
   background: var(--bg-2);
@@ -710,6 +719,18 @@ body.booted .boot { opacity: 0; pointer-events: none; transition: opacity 200ms 
     </div>
   </div>
 
+  <div class="section-h">global markets</div>
+  <div class="market-hero" id="mk-hero">
+    <div class="market-hero-stats">
+      <span>total cap: <b id="mk-hero-cap">—</b></span>
+      <span>btc dom: <b id="mk-hero-dom">—</b></span>
+      <span>24h change: <b id="mk-hero-chg">—</b></span>
+    </div>
+    <div class="market-hero-scroll" id="mk-hero-scroll">
+      <div class="empty" style="width: 100%"><p class="empty-title">fetching snapshot…</p></div>
+    </div>
+  </div>
+
   <div class="section-h">at a glance</div>
   <div class="cards">
     <div class="card">
@@ -993,6 +1014,7 @@ body.booted .boot { opacity: 0; pointer-events: none; transition: opacity 200ms 
     <div class="proj-head-left">
       <div class="proj-crumbs">~ <span class="crumb-arrow">/</span> projects <span class="crumb-arrow">/</span> markets</div>
       <h1 class="proj-title"><span class="bracket">[</span>Markets<span class="bracket">]</span></h1>
+      <div class="proj-subtitle">Macro state machine combining BTC funding rates, Fear & Greed, dominance — output is RISK_ON / TRANSITION / RISK_OFF.</div>
       <p class="proj-desc prose">Global crypto pulse — top 10 by market cap, 24h change, market cap, volume. Powered by /api/markets/snapshot (CoinGecko free tier, 60s cache).</p>
     </div>
     <div class="proj-head-right">
@@ -1077,6 +1099,19 @@ body.booted .boot { opacity: 0; pointer-events: none; transition: opacity 200ms 
   </div>
 </div>
 
+<div class="tour-mask" id="tour-mask"></div>
+<div class="tour-pop" id="tour-pop">
+  <div class="tour-title" id="tour-title"></div>
+  <div class="tour-body prose" id="tour-body"></div>
+  <div class="tour-foot">
+    <span class="tour-step" id="tour-step"></span>
+    <div style="display: flex; gap: 8px;">
+      <button class="btn" id="tour-skip">skip</button>
+      <button class="btn primary" id="tour-next">next</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast-host" aria-live="polite" aria-atomic="true"></div>
 
 <script>
@@ -1104,13 +1139,74 @@ body.booted .boot { opacity: 0; pointer-events: none; transition: opacity 200ms 
         setTimeout(function() {
           document.body.classList.add('booted');
           try { localStorage.setItem(BOOT_KEY, '1'); } catch(e){}
-          setTimeout(function() { boot.style.display = 'none'; }, 220);
+          setTimeout(function() { boot.style.display = 'none'; startTour(); }, 220);
         }, 80);
       }
     };
     tick();
   }
   runBoot();
+
+  var TOUR_KEY = 'sapphire_tour_v2';
+  var tourIdx = 0;
+  var tourSteps = [
+    { tab: 'brain',    selector: '.brain-rings',  title: 'Sapphire Brain',   body: 'This is the cross-silo synthesis layer. It combines trading, threats, and system health into one composite score.' },
+    { tab: 'hackathon', selector: '#mk-hero',      title: 'Global Markets',   body: 'Real-time crypto pulse from CoinGecko. Even if our local collectors are offline, the global market is always visible.' },
+    { selector: '.rail-list',   title: 'Project Silos',    body: 'Navigate between the major operational silos of Sapphire OS using these vertical tabs.' },
+    { tab: 'threats',   selector: '#threat-list',  title: 'Threat Intel',     body: 'Live CVE aggregation with EPSS scoring. We track known-exploited vulnerabilities in real-time.' },
+    { tab: 'system',    selector: '#svc-table',    title: 'System Health',    body: 'Monitor the status and latency of all Sapphire services and inference proxies.' },
+    { selector: '.rail-foot',   title: 'Deep Dives',       body: 'Access the raw Brain API, health probes, and the WebAuthn-protected admin console here.' }
+  ];
+
+  function startTour() {
+    if (localStorage.getItem(TOUR_KEY) === '1') return;
+    setTimeout(function() {
+      tourIdx = 0;
+      showTourStep();
+    }, 1000);
+  }
+
+  function showTourStep() {
+    var step = tourSteps[tourIdx];
+    if (!step) { closeTour(); return; }
+    if (step.tab) showTab(step.tab);
+
+    document.getElementById('tour-mask').classList.add('open');
+    var pop = document.getElementById('tour-pop');
+    pop.classList.add('open');
+    document.getElementById('tour-title').textContent = step.title;
+    document.getElementById('tour-body').textContent = step.body;
+    document.getElementById('tour-step').textContent = (tourIdx + 1) + ' / ' + tourSteps.length;
+    document.getElementById('tour-next').textContent = (tourIdx === tourSteps.length - 1) ? 'finish' : 'next';
+
+    var target = document.querySelector(step.selector);
+    if (target) {
+      var rect = target.getBoundingClientRect();
+      var top = rect.bottom + 12;
+      var left = rect.left;
+      if (top + 200 > window.innerHeight) top = rect.top - 200;
+      if (left + 280 > window.innerWidth) left = window.innerWidth - 300;
+      pop.style.top = Math.max(20, top) + 'px';
+      pop.style.left = Math.max(20, left) + 'px';
+    } else {
+      pop.style.top = '50%';
+      pop.style.left = '50%';
+      pop.style.transform = 'translate(-50%, -50%)';
+    }
+  }
+
+  function closeTour() {
+    document.getElementById('tour-mask').classList.remove('open');
+    document.getElementById('tour-pop').classList.remove('open');
+    localStorage.setItem(TOUR_KEY, '1');
+  }
+
+  document.getElementById('tour-next').addEventListener('click', function() {
+    tourIdx++;
+    if (tourIdx >= tourSteps.length) closeTour();
+    else showTourStep();
+  });
+  document.getElementById('tour-skip').addEventListener('click', closeTour);
 
   var TABS = ['hackathon','wildfire','threats','tho','regional','brain','markets','system'];
   var railTabs = document.querySelectorAll('.rail-tab');
@@ -1189,6 +1285,24 @@ body.booted .boot { opacity: 0; pointer-events: none; transition: opacity 200ms 
     setTimeout(function() { el.remove(); }, 3300);
   }
 
+  function drawSparkline(svgId, data, color, width, height) {
+    var el = document.getElementById(svgId);
+    if (!el) return;
+    var w = width || 400, h = height || 60;
+    var vals = data.map(Number);
+    if (!vals.length) return;
+    var max = Math.max.apply(null, vals.concat([1]));
+    var min = Math.min.apply(null, vals.concat([max]));
+    var range = max - min || 1;
+    var path = vals.map(function(v, i) {
+      var x = (i / (vals.length - 1 || 1)) * w;
+      var y = h - ((v - min) / range) * (h - 4) - 2;
+      return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ' ' + y.toFixed(1);
+    }).join(' ');
+    el.setAttribute('d', path);
+    if (color) el.setAttribute('stroke', color);
+  }
+
   function getJSON(url, timeout) {
     timeout = timeout || 8000;
     return new Promise(function(resolve, reject) {
@@ -1253,15 +1367,8 @@ body.booted .boot { opacity: 0; pointer-events: none; transition: opacity 200ms 
     var p3 = getJSON('/api/timeseries/threats').then(function(series) {
       var pts = series.points || series.series || [];
       if (pts.length) {
-        var w = 400, h = 60;
         var vals = pts.map(function(p) { return Number(p.severity_score || p.severity_index || p.value || 0); });
-        var max = Math.max.apply(null, vals.concat([1]));
-        var path = vals.map(function(v, i) {
-          var x = (i / (vals.length - 1 || 1)) * w;
-          var y = h - (v / max) * (h - 4) - 2;
-          return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ' ' + y.toFixed(1);
-        }).join(' ');
-        document.getElementById('threat-spark-path').setAttribute('d', path);
+        drawSparkline('threat-spark-path', vals, '#62ff40', 400, 60);
       }
     }).catch(function(){});
 
@@ -1333,31 +1440,73 @@ body.booted .boot { opacity: 0; pointer-events: none; transition: opacity 200ms 
   dataLoaders.markets = function() {
     return getJSON('/api/markets/snapshot').then(function(m) {
       var grid = document.getElementById('mk-grid');
+      var heroScroll = document.getElementById('mk-hero-scroll');
       var top = m.crypto || m.coins || m.top || [];
-      if (!top.length) {
-        grid.innerHTML = '<div class="empty" style="grid-column: 1 / -1;"><span class="empty-icon">&#9676;</span><p class="empty-title">no market data</p><p class="empty-desc prose">CoinGecko returned no rows. Free tier rate limits may apply.</p></div>';
-      } else {
-        grid.innerHTML = top.slice(0, 12).map(function(c) {
+
+      var renderRows = function(rows, isHero) {
+        return rows.slice(0, 12).map(function(c, i) {
           var sym = String(c.symbol || c.id || '').toUpperCase();
           var px = c.current_price || c.price || c.price_usd;
           var ch = c.price_change_percentage_24h != null ? c.price_change_percentage_24h : (c.change_24h_pct != null ? c.change_24h_pct : c.pct_24h);
           var cls = (ch >= 0) ? 'up' : 'down';
           var sign = (ch >= 0) ? '+' : '';
+          var sparkId = (isHero ? 'hero-spark-' : 'mk-spark-') + i;
+
+          if (isHero) {
+            return '<div class="market-hero-card">' +
+              '<div style="display: flex; justify-content: space-between; align-items: flex-start;">' +
+                '<span class="market-sym">' + escapeHtml(sym) + '</span>' +
+                '<span class="proj-pill" style="font-size: 8px; padding: 1px 4px;">#' + (c.rank || '?') + '</span>' +
+              '</div>' +
+              '<div class="market-px" style="font-size: 15px;">' + fmtMoney(px) + '</div>' +
+              '<div style="display: flex; justify-content: space-between; align-items: flex-end;">' +
+                '<div class="market-chg ' + cls + '">' + sign + (ch == null ? '—' : Number(ch).toFixed(2)) + '%</div>' +
+                '<svg width="60" height="20" class="market-hero-spark"><path id="' + sparkId + '" fill="none" stroke-width="1.5"/></svg>' +
+              '</div>' +
+            '</div>';
+          }
           return '<div class="market-cell">' +
             '<div class="market-sym">' + escapeHtml(sym) + '</div>' +
             '<div class="market-px">' + fmtMoney(px) + '</div>' +
             '<div class="market-chg ' + cls + '">' + sign + (ch == null ? '—' : Number(ch).toFixed(2)) + '%</div>' +
           '</div>';
         }).join('');
+      };
+
+      if (!top.length) {
+        var empty = '<div class="empty" style="grid-column: 1 / -1;"><span class="empty-icon">&#9676;</span><p class="empty-title">no market data</p></div>';
+        grid.innerHTML = empty;
+        if (heroScroll) heroScroll.innerHTML = empty;
+      } else {
+        grid.innerHTML = renderRows(top, false);
+        if (heroScroll) {
+          heroScroll.innerHTML = renderRows(top, true);
+          top.slice(0, 12).forEach(function(c, i) {
+            var ch = c.price_change_percentage_24h != null ? c.price_change_percentage_24h : (c.change_24h_pct != null ? c.change_24h_pct : 0);
+            var color = ch >= 0 ? '#62ff40' : '#f85149';
+            if (c.sparkline_7d) drawSparkline('hero-spark-' + i, c.sparkline_7d, color, 60, 20);
+          });
+        }
       }
       var g = m.global || {};
       var gmcap = g.total_market_cap_usd || g.market_cap_usd || g.market_cap || (g.total_market_cap && g.total_market_cap.usd);
       var gdom = g.btc_dominance_pct != null ? g.btc_dominance_pct : (g.btc_dominance != null ? g.btc_dominance : (g.market_cap_percentage && g.market_cap_percentage.btc));
-      document.getElementById('mk-global').textContent = 'market cap: ' + fmtMoney(gmcap);
-      document.getElementById('mk-dom').textContent = 'btc dom: ' + (gdom == null ? '—' : Number(gdom).toFixed(1) + '%');
-      document.getElementById('mk-updated').textContent = fmtAgo(m.fetched_at || m.ts || m.updated_at);
+      var gchg = g.market_cap_change_24h_pct || 0;
+
+      var setText = function(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
+      setText('mk-global', 'market cap: ' + fmtMoney(gmcap));
+      setText('mk-dom', 'btc dom: ' + (gdom == null ? '—' : Number(gdom).toFixed(1) + '%'));
+      setText('mk-updated', fmtAgo(m.fetched_at || m.ts || m.updated_at));
+
+      setText('mk-hero-cap', fmtMoney(gmcap));
+      setText('mk-hero-dom', (gdom == null ? '—' : Number(gdom).toFixed(1) + '%'));
+      setText('mk-hero-chg', (gchg >= 0 ? '+' : '') + Number(gchg).toFixed(2) + '%');
+      var chgEl = document.getElementById('mk-hero-chg');
+      if (chgEl) chgEl.style.color = gchg >= 0 ? 'var(--green)' : 'var(--red)';
     }).catch(function() {
-      document.getElementById('mk-grid').innerHTML = '<div class="empty" style="grid-column: 1 / -1;"><span class="empty-icon">!</span><p class="empty-title">snapshot unreachable</p><p class="empty-desc prose">/api/markets/snapshot returned an error.</p></div>';
+      var err = '<div class="empty" style="grid-column: 1 / -1;"><span class="empty-icon">!</span><p class="empty-title">snapshot unreachable</p></div>';
+      grid.innerHTML = err;
+      if (heroScroll) heroScroll.innerHTML = err;
     });
   };
 
@@ -1522,6 +1671,23 @@ body.booted .boot { opacity: 0; pointer-events: none; transition: opacity 200ms 
       var dot = document.getElementById('tb-dot');
       dot.classList.add('bad');
       document.getElementById('tb-ready').textContent = 'OFFLINE';
+    });
+  }
+  pingHealth();
+  setInterval(pingHealth, 30000);
+
+  var t0 = Date.now();
+  setInterval(function() {
+    var s = Math.floor((Date.now() - t0)/1000);
+    var h = Math.floor(s/3600), m = Math.floor((s%3600)/60);
+    var el = document.getElementById('tb-uptime');
+    if (el) el.textContent = 'tty: ' + (h ? h+'h ' : '') + (m<10?'0':'')+m+'m';
+  }, 1000);
+})();
+</script>
+</body>
+</html>
+'OFFLINE';
     });
   }
   pingHealth();

@@ -273,6 +273,11 @@ def regime():
         return jsonify({"rows": [], "meta": {}})
 
 
+# ---------------------------------------------------------------------------
+# Forecast & Intelligence
+# ---------------------------------------------------------------------------
+
+
 @app.get("/api/predictions")
 def predictions():
     limit = int(request.args.get("limit", "50"))
@@ -292,6 +297,56 @@ def predictions():
     except Exception as exc:
         log.info("predictions bq miss: %s", exc)
         return jsonify({"rows": []})
+
+
+@app.get("/api/forecast/explain/<symbol>")
+def forecast_explain(symbol: str):
+    """Detailed math rationale for a symbol's prediction consensus."""
+    sym = symbol.upper()
+    try:
+        # Cross-repo import bootstrap
+        sys.path.insert(0, str(_HERE.parents[1]))
+        from lib.analytics import forecast as f_api
+
+        data = f_api.forecast()
+        row = next((r for r in data.get("rows", []) if r["symbol"] == sym), None)
+        if not row:
+            return jsonify({"error": "not_found", "symbol": sym}), 404
+
+        k = row.get("kronos") or {}
+        ta = row.get("ta") or {}
+
+        # Synthesize "Why?" panel rationale
+        rationale = []
+        if k:
+            rationale.append(
+                f"Kronos (ML) projects {k.get('direction')} move "
+                f"to ${k.get('target_high') or k.get('final_close'):,.2f} "
+                f"({k.get('projected_change_pct')}% edge)."
+            )
+        if ta:
+            ta_desc = "bullish" if ta.get("net_signal", 0) > 0 else "bearish"
+            ta_desc = "neutral" if ta.get("net_signal", 0) == 0 else ta_desc
+            rationale.append(
+                f"TA Scanner consensus is {ta_desc} ({ta.get('signals_bullish')} bull / "
+                f"{ta.get('signals_bearish')} bear signals)."
+            )
+            if ta.get("rsi"):
+                rationale.append(f"RSI is currently {ta.get('rsi'):.1f}.")
+
+        return jsonify(
+            {
+                "symbol": sym,
+                "consensus": row.get("consensus"),
+                "edge_score": row.get("edge_score"),
+                "rationale": " ".join(rationale),
+                "details": {"kronos": k, "ta": ta},
+                "ts": datetime.now(UTC).isoformat(),
+            }
+        )
+    except Exception as exc:
+        log.warning("forecast_explain error: %s", exc)
+        return jsonify({"error": "server_error", "msg": str(exc)}), 500
 
 
 @app.get("/api/predictions/accuracy")
