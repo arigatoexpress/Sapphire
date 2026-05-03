@@ -2,6 +2,36 @@
 
 {% block content %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+{% include "pages/_forecast_explain.html" %}
+
+<!-- Page-level safety strip -->
+<div class="safety-strip" role="status" aria-label="Analytics safety posture">
+    <span class="safety-label">Mode</span>
+    <span class="safety-text">
+        <strong style="color:var(--text-primary)">Analysis only.</strong>
+        Every chart on this page is computed from historical paper trades and backtests — nothing here places an order.
+    </span>
+    <span class="safety-badge paper">Paper</span>
+    <span class="safety-badge read-only">Read-only</span>
+</div>
+
+<!-- Headline KPIs -->
+<section aria-labelledby="an-headline">
+    <div class="panel-headline">
+        <h3 id="an-headline">Did the regime filter actually help?</h3>
+    </div>
+    <p class="panel-subhead">
+        Four numbers comparing the same strategy <strong>with</strong> our market-regime filter turned on vs <strong>without</strong>. If the green numbers beat the dim ones, the filter is earning its keep.
+    </p>
+    <details class="tech-disclosure">
+        <summary>How does this work?</summary>
+        <div class="disclosure-body">
+            <p>The dashboard runs the same SapphireComposite quant strategy twice on the primary symbol: once unfiltered, and once gated by the regime classifier in <code>lib/analytics/regime_gmm.py</code>. The regime classifier is a Gaussian Mixture Model that buckets each bar into <strong>TREND_UP / TREND_DOWN / RANGE / VOLATILE</strong>. With the filter on, we only enter trades when the regime matches the strategy's calibrated bucket.</p>
+            <p>Source: <code>/api/analytics/performance</code> — totals come from running each side over the same 90-day OHLCV window with identical fees and slippage.</p>
+            <p><strong>Read it like this:</strong> if "WITH regime" return &gt; "without" by a meaningful margin <em>and</em> Sharpe is higher, the filter is adding value. If both are similar, the filter is noise; if WITH is worse, the regime calibration is stale.</p>
+        </div>
+    </details>
+</section>
 
 <div class="grid grid-4" style="margin-bottom: var(--space-xl);">
     <div class="stat-card">
@@ -25,6 +55,24 @@
         <div class="stat-change" id="a-winrate">Win rate: —</div>
     </div>
 </div>
+
+<!-- Token universe -->
+<section aria-labelledby="an-universe">
+    <div class="panel-headline">
+        <h3 id="an-universe">What's in the trading universe right now?</h3>
+        <span class="safety-badge dry-run">Dry run</span>
+    </div>
+    <p class="panel-subhead">
+        Three lists side-by-side: tokens we follow, tokens trending across the market, and which venues (TradingView / Hyperliquid / Robinhood) we can actually trade them on.
+    </p>
+    <details class="tech-disclosure">
+        <summary>How does this work?</summary>
+        <div class="disclosure-body">
+            <p><strong>Sapphire Tokens</strong> is the curated watchlist Ari has starred — sourced from <code>data/curated/sapphire_tokens.json</code> with live price and 24-hour change pulled from CoinGecko. <strong>Trending</strong> mirrors CoinGecko's global trending feed. <strong>Venue Symbols</strong> shows which symbol identifier each exchange uses (BTC vs BTCUSDT vs BTC-USD), so signals translate cleanly across the orchestrator.</p>
+            <p>The "Live / Fallback" badge above flips to Fallback when CoinGecko rate-limits us; the panel keeps showing the most recent cached snapshot.</p>
+        </div>
+    </details>
+</section>
 
 <div class="grid grid-3" style="margin-bottom: var(--space-xl);">
     <div class="card">
@@ -147,21 +195,36 @@
         <div style="margin-top: 16px;">
             <h4 style="margin: 0 0 8px; font-size: 14px; color: var(--muted);">TA Score (top 3 by |score|)</h4>
             <table class="data-table compact-table">
-                <thead><tr><th>Symbol</th><th>TF</th><th>Score</th><th>Regime</th><th>Rationale</th></tr></thead>
-                <tbody id="tv-orchestrator-scoring-tbody"><tr><td colspan="5" class="loading">Loading…</td></tr></tbody>
+                <thead><tr><th>Symbol</th><th>TF</th><th>Score</th><th>Regime</th><th>Rationale</th><th>Why?</th></tr></thead>
+                <tbody id="tv-orchestrator-scoring-tbody"><tr><td colspan="6" class="loading">Loading…</td></tr></tbody>
             </table>
         </div>
     </div>
 </div>
 
 <!-- Equity curve with BTC benchmark -->
-<div class="card" style="margin-bottom: var(--space-xl);">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-chart-line" style="margin-right: 8px; color: var(--primary);"></i>Equity Curve vs BTC Buy-and-Hold</h3>
-        <span class="badge badge-info" id="a-symbol-badge">—</span>
+<section aria-labelledby="an-equity">
+    <div class="panel-headline">
+        <h3 id="an-equity">Did our strategy beat just buying and holding BTC?</h3>
     </div>
-    <div class="card-body" style="height: 380px;"><canvas id="equity-chart"></canvas></div>
-</div>
+    <p class="panel-subhead">
+        Three lines: <strong style="color:#22c55e">green</strong> = strategy with regime filter, <strong style="color:#f59e0b">amber dashed</strong> = strategy without filter, <strong style="color:#60a5fa">blue dotted</strong> = simply holding BTC. We want green to finish on top.
+    </p>
+    <details class="tech-disclosure">
+        <summary>How does this work?</summary>
+        <div class="disclosure-body">
+            <p>All three curves start at the same dollar amount and apply the same fees and slippage model. The strategy lines compound paper P&amp;L from each closed trade in <code>data/paper_portfolio.json</code> filtered by the active backtest window. The buy-and-hold benchmark applies the same starting capital to BTC at <code>t=0</code> and marks it to market.</p>
+            <p>Crossing point matters: if the green line consistently sits above blue we're earning alpha; if green tracks blue closely, we're just paying fees for nothing.</p>
+        </div>
+    </details>
+    <div class="card" style="margin-bottom: var(--space-xl);">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-chart-line" style="margin-right: 8px; color: var(--primary);"></i>Equity Curve vs BTC Buy-and-Hold</h3>
+            <span class="badge badge-info" id="a-symbol-badge">—</span>
+        </div>
+        <div class="card-body" style="height: 380px;"><canvas id="equity-chart"></canvas></div>
+    </div>
+</section>
 
 <div class="grid grid-2">
     <!-- Rolling Sharpe -->
@@ -492,6 +555,7 @@
         const scoreColor = isFinite(score)
           ? (score > 0.05 ? 'var(--success, #00ff88)' : (score < -0.05 ? 'var(--danger, #ef4444)' : 'var(--muted)'))
           : 'var(--muted)';
+        const whySym = esc(row.symbol || row.tradingview_symbol || '');
         scoringTbody.insertAdjacentHTML('beforeend', `
           <tr>
             <td title="${esc(row.tradingview_symbol || '')}">${esc(row.symbol || row.tradingview_symbol || '—')}</td>
@@ -499,11 +563,13 @@
             <td style="color: ${scoreColor}; font-variant-numeric: tabular-nums;">${isFinite(score) ? score.toFixed(3) : '—'}</td>
             <td>${esc(row.regime || '—')}</td>
             <td style="font-size: 11px; color: var(--muted);" title="${esc(row.rationale || '')}">${esc(row.rationale || '—')}</td>
+            <td>${whySym ? `<button class="why-btn" data-symbol="${whySym}" type="button">Why?</button>` : '—'}</td>
           </tr>`);
       }
       if (!items.length) {
-        scoringTbody.innerHTML = '<tr><td colspan="5" class="venue-muted">No scoring yet — run a sweep to populate</td></tr>';
+        scoringTbody.innerHTML = '<tr><td colspan="6" class="venue-muted">No scoring yet — run a sweep to populate</td></tr>';
       }
+      if (window.attachForecastWhyButtons) window.attachForecastWhyButtons();
     } catch (scoringErr) {
       document.getElementById('tv-orchestrator-scoring-tbody').innerHTML = '<tr><td colspan="5" class="venue-muted">Unavailable</td></tr>';
     }
@@ -522,7 +588,7 @@
     document.getElementById('tv-orchestrator-pine-tbody').innerHTML = '<tr><td colspan="3" class="venue-muted">Unavailable</td></tr>';
     document.getElementById('tv-orchestrator-alerts-tbody').innerHTML = '<tr><td colspan="3" class="venue-muted">Unavailable</td></tr>';
     const scoringTbodyEl = document.getElementById('tv-orchestrator-scoring-tbody');
-    if (scoringTbodyEl) scoringTbodyEl.innerHTML = '<tr><td colspan="5" class="venue-muted">Unavailable</td></tr>';
+    if (scoringTbodyEl) scoringTbodyEl.innerHTML = '<tr><td colspan="6" class="venue-muted">Unavailable</td></tr>';
   }
 
   let resp;

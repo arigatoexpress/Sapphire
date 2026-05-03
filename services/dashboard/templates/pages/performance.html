@@ -397,11 +397,46 @@
 {% endblock %}
 
 {% block content %}
+{% include "pages/_forecast_explain.html" %}
+
+<!-- Page-level safety strip -->
+<div class="safety-strip" role="status" aria-label="Performance page safety posture">
+    <span class="safety-label">Trading mode</span>
+    <span class="safety-text">
+        <strong style="color:var(--text-primary)">Paper portfolio.</strong>
+        Every P&amp;L number on this page comes from simulated fills, not real money. Live execution requires manual confirmation per order.
+    </span>
+    <span class="safety-badge paper">Paper</span>
+    <span class="safety-badge dry-run">Backtest</span>
+</div>
+
 <!-- Refresh bar -->
 <div class="refresh-bar">
     <span class="last-update" id="lastUpdate">LAST UPDATE: --:--:--</span>
     <span class="auto-badge">AUTO-REFRESH 60s</span>
 </div>
+
+<!-- Hero stats headline -->
+<section aria-labelledby="pf-hero">
+    <div class="panel-headline">
+        <h3 id="pf-hero">Are we making money on paper?</h3>
+    </div>
+    <p class="panel-subhead">
+        Four numbers tell you whether the strategy is working: total profit, how often we win, the ratio of winning dollars to losing dollars, and risk-adjusted return.
+    </p>
+    <details class="tech-disclosure">
+        <summary>How does this work?</summary>
+        <div class="disclosure-body">
+            <p>All four come from <code>/api/strategy-performance</code> which aggregates closed trades from <code>data/signals/*.jsonl</code> + <code>data/paper_portfolio.json</code>:</p>
+            <ul>
+                <li><strong>Total P&amp;L</strong> — sum of <code>realized_pnl_usd</code> across every closed trade.</li>
+                <li><strong>Win rate</strong> — wins / total. Above 55% on crypto is good; we target 80% long-term.</li>
+                <li><strong>Profit factor</strong> — gross profit / gross loss. Above <code>1.5</code> is healthy; below <code>1.0</code> is unprofitable.</li>
+                <li><strong>Sortino ratio</strong> — like Sharpe but only counts <em>downside</em> volatility. We optimize for Sortino because we don't mind upside swings.</li>
+            </ul>
+        </div>
+    </details>
+</section>
 
 <!-- Hero stats (wired to /api/strategy-performance) -->
 <div class="perf-hero">
@@ -429,7 +464,26 @@
 
 <!-- Strategy comparison (wired) -->
 <div class="perf-section">
-    <div class="perf-section-title">Strategy Comparison</div>
+    <div class="panel-headline">
+        <h3>Which strategies are pulling their weight?</h3>
+    </div>
+    <p class="panel-subhead">
+        One row per quant strategy. We track 7 of them — RegimeAwareRSI, FundingRateContrarian, CorrelationBreakout, MultiTFMomentum, SapphireComposite, and friends. Sort by Sortino to find the safest earners; sort by P&amp;L to find the loudest ones.
+    </p>
+    <details class="tech-disclosure">
+        <summary>How does this work?</summary>
+        <div class="disclosure-body">
+            <p>Each row is a strategy class under <code>lib/analytics/strategies/</code>. Numbers come from <code>/api/strategy-performance.by_strategy</code>:</p>
+            <ul>
+                <li><strong>Trades</strong> — closed trades attributed to that strategy via the <code>strategy_id</code> field on each signal.</li>
+                <li><strong>Win rate</strong>, <strong>Total P&amp;L</strong>, <strong>Avg P&amp;L</strong>, <strong>Expectancy</strong> — basic aggregates.</li>
+                <li><strong>Profit factor / Sharpe / Sortino</strong> — risk-adjusted metrics. Sortino is our north star because it ignores upside volatility.</li>
+                <li><strong>Avg hold</strong> — mean trade duration in hours.</li>
+                <li><strong>Portfolio ROI</strong> — what this strategy returned <em>as a share of</em> the $100k paper portfolio.</li>
+            </ul>
+            <p>Strategies with fewer than 5 trades are filtered out — too few samples to draw conclusions.</p>
+        </div>
+    </details>
     <div class="panel" style="padding: 0; margin-bottom: 0;">
         <div class="table-scroll">
             <table class="strat-table">
@@ -536,7 +590,25 @@
 
 <!-- Forecast (live Kronos + TA consensus) -->
 <div class="perf-section">
-    <div class="perf-section-title">Live Forecast &mdash; Kronos + TA Consensus</div>
+    <div class="panel-headline">
+        <h3>What does the model think happens next?</h3>
+        <span class="safety-badge dry-run">Forecast only</span>
+    </div>
+    <p class="panel-subhead">
+        Two independent forecasters — <strong>Kronos</strong> (a deep model trained on OHLCV) and <strong>TA scanner</strong> (a deterministic 6-factor scorer) — vote on each symbol. When they agree, we trust it more.
+    </p>
+    <details class="tech-disclosure">
+        <summary>How does this work?</summary>
+        <div class="disclosure-body">
+            <p>The Forecast endpoint (<code>/api/forecast</code>) blends two sources for each tracked symbol:</p>
+            <ul>
+                <li><strong>Kronos</strong> — runs daily at 7am CT against BTC/ETH/SOL/SPY/TSLA, projects 24 bars ahead, writes to <code>data/intelligence/&lt;date&gt;/predictions.json</code>.</li>
+                <li><strong>TA scanner</strong> — deterministic score from RSI + MACD + EMA + change% + 5-bar trend, regime-bucketed. Source: <code>lib/trading/tradingview_orchestrator.py</code>.</li>
+            </ul>
+            <p>The <strong>Consensus</strong> column is one of: <code>AGREE_BULL</code>, <code>AGREE_BEAR</code>, <code>CONTRADICT</code>, <code>PARTIAL</code>, <code>KRONOS_ONLY</code>, <code>TA_ONLY</code>, <code>NEITHER</code>. <strong>Edge score</strong> is a blended expected value in <code>[-1, +1]</code>; |edge| &gt; 0.3 with consensus AGREE_* is the strongest signal.</p>
+            <p>This is not an order — it's a research view. The signal pipeline still has to fire and the operator still has to confirm.</p>
+        </div>
+    </details>
     <div style="display:flex; align-items:center; gap:12px; margin-bottom: 10px;">
         <span id="forecastMeta" style="color:#9fd89c; font-size:0.72rem;">&mdash;</span>
     </div>
@@ -556,10 +628,11 @@
                         <th>TA Conf</th>
                         <th>TA Target</th>
                         <th>TF</th>
+                        <th>Why?</th>
                     </tr>
                 </thead>
                 <tbody id="forecastBody">
-                    <tr><td colspan="11" style="text-align:center; padding:24px; color: #9fd89c;">Loading forecast…</td></tr>
+                    <tr><td colspan="12" style="text-align:center; padding:24px; color: #9fd89c;">Loading forecast…</td></tr>
                 </tbody>
             </table>
         </div>
@@ -1167,7 +1240,7 @@
                 : (rows.length + ' symbols (no Kronos data)');
         }
         if (!rows.length) {
-            body.innerHTML = '<tr><td colspan="11" style="text-align:center; padding:24px; color: #9fd89c;">Awaiting forecast data…</td></tr>';
+            body.innerHTML = '<tr><td colspan="12" style="text-align:center; padding:24px; color: #9fd89c;">Awaiting forecast data…</td></tr>';
             return;
         }
 
@@ -1206,6 +1279,7 @@
                 ? (_money(k.target_low) + ' — ' + _money(k.target_high))
                 : '—';
 
+            var safeSym = String(r.symbol || '').replace(/[^A-Za-z0-9_\-]/g, '');
             html += '<tr>'
                 + '<td class="strat-name">' + r.symbol + '</td>'
                 + '<td class="' + edgeCls + '">' + edgeSign + (r.edge_score * 100).toFixed(1) + '</td>'
@@ -1218,9 +1292,11 @@
                 + '<td>' + (t.confidence != null ? (t.confidence * 100).toFixed(1) + '%' : '—') + '</td>'
                 + '<td>' + _money(t.target_price) + '</td>'
                 + '<td style="color:#9fd89c;">' + (t.timeframe || '—') + '</td>'
+                + '<td>' + (safeSym ? '<button class="why-btn" data-symbol="' + safeSym + '" type="button">Why?</button>' : '—') + '</td>'
                 + '</tr>';
         });
         body.innerHTML = html;
+        if (window.attachForecastWhyButtons) window.attachForecastWhyButtons();
     }
 
     /* ── Render backtest leaderboard from /api/backtest-results ── */
