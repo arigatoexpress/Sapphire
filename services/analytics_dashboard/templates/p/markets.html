@@ -1,0 +1,95 @@
+{% extends "_base_subpage.html" %}
+{% block title %}Global Markets{% endblock %}
+{% block crumb %}p/markets{% endblock %}
+{% block meta %}coingecko 60s cache{% endblock %}
+
+{% block extra_css %}
+.spark { width: 100%; height: 32px; display: block; }
+.spark path { fill: none; stroke: var(--green); stroke-width: 1.4; }
+.spark.down path { stroke: var(--red); }
+.delta-up { color: var(--green); }
+.delta-down { color: var(--red); }
+{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <h1>Global Markets</h1>
+  <div class="typed" id="typed-line">$ ./markets snapshot --limit 10</div>
+</section>
+
+<section class="grid cols-3" id="globals">
+  <div class="card"><div class="muted">TOTAL_MKT_CAP</div><h3 id="g-cap">--</h3></div>
+  <div class="card"><div class="muted">BTC_DOM</div><h3 id="g-btc">--</h3></div>
+  <div class="card"><div class="muted">24H_CHANGE</div><h3 id="g-24h">--</h3></div>
+</section>
+
+<section class="box" style="margin-top: 14px;">
+  <h2 class="section">TOP_10_BY_MCAP</h2>
+  <div class="grid cols-2" id="cards">
+    <div class="muted">// loading top 10 ...</div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  var line = document.getElementById('typed-line');
+  if (line) {
+    var full = line.textContent; line.textContent = ''; var i=0;
+    (function tick(){ if (i>=full.length) return; line.textContent += full.charAt(i++); setTimeout(tick, 28); })();
+  }
+
+  function fmt(n, opts){
+    if (n == null || isNaN(n)) return '--';
+    if (Math.abs(n) >= 1e12) return (n/1e12).toFixed(2) + 'T';
+    if (Math.abs(n) >= 1e9)  return (n/1e9).toFixed(2) + 'B';
+    if (Math.abs(n) >= 1e6)  return (n/1e6).toFixed(2) + 'M';
+    if (Math.abs(n) >= 1)    return n.toLocaleString(undefined, {maximumFractionDigits:2});
+    return n.toFixed(opts && opts.tiny ? 6 : 4);
+  }
+
+  function spark(arr, down) {
+    if (!arr || !arr.length) return '';
+    var min = Math.min.apply(null, arr), max = Math.max.apply(null, arr);
+    var range = (max - min) || 1;
+    var w = 200, h = 32;
+    var step = w / (arr.length - 1 || 1);
+    var pts = arr.map((v, i) => i*step + ',' + (h - ((v - min) / range) * h)).join(' L ');
+    return '<svg class="spark ' + (down ? 'down' : '') + '" viewBox="0 0 200 32" preserveAspectRatio="none"><path d="M ' + pts + '"/></svg>';
+  }
+
+  fetch('/api/markets/snapshot').then(r=>r.json()).then(d=>{
+    var g = d.global || {};
+    document.getElementById('g-cap').textContent = '$' + fmt(g.total_market_cap_usd);
+    document.getElementById('g-btc').textContent = (g.btc_dominance_pct != null ? g.btc_dominance_pct.toFixed(2) + '%' : '--');
+    var ch = g.market_cap_change_24h_pct;
+    var $24 = document.getElementById('g-24h');
+    if (ch != null) {
+      $24.textContent = (ch >= 0 ? '+' : '') + ch.toFixed(2) + '%';
+      $24.className = ch >= 0 ? 'delta-up' : 'delta-down';
+    }
+
+    var rows = d.crypto || [];
+    if (!rows.length) { document.getElementById('cards').innerHTML = '<div class="muted">// snapshot empty (rate-limited?)</div>'; return; }
+    document.getElementById('cards').innerHTML = rows.map(c => {
+      var d24 = Number(c.change_24h_pct || 0);
+      var cls = d24 >= 0 ? 'delta-up' : 'delta-down';
+      return '<div class="card">' +
+        '<div style="display:flex; justify-content:space-between; align-items:center;">' +
+          '<h3 style="margin:0;">' + c.symbol + ' <span class="muted" style="font-weight:400;">#' + (c.rank || '--') + '</span></h3>' +
+          '<span class="' + cls + '">' + (d24 >= 0 ? '+' : '') + d24.toFixed(2) + '%</span>' +
+        '</div>' +
+        '<div class="muted" style="margin-bottom:8px;">' + (c.name || '') + '</div>' +
+        '<div class="row"><span class="lbl">price</span><span class="val">$' + fmt(c.price_usd) + '</span></div>' +
+        '<div class="row"><span class="lbl">mcap</span><span class="val">$' + fmt(c.market_cap_usd) + '</span></div>' +
+        '<div class="row"><span class="lbl">vol 24h</span><span class="val">$' + fmt(c.volume_24h_usd) + '</span></div>' +
+        '<div style="margin-top:8px;">' + spark(c.sparkline_7d, d24 < 0) + '</div>' +
+      '</div>';
+    }).join('');
+  }).catch(()=>{
+    document.getElementById('cards').innerHTML = '<div class="muted">// /api/markets/snapshot unreachable</div>';
+  });
+})();
+</script>
+{% endblock %}

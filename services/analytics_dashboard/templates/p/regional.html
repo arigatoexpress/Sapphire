@@ -1,0 +1,69 @@
+{% extends "_base_subpage.html" %}
+{% block title %}Regional Intel{% endblock %}
+{% block crumb %}p/regional{% endblock %}
+{% block meta %}{{ regions|length }} regions{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <h1>Regional Intelligence</h1>
+  <div class="typed" id="typed-line">$ ./regional --status --regions all</div>
+</section>
+
+<section class="box">
+  <h2 class="section">CONFIGURED_REGIONS</h2>
+  <div class="grid cols-3">
+    {% for r in regions %}
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <h3>{{ r.name }}</h3>
+        <span class="pill {% if r.category == 'primary' %}green{% elif r.category == 'operational' %}amber{% endif %}">{{ r.category }}</span>
+      </div>
+      <div class="muted" style="margin-top:6px;">{{ r.note }}</div>
+      <div class="row" style="margin-top:10px;">
+        <span class="lbl"></span>
+        <a class="dim" href="{{ regional_url }}region/{{ r.slug }}" target="_blank" rel="noopener">[/region/{{ r.slug }} &rarr;]</a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="box">
+  <h2 class="section">INTEL_FEED_SAMPLE</h2>
+  <pre style="margin:0; max-height: 220px; overflow:auto;" id="feed-sample">
+[ vote-monitor       ] {{ now }} :: snapshotting DeFi pools (Austin lens)
+[ regional-collector ] {{ now }} :: vote-monitor /api/health = ok
+[ digest             ] {{ now }} :: Blanga ops report queued
+[ feed               ] {{ now }} :: Houston watch — no new signals
+  </pre>
+  <div class="muted" style="margin-top: 10px;">// sample feed; full stream at <a href="{{ regional_url }}" target="_blank" rel="noopener">{{ regional_url }}</a></div>
+</section>
+
+<section class="box">
+  <h2 class="section">CONSOLE</h2>
+  <div class="kv">
+    <div class="k">platform</div><div class="v">regional-intel-workbench</div>
+    <div class="k">repo</div><div class="v">arigatoexpress/regional-intel-workbench</div>
+    <div class="k">api</div><div class="v"><a href="{{ regional_url }}" target="_blank" rel="noopener">{{ regional_url }}</a></div>
+    <div class="k">probe</div><div class="v">
+      {% if regional_online %}<span class="pill green">/api/health 200</span>{% else %}<span class="pill amber">unreachable from edge</span>{% endif %}
+    </div>
+    <div class="k">cadence</div><div class="v">vote-monitor every 4h, intel-summary daily</div>
+  </div>
+  <div style="margin-top: 14px;">
+    <a class="btn lg" href="{{ regional_url }}" target="_blank" rel="noopener">[open admin console]</a>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  var line = document.getElementById('typed-line');
+  if (line) {
+    var full = line.textContent; line.textContent = ''; var i=0;
+    (function tick(){ if (i>=full.length) return; line.textContent += full.charAt(i++); setTimeout(tick, 28); })();
+  }
+})();
+</script>
+{% endblock %}

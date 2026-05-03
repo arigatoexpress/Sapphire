@@ -1150,3 +1150,102 @@ def test_tradingview_orchestrator_alerts_endpoint_handles_failure(app_client, mo
     assert body["status"] == "fail"
     assert body["alert_count"] is None
     assert body["alerts"] == []
+
+
+# ── Production readiness SLO panel ────────────────────────────────────────
+
+
+def _readiness_sample_payload() -> dict:
+    """A minimal but realistic sweep JSON shape used by the readiness tests."""
+    return {
+        "schema_version": "1",
+        "mode": "json",
+        "duration_ms": 1234,
+        "generated_at": "2026-04-30T00:00:00+00:00",
+        "summary": {"pass": 36, "warn": 5, "fail": 0, "skip": 2, "total": 43},
+        "checks": [
+            {
+                "category": "repo",
+                "section": "repo",
+                "name": "canonical_checkout_clean",
+                "status": "PASS",
+                "evidence": "## main...origin/main",
+                "duration_ms": 87,
+            },
+            {
+                "category": "routines",
+                "section": "routines",
+                "name": "backtest-weekly",
+                "status": "WARN",
+                "evidence": "gate=collecting; latest=workflow_dispatch/success 2026-04-28T00:14:28Z",
+                "duration_ms": 412,
+            },
+        ],
+    }
+
+
+def test_readiness_latest_returns_cached_payload(app_client, tmp_path, monkeypatch):
+    dash_app, client = app_client
+    cache_path = tmp_path / "readiness-sweep-latest.json"
+    cache_path.write_text(json.dumps(_readiness_sample_payload()))
+    monkeypatch.setattr(dash_app, "_readiness_cache_path", lambda: cache_path)
+
+    r = client.get("/api/readiness/latest", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["status"] == "ok"
+    assert body["cache_age_seconds"] is not None and body["cache_age_seconds"] >= 0
+    assert body["cache_stale"] is False
+    assert body["summary"] == {"pass": 36, "warn": 5, "fail": 0, "skip": 2, "total": 43}
+    assert len(body["checks"]) == 2
+    assert body["generated_at"] == "2026-04-30T00:00:00+00:00"
+
+
+def test_readiness_latest_missing_cache_returns_note(app_client, tmp_path, monkeypatch):
+    dash_app, client = app_client
+    cache_path = tmp_path / "missing-readiness-cache.json"
+    assert not cache_path.exists()
+    monkeypatch.setattr(dash_app, "_readiness_cache_path", lambda: cache_path)
+
+    r = client.get("/api/readiness/latest", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["status"] == "ok"
+    assert body["note"] == "no cache yet"
+    assert body["cache_age_seconds"] is None
+    assert body["summary"] == {"pass": 0, "warn": 0, "fail": 0, "skip": 0, "total": 0}
+    assert body["checks"] == []
+
+
+def test_readiness_check_endpoint_happy_path(app_client, tmp_path, monkeypatch):
+    dash_app, client = app_client
+    cache_path = tmp_path / "readiness-sweep-latest.json"
+    cache_path.write_text(json.dumps(_readiness_sample_payload()))
+    monkeypatch.setattr(dash_app, "_readiness_cache_path", lambda: cache_path)
+
+    r = client.get(
+        "/api/readiness/check/routines/backtest-weekly",
+        headers={"Authorization": _AUTH},
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["status"] == "ok"
+    assert body["check"]["name"] == "backtest-weekly"
+    assert body["check"]["status"] == "WARN"
+    assert body["generated_at"] == "2026-04-30T00:00:00+00:00"
+
+
+def test_readiness_check_endpoint_404_when_missing(app_client, tmp_path, monkeypatch):
+    dash_app, client = app_client
+    cache_path = tmp_path / "readiness-sweep-latest.json"
+    cache_path.write_text(json.dumps(_readiness_sample_payload()))
+    monkeypatch.setattr(dash_app, "_readiness_cache_path", lambda: cache_path)
+
+    r = client.get(
+        "/api/readiness/check/repo/does_not_exist",
+        headers={"Authorization": _AUTH},
+    )
+    assert r.status_code == 404
+    body = r.get_json()
+    assert body["status"] == "error"
+    assert body["error"] == "check not found"

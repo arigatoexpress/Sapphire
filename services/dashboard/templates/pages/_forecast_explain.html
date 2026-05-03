@@ -1,0 +1,289 @@
+{# Reusable "Why?" rationale panel — included by the analytics + performance pages.
+
+Provides:
+  - A modal-style panel (#forecastWhyPanel) for showing structured rationale
+  - A renderer (window.renderForecastExplain) that paints the rationale into the panel
+  - A fetcher (window.fetchForecastExplain) that GETs /api/forecast/explain/<symbol>
+    and renders the result
+  - A helper (window.attachForecastWhyButtons) that wires every <button class="why-btn"
+    data-symbol="..."> on the page
+
+The panel is hidden until a Why button is clicked. Components are rendered as a
+horizontal bar chart (sign-colored). A "Show math" disclosure exposes the raw
+inputs that produced the score.
+
+Pure HTML + vanilla JS — no Chart.js dependency for the bar chart.
+#}
+
+<style>
+  #forecastWhyPanel {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    backdrop-filter: blur(2px);
+  }
+  #forecastWhyPanel.open { display: flex; }
+  #forecastWhyPanel .why-card {
+    background: rgba(11, 11, 26, 0.97);
+    border: 1px solid var(--border-color, #1f2a40);
+    border-radius: 8px;
+    padding: 22px 28px;
+    width: min(640px, 92vw);
+    max-height: 88vh;
+    overflow-y: auto;
+    color: var(--text-primary, #d4f2cc);
+    font-family: var(--font-terminal, ui-monospace, monospace);
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
+  }
+  #forecastWhyPanel .why-close {
+    float: right;
+    background: transparent;
+    border: 1px solid var(--border-color, #1f2a40);
+    color: var(--text-primary, #d4f2cc);
+    cursor: pointer;
+    padding: 4px 10px;
+    font-size: 0.85rem;
+    border-radius: 4px;
+  }
+  #forecastWhyPanel .why-headline {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin: 8px 0 4px;
+  }
+  #forecastWhyPanel .why-regime {
+    font-size: 0.78rem;
+    color: var(--muted, #9fd89c);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  #forecastWhyPanel .why-conf-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    margin-left: 8px;
+    border: 1px solid currentColor;
+  }
+  #forecastWhyPanel .why-conf-high { color: #00ff88; }
+  #forecastWhyPanel .why-conf-medium { color: #ffd60a; }
+  #forecastWhyPanel .why-conf-low { color: #9fd89c; }
+  #forecastWhyPanel .why-rationale-short {
+    margin: 12px 0;
+    font-size: 0.95rem;
+    color: var(--text-primary, #d4f2cc);
+  }
+  #forecastWhyPanel .why-rationale-long {
+    margin: 8px 0 16px;
+    font-size: 0.78rem;
+    color: var(--muted, #9fd89c);
+    line-height: 1.5;
+  }
+  #forecastWhyPanel .why-component-row {
+    display: grid;
+    grid-template-columns: 90px 1fr 90px;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 0.8rem;
+  }
+  #forecastWhyPanel .why-component-name { color: var(--muted, #9fd89c); text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; }
+  #forecastWhyPanel .why-bar-track {
+    position: relative;
+    height: 14px;
+    background: rgba(148, 163, 184, 0.08);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  #forecastWhyPanel .why-bar-track::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: rgba(148, 163, 184, 0.4);
+  }
+  #forecastWhyPanel .why-bar {
+    position: absolute;
+    top: 1px;
+    bottom: 1px;
+    border-radius: 1px;
+  }
+  #forecastWhyPanel .why-bar.pos { background: #00ff88; left: 50%; }
+  #forecastWhyPanel .why-bar.neg { background: #ef4444; right: 50%; }
+  #forecastWhyPanel .why-component-val { text-align: right; font-variant-numeric: tabular-nums; }
+  #forecastWhyPanel details.why-math {
+    margin-top: 14px;
+    border-top: 1px dashed var(--border-color, #1f2a40);
+    padding-top: 12px;
+    font-size: 0.72rem;
+  }
+  #forecastWhyPanel details.why-math summary {
+    cursor: pointer;
+    color: var(--muted, #9fd89c);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  #forecastWhyPanel details.why-math pre {
+    background: rgba(0, 0, 0, 0.4);
+    padding: 10px;
+    margin-top: 8px;
+    border-radius: 4px;
+    overflow-x: auto;
+    color: #d4f2cc;
+    max-height: 320px;
+  }
+  .why-btn {
+    background: transparent;
+    border: 1px solid var(--border-color, #1f2a40);
+    color: var(--muted, #9fd89c);
+    cursor: pointer;
+    padding: 2px 8px;
+    font-size: 0.65rem;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-family: var(--font-terminal, ui-monospace, monospace);
+  }
+  .why-btn:hover { color: var(--text-primary, #d4f2cc); border-color: var(--text-primary, #d4f2cc); }
+</style>
+
+<div id="forecastWhyPanel" role="dialog" aria-modal="true" aria-labelledby="why-headline">
+  <div class="why-card">
+    <button class="why-close" type="button" onclick="document.getElementById('forecastWhyPanel').classList.remove('open')">Close</button>
+    <div class="why-regime" id="why-source">—</div>
+    <div class="why-headline" id="why-headline">Why?</div>
+    <div class="why-regime" id="why-regime-row">—</div>
+    <div class="why-rationale-short" id="why-short">—</div>
+    <div class="why-rationale-long" id="why-long">—</div>
+    <div id="why-components"></div>
+    <details class="why-math">
+      <summary>Show math</summary>
+      <pre id="why-math-pre">—</pre>
+    </details>
+  </div>
+</div>
+
+<script>
+(function () {
+  function escapeHtml(s) {
+    if (s == null) return '';
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function renderComponents(components) {
+    if (!components || !components.length) {
+      return '<div class="why-rationale-long">No scorable components.</div>';
+    }
+    return components.map(function (c) {
+      var v = Math.max(-1, Math.min(1, Number(c.value) || 0));
+      var pctOfHalf = Math.abs(v) * 50; // 50% of bar = full
+      var sign = v >= 0 ? 'pos' : 'neg';
+      var displayVal = (v >= 0 ? '+' : '') + v.toFixed(2);
+      var weightText = ' · w=' + (Number(c.weight) || 0).toFixed(2);
+      var nameLabel = escapeHtml((c.name || '').toUpperCase());
+      return '' +
+        '<div class="why-component-row" title="' + escapeHtml(c.note || '') + '">' +
+          '<div class="why-component-name">' + nameLabel + '</div>' +
+          '<div class="why-bar-track">' +
+            '<div class="why-bar ' + sign + '" style="width: ' + pctOfHalf.toFixed(2) + '%;"></div>' +
+          '</div>' +
+          '<div class="why-component-val">' + displayVal + '<span style="opacity:0.6;">' + weightText + '</span></div>' +
+        '</div>';
+    }).join('');
+  }
+
+  window.renderForecastExplain = function (rationale, source) {
+    var panel = document.getElementById('forecastWhyPanel');
+    if (!panel) return;
+    document.getElementById('why-source').textContent = source ? ('Source: ' + source) : '—';
+    document.getElementById('why-headline').textContent = rationale.headline || ('Why? ' + (rationale.symbol || ''));
+    var conf = rationale.confidence_band || 'low';
+    var confClass = 'why-conf-' + conf;
+    document.getElementById('why-regime-row').innerHTML =
+      'Regime: <strong>' + escapeHtml(rationale.regime || '—') + '</strong>' +
+      ' · Score: <strong>' + (Number(rationale.score) >= 0 ? '+' : '') + Number(rationale.score || 0).toFixed(3) + '</strong>' +
+      ' <span class="why-conf-badge ' + confClass + '">' + conf + '</span>';
+    document.getElementById('why-short').textContent = rationale.rationale_short || '—';
+    document.getElementById('why-long').textContent = rationale.rationale_long || '—';
+    document.getElementById('why-components').innerHTML = renderComponents(rationale.components);
+    try {
+      document.getElementById('why-math-pre').textContent = JSON.stringify(rationale.show_math || {}, null, 2);
+    } catch (e) {
+      document.getElementById('why-math-pre').textContent = String(rationale.show_math);
+    }
+    panel.classList.add('open');
+  };
+
+  window.fetchForecastExplain = function (symbol) {
+    if (!symbol) return;
+    var url = '/api/forecast/explain/' + encodeURIComponent(symbol);
+    fetch(url, { credentials: 'same-origin' })
+      .then(function (r) {
+        if (r.status === 404) {
+          window.renderForecastExplain({
+            headline: symbol + ': no rationale available',
+            regime: 'NEUTRAL',
+            score: 0,
+            confidence_band: 'low',
+            rationale_short: 'no forecast row or scoring record matches this symbol',
+            rationale_long: 'The dashboard could not find a Kronos+TA forecast row or a recent TradingView orchestrator scoring record for ' + symbol + '. Run a TA capture sweep or wait for the next Kronos daily.',
+            components: [],
+            show_math: {},
+          }, 'none');
+          return null;
+        }
+        return r.json();
+      })
+      .then(function (body) {
+        if (!body) return;
+        if (body.status === 'ok' && body.rationale) {
+          window.renderForecastExplain(body.rationale, body.source || '');
+        } else {
+          window.renderForecastExplain({
+            headline: symbol + ': error',
+            regime: 'NEUTRAL', score: 0, confidence_band: 'low',
+            rationale_short: body.reason || 'unknown error',
+            rationale_long: JSON.stringify(body || {}, null, 2),
+            components: [],
+            show_math: {},
+          }, 'error');
+        }
+      })
+      .catch(function (err) {
+        window.renderForecastExplain({
+          headline: symbol + ': network error',
+          regime: 'NEUTRAL', score: 0, confidence_band: 'low',
+          rationale_short: String(err && err.message || err || ''),
+          rationale_long: 'Failed to fetch /api/forecast/explain/' + symbol + '.',
+          components: [], show_math: {},
+        }, 'error');
+      });
+  };
+
+  window.attachForecastWhyButtons = function (root) {
+    root = root || document;
+    var buttons = root.querySelectorAll('button.why-btn[data-symbol]:not([data-why-bound])');
+    buttons.forEach(function (btn) {
+      btn.setAttribute('data-why-bound', '1');
+      btn.addEventListener('click', function () {
+        var symbol = btn.getAttribute('data-symbol');
+        window.fetchForecastExplain(symbol);
+      });
+    });
+  };
+
+  // Auto-bind on initial load + every 2s for late-rendered tables.
+  document.addEventListener('DOMContentLoaded', function () {
+    window.attachForecastWhyButtons();
+    setInterval(function () { window.attachForecastWhyButtons(); }, 2000);
+  });
+})();
+</script>
