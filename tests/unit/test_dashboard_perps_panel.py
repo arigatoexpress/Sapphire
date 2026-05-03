@@ -41,8 +41,8 @@ dashboard_app = importlib.import_module("services.dashboard.app")
 from lib.perps.gmx_v2_overview import (  # noqa: E402
     EXTREME_FUNDING_ABS_APR,
     EXTREME_SKEW_DELTA,
-    PerpsMarketSnapshot,
     WARN_FUNDING_ABS_APR,
+    PerpsMarketSnapshot,
     _classify_severity,
     _side_recommendation,
     compute_cross_chain_divergence,
@@ -183,9 +183,7 @@ def test_perps_api_requires_auth(client):
 
 def test_perps_api_returns_200_and_valid_shape(client):
     sample = _sample_payload()
-    with patch(
-        "lib.perps.gmx_v2_overview.scan_perps_overview", return_value=sample
-    ):
+    with patch("lib.perps.gmx_v2_overview.scan_perps_overview", return_value=sample):
         response = client.get("/api/perps/overview", headers=_auth_header())
 
     assert response.status_code == 200
@@ -205,9 +203,17 @@ def test_perps_api_returns_200_and_valid_shape(client):
     # First market has the full snapshot shape
     m = body["markets"][0]
     for k in (
-        "chain_id", "chain_name", "market_name", "market_address",
-        "funding_apr", "funding_direction", "open_interest_long_usd",
-        "open_interest_short_usd", "skew", "severity", "side_recommendation",
+        "chain_id",
+        "chain_name",
+        "market_name",
+        "market_address",
+        "funding_apr",
+        "funding_direction",
+        "open_interest_long_usd",
+        "open_interest_short_usd",
+        "skew",
+        "severity",
+        "side_recommendation",
     ):
         assert k in m, f"missing {k}"
     assert m["severity"] in {"NORMAL", "WARN", "EXTREME"}
@@ -216,9 +222,7 @@ def test_perps_api_returns_200_and_valid_shape(client):
 def test_perps_api_includes_extreme_funding_signal(client):
     """The BTC/ETH funding divergence is the load-bearing demo signal."""
     sample = _sample_payload()
-    with patch(
-        "lib.perps.gmx_v2_overview.scan_perps_overview", return_value=sample
-    ):
+    with patch("lib.perps.gmx_v2_overview.scan_perps_overview", return_value=sample):
         response = client.get("/api/perps/overview", headers=_auth_header())
     body = response.get_json()
     # Both BTC and ETH same-underlying divergences should be present.
@@ -344,7 +348,9 @@ def test_thresholds_match_demo_contract():
 # ── 6. Cross-chain divergence pairing ────────────────────────────────────
 
 
-def _snap(chain_id: int, name: str, market_name: str, apr: str, skew: str = "0.5") -> PerpsMarketSnapshot:
+def _snap(
+    chain_id: int, name: str, market_name: str, apr: str, skew: str = "0.5"
+) -> PerpsMarketSnapshot:
     return PerpsMarketSnapshot(
         chain_id=chain_id,
         chain_name=name,

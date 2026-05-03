@@ -49,7 +49,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from decimal import Decimal
 from typing import Any
 
@@ -79,17 +79,17 @@ class PerpsMarketSnapshot:
     """
 
     chain_id: int
-    chain_name: str                # "MegaETH" / "Arbitrum"
-    market_name: str               # human-readable e.g. "ETH/USD"
-    market_address: str            # GMX market token address (lowercased)
-    funding_apr: Decimal           # signed annualized fraction (0.56 == +56%)
-    funding_direction: str         # "longs_pay_shorts" | "shorts_pay_longs"
+    chain_name: str  # "MegaETH" / "Arbitrum"
+    market_name: str  # human-readable e.g. "ETH/USD"
+    market_address: str  # GMX market token address (lowercased)
+    funding_apr: Decimal  # signed annualized fraction (0.56 == +56%)
+    funding_direction: str  # "longs_pay_shorts" | "shorts_pay_longs"
     open_interest_long_usd: Decimal
     open_interest_short_usd: Decimal
-    skew: Decimal                  # long_oi / (long_oi + short_oi); 0.5 == balanced
+    skew: Decimal  # long_oi / (long_oi + short_oi); 0.5 == balanced
     mark_price_usd: Decimal | None  # may be None when off-chain price feed unavailable
-    severity: str                  # "NORMAL" | "WARN" | "EXTREME"
-    side_recommendation: str       # human-readable directional hint
+    severity: str  # "NORMAL" | "WARN" | "EXTREME"
+    side_recommendation: str  # human-readable directional hint
 
 
 def _classify_severity(funding_apr: Decimal, skew: Decimal) -> str:
@@ -124,10 +124,7 @@ def _side_recommendation(funding_apr: Decimal) -> str:
 def _snapshot_to_dict(snap: PerpsMarketSnapshot) -> dict[str, Any]:
     """Flatten one snapshot to a JSON-serializable dict (Decimals → strings)."""
     raw = asdict(snap)
-    return {
-        k: (str(v) if isinstance(v, Decimal) else v)
-        for k, v in raw.items()
-    }
+    return {k: (str(v) if isinstance(v, Decimal) else v) for k, v in raw.items()}
 
 
 # ---------------------------------------------------------------------------
@@ -212,12 +209,12 @@ class FundingDivergence:
     on B). The strategy lane uses the absolute value to size opportunity.
     """
 
-    underlying: str                 # "ETH" / "BTC"
-    chain_a: str                    # "MegaETH"
-    chain_b: str                    # "Arbitrum"
+    underlying: str  # "ETH" / "BTC"
+    chain_a: str  # "MegaETH"
+    chain_b: str  # "Arbitrum"
     apr_a: Decimal
     apr_b: Decimal
-    divergence_bps: Decimal         # (apr_a - apr_b) * 10_000
+    divergence_bps: Decimal  # (apr_a - apr_b) * 10_000
 
 
 def _underlying_from_market_name(name: str) -> str | None:
@@ -264,10 +261,7 @@ def compute_cross_chain_divergence(
 
 def _divergence_to_dict(div: FundingDivergence) -> dict[str, Any]:
     raw = asdict(div)
-    return {
-        k: (str(v) if isinstance(v, Decimal) else v)
-        for k, v in raw.items()
-    }
+    return {k: (str(v) if isinstance(v, Decimal) else v) for k, v in raw.items()}
 
 
 # ---------------------------------------------------------------------------
@@ -293,6 +287,7 @@ def _build_megaeth_wiring() -> _ChainWiring:
             GmxV2,
             GmxV2Addresses,
         )
+
         from lib.chains.megaeth.registry import ProtocolRegistry  # noqa: PLC0415
 
         registry = ProtocolRegistry.from_yaml()
@@ -313,11 +308,12 @@ def _build_megaeth_wiring() -> _ChainWiring:
 def _build_arbitrum_wiring() -> _ChainWiring:
     wiring = _ChainWiring(chain_id=CHAIN_ID_ARBITRUM, chain_name="Arbitrum")
     try:
-        from lib.chains.arbitrum.client import ArbitrumClient  # noqa: PLC0415
         from lib.chains.arbitrum.contracts.gmx_v2 import (  # noqa: PLC0415
             GmxV2,
             GmxV2Addresses,
         )
+
+        from lib.chains.arbitrum.client import ArbitrumClient  # noqa: PLC0415
         from lib.chains.arbitrum.registry import ProtocolRegistry  # noqa: PLC0415
 
         registry = ProtocolRegistry.from_yaml()
@@ -359,19 +355,16 @@ async def _scan_chain_live(wiring: _ChainWiring) -> list[PerpsMarketSnapshot]:
             # raise — we swallow, log, and continue so a partial
             # outage produces a partial view instead of an empty page.
             prices = await wiring.gmx_v2_wrapper.fetch_prices(market)  # type: ignore[attr-defined]
-            info = await wiring.gmx_v2_wrapper.market_info(
-                market.market_token, prices
-            )
+            info = await wiring.gmx_v2_wrapper.market_info(market.market_token, prices)
             apr = wiring.gmx_v2_wrapper._funding_apr_from_info(info)  # type: ignore[attr-defined]
             skew = wiring.gmx_v2_wrapper._oi_skew_from_info(info)  # type: ignore[attr-defined]
             from decimal import Decimal as _D
+
             long_usd = _D(int(info.open_interest_long)) / _D(10) ** 30
             short_usd = _D(int(info.open_interest_short)) / _D(10) ** 30
             mark = None
             try:
-                mark = (
-                    _D(int(prices[0][0]) + int(prices[0][1])) / _D(2)
-                ) / (_D(10) ** _D(30 - 18))
+                mark = (_D(int(prices[0][0]) + int(prices[0][1])) / _D(2)) / (_D(10) ** _D(30 - 18))
             except Exception:
                 mark = None
             severity = _classify_severity(apr, skew)
@@ -396,7 +389,9 @@ async def _scan_chain_live(wiring: _ChainWiring) -> list[PerpsMarketSnapshot]:
         except Exception as exc:  # pragma: no cover
             logger.warning(
                 "market_info failed on %s/%s: %s",
-                wiring.chain_name, getattr(market, "name", "<unknown>"), exc,
+                wiring.chain_name,
+                getattr(market, "name", "<unknown>"),
+                exc,
             )
             continue
     return out
@@ -406,9 +401,7 @@ async def _scan_all_chains_live() -> tuple[list[PerpsMarketSnapshot], list[str]]
     """Run both per-chain live scans concurrently. Returns (snapshots, wiring_errors)."""
     wirings = [_build_megaeth_wiring(), _build_arbitrum_wiring()]
     errors = [w.error for w in wirings if w.error]
-    results = await asyncio.gather(
-        *(_scan_chain_live(w) for w in wirings), return_exceptions=True
-    )
+    results = await asyncio.gather(*(_scan_chain_live(w) for w in wirings), return_exceptions=True)
     snapshots: list[PerpsMarketSnapshot] = []
     for r in results:
         if isinstance(r, Exception):
@@ -496,11 +489,7 @@ def scan_perps_overview(
 
     divs = compute_cross_chain_divergence(snapshots)
     div_dicts = [_divergence_to_dict(d) for d in divs]
-    max_abs = (
-        max((abs(d.divergence_bps) for d in divs), default=None)
-        if divs
-        else None
-    )
+    max_abs = max((abs(d.divergence_bps) for d in divs), default=None) if divs else None
     extreme_count = sum(1 for s in snapshots if s.severity == "EXTREME")
 
     return {
