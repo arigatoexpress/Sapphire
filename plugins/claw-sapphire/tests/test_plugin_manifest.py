@@ -21,10 +21,11 @@ def test_manifest_registered_tools_are_intentional():
 
     tools = manifest["tools"]
     # Wave B.5 (2026-04-30) added sapphire_megaeth_protocols, bumping
-    # the registered surface from 15 → 16. Bump this assertion as new
-    # registered tools land — keeping the count check explicit catches
-    # accidental adds without a deliberate decision.
-    assert len(tools) == 16
+    # the registered surface from 15 → 16. Salvage PR #615 (2026-05-03)
+    # added sapphire_tradingview (read-only orchestrator surface), 16 → 17.
+    # Bump this assertion as new registered tools land — keeping the count
+    # check explicit catches accidental adds without a deliberate decision.
+    assert len(tools) == 17
 
     expected_permissions = {
         "sapphire_dispatch": "workspace-write",
@@ -43,6 +44,7 @@ def test_manifest_registered_tools_are_intentional():
         "sapphire_lead_engine": "workspace-write",
         "sapphire_trading_brain": "read-only",
         "sapphire_megaeth_protocols": "read-only",
+        "sapphire_tradingview": "read-only",
     }
 
     assert [tool["name"] for tool in tools] == list(expected_permissions)
