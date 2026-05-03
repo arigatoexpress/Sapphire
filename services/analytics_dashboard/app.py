@@ -68,6 +68,17 @@ try:
 except Exception as _brain_exc:  # noqa: BLE001
     log.warning("brain endpoints disabled: %s", _brain_exc)
 
+# Live global market feed (CoinGecko free tier, 60s in-process cache).
+# /api/markets/snapshot powers the "Global Markets" hero strip so the
+# dashboard never shows "0 signals" — even when our local trading
+# collectors are silent, real-world prices are flowing.
+try:
+    from markets import register_markets as _register_markets
+
+    _register_markets(app)
+except Exception as _markets_exc:  # noqa: BLE001
+    log.warning("markets endpoints disabled: %s", _markets_exc)
+
 _KNOWN_PROBE_PATHS = {
     "/.git/config",
     "/favicon.ico",
