@@ -204,9 +204,7 @@ async def test_one_chain_rpc_fails_signal_still_emits_with_chains_unavailable() 
     arb = _StubRegistry({"BTC": _price("BTC", "76000.00")})
     op = _StubRegistry({"BTC": _price("BTC", "76760.00")})
     mega = _StubRegistry(raises=RuntimeError("RPC down on MegaETH"))
-    scanner = CrossChainPythScanner(
-        megaeth_pyth=mega, arbitrum_pyth=arb, optimism_pyth=op
-    )
+    scanner = CrossChainPythScanner(megaeth_pyth=mega, arbitrum_pyth=arb, optimism_pyth=op)
     sig = await scanner.scan_asset("BTC")
     assert sig is not None
     assert sig.max_divergence_bps == Decimal("100")
@@ -221,9 +219,7 @@ async def test_two_chains_fail_returns_none_not_exception() -> None:
     arb = _StubRegistry({"BTC": _price("BTC", "76000.00")})
     op = _StubRegistry(raises=RuntimeError("Optimism RPC down"))
     mega = _StubRegistry(raises=RuntimeError("MegaETH RPC down"))
-    scanner = CrossChainPythScanner(
-        megaeth_pyth=mega, arbitrum_pyth=arb, optimism_pyth=op
-    )
+    scanner = CrossChainPythScanner(megaeth_pyth=mega, arbitrum_pyth=arb, optimism_pyth=op)
     sig = await scanner.scan_asset("BTC")
     assert sig is None
 
@@ -238,12 +234,8 @@ async def test_stale_price_still_surfaces_with_any_stale_flag() -> None:
     """Stale prices are not silently dropped — the signal surfaces
     with ``any_stale=True`` so the operator can discount the
     divergence (it may close the moment a keeper refreshes)."""
-    arb = _StubRegistry(
-        {"BTC": _price("BTC", "76000.00", publish_time=1_761_000_000, stale=False)}
-    )
-    op = _StubRegistry(
-        {"BTC": _price("BTC", "76760.00", publish_time=1_760_000_000, stale=True)}
-    )
+    arb = _StubRegistry({"BTC": _price("BTC", "76000.00", publish_time=1_761_000_000, stale=False)})
+    op = _StubRegistry({"BTC": _price("BTC", "76760.00", publish_time=1_760_000_000, stale=True)})
     scanner = CrossChainPythScanner(arbitrum_pyth=arb, optimism_pyth=op)
     sig = await scanner.scan_asset("BTC")
     assert sig is not None
@@ -272,9 +264,7 @@ async def test_freshest_stalest_resolved_by_publish_time() -> None:
         {"BTC": _price("BTC", "76152.00", publish_time=1000)},
         address="0xMEGA",
     )
-    scanner = CrossChainPythScanner(
-        megaeth_pyth=mega, arbitrum_pyth=arb, optimism_pyth=op
-    )
+    scanner = CrossChainPythScanner(megaeth_pyth=mega, arbitrum_pyth=arb, optimism_pyth=op)
     sig = await scanner.scan_asset("BTC")
     assert sig is not None
     assert sig.freshest_chain == "Optimism"

@@ -1,20 +1,21 @@
 """Cross-chain alpha surface for the Sentinel demo + dashboard.
 
-Wraps :class:`lib.chains.cross_chain.aave_apy_arb.CrossChainAaveScanner`
-in a synchronous, JSON-friendly entry point so the dashboard, the agent
-plugin tool, and the Telegram operator can all consume cross-chain Aave
-APY arbitrage signals without re-implementing the chain wiring.
+Wraps the cross-chain primitives (Aave APY arb + Pyth price divergence)
+in synchronous, JSON-friendly entry points so the dashboard, the agent
+plugin tool, and the Telegram operator can consume cross-chain signals
+without re-implementing the chain wiring.
 
 Why this matters: per-chain wrappers (megaeth/arbitrum/optimism) each
-expose a single chain's lend overview. Single-chain consumers cannot see
-cross-chain dislocation. This module composes all three wrappers and
-exports a *positive* signal — a cross-chain capital-rotation
-opportunity Sapphire's multi-chain stack uniquely surfaces. Sentinel
-historically traded only in *defensive* signals (chain-health BLOCK);
-``scan_aave_arb`` is the first entry on the offensive side of the
-ledger.
+expose a single chain's view. Single-chain consumers cannot see
+cross-chain dislocation. This module composes the primitives across
+chains and exports *positive* signals — capital-rotation and
+oracle-divergence opportunities Sapphire's multi-chain stack uniquely
+surfaces. Together :func:`scan_aave_arb` and
+:func:`scan_pyth_divergence` substantiate "Sapphire is the canonical
+multi-chain alpha-discovery layer" rather than just claiming
+portability.
 
-Read-only. The signal generator never executes — routing is a separate,
+Read-only. Signal generators never execute — routing is a separate,
 gated decision the operator (or a future executor) makes.
 """
 
@@ -25,123 +26,128 @@ import logging
 import os
 from typing import Any
 
-from lib.chains.cross_chain.aave_apy_arb import (
-    DEFAULT_TOP_ASSETS,
-    EXTREME_SPREAD_BPS,
-    MIN_SIGNAL_SPREAD_BPS,
-    AaveApyArbSignal,
-    CrossChainAaveScanner,
+from lib.chains.cross_chain.pyth_divergence import (
+    DEFAULT_TOP_ASSETS as PYTH_DEFAULT_TOP_ASSETS,
+)
+from lib.chains.cross_chain.pyth_divergence import (
+    EXTREME_DIVERGENCE_BPS,
+    MIN_SIGNAL_DIVERGENCE_BPS,
+    CrossChainPythScanner,
+    PythDivergenceSignal,
 )
 
 logger = logging.getLogger(__name__)
 
 
-def _build_scanner_from_default_clients() -> CrossChainAaveScanner:
-    """Construct a scanner wired to the three production chain facades.
+# ---------------------------------------------------------------------------
+# Pyth divergence — second cross-chain primitive (companion to Aave arb)
+# ---------------------------------------------------------------------------
 
-    Each facade is constructed lazily (and independently) so a missing
-    or unhealthy client on one chain does not block the other two —
+
+def _build_pyth_scanner_from_default_clients() -> CrossChainPythScanner:
+    """Construct a Pyth scanner wired to the per-chain registries.
+
+    Each registry is constructed lazily and independently so a missing
+    or unhealthy client on one chain does not block the others —
     matches the graceful-degradation guarantee the scanner already
     enforces internally.
 
-    Returns a scanner with whichever facades successfully wired; the
-    scanner itself permits ``None`` for any per-chain facade and just
-    skips that chain.
+    MegaETH and Optimism Pyth wrappers ship in parallel branches; until
+    they land on main this function gracefully ends up with only the
+    Arbitrum registry wired and the scanner correctly returns no
+    signals (need >=2 chains for a divergence). That's the right
+    behaviour: the scanner reports what it can see honestly rather
+    than fabricating a single-chain "divergence".
     """
-    megaeth_protocols: Any | None = None
-    arbitrum_protocols: Any | None = None
-    optimism_protocols: Any | None = None
+    megaeth_pyth: Any | None = None
+    arbitrum_pyth: Any | None = None
+    optimism_pyth: Any | None = None
 
-    # MegaETH transport ships in PR #529 (lib.chains.megaeth.client). Until
-    # that lands, the client lives at plugins/claw-sapphire/tools/internal/
-    # megaeth.py — try the post-merge path first, then the plugin path.
     try:
-        from lib.chains.megaeth.protocols import MegaETHProtocols  # noqa: PLC0415
+        from lib.chains.megaeth.client import MegaETHClient  # noqa: PLC0415
+        from lib.chains.megaeth.contracts.pyth_oracle import (  # noqa: PLC0415
+            PythRegistry as MegaPythRegistry,
+        )
 
-        megaeth_client = None
-        try:
-            from lib.chains.megaeth.client import MegaETHClient  # noqa: PLC0415
-
-            megaeth_client = MegaETHClient()
-        except ImportError:
-            try:
-                # Fallback to the plugin-tool location.
-                from plugins.claw_sapphire.tools.internal.megaeth import (  # noqa: PLC0415
-                    MegaETHClient as _PluginMegaETHClient,
-                )
-
-                megaeth_client = _PluginMegaETHClient()
-            except Exception:
-                megaeth_client = None
-        if megaeth_client is not None:
-            megaeth_protocols = MegaETHProtocols(megaeth_client)
-    except Exception as exc:  # pragma: no cover - exercised by integration test
-        logger.warning("megaeth facade unavailable: %s", exc)
+        megaeth_pyth = MegaPythRegistry(MegaETHClient())
+    except Exception as exc:  # pragma: no cover — exercised by integration test
+        logger.warning("MegaETH Pyth registry unavailable: %s", exc)
 
     try:
         from lib.chains.arbitrum.client import ArbitrumClient  # noqa: PLC0415
-        from lib.chains.arbitrum.protocols import ArbitrumProtocols  # noqa: PLC0415
+        from lib.chains.arbitrum.contracts.pyth_oracle import (  # noqa: PLC0415
+            PythRegistry as ArbPythRegistry,
+        )
 
-        arbitrum_protocols = ArbitrumProtocols(ArbitrumClient())
-    except Exception as exc:  # pragma: no cover - exercised by integration test
-        logger.warning("arbitrum facade unavailable: %s", exc)
+        arbitrum_pyth = ArbPythRegistry(ArbitrumClient())
+    except Exception as exc:  # pragma: no cover
+        logger.warning("Arbitrum Pyth registry unavailable: %s", exc)
 
     try:
         from lib.chains.optimism.client import OptimismClient  # noqa: PLC0415
-        from lib.chains.optimism.protocols import OptimismProtocols  # noqa: PLC0415
 
-        optimism_protocols = OptimismProtocols(OptimismClient())
-    except Exception as exc:  # pragma: no cover - exercised by integration test
-        logger.warning("optimism facade unavailable: %s", exc)
+        from lib.chains.optimism.contracts.pyth_oracle import (  # noqa: PLC0415
+            PythRegistry as OpPythRegistry,
+        )
 
-    return CrossChainAaveScanner(
-        megaeth_protocols=megaeth_protocols,
-        arbitrum_protocols=arbitrum_protocols,
-        optimism_protocols=optimism_protocols,
+        optimism_pyth = OpPythRegistry(OptimismClient())
+    except Exception as exc:  # pragma: no cover
+        logger.warning("Optimism Pyth registry unavailable: %s", exc)
+
+    return CrossChainPythScanner(
+        megaeth_pyth=megaeth_pyth,
+        arbitrum_pyth=arbitrum_pyth,
+        optimism_pyth=optimism_pyth,
     )
 
 
-def _signal_to_summary(sig: AaveApyArbSignal) -> dict[str, Any]:
-    """Flatten one signal to a dashboard-friendly dict.
+def _pyth_signal_to_summary(sig: PythDivergenceSignal) -> dict[str, Any]:
+    """Flatten one Pyth divergence signal to a dashboard-friendly dict.
 
-    All Decimals become strings; the per-chain APY snapshot keeps the
-    existing chain-name keys so the dashboard table can group rows by
-    chain consistently.
+    Decimals → strings; per-chain payload preserves the chain-name
+    keys so the dashboard table can group rows by chain consistently
+    with the Aave-arb table.
     """
     return {
         "asset": sig.asset,
         "severity": sig.severity,
-        "direction": sig.direction,
-        "max_supply_spread_bps": str(sig.max_supply_spread_bps),
-        "max_borrow_spread_bps": str(sig.max_borrow_spread_bps),
+        "max_divergence_bps": str(sig.max_divergence_bps),
+        "freshest_chain": sig.freshest_chain,
+        "stalest_chain": sig.stalest_chain,
+        "any_stale": bool(sig.any_stale),
         "chains": {
-            name: {k: str(v) for k, v in payload.items()}
+            name: {
+                "price": str(payload["price"]),
+                "publish_time": int(payload["publish_time"]),
+                "stale": bool(payload["stale"]),
+                "source_address": str(payload["source_address"]),
+            }
             for name, payload in sig.chains.items()
         },
         "chains_unavailable": list(sig.chains_unavailable),
     }
 
 
-async def _scan_aave_arb_async(
+async def _scan_pyth_divergence_async(
     top_n: int,
-    scanner: CrossChainAaveScanner | None,
-) -> list[AaveApyArbSignal]:
-    """Internal async helper so :func:`scan_aave_arb` can be sync."""
-    s = scanner if scanner is not None else _build_scanner_from_default_clients()
+    scanner: CrossChainPythScanner | None,
+) -> list[PythDivergenceSignal]:
+    """Internal async helper so :func:`scan_pyth_divergence` can be sync."""
+    s = scanner if scanner is not None else _build_pyth_scanner_from_default_clients()
     return await s.scan_top_assets(n=top_n)
 
 
-def scan_aave_arb(
+def scan_pyth_divergence(
     top_n: int = 5,
     *,
-    scanner: CrossChainAaveScanner | None = None,
+    scanner: CrossChainPythScanner | None = None,
 ) -> dict[str, Any]:
-    """Synchronous JSON-serializable cross-chain Aave APY arb summary.
+    """Synchronous JSON-serializable cross-chain Pyth divergence summary.
 
     Designed to be called from:
 
-    * the dashboard (``/api/cross-chain/aave-arb`` endpoint, future)
-    * a Sapphire plugin tool (``cross_chain_alpha.py``, future)
+    * the dashboard (``/api/cross-chain/pyth-divergence`` endpoint, future)
+    * a Sapphire plugin tool
     * the Sentinel decision engine as a *positive* signal source
 
     Returns a dict with this shape::
@@ -150,62 +156,56 @@ def scan_aave_arb(
             "top_n": 5,
             "signals": [ {<summary>}, ... ],   # length 0..top_n
             "signal_count": <int>,
-            "max_spread_bps": "<Decimal-as-str>" | None,
+            "max_divergence_bps": "<Decimal-as-str>" | None,
+            "any_stale": <bool>,
             "thresholds": {
-                "min_signal_spread_bps": "50",
-                "extreme_spread_bps": "200",
+                "min_signal_divergence_bps": "20",
+                "extreme_divergence_bps": "100",
             },
-            "candidate_assets": ["USDC", "USDT", "DAI", "WETH", "WBTC"],
+            "candidate_assets": ["BTC", "ETH", "SOL", "USDC", "USDT"],
             "error": "<str>" | not present,
         }
 
-    On *any* uncaught failure (e.g. the entire chain stack is offline),
+    On *any* uncaught failure (e.g. the entire chain stack offline),
     returns a structured error dict so the dashboard / plugin tool
     surface a graceful empty state rather than a 500.
 
-    ``scanner`` is injectable for tests; production callers pass nothing
-    and accept the default chain-client wiring.
+    ``scanner`` is injectable for tests; production callers pass
+    nothing and accept the default chain-client wiring.
     """
     try:
-        signals = asyncio.run(_scan_aave_arb_async(top_n=top_n, scanner=scanner))
+        signals = asyncio.run(_scan_pyth_divergence_async(top_n=top_n, scanner=scanner))
     except Exception as exc:
-        logger.exception("scan_aave_arb failed")
+        logger.exception("scan_pyth_divergence failed")
         return {
             "top_n": top_n,
             "signals": [],
             "signal_count": 0,
-            "max_spread_bps": None,
+            "max_divergence_bps": None,
+            "any_stale": False,
             "thresholds": {
-                "min_signal_spread_bps": str(MIN_SIGNAL_SPREAD_BPS),
-                "extreme_spread_bps": str(EXTREME_SPREAD_BPS),
+                "min_signal_divergence_bps": str(MIN_SIGNAL_DIVERGENCE_BPS),
+                "extreme_divergence_bps": str(EXTREME_DIVERGENCE_BPS),
             },
-            "candidate_assets": list(DEFAULT_TOP_ASSETS),
+            "candidate_assets": list(PYTH_DEFAULT_TOP_ASSETS),
             "error": f"{type(exc).__name__}: {exc}",
         }
 
-    summaries = [_signal_to_summary(s) for s in signals]
-    max_spread = (
-        max(
-            (
-                max(s.max_supply_spread_bps, s.max_borrow_spread_bps)
-                for s in signals
-            ),
-            default=None,
-        )
-        if signals
-        else None
-    )
+    summaries = [_pyth_signal_to_summary(s) for s in signals]
+    max_div = max((s.max_divergence_bps for s in signals), default=None) if signals else None
+    any_stale = any(s.any_stale for s in signals)
 
     return {
         "top_n": top_n,
         "signals": summaries,
         "signal_count": len(summaries),
-        "max_spread_bps": str(max_spread) if max_spread is not None else None,
+        "max_divergence_bps": str(max_div) if max_div is not None else None,
+        "any_stale": any_stale,
         "thresholds": {
-            "min_signal_spread_bps": str(MIN_SIGNAL_SPREAD_BPS),
-            "extreme_spread_bps": str(EXTREME_SPREAD_BPS),
+            "min_signal_divergence_bps": str(MIN_SIGNAL_DIVERGENCE_BPS),
+            "extreme_divergence_bps": str(EXTREME_DIVERGENCE_BPS),
         },
-        "candidate_assets": list(DEFAULT_TOP_ASSETS),
+        "candidate_assets": list(PYTH_DEFAULT_TOP_ASSETS),
     }
 
 
@@ -214,250 +214,7 @@ def is_integration_enabled() -> bool:
     return os.getenv("SAPPHIRE_CROSS_CHAIN_INTEGRATION") == "1"
 
 
-def backtest_aave_arb(
-    asset: str = "USDC",
-    capital_usd: float = 10_000.0,
-    days: int = 30,
-    *,
-    scanner: CrossChainAaveScanner | None = None,
-    bridge_cost_bps_per_round_trip: float = 5.0,
-    gas_cost_usd_per_action: float = 2.50,
-    holding_period_hours: float = 24.0,
-    decay_days: float = 7.0,
-) -> dict[str, Any]:
-    """Synchronous JSON-friendly cross-chain Aave APY arb PnL projection.
-
-    Convenience wrapper that fetches the live cross-chain spread for
-    ``asset`` and runs it through
-    :class:`lib.trading.cross_chain_arb_backtest.CrossChainArbBacktest`
-    at the requested capital + horizon, with all cost knobs surfaced as
-    keyword args so the dashboard can sweep them without touching the
-    underlying class.
-
-    Designed for:
-
-    * the dashboard (``/api/cross-chain/backtest`` endpoint, future)
-    * a Sapphire plugin tool (``cross_chain_alpha.py``, future)
-    * the agent's ``project_pnl`` skill
-
-    Returns a dict with this shape::
-
-        {
-            "asset": "USDC",
-            "capital_usd": 10000.0,
-            "days": 30,
-            "result": <BacktestResult.to_dict()>,
-            "signal": <signal-summary> | None,
-            "error": "<str>" | not present,
-        }
-
-    On any uncaught failure (entire chain stack offline, RPC timeout)
-    returns a structured error dict so the dashboard / plugin tool
-    surface a graceful empty state rather than a 500.
-
-    ``scanner`` is injectable for tests; production callers pass nothing
-    and accept the default chain-client wiring.
-    """
-    # Local import keeps the module load-light when the backtester isn't
-    # used (cross_chain_alpha is also imported by the live signal path).
-    from lib.trading.cross_chain_arb_backtest import (  # noqa: PLC0415
-        CrossChainArbBacktest,
-    )
-
-    s = scanner if scanner is not None else _build_scanner_from_default_clients()
-    try:
-        sig = asyncio.run(s.scan_asset(asset))
-    except Exception as exc:
-        logger.exception("backtest_aave_arb scan_asset(%s) failed", asset)
-        return {
-            "asset": asset,
-            "capital_usd": capital_usd,
-            "days": days,
-            "result": None,
-            "signal": None,
-            "error": f"{type(exc).__name__}: {exc}",
-        }
-
-    bt = CrossChainArbBacktest(
-        capital_usd=capital_usd,
-        days=days,
-        bridge_cost_bps_per_round_trip=bridge_cost_bps_per_round_trip,
-        gas_cost_usd_per_action=gas_cost_usd_per_action,
-        holding_period_hours=holding_period_hours,
-        decay_days=decay_days,
-    )
-    if sig is None:
-        # No live signal — surface a flat zero-PnL result so the dashboard
-        # tile renders an "all quiet" state instead of an error.
-        result = bt.simulate_with_spread(asset=asset, initial_spread_bps=0.0)
-        return {
-            "asset": asset,
-            "capital_usd": capital_usd,
-            "days": days,
-            "result": result.to_dict(),
-            "signal": None,
-        }
-
-    result = bt.simulate_from_signal(sig)
-    return {
-        "asset": asset,
-        "capital_usd": capital_usd,
-        "days": days,
-        "result": result.to_dict(),
-        "signal": _signal_to_summary(sig),
-    }
-
-
-def backtest_funding_carry(
-    market_addr: str,
-    chain_id: int,
-    asset: str,
-    capital_usd: float = 10_000.0,
-    days: int = 30,
-    *,
-    current_funding_apr: float | None = None,
-    leverage: float = 1.0,
-    gmx_open_close_bps: float = 30.0,
-    gmx_keeper_cost_per_funding_period_usd: float = 0.50,
-    funding_period_hours: float = 1.0,
-    decay_days: float = 7.0,
-) -> dict[str, Any]:
-    """Synchronous JSON-friendly funding-rate carry PnL projection.
-
-    Companion to :func:`backtest_aave_arb`. Wraps the
-    :class:`lib.trading.funding_rate_carry_backtest.FundingCarryBacktest`
-    projector around the GMX V2 funding-rate accessor on whichever
-    chain ``chain_id`` selects (42161 = Arbitrum, 6342 = MegaETH
-    testnet).
-
-    When ``current_funding_apr`` is provided the live RPC fetch is
-    skipped — useful for the dashboard tile that already has the funding
-    APR in hand from a parallel cross-chain probe, and for the unit
-    tests that drive the projector with synthetic inputs.
-
-    Designed for:
-
-    * the dashboard (``/api/cross-chain/funding-carry-backtest`` endpoint, future)
-    * a Sapphire plugin tool (``cross_chain_alpha.py`` action ``carry-backtest``)
-    * the agent's ``project_pnl`` skill
-
-    Returns a dict::
-
-        {
-            "market_addr": "0x...",
-            "chain_id": 42161,
-            "asset": "ETH",
-            "capital_usd": 10000.0,
-            "days": 30,
-            "leverage": 1.0,
-            "result": <FundingCarryBacktestResult.to_dict()>,
-            "funding_apr_source": "explicit" | "live_rpc" | "none",
-            "error": "<str>" | not present,
-        }
-    """
-    # Local imports keep the module load-light when carry isn't used.
-    from lib.trading.funding_rate_carry_backtest import (  # noqa: PLC0415
-        FundingCarryBacktest,
-    )
-
-    bt = FundingCarryBacktest(
-        capital_usd=capital_usd,
-        days=days,
-        gmx_open_close_bps=gmx_open_close_bps,
-        gmx_keeper_cost_per_funding_period_usd=gmx_keeper_cost_per_funding_period_usd,
-        leverage=leverage,
-        funding_period_hours=funding_period_hours,
-        decay_days=decay_days,
-    )
-
-    # Path A: caller passed the funding APR directly — use it.
-    if current_funding_apr is not None:
-        result = bt.simulate(
-            market_addr=market_addr,
-            chain_id=chain_id,
-            asset=asset,
-            current_funding_apr=float(current_funding_apr),
-        )
-        return {
-            "market_addr": market_addr,
-            "chain_id": chain_id,
-            "asset": asset,
-            "capital_usd": capital_usd,
-            "days": days,
-            "leverage": leverage,
-            "result": result.to_dict(),
-            "funding_apr_source": "explicit",
-        }
-
-    # Path B: fetch live funding APR via the per-chain protocols facade.
-    # Imported lazily so callers using path A never pay the chain-stack
-    # import cost.
-    try:
-        if chain_id == 42161:
-            from lib.chains.arbitrum.client import (  # noqa: PLC0415
-                ArbitrumClient,
-            )
-            from lib.chains.arbitrum.protocols import (  # noqa: PLC0415
-                ArbitrumProtocols,
-            )
-
-            facade = ArbitrumProtocols(ArbitrumClient())
-        elif chain_id == 6342:
-            from lib.chains.megaeth.client import MegaETHClient  # noqa: PLC0415
-            from lib.chains.megaeth.protocols import (  # noqa: PLC0415
-                MegaETHProtocols,
-            )
-
-            facade = MegaETHProtocols(MegaETHClient())
-        else:
-            return {
-                "market_addr": market_addr,
-                "chain_id": chain_id,
-                "asset": asset,
-                "capital_usd": capital_usd,
-                "days": days,
-                "leverage": leverage,
-                "result": None,
-                "funding_apr_source": "none",
-                "error": f"unsupported chain_id={chain_id}",
-            }
-
-        funding_apr = asyncio.run(facade.perps_funding_rate_apr(market_addr))
-    except Exception as exc:
-        logger.exception("backtest_funding_carry live fetch failed")
-        return {
-            "market_addr": market_addr,
-            "chain_id": chain_id,
-            "asset": asset,
-            "capital_usd": capital_usd,
-            "days": days,
-            "leverage": leverage,
-            "result": None,
-            "funding_apr_source": "none",
-            "error": f"{type(exc).__name__}: {exc}",
-        }
-
-    result = bt.simulate(
-        market_addr=market_addr,
-        chain_id=chain_id,
-        asset=asset,
-        current_funding_apr=float(funding_apr),
-    )
-    return {
-        "market_addr": market_addr,
-        "chain_id": chain_id,
-        "asset": asset,
-        "capital_usd": capital_usd,
-        "days": days,
-        "leverage": leverage,
-        "result": result.to_dict(),
-        "funding_apr_source": "live_rpc",
-    }
-
-
 __all__ = (
-    "backtest_aave_arb",
-    "backtest_funding_carry",
     "is_integration_enabled",
-    "scan_aave_arb",
+    "scan_pyth_divergence",
 )
