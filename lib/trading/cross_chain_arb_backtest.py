@@ -70,7 +70,6 @@ from lib.chains.cross_chain.aave_apy_arb import (
     CrossChainAaveScanner,
 )
 
-
 # ---------------------------------------------------------------------------
 # Bridge cost tiers — calibrated 2026-05-03 from live Across/Hop/Stargate/CCTP
 # quotes for USDC ARB↔OP. See scripts/research/bridge_cost_survey.py + the
@@ -91,10 +90,10 @@ from lib.chains.cross_chain.aave_apy_arb import (
 # Re-survey monthly. Update tiers if any value shifts more than 0.5 bps.
 # ---------------------------------------------------------------------------
 BRIDGE_COST_TIERS: tuple[tuple[float, float], ...] = (
-    (10_000.0, 3.0),       # ≤ $10k:    ~1.5 bps × 2 legs (Across)
-    (100_000.0, 3.5),      # ≤ $100k:   ~1.5-1.75 bps × 2 legs (Across)
-    (1_000_000.0, 4.0),    # ≤ $1M:     ~2 bps × 2 legs (LP fee creep)
-    (math.inf, 5.0),       # >  $1M:    ~2.5 bps × 2 legs (whale, slippage)
+    (10_000.0, 3.0),  # ≤ $10k:    ~1.5 bps × 2 legs (Across)
+    (100_000.0, 3.5),  # ≤ $100k:   ~1.5-1.75 bps × 2 legs (Across)
+    (1_000_000.0, 4.0),  # ≤ $1M:     ~2 bps × 2 legs (LP fee creep)
+    (math.inf, 5.0),  # >  $1M:    ~2.5 bps × 2 legs (whale, slippage)
 )
 
 
@@ -303,10 +302,7 @@ class CrossChainArbBacktest:
             raise ValueError("days must be positive")
         if holding_period_hours <= 0:
             raise ValueError("holding_period_hours must be positive")
-        if (
-            bridge_cost_bps_per_round_trip is not None
-            and bridge_cost_bps_per_round_trip < 0
-        ):
+        if bridge_cost_bps_per_round_trip is not None and bridge_cost_bps_per_round_trip < 0:
             raise ValueError("bridge_cost_bps_per_round_trip must be non-negative")
         if gas_cost_usd_per_action < 0:
             raise ValueError("gas_cost_usd_per_action must be non-negative")
@@ -320,9 +316,7 @@ class CrossChainArbBacktest:
         # decay vs cost behavior, and the dashboard's "what-if" panel may
         # want to ask "what bridge cost would make this viable?".
         if bridge_cost_bps_per_round_trip is None:
-            self.bridge_cost_bps_per_round_trip = bridge_cost_bps_for_capital(
-                self.capital_usd
-            )
+            self.bridge_cost_bps_per_round_trip = bridge_cost_bps_for_capital(self.capital_usd)
         else:
             self.bridge_cost_bps_per_round_trip = float(bridge_cost_bps_per_round_trip)
         self.gas_cost_usd_per_action = float(gas_cost_usd_per_action)

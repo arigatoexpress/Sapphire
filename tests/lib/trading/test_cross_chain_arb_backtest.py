@@ -379,11 +379,13 @@ def test_constructor_uses_tiered_default_when_unset() -> None:
 def test_constructor_explicit_bridge_cost_overrides_tier() -> None:
     """Explicit override wins, including 0 (used by decay-isolation tests)."""
     bt = CrossChainArbBacktest(
-        capital_usd=10_000.0, bridge_cost_bps_per_round_trip=42.0,
+        capital_usd=10_000.0,
+        bridge_cost_bps_per_round_trip=42.0,
     )
     assert bt.bridge_cost_bps_per_round_trip == 42.0
     bt_zero = CrossChainArbBacktest(
-        capital_usd=10_000.0, bridge_cost_bps_per_round_trip=0.0,
+        capital_usd=10_000.0,
+        bridge_cost_bps_per_round_trip=0.0,
     )
     assert bt_zero.bridge_cost_bps_per_round_trip == 0.0
 

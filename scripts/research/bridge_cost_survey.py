@@ -29,7 +29,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 # Token addresses (native USDC, not bridged USDC.e where possible)
 USDC_ARBITRUM = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"  # native USDC
@@ -73,23 +73,25 @@ def quote_across(direction: str, notional_usd: int) -> Quote:
         in_tok, out_tok = USDC_OPTIMISM, USDC_ARBITRUM
 
     amount_units = notional_usd * 1_000_000  # USDC = 6 decimals
-    params = urllib.parse.urlencode({
-        "inputToken": in_tok,
-        "outputToken": out_tok,
-        "originChainId": origin,
-        "destinationChainId": dest,
-        "amount": str(amount_units),
-    })
+    params = urllib.parse.urlencode(
+        {
+            "inputToken": in_tok,
+            "outputToken": out_tok,
+            "originChainId": origin,
+            "destinationChainId": dest,
+            "amount": str(amount_units),
+        }
+    )
     url = f"https://app.across.to/api/suggested-fees?{params}"
     try:
         data = _http_get(url)
     except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError) as exc:
-        return Quote("Across", direction, notional_usd, None, None, None,
-                     note=f"error: {exc}")
+        return Quote("Across", direction, notional_usd, None, None, None, note=f"error: {exc}")
 
     if data.get("isAmountTooLow"):
-        return Quote("Across", direction, notional_usd, None, None, None,
-                     note="below minDeposit", raw=data)
+        return Quote(
+            "Across", direction, notional_usd, None, None, None, note="below minDeposit", raw=data
+        )
 
     output_amount_units = int(data["outputAmount"])
     fee_units = amount_units - output_amount_units
@@ -97,12 +99,18 @@ def quote_across(direction: str, notional_usd: int) -> Quote:
     fee_bps = (fee_units / amount_units) * 10_000
     finality = int(data.get("estimatedFillTimeSec", 0))
     return Quote(
-        "Across", direction, notional_usd,
-        round(fee_usd, 4), round(fee_bps, 4), finality,
+        "Across",
+        direction,
+        notional_usd,
+        round(fee_usd, 4),
+        round(fee_bps, 4),
+        finality,
         note=f"output={output_amount_units / 1_000_000:.4f} USDC",
-        raw={"totalRelayFee_pct": data.get("totalRelayFee", {}).get("pct"),
-             "lpFee_pct": data.get("lpFee", {}).get("pct"),
-             "fillDeadline": data.get("fillDeadline")},
+        raw={
+            "totalRelayFee_pct": data.get("totalRelayFee", {}).get("pct"),
+            "lpFee_pct": data.get("lpFee", {}).get("pct"),
+            "fillDeadline": data.get("fillDeadline"),
+        },
     )
 
 
@@ -114,19 +122,20 @@ def quote_hop(direction: str, notional_usd: int) -> Quote:
         from_chain, to_chain = "optimism", "arbitrum"
 
     amount_units = notional_usd * 1_000_000
-    params = urllib.parse.urlencode({
-        "amount": str(amount_units),
-        "token": "USDC",
-        "fromChain": from_chain,
-        "toChain": to_chain,
-        "slippage": "0.5",
-    })
+    params = urllib.parse.urlencode(
+        {
+            "amount": str(amount_units),
+            "token": "USDC",
+            "fromChain": from_chain,
+            "toChain": to_chain,
+            "slippage": "0.5",
+        }
+    )
     url = f"https://api.hop.exchange/v1/quote?{params}"
     try:
         data = _http_get(url)
     except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError) as exc:
-        return Quote("Hop", direction, notional_usd, None, None, None,
-                     note=f"error: {exc}")
+        return Quote("Hop", direction, notional_usd, None, None, None, note=f"error: {exc}")
 
     # Hop returns: amountIn, estimatedRecieved (sic), bonderFee, etc.
     # NB: "estimatedRecieved" is the Hop API's actual key (typo upstream).
@@ -147,16 +156,19 @@ def quote_hop(direction: str, notional_usd: int) -> Quote:
         fee_bps = (total_fee_units / amount_in) * 10_000
         # Hop typically settles in 1-5 minutes for L2->L2
         return Quote(
-            "Hop", direction, notional_usd,
-            round(fee_usd, 4), round(fee_bps, 4),
+            "Hop",
+            direction,
+            notional_usd,
+            round(fee_usd, 4),
+            round(fee_bps, 4),
             120,  # ~2min typical hAMM settlement
-            note=f"bonderFee={bonder_fee/1e6:.4f} USDC",
-            raw={"amountIn": amount_in, "estimatedRecieved": amount_out,
-                 "bonderFee": bonder_fee},
+            note=f"bonderFee={bonder_fee / 1e6:.4f} USDC",
+            raw={"amountIn": amount_in, "estimatedRecieved": amount_out, "bonderFee": bonder_fee},
         )
     except (KeyError, ValueError, TypeError) as exc:
-        return Quote("Hop", direction, notional_usd, None, None, None,
-                     note=f"parse error: {exc}", raw=data)
+        return Quote(
+            "Hop", direction, notional_usd, None, None, None, note=f"parse error: {exc}", raw=data
+        )
 
 
 def quote_stargate(direction: str, notional_usd: int) -> Quote:
@@ -183,8 +195,11 @@ def quote_stargate(direction: str, notional_usd: int) -> Quote:
     fee_usd_estimate = (notional_usd * base_bps / 10_000) + lz_gas_usd
     fee_bps_estimate = (fee_usd_estimate / notional_usd) * 10_000
     return Quote(
-        "Stargate", direction, notional_usd,
-        round(fee_usd_estimate, 4), round(fee_bps_estimate, 4),
+        "Stargate",
+        direction,
+        notional_usd,
+        round(fee_usd_estimate, 4),
+        round(fee_bps_estimate, 4),
         90,  # typical L2<->L2 settlement
         note="modeled: 6bps protocol + ~$1 LZ gas (no public REST quote API)",
         raw={"base_bps": base_bps, "lz_gas_usd_estimate": lz_gas_usd},
@@ -207,8 +222,12 @@ def quote_cctp(direction: str, notional_usd: int) -> Quote:
     fee_bps = (fee_usd / notional_usd) * 10_000
     finality = 900  # 15 minutes typical
     return Quote(
-        "CCTP-v1", direction, notional_usd,
-        round(fee_usd, 4), round(fee_bps, 4), finality,
+        "CCTP-v1",
+        direction,
+        notional_usd,
+        round(fee_usd, 4),
+        round(fee_bps, 4),
+        finality,
         note="standard CCTP: zero protocol fee + ~$0.30 dest gas; 13-19min finality",
         raw={"protocol": "Circle CCTP v1"},
     )
@@ -229,7 +248,7 @@ def emit_markdown(quotes: list[Quote]) -> str:
     lines = [
         "# USDC L2-L2 Bridge Fee Survey",
         "",
-        f"_Surveyed: {datetime.now(timezone.utc).isoformat()}_",
+        f"_Surveyed: {datetime.now(UTC).isoformat()}_",
         "",
         "## Live quotes (Arbitrum <-> Optimism, USDC native)",
         "",
