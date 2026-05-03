@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sapphire OS — Hackathon Submissions</title>
-  <meta name="description" content="Sapphire OS hackathon submissions — 0G APAC, MegaETH/Arbitrum, Robinhood London, Zama. Cite-able PRs, live testnet contracts, demo videos.">
+  <meta name="description" content="Sapphire OS hackathon submissions — 0G APAC, MegaETH/Arbitrum, Robinhood London, Zama. Cite-able PRs, live testnet contracts, demo videos, judge-grade pitch decks.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -19,7 +19,7 @@
         Sapphire is a production trading + intelligence OS — 6,567 collected tests, live execution.
         These are the four hackathon submissions where we prove each property cryptographically:
         sealed inference, on-chain anchoring, multi-chain alpha verification, and confidential
-        compute. Every claim links back to a merged PR.
+        compute. Every claim links back to a merged PR. Every contract has a live RPC probe. Every pitch has a 60s video script and a 5-slide deck.
       </p>
       <div class="hero-meta">
         <a class="hero-link" href="{{ repo_url }}" target="_blank" rel="noopener">github.com/arigatoexpress/Sapphire</a>
@@ -28,70 +28,216 @@
         <span class="hero-dot">·</span>
         <span class="hero-link muted">aristotlespec@gmail.com</span>
       </div>
+      <div class="hero-hint">
+        <span class="hint-dot">▾</span> Click any card to expand the judge-grade pitch deck (live RPC probe + criteria match + video script + roadmap).
+      </div>
     </div>
   </header>
 
   <main class="cards">
     {% for s in submissions %}
-    <article class="card card-{{ s.slug }}">
-      <header class="card-head">
-        <div class="card-titles">
-          <div class="card-sponsor">{{ s.sponsor }}</div>
-          <h2 class="card-title">{{ s.title }}</h2>
-          <div class="card-subtitle">{{ s.subtitle }}</div>
+    <details class="card card-{{ s.slug }}" id="card-{{ s.slug }}">
+      <summary class="card-summary">
+        <header class="card-head">
+          <div class="card-titles">
+            <div class="card-sponsor">{{ s.sponsor }}</div>
+            <h2 class="card-title">{{ s.title }}</h2>
+            <div class="card-subtitle">{{ s.subtitle }}</div>
+          </div>
+          <span class="status status-{{ s.status }}">{{ s.status }}</span>
+        </header>
+
+        <div class="card-track">{{ s.track }}</div>
+        <p class="card-pitch"><strong>{{ s.one_line_pitch }}</strong></p>
+        <p class="card-pitch card-pitch-muted">{{ s.pitch }}</p>
+
+        <div class="card-summary-foot">
+          <div class="live-status">
+            <span class="dot dot-{{ s.status }}"></span>
+            {{ s.live_status }}
+          </div>
+          <span class="expand-cue">Click to expand pitch ↓</span>
         </div>
-        <span class="status status-{{ s.status }}">{{ s.status }}</span>
-      </header>
+      </summary>
 
-      <div class="card-track">{{ s.track }}</div>
+      <!-- ============== Expanded judge-grade content ============== -->
+      <div class="card-body">
 
-      <p class="card-pitch">{{ s.pitch }}</p>
+        <!-- Tab nav -->
+        <nav class="tabs" data-slug="{{ s.slug }}">
+          <button class="tab-btn active" data-tab="probe">Live probe</button>
+          <button class="tab-btn" data-tab="pitch">Pitch</button>
+          <button class="tab-btn" data-tab="novelty">Novelty</button>
+          <button class="tab-btn" data-tab="criteria">Criteria match</button>
+          <button class="tab-btn" data-tab="links">Demo & links</button>
+          <button class="tab-btn" data-tab="roadmap">Roadmap</button>
+        </nav>
 
-      <ul class="card-bullets">
-        {% for b in s.bullets %}<li>{{ b }}</li>{% endfor %}
-      </ul>
+        <!-- Tab: Live probe -->
+        <section class="tab-pane active" data-pane="probe">
+          <div class="section-label">Live JSON RPC probe</div>
+          {% if s.contracts %}
+            <p class="tab-blurb">
+              Each contract below is checked live by hitting its public RPC with
+              <code>eth_getCode</code>. Click <strong>Run probe</strong> to confirm
+              deployed bytecode is present right now. No wallet, no keys — just a
+              read against the public RPC.
+            </p>
+            <button class="probe-btn" data-slug="{{ s.slug }}">Run probe →</button>
+            <div class="probe-results" id="probe-{{ s.slug }}">
+              {% for c in s.contracts %}
+              <div class="probe-row">
+                <div class="probe-row-head">
+                  <span class="probe-name">{{ c.name }}</span>
+                  <span class="probe-net">{{ c.network }}</span>
+                </div>
+                <div class="probe-addr">
+                  {% if c.address %}
+                  <a href="{{ c.explorer_url }}" target="_blank" rel="noopener"><code>{{ c.address }}</code></a>
+                  {% else %}
+                  <code class="muted">deployment address pending — see PR for current state</code>
+                  {% endif %}
+                </div>
+                <div class="probe-status muted" data-contract="{{ c.name }}">
+                  Click <em>Run probe</em> to fetch bytecode.
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="tab-blurb">
+              This submission is a documentation skill, not a contract deploy.
+              See the <strong>Demo & links</strong> tab for the SKILL.md source.
+            </p>
+          {% endif %}
+        </section>
 
-      {% if s.contracts %}
-      <div class="card-section">
-        <div class="section-label">Contracts</div>
-        {% for label, network, url in s.contracts %}
-        <div class="contract">
-          <a href="{{ url }}" target="_blank" rel="noopener" class="contract-name">{{ label }}</a>
-          <span class="contract-net">{{ network }}</span>
-        </div>
-        {% endfor %}
-      </div>
-      {% endif %}
+        <!-- Tab: Pitch -->
+        <section class="tab-pane" data-pane="pitch">
+          <div class="section-label">The 1-line pitch</div>
+          <p class="big-pitch">{{ s.one_line_pitch }}</p>
 
-      <div class="card-section">
-        <div class="section-label">Pull requests</div>
-        <div class="pr-list">
-          {% for num, label in s.prs %}
-          <a class="pr" href="{{ repo_url }}/pull/{{ num }}" target="_blank" rel="noopener">
-            <span class="pr-num">#{{ num }}</span>
-            <span class="pr-label">{{ label }}</span>
-          </a>
+          <div class="section-label">Why now</div>
+          <p>{{ s.pitch }}</p>
+
+          <div class="section-label">Bullets</div>
+          <ul class="card-bullets">
+            {% for b in s.bullets %}<li>{{ b }}</li>{% endfor %}
+          </ul>
+
+          <div class="section-label">Hackathon context</div>
+          <ul class="kv-list">
+            <li><span class="kv-k">Sponsor</span><span class="kv-v">{{ s.sponsor }}</span></li>
+            <li><span class="kv-k">Track</span><span class="kv-v">{{ s.track }}</span></li>
+            <li><span class="kv-k">Deadline</span><span class="kv-v">{{ s.deadline }}</span></li>
+            <li><span class="kv-k">Prize</span><span class="kv-v">{{ s.prize_summary }}</span></li>
+            <li><span class="kv-k">Status</span><span class="kv-v"><span class="status status-{{ s.status }}">{{ s.status }}</span></span></li>
+          </ul>
+        </section>
+
+        <!-- Tab: Novelty -->
+        <section class="tab-pane" data-pane="novelty">
+          <div class="section-label">What makes this impossible to copy in a weekend</div>
+          <p>{{ s.novelty }}</p>
+
+          <div class="section-label">Code paths</div>
+          <ul class="code-list">
+            {% for p in s.code_paths %}<li><code>{{ p }}</code></li>{% endfor %}
+          </ul>
+
+          <div class="section-label">Pull requests</div>
+          <div class="pr-list">
+            {% for num, label in s.prs %}
+            <a class="pr" href="{{ repo_url }}/pull/{{ num }}" target="_blank" rel="noopener">
+              <span class="pr-num">#{{ num }}</span>
+              <span class="pr-label">{{ label }}</span>
+            </a>
+            {% endfor %}
+          </div>
+        </section>
+
+        <!-- Tab: Criteria -->
+        <section class="tab-pane" data-pane="criteria">
+          <div class="section-label">Sponsor judging criteria — line-by-line match</div>
+          <p class="tab-blurb">
+            Verbatim wording from the sponsor's official announcement, paired with
+            our specific implementation. Every cell is link-checkable.
+          </p>
+          <div class="criteria-list">
+            {% for c in s.criteria %}
+            <div class="criterion">
+              <div class="criterion-name">{{ c.name }}</div>
+              <div class="criterion-verbatim">
+                <span class="quote-mark">“</span>{{ c.verbatim }}<span class="quote-mark">”</span>
+              </div>
+              <div class="criterion-match">
+                <span class="match-tick">✓</span> {{ c.match }}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </section>
+
+        <!-- Tab: Demo & links -->
+        <section class="tab-pane" data-pane="links">
+          <div class="section-label">Video</div>
+          {% if s.video_embed_url %}
+            <div class="video-embed">
+              <iframe src="{{ s.video_embed_url }}" allowfullscreen frameborder="0"></iframe>
+            </div>
+          {% else %}
+            <p class="placeholder">
+              Video recording: pending. Script ready at
+              <a href="{{ s.video_script_url }}" target="_blank" rel="noopener">
+                <code>docs/hackathon/{{ s.slug }}/video-script.md</code>
+              </a>.
+              60-second cut targeted, with timing markers at 0:00 / 0:05 / 0:15 / 0:35 / 0:50 / 0:55.
+            </p>
+          {% endif %}
+
+          <div class="section-label">Judge-grade artifacts</div>
+          <ul class="kv-list">
+            <li><span class="kv-k">5-slide deck</span><span class="kv-v"><a href="{{ s.deck_url }}" target="_blank" rel="noopener">docs/hackathon/{{ s.slug }}/deck.md →</a></span></li>
+            <li><span class="kv-k">60s video script</span><span class="kv-v"><a href="{{ s.video_script_url }}" target="_blank" rel="noopener">docs/hackathon/{{ s.slug }}/video-script.md →</a></span></li>
+            <li><span class="kv-k">{{ s.demo_label }}</span><span class="kv-v"><a href="{{ s.demo_url }}" target="_blank" rel="noopener">{{ s.demo_url }} →</a></span></li>
+          </ul>
+
+          {% if s.contracts %}
+          <div class="section-label">Contracts</div>
+          {% for c in s.contracts %}
+          <div class="contract">
+            <a href="{{ c.explorer_url }}" target="_blank" rel="noopener" class="contract-name">{{ c.name }}</a>
+            <span class="contract-net">{{ c.network }}</span>
+          </div>
           {% endfor %}
-        </div>
-      </div>
+          {% endif %}
+        </section>
 
-      <div class="card-section">
-        <div class="section-label">Code paths</div>
-        <ul class="code-list">
-          {% for p in s.code_paths %}<li><code>{{ p }}</code></li>{% endfor %}
-        </ul>
-      </div>
+        <!-- Tab: Roadmap -->
+        <section class="tab-pane" data-pane="roadmap">
+          <div class="section-label">Post-hackathon roadmap</div>
+          <ul class="card-bullets roadmap-list">
+            {% for item in s.roadmap %}<li>{{ item }}</li>{% endfor %}
+          </ul>
+          <p class="placeholder">
+            The integration is the asset. The hackathon is the distribution event.
+          </p>
+        </section>
 
-      <footer class="card-foot">
-        <div class="live-status">
-          <span class="dot dot-{{ s.status }}"></span>
-          {{ s.live_status }}
-        </div>
-        <a class="demo-btn" href="{{ s.demo_url }}" target="_blank" rel="noopener">
-          {{ s.demo_label }} →
-        </a>
-      </footer>
-    </article>
+        <!-- Final CTA -->
+        <footer class="card-cta">
+          <a class="cta-btn primary" href="{{ s.demo_url }}" target="_blank" rel="noopener">
+            {{ s.demo_label }} →
+          </a>
+          <a class="cta-btn" href="{{ s.deck_url }}" target="_blank" rel="noopener">
+            Read the deck →
+          </a>
+          <a class="cta-btn" href="{{ repo_url }}/pull/{{ s.prs[0][0] }}" target="_blank" rel="noopener">
+            See PR #{{ s.prs[0][0] }} →
+          </a>
+        </footer>
+      </div>
+    </details>
     {% endfor %}
   </main>
 
@@ -115,8 +261,11 @@
     </div>
     <div class="foot-fine">
       Last updated 2026-05-02 · all status pulled from merged PR descriptions ·
-      this page is itself open source at <code>services/hackathon_frontend/</code>
+      this page is itself open source at <code>services/hackathon_frontend/</code> ·
+      live RPC probes are read-only <code>eth_getCode</code> calls
     </div>
   </footer>
+
+  <script src="{{ url_for('static', filename='cards.js') }}"></script>
 </body>
 </html>

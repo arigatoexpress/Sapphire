@@ -1,0 +1,120 @@
+{% extends "_base_subpage.html" %}
+{% block title %}Sapphire Brain{% endblock %}
+{% block crumb %}p/brain{% endblock %}
+{% block meta %}cross-silo synth{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <h1>The Brain</h1>
+  <div class="typed" id="typed-line">$ ./sapphire brain --synthesis --correlate --history</div>
+</section>
+
+<section class="grid cols-3">
+  <div class="card">
+    <div class="muted">HEALTH_SCORE</div>
+    <h3 id="kpi-health" style="font-size:24px;">--</h3>
+    <div id="kpi-conf" class="muted">confidence: --</div>
+  </div>
+  <div class="card">
+    <div class="muted">REGIME</div>
+    <h3 id="kpi-regime">--</h3>
+    <div id="kpi-fg" class="muted">fear/greed: --</div>
+  </div>
+  <div class="card">
+    <div class="muted">SIGNALS_24H</div>
+    <h3 id="kpi-sig">--</h3>
+    <div id="kpi-thr" class="muted">cves: --</div>
+  </div>
+</section>
+
+<section class="box" style="margin-top: 14px;">
+  <h2 class="section">NARRATIVE</h2>
+  <p id="narrative" style="margin:0; color: var(--text); line-height:1.7;">// loading synthesis ...</p>
+  <div class="muted" style="margin-top: 10px;">silos observed: <span id="silos-list" class="dim">--</span></div>
+</section>
+
+<section class="box">
+  <h2 class="section">PRIORITY_ACTIONS</h2>
+  <ol id="actions" style="margin: 0; padding-left: 22px;">
+    <li class="muted">// no actions queued</li>
+  </ol>
+</section>
+
+<section class="box">
+  <h2 class="section">CROSS_SILO_CORRELATIONS</h2>
+  <table class="term">
+    <thead><tr><th>pattern</th><th>severity</th><th>silos</th><th>evidence</th><th>score</th></tr></thead>
+    <tbody id="corr-rows"><tr><td colspan="5" class="muted">// no patterns matched</td></tr></tbody>
+  </table>
+</section>
+
+<section class="box">
+  <h2 class="section">HEALTH_SPARKLINE_48</h2>
+  <pre id="sparkline" style="margin:0; color:var(--green); font-size: 11px; line-height: 1.3;">  loading 48h history ...</pre>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  var line = document.getElementById('typed-line');
+  if (line) {
+    var full = line.textContent; line.textContent = ''; var i=0;
+    (function tick(){ if (i>=full.length) return; line.textContent += full.charAt(i++); setTimeout(tick, 28); })();
+  }
+  function esc(s){ return String(s||'').replace(/[<>&]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
+
+  fetch('/api/brain/synthesis').then(r=>r.json()).then(d=>{
+    document.getElementById('kpi-health').textContent = d.health_score != null ? Number(d.health_score).toFixed(2) : '--';
+    document.getElementById('kpi-conf').textContent = 'confidence: ' + (d.confidence != null ? Number(d.confidence).toFixed(2) : '--');
+    document.getElementById('kpi-regime').textContent = d.regime || '--';
+    document.getElementById('kpi-fg').textContent = 'fear/greed: ' + (d.fear_greed ?? '--');
+    document.getElementById('kpi-sig').textContent = d.signal_count_24h ?? '--';
+    document.getElementById('kpi-thr').textContent = 'cves: ' + (d.threat_count_24h ?? '--');
+    document.getElementById('narrative').textContent = d.narrative || '(no narrative)';
+    document.getElementById('silos-list').textContent = (d.silos_observed || []).join(', ') || '--';
+    var $a = document.getElementById('actions');
+    var actions = d.priority_actions || [];
+    if (actions.length) {
+      $a.innerHTML = actions.map(a => '<li>' + esc(a) + '</li>').join('');
+    }
+  }).catch(()=>{
+    document.getElementById('narrative').textContent = '// /api/brain/synthesis unreachable';
+  });
+
+  fetch('/api/brain/correlate').then(r=>r.json()).then(d=>{
+    var matches = d.matches || [];
+    var tb = document.getElementById('corr-rows');
+    if (!matches.length) return;
+    tb.innerHTML = matches.map(m => {
+      var sev = (m.severity||'').toUpperCase();
+      var pillCls = sev === 'HIGH' ? 'red' : sev === 'MEDIUM' ? 'amber' : 'green';
+      return '<tr>' +
+        '<td><code>' + esc(m.pattern_name) + '</code></td>' +
+        '<td><span class="pill ' + pillCls + '">' + esc(sev) + '</span></td>' +
+        '<td class="dim">' + esc((m.silos||[]).join('+')) + '</td>' +
+        '<td>' + esc(m.evidence||'') + '</td>' +
+        '<td class="dim">' + (m.score ? Number(m.score).toFixed(2) : '--') + '</td>' +
+      '</tr>';
+    }).join('');
+  }).catch(()=>{});
+
+  fetch('/api/brain/history?limit=48').then(r=>r.json()).then(d=>{
+    var rows = d.rows || [];
+    if (!rows.length) {
+      document.getElementById('sparkline').textContent = '  // no brain_synthesis history (run /api/brain/synthesis?persist=1 to seed)';
+      return;
+    }
+    rows = rows.slice().reverse();
+    var lines = [];
+    rows.forEach(r => {
+      var h = Number(r.health_score || 0);
+      var bar = '#'.repeat(Math.max(0, Math.round(h * 30)));
+      var ts = (r.timestamp||'').slice(5, 16).replace('T', ' ');
+      lines.push('  ' + ts + '  [' + bar.padEnd(30, ' ') + '] ' + h.toFixed(2));
+    });
+    document.getElementById('sparkline').textContent = lines.join('\n');
+  }).catch(()=>{});
+})();
+</script>
+{% endblock %}
