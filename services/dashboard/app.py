@@ -2940,6 +2940,38 @@ def api_sentinel_evaluate():
         return jsonify({"error": f"{type(e).__name__}: {e}"}), 400
 
 
+# Cross-chain Aave APY arbitrage scanner: ~1-2s per scan in production
+# (3 RPC fan-outs across 5 candidate assets). 30s server-side cache
+# keeps the panel snappy and avoids hammering chain RPCs from a 60s
+# auto-refreshing dashboard panel.
+CROSS_CHAIN_ARB_CACHE_DURATION = 30
+
+
+@app.route("/api/cross_chain/aave_arb")
+@requires_auth
+def api_cross_chain_aave_arb():
+    """Live cross-chain Aave V3 supply/borrow APY arbitrage opportunities.
+
+    Returns the JSON shape produced by
+    :func:`lib.hackathon.cross_chain_alpha.scan_aave_arb` plus a
+    ``generated_at`` ISO-8601 UTC timestamp so the panel can render an
+    accurate "Last scan" label even when responses come from cache.
+    """
+
+    def fetch():
+        from lib.hackathon.cross_chain_alpha import scan_aave_arb
+
+        payload = scan_aave_arb(top_n=5)
+        payload["generated_at"] = datetime.now(UTC).isoformat()
+        return payload
+
+    try:
+        return jsonify(get_cached("cross_chain_aave_arb", fetch, ttl=CROSS_CHAIN_ARB_CACHE_DURATION))
+    except Exception as e:
+        log.exception("cross-chain aave arb scan failed")
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+
+
 @app.route("/risk")
 @requires_auth
 def risk_page():
