@@ -497,6 +497,17 @@
 {% block content %}
 {% set dashboard = unified_dashboard %}
 <div class="unified-shell">
+    <!-- Page-level safety strip -->
+    <div class="safety-strip" role="status" aria-label="Showcase safety posture">
+        <span class="safety-label">Demo posture</span>
+        <span class="safety-text">
+            <strong style="color:var(--text-primary)">Read-only orientation surface.</strong>
+            Authenticated walkthrough — no live trading controls, no Telegram send buttons, no secrets exposed. Safe to share screenshots.
+        </span>
+        <span class="safety-badge read-only">Read-only</span>
+        <span class="safety-badge paper">Paper</span>
+    </div>
+
     <section class="unified-hero" aria-labelledby="unified-title">
         <div>
             <div class="unified-kicker">Unified Command Surface</div>
@@ -537,7 +548,20 @@
         </aside>
     </section>
 
-    <section class="metric-grid" aria-label="Unified dashboard metrics">
+    <section aria-labelledby="show-metrics">
+        <div class="panel-headline">
+            <h3 id="show-metrics">What does Sapphire ship today?</h3>
+        </div>
+        <p class="panel-subhead">
+            Headline metrics for buyer or operator review — test count, registered tools, dashboard surface area, and the live wiring footprint of the platform.
+        </p>
+        <details class="tech-disclosure">
+            <summary>How does this work?</summary>
+            <div class="disclosure-body">
+                <p>These metrics come from <code>_build_unified_dashboard_payload()</code> in <code>services/dashboard/app.py</code>. Counts are pulled from <code>scripts/ops/test_inventory.py</code> (tests, ruff-clean files, plugin tools) and <code>infra/tool-registry.yaml</code> (registered tools). They refresh on each page load — there's no client-side polling.</p>
+            </div>
+        </details>
+        <div class="metric-grid" style="margin-top: var(--space-md)">
         {% for metric in dashboard.metrics %}
         <article class="metric-card">
             <div class="metric-label">{{ metric.label }}</div>
@@ -545,6 +569,7 @@
             <div class="metric-note">{{ metric.note }}</div>
         </article>
         {% endfor %}
+        </div>
     </section>
 
     <section class="unified-section" aria-labelledby="primary-surfaces-title">
@@ -618,6 +643,18 @@
                 status so each link carries the right expectation.
             </p>
         </div>
+        <details class="tech-disclosure">
+            <summary>How does this work?</summary>
+            <div class="disclosure-body">
+                <p>Each satellite is a separate repo with its own deploy target — listed in CLAUDE.md under "Satellite Repos". The status chip indicates wiring state:</p>
+                <ul>
+                    <li><strong>Production</strong> — Cloud Run / Cloud-deployed and customer-facing (e.g. Project-Go-Forward at <code>project-go-forward-...run.app</code>).</li>
+                    <li><strong>Protected</strong> — auth-gated internal surface (Cyber Threat Bot, Regional Intel Workbench).</li>
+                    <li><strong>Local</strong> — dev demo only, runs from the operator's machine.</li>
+                </ul>
+                <p>Adjacent project coverage (table below) tracks documentation depth across the satellite repos.</p>
+            </div>
+        </details>
         <div class="satellite-grid">
             {% for satellite in dashboard.satellite_dashboards %}
             <article class="satellite-card">

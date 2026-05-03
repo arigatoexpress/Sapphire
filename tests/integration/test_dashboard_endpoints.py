@@ -1249,3 +1249,208 @@ def test_readiness_check_endpoint_404_when_missing(app_client, tmp_path, monkeyp
     body = r.get_json()
     assert body["status"] == "error"
     assert body["error"] == "check not found"
+
+
+# --------------------------------------------------------------------------- #
+# /api/forecast/explain/<symbol>
+# --------------------------------------------------------------------------- #
+
+
+def _patch_forecast_for_explain(monkeypatch):
+    """Stub lib.analytics.forecast.forecast() with a deterministic two-row payload.
+
+    Returns the payload so tests can also reach into it for assertions.
+    """
+    payload = {
+        "generated_at": "2026-05-03T01:00:00+00:00",
+        "kronos_stamp": "2026-05-03T00:00:00+00:00",
+        "kronos_source": "data/intelligence/2026-05-03/predictions.json",
+        "rows": [
+            {
+                "symbol": "BTC",
+                "kronos_symbol": "BTC-USD",
+                "ta_symbol": "BTC",
+                "kronos": {
+                    "direction": "bullish",
+                    "confidence": 0.82,
+                    "current_price": 78700,
+                    "target_high": 80000,
+                    "target_low": 78000,
+                    "horizon_hours": 24,
+                    "projected_change_pct": 1.2,
+                },
+                "ta": {
+                    "direction": "bullish",
+                    "confidence": 0.75,
+                    "target_price": 80500,
+                    "timeframe": "24h",
+                },
+                "consensus": "AGREE_BULL",
+                "edge_score": 0.78,
+            },
+            {
+                "symbol": "ETH",
+                "kronos_symbol": "ETH-USD",
+                "ta_symbol": None,
+                "kronos": {
+                    "direction": "bearish",
+                    "confidence": 0.6,
+                    "horizon_hours": 24,
+                    "projected_change_pct": -1.0,
+                },
+                "ta": None,
+                "consensus": "KRONOS_ONLY",
+                "edge_score": -0.30,
+            },
+        ],
+        "symbols": ["BTC", "ETH"],
+    }
+    import lib.analytics.forecast as fc_mod
+
+    monkeypatch.setattr(fc_mod, "forecast", lambda: payload)
+    return payload
+
+
+def test_forecast_explain_requires_auth(app_client):
+    _, client = app_client
+    r = client.get("/api/forecast/explain/BTC")
+    assert r.status_code == 401
+
+
+def test_forecast_explain_btc_returns_structured_rationale(app_client, monkeypatch):
+    dash_app, client = app_client
+    _patch_forecast_for_explain(monkeypatch)
+
+    r = client.get("/api/forecast/explain/BTC", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["status"] == "ok"
+    assert body["source"] == "forecast"
+    rat = body["rationale"]
+    assert rat["kind"] == "forecast"
+    assert rat["symbol"] == "BTC"
+    assert rat["consensus"] == "AGREE_BULL"
+    assert rat["regime"] == "STRONG_BULL"
+    assert "BTC" in rat["headline"]
+    assert "Agree Bull" in rat["headline"]
+    assert 0 < len(rat["rationale_short"]) <= 80
+    assert 0 < len(rat["rationale_long"]) <= 400
+    # Components should be normalized to weight sum of 1
+    weights = [c["weight"] for c in rat["components"]]
+    assert abs(sum(weights) - 1.0) < 1e-6
+    assert rat["confidence_band"] in {"high", "medium", "low"}
+    assert rat["show_math"]["raw_edge_score"] == 0.78
+
+
+def test_forecast_explain_kronos_only_row(app_client, monkeypatch):
+    dash_app, client = app_client
+    _patch_forecast_for_explain(monkeypatch)
+
+    r = client.get("/api/forecast/explain/ETH", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    body = r.get_json()
+    rat = body["rationale"]
+    assert rat["consensus"] == "KRONOS_ONLY"
+    assert rat["symbol"] == "ETH"
+    # Edge score of -0.30 falls in the BEAR band ([-0.40, -0.10])
+    assert rat["regime"] == "BEAR"
+
+
+def test_forecast_explain_alias_resolution_btc_usd(app_client, monkeypatch):
+    """Look up by Kronos alias should resolve to the canonical row."""
+    dash_app, client = app_client
+    _patch_forecast_for_explain(monkeypatch)
+
+    r = client.get("/api/forecast/explain/BTC-USD", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["rationale"]["symbol"] == "BTC"
+
+
+def test_forecast_explain_falls_back_to_scoring(app_client, monkeypatch):
+    """When forecast has no row, the endpoint should try the TV scoring manifest."""
+    dash_app, client = app_client
+
+    # No forecast rows at all.
+    import lib.analytics.forecast as fc_mod
+
+    monkeypatch.setattr(
+        fc_mod,
+        "forecast",
+        lambda: {"rows": [], "symbols": [], "kronos_stamp": None, "kronos_source": None},
+    )
+
+    # Stub the orchestrator manifest to expose a sweep-style score for SPY.
+    sweep_manifest = {
+        "schema_version": "tradingview-orchestrator.sweep_capture.v1",
+        "session_id": "20260503T000000Z",
+        "primary_timeframe": "60",
+        "symbols": [
+            {
+                "symbol": "SPY",
+                "tradingview_symbol": "AMEX:SPY",
+                "score": {
+                    "score": 0.35,
+                    "regime": "RISK_ON",
+                    "rationale": "RSI=58; trend up",
+                    "components": [
+                        {"name": "rsi", "score": 0.16, "weight": 0.30, "note": "RSI=58.0"},
+                        {
+                            "name": "change_pct",
+                            "score": 0.50,
+                            "weight": 0.10,
+                            "note": "Δ=+5%",
+                        },
+                    ],
+                },
+            }
+        ],
+    }
+
+    import lib.trading.tradingview_orchestrator as tv_mod
+
+    class _StubOrch:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def latest_manifest(self):
+            return sweep_manifest
+
+    monkeypatch.setattr(tv_mod, "TradingViewOrchestrator", _StubOrch)
+
+    r = client.get("/api/forecast/explain/SPY", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["source"] == "quick_signal_score"
+    rat = body["rationale"]
+    assert rat["kind"] == "quick_signal_score"
+    assert rat["symbol"] == "SPY"
+    assert rat["regime"] == "BULL"  # 0.35 falls in the BULL bucket
+
+
+def test_forecast_explain_unknown_symbol_404(app_client, monkeypatch):
+    dash_app, client = app_client
+
+    import lib.analytics.forecast as fc_mod
+    import lib.trading.tradingview_orchestrator as tv_mod
+
+    monkeypatch.setattr(
+        fc_mod,
+        "forecast",
+        lambda: {"rows": [], "symbols": [], "kronos_stamp": None, "kronos_source": None},
+    )
+
+    class _EmptyOrch:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def latest_manifest(self):
+            return None
+
+    monkeypatch.setattr(tv_mod, "TradingViewOrchestrator", _EmptyOrch)
+
+    r = client.get("/api/forecast/explain/DOESNOTEXIST", headers={"Authorization": _AUTH})
+    assert r.status_code == 404
+    body = r.get_json()
+    assert body["status"] == "not_found"
+    assert body["symbol"] == "DOESNOTEXIST"
