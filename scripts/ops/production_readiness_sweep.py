@@ -111,7 +111,45 @@ def main(argv: list[str] | None = None) -> int:
     if args.include_gcp_write_probe:
         checks.extend(probe_gcp_writes(args))
 
-    report = {
+    # `--json` is a convenience shortcut for `--format json`. Both paths emit
+    # the same payload via build_report() so the dashboard SLO panel
+    # (`/api/readiness/latest`) and operators reading stdout see the same shape.
+    fmt = "json" if args.json else args.format
+
+    report = build_report(checks, started, args)
+
+    if args.output:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        if fmt == "json":
+            args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+        else:
+            args.output.write_text(render_markdown(report))
+
+    if fmt == "json":
+        print(json.dumps(report, indent=2, sort_keys=True))
+    else:
+        print(render_markdown(report), end="")
+    return 0 if report["summary"]["fail"] == 0 else 20
+
+
+def build_report(
+    checks: list[Check], started: float, args: argparse.Namespace
+) -> dict[str, Any]:
+    """Assemble the canonical sweep report payload.
+
+    Each check entry carries both ``category`` (legacy, original Check field)
+    and ``section`` (alias for the dashboard SLO panel) so neither side has to
+    rename without coordination. Adds NO new fields beyond the alias and does
+    NOT change PASS/WARN/FAIL classifications.
+    """
+    report_checks: list[dict[str, Any]] = []
+    for check in checks:
+        entry = asdict(check)
+        # Alias category -> section for dashboard consumers without breaking
+        # consumers that key off `category`.
+        entry["section"] = entry["category"]
+        report_checks.append(entry)
+    return {
         "schema_version": 1,
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "duration_ms": int((time.perf_counter() - started) * 1000),
@@ -122,21 +160,8 @@ def main(argv: list[str] | None = None) -> int:
             "gcp_write_probe": args.include_gcp_write_probe,
         },
         "summary": summarize(checks),
-        "checks": [asdict(check) for check in checks],
+        "checks": report_checks,
     }
-
-    if args.output:
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        if args.format == "json":
-            args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
-        else:
-            args.output.write_text(render_markdown(report))
-
-    if args.format == "json":
-        print(json.dumps(report, indent=2, sort_keys=True))
-    else:
-        print(render_markdown(report), end="")
-    return 0 if report["summary"]["fail"] == 0 else 20
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -153,6 +178,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--include-telegram-probe", action="store_true")
     parser.add_argument("--include-gcp-write-probe", action="store_true")
     parser.add_argument("--format", choices=("markdown", "json"), default="markdown")
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Shortcut for --format json. Used by the dashboard SLO panel cache LaunchAgent.",
+    )
     parser.add_argument("--output", type=Path)
     return parser
 

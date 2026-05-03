@@ -142,6 +142,14 @@
       "command": "python3",
       "args": ["plugins/claw-sapphire/tools/megaeth_protocols.py"],
       "requiredPermission": "read-only"
+    },
+    {
+      "name": "sapphire_tradingview",
+      "description": "Read-only TradingView orchestrator surface. Wraps lib.trading.tradingview_orchestrator + pine_templates behind one dispatcher. Mutation paths (set_symbol, pine_compile/save/promote, alert_create/delete, setup_chart, indicator_stack) are intentionally NOT exposed — operator-supervised mutation lives in scripts/ops/tradingview_ta_capture.py. Actions: probe (state+quote+values), score (latest scoring rows), list_pine (TV account + local generated), list_alerts, generate_pine (symbol, kind=indicator|strategy → writes pine/generated/<slug>.pine), sweep (offline read-only TA sweep, returns manifest summary).",
+      "inputSchema": {"type": "object", "additionalProperties": true},
+      "command": "python3",
+      "args": ["plugins/claw-sapphire/tools/tradingview.py"],
+      "requiredPermission": "read-only"
     }
   ]
 }
