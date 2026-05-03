@@ -17,13 +17,15 @@ Routes:
                                and returns whether bytecode exists. Used by
                                the live-probe widget on each card.
 """
+
 from __future__ import annotations
 
+import json
 import os
 import urllib.request
 from pathlib import Path
 
-from flask import Flask, jsonify, render_template, url_for
+from flask import Flask, jsonify, render_template
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 
@@ -51,9 +53,7 @@ SUBMISSIONS = [
             "mainnet (16661) before market impact. Anyone can re-derive the "
             "audit trail with one CLI tool — `og_verify`."
         ),
-        "one_line_pitch": (
-            "Trading agents must prove their predictions before market impact."
-        ),
+        "one_line_pitch": ("Trading agents must prove their predictions before market impact."),
         "novelty": (
             "Three 0G primitives wired in one round-trip — Compute (TEE inference) → "
             "Storage (merkle rootHash) → Chain (mainnet 16661 anchor). The asset "
@@ -417,6 +417,7 @@ SUBMISSIONS = [
 # Hydrate contract addresses from data/chain/deployments.json if present.
 # ---------------------------------------------------------------------------
 
+
 def _hydrate_addresses() -> None:
     """If a deployments.json is present, fill in `address` fields in-place.
 
@@ -444,7 +445,10 @@ def _hydrate_addresses() -> None:
     # Map (slug, contract_name) -> deployments-json key path
     address_map = {
         ("0g", "SapphireSignalVerifier"): ("og_mainnet", "SapphireSignalVerifier"),
-        ("robinhood", "SapphireSentinelRegistry"): ("robinhood_chain_testnet", "SapphireSentinelRegistry"),
+        ("robinhood", "SapphireSentinelRegistry"): (
+            "robinhood_chain_testnet",
+            "SapphireSentinelRegistry",
+        ),
         ("robinhood", "SapphirePaymentGate"): ("robinhood_chain_testnet", "SapphirePaymentGate"),
     }
 
