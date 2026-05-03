@@ -6077,6 +6077,106 @@ def api_strategy_performance():
         ), 200
 
 
+# ── Production readiness SLO panel ─────────────────────────────────────────
+# The cached sweep output is produced by the com.sapphire.readiness-cache
+# LaunchAgent every 15 minutes. The dashboard intentionally never invokes the
+# sweep live — the sweep can take ~10s+ and we don't want a blocking call on
+# the request path. If the cache is missing, the endpoint returns a soft note
+# rather than 500-ing.
+_READINESS_CACHE_PATH = Path.home() / "autonomy-status" / "logs" / "readiness-sweep-latest.json"
+_READINESS_STALE_SECONDS = 3600  # 1h
+
+
+def _readiness_cache_path() -> Path:
+    """Resolve the cache file path. Indirected so tests can monkeypatch."""
+    return _READINESS_CACHE_PATH
+
+
+@app.route("/api/readiness/latest")
+@requires_auth
+def api_readiness_latest():
+    """Return the latest cached production readiness sweep JSON.
+
+    The com.sapphire.readiness-cache LaunchAgent runs the sweep every 15 minutes
+    and writes the JSON output to ~/autonomy-status/logs/readiness-sweep-latest.json.
+    This endpoint returns that file with a freshness header. It does NOT invoke
+    the sweep live.
+
+    Response shape (cache present):
+      {status: "ok", cache_age_seconds: int, cache_stale: bool, ...sweep_payload}
+
+    Response shape (no cache yet):
+      {status: "ok", note: "no cache yet", cache_age_seconds: null}
+    """
+    path = _readiness_cache_path()
+    try:
+        if not path.exists():
+            return jsonify(
+                {
+                    "status": "ok",
+                    "note": "no cache yet",
+                    "cache_age_seconds": None,
+                    "summary": {"pass": 0, "warn": 0, "fail": 0, "skip": 0, "total": 0},
+                    "checks": [],
+                }
+            )
+        mtime = path.stat().st_mtime
+        cache_age = int(time.time() - mtime)
+        try:
+            payload = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError) as e:
+            log.warning("readiness cache read failed: %s", e)
+            return jsonify(
+                {
+                    "status": "ok",
+                    "note": "cache unreadable",
+                    "cache_age_seconds": cache_age,
+                    "summary": {"pass": 0, "warn": 0, "fail": 0, "skip": 0, "total": 0},
+                    "checks": [],
+                }
+            )
+        out = {
+            "status": "ok",
+            "cache_age_seconds": cache_age,
+            "cache_stale": cache_age > _READINESS_STALE_SECONDS,
+        }
+        if isinstance(payload, dict):
+            out.update(payload)
+        return jsonify(out)
+    except Exception as e:  # pragma: no cover - defensive
+        log.warning("readiness latest API error: %s", e)
+        return jsonify({"status": "error", "error": str(e)}), 200
+
+
+@app.route("/api/readiness/check/<section>/<name>")
+@requires_auth
+def api_readiness_check(section: str, name: str):
+    """Return a single named check from the cached readiness sweep.
+
+    404 if the cache is missing or the (section, name) pair isn't present.
+    """
+    path = _readiness_cache_path()
+    if not path.exists():
+        return jsonify({"status": "error", "error": "cache missing"}), 404
+    try:
+        payload = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as e:
+        return jsonify({"status": "error", "error": f"cache unreadable: {e}"}), 404
+    checks = payload.get("checks", []) if isinstance(payload, dict) else []
+    for check in checks:
+        if not isinstance(check, dict):
+            continue
+        if check.get("section") == section and check.get("name") == name:
+            return jsonify(
+                {
+                    "status": "ok",
+                    "check": check,
+                    "generated_at": payload.get("generated_at") if isinstance(payload, dict) else None,
+                }
+            )
+    return jsonify({"status": "error", "error": "check not found"}), 404
+
+
 @app.route("/api/hyperliquid/live-status")
 @requires_auth
 def api_hyperliquid_live_status():
