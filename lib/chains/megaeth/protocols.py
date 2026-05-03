@@ -34,6 +34,7 @@ from .contracts.kumbaya import (
     PoolInfo,
 )
 from .contracts.peg_monitor import PegBreak, PegMonitor, PegSnapshot
+from .contracts.pyth_oracle import PythRegistry
 from .contracts.usdm import USDM, USDMAddresses
 from .dex_router import DexRoutingTable, SwapQuote, best_quote, quote_kumbaya
 from .registry import ProtocolEntry, ProtocolRegistry
@@ -163,6 +164,9 @@ class MegaETHProtocols:
         self,
         client: Any,
         registry: ProtocolRegistry | None = None,
+        *,
+        pyth: PythRegistry | None = None,
+        pyth_address_to_symbol: dict[str, str] | None = None,
     ) -> None:
         self._client = client
         # NOTE — must use ``is None`` not ``or`` here. ProtocolRegistry
@@ -173,6 +177,18 @@ class MegaETHProtocols:
         # injection in tests. Caught by Wave B.2's
         # test_build_kumbaya_quote_fn_returns_none_when_kumbaya_absent.
         self.registry = registry if registry is not None else ProtocolRegistry.from_yaml()
+        # Pyth fallback wiring — defaulted on so callers get the
+        # secondary price source for free. Tests that want Aave-only
+        # behavior pass ``pyth=False`` (sentinel) — see ``_price_adapter``.
+        # Constructing PythRegistry is cheap; the contract handle is
+        # lazy-built on first use.
+        if pyth is None:
+            self._pyth = PythRegistry(self._client)
+        elif pyth is False:  # type: ignore[comparison-overlap]
+            self._pyth = None
+        else:
+            self._pyth = pyth
+        self._pyth_address_to_symbol = dict(pyth_address_to_symbol or {})
 
     # -- read --------------------------------------------------------------
 
@@ -217,10 +233,17 @@ class MegaETHProtocols:
         gmx_venue: str = "gmx_v2",
         aave_venue: str = "aave_v3",
     ) -> GmxPriceAdapter:
-        """Build a fresh price adapter wired to the registered venues."""
+        """Build a fresh price adapter wired to the registered venues.
+
+        Includes the Pyth fallback registry by default — pass ``pyth=False``
+        to :class:`MegaETHProtocols` at construction to opt out (only
+        useful for tests that want to assert the legacy Aave-only behavior).
+        """
         return GmxPriceAdapter(
             aave_v3=self._aave(aave_venue),
             gmx=self._gmx(gmx_venue),
+            pyth=self._pyth,
+            address_to_symbol=self._pyth_address_to_symbol,
         )
 
     def _dex_routing_table(self) -> DexRoutingTable:
