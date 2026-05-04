@@ -12,7 +12,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-import sys
 
 # Add signal pipeline to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "services" / "alpha"))

@@ -633,6 +633,14 @@ tools:
     description: |
       Read-only MegaETH JSON-RPC client + plugin tool. Actions, status (chain_id + latest block + gas_price), balance <address> (wei + ETH-equivalent), tx <hash> (receipt summary + explorer URL), mempool_snapshot (txpool_status preferred, falls back to newPendingTransactions WS sample). RPC method allow-list enforced — no signing, no private keys, no state-changing calls. Endpoints configurable via SAPPHIRE_MEGAETH_RPC_URL / SAPPHIRE_MEGAETH_WS_URL / SAPPHIRE_MEGAETH_CHAIN_ID; defaults are MegaETH testnet (carrot.megaeth.com, chain_id 6343).
 
+  - name: megaeth_executor
+    path: plugins/claw-sapphire/tools/internal/megaeth_executor.py
+    status: internal
+    owner: sapphire
+    consumers: [services.hyperliquid, hermes-agent.trading-analysis]
+    description: |
+      MegaETH live-trading executor scaffold (testnet-only, fail-closed). Mirrors the safety pattern from services/hyperliquid: per-order USD cap ($5), daily realized-loss cap ($25), file-based killswitch, and signing_verified=False policy field. Mainnet path raises NotImplementedError until signing_verified=True is flipped via source-code change. Not wired into any scheduler or dispatch entrypoint; scaffolding only.
+
   # TradingView orchestrator agent-facing read-only surface — Tranche 7
   # Registry path points at the internal impl; the top-level shim is
   # auto-detected by validate_tool_registry.py's compat-shim rule. Mirrors

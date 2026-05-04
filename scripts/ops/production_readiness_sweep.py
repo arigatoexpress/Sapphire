@@ -548,7 +548,7 @@ def _probe_windows_tasks() -> list[Check]:
         tasks_data = json.loads(res.stdout)
         if isinstance(tasks_data, dict): tasks_data = [tasks_data]
         parsed = {t["TaskName"]: t["State"] for t in tasks_data}
-    except Exception as e:
+    except Exception:
         parsed = {}
         
     for label, expected_state in expected.items():

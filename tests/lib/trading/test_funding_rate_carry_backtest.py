@@ -22,7 +22,6 @@ import pytest
 
 from lib.trading.funding_rate_carry_backtest import (
     FundingCarryBacktest,
-    FundingCarryBacktestResult,
     PortfolioBacktestResult,
     project_carry_pnl,
 )

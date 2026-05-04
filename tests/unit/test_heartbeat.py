@@ -10,11 +10,12 @@ real fires — the focus is the state-machine contract.
 from __future__ import annotations
 
 import subprocess
+import sys
 import urllib.error
 from unittest.mock import MagicMock, patch
 
 import pytest
-import sys
+
 pytestmark = pytest.mark.skipif(sys.platform == 'win32', reason='Unix only (getuid)')
 
 from lib.core import heartbeat as hb
