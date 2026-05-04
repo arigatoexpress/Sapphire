@@ -488,7 +488,43 @@ def workflow_no_spend_gate_violations(repo_id: str, workflow: Path) -> tuple[lis
     return violations, len(jobs)
 
 
+
+def _probe_windows_tasks() -> list[Check]:
+    expected = {
+        "SapphireDashboard": "Running",
+        "SapphireResearchWorker": "Ready",
+        "Sapphire-TV-Agent-Logon": "Ready"
+    }
+    checks: list[Check] = []
+    
+    # Run Get-ScheduledTask
+    try:
+        res = subprocess.run(["powershell", "-NoProfile", "-Command", "Get-ScheduledTask -TaskName 'Sapphire*' | Select-Object TaskName, State | ConvertTo-Json"], capture_output=True, text=True, check=True)
+        import json
+        tasks_data = json.loads(res.stdout)
+        if isinstance(tasks_data, dict): tasks_data = [tasks_data]
+        parsed = {t["TaskName"]: t["State"] for t in tasks_data}
+    except Exception as e:
+        parsed = {}
+        
+    for label, expected_state in expected.items():
+        state = parsed.get(label)
+        if not state:
+            checks.append(Check("windows_task", label, "FAIL", "not loaded", 0))
+        elif expected_state == "Running" and str(state) not in ("Running", "4"):
+            checks.append(Check("windows_task", label, "FAIL", f"expected Running, got {state}", 0))
+        elif expected_state == "Ready" and str(state) not in ("Ready", "3"):
+            checks.append(Check("windows_task", label, "FAIL", f"expected Ready, got {state}", 0))
+        else:
+            checks.append(Check("windows_task", label, "PASS", f"state={state}", 0))
+            
+    return checks
+
 def probe_launchagents() -> list[Check]:
+    import sys
+    if sys.platform == "win32":
+        return _probe_windows_tasks()
+
     expected = {
         "com.sapphire.dashboard": "always_on",
         "com.sapphire.control-plane": "always_on",

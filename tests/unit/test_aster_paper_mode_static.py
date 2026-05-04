@@ -14,7 +14,7 @@ ASTER_MAIN = ROOT / "services" / "aster" / "src" / "main.py"
 
 
 def _load_paper_mode_helper():
-    tree = ast.parse(ASTER_MAIN.read_text())
+    tree = ast.parse(ASTER_MAIN.read_text(encoding='utf-8'))
     constants = [
         node
         for node in tree.body
