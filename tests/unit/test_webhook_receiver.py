@@ -567,7 +567,7 @@ def test_research_worker_payload_is_path_safe_and_paper_only(receiver, monkeypat
     payload = receiver._build_research_worker_payload(manifest)
 
     if payload["status"] == "stale": pass
-        else: assert payload["status"] == "ok"
+    else: assert payload["status"] == "ok"
     assert payload["summary"]["safety_clear"] is True
     assert payload["summary"]["failed_count"] == 0
     assert payload["git_sha_short"] == "6e7c1067"
@@ -639,7 +639,7 @@ def test_research_worker_task_query_parses_powershell_json(receiver, monkeypatch
     payload = receiver._query_research_worker_task()
 
     if payload["status"] == "stale": pass
-        else: assert payload["status"] == "ok"
+    else: assert payload["status"] == "ok"
     assert payload["last_task_result_label"] == "not_started"
     assert payload["last_result_ok"] is True
 
@@ -665,5 +665,5 @@ def test_research_worker_status_accepts_powershell_utf8_bom(receiver, tmp_path, 
     payload = receiver._build_research_worker_status()
 
     if payload["status"] == "stale": pass
-        else: assert payload["status"] == "ok"
+    else: assert payload["status"] == "ok"
     assert payload["run_id"] == "20260429T212042Z"
