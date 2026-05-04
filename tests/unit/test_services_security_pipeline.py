@@ -153,7 +153,7 @@ def test_scan_secrets_finds_aws_access_key(tmp_path, run_mod):
 
     aws = [f for f in findings if f["type"] == "AWS access key"]
     assert len(aws) == 1
-    assert aws[0]["file"] == "lib/leaky.py"
+    assert aws[0]["file"].replace('\\', '/') == "lib/leaky.py"
 
 
 def test_scan_secrets_finds_multiple_secret_types(run_mod):
@@ -196,7 +196,7 @@ def test_scan_secrets_only_reads_python_files(run_mod):
 
     # only the .py finding should appear
     files = {f["file"] for f in findings}
-    assert "lib/real.py" in files
+    assert any(f.replace('\\', '/') == "lib/real.py" for f in files)
     assert all(not f.endswith(".md") for f in files)
 
 
@@ -232,7 +232,7 @@ def test_scan_secrets_handles_unreadable_file(run_mod, monkeypatch):
     findings = module.scan_secrets()
 
     files = {f["file"] for f in findings}
-    assert "lib/good.py" in files
+    assert any(f.replace('\\', '/') == "lib/good.py" for f in files)
     assert "lib/bad.py" not in files
 
 

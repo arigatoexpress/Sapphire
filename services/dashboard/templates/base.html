@@ -980,6 +980,36 @@
         }
 
         {% block extra_css %}{% endblock %}
+    
+        /* Mobile Responsive Overrides */
+        @media (max-width: 768px) {
+            .terminal-nav { flex-direction: column; align-items: flex-start; }
+            .nav-group { flex-wrap: wrap; margin-bottom: 8px; }
+            .dashboard-grid, .grid, .panel-grid { grid-template-columns: 1fr !important; }
+            .panel { margin-bottom: 16px; }
+            .terminal-header { flex-direction: column; }
+        }
+        
+        /* Expandable Explainers */
+        details.explainer {
+            background: rgba(105, 214, 255, 0.05);
+            border: 1px solid var(--cyan-dim);
+            padding: 8px 12px;
+            margin-bottom: 16px;
+            border-radius: 4px;
+        }
+        details.explainer summary {
+            cursor: pointer;
+            color: var(--cyan);
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+        details.explainer p {
+            margin-top: 8px;
+            font-size: 0.85em;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
     </style>
     {% block extra_head %}{% endblock %}
 </head>
@@ -1051,6 +1081,10 @@
             <div class="nav-group">
                 <span class="nav-group-label">Business</span>
                 <a href="https://project-go-forward-trgi34bxuq-uc.a.run.app/" target="_blank" rel="noopener" class="nav-item">THO Operations ↗</a>
+            </div>
+        
+            <div class="nav-group" style="margin-left: auto; display: flex; align-items: center;">
+                <span class="badge" style="background: rgba(255, 111, 158, 0.2); color: #ff6f9e; padding: 4px 8px; border: 1px solid #ff6f9e; border-radius: 4px; font-size: 0.8rem; font-weight: bold;">MODE: PAPER TRADING (DRY RUN)</span>
             </div>
         </nav>
 

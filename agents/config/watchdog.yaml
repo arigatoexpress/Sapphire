@@ -1,5 +1,5 @@
-# Market Watchdog Agent Configuration
-# Runs on rari1 (100.120.191.1) — lightweight, stays within 3.8GB RAM
+﻿# Market Watchdog Agent Configuration
+# Runs on rari1 (100.120.191.1) â€” lightweight, stays within 3.8GB RAM
 # Restart: sudo systemctl restart market-watchdog
 
 agent:
@@ -8,9 +8,9 @@ agent:
   log_level: INFO
   health_port: 19001
 
-# Check schedule — CT (America/Chicago)
-# Active window: 08:00–22:00 CT every 4 hours
-# Quiet hours: 23:00–07:00 CT (security alerts only — no market noise)
+# Check schedule â€” CT (America/Chicago)
+# Active window: 08:00â€“22:00 CT every 4 hours
+# Quiet hours: 23:00â€“07:00 CT (security alerts only â€” no market noise)
 schedule:
   interval_hours: 4          # Check every 4 hours
   active_start_ct: "08:00"   # Start checks at 8 AM CT
@@ -18,13 +18,13 @@ schedule:
   quiet_mode: security_only  # During quiet hours: only alert on extreme moves (>2x threshold)
   timezone: "America/Chicago"
 
-# Polling intervals (seconds) — used within a check cycle
+# Polling intervals (seconds) â€” used within a check cycle
 intervals:
   heartbeat: 60              # Health endpoint heartbeat every 60s
 
 # OpenBB API (proxied from Mac via Tailscale)
 openbb:
-  base_url: "http://100.67.171.79:6900"   # Mac via Tailscale
+  base_url: "http://127.0.0.1:6900"   # Mac via Tailscale
   timeout: 10
   fallback_url: "https://api.coingecko.com"  # direct CoinGecko fallback
 
@@ -34,7 +34,7 @@ telegram:
   bot_token_env: "TELEGRAM_BOT_TOKEN"
   priority: "p1"
 
-# ── Major Index Alerts ──────────────────────────────────────────────────────
+# â”€â”€ Major Index Alerts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 indices:
   - symbol: "SPY"
     name: "S&P 500"
@@ -58,13 +58,13 @@ indices:
     alert_spike_pct: 20.0               # Also alert on >20% intraday spike
     direction: up
 
-# ── Crypto Price Alerts ─────────────────────────────────────────────────────
+# â”€â”€ Crypto Price Alerts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Source: CoinGecko free tier (no API key required, 30 req/min)
 crypto:
   - symbol: "bitcoin"
     ticker: "BTC"
     coingecko_id: "bitcoin"
-    alert_threshold_pct: 4.0   # Alert on >4% 24h move (tight — large cap)
+    alert_threshold_pct: 4.0   # Alert on >4% 24h move (tight â€” large cap)
 
   - symbol: "ethereum"
     ticker: "ETH"
@@ -91,7 +91,7 @@ crypto:
     coingecko_id: "hyperliquid"
     alert_threshold_pct: 12.0
 
-# ── Commodity Alerts ─────────────────────────────────────────────────────────
+# â”€â”€ Commodity Alerts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Source: yfinance via OpenBB (ETF proxies for tradable instruments)
 commodities:
   - symbol: "SLV"
@@ -118,18 +118,18 @@ commodities:
     alert_threshold_pct: 3.0   # Alert on >3% daily move
     direction: both
 
-# ── Macro Rate Alerts ────────────────────────────────────────────────────────
+# â”€â”€ Macro Rate Alerts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # TNX is a yield expressed in %, so threshold is in basis points (bps)
 macro_rates:
   - symbol: "TNX"
     name: "10-Year Treasury Yield"
     source: "yahoo"
     ticker_yahoo: "^TNX"
-    alert_threshold_bps: 5.0   # Alert on >5bps single-day move (e.g., 4.30 → 4.35)
+    alert_threshold_bps: 5.0   # Alert on >5bps single-day move (e.g., 4.30 â†’ 4.35)
     direction: both
     note: "Price * 10 = yield in bps. Each 0.01 point = 1 basis point."
 
-# ── Funding Rate Alerts ─────────────────────────────────────────────────────
+# â”€â”€ Funding Rate Alerts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Source: Hyperliquid public API (no key required)
 # Funding rate: hourly rate on perps. Extreme = market very one-sided.
 funding_rates:
@@ -147,12 +147,12 @@ funding_rates:
   alert_threshold_low: -0.001    # <-0.1% per 8h = extremely bearish/crowded shorts
   # These are per-8h rates (Hyperliquid standard). Convert to hourly: /8
 
-# ── Notification Cooldown ────────────────────────────────────────────────────
+# â”€â”€ Notification Cooldown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 cooldown:
   same_alert_seconds: 14400  # Don't repeat the same alert within 4 hours (matches schedule interval)
-  max_alerts_per_hour: 8     # Rate limit — prevents noise storms
+  max_alerts_per_hour: 8     # Rate limit â€” prevents noise storms
 
-# ── State Persistence ────────────────────────────────────────────────────────
+# â”€â”€ State Persistence â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 state:
   path: "/home/rari/sapphire/watchdog_state.json"
   save_interval: 60

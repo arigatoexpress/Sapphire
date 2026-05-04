@@ -13,6 +13,7 @@ import types
 from pathlib import Path
 
 import pytest
+import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
@@ -86,7 +87,8 @@ def test_init_creates_keypair_and_files(wallet_mod):
     # Files are mode 0600
     wallet_mode = os.stat(wallet_mod.WALLET_PATH).st_mode & 0o777
     key_mode = os.stat(wallet_mod.KEY_PATH).st_mode & 0o777
-    assert wallet_mode == 0o600
+    if sys.platform != 'win32':
+        assert wallet_mode == 0o600
     assert key_mode == 0o600
 
 

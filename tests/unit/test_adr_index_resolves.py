@@ -40,7 +40,7 @@ def _adr_files() -> list[Path]:
 
 def _index_links() -> list[tuple[str, str]]:
     """Parse the index file's main table — return list of (filename, title)."""
-    text = INDEX_FILE.read_text()
+    text = INDEX_FILE.read_text(encoding='utf-8')
     # Match a row like: | [0001](0001-foo.md) | Title text | accepted |
     row_pattern = re.compile(r"\|\s*\[\d{4}\]\(([^)]+)\)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|")
     out: list[tuple[str, str]] = []
@@ -51,7 +51,7 @@ def _index_links() -> list[tuple[str, str]]:
 
 def _status_of(path: Path) -> str:
     """Extract the status field from an ADR file body."""
-    text = path.read_text()
+    text = path.read_text(encoding='utf-8')
     match = re.search(r"\*\*Status\*\*:\s*([\w-]+)", text)
     if not match:
         return ""
@@ -108,7 +108,7 @@ def test_every_superseded_adr_points_at_successor():
         status = _status_of(path)
         if status != "superseded":
             continue
-        text = path.read_text()
+        text = path.read_text(encoding='utf-8')
         related_match = re.search(r"\*\*Related\*\*:\s*([^\n]+)", text)
         assert related_match, f"{path.name}: status=superseded but no Related line"
         related = related_match.group(1)
@@ -129,7 +129,7 @@ def test_every_superseded_adr_points_at_successor():
 def test_every_real_adr_has_required_sections():
     """Every non-template ADR must have all four canonical sections."""
     for path in _adr_files():
-        text = path.read_text()
+        text = path.read_text(encoding='utf-8')
         for section in REQUIRED_SECTIONS_TEMPLATE:
             assert section in text, f"{path.name}: missing section {section!r}"
 
@@ -137,14 +137,14 @@ def test_every_real_adr_has_required_sections():
 def test_template_has_required_sections():
     """The 0000 template itself must demonstrate all canonical sections."""
     template = ADR_DIR / "0000-template.md"
-    text = template.read_text()
+    text = template.read_text(encoding='utf-8')
     for section in REQUIRED_SECTIONS_TEMPLATE:
         assert section in text, f"0000-template.md missing section {section!r}"
 
 
 def test_index_summaries_exist_for_every_listed_adr():
     """The 'One-line summaries' bullets must list every linked ADR."""
-    text = INDEX_FILE.read_text()
+    text = INDEX_FILE.read_text(encoding='utf-8')
     summaries_section = text.split("## One-line summaries", 1)
     assert len(summaries_section) == 2, "index.md must contain a 'One-line summaries' section"
     summaries = summaries_section[1]
@@ -163,7 +163,7 @@ def test_filename_prefix_matches_adr_number_in_body():
     """The Title or first heading must match the filename's numeric prefix."""
     pattern = re.compile(r"^#\s*ADR\s*(\d{4})\b", re.MULTILINE)
     for path in _adr_files():
-        text = path.read_text()
+        text = path.read_text(encoding='utf-8')
         match = pattern.search(text)
         assert match, f"{path.name}: no '# ADR NNNN' first heading found"
         body_number = match.group(1)

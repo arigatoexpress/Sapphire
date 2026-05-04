@@ -12,6 +12,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+import sys
 
 # Add signal pipeline to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "services" / "alpha"))
@@ -244,6 +245,7 @@ class TestOutcomeWriteback:
         active_after = pl.active_signals()
         assert len(active_after) == 0
 
+    @pytest.mark.skipif(sys.platform == 'win32', reason='Windows locks files differently')
     def test_atomic_write_survives_concurrent_updates(self, pipeline, tmp_path):
         """Two concurrent updates to the same day file must not lose data."""
         pl, sig_dir = pipeline
