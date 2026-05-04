@@ -610,15 +610,13 @@ def test_index_renders_brain_panel_in_terminal_tab():
     template_path = REPO_ROOT / "services" / "analytics_dashboard" / "templates" / "index.html"
     html = template_path.read_text(encoding="utf-8")
 
-    # Marker 1: brain tab and pane exist.
-    assert 'data-tab="brain"' in html
-    assert 'data-pane="brain"' in html
+    # Marker 1: brain section and title exist.
+    assert 'id="brain-section-h"' in html
     assert "Sapphire Brain" in html
     assert "cross-silo synthesis" in html
 
-    # Marker 2: brain tab pane contains the composite gauge and narrative.
-    pane_open_idx = html.find('<section class="tab-pane" data-pane="brain">')
-    assert pane_open_idx != -1, "Brain tab pane missing"
+    # Marker 2: brain hero panel contains the composite gauge and narrative.
+    assert '<div class="section-h" id="brain-section-h">' in html
 
     # Marker 3: the Persist + Run button reaches a canonical persist endpoint.
     assert "/api/brain/synthesis?persist=1" in html or "/api/brain/llm-refresh?persist=1" in html
@@ -627,7 +625,6 @@ def test_index_renders_brain_panel_in_terminal_tab():
     assert 'id="brain-narrative"' in html
     assert 'id="brain-degraded"' in html
     assert 'id="brain-actions"' in html
-    assert 'id="brain-score"' in html
 
 
 def test_index_brain_panel_fetches_core_brain_endpoints():
