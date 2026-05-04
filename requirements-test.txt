@@ -20,7 +20,7 @@ hypothesis>=6.152.4,<7
 # distutils.command.install.install_layout, removed in setuptools 74+, which
 # bricks `pip install -r requirements-test.txt` in clean cloud envs and
 # blocks flask/pandas/reportlab from installing — see issue #539).
-mutmut>=3,<4
+mutmut>=3.5.0,<4
 
 # web / http
 aiohttp==3.13.5
