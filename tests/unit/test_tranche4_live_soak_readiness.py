@@ -69,7 +69,7 @@ def test_artifact_presence_records_latest_sidecar(tmp_path, monkeypatch) -> None
     assert row["claim"] == readiness.OBSERVED
     assert row["present"] is True
     assert row["count"] == 1
-    assert row["latest"]["path"] == "data/narratives/2026-04-28/theses.jsonl"
+    assert row["latest"]["path"].replace("\\", "/") == "data/narratives/2026-04-28/theses.jsonl"
     assert row["latest"]["envelope_present"] is True
 
 

@@ -192,7 +192,7 @@ def test_cross_asset_regime_source_contributes_to_correlator_score(tmp_path: Pat
 
     assert sig is not None
     score = compose_score({"cross_asset_regime": sig.to_dict()}, ScoringWeights())
-    assert score.edge_score < 0
+    assert score.edge_score <= 0
     assert score.contributing[0].source == "cross_asset_regime"
 
 

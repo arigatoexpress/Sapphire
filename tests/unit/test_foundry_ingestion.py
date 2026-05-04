@@ -120,7 +120,7 @@ class TestTransformPaperTrades:
         assert t["symbol"] == "BTC"
         assert t["direction"] == "long"
         assert t["entry_price"] == 65000.0
-        assert t["_sapphire_source"] == "data/signals/2026-04-19.jsonl"
+        assert t["_sapphire_source"].replace("\\", "/") == "data/signals/2026-04-19.jsonl"
 
     def test_empty_dir(self, tmp_path):
         (tmp_path / "data" / "signals").mkdir(parents=True)

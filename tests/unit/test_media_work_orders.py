@@ -102,7 +102,7 @@ def test_build_work_order_from_draft_manifest(tmp_path):
     assert order["work_order_id"] == "20260427_media_work_order_20260427_0607_weekly_crypto_brief"
     assert order["dry_run"] is True
     assert order["report"]["kind"] == "weekly_crypto_brief"
-    assert order["provenance_manifest_path"] == (
+    assert order["provenance_manifest_path"].replace("\\", "/") == (
         "data/media/manifests/20260427_media_work_order_20260427_0607_weekly_crypto_brief.json"
     )
     assert order["report"]["summary"]["symbols"] == ["BTC", "ETH"]
@@ -125,7 +125,7 @@ def test_write_work_order_creates_order_and_manifest(tmp_path):
 
     order_path = result["path"]
     assert order_path.is_file()
-    assert result["manifest"]["outputs"][0]["path"] == (
+    assert result["manifest"]["outputs"][0]["path"].replace("\\", "/") == (
         "data/media/work_orders/20260427_media_work_order_20260427_0607_market_pulse.json"
     )
     assert result["manifest"]["inputs"][0]["path"] == (
