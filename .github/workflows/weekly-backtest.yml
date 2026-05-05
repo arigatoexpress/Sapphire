@@ -28,7 +28,7 @@ jobs:
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Run strategy sweep
         env:
           PYTHONPATH: ${{ github.workspace }}

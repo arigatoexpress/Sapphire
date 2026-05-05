@@ -28,7 +28,7 @@ jobs:
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: ruff check
         run: uv run --python 3.11 --no-project --with ruff==0.7.4 ruff check --output-format=github .
       # Note: `ruff format --check` would currently flag 373 pre-existing
@@ -44,7 +44,7 @@ jobs:
       AUTH_PASSWORD: ci-placeholder
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: pytest (unit)
         # PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 is set at the job level to avoid
         # loading stray plugins. pytest-asyncio must then be loaded explicitly
@@ -64,7 +64,7 @@ jobs:
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     needs: lint
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: pytest (claw-sapphire)
         run: uv run --python 3.11 --no-project --with-requirements requirements-test.txt pytest plugins/claw-sapphire/tests/ -q
 
@@ -74,7 +74,7 @@ jobs:
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     needs: lint
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: README test inventory
         run: |
           uv run --python 3.11 --no-project --with-requirements requirements-test.txt \
@@ -85,7 +85,7 @@ jobs:
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - run: uv run --python 3.11 --no-project --with pyyaml python scripts/validate_tool_registry.py
 
   pine-lint:
@@ -93,7 +93,7 @@ jobs:
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: detect pine-relevant changes
@@ -134,7 +134,7 @@ jobs:
       contents: read
       pull-requests: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install gitleaks when missing
         run: |
           if ! command -v gitleaks >/dev/null 2>&1; then

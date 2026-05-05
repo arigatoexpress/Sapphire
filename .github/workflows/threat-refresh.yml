@@ -27,7 +27,7 @@ jobs:
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Refresh threats
         env:
           PYTHONPATH: ${{ github.workspace }}

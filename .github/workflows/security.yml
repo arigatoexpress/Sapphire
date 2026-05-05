@@ -32,7 +32,7 @@ jobs:
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install osv-scanner
         env:
           OSV_SCANNER_VERSION: v1.9.1
@@ -76,7 +76,7 @@ jobs:
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: aquasecurity/trivy-action@v0.36.0
         continue-on-error: true
         with:
@@ -102,6 +102,6 @@ jobs:
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       # -ll = high + medium severity only. Skip tests and archived/legacy.
       - run: uv run --python 3.11 --no-project --with "bandit[toml]" bandit -r services lib plugins --exclude "**/tests/**" -ll || true
