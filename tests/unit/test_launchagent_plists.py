@@ -47,9 +47,9 @@ def test_launchagents_do_not_target_stale_worktrees() -> None:
     for path in _plist_paths():
         plist = _load_plist(path)
         working_directory = plist.get("WorkingDirectory")
-        assert working_directory is None or "/Code/_worktrees/" not in working_directory, (
-            f"{path} points WorkingDirectory at stale worktree {working_directory!r}"
-        )
+        assert (
+            working_directory is None or "/Code/_worktrees/" not in working_directory
+        ), f"{path} points WorkingDirectory at stale worktree {working_directory!r}"
 
 
 def test_daily_brief_has_one_versioned_launchagent() -> None:
@@ -123,6 +123,28 @@ def test_trading_shadow_controller_launchagent_is_paper_only() -> None:
     assert env["PYTHONPATH"] == "/Users/aribs/Code/Sapphire"
     assert "--execute" not in arguments
     assert not any(key.startswith("ROBINHOOD") for key in env)
+
+
+def test_tradingview_pine_batch_global_args_precede_subcommand() -> None:
+    plist = _load_plist(INFRA_LAUNCHAGENTS / "com.sapphire.tradingview-pine-batch.plist")
+    arguments = plist["ProgramArguments"]
+
+    assert plist["Label"] == "com.sapphire.tradingview-pine-batch"
+    assert arguments[:4] == [
+        "/opt/homebrew/bin/python3",
+        "/Users/aribs/Code/Sapphire/scripts/ops/tradingview_ta_capture.py",
+        "--out",
+        "/Users/aribs/autonomy-status/logs/tradingview-pine-batch-latest.json",
+    ]
+    assert arguments[4:] == [
+        "pine-generate-batch",
+        "--offline",
+        "--limit",
+        "8",
+        "--validate",
+    ]
+    assert arguments.index("--out") < arguments.index("pine-generate-batch")
+    assert "--mutate" not in arguments
 
 
 def test_dashboard_and_inference_proxy_plists_are_sanitized() -> None:
