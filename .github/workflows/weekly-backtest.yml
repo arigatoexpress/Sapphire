@@ -28,7 +28,7 @@ jobs:
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
       - name: Run strategy sweep
         env:
           PYTHONPATH: ${{ github.workspace }}
@@ -36,7 +36,7 @@ jobs:
           mkdir -p data/backtests/strategies
           uv run --python 3.11 --no-project --with-requirements requirements-test.txt --with "yfinance>=0.2,<0.3" python -m lib.analytics.run_strategies --days 90 --bankroll 10000 | tee backtest-weekly.log
       - name: Upload backtest artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: weekly-backtest-${{ github.run_id }}
