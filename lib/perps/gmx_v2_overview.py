@@ -282,7 +282,7 @@ class _ChainWiring:
 def _build_megaeth_wiring() -> _ChainWiring:
     wiring = _ChainWiring(chain_id=CHAIN_ID_MEGAETH, chain_name="MegaETH")
     try:
-        from lib.chains.megaeth.client import MegaETHClient  # noqa: PLC0415
+        from lib.chains.megaeth.client import MegaETHClient  # noqa: I001, PLC0415
         from lib.chains.megaeth.contracts.gmx_v2 import (  # noqa: PLC0415
             GmxV2,
             GmxV2Addresses,

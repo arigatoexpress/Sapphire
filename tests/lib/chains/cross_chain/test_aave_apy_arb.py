@@ -484,7 +484,7 @@ async def test_live_scan_top_assets_returns_at_least_one_usdc_signal() -> None:
     we can make. If this fails it likely means cross-chain APYs really
     have converged — interesting on its own but not a code bug.
     """
-    from lib.chains.arbitrum.client import ArbitrumClient
+    from lib.chains.arbitrum.client import ArbitrumClient  # noqa: I001
     from lib.chains.arbitrum.protocols import ArbitrumProtocols
     from lib.chains.optimism.client import OptimismClient
     from lib.chains.optimism.protocols import OptimismProtocols
@@ -494,7 +494,7 @@ async def test_live_scan_top_assets_returns_at_least_one_usdc_signal() -> None:
     # works the same with 2 chains as with 3 (it just sees fewer signals).
     megaeth_protocols: Any | None = None
     try:
-        from lib.chains.megaeth.client import MegaETHClient
+        from lib.chains.megaeth.client import MegaETHClient  # noqa: I001
         from lib.chains.megaeth.protocols import MegaETHProtocols
 
         megaeth_client = MegaETHClient()

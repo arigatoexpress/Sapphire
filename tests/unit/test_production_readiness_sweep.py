@@ -185,6 +185,7 @@ def test_scheduled_launchagent_nonzero_last_status_warns(monkeypatch) -> None:
         "com.sapphire.heartbeat",
         "com.sapphire.openbb-api",
         "com.sapphire.cloudflare-tunnel",
+        "com.sapphire.mac-to-windows-tunnel",
         "ai.hermes.gateway",
         "actions.runner.arigatoexpress-Sapphire.ari-macbook-sapphire",
     ]
@@ -345,6 +346,154 @@ def test_windows_webhook_health_treats_agent_only_as_pass(monkeypatch) -> None:
     assert check.status == "PASS"
     assert "agent_only_services=windows_tv_agent" in check.evidence
     assert "degraded_services" not in check.evidence
+
+
+def test_windows_tv_agent_cdp_status_passes_when_cdp_is_healthy(monkeypatch) -> None:
+    def fake_urlopen(_request: object, timeout: int) -> _FakeHTTPResponse:
+        assert timeout == 5
+        return _FakeHTTPResponse(
+            200,
+            {
+                "status": "ok",
+                "cdp": {
+                    "healthy": True,
+                    "status": "ready",
+                    "latency_ms": 41,
+                    "tab_count": 3,
+                    "tradingview_tab_count": 1,
+                },
+            },
+        )
+
+    monkeypatch.setattr(sweep.urllib.request, "urlopen", fake_urlopen)
+
+    check = sweep.windows_tv_agent_cdp_check("100.71.10.48")
+
+    assert check.status == "PASS"
+    assert "cdp=ready" in check.evidence
+    assert "tradingview_tab_count=1" in check.evidence
+
+
+def test_windows_tv_agent_cdp_status_warns_when_cdp_is_agent_only(monkeypatch) -> None:
+    def fake_urlopen(_request: object, timeout: int) -> _FakeHTTPResponse:
+        assert timeout == 5
+        return _FakeHTTPResponse(
+            200,
+            {
+                "status": "agent_only",
+                "cdp": {
+                    "healthy": False,
+                    "status": "unreachable",
+                },
+            },
+        )
+
+    monkeypatch.setattr(sweep.urllib.request, "urlopen", fake_urlopen)
+
+    check = sweep.windows_tv_agent_cdp_check("100.71.10.48")
+
+    assert check.status == "WARN"
+    assert "status=agent_only" in check.evidence
+    assert "cdp=unreachable" in check.evidence
+
+
+def test_windows_scheduled_tasks_pass_when_expected_tasks_are_ready_or_running(
+    monkeypatch,
+) -> None:
+    payload = [
+        {"TaskName": name, "State": next(iter(states)), "LastTaskResult": 0}
+        for name, states in sweep.WINDOWS_EXPECTED_TASK_STATES.items()
+    ]
+
+    def fake_windows_powershell_json(
+        host: str, script: str, *, timeout: int | None = None
+    ) -> sweep.RunResult:
+        del timeout
+        assert host == "100.71.10.48"
+        assert "Get-ScheduledTask" in script
+        assert "SapphireTradingViewCDP" in script
+        return sweep.RunResult(0, json.dumps(payload), "", 25)
+
+    monkeypatch.setattr(sweep, "windows_powershell_json", fake_windows_powershell_json)
+
+    check = sweep.windows_scheduled_tasks_check("100.71.10.48")
+
+    assert check.status == "PASS"
+    assert "checked=6" in check.evidence
+    assert "states=ok" in check.evidence
+
+
+def test_windows_scheduled_tasks_warn_when_expected_task_is_missing(monkeypatch) -> None:
+    payload = [
+        {"TaskName": "SapphireDashboard", "State": "Running", "LastTaskResult": 0},
+        {"TaskName": "SapphireTradingViewCDP", "State": "Missing", "LastTaskResult": None},
+    ]
+
+    monkeypatch.setattr(
+        sweep,
+        "windows_powershell_json",
+        lambda _host, _script, timeout=None: sweep.RunResult(0, json.dumps(payload), "", 25),
+    )
+
+    check = sweep.windows_scheduled_tasks_check("100.71.10.48")
+
+    assert check.status == "WARN"
+    assert "missing=Sapphire-TV-Agent" in check.evidence
+    assert "SapphireTradingViewCDP" in check.evidence
+
+
+def test_windows_power_availability_passes_with_never_sleep_readback(monkeypatch) -> None:
+    zero_power = """
+    Current AC Power Setting Index: 0x00000000
+    Current DC Power Setting Index: 0x00000000
+    """
+    payload = {
+        "sleep": zero_power,
+        "display": zero_power,
+        "screen_save_active": "ScreenSaveActive    REG_SZ    0",
+        "screen_saver_secure": "ScreenSaverIsSecure    REG_SZ    0",
+        "screen_save_timeout": "ScreenSaveTimeOut    REG_SZ    0",
+        "inactivity_timeout": "InactivityTimeoutSecs    REG_DWORD    0x0",
+    }
+
+    monkeypatch.setattr(
+        sweep,
+        "windows_powershell_json",
+        lambda _host, _script, timeout=None: sweep.RunResult(0, json.dumps(payload), "", 19),
+    )
+
+    check = sweep.windows_power_availability_check("100.71.10.48")
+
+    assert check.status == "PASS"
+    assert "sleep=never" in check.evidence
+    assert "inactivity_timeout=0" in check.evidence
+
+
+def test_windows_power_availability_warns_on_lock_or_sleep_readback(monkeypatch) -> None:
+    nonzero_power = """
+    Current AC Power Setting Index: 0x00000384
+    Current DC Power Setting Index: 0x00000384
+    """
+    payload = {
+        "sleep": nonzero_power,
+        "display": nonzero_power,
+        "screen_save_active": "ScreenSaveActive    REG_SZ    1",
+        "screen_saver_secure": "ScreenSaverIsSecure    REG_SZ    1",
+        "screen_save_timeout": "ScreenSaveTimeOut    REG_SZ    600",
+        "inactivity_timeout": "InactivityTimeoutSecs    REG_DWORD    0x384",
+    }
+
+    monkeypatch.setattr(
+        sweep,
+        "windows_powershell_json",
+        lambda _host, _script, timeout=None: sweep.RunResult(0, json.dumps(payload), "", 19),
+    )
+
+    check = sweep.windows_power_availability_check("100.71.10.48")
+
+    assert check.status == "WARN"
+    assert "sleep_timeout" in check.evidence
+    assert "screensaver_timeout" in check.evidence
 
 
 def test_windows_research_worker_passes_with_fresh_safe_manifest(monkeypatch) -> None:

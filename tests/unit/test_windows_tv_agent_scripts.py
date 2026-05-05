@@ -10,6 +10,8 @@ INSTALLER = ROOT / "scripts" / "windows_setup" / "create_tv_agent_task.ps1"
 COMPAT = ROOT / "scripts" / "windows_setup" / "create_task_scheduler_job.ps1"
 QUICK_START = ROOT / "scripts" / "windows_setup" / "quick_start_tv_agent.bat"
 MANAGER = ROOT / "scripts" / "windows_setup" / "manage_sapphire_services.bat"
+TV_CDP = ROOT / "scripts" / "windows_setup" / "start_tradingview_cdp.ps1"
+AVAILABILITY = ROOT / "scripts" / "windows_setup" / "ensure_windows_availability.ps1"
 
 
 def test_tv_agent_launcher_is_repo_owned_and_read_only() -> None:
@@ -44,3 +46,27 @@ def test_batch_helpers_no_longer_reference_removed_backend() -> None:
     assert "start_tv_agent.ps1" in combined
     assert "services.windows_tv_agent.server" not in combined
     assert "TradingViewAutonomousManager" not in combined
+
+
+def test_tradingview_cdp_launcher_resolves_installed_package_without_version_pin() -> None:
+    script = TV_CDP.read_text(encoding="utf-8")
+
+    assert 'Get-AppxPackage -Name "TradingView.Desktop"' in script
+    assert "TradingView.Desktop_3." not in script
+    assert "--remote-debugging-port=$CdpPort" in script
+    assert "trading_execution_enabled = $false" in script
+    assert "telegram_sends_enabled = $false" in script
+    assert "browser_mutation_enabled = $false" in script
+
+
+def test_windows_availability_guard_registers_safe_logon_tasks() -> None:
+    script = AVAILABILITY.read_text(encoding="utf-8")
+
+    assert "SapphireTradingViewCDP" in script
+    assert "SapphireWindowsAvailabilityGuard" in script
+    assert "start_tradingview_cdp.ps1" in script
+    assert "powercfg /change standby-timeout-ac 0" in script
+    assert "InactivityTimeoutSecs" in script
+    assert "TradingView-CDP.bat" in script
+    assert "Start-ScheduledTask -TaskName $TradingViewTaskName" in script
+    assert "TRADINGVIEW_EXECUTION_ENABLED" not in script
