@@ -157,6 +157,39 @@
 
 <div class="card" style="margin-bottom: var(--space-xl);">
     <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-brain" style="margin-right: 8px; color: var(--success);"></i>Quant Intelligence Flywheel</h3>
+        <span class="badge badge-warning" id="quant-flywheel-gate">Read-Only</span>
+    </div>
+    <div class="card-body">
+        <div class="grid grid-3">
+            <div>
+                <h4 style="margin: 0 0 8px; font-size: 14px; color: var(--muted);">Watch Universes</h4>
+                <table class="data-table compact-table">
+                    <thead><tr><th>Rank</th><th>Universe</th><th>Symbols</th></tr></thead>
+                    <tbody id="quant-universe-tbody"><tr><td colspan="3" class="loading">Loading...</td></tr></tbody>
+                </table>
+            </div>
+            <div>
+                <h4 style="margin: 0 0 8px; font-size: 14px; color: var(--muted);">Dispatch Now</h4>
+                <table class="data-table compact-table">
+                    <thead><tr><th>Lane</th><th>Work Order</th><th>Mode</th></tr></thead>
+                    <tbody id="quant-dispatch-tbody"><tr><td colspan="3" class="loading">Loading...</td></tr></tbody>
+                </table>
+            </div>
+            <div>
+                <h4 style="margin: 0 0 8px; font-size: 14px; color: var(--muted);">Data Gaps</h4>
+                <table class="data-table compact-table">
+                    <thead><tr><th>Source</th><th>Status</th><th>Priority</th></tr></thead>
+                    <tbody id="quant-source-tbody"><tr><td colspan="3" class="loading">Loading...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="ta-export" id="quant-loop-summary">Loading...</div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: var(--space-xl);">
+    <div class="card-header">
         <h3 class="card-title"><i class="fas fa-robot" style="margin-right: 8px; color: var(--primary);"></i>TradingView Orchestrator</h3>
         <span class="badge badge-info" id="tv-orchestrator-gate">Read-Only</span>
         <span class="badge" id="tv-orchestrator-live" style="margin-left: 6px; background: rgba(148, 163, 184, 0.15); color: var(--muted, #888); border: 1px solid var(--border, #333); transition: background 0.4s, color 0.4s; font-size: 11px;" title="SSE auto-refresh status">Live</span>
@@ -343,11 +376,12 @@
   function apiUrl(path) { return new URL(path, window.location.origin).toString(); }
 
   try {
-    const [universe, tvCaps, taMachine, tvOrch] = await Promise.all([
+    const [universe, tvCaps, taMachine, tvOrch, quantFlywheel] = await Promise.all([
       fetch(apiUrl('/api/analytics/market-universe')).then(r => r.json()),
       fetch(apiUrl('/api/tradingview/capabilities')).then(r => r.json()),
       fetch(apiUrl('/api/tradingview/ta-machine?limit=12')).then(r => r.json()),
       fetch(apiUrl('/api/tradingview/orchestrator/sessions?limit=10')).then(r => r.json()),
+      fetch(apiUrl('/api/autonomy/quant-intelligence')).then(r => r.json()).catch(() => ({ error: 'unavailable' })),
     ]);
     document.getElementById('universe-source').textContent = universe.stale ? 'Fallback' : 'Live';
 
@@ -439,6 +473,69 @@
     }
     if (!(tvCaps.groups || []).length) {
       tvBody.innerHTML = '<tr><td colspan="4" class="venue-muted">No capability rows</td></tr>';
+    }
+
+    const quantGate = document.getElementById('quant-flywheel-gate');
+    if (quantGate) {
+      quantGate.textContent = ((quantFlywheel.safety || {}).guards || []).includes('no_order_submission')
+        ? 'Read-Only'
+        : 'Check';
+    }
+    const quantUniverseBody = document.getElementById('quant-universe-tbody');
+    if (quantUniverseBody) {
+      quantUniverseBody.innerHTML = '';
+      for (const row of (quantFlywheel.watch_universes || []).slice(0, 6)) {
+        quantUniverseBody.insertAdjacentHTML('beforeend', `
+          <tr>
+            <td>${esc(row.rank || '—')}</td>
+            <td title="${esc(row.role || '')}"><strong>${esc(row.title || row.id || '—')}</strong></td>
+            <td title="${esc((row.symbols || []).join(', '))}">${esc((row.symbols || []).slice(0, 6).join(', '))}</td>
+          </tr>`);
+      }
+      if (!((quantFlywheel.watch_universes || []).length)) {
+        quantUniverseBody.innerHTML = '<tr><td colspan="3" class="venue-muted">No universes</td></tr>';
+      }
+    }
+    const quantDispatchBody = document.getElementById('quant-dispatch-tbody');
+    if (quantDispatchBody) {
+      quantDispatchBody.innerHTML = '';
+      for (const row of (quantFlywheel.dispatch_now || []).slice(0, 5)) {
+        quantDispatchBody.insertAdjacentHTML('beforeend', `
+          <tr>
+            <td>${esc(row.lane || '—')}</td>
+            <td title="${esc(row.description || '')}"><strong>${esc(row.title || row.id || '—')}</strong></td>
+            <td>${esc(row.safe_mode || '—')}</td>
+          </tr>`);
+      }
+      if (!((quantFlywheel.dispatch_now || []).length)) {
+        quantDispatchBody.innerHTML = '<tr><td colspan="3" class="venue-muted">No dispatch rows</td></tr>';
+      }
+    }
+    const quantSourceBody = document.getElementById('quant-source-tbody');
+    if (quantSourceBody) {
+      quantSourceBody.innerHTML = '';
+      const sources = (quantFlywheel.data_source_roadmap || [])
+        .filter(row => row.priority === 'P1' || ['research_gap', 'gap'].includes(row.status))
+        .slice(0, 6);
+      for (const row of sources) {
+        quantSourceBody.insertAdjacentHTML('beforeend', `
+          <tr>
+            <td title="${esc(row.next_step || '')}"><strong>${esc(row.title || row.id || '—')}</strong></td>
+            <td>${esc(row.status || '—')}</td>
+            <td>${esc(row.priority || '—')}</td>
+          </tr>`);
+      }
+      if (!sources.length) {
+        quantSourceBody.innerHTML = '<tr><td colspan="3" class="venue-muted">No source rows</td></tr>';
+      }
+    }
+    const quantSummary = document.getElementById('quant-loop-summary');
+    if (quantSummary) {
+      const totals = quantFlywheel.totals || {};
+      const state = quantFlywheel.current_state || {};
+      const loop = (quantFlywheel.operating_loop || []).slice(0, 5).join('\n');
+      quantSummary.textContent =
+        `Symbols: ${totals.unique_watch_symbols || 0} | Signals: ${totals.signal_families || 0} | Work orders: ${totals.work_orders || 0} | Source gaps: ${state.source_gap_count || 0}\n${loop}`;
     }
 
     const orchSessions = document.getElementById('tv-orchestrator-sessions-tbody');
@@ -587,6 +684,10 @@
     document.getElementById('tv-orchestrator-screenshot-grid').innerHTML = '<p class="venue-muted">Unavailable</p>';
     document.getElementById('tv-orchestrator-pine-tbody').innerHTML = '<tr><td colspan="3" class="venue-muted">Unavailable</td></tr>';
     document.getElementById('tv-orchestrator-alerts-tbody').innerHTML = '<tr><td colspan="3" class="venue-muted">Unavailable</td></tr>';
+    document.getElementById('quant-universe-tbody').innerHTML = '<tr><td colspan="3" class="venue-muted">Unavailable</td></tr>';
+    document.getElementById('quant-dispatch-tbody').innerHTML = '<tr><td colspan="3" class="venue-muted">Unavailable</td></tr>';
+    document.getElementById('quant-source-tbody').innerHTML = '<tr><td colspan="3" class="venue-muted">Unavailable</td></tr>';
+    document.getElementById('quant-loop-summary').textContent = 'Unavailable';
     const scoringTbodyEl = document.getElementById('tv-orchestrator-scoring-tbody');
     if (scoringTbodyEl) scoringTbodyEl.innerHTML = '<tr><td colspan="5" class="venue-muted">Unavailable</td></tr>';
   }
