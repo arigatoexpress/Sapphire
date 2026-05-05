@@ -166,3 +166,43 @@ def test_subpages_all_register(monkeypatch):
     ]:
         resp = client.get(path)
         assert resp.status_code == 200, f"{path} -> {resp.status_code}"
+
+
+def test_projects_manifest_api_is_safe_and_complete(monkeypatch):
+    client = _load_analytics_app(monkeypatch)
+
+    resp = client.get("/api/projects")
+
+    assert resp.status_code == 200
+    projects = resp.get_json()["projects"]
+    slugs = [project["slug"] for project in projects]
+    assert len(slugs) == len(set(slugs))
+    assert {
+        "brain",
+        "markets",
+        "tho",
+        "threats",
+        "wildfire",
+        "regional",
+        "hackathon",
+        "system",
+    }.issubset(slugs)
+    forbidden = ("localhost", "127.0.0.1", "file://", "secret", "token")
+    for project in projects:
+        assert project["info_route"].startswith("/p/")
+        assert project["primary_cta"]["label"]
+        for value in str(project).lower().split():
+            assert not any(term in value for term in forbidden)
+
+
+def test_projects_manifest_single_project(monkeypatch):
+    client = _load_analytics_app(monkeypatch)
+
+    resp = client.get("/api/projects/tho")
+    missing = client.get("/api/projects/not-real")
+
+    assert resp.status_code == 200
+    project = resp.get_json()["project"]
+    assert project["slug"] == "tho"
+    assert project["primary_cta"]["href"] == "https://tho.sapphirealpha.xyz/"
+    assert missing.status_code == 404

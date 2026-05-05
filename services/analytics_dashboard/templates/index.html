@@ -168,6 +168,14 @@ header.top {
 .silo-card.intel:hover { border-color: var(--purple); }
 .silo-card.regional:hover { border-color: var(--accent-2); }
 .silo-card.hackathon:hover { border-color: var(--yellow); }
+.silo-card.accent-blue:hover { border-color: var(--accent); }
+.silo-card.accent-cyan:hover { border-color: #58d5ff; }
+.silo-card.accent-green:hover { border-color: var(--accent-2); }
+.silo-card.accent-red:hover { border-color: var(--red); }
+.silo-card.accent-orange:hover { border-color: var(--orange); }
+.silo-card.accent-purple:hover { border-color: var(--purple); }
+.silo-card.accent-yellow:hover { border-color: var(--yellow); }
+.silo-card.accent-slate:hover { border-color: var(--border-bright); }
 
 .silo-card .accent-bar {
   position: absolute;
@@ -182,6 +190,159 @@ header.top {
 .silo-card.intel .accent-bar { background: var(--purple); }
 .silo-card.regional .accent-bar { background: var(--accent-2); }
 .silo-card.hackathon .accent-bar { background: var(--yellow); }
+.silo-card.accent-blue .accent-bar { background: var(--accent); }
+.silo-card.accent-cyan .accent-bar { background: #58d5ff; }
+.silo-card.accent-green .accent-bar { background: var(--accent-2); }
+.silo-card.accent-red .accent-bar { background: var(--red); }
+.silo-card.accent-orange .accent-bar { background: var(--orange); }
+.silo-card.accent-purple .accent-bar { background: var(--purple); }
+.silo-card.accent-yellow .accent-bar { background: var(--yellow); }
+.silo-card.accent-slate .accent-bar { background: var(--text-3); }
+
+.project-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0 0 16px;
+}
+.project-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-1);
+  color: var(--text-2);
+  text-decoration: none;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  transition: border-color var(--t-fast), color var(--t-fast), background var(--t-fast);
+}
+.project-tab:hover { border-color: var(--accent); color: var(--text-1); background: var(--bg-2); }
+.project-tab .project-kind {
+  color: var(--text-3);
+  text-transform: uppercase;
+  font-size: 9px;
+}
+.project-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.project-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-2);
+  background: rgba(255,255,255,0.02);
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 600;
+}
+.project-action.primary {
+  border-color: rgba(98,255,64,0.34);
+  color: var(--accent-2);
+  background: rgba(98,255,64,0.08);
+}
+.project-proof {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.project-proof span {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 7px;
+  color: var(--text-3);
+  font-size: 10px;
+}
+.landing-shell {
+  border: 1px solid var(--border-bright);
+  background:
+    linear-gradient(180deg, rgba(98,255,64,0.06), rgba(78,168,255,0.02) 44%, rgba(7,9,14,0)),
+    var(--bg-1);
+  padding: 22px;
+  margin-bottom: 28px;
+  position: relative;
+  overflow: hidden;
+}
+.landing-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(98,255,64,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(98,255,64,0.04) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: linear-gradient(180deg, rgba(0,0,0,0.78), transparent 78%);
+}
+.landing-head,
+.landing-body {
+  position: relative;
+  z-index: 1;
+}
+.landing-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.landing-kicker {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--accent-2);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.landing-title {
+  margin: 0;
+  color: var(--text-1);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: 0;
+}
+.landing-copy {
+  max-width: 680px;
+  margin: 10px 0 0;
+  color: var(--text-2);
+  font-size: 14px;
+}
+.landing-terminal {
+  min-width: 220px;
+  border: 1px solid rgba(98,255,64,0.28);
+  background: rgba(5,8,8,0.72);
+  padding: 10px 12px;
+  color: var(--accent-2);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+}
+.landing-terminal div {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 2px 0;
+}
+.landing-terminal span:last-child { color: var(--text-2); }
+.project-grid .silo-card {
+  border-radius: 6px;
+  background: rgba(11,14,22,0.86);
+}
+.project-grid .silo-card,
+.project-grid .silo-card:hover {
+  transform: none;
+}
 
 .silo-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -1178,6 +1339,14 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
 /* ========== Mobile tweaks ========== */
 @media (max-width: 600px) {
   .wrap { padding: 16px 14px 60px; }
+  .header-right { width: 100%; align-items: flex-start; }
+  .health-strip { flex: 1 1 140px; min-width: 0; }
+  .icon-btn { padding: 8px 12px; }
+  .landing-shell { padding: 22px; }
+  .landing-title { font-size: 27px; }
+  .panel,
+  .cols-2 > *,
+  .cols-3 > * { min-width: 0; }
   .markets-grid { grid-template-columns: repeat(2, 1fr); }
   .markets-globals { gap: 12px; font-size: 11px; }
   .density-toggle { display: none; }
@@ -1234,6 +1403,55 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
 <!-- Toast notification host -->
 <div id="toast-host" aria-live="polite" aria-atomic="true"></div>
 
+<!-- ========== PUBLIC PROJECT MAP ========== -->
+<section class="landing-shell" id="project-map" aria-labelledby="project-map-title">
+  <div class="landing-head">
+    <div>
+      <div class="landing-kicker">sapphirealpha.xyz / public map</div>
+      <h1 class="landing-title" id="project-map-title">Sapphire project tabs</h1>
+      <p class="landing-copy">
+        Core Sapphire systems and satellite products, each with a project brief, resources, and a direct launch path to its own frontend.
+      </p>
+    </div>
+    <div class="landing-terminal" aria-label="Public surface status">
+      <div><span>mesh</span><span>online</span></div>
+      <div><span>mode</span><span>read-only</span></div>
+      <div><span>cta</span><span>project-first</span></div>
+    </div>
+  </div>
+  <div class="landing-body">
+    <nav class="project-tabs" aria-label="Sapphire project tabs">
+      {% for tab in project_tabs %}
+      <a class="project-tab" href="{{ tab.info_route }}">
+        <span>{{ tab.label }}</span>
+        <span class="project-kind">{{ tab.kind }}</span>
+      </a>
+      {% endfor %}
+    </nav>
+    <div class="silo-grid project-grid">
+      {% for tab in project_tabs %}
+      <div class="silo-card accent-{{ tab.accent }}">
+        <span class="accent-bar"></span>
+        <div class="silo-head">
+          <div class="silo-title">{{ tab.label }}</div>
+          <span class="silo-status {{ tab.status }}" {% if tab.status_id %}id="{{ tab.status_id }}"{% endif %}>{{ tab.status }}</span>
+        </div>
+        <div class="silo-desc">{{ tab.summary }}</div>
+        <div class="project-proof">
+          {% for proof in tab.proof_points[:3] %}
+          <span>{{ proof }}</span>
+          {% endfor %}
+        </div>
+        <div class="project-actions">
+          <a class="project-action" href="{{ tab.info_route }}">Project brief</a>
+          <a class="project-action primary" href="{{ tab.primary_cta.href }}" {% if tab.link_id %}id="{{ tab.link_id }}"{% endif %} {% if tab.primary_cta.external %}target="_blank" rel="noopener"{% endif %}>{{ tab.primary_cta.label }}</a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
 <!-- ========== Staleness banner (regime collector) ========== -->
 <div class="banner" id="regime-stale-banner">
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -1279,76 +1497,6 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
     <div class="empty" style="grid-column:1/-1;">loading top 10 crypto…</div>
   </div>
 </section>
-
-<!-- ========== SILO CARDS ========== -->
-<div class="section-h" id="silos-section-h">
-  <span>Operational silos</span>
-  <span class="meta">six production surfaces</span>
-</div>
-<div class="section-sub">
-  Each card opens its own console: THO production, threat feed, wildfire admin, intel page, regional admin, hackathon submissions. Status pill = live health.
-</div>
-<div class="silo-grid">
-  <a class="silo-card tho" href="#" id="silo-tho-link" target="_blank" rel="noopener">
-    <span class="accent-bar"></span>
-    <div class="silo-head">
-      <div class="silo-title">THO Operations</div>
-      <span class="silo-status unknown" id="silo-tho-status">…</span>
-    </div>
-    <div class="silo-desc">Texas Home Outlet — CRM, document center, customer ops</div>
-    <span class="silo-link">Open production console →</span>
-  </a>
-
-  <a class="silo-card threat" href="https://cyber-threat-bot-691674245427.us-central1.run.app/threats?source=all" target="_blank" rel="noopener">
-    <span class="accent-bar"></span>
-    <div class="silo-head">
-      <div class="silo-title">Threat Intel</div>
-      <span class="silo-status live" id="silo-threat-status">live</span>
-    </div>
-    <div class="silo-desc">CISA KEV · NVD · MITRE ATT&CK — refreshed every 4h</div>
-    <span class="silo-link">Open feed ↗</span>
-  </a>
-
-  <a class="silo-card wildfire" href="https://wildfire.sapphirealpha.xyz/" target="_blank" rel="noopener">
-    <span class="accent-bar"></span>
-    <div class="silo-head">
-      <div class="silo-title">Wildfire Watch</div>
-      <span class="silo-status phase-0">phase-0</span>
-    </div>
-    <div class="silo-desc">Autonomous drone fleet — wildfire + ecology monitoring</div>
-    <span class="silo-link">Open admin console →</span>
-  </a>
-
-  <a class="silo-card intel" href="#predictions">
-    <span class="accent-bar"></span>
-    <div class="silo-head">
-      <div class="silo-title">Intelligence</div>
-      <span class="silo-status live" id="silo-intel-status">live</span>
-    </div>
-    <div class="silo-desc">Market regime · ML predictions · cross-asset signals</div>
-    <span class="silo-link">View intel ↓</span>
-  </a>
-
-  <a class="silo-card regional" href="https://regional.sapphirealpha.xyz/admin" target="_blank" rel="noopener">
-    <span class="accent-bar"></span>
-    <div class="silo-head">
-      <div class="silo-title">Regional Intel</div>
-      <span class="silo-status active">active</span>
-    </div>
-    <div class="silo-desc">Geographic watchlist · vote monitor · DeFi pool snapshots</div>
-    <span class="silo-link">Open admin console →</span>
-  </a>
-
-  <a class="silo-card hackathon" href="https://hack.sapphirealpha.xyz/" target="_blank" rel="noopener">
-    <span class="accent-bar"></span>
-    <div class="silo-head">
-      <div class="silo-title">Hackathon Lanes</div>
-      <span class="silo-status active">active</span>
-    </div>
-    <div class="silo-desc">0G APAC · MegaETH · Robinhood London · Zama</div>
-    <span class="silo-link">Open submissions site ↗</span>
-  </a>
-</div>
 
 <!-- ========== SAPPHIRE BRAIN — cross-silo synthesis ========== -->
 <div class="section-h" id="brain-section-h">
@@ -2747,9 +2895,9 @@ function applyDensity(d) {
 
 // ---------- Command palette ----------
 const CMDK_ITEMS = [
+  { type: 'jump', name: 'Project tabs', hint: '#project-map', target: '#project-map' },
   { type: 'jump', name: 'Brain · cross-silo synthesis', hint: '#brain-section-h', target: '#brain-section-h' },
   { type: 'jump', name: 'Global Markets', hint: '#markets-hero', target: '#markets-hero' },
-  { type: 'jump', name: 'Operational silos', hint: '#silos-section-h', target: '#silos-section-h' },
   { type: 'jump', name: 'Threat intelligence feed', hint: '#threats', target: '#threats' },
   { type: 'jump', name: 'Service health', hint: 'service heartbeats', target: '#services' },
   { type: 'jump', name: 'Inference proxy tiers', hint: '4-tier failover', target: '#inference' },
@@ -2879,6 +3027,11 @@ document.addEventListener('keydown', (e) => {
 // ---------- Onboarding tour ----------
 const TOUR_STEPS = [
   {
+    target: '#project-map',
+    title: 'Project tabs',
+    body: 'The public first screen maps every core Sapphire system and satellite to a project brief plus its direct frontend.',
+  },
+  {
     target: '#brain-hero',
     title: 'Sapphire Brain',
     body: 'Cross-silo health score (0–100%). The gauge regenerates every 15 min. Click Persist + Run to capture a snapshot to BigQuery; click Correlate for cross-silo pattern matches.',
@@ -2887,11 +3040,6 @@ const TOUR_STEPS = [
     target: '#markets-hero',
     title: 'Global Markets',
     body: 'Top 10 crypto by market cap with 7d sparklines. Total market cap, BTC and ETH dominance refresh every 60s from CoinGecko.',
-  },
-  {
-    target: '#silos-section-h',
-    title: 'Six operational silos',
-    body: 'Each card opens a production surface in a new tab. Status pills show live health: green = ok, yellow = degraded, red = down, orange = phase-0 / experimental.',
   },
   {
     target: '#threats',

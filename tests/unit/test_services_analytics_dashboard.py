@@ -523,7 +523,9 @@ def test_index_route_uses_template(client, app_module, monkeypatch):
     assert response.status_code == 200
     assert response.text == "RENDERED"
     assert captured["name"] == "index.html"
-    assert captured["ctx"] == {"project": "test-project", "dataset": "test_dataset"}
+    assert captured["ctx"]["project"] == "test-project"
+    assert captured["ctx"]["dataset"] == "test_dataset"
+    assert [tab["slug"] for tab in captured["ctx"]["project_tabs"]]
 
 
 def test_unknown_post_path_falls_through_to_probe_sink(client, app_module, monkeypatch):
@@ -625,6 +627,16 @@ def test_index_renders_brain_panel_in_terminal_tab():
     assert 'id="brain-narrative"' in html
     assert 'id="brain-degraded"' in html
     assert 'id="brain-actions"' in html
+
+
+def test_index_renders_project_tab_manifest():
+    template_path = REPO_ROOT / "services" / "analytics_dashboard" / "templates" / "index.html"
+    html = template_path.read_text(encoding="utf-8")
+
+    assert "Project tabs" in html
+    assert 'id="project-map"' in html
+    assert "project_tabs" in html
+    assert "Open THO Frontend" not in html  # rendered from data, not hard-coded drift
 
 
 def test_index_brain_panel_fetches_core_brain_endpoints():

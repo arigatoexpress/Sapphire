@@ -33,6 +33,7 @@ if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
 from _deflated_sharpe import annualized_sharpe, deflated_sharpe  # noqa: E402
+from project_tabs import get_project_tab, public_project_tabs  # noqa: E402
 
 PROJECT = os.environ.get("GCP_PROJECT", "tho-ai-agent")
 DATASET = os.environ.get("BQ_DATASET", "sapphire")
@@ -1087,7 +1088,27 @@ def signals_recent():
 
 @app.get("/")
 def index():
-    return render_template("index.html", project=PROJECT, dataset=DATASET)
+    return render_template(
+        "index.html",
+        project=PROJECT,
+        dataset=DATASET,
+        project_tabs=public_project_tabs(),
+    )
+
+
+@app.get("/api/projects")
+def projects_manifest():
+    """Public project/satellite manifest backing the landing-page tabs."""
+    return jsonify({"projects": public_project_tabs()})
+
+
+@app.get("/api/projects/<slug>")
+def project_manifest(slug: str):
+    """Return one public project/satellite manifest entry."""
+    tab = get_project_tab(slug)
+    if tab is None:
+        return jsonify({"error": "project_not_found"}), 404
+    return jsonify({"project": tab})
 
 
 @app.route("/<path:path>", methods=["GET", "HEAD", "POST"])
