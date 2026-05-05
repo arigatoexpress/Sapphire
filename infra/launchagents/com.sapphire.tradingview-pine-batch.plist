@@ -8,13 +8,13 @@
     <array>
         <string>/opt/homebrew/bin/python3</string>
         <string>/Users/aribs/Code/Sapphire/scripts/ops/tradingview_ta_capture.py</string>
+        <string>--out</string>
+        <string>/Users/aribs/autonomy-status/logs/tradingview-pine-batch-latest.json</string>
         <string>pine-generate-batch</string>
         <string>--offline</string>
         <string>--limit</string>
         <string>8</string>
         <string>--validate</string>
-        <string>--out</string>
-        <string>/Users/aribs/autonomy-status/logs/tradingview-pine-batch-latest.json</string>
     </array>
     <key>StartCalendarInterval</key>
     <array>
