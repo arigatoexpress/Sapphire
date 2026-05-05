@@ -23,6 +23,7 @@ def reload_server(monkeypatch):
     monkeypatch.delenv("SAPPHIRE_PM_BOT_WEBHOOK_SECRET", raising=False)
     monkeypatch.delenv("TELEGRAM_WEBHOOK_SECRET", raising=False)
     monkeypatch.delenv("MODE", raising=False)
+    monkeypatch.delenv("SAPPHIRE_PM_BOT_ALLOW_SHARED_POLLING", raising=False)
 
     if "server" in sys.modules:
         del sys.modules["server"]
@@ -38,12 +39,14 @@ def test_explicit_token_wins(monkeypatch, reload_server):
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "shared-should-be-ignored")
     server = reload_server()
     assert server._resolve_bot_token() == "explicit-override"
+    assert server._resolve_bot_token_with_source() == ("explicit-override", "explicit_env")
 
 
 def test_falls_back_to_shared_telegram_token(monkeypatch, reload_server):
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "shared-sapphire-token")
     server = reload_server()
     assert server._resolve_bot_token() == "shared-sapphire-token"
+    assert server._resolve_bot_token_with_source() == ("shared-sapphire-token", "shared_env")
 
 
 def test_falls_back_to_secrets_file(monkeypatch, tmp_path, reload_server):
@@ -67,6 +70,10 @@ def test_falls_back_to_secrets_file(monkeypatch, tmp_path, reload_server):
         ],
     )
     assert server._resolve_bot_token() == "file-based-token"
+    assert server._resolve_bot_token_with_source() == (
+        "file-based-token",
+        "shared_secret_file",
+    )
 
 
 def test_returns_empty_when_nothing_configured(monkeypatch, tmp_path, reload_server):
@@ -84,6 +91,7 @@ def test_returns_empty_when_nothing_configured(monkeypatch, tmp_path, reload_ser
         ],
     )
     assert server._resolve_bot_token() == ""
+    assert server._resolve_bot_token_with_source() == ("", "missing")
 
 
 def test_whitespace_only_token_is_treated_as_missing(monkeypatch, reload_server):

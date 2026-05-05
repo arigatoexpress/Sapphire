@@ -46,6 +46,7 @@ def reload_server(monkeypatch):
     monkeypatch.delenv("SAPPHIRE_PM_BOT_WEBHOOK_SECRET", raising=False)
     monkeypatch.delenv("TELEGRAM_WEBHOOK_SECRET", raising=False)
     monkeypatch.delenv("MODE", raising=False)
+    monkeypatch.delenv("SAPPHIRE_PM_BOT_ALLOW_SHARED_POLLING", raising=False)
     monkeypatch.setenv("SAPPHIRE_PM_BOT_TOKEN", "test-token-default")
 
     sys.modules.pop("server", None)
@@ -391,10 +392,52 @@ def test_validate_startup_accepts_polling_mode(reload_server, monkeypatch):
             host="127.0.0.1",
             port=18082,
             telegram_timeout_seconds=30.0,
+            token_source="explicit_env",
         ),
     )
 
     # No exception expected
+    server._validate_startup_config()
+
+
+def test_validate_startup_rejects_shared_token_polling(reload_server, monkeypatch):
+    server = reload_server()
+    monkeypatch.setattr(
+        server,
+        "SETTINGS",
+        server.Settings(
+            token="abc",
+            webhook_secret="",
+            mode="polling",
+            host="127.0.0.1",
+            port=18082,
+            telegram_timeout_seconds=30.0,
+            token_source="shared_secret_file",
+            shared_polling_allowed=False,
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="Polling mode requires SAPPHIRE_PM_BOT_TOKEN"):
+        server._validate_startup_config()
+
+
+def test_validate_startup_break_glass_allows_shared_token_polling(reload_server, monkeypatch):
+    server = reload_server()
+    monkeypatch.setattr(
+        server,
+        "SETTINGS",
+        server.Settings(
+            token="abc",
+            webhook_secret="",
+            mode="polling",
+            host="127.0.0.1",
+            port=18082,
+            telegram_timeout_seconds=30.0,
+            token_source="shared_env",
+            shared_polling_allowed=True,
+        ),
+    )
+
     server._validate_startup_config()
 
 
@@ -433,6 +476,17 @@ def test_settings_from_env_lowercases_mode(reload_server, monkeypatch):
     assert s.mode == "polling"
 
 
+def test_settings_from_env_reports_token_source_and_polling_override(reload_server, monkeypatch):
+    monkeypatch.delenv("SAPPHIRE_PM_BOT_TOKEN", raising=False)
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "shared-token")
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOW_SHARED_POLLING", "yes")
+    server = reload_server()
+    s = server.Settings.from_env()
+    assert s.token == "shared-token"
+    assert s.token_source == "shared_env"
+    assert s.shared_polling_allowed is True
+
+
 # ---------------------------------------------------------------------------
 # health endpoint shape
 # ---------------------------------------------------------------------------
@@ -468,8 +522,10 @@ def test_health_endpoint_full_shape_default_state(monkeypatch, tmp_path, reload_
     assert body["status"] == "ok"
     assert body["service"] == "sapphire-pm-bot"
     assert body["mode"] == "webhook"
+    assert body["token_source"] == "explicit_env"
     assert body["polling_active"] is False
     assert body["last_poll_error"] is None
+    assert body["shared_polling_allowed"] is False
     assert body["webhook_secret_configured"] is False
 
 

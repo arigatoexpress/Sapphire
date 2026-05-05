@@ -16,7 +16,7 @@ Required:
 
 - Telegram bot token — resolved in this priority order:
   1. `SAPPHIRE_PM_BOT_TOKEN=123456:abc` — explicit override for a dedicated PM bot
-  2. `TELEGRAM_BOT_TOKEN=...` — share the existing Sapphire bot that `notify` / `watchdog` / etc. already use (recommended — one less token to rotate)
+  2. `TELEGRAM_BOT_TOKEN=...` — shared Sapphire bot used by `notify` / `watchdog` / Hermes
   3. `~/.config/sapphire-secrets/telegram_bot_token` — file fallback (same location used by `plugins/claw-sapphire/tools/notify.py`)
   4. `~/.config/sapphire/telegram_bot_token` — legacy file location
 - `SAPPHIRE_PM_BOT_ALLOWED_USER_IDS=12345,67890`
@@ -39,6 +39,9 @@ Optional:
   - Supported for local development only
 - `MODE=webhook`
   - Set `MODE=polling` for local long-poll development
+- `SAPPHIRE_PM_BOT_ALLOW_SHARED_POLLING=1`
+  - Break-glass only. Polling mode normally refuses to start with the shared
+    Sapphire Telegram token because it competes with Hermes or webhook consumers.
 - `SAPPHIRE_PM_BOT_HOST=127.0.0.1`
 - `SAPPHIRE_PM_BOT_PORT=18082`
 - `THO_API_BASE_URL=https://project-go-forward-trgi34bxuq-uc.a.run.app`
@@ -59,10 +62,10 @@ Polling mode:
 
 ```bash
 cd /Users/aribs/Code/Sapphire/services/pm_bot
-MODE=polling python3 server.py
+SAPPHIRE_PM_BOT_TOKEN=123456:dedicated-pm-token MODE=polling python3 server.py
 ```
 
-`MODE=polling` is intended for local development. Telegram must not still have a webhook registered for the same bot token when polling is active; the service attempts `deleteWebhook` on startup in polling mode.
+`MODE=polling` is intended for local development with a dedicated PM bot token. The service refuses to poll with `TELEGRAM_BOT_TOKEN` or the shared token files unless `SAPPHIRE_PM_BOT_ALLOW_SHARED_POLLING=1` is set for a deliberate break-glass run. Telegram must not still have a webhook registered for the same bot token when polling is active; the service attempts `deleteWebhook` on startup in polling mode.
 
 ## Register The Webhook
 
