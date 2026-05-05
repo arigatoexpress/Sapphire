@@ -1,0 +1,22 @@
+# Bandit configuration — Sapphire OS
+#
+# The analytics dashboard (`services/analytics_dashboard/app.py`) contains
+# BigQuery parameterized queries where table names are interpolated via
+# f-strings using module-level constants (`PROJECT`, `DATASET`). Bandit
+# B608 flags these as potential SQL injection vectors, but the queries are
+# not user-injectable — user input is passed via BigQuery `@param` bindings.
+#
+# B104 (bind-all-interfaces) is triggered by `app.run(host="0.0.0.0")`, which
+# is required for Cloud Run containers.
+#
+# B310 (urlopen blacklist) is triggered by `urllib.request.urlopen` used for
+# internal health probes against fixed, known URLs.
+#
+# This config is applied ONLY to `services/analytics_dashboard/app.py` in the
+# dedicated bandit CI step; all other Python files are scanned with the full
+# rule set.
+#
+skips:
+  - B608
+  - B104
+  - B310

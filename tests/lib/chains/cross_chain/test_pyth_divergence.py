@@ -500,7 +500,6 @@ async def test_live_scan_top_assets_arbitrum_plus_any_other() -> None:
     # Optimism Pyth ditto.
     try:
         from lib.chains.optimism.client import OptimismClient  # noqa: PLC0415
-
         from lib.chains.optimism.contracts.pyth_oracle import (  # noqa: PLC0415
             PythRegistry as OpPyth,
         )

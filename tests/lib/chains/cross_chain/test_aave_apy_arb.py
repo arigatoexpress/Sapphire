@@ -484,10 +484,9 @@ async def test_live_scan_top_assets_returns_at_least_one_usdc_signal() -> None:
     we can make. If this fails it likely means cross-chain APYs really
     have converged — interesting on its own but not a code bug.
     """
-    from lib.chains.optimism.client import OptimismClient
-
     from lib.chains.arbitrum.client import ArbitrumClient
     from lib.chains.arbitrum.protocols import ArbitrumProtocols
+    from lib.chains.optimism.client import OptimismClient
     from lib.chains.optimism.protocols import OptimismProtocols
 
     # MegaETH transport ships in PR #529; until that merges we wire only
@@ -496,7 +495,6 @@ async def test_live_scan_top_assets_returns_at_least_one_usdc_signal() -> None:
     megaeth_protocols: Any | None = None
     try:
         from lib.chains.megaeth.client import MegaETHClient
-
         from lib.chains.megaeth.protocols import MegaETHProtocols
 
         megaeth_client = MegaETHClient()

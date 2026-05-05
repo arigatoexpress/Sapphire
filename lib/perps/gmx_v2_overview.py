@@ -287,7 +287,6 @@ def _build_megaeth_wiring() -> _ChainWiring:
             GmxV2,
             GmxV2Addresses,
         )
-
         from lib.chains.megaeth.registry import ProtocolRegistry  # noqa: PLC0415
 
         registry = ProtocolRegistry.from_yaml()

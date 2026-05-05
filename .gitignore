@@ -130,3 +130,4 @@ data/tradingview_ta/
 # Generated Pine scripts (runtime artifacts of lib.trading.pine_templates)
 pine/generated/
 .build/
+coverage.xml

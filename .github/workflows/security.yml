@@ -100,5 +100,23 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      # -ll = high + medium severity only. Skip tests and archived/legacy.
-      - run: uv run --python 3.11 --no-project --with "bandit[toml]" bandit -r services lib plugins --exclude "**/tests/**" -ll
+      - name: bandit — general scan (excludes analytics dashboard false positives)
+        # -ll = high + medium severity only. Skip tests and archived/legacy.
+        run: |
+          uv run --python 3.11 --no-project --with "bandit[toml]" bandit \
+            -r services lib plugins \
+            --exclude "**/tests/**" \
+            --exclude "services/analytics_dashboard/app.py" \
+            -ll
+      - name: bandit — analytics dashboard (known false positives suppressed)
+        # The analytics dashboard uses BigQuery parameterized queries where
+        # table names are interpolated via f-strings using module-level
+        # constants (PROJECT, DATASET). Bandit B608 flags these as SQL
+        # injection, but user input is passed via BigQuery @param bindings.
+        # B104 (0.0.0.0 bind) is required for Cloud Run containers.
+        # B310 (urlopen) is used for internal health probes with fixed URLs.
+        run: |
+          uv run --python 3.11 --no-project --with "bandit[toml]" bandit \
+            -r services/analytics_dashboard/app.py \
+            -ll \
+            -c .bandit.yml
