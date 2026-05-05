@@ -55,6 +55,9 @@ _WEBHOOK_SECRET_PATHS = [
     Path.home() / ".config" / "sapphire" / "telegram_webhook_secret",
 ]
 
+_TRUE_VALUES = {"1", "true", "yes", "on"}
+_DEDICATED_TOKEN_SOURCES = {"explicit_env"}
+
 
 def _read_first_secret_file(paths: list[Path]) -> str:
     for path in paths:
@@ -66,6 +69,44 @@ def _read_first_secret_file(paths: list[Path]) -> str:
         except OSError:
             continue
     return ""
+
+
+def _read_first_secret_file_with_path(paths: list[Path]) -> tuple[str, Path | None]:
+    for path in paths:
+        try:
+            if path.exists():
+                contents = path.read_text().strip()
+                if contents:
+                    return contents, path
+        except OSError:
+            continue
+    return "", None
+
+
+def _bot_token_file_source(path: Path) -> str:
+    if path.name == "telegram_bot_token" and path.parent.name == "sapphire-secrets":
+        return "shared_secret_file"
+    return "legacy_secret_file"
+
+
+def _env_flag(name: str) -> bool:
+    return os.getenv(name, "").strip().lower() in _TRUE_VALUES
+
+
+def _resolve_bot_token_with_source() -> tuple[str, str]:
+    explicit = os.getenv("SAPPHIRE_PM_BOT_TOKEN", "").strip()
+    if explicit:
+        return explicit, "explicit_env"
+
+    shared = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    if shared:
+        return shared, "shared_env"
+
+    file_token, path = _read_first_secret_file_with_path(_SECRET_PATHS)
+    if file_token:
+        return file_token, _bot_token_file_source(path) if path is not None else "secret_file"
+
+    return "", "missing"
 
 
 def _resolve_bot_token() -> str:
@@ -80,19 +121,8 @@ def _resolve_bot_token() -> str:
     fails-closed on empty so the service refuses to start with a clear
     critical-log message.
     """
-    explicit = os.getenv("SAPPHIRE_PM_BOT_TOKEN", "").strip()
-    if explicit:
-        return explicit
-
-    shared = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-    if shared:
-        return shared
-
-    file_token = _read_first_secret_file(_SECRET_PATHS)
-    if file_token:
-        return file_token
-
-    return ""
+    token, _source = _resolve_bot_token_with_source()
+    return token
 
 
 def _resolve_webhook_secret() -> str:
@@ -116,17 +146,22 @@ class Settings:
     host: str
     port: int
     telegram_timeout_seconds: float
+    token_source: str = "explicit_env"
+    shared_polling_allowed: bool = False
 
     @classmethod
     def from_env(cls) -> Settings:
         port_text = os.getenv("SAPPHIRE_PM_BOT_PORT", "18082").strip() or "18082"
+        token, token_source = _resolve_bot_token_with_source()
         return cls(
-            token=_resolve_bot_token(),
+            token=token,
             webhook_secret=_resolve_webhook_secret(),
             mode=os.getenv("MODE", "webhook").strip().lower() or "webhook",
             host=os.getenv("SAPPHIRE_PM_BOT_HOST", "127.0.0.1").strip() or "127.0.0.1",
             port=int(port_text),
             telegram_timeout_seconds=float(os.getenv("SAPPHIRE_PM_BOT_TIMEOUT_SECONDS", "30")),
+            token_source=token_source,
+            shared_polling_allowed=_env_flag("SAPPHIRE_PM_BOT_ALLOW_SHARED_POLLING"),
         )
 
 
@@ -197,6 +232,22 @@ def _validate_startup_config() -> None:
         raise RuntimeError("Telegram bot token is required")
     if SETTINGS.mode not in {"webhook", "polling"}:
         raise RuntimeError(f"Unsupported MODE={SETTINGS.mode!r}; expected 'webhook' or 'polling'")
+    if (
+        SETTINGS.mode == "polling"
+        and SETTINGS.token_source not in _DEDICATED_TOKEN_SOURCES
+        and not SETTINGS.shared_polling_allowed
+    ):
+        logger.critical(
+            "Refusing to start Telegram polling with token_source=%s. Polling with the shared "
+            "Sapphire Telegram bot conflicts with Hermes or webhook consumers. Set "
+            "SAPPHIRE_PM_BOT_TOKEN for a dedicated PM bot, switch MODE=webhook, or set "
+            "SAPPHIRE_PM_BOT_ALLOW_SHARED_POLLING=1 only for a deliberate break-glass run.",
+            SETTINGS.token_source,
+        )
+        raise RuntimeError(
+            "Polling mode requires SAPPHIRE_PM_BOT_TOKEN or "
+            "SAPPHIRE_PM_BOT_ALLOW_SHARED_POLLING=1"
+        )
 
 
 def _message_payload(update: dict[str, Any]) -> dict[str, Any]:
@@ -295,7 +346,11 @@ def on_startup() -> None:
     _validate_startup_config()
     if SETTINGS.mode == "polling":
         _start_polling_thread()
-    logger.info("Sapphire PM bot ready (mode=%s)", SETTINGS.mode)
+    logger.info(
+        "Sapphire PM bot ready (mode=%s token_source=%s)",
+        SETTINGS.mode,
+        SETTINGS.token_source,
+    )
 
 
 @app.on_event("shutdown")
@@ -311,8 +366,10 @@ def health() -> dict[str, Any]:
         "status": "ok",
         "service": "sapphire-pm-bot",
         "mode": SETTINGS.mode,
+        "token_source": SETTINGS.token_source,
         "polling_active": polling_active,
         "last_poll_error": POLLING_STATE.get("last_error"),
+        "shared_polling_allowed": SETTINGS.shared_polling_allowed,
         "webhook_secret_configured": bool(SETTINGS.webhook_secret),
     }
 
