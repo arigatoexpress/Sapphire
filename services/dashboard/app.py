@@ -5036,6 +5036,57 @@ def api_autonomy_continuous_intelligence():
         ), 200
 
 
+@app.route("/api/autonomy/quant-intelligence")
+@requires_auth
+def api_autonomy_quant_intelligence():
+    """Read-only quant flywheel for assets, signals, validation, and work orders."""
+    try:
+        from lib.autonomy.quant_intelligence import build_quant_intelligence_flywheel
+
+        live = str(request.args.get("live") or "").lower() in {"1", "true", "yes"}
+        cache_key = f"quant_intelligence::{live}"
+        return jsonify(
+            get_cached(
+                cache_key,
+                lambda: build_quant_intelligence_flywheel(fetch_live=live),
+                ttl=STRATEGY_LAB_CACHE_DURATION,
+                raise_on_miss=True,
+            )
+        )
+    except Exception as e:
+        log.warning("quant intelligence API error: %s", e)
+        return jsonify(
+            {
+                "generated_at": datetime.now(UTC).isoformat(),
+                "mode": "quant_intelligence_flywheel",
+                "live_requested": False,
+                "execution_enabled": False,
+                "live_trading_enabled": False,
+                "telegram_sends_enabled": False,
+                "writes_by_default": False,
+                "error": str(e),
+                "safety": {
+                    "execution_enabled": False,
+                    "live_trading_enabled": False,
+                    "telegram_sends_enabled": False,
+                    "writes_by_default": False,
+                    "guards": ["read_only_quant_planning", "paper_forward_only"],
+                },
+                "current_state": {},
+                "watch_universes": [],
+                "signal_families": [],
+                "validation_stack": [],
+                "data_source_roadmap": [],
+                "autonomy_gaps": [],
+                "work_orders": [],
+                "dispatch_now": [],
+                "operating_loop": [],
+                "totals": {},
+                "source_docs": [],
+            }
+        ), 200
+
+
 def _truncate_gemini_ooda_diff_value(value: Any, limit: int = 180) -> str:
     if isinstance(value, (dict, list)):
         text = json.dumps(value, sort_keys=True)

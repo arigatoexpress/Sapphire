@@ -39,6 +39,8 @@ def _auth_header() -> dict[str, str]:
 @pytest.fixture
 def client():
     dashboard_app.app.config["TESTING"] = True
+    dashboard_app._cache.clear()
+    dashboard_app._cache_time.clear()
     with dashboard_app.app.test_client() as test_client:
         yield test_client
 
@@ -169,6 +171,78 @@ def test_continuous_intelligence_error_returns_safety_envelope(client, monkeypat
     assert payload["writes_by_default"] is False
     assert payload["totals"]["tasks"] == 0
     assert payload["tasks"] == []
+
+
+# -- /api/autonomy/quant-intelligence --------------------------------
+
+
+def test_quant_intelligence_happy_path_defaults_to_dry_run(client, monkeypatch):
+    captured = {"live": None}
+
+    def fake_build(*, fetch_live: bool):
+        captured["live"] = fetch_live
+        return {
+            "mode": "quant_intelligence_flywheel",
+            "totals": {"work_orders": 4, "watch_universes": 2},
+            "dispatch_now": [{"id": "q-1"}],
+            "execution_enabled": False,
+            "live_trading_enabled": False,
+            "telegram_sends_enabled": False,
+            "writes_by_default": False,
+        }
+
+    import lib.autonomy.quant_intelligence as qi
+
+    monkeypatch.setattr(qi, "build_quant_intelligence_flywheel", fake_build)
+
+    response = client.get("/api/autonomy/quant-intelligence", headers=_auth_header())
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["totals"]["work_orders"] == 4
+    assert payload["execution_enabled"] is False
+    assert payload["live_trading_enabled"] is False
+    assert payload["telegram_sends_enabled"] is False
+    assert captured["live"] is False
+
+
+@pytest.mark.parametrize("flag", ["1", "true", "yes", "TRUE"])
+def test_quant_intelligence_live_query_param(client, monkeypatch, flag):
+    captured = {"live": None}
+
+    def fake_build(*, fetch_live: bool):
+        captured["live"] = fetch_live
+        return {"mode": "quant_intelligence_flywheel", "live_requested": fetch_live}
+
+    import lib.autonomy.quant_intelligence as qi
+
+    monkeypatch.setattr(qi, "build_quant_intelligence_flywheel", fake_build)
+
+    response = client.get(f"/api/autonomy/quant-intelligence?live={flag}", headers=_auth_header())
+
+    assert response.status_code == 200
+    assert captured["live"] is True
+
+
+def test_quant_intelligence_error_returns_safety_envelope(client, monkeypatch):
+    import lib.autonomy.quant_intelligence as qi
+
+    def boom(*, fetch_live: bool):  # noqa: ARG001
+        raise RuntimeError("quant registry unavailable")
+
+    monkeypatch.setattr(qi, "build_quant_intelligence_flywheel", boom)
+
+    response = client.get("/api/autonomy/quant-intelligence", headers=_auth_header())
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["mode"] == "quant_intelligence_flywheel"
+    assert "quant registry unavailable" in payload["error"]
+    assert payload["execution_enabled"] is False
+    assert payload["live_trading_enabled"] is False
+    assert payload["telegram_sends_enabled"] is False
+    assert payload["writes_by_default"] is False
+    assert payload["dispatch_now"] == []
 
 
 # ── /api/autonomy/continuous-intelligence/artifacts ─────────────────

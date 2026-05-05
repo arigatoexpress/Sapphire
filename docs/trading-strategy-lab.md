@@ -40,6 +40,9 @@ market data/order drafts, and Robinhood Chain testnet attestations.
   trading report: ranked candidates, capped manual-order dry-run instructions,
   blocked live surfaces, and promotion gates. Add `?offline=1` to skip public
   market-data fetches.
+- `GET /api/autonomy/quant-intelligence` returns the read-only quant
+  intelligence flywheel: ranked watch universes, signal families, validation
+  gates, data-source roadmap, autonomy gaps, and dispatchable work orders.
 - `POST /api/trading/order-draft` returns venue payload drafts for a symbol,
   action, and notional without signing or submitting anything.
 - The strategy-lab report includes `real_funds_readiness`, which documents the
@@ -165,3 +168,18 @@ curl -s -X POST http://127.0.0.1:8080/api/trading/workbench/work-orders/preview 
 The preview endpoint always returns `execution_enabled=false`; requested
 browser, Telegram, webhook, or trading mutations appear as blocked actions
 unless a separate operator-gated tool explicitly executes them.
+
+## Quant Intelligence Flywheel
+
+The quant flywheel is the bridge from "many useful tools" to an operating loop
+agents can repeatedly claim:
+
+- Watch universes cover core crypto liquidity, ETH/DeFi/RWA, privacy,
+  macro-risk sensors, commodities/power, and AI/cyber infrastructure equities.
+- Signal families separate robust factors (trend, relative strength, volatility
+  regime) from moderate factors (funding, on-chain liquidity, official events)
+  and experimental LLM overlays.
+- Validation gates are explicit: walk-forward OOS, purged/embargoed CPCV,
+  deflated Sharpe, source-quality decay, and paper-forward incubation.
+- Work orders remain read-only, dry-run, or paper. They can write reviewable
+  artifacts, but cannot submit orders, mutate TradingView, or send Telegram.
