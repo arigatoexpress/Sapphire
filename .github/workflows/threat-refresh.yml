@@ -37,7 +37,7 @@ jobs:
           mkdir -p data/intelligence
           uv run --python 3.11 --no-project python services/dashboard/refresh_threats.py | tee threat-refresh.log
       - name: Upload threat artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: threat-refresh-${{ github.run_id }}
