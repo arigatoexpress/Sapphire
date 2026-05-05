@@ -41,7 +41,11 @@ logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("analytics")
 
 app = Flask(__name__, template_folder=str(_HERE / "templates"))
-bq = bigquery.Client(project=PROJECT)
+try:
+    bq = bigquery.Client(project=PROJECT)
+except Exception as _bq_exc:  # pragma: no cover
+    log.warning("BigQuery client unavailable: %s", _bq_exc)
+    bq = None
 
 # WebAuthn passkey admin scaffold (gated /admin/* + /api/admin/*).
 # Lazily wired so a missing optional dep (webauthn / firestore) doesn't crash
