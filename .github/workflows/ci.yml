@@ -45,7 +45,7 @@ jobs:
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
     steps:
       - uses: actions/checkout@v4
-      - name: pytest (unit)
+      - name: pytest (unit + coverage)
         # PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 is set at the job level to avoid
         # loading stray plugins. pytest-asyncio must then be loaded explicitly
         # via -p, otherwise pytest 9.x fails async tests (8.x silently skipped
@@ -56,7 +56,17 @@ jobs:
             --maxfail=25 \
             --durations=20 \
             -p no:cacheprovider \
-            -p pytest_asyncio.plugin
+            -p pytest_asyncio.plugin \
+            -p pytest_cov.plugin \
+            --cov=lib --cov=services --cov=plugins \
+            --cov-report=xml \
+            --cov-fail-under=60
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   plugin-test:
     name: plugin tests
@@ -125,6 +135,65 @@ jobs:
         if: steps.changed.outputs.run == 'true'
         run: |
           uv run --python 3.11 --no-project python scripts/lint_pine.py pine/standalone/*.pine
+
+  smoke-test:
+    name: container smoke test
+    if: github.ref == 'refs/heads/main' && vars.SAPPHIRE_RUNNER != ''
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build analytics dashboard image
+        run: |
+          docker build \
+            -t sapphire-analytics-smoke \
+            -f services/analytics_dashboard/Dockerfile \
+            services/analytics_dashboard
+      - name: Start container and health-check
+        run: |
+          docker run -d --name analytics-smoke \
+            -p 8080:8080 \
+            -e AUTH_PASSWORD=smoke-test \
+            sapphire-analytics-smoke
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8080/healthz >/dev/null 2>&1; then
+              echo "✓ Container healthy"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "✗ Health check timed out" >&2
+          docker logs analytics-smoke
+          exit 1
+      - name: Stop container
+        if: always()
+        run: docker stop analytics-smoke && docker rm analytics-smoke
+
+  deploy:
+    name: deploy analytics dashboard
+    if: github.ref == 'refs/heads/main' && vars.SAPPHIRE_RUNNER != ''
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
+    needs: [test, smoke-test]
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy sapphire-analytics \
+            --source services/analytics_dashboard \
+            --region us-central1 \
+            --platform managed \
+            --allow-unauthenticated \
+            --quiet
 
   secrets-scan:
     name: gitleaks (secrets)
