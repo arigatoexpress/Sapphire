@@ -146,6 +146,8 @@ at the repo-owned read-only agent, not the removed
 | `scripts/windows_setup/start_tv_agent.ps1` | Starts `python -m services.windows_tv_agent.server` on port `8081`; exits 0 if the port is already listening. |
 | `scripts/windows_setup/create_tv_agent_task.ps1` | Registers startup and logon tasks for the read-only agent. |
 | `scripts/windows_setup/create_task_scheduler_job.ps1` | Backwards-compatible wrapper that delegates to `create_tv_agent_task.ps1`. |
+| `scripts/windows_setup/start_tradingview_cdp.ps1` | Starts the installed TradingView Desktop package with local CDP on `127.0.0.1:9222`, without hard-coding the WindowsApps version. |
+| `scripts/windows_setup/ensure_windows_availability.ps1` | Disables sleep/lock paths, backs up rollback evidence, and registers read-only user-logon tasks for TradingView CDP and availability guardrails. |
 
 Install or repair the tasks from Windows PowerShell:
 
@@ -167,6 +169,21 @@ The agent is a read-only visibility surface. It reports `status=degraded` when
 TradingView Desktop CDP is unavailable at `127.0.0.1:9222`, but it still
 confirms that the `8081` service is alive. Do not add order-entry or Telegram
 send behavior to this service.
+
+To repair the Windows desktop availability/CDP layer without reintroducing
+hard-coded package paths:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File E:\Sapphire\Code\Sapphire\scripts\windows_setup\ensure_windows_availability.ps1 `
+  -RepoPath E:\Sapphire\Code\Sapphire `
+  -StartTradingViewCdp
+```
+
+This writes status/rollback files under `C:\Users\aribs\SapphireOps`, registers
+`SapphireTradingViewCDP` and `SapphireWindowsAvailabilityGuard`, keeps safety
+flags false for trading, Telegram, and browser mutation, and preserves any old
+`TradingView-CDP.bat` copies in timestamped backups.
 
 ## Strategy Experiments
 

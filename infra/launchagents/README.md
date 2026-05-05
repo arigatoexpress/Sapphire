@@ -2,7 +2,7 @@
 
 macOS LaunchAgent definitions for Sapphire background services and schedulers.
 
-Current inventory: 21 active plists in this directory, plus 1 disabled template (`com.sapphire.lumo-api.plist.disabled`). The 2026-04-21 audit folded in the production plists that had been running un-versioned on Ari's Mac — see `docs/archive/2026/audits/launchagents-audit-2026-04-21.md`. Some service-owned LaunchAgents live with their service code under `services/*/launchagent/`; this currently includes `services/dashboard/launchagent/com.sapphire.dashboard.plist`, `services/inference-proxy/launchagent/com.sapphire.inference-proxy.plist`, `services/pm_bot/launchagent/com.sapphire.pm-bot.plist`, and `services/service_supervisor/launchagent/com.sapphire.service-supervisor.plist`. The remaining Mac-only plists (cloudflare-tunnel, kronos-daily, regional-intel, hermes) are intentionally not versioned here; see the audit for why.
+Current inventory: 28 active plists in this directory, plus 1 disabled template (`com.sapphire.lumo-api.plist.disabled`). The 2026-04-21 audit folded in the production plists that had been running un-versioned on Ari's Mac — see `docs/archive/2026/audits/launchagents-audit-2026-04-21.md`. Some service-owned LaunchAgents live with their service code under `services/*/launchagent/`; this currently includes `services/dashboard/launchagent/com.sapphire.dashboard.plist`, `services/inference-proxy/launchagent/com.sapphire.inference-proxy.plist`, `services/pm_bot/launchagent/com.sapphire.pm-bot.plist`, and `services/service_supervisor/launchagent/com.sapphire.service-supervisor.plist`. The remaining Mac-only plists (cloudflare-tunnel, kronos-daily, regional-intel, hermes) are intentionally not versioned here; see the audit for why.
 
 ## Active Plists
 
@@ -19,6 +19,7 @@ Current inventory: 21 active plists in this directory, plus 1 disabled template 
 | `com.sapphire.gcp-sync.plist` | GCP → BigQuery event pipeline. | hourly at :05 |
 | `com.sapphire.heartbeat.plist` | Platform heartbeat daemon. | KeepAlive |
 | `com.sapphire.logrotate.plist` | Compress + rotate `~/autonomy-status/logs/`. | 03:30 daily |
+| `com.sapphire.mac-to-windows-tunnel.plist` | Reverse-forwards selected Mac services to the Windows desktop over SSH/Tailscale. | KeepAlive |
 | `com.sapphire.market-intel.plist` | Market intelligence refresh. | RunAtLoad + every 30 min |
 | `com.sapphire.morning-brief.plist` | Canonical morning briefing run (`services/intelligence/daily_brief.py`). | 06:00 local / 07:00 CT daily |
 | `com.sapphire.openbb-api.plist` | OpenBB REST server on `:6900`. | KeepAlive |

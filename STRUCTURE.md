@@ -37,6 +37,8 @@ policy, and a rule for what must not drift into it.
 - `infra/` — LaunchAgents, registries, org manifests, and cloud templates.
   Retention: git, no secret payloads.
 - `lib/` — reusable Sapphire libraries and product kernels. Retention: git.
+- `packages/` — local package manifests and reusable package scaffolds.
+  Retention: git source/config only; build output stays ignored.
 - `patches/` — small reviewable patch artifacts. Retention: git while active;
   stale patches move to `docs/archive/` or the cold tier.
 - `pine/` — TradingView Pine scripts and related docs. Retention: git.
@@ -61,7 +63,9 @@ policy, and a rule for what must not drift into it.
 ## Canonical Top-Level Files
 
 <!-- canonical-top-level-files:start -->
+- `.bandit.yml`
 - `.editorconfig`
+- `.env.example`
 - `.env.integrations.example`
 - `.eslintrc.cjs`
 - `.firebaserc`
@@ -78,6 +82,7 @@ policy, and a rule for what must not drift into it.
 - `AGENTS.md`
 - `CLAUDE.md`
 - `CONTRIBUTING.md`
+- `DEPLOY_CANDIDATES.md`
 - `GEMINI.md`
 - `LICENSE`
 - `Makefile`
@@ -90,6 +95,7 @@ policy, and a rule for what must not drift into it.
 - `foundry.toml`
 - `pyproject.toml`
 - `requirements-test.txt`
+- `slither.config.json`
 <!-- canonical-top-level-files:end -->
 
 ## Retention Summary

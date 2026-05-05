@@ -42,6 +42,7 @@ DEFAULT_WINDOWS_GPU_URL = "http://100.71.10.48:11434"
 DEFAULT_WINDOWS_HOST = "100.71.10.48"
 DEFAULT_WINDOWS_HTTP_TIMEOUT_SECONDS = 5.0
 DEFAULT_WINDOWS_TCP_TIMEOUT_SECONDS = 3.0
+DEFAULT_WINDOWS_SSH_TIMEOUT_SECONDS = 8
 GEMINI_PROBE_PROMPT = "Return exactly SAPPHIRE_GEMINI_PROBE_OK and nothing else."
 GEMINI_PROBE_RESPONSE = "SAPPHIRE_GEMINI_PROBE_OK"
 WINDOWS_REQUIRED_MODELS = {
@@ -60,6 +61,14 @@ WINDOWS_SERVICE_PORTS = {
     "tradingview_agent_tcp": 8081,
     "tradingview_webhook_tcp": 9090,
     "telemetry_dashboard_tcp": 3001,
+}
+WINDOWS_EXPECTED_TASK_STATES = {
+    "SapphireDashboard": {"Running"},
+    "SapphireWebhook": {"Running"},
+    "Sapphire-TV-Agent": {"Running"},
+    "SapphireResearchWorker": {"Ready", "Running"},
+    "SapphireTradingViewCDP": {"Ready", "Running"},
+    "SapphireWindowsAvailabilityGuard": {"Ready", "Running"},
 }
 WINDOWS_RESEARCH_WORKER_MAX_AGE_SECONDS = int(
     os.getenv("WINDOWS_RESEARCH_WORKER_MAX_AGE_SECONDS", "129600")
@@ -132,9 +141,7 @@ def main(argv: list[str] | None = None) -> int:
     return 0 if report["summary"]["fail"] == 0 else 20
 
 
-def build_report(
-    checks: list[Check], started: float, args: argparse.Namespace
-) -> dict[str, Any]:
+def build_report(checks: list[Check], started: float, args: argparse.Namespace) -> dict[str, Any]:
     """Assemble the canonical sweep report payload.
 
     Each check entry carries both ``category`` (legacy, original Check field)
@@ -532,25 +539,36 @@ def workflow_no_spend_gate_violations(repo_id: str, workflow: Path) -> tuple[lis
     return violations, len(jobs)
 
 
-
 def _probe_windows_tasks() -> list[Check]:
     expected = {
         "SapphireDashboard": "Running",
         "SapphireResearchWorker": "Ready",
-        "Sapphire-TV-Agent-Logon": "Ready"
+        "Sapphire-TV-Agent-Logon": "Ready",
     }
     checks: list[Check] = []
-    
+
     # Run Get-ScheduledTask
     try:
-        res = subprocess.run(["powershell", "-NoProfile", "-Command", "Get-ScheduledTask -TaskName 'Sapphire*' | Select-Object TaskName, State | ConvertTo-Json"], capture_output=True, text=True, check=True)
+        res = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-Command",
+                "Get-ScheduledTask -TaskName 'Sapphire*' | Select-Object TaskName, State | ConvertTo-Json",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
         import json
+
         tasks_data = json.loads(res.stdout)
-        if isinstance(tasks_data, dict): tasks_data = [tasks_data]
+        if isinstance(tasks_data, dict):
+            tasks_data = [tasks_data]
         parsed = {t["TaskName"]: t["State"] for t in tasks_data}
     except Exception:
         parsed = {}
-        
+
     for label, expected_state in expected.items():
         state = parsed.get(label)
         if not state:
@@ -561,11 +579,13 @@ def _probe_windows_tasks() -> list[Check]:
             checks.append(Check("windows_task", label, "FAIL", f"expected Ready, got {state}", 0))
         else:
             checks.append(Check("windows_task", label, "PASS", f"state={state}", 0))
-            
+
     return checks
+
 
 def probe_launchagents() -> list[Check]:
     import sys
+
     if sys.platform == "win32":
         return _probe_windows_tasks()
 
@@ -578,6 +598,7 @@ def probe_launchagents() -> list[Check]:
         "com.sapphire.heartbeat": "always_on",
         "com.sapphire.openbb-api": "always_on",
         "com.sapphire.cloudflare-tunnel": "always_on",
+        "com.sapphire.mac-to-windows-tunnel": "always_on",
         "ai.hermes.gateway": "always_on",
         "actions.runner.arigatoexpress-Sapphire.ari-macbook-sapphire": "always_on",
         "com.sapphire.gcp-sync": "scheduled",
@@ -729,12 +750,257 @@ def probe_windows_desktop_server(env: dict[str, str] | None = None) -> list[Chec
         windows_ollama_inventory_check(gpu_url),
         windows_webhook_health_check(host),
         windows_research_worker_check(host),
+        windows_tv_agent_cdp_check(host),
+        windows_scheduled_tasks_check(host),
+        windows_power_availability_check(host),
     ]
     checks.extend(
         tcp_check("windows", name, host, port, warn_on_error=True)
         for name, port in WINDOWS_SERVICE_PORTS.items()
     )
     return checks
+
+
+def windows_ssh_target(host: str) -> str:
+    return os.getenv("SAPPHIRE_WINDOWS_SSH_TARGET", f"aribs@{host}")
+
+
+def windows_ssh_timeout_seconds() -> int:
+    raw = os.getenv("SAPPHIRE_WINDOWS_SSH_TIMEOUT_SECONDS")
+    if raw is None:
+        return DEFAULT_WINDOWS_SSH_TIMEOUT_SECONDS
+    try:
+        value = int(raw)
+    except ValueError:
+        return DEFAULT_WINDOWS_SSH_TIMEOUT_SECONDS
+    return value if value > 0 else DEFAULT_WINDOWS_SSH_TIMEOUT_SECONDS
+
+
+def windows_powershell_json(host: str, script: str, *, timeout: int | None = None) -> RunResult:
+    encoded = base64.b64encode(script.encode("utf-16le")).decode("ascii")
+    connect_timeout = max(1, int(windows_tcp_timeout_seconds()))
+    return run(
+        [
+            "ssh",
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            f"ConnectTimeout={connect_timeout}",
+            windows_ssh_target(host),
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-EncodedCommand",
+            encoded,
+        ],
+        timeout=timeout or windows_ssh_timeout_seconds(),
+    )
+
+
+def windows_tv_agent_cdp_check(host: str = DEFAULT_WINDOWS_HOST) -> Check:
+    started = time.perf_counter()
+    url = f"http://{host}:8081/health"
+    try:
+        with urllib.request.urlopen(url, timeout=windows_http_timeout_seconds()) as response:  # nosec B310 - fixed private Tailscale readiness URL.
+            status_code = response.status
+            body = response.read(1024 * 1024)
+    except urllib.error.HTTPError as exc:
+        return Check(
+            "windows",
+            "tradingview_cdp_status",
+            "WARN",
+            f"http={exc.code}",
+            int((time.perf_counter() - started) * 1000),
+        )
+    except Exception as exc:
+        return Check(
+            "windows",
+            "tradingview_cdp_status",
+            "WARN",
+            exc.__class__.__name__,
+            int((time.perf_counter() - started) * 1000),
+        )
+
+    evidence = f"http={status_code}"
+    try:
+        parsed = json.loads(body)
+    except json.JSONDecodeError:
+        return Check(
+            "windows",
+            "tradingview_cdp_status",
+            "WARN",
+            f"{evidence}; invalid_json",
+            int((time.perf_counter() - started) * 1000),
+        )
+    if not isinstance(parsed, dict):
+        return Check(
+            "windows",
+            "tradingview_cdp_status",
+            "WARN",
+            f"{evidence}; invalid_payload",
+            int((time.perf_counter() - started) * 1000),
+        )
+
+    service_status = str(parsed.get("status") or "unknown")
+    cdp = parsed.get("cdp") if isinstance(parsed.get("cdp"), dict) else {}
+    cdp_status = str(cdp.get("status") or "unknown")
+    cdp_healthy = cdp.get("healthy") is True
+    status = "PASS" if 200 <= status_code < 300 and cdp_healthy else "WARN"
+    evidence += f"; status={service_status}; cdp={cdp_status}"
+    if cdp.get("latency_ms") is not None:
+        evidence += f"; cdp_latency_ms={cdp.get('latency_ms')}"
+    if cdp.get("tab_count") is not None:
+        evidence += f"; tab_count={cdp.get('tab_count')}"
+    if cdp.get("tradingview_tab_count") is not None:
+        evidence += f"; tradingview_tab_count={cdp.get('tradingview_tab_count')}"
+    return Check(
+        "windows",
+        "tradingview_cdp_status",
+        status,
+        evidence,
+        int((time.perf_counter() - started) * 1000),
+    )
+
+
+def windows_scheduled_tasks_check(host: str = DEFAULT_WINDOWS_HOST) -> Check:
+    names = sorted(WINDOWS_EXPECTED_TASK_STATES)
+    quoted_names = ", ".join(f'"{name}"' for name in names)
+    script = f"""
+$ProgressPreference = 'SilentlyContinue'
+$ErrorActionPreference = 'Continue'
+$names = @({quoted_names})
+$rows = foreach ($name in $names) {{
+  $task = Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
+  if ($task) {{
+    $info = $task | Get-ScheduledTaskInfo
+    [pscustomobject]@{{
+      TaskName = $task.TaskName
+      State = $task.State.ToString()
+      LastTaskResult = $info.LastTaskResult
+    }}
+  }} else {{
+    [pscustomobject]@{{
+      TaskName = $name
+      State = 'Missing'
+      LastTaskResult = $null
+    }}
+  }}
+}}
+$rows | ConvertTo-Json -Depth 4 -Compress
+""".strip()
+    result = windows_powershell_json(host, script)
+    if not result.ok:
+        return Check("windows", "scheduled_tasks", "WARN", short_error(result), result.duration_ms)
+    try:
+        parsed = json.loads(result.stdout or "[]")
+    except json.JSONDecodeError:
+        return Check("windows", "scheduled_tasks", "WARN", "invalid_json", result.duration_ms)
+    if isinstance(parsed, dict):
+        parsed = [parsed]
+    if not isinstance(parsed, list):
+        return Check("windows", "scheduled_tasks", "WARN", "invalid_payload", result.duration_ms)
+
+    states = {
+        str(item.get("TaskName")): str(item.get("State"))
+        for item in parsed
+        if isinstance(item, dict)
+    }
+    missing = [name for name in names if states.get(name) in {None, "Missing"}]
+    unexpected = [
+        f"{name}:{states.get(name, 'Missing')}"
+        for name, allowed in WINDOWS_EXPECTED_TASK_STATES.items()
+        if states.get(name) not in allowed
+    ]
+    status = "PASS" if not missing and not unexpected else "WARN"
+    evidence = f"checked={len(names)}"
+    if missing:
+        evidence += f"; missing={','.join(missing)}"
+    if unexpected:
+        evidence += f"; unexpected={','.join(unexpected)}"
+    if not missing and not unexpected:
+        evidence += "; states=ok"
+    return Check("windows", "scheduled_tasks", status, evidence, result.duration_ms)
+
+
+def _power_indices_are_zero(value: Any) -> bool:
+    text = str(value or "")
+    return (
+        "Current AC Power Setting Index: 0x00000000" in text
+        and "Current DC Power Setting Index: 0x00000000" in text
+    )
+
+
+def _registry_value_is_zero(value: Any, name: str) -> bool:
+    for line in str(value or "").splitlines():
+        parts = line.split()
+        if len(parts) >= 3 and parts[0].lower() == name.lower():
+            return parts[-1].lower() in {"0", "0x0", "0x00000000"}
+    return False
+
+
+def windows_power_availability_check(host: str = DEFAULT_WINDOWS_HOST) -> Check:
+    script = """
+$ProgressPreference = 'SilentlyContinue'
+$ErrorActionPreference = 'Continue'
+[pscustomobject]@{
+  active_scheme = (powercfg /getactivescheme | Out-String).Trim()
+  sleep = (powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE | Out-String).Trim()
+  display = (powercfg /query SCHEME_CURRENT SUB_VIDEO VIDEOIDLE | Out-String).Trim()
+  screen_save_active = (reg query 'HKCU\\Control Panel\\Desktop' /v ScreenSaveActive | Out-String).Trim()
+  screen_saver_secure = (reg query 'HKCU\\Control Panel\\Desktop' /v ScreenSaverIsSecure | Out-String).Trim()
+  screen_save_timeout = (reg query 'HKCU\\Control Panel\\Desktop' /v ScreenSaveTimeOut | Out-String).Trim()
+  inactivity_timeout = (reg query 'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System' /v InactivityTimeoutSecs | Out-String).Trim()
+} | ConvertTo-Json -Depth 4 -Compress
+""".strip()
+    result = windows_powershell_json(host, script)
+    if not result.ok:
+        return Check(
+            "windows",
+            "desktop_availability_settings",
+            "WARN",
+            short_error(result),
+            result.duration_ms,
+        )
+    try:
+        parsed = json.loads(result.stdout or "{}")
+    except json.JSONDecodeError:
+        return Check(
+            "windows", "desktop_availability_settings", "WARN", "invalid_json", result.duration_ms
+        )
+    if not isinstance(parsed, dict):
+        return Check(
+            "windows",
+            "desktop_availability_settings",
+            "WARN",
+            "invalid_payload",
+            result.duration_ms,
+        )
+
+    problems: list[str] = []
+    if not _power_indices_are_zero(parsed.get("sleep")):
+        problems.append("sleep_timeout")
+    if not _power_indices_are_zero(parsed.get("display")):
+        problems.append("display_timeout")
+    if not _registry_value_is_zero(parsed.get("screen_save_active"), "ScreenSaveActive"):
+        problems.append("screensaver_active")
+    if not _registry_value_is_zero(parsed.get("screen_saver_secure"), "ScreenSaverIsSecure"):
+        problems.append("screensaver_secure")
+    if not _registry_value_is_zero(parsed.get("screen_save_timeout"), "ScreenSaveTimeOut"):
+        problems.append("screensaver_timeout")
+    if not _registry_value_is_zero(parsed.get("inactivity_timeout"), "InactivityTimeoutSecs"):
+        problems.append("inactivity_timeout")
+
+    evidence = "sleep=never; display=never; screensaver=off; inactivity_timeout=0"
+    if problems:
+        evidence += f"; problems={','.join(problems)}"
+    return Check(
+        "windows",
+        "desktop_availability_settings",
+        "PASS" if not problems else "WARN",
+        evidence,
+        result.duration_ms,
+    )
 
 
 def windows_ollama_inventory_check(base_url: str = DEFAULT_WINDOWS_GPU_URL) -> Check:
