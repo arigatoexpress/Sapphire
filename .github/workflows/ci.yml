@@ -171,7 +171,9 @@ jobs:
 
   deploy:
     name: deploy analytics dashboard
-    if: github.ref == 'refs/heads/main' && vars.SAPPHIRE_RUNNER != ''
+    # Deploy only when the self-hosted runner and Google WIF variables are
+    # configured. Otherwise the auth action fails before it can no-op.
+    if: github.ref == 'refs/heads/main' && vars.SAPPHIRE_RUNNER != '' && vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_SERVICE_ACCOUNT != ''
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     needs: [test, smoke-test]
     permissions:
