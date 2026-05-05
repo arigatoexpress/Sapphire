@@ -649,12 +649,24 @@ def _stub_brain_module(app_module):
     return sys.modules["brain"]
 
 
+def _stub_brain_external_observations(brain, monkeypatch):
+    """Keep LLM tests deterministic by removing live HTTP feed drift."""
+
+    def _stable_json(url, timeout=3.0):
+        if "tho.sapphirealpha.xyz" in url:
+            return {"status": "ok", "warnings": []}
+        return {"records": [], "fetched_at": "2026-05-02T00:00:00+00:00"}
+
+    monkeypatch.setattr(brain, "_http_get_json", _stable_json)
+
+
 def test_brain_synthesis_includes_narrative_llm_field(client, app_module, monkeypatch):
     """When LLM_BRAIN_ENABLED=1 and Vertex returns a string, narrative_llm
     must appear on the synthesis payload — the deterministic narrative
     field stays untouched.
     """
     brain = _stub_brain_module(app_module)
+    _stub_brain_external_observations(brain, monkeypatch)
     monkeypatch.setattr(brain, "LLM_BRAIN_ENABLED", True)
     monkeypatch.setattr(
         brain,
@@ -693,6 +705,7 @@ def test_brain_synthesis_narrative_llm_is_null_when_vertex_unavailable(
     endpoint must NOT fail and the deterministic narrative must remain.
     """
     brain = _stub_brain_module(app_module)
+    _stub_brain_external_observations(brain, monkeypatch)
     monkeypatch.setattr(brain, "LLM_BRAIN_ENABLED", True)
     monkeypatch.setattr(brain, "_vertex_generate", lambda prompt: None)
     with brain._llm_cache_lock:
@@ -710,6 +723,7 @@ def test_brain_synthesis_skips_llm_when_disabled(client, app_module, monkeypatch
     narrative_llm null.
     """
     brain = _stub_brain_module(app_module)
+    _stub_brain_external_observations(brain, monkeypatch)
     monkeypatch.setattr(brain, "LLM_BRAIN_ENABLED", False)
 
     sentinel = {"called": False}
@@ -732,6 +746,7 @@ def test_brain_synthesis_caches_llm_result(client, app_module, monkeypatch):
     Vertex at most once; the second is served from the in-process cache.
     """
     brain = _stub_brain_module(app_module)
+    _stub_brain_external_observations(brain, monkeypatch)
     monkeypatch.setattr(brain, "LLM_BRAIN_ENABLED", True)
 
     counter = {"n": 0}
@@ -765,6 +780,7 @@ def test_brain_llm_refresh_endpoint_bypasses_cache(client, app_module, monkeypat
     when the cache is warm.
     """
     brain = _stub_brain_module(app_module)
+    _stub_brain_external_observations(brain, monkeypatch)
     monkeypatch.setattr(brain, "LLM_BRAIN_ENABLED", True)
 
     counter = {"n": 0}
