@@ -200,22 +200,69 @@
 {% endblock %}
 
 {% block content %}
-<!-- Mission control hero -->
-<div class="mc-hero" id="mc-hero">
-    <div>
-        <div class="mc-state">
-            <span class="status-dot ok" id="mc-dot"></span>
-            <span id="mc-label">Initializing</span>
-        </div>
-        <div class="mc-sub" id="mc-sub">Loading system status…</div>
-    </div>
-    <div class="mc-right">
-        <span class="big" id="mc-services">—/— services</span>
-        <span id="mc-clock">—</span>
-    </div>
+<!-- Page-level safety strip -->
+<div class="safety-strip" role="status" aria-label="System safety posture">
+    <span class="safety-label">Posture</span>
+    <span class="safety-text">
+        <strong style="color:var(--text-primary)">Paper trading is the default.</strong>
+        Live order placement is gated behind manual confirmation, $5/order caps, and a file-based killswitch.
+    </span>
+    <span class="safety-badge paper">Paper</span>
+    <span class="safety-badge read-only">Read-only UI</span>
 </div>
 
+<!-- Mission control hero -->
+<section aria-labelledby="oh-mission">
+    <div class="panel-headline">
+        <h3 id="oh-mission">How is Sapphire feeling right now?</h3>
+    </div>
+    <p class="panel-subhead">
+        One-glance status of the whole system. Green means everything is nominal; amber means at least one service is degraded; red means a critical service is down or the killswitch tripped.
+    </p>
+    <details class="tech-disclosure">
+        <summary>How does this work?</summary>
+        <div class="disclosure-body">
+            <p>The hero polls <code>/api/system</code> every 60 seconds. It counts how many of the registered services (control-plane, dashboard, signal-logger, inference-proxy, hermes, etc.) report <em>healthy</em>, plus how many of the four inference tiers (Windows GPU, Pi rari1/rari2, Mac local, Kimi cloud) are currently online.</p>
+            <p>Thresholds: <code>≥80%</code> healthy = <strong>Nominal</strong>, <code>50–79%</code> = <strong>Degraded</strong>, <code>&lt;50%</code> = <strong>Critical</strong>.</p>
+        </div>
+    </details>
+    <div class="mc-hero" id="mc-hero">
+        <div>
+            <div class="mc-state">
+                <span class="status-dot ok" id="mc-dot"></span>
+                <span id="mc-label">Initializing</span>
+            </div>
+            <div class="mc-sub" id="mc-sub">Loading system status…</div>
+        </div>
+        <div class="mc-right">
+            <span class="big" id="mc-services">—/— services</span>
+            <span id="mc-clock">—</span>
+        </div>
+    </div>
+</section>
+
 <!-- KPI row -->
+<section aria-labelledby="oh-kpis" style="margin-top: 24px">
+    <div class="panel-headline">
+        <h3 id="oh-kpis">The four numbers that matter most today</h3>
+    </div>
+    <p class="panel-subhead">
+        Service health, inference redundancy, today's signal count, and Pi cluster availability — refreshed every minute. Use these to decide whether the platform is safe to lean on.
+    </p>
+    <details class="tech-disclosure">
+        <summary>How does this work?</summary>
+        <div class="disclosure-body">
+            <p>Each KPI tile is a thin formatter over a JSON endpoint:</p>
+            <ul>
+                <li><strong>Services healthy</strong> — count of services in <code>/api/system</code> with <code>healthy: true</code>.</li>
+                <li><strong>Inference tiers</strong> — count of tiers in <code>/api/system.inference.endpoints</code> reporting <code>healthy</code>.</li>
+                <li><strong>Signals today</strong> — total + win-rate from <code>/api/signals.stats</code> (data/signals/*.jsonl, deduplicated).</li>
+                <li><strong>Pi cluster</strong> — boolean health of <code>pi-rari1</code> + <code>pi-rari2</code>.</li>
+            </ul>
+            <p>Sparklines come from <code>/api/metrics/history</code>.</p>
+        </div>
+    </details>
+</section>
 <div class="grid grid-4" style="margin-bottom: 20px">
     <div class="kpi">
         <div class="kpi-label">Services healthy</div>
@@ -314,6 +361,27 @@
 </div>
 
 <!-- Service health + tiers -->
+<section aria-labelledby="oh-services">
+    <div class="panel-headline">
+        <h3 id="oh-services">Which services and AI brains are online?</h3>
+    </div>
+    <p class="panel-subhead">
+        Left: every long-running Sapphire service and its port. Right: the four-tier AI inference fallback chain — your Telegram bot will keep answering even if the GPU server goes offline.
+    </p>
+    <details class="tech-disclosure">
+        <summary>How does this work?</summary>
+        <div class="disclosure-body">
+            <p>Each service entry probes its own <code>/health</code> endpoint via the proxy and reports <em>healthy / unhealthy / unknown</em>. Inference tiers cascade in this order:</p>
+            <ul>
+                <li><strong>T1</strong> — Windows GPU (RTX 5070 Ti, 27 models). Fastest path, ~0.4s.</li>
+                <li><strong>T2</strong> — Raspberry Pi rari1 / rari2 (small models, ARM).</li>
+                <li><strong>T3</strong> — Mac local (Ollama on this machine, CPU fallback ~90s).</li>
+                <li><strong>T4</strong> — Kimi cloud (non-sensitive prompts only — regex blocks API keys, passwords, JWTs).</li>
+            </ul>
+            <p>The proxy auto-fails-over: if T1 returns 503, the request retries against T2, then T3, then T4. Tier latencies come from <code>/metrics</code> on the inference proxy.</p>
+        </div>
+    </details>
+</section>
 <div class="grid grid-2" style="margin-bottom: 20px">
     <div class="card">
         <div class="card-header">

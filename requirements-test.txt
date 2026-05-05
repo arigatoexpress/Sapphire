@@ -15,12 +15,12 @@ pytest-cov==7.1.0
 # property-based + mutation testing (Tranche 6 Lane 1 — see
 # docs/products/test-rigor-0.1.0.md). Authorized for the test-rigor lane only;
 # do not leak into runtime requirements.
-hypothesis>=6.130,<7
+hypothesis>=6.152.4,<7
 # mutmut 3.x dropped the glob2 transitive (glob2 setup.py imports
 # distutils.command.install.install_layout, removed in setuptools 74+, which
 # bricks `pip install -r requirements-test.txt` in clean cloud envs and
 # blocks flask/pandas/reportlab from installing — see issue #539).
-mutmut>=3,<4
+mutmut>=3.5.0,<4
 
 # web / http
 aiohttp==3.13.5
@@ -36,9 +36,9 @@ requests==2.33.1
 websockets>=16.0,<17
 
 # data / validation
-pydantic==2.13.2
+pydantic==2.13.3
 python-dateutil==2.9.0.post0
-orjson==3.11.6
+orjson==3.11.8
 pyyaml==6.0.3
 redis==5.2.1
 

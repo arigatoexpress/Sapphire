@@ -979,6 +979,221 @@
             flex-shrink: 0;
         }
 
+        /* ============================================
+           CONSUMER POLISH — plain-language headers,
+           disclosure, safety badges, mobile shims.
+           ============================================ */
+
+        /* Plain-English panel headlines */
+        .panel-headline {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            gap: var(--space-md);
+            margin-bottom: var(--space-sm);
+        }
+        .panel-headline h3 {
+            font-family: var(--font-header);
+            font-size: 1.25rem;
+            font-weight: 400;
+            color: var(--text-primary);
+            letter-spacing: 0.02em;
+            line-height: 1.2;
+            margin: 0;
+            text-transform: none;
+        }
+        .panel-subhead {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            line-height: 1.5;
+            margin: 0 0 var(--space-md) 0;
+            max-width: 720px;
+        }
+        .panel-subhead strong {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        /* Inline expandable disclosure ("How does this work?") */
+        details.tech-disclosure {
+            margin: var(--space-sm) 0 var(--space-md) 0;
+            border: 1px dashed var(--border-dim);
+            border-radius: 6px;
+            background: rgba(98, 255, 64, 0.015);
+            transition: border-color 200ms ease, background 200ms ease;
+        }
+        details.tech-disclosure[open] {
+            border-color: var(--border-color);
+            background: rgba(98, 255, 64, 0.04);
+        }
+        details.tech-disclosure > summary {
+            list-style: none;
+            cursor: pointer;
+            padding: var(--space-sm) var(--space-md);
+            font-size: 0.78rem;
+            color: var(--cyan);
+            letter-spacing: 0.04em;
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            user-select: none;
+        }
+        details.tech-disclosure > summary::-webkit-details-marker { display: none; }
+        details.tech-disclosure > summary::before {
+            content: '▸';
+            display: inline-block;
+            transition: transform 150ms ease;
+            color: var(--cyan-dim);
+            font-size: 0.7rem;
+        }
+        details.tech-disclosure[open] > summary::before {
+            transform: rotate(90deg);
+        }
+        details.tech-disclosure > summary:hover { color: var(--amber); }
+        details.tech-disclosure[open] > summary { color: var(--amber); border-bottom: 1px solid var(--border-dim); }
+        details.tech-disclosure .disclosure-body {
+            padding: var(--space-md);
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+        details.tech-disclosure .disclosure-body p { margin: 0 0 var(--space-sm) 0; }
+        details.tech-disclosure .disclosure-body p:last-child { margin-bottom: 0; }
+        details.tech-disclosure .disclosure-body code {
+            background: rgba(98, 255, 64, 0.08);
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-size: 0.92em;
+            color: var(--green);
+        }
+        details.tech-disclosure .disclosure-body ul {
+            margin: var(--space-sm) 0 var(--space-sm) var(--space-lg);
+            padding: 0;
+        }
+        details.tech-disclosure .disclosure-body li { margin-bottom: 4px; }
+
+        /* Safety badges (Paper / Live / Dry-run / Killswitch) */
+        .safety-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 10px;
+            font-size: 0.7rem;
+            font-family: var(--font-terminal);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            border: 1px solid;
+            border-radius: 999px;
+            white-space: nowrap;
+            line-height: 1;
+        }
+        .safety-badge::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+            box-shadow: 0 0 6px currentColor;
+            flex-shrink: 0;
+        }
+        .safety-badge.paper {
+            color: var(--cyan);
+            border-color: var(--cyan-dim);
+            background: rgba(105, 214, 255, 0.08);
+        }
+        .safety-badge.live {
+            color: var(--red);
+            border-color: var(--red);
+            background: rgba(255, 111, 158, 0.08);
+        }
+        .safety-badge.dry-run {
+            color: var(--amber);
+            border-color: var(--amber-dim);
+            background: rgba(98, 255, 64, 0.08);
+        }
+        .safety-badge.killswitch {
+            color: var(--red);
+            border-color: var(--red);
+            background: rgba(255, 51, 51, 0.16);
+            animation: pulse 2s ease-in-out infinite;
+        }
+        .safety-badge.read-only {
+            color: var(--text-secondary);
+            border-color: var(--border-color);
+            background: rgba(98, 255, 64, 0.03);
+        }
+        .safety-badge.shadow-only {
+            color: var(--text-secondary);
+            border-color: var(--border-dim);
+        }
+
+        /* Page-level safety strip (sits at top of the dense pages) */
+        .safety-strip {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: var(--space-md);
+            padding: var(--space-md) var(--space-lg);
+            margin-bottom: var(--space-lg);
+            border: 1px solid var(--border-dim);
+            border-left: 3px solid var(--green);
+            border-radius: 8px;
+            background: rgba(98, 255, 64, 0.03);
+        }
+        .safety-strip .safety-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+        }
+        .safety-strip .safety-text {
+            color: var(--text-secondary);
+            font-size: 0.82rem;
+            line-height: 1.5;
+            flex: 1 1 auto;
+            min-width: 220px;
+        }
+
+        /* Tighter mobile responsive shims for dense pages */
+        @media (max-width: 768px) {
+            .panel-headline {
+                gap: var(--space-sm);
+            }
+            .panel-headline h3 {
+                font-size: 1.05rem;
+            }
+            .panel-subhead {
+                font-size: 0.8rem;
+            }
+            .safety-strip {
+                padding: var(--space-sm) var(--space-md);
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            details.tech-disclosure > summary {
+                font-size: 0.74rem;
+            }
+            details.tech-disclosure .disclosure-body {
+                font-size: 0.74rem;
+                padding: var(--space-sm) var(--space-md);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .terminal-main {
+                padding: var(--space-sm);
+            }
+            .panel-body, .card-body {
+                padding: var(--space-md);
+            }
+            .stat-value {
+                font-size: 1.5rem;
+            }
+            .panel-headline h3 {
+                font-size: 1rem;
+            }
+        }
+
         {% block extra_css %}{% endblock %}
     
         /* Mobile Responsive Overrides */

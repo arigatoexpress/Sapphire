@@ -40,7 +40,7 @@ DATASET = os.environ.get("BQ_DATASET", "sapphire")
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("analytics")
 
-app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), "templates"))
+app = Flask(__name__, template_folder=str(_HERE / "templates"))
 bq = bigquery.Client(project=PROJECT)
 
 # WebAuthn passkey admin scaffold (gated /admin/* + /api/admin/*).

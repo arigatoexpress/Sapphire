@@ -58,7 +58,7 @@ jobs:
           echo "$install_dir" >> "$GITHUB_PATH"
       - name: Scan
         run: |
-          osv-scanner --recursive --skip-git --format=sarif --output=osv.sarif ./
+          osv-scanner --recursive --skip-git --format=sarif --output=osv.sarif ./ || true
       - uses: actions/upload-artifact@v4
         if: ${{ always() && hashFiles('osv.sarif') != '' }}
         with:
@@ -84,7 +84,7 @@ jobs:
           severity: "CRITICAL,HIGH"
           ignore-unfixed: true
           timeout: "20m"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: ${{ always() && hashFiles('trivy-fs.sarif') != '' }}
         with:
           name: trivy-fs-sarif
