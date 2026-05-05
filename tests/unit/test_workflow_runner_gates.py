@@ -11,7 +11,16 @@ WORKFLOWS = ROOT / ".github" / "workflows"
 RUNNER_IF = "${{ vars.SAPPHIRE_RUNNER != '' }}"
 RUNNER_IF_ALWAYS = "${{ always() && vars.SAPPHIRE_RUNNER != '' }}"
 RUNNER_IF_MAIN = "github.ref == 'refs/heads/main' && vars.SAPPHIRE_RUNNER != ''"
-ALLOWED_RUNNER_IFS = {RUNNER_IF, RUNNER_IF_ALWAYS, RUNNER_IF_MAIN}
+RUNNER_IF_MAIN_WITH_GCP_WIF = (
+    "github.ref == 'refs/heads/main' && vars.SAPPHIRE_RUNNER != '' "
+    "&& vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_SERVICE_ACCOUNT != ''"
+)
+ALLOWED_RUNNER_IFS = {
+    RUNNER_IF,
+    RUNNER_IF_ALWAYS,
+    RUNNER_IF_MAIN,
+    RUNNER_IF_MAIN_WITH_GCP_WIF,
+}
 RUNS_ON = "${{ fromJSON(vars.SAPPHIRE_RUNNER) }}"
 
 
