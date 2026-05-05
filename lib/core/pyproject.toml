@@ -1,0 +1,12 @@
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sapphire-core"
+version = "0.1.0"
+description = "Sapphire core library: risk kernel, circuit breaker, cognitive mesh, pubsub"
+requires-python = ">=3.11"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sapphire_core"]

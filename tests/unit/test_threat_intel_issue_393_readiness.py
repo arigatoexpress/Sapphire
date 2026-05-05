@@ -101,7 +101,7 @@ def test_deployment_footprint_ignores_docs_and_reports_config_matches(tmp_path: 
     by_product = {item["product"]: item for item in summary}
 
     assert by_product["JetBrains TeamCity"]["status"] == "present_in_repo_config_evidence"
-    assert [m["path"].replace("\\", "/") for m in by_product["JetBrains TeamCity"]["matches"]] == [
+    assert by_product["JetBrains TeamCity"]["matches"] == [
         {"path": "infra/ci.yaml", "line": 1, "matched_alias": "teamcity"}
     ]
     assert by_product["PaperCut NG/MF"]["status"] == "absent_by_repo_config_evidence"

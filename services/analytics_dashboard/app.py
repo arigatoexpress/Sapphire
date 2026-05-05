@@ -40,7 +40,7 @@ DATASET = os.environ.get("BQ_DATASET", "sapphire")
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("analytics")
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), "templates"))
 bq = bigquery.Client(project=PROJECT)
 
 # WebAuthn passkey admin scaffold (gated /admin/* + /api/admin/*).
@@ -365,7 +365,9 @@ def predictions_accuracy():
     """
 
     try:
-        by_model = _rows(backfill_cte + """
+        by_model = _rows(
+            backfill_cte
+            + """
             SELECT model,
                    COUNTIF(effective_accuracy IS NOT NULL
                            AND timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)) AS scored_7d,
@@ -377,13 +379,16 @@ def predictions_accuracy():
             FROM scored
             GROUP BY model
             ORDER BY scored_30d DESC
-        """)
+        """
+        )
         out["by_model"] = _clean(by_model)
     except Exception as exc:
         log.info("predictions_accuracy by_model bq miss: %s", exc)
 
     try:
-        by_symbol = _rows(backfill_cte + """
+        by_symbol = _rows(
+            backfill_cte
+            + """
             SELECT symbol,
                    COUNTIF(effective_accuracy IS NOT NULL
                            AND timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)) AS scored_7d,
@@ -395,13 +400,16 @@ def predictions_accuracy():
             FROM scored
             GROUP BY symbol
             ORDER BY scored_30d DESC
-        """)
+        """
+        )
         out["by_symbol"] = _clean(by_symbol)
     except Exception as exc:
         log.info("predictions_accuracy by_symbol bq miss: %s", exc)
 
     try:
-        rolling = _rows(backfill_cte + """
+        rolling = _rows(
+            backfill_cte
+            + """
             SELECT DATE(timestamp) AS date,
                    IFNULL(model, 'unknown') AS model,
                    AVG(effective_accuracy) AS accuracy,
@@ -410,7 +418,8 @@ def predictions_accuracy():
             WHERE effective_accuracy IS NOT NULL
             GROUP BY date, model
             ORDER BY date ASC, model
-        """)
+        """
+        )
         out["rolling"] = _clean(rolling)
     except Exception as exc:
         log.info("predictions_accuracy rolling bq miss: %s", exc)
@@ -471,7 +480,9 @@ def correlation_matrix():
         )
     except Exception as exc:
         log.info("correlation_matrix bq miss: %s", exc)
-        return jsonify({"symbols": syms, "matrix": [], "n_obs": 0, "days": days, "warnings": ["bq error"]})
+        return jsonify(
+            {"symbols": syms, "matrix": [], "n_obs": 0, "days": days, "warnings": ["bq error"]}
+        )
 
     # Group by symbol → list of (day, close)
     by_sym: dict[str, list[tuple[str, float]]] = {s: [] for s in syms}
@@ -500,13 +511,15 @@ def correlation_matrix():
 
     used_syms = [s for s in syms if s in returns]
     if len(used_syms) < 2:
-        return jsonify({
-            "symbols": used_syms,
-            "matrix": [[1.0]] if len(used_syms) == 1 else [],
-            "n_obs": 0,
-            "days": days,
-            "warnings": warnings or ["insufficient data"],
-        })
+        return jsonify(
+            {
+                "symbols": used_syms,
+                "matrix": [[1.0]] if len(used_syms) == 1 else [],
+                "n_obs": 0,
+                "days": days,
+                "warnings": warnings or ["insufficient data"],
+            }
+        )
 
     # Common date intersection
     common_dates = set(returns[used_syms[0]].keys())
@@ -516,13 +529,18 @@ def correlation_matrix():
     n_obs = len(common)
 
     if n_obs < 3:
-        return jsonify({
-            "symbols": used_syms,
-            "matrix": [[1.0 if i == j else 0.0 for j in range(len(used_syms))] for i in range(len(used_syms))],
-            "n_obs": n_obs,
-            "days": days,
-            "warnings": warnings + [f"only {n_obs} overlapping days"],
-        })
+        return jsonify(
+            {
+                "symbols": used_syms,
+                "matrix": [
+                    [1.0 if i == j else 0.0 for j in range(len(used_syms))]
+                    for i in range(len(used_syms))
+                ],
+                "n_obs": n_obs,
+                "days": days,
+                "warnings": warnings + [f"only {n_obs} overlapping days"],
+            }
+        )
 
     # Pearson correlation for each pair
     def _pearson(x: list[float], y: list[float]) -> float:
@@ -548,13 +566,15 @@ def correlation_matrix():
             matrix[i][j] = round(r, 4)
             matrix[j][i] = round(r, 4)
 
-    return jsonify({
-        "symbols": used_syms,
-        "matrix": matrix,
-        "n_obs": n_obs,
-        "days": days,
-        "warnings": warnings,
-    })
+    return jsonify(
+        {
+            "symbols": used_syms,
+            "matrix": matrix,
+            "n_obs": n_obs,
+            "days": days,
+            "warnings": warnings,
+        }
+    )
 
 
 @app.get("/api/vpin")
@@ -584,8 +604,14 @@ def vpin():
     """
     symbol = request.args.get("symbol", "BTC").strip().upper() or "BTC"
     buckets = max(10, min(500, int(request.args.get("buckets", "50"))))
-    out: dict = {"symbol": symbol, "buckets": buckets, "vpin": None,
-                 "toxicity": "unknown", "history": [], "n_ticks": 0}
+    out: dict = {
+        "symbol": symbol,
+        "buckets": buckets,
+        "vpin": None,
+        "toxicity": "unknown",
+        "history": [],
+        "n_ticks": 0,
+    }
 
     try:
         rows = _rows(
@@ -636,7 +662,7 @@ def vpin():
     # Rolling VPIN history
     history: list[dict] = []
     for end in range(buckets, len(classified) + 1):
-        window = classified[end - buckets:end]
+        window = classified[end - buckets : end]
         imbalances: list[float] = []
         for _ts, b, s in window:
             tot = b + s
@@ -740,7 +766,7 @@ def deflated_sharpe_rolling():
         per_window_sharpes: list[float] = []
         windows_emitted: list[dict] = []
         for end in range(window, len(series) + 1):
-            slc = series[end - window:end]
+            slc = series[end - window : end]
             rets = [r for _, r in slc]
             sharpe = annualized_sharpe(rets)
             per_window_sharpes.append(sharpe)
@@ -751,26 +777,30 @@ def deflated_sharpe_rolling():
                 selected_sharpe=sharpe,
                 n_obs=len(rets),
             )
-            windows_emitted.append({
-                "date": slc[-1][0],
-                "strategy": strat,
-                "sharpe": round(sharpe, 4),
-                "deflated_sharpe": dsr["deflated_sharpe"],
-                "probability": dsr["probability"],
-                "trials": dsr["trials"],
-                "n_obs": len(rets),
-            })
+            windows_emitted.append(
+                {
+                    "date": slc[-1][0],
+                    "strategy": strat,
+                    "sharpe": round(sharpe, 4),
+                    "deflated_sharpe": dsr["deflated_sharpe"],
+                    "probability": dsr["probability"],
+                    "trials": dsr["trials"],
+                    "n_obs": len(rets),
+                }
+            )
         rolling.extend(windows_emitted)
 
         if windows_emitted:
             latest = windows_emitted[-1]
-            summary.append({
-                "strategy": strat,
-                "latest_sharpe": latest["sharpe"],
-                "latest_deflated": latest["deflated_sharpe"],
-                "latest_probability": latest["probability"],
-                "n_windows": len(windows_emitted),
-            })
+            summary.append(
+                {
+                    "strategy": strat,
+                    "latest_sharpe": latest["sharpe"],
+                    "latest_deflated": latest["deflated_sharpe"],
+                    "latest_probability": latest["probability"],
+                    "n_windows": len(windows_emitted),
+                }
+            )
 
     out["rolling"] = rolling
     out["summary"] = sorted(summary, key=lambda r: r["latest_probability"], reverse=True)
@@ -912,10 +942,12 @@ def threats_live():
     feed = _http_get_json(THREAT_FEED_URL, timeout=4.0)
     if not feed:
         return jsonify({"records": [], "fetched_at": None})
-    return jsonify({
-        "records": feed.get("records", [])[:25],
-        "fetched_at": feed.get("fetched_at"),
-    })
+    return jsonify(
+        {
+            "records": feed.get("records", [])[:25],
+            "fetched_at": feed.get("fetched_at"),
+        }
+    )
 
 
 @app.get("/api/silos/health")
@@ -946,10 +978,18 @@ def silos_health():
 
     tho_health = _http_get_json(THO_HEALTH_URL, timeout=2.5)
     silos = {
-        "trading": {"status": "ok" if any(s["service"] == "signal-logger" and s["status"] == "ok" for s in services) else "unknown"},
+        "trading": {
+            "status": "ok"
+            if any(s["service"] == "signal-logger" and s["status"] == "ok" for s in services)
+            else "unknown"
+        },
         "intel": {"status": "ok"},
         "tho": {
-            "status": "ok" if tho_health and tho_health.get("status") in ("ok", "ready") else "degraded" if tho_health else "unknown",
+            "status": "ok"
+            if tho_health and tho_health.get("status") in ("ok", "ready")
+            else "degraded"
+            if tho_health
+            else "unknown",
             "url": THO_PUBLIC_URL,
             "sha": (tho_health or {}).get("sha"),
         },
@@ -957,11 +997,13 @@ def silos_health():
         "hackathon": {"status": "active"},
     }
 
-    return jsonify({
-        "services": services,
-        "silos": silos,
-        "ts": datetime.now(UTC).isoformat(),
-    })
+    return jsonify(
+        {
+            "services": services,
+            "silos": silos,
+            "ts": datetime.now(UTC).isoformat(),
+        }
+    )
 
 
 @app.get("/api/silos/business")

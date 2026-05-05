@@ -57,10 +57,8 @@ jobs:
           chmod +x "${install_dir}/osv-scanner"
           echo "$install_dir" >> "$GITHUB_PATH"
       - name: Scan
-        # Non-blocking: report findings, don't fail the workflow. The
-        # artifact upload below is the always-on evidence path.
         run: |
-          osv-scanner --recursive --skip-git --format=sarif --output=osv.sarif ./ || true
+          osv-scanner --recursive --skip-git --format=sarif --output=osv.sarif ./
       - uses: actions/upload-artifact@v4
         if: ${{ always() && hashFiles('osv.sarif') != '' }}
         with:
@@ -78,7 +76,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: aquasecurity/trivy-action@v0.36.0
-        continue-on-error: true
         with:
           scan-type: "fs"
           scan-ref: "."
@@ -104,4 +101,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # -ll = high + medium severity only. Skip tests and archived/legacy.
-      - run: uv run --python 3.11 --no-project --with "bandit[toml]" bandit -r services lib plugins --exclude "**/tests/**" -ll || true
+      - run: uv run --python 3.11 --no-project --with "bandit[toml]" bandit -r services lib plugins --exclude "**/tests/**" -ll

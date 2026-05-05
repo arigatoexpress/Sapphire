@@ -106,14 +106,12 @@ filterwarnings = [
     "ignore::DeprecationWarning:websockets.*",
 ]
 
-[tool.bandit]
-exclude_dirs = ["tests", "legacy_code", "archived", "results", ".venv"]
-skips = ["B101", "B601"]  # assert_used, shell=True in controlled scripts
-
 [tool.mypy]
 python_version = "3.11"
 strict = false
 ignore_missing_imports = true
-exclude = ["tests", "legacy_code", "archived", "data", "world_knowledge", "benchmarks"]
-warn_unused_ignores = true
-warn_redundant_casts = true
+exclude = ["tests", "legacy_code", "archived"]
+
+[tool.bandit]
+exclude_dirs = ["tests", "legacy_code", "archived", "results", ".venv"]
+skips = ["B101", "B601"]  # assert_used, shell=True in controlled scripts

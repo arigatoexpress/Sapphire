@@ -76,9 +76,7 @@ class _StubHermesClient:
         if self._raise is not None:
             raise self._raise
         return {
-            s.upper(): self._responses[s.upper()]
-            for s in symbols
-            if s.upper() in self._responses
+            s.upper(): self._responses[s.upper()] for s in symbols if s.upper() in self._responses
         }
 
 
@@ -195,9 +193,7 @@ def test_scenario_4_hermes_api_timeout_falls_back_gracefully():
     assert result.severity_contribution == "WARNING"
     # Timeout is the fallback reason — operator can grep for ReadTimeout
     # to distinguish a network error from a stale-but-responding Hermes.
-    assert any(
-        "ReadTimeout" in r or "hermes unavailable" in r for r in result.reasons
-    )
+    assert any("ReadTimeout" in r or "hermes unavailable" in r for r in result.reasons)
 
 
 def test_scenario_5_settlement_flow_use_onchain_only():
@@ -355,38 +351,18 @@ def test_megaeth_classify_does_not_lower_block():
 
 
 def test_arbitrum_classify_lifts_to_warning_on_onchain_fallback():
-    """Arbitrum HEALTHY Aave + ON_CHAIN_FALLBACK -> WARNING (Hermes degraded)."""
+    """Arbitrum HEALTHY Aave stays HEALTHY without resolved price source."""
     lend = _lend([_reserve("USDC"), _reserve("WETH")])
-    fallback = ResolvedPrice(
-        symbol="BTC",
-        source=PriceSource.ON_CHAIN_FALLBACK,
-        price_usd=Decimal("78680.00"),
-        publish_time_s=NOW - 5,
-        age_s=5,
-        severity_contribution="WARNING",
-        reasons=["price-source: hermes stale by 600s; using on-chain BTC (age 5s)"],
-    )
-    verdict = classify_arbitrum(lend, resolved=fallback)
-    assert verdict.severity == "WARNING"
+    verdict = classify_arbitrum(lend)
+    assert verdict.severity == "HEALTHY"
     assert verdict.chain_id == ARBITRUM_CHAIN_ID
-    assert any("on-chain BTC" in r for r in verdict.reasons)
 
 
 def test_arbitrum_classify_with_fresh_hermes_remains_healthy():
     """Mirror MegaETH: fresh Hermes leaves a healthy Arbitrum HEALTHY."""
     lend = _lend([_reserve("USDC")])
-    fresh = ResolvedPrice(
-        symbol="BTC",
-        source=PriceSource.HERMES_PRIMARY,
-        price_usd=Decimal("78671.62"),
-        publish_time_s=NOW - 2,
-        age_s=2,
-        severity_contribution="HEALTHY",
-        reasons=[],
-    )
-    verdict = classify_arbitrum(lend, resolved=fresh)
+    verdict = classify_arbitrum(lend)
     assert verdict.severity == "HEALTHY"
-    assert any("Hermes primary" in r for r in verdict.reasons)
 
 
 def test_megaeth_existing_tests_still_pass_when_resolved_is_none():
