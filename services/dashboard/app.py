@@ -2947,13 +2947,33 @@ def api_sentinel_evaluate():
     """Evaluate an agent payment attempt without settlement or order submission."""
     try:
         body = request.get_json(silent=True) or {}
+        from lib.hackathon.chain_health_gate import ChainHealthVerdict
         from lib.hackathon.sentinel import evaluate_from_payload
+
+        if os.environ.get("SENTINEL_DEMO_FORCE_DEPEG") == "1":
+            from decimal import Decimal
+
+            class _PoisonGate:
+                def evaluate_chain(self, chain_id: int):
+                    return ChainHealthVerdict(
+                        chain_id=4326,
+                        chain_name="MegaETH",
+                        severity="BLOCK",
+                        reasons=["demo: forced depeg (500 bps)"],
+                        peg_divergence_bps=Decimal("500"),
+                    )
+
+            gate = _PoisonGate()
+        else:
+            from lib.hackathon.chain_health_gate import default_gate
+
+            gate = default_gate()
 
         return jsonify(
             {
                 "execution_enabled": False,
                 "mode": "policy_preview_only",
-                "decision": evaluate_from_payload(body),
+                "decision": evaluate_from_payload(body, gate=gate),
                 "timestamp": datetime.now(UTC).isoformat(),
             }
         )
@@ -2988,7 +3008,9 @@ def api_cross_chain_aave_arb():
         return payload
 
     try:
-        return jsonify(get_cached("cross_chain_aave_arb", fetch, ttl=CROSS_CHAIN_ARB_CACHE_DURATION))
+        return jsonify(
+            get_cached("cross_chain_aave_arb", fetch, ttl=CROSS_CHAIN_ARB_CACHE_DURATION)
+        )
     except Exception as e:
         log.exception("cross-chain aave arb scan failed")
         return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
@@ -3020,11 +3042,7 @@ def api_perps_overview():
         return payload
 
     try:
-        return jsonify(
-            get_cached(
-                "perps_overview", fetch, ttl=PERPS_OVERVIEW_CACHE_DURATION
-            )
-        )
+        return jsonify(get_cached("perps_overview", fetch, ttl=PERPS_OVERVIEW_CACHE_DURATION))
     except Exception as e:
         log.exception("perps overview scan failed")
         return jsonify({"error": f"{type(e).__name__}: {e}"}), 500

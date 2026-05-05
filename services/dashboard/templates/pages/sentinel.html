@@ -552,12 +552,31 @@
             <div class="sentinel-panel-title">Order Draft</div>
             <pre class="sentinel-code" id="order-draft">{}</pre>
         </div>
+
+        <div class="sentinel-band" id="chain-health-band">
+            <div class="sentinel-panel-title">Chain health</div>
+            <div id="chain-health-pill">...</div>
+            <div id="chain-health-peg">...</div>
+        </div>
     </aside>
 </div>
 
 <script>
 let sentinelData = null;
 let activeFlow = 'approved';
+
+function renderChainHealth(ch) {
+    if (!ch) {
+        document.getElementById('chain-health-pill').textContent = '—';
+        document.getElementById('chain-health-peg').textContent = '—';
+        return;
+    }
+    const pill = document.getElementById('chain-health-pill');
+    const peg = document.getElementById('chain-health-peg');
+    pill.textContent = ch.severity + ' (chain ' + ch.chain_id + ')';
+    pill.className = 'sentinel-badge ' + (ch.severity === 'BLOCK' ? 'blocked' : ch.severity === 'WARNING' ? 'warn' : 'healthy');
+    peg.textContent = ch.peg_divergence_bps ? 'peg divergence: ' + ch.peg_divergence_bps + ' bps' : 'peg nominal';
+}
 
 function fmtUsdcAtomic(value) {
     const atomic = Number(value || 0);

@@ -40,6 +40,99 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
+# Aave APY arb — first cross-chain primitive (companion to Pyth divergence)
+# ---------------------------------------------------------------------------
+
+
+async def _scan_aave_arb_async(top_n: int) -> list[Any]:
+    """Internal async helper so :func:`scan_aave_arb` can be sync."""
+    from lib.chains.cross_chain.aave_apy_arb import AaveApyArbScanner
+
+    scanner = AaveApyArbScanner()
+    return await scanner.scan_top_assets(n=top_n)
+
+
+def scan_aave_arb(top_n: int = 5) -> dict[str, Any]:
+    """Synchronous JSON-serializable cross-chain Aave APY arbitrage summary.
+
+    Returns a dict with this shape::
+
+        {
+            "top_n": 5,
+            "signals": [ {<summary>}, ... ],   # length 0..top_n
+            "signal_count": <int>,
+            "max_spread_bps": "<Decimal-as-str>" | None,
+            "thresholds": {
+                "min_signal_spread_bps": "50",
+                "extreme_spread_bps": "200",
+            },
+            "candidate_assets": ["USDC", "USDT", "DAI", "WETH", "WBTC"],
+            "error": "<str>" | not present,
+        }
+
+    On *any* uncaught failure returns a structured error dict so the
+    dashboard / plugin tool surface a graceful empty state rather than
+    a 500.
+    """
+    from lib.chains.cross_chain.aave_apy_arb import (
+        DEFAULT_TOP_ASSETS,
+        EXTREME_SPREAD_BPS,
+        MIN_SIGNAL_SPREAD_BPS,
+    )
+
+    try:
+        signals = asyncio.run(_scan_aave_arb_async(top_n=top_n))
+    except Exception as exc:
+        logger.exception("scan_aave_arb failed")
+        return {
+            "top_n": top_n,
+            "signals": [],
+            "signal_count": 0,
+            "max_spread_bps": None,
+            "thresholds": {
+                "min_signal_spread_bps": str(MIN_SIGNAL_SPREAD_BPS),
+                "extreme_spread_bps": str(EXTREME_SPREAD_BPS),
+            },
+            "candidate_assets": list(DEFAULT_TOP_ASSETS),
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+
+    summaries = []
+    for s in signals:
+        summaries.append(
+            {
+                "asset": s.asset,
+                "severity": s.severity,
+                "direction": s.direction,
+                "max_supply_spread_bps": str(s.max_supply_spread_bps),
+                "max_borrow_spread_bps": str(s.max_borrow_spread_bps),
+                "chains": {
+                    name: {
+                        "supply_apy": str(v["supply_apy"]),
+                        "borrow_apy": str(v["borrow_apy"]),
+                    }
+                    for name, v in s.chains.items()
+                },
+                "chains_unavailable": list(s.chains_unavailable),
+            }
+        )
+
+    max_spread = max((s.max_supply_spread_bps for s in signals), default=None) if signals else None
+
+    return {
+        "top_n": top_n,
+        "signals": summaries,
+        "signal_count": len(summaries),
+        "max_spread_bps": str(max_spread) if max_spread is not None else None,
+        "thresholds": {
+            "min_signal_spread_bps": str(MIN_SIGNAL_SPREAD_BPS),
+            "extreme_spread_bps": str(EXTREME_SPREAD_BPS),
+        },
+        "candidate_assets": list(DEFAULT_TOP_ASSETS),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Pyth divergence — second cross-chain primitive (companion to Aave arb)
 # ---------------------------------------------------------------------------
 
@@ -85,7 +178,6 @@ def _build_pyth_scanner_from_default_clients() -> CrossChainPythScanner:
 
     try:
         from lib.chains.optimism.client import OptimismClient  # noqa: PLC0415
-
         from lib.chains.optimism.contracts.pyth_oracle import (  # noqa: PLC0415
             PythRegistry as OpPythRegistry,
         )
@@ -216,5 +308,6 @@ def is_integration_enabled() -> bool:
 
 __all__ = (
     "is_integration_enabled",
+    "scan_aave_arb",
     "scan_pyth_divergence",
 )
