@@ -52,6 +52,7 @@ from lib.core import routine_pause
 # — only for authenticated users.
 app = Flask(__name__, static_folder=None)
 _STATIC_DIR = Path(__file__).parent / "static"
+_FRONTEND_DIST_DIR = Path(__file__).parent / "frontend" / "dist"
 _DASHBOARD_REPO_ROOT = Path(__file__).resolve().parents[2]
 _AGENT_EVENTS_FILE = _DASHBOARD_REPO_ROOT / "data" / "events" / "bus.jsonl"
 _AGENT_HEARTBEAT_DIR = _DASHBOARD_REPO_ROOT / "data" / "agents"
@@ -132,6 +133,50 @@ def guarded_static(filename):
     template or route that relies on the default Flask endpoint name.
     """
     return send_from_directory(_STATIC_DIR, filename)
+
+
+@app.route("/app-preview")
+@requires_auth
+def app_preview():
+    """Serve the built React control-plane preview when the bundle exists."""
+    index_path = _FRONTEND_DIST_DIR / "index.html"
+    if not index_path.exists():
+        return (
+            jsonify(
+                {
+                    "status": "unknown",
+                    "mode": "blocked",
+                    "title": "Sapphire OS Control Plane preview",
+                    "value": "build required",
+                    "summary": (
+                        "The React app source exists under services/dashboard/frontend, "
+                        "but the local Vite bundle has not been built yet."
+                    ),
+                    "source": {
+                        "kind": "file",
+                        "path_or_url": "services/dashboard/frontend/dist/index.html",
+                        "generated_at": None,
+                        "age_seconds": None,
+                    },
+                    "actions": [
+                        {
+                            "label": "Build preview bundle",
+                            "mode": "dry_run",
+                            "requires_confirm": False,
+                        }
+                    ],
+                }
+            ),
+            503,
+        )
+    return send_file(index_path)
+
+
+@app.route("/app-preview/assets/<path:filename>")
+@requires_auth
+def app_preview_assets(filename):
+    """Serve Vite assets for the React control-plane preview."""
+    return send_from_directory(_FRONTEND_DIST_DIR / "assets", filename)
 
 
 # Cache for data
