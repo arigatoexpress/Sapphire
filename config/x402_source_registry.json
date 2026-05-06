@@ -11,7 +11,7 @@
       "terms_status": "public_official_review_before_resale",
       "redistribution": "transform_outputs_only",
       "freshness": "near_real_time_filings_plus_daily_indexes",
-      "production_ready": true,
+      "production_ready": false,
       "allowed_products": ["research_pack_basic", "market_regime_report"],
       "tags": ["filings", "regulated", "event-labels"],
       "notes": "Adapter exists in lib/sources/sec_edgar.py; broaden event extraction before model training."
@@ -29,7 +29,7 @@
       "production_ready": true,
       "allowed_products": ["market_regime_report"],
       "tags": ["macro", "vintage-data", "regime"],
-      "notes": "Cache-first loader, daily export routine, warehouse path, and simulated x402 market-regime feature inclusion exist. Live cache misses still require SAPPHIRE_FRED_LIVE=1 plus FRED_API_KEY; paid outputs expose transformed features only."
+      "notes": "Cache-first loader, daily export routine, warehouse path, and simulated x402 market-regime feature inclusion exist. Keep source readiness false until first operator-gated live hydration and terms review are recorded; paid outputs expose transformed local features only."
     },
     {
       "source_id": "gdelt_2",
