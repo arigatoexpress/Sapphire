@@ -88,3 +88,20 @@ Properties:
 The FRED feature section is intentionally local-artifact-only. Missing
 `fred_observations.jsonl` rows produce a warning in the paid report rather than
 triggering a live public API call inside the dashboard request path.
+
+## Simulated Backtest Receipt Endpoint
+
+The second paid route using the spine is:
+
+`POST /api/x402/backtest`
+
+Properties:
+
+- requires dashboard Basic Auth first;
+- returns product-specific x402 requirements from `backtest_receipt`;
+- uses `X402Middleware.gate(...)` with catalog-built requirements;
+- writes non-secret receipt records for `required`, `rejected`, and `accepted`;
+- reads already-materialized local `data/backtests/strategies/` artifacts;
+- returns paper-only assumptions and a reproducibility hash;
+- does not run strategies, pull live market data, place orders, or enable live
+  settlement.
