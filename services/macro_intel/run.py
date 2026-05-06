@@ -375,6 +375,45 @@ def run_once(**kwargs: Any) -> dict[str, Any]:
     return asyncio.run(run_once_async(**kwargs))
 
 
+def fred_daily_export(
+    *,
+    output_root: str | Path = DEFAULT_OUTPUT_ROOT,
+    now: datetime | None = None,
+    live: bool = False,
+    fred_series_ids: Sequence[str] = DEFAULT_MARKET_REGIME_SERIES,
+    fred_loader: FredLoader | None = None,
+    fred_observation_start: str | None = None,
+    fred_realtime_start: str | None = None,
+    fred_realtime_end: str | None = None,
+) -> dict[str, Any]:
+    """Write the bounded daily FRED observation export artifact."""
+
+    result = run_once(
+        output_root=output_root,
+        now=now,
+        live=live,
+        publish=False,
+        include_static_calendar=False,
+        include_fred=True,
+        fred_series_ids=fred_series_ids,
+        fred_loader=fred_loader,
+        fred_observation_start=fred_observation_start,
+        fred_realtime_start=fred_realtime_start,
+        fred_realtime_end=fred_realtime_end,
+    )
+    errors = list(result.get("errors") or [])
+    cache_miss_only = bool(errors) and all(
+        isinstance(error, dict)
+        and str(error.get("error") or "").startswith("FRED cache miss and live reads are disabled")
+        for error in errors
+    )
+    if not live and cache_miss_only:
+        result["ok"] = True
+        result["empty_cache_only"] = True
+        result["reason"] = "FRED cache is empty and live reads are disabled; no live pull attempted"
+    return result
+
+
 def daemon(
     *,
     poll_interval_seconds: float = DEFAULT_POLL_INTERVAL_SECONDS,
@@ -477,6 +516,34 @@ def build_parser() -> argparse.ArgumentParser:
         help="FRED series id to include; repeatable. Defaults to market-regime set.",
     )
 
+    fred_p = sub.add_parser(
+        "fred-daily-export",
+        help="write daily bounded FRED observation rows without macro event pulls",
+    )
+    fred_p.add_argument("--live", action="store_true", help="allow live FRED cache misses")
+    fred_p.add_argument(
+        "--fred-series",
+        action="append",
+        help="FRED series id to include; repeatable. Defaults to market-regime set.",
+    )
+    fred_p.add_argument(
+        "--observation-start",
+        help="optional FRED observation_start date for bounded backfill windows",
+    )
+    fred_p.add_argument(
+        "--realtime-start",
+        help="optional ALFRED realtime_start date for vintage windows",
+    )
+    fred_p.add_argument(
+        "--realtime-end",
+        help="optional ALFRED realtime_end date for vintage windows",
+    )
+    fred_p.add_argument(
+        "--output-root",
+        default=str(DEFAULT_OUTPUT_ROOT),
+        help="macro output root; defaults to repo data/macro",
+    )
+
     sub.add_parser("status", help="report counters and local artifacts")
     return parser
 
@@ -500,6 +567,15 @@ def main(argv: list[str] | None = None) -> int:
             publish=args.publish,
             include_fred=args.fred,
             fred_series_ids=tuple(args.fred_series or DEFAULT_MARKET_REGIME_SERIES),
+        )
+    elif args.action == "fred-daily-export":
+        result = fred_daily_export(
+            output_root=args.output_root,
+            live=args.live,
+            fred_series_ids=tuple(args.fred_series or DEFAULT_MARKET_REGIME_SERIES),
+            fred_observation_start=args.observation_start,
+            fred_realtime_start=args.realtime_start,
+            fred_realtime_end=args.realtime_end,
         )
     elif args.action == "status":
         result = status()

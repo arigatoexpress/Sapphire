@@ -17,7 +17,9 @@ from lib.macro.fred_loader import (
     fred_observation_rows,
     latest_observation,
     macro_feature_row,
+    macro_feature_row_from_observation_rows,
     parse_fred_observations,
+    read_fred_observation_jsonl,
 )
 
 
@@ -207,3 +209,36 @@ def test_cache_dir_can_follow_macro_root(monkeypatch, tmp_path):
 
 def test_default_market_regime_series_has_core_rates_and_risk_series():
     assert {"DFF", "DGS10", "T10Y2Y", "VIXCLS", "BAMLH0A0HYM2"} <= set(DEFAULT_MARKET_REGIME_SERIES)
+
+
+def test_observation_jsonl_rows_build_latest_feature_row(tmp_path):
+    snapshot = parse_fred_observations(sample_payload(), series_id="DFF")
+    rows = fred_observation_rows(
+        snapshot,
+        ingested_at=datetime(2026, 1, 5, 12, 30, tzinfo=UTC),
+    )
+    rows.append(
+        {
+            **rows[-1],
+            "id": "latest-null",
+            "observation_id": "latest-null",
+            "observation_date": "2026-01-04",
+            "value": None,
+        }
+    )
+    path = tmp_path / "fred_observations.jsonl"
+    path.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
+
+    feature = macro_feature_row_from_observation_rows(
+        read_fred_observation_jsonl(path),
+        generated_at=datetime(2026, 1, 6, tzinfo=UTC),
+        source_path=path,
+    )
+
+    assert feature["schema_version"] == 1
+    assert feature["source"] == "fred_alfred"
+    assert feature["row_count"] == 4
+    assert feature["series_count"] == 1
+    assert feature["latest_observation_date"] == "2026-01-03"
+    assert feature["series"]["DFF"]["value"] == 4.35
+    assert feature["series"]["DFF"]["frequency"] == "Daily"

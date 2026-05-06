@@ -16,7 +16,10 @@ data mutation.
 - `infra/gcp/bootstrap_bigquery.sh` - table registration for
   `sapphire.fred_series_observations`.
 - `services/macro_intel/run.py` - optional `--fred` writer for
-  `data/macro/<YYYY-MM-DD>/fred_observations.jsonl`.
+  `data/macro/<YYYY-MM-DD>/fred_observations.jsonl`, plus the explicit
+  `fred-daily-export` command for scheduled daily export.
+- `services/macro_intel/launchagent/com.sapphire.macro-intel-fred-daily.plist.template`
+  - optional daily LaunchAgent template for cache-first export.
 - `services/pipeline/gcp_sync.py` - upload-only transform for
   `raw/fred/<YYYY-MM-DD>/*.ndjson`.
 - `infra/gcp/cloud_functions/gcs_to_bq/main.py` - Cloud Function table mapping
@@ -78,6 +81,12 @@ Write cache-backed local artifacts:
 python3 -m services.macro_intel.run run-once --fred
 ```
 
+Daily bounded export contract:
+
+```bash
+python3 -m services.macro_intel.run fred-daily-export
+```
+
 Run live FRED pulls for missing cache files:
 
 ```bash
@@ -102,6 +111,7 @@ print(macro_feature_row(snapshots))
 PY
 ```
 
-The next build step is a planned daily backfill/export routine that writes
-`fred_series_observations` rows with payload hashes, then exposes those features
-to the simulated x402 market-regime endpoint.
+The simulated x402 market-regime endpoint now reads the local daily
+`fred_observations.jsonl` artifact and exposes latest-value FRED features under
+`macro_features`. If the local artifact is missing, the endpoint remains
+available and records a warning rather than making live FRED calls.

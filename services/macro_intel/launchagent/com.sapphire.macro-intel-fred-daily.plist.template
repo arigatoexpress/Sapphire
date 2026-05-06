@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.sapphire.macro-intel-fred-daily</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/aribs/Code/Sapphire/services/macro_intel/run.py</string>
+    <string>fred-daily-export</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/aribs/Code/Sapphire</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PYTHONUNBUFFERED</key>
+    <string>1</string>
+    <key>SAPPHIRE_MACRO_CACHE_DIR</key>
+    <string>/Users/aribs/.cache/sapphire/macro</string>
+    <key>SAPPHIRE_MACRO_OUTPUT_ROOT</key>
+    <string>/Users/aribs/Code/Sapphire/data/macro</string>
+    <key>SAPPHIRE_FRED_USER_AGENT</key>
+    <string>SapphireFredLoader/0.1 (+https://github.com/arigatoexpress/Sapphire; contact=ops@sapphirealpha.xyz)</string>
+  </dict>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>6</integer>
+    <key>Minute</key>
+    <integer>35</integer>
+  </dict>
+  <key>RunAtLoad</key>
+  <false/>
+  <key>KeepAlive</key>
+  <false/>
+  <key>StandardOutPath</key>
+  <string>/Users/aribs/Library/Logs/sapphire/macro-intel-fred-daily.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/aribs/Library/Logs/sapphire/macro-intel-fred-daily.err.log</string>
+</dict>
+</plist>

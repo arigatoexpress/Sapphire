@@ -26,6 +26,37 @@ def _snapshot() -> dict:
     }
 
 
+def _macro_features() -> dict:
+    return {
+        "schema_version": 1,
+        "feature_id": "fred-feature-1",
+        "generated_at": "2026-05-06T15:25:00+00:00",
+        "source": "fred_alfred",
+        "row_count": 2,
+        "series_count": 2,
+        "latest_observation_date": "2026-05-05",
+        "source_path": "data/macro/2026-05-06/fred_observations.jsonl",
+        "series": {
+            "DFF": {
+                "value": 4.33,
+                "observation_date": "2026-05-05",
+                "realtime_start": "2026-05-06",
+                "realtime_end": "2026-05-06",
+                "units": "lin",
+                "frequency": "Daily",
+            },
+            "DGS10": {
+                "value": 4.12,
+                "observation_date": "2026-05-05",
+                "realtime_start": "2026-05-06",
+                "realtime_end": "2026-05-06",
+                "units": "lin",
+                "frequency": "Daily",
+            },
+        },
+    }
+
+
 def test_market_regime_report_is_catalog_grounded() -> None:
     product = load_product_catalog().get("market_regime_report")
     registry = load_source_registry()
@@ -34,6 +65,7 @@ def test_market_regime_report_is_catalog_grounded() -> None:
         product=product,
         registry=registry,
         snapshot=_snapshot(),
+        macro_features=_macro_features(),
         generated_at="2026-05-06T15:30:00Z",
     )
 
@@ -44,6 +76,10 @@ def test_market_regime_report_is_catalog_grounded() -> None:
     assert report["summary"]["label"] == "risk_on_correlated"
     assert report["summary"]["asset_count"] == 3
     assert report["summary"]["breakdown_count"] == 1
+    assert report["summary"]["macro_series_count"] == 2
+    assert report["summary"]["macro_latest_observation_date"] == "2026-05-05"
+    assert report["macro_features"]["source"] == "fred_alfred"
+    assert report["macro_features"]["series"]["DFF"]["value"] == 4.33
     assert report["artifact_id"].startswith("x402-mr-")
     assert {source["source_id"] for source in report["catalog_sources"]} >= {
         "defillama",
@@ -60,6 +96,7 @@ def test_market_regime_artifact_id_is_deterministic() -> None:
         product=product,
         registry=registry,
         snapshot=_snapshot(),
+        macro_features=_macro_features(),
         generated_at="2026-05-06T15:30:00Z",
     )
 

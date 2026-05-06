@@ -66,6 +66,7 @@ def build_market_regime_report(
     product: ProductDefinition,
     registry: SourceRegistry,
     snapshot: Mapping[str, Any],
+    macro_features: Mapping[str, Any] | None = None,
     generated_at: str | None = None,
 ) -> dict[str, Any]:
     """Build the first x402-paid market-regime artifact.
@@ -79,6 +80,8 @@ def build_market_regime_report(
     lead_lag = list(snapshot.get("lead_lag") or [])
     source_summary = dict(snapshot.get("source_summary") or {})
     assets = list(snapshot.get("assets") or sorted(source_summary))
+    macro_feature_payload = dict(macro_features or {})
+    macro_series = dict(macro_feature_payload.get("series") or {})
     ok = bool(snapshot.get("ok", True))
     warnings: list[str] = []
     if not ok:
@@ -87,6 +90,8 @@ def build_market_regime_report(
         warnings.append("product has no registered source dependencies")
     if product.live_settlement_allowed:
         warnings.append("unexpected live settlement flag enabled")
+    if "fred_alfred" in product.source_ids and not macro_series:
+        warnings.append("local FRED macro feature artifact unavailable")
 
     report = {
         "ok": ok,
@@ -104,8 +109,22 @@ def build_market_regime_report(
             "asset_count": len(assets),
             "breakdown_count": len(breakdowns),
             "lead_lag_count": len(lead_lag),
+            "macro_series_count": int(
+                macro_feature_payload.get("series_count") or len(macro_series)
+            ),
+            "macro_latest_observation_date": macro_feature_payload.get("latest_observation_date"),
         },
         "regime": regime,
+        "macro_features": {
+            "source": macro_feature_payload.get("source") or "fred_alfred",
+            "feature_id": macro_feature_payload.get("feature_id"),
+            "generated_at": macro_feature_payload.get("generated_at"),
+            "row_count": macro_feature_payload.get("row_count", 0),
+            "series_count": macro_feature_payload.get("series_count", len(macro_series)),
+            "latest_observation_date": macro_feature_payload.get("latest_observation_date"),
+            "series": macro_series,
+            "source_path": macro_feature_payload.get("source_path"),
+        },
         "breakdowns": breakdowns[:12],
         "lead_lag": lead_lag[:12],
         "source_summary": source_summary,

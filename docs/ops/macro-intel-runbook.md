@@ -67,12 +67,18 @@ Cache-first FRED/ALFRED observation writer:
 python3 services/macro_intel/run.py run-once --fred
 ```
 
+Daily bounded FRED export routine:
+
+```bash
+python3 services/macro_intel/run.py fred-daily-export
+```
+
 Live FRED pull for cache misses:
 
 ```bash
 SAPPHIRE_FRED_LIVE=1 \
 FRED_API_KEY=... \
-python3 services/macro_intel/run.py run-once --fred
+python3 services/macro_intel/run.py fred-daily-export --live
 ```
 
 Dry-run the GCS upload transform after local FRED artifacts exist:
@@ -101,6 +107,7 @@ weakened.
 | `SAPPHIRE_MACRO_INTEL_LIVE` | unset | Required for official public HTTP pulls. |
 | `SAPPHIRE_MACRO_INTEL_LIVE_BUS` | unset | Required, with `--publish`, for event-bus publishing. |
 | `SAPPHIRE_MACRO_CACHE_DIR` | `~/.cache/sapphire/macro` | Cache and counter root. Override in tests or temporary runs. |
+| `SAPPHIRE_MACRO_OUTPUT_ROOT` | `data/macro` | Local append-only macro artifact root for daily FRED rows. |
 | `SAPPHIRE_MACRO_USER_AGENT` | `SapphireMacroIntel/0.1 (+https://github.com/arigatoexpress/Sapphire; contact=ops@sapphirealpha.xyz)` | User-Agent for official pulls and robots checks. |
 | `SAPPHIRE_FRED_LIVE` | unset | Required, with `FRED_API_KEY`, for live FRED/ALFRED cache misses. |
 | `FRED_API_KEY` | unset | FRED API key. Used only by `--fred` when the FRED live gate is enabled. |

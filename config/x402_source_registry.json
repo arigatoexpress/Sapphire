@@ -26,10 +26,10 @@
       "terms_status": "public_official_review_before_resale",
       "redistribution": "transform_outputs_only",
       "freshness": "series_dependent_release_calendar",
-      "production_ready": false,
+      "production_ready": true,
       "allowed_products": ["market_regime_report"],
       "tags": ["macro", "vintage-data", "regime"],
-      "notes": "Cache-first loader exists in lib/macro/fred_loader.py; live pulls still require SAPPHIRE_FRED_LIVE=1 plus FRED_API_KEY and a planned warehouse backfill."
+      "notes": "Cache-first loader, daily export routine, warehouse path, and simulated x402 market-regime feature inclusion exist. Live cache misses still require SAPPHIRE_FRED_LIVE=1 plus FRED_API_KEY; paid outputs expose transformed features only."
     },
     {
       "source_id": "gdelt_2",
