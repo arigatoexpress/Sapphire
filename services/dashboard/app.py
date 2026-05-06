@@ -392,6 +392,43 @@ def _cross_asset_snapshot_cached() -> dict[str, Any]:
     )
 
 
+def _x402_fred_observations_path(now: datetime | None = None) -> Path:
+    raw_path = os.environ.get("SAPPHIRE_X402_FRED_OBSERVATIONS_PATH")
+    if raw_path:
+        return Path(raw_path).expanduser()
+    raw_root = os.environ.get("SAPPHIRE_MACRO_OUTPUT_ROOT")
+    output_root = (
+        Path(raw_root).expanduser() if raw_root else _DASHBOARD_REPO_ROOT / "data" / "macro"
+    )
+    day = (now or datetime.now(UTC)).astimezone(UTC).strftime("%Y-%m-%d")
+    return output_root / day / "fred_observations.jsonl"
+
+
+def _build_x402_fred_features() -> dict[str, Any]:
+    """Load local FRED-derived features for the simulated paid report."""
+    from lib.macro.fred_loader import (
+        macro_feature_row_from_observation_rows,
+        read_fred_observation_jsonl,
+    )
+
+    path = _x402_fred_observations_path()
+    rows = read_fred_observation_jsonl(path)
+    if not rows:
+        return {}
+    return macro_feature_row_from_observation_rows(
+        rows,
+        source_path=_repo_display_path(path),
+    )
+
+
+def _x402_fred_features_cached() -> dict[str, Any]:
+    return get_cached(
+        "x402_fred_features",
+        _build_x402_fred_features,
+        ttl=CROSS_ASSET_CACHE_DURATION,
+    )
+
+
 def _x402_payment_header() -> str | None:
     return request.headers.get("X-PAYMENT") or request.headers.get("PAYMENT-SIGNATURE")
 
@@ -4957,6 +4994,7 @@ def api_x402_market_regime():
             product=product,
             registry=registry,
             snapshot=snapshot,
+            macro_features=_x402_fred_features_cached(),
         )
         receipt = _append_x402_market_regime_receipt(
             product=product,

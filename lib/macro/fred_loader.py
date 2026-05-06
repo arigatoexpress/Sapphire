@@ -349,6 +349,94 @@ def macro_feature_row(
     }
 
 
+def read_fred_observation_jsonl(
+    path: str | Path,
+    *,
+    limit: int = 10_000,
+) -> list[dict[str, Any]]:
+    """Read bounded FRED observation rows from an append-only JSONL artifact."""
+
+    artifact_path = Path(path).expanduser()
+    if not artifact_path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    for line in artifact_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(row, Mapping):
+            rows.append(dict(row))
+    return rows[-max(1, int(limit)) :]
+
+
+def macro_feature_row_from_observation_rows(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    generated_at: datetime | None = None,
+    source_path: str | Path | None = None,
+) -> dict[str, Any]:
+    """Build latest-value FRED features from exported observation JSONL rows."""
+
+    now = generated_at or datetime.now(UTC).replace(microsecond=0)
+    row_list = [dict(row) for row in rows if isinstance(row, Mapping)]
+    latest_by_series: dict[str, dict[str, Any]] = {}
+    for row in row_list:
+        raw_series_id = str(row.get("series_id") or "").strip()
+        if not raw_series_id:
+            continue
+        series_id = _clean_series_id(raw_series_id)
+        observation_date = _parse_optional_date(row.get("observation_date"))
+        realtime_start = _parse_optional_date(row.get("realtime_start"))
+        realtime_end = _parse_optional_date(row.get("realtime_end"))
+        if observation_date is None or realtime_start is None or realtime_end is None:
+            continue
+        value = row.get("value")
+        if value is not None:
+            value = _parse_value(value)
+        candidate = {
+            "value": value,
+            "observation_date": observation_date.isoformat(),
+            "realtime_start": realtime_start.isoformat(),
+            "realtime_end": realtime_end.isoformat(),
+            "units": str(row.get("units") or ""),
+            "frequency": str(row.get("frequency") or ""),
+        }
+        current = latest_by_series.get(series_id)
+        candidate_key = (value is not None, observation_date, realtime_start, realtime_end)
+        current_key = (
+            (current or {}).get("value") is not None,
+            _parse_optional_date((current or {}).get("observation_date")) or date.min,
+            _parse_optional_date((current or {}).get("realtime_start")) or date.min,
+            _parse_optional_date((current or {}).get("realtime_end")) or date.min,
+        )
+        if current is None or candidate_key > current_key:
+            latest_by_series[series_id] = candidate
+
+    series = dict(sorted(latest_by_series.items()))
+    material = json.dumps(series, sort_keys=True, separators=(",", ":"))
+    latest_dates = [
+        value["observation_date"]
+        for value in series.values()
+        if isinstance(value.get("observation_date"), str)
+    ]
+    feature_row = {
+        "schema_version": 1,
+        "feature_id": hashlib.sha256(material.encode("utf-8")).hexdigest()[:24],
+        "generated_at": now.astimezone(UTC).isoformat(),
+        "source": "fred_alfred",
+        "row_count": len(row_list),
+        "series_count": len(series),
+        "latest_observation_date": max(latest_dates) if latest_dates else None,
+        "series": series,
+    }
+    if source_path is not None:
+        feature_row["source_path"] = str(source_path)
+    return feature_row
+
+
 class FredLoader:
     """Cache-first FRED client with an explicit live-read gate."""
 

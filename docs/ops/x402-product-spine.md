@@ -80,4 +80,11 @@ Properties:
 - uses `X402Middleware.gate(...)` with catalog-built requirements;
 - writes non-secret receipt records for `required`, `rejected`, and `accepted`;
 - uses the cache-first cross-asset snapshot path;
+- includes local FRED/ALFRED latest-value features from
+  `data/macro/<YYYY-MM-DD>/fred_observations.jsonl` when the daily export
+  artifact exists;
 - does not call live settlement, trading, Telegram, or chain-history writers.
+
+The FRED feature section is intentionally local-artifact-only. Missing
+`fred_observations.jsonl` rows produce a warning in the paid report rather than
+triggering a live public API call inside the dashboard request path.

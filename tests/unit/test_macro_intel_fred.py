@@ -48,3 +48,37 @@ def test_run_once_writes_fred_artifact_without_macro_live_env(tmp_path, monkeypa
     assert rows[0]["series_id"] == "DFF"
     assert rows[0]["observation_date"] == "2026-01-02"
     assert result["writes"]["fred_observations"]["written"] == 1
+
+
+def test_fred_daily_export_is_explicit_bounded_daily_artifact(tmp_path, monkeypatch):
+    monkeypatch.delenv("SAPPHIRE_MACRO_INTEL_LIVE", raising=False)
+    result = macro_run.fred_daily_export(
+        fred_series_ids=("DFF",),
+        fred_loader=FakeFredLoader(),
+        output_root=tmp_path,
+        now=datetime(2026, 1, 5, tzinfo=UTC),
+    )
+
+    assert result["ok"] is True
+    assert result["dry_run"] is True
+    assert result["events"] == []
+    assert result["calendar_window"] == []
+    assert result["metadata"]["live_http_allowed"] is False
+    assert result["writes"]["fred_observations"]["path"].endswith(
+        "2026-01-05/fred_observations.jsonl"
+    )
+
+
+def test_fred_daily_export_empty_cache_is_safe_noop(tmp_path, monkeypatch):
+    monkeypatch.delenv("SAPPHIRE_FRED_LIVE", raising=False)
+    monkeypatch.setenv("SAPPHIRE_FRED_CACHE_DIR", str(tmp_path / "empty-cache"))
+    result = macro_run.fred_daily_export(
+        fred_series_ids=("DFF",),
+        output_root=tmp_path,
+        now=datetime(2026, 1, 5, tzinfo=UTC),
+    )
+
+    assert result["ok"] is True
+    assert result["empty_cache_only"] is True
+    assert result["writes"]["fred_observations"]["written"] == 0
+    assert result["errors"][0]["series_id"] == "DFF"

@@ -68,6 +68,36 @@ def _sample_snapshot() -> dict:
     }
 
 
+def _sample_fred_features() -> dict:
+    return {
+        "feature_id": "fred-feature-1",
+        "generated_at": "2026-05-06T15:25:00+00:00",
+        "source": "fred_alfred",
+        "row_count": 2,
+        "series_count": 2,
+        "latest_observation_date": "2026-05-05",
+        "source_path": "data/macro/2026-05-06/fred_observations.jsonl",
+        "series": {
+            "DFF": {
+                "value": 4.33,
+                "observation_date": "2026-05-05",
+                "realtime_start": "2026-05-06",
+                "realtime_end": "2026-05-06",
+                "units": "lin",
+                "frequency": "Daily",
+            },
+            "DGS10": {
+                "value": 4.12,
+                "observation_date": "2026-05-05",
+                "realtime_start": "2026-05-06",
+                "realtime_end": "2026-05-06",
+                "units": "lin",
+                "frequency": "Daily",
+            },
+        },
+    }
+
+
 @pytest.fixture
 def client(monkeypatch, tmp_path: Path):
     from lib.payments.x402_products import ReceiptLedger
@@ -79,6 +109,7 @@ def client(monkeypatch, tmp_path: Path):
     dashboard_app._X402_PRODUCT_MIDDLEWARE_CACHE.clear()
     monkeypatch.setenv("X402_RECIPIENT", RECIPIENT)
     monkeypatch.setattr(dashboard_app, "_build_cross_asset_snapshot", _sample_snapshot)
+    monkeypatch.setattr(dashboard_app, "_x402_fred_features_cached", _sample_fred_features)
     monkeypatch.setattr(
         dashboard_app,
         "_x402_receipt_ledger",
@@ -131,6 +162,8 @@ def test_market_regime_endpoint_accepts_mock_payment_and_ledgers_receipt(client)
     assert payload["settlement_mode"] == "simulated_or_testnet"
     assert payload["live_settlement_allowed"] is False
     assert payload["summary"]["label"] == "risk_on_correlated"
+    assert payload["summary"]["macro_series_count"] == 2
+    assert payload["macro_features"]["series"]["DFF"]["value"] == 4.33
     assert payload["payment"]["status"] == "accepted"
     assert payload["payment"]["live_settlement_allowed"] is False
     assert receipts[0]["status"] == "accepted"
