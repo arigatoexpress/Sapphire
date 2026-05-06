@@ -73,6 +73,17 @@ def test_enabled_without_config_fails_closed():
     assert body["error"]
 
 
+def test_explicit_empty_config_is_not_backfilled_from_env(monkeypatch):
+    monkeypatch.setenv("X402_RECIPIENT", RECIPIENT)
+    monkeypatch.setenv("X402_ASSET", ASSET)
+
+    mw = X402Middleware(recipient_address="", network=NETWORK, asset="", enabled=True)
+    allowed, body, _ = mw.gate("http://x/", 0.01, header_value="whatever")
+
+    assert not allowed
+    assert "not configured" in body["error"].lower()
+
+
 def test_missing_header_returns_402(mw: X402Middleware):
     allowed, body, _ = mw.gate("http://x/api/premium", 0.01, header_value=None)
     assert not allowed
@@ -83,6 +94,21 @@ def test_missing_header_returns_402(mw: X402Middleware):
     assert req["network"] == NETWORK
     assert req["asset"] == ASSET
     assert req["maxAmountRequired"] == "10000"  # 0.01 USDC * 1e6
+
+
+def test_gate_accepts_product_specific_requirements(mw: X402Middleware):
+    req = mw.build_requirements("http://x/api/premium", 0.01, "premium")
+    req.extra["productId"] = "market_regime_report"
+
+    allowed, body, _ = mw.gate(
+        "http://x/api/premium",
+        0.01,
+        header_value=None,
+        requirements=req,
+    )
+
+    assert not allowed
+    assert body["accepts"][0]["extra"]["productId"] == "market_regime_report"
 
 
 def test_valid_payment_is_accepted(mw: X402Middleware):
