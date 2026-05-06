@@ -1,10 +1,15 @@
-# Sapphire — Working with AI Coding Agents
+# Sapphire — Creative Agent Charter
 
 This file is the single source of truth for any AI coding agent (Claude Code, Codex, Kimi Code, or future) working in this repo. Read it first.
 
-## What this repo is
+## What This Repo Is Now
 
-Sapphire OS is Ari's personal factory / agent runtime. It orchestrates:
+Sapphire is the current command repo for Ari's evolving autonomous system. It is
+not a fixed product brief. Treat the repo as a live collection of useful parts,
+runtime surfaces, experiments, and control-plane assets that can be composed
+into something stronger.
+
+The current useful materials include:
 
 - A 4-tier inference mesh (Windows RTX 5070 Ti → Pi cluster → Mac Ollama → Kimi cloud)
 - A `claw-sapphire` plugin with 19 tools exposed to the `claw-code` runtime
@@ -12,7 +17,27 @@ Sapphire OS is Ari's personal factory / agent runtime. It orchestrates:
 - A Telegram-first PM bot (`services/pm_bot/`) for operational commands on the go
 - Production-grade trading + research flows with paper-trading + Kronos daily predictions
 
-It talks to sibling repos — `Project-Go-Forward` (THO app), `cyber-threat-bot`, `regional-intel-workbench`, `claw-code`, `tradingview-mcp-v2` — and to the live Firestore database in the `tho-ai-agent` GCP project.
+It also talks to sibling repos and local services. Those relationships are
+inputs, not walls. If a better product direction emerges from the current
+assets, build toward it.
+
+## Creative Mandate
+
+Do not preserve old scaffolding just because it exists. Build the coolest,
+clearest, most useful system the current assets make possible.
+
+Good directions include:
+
+- intelligence dashboards that explain current state and recommend action;
+- regional, cyber, market, and business-intel loops that create durable
+  artifacts;
+- operator controls that make risky actions explicit, reversible, and auditable;
+- unified local command surfaces across Sapphire and satellites;
+- demos that are legible to judges, clients, and operators without pretending
+  paper-only systems are live.
+
+When the repo's old docs imply a narrow mission, treat that as history. Ari's
+latest instruction and verified current state win.
 
 ## Production state
 
@@ -51,6 +76,19 @@ It talks to sibling repos — `Project-Go-Forward` (THO app), `cyber-threat-bot`
 - Run touched-file lint (`ruff check <files>`) before push. Full-repo sweeps go in their own `chore/` PRs.
 - If a test fails, fix it or mark it skip-with-reason; do not ignore it.
 
+### Deletion, replacement, and cleanup
+
+- Deletion is allowed and encouraged when it removes dead code, duplicate
+  surfaces, stale docs, misleading scaffolds, or generated clutter.
+- Delete tracked code in focused PRs when tests and rollback prove the
+  replacement is better.
+- Delete ignored/generated artifacts directly when they are reproducible.
+- Quarantine or stash unknown WIP first when it may contain evidence or user
+  work.
+- Prefer one coherent path over several half-maintained alternatives.
+- If a route, script, dashboard, workflow, or doc is stale and actively
+  confusing agents, either fix it or remove it.
+
 ### Conflict avoidance
 
 When multiple agents are active:
@@ -82,7 +120,8 @@ Rough guidance; Ari can override when needed:
 
 When a task involves real money, production credentials, destructive shared
 infrastructure changes, or live external messaging, stop at the safest
-non-mutating artifact unless Ari has explicitly authorized that exact live step.
+prepared artifact unless Ari has explicitly authorized that exact live step.
+Everywhere else, act boldly with tests and a rollback path.
 
 ## Codex lead operating model
 
@@ -134,13 +173,18 @@ launchctl load ~/Library/LaunchAgents/com.sapphire.pm-bot.plist
 launchctl list | grep pm-bot
 ```
 
-## What NOT to do
+## Hard Stops
 
 - **Never** delete projects in GCP, drop Firestore collections, or force-push to `main`.
 - **Never** commit contents of `data/paper_trading.jsonl`, `data/signals/`, `data/enrich/*`, or any `~/.config/sapphire-secrets/*` file.
 - **Never** embed secrets inline in code — use env vars or `~/.config/sapphire-secrets/` files.
 - **Never** change the inference-proxy's tier routing without running the mesh benchmark first.
 - **Never** run `launchctl bootout` on a service other sibling services depend on.
+
+These hard stops do not prohibit deleting local dead code, stale docs,
+misleading prototypes, unused branches, broken routes, duplicate scripts, or
+reproducible generated files. Clean those up when doing so makes the system
+easier to understand and operate.
 
 ## Sibling repos you'll touch from here
 
