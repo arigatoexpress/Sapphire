@@ -237,9 +237,13 @@ class X402Middleware:
         enabled: bool | None = None,
     ) -> None:
         self.network = network or os.environ.get("X402_NETWORK", "base-sepolia")
-        self.recipient = recipient_address or os.environ.get("X402_RECIPIENT", "")
-        self.asset = asset or os.environ.get(
-            "X402_ASSET", DEFAULT_USDC_CONTRACTS.get(self.network, "")
+        self.recipient = (
+            os.environ.get("X402_RECIPIENT", "") if recipient_address is None else recipient_address
+        )
+        self.asset = (
+            os.environ.get("X402_ASSET", DEFAULT_USDC_CONTRACTS.get(self.network, ""))
+            if asset is None
+            else asset
         )
         self.pricing = dict(pricing or {})
         if enabled is None:
@@ -291,6 +295,8 @@ class X402Middleware:
         amount_usd: float,
         header_value: str | None,
         description: str = "",
+        *,
+        requirements: PaymentRequirements | None = None,
     ) -> tuple[bool, dict[str, Any] | None, PaymentVerificationResult | None]:
         """Returns (allowed, response_body_if_blocked, verification_result).
 
@@ -307,7 +313,7 @@ class X402Middleware:
             body = build_402_response([], error="x402 is enabled but not configured on this server")
             return False, body, None
 
-        reqs = self.build_requirements(resource_url, amount_usd, description)
+        reqs = requirements or self.build_requirements(resource_url, amount_usd, description)
 
         if not header_value:
             self._emit(

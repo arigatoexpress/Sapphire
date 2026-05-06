@@ -66,3 +66,18 @@ Wire `market_regime_report` into a simulated endpoint:
 
 Keep Base Sepolia/CDP facilitator work behind explicit env toggles until a
 tiny operator-approved settlement test is planned.
+
+## Simulated Market-Regime Endpoint
+
+The first route using the spine is:
+
+`POST /api/x402/market-regime`
+
+Properties:
+
+- requires dashboard Basic Auth first;
+- returns product-specific x402 requirements from `market_regime_report`;
+- uses `X402Middleware.gate(...)` with catalog-built requirements;
+- writes non-secret receipt records for `required`, `rejected`, and `accepted`;
+- uses the cache-first cross-asset snapshot path;
+- does not call live settlement, trading, Telegram, or chain-history writers.

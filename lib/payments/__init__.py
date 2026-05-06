@@ -3,6 +3,10 @@
 x402 (Coinbase) — HTTP 402 micropayment middleware for monetizing endpoints.
 """
 
+from .x402_market_regime import (
+    artifact_id_for_report,
+    build_market_regime_report,
+)
 from .x402_middleware import (
     MockVerifier,
     PaymentRequirements,
@@ -34,6 +38,8 @@ __all__ = [
     "X402Middleware",
     "build_402_response",
     "require_payment",
+    "artifact_id_for_report",
+    "build_market_regime_report",
     "CatalogValidationError",
     "ProductCatalog",
     "ProductDefinition",

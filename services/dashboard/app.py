@@ -154,6 +154,7 @@ _METRICS_MAX_SAMPLES = 2000
 _metrics_samples: list[tuple[str, str, float]] = []
 _metrics_counts: dict[str, int] = {}
 _metrics_totals: dict[str, float] = {}
+_X402_PRODUCT_MIDDLEWARE_CACHE: dict[tuple[str, str, str, str], Any] = {}
 
 
 @app.before_request
@@ -389,6 +390,70 @@ def _cross_asset_snapshot_cached() -> dict[str, Any]:
         _build_cross_asset_snapshot,
         ttl=CROSS_ASSET_CACHE_DURATION,
     )
+
+
+def _x402_payment_header() -> str | None:
+    return request.headers.get("X-PAYMENT") or request.headers.get("PAYMENT-SIGNATURE")
+
+
+def _x402_market_regime_catalogs():
+    from lib.payments.x402_products import load_validated_catalogs
+
+    return load_validated_catalogs()
+
+
+def _x402_market_regime_middleware(product):
+    from lib.payments.x402_middleware import X402Middleware
+
+    recipient = os.environ.get("X402_RECIPIENT", "")
+    key = (product.product_id, recipient, product.network, product.asset or "")
+    middleware = _X402_PRODUCT_MIDDLEWARE_CACHE.get(key)
+    if middleware is None:
+        middleware = X402Middleware(
+            recipient_address=recipient,
+            pricing={product.route: float(product.price_usd)},
+            network=product.network,
+            asset=product.asset,
+            enabled=True,
+        )
+        _X402_PRODUCT_MIDDLEWARE_CACHE[key] = middleware
+    return middleware
+
+
+def _x402_receipt_ledger():
+    from lib.payments.x402_products import ReceiptLedger
+
+    return ReceiptLedger()
+
+
+def _append_x402_market_regime_receipt(
+    *,
+    product,
+    requirements,
+    payment_header: str | None,
+    verification,
+    status: str,
+    artifact_id: str | None = None,
+):
+    from lib.payments.x402_products import ReceiptRecord
+
+    receipt = ReceiptRecord.from_payment(
+        product=product,
+        requirements=requirements,
+        payment_header=payment_header,
+        verification=verification,
+        status=status,
+        artifact_id=artifact_id,
+        metadata={
+            "endpoint": "/api/x402/market-regime",
+            "live_settlement_allowed": product.live_settlement_allowed,
+        },
+    )
+    try:
+        _x402_receipt_ledger().append(receipt)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("x402 market-regime receipt append failed: %s", exc)
+    return receipt
 
 
 def _matrix_payload(snapshot: dict[str, Any], *, window: str, method: str) -> dict[str, Any]:
@@ -4836,6 +4901,82 @@ def api_cross_asset_regime():
             "error": snapshot.get("error"),
         }
     )
+
+
+@app.route("/api/x402/market-regime", methods=["POST"])
+@requires_auth
+def api_x402_market_regime():
+    """Simulated x402-paid market-regime report.
+
+    This endpoint intentionally uses the existing mock/pluggable x402 verifier
+    path. It records non-secret receipts but does not enable facilitator
+    settlement or any trading behavior.
+    """
+    try:
+        from lib.payments.x402_market_regime import build_market_regime_report
+
+        catalog, registry = _x402_market_regime_catalogs()
+        product = catalog.get("market_regime_report")
+        middleware = _x402_market_regime_middleware(product)
+        requirements = product.to_payment_requirements(
+            resource_url=request.url,
+            pay_to=middleware.recipient,
+            network=middleware.network,
+            asset=middleware.asset,
+        )
+        payment_header = _x402_payment_header()
+        allowed, body, result = middleware.gate(
+            request.url,
+            float(product.price_usd),
+            payment_header,
+            product.description,
+            requirements=requirements,
+        )
+        if not allowed:
+            status = "required" if not payment_header else "rejected"
+            receipt = _append_x402_market_regime_receipt(
+                product=product,
+                requirements=requirements,
+                payment_header=payment_header,
+                verification=result,
+                status=status,
+            )
+            response_body = dict(body or {})
+            response_body["receipt"] = {
+                "receipt_id": receipt.receipt_id,
+                "status": receipt.status,
+                "product_id": receipt.product_id,
+            }
+            resp = jsonify(response_body)
+            resp.status_code = 402
+            resp.headers["X-Payment-Required"] = "true"
+            return resp
+
+        snapshot = _cross_asset_snapshot_cached()
+        report = build_market_regime_report(
+            product=product,
+            registry=registry,
+            snapshot=snapshot,
+        )
+        receipt = _append_x402_market_regime_receipt(
+            product=product,
+            requirements=requirements,
+            payment_header=payment_header,
+            verification=result,
+            status="accepted",
+            artifact_id=str(report.get("artifact_id") or ""),
+        )
+        report["payment"] = {
+            "receipt_id": receipt.receipt_id,
+            "status": receipt.status,
+            "network": receipt.network,
+            "amount_atomic": receipt.amount_atomic,
+            "live_settlement_allowed": product.live_settlement_allowed,
+        }
+        return jsonify(report)
+    except Exception as exc:  # noqa: BLE001
+        log.exception("x402 market-regime report failed")
+        return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 500
 
 
 @app.route("/api/cross-asset-breakdowns")
