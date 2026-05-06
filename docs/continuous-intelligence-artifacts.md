@@ -13,6 +13,7 @@ python3 -m lib.autonomy.continuous_intelligence_artifacts status --pretty
 python3 -m lib.autonomy.continuous_intelligence_artifacts snapshot --pretty
 python3 -m lib.autonomy.continuous_intelligence_artifacts lease \
   --agent-id windows-gpu --target-runtime windows-gpu --limit 2 --pretty
+python3 -m lib.autonomy.continuous_intelligence_artifacts daily-packet --pretty
 ```
 
 The commands above are previews. They do not write files unless `--write` is
@@ -26,10 +27,26 @@ When explicitly enabled, records are appended under the ignored directory:
 data/.autonomy/continuous_intelligence/task_snapshots.jsonl
 data/.autonomy/continuous_intelligence/task_leases.jsonl
 data/.autonomy/continuous_intelligence/task_results.jsonl
+data/.autonomy/continuous_intelligence/daily_autonomy_packets.jsonl
+data/.autonomy/continuous_intelligence/daily_autonomy_packet_latest.json
 ```
 
 These paths are intentionally ignored by git. They are runtime evidence, not
 source.
+
+## Daily Packet
+
+The scheduled packet is artifact-only:
+
+```bash
+python3 -m lib.autonomy.continuous_intelligence_artifacts daily-packet \
+  --write --pretty
+```
+
+It appends a task snapshot, appends dry-run leases for `mac-local` and
+`windows-gpu`, appends a daily packet row, and refreshes a latest JSON pointer.
+It does not dispatch workers, call Telegram, change trading state, or promote
+tasks without review.
 
 ## Dashboard
 
@@ -57,7 +74,7 @@ previews.
 
 ## Next
 
-After this lands, the next reversible step is a tiny local LaunchAgent or
-scheduled command that runs `snapshot --write` and `lease --write` against
-approved dry-run worker IDs. Worker execution should still wait until task
+The local LaunchAgent
+`infra/launchagents/com.sapphire.continuous-intelligence-daily.plist` runs the
+daily packet at 06:45 local time. Worker execution should still wait until task
 results have schema validation and dashboard review.

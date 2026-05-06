@@ -20,10 +20,12 @@ if str(ROOT) not in sys.path:
 from lib.trading.shadow_controller import (  # noqa: E402
     ShadowRiskPolicy,
     build_shadow_trading_report,
+    write_shadow_history,
     write_shadow_report,
 )
 
 DEFAULT_OUTPUT = ROOT / "data" / "trading" / "shadow-controller-latest.json"
+DEFAULT_HISTORY = ROOT / "data" / "trading" / "shadow-controller-history.jsonl"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -42,6 +44,14 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.output:
         write_shadow_report(report, args.output)
+    if args.history:
+        history_record = write_shadow_history(report, args.history)
+        report["history"] = {
+            "appended": True,
+            "target_file": str(args.history),
+            "recorded_at": history_record["recorded_at"],
+            "report_sha256": history_record["report_sha256"],
+        }
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0
 
@@ -59,6 +69,16 @@ def build_parser() -> argparse.ArgumentParser:
         nargs="?",
         const=DEFAULT_OUTPUT,
         help="Write the report to a path; with no value, writes data/trading/shadow-controller-latest.json.",
+    )
+    parser.add_argument(
+        "--history",
+        type=Path,
+        nargs="?",
+        const=DEFAULT_HISTORY,
+        help=(
+            "Append a compact JSONL history row; with no value, writes "
+            "data/trading/shadow-controller-history.jsonl."
+        ),
     )
     parser.add_argument(
         "--notional-usd",

@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,7 @@ from lib.trading.strategy_lab import (
 )
 
 SHADOW_CONTROLLER_SCHEMA_VERSION = 1
+SHADOW_HISTORY_SCHEMA_VERSION = 1
 SHADOW_STRATEGY_ID = "sapphire_shadow_controller_v1"
 
 
@@ -291,6 +293,68 @@ def write_shadow_report(report: dict[str, Any], path: Path) -> None:
     path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def build_shadow_history_record(report: dict[str, Any]) -> dict[str, Any]:
+    """Build a compact append-only ledger row for one shadow-controller run."""
+    candidates = [row for row in report.get("candidates") or [] if isinstance(row, dict)]
+    watchlist = [row for row in report.get("watchlist") or [] if isinstance(row, dict)]
+    blocked_live_actions = [
+        row for row in report.get("blocked_live_actions") or [] if isinstance(row, dict)
+    ]
+    canonical = json.dumps(report, sort_keys=True, separators=(",", ":"), default=str)
+    top = candidates[0] if candidates else None
+    return {
+        "schema_version": SHADOW_HISTORY_SCHEMA_VERSION,
+        "record_type": "shadow_controller_run",
+        "recorded_at": _now_iso(),
+        "report_generated_at": report.get("generated_at"),
+        "report_sha256": sha256(canonical.encode("utf-8")).hexdigest(),
+        "mode": report.get("mode"),
+        "strategy_id": report.get("strategy_id"),
+        "source": report.get("source"),
+        "market_stale": bool(report.get("market_stale")),
+        "market_error_count": len(report.get("market_errors") or []),
+        "candidate_count": len(candidates),
+        "watchlist_count": len(watchlist),
+        "blocked_live_surface_count": len(blocked_live_actions),
+        "top_candidate": _history_candidate_summary(top),
+        "operator_next_step": report.get("operator_next_step") or {},
+        "risk_policy": report.get("risk_policy") or {},
+        "safety": {
+            "paper_shadow_only": report.get("mode") == "paper_shadow",
+            "live_execution_enabled": False,
+            "manual_confirmation_required": bool(
+                (report.get("risk_policy") or {}).get("manual_confirmation_required", True)
+            ),
+            "append_only_history": True,
+        },
+    }
+
+
+def write_shadow_history(report: dict[str, Any], path: Path) -> dict[str, Any]:
+    """Append one shadow-controller history row and return the row written."""
+    record = build_shadow_history_record(report)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, sort_keys=True) + "\n")
+    return record
+
+
+def _history_candidate_summary(candidate: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not candidate:
+        return None
+    return {
+        "symbol": candidate.get("symbol"),
+        "decision": candidate.get("decision"),
+        "action": candidate.get("action"),
+        "confidence": candidate.get("confidence"),
+        "notional_usd": candidate.get("notional_usd"),
+        "price_usd": candidate.get("price_usd"),
+        "change_24h_pct": candidate.get("change_24h_pct"),
+        "reasons": list(candidate.get("reasons") or [])[:6],
+        "blockers": list(candidate.get("blockers") or [])[:6],
+    }
+
+
 def _manual_order_candidate(
     symbol: str,
     notional: float,
@@ -409,13 +473,16 @@ def _now_iso() -> str:
 
 __all__ = [
     "SHADOW_CONTROLLER_SCHEMA_VERSION",
+    "SHADOW_HISTORY_SCHEMA_VERSION",
     "SHADOW_STRATEGY_ID",
     "ShadowCandidate",
     "ShadowRiskPolicy",
+    "build_shadow_history_record",
     "blocked_live_actions",
     "build_shadow_trading_report",
     "evaluate_market_row",
     "operator_next_step",
     "promotion_gates",
+    "write_shadow_history",
     "write_shadow_report",
 ]

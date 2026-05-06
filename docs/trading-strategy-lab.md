@@ -114,8 +114,13 @@ What it automates:
 - Write an optional JSON report for dashboard or operator review:
 
   ```bash
-  python3 scripts/ops/trading_shadow_controller.py --output
+  python3 scripts/ops/trading_shadow_controller.py --output --history
   ```
+- Append one compact JSONL ledger row per scheduled run at
+  `data/trading/shadow-controller-history.jsonl`. The row stores counts,
+  the top paper candidate, safety flags, and a SHA-256 hash of the full report,
+  so the controller can accumulate evidence instead of overwriting only the
+  latest snapshot.
 - Run every 30 minutes via the versioned paper-only LaunchAgent
   `infra/launchagents/com.sapphire.trading-shadow-controller.plist` once that
   plist is installed.

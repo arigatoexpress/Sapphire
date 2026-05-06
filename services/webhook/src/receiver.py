@@ -14,10 +14,13 @@ Signal flow:
 import asyncio
 import base64
 import contextlib
+import hmac
 import json
 import logging
+import math
 import os
 import platform
+import re
 import socket
 import subprocess
 import uuid
@@ -47,6 +50,9 @@ OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")  # Local Ollama (
 WEBHOOK_PORT = int(os.getenv("WEBHOOK_PORT", "9090"))
 LOG_FILE = os.getenv("WEBHOOK_LOG_FILE", "C:/sapphire/webhook.log")
 MAX_HISTORY = 200
+MAX_WEBHOOK_BODY_BYTES = int(
+    os.getenv("WEBHOOK_MAX_BODY_BYTES", os.getenv("MAX_WEBHOOK_BODY_BYTES", "8192"))
+)
 
 # On-prem signal routing — api-gateway endpoints over Tailscale
 # POST /api/signals/create with X-Sapphire-Control-Token header
@@ -92,6 +98,9 @@ VALID_ACTIONS = [
     "exit_long",
     "exit_short",
 ]
+SYMBOL_RE = re.compile(r"^[A-Z0-9:._/\-]{1,40}$")
+SECRET_FIELDS = {"secret", "webhook_secret", "passphrase"}
+SECRET_FIELD_RE = re.compile(r"(secret|token|passphrase|password|private[_-]?key)", re.I)
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
 
@@ -110,6 +119,62 @@ logging.basicConfig(
 log = logging.getLogger("sapphire-webhook")
 
 # ─── Data Models ──────────────────────────────────────────────────────────────
+
+
+def _canonical_symbol(raw_symbol: Any) -> str:
+    raw = str(raw_symbol or "").strip().upper()
+    symbol = raw.split(":")[-1] if ":" in raw else raw
+    return SYMBOL_MAP.get(symbol, symbol)
+
+
+def _parse_optional_float(value: Any) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(parsed):
+        return None
+    return parsed
+
+
+def _redacted_payload_summary(data: Any) -> dict[str, Any]:
+    if not isinstance(data, dict):
+        return {"payload_type": type(data).__name__}
+    summary: dict[str, Any] = {}
+    for key in ("symbol", "action", "exchange", "interval", "source", "strategy"):
+        if key in data:
+            summary[key] = data.get(key)
+    for key in data:
+        if SECRET_FIELD_RE.search(str(key)):
+            summary[str(key)] = "<redacted>"
+    summary["keys"] = sorted(str(key) for key in data)[:30]
+    return summary
+
+
+def verify_webhook_secret(data: dict[str, Any], headers: Any | None = None) -> bool:
+    """Return true when ingress is allowed by the configured shared secret."""
+    expected = str(WEBHOOK_SECRET or "").strip()
+    if not expected:
+        return True
+    header_candidates = []
+    if headers is not None:
+        for name in (
+            "X-Sapphire-Webhook-Secret",
+            "X-TradingView-Secret",
+            "X-Webhook-Secret",
+        ):
+            value = headers.get(name) if hasattr(headers, "get") else None
+            if value:
+                header_candidates.append(value)
+    body_candidates = [
+        value for key, value in data.items() if str(key).strip().lower() in SECRET_FIELDS
+    ]
+    for candidate in [*header_candidates, *body_candidates]:
+        if candidate is not None and hmac.compare_digest(str(candidate), expected):
+            return True
+    return False
 
 
 @dataclass
@@ -132,21 +197,19 @@ class TradingViewAlert:
 
     @classmethod
     def from_webhook(cls, data: dict) -> "TradingViewAlert":
-        raw_symbol = data.get("symbol", "").upper()
-        symbol = raw_symbol.split(":")[-1] if ":" in raw_symbol else raw_symbol
-        symbol = SYMBOL_MAP.get(symbol, symbol)
+        symbol = _canonical_symbol(data.get("symbol"))
         return cls(
             symbol=symbol,
-            action=data.get("action", "").lower(),
-            price=float(data.get("price", 0)),
+            action=str(data.get("action", "")).lower(),
+            price=_parse_optional_float(data.get("price")) or 0.0,
             timestamp=data.get("time", datetime.now(UTC).isoformat()),
-            message=data.get("message", ""),
-            exchange=data.get("exchange", ""),
-            interval=data.get("interval", ""),
-            z_score=float(data["z_score"]) if "z_score" in data else None,
-            confidence=float(data["confidence"]) if "confidence" in data else None,
-            regime_score=float(data["regime_score"]) if "regime_score" in data else None,
-            quantity=float(data["quantity"]) if "quantity" in data else None,
+            message=str(data.get("message", ""))[:500],
+            exchange=str(data.get("exchange", ""))[:40],
+            interval=str(data.get("interval", ""))[:40],
+            z_score=_parse_optional_float(data.get("z_score")),
+            confidence=_parse_optional_float(data.get("confidence")),
+            regime_score=_parse_optional_float(data.get("regime_score")),
+            quantity=_parse_optional_float(data.get("quantity")),
         )
 
 
@@ -860,9 +923,25 @@ app = FastAPI(
 
 
 def validate_payload(data: dict) -> bool:
-    if "symbol" not in data or "action" not in data:
+    if not isinstance(data, dict):
         return False
-    return data.get("action", "").lower() in VALID_ACTIONS
+    raw_symbol = str(data.get("symbol") or "").strip().upper()
+    if not raw_symbol or not SYMBOL_RE.fullmatch(raw_symbol):
+        return False
+    action = str(data.get("action") or "").strip().lower()
+    if action not in VALID_ACTIONS:
+        return False
+    for key in ("price", "z_score", "confidence", "regime_score", "quantity"):
+        if key not in data:
+            continue
+        value = _parse_optional_float(data.get(key))
+        if value is None:
+            return False
+        if key in {"price", "quantity"} and value < 0:
+            return False
+        if key == "confidence" and not 0 <= value <= 1:
+            return False
+    return True
 
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
@@ -1009,12 +1088,23 @@ async def receive_tradingview(request: Request, background_tasks: BackgroundTask
     """Main TradingView webhook endpoint — validates, enriches, publishes."""
     try:
         body = await request.body()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body")
+    if len(body) > MAX_WEBHOOK_BODY_BYTES:
+        raise HTTPException(status_code=413, detail="Webhook body too large")
+    try:
         data = json.loads(body)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON")
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=400, detail="Invalid payload — expected JSON object")
+
+    if not verify_webhook_secret(data, request.headers):
+        log.warning("TradingView webhook secret rejected: %s", _redacted_payload_summary(data))
+        raise HTTPException(status_code=403, detail="Webhook secret rejected")
 
     if not validate_payload(data):
-        log.warning("Invalid payload rejected: %s", str(data)[:100])
+        log.warning("Invalid payload rejected: %s", _redacted_payload_summary(data))
         raise HTTPException(
             status_code=400,
             detail="Invalid payload — check symbol/action fields",
@@ -1120,7 +1210,7 @@ async def receive_tradingview(request: Request, background_tasks: BackgroundTask
 if __name__ == "__main__":
     uvicorn.run(
         app,
-        host="0.0.0.0",
+        host="0.0.0.0",  # nosec B104 - Windows receiver is firewall/Tailscale scoped.
         port=WEBHOOK_PORT,
         log_level="info",
         access_log=True,

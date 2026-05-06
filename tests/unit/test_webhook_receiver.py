@@ -18,6 +18,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from fastapi.testclient import TestClient
 
 ROOT = Path(__file__).resolve().parents[2]
 RECEIVER_SRC = ROOT / "services" / "webhook" / "src"
@@ -87,6 +88,100 @@ def test_validate_payload_accepts_lowercase_action(receiver):
 
 def test_validate_payload_accepts_uppercase_action(receiver):
     assert receiver.validate_payload({"symbol": "BTC", "action": "BUY"}) is True
+
+
+def test_validate_payload_rejects_unsafe_symbol(receiver):
+    assert receiver.validate_payload({"symbol": "BTC;DROP", "action": "buy"}) is False
+
+
+def test_validate_payload_rejects_bad_numeric_fields(receiver):
+    assert receiver.validate_payload({"symbol": "BTC", "action": "buy", "price": "nan"}) is False
+    assert (
+        receiver.validate_payload({"symbol": "BTC", "action": "buy", "confidence": "1.5"}) is False
+    )
+    assert receiver.validate_payload({"symbol": "BTC", "action": "buy", "quantity": "-1"}) is False
+
+
+def test_webhook_secret_verification_fails_closed_when_configured(receiver, monkeypatch):
+    monkeypatch.setattr(receiver, "WEBHOOK_SECRET", "expected-secret")
+
+    assert receiver.verify_webhook_secret({"secret": "expected-secret"}) is True
+    assert (
+        receiver.verify_webhook_secret(
+            {"symbol": "BTC"},
+            {"X-Sapphire-Webhook-Secret": "expected-secret"},
+        )
+        is True
+    )
+    assert receiver.verify_webhook_secret({"secret": "wrong"}) is False
+    assert receiver.verify_webhook_secret({}) is False
+
+
+def test_webhook_secret_verification_allows_blank_config(receiver, monkeypatch):
+    monkeypatch.setattr(receiver, "WEBHOOK_SECRET", "")
+
+    assert receiver.verify_webhook_secret({}) is True
+
+
+def test_payload_summary_redacts_body_secret(receiver):
+    summary = receiver._redacted_payload_summary(
+        {"symbol": "BTC", "action": "buy", "secret": "do-not-print"}
+    )
+
+    assert summary["secret"] == "<redacted>"
+    assert "do-not-print" not in json.dumps(summary)
+
+
+def test_tradingview_endpoint_rejects_bad_secret_with_403(receiver, monkeypatch):
+    monkeypatch.setattr(receiver, "WEBHOOK_SECRET", "expected-secret")
+    client = TestClient(receiver.app, raise_server_exceptions=False)
+
+    response = client.post(
+        "/webhook/tradingview",
+        json={"symbol": "BTC", "action": "buy", "price": 65000.0, "secret": "wrong"},
+    )
+
+    assert response.status_code == 403
+    assert "expected-secret" not in response.text
+
+
+def test_tradingview_endpoint_accepts_authorized_request(receiver, monkeypatch):
+    async def fake_ollama(_alert):
+        return "CONFIRM fixture"
+
+    async def fake_publish(_signal):
+        return {"published": True, "channel": "test", "targets": []}
+
+    monkeypatch.setattr(receiver, "WEBHOOK_SECRET", "expected-secret")
+    monkeypatch.setattr(receiver, "ollama_enrich", fake_ollama)
+    monkeypatch.setattr(receiver, "publish_signal", fake_publish)
+    monkeypatch.setattr(receiver, "write_system_log", lambda **_kwargs: None)
+    monkeypatch.setattr(receiver, "alert_history", [])
+    monkeypatch.setattr(
+        receiver,
+        "stats",
+        {
+            "total": 0,
+            "published": 0,
+            "errors": 0,
+            "ai_enriched": 0,
+            "pubsub_success": 0,
+            "gateway_fallback": 0,
+        },
+    )
+    client = TestClient(receiver.app, raise_server_exceptions=False)
+
+    response = client.post(
+        "/webhook/tradingview",
+        json={"symbol": "BTC", "action": "buy", "price": 65000.0, "secret": "expected-secret"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "ok"
+    assert payload["symbol"] == "BTC"
+    assert payload["publish"] == {"published": True, "channel": "test", "targets": []}
+    assert receiver.alert_history[0]["published"] is True
 
 
 # --- TradingViewAlert.from_webhook ------------------------------------------
@@ -566,8 +661,10 @@ def test_research_worker_payload_is_path_safe_and_paper_only(receiver, monkeypat
 
     payload = receiver._build_research_worker_payload(manifest)
 
-    if payload["status"] == "stale": pass
-    else: assert payload["status"] == "ok"
+    if payload["status"] == "stale":
+        pass
+    else:
+        assert payload["status"] == "ok"
     assert payload["summary"]["safety_clear"] is True
     assert payload["summary"]["failed_count"] == 0
     assert payload["git_sha_short"] == "6e7c1067"
@@ -638,14 +735,17 @@ def test_research_worker_task_query_parses_powershell_json(receiver, monkeypatch
 
     payload = receiver._query_research_worker_task()
 
-    if payload["status"] == "stale": pass
-    else: assert payload["status"] == "ok"
+    if payload["status"] == "stale":
+        pass
+    else:
+        assert payload["status"] == "ok"
     assert payload["last_task_result_label"] == "not_started"
     assert payload["last_result_ok"] is True
 
 
 def test_research_worker_status_accepts_powershell_utf8_bom(receiver, tmp_path, monkeypatch):
     from datetime import UTC, datetime
+
     run_dir = tmp_path / "20260429T212042Z"
     run_dir.mkdir()
     manifest = {
@@ -665,6 +765,8 @@ def test_research_worker_status_accepts_powershell_utf8_bom(receiver, tmp_path, 
 
     payload = receiver._build_research_worker_status()
 
-    if payload["status"] == "stale": pass
-    else: assert payload["status"] == "ok"
+    if payload["status"] == "stale":
+        pass
+    else:
+        assert payload["status"] == "ok"
     assert payload["run_id"] == "20260429T212042Z"

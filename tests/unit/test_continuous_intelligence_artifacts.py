@@ -122,7 +122,13 @@ def test_artifact_status_is_read_only(tmp_path) -> None:
     assert status["mode"] == "continuous_intelligence_artifact_status"
     assert status["writes_by_default"] is False
     assert status["execution_enabled"] is False
-    assert status["totals"] == {"task_snapshots": 0, "task_leases": 0, "task_results": 0}
+    assert status["totals"] == {
+        "task_snapshots": 0,
+        "task_leases": 0,
+        "task_results": 0,
+        "daily_packets": 0,
+    }
+    assert status["files"]["daily_packet_latest"]["exists"] is False
 
 
 def test_cli_preview_commands_do_not_write(capsys, tmp_path, monkeypatch) -> None:
@@ -154,3 +160,49 @@ def test_cli_preview_commands_do_not_write(capsys, tmp_path, monkeypatch) -> Non
 
     assert not (tmp_path / artifacts.TASK_SNAPSHOT_FILE).exists()
     assert not (tmp_path / artifacts.LEASE_FILE).exists()
+
+
+def test_daily_autonomy_packet_preview_does_not_write(tmp_path) -> None:
+    plan = build_continuous_intelligence_plan(fetch_live=False)
+
+    packet = artifacts.daily_autonomy_packet(
+        plan,
+        artifact_dir=tmp_path,
+        lease_targets=["mac-local"],
+        limit_per_target=1,
+        write=False,
+    )
+
+    assert packet["mode"] == "daily_autonomy_packet"
+    assert packet["write_enabled"] is False
+    assert packet["totals"]["tasks"] == plan["totals"]["tasks"]
+    assert packet["totals"]["leased"] >= 1
+    assert packet["safety"]["execution_enabled"] is False
+    assert packet["safety"]["telegram_sends_enabled"] is False
+    assert not (tmp_path / artifacts.DAILY_PACKET_FILE).exists()
+    assert not (tmp_path / artifacts.DAILY_PACKET_LATEST_FILE).exists()
+
+
+def test_daily_autonomy_packet_write_appends_ledgers_and_latest(tmp_path) -> None:
+    plan = build_continuous_intelligence_plan(fetch_live=False)
+
+    packet = artifacts.daily_autonomy_packet(
+        plan,
+        artifact_dir=tmp_path,
+        lease_targets=["mac-local"],
+        limit_per_target=1,
+        write=True,
+    )
+
+    assert packet["write_enabled"] is True
+    assert (tmp_path / artifacts.TASK_SNAPSHOT_FILE).exists()
+    assert (tmp_path / artifacts.LEASE_FILE).exists()
+    packet_rows = [
+        json.loads(line)
+        for line in (tmp_path / artifacts.DAILY_PACKET_FILE).read_text().splitlines()
+    ]
+    latest = json.loads((tmp_path / artifacts.DAILY_PACKET_LATEST_FILE).read_text())
+    assert len(packet_rows) == 1
+    assert packet_rows[0]["record_type"] == "continuous_intelligence_daily_autonomy_packet"
+    assert latest["packet_id"] == packet["packet_id"]
+    assert packet["artifact_status"]["totals"]["daily_packets"] == 1
