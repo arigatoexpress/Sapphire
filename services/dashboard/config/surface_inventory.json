@@ -1,0 +1,3348 @@
+{
+  "generated_by": "scripts/ops/dashboard_surface_inventory.py",
+  "routes": [
+    {
+      "endpoint": "static",
+      "kind": "static",
+      "lifecycle": "keep",
+      "line": 127,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Settings / Contracts",
+      "requires_auth": true,
+      "rule": "/static/<path:filename>",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "app_preview",
+      "kind": "page",
+      "lifecycle": "keep",
+      "line": 138,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Home / Worldline",
+      "requires_auth": true,
+      "rule": "/app-preview",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "app_preview_assets",
+      "kind": "static",
+      "lifecycle": "keep",
+      "line": 175,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Home / Worldline",
+      "requires_auth": true,
+      "rule": "/app-preview/assets/<path:filename>",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "index",
+      "kind": "page",
+      "lifecycle": "keep",
+      "line": 1593,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Home / Worldline",
+      "requires_auth": true,
+      "rule": "/",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/overview.html"
+      ]
+    },
+    {
+      "endpoint": "showcase",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 1602,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Home / Worldline",
+      "requires_auth": true,
+      "rule": "/showcase",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/showcase.html"
+      ]
+    },
+    {
+      "endpoint": "showcase",
+      "kind": "page",
+      "lifecycle": "redirect",
+      "line": 1603,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Home / Worldline",
+      "requires_auth": true,
+      "rule": "/unified",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/showcase.html"
+      ]
+    },
+    {
+      "endpoint": "showcase",
+      "kind": "page",
+      "lifecycle": "redirect",
+      "line": 1604,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Home / Worldline",
+      "requires_auth": true,
+      "rule": "/unified-dashboard",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/showcase.html"
+      ]
+    },
+    {
+      "endpoint": "architecture",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 1616,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": true,
+      "rule": "/architecture",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/architecture.html"
+      ]
+    },
+    {
+      "endpoint": "intelligence",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 1624,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Intelligence",
+      "requires_auth": true,
+      "rule": "/intelligence",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/intelligence.html"
+      ]
+    },
+    {
+      "endpoint": "organization",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 1632,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Intelligence",
+      "requires_auth": true,
+      "rule": "/organization",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/organization.html"
+      ]
+    },
+    {
+      "endpoint": "activity",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 1640,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Automation",
+      "requires_auth": true,
+      "rule": "/activity",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/activity.html"
+      ]
+    },
+    {
+      "endpoint": "sapphire_book",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 1646,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Products / Diligence",
+      "requires_auth": true,
+      "rule": "/sapphire-book",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/sapphire_book.html"
+      ]
+    },
+    {
+      "endpoint": "infrastructure",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 1654,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": true,
+      "rule": "/infrastructure",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/infrastructure.html"
+      ]
+    },
+    {
+      "endpoint": "control",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 1662,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Automation",
+      "requires_auth": true,
+      "rule": "/control",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/control.html"
+      ]
+    },
+    {
+      "endpoint": "settings",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 1668,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Settings / Contracts",
+      "requires_auth": true,
+      "rule": "/settings",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/settings.html"
+      ]
+    },
+    {
+      "endpoint": "metrics",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 1674,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": true,
+      "rule": "/metrics",
+      "safety_mode": "live",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_status",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 1724,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Automation",
+      "requires_auth": true,
+      "rule": "/api/status",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_watchlist",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 1745,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/watchlist",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_analytics_market_universe",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 1830,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/analytics/market-universe",
+      "safety_mode": "modeled",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_tradingview_capabilities",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 1843,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/tradingview/capabilities",
+      "safety_mode": "paper",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_tradingview_ta_machine",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 1856,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/tradingview/ta-machine",
+      "safety_mode": "paper",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_tradingview_watchlist_txt",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 1875,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/tradingview/watchlist.txt",
+      "safety_mode": "paper",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_trading_workbench_watchlist",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 1895,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/trading/workbench/watchlist",
+      "safety_mode": "paper",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_trading_workbench_work_orders_preview",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 1921,
+      "methods": [
+        "POST"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/trading/workbench/work-orders/preview",
+      "safety_mode": "paper",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_trading_strategy_lab",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 1960,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/trading/strategy-lab",
+      "safety_mode": "paper",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_trading_shadow_controller",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 1973,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/trading/shadow-controller",
+      "safety_mode": "paper",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_trading_order_draft",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 1988,
+      "methods": [
+        "POST"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/trading/order-draft",
+      "safety_mode": "paper",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_tradingview_orchestrator_sessions",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 2015,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/tradingview/orchestrator/sessions",
+      "safety_mode": "paper",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_tradingview_orchestrator_latest",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 2029,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/tradingview/orchestrator/latest",
+      "safety_mode": "paper",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_tradingview_orchestrator_scoring_latest",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 2042,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/tradingview/orchestrator/scoring/latest",
+      "safety_mode": "paper",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_tradingview_orchestrator_probe",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 2064,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/tradingview/orchestrator/probe",
+      "safety_mode": "paper",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_tradingview_orchestrator_artifact",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 2081,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/tradingview/orchestrator/artifacts/<path:artifact_path>",
+      "safety_mode": "paper",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_tradingview_orchestrator_pine",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 2100,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/tradingview/orchestrator/pine",
+      "safety_mode": "paper",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_tradingview_orchestrator_alerts",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 2122,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/tradingview/orchestrator/alerts",
+      "safety_mode": "paper",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_proposals",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 2140,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Automation",
+      "requires_auth": true,
+      "rule": "/api/proposals",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_opportunities",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 2151,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Automation",
+      "requires_auth": true,
+      "rule": "/api/opportunities",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_logs",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 2201,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": true,
+      "rule": "/api/logs",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_events_stream",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 2348,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Automation",
+      "requires_auth": true,
+      "rule": "/api/events/stream",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_world_state",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 2408,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Automation",
+      "requires_auth": true,
+      "rule": "/api/events/world-state",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_events_replay",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 2419,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Automation",
+      "requires_auth": true,
+      "rule": "/api/events/replay",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "system",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 2440,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": true,
+      "rule": "/system",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/system.html"
+      ]
+    },
+    {
+      "endpoint": "api_system",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 2476,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": true,
+      "rule": "/api/system",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "signals_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 2566,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/signals",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/signals.html"
+      ]
+    },
+    {
+      "endpoint": "api_signals",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 2575,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/signals",
+      "safety_mode": "paper",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "agents_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 2630,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Automation",
+      "requires_auth": true,
+      "rule": "/agents",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/agents.html"
+      ]
+    },
+    {
+      "endpoint": "api_agents",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 2637,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Automation",
+      "requires_auth": true,
+      "rule": "/api/agents",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "benchmarks",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 2679,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": true,
+      "rule": "/benchmarks",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "health_status_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 2692,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": true,
+      "rule": "/health-status",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/health.html"
+      ]
+    },
+    {
+      "endpoint": "api_health_summary",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 2699,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": true,
+      "rule": "/api/health/summary",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "production_readiness_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 2756,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": true,
+      "rule": "/production-readiness",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/production_readiness.html"
+      ]
+    },
+    {
+      "endpoint": "api_readiness_latest",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 2817,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": true,
+      "rule": "/api/readiness/latest",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_readiness_check",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 2824,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": true,
+      "rule": "/api/readiness/check/<section>/<name>",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_production_readiness",
+      "kind": "api",
+      "lifecycle": "keep",
+      "line": 2844,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": true,
+      "rule": "/api/production/readiness",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "logs_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 2959,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": true,
+      "rule": "/logs",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/logs.html"
+      ]
+    },
+    {
+      "endpoint": "command_deck_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 2966,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Automation",
+      "requires_auth": true,
+      "rule": "/command-deck",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/command_deck.html"
+      ]
+    },
+    {
+      "endpoint": "api_trading_metrics",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 2975,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/trading/metrics",
+      "safety_mode": "paper",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "soc_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 3051,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Security",
+      "requires_auth": true,
+      "rule": "/soc",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/soc.html"
+      ]
+    },
+    {
+      "endpoint": "security_overview_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 3060,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Security",
+      "requires_auth": true,
+      "rule": "/security/overview",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/security.html"
+      ]
+    },
+    {
+      "endpoint": "chain_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 3069,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/chain",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/chain.html"
+      ]
+    },
+    {
+      "endpoint": "api_chain_overview",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 3078,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/chain/overview",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "robinhood_chain_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 3109,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/chain/robinhood",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/robinhood_chain.html"
+      ]
+    },
+    {
+      "endpoint": "api_robinhood_chain_status",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 3118,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/chain/robinhood/status",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_robinhood_chain_signals",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 3145,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/chain/robinhood/signals",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_robinhood_payment_stats",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 3161,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/chain/robinhood/payment",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "sentinel_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 3175,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/chain/sentinel",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/sentinel.html"
+      ]
+    },
+    {
+      "endpoint": "api_sentinel_demo",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 3184,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/hackathon/sentinel/demo",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_sentinel_evaluate",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 3197,
+      "methods": [
+        "POST"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/hackathon/sentinel/evaluate",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_cross_chain_aave_arb",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 3245,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/cross_chain/aave_arb",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_perps_overview",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 3279,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/perps/overview",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "risk_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 3304,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/risk",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/risk.html"
+      ]
+    },
+    {
+      "endpoint": "analytics_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 3311,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/analytics",
+      "safety_mode": "modeled",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/analytics.html"
+      ]
+    },
+    {
+      "endpoint": "api_analytics",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 3320,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/analytics",
+      "safety_mode": "modeled",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_risk_metrics",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 3338,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/risk/metrics",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_analytics_performance",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 3361,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/analytics/performance",
+      "safety_mode": "modeled",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_risk_backtest",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 3379,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/risk/backtest",
+      "safety_mode": "modeled",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_correlation",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 3414,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/analytics/correlation",
+      "safety_mode": "modeled",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_soc_security",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 3446,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Security",
+      "requires_auth": true,
+      "rule": "/api/soc/security",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_soc_threats",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 3851,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Security",
+      "requires_auth": true,
+      "rule": "/api/soc/threats",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "predictions_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 4033,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/predictions",
+      "safety_mode": "modeled",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/predictions.html"
+      ]
+    },
+    {
+      "endpoint": "api_kronos_prediction",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 4042,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/predictions/kronos",
+      "safety_mode": "modeled",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_kronos_status",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 4143,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/predictions/status",
+      "safety_mode": "modeled",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_soc_cyber_research",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 4190,
+      "methods": [
+        "POST"
+      ],
+      "owner_module": "Security",
+      "requires_auth": true,
+      "rule": "/api/soc/cyber-research",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_soc_lumo_status",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 4247,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Security",
+      "requires_auth": true,
+      "rule": "/api/soc/lumo-status",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "health",
+      "kind": "page",
+      "lifecycle": "keep",
+      "line": 4276,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": false,
+      "rule": "/health",
+      "safety_mode": "live",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_metrics_history",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 4285,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": true,
+      "rule": "/api/metrics/history",
+      "safety_mode": "live",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_soc_threat_timeline",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 4307,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Security",
+      "requires_auth": true,
+      "rule": "/api/soc/threat-timeline",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_agents_history",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 4336,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Automation",
+      "requires_auth": true,
+      "rule": "/api/agents/history",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_signals_performance",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 4357,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/signals/performance",
+      "safety_mode": "paper",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "portfolio_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 4408,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/portfolio",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/portfolio.html"
+      ]
+    },
+    {
+      "endpoint": "factors_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 4414,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/factors",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/factors.html"
+      ]
+    },
+    {
+      "endpoint": "performance_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 4420,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/performance",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/performance.html"
+      ]
+    },
+    {
+      "endpoint": "agents_autonomous_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 4527,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Automation",
+      "requires_auth": true,
+      "rule": "/agents/autonomous",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/agents_autonomous.html"
+      ]
+    },
+    {
+      "endpoint": "content_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 4539,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Intelligence",
+      "requires_auth": true,
+      "rule": "/content",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/content.html"
+      ]
+    },
+    {
+      "endpoint": "cascade_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 4547,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/cascade",
+      "safety_mode": "modeled",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/cascade.html"
+      ]
+    },
+    {
+      "endpoint": "intel_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 4553,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Intelligence",
+      "requires_auth": true,
+      "rule": "/intel",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/intel.html"
+      ]
+    },
+    {
+      "endpoint": "intel_leads_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 4559,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Intelligence",
+      "requires_auth": true,
+      "rule": "/intel/leads",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/intel_leads.html"
+      ]
+    },
+    {
+      "endpoint": "api_leads",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 4587,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Intelligence",
+      "requires_auth": true,
+      "rule": "/api/leads",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_leads_map",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 4627,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Intelligence",
+      "requires_auth": true,
+      "rule": "/api/leads/map",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_leads_stats",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 4665,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Intelligence",
+      "requires_auth": true,
+      "rule": "/api/leads/stats",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_leads_score",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 4675,
+      "methods": [
+        "POST"
+      ],
+      "owner_module": "Intelligence",
+      "requires_auth": true,
+      "rule": "/api/leads/score",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "investment_intel_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 4689,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/investment-intel",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/investment_intel.html"
+      ]
+    },
+    {
+      "endpoint": "cross_asset_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 4699,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/cross-asset",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/cross_asset.html"
+      ]
+    },
+    {
+      "endpoint": "sovereign_thesis_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 4709,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/sovereign-thesis",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/sovereign_thesis.html"
+      ]
+    },
+    {
+      "endpoint": "sovereign_thesis_story_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 4719,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/sovereign-thesis/story",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/sovereign_thesis_story.html"
+      ]
+    },
+    {
+      "endpoint": "diligence_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 4729,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Products / Diligence",
+      "requires_auth": true,
+      "rule": "/diligence",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/diligence.html"
+      ]
+    },
+    {
+      "endpoint": "observability_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 4741,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": true,
+      "rule": "/observability",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/observability.html"
+      ]
+    },
+    {
+      "endpoint": "narrative_eval_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 4753,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Intelligence",
+      "requires_auth": true,
+      "rule": "/narrative-eval",
+      "safety_mode": "modeled",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/narrative_eval.html"
+      ]
+    },
+    {
+      "endpoint": "timetravel_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 4864,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Intelligence",
+      "requires_auth": true,
+      "rule": "/timetravel",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/timetravel.html"
+      ]
+    },
+    {
+      "endpoint": "api_timetravel_snapshot",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 4879,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Intelligence",
+      "requires_auth": true,
+      "rule": "/api/timetravel-snapshot",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_diligence_summary",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 4952,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Products / Diligence",
+      "requires_auth": true,
+      "rule": "/api/diligence-summary",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_risk_kernel_summary",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 4958,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/risk-kernel-summary",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_provenance_summary",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 4964,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Products / Diligence",
+      "requires_auth": true,
+      "rule": "/api/provenance-summary",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_test_suite_health",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 4977,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": true,
+      "rule": "/api/test-suite-health",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_launchagent_summary",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 4983,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": true,
+      "rule": "/api/launchagent-summary",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_cross_asset_matrix",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 4989,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/cross-asset-matrix",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_cross_asset_regime",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 4998,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/cross-asset-regime",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_x402_market_regime",
+      "kind": "api",
+      "lifecycle": "hard-stop",
+      "line": 5017,
+      "methods": [
+        "POST"
+      ],
+      "owner_module": "Products / Diligence",
+      "requires_auth": true,
+      "rule": "/api/x402/market-regime",
+      "safety_mode": "blocked",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_x402_backtest",
+      "kind": "api",
+      "lifecycle": "hard-stop",
+      "line": 5094,
+      "methods": [
+        "POST"
+      ],
+      "owner_module": "Products / Diligence",
+      "requires_auth": true,
+      "rule": "/api/x402/backtest",
+      "safety_mode": "blocked",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_x402_products",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 5198,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Products / Diligence",
+      "requires_auth": true,
+      "rule": "/api/x402/products",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_cross_asset_breakdowns",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 5213,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/cross-asset-breakdowns",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_routine_pause_status",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 5229,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Automation",
+      "requires_auth": true,
+      "rule": "/api/routine-pause-status",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_narrative_eval_summary",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 5235,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Intelligence",
+      "requires_auth": true,
+      "rule": "/api/narrative-eval-summary",
+      "safety_mode": "modeled",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_narrative_eval_aggregates",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 5259,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Intelligence",
+      "requires_auth": true,
+      "rule": "/api/narrative-eval-aggregates",
+      "safety_mode": "modeled",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_foundry_readiness",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 5286,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Products / Diligence",
+      "requires_auth": true,
+      "rule": "/api/foundry/readiness",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_foundry_sync_status",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 5318,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Products / Diligence",
+      "requires_auth": true,
+      "rule": "/api/foundry/sync-status",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_investments_intel",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 5346,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/investments/intel",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_investments_probes",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 5380,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/investments/probes",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_investments_thesis",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 5404,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/investments/thesis",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_autonomy_continuous_intelligence",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 5449,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Automation",
+      "requires_auth": true,
+      "rule": "/api/autonomy/continuous-intelligence",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_autonomy_org_coverage",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 5488,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Automation",
+      "requires_auth": true,
+      "rule": "/api/autonomy/org-coverage",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_autonomy_quant_intelligence",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 5543,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Automation",
+      "requires_auth": true,
+      "rule": "/api/autonomy/quant-intelligence",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_gemini_ooda",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 5712,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Automation",
+      "requires_auth": true,
+      "rule": "/api/gemini-ooda",
+      "safety_mode": "modeled",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "threat_intel_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 6042,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Intelligence",
+      "requires_auth": true,
+      "rule": "/threat-intel",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/threat_intel.html"
+      ]
+    },
+    {
+      "endpoint": "api_threat_intel",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 6053,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Intelligence",
+      "requires_auth": true,
+      "rule": "/api/threat-intel",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "customer_dossier_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 6346,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Products / Diligence",
+      "requires_auth": true,
+      "rule": "/customer-dossier",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/customer_dossier.html"
+      ]
+    },
+    {
+      "endpoint": "api_customer_dossier",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 6357,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Products / Diligence",
+      "requires_auth": true,
+      "rule": "/api/customer-dossier",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_autonomy_continuous_intelligence_artifacts",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 6374,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Automation",
+      "requires_auth": true,
+      "rule": "/api/autonomy/continuous-intelligence/artifacts",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_autonomy_continuous_intelligence_lease_preview",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 6408,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Automation",
+      "requires_auth": true,
+      "rule": "/api/autonomy/continuous-intelligence/lease-preview",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_investments_sources",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 6449,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/investments/sources",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_portfolio",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 6478,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/portfolio",
+      "safety_mode": "paper",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_factors",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 6518,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/factors",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_cascade",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 6544,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/cascade",
+      "safety_mode": "modeled",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_telegram_history_intel",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 6700,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Intelligence",
+      "requires_auth": true,
+      "rule": "/api/telegram-history-intel",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_intel",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 6712,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Intelligence",
+      "requires_auth": true,
+      "rule": "/api/intel",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_performance",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 6826,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/performance",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_strategy_performance",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 6850,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/strategy-performance",
+      "safety_mode": "modeled",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_hyperliquid_live_status",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 6893,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/hyperliquid/live-status",
+      "safety_mode": "paper",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_convergence_watchlist",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 6939,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/convergence-watchlist",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_prediction_accuracy",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 6965,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/prediction-accuracy",
+      "safety_mode": "modeled",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_forecast",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 6989,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/forecast",
+      "safety_mode": "modeled",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_backtest_results",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 7012,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/backtest-results",
+      "safety_mode": "modeled",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_walkforward_results",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 7272,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/walkforward-results",
+      "safety_mode": "modeled",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_windows_research_worker",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 7474,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": true,
+      "rule": "/api/windows-research-worker",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_trading_brain",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 7487,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/trading-brain",
+      "safety_mode": "paper",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_tho_market_intel",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 7547,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Intelligence",
+      "requires_auth": true,
+      "rule": "/api/tho/market-intel",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_lumo_latest_pack",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 7595,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Intelligence",
+      "requires_auth": true,
+      "rule": "/api/lumo/latest-pack",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_performance_timeseries",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 7628,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/performance-timeseries",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_brain_accuracy",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 7661,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Markets",
+      "requires_auth": true,
+      "rule": "/api/brain-accuracy",
+      "safety_mode": "modeled",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_content_drafts",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 7687,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Intelligence",
+      "requires_auth": true,
+      "rule": "/api/content/drafts",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "security_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 7709,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Security",
+      "requires_auth": true,
+      "rule": "/security",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/security.html"
+      ]
+    },
+    {
+      "endpoint": "api_security_dependencies",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 7718,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Security",
+      "requires_auth": true,
+      "rule": "/api/security/dependencies",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_security_dependencies_full",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 7733,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Security",
+      "requires_auth": true,
+      "rule": "/api/security/dependencies/full",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_security_models",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 7748,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Security",
+      "requires_auth": true,
+      "rule": "/api/security/models",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_security_network",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 7763,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Security",
+      "requires_auth": true,
+      "rule": "/api/security/network",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_security_score",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 7778,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Security",
+      "requires_auth": true,
+      "rule": "/api/security/score",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_observability_system_summary",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 7880,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": true,
+      "rule": "/api/observability-system-summary",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_observability_stream_rates",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 7897,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": true,
+      "rule": "/api/observability-stream-rates",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_observability_launchagents",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 7914,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": true,
+      "rule": "/api/observability-launchagents",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_observability_tranche4_feeds",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 7931,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": true,
+      "rule": "/api/observability-tranche4-feeds",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "source_quality_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 8001,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Intelligence",
+      "requires_auth": true,
+      "rule": "/source-quality",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/source_quality.html"
+      ]
+    },
+    {
+      "endpoint": "api_source_quality_snr",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 8008,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Intelligence",
+      "requires_auth": true,
+      "rule": "/api/source-quality-snr",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_source_quality_correlation",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 8040,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Intelligence",
+      "requires_auth": true,
+      "rule": "/api/source-quality-correlation",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_source_quality_decay",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 8070,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Intelligence",
+      "requires_auth": true,
+      "rule": "/api/source-quality-decay",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "inference_telemetry_page",
+      "kind": "page",
+      "lifecycle": "merge",
+      "line": 8201,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": true,
+      "rule": "/inference-telemetry",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": [
+        "pages/inference_telemetry.html"
+      ]
+    },
+    {
+      "endpoint": "api_inference_telemetry_report",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 8211,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": true,
+      "rule": "/api/inference-telemetry-report",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_inference_telemetry_recommendations",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 8228,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": true,
+      "rule": "/api/inference-telemetry-recommendations",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    },
+    {
+      "endpoint": "api_inference_telemetry_cost_model",
+      "kind": "api",
+      "lifecycle": "merge",
+      "line": 8246,
+      "methods": [
+        "GET"
+      ],
+      "owner_module": "Operations",
+      "requires_auth": true,
+      "rule": "/api/inference-telemetry-cost-model",
+      "safety_mode": "read_only",
+      "source": "services/dashboard/app.py",
+      "templates": []
+    }
+  ],
+  "schema_version": 1,
+  "source": {
+    "app": "services/dashboard/app.py",
+    "templates": "services/dashboard/templates/pages"
+  },
+  "summary": {
+    "api_route_count": 123,
+    "lifecycles": {
+      "hard-stop": 2,
+      "keep": 6,
+      "merge": 167,
+      "redirect": 2,
+      "retire": 0
+    },
+    "owner_modules": {
+      "Automation": 20,
+      "Home / Worldline": 6,
+      "Intelligence": 25,
+      "Markets": 72,
+      "Operations": 28,
+      "Products / Diligence": 11,
+      "Security": 13,
+      "Settings / Contracts": 2
+    },
+    "page_route_count": 52,
+    "page_template_count": 46,
+    "route_count": 177,
+    "safety_modes": {
+      "blocked": 2,
+      "live": 3,
+      "modeled": 21,
+      "paper": 21,
+      "read_only": 130,
+      "stale": 0
+    },
+    "static_route_count": 2
+  },
+  "templates": [
+    {
+      "lifecycle": "keep",
+      "name": "_forecast_explain.html",
+      "owner_module": "Settings / Contracts",
+      "role": "partial",
+      "routes": [],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/_forecast_explain.html",
+      "template": "pages/_forecast_explain.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "activity.html",
+      "owner_module": "Automation",
+      "role": "page",
+      "routes": [
+        "/activity"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/activity.html",
+      "template": "pages/activity.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "agents.html",
+      "owner_module": "Automation",
+      "role": "page",
+      "routes": [
+        "/agents"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/agents.html",
+      "template": "pages/agents.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "agents_autonomous.html",
+      "owner_module": "Automation",
+      "role": "page",
+      "routes": [
+        "/agents/autonomous"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/agents_autonomous.html",
+      "template": "pages/agents_autonomous.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "analytics.html",
+      "owner_module": "Markets",
+      "role": "page",
+      "routes": [
+        "/analytics"
+      ],
+      "safety_mode": "modeled",
+      "source": "services/dashboard/templates/pages/analytics.html",
+      "template": "pages/analytics.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "architecture.html",
+      "owner_module": "Operations",
+      "role": "page",
+      "routes": [
+        "/architecture"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/architecture.html",
+      "template": "pages/architecture.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "cascade.html",
+      "owner_module": "Markets",
+      "role": "page",
+      "routes": [
+        "/cascade"
+      ],
+      "safety_mode": "modeled",
+      "source": "services/dashboard/templates/pages/cascade.html",
+      "template": "pages/cascade.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "chain.html",
+      "owner_module": "Markets",
+      "role": "page",
+      "routes": [
+        "/chain"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/chain.html",
+      "template": "pages/chain.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "command_deck.html",
+      "owner_module": "Automation",
+      "role": "page",
+      "routes": [
+        "/command-deck"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/command_deck.html",
+      "template": "pages/command_deck.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "content.html",
+      "owner_module": "Intelligence",
+      "role": "page",
+      "routes": [
+        "/content"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/content.html",
+      "template": "pages/content.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "control.html",
+      "owner_module": "Automation",
+      "role": "page",
+      "routes": [
+        "/control"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/control.html",
+      "template": "pages/control.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "cross_asset.html",
+      "owner_module": "Markets",
+      "role": "page",
+      "routes": [
+        "/cross-asset"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/cross_asset.html",
+      "template": "pages/cross_asset.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "customer_dossier.html",
+      "owner_module": "Products / Diligence",
+      "role": "page",
+      "routes": [
+        "/customer-dossier"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/customer_dossier.html",
+      "template": "pages/customer_dossier.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "diligence.html",
+      "owner_module": "Products / Diligence",
+      "role": "page",
+      "routes": [
+        "/diligence"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/diligence.html",
+      "template": "pages/diligence.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "factors.html",
+      "owner_module": "Markets",
+      "role": "page",
+      "routes": [
+        "/factors"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/factors.html",
+      "template": "pages/factors.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "health.html",
+      "owner_module": "Operations",
+      "role": "page",
+      "routes": [
+        "/health-status"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/health.html",
+      "template": "pages/health.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "inference_telemetry.html",
+      "owner_module": "Operations",
+      "role": "page",
+      "routes": [
+        "/inference-telemetry"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/inference_telemetry.html",
+      "template": "pages/inference_telemetry.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "infrastructure.html",
+      "owner_module": "Operations",
+      "role": "page",
+      "routes": [
+        "/infrastructure"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/infrastructure.html",
+      "template": "pages/infrastructure.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "intel.html",
+      "owner_module": "Intelligence",
+      "role": "page",
+      "routes": [
+        "/intel"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/intel.html",
+      "template": "pages/intel.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "intel_leads.html",
+      "owner_module": "Intelligence",
+      "role": "page",
+      "routes": [
+        "/intel/leads"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/intel_leads.html",
+      "template": "pages/intel_leads.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "intelligence.html",
+      "owner_module": "Intelligence",
+      "role": "page",
+      "routes": [
+        "/intelligence"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/intelligence.html",
+      "template": "pages/intelligence.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "investment_intel.html",
+      "owner_module": "Markets",
+      "role": "page",
+      "routes": [
+        "/investment-intel"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/investment_intel.html",
+      "template": "pages/investment_intel.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "logs.html",
+      "owner_module": "Operations",
+      "role": "page",
+      "routes": [
+        "/logs"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/logs.html",
+      "template": "pages/logs.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "narrative_eval.html",
+      "owner_module": "Intelligence",
+      "role": "page",
+      "routes": [
+        "/narrative-eval"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/narrative_eval.html",
+      "template": "pages/narrative_eval.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "observability.html",
+      "owner_module": "Operations",
+      "role": "page",
+      "routes": [
+        "/observability"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/observability.html",
+      "template": "pages/observability.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "organization.html",
+      "owner_module": "Intelligence",
+      "role": "page",
+      "routes": [
+        "/organization"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/organization.html",
+      "template": "pages/organization.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "overview.html",
+      "owner_module": "Home / Worldline",
+      "role": "page",
+      "routes": [
+        "/"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/overview.html",
+      "template": "pages/overview.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "performance.html",
+      "owner_module": "Markets",
+      "role": "page",
+      "routes": [
+        "/performance"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/performance.html",
+      "template": "pages/performance.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "portfolio.html",
+      "owner_module": "Markets",
+      "role": "page",
+      "routes": [
+        "/portfolio"
+      ],
+      "safety_mode": "paper",
+      "source": "services/dashboard/templates/pages/portfolio.html",
+      "template": "pages/portfolio.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "predictions.html",
+      "owner_module": "Markets",
+      "role": "page",
+      "routes": [
+        "/predictions"
+      ],
+      "safety_mode": "modeled",
+      "source": "services/dashboard/templates/pages/predictions.html",
+      "template": "pages/predictions.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "production_readiness.html",
+      "owner_module": "Operations",
+      "role": "page",
+      "routes": [
+        "/production-readiness"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/production_readiness.html",
+      "template": "pages/production_readiness.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "risk.html",
+      "owner_module": "Markets",
+      "role": "page",
+      "routes": [
+        "/risk"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/risk.html",
+      "template": "pages/risk.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "robinhood_chain.html",
+      "owner_module": "Markets",
+      "role": "page",
+      "routes": [
+        "/chain/robinhood"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/robinhood_chain.html",
+      "template": "pages/robinhood_chain.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "sapphire_book.html",
+      "owner_module": "Products / Diligence",
+      "role": "page",
+      "routes": [
+        "/sapphire-book"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/sapphire_book.html",
+      "template": "pages/sapphire_book.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "security.html",
+      "owner_module": "Security",
+      "role": "page",
+      "routes": [
+        "/security",
+        "/security/overview"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/security.html",
+      "template": "pages/security.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "sentinel.html",
+      "owner_module": "Markets",
+      "role": "page",
+      "routes": [
+        "/chain/sentinel"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/sentinel.html",
+      "template": "pages/sentinel.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "settings.html",
+      "owner_module": "Settings / Contracts",
+      "role": "page",
+      "routes": [
+        "/settings"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/settings.html",
+      "template": "pages/settings.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "showcase.html",
+      "owner_module": "Home / Worldline",
+      "role": "page",
+      "routes": [
+        "/showcase",
+        "/unified",
+        "/unified-dashboard"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/showcase.html",
+      "template": "pages/showcase.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "signals.html",
+      "owner_module": "Markets",
+      "role": "page",
+      "routes": [
+        "/signals"
+      ],
+      "safety_mode": "paper",
+      "source": "services/dashboard/templates/pages/signals.html",
+      "template": "pages/signals.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "soc.html",
+      "owner_module": "Security",
+      "role": "page",
+      "routes": [
+        "/soc"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/soc.html",
+      "template": "pages/soc.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "source_quality.html",
+      "owner_module": "Intelligence",
+      "role": "page",
+      "routes": [
+        "/source-quality"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/source_quality.html",
+      "template": "pages/source_quality.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "sovereign_thesis.html",
+      "owner_module": "Markets",
+      "role": "page",
+      "routes": [
+        "/sovereign-thesis"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/sovereign_thesis.html",
+      "template": "pages/sovereign_thesis.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "sovereign_thesis_story.html",
+      "owner_module": "Markets",
+      "role": "page",
+      "routes": [
+        "/sovereign-thesis/story"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/sovereign_thesis_story.html",
+      "template": "pages/sovereign_thesis_story.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "system.html",
+      "owner_module": "Operations",
+      "role": "page",
+      "routes": [
+        "/system"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/system.html",
+      "template": "pages/system.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "threat_intel.html",
+      "owner_module": "Intelligence",
+      "role": "page",
+      "routes": [
+        "/threat-intel"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/threat_intel.html",
+      "template": "pages/threat_intel.html"
+    },
+    {
+      "lifecycle": "merge",
+      "name": "timetravel.html",
+      "owner_module": "Intelligence",
+      "role": "page",
+      "routes": [
+        "/timetravel"
+      ],
+      "safety_mode": "read_only",
+      "source": "services/dashboard/templates/pages/timetravel.html",
+      "template": "pages/timetravel.html"
+    }
+  ]
+}

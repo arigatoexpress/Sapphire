@@ -25,6 +25,7 @@ gcloud run services describe sapphire-unified-frontend \
 echo
 echo "Pages available:"
 echo "  /                      - Overview"
+echo "  /app-preview           - React Control Plane preview"
 echo "  /organization          - Organization + Programs"
 echo "  /intelligence          - Market + Intelligence"
 echo "  /architecture          - Operations Architecture"

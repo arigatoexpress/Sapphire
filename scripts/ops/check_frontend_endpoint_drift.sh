@@ -11,6 +11,7 @@ fi
 ENDPOINT_SCAN_ROOTS=(
   "$ROOT_DIR/services/dashboard/templates"
   "$ROOT_DIR/services/dashboard/static/js"
+  "$ROOT_DIR/services/dashboard/frontend/src"
 )
 DIRECT_FETCH_SCAN_ROOTS=(
   "$ROOT_DIR/services/dashboard/static/js"
