@@ -20,15 +20,16 @@ git worktree list
 
 ## Scope
 
-- Active repos tracked: 11
+- Active repos tracked: 12
 - Upstream integrations tracked: 16
-- Manifest updated at: 2026-04-26
+- Manifest updated at: 2026-05-06
 
 | Repo | Class | Production Adjacent | CI Strategy | State |
 |---|---|:---:|---|---|
 | `sapphire` | core | yes | `sapphire_self_hosted_gate` | command_repo |
 | `project-go-forward` | core | yes | `draft_auto_deploy` | active_cloud_run |
 | `agentic-arigato` | integration | yes | `local_evidence_skip_ci_bootstrap` | guardrails_complete_protected_cloud_run |
+| `org-platform` | satellite | yes | `local_evidence_skip_ci_bootstrap` | active_local_showcase |
 | `claw-code` | satellite | no | `upstream_fork_local_only` | active_runtime |
 | `cyber-threat-bot` | satellite | yes | `local_evidence_skip_ci_bootstrap` | active_capability |
 | `regional-intel-workbench` | satellite | yes | `local_evidence_skip_ci_bootstrap` | active_capability |

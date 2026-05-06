@@ -1,6 +1,6 @@
 schema_version: 1
 generated_for: sapphire-autonomous-org
-updated_at: "2026-04-26"
+updated_at: "2026-05-06"
 source_manifest: infra/org-repos.yaml
 scope: Core+Satellites only; older experiments remain inventory-only unless they overlap Sapphire autonomy.
 
@@ -17,6 +17,7 @@ active_repos:
     - project-go-forward
   satellite:
     - claw-code
+    - org-platform
     - cyber-threat-bot
     - regional-intel-workbench
     - tradingview-mcp

@@ -1,6 +1,6 @@
 schema_version: 1
 generated_for: sapphire-autonomous-org
-updated_at: "2026-04-26"
+updated_at: "2026-05-06"
 
 repos:
   - id: sapphire
@@ -71,6 +71,28 @@ repos:
         - uvx pre-commit run --all-files
         - scripts/ops/check_agentic_pm_hub_health.sh
       next_step: No deploy or IAM change without a dedicated PR, blast-radius note, and rollback.
+
+  - id: org-platform
+    name: org-platform
+    classification: satellite
+    role: Autonomous intelligence organization platform and unified local dashboard fallback
+    local_path: /Users/aribs/Code/org-platform
+    github: arigatoexpress/org-platform
+    default_branch: main
+    ci_strategy: local_evidence_skip_ci_bootstrap
+    production_adjacent: true
+    required_guardrails:
+      - AGENTS.md
+      - local Makefile test/build parity
+      - no direct main pushes
+    migration_state: active_local_showcase
+    local_runtime_tracking:
+      launchagent_label: com.codex.org-platform-dashboard
+      dashboard_url: http://127.0.0.1:3000
+      validated_commands:
+        - make test
+        - make dashboard-build
+      next_step: Add no-spend CI gate or keep local evidence as the merge proof for dashboard and OSINT demo changes.
 
   - id: claw-code
     name: claw-code
@@ -421,6 +443,9 @@ local_runtime:
     - com.sapphire.inference-proxy
     - com.sapphire.openbb-api
     - com.sapphire.dashboard
+    - com.codex.org-platform-dashboard
+    - com.sapphire.soc-dashboard
+    - com.sapphire.soc-dashboard-frontend
     - com.sapphire.control-plane
     - com.sapphire.signal-logger
     - com.sapphire.threat-refresh
