@@ -1,0 +1,68 @@
+# x402 Product Spine
+
+Date: 2026-05-06
+
+Sapphire now has a small, testable spine for x402-paid information products.
+This does not enable live settlement, live trading, Telegram sends, or any
+production data mutation. It gives future paid endpoints a shared contract.
+
+## Files
+
+- `config/x402_products.json` - product/SKU catalog for agent-buyable APIs.
+- `config/x402_source_registry.json` - source registry with auth, terms, freshness,
+  redistribution, and allowed-product notes.
+- `lib/payments/x402_products.py` - typed loader, validator, payment-requirement
+  builder, and non-secret receipt ledger.
+- `infra/gcp/schemas/x402_payment_receipts.json` - future BigQuery receipt table.
+- `infra/gcp/schemas/x402_source_registry.json` - future BigQuery source table.
+
+## Current Products
+
+- `research_pack_basic`
+- `market_regime_report`
+- `backtest_receipt`
+- `prediction_market_brief`
+- `cyber_exploit_risk`
+- `regional_brief`
+- `paid_inference_chat`
+- `paid_embeddings`
+
+All products currently set `live_settlement_allowed=false` and
+`settlement_mode=simulated_or_testnet`.
+
+## Receipt Policy
+
+Receipt records store:
+
+- product id,
+- resource,
+- amount/network/asset,
+- requirement hash,
+- payment payload hash,
+- payer/tx/nonce when a verifier supplies them,
+- artifact id and source ids.
+
+They do not store raw `X-PAYMENT` or `PAYMENT-SIGNATURE` header values.
+
+The default local JSONL ledger path is outside the repo:
+
+`~/.sapphire/x402_payment_receipts.jsonl`
+
+Override with:
+
+```bash
+export X402_RECEIPT_LEDGER=/path/to/x402_payment_receipts.jsonl
+```
+
+## Next Wiring Step
+
+Wire `market_regime_report` into a simulated endpoint:
+
+1. Load `load_validated_catalogs()`.
+2. Build requirements with `product.to_payment_requirements(...)`.
+3. Reuse `X402Middleware` for verification.
+4. Write a `ReceiptRecord` after payment-required, rejected, or accepted states.
+5. Return an artifact id that points to a reproducible report.
+
+Keep Base Sepolia/CDP facilitator work behind explicit env toggles until a
+tiny operator-approved settlement test is planned.

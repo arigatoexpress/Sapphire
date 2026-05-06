@@ -40,6 +40,8 @@ declare -a TABLES=(
   "regional_regions:timestamp:region_id,name"
   "regional_intel_items:timestamp:region_id,kind,source_name"
   "regional_source_health:timestamp:status,category"
+  "x402_payment_receipts:recorded_at:product_id,status,network"
+  "x402_source_registry:recorded_at:source_id,priority,domain"
 )
 
 create_or_update() {

@@ -12,6 +12,19 @@ from .x402_middleware import (
     build_402_response,
     require_payment,
 )
+from .x402_products import (
+    CatalogValidationError,
+    ProductCatalog,
+    ProductDefinition,
+    ReceiptLedger,
+    ReceiptRecord,
+    SourceDefinition,
+    SourceRegistry,
+    load_product_catalog,
+    load_source_registry,
+    load_validated_catalogs,
+    validate_catalog,
+)
 
 __all__ = [
     "PaymentRequirements",
@@ -21,4 +34,15 @@ __all__ = [
     "X402Middleware",
     "build_402_response",
     "require_payment",
+    "CatalogValidationError",
+    "ProductCatalog",
+    "ProductDefinition",
+    "ReceiptLedger",
+    "ReceiptRecord",
+    "SourceDefinition",
+    "SourceRegistry",
+    "load_product_catalog",
+    "load_source_registry",
+    "load_validated_catalogs",
+    "validate_catalog",
 ]

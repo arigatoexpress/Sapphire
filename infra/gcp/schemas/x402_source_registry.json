@@ -1,0 +1,17 @@
+[
+  {"name": "source_id", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "name", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "domain", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "priority", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "url", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "auth", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "terms_status", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "redistribution", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "freshness", "type": "STRING", "mode": "REQUIRED"},
+  {"name": "production_ready", "type": "BOOL", "mode": "REQUIRED"},
+  {"name": "allowed_products", "type": "STRING", "mode": "REPEATED"},
+  {"name": "tags", "type": "STRING", "mode": "REPEATED"},
+  {"name": "notes", "type": "STRING", "mode": "NULLABLE"},
+  {"name": "catalog_version", "type": "INT64", "mode": "REQUIRED"},
+  {"name": "recorded_at", "type": "TIMESTAMP", "mode": "REQUIRED"}
+]
