@@ -132,6 +132,18 @@ python3 services/macro_intel/run.py daemon --poll-interval-seconds 900 --live
 python3 services/macro_intel/run.py status
 ```
 
+An optional FRED/ALFRED extension writes point-in-time observations for macro
+regime features:
+
+```bash
+python3 services/macro_intel/run.py run-once --fred
+```
+
+Live cache misses require `SAPPHIRE_FRED_LIVE=1` and `FRED_API_KEY`. These rows
+use `observation_date`, `value`, `realtime_start`, and `realtime_end` rather
+than the `MacroEvent` schema, because they are historical observations rather
+than announcements.
+
 Default `run-once` is dry-run. It builds the static planning calendar, reports
 the gate reason, and exits without official HTTP calls. Live pulls are bounded
 by per-source counters under `~/.cache/sapphire/macro/<source>/`. The cache also

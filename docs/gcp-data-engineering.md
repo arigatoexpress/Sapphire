@@ -1,6 +1,6 @@
 # Sapphire OS — GCP Data Engineering
 
-Last updated: 2026-04-30
+Last updated: 2026-05-06
 
 End-to-end reference for the `tho-ai-agent` project's data plane: what lives in GCP, how data flows from the Mac into BigQuery, and how to recover when something breaks.
 
@@ -33,7 +33,8 @@ training work.
 
 ### BigQuery — dataset `sapphire`
 
-**Raw / event tables** (all partitioned by `DAY` on `timestamp`, labeled `owner:sapphire env:prod`):
+**Raw / event tables** (partitioned by `DAY` on `timestamp` unless noted,
+labeled `owner:sapphire env:prod`):
 
 | Table | Clustering | Loaded by | Source |
 |-------|------------|-----------|--------|
@@ -47,6 +48,7 @@ training work.
 | `regional_regions`   | `region_id, name`           | planned GCF from GCS | regional-intel workbench export → `raw/regional_regions/` |
 | `regional_intel_items` | `region_id, kind, source_name` | planned GCF from GCS | regional-intel workbench export → `raw/regional_intel_items/` |
 | `regional_source_health` | `status, category`       | planned GCF from GCS | regional-intel workbench export → `raw/regional_source_health/` |
+| `fred_series_observations` | `series_id, realtime_start, realtime_end` | GCF from GCS | macro-intel FRED writer → `raw/fred/` (`DAY` partition on `observation_date`) |
 
 **Rollup tables** (materialized by scheduled queries):
 
@@ -178,6 +180,7 @@ Any new producer must pick one path. This is the contract.
 | `services/pipeline/telemetry_collector.py` (proxy)  | B    | GCS `raw/metrics/YYYY-MM-DD/*.ndjson`        | `inference_metrics` |
 | `services/pipeline/telemetry_collector.py` (probes) | B    | GCS `raw/health/YYYY-MM-DD/*.ndjson`         | `service_health` |
 | `python3 -m lib.intel.pipeline --run` + `services.pipeline.gcp_sync` | B | GCS `raw/leads/YYYY-MM-DD/*.ndjson` | `leads` |
+| `python3 -m services.macro_intel.run run-once --fred` + `services.pipeline.gcp_sync --source fred` | B | GCS `raw/fred/YYYY-MM-DD/*.ndjson` | `fred_series_observations` |
 | (planned) regional-intel export promotion           | B    | GCS `raw/regional_regions/YYYY-MM-DD/*.ndjson` | `regional_regions` |
 | (planned) regional-intel export promotion           | B    | GCS `raw/regional_intel_items/YYYY-MM-DD/*.ndjson` | `regional_intel_items` |
 | (planned) regional-intel export promotion           | B    | GCS `raw/regional_source_health/YYYY-MM-DD/*.ndjson` | `regional_source_health` |

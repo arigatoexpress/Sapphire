@@ -29,7 +29,7 @@
       "production_ready": false,
       "allowed_products": ["market_regime_report"],
       "tags": ["macro", "vintage-data", "regime"],
-      "notes": "Loader missing; first target for macro regime features and vintage-aware backtests."
+      "notes": "Cache-first loader exists in lib/macro/fred_loader.py; live pulls still require SAPPHIRE_FRED_LIVE=1 plus FRED_API_KEY and a planned warehouse backfill."
     },
     {
       "source_id": "gdelt_2",

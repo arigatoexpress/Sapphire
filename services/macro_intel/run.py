@@ -30,6 +30,13 @@ if str(REPO_ROOT) not in sys.path:
 
 from lib.macro.calendar import MacroCalendar, build_calendar  # noqa: E402
 from lib.macro.classifier import enrich_event  # noqa: E402
+from lib.macro.fred_loader import (  # noqa: E402
+    DEFAULT_MARKET_REGIME_SERIES,
+    FredLoader,
+    FredLoaderError,
+    fred_cache_dir,
+    fred_observation_rows,
+)
 from lib.macro.sources import (  # noqa: E402
     MAX_EVENTS_PER_PULL,
     MAX_FORWARD_CALENDAR_DAYS,
@@ -70,6 +77,10 @@ def _events_path(output_root: Path, now: datetime | None = None) -> Path:
 
 def _calendar_path(output_root: Path, now: datetime | None = None) -> Path:
     return output_root / _date_key(now) / "calendar.jsonl"
+
+
+def _fred_observations_path(output_root: Path, now: datetime | None = None) -> Path:
+    return output_root / _date_key(now) / "fred_observations.jsonl"
 
 
 def _read_jsonl(path: Path, *, limit: int = 500) -> list[dict[str, Any]]:
@@ -210,6 +221,40 @@ def _live_allowed(*, live: bool) -> bool:
     return bool(live) or os.environ.get("SAPPHIRE_MACRO_INTEL_LIVE", "").strip() == "1"
 
 
+def _pull_fred_rows(
+    *,
+    loader: FredLoader,
+    series_ids: Sequence[str],
+    now: datetime,
+    observation_start: str | None = None,
+    realtime_start: str | None = None,
+    realtime_end: str | None = None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    rows: list[dict[str, Any]] = []
+    errors: list[dict[str, Any]] = []
+    for series_id in series_ids:
+        try:
+            snapshot = loader.pull_series(
+                series_id,
+                observation_start=observation_start,
+                realtime_start=realtime_start,
+                realtime_end=realtime_end,
+            )
+            rows.extend(fred_observation_rows(snapshot, ingested_at=now))
+        except FredLoaderError as exc:
+            errors.append({"source": "fred_alfred", "series_id": series_id, "error": str(exc)})
+        except Exception as exc:  # noqa: BLE001 - one series must not kill the lane.
+            errors.append(
+                {
+                    "source": "fred_alfred",
+                    "series_id": series_id,
+                    "error": str(exc),
+                    "type": exc.__class__.__name__,
+                }
+            )
+    return rows, errors
+
+
 async def run_once_async(
     *,
     since_hours: float = 24.0,
@@ -220,6 +265,12 @@ async def run_once_async(
     live: bool = False,
     publish: bool = False,
     include_static_calendar: bool = True,
+    include_fred: bool = False,
+    fred_series_ids: Sequence[str] = DEFAULT_MARKET_REGIME_SERIES,
+    fred_loader: FredLoader | None = None,
+    fred_observation_start: str | None = None,
+    fred_realtime_start: str | None = None,
+    fred_realtime_end: str | None = None,
 ) -> dict[str, Any]:
     now = (now or _now_utc()).astimezone(UTC)
     output_root = Path(output_root)
@@ -238,9 +289,10 @@ async def run_once_async(
             "max_forward_calendar_days": MAX_FORWARD_CALENDAR_DAYS,
         },
         "cache_dir": str(cache_dir),
+        "fred_cache_dir": str(fred_cache_dir()),
         "output_root": str(output_root),
     }
-    if not live_ok and sources is None:
+    if not live_ok and sources is None and not include_fred:
         calendar = build_calendar((), now=now, include_static=include_static_calendar)
         calendar_rows = _calendar_window_rows(calendar, now=now)
         return {
@@ -252,6 +304,37 @@ async def run_once_async(
             "metadata": metadata,
             "published": _publish_events([], [], requested=False),
         }
+
+    fred_write: dict[str, Any] | None = None
+    fred_errors: list[dict[str, Any]] = []
+    if include_fred:
+        fred_rows, fred_errors = _pull_fred_rows(
+            loader=fred_loader or FredLoader(),
+            series_ids=fred_series_ids,
+            now=now,
+            observation_start=fred_observation_start,
+            realtime_start=fred_realtime_start,
+            realtime_end=fred_realtime_end,
+        )
+        fred_write = _write_jsonl(
+            _fred_observations_path(output_root, now),
+            fred_rows,
+            source_paths=(Path(__file__), REPO_ROOT / "lib" / "macro" / "fred_loader.py"),
+        )
+        if not live_ok and sources is None:
+            calendar = build_calendar((), now=now, include_static=include_static_calendar)
+            calendar_rows = _calendar_window_rows(calendar, now=now)
+            return {
+                "ok": not fred_errors,
+                "dry_run": True,
+                "reason": "FRED cache-only/live-gated run; set SAPPHIRE_MACRO_INTEL_LIVE=1 or --live for event sources",
+                "events": [],
+                "calendar_window": calendar_rows,
+                "errors": fred_errors,
+                "writes": {"fred_observations": fred_write},
+                "metadata": metadata,
+                "published": _publish_events([], [], requested=False),
+            }
 
     since = now - timedelta(hours=max(1.0, float(since_hours)))
     source_list = list(sources or build_default_sources(cache_dir=cache_dir))
@@ -272,14 +355,17 @@ async def run_once_async(
         source_paths=(Path(__file__), REPO_ROOT / "lib" / "macro" / "calendar.py"),
     )
     published = _publish_events(event_rows, window_rows, requested=publish)
+    writes: dict[str, Any] = {"events": event_write, "calendar": calendar_write}
+    if fred_write is not None:
+        writes["fred_observations"] = fred_write
     return {
-        "ok": not errors,
+        "ok": not errors and not fred_errors,
         "dry_run": False,
         "pulled_sources": [source.name for source in source_list],
         "events": event_rows,
-        "errors": errors,
+        "errors": errors + fred_errors,
         "calendar_window": window_rows,
-        "writes": {"events": event_write, "calendar": calendar_write},
+        "writes": writes,
         "published": published,
         "metadata": metadata,
     }
@@ -295,12 +381,19 @@ def daemon(
     max_iterations: int | None = None,
     live: bool = False,
     publish: bool = False,
+    include_fred: bool = False,
+    fred_series_ids: Sequence[str] = DEFAULT_MARKET_REGIME_SERIES,
     sleep: Any = time.sleep,
 ) -> dict[str, Any]:
     iterations = 0
     last: dict[str, Any] | None = None
     while True:
-        last = run_once(live=live, publish=publish)
+        last = run_once(
+            live=live,
+            publish=publish,
+            include_fred=include_fred,
+            fred_series_ids=fred_series_ids,
+        )
         iterations += 1
         if max_iterations is not None and iterations >= max_iterations:
             break
@@ -312,6 +405,7 @@ def status(*, output_root: str | Path = DEFAULT_OUTPUT_ROOT) -> dict[str, Any]:
     output_root = Path(output_root)
     today_events = _events_path(output_root)
     today_calendar = _calendar_path(output_root)
+    today_fred = _fred_observations_path(output_root)
     cache_dir = cache_base_dir()
     source_counters: dict[str, Any] = {}
     if cache_dir.exists():
@@ -328,9 +422,12 @@ def status(*, output_root: str | Path = DEFAULT_OUTPUT_ROOT) -> dict[str, Any]:
         "version": VERSION,
         "live_http_env": os.environ.get("SAPPHIRE_MACRO_INTEL_LIVE") == "1",
         "live_bus_env": os.environ.get("SAPPHIRE_MACRO_INTEL_LIVE_BUS") == "1",
+        "fred_live_env": os.environ.get("SAPPHIRE_FRED_LIVE") == "1",
         "cache_dir": str(cache_dir),
+        "fred_cache_dir": str(fred_cache_dir()),
         "today_events": len(_read_jsonl(today_events, limit=10_000)),
         "today_calendar": len(_read_jsonl(today_calendar, limit=10_000)),
+        "today_fred_observations": len(_read_jsonl(today_fred, limit=10_000)),
         "source_counters": source_counters,
         "caps": {
             "max_pulls_per_hour_per_source": MAX_PULLS_PER_HOUR_PER_SOURCE,
@@ -349,6 +446,16 @@ def build_parser() -> argparse.ArgumentParser:
     run_once_p.add_argument(
         "--publish", action="store_true", help="publish to event bus if env gate is set"
     )
+    run_once_p.add_argument(
+        "--fred",
+        action="store_true",
+        help="write cache-first FRED/ALFRED observation rows",
+    )
+    run_once_p.add_argument(
+        "--fred-series",
+        action="append",
+        help="FRED series id to include; repeatable. Defaults to market-regime set.",
+    )
 
     daemon_p = sub.add_parser("daemon", help="continuous poll loop")
     daemon_p.add_argument(
@@ -358,6 +465,16 @@ def build_parser() -> argparse.ArgumentParser:
     daemon_p.add_argument("--live", action="store_true", help="allow official HTTP pulls")
     daemon_p.add_argument(
         "--publish", action="store_true", help="publish to event bus if env gate is set"
+    )
+    daemon_p.add_argument(
+        "--fred",
+        action="store_true",
+        help="write cache-first FRED/ALFRED observation rows",
+    )
+    daemon_p.add_argument(
+        "--fred-series",
+        action="append",
+        help="FRED series id to include; repeatable. Defaults to market-regime set.",
     )
 
     sub.add_parser("status", help="report counters and local artifacts")
@@ -372,6 +489,8 @@ def main(argv: list[str] | None = None) -> int:
             since_hours=args.since_hours,
             live=args.live,
             publish=args.publish,
+            include_fred=args.fred,
+            fred_series_ids=tuple(args.fred_series or DEFAULT_MARKET_REGIME_SERIES),
         )
     elif args.action == "daemon":
         result = daemon(
@@ -379,6 +498,8 @@ def main(argv: list[str] | None = None) -> int:
             max_iterations=args.max_iterations,
             live=args.live,
             publish=args.publish,
+            include_fred=args.fred,
+            fred_series_ids=tuple(args.fred_series or DEFAULT_MARKET_REGIME_SERIES),
         )
     elif args.action == "status":
         result = status()
