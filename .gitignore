@@ -82,7 +82,8 @@ data/.gcp_sync_state.json
 data/.watchdog_state.json
 data/foundry/
 data/google/
-data/hackathon/
+data/hackathon/*
+!data/hackathon/digest_*.md
 data/media/
 data/readiness/
 data/*.envelope.json
