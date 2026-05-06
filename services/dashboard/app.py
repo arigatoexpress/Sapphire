@@ -5150,6 +5150,21 @@ def api_x402_backtest():
         return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 500
 
 
+@app.route("/api/x402/products")
+@requires_auth
+def api_x402_products():
+    """Authenticated discovery index for Sapphire x402-paid products."""
+
+    try:
+        from lib.payments.x402_product_index import build_product_index
+
+        catalog, registry = _x402_product_catalogs()
+        return jsonify(build_product_index(catalog, registry))
+    except Exception as exc:  # noqa: BLE001
+        log.exception("x402 product index failed")
+        return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 500
+
+
 @app.route("/api/cross-asset-breakdowns")
 @requires_auth
 def api_cross_asset_breakdowns():

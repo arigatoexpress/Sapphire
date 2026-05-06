@@ -105,3 +105,17 @@ Properties:
 - returns paper-only assumptions and a reproducibility hash;
 - does not run strategies, pull live market data, place orders, or enable live
   settlement.
+
+## Product Discovery Endpoint
+
+Agents can inspect the currently configured paid products at:
+
+`GET /api/x402/products`
+
+Properties:
+
+- requires dashboard Basic Auth;
+- does not require an x402 payment;
+- returns catalog product metadata, route, pricing, source status, and readiness;
+- makes the all-products `live_settlement_allowed=false` posture explicit;
+- does not write receipts or mutate any production data.
