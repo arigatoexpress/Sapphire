@@ -65,6 +65,7 @@ def test_manifest_tracks_required_core_and_satellite_fields() -> None:
     assert {repo["id"] for repo in repos} >= {
         "sapphire",
         "project-go-forward",
+        "org-platform",
         "cyber-threat-bot",
         "tradingview-mcp-v2",
         "hermes-agent",
@@ -87,8 +88,27 @@ def test_production_adjacent_repos_have_no_spend_ci_posture() -> None:
 
     assert repos["sapphire"]["ci_strategy"] == "sapphire_self_hosted_gate"
     assert repos["project-go-forward"]["ci_strategy"] == "draft_auto_deploy"
+    assert repos["org-platform"]["ci_strategy"] == "local_evidence_skip_ci_bootstrap"
     assert repos["hermes-agent"]["ci_strategy"] == "upstream_fork_local_only"
     assert repos["regional-intel-workbench"]["ci_strategy"] == ("local_evidence_skip_ci_bootstrap")
+
+
+def test_org_platform_tracks_local_showcase_runtime() -> None:
+    repos = {repo["id"]: repo for repo in _manifest()["repos"]}
+    repo = repos["org-platform"]
+
+    assert repo["classification"] == "satellite"
+    assert repo["github"] == "arigatoexpress/org-platform"
+    assert repo["migration_state"] == "active_local_showcase"
+    assert repo["local_runtime_tracking"] == {
+        "launchagent_label": "com.codex.org-platform-dashboard",
+        "dashboard_url": "http://127.0.0.1:3000",
+        "validated_commands": ["make test", "make dashboard-build"],
+        "next_step": (
+            "Add no-spend CI gate or keep local evidence as the merge proof for dashboard "
+            "and OSINT demo changes."
+        ),
+    }
 
 
 def test_manifest_tracks_upstream_integration_fleet() -> None:
@@ -389,6 +409,7 @@ def test_classification_report_tracks_absorb_and_archive_candidates() -> None:
         "foundry-platform-python",
     }
     assert "agentic-arigato" in report["active_repos"]["integration"]
+    assert "org-platform" in report["active_repos"]["satellite"]
     assert "agentic-arigato" not in {item["id"] for item in report["blocked_or_watch"]}
     assert "crypto-tax-tracker" not in {item["id"] for item in report["blocked_or_watch"]}
     assert "crypto-tax-tracker" not in {item["id"] for item in report["next_reviews"]}
