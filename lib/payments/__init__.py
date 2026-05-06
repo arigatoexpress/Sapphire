@@ -21,6 +21,7 @@ from .x402_middleware import (
     build_402_response,
     require_payment,
 )
+from .x402_product_index import build_product_index
 from .x402_products import (
     CatalogValidationError,
     ProductCatalog,
@@ -59,4 +60,5 @@ __all__ = [
     "load_source_registry",
     "load_validated_catalogs",
     "validate_catalog",
+    "build_product_index",
 ]
