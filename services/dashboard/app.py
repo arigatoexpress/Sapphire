@@ -433,13 +433,17 @@ def _x402_payment_header() -> str | None:
     return request.headers.get("X-PAYMENT") or request.headers.get("PAYMENT-SIGNATURE")
 
 
-def _x402_market_regime_catalogs():
+def _x402_product_catalogs():
     from lib.payments.x402_products import load_validated_catalogs
 
     return load_validated_catalogs()
 
 
-def _x402_market_regime_middleware(product):
+def _x402_market_regime_catalogs():
+    return _x402_product_catalogs()
+
+
+def _x402_product_middleware(product):
     from lib.payments.x402_middleware import X402Middleware
 
     recipient = os.environ.get("X402_RECIPIENT", "")
@@ -457,19 +461,24 @@ def _x402_market_regime_middleware(product):
     return middleware
 
 
+def _x402_market_regime_middleware(product):
+    return _x402_product_middleware(product)
+
+
 def _x402_receipt_ledger():
     from lib.payments.x402_products import ReceiptLedger
 
     return ReceiptLedger()
 
 
-def _append_x402_market_regime_receipt(
+def _append_x402_product_receipt(
     *,
     product,
     requirements,
     payment_header: str | None,
     verification,
     status: str,
+    endpoint: str,
     artifact_id: str | None = None,
 ):
     from lib.payments.x402_products import ReceiptRecord
@@ -482,15 +491,35 @@ def _append_x402_market_regime_receipt(
         status=status,
         artifact_id=artifact_id,
         metadata={
-            "endpoint": "/api/x402/market-regime",
+            "endpoint": endpoint,
             "live_settlement_allowed": product.live_settlement_allowed,
         },
     )
     try:
         _x402_receipt_ledger().append(receipt)
     except Exception as exc:  # noqa: BLE001
-        log.warning("x402 market-regime receipt append failed: %s", exc)
+        log.warning("x402 receipt append failed for %s: %s", endpoint, exc)
     return receipt
+
+
+def _append_x402_market_regime_receipt(
+    *,
+    product,
+    requirements,
+    payment_header: str | None,
+    verification,
+    status: str,
+    artifact_id: str | None = None,
+):
+    return _append_x402_product_receipt(
+        product=product,
+        requirements=requirements,
+        payment_header=payment_header,
+        verification=verification,
+        status=status,
+        endpoint="/api/x402/market-regime",
+        artifact_id=artifact_id,
+    )
 
 
 def _matrix_payload(snapshot: dict[str, Any], *, window: str, method: str) -> dict[str, Any]:
@@ -5014,6 +5043,110 @@ def api_x402_market_regime():
         return jsonify(report)
     except Exception as exc:  # noqa: BLE001
         log.exception("x402 market-regime report failed")
+        return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 500
+
+
+@app.route("/api/x402/backtest", methods=["POST"])
+@requires_auth
+def api_x402_backtest():
+    """Simulated x402-paid backtest receipt.
+
+    This endpoint packages already-materialized local backtest artifacts. It
+    does not run a strategy, pull market data, place orders, or enable live
+    settlement.
+    """
+    try:
+        from lib.analytics.backtest_results import leaderboard, summary
+        from lib.payments.x402_backtest_receipt import build_backtest_receipt
+
+        catalog, registry = _x402_product_catalogs()
+        product = catalog.get("backtest_receipt")
+        middleware = _x402_product_middleware(product)
+        requirements = product.to_payment_requirements(
+            resource_url=request.url,
+            pay_to=middleware.recipient,
+            network=middleware.network,
+            asset=middleware.asset,
+        )
+        payment_header = _x402_payment_header()
+        allowed, body, result = middleware.gate(
+            request.url,
+            float(product.price_usd),
+            payment_header,
+            product.description,
+            requirements=requirements,
+        )
+        if not allowed:
+            status = "required" if not payment_header else "rejected"
+            receipt = _append_x402_product_receipt(
+                product=product,
+                requirements=requirements,
+                payment_header=payment_header,
+                verification=result,
+                status=status,
+                endpoint="/api/x402/backtest",
+            )
+            response_body = dict(body or {})
+            response_body["receipt"] = {
+                "receipt_id": receipt.receipt_id,
+                "status": receipt.status,
+                "product_id": receipt.product_id,
+            }
+            resp = jsonify(response_body)
+            resp.status_code = 402
+            resp.headers["X-Payment-Required"] = "true"
+            return resp
+
+        payload = request.get_json(silent=True) or {}
+        metric = str(payload.get("metric") or "sortino")
+        try:
+            limit = int(payload.get("limit", 10))
+        except (TypeError, ValueError):
+            limit = 10
+        symbols = payload.get("symbols") or ()
+        if isinstance(symbols, str):
+            symbols = [symbols]
+        if not isinstance(symbols, list | tuple):
+            symbols = ()
+        include_minimal = bool(payload.get("include_minimal_trades", False))
+        bounded_limit = max(1, min(limit, 25))
+        backtest_summary = summary()
+        backtest_leaderboard = leaderboard(
+            metric=metric,
+            limit=bounded_limit,
+            include_minimal_trades=include_minimal,
+        )
+        report = build_backtest_receipt(
+            product=product,
+            registry=registry,
+            summary=backtest_summary,
+            leaderboard=backtest_leaderboard,
+            metric=metric,
+            symbols=tuple(str(symbol) for symbol in symbols),
+            limit=bounded_limit,
+            include_minimal_trades=include_minimal,
+        )
+        receipt = _append_x402_product_receipt(
+            product=product,
+            requirements=requirements,
+            payment_header=payment_header,
+            verification=result,
+            status="accepted",
+            endpoint="/api/x402/backtest",
+            artifact_id=str(report.get("artifact_id") or ""),
+        )
+        report["payment"] = {
+            "receipt_id": receipt.receipt_id,
+            "status": receipt.status,
+            "network": receipt.network,
+            "amount_atomic": receipt.amount_atomic,
+            "live_settlement_allowed": product.live_settlement_allowed,
+        }
+        return jsonify(report)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:  # noqa: BLE001
+        log.exception("x402 backtest receipt failed")
         return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 500
 
 
