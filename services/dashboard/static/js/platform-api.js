@@ -1,12 +1,19 @@
 (function () {
+    function cleanOrigin() {
+        const currentUrl = new URL(window.location.href);
+        currentUrl.username = '';
+        currentUrl.password = '';
+        return currentUrl.origin;
+    }
+
     function withQuery(path, params) {
-        const url = new URL(path, window.location.origin);
+        const url = new URL(path, cleanOrigin());
         Object.entries(params || {}).forEach(([key, value]) => {
             if (value !== undefined && value !== null && value !== '') {
                 url.searchParams.set(key, value);
             }
         });
-        return url.pathname + url.search;
+        return url.href;
     }
 
     async function request(path, params) {
