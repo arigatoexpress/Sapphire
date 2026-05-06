@@ -79,6 +79,15 @@ ROUTINES: list[Routine] = [
         max_age_secs=2 * 60 * 60,
     ),  # 30 min + buffer
     Routine(
+        "continuous-intelligence-daily",
+        "launchagent_scheduled",
+        launchagent="com.sapphire.continuous-intelligence-daily",
+        artifact=str(
+            DATA / ".autonomy" / "continuous_intelligence" / "daily_autonomy_packet_latest.json"
+        ),
+        max_age_secs=36 * 60 * 60,
+    ),
+    Routine(
         "gcp-sync",
         "launchagent_scheduled",
         launchagent="com.sapphire.gcp-sync",

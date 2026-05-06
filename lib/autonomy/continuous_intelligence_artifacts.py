@@ -25,6 +25,8 @@ DEFAULT_ARTIFACT_DIR = ROOT / "data" / ".autonomy" / "continuous_intelligence"
 TASK_SNAPSHOT_FILE = "task_snapshots.jsonl"
 LEASE_FILE = "task_leases.jsonl"
 RESULT_FILE = "task_results.jsonl"
+DAILY_PACKET_FILE = "daily_autonomy_packets.jsonl"
+DAILY_PACKET_LATEST_FILE = "daily_autonomy_packet_latest.json"
 SCHEMA_VERSION = 1
 SAFE_MODES = {"read_only", "dry_run", "paper"}
 RESULT_STATUSES = {"completed", "failed", "blocked", "rejected", "needs_review"}
@@ -53,6 +55,7 @@ def _artifact_paths(artifact_dir: Path = DEFAULT_ARTIFACT_DIR) -> dict[str, Path
         "task_snapshots": artifact_dir / TASK_SNAPSHOT_FILE,
         "task_leases": artifact_dir / LEASE_FILE,
         "task_results": artifact_dir / RESULT_FILE,
+        "daily_packets": artifact_dir / DAILY_PACKET_FILE,
     }
 
 
@@ -110,6 +113,21 @@ def _append_jsonl(path: Path, rows: list[dict[str, Any]], *, write: bool) -> Non
         metadata={
             "record_count": len(_jsonl_rows(path)),
             "artifact_family": "continuous_intelligence",
+        },
+    )
+
+
+def _write_json(path: Path, payload: dict[str, Any], *, write: bool) -> None:
+    if not write:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    write_envelope_sidecar(
+        path,
+        generator="lib.autonomy.continuous_intelligence_artifacts",
+        metadata={
+            "artifact_family": "continuous_intelligence",
+            "artifact_kind": "daily_autonomy_packet_latest",
         },
     )
 
@@ -343,6 +361,111 @@ def record_task_result(
     }
 
 
+def daily_autonomy_packet(
+    plan: dict[str, Any] | None = None,
+    *,
+    artifact_dir: Path = DEFAULT_ARTIFACT_DIR,
+    agent_id: str = "continuous-intelligence-daily",
+    lease_targets: list[str] | None = None,
+    lease_seconds: int = 24 * 3600,
+    limit_per_target: int = 3,
+    write: bool = False,
+) -> dict[str, Any]:
+    """Build or write the daily autonomy packet without executing tasks.
+
+    A write appends the task snapshot, appends dry-run leases for the requested
+    runtimes, appends the packet itself, and refreshes a latest JSON pointer.
+    It never dispatches workers, sends Telegram, or changes trading state.
+    """
+    payload = plan or build_continuous_intelligence_plan(fetch_live=False)
+    generated_at = _iso()
+    cleaned_agent = _safe_token(agent_id, default="continuous-intelligence-daily")
+    default_targets = ["mac-local", "windows-gpu"]
+    targets = [
+        _safe_token(target, default="runtime") for target in (lease_targets or default_targets)
+    ]
+    snapshot = snapshot_tasks(
+        payload,
+        artifact_dir=artifact_dir,
+        write=write,
+        generated_by="daily_autonomy_packet",
+    )
+    leases = [
+        lease_tasks(
+            payload,
+            agent_id=f"{cleaned_agent}-{target}",
+            target_runtime=target,
+            artifact_dir=artifact_dir,
+            lease_seconds=lease_seconds,
+            limit=limit_per_target,
+            write=write,
+        )
+        for target in targets
+    ]
+    snapshot_records = build_task_snapshot_records(
+        payload,
+        generated_by="daily_autonomy_packet",
+        captured_at=_now(),
+    )
+    queued = [record for record in snapshot_records if record.get("status") == "queued"]
+    blocked = [record for record in snapshot_records if record.get("status") == "blocked"]
+    lanes = Counter(str(record.get("lane") or "") for record in snapshot_records)
+    priorities = Counter(str(record.get("priority") or "") for record in snapshot_records)
+    packet_id = f"{_safe_token(generated_at, default='packet')}-{cleaned_agent}"
+    packet = {
+        "schema_version": SCHEMA_VERSION,
+        "record_type": "continuous_intelligence_daily_autonomy_packet",
+        "mode": "daily_autonomy_packet",
+        "packet_id": packet_id,
+        "generated_at": generated_at,
+        "plan_generated_at": payload.get("generated_at"),
+        "agent_id": cleaned_agent,
+        "write_enabled": bool(write),
+        "writes_by_default": False,
+        "artifact_dir": str(artifact_dir),
+        "target_file": str(_artifact_paths(artifact_dir)["daily_packets"]),
+        "latest_file": str(artifact_dir / DAILY_PACKET_LATEST_FILE),
+        "totals": {
+            "tasks": len(snapshot_records),
+            "queued": len(queued),
+            "blocked": len(blocked),
+            "leased": sum(int(lease.get("leased_count") or 0) for lease in leases),
+        },
+        "lanes": dict(sorted(lanes.items())),
+        "priorities": dict(sorted(priorities.items())),
+        "snapshot": snapshot,
+        "leases": leases,
+        "next_tasks": [_packet_task_summary(record) for record in queued[:10]],
+        "blocked_tasks": [_packet_task_summary(record) for record in blocked[:5]],
+        "safety": {
+            "dry_run_dispatch_only": True,
+            "execution_enabled": False,
+            "live_trading_enabled": False,
+            "telegram_sends_enabled": False,
+            "scheduler_writes_local_artifacts_only": True,
+        },
+    }
+    paths = _artifact_paths(artifact_dir)
+    _append_jsonl(paths["daily_packets"], [packet], write=write)
+    _write_json(artifact_dir / DAILY_PACKET_LATEST_FILE, packet, write=write)
+    packet["artifact_status"] = artifact_status(artifact_dir=artifact_dir)
+    return packet
+
+
+def _packet_task_summary(record: dict[str, Any]) -> dict[str, Any]:
+    task = record.get("task") or {}
+    return {
+        "task_id": record.get("task_id"),
+        "lane": record.get("lane"),
+        "priority": record.get("priority"),
+        "target_runtime": record.get("target_runtime"),
+        "safe_mode": record.get("safe_mode"),
+        "title": task.get("title"),
+        "blocked_by": list(record.get("blocked_by") or []),
+        "expected_artifacts": list(record.get("expected_artifacts") or [])[:4],
+    }
+
+
 def artifact_status(*, artifact_dir: Path = DEFAULT_ARTIFACT_DIR) -> dict[str, Any]:
     """Summarize local continuous-intelligence artifacts without mutating state."""
     paths = _artifact_paths(artifact_dir)
@@ -357,11 +480,21 @@ def artifact_status(*, artifact_dir: Path = DEFAULT_ARTIFACT_DIR) -> dict[str, A
             "exists": path.exists(),
             "rows": len(rows),
             "latest_at": (
-                latest.get("captured_at") or latest.get("leased_at") or latest.get("recorded_at")
+                latest.get("captured_at")
+                or latest.get("leased_at")
+                or latest.get("recorded_at")
+                or latest.get("generated_at")
                 if latest
                 else None
             ),
         }
+    latest_packet = artifact_dir / DAILY_PACKET_LATEST_FILE
+    files["daily_packet_latest"] = {
+        "path": str(latest_packet),
+        "exists": latest_packet.exists(),
+        "rows": 1 if latest_packet.exists() else 0,
+        "latest_at": None,
+    }
     return {
         "mode": "continuous_intelligence_artifact_status",
         "artifact_dir": str(artifact_dir),
@@ -394,6 +527,22 @@ def cli(argv: list[str] | None = None) -> int:
     lease_parser.add_argument("--write", action="store_true")
     lease_parser.add_argument("--pretty", action="store_true")
 
+    packet_parser = sub.add_parser(
+        "daily-packet",
+        help="Preview or write the daily autonomy packet and dry-run leases.",
+    )
+    packet_parser.add_argument("--agent-id", default="continuous-intelligence-daily")
+    packet_parser.add_argument(
+        "--lease-target",
+        action="append",
+        default=[],
+        help="Runtime to lease tasks for; defaults to mac-local and windows-gpu.",
+    )
+    packet_parser.add_argument("--limit-per-target", type=int, default=3)
+    packet_parser.add_argument("--lease-seconds", type=int, default=24 * 3600)
+    packet_parser.add_argument("--write", action="store_true")
+    packet_parser.add_argument("--pretty", action="store_true")
+
     args = parser.parse_args(argv)
     if args.command == "status":
         payload = artifact_status()
@@ -406,6 +555,14 @@ def cli(argv: list[str] | None = None) -> int:
             target_runtime=args.target_runtime,
             lease_seconds=args.lease_seconds,
             limit=args.limit,
+            write=bool(args.write),
+        )
+    elif args.command == "daily-packet":
+        payload = daily_autonomy_packet(
+            agent_id=args.agent_id,
+            lease_targets=list(args.lease_target or []) or None,
+            lease_seconds=args.lease_seconds,
+            limit_per_target=args.limit_per_target,
             write=bool(args.write),
         )
     else:
@@ -423,6 +580,7 @@ if __name__ == "__main__":
 __all__ = [
     "artifact_status",
     "build_task_snapshot_records",
+    "daily_autonomy_packet",
     "lease_tasks",
     "record_task_result",
     "snapshot_tasks",

@@ -83,6 +83,31 @@ def test_routine_health_tracks_trading_shadow_controller() -> None:
     assert "trading-shadow-controller" in routine_names
 
 
+def test_continuous_intelligence_daily_launchagent_is_artifact_only() -> None:
+    plist = _load_plist(INFRA_LAUNCHAGENTS / "com.sapphire.continuous-intelligence-daily.plist")
+    env = plist["EnvironmentVariables"]
+    arguments = plist["ProgramArguments"]
+    launchagents = {routine.launchagent for routine in check_routines.ROUTINES}
+    routine_names = {routine.name for routine in check_routines.ROUTINES}
+
+    assert plist["Label"] == "com.sapphire.continuous-intelligence-daily"
+    assert arguments == [
+        "/usr/local/bin/python3",
+        "-m",
+        "lib.autonomy.continuous_intelligence_artifacts",
+        "daily-packet",
+        "--write",
+    ]
+    assert plist["WorkingDirectory"] == "/Users/aribs/Code/Sapphire"
+    assert plist["StartCalendarInterval"] == {"Hour": 6, "Minute": 45}
+    assert plist["RunAtLoad"] is False
+    assert env["PYTHONPATH"] == "/Users/aribs/Code/Sapphire"
+    assert "com.sapphire.continuous-intelligence-daily" in launchagents
+    assert "continuous-intelligence-daily" in routine_names
+    assert "--execute" not in arguments
+    assert not any(key.startswith("ROBINHOOD") for key in env)
+
+
 def test_content_publisher_keeps_telegram_summary_explicit() -> None:
     plist = _load_plist(INFRA_LAUNCHAGENTS / "com.sapphire.content-publisher.plist")
     env = plist["EnvironmentVariables"]
@@ -116,6 +141,7 @@ def test_trading_shadow_controller_launchagent_is_paper_only() -> None:
         "/usr/local/bin/python3",
         "/Users/aribs/Code/Sapphire/scripts/ops/trading_shadow_controller.py",
         "--output",
+        "--history",
     ]
     assert plist["WorkingDirectory"] == "/Users/aribs/Code/Sapphire"
     assert plist["StartInterval"] == 1800

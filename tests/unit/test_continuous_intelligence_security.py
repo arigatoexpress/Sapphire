@@ -495,9 +495,10 @@ def test_artifact_status_empty_directory(tmp_path) -> None:
     status = artifacts.artifact_status(artifact_dir=tmp_path)
 
     assert status["mode"] == "continuous_intelligence_artifact_status"
-    for key in ("task_snapshots", "task_leases", "task_results"):
+    for key in ("task_snapshots", "task_leases", "task_results", "daily_packets"):
         assert status["files"][key]["exists"] is False
         assert status["files"][key]["rows"] == 0
+    assert status["files"]["daily_packet_latest"]["exists"] is False
 
 
 def test_artifact_status_reports_existing_rows(tmp_path) -> None:

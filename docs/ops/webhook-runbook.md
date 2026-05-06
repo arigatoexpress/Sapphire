@@ -1,6 +1,6 @@
 # Windows TradingView Webhook Runbook
 
-Last reviewed: 2026-04-29
+Last reviewed: 2026-05-06
 
 This runbook covers the Windows-side TradingView webhook receiver in
 `services/webhook/src/receiver.py`. The receiver listens on port `9090`, accepts
@@ -30,16 +30,19 @@ Be precise about the current implementation:
 
 - The receiver validates JSON shape, supported action, symbol normalization, and
   signal construction.
+- If `WEBHOOK_SECRET` is configured, the receiver requires a matching
+  `secret`, `webhook_secret`, `passphrase`, `X-Sapphire-Webhook-Secret`,
+  `X-TradingView-Secret`, or `X-Webhook-Secret` value and compares it with a
+  constant-time check. Bad secrets return HTTP 403.
+- Invalid-payload logs redact secret-bearing fields and numeric fields must be
+  finite. Oversized request bodies are rejected before JSON parsing.
 - It sets `metadata.dry_run=true` when confidence is present and below `0.70`.
 - It routes over Tailscale to local Sapphire services.
 - It does not perform order placement itself.
-- The code currently does **not** enforce a request HMAC or reject mismatched
-  `WEBHOOK_SECRET` values, even though the env template documents a shared
-  secret. Treat this as a known code follow-up before public exposure.
 
-Until explicit secret/HMAC enforcement is added and tested, do not expose this
-receiver directly to the public internet. Keep it behind the existing local or
-Tailscale relay posture.
+Do not expose this receiver directly to the public internet without a reviewed
+Cloudflare/Tailscale ingress path, secret rotation procedure, and downstream
+paper-only gate verification.
 
 ## Normal Operation
 
@@ -81,6 +84,7 @@ curl -sS -X POST http://100.71.10.48:9090/webhook/tradingview \
     "action":"buy",
     "price":65000,
     "confidence":0.50,
+    "secret":"<WEBHOOK_SECRET>",
     "message":"operator dry-run test"
   }' | python3 -m json.tool
 ```
@@ -108,6 +112,13 @@ The payload must include `symbol` and `action`, and `action` must be one of the
 supported action strings in `VALID_ACTIONS`. Normalize TradingView alerts to
 the shape accepted by `TradingViewAlert.from_webhook()`.
 
+### Payload Rejected With 403
+
+`WEBHOOK_SECRET` is configured and the payload/header did not match it. Do not
+paste the secret into logs or PRs. Check the Windows environment and the
+TradingView alert body/header template, then retry with a placeholder in any
+shared notes.
+
 ### Signal Forwarding Fails
 
 The receiver forwards to:
@@ -129,12 +140,11 @@ continue with `ai_verdict=null`. Do not block signal logging on enrichment.
 
 Before this receiver is considered production-ingress hardened:
 
-1. Add explicit `WEBHOOK_SECRET` or HMAC enforcement in
-   `services/webhook/src/receiver.py`.
-2. Add tests for accepted authorized request and rejected bad secret.
-3. Decide whether low-confidence `dry_run=true` should be a hard paper-only gate
+1. Decide whether low-confidence `dry_run=true` should be a hard paper-only gate
    at the downstream consumer, not merely metadata.
-4. Document the intended Cloudflare/Tailscale ingress path and rollback.
+2. Document the intended Cloudflare/Tailscale ingress path and rollback.
+3. Add periodic replay/idempotency checks if TradingView alert retry behavior
+   starts producing duplicate signals.
 
 ## Safety Notes
 

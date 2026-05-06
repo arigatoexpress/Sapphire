@@ -3,19 +3,25 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.sapphire.trading-shadow-controller</string>
+    <string>com.sapphire.continuous-intelligence-daily</string>
 
     <key>ProgramArguments</key>
     <array>
         <string>/usr/local/bin/python3</string>
-        <string>/Users/aribs/Code/Sapphire/scripts/ops/trading_shadow_controller.py</string>
-        <string>--output</string>
-        <string>--history</string>
+        <string>-m</string>
+        <string>lib.autonomy.continuous_intelligence_artifacts</string>
+        <string>daily-packet</string>
+        <string>--write</string>
     </array>
 
-    <!-- Paper-shadow market screening only; appends local JSONL history, no Robinhood credentials or submit path. -->
-    <key>StartInterval</key>
-    <integer>1800</integer>
+    <!-- Local artifact packet only: snapshots + dry-run leases, no worker dispatch. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>6</integer>
+        <key>Minute</key>
+        <integer>45</integer>
+    </dict>
 
     <key>WorkingDirectory</key>
     <string>/Users/aribs/Code/Sapphire</string>
@@ -31,12 +37,12 @@
     </dict>
 
     <key>StandardOutPath</key>
-    <string>/Users/aribs/Library/Logs/sapphire/trading-shadow-controller.log</string>
+    <string>/Users/aribs/Library/Logs/sapphire/continuous-intelligence-daily.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/aribs/Library/Logs/sapphire/trading-shadow-controller.err</string>
+    <string>/Users/aribs/Library/Logs/sapphire/continuous-intelligence-daily.err</string>
 
     <key>RunAtLoad</key>
-    <true/>
+    <false/>
 
     <key>ThrottleInterval</key>
     <integer>300</integer>

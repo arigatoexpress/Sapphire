@@ -101,3 +101,39 @@ def test_shadow_policy_caps_requested_notional_to_first_order_limit():
     policy = controller.ShadowRiskPolicy(requested_candidate_notional_usd=100.0)
 
     assert policy.bounded_candidate_notional_usd == 5.0
+
+
+def test_shadow_history_appends_compact_run_records(tmp_path):
+    report = controller.build_shadow_trading_report(
+        market_universe=_market(
+            [
+                {
+                    "symbol": "BTC",
+                    "name": "Bitcoin",
+                    "priority": "high",
+                    "tags": ["liked", "core", "robinhood"],
+                    "robinhood_symbol": "BTC-USD",
+                    "price_usd": 77000,
+                    "change_24h_pct": 2.4,
+                    "trend_score": 0,
+                }
+            ]
+        )
+    )
+    history = tmp_path / "shadow-history.jsonl"
+
+    first = controller.write_shadow_history(report, history)
+    second = controller.write_shadow_history(report, history)
+
+    rows = [line for line in history.read_text().splitlines() if line]
+    assert len(rows) == 2
+    assert first["record_type"] == "shadow_controller_run"
+    assert first["report_sha256"] == second["report_sha256"]
+    assert first["candidate_count"] == 1
+    assert first["top_candidate"]["symbol"] == "BTC"
+    assert first["safety"] == {
+        "paper_shadow_only": True,
+        "live_execution_enabled": False,
+        "manual_confirmation_required": True,
+        "append_only_history": True,
+    }
