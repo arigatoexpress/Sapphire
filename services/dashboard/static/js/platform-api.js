@@ -32,39 +32,12 @@
     }
 
     function getOrganization() {
-        return Promise.resolve({
-            summary: { workspaces: 4 },
-            model: {
-                departments: [
-                    {
-                        name: 'Operations',
-                        focus: 'Runtime health, routines, and deployment posture',
-                        systems: ['Dashboard', 'Control plane', 'LaunchAgents'],
-                    },
-                    {
-                        name: 'Trading Research',
-                        focus: 'Paper execution, analytics, and risk controls',
-                        systems: ['Signal logger', 'Strategy performance', 'Cascade'],
-                    },
-                    {
-                        name: 'Intelligence',
-                        focus: 'Threat, regional, and content pipelines',
-                        systems: ['Threat refresh', 'Content engine', 'Foundry sync'],
-                    },
-                ],
-            },
-        });
+        return request('/api/autonomy/org-coverage');
     }
 
-    function getProjects() {
-        return Promise.resolve({
-            projects: [
-                { name: 'Sapphire OS', status: 'active', progress: 82 },
-                { name: 'Routine migration', status: 'in_progress', progress: 45 },
-                { name: 'Autonomy safety', status: 'active', progress: 68 },
-                { name: 'Data platform', status: 'blocked', progress: 22 },
-            ],
-        });
+    async function getProjects() {
+        const org = await getOrganization();
+        return { projects: org.programs || [] };
     }
 
     window.platformApi = {

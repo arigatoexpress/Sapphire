@@ -688,6 +688,24 @@ def test_continuous_intelligence_endpoint_is_dry_run(app_client):
     assert any(target["id"] == "windows-gpu" for target in body["runtime_targets"])
 
 
+def test_org_coverage_endpoint_is_read_only(app_client):
+    _, client = app_client
+    r = client.get("/api/autonomy/org-coverage", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["mode"] == "org_coverage"
+    assert body["execution_enabled"] is False
+    assert body["live_trading_enabled"] is False
+    assert body["telegram_sends_enabled"] is False
+    assert body["writes_by_default"] is False
+    assert body["safety"]["execution_enabled"] is False
+    assert body["summary"]["repos_tracked"] >= 1
+    assert body["modules"]
+    assert body["repos"]
+    assert any(module["id"] == "satellite" for module in body["modules"])
+    assert all("/Users/" not in str(repo.get("local_path_label", "")) for repo in body["repos"])
+
+
 def test_continuous_intelligence_artifacts_endpoint_is_read_only(app_client):
     _, client = app_client
     r = client.get(
@@ -741,6 +759,20 @@ def test_sovereign_thesis_page_renders(app_client):
     assert "Gemini OODA (dry-run)" in html
     assert "/api/gemini-ooda" in html
     assert "Daily Delta" in html
+
+
+def test_organization_page_renders_live_coverage_ui(app_client):
+    _, client = app_client
+    r = client.get("/organization", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert "Organization Coverage" in html
+    assert "Modular Fleet" in html
+    assert "Repository Fleet" in html
+    assert "Attention Queue" in html
+    assert "CI Posture" in html
+    assert "window.platformApi.getOrganization" in html
+    assert 'data-filter="satellite"' in html
 
 
 def test_gemini_ooda_endpoint_is_dry_run_dashboard(app_client):

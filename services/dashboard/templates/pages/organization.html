@@ -1,185 +1,419 @@
 {% extends "base.html" %}
 
-{% block title %}Organization_Structure{% endblock %}
+{% block title %}Organization Coverage{% endblock %}
 
 {% block extra_css %}
-.dept-grid {
+.org-kpi-row {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(5, minmax(130px, 1fr));
+    gap: var(--space-md);
+    margin-bottom: var(--space-lg);
+}
+
+.org-safety-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    margin-bottom: var(--space-lg);
+    border: 1px solid rgba(105, 214, 255, 0.24);
+    background: rgba(105, 214, 255, 0.04);
+}
+
+.org-grid {
+    display: grid;
+    grid-template-columns: minmax(760px, 1fr) minmax(340px, 360px);
+    gap: var(--space-lg);
+    align-items: start;
+}
+
+.org-stack {
+    display: grid;
     gap: var(--space-lg);
 }
 
-@media (max-width: 768px) {
-    .dept-grid {
+.module-list,
+.attention-list,
+.posture-list {
+    display: grid;
+}
+
+.module-row,
+.attention-row,
+.posture-row {
+    display: grid;
+    gap: var(--space-sm);
+    padding: var(--space-md) 0;
+    border-bottom: 1px solid var(--border-dim);
+}
+
+.module-row:first-child,
+.attention-row:first-child,
+.posture-row:first-child {
+    padding-top: 0;
+}
+
+.module-row:last-child,
+.attention-row:last-child,
+.posture-row:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+}
+
+.module-row {
+    grid-template-columns: minmax(0, 1fr) minmax(96px, auto);
+    align-items: center;
+}
+
+.module-title,
+.attention-title,
+.repo-title {
+    color: var(--text-primary);
+    font-size: 0.92rem;
+}
+
+.module-copy,
+.attention-copy,
+.repo-subtitle {
+    color: var(--text-muted);
+    font-size: 0.74rem;
+    line-height: 1.45;
+}
+
+.module-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    margin-top: var(--space-xs);
+}
+
+.module-score {
+    display: grid;
+    justify-items: end;
+    gap: var(--space-xs);
+    min-width: 96px;
+}
+
+.module-percent {
+    color: var(--cyan);
+    font-family: var(--font-header);
+    font-size: 1.35rem;
+    line-height: 1;
+}
+
+.module-meter {
+    width: 96px;
+    height: 5px;
+    background: rgba(105, 214, 255, 0.10);
+    overflow: hidden;
+}
+
+.module-meter-fill {
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, var(--green-dim), var(--cyan));
+    box-shadow: 0 0 10px rgba(105, 214, 255, 0.35);
+}
+
+.repo-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
+    margin-bottom: var(--space-md);
+}
+
+.repo-filter-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+}
+
+.repo-filter {
+    min-height: 32px;
+    border: 1px solid var(--border-dim);
+    background: rgba(98, 255, 64, 0.03);
+    color: var(--text-secondary);
+    padding: 0 var(--space-sm);
+    font-family: var(--font-terminal);
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.repo-filter:hover,
+.repo-filter.active {
+    border-color: var(--cyan);
+    color: var(--cyan);
+    background: rgba(105, 214, 255, 0.08);
+}
+
+.repo-table-wrap {
+    overflow-x: auto;
+}
+
+.repo-table {
+    min-width: 820px;
+    table-layout: fixed;
+}
+
+.repo-table th,
+.repo-table td {
+    padding-left: 0.65rem;
+    padding-right: 0.65rem;
+    vertical-align: top;
+    overflow-wrap: anywhere;
+}
+
+.repo-table th:nth-child(1) { width: 34%; }
+.repo-table th:nth-child(2) { width: 11%; }
+.repo-table th:nth-child(3) { width: 11%; }
+.repo-table th:nth-child(4) { width: 13%; }
+.repo-table th:nth-child(5) { width: 18%; }
+.repo-table th:nth-child(6) { width: 13%; }
+
+.repo-name-cell {
+    display: grid;
+    gap: 2px;
+    min-width: 220px;
+}
+
+.repo-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+}
+
+.repo-link {
+    color: var(--cyan);
+    text-decoration: none;
+}
+
+.repo-link:hover {
+    text-decoration: underline;
+}
+
+.mono-muted {
+    color: var(--text-muted);
+    font-size: 0.72rem;
+}
+
+.attention-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+}
+
+.attention-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    margin-top: var(--space-xs);
+}
+
+.posture-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+}
+
+.posture-count {
+    color: var(--cyan);
+    font-family: var(--font-header);
+    font-size: 1.25rem;
+}
+
+.org-generated {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--space-sm);
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    margin-top: var(--space-md);
+}
+
+@media (max-width: 1080px) {
+    .org-kpi-row {
+        grid-template-columns: repeat(2, minmax(130px, 1fr));
+    }
+
+    .org-grid {
         grid-template-columns: 1fr;
     }
 }
 
-.dept-card {
-    border: 1px solid var(--border-dim);
-    background: rgba(255, 176, 0, 0.02);
-    position: relative;
-}
+@media (max-width: 620px) {
+    .org-kpi-row {
+        grid-template-columns: 1fr;
+    }
 
-.dept-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 2px;
-    background: var(--amber);
-    opacity: 0.5;
-}
+    .module-row,
+    .attention-row,
+    .posture-row {
+        grid-template-columns: 1fr;
+    }
 
-.dept-header {
-    padding: var(--space-md) var(--space-lg);
-    border-bottom: 1px solid var(--border-dim);
-}
+    .module-score {
+        justify-items: start;
+    }
 
-.dept-title {
-    font-family: var(--font-header);
-    font-size: 1rem;
-    color: var(--amber);
-    letter-spacing: 0.1em;
-}
+    .repo-toolbar {
+        align-items: stretch;
+    }
 
-.dept-focus {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    margin-top: var(--space-xs);
-}
-
-.dept-body {
-    padding: var(--space-lg);
-}
-
-.systems-list {
-    list-style: none;
-}
-
-.systems-list li {
-    padding: var(--space-xs) 0;
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
-}
-
-.systems-list li::before {
-    content: '>';
-    color: var(--amber);
-    font-size: 0.7rem;
-}
-
-.projects-panel {
-    margin-top: var(--space-lg);
-}
-
-.project-item {
-    display: grid;
-    grid-template-columns: 1fr auto auto;
-    gap: var(--space-md);
-    align-items: center;
-    padding: var(--space-sm) var(--space-md);
-    border: 1px solid var(--border-dim);
-    margin-bottom: var(--space-sm);
-    background: rgba(255, 176, 0, 0.02);
-}
-
-.project-item:hover {
-    background: rgba(255, 176, 0, 0.05);
-    border-color: var(--border-color);
-}
-
-.project-name {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-}
-
-.project-progress {
-    width: 100px;
-    height: 4px;
-    background: rgba(255, 176, 0, 0.1);
-    position: relative;
-}
-
-.project-progress-fill {
-    height: 100%;
-    background: var(--amber);
-    box-shadow: var(--glow-amber);
-}
-
-.kpi-row {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: var(--space-md);
-    margin-bottom: var(--space-xl);
-}
-
-@media (max-width: 768px) {
-    .kpi-row {
-        grid-template-columns: repeat(2, 1fr);
+    .repo-filter-group,
+    .repo-filter {
+        width: 100%;
     }
 }
 {% endblock %}
 
 {% block content %}
 <div class="section-header">
-    <div class="section-title">Organization_Structure</div>
-    <div class="section-subtitle">Sapphire Autonomous Organization - Departmental breakdown and program portfolio</div>
+    <div class="section-title">Organization Coverage</div>
+    <div class="section-subtitle">Manifest-backed Sapphire, satellite, integration, and upstream fleet posture</div>
 </div>
 
-<!-- KPI Row -->
-<div class="kpi-row">
+<div class="org-kpi-row">
     <div class="stat-block">
-        <div class="stat-label">Workspaces</div>
-        <div class="stat-value" id="org-workspaces">--</div>
+        <div class="stat-label">Repos</div>
+        <div class="stat-value" id="org-repos">--</div>
+        <div class="stat-delta" id="org-repos-delta">tracked</div>
     </div>
     <div class="stat-block">
-        <div class="stat-label">Programs</div>
-        <div class="stat-value" id="org-programs">--</div>
+        <div class="stat-label">Satellites</div>
+        <div class="stat-value green" id="org-satellites">--</div>
+        <div class="stat-delta">covered by manifest</div>
     </div>
     <div class="stat-block">
-        <div class="stat-label">Active</div>
-        <div class="stat-value green" id="org-active">--</div>
+        <div class="stat-label">Attention</div>
+        <div class="stat-value" id="org-attention">--</div>
+        <div class="stat-delta" id="org-attention-delta">local findings</div>
     </div>
     <div class="stat-block">
-        <div class="stat-label">Blocked</div>
-        <div class="stat-value" id="org-blocked">--</div>
+        <div class="stat-label">Worktrees</div>
+        <div class="stat-value" id="org-worktrees">--</div>
+        <div class="stat-delta" id="org-worktrees-delta">active lanes</div>
+    </div>
+    <div class="stat-block">
+        <div class="stat-label">Upstreams</div>
+        <div class="stat-value" id="org-upstreams">--</div>
+        <div class="stat-delta" id="org-upstreams-delta">tracked integrations</div>
     </div>
 </div>
 
-<!-- Organization Model -->
-<div class="panel">
-    <span class="panel-corner tl"></span>
-    <span class="panel-corner tr"></span>
-    <span class="panel-corner bl"></span>
-    <span class="panel-corner br"></span>
-    <div class="panel-header">
-        <div class="panel-title">Departments</div>
-    </div>
-    <div class="panel-body">
-        <div class="dept-grid" id="departments">
-            <div class="loading">Loading organization data...</div>
+<div class="org-safety-strip" id="org-safety">
+    <span class="safety-badge read-only">Read only</span>
+    <span class="safety-badge paper">No live trading</span>
+    <span class="safety-badge dry-run">No Telegram sends</span>
+    <span class="timestamp" id="org-generated">Loading...</span>
+</div>
+
+<div class="org-grid">
+    <div class="org-stack">
+        <div class="panel">
+            <span class="panel-corner tl"></span>
+            <span class="panel-corner tr"></span>
+            <span class="panel-corner bl"></span>
+            <span class="panel-corner br"></span>
+            <div class="panel-header">
+                <div class="panel-title">Modular Fleet</div>
+                <span class="timestamp" id="module-count">0 modules</span>
+            </div>
+            <div class="panel-body">
+                <div class="module-list" id="module-list">
+                    <div class="loading">Loading organization modules...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <span class="panel-corner tl"></span>
+            <span class="panel-corner tr"></span>
+            <span class="panel-corner bl"></span>
+            <span class="panel-corner br"></span>
+            <div class="panel-header">
+                <div class="panel-title">Repository Fleet</div>
+                <span class="timestamp" id="repo-count">0 repos</span>
+            </div>
+            <div class="panel-body">
+                <div class="repo-toolbar">
+                    <div class="repo-filter-group" id="repo-filters">
+                        <button class="repo-filter active" type="button" data-filter="all">All</button>
+                        <button class="repo-filter" type="button" data-filter="attention">Attention</button>
+                        <button class="repo-filter" type="button" data-filter="production">Production</button>
+                        <button class="repo-filter" type="button" data-filter="satellite">Satellites</button>
+                    </div>
+                    <span class="timestamp" id="repo-filter-count">--</span>
+                </div>
+                <div class="repo-table-wrap">
+                    <table class="data-table repo-table">
+                        <thead>
+                            <tr>
+                                <th>Repo</th>
+                                <th>Status</th>
+                                <th>Module</th>
+                                <th>Branch</th>
+                                <th>CI</th>
+                                <th>Guardrails</th>
+                            </tr>
+                        </thead>
+                        <tbody id="repo-table-body">
+                            <tr><td colspan="6" class="empty-state">Loading repository fleet...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
-</div>
 
-<!-- Programs -->
-<div class="panel projects-panel">
-    <span class="panel-corner tl"></span>
-    <span class="panel-corner tr"></span>
-    <span class="panel-corner bl"></span>
-    <span class="panel-corner br"></span>
-    <div class="panel-header">
-        <div class="panel-title">Active_Programs</div>
-        <span class="timestamp" id="programs-count">0 programs</span>
-    </div>
-    <div class="panel-body">
-        <div id="projects-list">
-            <div class="loading">Loading program portfolio...</div>
+    <div class="org-stack">
+        <div class="panel">
+            <span class="panel-corner tl"></span>
+            <span class="panel-corner tr"></span>
+            <span class="panel-corner bl"></span>
+            <span class="panel-corner br"></span>
+            <div class="panel-header">
+                <div class="panel-title">Attention Queue</div>
+                <span class="timestamp" id="attention-count">0 items</span>
+            </div>
+            <div class="panel-body">
+                <div class="attention-list" id="attention-list">
+                    <div class="loading">Loading findings...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <span class="panel-corner tl"></span>
+            <span class="panel-corner tr"></span>
+            <span class="panel-corner bl"></span>
+            <span class="panel-corner br"></span>
+            <div class="panel-header">
+                <div class="panel-title">CI Posture</div>
+                <span class="timestamp" id="ci-count">0 strategies</span>
+            </div>
+            <div class="panel-body">
+                <div class="posture-list" id="ci-list">
+                    <div class="loading">Loading CI posture...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <span class="panel-corner tl"></span>
+            <span class="panel-corner tr"></span>
+            <span class="panel-corner bl"></span>
+            <span class="panel-corner br"></span>
+            <div class="panel-header">
+                <div class="panel-title">Routine Stages</div>
+                <span class="timestamp" id="routine-count">0 stages</span>
+            </div>
+            <div class="panel-body">
+                <div class="posture-list" id="routine-list">
+                    <div class="loading">Loading routines...</div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -187,83 +421,227 @@
 
 {% block extra_js %}
 <script>
+    let orgPayload = null;
+    let repoFilter = 'all';
+
+    function esc(value) {
+        return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[char]));
+    }
+
+    function number(value) {
+        return Number(value || 0).toLocaleString();
+    }
+
+    function pct(value) {
+        return `${Math.max(0, Math.min(100, Number(value || 0)))}%`;
+    }
+
+    function badge(label, className) {
+        return `<span class="badge ${esc(className || 'offline')}">${esc(label || 'unknown')}</span>`;
+    }
+
+    function compactLabel(value) {
+        return esc(String(value || '').replaceAll('_', ' '));
+    }
+
     async function loadOrganization() {
         try {
-            const [org, projects] = await Promise.all([
-                window.platformApi.getOrganization(),
-                window.platformApi.getProjects()
-            ]);
-            
-            renderDepartments(org);
-            renderProjects(projects);
-            updateKPIs(org, projects);
-        } catch (e) {
-            console.error('Organization load failed:', e);
+            const org = await window.platformApi.getOrganization();
+            orgPayload = org;
+            renderOrganization(org);
+        } catch (error) {
+            console.error('Organization coverage load failed:', error);
+            document.getElementById('module-list').innerHTML = '<div class="empty-state">Organization coverage unavailable</div>';
+            document.getElementById('repo-table-body').innerHTML = '<tr><td colspan="6" class="empty-state">Repository coverage unavailable</td></tr>';
+            document.getElementById('attention-list').innerHTML = '<div class="empty-state">Attention queue unavailable</div>';
         }
     }
 
-    function renderDepartments(org) {
-        const container = document.getElementById('departments');
-        const depts = org.model?.departments || [];
-        
-        if (!depts.length) {
-            container.innerHTML = '<div class="empty-state">No department data available</div>';
+    function renderOrganization(org) {
+        const summary = org.summary || {};
+        document.getElementById('org-repos').textContent = number(summary.repos_tracked);
+        document.getElementById('org-repos-delta').textContent = `${number(summary.clean_repos)} clean`;
+        document.getElementById('org-satellites').textContent = number(summary.satellite_repos);
+        document.getElementById('org-attention').textContent = number(summary.attention_items);
+        document.getElementById('org-attention-delta').textContent = `${number(summary.dirty_repos)} repo, ${number(summary.dirty_upstreams)} upstream`;
+        document.getElementById('org-worktrees').textContent = number(summary.worktree_count);
+        document.getElementById('org-worktrees-delta').textContent = `${number(summary.dirty_worktree_count)} dirty`;
+        document.getElementById('org-upstreams').textContent = number(summary.upstream_tracked);
+        document.getElementById('org-upstreams-delta').textContent = `${number(summary.clean_upstreams)} clean`;
+        document.getElementById('org-generated').textContent = `Updated ${esc(org.generated_at || 'unknown')} · external ${summary.external_checked ? 'checked' : 'not checked'}`;
+
+        renderSafety(org.safety || {});
+        renderModules(org.modules || []);
+        renderRepos();
+        renderAttention(org);
+        renderPosture('ci-list', 'ci-count', org.ci_strategies || [], 'strategies');
+        renderPosture('routine-list', 'routine-count', org.routine_stages || [], 'stages');
+    }
+
+    function renderSafety(safety) {
+        const guards = safety.guards || [];
+        const base = [
+            safety.execution_enabled ? ['Execution enabled', 'live'] : ['Read only', 'read-only'],
+            safety.live_trading_enabled ? ['Live trading', 'live'] : ['No live trading', 'paper'],
+            safety.telegram_sends_enabled ? ['Telegram enabled', 'live'] : ['No Telegram sends', 'dry-run'],
+            safety.writes_by_default ? ['Writes default', 'live'] : ['Writes opt-in', 'shadow-only']
+        ];
+        document.getElementById('org-safety').innerHTML = `
+            ${base.map(([label, cls]) => `<span class="safety-badge ${cls}">${esc(label)}</span>`).join('')}
+            <span class="timestamp">${guards.map(compactLabel).slice(0, 3).join(' · ')}</span>
+            <span class="timestamp" id="org-generated">${document.getElementById('org-generated')?.textContent || ''}</span>
+        `;
+    }
+
+    function renderModules(modules) {
+        const container = document.getElementById('module-list');
+        document.getElementById('module-count').textContent = `${modules.length} modules`;
+        if (!modules.length) {
+            container.innerHTML = '<div class="empty-state">No modules available</div>';
             return;
         }
-
-        container.innerHTML = depts.map(dept => `
-            <div class="dept-card">
-                <div class="dept-header">
-                    <div class="dept-title">${dept.name}</div>
-                    <div class="dept-focus">${dept.focus}</div>
+        container.innerHTML = modules.map((module) => `
+            <div class="module-row">
+                <div>
+                    <div class="module-title">${esc(module.title)}</div>
+                    <div class="module-copy">${esc(module.description)}</div>
+                    <div class="module-metrics">
+                        ${badge(`${number(module.repo_count)} repos`, module.badge_class)}
+                        ${badge(`${number(module.clean_count)} clean`, 'online')}
+                        ${module.attention_count ? badge(`${number(module.attention_count)} attention`, 'warning') : badge('steady', 'online')}
+                    </div>
                 </div>
-                <div class="dept-body">
-                    <ul class="systems-list">
-                        ${(dept.systems || []).map(sys => `<li>${sys}</li>`).join('')}
-                    </ul>
+                <div class="module-score">
+                    <div class="module-percent">${pct(module.coverage_pct)}</div>
+                    <div class="module-meter"><div class="module-meter-fill" style="width: ${pct(module.coverage_pct)}"></div></div>
                 </div>
             </div>
         `).join('');
     }
 
-    function renderProjects(data) {
-        const container = document.getElementById('projects-list');
-        const projects = data.projects || [];
-        
-        document.getElementById('programs-count').textContent = `${projects.length} programs`;
-        
-        if (!projects.length) {
-            container.innerHTML = '<div class="empty-state">No active programs</div>';
+    function filterRepos(repos) {
+        if (repoFilter === 'attention') {
+            return repos.filter((repo) => repo.state !== 'clean');
+        }
+        if (repoFilter === 'production') {
+            return repos.filter((repo) => repo.production_adjacent);
+        }
+        if (repoFilter === 'satellite') {
+            return repos.filter((repo) => repo.classification === 'satellite');
+        }
+        return repos;
+    }
+
+    function renderRepos() {
+        const tbody = document.getElementById('repo-table-body');
+        const repos = orgPayload?.repos || [];
+        const filtered = filterRepos(repos);
+        document.getElementById('repo-count').textContent = `${repos.length} repos`;
+        document.getElementById('repo-filter-count').textContent = `${filtered.length} shown`;
+
+        if (!filtered.length) {
+            tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No repositories match this view</td></tr>';
             return;
         }
 
-        container.innerHTML = projects.map(proj => {
-            const statusClass = proj.status === 'active' ? 'online' : (proj.status === 'blocked' ? 'error' : 'warning');
+        tbody.innerHTML = filtered.map((repo) => {
+            const link = repo.github_url ? `<a class="repo-link" href="${esc(repo.github_url)}" target="_blank" rel="noopener">GitHub</a>` : '';
+            const branch = repo.branch || repo.default_branch || 'unknown';
+            const guardrails = repo.guardrail_count ? `${number(repo.guardrail_count)} guardrails` : 'unlisted';
             return `
-                <div class="project-item">
-                    <span class="project-name">${proj.name}</span>
-                    <div class="project-progress">
-                        <div class="project-progress-fill" style="width: ${proj.progress || 0}%"></div>
-                    </div>
-                    <span class="badge ${statusClass}">${proj.status}</span>
-                </div>
+                <tr>
+                    <td>
+                        <div class="repo-name-cell">
+                            <span class="repo-title">${esc(repo.name || repo.id)}</span>
+                            <span class="repo-subtitle">${esc(repo.role || repo.local_path_label || '')}</span>
+                            <span class="mono-muted">${esc(repo.local_path_label || '')} ${link}</span>
+                        </div>
+                    </td>
+                    <td>${badge(repo.status_label, repo.badge_class)}</td>
+                    <td>${compactLabel(repo.classification)}</td>
+                    <td><span class="mono-muted">${esc(branch)}</span></td>
+                    <td>${compactLabel(repo.ci_strategy)}</td>
+                    <td>${esc(guardrails)}</td>
+                </tr>
             `;
         }).join('');
     }
 
-    function updateKPIs(org, projects) {
-        const summary = org.summary || {};
-        const projectList = projects.projects || [];
-        
-        document.getElementById('org-workspaces').textContent = summary.workspaces || 0;
-        document.getElementById('org-programs').textContent = projectList.length;
-        
-        const active = projectList.filter(p => ['active', 'in_progress'].includes(String(p.status).toLowerCase())).length;
-        const blocked = projectList.filter(p => String(p.status).toLowerCase() === 'blocked').length;
-        
-        document.getElementById('org-active').textContent = active;
-        document.getElementById('org-blocked').textContent = blocked;
+    function renderAttention(org) {
+        const rows = [];
+        (org.repos || []).filter((repo) => repo.state !== 'clean').forEach((repo) => rows.push({
+            title: repo.name || repo.id,
+            copy: repo.next_step,
+            badge: repo.status_label,
+            cls: repo.badge_class,
+            meta: [repo.classification, repo.local_path_label, `${repo.dirty_count || 0} dirty`]
+        }));
+        (org.upstream_repos || []).filter((repo) => repo.state !== 'clean').forEach((repo) => rows.push({
+            title: repo.name || repo.id,
+            copy: repo.next_step,
+            badge: repo.status_label,
+            cls: repo.badge_class,
+            meta: ['upstream', repo.sync_state, `${repo.dirty_count || 0} dirty`]
+        }));
+        (org.worktrees || []).filter((tree) => tree.state !== 'clean').forEach((tree) => rows.push({
+            title: tree.branch || tree.local_path_label,
+            copy: tree.local_path_label,
+            badge: tree.status_label,
+            cls: tree.badge_class,
+            meta: ['worktree', tree.upstream || 'no upstream', `${tree.dirty_count || 0} dirty`]
+        }));
+
+        const container = document.getElementById('attention-list');
+        document.getElementById('attention-count').textContent = `${rows.length} items`;
+        if (!rows.length) {
+            container.innerHTML = '<div class="empty-state">No local attention items</div>';
+            return;
+        }
+        container.innerHTML = rows.slice(0, 12).map((row) => `
+            <div class="attention-row">
+                <div>
+                    <div class="attention-title">${esc(row.title)}</div>
+                    <div class="attention-copy">${esc(row.copy || '')}</div>
+                    <div class="attention-meta">${row.meta.filter(Boolean).map((item) => badge(item, 'offline')).join('')}</div>
+                </div>
+                <div>${badge(row.badge, row.cls)}</div>
+            </div>
+        `).join('');
     }
+
+    function renderPosture(listId, countId, rows, label) {
+        const container = document.getElementById(listId);
+        document.getElementById(countId).textContent = `${rows.length} ${label}`;
+        if (!rows.length) {
+            container.innerHTML = '<div class="empty-state">No rows available</div>';
+            return;
+        }
+        container.innerHTML = rows.map((row) => `
+            <div class="posture-row">
+                <div>
+                    <div class="attention-title">${esc(row.label)}</div>
+                    <div class="attention-copy">${esc(row.id)}</div>
+                </div>
+                <div class="posture-count">${number(row.count)}</div>
+            </div>
+        `).join('');
+    }
+
+    document.getElementById('repo-filters').addEventListener('click', (event) => {
+        const button = event.target.closest('[data-filter]');
+        if (!button) {
+            return;
+        }
+        repoFilter = button.dataset.filter;
+        document.querySelectorAll('.repo-filter').forEach((item) => item.classList.toggle('active', item === button));
+        renderRepos();
+    });
 
     loadOrganization();
     setInterval(loadOrganization, 30000);

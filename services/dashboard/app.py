@@ -2588,6 +2588,83 @@ def production_readiness_page():
     )
 
 
+def _readiness_cache_path() -> Path:
+    """Latest JSON output from scripts/ops/production_readiness_sweep.py."""
+    return _DASHBOARD_REPO_ROOT / "data" / "readiness" / "readiness-sweep-latest.json"
+
+
+def _empty_readiness_payload(*, note: str | None = None) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "status": "ok",
+        "generated_at": None,
+        "cache_age_seconds": None,
+        "cache_stale": False,
+        "summary": {"pass": 0, "warn": 0, "fail": 0, "skip": 0, "total": 0},
+        "checks": [],
+    }
+    if note:
+        payload["note"] = note
+    return payload
+
+
+def _readiness_latest_payload() -> dict[str, Any]:
+    path = _readiness_cache_path()
+    if not path.exists():
+        return _empty_readiness_payload(note="no cache yet")
+    try:
+        body = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        payload = _empty_readiness_payload(note="cache unreadable")
+        payload["error"] = f"{type(exc).__name__}: {exc}"
+        return payload
+
+    summary = body.get("summary") if isinstance(body, dict) else {}
+    checks = body.get("checks") if isinstance(body, dict) else []
+    if not isinstance(summary, dict):
+        summary = {}
+    if not isinstance(checks, list):
+        checks = []
+    complete_summary = {"pass": 0, "warn": 0, "fail": 0, "skip": 0, "total": 0}
+    complete_summary.update({key: int(summary.get(key) or 0) for key in complete_summary})
+    age_seconds = max(0, int(time.time() - path.stat().st_mtime))
+    return {
+        "status": "ok",
+        "generated_at": body.get("generated_at") if isinstance(body, dict) else None,
+        "duration_ms": body.get("duration_ms") if isinstance(body, dict) else None,
+        "cache_age_seconds": age_seconds,
+        "cache_stale": age_seconds > 6 * 60 * 60,
+        "summary": complete_summary,
+        "checks": checks,
+    }
+
+
+@app.route("/api/readiness/latest")
+@requires_auth
+def api_readiness_latest():
+    """Return the latest cached production-readiness sweep JSON."""
+    return jsonify(_readiness_latest_payload())
+
+
+@app.route("/api/readiness/check/<section>/<name>")
+@requires_auth
+def api_readiness_check(section: str, name: str):
+    """Return one cached production-readiness check by section/category and name."""
+    payload = _readiness_latest_payload()
+    for check in payload.get("checks") or []:
+        check_section = str(check.get("section") or check.get("category") or "")
+        if check_section == section and str(check.get("name") or "") == name:
+            return jsonify(
+                {
+                    "status": "ok",
+                    "generated_at": payload.get("generated_at"),
+                    "cache_age_seconds": payload.get("cache_age_seconds"),
+                    "cache_stale": payload.get("cache_stale"),
+                    "check": check,
+                }
+            )
+    return jsonify({"status": "error", "error": "check not found"}), 404
+
+
 @app.route("/api/production/readiness")
 @requires_auth
 def api_production_readiness():
@@ -5032,6 +5109,61 @@ def api_autonomy_continuous_intelligence():
                 "next_dispatch": [],
                 "operating_loop": [],
                 "source_docs": [],
+            }
+        ), 200
+
+
+@app.route("/api/autonomy/org-coverage")
+@requires_auth
+def api_autonomy_org_coverage():
+    """Read-only Sapphire and satellite repo coverage for the organization page."""
+    try:
+        from lib.autonomy.org_coverage import build_org_coverage
+
+        external = str(request.args.get("external") or "").lower() in {"1", "true", "yes"}
+        cache_key = f"org_coverage::{external}"
+        return jsonify(
+            get_cached(
+                cache_key,
+                lambda: build_org_coverage(external=external),
+                ttl=30,
+                raise_on_miss=True,
+            )
+        )
+    except Exception as e:
+        log.warning("org coverage API error: %s", e)
+        return jsonify(
+            {
+                "schema_version": 1,
+                "mode": "org_coverage",
+                "generated_at": datetime.now(UTC).isoformat(),
+                "error": str(e),
+                "summary": {
+                    "repos_tracked": 0,
+                    "satellite_repos": 0,
+                    "upstream_tracked": 0,
+                    "modules_tracked": 0,
+                    "attention_items": 0,
+                    "external_checked": False,
+                },
+                "safety": {
+                    "execution_enabled": False,
+                    "live_trading_enabled": False,
+                    "telegram_sends_enabled": False,
+                    "writes_by_default": False,
+                    "guards": ["dashboard_read_only", "error_fallback"],
+                },
+                "execution_enabled": False,
+                "live_trading_enabled": False,
+                "telegram_sends_enabled": False,
+                "writes_by_default": False,
+                "modules": [],
+                "repos": [],
+                "upstream_repos": [],
+                "worktrees": [],
+                "ci_strategies": [],
+                "routine_stages": [],
+                "programs": [],
             }
         ), 200
 
