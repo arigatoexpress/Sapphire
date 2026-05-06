@@ -58,3 +58,14 @@ def test_base_template_loads_platform_api_helper() -> None:
     assert "window.platformApi" in helper
     assert "getStatus" in helper
     assert "getReadiness" in helper
+
+
+def test_platform_api_strips_url_credentials_before_fetch() -> None:
+    helper = PLATFORM_API.read_text(encoding="utf-8")
+
+    assert "function cleanOrigin()" in helper
+    assert "new URL(window.location.href)" in helper
+    assert "currentUrl.username = ''" in helper
+    assert "currentUrl.password = ''" in helper
+    assert "new URL(path, cleanOrigin())" in helper
+    assert "return url.href" in helper
