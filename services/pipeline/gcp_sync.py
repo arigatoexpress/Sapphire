@@ -7,7 +7,7 @@ Flow per source:
   2. Transform raw JSON into BigQuery-ready row dicts (schema matches
      infra/gcp/schemas/*.json).
   3. Upload the transformed rows as NDJSON to GCS under raw/<source>/YYYY-MM-DD/.
-  4. Load NDJSON from GCS into the matching BQ table.
+  4. The GCS finalize Cloud Function loads NDJSON into the matching BQ table.
   5. Advance the watermark.
 
 Usage:
@@ -55,7 +55,10 @@ def _now_iso() -> str:
 
 
 def _stable_id(*parts: Any) -> str:
-    return hashlib.sha1("::".join(str(p) for p in parts).encode()).hexdigest()[:16]
+    return hashlib.sha1(  # noqa: S324 - stable non-security row ids only.
+        "::".join(str(p) for p in parts).encode(),
+        usedforsecurity=False,
+    ).hexdigest()[:16]
 
 
 def _grade_from_score_value(score: Any) -> str | None:
@@ -324,7 +327,9 @@ def transform_regime(files: list[Path]) -> Iterator[dict]:
             log.warning("regime read failed %s: %s", fp, e)
             continue
         if not isinstance(snap, dict):
-            log.info("regime snapshot is not a dict (got %s) — skipping %s", type(snap).__name__, fp.name)
+            log.info(
+                "regime snapshot is not a dict (got %s) — skipping %s", type(snap).__name__, fp.name
+            )
             continue
         ts = _parse_ts(snap.get("timestamp") or snap.get("generated_at"))
         _raw_regime = snap.get("regime") or {}
@@ -485,6 +490,56 @@ def _transform_houston_leads_jsonl(fp: Path, *, now: str) -> Iterator[dict]:
         handle.close()
 
 
+def transform_fred_observations(files: list[Path]) -> Iterator[dict]:
+    """data/macro/YYYY-MM-DD/fred_observations.jsonl -> fred_series_observations rows."""
+
+    now = _now_iso()
+    for fp in files:
+        try:
+            handle = fp.open("r", encoding="utf-8")
+        except OSError as e:
+            log.warning("fred observations read failed %s: %s", fp, e)
+            continue
+        try:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(row, dict):
+                    continue
+                observation_id = row.get("observation_id") or row.get("id")
+                series_id = row.get("series_id")
+                observation_date = row.get("observation_date")
+                realtime_start = row.get("realtime_start")
+                realtime_end = row.get("realtime_end")
+                if not all(
+                    [observation_id, series_id, observation_date, realtime_start, realtime_end]
+                ):
+                    continue
+                yield {
+                    "observation_id": str(observation_id),
+                    "series_id": str(series_id).upper(),
+                    "observation_date": str(observation_date)[:10],
+                    "value": row.get("value"),
+                    "realtime_start": str(realtime_start)[:10],
+                    "realtime_end": str(realtime_end)[:10],
+                    "units": row.get("units"),
+                    "frequency": row.get("frequency"),
+                    "source_url": row.get("source_url")
+                    or "https://api.stlouisfed.org/fred/series/observations",
+                    "payload_hash": row.get("payload_hash") or _stable_id(row),
+                    "ingested_at": _parse_ts(row.get("ingested_at") or now),
+                }
+        except OSError as e:
+            log.warning("fred observations read failed %s: %s", fp, e)
+        finally:
+            handle.close()
+
+
 # ---------------------------------------------------------------------------
 # Source registry
 # ---------------------------------------------------------------------------
@@ -513,6 +568,12 @@ SOURCES: dict[str, Source] = {
     ),
     "metrics": Source("metrics", "inference_metrics", "metrics/*.ndjson", transform_metrics),
     "health": Source("health", "service_health", "health/*.ndjson", transform_health),
+    "fred": Source(
+        "fred",
+        "fred_series_observations",
+        "macro/*/fred_observations.jsonl",
+        transform_fred_observations,
+    ),
 }
 
 

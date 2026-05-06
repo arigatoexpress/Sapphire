@@ -17,6 +17,7 @@ available only when intentionally enabled.
 | Path | Purpose |
 |---|---|
 | `lib/macro/sources.py` | Official source fetchers, parsers, cache, robots checks, and rate caps. |
+| `lib/macro/fred_loader.py` | Cache-first FRED/ALFRED observation loader for macro regime features and vintage-aware backtests. |
 | `lib/macro/classifier.py` | Pure heuristic category, severity, direction, and asset classifier. |
 | `lib/macro/calendar.py` | Forward calendar utilities for FOMC, Treasury auctions, and payroll planning. |
 | `services/macro_intel/run.py` | CLI daemon and single-tick runner. |
@@ -25,7 +26,9 @@ available only when intentionally enabled.
 | `plugins/claw-sapphire/tools/macro_intel.py` | Compatibility shim. |
 | `data/macro/<YYYY-MM-DD>/events.jsonl` | Runtime event output. Do not commit. |
 | `data/macro/<YYYY-MM-DD>/calendar.jsonl` | Runtime calendar output. Do not commit. |
+| `data/macro/<YYYY-MM-DD>/fred_observations.jsonl` | Optional FRED/ALFRED observation output. Do not commit. |
 | `~/.cache/sapphire/macro/<source>/` | Per-source raw response cache and counters. |
+| `~/.cache/sapphire/macro/fred/` | Default FRED payload cache when `SAPPHIRE_FRED_CACHE_DIR` is unset. |
 
 ## Commands
 
@@ -58,6 +61,26 @@ SAPPHIRE_MACRO_INTEL_LIVE_BUS=1 \
 python3 services/macro_intel/run.py daemon --poll-interval-seconds 900 --live --publish
 ```
 
+Cache-first FRED/ALFRED observation writer:
+
+```bash
+python3 services/macro_intel/run.py run-once --fred
+```
+
+Live FRED pull for cache misses:
+
+```bash
+SAPPHIRE_FRED_LIVE=1 \
+FRED_API_KEY=... \
+python3 services/macro_intel/run.py run-once --fred
+```
+
+Dry-run the GCS upload transform after local FRED artifacts exist:
+
+```bash
+python3 -m services.pipeline.gcp_sync --dry-run --source fred
+```
+
 Plugin examples:
 
 ```bash
@@ -79,10 +102,15 @@ weakened.
 | `SAPPHIRE_MACRO_INTEL_LIVE_BUS` | unset | Required, with `--publish`, for event-bus publishing. |
 | `SAPPHIRE_MACRO_CACHE_DIR` | `~/.cache/sapphire/macro` | Cache and counter root. Override in tests or temporary runs. |
 | `SAPPHIRE_MACRO_USER_AGENT` | `SapphireMacroIntel/0.1 (+https://github.com/arigatoexpress/Sapphire; contact=ops@sapphirealpha.xyz)` | User-Agent for official pulls and robots checks. |
+| `SAPPHIRE_FRED_LIVE` | unset | Required, with `FRED_API_KEY`, for live FRED/ALFRED cache misses. |
+| `FRED_API_KEY` | unset | FRED API key. Used only by `--fred` when the FRED live gate is enabled. |
+| `SAPPHIRE_FRED_CACHE_DIR` | `~/.cache/sapphire/macro/fred` | FRED payload cache override. |
+| `SAPPHIRE_FRED_USER_AGENT` | `SapphireFredLoader/0.1 (+https://github.com/arigatoexpress/Sapphire; contact=ops@sapphirealpha.xyz)` | User-Agent for FRED observations pulls. |
 
-No API keys are used. Do not add secrets to this service. If a future source
-requires authentication, implement it as a separate gated provider and keep this
-official public-source daemon secret-free.
+The event-source daemon uses no API keys. FRED/ALFRED is a separate gated
+provider: it may read `FRED_API_KEY` only when `--fred` is requested and
+`SAPPHIRE_FRED_LIVE=1` is set. Do not write keys into repo files, artifacts, or
+operator notes.
 
 ## Operating Posture
 
@@ -93,6 +121,11 @@ Macro Intel is bounded along four axes:
 3. Each source is capped at four pulls per rolling hour.
 4. Each pull is capped at 100 parsed events and the forward calendar is capped
    at 90 days.
+
+The optional FRED writer is bounded separately: it is cache-first, its live
+cache-miss path requires `SAPPHIRE_FRED_LIVE=1`, and every observation row keeps
+`realtime_start` and `realtime_end` so ALFRED vintages can be used for
+point-in-time backtests without label leakage.
 
 If a source exceeds its cap and a cached raw payload exists, the source parser
 uses the cached payload. If no cache exists, the source returns a recoverable
@@ -117,6 +150,12 @@ before retrieving it. Parsed meeting dates should be treated as official
 calendar context. The precise statement time is represented as a UTC planning
 time; operators should confirm exact release timing for high-risk live trading
 windows.
+
+FRED and ALFRED observations are first-party St. Louis Fed time-series data,
+not event/news items. Treat `value="."` as missing, respect each series'
+native frequency, and keep realtime vintage windows in every warehouse row.
+FRED data can be used in paid derived reports and backtests only after source
+terms and redistribution posture are reviewed for that product.
 
 CFTC press RSS is first-party and high-trust for enforcement and regulatory
 announcements from the Commodity Futures Trading Commission. It is especially

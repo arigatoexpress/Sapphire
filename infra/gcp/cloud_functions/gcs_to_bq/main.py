@@ -11,6 +11,7 @@ Path convention (matches services.pipeline.gcp_sync):
     raw/leads/YYYY-MM-DD/*.ndjson        → sapphire.leads
     raw/metrics/YYYY-MM-DD/*.ndjson      → sapphire.inference_metrics
     raw/health/YYYY-MM-DD/*.ndjson       → sapphire.service_health
+    raw/fred/YYYY-MM-DD/*.ndjson         → sapphire.fred_series_observations
 
 Non-matching paths and non-NDJSON files are skipped.
 """
@@ -35,6 +36,7 @@ SOURCE_TO_TABLE: dict[str, str] = {
     "leads": "leads",
     "metrics": "inference_metrics",
     "health": "service_health",
+    "fred": "fred_series_observations",
 }
 
 log = logging.getLogger(__name__)
