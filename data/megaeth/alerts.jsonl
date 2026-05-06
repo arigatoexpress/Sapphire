@@ -1,0 +1,1 @@
+{"ts":"2026-05-06T21:12:17.620926+00:00","block_number":15304926,"type":"aave_high_utilization","severity":"HIGH","symbol":"USDT0","utilization":0.954374,"threshold":0.95,"context":"USDT0 sustained near-100% utilization since at least 18:11 UTC. Borrowers cannot exit; supply rate spiked to 13.4% APY."}
