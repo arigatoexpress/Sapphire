@@ -431,6 +431,58 @@ def test_lease_preview_filters_blank_capabilities(client, monkeypatch):
     assert captured["capabilities"] == ["ta", "research"]
 
 
+def test_lease_preview_passes_windows_runtime_guard(client, monkeypatch):
+    captured: dict = {}
+
+    def fake_lease(*, agent_id, capabilities, target_runtime, runtime_status, limit, write):
+        captured.update(
+            {
+                "agent_id": agent_id,
+                "target_runtime": target_runtime,
+                "runtime_status": runtime_status,
+                "limit": limit,
+                "write": write,
+            }
+        )
+        return {
+            "mode": "dry_run_task_lease",
+            "leases": [],
+            "leased_count": 0,
+            "candidate_count": 3,
+            "blocked_by_runtime": 3,
+            "runtime_guard": {"status": "blocked"},
+        }
+
+    import lib.autonomy.continuous_intelligence_artifacts as cia
+    import services.dashboard.app as dashboard_app
+
+    monkeypatch.setattr(cia, "lease_tasks", fake_lease)
+    monkeypatch.setattr(
+        dashboard_app,
+        "_build_system_failover_status",
+        lambda: {
+            "mode": "local_failover",
+            "active_route": "mac-local",
+            "windows_offline": True,
+            "fallback_ready": True,
+        },
+    )
+
+    response = client.get(
+        "/api/autonomy/continuous-intelligence/lease-preview?target_runtime=windows-gpu",
+        headers=_auth_header(),
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["runtime_guard"]["status"] == "blocked"
+    assert captured["agent_id"] == "windows-gpu"
+    assert captured["target_runtime"] == "windows-gpu"
+    assert captured["runtime_status"]["windows_offline"] is True
+    assert captured["runtime_status"]["active_route"] == "mac-local"
+    assert captured["write"] is False
+
+
 def test_lease_preview_error_returns_safety_envelope(client, monkeypatch):
     import lib.autonomy.continuous_intelligence_artifacts as cia
 

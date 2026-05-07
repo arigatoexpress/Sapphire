@@ -132,6 +132,17 @@
     </section>
 
     <section class="obs-panel">
+        <h2>System Failover</h2>
+        <div class="obs-stats">
+            <div class="obs-stat"><div class="label">Mode</div><div class="value" id="obs-fo-mode" style="font-size:1.05rem;">--</div></div>
+            <div class="obs-stat"><div class="label">Route</div><div class="value" id="obs-fo-route" style="font-size:1.05rem;">--</div></div>
+            <div class="obs-stat"><div class="label">Windows</div><div class="value" id="obs-fo-windows">--</div></div>
+        </div>
+        <div id="obs-fo-actions" class="text-muted" style="margin-bottom: var(--space-sm);"></div>
+        <div id="obs-fo-table"></div>
+    </section>
+
+    <section class="obs-panel">
         <h2>Signal Streams</h2>
         <div class="obs-stats">
             <div class="obs-stat"><div class="label">1h</div><div class="value" id="obs-ss-rate1">0</div></div>
@@ -300,7 +311,9 @@ function refreshPauseStatus() {
 
 function statusBadge(status) {
     const s = String(status || 'unknown').toLowerCase();
-    const cls = s === 'pass' ? 'ok' : s === 'warn' ? 'warn' : 'err';
+    const cls = ['pass', 'ok', 'healthy', 'primary'].includes(s) ? 'ok'
+        : ['warn', 'degraded', 'disabled', 'unknown'].includes(s) ? 'warn'
+        : 'err';
     return `<span class="obs-badge ${cls}">${esc(s.toUpperCase())}</span>`;
 }
 
@@ -350,6 +363,47 @@ function renderInferenceProxy(payload) {
             <span>${tier.healthy ? statusBadge('pass') : statusBadge('warn')}</span>
         </div>
     `).join('');
+}
+
+function renderSystemFailover(payload) {
+    const proxy = (payload && payload.proxy) || {};
+    const tiers = proxy.tiers || [];
+    document.getElementById('obs-fo-mode').textContent = payload.mode || '--';
+    document.getElementById('obs-fo-route').textContent = payload.active_route || '--';
+    document.getElementById('obs-fo-windows').innerHTML = payload.windows_offline ? statusBadge('degraded') : statusBadge('ok');
+    const actions = proxy.recommended_actions || payload.blockers || [];
+    document.getElementById('obs-fo-actions').textContent = actions[0] || '';
+    const target = document.getElementById('obs-fo-table');
+    if (!tiers.length) {
+        const endpoints = proxy.endpoints || {};
+        const rows = Object.entries(endpoints);
+        if (!rows.length) {
+            target.innerHTML = '<div class="obs-empty">No failover status data</div>';
+            return;
+        }
+        target.innerHTML = `
+            <table class="obs-table">
+                <thead><tr><th>Endpoint</th><th>Status</th></tr></thead>
+                <tbody>
+                    ${rows.map(([name, status]) => `<tr><td>${esc(name)}</td><td>${statusBadge(status)}</td></tr>`).join('')}
+                </tbody>
+            </table>
+        `;
+        return;
+    }
+    target.innerHTML = `
+        <table class="obs-table">
+            <thead><tr><th>Tier</th><th>Endpoint</th><th>Role</th><th>Status</th></tr></thead>
+            <tbody>
+                ${tiers.map(row => `<tr>
+                    <td>${esc(row.tier)}</td>
+                    <td>${esc(row.endpoint)}</td>
+                    <td>${esc(row.role)}</td>
+                    <td>${statusBadge(row.status)}</td>
+                </tr>`).join('')}
+            </tbody>
+        </table>
+    `;
 }
 
 function renderSignalStreams(payload) {
@@ -475,11 +529,20 @@ function refreshTranche4Feeds() {
         .catch(() => {});
 }
 
+function refreshSystemFailover() {
+    fetch(`${window.location.origin}/api/system-failover-status${buyerSafeQuery}`)
+        .then(response => response.json())
+        .then(renderSystemFailover)
+        .catch(() => {});
+}
+
 renderPauseStatus(JSON.parse(document.getElementById('routine-pause-seed').textContent || '{}'));
 refreshSystemSummary();
+refreshSystemFailover();
 refreshTranche4Feeds();
 setInterval(refreshPauseStatus, 15000);
 setInterval(refreshSystemSummary, 15000);
+setInterval(refreshSystemFailover, 15000);
 setInterval(refreshTranche4Feeds, 30000);
 </script>
 {% endblock %}

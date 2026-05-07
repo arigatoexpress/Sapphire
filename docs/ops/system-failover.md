@@ -55,6 +55,17 @@ Strict primary-required check, useful before GPU-heavy jobs:
 
 This should fail while Windows is offline.
 
+Authenticated local dashboard posture:
+
+- `/observability` includes the System Failover panel.
+- `GET /api/system-failover-status` returns the same local failover envelope
+  without probing or mutating GCP.
+
+Windows-bound dry-run work leases are also guarded. When
+`/api/autonomy/continuous-intelligence/lease-preview?target_runtime=windows-gpu`
+sees `windows_offline=true`, it returns zero leases with
+`runtime_guard.status=blocked` until the primary tier is healthy again.
+
 ## Safe Next Steps During Windows Downtime
 
 1. Keep GPU-only jobs paused or reroute only exact Mac-supported models.
