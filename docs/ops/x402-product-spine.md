@@ -159,3 +159,23 @@ terms-review-required inputs for the opportunity-intelligence wedge:
 Keep new AgentWiki sources default-deny until their source registry row has
 explicit allowed products, terms status, redistribution posture, freshness, and
 operator notes.
+
+## Control Plane Summary Wiring
+
+The React Control Plane preview consumes the read-only v2 summary endpoint:
+
+`GET /api/v2/control-plane/summary`
+
+Properties:
+
+- requires dashboard Basic Auth;
+- returns normalized envelope cards for dashboard runtime, org posture, surface
+  inventory, x402 product readiness, AgentWiki builder briefs, and commercial
+  safety posture;
+- keeps `live_settlement_allowed=false`, real trading disabled, Telegram sends
+  disabled, and production mutation disabled in the top-level safety block;
+- marks x402 products with source-review needs as `warn` instead of pretending
+  they are production-ready;
+- probes only local health/read-only adapters and does not write receipts, crawl
+  sources, settle payments, trade, send Telegram messages, or mutate production
+  data.

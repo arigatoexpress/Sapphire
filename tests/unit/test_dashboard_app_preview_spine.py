@@ -17,8 +17,10 @@ def test_app_preview_route_is_auth_gated_and_honest_when_unbuilt() -> None:
     assert '_FRONTEND_DIST_DIR = Path(__file__).parent / "frontend" / "dist"' in source
     assert '@app.route("/app-preview")' in source
     assert '@app.route("/app-preview/assets/<path:filename>")' in source
+    assert '@app.route("/api/v2/control-plane/summary")' in source
     assert "def app_preview():" in source
     assert "def app_preview_assets(filename):" in source
+    assert "def api_v2_control_plane_summary():" in source
     assert '"mode": "blocked"' in source
     assert '"path_or_url": "services/dashboard/frontend/dist/index.html"' in source
     assert "send_file(index_path)" in source
@@ -31,6 +33,8 @@ def test_frontend_preview_targets_v2_summary_without_mock_data() -> None:
 
     assert 'base: "/app-preview/"' in vite
     assert '"/api/v2/control-plane/summary"' in api
+    assert "modules?:" in api
+    assert "module?: string" in api
     assert "No mock data is displayed" in api
     assert 'currentUrl.username = ""' in api
     assert 'currentUrl.password = ""' in api

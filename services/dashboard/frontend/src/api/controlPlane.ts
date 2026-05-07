@@ -15,6 +15,7 @@ export interface ActionPreview {
 }
 
 export interface EnvelopeCard {
+  module?: string;
   status: CardStatus;
   mode: CardMode;
   title: string;
@@ -26,7 +27,20 @@ export interface EnvelopeCard {
 
 export interface ControlPlaneSummary {
   status: CardStatus;
+  mode?: CardMode;
   generated_at: string | null;
+  summary?: {
+    card_count: number;
+    warn_count: number;
+    fail_count: number;
+    blocked_mode_count: number;
+  };
+  modules?: {
+    name: string;
+    status: CardStatus;
+    summary: string;
+    card_count: number;
+  }[];
   cards: EnvelopeCard[];
 }
 
