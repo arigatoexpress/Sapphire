@@ -153,6 +153,7 @@ class Settings:
     host: str
     port: int
     telegram_timeout_seconds: float
+    telegram_probe_timeout_seconds: float = 2.0
     token_source: str = "explicit_env"
     shared_polling_allowed: bool = False
     bot_username: str = ""
@@ -168,6 +169,9 @@ class Settings:
             host=os.getenv("SAPPHIRE_PM_BOT_HOST", "127.0.0.1").strip() or "127.0.0.1",
             port=int(port_text),
             telegram_timeout_seconds=float(os.getenv("SAPPHIRE_PM_BOT_TIMEOUT_SECONDS", "30")),
+            telegram_probe_timeout_seconds=float(
+                os.getenv("SAPPHIRE_PM_BOT_PROBE_TIMEOUT_SECONDS", "2")
+            ),
             token_source=token_source,
             shared_polling_allowed=_env_flag("SAPPHIRE_PM_BOT_ALLOW_SHARED_POLLING"),
             bot_username=os.getenv("SAPPHIRE_PM_BOT_BOT_USERNAME", "").strip().lstrip("@"),
@@ -196,8 +200,9 @@ class TelegramAPI:
             raise RuntimeError(f"Telegram API error for {method}: {data}")
         return data
 
-    def _get(self, method: str) -> dict[str, Any]:
-        response = requests.get(self._url(method), timeout=self._timeout)
+    def _get(self, method: str, *, timeout_seconds: float | None = None) -> dict[str, Any]:
+        timeout = self._timeout if timeout_seconds is None else timeout_seconds
+        response = requests.get(self._url(method), timeout=timeout)
         try:
             response.raise_for_status()
         except requests.HTTPError as exc:
@@ -252,11 +257,11 @@ class TelegramAPI:
     def delete_webhook(self, *, drop_pending_updates: bool = False) -> dict[str, Any]:
         return self._post("deleteWebhook", {"drop_pending_updates": drop_pending_updates})
 
-    def get_me(self) -> dict[str, Any]:
-        return self._get("getMe")
+    def get_me(self, *, timeout_seconds: float | None = None) -> dict[str, Any]:
+        return self._get("getMe", timeout_seconds=timeout_seconds)
 
-    def get_webhook_info(self) -> dict[str, Any]:
-        return self._get("getWebhookInfo")
+    def get_webhook_info(self, *, timeout_seconds: float | None = None) -> dict[str, Any]:
+        return self._get("getWebhookInfo", timeout_seconds=timeout_seconds)
 
 
 SETTINGS = Settings.from_env()
@@ -483,8 +488,9 @@ def _telegram_runtime_probe() -> dict[str, Any]:
 
     username = SETTINGS.bot_username
     try:
-        me = TELEGRAM_API.get_me()
-        webhook = TELEGRAM_API.get_webhook_info()
+        probe_timeout = SETTINGS.telegram_probe_timeout_seconds
+        me = TELEGRAM_API.get_me(timeout_seconds=probe_timeout)
+        webhook = TELEGRAM_API.get_webhook_info(timeout_seconds=probe_timeout)
         username = str(me.get("username") or username or "").strip().lstrip("@")
         webhook_url = str(webhook.get("url") or "").strip()
         webhook_registered = bool(webhook_url)

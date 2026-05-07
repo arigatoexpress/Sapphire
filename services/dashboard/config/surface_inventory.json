@@ -676,7 +676,7 @@
       "endpoint": "signals_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 2587,
+      "line": 2588,
       "methods": [
         "GET"
       ],
@@ -693,7 +693,7 @@
       "endpoint": "api_signals",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 2596,
+      "line": 2597,
       "methods": [
         "GET"
       ],
@@ -708,7 +708,7 @@
       "endpoint": "agents_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 2651,
+      "line": 2652,
       "methods": [
         "GET"
       ],
@@ -725,7 +725,7 @@
       "endpoint": "api_agents",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 2658,
+      "line": 2659,
       "methods": [
         "GET"
       ],
@@ -740,7 +740,7 @@
       "endpoint": "benchmarks",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 2700,
+      "line": 2701,
       "methods": [
         "GET"
       ],
@@ -755,7 +755,7 @@
       "endpoint": "health_status_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 2713,
+      "line": 2714,
       "methods": [
         "GET"
       ],
@@ -772,7 +772,7 @@
       "endpoint": "api_health_summary",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 2720,
+      "line": 2721,
       "methods": [
         "GET"
       ],
@@ -787,7 +787,7 @@
       "endpoint": "production_readiness_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 2777,
+      "line": 2779,
       "methods": [
         "GET"
       ],
@@ -804,7 +804,7 @@
       "endpoint": "api_readiness_latest",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 2838,
+      "line": 2840,
       "methods": [
         "GET"
       ],
@@ -819,7 +819,7 @@
       "endpoint": "api_readiness_check",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 2845,
+      "line": 2847,
       "methods": [
         "GET"
       ],
@@ -834,7 +834,7 @@
       "endpoint": "api_production_readiness",
       "kind": "api",
       "lifecycle": "keep",
-      "line": 2865,
+      "line": 2867,
       "methods": [
         "GET"
       ],
@@ -849,7 +849,7 @@
       "endpoint": "logs_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 2980,
+      "line": 2982,
       "methods": [
         "GET"
       ],
@@ -866,7 +866,7 @@
       "endpoint": "command_deck_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 2987,
+      "line": 2989,
       "methods": [
         "GET"
       ],
@@ -883,7 +883,7 @@
       "endpoint": "api_trading_metrics",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 2996,
+      "line": 2998,
       "methods": [
         "GET"
       ],
@@ -898,7 +898,7 @@
       "endpoint": "soc_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 3072,
+      "line": 3074,
       "methods": [
         "GET"
       ],
@@ -915,7 +915,7 @@
       "endpoint": "security_overview_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 3081,
+      "line": 3083,
       "methods": [
         "GET"
       ],
@@ -932,7 +932,7 @@
       "endpoint": "chain_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 3090,
+      "line": 3092,
       "methods": [
         "GET"
       ],
@@ -949,7 +949,7 @@
       "endpoint": "api_chain_overview",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 3099,
+      "line": 3101,
       "methods": [
         "GET"
       ],
@@ -964,7 +964,7 @@
       "endpoint": "robinhood_chain_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 3130,
+      "line": 3132,
       "methods": [
         "GET"
       ],
@@ -981,7 +981,7 @@
       "endpoint": "api_robinhood_chain_status",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 3139,
+      "line": 3141,
       "methods": [
         "GET"
       ],
@@ -996,7 +996,7 @@
       "endpoint": "api_robinhood_chain_signals",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 3166,
+      "line": 3168,
       "methods": [
         "GET"
       ],
@@ -1011,7 +1011,7 @@
       "endpoint": "api_robinhood_payment_stats",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 3182,
+      "line": 3184,
       "methods": [
         "GET"
       ],
@@ -1026,7 +1026,7 @@
       "endpoint": "sentinel_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 3196,
+      "line": 3198,
       "methods": [
         "GET"
       ],
@@ -1043,7 +1043,7 @@
       "endpoint": "api_sentinel_demo",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 3205,
+      "line": 3207,
       "methods": [
         "GET"
       ],
@@ -1058,7 +1058,7 @@
       "endpoint": "api_sentinel_evaluate",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 3218,
+      "line": 3220,
       "methods": [
         "POST"
       ],
@@ -1073,7 +1073,7 @@
       "endpoint": "api_cross_chain_aave_arb",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 3266,
+      "line": 3268,
       "methods": [
         "GET"
       ],
@@ -1088,7 +1088,7 @@
       "endpoint": "api_perps_overview",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 3300,
+      "line": 3302,
       "methods": [
         "GET"
       ],
@@ -1103,7 +1103,7 @@
       "endpoint": "risk_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 3325,
+      "line": 3327,
       "methods": [
         "GET"
       ],
@@ -1120,7 +1120,7 @@
       "endpoint": "analytics_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 3332,
+      "line": 3334,
       "methods": [
         "GET"
       ],
@@ -1137,7 +1137,7 @@
       "endpoint": "api_analytics",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 3341,
+      "line": 3343,
       "methods": [
         "GET"
       ],
@@ -1152,7 +1152,7 @@
       "endpoint": "api_risk_metrics",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 3359,
+      "line": 3361,
       "methods": [
         "GET"
       ],
@@ -1167,7 +1167,7 @@
       "endpoint": "api_analytics_performance",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 3382,
+      "line": 3384,
       "methods": [
         "GET"
       ],
@@ -1182,7 +1182,7 @@
       "endpoint": "api_risk_backtest",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 3400,
+      "line": 3402,
       "methods": [
         "GET"
       ],
@@ -1197,7 +1197,7 @@
       "endpoint": "api_correlation",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 3435,
+      "line": 3437,
       "methods": [
         "GET"
       ],
@@ -1212,7 +1212,7 @@
       "endpoint": "api_soc_security",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 3467,
+      "line": 3469,
       "methods": [
         "GET"
       ],
@@ -1227,7 +1227,7 @@
       "endpoint": "api_soc_threats",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 3872,
+      "line": 3874,
       "methods": [
         "GET"
       ],
@@ -1242,7 +1242,7 @@
       "endpoint": "predictions_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 4054,
+      "line": 4056,
       "methods": [
         "GET"
       ],
@@ -1259,7 +1259,7 @@
       "endpoint": "api_kronos_prediction",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 4063,
+      "line": 4065,
       "methods": [
         "GET"
       ],
@@ -1274,7 +1274,7 @@
       "endpoint": "api_kronos_status",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 4164,
+      "line": 4166,
       "methods": [
         "GET"
       ],
@@ -1289,7 +1289,7 @@
       "endpoint": "api_soc_cyber_research",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 4211,
+      "line": 4213,
       "methods": [
         "POST"
       ],
@@ -1304,7 +1304,7 @@
       "endpoint": "api_soc_lumo_status",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 4268,
+      "line": 4270,
       "methods": [
         "GET"
       ],
@@ -1319,7 +1319,7 @@
       "endpoint": "health",
       "kind": "page",
       "lifecycle": "keep",
-      "line": 4297,
+      "line": 4299,
       "methods": [
         "GET"
       ],
@@ -1334,7 +1334,7 @@
       "endpoint": "api_metrics_history",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 4306,
+      "line": 4308,
       "methods": [
         "GET"
       ],
@@ -1349,7 +1349,7 @@
       "endpoint": "api_soc_threat_timeline",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 4328,
+      "line": 4330,
       "methods": [
         "GET"
       ],
@@ -1364,7 +1364,7 @@
       "endpoint": "api_agents_history",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 4357,
+      "line": 4359,
       "methods": [
         "GET"
       ],
@@ -1379,7 +1379,7 @@
       "endpoint": "api_signals_performance",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 4378,
+      "line": 4380,
       "methods": [
         "GET"
       ],
@@ -1394,7 +1394,7 @@
       "endpoint": "portfolio_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 4429,
+      "line": 4431,
       "methods": [
         "GET"
       ],
@@ -1411,7 +1411,7 @@
       "endpoint": "factors_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 4435,
+      "line": 4437,
       "methods": [
         "GET"
       ],
@@ -1428,7 +1428,7 @@
       "endpoint": "performance_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 4441,
+      "line": 4443,
       "methods": [
         "GET"
       ],
@@ -1445,7 +1445,7 @@
       "endpoint": "agents_autonomous_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 4548,
+      "line": 4550,
       "methods": [
         "GET"
       ],
@@ -1462,7 +1462,7 @@
       "endpoint": "content_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 4560,
+      "line": 4562,
       "methods": [
         "GET"
       ],
@@ -1479,7 +1479,7 @@
       "endpoint": "cascade_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 4568,
+      "line": 4570,
       "methods": [
         "GET"
       ],
@@ -1496,7 +1496,7 @@
       "endpoint": "intel_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 4574,
+      "line": 4576,
       "methods": [
         "GET"
       ],
@@ -1513,7 +1513,7 @@
       "endpoint": "intel_leads_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 4580,
+      "line": 4582,
       "methods": [
         "GET"
       ],
@@ -1530,7 +1530,7 @@
       "endpoint": "api_leads",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 4608,
+      "line": 4610,
       "methods": [
         "GET"
       ],
@@ -1545,7 +1545,7 @@
       "endpoint": "api_leads_map",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 4648,
+      "line": 4650,
       "methods": [
         "GET"
       ],
@@ -1560,7 +1560,7 @@
       "endpoint": "api_leads_stats",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 4686,
+      "line": 4688,
       "methods": [
         "GET"
       ],
@@ -1575,7 +1575,7 @@
       "endpoint": "api_leads_score",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 4696,
+      "line": 4698,
       "methods": [
         "POST"
       ],
@@ -1590,7 +1590,7 @@
       "endpoint": "investment_intel_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 4710,
+      "line": 4712,
       "methods": [
         "GET"
       ],
@@ -1607,7 +1607,7 @@
       "endpoint": "cross_asset_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 4720,
+      "line": 4722,
       "methods": [
         "GET"
       ],
@@ -1624,7 +1624,7 @@
       "endpoint": "sovereign_thesis_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 4730,
+      "line": 4732,
       "methods": [
         "GET"
       ],
@@ -1641,7 +1641,7 @@
       "endpoint": "sovereign_thesis_story_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 4740,
+      "line": 4742,
       "methods": [
         "GET"
       ],
@@ -1658,7 +1658,7 @@
       "endpoint": "diligence_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 4750,
+      "line": 4752,
       "methods": [
         "GET"
       ],
@@ -1675,7 +1675,7 @@
       "endpoint": "observability_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 4762,
+      "line": 4764,
       "methods": [
         "GET"
       ],
@@ -1692,7 +1692,7 @@
       "endpoint": "narrative_eval_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 4774,
+      "line": 4776,
       "methods": [
         "GET"
       ],
@@ -1709,7 +1709,7 @@
       "endpoint": "timetravel_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 4885,
+      "line": 4887,
       "methods": [
         "GET"
       ],
@@ -1726,7 +1726,7 @@
       "endpoint": "api_timetravel_snapshot",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 4900,
+      "line": 4902,
       "methods": [
         "GET"
       ],
@@ -1741,7 +1741,7 @@
       "endpoint": "api_diligence_summary",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 4973,
+      "line": 4975,
       "methods": [
         "GET"
       ],
@@ -1756,7 +1756,7 @@
       "endpoint": "api_risk_kernel_summary",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 4979,
+      "line": 4981,
       "methods": [
         "GET"
       ],
@@ -1771,7 +1771,7 @@
       "endpoint": "api_provenance_summary",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 4985,
+      "line": 4987,
       "methods": [
         "GET"
       ],
@@ -1786,7 +1786,7 @@
       "endpoint": "api_test_suite_health",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 4998,
+      "line": 5000,
       "methods": [
         "GET"
       ],
@@ -1801,7 +1801,7 @@
       "endpoint": "api_launchagent_summary",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 5004,
+      "line": 5006,
       "methods": [
         "GET"
       ],
@@ -1816,7 +1816,7 @@
       "endpoint": "api_cross_asset_matrix",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 5010,
+      "line": 5012,
       "methods": [
         "GET"
       ],
@@ -1831,7 +1831,7 @@
       "endpoint": "api_cross_asset_regime",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 5019,
+      "line": 5021,
       "methods": [
         "GET"
       ],
@@ -1846,7 +1846,7 @@
       "endpoint": "api_x402_market_regime",
       "kind": "api",
       "lifecycle": "hard-stop",
-      "line": 5038,
+      "line": 5040,
       "methods": [
         "POST"
       ],
@@ -1861,7 +1861,7 @@
       "endpoint": "api_x402_backtest",
       "kind": "api",
       "lifecycle": "hard-stop",
-      "line": 5115,
+      "line": 5117,
       "methods": [
         "POST"
       ],
@@ -1876,7 +1876,7 @@
       "endpoint": "api_x402_agentwiki_search",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 5219,
+      "line": 5221,
       "methods": [
         "GET"
       ],
@@ -1891,7 +1891,7 @@
       "endpoint": "api_x402_agentwiki_grants_gov_search",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 5247,
+      "line": 5249,
       "methods": [
         "GET",
         "POST"
@@ -1907,7 +1907,7 @@
       "endpoint": "api_x402_agentwiki_quote",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 5299,
+      "line": 5301,
       "methods": [
         "GET"
       ],
@@ -1922,7 +1922,7 @@
       "endpoint": "api_x402_agentwiki_content",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 5318,
+      "line": 5320,
       "methods": [
         "POST"
       ],
@@ -1937,7 +1937,7 @@
       "endpoint": "api_x402_products",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 5396,
+      "line": 5398,
       "methods": [
         "GET"
       ],
@@ -1952,7 +1952,7 @@
       "endpoint": "api_cross_asset_breakdowns",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 5411,
+      "line": 5413,
       "methods": [
         "GET"
       ],
@@ -1967,7 +1967,7 @@
       "endpoint": "api_routine_pause_status",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 5427,
+      "line": 5429,
       "methods": [
         "GET"
       ],
@@ -1982,7 +1982,7 @@
       "endpoint": "api_narrative_eval_summary",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 5433,
+      "line": 5435,
       "methods": [
         "GET"
       ],
@@ -1997,7 +1997,7 @@
       "endpoint": "api_narrative_eval_aggregates",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 5457,
+      "line": 5459,
       "methods": [
         "GET"
       ],
@@ -2012,7 +2012,7 @@
       "endpoint": "api_foundry_readiness",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 5484,
+      "line": 5486,
       "methods": [
         "GET"
       ],
@@ -2027,7 +2027,7 @@
       "endpoint": "api_foundry_sync_status",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 5516,
+      "line": 5518,
       "methods": [
         "GET"
       ],
@@ -2042,7 +2042,7 @@
       "endpoint": "api_investments_intel",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 5544,
+      "line": 5546,
       "methods": [
         "GET"
       ],
@@ -2057,7 +2057,7 @@
       "endpoint": "api_investments_probes",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 5578,
+      "line": 5580,
       "methods": [
         "GET"
       ],
@@ -2072,7 +2072,7 @@
       "endpoint": "api_investments_thesis",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 5602,
+      "line": 5604,
       "methods": [
         "GET"
       ],
@@ -2087,7 +2087,7 @@
       "endpoint": "api_autonomy_continuous_intelligence",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 5647,
+      "line": 5649,
       "methods": [
         "GET"
       ],
@@ -2102,7 +2102,7 @@
       "endpoint": "api_autonomy_org_coverage",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 5686,
+      "line": 5688,
       "methods": [
         "GET"
       ],
@@ -2117,7 +2117,7 @@
       "endpoint": "api_autonomy_quant_intelligence",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 5741,
+      "line": 5743,
       "methods": [
         "GET"
       ],
@@ -2132,7 +2132,7 @@
       "endpoint": "api_gemini_ooda",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 5910,
+      "line": 5912,
       "methods": [
         "GET"
       ],
@@ -2147,7 +2147,7 @@
       "endpoint": "threat_intel_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 6240,
+      "line": 6242,
       "methods": [
         "GET"
       ],
@@ -2164,7 +2164,7 @@
       "endpoint": "api_threat_intel",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 6251,
+      "line": 6253,
       "methods": [
         "GET"
       ],
@@ -2179,7 +2179,7 @@
       "endpoint": "customer_dossier_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 6544,
+      "line": 6546,
       "methods": [
         "GET"
       ],
@@ -2196,7 +2196,7 @@
       "endpoint": "api_customer_dossier",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 6555,
+      "line": 6557,
       "methods": [
         "GET"
       ],
@@ -2211,7 +2211,7 @@
       "endpoint": "api_autonomy_continuous_intelligence_artifacts",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 6572,
+      "line": 6574,
       "methods": [
         "GET"
       ],
@@ -2226,7 +2226,7 @@
       "endpoint": "api_autonomy_continuous_intelligence_lease_preview",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 6606,
+      "line": 6608,
       "methods": [
         "GET"
       ],
@@ -2241,7 +2241,7 @@
       "endpoint": "api_investments_sources",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 6647,
+      "line": 6649,
       "methods": [
         "GET"
       ],
@@ -2256,7 +2256,7 @@
       "endpoint": "api_portfolio",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 6676,
+      "line": 6678,
       "methods": [
         "GET"
       ],
@@ -2271,7 +2271,7 @@
       "endpoint": "api_factors",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 6716,
+      "line": 6718,
       "methods": [
         "GET"
       ],
@@ -2286,7 +2286,7 @@
       "endpoint": "api_cascade",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 6742,
+      "line": 6744,
       "methods": [
         "GET"
       ],
@@ -2301,7 +2301,7 @@
       "endpoint": "api_telegram_history_intel",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 6898,
+      "line": 6900,
       "methods": [
         "GET"
       ],
@@ -2316,7 +2316,7 @@
       "endpoint": "api_intel",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 6910,
+      "line": 6912,
       "methods": [
         "GET"
       ],
@@ -2331,7 +2331,7 @@
       "endpoint": "api_performance",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 7024,
+      "line": 7026,
       "methods": [
         "GET"
       ],
@@ -2346,7 +2346,7 @@
       "endpoint": "api_strategy_performance",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 7048,
+      "line": 7050,
       "methods": [
         "GET"
       ],
@@ -2361,7 +2361,7 @@
       "endpoint": "api_hyperliquid_live_status",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 7091,
+      "line": 7093,
       "methods": [
         "GET"
       ],
@@ -2376,7 +2376,7 @@
       "endpoint": "api_convergence_watchlist",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 7137,
+      "line": 7139,
       "methods": [
         "GET"
       ],
@@ -2391,7 +2391,7 @@
       "endpoint": "api_prediction_accuracy",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 7163,
+      "line": 7165,
       "methods": [
         "GET"
       ],
@@ -2406,7 +2406,7 @@
       "endpoint": "api_forecast",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 7187,
+      "line": 7189,
       "methods": [
         "GET"
       ],
@@ -2421,7 +2421,7 @@
       "endpoint": "api_backtest_results",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 7210,
+      "line": 7212,
       "methods": [
         "GET"
       ],
@@ -2436,7 +2436,7 @@
       "endpoint": "api_walkforward_results",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 7470,
+      "line": 7472,
       "methods": [
         "GET"
       ],
@@ -2451,7 +2451,7 @@
       "endpoint": "api_windows_research_worker",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 7672,
+      "line": 7674,
       "methods": [
         "GET"
       ],
@@ -2466,7 +2466,7 @@
       "endpoint": "api_trading_brain",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 7685,
+      "line": 7687,
       "methods": [
         "GET"
       ],
@@ -2481,7 +2481,7 @@
       "endpoint": "api_tho_market_intel",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 7745,
+      "line": 7747,
       "methods": [
         "GET"
       ],
@@ -2496,7 +2496,7 @@
       "endpoint": "api_lumo_latest_pack",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 7793,
+      "line": 7795,
       "methods": [
         "GET"
       ],
@@ -2511,7 +2511,7 @@
       "endpoint": "api_performance_timeseries",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 7826,
+      "line": 7828,
       "methods": [
         "GET"
       ],
@@ -2526,7 +2526,7 @@
       "endpoint": "api_brain_accuracy",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 7859,
+      "line": 7861,
       "methods": [
         "GET"
       ],
@@ -2541,7 +2541,7 @@
       "endpoint": "api_content_drafts",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 7885,
+      "line": 7887,
       "methods": [
         "GET"
       ],
@@ -2556,7 +2556,7 @@
       "endpoint": "security_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 7907,
+      "line": 7909,
       "methods": [
         "GET"
       ],
@@ -2573,7 +2573,7 @@
       "endpoint": "api_security_dependencies",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 7916,
+      "line": 7918,
       "methods": [
         "GET"
       ],
@@ -2588,7 +2588,7 @@
       "endpoint": "api_security_dependencies_full",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 7931,
+      "line": 7933,
       "methods": [
         "GET"
       ],
@@ -2603,7 +2603,7 @@
       "endpoint": "api_security_models",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 7946,
+      "line": 7948,
       "methods": [
         "GET"
       ],
@@ -2618,7 +2618,7 @@
       "endpoint": "api_security_network",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 7961,
+      "line": 7963,
       "methods": [
         "GET"
       ],
@@ -2633,7 +2633,7 @@
       "endpoint": "api_security_score",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 7976,
+      "line": 7978,
       "methods": [
         "GET"
       ],
@@ -2648,7 +2648,7 @@
       "endpoint": "api_observability_system_summary",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 8078,
+      "line": 8080,
       "methods": [
         "GET"
       ],
@@ -2663,7 +2663,7 @@
       "endpoint": "api_observability_stream_rates",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 8095,
+      "line": 8097,
       "methods": [
         "GET"
       ],
@@ -2678,7 +2678,7 @@
       "endpoint": "api_observability_launchagents",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 8112,
+      "line": 8114,
       "methods": [
         "GET"
       ],
@@ -2693,7 +2693,7 @@
       "endpoint": "api_observability_tranche4_feeds",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 8129,
+      "line": 8131,
       "methods": [
         "GET"
       ],
@@ -2708,7 +2708,7 @@
       "endpoint": "source_quality_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 8199,
+      "line": 8201,
       "methods": [
         "GET"
       ],
@@ -2725,7 +2725,7 @@
       "endpoint": "api_source_quality_snr",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 8206,
+      "line": 8208,
       "methods": [
         "GET"
       ],
@@ -2740,7 +2740,7 @@
       "endpoint": "api_source_quality_correlation",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 8238,
+      "line": 8240,
       "methods": [
         "GET"
       ],
@@ -2755,7 +2755,7 @@
       "endpoint": "api_source_quality_decay",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 8268,
+      "line": 8270,
       "methods": [
         "GET"
       ],
@@ -2770,7 +2770,7 @@
       "endpoint": "inference_telemetry_page",
       "kind": "page",
       "lifecycle": "merge",
-      "line": 8399,
+      "line": 8401,
       "methods": [
         "GET"
       ],
@@ -2787,7 +2787,7 @@
       "endpoint": "api_inference_telemetry_report",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 8409,
+      "line": 8411,
       "methods": [
         "GET"
       ],
@@ -2802,7 +2802,7 @@
       "endpoint": "api_inference_telemetry_recommendations",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 8426,
+      "line": 8428,
       "methods": [
         "GET"
       ],
@@ -2817,7 +2817,7 @@
       "endpoint": "api_inference_telemetry_cost_model",
       "kind": "api",
       "lifecycle": "merge",
-      "line": 8444,
+      "line": 8446,
       "methods": [
         "GET"
       ],

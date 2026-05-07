@@ -47,6 +47,7 @@ def reload_server(monkeypatch):
     monkeypatch.delenv("TELEGRAM_WEBHOOK_SECRET", raising=False)
     monkeypatch.delenv("MODE", raising=False)
     monkeypatch.delenv("SAPPHIRE_PM_BOT_ALLOW_SHARED_POLLING", raising=False)
+    monkeypatch.delenv("SAPPHIRE_PM_BOT_PROBE_TIMEOUT_SECONDS", raising=False)
     monkeypatch.setenv("SAPPHIRE_PM_BOT_TOKEN", "test-token-default")
 
     sys.modules.pop("server", None)
@@ -325,6 +326,23 @@ def test_telegram_get_returns_result_dict(reload_server, monkeypatch):
     assert server.TELEGRAM_API.get_me() == {"username": "NemotronRariBot", "id": 123}
 
 
+def test_telegram_get_accepts_timeout_override(reload_server, monkeypatch):
+    server = reload_server()
+    captured: dict[str, Any] = {}
+
+    def fake_get(url, timeout):
+        captured["timeout"] = timeout
+        return _FakeResponse(
+            status_code=200,
+            json_payload={"ok": True, "result": {"username": "NemotronRariBot"}},
+        )
+
+    monkeypatch.setattr(server.requests, "get", fake_get)
+
+    assert server.TELEGRAM_API.get_me(timeout_seconds=1.25) == {"username": "NemotronRariBot"}
+    assert captured["timeout"] == 1.25
+
+
 def test_telegram_send_message_includes_disable_web_page_preview(reload_server, monkeypatch):
     server = reload_server()
     captured: dict = {}
@@ -594,12 +612,22 @@ def test_settings_from_env_reads_default_port_and_host(reload_server, monkeypatc
     monkeypatch.delenv("SAPPHIRE_PM_BOT_HOST", raising=False)
     monkeypatch.delenv("MODE", raising=False)
     monkeypatch.delenv("SAPPHIRE_PM_BOT_TIMEOUT_SECONDS", raising=False)
+    monkeypatch.delenv("SAPPHIRE_PM_BOT_PROBE_TIMEOUT_SECONDS", raising=False)
     server = reload_server()
     s = server.Settings.from_env()
     assert s.port == 18082
     assert s.host == "127.0.0.1"
     assert s.mode == "webhook"
     assert s.telegram_timeout_seconds == 30.0
+    assert s.telegram_probe_timeout_seconds == 2.0
+
+
+def test_settings_from_env_reads_probe_timeout(reload_server, monkeypatch):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_TOKEN", "xyz")
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_PROBE_TIMEOUT_SECONDS", "1.5")
+    server = reload_server()
+    s = server.Settings.from_env()
+    assert s.telegram_probe_timeout_seconds == 1.5
 
 
 def test_settings_from_env_handles_blank_port_string(reload_server, monkeypatch):
@@ -632,6 +660,54 @@ def test_settings_from_env_reports_token_source_and_polling_override(reload_serv
 # ---------------------------------------------------------------------------
 # health endpoint shape
 # ---------------------------------------------------------------------------
+
+
+def test_runtime_probe_uses_dedicated_probe_timeout(reload_server, monkeypatch):
+    server = reload_server()
+    monkeypatch.setattr(
+        server,
+        "SETTINGS",
+        server.Settings(
+            token=server.SETTINGS.token,
+            webhook_secret="",
+            mode="webhook",
+            host="127.0.0.1",
+            port=18082,
+            telegram_timeout_seconds=30.0,
+            telegram_probe_timeout_seconds=1.5,
+        ),
+    )
+    server._TELEGRAM_PROBE_CACHE["expires_at"] = 0.0
+    server._TELEGRAM_PROBE_CACHE["value"] = None
+    captured_timeouts: list[float] = []
+
+    def fake_get(url, timeout):
+        captured_timeouts.append(timeout)
+        if url.endswith("/getMe"):
+            return _FakeResponse(
+                status_code=200,
+                json_payload={"ok": True, "result": {"username": "NemotronRariBot", "id": 123}},
+            )
+        return _FakeResponse(
+            status_code=200,
+            json_payload={
+                "ok": True,
+                "result": {
+                    "url": "https://example.invalid/telegram/webhook",
+                    "pending_update_count": 2,
+                    "allowed_updates": ["message"],
+                },
+            },
+        )
+
+    monkeypatch.setattr(server.requests, "get", fake_get)
+
+    result = server._telegram_runtime_probe()
+
+    assert captured_timeouts == [1.5, 1.5]
+    assert result["probe_ok"] is True
+    assert result["bot_username"] == "NemotronRariBot"
+    assert result["delivery_ready"] is True
 
 
 def test_health_endpoint_full_shape_default_state(monkeypatch, tmp_path, reload_server):
