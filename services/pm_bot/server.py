@@ -9,6 +9,7 @@ import re
 import sys
 import threading
 import time
+from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -57,6 +58,12 @@ _WEBHOOK_SECRET_PATHS = [
 
 _TRUE_VALUES = {"1", "true", "yes", "on"}
 _DEDICATED_TOKEN_SOURCES = {"explicit_env"}
+_SUPPORTED_UPDATE_TYPES = [
+    "message",
+    "edited_message",
+    "channel_post",
+    "edited_channel_post",
+]
 
 
 def _read_first_secret_file(paths: list[Path]) -> str:
@@ -148,6 +155,7 @@ class Settings:
     telegram_timeout_seconds: float
     token_source: str = "explicit_env"
     shared_polling_allowed: bool = False
+    bot_username: str = ""
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -162,6 +170,7 @@ class Settings:
             telegram_timeout_seconds=float(os.getenv("SAPPHIRE_PM_BOT_TIMEOUT_SECONDS", "30")),
             token_source=token_source,
             shared_polling_allowed=_env_flag("SAPPHIRE_PM_BOT_ALLOW_SHARED_POLLING"),
+            bot_username=os.getenv("SAPPHIRE_PM_BOT_BOT_USERNAME", "").strip().lstrip("@"),
         )
 
 
@@ -187,7 +196,17 @@ class TelegramAPI:
             raise RuntimeError(f"Telegram API error for {method}: {data}")
         return data
 
-    def send_message(self, *, chat_id: int, text: str, parse_mode: str | None) -> dict[str, Any]:
+    def send_message(
+        self,
+        *,
+        chat_id: int,
+        text: str,
+        parse_mode: str | None,
+        disable_notification: bool = False,
+        reply_parameters: dict[str, Any] | None = None,
+        message_thread_id: int | None = None,
+        direct_messages_topic_id: int | None = None,
+    ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "chat_id": chat_id,
             "text": text,
@@ -195,11 +214,20 @@ class TelegramAPI:
         }
         if parse_mode:
             payload["parse_mode"] = parse_mode
+        if disable_notification:
+            payload["disable_notification"] = True
+        if reply_parameters:
+            payload["reply_parameters"] = reply_parameters
+        if message_thread_id is not None:
+            payload["message_thread_id"] = message_thread_id
+        if direct_messages_topic_id is not None:
+            payload["direct_messages_topic_id"] = direct_messages_topic_id
         return self._post("sendMessage", payload)
 
     def get_updates(self, *, offset: int, timeout: int = 30) -> list[dict[str, Any]]:
         data = self._post(
-            "getUpdates", {"offset": offset, "timeout": timeout, "allowed_updates": ["message"]}
+            "getUpdates",
+            {"offset": offset, "timeout": timeout, "allowed_updates": _SUPPORTED_UPDATE_TYPES},
         )
         result = data.get("result")
         if isinstance(result, list):
@@ -218,6 +246,10 @@ POLLING_STATE: dict[str, Any] = {
     "last_error": None,
     "offset": 0,
 }
+_RECENT_UPDATE_IDS: OrderedDict[int, float] = OrderedDict()
+_RECENT_UPDATE_IDS_LOCK = threading.Lock()
+_RECENT_UPDATE_WINDOW_SECONDS = 600.0
+_RECENT_UPDATE_LIMIT = 2048
 
 app = FastAPI(title="Sapphire PM Bot", version="0.1.0")
 
@@ -251,10 +283,72 @@ def _validate_startup_config() -> None:
 
 
 def _message_payload(update: dict[str, Any]) -> dict[str, Any]:
-    message = update.get("message")
-    if isinstance(message, dict):
-        return message
+    for key in _SUPPORTED_UPDATE_TYPES:
+        message = update.get(key)
+        if isinstance(message, dict):
+            return message
     return update
+
+
+def _message_id(update: dict[str, Any]) -> int | None:
+    message = _message_payload(update)
+    value = message.get("message_id")
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _message_thread_id(update: dict[str, Any]) -> int | None:
+    message = _message_payload(update)
+    value = message.get("message_thread_id")
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _direct_messages_topic_id(update: dict[str, Any]) -> int | None:
+    message = _message_payload(update)
+    value = message.get("direct_messages_topic_id")
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _mark_update_seen(update: dict[str, Any]) -> bool:
+    """Return True when this update_id was already processed recently."""
+
+    update_id = update.get("update_id")
+    if not isinstance(update_id, int):
+        return False
+    now = time.time()
+    with _RECENT_UPDATE_IDS_LOCK:
+        expired = []
+        for seen_id, seen_at in _RECENT_UPDATE_IDS.items():
+            if now - seen_at > _RECENT_UPDATE_WINDOW_SECONDS:
+                expired.append(seen_id)
+            else:
+                break
+        for seen_id in expired:
+            _RECENT_UPDATE_IDS.pop(seen_id, None)
+
+        if update_id in _RECENT_UPDATE_IDS:
+            _RECENT_UPDATE_IDS.move_to_end(update_id)
+            return True
+
+        _RECENT_UPDATE_IDS[update_id] = now
+        _RECENT_UPDATE_IDS.move_to_end(update_id)
+        while len(_RECENT_UPDATE_IDS) > _RECENT_UPDATE_LIMIT:
+            _RECENT_UPDATE_IDS.popitem(last=False)
+    return False
 
 
 def _chat_id(update: dict[str, Any]) -> int | None:
@@ -275,6 +369,10 @@ def _chat_id(update: dict[str, Any]) -> int | None:
 
 
 def process_update(update: dict[str, Any]) -> bool:
+    if _mark_update_seen(update):
+        logger.info("Ignoring duplicate Telegram update_id=%s", update.get("update_id"))
+        return False
+
     message = _message_payload(update)
     if not isinstance(message, dict):
         return False
@@ -295,6 +393,14 @@ def process_update(update: dict[str, Any]) -> bool:
         chat_id=chat_id,
         text=text,
         parse_mode=response.get("parse_mode"),
+        disable_notification=bool(response.get("disable_notification", False)),
+        reply_parameters=(
+            {"message_id": response.get("reply_to_message_id", _message_id(update))}
+            if response.get("reply_to_message_id", _message_id(update)) is not None
+            else None
+        ),
+        message_thread_id=_message_thread_id(update),
+        direct_messages_topic_id=_direct_messages_topic_id(update),
     )
     return True
 
@@ -371,6 +477,8 @@ def health() -> dict[str, Any]:
         "last_poll_error": POLLING_STATE.get("last_error"),
         "shared_polling_allowed": SETTINGS.shared_polling_allowed,
         "webhook_secret_configured": bool(SETTINGS.webhook_secret),
+        "bot_username": SETTINGS.bot_username,
+        "supported_update_types": list(_SUPPORTED_UPDATE_TYPES),
     }
 
 

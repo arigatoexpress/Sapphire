@@ -68,6 +68,12 @@ def test_message_payload_extracts_message_dict(reload_server):
     assert server._message_payload(update) == {"chat": {"id": 99}, "text": "hi"}
 
 
+def test_message_payload_extracts_edited_message_dict(reload_server):
+    server = reload_server()
+    update = {"update_id": 2, "edited_message": {"chat": {"id": 99}, "text": "hi again"}}
+    assert server._message_payload(update) == {"chat": {"id": 99}, "text": "hi again"}
+
+
 def test_message_payload_falls_back_to_top_level_when_missing(reload_server):
     """If the update has no ``message`` key, the top-level dict is treated as the
     message — matches the upstream tolerance pattern.
@@ -122,15 +128,70 @@ def test_process_update_dispatches_to_handler_and_sends_message(reload_server, m
 
     sent: list[dict] = []
 
-    def fake_send_message(*, chat_id, text, parse_mode):
-        sent.append({"chat_id": chat_id, "text": text, "parse_mode": parse_mode})
+    def fake_send_message(**kwargs):
+        sent.append(kwargs)
         return {"ok": True}
 
     monkeypatch.setattr(server.TELEGRAM_API, "send_message", fake_send_message)
 
     update = {"update_id": 9, "message": {"chat": {"id": 77}, "text": "/help"}}
     assert server.process_update(update) is True
-    assert sent == [{"chat_id": 77, "text": "PONG", "parse_mode": "Markdown"}]
+    assert sent == [
+        {
+            "chat_id": 77,
+            "text": "PONG",
+            "parse_mode": "Markdown",
+            "disable_notification": False,
+            "reply_parameters": None,
+            "message_thread_id": None,
+            "direct_messages_topic_id": None,
+        }
+    ]
+
+
+def test_process_update_replies_in_thread_with_defaults(reload_server, monkeypatch):
+    server = reload_server()
+
+    if str(TOOL_DIR) not in sys.path:
+        sys.path.insert(0, str(TOOL_DIR))
+    import sapphire_pm_bot
+
+    monkeypatch.setattr(
+        sapphire_pm_bot,
+        "handle_telegram_command",
+        lambda upd: {"text": "PONG", "parse_mode": "Markdown"},
+    )
+
+    sent: list[dict[str, Any]] = []
+
+    def fake_send_message(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    monkeypatch.setattr(server.TELEGRAM_API, "send_message", fake_send_message)
+
+    update = {
+        "update_id": 10,
+        "edited_message": {
+            "message_id": 55,
+            "message_thread_id": 9001,
+            "direct_messages_topic_id": 7,
+            "chat": {"id": 77},
+            "text": "/help",
+        },
+    }
+    assert server.process_update(update) is True
+    assert sent == [
+        {
+            "chat_id": 77,
+            "text": "PONG",
+            "parse_mode": "Markdown",
+            "disable_notification": False,
+            "reply_parameters": {"message_id": 55},
+            "message_thread_id": 9001,
+            "direct_messages_topic_id": 7,
+        }
+    ]
 
 
 def test_process_update_returns_false_when_no_text(reload_server, monkeypatch):
@@ -165,6 +226,26 @@ def test_process_update_returns_false_when_handler_returns_empty_text(reload_ser
     update = {"message": {"chat": {"id": 8}, "text": "/noop"}}
     assert server.process_update(update) is False
     assert sent == []
+
+
+def test_process_update_ignores_duplicate_update_ids(reload_server, monkeypatch):
+    server = reload_server()
+    if str(TOOL_DIR) not in sys.path:
+        sys.path.insert(0, str(TOOL_DIR))
+    import sapphire_pm_bot
+
+    monkeypatch.setattr(
+        sapphire_pm_bot,
+        "handle_telegram_command",
+        lambda upd: {"text": "first", "parse_mode": None},
+    )
+    sent: list[dict[str, Any]] = []
+    monkeypatch.setattr(server.TELEGRAM_API, "send_message", lambda **kw: sent.append(kw))
+
+    update = {"update_id": 444, "message": {"message_id": 9, "chat": {"id": 8}, "text": "/help"}}
+    assert server.process_update(update) is True
+    assert server.process_update(update) is False
+    assert len(sent) == 1
 
 
 def test_process_update_returns_false_for_non_dict_payload(reload_server, monkeypatch):
@@ -248,6 +329,32 @@ def test_telegram_send_message_includes_disable_web_page_preview(reload_server, 
     assert captured["json"]["parse_mode"] == "HTML"
 
 
+def test_telegram_send_message_supports_reply_and_silent_delivery(reload_server, monkeypatch):
+    server = reload_server()
+    captured: dict[str, Any] = {}
+
+    def fake_post(url, json, timeout):
+        captured["json"] = json
+        return _FakeResponse(status_code=200, json_payload={"ok": True, "result": {}})
+
+    monkeypatch.setattr(server.requests, "post", fake_post)
+
+    server.TELEGRAM_API.send_message(
+        chat_id=42,
+        text="hello",
+        parse_mode="HTML",
+        disable_notification=True,
+        reply_parameters={"message_id": 99},
+        message_thread_id=10,
+        direct_messages_topic_id=11,
+    )
+
+    assert captured["json"]["disable_notification"] is True
+    assert captured["json"]["reply_parameters"] == {"message_id": 99}
+    assert captured["json"]["message_thread_id"] == 10
+    assert captured["json"]["direct_messages_topic_id"] == 11
+
+
 def test_telegram_send_message_omits_parse_mode_when_none(reload_server, monkeypatch):
     server = reload_server()
     captured: dict = {}
@@ -285,6 +392,26 @@ def test_telegram_get_updates_filters_non_dict_results(reload_server, monkeypatc
     updates = server.TELEGRAM_API.get_updates(offset=0)
 
     assert [u["update_id"] for u in updates] == [1, 2]
+
+
+def test_telegram_get_updates_requests_supported_update_types(reload_server, monkeypatch):
+    server = reload_server()
+    captured: dict[str, Any] = {}
+
+    def fake_post(url, json, timeout):
+        captured["json"] = json
+        return _FakeResponse(status_code=200, json_payload={"ok": True, "result": []})
+
+    monkeypatch.setattr(server.requests, "post", fake_post)
+
+    server.TELEGRAM_API.get_updates(offset=5)
+
+    assert captured["json"]["allowed_updates"] == [
+        "message",
+        "edited_message",
+        "channel_post",
+        "edited_channel_post",
+    ]
 
 
 def test_telegram_get_updates_returns_empty_when_result_not_list(reload_server, monkeypatch):
@@ -518,6 +645,13 @@ def test_health_endpoint_full_shape_default_state(monkeypatch, tmp_path, reload_
         response = http.get("/health")
 
     assert response.status_code == 200
+    payload = response.json()
+    assert payload["supported_update_types"] == [
+        "message",
+        "edited_message",
+        "channel_post",
+        "edited_channel_post",
+    ]
     body = response.json()
     assert body["status"] == "ok"
     assert body["service"] == "sapphire-pm-bot"

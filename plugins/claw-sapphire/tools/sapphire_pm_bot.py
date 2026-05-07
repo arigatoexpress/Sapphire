@@ -91,6 +91,7 @@ THO_BASE_URL = os.getenv(
 )
 STATUS_HELP_TEXT = (
     "Available commands:\n"
+    "You can also tag the bot in a group, for example @SapphirePMBot status\n"
     "• /help\n"
     "• /status\n"
     "• /health\n"
@@ -207,6 +208,103 @@ def _message_text(update: dict[str, Any]) -> str:
     message = _message_from_update(update)
     text = message.get("text")
     return str(text or "").strip()
+
+
+def _bot_username() -> str:
+    return str(os.getenv("SAPPHIRE_PM_BOT_BOT_USERNAME", "")).strip().lstrip("@").lower()
+
+
+def _reply_targets_this_bot(update: dict[str, Any]) -> bool:
+    """Return True when the incoming message replies to one of this bot's messages."""
+
+    username = _bot_username()
+    if not username:
+        return False
+    message = _message_from_update(update)
+    reply = message.get("reply_to_message")
+    if not isinstance(reply, dict):
+        return False
+    sender = reply.get("from")
+    if not isinstance(sender, dict):
+        return False
+    return bool(sender.get("is_bot")) and (
+        str(sender.get("username") or "").strip().lstrip("@").lower() == username
+    )
+
+
+def _strip_command_username_suffix(text: str) -> str:
+    if not text.startswith("/"):
+        return text
+    first, sep, rest = text.partition(" ")
+    command, at, _username = first.partition("@")
+    if at and command.startswith("/"):
+        return f"{command}{sep}{rest}".strip()
+    return text
+
+
+def _normalize_mention_command_body(text: str) -> str:
+    """Convert guest-mention or reply shorthand into canonical slash commands."""
+
+    lowered = text.lower().strip()
+    mapping = (
+        ("dev pulse", "/dev pulse"),
+        ("svc status", "/svc status"),
+        ("digest morning", "/digest morning"),
+        ("digest dev", "/digest dev"),
+        ("routines list", "/routines list"),
+        ("routines status", "/routines status"),
+        ("routines pause ", "/routines pause "),
+        ("routines resume ", "/routines resume "),
+        ("cancel-routine ", "/cancel-routine "),
+        ("pm list", "/pm list"),
+        ("pm new ", "/pm new "),
+        ("rag ", "/rag "),
+        ("claw ", "/claw "),
+        ("help", "/help"),
+        ("start", "/start"),
+        ("status", "/status"),
+        ("health", "/health"),
+        ("services", "/services"),
+        ("whoami", "/whoami"),
+    )
+    for source, target in mapping:
+        if lowered == source:
+            return target
+        if source.endswith(" ") and lowered.startswith(source):
+            return f"{target}{text[len(source):].strip()}".strip()
+    return text
+
+
+def _normalize_telegram_command_text(update: dict[str, Any]) -> str:
+    """Normalize Telegram guest mentions, reply shorthand, and /cmd@bot syntax."""
+
+    text = _strip_command_username_suffix(_message_text(update))
+    if not text:
+        return text
+    if text.startswith("/"):
+        return text
+
+    username = _bot_username()
+    mention_prefix = f"@{username}" if username else ""
+    if text.startswith("@") and " " in text:
+        _mentioned, _sep, remainder = text.partition(" ")
+        remainder = remainder.lstrip(" ,:.-\n\t")
+        if remainder.startswith("/"):
+            return _strip_command_username_suffix(remainder)
+        normalized = _normalize_mention_command_body(remainder)
+        if normalized.startswith("/"):
+            return normalized
+    if mention_prefix and text.lower().startswith(mention_prefix):
+        remainder = text[len(mention_prefix) :].lstrip(" ,:.-\n\t")
+        if remainder.startswith("/"):
+            return _strip_command_username_suffix(remainder)
+        return _normalize_mention_command_body(remainder)
+
+    if _reply_targets_this_bot(update):
+        normalized = _normalize_mention_command_body(text)
+        if normalized.startswith("/"):
+            return normalized
+    return text
 
 
 def _allowed_user_ids() -> set[int]:
@@ -1115,6 +1213,7 @@ def _handle_whoami(update: dict[str, Any]) -> dict[str, Any]:
         f"user_id: {sender_id if sender_id is not None else 'unknown'}",
         f"username: {username}",
         f"chat_id: {chat_id if chat_id is not None else 'unknown'}",
+        f"reply_targets_bot: {_reply_targets_this_bot(update)}",
     ]
     return _response("\n".join(escape_markdown_v2(line) for line in lines), "MarkdownV2")
 
@@ -1192,7 +1291,7 @@ def handle_telegram_command(update: dict[str, Any]) -> dict[str, Any]:
     if refusal is not None:
         return refusal
 
-    text = _message_text(update)
+    text = _normalize_telegram_command_text(update)
 
     refusal = _ensure_not_forbidden(text)
     if refusal is not None:
