@@ -26,7 +26,9 @@ def test_product_index_lists_products_and_safety_posture() -> None:
     by_id = {product["product_id"]: product for product in payload["products"]}
     assert by_id["market_regime_report"]["route"] == "/api/x402/market-regime"
     assert by_id["backtest_receipt"]["route"] == "/api/x402/backtest"
+    assert by_id["agentwiki_builder_brief"]["category"] == "agentwiki"
     assert by_id["backtest_receipt"]["readiness"] == "source_review_required"
+    assert by_id["agentwiki_builder_brief"]["readiness"] == "source_review_required"
     assert by_id["backtest_receipt"]["source_count"] >= 1
 
 

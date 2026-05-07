@@ -567,6 +567,14 @@ def _append_x402_market_regime_receipt(
     )
 
 
+def _agentwiki_context():
+    from lib.payments.agentwiki import load_validated_agentwiki_artifacts
+
+    catalog, registry = _x402_product_catalogs()
+    artifacts = load_validated_agentwiki_artifacts(catalog, registry)
+    return catalog, registry, artifacts
+
+
 def _matrix_payload(snapshot: dict[str, Any], *, window: str, method: str) -> dict[str, Any]:
     matrix_root = snapshot.get("matrix") or {}
     windows = matrix_root.get("windows") or {}
@@ -5192,6 +5200,131 @@ def api_x402_backtest():
         return jsonify({"error": str(exc)}), 400
     except Exception as exc:  # noqa: BLE001
         log.exception("x402 backtest receipt failed")
+        return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 500
+
+
+@app.route("/api/x402/agentwiki/search")
+@requires_auth
+def api_x402_agentwiki_search():
+    """Free, authenticated discovery for rights-labeled AgentWiki artifacts."""
+
+    try:
+        from lib.payments.agentwiki import search_agentwiki_artifacts
+
+        catalog, registry, artifacts = _agentwiki_context()
+        try:
+            limit = int(request.args.get("limit", "10"))
+        except ValueError:
+            limit = 10
+        payload = search_agentwiki_artifacts(
+            artifacts,
+            catalog,
+            registry,
+            query=str(request.args.get("q") or ""),
+            max_price_usd=request.args.get("max_price"),
+            category=request.args.get("category"),
+            limit=limit,
+        )
+        return jsonify(payload)
+    except Exception as exc:  # noqa: BLE001
+        log.exception("AgentWiki search failed")
+        return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 500
+
+
+@app.route("/api/x402/agentwiki/artifacts/<artifact_id>/quote")
+@requires_auth
+def api_x402_agentwiki_quote(artifact_id: str):
+    """Free quote and rights preview before an AgentWiki paid fetch."""
+
+    try:
+        from lib.payments.agentwiki import artifact_by_id, quote_agentwiki_artifact
+
+        catalog, registry, artifacts = _agentwiki_context()
+        artifact = artifact_by_id(artifacts, artifact_id)
+        product = catalog.get(artifact.product_id)
+        return jsonify(quote_agentwiki_artifact(artifact, product, registry))
+    except KeyError:
+        return jsonify({"error": "AgentWiki artifact not found", "artifact_id": artifact_id}), 404
+    except Exception as exc:  # noqa: BLE001
+        log.exception("AgentWiki quote failed")
+        return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 500
+
+
+@app.route("/api/x402/agentwiki/artifacts/<artifact_id>/content", methods=["POST"])
+@requires_auth
+def api_x402_agentwiki_content(artifact_id: str):
+    """Simulated x402-paid AgentWiki artifact delivery.
+
+    This endpoint serves static, rights-labeled seed artifacts only. It does not
+    crawl, bypass access controls, mutate external systems, or enable live
+    settlement.
+    """
+
+    endpoint = f"/api/x402/agentwiki/artifacts/{artifact_id}/content"
+    try:
+        from lib.payments.agentwiki import artifact_by_id, build_agentwiki_artifact_payload
+
+        catalog, registry, artifacts = _agentwiki_context()
+        artifact = artifact_by_id(artifacts, artifact_id)
+        product = catalog.get(artifact.product_id)
+        middleware = _x402_product_middleware(product)
+        requirements = product.to_payment_requirements(
+            resource_url=request.url,
+            pay_to=middleware.recipient,
+            network=middleware.network,
+            asset=middleware.asset,
+        )
+        payment_header = _x402_payment_header()
+        allowed, body, result = middleware.gate(
+            request.url,
+            float(product.price_usd),
+            payment_header,
+            product.description,
+            requirements=requirements,
+        )
+        if not allowed:
+            status = "required" if not payment_header else "rejected"
+            receipt = _append_x402_product_receipt(
+                product=product,
+                requirements=requirements,
+                payment_header=payment_header,
+                verification=result,
+                status=status,
+                endpoint=endpoint,
+            )
+            response_body = dict(body or {})
+            response_body["receipt"] = {
+                "receipt_id": receipt.receipt_id,
+                "status": receipt.status,
+                "product_id": receipt.product_id,
+            }
+            resp = jsonify(response_body)
+            resp.status_code = 402
+            resp.headers["X-Payment-Required"] = "true"
+            return resp
+
+        payload = build_agentwiki_artifact_payload(artifact, product, registry)
+        receipt = _append_x402_product_receipt(
+            product=product,
+            requirements=requirements,
+            payment_header=payment_header,
+            verification=result,
+            status="accepted",
+            endpoint=endpoint,
+            artifact_id=str(payload.get("delivery_id") or artifact_id),
+        )
+        payload["payment"] = {
+            "receipt_id": receipt.receipt_id,
+            "status": receipt.status,
+            "network": receipt.network,
+            "amount_atomic": receipt.amount_atomic,
+            "live_settlement_allowed": product.live_settlement_allowed,
+        }
+        return jsonify(payload)
+    except KeyError:
+        return jsonify({"error": "AgentWiki artifact not found", "artifact_id": artifact_id}), 404
+    except Exception as exc:  # noqa: BLE001
+        log.exception("AgentWiki artifact delivery failed")
         return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 500
 
 

@@ -1,0 +1,189 @@
+{
+  "schema_version": 1,
+  "artifacts": [
+    {
+      "artifact_id": "aw_opportunities_federal_fit",
+      "product_id": "agentwiki_builder_brief",
+      "title": "Federal Grants and RFP Fit Brief",
+      "category": "opportunity_intelligence",
+      "description": "A source-cited brief for builders matching public grants and procurement notices to a specific project profile.",
+      "audience": ["grant_writers", "nonprofits", "small_agencies", "founder_consultants"],
+      "source_ids": ["sam_gov_opportunities", "grants_gov", "data_gov_catalog"],
+      "tags": ["grants", "rfp", "procurement", "small-business", "public-sector"],
+      "freshness": {
+        "class": "daily",
+        "ttl_seconds": 86400,
+        "last_verified": "seeded_static_catalog"
+      },
+      "rights": {
+        "license_id": "public_official_fair_access",
+        "allowed_uses": ["read", "summarize", "fact_extract", "cite", "private_cache"],
+        "prohibited_uses": ["resell_raw_source", "train", "claim_live_award_status"],
+        "cache_until": "ttl",
+        "max_extract": "facts_and_short_quotes_only",
+        "attribution": "SAM.gov, Grants.gov, and Data.gov source links required",
+        "privacy_class": "public",
+        "redistribution": "derived_facts_with_citation"
+      },
+      "preview": {
+        "data_points": ["deadline", "agency", "eligibility", "award_range", "required_documents"],
+        "sample_questions": [
+          "Which opportunities match a rural AI workforce project?",
+          "What documents are required before bid/no-bid?"
+        ]
+      },
+      "content": {
+        "summary": "Use public federal opportunity sources to produce a fit-scored opportunity brief with deadlines, eligibility flags, required documents, amendment watch items, and next actions.",
+        "workflow": [
+          "Collect opportunity notices from authorized public APIs or cached official exports.",
+          "Normalize deadline, agency, NAICS/CFDA/assistance listing, place of performance, and eligibility fields.",
+          "Score fit against the buyer profile and surface disqualifiers before recommending effort.",
+          "Return source links, last-checked timestamps, and a checklist for the next human action."
+        ],
+        "next_actions": [
+          "Build a profile schema for organization type, location, capabilities, and target award size.",
+          "Seed daily SAM.gov and Grants.gov snapshots before adding partner-only sources.",
+          "Export accepted matches to Sheets, Airtable, or a proposal tracker."
+        ]
+      }
+    },
+    {
+      "artifact_id": "aw_regulatory_deadline_watch",
+      "product_id": "agentwiki_builder_brief",
+      "title": "Regulatory Deadline Watch",
+      "category": "compliance_monitoring",
+      "description": "A deadline/change radar for builders tracking public regulatory notices and compliance windows.",
+      "audience": ["smb_operators", "founders", "compliance_consultants", "builders"],
+      "source_ids": ["regulations_gov", "data_gov_catalog"],
+      "tags": ["regulation", "compliance", "deadline", "public-comment", "monitoring"],
+      "freshness": {
+        "class": "daily",
+        "ttl_seconds": 86400,
+        "last_verified": "seeded_static_catalog"
+      },
+      "rights": {
+        "license_id": "public_official_fair_access",
+        "allowed_uses": ["read", "summarize", "fact_extract", "cite", "private_cache"],
+        "prohibited_uses": ["resell_raw_source", "train", "claim_legal_advice"],
+        "cache_until": "ttl",
+        "max_extract": "facts_and_short_quotes_only",
+        "attribution": "Regulations.gov and agency source links required",
+        "privacy_class": "public",
+        "redistribution": "derived_facts_with_citation"
+      },
+      "preview": {
+        "data_points": ["comment_deadline", "agency", "docket_id", "rule_stage", "affected_industries"],
+        "sample_questions": [
+          "Which AI or data rules changed this week?",
+          "What deadlines affect a small healthcare software business?"
+        ]
+      },
+      "content": {
+        "summary": "Track public regulatory notices, normalize docket metadata, and generate non-legal action checklists for builders who need to notice changes early.",
+        "workflow": [
+          "Read official docket and notice metadata through permitted public APIs or exports.",
+          "Extract comment windows, effective dates, affected industries, and cited statutes.",
+          "Diff the latest snapshot against prior cached versions and flag changed deadlines.",
+          "Return a source-cited monitor page with practical next-check prompts."
+        ],
+        "next_actions": [
+          "Add saved industry profiles for AI, construction, healthcare, fintech, and food businesses.",
+          "Attach non-legal disclaimers to every compliance artifact.",
+          "Create alert routes for deadline changes and new comment windows."
+        ]
+      }
+    },
+    {
+      "artifact_id": "aw_local_market_program_map",
+      "product_id": "agentwiki_builder_brief",
+      "title": "Local Market and Program Map",
+      "category": "regional_opportunity",
+      "description": "A regional builder brief that combines public datasets, grant catalogs, and Census business patterns into a local opportunity map.",
+      "audience": ["local_businesses", "economic_development_groups", "founders", "consultants"],
+      "source_ids": ["data_gov_catalog", "census_cbp_zbp", "grants_gov"],
+      "tags": ["local-market", "regional", "census", "programs", "smb"],
+      "freshness": {
+        "class": "weekly_to_annual",
+        "ttl_seconds": 604800,
+        "last_verified": "seeded_static_catalog"
+      },
+      "rights": {
+        "license_id": "public_official_fair_access",
+        "allowed_uses": ["read", "summarize", "fact_extract", "cite", "private_cache"],
+        "prohibited_uses": ["resell_raw_source", "train", "claim_real_time_availability"],
+        "cache_until": "ttl",
+        "max_extract": "facts_and_short_quotes_only",
+        "attribution": "Data.gov, Census, and Grants.gov source links required",
+        "privacy_class": "public_aggregate",
+        "redistribution": "derived_facts_with_citation"
+      },
+      "preview": {
+        "data_points": ["county", "industry", "establishments", "program_count", "matched_requirements"],
+        "sample_questions": [
+          "Where are local programs for climate or public safety builders?",
+          "What business-density context should a founder know before entering a region?"
+        ]
+      },
+      "content": {
+        "summary": "Combine official public catalogs and aggregate Census business data into a regional opportunity map that is useful to new builders without exposing private records.",
+        "workflow": [
+          "Normalize public program records and aggregate local business signals by geography and industry.",
+          "Preserve source URLs, retrieval dates, geography scope, and data vintage.",
+          "Score local relevance with clear caveats for annual or stale datasets.",
+          "Export a map-ready table plus a plain-English opportunity brief."
+        ],
+        "next_actions": [
+          "Add region profile inputs for county, state, industry, and buyer type.",
+          "Build a source-vintage warning when annual Census records are mixed with daily program data.",
+          "Create example pages for Colorado public safety, Houston SMB, and wildfire resilience."
+        ]
+      }
+    },
+    {
+      "artifact_id": "aw_developer_api_change_radar",
+      "product_id": "agentwiki_builder_brief",
+      "title": "Developer API Change Radar",
+      "category": "developer_intelligence",
+      "description": "A tested-docs radar for builders tracking public API docs, changelogs, pricing pages, limits, and auth scope changes.",
+      "audience": ["developers", "devrel", "agent_builders", "technical_founders"],
+      "source_ids": ["developer_docs_public", "github_releases"],
+      "tags": ["developer-docs", "api", "changelog", "sdk", "limits"],
+      "freshness": {
+        "class": "daily",
+        "ttl_seconds": 86400,
+        "last_verified": "seeded_static_catalog"
+      },
+      "rights": {
+        "license_id": "public_docs_with_source_terms",
+        "allowed_uses": ["read", "summarize", "fact_extract", "cite", "private_cache"],
+        "prohibited_uses": ["resell_raw_docs", "train_without_license", "claim_vendor_certification"],
+        "cache_until": "ttl",
+        "max_extract": "facts_and_short_quotes_only",
+        "attribution": "Vendor documentation and repository links required",
+        "privacy_class": "public",
+        "redistribution": "derived_facts_with_citation"
+      },
+      "preview": {
+        "data_points": ["endpoint", "auth_scope", "rate_limit", "pricing_change", "sdk_version"],
+        "sample_questions": [
+          "Which API limits changed since the last agent run?",
+          "Which examples are stale or untested?"
+        ]
+      },
+      "content": {
+        "summary": "Track public docs and releases as a builder-facing wiki that separates current facts, tested examples, stale snippets, and unknown contract areas.",
+        "workflow": [
+          "Ingest public docs and release metadata only where source terms permit indexing.",
+          "Diff endpoint names, auth scopes, SDK versions, pricing limits, and breaking-change notes.",
+          "Mark snippets as tested, untested, stale, or blocked by auth.",
+          "Return a source-cited change radar for agents before they generate code."
+        ],
+        "next_actions": [
+          "Seed first sources from Sapphire's own API docs, x402 docs, MCP docs, and partner-friendly open docs.",
+          "Add a small endpoint-test harness for public no-auth examples.",
+          "Expose an MCP prompt for purchase planning before a paid docs fetch."
+        ]
+      }
+    }
+  ]
+}
