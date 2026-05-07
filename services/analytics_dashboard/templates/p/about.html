@@ -12,10 +12,10 @@
 <section class="box">
   <h2 class="section">THE_THESIS</h2>
   <p style="line-height: 1.8;">
-    Trading desks watch one screen. Threat-intel desks watch another. Compliance, regional intel, on-chain analytics, customer ops — each in its own silo, each producing data the others would die for. Sapphire OS is the integration layer: a single decision surface that observes every silo, correlates across them, and emits actions you can read in plain English.
+    Trading desks watch one screen. Threat-intel desks watch another. Compliance, regional intel, on-chain analytics, customer ops — each in its own silo, each producing data the others would die for. Sapphire OS is the integration layer: a public proof surface plus a gated operator console that observes every silo, correlates across them, and emits actions you can read in plain English.
   </p>
   <p style="line-height: 1.8;">
-    Telegram-first. Agent-driven. Event-bus mediated. Built on top of <code>claw-code</code> (Rust agent runtime) with a Python plugin layer. Pure deterministic synthesis at the core — no LLM hop in the critical path. Fast, predictable, auditable.
+    Agent-driven. Event-bus mediated. Pure deterministic synthesis at the core, with public-safe summaries outside the admin panel and sensitive actions/data locked behind passkeys. Fast, predictable, auditable.
   </p>
 </section>
 
@@ -54,13 +54,10 @@
 <section class="box">
   <h2 class="section">THE_BRAIN</h2>
   <p style="line-height: 1.8;">
-    Three deterministic endpoints behind <code>/api/brain/*</code>:
-    <code>synthesis</code> observes every silo and emits a single situational-awareness brief (degraded silos, top priority actions, health score 0..1);
-    <code>correlate</code> runs a pattern catalog over the latest silo state for ranked cross-silo correlations;
-    <code>history</code> backs the rolling sparkline so you can see the system's mood drift over 48 hours.
+    <code>/api/brain/synthesis</code> now emits a public-safe situational-awareness brief: health score, degraded silo names, and a plain-English narrative. Priority actions, <code>correlate</code>, persisted <code>history</code>, and forced refresh/persist controls are passkey-gated through <code>/admin</code>.
   </p>
   <p style="line-height: 1.8;">
-    No LLM hop in v0. Predictable. Auditable. The <code>/p/brain</code> page is the live view.
+    Predictable. Auditable. The <code>/p/brain</code> page is the public view; <code>/admin</code> is the operator view.
   </p>
 </section>
 
@@ -68,11 +65,9 @@
   <h2 class="section">PROOF_OF_WORK</h2>
   <ul style="line-height: 1.85;">
     <li>6,488+ collected tests across core + plugin (verified by <code>scripts/ops/test_inventory.py --check-readme</code>).</li>
-    <li>22 scheduled tasks + 8 cloud routines (claude.ai/code/routines).</li>
-    <li>20 macOS LaunchAgents in production on the Mac commander.</li>
+    <li>Scheduled cloud and local routines are monitored, with raw topology gated behind admin.</li>
     <li>3 deployed smart contracts: <code>SapphireSignalVerifier</code> (zk hash), <code>SapphirePaymentGate</code> (x402), <code>SapphireSentinelRegistry</code> (mandate anchor).</li>
-    <li>First $5 BTC live fill on Robinhood Crypto: 2026-04-28 04:06 UTC at $76,774.81.</li>
-    <li>Hyperliquid live executor with $5/order, 3x lev, $25/day kill cap, file-killswitch.</li>
+    <li>Trading research exists, but public pages do not expose signals, fills, executor configuration, or order-control paths.</li>
     <li>Wildfire Watch: 3D-printed AI drones for fire-dept partnership (Phase 0 live).</li>
   </ul>
 </section>
@@ -80,8 +75,8 @@
 <section class="box">
   <h2 class="section">PHILOSOPHY</h2>
   <ul style="line-height: 1.85;">
-    <li><strong>PnL is king.</strong> Sortino + Calmar over Sharpe. Live capital with hard caps before live capital scaling.</li>
-    <li><strong>Fail closed.</strong> Mainnet refused until signing is verified on testnet. Killswitch files block every order.</li>
+    <li><strong>Truth is king.</strong> Real data over mock data; locked states over pretending a broken panel is healthy.</li>
+    <li><strong>Fail closed.</strong> Sensitive data, persistence, trading, money, and external sends remain gated.</li>
     <li><strong>Mac is commander.</strong> No Pi dependency — system must be resilient without them.</li>
     <li><strong>Autonomous.</strong> System should work even when the operator is away.</li>
     <li><strong>Cypherpunk first.</strong> Open-source, self-hostable, no telemetry, no vendor lock-in.</li>

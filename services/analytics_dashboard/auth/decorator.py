@@ -31,6 +31,26 @@ def _wants_json() -> bool:
     return requested == "xmlhttprequest"
 
 
+def admin_session_payload() -> dict | None:
+    """Return the verified admin session payload for the current request."""
+    sm = current_app.extensions.get("sapphire_admin_session")
+    if sm is None:
+        return None
+    return sm.verify_session(request.cookies.get(SESSION_COOKIE_NAME))
+
+
+def has_admin_session() -> bool:
+    """Return true when the request has a valid admin session cookie."""
+    return admin_session_payload() is not None
+
+
+def admin_required_response():
+    """Return the standard response for a missing admin session."""
+    if _wants_json():
+        return jsonify({"error": "unauthorized"}), 401
+    return redirect("/admin/login")
+
+
 def requires_admin(view_func: Callable):
     """Block access unless a valid admin session cookie is present."""
 
@@ -40,12 +60,9 @@ def requires_admin(view_func: Callable):
         if sm is None:
             # Misconfiguration — bail with a clean 503 instead of crashing.
             return jsonify({"error": "admin_auth_not_configured"}), 503
-        token = request.cookies.get(SESSION_COOKIE_NAME)
-        payload = sm.verify_session(token)
+        payload = sm.verify_session(request.cookies.get(SESSION_COOKIE_NAME))
         if not payload:
-            if _wants_json():
-                return jsonify({"error": "unauthorized"}), 401
-            return redirect("/admin/login")
+            return admin_required_response()
         g.admin_user = payload.get("user_id", "admin")
         g.admin_session = payload
         return view_func(*args, **kwargs)

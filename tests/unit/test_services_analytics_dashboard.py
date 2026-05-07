@@ -106,7 +106,21 @@ def app_module(monkeypatch):
 
 @pytest.fixture
 def client(app_module):
-    return app_module.app.test_client()
+    c = app_module.app.test_client()
+    _install_test_admin_session(app_module)
+    c.set_cookie("sapphire_admin", "test-admin")
+    return c
+
+
+class _TestAdminSession:
+    def verify_session(self, token):
+        if token == "test-admin":
+            return {"user_id": "test-admin"}
+        return None
+
+
+def _install_test_admin_session(app_module):
+    app_module.app.extensions["sapphire_admin_session"] = _TestAdminSession()
 
 
 # ---------------------------------------------------------------------------
@@ -495,6 +509,66 @@ def test_signals_recent_default_limit_is_100(client, app_module, monkeypatch):
     assert captured["params"][0].value == 100
 
 
+def test_sensitive_endpoints_require_admin_cookie(app_module):
+    _install_test_admin_session(app_module)
+    public = app_module.app.test_client()
+
+    for path in [
+        "/api/performance",
+        "/api/predictions",
+        "/api/predictions/accuracy",
+        "/api/correlation/matrix",
+        "/api/vpin",
+        "/api/deflated-sharpe/rolling",
+        "/api/timeseries/inference",
+        "/api/timeseries/services",
+        "/api/silos/business",
+        "/api/silos/inference",
+        "/api/signals/recent",
+        "/api/brain/history",
+        "/api/brain/correlate",
+    ]:
+        response = public.get(path)
+        assert response.status_code == 401, path
+        assert response.get_json()["error"] == "unauthorized"
+
+
+def test_public_silos_health_hides_service_details(app_module, monkeypatch):
+    _install_test_admin_session(app_module)
+    monkeypatch.setattr(
+        app_module,
+        "_rows",
+        lambda sql, params=None: [
+            {
+                "service": "secret-service",
+                "status": "healthy",
+                "host": "internal-host",
+                "last_seen": datetime(2026, 5, 7, 12, 0, tzinfo=UTC),
+                "response_ms": 12,
+            }
+        ],
+    )
+    public = app_module.app.test_client()
+
+    response = public.get("/api/silos/health")
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["mode"] == "public_silos_health_summary"
+    assert body["services"] == []
+    assert body["service_summary"]["reporting"] == 1
+    assert "admin_required_for" in body
+
+
+def test_public_brain_persist_requires_admin(app_module):
+    _install_test_admin_session(app_module)
+    public = app_module.app.test_client()
+
+    response = public.get("/api/brain/synthesis?persist=1")
+
+    assert response.status_code == 401
+    assert response.get_json()["error"] == "unauthorized"
+
+
 def test_invalid_days_param_rejected_with_500(client, app_module, monkeypatch):
     """``int(request.args.get(...))`` raises ValueError on non-numeric input,
     which Flask surfaces as a 500. Anchor that behavior so any future input
@@ -620,8 +694,10 @@ def test_index_renders_brain_panel_in_terminal_tab():
     # Marker 2: brain hero panel contains the composite gauge and narrative.
     assert '<div class="section-h" id="brain-section-h">' in html
 
-    # Marker 3: the Persist + Run button reaches a canonical persist endpoint.
-    assert "/api/brain/synthesis?persist=1" in html or "/api/brain/llm-refresh?persist=1" in html
+    # Marker 3: public page routes privileged controls to the admin console.
+    assert 'href="/admin"' in html
+    assert "/api/brain/synthesis?persist=1" not in html
+    assert "/api/brain/correlate" not in html
 
     # Marker 4: narrative, actions, and degraded element ids ship.
     assert 'id="brain-narrative"' in html
@@ -656,16 +732,15 @@ def test_index_onboarding_tour_is_help_invoked_not_auto_started():
     assert "setTimeout(() => startTour(false)" not in html
 
 
-def test_index_brain_panel_fetches_core_brain_endpoints():
-    """The brain data-loader hits synthesis and correlate.  history is
-    backend-only today (no UI sparkline) — if a future refactor wires
-    it into the tab loader this test should be expanded.
+def test_index_brain_panel_fetches_public_brain_summary_only():
+    """The public brain data-loader hits synthesis only. Privileged
+    history, persistence, and correlation endpoints stay out of the shell.
     """
     template_path = REPO_ROOT / "services" / "analytics_dashboard" / "templates" / "index.html"
     html = template_path.read_text(encoding="utf-8")
     assert "/api/brain/synthesis" in html
-    # correlate is exposed via a button — ensure it's reachable from the UI.
-    assert "/api/brain/correlate" in html
+    assert "/api/brain/correlate" not in html
+    assert "/api/brain/history" not in html
 
 
 # ---------------------------------------------------------------------------
