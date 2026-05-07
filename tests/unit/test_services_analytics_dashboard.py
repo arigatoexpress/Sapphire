@@ -639,6 +639,15 @@ def test_index_renders_project_tab_manifest():
     assert "Open THO Frontend" not in html  # rendered from data, not hard-coded drift
 
 
+def test_index_markets_panel_distinguishes_partial_feed_from_total_outage():
+    template_path = REPO_ROOT / "services" / "analytics_dashboard" / "templates" / "index.html"
+    html = template_path.read_text(encoding="utf-8")
+
+    assert "Global market totals loaded; showing trending assets" in html
+    assert "Price list temporarily unavailable" in html
+    assert "const trending = Array.isArray(data.trending)" in html
+
+
 def test_index_brain_panel_fetches_core_brain_endpoints():
     """The brain data-loader hits synthesis and correlate.  history is
     backend-only today (no UI sparkline) — if a future refactor wires
