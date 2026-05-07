@@ -3132,8 +3132,6 @@ document.getElementById('tour-next-btn').addEventListener('click', () => {
 });
 document.getElementById('tour-skip-btn').addEventListener('click', endTour);
 document.getElementById('tour-backdrop').addEventListener('click', endTour);
-// Auto-start tour on first visit (small delay to let dashboard render).
-setTimeout(() => startTour(false), 1200);
 
 // Help-modal action buttons
 document.getElementById('help-show-tour')?.addEventListener('click', () => { closeHelp(); startTour(true); });

@@ -648,6 +648,14 @@ def test_index_markets_panel_distinguishes_partial_feed_from_total_outage():
     assert "const trending = Array.isArray(data.trending)" in html
 
 
+def test_index_onboarding_tour_is_help_invoked_not_auto_started():
+    template_path = REPO_ROOT / "services" / "analytics_dashboard" / "templates" / "index.html"
+    html = template_path.read_text(encoding="utf-8")
+
+    assert "help-show-tour" in html
+    assert "setTimeout(() => startTour(false)" not in html
+
+
 def test_index_brain_panel_fetches_core_brain_endpoints():
     """The brain data-loader hits synthesis and correlate.  history is
     backend-only today (no UI sparkline) — if a future refactor wires
