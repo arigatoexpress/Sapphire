@@ -20,6 +20,10 @@ Required:
   3. `~/.config/sapphire-secrets/telegram_bot_token` — file fallback (same location used by `plugins/claw-sapphire/tools/notify.py`)
   4. `~/.config/sapphire/telegram_bot_token` — legacy file location
 - `SAPPHIRE_PM_BOT_ALLOWED_USER_IDS=12345,67890`
+- `SAPPHIRE_PM_BOT_ALLOWED_USER_IDS_FILE=~/.config/sapphire-secrets/sapphire_pm_bot_allowed_user_ids`
+  - File-backed allowlist for LaunchAgent deployments. Contents should be a
+    comma-separated list of numeric Telegram user IDs. If both the env var and
+    file path are set, the env var wins.
 
 Optional:
 
@@ -70,7 +74,7 @@ cd /Users/aribs/Code/Sapphire/services/pm_bot
 SAPPHIRE_PM_BOT_TOKEN=123456:dedicated-pm-token MODE=polling python3 server.py
 ```
 
-`MODE=polling` is intended for local development with a dedicated PM bot token. The service refuses to poll with `TELEGRAM_BOT_TOKEN` or the shared token files unless `SAPPHIRE_PM_BOT_ALLOW_SHARED_POLLING=1` is set for a deliberate break-glass run. Telegram must not still have a webhook registered for the same bot token when polling is active; the service attempts `deleteWebhook` on startup in polling mode.
+`MODE=polling` is intended for local development with a dedicated PM bot token. The service refuses to poll with `TELEGRAM_BOT_TOKEN` or the shared token files unless `SAPPHIRE_PM_BOT_ALLOW_SHARED_POLLING=1` is set for a deliberate break-glass run. Telegram must not still have a webhook registered for the same bot token when polling is active; the service attempts `deleteWebhook` on startup in polling mode. If you are testing against the shared Sapphire bot token, verify no other Telegram consumer is actively polling it first.
 
 ## Register The Webhook
 
@@ -162,3 +166,10 @@ Quick manual smoke test with the service running:
 - DM the bot `/rag what forms are needed for a sale in Harris County`
 - In a group, tag the bot with `@SapphirePMBot status` if `SAPPHIRE_PM_BOT_BOT_USERNAME` is set
 - Reply to one of the bot's messages with `status` to exercise reply-followup normalization
+
+For LaunchAgent deployments, the easiest live-test setup is:
+
+1. put your numeric Telegram user ID in `~/.config/sapphire-secrets/sapphire_pm_bot_allowed_user_ids`
+2. switch the plist to `MODE=polling`
+3. add `SAPPHIRE_PM_BOT_ALLOW_SHARED_POLLING=1` only if you are deliberately testing with the shared Sapphire bot token
+4. reload the LaunchAgent and confirm `/health` reports `telegram_delivery_ready=true`

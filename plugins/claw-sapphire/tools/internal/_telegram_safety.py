@@ -33,6 +33,7 @@ import threading
 import time
 from collections import deque
 from dataclasses import dataclass, field
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -216,13 +217,7 @@ def assert_no_live_trading() -> None:
 # ---------------------------------------------------------------------------
 
 
-def load_allowed_user_ids(env_var: str = "SAPPHIRE_PM_BOT_ALLOWED_USER_IDS") -> set[int]:
-    """Load Telegram user IDs from an environment variable, fail-closed.
-
-    Empty / unset → empty set → allowlist denies everyone. Invalid entries
-    are logged at WARNING and skipped — they never grant access.
-    """
-    raw = os.getenv(env_var, "")
+def _parse_allowed_user_ids(raw: str, *, source: str) -> set[int]:
     allowed: set[int] = set()
     for item in raw.split(","):
         text = item.strip()
@@ -231,8 +226,40 @@ def load_allowed_user_ids(env_var: str = "SAPPHIRE_PM_BOT_ALLOWED_USER_IDS") -> 
         try:
             allowed.add(int(text))
         except ValueError:
-            logger.warning("Ignoring invalid Telegram allowlist entry in %s: %r", env_var, text)
+            logger.warning("Ignoring invalid Telegram allowlist entry in %s: %r", source, text)
     return allowed
+
+
+def _read_allowed_user_ids_file(path_text: str) -> set[int]:
+    path = Path(path_text).expanduser()
+    try:
+        raw = path.read_text().strip()
+    except OSError:
+        logger.warning("Could not read Telegram allowlist file: %s", path)
+        return set()
+    if not raw:
+        return set()
+    return _parse_allowed_user_ids(raw, source=str(path))
+
+
+def load_allowed_user_ids(
+    env_var: str = "SAPPHIRE_PM_BOT_ALLOWED_USER_IDS",
+    file_var: str = "SAPPHIRE_PM_BOT_ALLOWED_USER_IDS_FILE",
+) -> set[int]:
+    """Load Telegram user IDs from an environment variable, fail-closed.
+
+    Empty / unset → empty set → allowlist denies everyone. Invalid entries
+    are logged at WARNING and skipped — they never grant access.
+    """
+    raw = os.getenv(env_var, "")
+    if raw.strip():
+        return _parse_allowed_user_ids(raw, source=env_var)
+
+    file_path = os.getenv(file_var, "").strip()
+    if file_path:
+        return _read_allowed_user_ids_file(file_path)
+
+    return set()
 
 
 def is_allowed(user_id: int | None, allowed: set[int]) -> bool:

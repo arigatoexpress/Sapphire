@@ -35,6 +35,22 @@ def test_load_allowed_user_ids_skips_invalid(monkeypatch):
     assert safety.load_allowed_user_ids() == {111, 222}
 
 
+def test_load_allowed_user_ids_falls_back_to_file(monkeypatch, tmp_path):
+    monkeypatch.delenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", raising=False)
+    allowlist_file = tmp_path / "allowed_user_ids.txt"
+    allowlist_file.write_text("111, 222 ,333\n")
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS_FILE", str(allowlist_file))
+    assert safety.load_allowed_user_ids() == {111, 222, 333}
+
+
+def test_load_allowed_user_ids_prefers_env_over_file(monkeypatch, tmp_path):
+    allowlist_file = tmp_path / "allowed_user_ids.txt"
+    allowlist_file.write_text("111,222,333\n")
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS_FILE", str(allowlist_file))
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "444")
+    assert safety.load_allowed_user_ids() == {444}
+
+
 def test_is_allowed_denies_none_user():
     assert safety.is_allowed(None, {111}) is False
 
