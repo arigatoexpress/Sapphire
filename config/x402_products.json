@@ -94,6 +94,29 @@
       "tags": ["regional", "public-source", "client-safe"]
     },
     {
+      "product_id": "agentwiki_builder_brief",
+      "route": "/api/x402/agentwiki/artifacts/{artifact_id}/content",
+      "method": "POST",
+      "description": "Rights-labeled builder data brief with source-cited evidence cards, next actions, provenance, and an x402 receipt.",
+      "category": "agentwiki",
+      "price_usd": "0.2500",
+      "artifact_kind": "agentwiki_builder_brief",
+      "entitlement_ttl_seconds": 3600,
+      "max_compute_seconds": 30,
+      "settlement_mode": "simulated_or_testnet",
+      "live_settlement_allowed": false,
+      "source_ids": [
+        "sam_gov_opportunities",
+        "grants_gov",
+        "regulations_gov",
+        "data_gov_catalog",
+        "census_cbp_zbp",
+        "developer_docs_public",
+        "github_releases"
+      ],
+      "tags": ["agentwiki", "builder-data", "opportunity-intel", "rights-envelope"]
+    },
+    {
       "product_id": "paid_inference_chat",
       "route": "/v1/chat/completions",
       "method": "POST",

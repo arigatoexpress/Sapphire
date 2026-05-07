@@ -40,4 +40,9 @@ def test_x402_products_returns_catalog_and_safety_posture() -> None:
     assert payload["summary"]["live_settlement_allowed_count"] == 0
     assert payload["safety"]["real_trading_enabled"] is False
     product_ids = {product["product_id"] for product in payload["products"]}
-    assert {"market_regime_report", "backtest_receipt", "prediction_market_brief"} <= product_ids
+    assert {
+        "market_regime_report",
+        "backtest_receipt",
+        "prediction_market_brief",
+        "agentwiki_builder_brief",
+    } <= product_ids

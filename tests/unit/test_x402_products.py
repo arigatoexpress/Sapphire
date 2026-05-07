@@ -45,8 +45,10 @@ def test_default_catalog_and_registry_validate() -> None:
 
     assert "market_regime_report" in product_ids
     assert "backtest_receipt" in product_ids
+    assert "agentwiki_builder_brief" in product_ids
     assert "defillama" in source_ids
     assert "fred_alfred" in source_ids
+    assert "sam_gov_opportunities" in source_ids
     assert "local_inference_mesh" in source_ids
     assert all(product.live_settlement_allowed is False for product in catalog.products)
 

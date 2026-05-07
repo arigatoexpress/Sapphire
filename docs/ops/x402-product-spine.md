@@ -24,6 +24,7 @@ production data mutation. It gives future paid endpoints a shared contract.
 - `prediction_market_brief`
 - `cyber_exploit_risk`
 - `regional_brief`
+- `agentwiki_builder_brief`
 - `paid_inference_chat`
 - `paid_embeddings`
 
@@ -119,3 +120,42 @@ Properties:
 - returns catalog product metadata, route, pricing, source status, and readiness;
 - makes the all-products `live_settlement_allowed=false` posture explicit;
 - does not write receipts or mutate any production data.
+
+## AgentWiki Builder Brief MVP
+
+The first AgentWiki route set is a static, rights-labeled seed registry for
+builder-facing data products:
+
+- `GET /api/x402/agentwiki/search`
+- `GET /api/x402/agentwiki/artifacts/<artifact_id>/quote`
+- `POST /api/x402/agentwiki/artifacts/<artifact_id>/content`
+
+Properties:
+
+- requires dashboard Basic Auth;
+- search and quote are free discovery surfaces;
+- paid content uses `agentwiki_builder_brief` and the same
+  `X402Middleware.gate(...)` path as the other simulated paid endpoints;
+- writes non-secret receipt records for `required`, `rejected`, and `accepted`;
+- serves only static seed artifacts from `config/agentwiki_artifacts.json`;
+- carries a rights envelope with allowed uses, prohibited uses, cache posture,
+  attribution, and redistribution posture;
+- makes `payment_is_permission=false` and `bypass_allowed=false` explicit;
+- does not crawl, bypass paywalls, use stealth browser/proxy paths, pull live
+  third-party APIs, enable live settlement, trade, send Telegram messages, or
+  mutate production data.
+
+Seed source registry entries currently cover public-official or
+terms-review-required inputs for the opportunity-intelligence wedge:
+
+- `sam_gov_opportunities`
+- `grants_gov`
+- `regulations_gov`
+- `data_gov_catalog`
+- `census_cbp_zbp`
+- `developer_docs_public`
+- `github_releases`
+
+Keep new AgentWiki sources default-deny until their source registry row has
+explicit allowed products, terms status, redistribution posture, freshness, and
+operator notes.
