@@ -63,3 +63,18 @@ def test_control_plane_summary_rolls_up_all_product_modules() -> None:
         "Automation",
         "Settings / Contracts",
     } <= module_names
+
+
+def test_control_plane_summary_defers_heavy_org_dirty_sweep() -> None:
+    summary = build_control_plane_summary(
+        probe_services=False,
+        now=datetime(2026, 5, 6, 23, 59, tzinfo=UTC),
+    )
+
+    cards = {card["title"]: card for card in summary["cards"]}
+    org_card = cards["Org Repo Posture"]
+    assert org_card["status"] in {"ok", "unknown"}
+    assert org_card["mode"] in {"read_only", "stale"}
+    org_summary = org_card["summary"]
+    assert "Dirty-state sweep is deferred" in org_summary or "failed" in org_summary
+    assert org_card["source"]["path_or_url"].startswith("infra/org-repos.yaml")

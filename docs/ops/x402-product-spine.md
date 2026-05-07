@@ -172,6 +172,8 @@ Properties:
 - returns normalized envelope cards for dashboard runtime, org posture, surface
   inventory, x402 product readiness, AgentWiki builder briefs, and commercial
   safety posture;
+- keeps the home summary fast by showing a live manifest/worktree-count org
+  snapshot while deferring detailed dirty-state sweeps to Operations;
 - keeps `live_settlement_allowed=false`, real trading disabled, Telegram sends
   disabled, and production mutation disabled in the top-level safety block;
 - marks x402 products with source-review needs as `warn` instead of pretending

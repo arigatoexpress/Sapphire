@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Mapping
@@ -94,6 +95,24 @@ def _probe_json(
         return "fail", {"error": f"{type(exc).__name__}: {exc}"}
 
 
+def _fast_worktree_count(root: Path = ROOT) -> tuple[int | None, str | None]:
+    try:
+        result = subprocess.run(
+            ["git", "worktree", "list", "--porcelain"],
+            cwd=root,
+            text=True,
+            capture_output=True,
+            timeout=1,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return None, f"{type(exc).__name__}: {exc}"
+    if result.returncode != 0:
+        return None, (result.stderr or result.stdout or "git worktree list failed")[:160]
+    count = sum(1 for line in result.stdout.splitlines() if line.startswith("worktree "))
+    return count, None
+
+
 def _dashboard_surface_card(now: datetime) -> dict[str, Any]:
     inventory = _read_json(SURFACE_INVENTORY)
     summary = inventory.get("summary", {})
@@ -160,7 +179,65 @@ def _control_plane_health_card(now: datetime, *, probe_services: bool) -> dict[s
     )
 
 
-def _org_status_card(now: datetime) -> dict[str, Any]:
+def _fast_org_status_card(now: datetime) -> dict[str, Any]:
+    try:
+        from scripts.ops.org_status import load_manifest
+
+        manifest = load_manifest()
+        repos = manifest.get("repos") or []
+        upstream = manifest.get("upstream_repos") or []
+        worktree_count, worktree_error = _fast_worktree_count()
+        status = "ok" if worktree_error is None else "unknown"
+        value = (
+            f"{len(repos)} repos · {worktree_count} worktrees"
+            if worktree_count is not None
+            else f"{len(repos)} repos · worktrees unknown"
+        )
+        detail = (
+            f"{len(upstream)} upstream integrations are tracked. "
+            "Dirty-state sweep is deferred to the Operations module."
+            if worktree_error is None
+            else f"Worktree count probe failed: {worktree_error}"
+        )
+        return _card(
+            module="Operations",
+            status=status,
+            mode="read_only" if worktree_error is None else "stale",
+            title="Org Repo Posture",
+            value=value,
+            summary=detail,
+            source={
+                "kind": "script",
+                "path_or_url": "infra/org-repos.yaml + git worktree list --porcelain",
+                "generated_at": _iso(now),
+                "age_seconds": 0,
+            },
+            actions=[
+                {
+                    "label": "Run detailed no-external status",
+                    "mode": "read_only",
+                    "requires_confirm": False,
+                }
+            ],
+        )
+    except Exception as exc:  # noqa: BLE001
+        return _card(
+            module="Operations",
+            status="unknown",
+            mode="stale",
+            title="Org Repo Posture",
+            value="not available",
+            summary=f"Fast org posture could not be built: {type(exc).__name__}: {exc}",
+            source={
+                "kind": "script",
+                "path_or_url": "infra/org-repos.yaml",
+                "generated_at": _iso(now),
+                "age_seconds": 0,
+            },
+        )
+
+
+def _detailed_org_status_card(now: datetime) -> dict[str, Any]:
     try:
         from scripts.ops.org_status import collect_status, load_manifest
 
@@ -372,12 +449,16 @@ def _overall_status(cards: list[Mapping[str, Any]]) -> str:
 
 
 def build_control_plane_summary(
-    *, probe_services: bool = True, now: datetime | None = None
+    *,
+    probe_services: bool = True,
+    detailed_org_status: bool = False,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     """Build normalized, real-data cards for `/api/v2/control-plane/summary`."""
 
     now = now or _now()
     x402_card, product_index = _x402_product_card(now)
+    org_card = _detailed_org_status_card(now) if detailed_org_status else _fast_org_status_card(now)
     cards = [
         _dashboard_runtime_card(now),
         x402_card,
@@ -385,7 +466,7 @@ def build_control_plane_summary(
         _x402_safety_card(now, product_index),
         _dashboard_surface_card(now),
         _control_plane_health_card(now, probe_services=probe_services),
-        _org_status_card(now),
+        org_card,
     ]
     status = _overall_status(cards)
     return {
