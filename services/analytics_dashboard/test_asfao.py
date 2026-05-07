@@ -260,8 +260,10 @@ def test_evaluate_rules_collects_multiple_proposals(asfao):
 
 def test_evaluate_rules_swallows_rule_exceptions(asfao, monkeypatch):
     """A buggy rule must not poison the catalog."""
+
     def _broken(*_a, **_kw):
         raise ValueError("rule blew up")
+
     monkeypatch.setattr(asfao, "RULES_CATALOG", [_broken, asfao.rule_lead_nurture])
     proposals = asfao.evaluate_rules({}, [], {"stale_leads_count": 5})
     assert len(proposals) == 1  # only lead_nurture fired
@@ -369,9 +371,7 @@ def test_decide_endpoint_proposes_and_persists(asfao):
 
     payload = {
         "synthesis": {
-            "priority_actions": [
-                "trading: collector stale 9.5h — restart signal logger"
-            ],
+            "priority_actions": ["trading: collector stale 9.5h — restart signal logger"],
             "degraded_silos": ["trading"],
         },
         "synthesis_id": "syn-abc-123",

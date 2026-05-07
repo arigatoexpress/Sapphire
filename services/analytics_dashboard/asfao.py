@@ -43,14 +43,16 @@ log = logging.getLogger("sapphire.asfao")
 ROLES = ("CTO", "CFO", "Ops", "Threat", "Wildfire", "THO", "Strategy")
 
 # Action kinds. Anything matching TRADING_CRITICAL_KINDS NEVER auto-executes.
-TRADING_CRITICAL_KINDS = frozenset({
-    "trading_pause",
-    "trading_resume",
-    "trading_order",
-    "payments_send",
-    "hyperliquid_order",
-    "hyperliquid_pause",
-})
+TRADING_CRITICAL_KINDS = frozenset(
+    {
+        "trading_pause",
+        "trading_resume",
+        "trading_order",
+        "payments_send",
+        "hyperliquid_order",
+        "hyperliquid_pause",
+    }
+)
 
 # Vendors / products we care about for "CVE in our stack" matching.
 # Sourced from a hand-curated read of requirements.txt — matched
@@ -146,6 +148,7 @@ def _read_secret(name: str, project: str = "tho-ai-agent") -> str | None:
 # Side-effect adapters (the only things that touch the world).
 # Every adapter returns a result dict that gets stored into decisions.result.
 # ---------------------------------------------------------------------------
+
 
 def _gh_find_open_issue(repo: str, title_substr: str, token: str) -> dict | None:
     """Search the repo for an open issue containing the title substring."""
@@ -270,7 +273,9 @@ def _execute_action(action: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def rule_stale_collector_issue(synthesis: dict, _correlations: list[dict], _ctx: dict) -> tuple[bool, dict]:
+def rule_stale_collector_issue(
+    synthesis: dict, _correlations: list[dict], _ctx: dict
+) -> tuple[bool, dict]:
     """If a service silo has been silent for >6h, file a GitHub issue."""
     actions = synthesis.get("priority_actions") or []
     degraded = synthesis.get("degraded_silos") or []
@@ -286,6 +291,7 @@ def rule_stale_collector_issue(synthesis: dict, _correlations: list[dict], _ctx:
         silo = silo.strip().lower()
         # Extract the X.Yh number
         import re
+
         m = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*h", rest)
         if not m:
             continue
@@ -327,7 +333,9 @@ def rule_stale_collector_issue(synthesis: dict, _correlations: list[dict], _ctx:
     }
 
 
-def rule_critical_cve_alert(_synthesis: dict, _correlations: list[dict], ctx: dict) -> tuple[bool, dict]:
+def rule_critical_cve_alert(
+    _synthesis: dict, _correlations: list[dict], ctx: dict
+) -> tuple[bool, dict]:
     """If a CRITICAL CVE in last 24h affects our stack, alert + file issue."""
     cves = ctx.get("critical_cves_24h") or []
     if not cves:
@@ -369,7 +377,9 @@ def rule_critical_cve_alert(_synthesis: dict, _correlations: list[dict], ctx: di
     }
 
 
-def rule_trading_silo_silent(synthesis: dict, _correlations: list[dict], ctx: dict) -> tuple[bool, dict]:
+def rule_trading_silo_silent(
+    synthesis: dict, _correlations: list[dict], ctx: dict
+) -> tuple[bool, dict]:
     """Trading silo silent + a live executor enabled → human-only critical alert.
 
     NEVER auto-disables trading. The action kind is ``telegram_alert``
@@ -433,7 +443,9 @@ def rule_lead_nurture(_synthesis: dict, _correlations: list[dict], ctx: dict) ->
     }
 
 
-def rule_regional_intel_surge(_synthesis: dict, _correlations: list[dict], ctx: dict) -> tuple[bool, dict]:
+def rule_regional_intel_surge(
+    _synthesis: dict, _correlations: list[dict], ctx: dict
+) -> tuple[bool, dict]:
     """If a region's intel-item count is >2 std dev, propose a brief generation."""
     surge = ctx.get("regional_surge")  # {region_id, today, mean, stddev, z}
     if not surge:
@@ -591,13 +603,9 @@ def register_asfao(app, *, project: str, dataset: str, bq_client, query_param_fa
         except Exception:
             ctx["regional_surge"] = None
         # Live executor — hyperliquid is the only one in tree today.
-        ctx["hyperliquid_live_enabled"] = (
-            os.environ.get("HYPERLIQUID_TRADING_ENABLED", "0") == "1"
-        )
+        ctx["hyperliquid_live_enabled"] = os.environ.get("HYPERLIQUID_TRADING_ENABLED", "0") == "1"
         ctx["any_live_executor_enabled"] = ctx["hyperliquid_live_enabled"]
-        ctx["live_executor_label"] = (
-            "hyperliquid" if ctx["hyperliquid_live_enabled"] else "none"
-        )
+        ctx["live_executor_label"] = "hyperliquid" if ctx["hyperliquid_live_enabled"] else "none"
         return ctx
 
     def _persist_proposal(decision: dict, source_synthesis_id: str | None) -> str:
@@ -627,9 +635,7 @@ def register_asfao(app, *, project: str, dataset: str, bq_client, query_param_fa
             bigquery.ScalarQueryParameter("status", "STRING", "proposed"),
             bigquery.ScalarQueryParameter("proposed", "TIMESTAMP", now),
         ]
-        bq_client.query(
-            sql, job_config=bigquery.QueryJobConfig(query_parameters=params)
-        ).result()
+        bq_client.query(sql, job_config=bigquery.QueryJobConfig(query_parameters=params)).result()
         return decision_id
 
     def _load_decision(decision_id: str) -> dict | None:
@@ -675,13 +681,9 @@ def register_asfao(app, *, project: str, dataset: str, bq_client, query_param_fa
             bigquery.ScalarQueryParameter("id", "STRING", decision_id),
             bigquery.ScalarQueryParameter("status", "STRING", status),
             bigquery.ScalarQueryParameter("executed", "TIMESTAMP", _now_iso()),
-            bigquery.ScalarQueryParameter(
-                "result", "STRING", json.dumps(result or {})
-            ),
+            bigquery.ScalarQueryParameter("result", "STRING", json.dumps(result or {})),
         ]
-        bq_client.query(
-            sql, job_config=bigquery.QueryJobConfig(query_parameters=params)
-        ).result()
+        bq_client.query(sql, job_config=bigquery.QueryJobConfig(query_parameters=params)).result()
 
     def _serialize_row(d: dict) -> dict:
         out = dict(d)
@@ -744,12 +746,14 @@ def register_asfao(app, *, project: str, dataset: str, bq_client, query_param_fa
             except Exception as exc:  # noqa: BLE001
                 log.warning("persist proposal failed: %s", exc)
                 persisted.append({"decision_id": None, "persist_error": str(exc), **p})
-        return jsonify({
-            "ts": _now_iso(),
-            "proposed_count": len(persisted),
-            "decisions": persisted,
-            "context_keys": sorted(ctx.keys()),
-        })
+        return jsonify(
+            {
+                "ts": _now_iso(),
+                "proposed_count": len(persisted),
+                "decisions": persisted,
+                "context_keys": sorted(ctx.keys()),
+            }
+        )
 
     @app.post("/api/asfao/execute/<decision_id>")
     @requires_admin
@@ -761,32 +765,32 @@ def register_asfao(app, *, project: str, dataset: str, bq_client, query_param_fa
             return jsonify({"error": "not_found"}), 404
         status = (rec.get("status") or "").lower()
         if status not in ("proposed", "approved"):
-            return jsonify({
-                "error": "invalid_status",
-                "status": status,
-                "message": "Only proposed/approved decisions can transition.",
-            }), 409
+            return jsonify(
+                {
+                    "error": "invalid_status",
+                    "status": status,
+                    "message": "Only proposed/approved decisions can transition.",
+                }
+            ), 409
         if not approve:
             try:
-                _update_decision(
-                    decision_id, status="rejected", result={"rejected_by": "admin"}
-                )
+                _update_decision(decision_id, status="rejected", result={"rejected_by": "admin"})
             except Exception as exc:  # noqa: BLE001
                 return jsonify({"error": "update_failed", "detail": str(exc)}), 500
             return jsonify({"decision_id": decision_id, "status": "rejected"})
         action = rec.get("action") or {}
         kind = action.get("kind")
         if kind in TRADING_CRITICAL_KINDS:
-            return jsonify({
-                "error": "trading_critical_blocked",
-                "kind": kind,
-                "message": "Trading critical-path actions never auto-execute.",
-            }), 403
+            return jsonify(
+                {
+                    "error": "trading_critical_blocked",
+                    "kind": kind,
+                    "message": "Trading critical-path actions never auto-execute.",
+                }
+            ), 403
         # Mark approved → execute → update status to executed/failed.
         try:
-            _update_decision(
-                decision_id, status="approved", result={"approved_by": "admin"}
-            )
+            _update_decision(decision_id, status="approved", result={"approved_by": "admin"})
         except Exception as exc:  # noqa: BLE001
             return jsonify({"error": "approve_failed", "detail": str(exc)}), 500
         side = _execute_action(action)
@@ -795,11 +799,13 @@ def register_asfao(app, *, project: str, dataset: str, bq_client, query_param_fa
             _update_decision(decision_id, status=new_status, result=side)
         except Exception as exc:  # noqa: BLE001
             log.warning("post-execute persist failed: %s", exc)
-        return jsonify({
-            "decision_id": decision_id,
-            "status": new_status,
-            "result": side,
-        })
+        return jsonify(
+            {
+                "decision_id": decision_id,
+                "status": new_status,
+                "result": side,
+            }
+        )
 
     @app.get("/api/asfao/decisions")
     def _asfao_list_endpoint():

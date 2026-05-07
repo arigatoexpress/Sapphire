@@ -61,9 +61,7 @@ from lib.hackathon.optimism_chain_health import (
 # ---------------------------------------------------------------------------
 
 
-def _encode_price_tuple(
-    price: int, conf: int, expo: int, publish_time: int
-) -> str:
+def _encode_price_tuple(price: int, conf: int, expo: int, publish_time: int) -> str:
     """Return the eth_call hex result for a Pyth getPriceUnsafe response."""
     raw = abi_encode(
         ["(int64,uint64,int32,uint256)"],
@@ -331,9 +329,7 @@ class _StubPythReading:
 
 def test_classify_optimism_warning_on_stale_pyth_with_aave_healthy() -> None:
     """Aave nominal + Pyth stale on a major => WARNING (degraded redundancy)."""
-    overview = _StubOverview(
-        reserves=[_StubReserve(symbol="WETH", utilization=0.4)]
-    )
+    overview = _StubOverview(reserves=[_StubReserve(symbol="WETH", utilization=0.4)])
     pyth = [
         _StubPythReading(symbol="BTC", stale=True),
         _StubPythReading(symbol="ETH", stale=False),
@@ -347,9 +343,7 @@ def test_classify_optimism_warning_on_stale_pyth_with_aave_healthy() -> None:
 
 def test_classify_optimism_block_from_aave_not_overridden_by_fresh_pyth() -> None:
     """A BLOCK on Aave never downgrades just because Pyth is healthy."""
-    overview = _StubOverview(
-        reserves=[_StubReserve(symbol="USDC", paused=True, utilization=0.95)]
-    )
+    overview = _StubOverview(reserves=[_StubReserve(symbol="USDC", paused=True, utilization=0.95)])
     pyth = [_StubPythReading(symbol="BTC", stale=False)]
     verdict = classify_optimism(overview, pyth_readings=pyth)
     assert verdict.severity == "BLOCK"
@@ -358,9 +352,7 @@ def test_classify_optimism_block_from_aave_not_overridden_by_fresh_pyth() -> Non
 
 def test_classify_optimism_pyth_telemetry_appears_in_healthy_reasons() -> None:
     """Operators want to see Pyth-fresh-on-X next to 'chain healthy'."""
-    overview = _StubOverview(
-        reserves=[_StubReserve(symbol="WETH", utilization=0.4)]
-    )
+    overview = _StubOverview(reserves=[_StubReserve(symbol="WETH", utilization=0.4)])
     pyth = [
         _StubPythReading(symbol="BTC", stale=False),
         _StubPythReading(symbol="ETH", stale=False),
@@ -375,9 +367,7 @@ def test_classify_optimism_pyth_telemetry_appears_in_healthy_reasons() -> None:
 
 def test_classify_optimism_no_pyth_arg_keeps_pre_pyth_behavior() -> None:
     """Backwards-compat: classify_optimism(overview) works without Pyth arg."""
-    overview = _StubOverview(
-        reserves=[_StubReserve(symbol="WETH", utilization=0.4)]
-    )
+    overview = _StubOverview(reserves=[_StubReserve(symbol="WETH", utilization=0.4)])
     verdict = classify_optimism(overview)
     assert verdict.severity == "HEALTHY"
     assert verdict.pyth_fresh_symbols == []
@@ -398,9 +388,7 @@ async def test_evaluate_falls_back_to_pyth_when_aave_reverts(
     class FakeProtocols:
         def __init__(self, client: object) -> None:
             self._client = client
-            self.pyth = _FakePythReg(
-                {"BTC": _StubPythReading(symbol="BTC", stale=False)}
-            )
+            self.pyth = _FakePythReg({"BTC": _StubPythReading(symbol="BTC", stale=False)})
 
         async def lend_overview(self) -> Any:
             raise RuntimeError("execution reverted (Aave oracle)")

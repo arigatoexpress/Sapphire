@@ -340,9 +340,7 @@ def test_register_begin_allowed_for_authenticated_admin_when_credential_exists(
     assert r.status_code == 200
 
 
-def test_register_complete_persists_credential_and_sets_cookie(
-    auth_pkg, monkeypatch
-):
+def test_register_complete_persists_credential_and_sets_cookie(auth_pkg, monkeypatch):
     """End-to-end: client posts attestation, server verifies (mocked),
     credential is persisted, session cookie is set.
     """
