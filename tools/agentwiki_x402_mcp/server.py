@@ -46,6 +46,13 @@ def _require_text(args: Mapping[str, Any], key: str) -> str:
     return value
 
 
+def _bool_arg(args: Mapping[str, Any], key: str, *, default: bool = False) -> bool:
+    value = args.get(key, default)
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
 def _resolve_dashboard_password() -> str:
     for key in ("SAPPHIRE_DASHBOARD_PASSWORD", "AUTH_PASSWORD"):
         value = os.environ.get(key)
@@ -196,6 +203,28 @@ class AgentWikiTools:
             },
         )
 
+    def wiki_grants_search(self, args: Mapping[str, Any]) -> dict[str, Any]:
+        """Search Grants.gov through the dashboard's cache-first source adapter."""
+
+        return self.client.request_json(
+            "POST",
+            "/api/x402/agentwiki/sources/grants-gov/search",
+            body={
+                "query": args.get("query", args.get("q", "")),
+                "limit": args.get("limit", 10),
+                "statuses": args.get("statuses", "forecasted|posted"),
+                "agencies": args.get("agencies", ""),
+                "funding_categories": args.get("funding_categories", ""),
+                "eligibilities": args.get("eligibilities", ""),
+                "funding_instruments": args.get("funding_instruments", ""),
+                "aln": args.get("aln", ""),
+                "opportunity_number": args.get("opportunity_number", args.get("oppNum", "")),
+                "fetch_live": _bool_arg(args, "fetch_live", default=False),
+                "use_cache": _bool_arg(args, "use_cache", default=True),
+                "write_cache": _bool_arg(args, "write_cache", default=False),
+            },
+        )
+
     def wiki_quote(self, args: Mapping[str, Any]) -> dict[str, Any]:
         artifact_id = _require_text(args, "artifact_id")
         return self.client.request_json(
@@ -339,6 +368,29 @@ TOOL_DEFINITIONS: dict[str, dict[str, Any]] = {
                 "category": {"type": "string"},
                 "limit": {"type": "integer", "minimum": 1, "maximum": 50},
                 "max_price_usd": {"type": "number"},
+            },
+        },
+    },
+    "wiki_grants_search": {
+        "description": (
+            "Search the Grants.gov AgentWiki source adapter. Defaults to cache/dry-run and "
+            "requires fetch_live=true before the dashboard contacts Grants.gov."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 50},
+                "statuses": {"type": "string", "default": "forecasted|posted"},
+                "agencies": {"type": "string"},
+                "funding_categories": {"type": "string"},
+                "eligibilities": {"type": "string"},
+                "funding_instruments": {"type": "string"},
+                "aln": {"type": "string"},
+                "opportunity_number": {"type": "string"},
+                "fetch_live": {"type": "boolean", "default": False},
+                "use_cache": {"type": "boolean", "default": True},
+                "write_cache": {"type": "boolean", "default": False},
             },
         },
     },

@@ -160,6 +160,34 @@ Keep new AgentWiki sources default-deny until their source registry row has
 explicit allowed products, terms status, redistribution posture, freshness, and
 operator notes.
 
+### Grants.gov Source Adapter
+
+The first live-authorized AgentWiki source adapter is Grants.gov `search2`,
+wrapped by an authenticated dashboard route:
+
+- `GET|POST /api/x402/agentwiki/sources/grants-gov/search`
+
+Properties:
+
+- uses the official `POST https://api.grants.gov/v1/api/search2` endpoint shape;
+- requires dashboard Basic Auth before local callers can access it;
+- defaults to cache/dry-run mode and never opens the network unless
+  `fetch_live=true` or `live=1` is supplied;
+- writes live responses only to `~/.cache/sapphire/agentwiki/grants_gov/search2`
+  when `write_cache=true`;
+- normalizes only derived opportunity facts with source identifiers and evidence
+  fields;
+- includes the Grants.gov attribution notice and terms/docs links in every
+  response;
+- keeps `payment_is_permission=false`, `bypass_allowed=false`, and
+  `official_award_status_claimed=false` explicit.
+
+Official references:
+
+- `https://www.grants.gov/api/common/search2`
+- `https://www.grants.gov/api/api-guide`
+- `https://www.grants.gov/api/terms-conditions`
+
 ## AgentWiki MCP Surface
 
 The local MCP-compatible stdio server wraps the authenticated dashboard routes
@@ -172,6 +200,8 @@ Repo-local `.mcp.json` registers it as `agentwiki-x402`.
 Tools:
 
 - `wiki_search` -> `GET /api/x402/agentwiki/search`
+- `wiki_grants_search` ->
+  `POST /api/x402/agentwiki/sources/grants-gov/search`
 - `wiki_quote` -> `GET /api/x402/agentwiki/artifacts/<artifact_id>/quote`
 - `wiki_fetch_paid` -> `POST /api/x402/agentwiki/artifacts/<artifact_id>/content`
 - `wiki_receipt` -> local non-secret x402 receipt ledger lookup
@@ -182,6 +212,8 @@ Properties:
   `~/.config/sapphire-secrets/dashboard_password`;
 - without a `payment_header` or explicit `simulate_payment=true`,
   `wiki_fetch_paid` returns the 402 requirement and receipt instead of content;
+- `wiki_grants_search` defaults to cache/dry-run and requires explicit
+  `fetch_live=true` before the dashboard contacts Grants.gov;
 - simulated payment headers are local/testnet-only, require explicit caller
   intent, and are never returned in tool output;
 - `wiki_receipt` returns sanitized records by default and does not expose raw

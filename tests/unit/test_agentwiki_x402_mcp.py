@@ -36,7 +36,15 @@ class FakeDashboardClient:
             "headers": headers or {},
         }
         self.calls.append(call)
-        if path.endswith("/search"):
+        if path == "/api/x402/agentwiki/sources/grants-gov/search":
+            return {
+                "ok": True,
+                "mode": "agentwiki_grants_gov_source_search",
+                "source_mode": "dry_run",
+                "summary": {"network_called": False},
+                "request": {"body": body or {}},
+            }
+        if path == "/api/x402/agentwiki/search":
             return {
                 "ok": True,
                 "mode": "agentwiki_discovery",
@@ -80,7 +88,13 @@ def test_mcp_lists_agentwiki_tools() -> None:
     response = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
 
     tool_names = {tool["name"] for tool in response["result"]["tools"]}
-    assert {"wiki_search", "wiki_quote", "wiki_fetch_paid", "wiki_receipt"} <= tool_names
+    assert {
+        "wiki_search",
+        "wiki_grants_search",
+        "wiki_quote",
+        "wiki_fetch_paid",
+        "wiki_receipt",
+    } <= tool_names
 
 
 def test_search_and_quote_call_dashboard_routes() -> None:
@@ -95,6 +109,23 @@ def test_search_and_quote_call_dashboard_routes() -> None:
     assert client.calls[0]["path"] == "/api/x402/agentwiki/search"
     assert client.calls[0]["query"]["q"] == "grants"
     assert client.calls[1]["path"].endswith(f"/{ARTIFACT_ID}/quote")
+
+
+def test_grants_search_defaults_to_cache_dry_run_route() -> None:
+    client = FakeDashboardClient()
+    tools = AgentWikiTools(client)
+
+    payload = tools.wiki_grants_search({"query": "wildfire", "limit": 5, "fetch_live": "false"})
+
+    assert payload["mode"] == "agentwiki_grants_gov_source_search"
+    assert payload["source_mode"] == "dry_run"
+    assert payload["summary"]["network_called"] is False
+    assert client.calls[0]["method"] == "POST"
+    assert client.calls[0]["path"] == "/api/x402/agentwiki/sources/grants-gov/search"
+    assert client.calls[0]["body"]["query"] == "wildfire"
+    assert client.calls[0]["body"]["fetch_live"] is False
+    assert client.calls[0]["body"]["use_cache"] is True
+    assert client.calls[0]["body"]["write_cache"] is False
 
 
 def test_fetch_paid_defaults_to_requirement_only_without_payment_header() -> None:

@@ -76,6 +76,12 @@ def test_agentwiki_search_requires_auth(client) -> None:
     assert test_client.get("/api/x402/agentwiki/search").status_code == 401
 
 
+def test_agentwiki_grants_source_search_requires_auth(client) -> None:
+    test_client, _ledger_path = client
+
+    assert test_client.post("/api/x402/agentwiki/sources/grants-gov/search").status_code == 401
+
+
 def test_agentwiki_search_and_quote_return_rights_context(client) -> None:
     test_client, _ledger_path = client
 
@@ -96,6 +102,32 @@ def test_agentwiki_search_and_quote_return_rights_context(client) -> None:
     assert search_payload["artifacts"][0]["rights"]["bypass_allowed"] is False
     assert quote_payload["payment"]["amount_atomic"] == 250_000
     assert quote_payload["preflight"]["requires_rights_envelope"] is True
+
+
+def test_agentwiki_grants_source_search_is_dry_run_by_default(
+    client,
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    test_client, _ledger_path = client
+    monkeypatch.setenv("SAPPHIRE_AGENTWIKI_GRANTS_CACHE_DIR", str(tmp_path / "grants-cache"))
+
+    response = test_client.post(
+        "/api/x402/agentwiki/sources/grants-gov/search",
+        headers=_auth_header(),
+        json={"query": "wildfire", "limit": 4},
+    )
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert payload["mode"] == "agentwiki_grants_gov_source_search"
+    assert payload["source_mode"] == "dry_run"
+    assert payload["safety_mode"] == "read_only"
+    assert payload["request"]["body"]["keyword"] == "wildfire"
+    assert payload["request"]["body"]["rows"] == 4
+    assert payload["summary"]["network_called"] is False
+    assert payload["summary"]["official_award_status_claimed"] is False
+    assert payload["rights"]["requires_attribution"] is True
 
 
 def test_agentwiki_content_returns_402_and_receipt(client) -> None:
