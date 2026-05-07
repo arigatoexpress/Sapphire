@@ -310,6 +310,21 @@ def test_telegram_post_raises_when_api_returns_ok_false(reload_server, monkeypat
         server.TELEGRAM_API._post("sendMessage", {"chat_id": 1, "text": "hi"})
 
 
+def test_telegram_get_returns_result_dict(reload_server, monkeypatch):
+    server = reload_server()
+
+    monkeypatch.setattr(
+        server.requests,
+        "get",
+        lambda *a, **k: _FakeResponse(
+            status_code=200,
+            json_payload={"ok": True, "result": {"username": "NemotronRariBot", "id": 123}},
+        ),
+    )
+
+    assert server.TELEGRAM_API.get_me() == {"username": "NemotronRariBot", "id": 123}
+
+
 def test_telegram_send_message_includes_disable_web_page_preview(reload_server, monkeypatch):
     server = reload_server()
     captured: dict = {}
@@ -640,6 +655,21 @@ def test_health_endpoint_full_shape_default_state(monkeypatch, tmp_path, reload_
             telegram_timeout_seconds=30.0,
         ),
     )
+    monkeypatch.setattr(
+        server,
+        "_telegram_runtime_probe",
+        lambda: {
+            "probe_ok": True,
+            "bot_username": "NemotronRariBot",
+            "bot_id": 123,
+            "webhook_registered": False,
+            "pending_update_count": 0,
+            "allowed_updates": ["message", "edited_message"],
+            "delivery_ready": False,
+            "delivery_mode_reason": "webhook_missing",
+            "probe_error": None,
+        },
+    )
 
     with TestClient(server.app) as http:
         response = http.get("/health")
@@ -661,6 +691,13 @@ def test_health_endpoint_full_shape_default_state(monkeypatch, tmp_path, reload_
     assert body["last_poll_error"] is None
     assert body["shared_polling_allowed"] is False
     assert body["webhook_secret_configured"] is False
+    assert body["bot_username"] == "NemotronRariBot"
+    assert body["telegram_delivery_ready"] is False
+    assert body["telegram_delivery_reason"] == "webhook_missing"
+    assert body["telegram_probe_ok"] is True
+    assert body["telegram_webhook_registered"] is False
+    assert body["telegram_pending_update_count"] == 0
+    assert body["telegram_allowed_updates"] == ["message", "edited_message"]
 
 
 def test_health_reports_polling_active_when_thread_alive(reload_server):
@@ -705,6 +742,35 @@ def test_health_reports_last_poll_error(reload_server):
         assert response.json()["last_poll_error"] == "redacted error message"
     finally:
         server.POLLING_STATE["last_error"] = None
+
+
+def test_health_reports_probe_failure(reload_server, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    server = reload_server()
+    monkeypatch.setattr(
+        server,
+        "_telegram_runtime_probe",
+        lambda: {
+            "probe_ok": False,
+            "bot_username": "",
+            "bot_id": None,
+            "webhook_registered": None,
+            "pending_update_count": None,
+            "allowed_updates": None,
+            "delivery_ready": False,
+            "delivery_mode_reason": "probe_failed",
+            "probe_error": "timeout",
+        },
+    )
+
+    with TestClient(server.app) as http:
+        response = http.get("/health")
+
+    body = response.json()
+    assert body["telegram_probe_ok"] is False
+    assert body["telegram_probe_error"] == "timeout"
+    assert body["telegram_delivery_reason"] == "probe_failed"
 
 
 # ---------------------------------------------------------------------------

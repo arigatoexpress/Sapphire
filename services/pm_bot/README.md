@@ -26,6 +26,8 @@ Optional:
 - `SAPPHIRE_PM_BOT_BOT_USERNAME=SapphirePMBot`
   - Enables guest-style mention parsing such as `@SapphirePMBot status` and
     reply-followup shorthand like replying `status` to the bot in group chats.
+    The service can also fall back to Telegram `getMe` during health probing if
+    this env var is missing or stale.
 - `SAPPHIRE_PM_BOT_WEBHOOK_SECRET=...`
   - Recommended for webhook mode. The service compares this against
     Telegram's `X-Telegram-Bot-Api-Secret-Token` header and rejects bad
@@ -89,6 +91,35 @@ curl -s "https://api.telegram.org/bot${SAPPHIRE_PM_BOT_TOKEN}/deleteWebhook" \
   -H "Content-Type: application/json" \
   -d '{"drop_pending_updates":false}'
 ```
+
+## Health Endpoint
+
+`GET /health` now reports not just local process state, but Telegram delivery
+readiness as seen from the Bot API. In webhook mode this makes it obvious when
+the service is healthy locally but Telegram still has no webhook registered.
+
+Key fields:
+
+- `bot_username`
+  - Prefers the configured env var, but falls back to a read-only `getMe`
+    probe so stale LaunchAgent environment does not hide the real bot username.
+- `supported_update_types`
+  - The update types this service is prepared to parse.
+- `telegram_delivery_ready`
+  - `true` only when the configured delivery mode is actually ready:
+    registered webhook in `MODE=webhook`, or live polling thread in
+    `MODE=polling`.
+- `telegram_delivery_reason`
+  - One of `webhook_registered`, `webhook_missing`, `polling_active`,
+    `polling_inactive`, or `probe_failed`.
+- `telegram_probe_ok`
+  - Whether the read-only Telegram readiness probe succeeded.
+- `telegram_webhook_registered`
+  - Whether Telegram currently has a webhook URL for this bot token.
+- `telegram_pending_update_count`
+  - Bot API pending update count when available.
+- `telegram_allowed_updates`
+  - Bot API allowed update list when available.
 
 ## LaunchAgent
 

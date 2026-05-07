@@ -196,6 +196,21 @@ class TelegramAPI:
             raise RuntimeError(f"Telegram API error for {method}: {data}")
         return data
 
+    def _get(self, method: str) -> dict[str, Any]:
+        response = requests.get(self._url(method), timeout=self._timeout)
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as exc:
+            detail = _redact_sensitive_text(response.text[:500])
+            raise RuntimeError(
+                f"Telegram API HTTP error for {method}: status={response.status_code} body={detail}"
+            ) from exc
+        data = response.json()
+        if not data.get("ok"):
+            raise RuntimeError(f"Telegram API error for {method}: {data}")
+        result = data.get("result")
+        return result if isinstance(result, dict) else {}
+
     def send_message(
         self,
         *,
@@ -237,6 +252,12 @@ class TelegramAPI:
     def delete_webhook(self, *, drop_pending_updates: bool = False) -> dict[str, Any]:
         return self._post("deleteWebhook", {"drop_pending_updates": drop_pending_updates})
 
+    def get_me(self) -> dict[str, Any]:
+        return self._get("getMe")
+
+    def get_webhook_info(self) -> dict[str, Any]:
+        return self._get("getWebhookInfo")
+
 
 SETTINGS = Settings.from_env()
 TELEGRAM_API = TelegramAPI(SETTINGS.token, timeout_seconds=SETTINGS.telegram_timeout_seconds)
@@ -250,6 +271,9 @@ _RECENT_UPDATE_IDS: OrderedDict[int, float] = OrderedDict()
 _RECENT_UPDATE_IDS_LOCK = threading.Lock()
 _RECENT_UPDATE_WINDOW_SECONDS = 600.0
 _RECENT_UPDATE_LIMIT = 2048
+_TELEGRAM_PROBE_TTL_SECONDS = 60.0
+_TELEGRAM_PROBE_CACHE: dict[str, Any] = {"expires_at": 0.0, "value": None}
+_TELEGRAM_PROBE_CACHE_LOCK = threading.Lock()
 
 app = FastAPI(title="Sapphire PM Bot", version="0.1.0")
 
@@ -447,6 +471,69 @@ def _start_polling_thread() -> None:
     thread.start()
 
 
+def _telegram_runtime_probe() -> dict[str, Any]:
+    """Read-only Telegram readiness probe with a short in-process cache."""
+
+    now = time.time()
+    with _TELEGRAM_PROBE_CACHE_LOCK:
+        cached = _TELEGRAM_PROBE_CACHE.get("value")
+        expires_at = float(_TELEGRAM_PROBE_CACHE.get("expires_at") or 0.0)
+        if isinstance(cached, dict) and expires_at > now:
+            return dict(cached)
+
+    username = SETTINGS.bot_username
+    try:
+        me = TELEGRAM_API.get_me()
+        webhook = TELEGRAM_API.get_webhook_info()
+        username = str(me.get("username") or username or "").strip().lstrip("@")
+        webhook_url = str(webhook.get("url") or "").strip()
+        webhook_registered = bool(webhook_url)
+        polling_active = bool(
+            isinstance(POLLING_STATE.get("thread"), threading.Thread)
+            and POLLING_STATE["thread"].is_alive()
+        )
+        pending_update_count = webhook.get("pending_update_count")
+        allowed_updates = webhook.get("allowed_updates")
+        result = {
+            "probe_ok": True,
+            "bot_username": username,
+            "bot_id": me.get("id"),
+            "webhook_registered": webhook_registered,
+            "pending_update_count": pending_update_count
+            if isinstance(pending_update_count, int)
+            else None,
+            "allowed_updates": allowed_updates if isinstance(allowed_updates, list) else None,
+            "delivery_ready": webhook_registered if SETTINGS.mode == "webhook" else polling_active,
+            "delivery_mode_reason": (
+                "webhook_registered"
+                if SETTINGS.mode == "webhook" and webhook_registered
+                else "webhook_missing"
+                if SETTINGS.mode == "webhook"
+                else "polling_active"
+                if polling_active
+                else "polling_inactive"
+            ),
+            "probe_error": None,
+        }
+    except Exception as exc:  # pragma: no cover - network/runtime behavior
+        result = {
+            "probe_ok": False,
+            "bot_username": username,
+            "bot_id": None,
+            "webhook_registered": None,
+            "pending_update_count": None,
+            "allowed_updates": None,
+            "delivery_ready": False,
+            "delivery_mode_reason": "probe_failed",
+            "probe_error": _redact_sensitive_text(exc),
+        }
+
+    with _TELEGRAM_PROBE_CACHE_LOCK:
+        _TELEGRAM_PROBE_CACHE["value"] = dict(result)
+        _TELEGRAM_PROBE_CACHE["expires_at"] = now + _TELEGRAM_PROBE_TTL_SECONDS
+    return result
+
+
 @app.on_event("startup")
 def on_startup() -> None:
     _validate_startup_config()
@@ -468,6 +555,7 @@ def on_shutdown() -> None:
 def health() -> dict[str, Any]:
     thread = POLLING_STATE.get("thread")
     polling_active = bool(isinstance(thread, threading.Thread) and thread.is_alive())
+    telegram_probe = _telegram_runtime_probe()
     return {
         "status": "ok",
         "service": "sapphire-pm-bot",
@@ -477,8 +565,15 @@ def health() -> dict[str, Any]:
         "last_poll_error": POLLING_STATE.get("last_error"),
         "shared_polling_allowed": SETTINGS.shared_polling_allowed,
         "webhook_secret_configured": bool(SETTINGS.webhook_secret),
-        "bot_username": SETTINGS.bot_username,
+        "bot_username": telegram_probe.get("bot_username") or SETTINGS.bot_username,
         "supported_update_types": list(_SUPPORTED_UPDATE_TYPES),
+        "telegram_delivery_ready": bool(telegram_probe.get("delivery_ready")),
+        "telegram_delivery_reason": telegram_probe.get("delivery_mode_reason"),
+        "telegram_probe_ok": bool(telegram_probe.get("probe_ok")),
+        "telegram_probe_error": telegram_probe.get("probe_error"),
+        "telegram_webhook_registered": telegram_probe.get("webhook_registered"),
+        "telegram_pending_update_count": telegram_probe.get("pending_update_count"),
+        "telegram_allowed_updates": telegram_probe.get("allowed_updates"),
     }
 
 
