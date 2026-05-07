@@ -10,6 +10,15 @@
 </section>
 
 <section class="box">
+  <h2 class="section">FAILOVER_POSTURE</h2>
+  <table class="term">
+    <thead><tr><th>lane</th><th>status</th><th>reporting</th><th>role</th></tr></thead>
+    <tbody id="failover"><tr><td colspan="4" class="muted">// loading failover readiness ...</td></tr></tbody>
+  </table>
+  <div class="muted" style="margin-top:10px;">// service names, hosts, ports, raw evidence, and routing policy require <a href="/admin">admin</a></div>
+</section>
+
+<section class="box">
   <h2 class="section">SERVICE_HEALTH_60M</h2>
   <table class="term">
     <thead><tr><th>service</th><th>host</th><th>healthy</th><th>degraded</th><th>down</th><th>p50 ms</th><th>p95 ms</th><th>last seen</th></tr></thead>
@@ -55,6 +64,32 @@
     (function tick(){ if (i>=full.length) return; line.textContent += full.charAt(i++); setTimeout(tick, 28); })();
   }
   function esc(s){ return String(s||'').replace(/[<>&]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
+  function pillClass(status) {
+    status = String(status || '').toLowerCase();
+    if (status === 'ready') return 'green';
+    if (status === 'degraded' || status === 'degraded_with_fallback') return 'amber';
+    return 'red';
+  }
+
+  fetch('/api/failover/readiness').then(r=>r.json()).then(d=>{
+    var rows = d.lanes || [];
+    var tb = document.getElementById('failover');
+    if (!rows.length) {
+      tb.innerHTML = '<tr><td colspan="4" class="muted">// failover summary unavailable</td></tr>';
+      return;
+    }
+    tb.innerHTML = rows.map(r => {
+      var cls = pillClass(r.status);
+      return '<tr>' +
+        '<td><code>' + esc(r.label || r.lane) + '</code></td>' +
+        '<td><span class="pill ' + cls + '">' + esc(String(r.status || 'unknown').toUpperCase()) + '</span></td>' +
+        '<td>' + Number(r.reporting || 0) + '</td>' +
+        '<td class="dim">' + esc(r.role || '') + '</td>' +
+      '</tr>';
+    }).join('');
+  }).catch(()=>{
+    document.getElementById('failover').innerHTML = '<tr><td colspan="4" class="muted">// /api/failover/readiness unreachable</td></tr>';
+  });
 
   fetch('/api/silos/health').then(r=>r.json()).then(d=>{
     var rows = d.services || [];
