@@ -160,6 +160,35 @@ Keep new AgentWiki sources default-deny until their source registry row has
 explicit allowed products, terms status, redistribution posture, freshness, and
 operator notes.
 
+## AgentWiki MCP Surface
+
+The local MCP-compatible stdio server wraps the authenticated dashboard routes
+instead of duplicating AgentWiki business logic:
+
+`python3 /Users/aribs/Code/Sapphire/tools/agentwiki_x402_mcp/server.py`
+
+Repo-local `.mcp.json` registers it as `agentwiki-x402`.
+
+Tools:
+
+- `wiki_search` -> `GET /api/x402/agentwiki/search`
+- `wiki_quote` -> `GET /api/x402/agentwiki/artifacts/<artifact_id>/quote`
+- `wiki_fetch_paid` -> `POST /api/x402/agentwiki/artifacts/<artifact_id>/content`
+- `wiki_receipt` -> local non-secret x402 receipt ledger lookup
+
+Properties:
+
+- reads dashboard auth from `SAPPHIRE_DASHBOARD_PASSWORD`, `AUTH_PASSWORD`, or
+  `~/.config/sapphire-secrets/dashboard_password`;
+- without a `payment_header` or explicit `simulate_payment=true`,
+  `wiki_fetch_paid` returns the 402 requirement and receipt instead of content;
+- simulated payment headers are local/testnet-only, require explicit caller
+  intent, and are never returned in tool output;
+- `wiki_receipt` returns sanitized records by default and does not expose raw
+  payment headers, which the ledger does not store;
+- does not crawl sources, settle payments, trade, send Telegram messages, or
+  mutate production data.
+
 ## Control Plane Summary Wiring
 
 The React Control Plane preview consumes the read-only v2 summary endpoint:

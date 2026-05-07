@@ -8,6 +8,10 @@
       "command": "python3",
       "args": ["/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/openbb_mcp_server/app/app.py"]
     },
+    "agentwiki-x402": {
+      "command": "python3",
+      "args": ["/Users/aribs/Code/Sapphire/tools/agentwiki_x402_mcp/server.py"]
+    },
     "context7": {
       "command": "npx",
       "args": ["-y", "@upstash/context7-mcp@latest"]
