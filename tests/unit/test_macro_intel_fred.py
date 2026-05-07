@@ -69,6 +69,30 @@ def test_fred_daily_export_is_explicit_bounded_daily_artifact(tmp_path, monkeypa
     )
 
 
+def test_fred_daily_export_live_does_not_pull_macro_event_sources(tmp_path, monkeypatch):
+    monkeypatch.setenv("SAPPHIRE_MACRO_INTEL_LIVE", "1")
+
+    def fail_if_called(**_kwargs):
+        raise AssertionError("fred_daily_export must not build macro event sources")
+
+    monkeypatch.setattr(macro_run, "build_default_sources", fail_if_called)
+
+    result = macro_run.fred_daily_export(
+        live=True,
+        fred_series_ids=("DFF",),
+        fred_loader=FakeFredLoader(),
+        output_root=tmp_path,
+        now=datetime(2026, 1, 5, tzinfo=UTC),
+    )
+
+    assert result["ok"] is True
+    assert result["dry_run"] is False
+    assert result["events"] == []
+    assert result["pulled_sources"] == []
+    assert result["metadata"]["live_http_allowed"] is True
+    assert result["writes"]["fred_observations"]["written"] == 1
+
+
 def test_fred_daily_export_empty_cache_is_safe_noop(tmp_path, monkeypatch):
     monkeypatch.delenv("SAPPHIRE_FRED_LIVE", raising=False)
     monkeypatch.setenv("SAPPHIRE_FRED_CACHE_DIR", str(tmp_path / "empty-cache"))

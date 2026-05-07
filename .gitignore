@@ -72,6 +72,7 @@ data/content/
 data/events/
 data/health/
 data/intelligence/
+data/macro/
 data/metrics/
 data/signals/
 data/vote_monitor/

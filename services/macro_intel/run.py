@@ -388,19 +388,49 @@ def fred_daily_export(
 ) -> dict[str, Any]:
     """Write the bounded daily FRED observation export artifact."""
 
-    result = run_once(
-        output_root=output_root,
+    now = (now or _now_utc()).astimezone(UTC)
+    output_root = Path(output_root)
+    live_ok = _live_allowed(live=live)
+    metadata = {
+        "generator": GENERATOR,
+        "version": VERSION,
+        "dry_run": not live_ok,
+        "live_http_allowed": live_ok,
+        "publish_requested": False,
+        "caps": {
+            "max_pulls_per_hour_per_source": MAX_PULLS_PER_HOUR_PER_SOURCE,
+            "max_events_per_pull": MAX_EVENTS_PER_PULL,
+            "max_forward_calendar_days": MAX_FORWARD_CALENDAR_DAYS,
+        },
+        "cache_dir": str(cache_base_dir()),
+        "fred_cache_dir": str(fred_cache_dir()),
+        "output_root": str(output_root),
+    }
+    fred_rows, fred_errors = _pull_fred_rows(
+        loader=fred_loader or FredLoader(),
+        series_ids=fred_series_ids,
         now=now,
-        live=live,
-        publish=False,
-        include_static_calendar=False,
-        include_fred=True,
-        fred_series_ids=fred_series_ids,
-        fred_loader=fred_loader,
-        fred_observation_start=fred_observation_start,
-        fred_realtime_start=fred_realtime_start,
-        fred_realtime_end=fred_realtime_end,
+        observation_start=fred_observation_start,
+        realtime_start=fred_realtime_start,
+        realtime_end=fred_realtime_end,
     )
+    fred_write = _write_jsonl(
+        _fred_observations_path(output_root, now),
+        fred_rows,
+        source_paths=(Path(__file__), REPO_ROOT / "lib" / "macro" / "fred_loader.py"),
+    )
+    result = {
+        "ok": not fred_errors,
+        "dry_run": not live_ok,
+        "reason": "FRED daily export only; macro event sources were not pulled",
+        "pulled_sources": [],
+        "events": [],
+        "errors": fred_errors,
+        "calendar_window": [],
+        "writes": {"fred_observations": fred_write},
+        "published": _publish_events([], [], requested=False),
+        "metadata": metadata,
+    }
     errors = list(result.get("errors") or [])
     cache_miss_only = bool(errors) and all(
         isinstance(error, dict)
