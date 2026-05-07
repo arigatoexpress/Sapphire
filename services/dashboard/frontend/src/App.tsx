@@ -17,25 +17,25 @@ const modules = [
   "Settings / Contracts",
 ] as const;
 
-const moduleContracts = [
+const fallbackModuleContracts = [
   {
-    module: "Operations",
-    status: "read-only adapters",
+    name: "Operations",
+    status: "unknown",
     detail: "Org status, readiness, services, worktrees, PR lanes.",
   },
   {
-    module: "Markets",
-    status: "paper-first",
+    name: "Markets",
+    status: "unknown",
     detail: "Signals, strategy lab, portfolio, forecasts, chain and perps.",
   },
   {
-    module: "Security",
-    status: "evidence required",
+    name: "Security",
+    status: "unknown",
     detail: "SOC, dependency, network, model, and credential hygiene.",
   },
   {
-    module: "Automation",
-    status: "dry-run only",
+    name: "Automation",
+    status: "unknown",
     detail: "Task previews, event stream, routine pause, next actions.",
   },
 ];
@@ -59,7 +59,7 @@ function Card({ card }: { card: EnvelopeCard }) {
     <article className={`card card-${card.status}`}>
       <div className="card-topline">
         <span className="status-dot" aria-hidden="true" />
-        <span>{modeLabel(card)}</span>
+        <span>{card.module ? `${card.module} · ${modeLabel(card)}` : modeLabel(card)}</span>
       </div>
       <h2>{card.title}</h2>
       <strong>{card.value}</strong>
@@ -97,7 +97,17 @@ export function App() {
     };
   }, []);
 
-  const visibleCards = useMemo(() => summary.cards.slice(0, 6), [summary.cards]);
+  const visibleCards = useMemo(() => summary.cards, [summary.cards]);
+  const moduleRows = useMemo(() => {
+    if (summary.modules?.length) {
+      return summary.modules.map((module) => ({
+        name: module.name,
+        status: module.status,
+        detail: `${module.summary} ${module.card_count ? "" : "Pending adapter."}`.trim(),
+      }));
+    }
+    return fallbackModuleContracts;
+  }, [summary.modules]);
 
   return (
     <main className="shell">
@@ -135,9 +145,9 @@ export function App() {
         </section>
 
         <section className="modules" aria-label="Module contracts">
-          {moduleContracts.map((contract) => (
-            <article className="module-row" id={contract.module.toLowerCase().replaceAll(" ", "-")} key={contract.module}>
-              <span>{contract.module}</span>
+          {moduleRows.map((contract) => (
+            <article className="module-row" id={contract.name.toLowerCase().replaceAll(" ", "-").replaceAll("/", "")} key={contract.name}>
+              <span>{contract.name}</span>
               <strong>{contract.status}</strong>
               <p>{contract.detail}</p>
             </article>

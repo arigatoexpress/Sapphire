@@ -179,6 +179,19 @@ def app_preview_assets(filename):
     return send_from_directory(_FRONTEND_DIST_DIR / "assets", filename)
 
 
+@app.route("/api/v2/control-plane/summary")
+@requires_auth
+def api_v2_control_plane_summary():
+    """Normalized read-only cards for the Sapphire OS Control Plane preview."""
+
+    def fetch():
+        from services.dashboard.control_plane_summary import build_control_plane_summary
+
+        return build_control_plane_summary(probe_services=True)
+
+    return jsonify(get_cached("v2_control_plane_summary", fetch, ttl=30, raise_on_miss=True))
+
+
 # Cache for data
 _cache = {}
 _cache_time = {}
