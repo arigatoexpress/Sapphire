@@ -261,7 +261,7 @@
       "name": "Grants.gov API",
       "domain": "grants",
       "priority": "P0",
-      "url": "https://grants.gov/api/api-guide",
+      "url": "https://www.grants.gov/api/common/search2",
       "auth": "public_api",
       "terms_status": "public_official_fair_access_review_required",
       "redistribution": "derived_facts_with_citation",
@@ -269,7 +269,7 @@
       "production_ready": false,
       "allowed_products": ["agentwiki_builder_brief"],
       "tags": ["grants", "assistance", "eligibility", "deadlines"],
-      "notes": "Normalize opportunity fields and eligibility into AgentWiki pages; do not imply award status or legal advice."
+      "notes": "Cache-first AgentWiki adapter exists for the public search2 endpoint; live fetch requires an explicit flag and local cache writes require write_cache=true. Keep production_ready false until terms review and first operator-gated live hydration are recorded; do not imply award status or legal advice."
     },
     {
       "source_id": "regulations_gov",

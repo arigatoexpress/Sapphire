@@ -5244,6 +5244,58 @@ def api_x402_agentwiki_search():
         return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 500
 
 
+@app.route("/api/x402/agentwiki/sources/grants-gov/search", methods=["GET", "POST"])
+@requires_auth
+def api_x402_agentwiki_grants_gov_search():
+    """Cache-first Grants.gov source search for AgentWiki builders."""
+
+    try:
+        from lib.payments.agentwiki_grants_gov import search_grants_gov_opportunities
+
+        body = request.get_json(silent=True) if request.method == "POST" else {}
+        body = body if isinstance(body, dict) else {}
+
+        def value(*keys: str, default=None):
+            for key in keys:
+                if key in body and body[key] not in (None, ""):
+                    return body[key]
+                arg_value = request.args.get(key)
+                if arg_value not in (None, ""):
+                    return arg_value
+            return default
+
+        def bool_value(*keys: str, default: bool = False) -> bool:
+            raw = value(*keys, default=default)
+            if isinstance(raw, bool):
+                return raw
+            return str(raw).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+        payload = search_grants_gov_opportunities(
+            query=str(value("query", "q", default="")),
+            limit=value("limit", "rows", default=10),
+            statuses=value("statuses", "oppStatuses", default="forecasted|posted"),
+            agencies=value("agencies", default=""),
+            funding_categories=value("funding_categories", "fundingCategories", default=""),
+            eligibilities=value("eligibilities", default=""),
+            funding_instruments=value(
+                "funding_instruments",
+                "fundingInstruments",
+                default="",
+            ),
+            aln=value("aln", default=""),
+            opportunity_number=str(value("opportunity_number", "oppNum", default="")),
+            fetch_live=bool_value("fetch_live", "live", default=False),
+            use_cache=bool_value("use_cache", default=True),
+            write_cache=bool_value("write_cache", default=False),
+        )
+        return jsonify(payload)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:  # noqa: BLE001
+        log.exception("AgentWiki Grants.gov source search failed")
+        return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 500
+
+
 @app.route("/api/x402/agentwiki/artifacts/<artifact_id>/quote")
 @requires_auth
 def api_x402_agentwiki_quote(artifact_id: str):

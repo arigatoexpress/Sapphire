@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -36,6 +38,17 @@ README_FILES_RE = re.compile(r"\| Test files \| \*\*(?P<files>[\d,]+)\+\*\* \|")
 README_BADGE_RE = re.compile(
     r"\[!\[Tests\]\(https://img\.shields\.io/badge/tests-(?P<label>[^-]+)-2ea44f\)\]"
 )
+
+
+def _resolve_collection_python() -> str:
+    if env := os.environ.get("PYTHON3"):
+        return env
+    if Path("/usr/local/bin/python3").exists():
+        return "/usr/local/bin/python3"
+    return shutil.which("python3") or sys.executable
+
+
+COLLECTION_PYTHON = _resolve_collection_python()
 
 
 @dataclass
@@ -111,7 +124,7 @@ def collect_inventory() -> Inventory:
 def collect_suite(name: str, paths: tuple[str, ...]) -> SuiteInventory:
     start = time.perf_counter()
     result = subprocess.run(
-        [sys.executable, "-m", "pytest", *paths, "--collect-only", "-qq"],
+        [COLLECTION_PYTHON, "-m", "pytest", *paths, "--collect-only", "-qq"],
         cwd=ROOT,
         text=True,
         capture_output=True,
