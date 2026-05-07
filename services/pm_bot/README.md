@@ -23,6 +23,9 @@ Required:
 
 Optional:
 
+- `SAPPHIRE_PM_BOT_BOT_USERNAME=SapphirePMBot`
+  - Enables guest-style mention parsing such as `@SapphirePMBot status` and
+    reply-followup shorthand like replying `status` to the bot in group chats.
 - `SAPPHIRE_PM_BOT_WEBHOOK_SECRET=...`
   - Recommended for webhook mode. The service compares this against
     Telegram's `X-Telegram-Bot-Api-Secret-Token` header and rejects bad
@@ -76,7 +79,7 @@ Set the webhook:
 ```bash
 curl -s "https://api.telegram.org/bot${SAPPHIRE_PM_BOT_TOKEN}/setWebhook" \
   -H "Content-Type: application/json" \
-  -d "{\"url\":\"https://YOUR-PUBLIC-URL/telegram/webhook\",\"allowed_updates\":[\"message\"],\"secret_token\":\"${SAPPHIRE_PM_BOT_WEBHOOK_SECRET}\"}"
+  -d "{\"url\":\"https://YOUR-PUBLIC-URL/telegram/webhook\",\"allowed_updates\":[\"message\",\"edited_message\",\"channel_post\",\"edited_channel_post\"],\"secret_token\":\"${SAPPHIRE_PM_BOT_WEBHOOK_SECRET}\"}"
 ```
 
 Clear the webhook for polling:
@@ -126,3 +129,5 @@ Quick manual smoke test with the service running:
 - DM the bot `/status`
 - DM the bot `/pm list`
 - DM the bot `/rag what forms are needed for a sale in Harris County`
+- In a group, tag the bot with `@SapphirePMBot status` if `SAPPHIRE_PM_BOT_BOT_USERNAME` is set
+- Reply to one of the bot's messages with `status` to exercise reply-followup normalization

@@ -120,12 +120,14 @@ def test_allowlist_permits_listed_user_id(monkeypatch):
 
 def test_help_command_happy_path(monkeypatch):
     monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_BOT_USERNAME", "SapphirePMBot")
 
     response = pm_bot.handle_telegram_command(_make_update("/help"))
 
     assert response["parse_mode"] == "MarkdownV2"
     assert "Available commands" in response["text"]
     assert "/pm list \\[\\-\\-project <id\\>\\]" in response["text"]
+    assert "@SapphirePMBot status" in response["text"]
 
 
 def test_status_command_happy_path(monkeypatch):
@@ -316,6 +318,94 @@ def test_claw_stub_happy_path(monkeypatch):
     response = pm_bot.handle_telegram_command(_make_update("/claw investigate backlog"))
 
     assert response["text"] == "claw session not yet wired (phase 2)"
+
+
+def test_command_suffix_with_bot_username_is_normalized(monkeypatch):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    monkeypatch.setattr(
+        pm_bot.sapphire_status_tool,
+        "run",
+        lambda: '{"devices": [], "inference": {"proxy_health": {}}}',
+    )
+    monkeypatch.setattr(pm_bot, "_count_signals_today", lambda: 0)
+    monkeypatch.setattr(
+        pm_bot.requests,
+        "get",
+        lambda *args, **kwargs: SimpleNamespace(status_code=200, reason="OK"),
+    )
+
+    response = pm_bot.handle_telegram_command(_make_update("/status@SapphirePMBot"))
+
+    assert response["parse_mode"] == "MarkdownV2"
+    assert "Sapphire PM bot status" in response["text"]
+
+
+def test_guest_mention_status_is_normalized(monkeypatch):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_BOT_USERNAME", "SapphirePMBot")
+    monkeypatch.setattr(
+        pm_bot.sapphire_status_tool,
+        "run",
+        lambda: '{"devices": [], "inference": {"proxy_health": {}}}',
+    )
+    monkeypatch.setattr(pm_bot, "_count_signals_today", lambda: 0)
+    monkeypatch.setattr(
+        pm_bot.requests,
+        "get",
+        lambda *args, **kwargs: SimpleNamespace(status_code=200, reason="OK"),
+    )
+
+    response = pm_bot.handle_telegram_command(_make_update("@SapphirePMBot status"))
+
+    assert response["parse_mode"] == "MarkdownV2"
+    assert "Sapphire PM bot status" in response["text"]
+
+
+def test_guest_mention_status_normalizes_without_configured_username(monkeypatch):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    monkeypatch.delenv("SAPPHIRE_PM_BOT_BOT_USERNAME", raising=False)
+    monkeypatch.setattr(
+        pm_bot.sapphire_status_tool,
+        "run",
+        lambda: '{"devices": [], "inference": {"proxy_health": {}}}',
+    )
+    monkeypatch.setattr(pm_bot, "_count_signals_today", lambda: 0)
+    monkeypatch.setattr(
+        pm_bot.requests,
+        "get",
+        lambda *args, **kwargs: SimpleNamespace(status_code=200, reason="OK"),
+    )
+
+    response = pm_bot.handle_telegram_command(_make_update("@NemotronRariBot status"))
+
+    assert response["parse_mode"] == "MarkdownV2"
+    assert "Sapphire PM bot status" in response["text"]
+
+
+def test_reply_followup_to_bot_normalizes_bare_command(monkeypatch):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_BOT_USERNAME", "SapphirePMBot")
+    monkeypatch.setattr(
+        pm_bot.sapphire_status_tool,
+        "run",
+        lambda: '{"devices": [], "inference": {"proxy_health": {}}}',
+    )
+    monkeypatch.setattr(pm_bot, "_count_signals_today", lambda: 0)
+    monkeypatch.setattr(
+        pm_bot.requests,
+        "get",
+        lambda *args, **kwargs: SimpleNamespace(status_code=200, reason="OK"),
+    )
+    update = _make_update("status")
+    update["message"]["reply_to_message"] = {
+        "from": {"is_bot": True, "username": "SapphirePMBot"},
+        "text": "previous reply",
+    }
+
+    response = pm_bot.handle_telegram_command(update)
+
+    assert response["parse_mode"] == "MarkdownV2"
+    assert "Sapphire PM bot status" in response["text"]
 
 
 def test_svc_status_uses_service_supervisor_dry_run(monkeypatch):
