@@ -29,6 +29,7 @@ Endpoints:
   /v1/quota             — Current tenant quota policy and usage
   /v1/cache-stats       — Prompt-cache aggregate stats
   /health               — Full tier health report
+  /failover/status      — Operator-grade failover mode + active fallback route
   /metrics              — Per-tier request/success/failure counters
 """
 
@@ -262,6 +263,133 @@ def _endpoint_status(name: str) -> str:
     if not _endpoint_enabled(name):
         return "disabled"
     return "healthy" if _is_healthy(name) else "failed"
+
+
+def _tier_inventory() -> dict[str, str]:
+    """Return public, non-secret endpoint inventory for health/readiness views."""
+    return {
+        "t1_windows_gpu": WINDOWS_GPU,
+        "t2_pi_rari1": f"{PI_RARI1} (enabled={PI_RARI1_ENABLED})",
+        "t2_pi_rari2": f"{PI_RARI2} (enabled={PI_RARI2_ENABLED})",
+        "t3_mac_local": MAC_LOCAL,
+        "t4_kimi_cloud": MOONSHOT_BASE,
+    }
+
+
+def _endpoint_status_snapshot() -> dict[str, str]:
+    """Return current endpoint status without exposing raw health internals."""
+    return {name: _endpoint_status(name) for name in ENDPOINTS}
+
+
+def _failover_status_payload() -> dict[str, object]:
+    """Build the operator contract for Windows-offline/local/cloud failover.
+
+    This intentionally distinguishes "degraded but covered" from "down":
+    Windows can be offline while Sapphire remains operational through Mac/Pi
+    local tiers and non-sensitive cloud fallback.
+    """
+    endpoints = _endpoint_status_snapshot()
+    local_candidates = ("pi-rari1", "pi-rari2", "mac-local")
+    ordered_route = ("windows-gpu", "pi-rari1", "pi-rari2", "mac-local", "kimi-cloud")
+    enabled_local = [name for name in local_candidates if endpoints.get(name) != "disabled"]
+    healthy_local = [name for name in enabled_local if endpoints.get(name) == "healthy"]
+    healthy_cloud = endpoints.get("kimi-cloud") == "healthy"
+    windows_healthy = endpoints.get("windows-gpu") == "healthy"
+    active_route = next(
+        (name for name in ordered_route if endpoints.get(name) == "healthy"),
+        None,
+    )
+
+    if windows_healthy:
+        mode = "primary"
+        status = "ok"
+    elif healthy_local:
+        mode = "local_failover"
+        status = "degraded"
+    elif healthy_cloud:
+        mode = "cloud_failover"
+        status = "degraded"
+    else:
+        mode = "unavailable"
+        status = "fail"
+
+    recommended_actions: list[str] = []
+    if not windows_healthy:
+        recommended_actions.append(
+            "Windows GPU tier is offline; keep GPU-only jobs paused or route them to exact Mac models when available."
+        )
+    if not healthy_local:
+        recommended_actions.append(
+            "No local fallback tier is healthy; restore Mac Ollama or enable a Pi tier before relying on sensitive inference."
+        )
+    if not healthy_cloud:
+        recommended_actions.append(
+            "Cloud fallback is unavailable; verify MOONSHOT_API_KEY/OpenRouter or Kimi relay configuration."
+        )
+    if endpoints.get("pi-rari1") == "disabled" and endpoints.get("pi-rari2") == "disabled":
+        recommended_actions.append(
+            "Pi tiers are disabled; enable one only after a live probe confirms the device is reachable."
+        )
+    if not recommended_actions:
+        recommended_actions.append("All failover tiers are healthy; keep current routing.")
+
+    tiers = [
+        {
+            "tier": "T1",
+            "endpoint": "windows-gpu",
+            "role": "primary_gpu",
+            "location": "windows",
+            "status": endpoints["windows-gpu"],
+            "enabled": endpoints["windows-gpu"] != "disabled",
+        },
+        {
+            "tier": "T2",
+            "endpoint": "pi-rari1",
+            "role": "local_lightweight",
+            "location": "local_device",
+            "status": endpoints["pi-rari1"],
+            "enabled": endpoints["pi-rari1"] != "disabled",
+        },
+        {
+            "tier": "T2",
+            "endpoint": "pi-rari2",
+            "role": "local_lightweight",
+            "location": "local_device",
+            "status": endpoints["pi-rari2"],
+            "enabled": endpoints["pi-rari2"] != "disabled",
+        },
+        {
+            "tier": "T3",
+            "endpoint": "mac-local",
+            "role": "local_sensitive_fallback",
+            "location": "mac",
+            "status": endpoints["mac-local"],
+            "enabled": endpoints["mac-local"] != "disabled",
+        },
+        {
+            "tier": "T4",
+            "endpoint": "kimi-cloud",
+            "role": "non_sensitive_cloud_fallback",
+            "location": "cloud",
+            "status": endpoints["kimi-cloud"],
+            "enabled": endpoints["kimi-cloud"] != "disabled",
+        },
+    ]
+
+    return {
+        "status": status,
+        "service": "inference-proxy",
+        "mode": mode,
+        "active_route": active_route,
+        "fallback_ready": bool(healthy_local or healthy_cloud),
+        "windows_offline": not windows_healthy,
+        "sensitive_cloud_block": True,
+        "local_fallbacks": healthy_local,
+        "cloud_fallbacks": ["kimi-cloud"] if healthy_cloud else [],
+        "endpoints": endpoints,
+        "tiers": tiers,
+        "recommended_actions": recommended_actions,
+    }
 
 
 # ─── Metrics ─────────────────────────────────────────────────────────────────
@@ -1214,16 +1342,15 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 {
                     "status": "ok",
                     "service": "inference-proxy",
-                    "endpoints": {name: _endpoint_status(name) for name in ENDPOINTS},
-                    "tiers": {
-                        "t1_windows_gpu": WINDOWS_GPU,
-                        "t2_pi_rari1": f"{PI_RARI1} (enabled={PI_RARI1_ENABLED})",
-                        "t2_pi_rari2": f"{PI_RARI2} (enabled={PI_RARI2_ENABLED})",
-                        "t3_mac_local": MAC_LOCAL,
-                        "t4_kimi_cloud": MOONSHOT_BASE,
-                    },
+                    "endpoints": _endpoint_status_snapshot(),
+                    "tiers": _tier_inventory(),
+                    "failover": _failover_status_payload(),
                 },
             )
+            return
+
+        if self.path == "/failover/status":
+            self._respond(200, _failover_status_payload())
             return
 
         if self.path == "/metrics":
@@ -1623,7 +1750,7 @@ if __name__ == "__main__":
     probe_thread = threading.Thread(target=_background_health_probe, daemon=True)
     probe_thread.start()
 
-    server = ThreadedHTTPServer(("0.0.0.0", PORT), ProxyHandler)
+    server = ThreadedHTTPServer(("0.0.0.0", PORT), ProxyHandler)  # nosec B104
     log.info("Sapphire Inference Proxy :%d — 4-tier failover (threaded)", PORT)
     log.info("T1 Windows GPU : %s (native /api/chat)", WINDOWS_GPU)
     log.info("T2 Pi rari1    : %s enabled=%s", PI_RARI1, PI_RARI1_ENABLED)

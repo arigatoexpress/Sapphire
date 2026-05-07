@@ -932,6 +932,8 @@ class TestGetEndpoints:
             assert status in {"healthy", "failed", "disabled"}
         assert "tiers" in payload
         assert "t1_windows_gpu" in payload["tiers"]
+        assert payload["failover"]["service"] == "inference-proxy"
+        assert "fallback_ready" in payload["failover"]
 
     def test_health_response_reports_disabled_pi_tiers(self, app_module, monkeypatch):
         monkeypatch.setattr(app_module, "PI_RARI1_ENABLED", False)
@@ -949,6 +951,58 @@ class TestGetEndpoints:
         payload = _response_payload(handler)
         assert payload["endpoints"]["pi-rari1"] == "disabled"
         assert payload["endpoints"]["pi-rari2"] == "disabled"
+
+    def test_failover_status_reports_local_failover_when_windows_is_offline(
+        self, app_module, monkeypatch
+    ):
+        monkeypatch.setattr(app_module, "PI_RARI1_ENABLED", False)
+        monkeypatch.setattr(app_module, "PI_RARI2_ENABLED", False)
+        app_module._mark_failed("windows-gpu")
+        app_module._mark_ok("mac-local")
+        app_module._mark_ok("kimi-cloud")
+
+        handler = _make_handler(
+            app_module,
+            path="/failover/status",
+            body=b"",
+            method="GET",
+        )
+        handler.do_GET()
+
+        assert handler._captured_status == 200
+        payload = _response_payload(handler)
+        assert payload["status"] == "degraded"
+        assert payload["mode"] == "local_failover"
+        assert payload["active_route"] == "mac-local"
+        assert payload["fallback_ready"] is True
+        assert payload["windows_offline"] is True
+        assert payload["sensitive_cloud_block"] is True
+        assert payload["local_fallbacks"] == ["mac-local"]
+        assert payload["cloud_fallbacks"] == ["kimi-cloud"]
+        assert any("Windows GPU tier is offline" in item for item in payload["recommended_actions"])
+
+    def test_failover_status_fails_when_no_local_or_cloud_tiers_are_healthy(
+        self, app_module, monkeypatch
+    ):
+        monkeypatch.setattr(app_module, "PI_RARI1_ENABLED", False)
+        monkeypatch.setattr(app_module, "PI_RARI2_ENABLED", False)
+        app_module._mark_failed("windows-gpu")
+        app_module._mark_failed("mac-local")
+        app_module._mark_failed("kimi-cloud")
+
+        handler = _make_handler(
+            app_module,
+            path="/failover/status",
+            body=b"",
+            method="GET",
+        )
+        handler.do_GET()
+
+        payload = _response_payload(handler)
+        assert payload["status"] == "fail"
+        assert payload["mode"] == "unavailable"
+        assert payload["active_route"] is None
+        assert payload["fallback_ready"] is False
 
     def test_metrics_response_shape_with_data(self, app_module):
         # Seed a few metric points to exercise the avg/success_rate formatters.
