@@ -84,6 +84,59 @@ def _validate_task(task: dict[str, Any]) -> None:
         raise ValueError(f"unsafe task mode {safe_mode!r} for {task_id}")
 
 
+def _runtime_guard(
+    *,
+    target_runtime: str | None,
+    runtime_status: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Return a dry-run dispatch guard for runtime-specific leases."""
+    if target_runtime != "windows-gpu":
+        return {
+            "applied": False,
+            "status": "not_required",
+            "target_runtime": target_runtime,
+            "reason": None,
+            "message": None,
+        }
+    if not runtime_status:
+        return {
+            "applied": False,
+            "status": "unknown",
+            "target_runtime": target_runtime,
+            "reason": "runtime_status_absent",
+            "message": "Windows GPU lease preview did not receive failover status.",
+        }
+
+    windows_offline = bool(runtime_status.get("windows_offline"))
+    fallback_ready = bool(runtime_status.get("fallback_ready"))
+    mode = str(runtime_status.get("mode") or "unknown")
+    if windows_offline:
+        return {
+            "applied": True,
+            "status": "blocked",
+            "target_runtime": target_runtime,
+            "reason": "windows_gpu_primary_unavailable",
+            "mode": mode,
+            "active_route": runtime_status.get("active_route"),
+            "fallback_ready": fallback_ready,
+            "message": (
+                "Windows GPU is offline; GPU-primary dry-run leases are paused "
+                "until the primary tier is healthy."
+            ),
+        }
+
+    return {
+        "applied": True,
+        "status": "pass",
+        "target_runtime": target_runtime,
+        "reason": None,
+        "mode": mode,
+        "active_route": runtime_status.get("active_route"),
+        "fallback_ready": fallback_ready,
+        "message": "Windows GPU primary tier is available for dry-run lease preview.",
+    }
+
+
 def _jsonl_rows(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
@@ -229,6 +282,7 @@ def lease_tasks(
     agent_id: str,
     capabilities: list[str] | None = None,
     target_runtime: str | None = None,
+    runtime_status: dict[str, Any] | None = None,
     artifact_dir: Path = DEFAULT_ARTIFACT_DIR,
     lease_seconds: int = 1800,
     limit: int = 3,
@@ -260,7 +314,8 @@ def lease_tasks(
             str(task.get("id") or ""),
         )
     )
-    selected = candidates[:effective_limit]
+    runtime_guard = _runtime_guard(target_runtime=target_runtime, runtime_status=runtime_status)
+    selected = [] if runtime_guard["status"] == "blocked" else candidates[:effective_limit]
     records = []
     for task in selected:
         task_id = str(task["id"])
@@ -301,8 +356,10 @@ def lease_tasks(
         "artifact_dir": str(artifact_dir),
         "target_file": str(target),
         "candidate_count": len(candidates),
+        "blocked_by_runtime": len(candidates) if runtime_guard["status"] == "blocked" else 0,
         "leased_count": len(records),
         "leases": records,
+        "runtime_guard": runtime_guard,
         "safety": {
             "dry_run_dispatch_only": True,
             "execution_enabled": False,

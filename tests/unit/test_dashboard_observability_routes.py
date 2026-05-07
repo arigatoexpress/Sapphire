@@ -243,6 +243,38 @@ def _stub_launchagents_payload() -> dict:
     }
 
 
+def _stub_failover_payload() -> dict:
+    return {
+        "mode_name": "read_only_system_failover_status",
+        "mode": "local_failover",
+        "status": "degraded",
+        "ok": True,
+        "active_route": "mac-local",
+        "windows_offline": True,
+        "fallback_ready": True,
+        "proxy": {
+            "tiers": [
+                {
+                    "tier": "T1",
+                    "endpoint": "windows-gpu",
+                    "role": "primary_gpu",
+                    "status": "failed",
+                },
+                {
+                    "tier": "T3",
+                    "endpoint": "mac-local",
+                    "role": "local_sensitive_fallback",
+                    "status": "healthy",
+                },
+            ],
+            "recommended_actions": ["Keep GPU-only jobs paused."],
+        },
+        "cloud_run": {"checked": False},
+        "warnings": [],
+        "blockers": [],
+    }
+
+
 def test_observability_system_summary_requires_auth(client):
     response = client.get("/api/observability-system-summary")
     assert response.status_code == 401
@@ -273,6 +305,41 @@ def test_observability_system_summary_handles_aggregator_exception(client, monke
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["status"] == "unknown"
+    assert "RuntimeError" in payload["error"]
+
+
+def test_system_failover_status_requires_auth(client):
+    response = client.get("/api/system-failover-status")
+    assert response.status_code == 401
+
+
+def test_system_failover_status_returns_full_envelope(client, monkeypatch):
+    monkeypatch.setattr(dashboard_app, "_build_system_failover_status", _stub_failover_payload)
+
+    response = client.get("/api/system-failover-status", headers=_auth_header())
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["mode_name"] == "read_only_system_failover_status"
+    assert payload["mode"] == "local_failover"
+    assert payload["active_route"] == "mac-local"
+    assert payload["windows_offline"] is True
+    assert payload["proxy"]["tiers"][1]["endpoint"] == "mac-local"
+
+
+def test_system_failover_status_handles_exception(client, monkeypatch):
+    def boom():
+        raise RuntimeError("proxy unavailable")
+
+    monkeypatch.setattr(dashboard_app, "_build_system_failover_status", boom)
+
+    response = client.get("/api/system-failover-status", headers=_auth_header())
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["mode_name"] == "read_only_system_failover_status"
+    assert payload["status"] == "unknown"
+    assert payload["windows_offline"] is True
     assert "RuntimeError" in payload["error"]
 
 
@@ -399,11 +466,13 @@ def test_observability_page_includes_new_panels_and_endpoint_polling(client, mon
     # New aggregator-backed sections must appear and poll the new endpoint.
     assert "System Heartbeat" in html
     assert "Inference Proxy" in html
+    assert "System Failover" in html
     assert "Signal Streams" in html
     assert "Provenance Coverage" in html
     assert "Event Bus" in html
     assert "Tranche 4 Feed Health" in html
     assert "/api/observability-system-summary" in html
+    assert "/api/system-failover-status" in html
     assert "/api/observability-tranche4-feeds" in html
 
 
@@ -418,6 +487,7 @@ def test_observability_page_buyer_profile_fetches_buyer_safe_endpoints(
     html = response.get_data(as_text=True)
     assert "Buyer-safe profile" in html
     assert "/api/observability-system-summary${buyerSafeQuery}" in html
+    assert "/api/system-failover-status${buyerSafeQuery}" in html
     assert "/api/observability-tranche4-feeds${buyerSafeQuery}" in html
     assert "profile=buyer" in html
 

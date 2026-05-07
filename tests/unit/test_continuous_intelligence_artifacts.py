@@ -55,6 +55,35 @@ def test_lease_preview_filters_for_windows_without_writing(tmp_path) -> None:
     assert not (tmp_path / artifacts.LEASE_FILE).exists()
 
 
+def test_lease_preview_pauses_windows_when_primary_offline(tmp_path) -> None:
+    plan = build_continuous_intelligence_plan(fetch_live=False)
+
+    lease = artifacts.lease_tasks(
+        plan,
+        agent_id="windows-gpu",
+        target_runtime="windows-gpu",
+        capabilities=["reason"],
+        runtime_status={
+            "mode": "local_failover",
+            "active_route": "mac-local",
+            "windows_offline": True,
+            "fallback_ready": True,
+        },
+        artifact_dir=tmp_path,
+        write=False,
+        limit=2,
+    )
+
+    assert lease["mode"] == "dry_run_task_lease"
+    assert lease["candidate_count"] >= 1
+    assert lease["leased_count"] == 0
+    assert lease["blocked_by_runtime"] == lease["candidate_count"]
+    assert lease["runtime_guard"]["status"] == "blocked"
+    assert lease["runtime_guard"]["reason"] == "windows_gpu_primary_unavailable"
+    assert lease["runtime_guard"]["active_route"] == "mac-local"
+    assert not (tmp_path / artifacts.LEASE_FILE).exists()
+
+
 def test_lease_write_materializes_jsonl(tmp_path) -> None:
     plan = build_continuous_intelligence_plan(fetch_live=False)
 

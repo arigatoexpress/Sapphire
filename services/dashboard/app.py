@@ -6617,13 +6617,32 @@ def api_autonomy_continuous_intelligence_lease_preview():
         except ValueError:
             limit = 3
         capabilities = [item.strip() for item in request.args.getlist("capability") if item.strip()]
-        payload = lease_tasks(
-            agent_id=str(request.args.get("agent_id") or "windows-gpu"),
-            capabilities=capabilities,
-            target_runtime=request.args.get("target_runtime") or None,
-            limit=limit,
-            write=False,
-        )
+        target_runtime = request.args.get("target_runtime") or None
+        runtime_status = None
+        if target_runtime == "windows-gpu":
+            try:
+                runtime_status = _build_system_failover_status()
+            except Exception as exc:
+                log.warning("continuous intelligence runtime guard probe error: %s", exc)
+                runtime_status = {
+                    "mode_name": "read_only_system_failover_status",
+                    "mode": "unknown",
+                    "status": "unknown",
+                    "windows_offline": True,
+                    "fallback_ready": False,
+                    "active_route": None,
+                    "error": f"{exc.__class__.__name__}: {exc}"[:200],
+                }
+        lease_kwargs = {
+            "agent_id": str(request.args.get("agent_id") or "windows-gpu"),
+            "capabilities": capabilities,
+            "target_runtime": target_runtime,
+            "limit": limit,
+            "write": False,
+        }
+        if runtime_status is not None:
+            lease_kwargs["runtime_status"] = runtime_status
+        payload = lease_tasks(**lease_kwargs)
         return jsonify(payload)
     except Exception as e:
         log.warning("continuous intelligence lease preview API error: %s", e)
@@ -8077,6 +8096,27 @@ def _build_observability_tranche4_feeds() -> dict[str, Any]:
     return redact_record(feed_status_from_artifacts())
 
 
+def _build_system_failover_status() -> dict[str, Any]:
+    """Return the local inference failover posture without touching infra."""
+    from lib.security.pii_redactor import redact_record
+    from scripts.ops.system_failover_status import (
+        DEFAULT_PROXY_URL,
+        build_report,
+        load_proxy_failover,
+    )
+
+    proxy, warnings = load_proxy_failover(DEFAULT_PROXY_URL, timeout=5.0)
+    payload = build_report(
+        proxy=proxy,
+        proxy_warnings=warnings,
+        cloud_run=None,
+        require_primary=False,
+    )
+    payload["mode_name"] = "read_only_system_failover_status"
+    payload["schema_version"] = 1
+    return redact_record(payload)
+
+
 @app.route("/api/observability-system-summary")
 @requires_auth
 def api_observability_system_summary():
@@ -8090,6 +8130,32 @@ def api_observability_system_summary():
                 "status": "unknown",
                 "error": f"{exc.__class__.__name__}: {exc}"[:200],
                 "schema_version": 1,
+            }
+        ), 200
+
+
+@app.route("/api/system-failover-status")
+@requires_auth
+def api_system_failover_status():
+    try:
+        return jsonify(_maybe_buyer_safe_payload(_build_system_failover_status()))
+    except Exception as exc:
+        log.warning("system failover status error: %s", exc)
+        return jsonify(
+            {
+                "mode_name": "read_only_system_failover_status",
+                "mode": "unknown",
+                "status": "unknown",
+                "ok": False,
+                "windows_offline": True,
+                "fallback_ready": False,
+                "active_route": None,
+                "error": f"{exc.__class__.__name__}: {exc}"[:200],
+                "schema_version": 1,
+                "blockers": ["failover status probe unavailable"],
+                "warnings": [],
+                "proxy": {"endpoints": {}},
+                "cloud_run": {"checked": False},
             }
         ), 200
 
