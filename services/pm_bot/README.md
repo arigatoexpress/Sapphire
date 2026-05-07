@@ -53,6 +53,9 @@ Optional:
     Sapphire Telegram token because it competes with Hermes or webhook consumers.
 - `SAPPHIRE_PM_BOT_HOST=127.0.0.1`
 - `SAPPHIRE_PM_BOT_PORT=18082`
+- `SAPPHIRE_PM_BOT_PROBE_TIMEOUT_SECONDS=2`
+  - Dedicated timeout for read-only `getMe` / `getWebhookInfo` health probes.
+    Keep this short so local `/health` remains responsive when Telegram is slow.
 - `THO_API_BASE_URL=https://project-go-forward-trgi34bxuq-uc.a.run.app`
 - `THO_FIRESTORE_PROJECT=tho-ai-agent`
 - `SAPPHIRE_PM_BOT_DEFAULT_PROJECT_ID=<firestore-project-id>`
@@ -101,6 +104,9 @@ curl -s "https://api.telegram.org/bot${SAPPHIRE_PM_BOT_TOKEN}/deleteWebhook" \
 `GET /health` now reports not just local process state, but Telegram delivery
 readiness as seen from the Bot API. In webhook mode this makes it obvious when
 the service is healthy locally but Telegram still has no webhook registered.
+The read-only Bot API probe is cached for 60 seconds and uses
+`SAPPHIRE_PM_BOT_PROBE_TIMEOUT_SECONDS` so local liveness does not block on the
+longer operational Telegram timeout.
 
 Key fields:
 

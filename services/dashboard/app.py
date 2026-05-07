@@ -2508,6 +2508,7 @@ def api_system():
             ("control-plane", "127.0.0.1", 8082, "/health"),
             ("dashboard", "127.0.0.1", 8080, "/health"),
             ("signal-logger", "127.0.0.1", 18081, "/health"),
+            ("pm-bot", "127.0.0.1", 18082, "/health"),
             ("openbb-api", "127.0.0.1", 6900, None),  # TCP: /api/v1/system/status 404s
             ("regional-intel", "127.0.0.1", 8787, None),  # TCP: /health 404s, root returns HTML
             # inference-proxy health already fetched above via proxy_health — reuse, no re-probe
@@ -2729,6 +2730,7 @@ def api_health_summary():
             ("control-plane", "cloud", "127.0.0.1", 8082, "/health"),
             ("dashboard", "cloud", "127.0.0.1", 8080, "/health"),
             ("signal-logger", "cloud", "127.0.0.1", 18081, "/health"),
+            ("pm-bot", "cloud", "127.0.0.1", 18082, "/health"),
             ("inference-proxy", "cloud", "127.0.0.1", 11435, "/health"),
             ("openbb-api", "cloud", "127.0.0.1", 6900, None),
             ("redis", "cloud", "127.0.0.1", 6379, None),
