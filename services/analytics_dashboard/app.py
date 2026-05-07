@@ -202,6 +202,202 @@ def _public_silos_health_payload(payload: dict) -> dict:
     }
 
 
+def _latest_service_health_rows() -> list[dict]:
+    # Pi nodes (rari1/rari2) are filtered out of the public silo strip because
+    # they are not active inference routes yet. The failover endpoint handles
+    # standby/offline posture separately so public UI does not confuse inactive
+    # devices with broken production dependencies.
+    rows = _rows(f"""  # nosec B608 - PROJECT/DATASET are operator env table identifiers.
+        SELECT service_name AS service, status, host, response_ms,
+               timestamp AS last_seen
+        FROM `{PROJECT}.{DATASET}.service_health`
+        WHERE timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 60 MINUTE)
+          AND host NOT IN ('rari1', 'rari2')
+          AND service_name NOT LIKE 'ollama-rari%'
+        QUALIFY ROW_NUMBER() OVER (PARTITION BY service_name ORDER BY timestamp DESC) = 1
+    """)
+    return _clean(rows)
+
+
+def _status_bucket(status: object) -> str:
+    value = str(status or "unknown").strip().lower()
+    if value in {"ok", "healthy", "ready", "active", "running", "pass"}:
+        return "ready"
+    if value in {"degraded", "warn", "warning", "agent_only", "standby"}:
+        return "degraded"
+    if value in {"down", "fail", "failed", "error", "offline", "unreachable"}:
+        return "down"
+    return "unknown"
+
+
+def _lane_for_service(service: dict) -> str:
+    text = f"{service.get('service', '')} {service.get('host', '')}".lower()
+    if any(token in text for token in ("windows", "gpu", "ollama", "tradingview", "webhook")):
+        return "gpu_compute"
+    if any(token in text for token in ("gcp", "cloud", "bigquery", "gcs", "pipeline", "sync")):
+        return "cloud_data"
+    if any(
+        token in text
+        for token in ("mac", "control-plane", "signal-logger", "inference-proxy", "dashboard")
+    ):
+        return "local_control"
+    return "service_mesh"
+
+
+def _lane_status(counts: dict[str, int], *, empty: str = "unknown") -> str:
+    total = sum(counts.values())
+    if total == 0:
+        return empty
+    if counts.get("down", 0):
+        return "degraded"
+    if counts.get("degraded", 0) or counts.get("unknown", 0):
+        return "degraded"
+    return "ready"
+
+
+def _build_failover_payload(services: list[dict], tho_health: dict | None) -> dict:
+    lanes = {
+        "cloud_data": {
+            "label": "Cloud data plane",
+            "role": "Cloud Run, BigQuery, GCS, and scheduled sync durability.",
+            "counts": {"ready": 0, "degraded": 0, "down": 0, "unknown": 0},
+            "services": [],
+        },
+        "local_control": {
+            "label": "Local control plane",
+            "role": "Mac-hosted control surfaces and local operators.",
+            "counts": {"ready": 0, "degraded": 0, "down": 0, "unknown": 0},
+            "services": [],
+        },
+        "gpu_compute": {
+            "label": "GPU compute lane",
+            "role": "High-throughput model and desktop automation capacity.",
+            "counts": {"ready": 0, "degraded": 0, "down": 0, "unknown": 0},
+            "services": [],
+        },
+        "service_mesh": {
+            "label": "Service mesh",
+            "role": "Remaining observed services that support the dashboard.",
+            "counts": {"ready": 0, "degraded": 0, "down": 0, "unknown": 0},
+            "services": [],
+        },
+    }
+    for service in services:
+        if not isinstance(service, dict):
+            continue
+        lane_key = _lane_for_service(service)
+        bucket = _status_bucket(service.get("status"))
+        lanes[lane_key]["counts"][bucket] += 1
+        lanes[lane_key]["services"].append(service)
+
+    tho_bucket = _status_bucket((tho_health or {}).get("status"))
+    if tho_health is None:
+        tho_bucket = "unknown"
+    lanes["cloud_data"]["counts"][tho_bucket] += 1
+    lanes["cloud_data"]["services"].append(
+        {
+            "service": "tho-production",
+            "status": (tho_health or {}).get("status", "unknown"),
+            "host": THO_PUBLIC_URL,
+            "sha": (tho_health or {}).get("sha"),
+        }
+    )
+
+    lane_rows = []
+    for key, lane in lanes.items():
+        counts = lane["counts"]
+        status = _lane_status(counts)
+        lane_rows.append(
+            {
+                "lane": key,
+                "label": lane["label"],
+                "role": lane["role"],
+                "status": status,
+                "counts": counts,
+                "services": lane["services"],
+            }
+        )
+
+    degraded = [row["lane"] for row in lane_rows if row["status"] != "ready"]
+    if not degraded:
+        overall = "ready"
+    elif any(row["lane"] == "cloud_data" and row["status"] != "ready" for row in lane_rows):
+        overall = "needs_attention"
+    else:
+        overall = "degraded_with_fallback"
+
+    return {
+        "mode": "admin_failover_readiness_detail",
+        "overall_status": overall,
+        "lanes": lane_rows,
+        "degraded_lanes": degraded,
+        "routing_policy": [
+            "Keep public dashboard on cloud-safe summaries when local devices are degraded.",
+            "Use local control plane for operator actions only after admin authentication.",
+            "Treat GPU/desktop lane outages as degraded capacity, not a public incident, while cloud summaries stay live.",
+        ],
+        "ts": datetime.now(UTC).isoformat(),
+    }
+
+
+def _public_failover_payload(payload: dict) -> dict:
+    public_lanes = {
+        "cloud_data": {
+            "lane": "cloud_path",
+            "label": "Cloud path",
+            "role": "Hosted public route and data durability summary.",
+        },
+        "local_control": {
+            "lane": "operator_path",
+            "label": "Operator path",
+            "role": "Private control route summarized for availability only.",
+        },
+        "gpu_compute": {
+            "lane": "compute_path",
+            "label": "Compute path",
+            "role": "Model and automation capacity summary.",
+        },
+        "service_mesh": {
+            "lane": "service_path",
+            "label": "Service path",
+            "role": "Supporting service availability summary.",
+        },
+    }
+    lanes = []
+    for lane in payload.get("lanes", []):
+        if not isinstance(lane, dict):
+            continue
+        public = public_lanes.get(str(lane.get("lane")), {})
+        counts = lane.get("counts") if isinstance(lane.get("counts"), dict) else {}
+        lanes.append(
+            {
+                "lane": public.get("lane", "service_path"),
+                "label": public.get("label", "Service path"),
+                "role": public.get("role", "Supporting service availability summary."),
+                "status": lane.get("status", "unknown"),
+                "reporting": sum(int(v or 0) for v in counts.values()),
+            }
+        )
+    degraded = [
+        public_lanes.get(str(lane), {"lane": "service_path"})["lane"]
+        for lane in payload.get("degraded_lanes", [])
+    ]
+    return {
+        "mode": "public_failover_readiness_summary",
+        "overall_status": payload.get("overall_status", "unknown"),
+        "lanes": lanes,
+        "degraded_lanes": degraded,
+        "ts": payload.get("ts") or datetime.now(UTC).isoformat(),
+        "admin_required_for": [
+            "service names",
+            "hosts",
+            "ports",
+            "raw check evidence",
+            "operator routing policy",
+        ],
+    }
+
+
 def _is_known_probe_path(path: str) -> bool:
     normalized = ("/" + path.lstrip("/")).lower().rstrip("/") or "/"
     return (
@@ -1013,19 +1209,7 @@ def silos_health():
     """
     services: list[dict] = []
     try:
-        # Pi nodes (rari1/rari2) are filtered out — Pi cluster removed
-        # from the active inference fleet 2026-05-03; their entries
-        # were perpetual-down noise.
-        rows = _rows(f"""
-            SELECT service_name AS service, status, host, response_ms,
-                   timestamp AS last_seen
-            FROM `{PROJECT}.{DATASET}.service_health`
-            WHERE timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 60 MINUTE)
-              AND host NOT IN ('rari1', 'rari2')
-              AND service_name NOT LIKE 'ollama-rari%'
-            QUALIFY ROW_NUMBER() OVER (PARTITION BY service_name ORDER BY timestamp DESC) = 1
-        """)
-        services = _clean(rows)
+        services = _latest_service_health_rows()
     except Exception as exc:
         log.info("service_health bq miss: %s", exc)
 
@@ -1059,6 +1243,26 @@ def silos_health():
         payload["mode"] = "admin_silos_health_detail"
         return jsonify(payload)
     return jsonify(_public_silos_health_payload(payload))
+
+
+@app.get("/api/failover/readiness")
+def failover_readiness():
+    """Public-safe failover posture with admin-only raw device detail.
+
+    This is intentionally separate from /api/silos/health: public users get a
+    clear degraded/ready posture by lane, while operators can authenticate to
+    inspect the raw services, hosts, and routing policy behind each lane.
+    """
+    services: list[dict] = []
+    try:
+        services = _latest_service_health_rows()
+    except Exception as exc:
+        log.info("failover service_health bq miss: %s", exc)
+    tho_health = _http_get_json(THO_HEALTH_URL, timeout=2.5)
+    payload = _build_failover_payload(services, tho_health)
+    if _is_admin_request():
+        return jsonify(payload)
+    return jsonify(_public_failover_payload(payload))
 
 
 @app.get("/api/silos/business")

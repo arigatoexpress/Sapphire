@@ -20,6 +20,7 @@ probe-sink test pattern) so no GCP creds are required, then patch
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 import types
 from datetime import UTC, datetime
@@ -557,6 +558,84 @@ def test_public_silos_health_hides_service_details(app_module, monkeypatch):
     assert body["services"] == []
     assert body["service_summary"]["reporting"] == 1
     assert "admin_required_for" in body
+
+
+def test_public_failover_readiness_hides_device_detail(app_module, monkeypatch):
+    _install_test_admin_session(app_module)
+    monkeypatch.setattr(
+        app_module,
+        "_rows",
+        lambda sql, params=None: [
+            {
+                "service": "windows-secret-ollama",
+                "status": "down",
+                "host": "100.71.10.48",
+                "last_seen": datetime(2026, 5, 7, 12, 0, tzinfo=UTC),
+                "response_ms": 999,
+            },
+            {
+                "service": "signal-logger",
+                "status": "healthy",
+                "host": "mac-commander",
+                "last_seen": datetime(2026, 5, 7, 12, 1, tzinfo=UTC),
+                "response_ms": 12,
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        app_module,
+        "_http_get_json",
+        lambda url, timeout=3.0: {"status": "ok", "sha": "private-tho-sha"},
+    )
+    public = app_module.app.test_client()
+
+    response = public.get("/api/failover/readiness")
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["mode"] == "public_failover_readiness_summary"
+    assert body["overall_status"] == "degraded_with_fallback"
+    assert "compute_path" in body["degraded_lanes"]
+    assert all("services" not in lane for lane in body["lanes"])
+    serialized = json.dumps(body)
+    assert "windows-secret-ollama" not in serialized
+    assert "100.71.10.48" not in serialized
+    assert "private-tho-sha" not in serialized
+    assert "GPU" not in serialized
+    assert "Mac" not in serialized
+    assert "admin_required_for" in body
+
+
+def test_admin_failover_readiness_includes_operator_detail(client, app_module, monkeypatch):
+    monkeypatch.setattr(
+        app_module,
+        "_rows",
+        lambda sql, params=None: [
+            {
+                "service": "windows-secret-ollama",
+                "status": "down",
+                "host": "100.71.10.48",
+                "last_seen": datetime(2026, 5, 7, 12, 0, tzinfo=UTC),
+                "response_ms": 999,
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        app_module,
+        "_http_get_json",
+        lambda url, timeout=3.0: {"status": "ok", "sha": "private-tho-sha"},
+    )
+
+    response = client.get("/api/failover/readiness")
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["mode"] == "admin_failover_readiness_detail"
+    assert body["routing_policy"]
+    serialized = json.dumps(body)
+    assert "windows-secret-ollama" in serialized
+    assert "100.71.10.48" in serialized
+    assert "private-tho-sha" in serialized
 
 
 def test_public_brain_persist_requires_admin(app_module):
