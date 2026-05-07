@@ -24,7 +24,7 @@ production data.
 | Threat model | `docs/security/telegram-operator-threat-model.md` |
 | LaunchAgent | `~/Library/LaunchAgents/com.sapphire.pm-bot.plist` |
 | Bot token | `~/.config/sapphire-secrets/telegram_bot_token` (mode 0600) |
-| Allowlist env | `SAPPHIRE_PM_BOT_ALLOWED_USER_IDS` (in `~/.sapphire/secrets.env`) |
+| Allowlist env | `SAPPHIRE_PM_BOT_ALLOWED_USER_IDS` or `SAPPHIRE_PM_BOT_ALLOWED_USER_IDS_FILE` |
 | Pause-flag dir | `~/.sapphire/routine_pause/` |
 
 ---
@@ -45,14 +45,28 @@ To enable an operator:
    tail -n 200 ~/Library/Logs/sapphire-pm-bot.err
    ```
 
-2. Add the operator's numeric Telegram user ID to the comma-separated env
+2. Add the operator's numeric Telegram user ID to either the comma-separated env
    value in `~/.sapphire/secrets.env`:
 
    ```
    SAPPHIRE_PM_BOT_ALLOWED_USER_IDS=111222333,444555666
    ```
 
-3. Restart the LaunchAgent (the env file is read at process start):
+   or to a file pointed at by the LaunchAgent / shell environment:
+
+   ```
+   ~/.config/sapphire-secrets/sapphire_pm_bot_allowed_user_ids
+   ```
+
+   with contents such as:
+
+   ```
+   111222333,444555666
+   ```
+
+3. Restart the LaunchAgent if you changed the env var. If you changed only the
+   file-backed allowlist, the next request will pick it up automatically, but a
+   restart is still fine if you want a clean boundary:
 
    ```bash
    launchctl kickstart -k gui/$(id -u)/com.sapphire.pm-bot
@@ -152,9 +166,10 @@ that file will end up under CODEOWNERS once Wave 4 lands).
 ## 4. Safety posture
 
 ### 4.1 Allowlist — fail-closed
-The bot loads `SAPPHIRE_PM_BOT_ALLOWED_USER_IDS` at request time. Empty,
-unset, or all-invalid → empty set → every request is denied. Invalid CSV
-entries are logged at WARN and skipped — they never grant access.
+The bot loads `SAPPHIRE_PM_BOT_ALLOWED_USER_IDS` at request time and falls back
+to `SAPPHIRE_PM_BOT_ALLOWED_USER_IDS_FILE` when the env var is unset. Empty,
+unset, unreadable, or all-invalid → empty set → every request is denied.
+Invalid CSV entries are logged at WARN and skipped — they never grant access.
 
 ### 4.2 Per-user rate limit
 Every authenticated request increments a per-user sliding-window counter.

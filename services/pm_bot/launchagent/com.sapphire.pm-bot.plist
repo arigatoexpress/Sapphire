@@ -33,6 +33,8 @@
         <string>webhook</string>
         <key>THO_API_KEY_FILE</key>
         <string>/Users/aribs/.config/sapphire-secrets/tho_api_key</string>
+        <key>SAPPHIRE_PM_BOT_ALLOWED_USER_IDS_FILE</key>
+        <string>/Users/aribs/.config/sapphire-secrets/sapphire_pm_bot_allowed_user_ids</string>
         <key>SAPPHIRE_PM_BOT_BOT_USERNAME</key>
         <string>NemotronRariBot</string>
     </dict>
