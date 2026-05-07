@@ -6,7 +6,7 @@
 {% block content %}
 <section class="hero">
   <h1>The Brain</h1>
-  <div class="typed" id="typed-line">$ ./sapphire brain --synthesis --correlate --history</div>
+  <div class="typed" id="typed-line">$ ./sapphire brain --public-summary</div>
 </section>
 
 <section class="grid cols-3">
@@ -36,7 +36,7 @@
 <section class="box">
   <h2 class="section">PRIORITY_ACTIONS</h2>
   <ol id="actions" style="margin: 0; padding-left: 22px;">
-    <li class="muted">// no actions queued</li>
+    <li class="muted">// admin-only action detail</li>
   </ol>
 </section>
 
@@ -77,44 +77,20 @@
     var actions = d.priority_actions || [];
     if (actions.length) {
       $a.innerHTML = actions.map(a => '<li>' + esc(a) + '</li>').join('');
+    } else if (d.priority_action_count) {
+      $a.innerHTML = '<li class="muted">' + Number(d.priority_action_count) + ' action(s) require <a href="/admin">admin</a></li>';
+    } else {
+      $a.innerHTML = '<li class="muted">// no actions queued</li>';
     }
   }).catch(()=>{
     document.getElementById('narrative').textContent = '// /api/brain/synthesis unreachable';
   });
 
-  fetch('/api/brain/correlate').then(r=>r.json()).then(d=>{
-    var matches = d.matches || [];
-    var tb = document.getElementById('corr-rows');
-    if (!matches.length) return;
-    tb.innerHTML = matches.map(m => {
-      var sev = (m.severity||'').toUpperCase();
-      var pillCls = sev === 'HIGH' ? 'red' : sev === 'MEDIUM' ? 'amber' : 'green';
-      return '<tr>' +
-        '<td><code>' + esc(m.pattern_name) + '</code></td>' +
-        '<td><span class="pill ' + pillCls + '">' + esc(sev) + '</span></td>' +
-        '<td class="dim">' + esc((m.silos||[]).join('+')) + '</td>' +
-        '<td>' + esc(m.evidence||'') + '</td>' +
-        '<td class="dim">' + (m.score ? Number(m.score).toFixed(2) : '--') + '</td>' +
-      '</tr>';
-    }).join('');
-  }).catch(()=>{});
+  document.getElementById('corr-rows').innerHTML =
+    '<tr><td colspan="5" class="muted">// cross-silo correlations require <a href="/admin">admin</a></td></tr>';
 
-  fetch('/api/brain/history?limit=48').then(r=>r.json()).then(d=>{
-    var rows = d.rows || [];
-    if (!rows.length) {
-      document.getElementById('sparkline').textContent = '  // no brain_synthesis history (run /api/brain/synthesis?persist=1 to seed)';
-      return;
-    }
-    rows = rows.slice().reverse();
-    var lines = [];
-    rows.forEach(r => {
-      var h = Number(r.health_score || 0);
-      var bar = '#'.repeat(Math.max(0, Math.round(h * 30)));
-      var ts = (r.timestamp||'').slice(5, 16).replace('T', ' ');
-      lines.push('  ' + ts + '  [' + bar.padEnd(30, ' ') + '] ' + h.toFixed(2));
-    });
-    document.getElementById('sparkline').textContent = lines.join('\n');
-  }).catch(()=>{});
+  document.getElementById('sparkline').textContent =
+    '  // persisted brain history requires admin; open /admin for full operator history';
 })();
 </script>
 {% endblock %}

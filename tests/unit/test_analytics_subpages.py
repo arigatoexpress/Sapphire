@@ -128,8 +128,8 @@ def test_p_system_smoke(monkeypatch):
     client = _load_analytics_app(monkeypatch)
     _assert_html_200(client, "/p/system")
     body = client.get("/p/system").data.decode("utf-8")
-    assert "/api/timeseries/services" in body
-    assert "Pi" in body or "pi cluster" in body or "rari" in body
+    assert "/api/silos/health" in body
+    assert 'requires <a href="/admin">admin</a>' in body
 
 
 def test_p_about_smoke(monkeypatch):

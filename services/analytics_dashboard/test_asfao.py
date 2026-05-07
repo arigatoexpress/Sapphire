@@ -260,8 +260,10 @@ def test_evaluate_rules_collects_multiple_proposals(asfao):
 
 def test_evaluate_rules_swallows_rule_exceptions(asfao, monkeypatch):
     """A buggy rule must not poison the catalog."""
+
     def _broken(*_a, **_kw):
         raise ValueError("rule blew up")
+
     monkeypatch.setattr(asfao, "RULES_CATALOG", [_broken, asfao.rule_lead_nurture])
     proposals = asfao.evaluate_rules({}, [], {"stale_leads_count": 5})
     assert len(proposals) == 1  # only lead_nurture fired
@@ -324,6 +326,18 @@ def _make_app(asfao_module, fake_bq_query):
     return app
 
 
+class _TestAdminSession:
+    def verify_session(self, token):
+        if token == "test-admin":
+            return {"user_id": "test-admin"}
+        return None
+
+
+def _authorize_admin(app, client):
+    app.extensions["sapphire_admin_session"] = _TestAdminSession()
+    client.set_cookie("sapphire_admin", "test-admin")
+
+
 def _capturing_query(rows_by_sql_kw=None, capture=None):
     """Build a fake bq.query that returns rows based on SQL keyword match."""
     rows_by_sql_kw = rows_by_sql_kw or {}
@@ -369,13 +383,12 @@ def test_decide_endpoint_proposes_and_persists(asfao):
 
     payload = {
         "synthesis": {
-            "priority_actions": [
-                "trading: collector stale 9.5h — restart signal logger"
-            ],
+            "priority_actions": ["trading: collector stale 9.5h — restart signal logger"],
             "degraded_silos": ["trading"],
         },
         "synthesis_id": "syn-abc-123",
     }
+    _authorize_admin(app, client)
     resp = client.post("/api/asfao/decide", json=payload)
     assert resp.status_code == 200
     data = resp.get_json()
@@ -399,6 +412,7 @@ def test_decide_endpoint_returns_zero_when_no_rules_fire(asfao):
     fake_query = _capturing_query(rows_by_sql_kw={})
     app = _make_app(asfao, fake_query)
     client = app.test_client()
+    _authorize_admin(app, client)
     resp = client.post("/api/asfao/decide", json={"synthesis": {}})
     assert resp.status_code == 200
     data = resp.get_json()
@@ -425,6 +439,7 @@ def test_decisions_list_endpoint_filters_by_status_and_role(asfao):
     fake_query = _capturing_query(rows_map, capture)
     app = _make_app(asfao, fake_query)
     client = app.test_client()
+    _authorize_admin(app, client)
 
     resp = client.get("/api/asfao/decisions?status=proposed&role=Ops&limit=5")
     assert resp.status_code == 200

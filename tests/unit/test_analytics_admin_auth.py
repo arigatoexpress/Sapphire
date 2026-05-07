@@ -340,9 +340,7 @@ def test_register_begin_allowed_for_authenticated_admin_when_credential_exists(
     assert r.status_code == 200
 
 
-def test_register_complete_persists_credential_and_sets_cookie(
-    auth_pkg, monkeypatch
-):
+def test_register_complete_persists_credential_and_sets_cookie(auth_pkg, monkeypatch):
     """End-to-end: client posts attestation, server verifies (mocked),
     credential is persisted, session cookie is set.
     """
@@ -707,7 +705,9 @@ def test_admin_landing_renders_with_valid_session(auth_pkg):
     client.set_cookie("sapphire_admin", token)
     r = client.get("/admin")
     assert r.status_code == 200
-    # Cards link out to the four sub-tools
-    assert b"Wildfire" in r.data
-    assert b"Regional Intel" in r.data
-    assert b"THO" in r.data
+    # Cards link to the passkey-gated data suites plus public surfaces.
+    assert b"System Health Detail" in r.data
+    assert b"Brain Full Synthesis" in r.data
+    assert b"Signals And Forecasts" in r.data
+    assert b"Decision Queue" in r.data
+    assert b"Public Sapphire OS" in r.data

@@ -14,10 +14,10 @@
   <table class="term">
     <thead><tr><th>tab</th><th>route</th><th>what it shows</th><th>data source</th></tr></thead>
     <tbody>
-      <tr><td>Brain</td><td><a href="/p/brain">/p/brain</a></td><td>cross-silo synthesis: health 0..1, regime, narrative, priority actions, correlations</td><td>BQ <code>brain_synthesis</code> + <code>/api/brain/*</code></td></tr>
+      <tr><td>Brain</td><td><a href="/p/brain">/p/brain</a></td><td>public-safe cross-silo synthesis: health 0..1, regime, narrative, degraded silos</td><td><code>/api/brain/synthesis</code> summary</td></tr>
       <tr><td>Markets</td><td><a href="/p/markets">/p/markets</a></td><td>top 10 crypto by mcap, sparklines, total mcap, BTC dominance, 24h change</td><td>CoinGecko (60s cache)</td></tr>
       <tr><td>Threats</td><td><a href="/p/threats">/p/threats</a></td><td>live CVE feed, 30d severity stack, prioritized actions</td><td>cyber-threat-bot (CISA KEV + NVD + MITRE + EPSS)</td></tr>
-      <tr><td>System</td><td><a href="/p/system">/p/system</a></td><td>service health (60min), 24h inference per tier, deploy revisions</td><td>BQ <code>service_health</code> + <code>inference_metrics</code></td></tr>
+      <tr><td>System</td><td><a href="/p/system">/p/system</a></td><td>public system summary plus admin lock states for raw telemetry</td><td><code>/api/silos/health</code> summary</td></tr>
       <tr><td>Hackathon</td><td><a href="/p/hackathon">/p/hackathon</a></td><td>4 submissions: 0G APAC, MegaETH, Robinhood London, Zama</td><td>hack.sapphirealpha.xyz (fallback: baked-in)</td></tr>
       <tr><td>Wildfire</td><td><a href="/p/wildfire">/p/wildfire</a></td><td>signal map + KPI strip + Phase-0 status</td><td>wildfire.sapphirealpha.xyz <code>/api/sensors/health</code></td></tr>
       <tr><td>THO</td><td><a href="/p/tho">/p/tho</a></td><td>retail-brand info card &rarr; OPEN OPERATIONS CONSOLE</td><td>tho.sapphirealpha.xyz <code>/healthz/</code></td></tr>
@@ -48,7 +48,7 @@
 <section class="box">
   <h2 class="section">DATA_PROVENANCE</h2>
   <p style="line-height: 1.8;">
-    <strong>Trading signals.</strong> TradingView (Mac orchestrator) → webhook (Windows :9090) → signal logger (Mac :18081) → BigQuery <code>trading_signals</code>. Live BTC fills via Robinhood Crypto API (Ed25519-signed REST).
+    <strong>Trading research.</strong> Signal, forecast, fill, and executor detail exists only in the admin surface. The public site shows market context and readiness labels without exposing operational paths.
   </p>
   <p style="line-height: 1.8;">
     <strong>Threat intel.</strong> cyber-threat-bot (Cloud Run, us-central1) pulls CISA Known Exploited Vulnerabilities, NVD, MITRE ATT&amp;CK, scores with EPSS + composite actionability. We proxy <code>/api/threats/live</code> same-origin to dodge CORS.
@@ -60,18 +60,18 @@
     <strong>Markets.</strong> CoinGecko free tier with 60s in-process cache (Cloud Run instances are ephemeral so per-instance cache is sufficient). Top 10 by market cap with 7-day sparkline.
   </p>
   <p style="line-height: 1.8;">
-    <strong>Service health.</strong> Telemetry collector LaunchAgent on the Mac writes heartbeat rows to BQ <code>service_health</code> every 60s. The dashboard rolls up the last 60min and reports p50/p95 response times.
+    <strong>Service health.</strong> Public pages show aggregate health counts only. Service names, hosts, latency, local runtime detail, and operational timeseries require <a href="/admin">admin</a>.
   </p>
 </section>
 
 <section class="box">
   <h2 class="section">USING_THE_BRAIN</h2>
   <ol style="line-height: 1.85;">
-    <li>Visit <a href="/p/brain">/p/brain</a> — health score, regime, signals/24h, CVEs/24h are at the top.</li>
-    <li><strong>Narrative</strong> is a plain-English sentence per silo. If a silo is degraded, it's omitted from the narrative and added to <strong>priority actions</strong>.</li>
-    <li><strong>Priority actions</strong> are concrete: "trading: 0 signals in last 24h — check signal-logger LaunchAgent on Mac".</li>
-    <li><strong>Correlations</strong> match against a deterministic catalog: telemetry_collapse, service_inference_failover, threat_with_silent_trading, tho_health_degraded.</li>
-    <li>To seed the rolling sparkline: <code>curl /api/brain/synthesis?persist=1</code> writes a row to <code>brain_synthesis</code>.</li>
+    <li>Visit <a href="/p/brain">/p/brain</a> — health score, regime, public narrative, and degraded silo names are at the top.</li>
+    <li><strong>Narrative</strong> is a public-safe plain-English sentence per silo. It avoids raw service names, hosts, signal rows, and action instructions.</li>
+    <li><strong>Priority actions</strong> are counted publicly but hidden until <a href="/admin">admin</a> sign-in.</li>
+    <li><strong>Correlations</strong> and persisted history match against deterministic catalogs, but those endpoints are admin-only.</li>
+    <li>Use <a href="/admin">/admin</a> for persistence, history, correlation, and decision queues.</li>
   </ol>
 </section>
 

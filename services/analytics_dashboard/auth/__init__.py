@@ -18,8 +18,12 @@ calls one helper (`register_blueprint`) and everything else lives here.
 
 from __future__ import annotations
 
-from .decorator import requires_admin
-from .routes import build_blueprint, register_blueprint
+from .decorator import (
+    admin_required_response,
+    admin_session_payload,
+    has_admin_session,
+    requires_admin,
+)
 from .session import SessionManager
 from .store import (
     CredentialRecord,
@@ -28,13 +32,28 @@ from .store import (
     InMemoryCredentialStore,
 )
 
+try:
+    from .routes import build_blueprint, register_blueprint
+except Exception as _routes_exc:  # noqa: BLE001
+    _ROUTES_IMPORT_ERROR = _routes_exc
+
+    def build_blueprint(*args, _exc=_ROUTES_IMPORT_ERROR, **kwargs):  # type: ignore[no-untyped-def]
+        raise RuntimeError(f"admin auth routes unavailable: {_exc}") from _exc
+
+    def register_blueprint(*args, _exc=_ROUTES_IMPORT_ERROR, **kwargs):  # type: ignore[no-untyped-def]
+        raise RuntimeError(f"admin auth routes unavailable: {_exc}") from _exc
+
+
 __all__ = [
     "CredentialRecord",
     "CredentialStore",
     "FirestoreCredentialStore",
     "InMemoryCredentialStore",
     "SessionManager",
+    "admin_required_response",
+    "admin_session_payload",
     "build_blueprint",
+    "has_admin_session",
     "register_blueprint",
     "requires_admin",
 ]

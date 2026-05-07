@@ -6,7 +6,7 @@
 {% block content %}
 <section class="hero">
   <h1>System Health</h1>
-  <div class="typed" id="typed-line">$ ./sapphire system --health --inference --deploys</div>
+  <div class="typed" id="typed-line">$ ./sapphire system --public-health</div>
 </section>
 
 <section class="box">
@@ -15,7 +15,7 @@
     <thead><tr><th>service</th><th>host</th><th>healthy</th><th>degraded</th><th>down</th><th>p50 ms</th><th>p95 ms</th><th>last seen</th></tr></thead>
     <tbody id="services"><tr><td colspan="8" class="muted">// loading service health ...</td></tr></tbody>
   </table>
-  <div class="muted" style="margin-top:10px;">// pi nodes (rari1, rari2) filtered out — pi cluster on hold since 2026-05-03</div>
+  <div class="muted" style="margin-top:10px;">// service names, hosts, and latency require <a href="/admin">admin</a></div>
 </section>
 
 <section class="box">
@@ -56,10 +56,16 @@
   }
   function esc(s){ return String(s||'').replace(/[<>&]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
 
-  fetch('/api/timeseries/services').then(r=>r.json()).then(d=>{
-    var rows = d.rows || [];
+  fetch('/api/silos/health').then(r=>r.json()).then(d=>{
+    var rows = d.services || [];
     var tb = document.getElementById('services');
-    if (!rows.length) { tb.innerHTML = '<tr><td colspan="8" class="muted">// no service heartbeats in last 60min</td></tr>'; return; }
+    if (!rows.length) {
+      var summary = d.service_summary || {};
+      var reporting = Number(summary.reporting || 0);
+      var healthy = Number(summary.healthy || 0);
+      tb.innerHTML = '<tr><td colspan="8" class="muted">// public summary: ' + healthy + ' / ' + reporting + ' reporting healthy; detail requires <a href="/admin">admin</a></td></tr>';
+      return;
+    }
     tb.innerHTML = rows.map(r => {
       var down = Number(r.down_n||0), deg = Number(r.degraded_n||0);
       var pillCls = down ? 'red' : deg ? 'amber' : 'green';
@@ -76,31 +82,11 @@
       '</tr>';
     }).join('');
   }).catch(()=>{
-    document.getElementById('services').innerHTML = '<tr><td colspan="8" class="muted">// /api/timeseries/services unreachable</td></tr>';
+    document.getElementById('services').innerHTML = '<tr><td colspan="8" class="muted">// /api/silos/health unreachable</td></tr>';
   });
 
-  fetch('/api/silos/inference').then(r=>r.json()).then(d=>{
-    var rows = d.tiers || [];
-    var tb = document.getElementById('inference');
-    if (!rows.length) { tb.innerHTML = '<tr><td colspan="7" class="muted">// no inference metrics in last 24h</td></tr>'; return; }
-    tb.innerHTML = rows.map(r => {
-      var calls = Number(r.calls||0);
-      var errs = Number(r.err_count||0);
-      var rate = calls > 0 ? (errs/calls*100).toFixed(2) + '%' : '--';
-      var bad = calls > 0 && (errs/calls) > 0.05;
-      return '<tr>' +
-        '<td><code>' + esc(r.tier) + '</code></td>' +
-        '<td>' + calls.toLocaleString() + '</td>' +
-        '<td>' + (Number(r.ok_count||0)).toLocaleString() + '</td>' +
-        '<td>' + errs + '</td>' +
-        '<td' + (bad ? ' class="delta-down"' : '') + '>' + rate + '</td>' +
-        '<td>' + (r.avg_latency_ms != null ? Math.round(r.avg_latency_ms) + 'ms' : '--') + '</td>' +
-        '<td>' + (r.p95_latency_ms != null ? Math.round(r.p95_latency_ms) + 'ms' : '--') + '</td>' +
-      '</tr>';
-    }).join('');
-  }).catch(()=>{
-    document.getElementById('inference').innerHTML = '<tr><td colspan="7" class="muted">// /api/silos/inference unreachable</td></tr>';
-  });
+  document.getElementById('inference').innerHTML =
+    '<tr><td colspan="7" class="muted">// inference tier detail requires <a href="/admin">admin</a></td></tr>';
 
   fetch('/api/brain/synthesis').then(r=>r.json()).then(d=>{
     var actions = d.priority_actions || [];

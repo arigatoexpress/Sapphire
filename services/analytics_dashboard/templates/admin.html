@@ -158,43 +158,78 @@
   <main>
     <h1>Operator console</h1>
     <p class="lede">
-      Authenticated control surface for Sapphire-aligned admin tools.
-      Each card opens a dedicated admin frontend; auth carries via passkey
-      session for the current relying party.
+      Authenticated control surface for sensitive Sapphire data and operator
+      workflows. Public pages show proof and summarized status; full telemetry,
+      forecasts, decisions, and persistence controls stay behind this session.
     </p>
 
     <section class="section-head">
-      <h2>Operations</h2>
-      <span class="meta">passkey-gated</span>
+      <h2>Admin-only data suites</h2>
+      <span class="meta">passkey-gated JSON</span>
     </section>
 
     <div class="grid">
-      <a class="card" href="/admin/wildfire">
-        <div class="icon">🜂</div>
-        <h3>Wildfire Watch</h3>
-        <p>Drone fleet, fire-incident triage, partner agency dashboard.</p>
-        <span class="tag">phase 0</span>
+      <a class="card" href="/api/silos/health">
+        <div class="icon">SYS</div>
+        <h3>System Health Detail</h3>
+        <p>Service names, hosts, response timing, THO dependency detail, and silo state.</p>
+        <span class="tag">read only</span>
       </a>
 
-      <a class="card" href="/admin/regional-intel">
-        <div class="icon">◈</div>
-        <h3>Regional Intel</h3>
-        <p>Vote monitor, intel console, source registry, signal review.</p>
-        <span class="tag">live</span>
+      <a class="card" href="/api/brain/synthesis">
+        <div class="icon">BRN</div>
+        <h3>Brain Full Synthesis</h3>
+        <p>Priority actions, degraded silo detail, LLM metadata, and admin-only history links.</p>
+        <span class="tag">read only</span>
       </a>
 
-      <a class="card" href="/admin/tho">
-        <div class="icon">⊡</div>
-        <h3>THO Operations</h3>
-        <p>Customer CRM, document templates, deal pipeline overrides.</p>
-        <span class="tag">production</span>
+      <a class="card" href="/api/signals/recent?limit=25">
+        <div class="icon">MKT</div>
+        <h3>Signals And Forecasts</h3>
+        <p>Recent signals, predictions, performance, VPIN, and deflated Sharpe views.</p>
+        <span class="tag">research IP</span>
       </a>
 
-      <a class="card warn" href="/admin/system">
-        <div class="icon">⚙</div>
-        <h3>System</h3>
-        <p>Service health, kill-switch, routine pause/resume, audit log.</p>
-        <span class="tag">danger</span>
+      <a class="card" href="/api/asfao/decisions?limit=25">
+        <div class="icon">ACT</div>
+        <h3>Decision Queue</h3>
+        <p>ASFAO proposals and execution review. Execution remains explicit and admin-gated.</p>
+        <span class="tag">review</span>
+      </a>
+
+      <a class="card" href="/api/timeseries/services">
+        <div class="icon">OPS</div>
+        <h3>Operational Timeseries</h3>
+        <p>Service response timing and inference telemetry that public pages reduce to summary.</p>
+        <span class="tag">read only</span>
+      </a>
+
+      <a class="card warn" href="/api/brain/correlate">
+        <div class="icon">COR</div>
+        <h3>Correlation Matches</h3>
+        <p>Cross-silo pattern matches and recommendations, kept out of public proof pages.</p>
+        <span class="tag">sensitive</span>
+      </a>
+    </div>
+
+    <section class="section-head">
+      <h2>Public surfaces</h2>
+      <span class="meta">sanitized</span>
+    </section>
+
+    <div class="grid">
+      <a class="card" href="/">
+        <div class="icon">PUB</div>
+        <h3>Public Sapphire OS</h3>
+        <p>Public-safe overview with summarized health and no privileged action controls.</p>
+        <span class="tag">public</span>
+      </a>
+
+      <a class="card" href="/p/help">
+        <div class="icon">DOC</div>
+        <h3>Public Explainer</h3>
+        <p>Reader-friendly documentation that points sensitive endpoints back to admin.</p>
+        <span class="tag">public</span>
       </a>
     </div>
   </main>

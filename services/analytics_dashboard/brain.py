@@ -38,6 +38,7 @@ import urllib.request
 from datetime import UTC, datetime
 from typing import Any
 
+from auth import admin_required_response, admin_session_payload, requires_admin
 from flask import jsonify, request
 
 log = logging.getLogger("sapphire.brain")
@@ -72,6 +73,34 @@ _SENSITIVE_RE = re.compile(
 # under any sane Gemini Flash budget.
 _llm_cache_lock = threading.Lock()
 _llm_cache: dict[str, Any] = {"key": None, "ts": 0.0, "value": None}
+
+
+def _is_admin_request() -> bool:
+    try:
+        return admin_session_payload() is not None
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _public_synthesis_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    actions = (
+        payload.get("priority_actions") if isinstance(payload.get("priority_actions"), list) else []
+    )
+    return {
+        "mode": "public_brain_summary",
+        "health_score": payload.get("health_score"),
+        "confidence": payload.get("confidence"),
+        "regime": payload.get("regime"),
+        "narrative": payload.get("narrative"),
+        "narrative_llm": None,
+        "llm_meta": None,
+        "degraded_silos": list(payload.get("degraded_silos") or []),
+        "silos_observed": list(payload.get("silos_observed") or []),
+        "priority_actions": [],
+        "priority_action_count": len(actions),
+        "admin_required_for": ["priority actions", "correlations", "history", "persistence"],
+        "persisted": False,
+    }
 
 
 def _http_get_json(url: str, timeout: float = 3.0) -> dict | None:
@@ -637,10 +666,14 @@ def register_brain(app, *, project: str, dataset: str, bq_client, query_param_fa
     def _brain_synthesis_endpoint():
         persist = request.args.get("persist", "0") == "1"
         force_llm = request.args.get("force_llm", "0") == "1"
+        admin = _is_admin_request()
+        if (persist or force_llm) and not admin:
+            return admin_required_response()
         payload = _emit_synthesis_payload(persist=persist, force_llm=force_llm)
-        return jsonify(payload)
+        return jsonify(payload if admin else _public_synthesis_payload(payload))
 
     @app.post("/api/brain/llm-refresh")
+    @requires_admin
     def _brain_llm_refresh_endpoint():
         """Force a fresh Gemini call, bypassing the 60s cache.
 
@@ -657,6 +690,7 @@ def register_brain(app, *, project: str, dataset: str, bq_client, query_param_fa
         return jsonify(payload)
 
     @app.get("/api/brain/correlate")
+    @requires_admin
     def _brain_correlate_endpoint():
         obs = _observe()
         silos = obs.get("silos", {})
@@ -742,6 +776,7 @@ def register_brain(app, *, project: str, dataset: str, bq_client, query_param_fa
         return jsonify({"ts": obs.get("ts"), "matches": matches, "count": len(matches)})
 
     @app.get("/api/brain/history")
+    @requires_admin
     def _brain_history_endpoint():
         limit = int(request.args.get("limit", "48"))
         try:

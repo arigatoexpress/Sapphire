@@ -33,6 +33,7 @@ if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
 from _deflated_sharpe import annualized_sharpe, deflated_sharpe  # noqa: E402
+from auth import admin_session_payload, requires_admin  # noqa: E402
 from project_tabs import get_project_tab, public_project_tabs  # noqa: E402
 
 PROJECT = os.environ.get("GCP_PROJECT", "tho-ai-agent")
@@ -162,6 +163,45 @@ def _clean(rows: list[dict]) -> list[dict]:
     return [{k: _jsonable(v) for k, v in r.items()} for r in rows]
 
 
+def _is_admin_request() -> bool:
+    try:
+        return admin_session_payload() is not None
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _public_silos_health_payload(payload: dict) -> dict:
+    services = payload.get("services") if isinstance(payload.get("services"), list) else []
+    status_counts: dict[str, int] = {}
+    for service in services:
+        if not isinstance(service, dict):
+            continue
+        status = str(service.get("status") or "unknown").lower()
+        status_counts[status] = status_counts.get(status, 0) + 1
+
+    silos: dict[str, dict] = {}
+    for name, silo in (payload.get("silos") or {}).items():
+        if not isinstance(silo, dict):
+            continue
+        row = {"status": silo.get("status", "unknown")}
+        if name == "tho" and silo.get("url"):
+            row["url"] = silo.get("url")
+        silos[str(name)] = row
+
+    return {
+        "mode": "public_silos_health_summary",
+        "silos": silos,
+        "service_summary": {
+            "reporting": len(services),
+            "status_counts": status_counts,
+            "healthy": status_counts.get("healthy", 0) + status_counts.get("ok", 0),
+        },
+        "services": [],
+        "ts": payload.get("ts") or datetime.now(UTC).isoformat(),
+        "admin_required_for": ["service names", "hosts", "response times", "SHAs"],
+    }
+
+
 def _is_known_probe_path(path: str) -> bool:
     normalized = ("/" + path.lstrip("/")).lower().rstrip("/") or "/"
     return (
@@ -220,6 +260,7 @@ def summary():
 
 
 @app.get("/api/performance")
+@requires_admin
 def performance():
     days = int(request.args.get("days", "30"))
     try:
@@ -279,6 +320,7 @@ def regime():
 
 
 @app.get("/api/predictions")
+@requires_admin
 def predictions():
     limit = int(request.args.get("limit", "50"))
     try:
@@ -300,6 +342,7 @@ def predictions():
 
 
 @app.get("/api/predictions/accuracy")
+@requires_admin
 def predictions_accuracy():
     """Rolling 7d/30d prediction accuracy by symbol + by model.
 
@@ -433,6 +476,7 @@ def predictions_accuracy():
 
 
 @app.get("/api/correlation/matrix")
+@requires_admin
 def correlation_matrix():
     """Cross-asset Pearson correlation matrix of daily log returns.
 
@@ -583,6 +627,7 @@ def correlation_matrix():
 
 
 @app.get("/api/vpin")
+@requires_admin
 def vpin():
     """VPIN — Volume-Synchronized Probability of Informed Trading.
 
@@ -701,6 +746,7 @@ def vpin():
 
 
 @app.get("/api/deflated-sharpe/rolling")
+@requires_admin
 def deflated_sharpe_rolling():
     """Rolling Deflated Sharpe Ratio per strategy.
 
@@ -858,6 +904,7 @@ THREAT_FEED_URL = os.environ.get(
 
 
 @app.get("/api/timeseries/inference")
+@requires_admin
 def timeseries_inference():
     """Hourly inference-call counts for the last 24h, grouped by tier.
 
@@ -904,6 +951,7 @@ def timeseries_threats():
 
 
 @app.get("/api/timeseries/services")
+@requires_admin
 def timeseries_services():
     """Service-health rollup over the last hour, per service.
 
@@ -1002,16 +1050,19 @@ def silos_health():
         "hackathon": {"status": "active"},
     }
 
-    return jsonify(
-        {
-            "services": services,
-            "silos": silos,
-            "ts": datetime.now(UTC).isoformat(),
-        }
-    )
+    payload = {
+        "services": services,
+        "silos": silos,
+        "ts": datetime.now(UTC).isoformat(),
+    }
+    if _is_admin_request():
+        payload["mode"] = "admin_silos_health_detail"
+        return jsonify(payload)
+    return jsonify(_public_silos_health_payload(payload))
 
 
 @app.get("/api/silos/business")
+@requires_admin
 def silos_business():
     """Business silo summary — THO customer counts, deals, recent activity.
 
@@ -1040,6 +1091,7 @@ def silos_business():
 
 
 @app.get("/api/silos/inference")
+@requires_admin
 def silos_inference():
     """Inference proxy telemetry from BigQuery. Fails-safe to empty list.
 
@@ -1067,6 +1119,7 @@ def silos_inference():
 
 
 @app.get("/api/signals/recent")
+@requires_admin
 def signals_recent():
     limit = int(request.args.get("limit", "100"))
     try:

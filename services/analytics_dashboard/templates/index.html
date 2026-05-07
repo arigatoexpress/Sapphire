@@ -1504,7 +1504,7 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
   <span class="meta" id="brain-section-meta">regenerated every 15 min</span>
 </div>
 <div class="section-sub">
-  Health score across 7 silos · regenerated every 15 min · click <span class="mono">Persist + Run</span> to capture a snapshot to BigQuery, or <span class="mono">Correlate</span> to surface cross-silo pattern matches.
+  Public-safe health summary across 7 silos · regenerated every 15 min · priority actions, history, persistence, and correlations require admin.
 </div>
 <section class="brain-hero" id="brain-hero" aria-labelledby="brain-hero-title">
   <div class="brain-hero-head">
@@ -1514,13 +1514,7 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
     </div>
     <div class="brain-hero-actions">
       <span class="brain-meta" id="brain-meta">—</span>
-      <button type="button" class="brain-btn" id="brain-persist-btn" title="Run synthesis and persist to BigQuery">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-        Persist + Run
-      </button>
-      <button type="button" class="brain-btn" id="brain-correlate-btn" title="Cross-silo correlation matches">
-        Correlate
-      </button>
+      <a class="brain-btn" href="/admin" title="Open passkey-gated admin console">Admin console</a>
     </div>
   </div>
   <div class="brain-hero-body">
@@ -1563,7 +1557,7 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
   <span class="meta">aggregated by hour</span>
 </div>
 <div class="section-sub">
-  Inference proxy: 4-tier failover (proxy / mac_ollama / gpu_local / kimi). Calls + error rate per tier last 24h.
+  Inference proxy detail is admin-only; the public chart is intentionally locked.
   Threat severity: CISA KEV + NVD + MITRE ATT&CK CVEs by day, stacked by severity.
 </div>
 <div class="cols-2">
@@ -1591,7 +1585,7 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
   <span class="meta">Volume-Synchronized Probability of Informed Trading</span>
 </div>
 <div class="section-sub">
-  Toxicity = how much informed-trader flow is poisoning the order book. Bucketed by 50-tick volume slices.
+  Toxicity detail is admin-only research IP. Bucket thresholds are shown publicly; live bucket history requires an admin session.
   <span style="color:var(--green)">normal</span> &lt; 0.3 ·
   <span style="color:var(--accent)">moderate</span> 0.3-0.5 ·
   <span style="color:var(--yellow)">high</span> 0.5-0.7 ·
@@ -1622,7 +1616,7 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
   <span class="meta">90-day window · Bailey & López de Prado 2014</span>
 </div>
 <div class="section-sub">
-  Deflated Sharpe penalizes Sharpe for the number of strategy trials. Probability ≥ 95% means the strategy is statistically significant after multiple-testing correction.
+  Deflated Sharpe penalizes Sharpe for the number of strategy trials. Live strategy results are admin-only research IP.
 </div>
 <div class="cols-2">
   <div class="panel">
@@ -1670,7 +1664,7 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
   <span class="meta" id="services-meta">last 60-min rollup</span>
 </div>
 <div class="section-sub">
-  Mac + Cloud Run heartbeat last 60 min. p50/p95 response time per service.
+  Public pages show aggregate health only. Service names, hosts, latency, and local-runtime details require admin.
   <span style="color:var(--green)">healthy</span> · <span style="color:var(--yellow)">degraded</span> · <span style="color:var(--red)">down</span>.
 </div>
 <div class="panel">
@@ -1693,7 +1687,7 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
   <span class="meta">24h tier breakdown</span>
 </div>
 <div class="section-sub">
-  4-tier failover (proxy / mac_ollama / gpu_local / kimi). Calls + error rate per tier last 24h. T1 GPU is fast Ollama on RTX 5070 Ti; T4 Kimi is non-sensitive cloud fallback.
+  Failover exists, but per-tier calls, local hosts, and latency are admin-only. Public status is summarized in the health cards.
 </div>
 <div class="panel">
   <h2>
@@ -1719,7 +1713,7 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
   <span style="color:var(--green)">RISK_ON</span> /
   <span style="color:var(--yellow)">TRANSITION</span> /
   <span style="color:var(--red)">RISK_OFF</span>.
-  <strong>Predictions:</strong> Kronos ML 24-bar forecasts for BTC/ETH/SOL/SPY/TSLA — directional + confidence + expected % move.
+  <strong>Predictions:</strong> admin-only model output. The public surface shows regime context without exposing signals or forecasts.
 </div>
 <div class="cols-2">
   <div class="panel">
@@ -1754,8 +1748,9 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
     <a href="/healthz/">/healthz/</a>
     <a href="/api/silos/health">/api/silos/health</a>
     <a href="/api/threats/live">/api/threats/live</a>
-    <a href="/api/timeseries/inference">/api/timeseries/inference</a>
     <a href="/api/timeseries/threats">/api/timeseries/threats</a>
+    <a href="/api/brain/synthesis">/api/brain/synthesis</a>
+    <a href="/admin">/admin</a>
   </div>
 </div>
 
@@ -1779,7 +1774,7 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
     &nbsp;48h spark&nbsp;&nbsp;&nbsp;degraded silos<br>
     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;priority actions (silo: …)
   </div>
-  <p>Click <span class="mono">Persist + Run</span> to capture the current state to BigQuery (<span class="mono">brain_synthesis</span> table). Click <span class="mono">Correlate</span> for cross-silo pattern matches.</p>
+  <p>The public brain panel shows summarized health and narrative only. Priority actions, persisted history, and cross-silo correlations live behind the passkey-gated admin console.</p>
 
   <h4>What each silo means</h4>
   <table class="silo-table">
@@ -1814,11 +1809,11 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
   </p>
 
   <h4>Where the data comes from</h4>
-  <p>Every panel maps to one <span class="mono">/api/*</span> endpoint. They all fail-safe to empty payloads — the dashboard never 500s. Top sources:</p>
+  <p>Public panels map to public-safe <span class="mono">/api/*</span> endpoints. Sensitive raw data and write/persist controls are admin-only. Top public sources:</p>
   <p style="font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.8;color:var(--text-2);">
     /api/markets/snapshot · /api/brain/synthesis · /api/silos/health<br>
-    /api/timeseries/inference · /api/timeseries/threats · /api/timeseries/services<br>
-    /api/regime · /api/predictions · /api/threats/live · /api/vpin · /api/deflated-sharpe/rolling
+    /api/timeseries/threats · /api/regime · /api/threats/live<br>
+    Admin-only: predictions, signals, service timeseries, inference metrics, VPIN, DSR, Brain history/correlation/persistence.
   </p>
 
   <h4>Information density</h4>
@@ -1827,6 +1822,7 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
   <div class="help-actions">
     <button class="help-btn" id="help-show-tour">Show onboarding tour again</button>
     <button class="help-btn" id="help-open-cmdk">Open command palette</button>
+    <a class="help-btn" href="/admin">Admin console</a>
     <a class="help-btn" href="/healthz/" target="_blank" rel="noopener">/healthz/</a>
     <a class="help-btn" href="https://github.com/arigatoexpress" target="_blank" rel="noopener">GitHub</a>
   </div>
@@ -1901,6 +1897,19 @@ async function safeFetch(url) {
     if (!r.ok) return null;
     return await r.json();
   } catch (_) { return null; }
+}
+
+function adminLocked(label) {
+  return `<div class="empty actionable"><strong>${escapeHtml(label)} is admin-only.</strong> Sign in at <a class="mono" href="/admin">/admin</a> for the full operator view.</div>`;
+}
+
+function setLockedSvg(svg, label = 'admin-only detail') {
+  if (!svg) return;
+  svg.innerHTML = '';
+  svg.setAttribute('viewBox', '0 0 600 160');
+  const t = svgEl('text', { x: '50%', y: '50%', 'text-anchor': 'middle', fill: '#6c7891', 'font-size': 12, 'font-family': 'Inter' });
+  t.textContent = label;
+  svg.appendChild(t);
 }
 
 // ========== SVG chart helpers ==========
@@ -2175,71 +2184,6 @@ function toast({title, body, meta, kind = 'ok', ttl = 5000}) {
   }, ttl);
 }
 
-// ========== Brain action buttons ==========
-const persistBtn = document.getElementById('brain-persist-btn');
-if (persistBtn) {
-  persistBtn.addEventListener('click', async () => {
-    persistBtn.disabled = true;
-    persistBtn.style.opacity = '0.6';
-    try {
-      const r = await fetch('/api/brain/synthesis?persist=1');
-      if (!r.ok) {
-        toast({title: 'Persist failed', body: `HTTP ${r.status}`, kind: 'err'});
-        return;
-      }
-      const d = await r.json();
-      const sid = d.synthesis_id || '(no id returned)';
-      toast({
-        title: d.persisted ? 'Synthesis persisted' : 'Synthesis ran (not persisted)',
-        body: d.narrative || '',
-        meta: `id: ${sid} · health: ${d.health_score} · degraded: ${(d.degraded_silos || []).length}`,
-        kind: d.persisted ? 'ok' : 'warn',
-        ttl: 7000,
-      });
-      // Refresh dashboard so new row + brain panel update.
-      refresh();
-    } catch (e) {
-      toast({title: 'Persist error', body: String(e), kind: 'err'});
-    } finally {
-      persistBtn.disabled = false;
-      persistBtn.style.opacity = '';
-    }
-  });
-}
-const correlateBtn = document.getElementById('brain-correlate-btn');
-if (correlateBtn) {
-  correlateBtn.addEventListener('click', async () => {
-    correlateBtn.disabled = true;
-    correlateBtn.style.opacity = '0.6';
-    try {
-      const r = await fetch('/api/brain/correlate');
-      if (!r.ok) {
-        toast({title: 'Correlate failed', body: `HTTP ${r.status}`, kind: 'err'});
-        return;
-      }
-      const d = await r.json();
-      const matches = d.matches || [];
-      if (matches.length === 0) {
-        toast({title: 'No correlations', body: 'No cross-silo patterns matched.', meta: `ts: ${(d.ts || '').slice(0, 19)}`, kind: 'ok'});
-      } else {
-        const top = matches.slice(0, 3).map(m => `<div style="margin-top:4px"><span style="color:var(--accent)">${m.pattern_name}</span> · ${m.severity}<br><span style="color:var(--text-3);font-size:11px">${m.recommendation || ''}</span></div>`).join('');
-        toast({
-          title: `${matches.length} correlation${matches.length === 1 ? '' : 's'}`,
-          body: top,
-          meta: `score range ${matches[matches.length - 1].score.toFixed(2)} – ${matches[0].score.toFixed(2)}`,
-          kind: matches[0].severity === 'HIGH' ? 'err' : 'warn',
-          ttl: 9000,
-        });
-      }
-    } catch (e) {
-      toast({title: 'Correlate error', body: String(e), kind: 'err'});
-    } finally {
-      correlateBtn.disabled = false;
-      correlateBtn.style.opacity = '';
-    }
-  });
-}
-
 // ========== Sapphire Brain panel ==========
 const BRAIN_SILO_TAGS = ['regime','trading','threat','threat_live','services','service','inference','tho'];
 function brainTagClass(action) {
@@ -2314,7 +2258,10 @@ function renderBrainPanel(syn) {
   if (actEl) {
     const list = Array.isArray(syn.priority_actions) ? syn.priority_actions : [];
     if (!list.length) {
-      actEl.innerHTML = '<div class="brain-actions-empty mono">No priority actions queued.</div>';
+      const count = Number(syn.priority_action_count || 0);
+      actEl.innerHTML = count > 0
+        ? `<div class="brain-actions-empty mono">${count} priority action${count === 1 ? '' : 's'} locked behind admin.</div>`
+        : '<div class="brain-actions-empty mono">No priority actions queued.</div>';
     } else {
       actEl.innerHTML = list.map(a => {
         const tag = brainTagClass(a);
@@ -2333,6 +2280,13 @@ function renderBrainSpark(rows) {
   const svg = document.getElementById('brain-spark-svg');
   if (!svg) return;
   svg.innerHTML = '';
+  if (rows === null) {
+    svg.setAttribute('viewBox', '0 0 200 28');
+    const t = svgEl('text', { x: '50%', y: 18, 'text-anchor': 'middle', fill: '#424d65', 'font-size': 9, 'font-family': 'JetBrains Mono' });
+    t.textContent = 'admin history locked';
+    svg.appendChild(t);
+    return;
+  }
   if (!Array.isArray(rows) || rows.length < 2) {
     svg.setAttribute('viewBox', '0 0 200 28');
     const t = svgEl('text', { x: '50%', y: 18, 'text-anchor': 'middle', fill: '#424d65', 'font-size': 9, 'font-family': 'JetBrains Mono' });
@@ -2340,7 +2294,7 @@ function renderBrainSpark(rows) {
     svg.appendChild(t);
     return;
   }
-  // /api/brain/history returns DESC; reverse for chronological plot.
+  // Admin history rows are DESC; reverse for chronological plot when present.
   const ordered = [...rows].reverse();
   const points = ordered
     .map(r => (typeof r.health_score === 'number' ? r.health_score : null))
@@ -2386,25 +2340,25 @@ async function refresh() {
   const wmeta = document.getElementById('charts-window-meta');
   if (wmeta) wmeta.textContent = granLbl;
 
-  const [sum, regime, preds, silos, inference, threatsLive, tsInf, tsThr, tsSvc, vpinResp, dsr, brainSyn, brainHist] = await Promise.all([
+  const [sum, regime, silos, threatsLive, tsThr, brainSyn] = await Promise.all([
     safeFetch('/api/summary'),
     safeFetch('/api/regime?limit=8'),
-    safeFetch('/api/predictions?limit=8'),
     safeFetch('/api/silos/health'),
-    safeFetch('/api/silos/inference'),
     safeFetch('/api/threats/live'),
-    safeFetch('/api/timeseries/inference' + winQ),
     safeFetch('/api/timeseries/threats' + winQ),
-    safeFetch('/api/timeseries/services' + winQ),
-    safeFetch('/api/vpin?symbol=BTC&buckets=50'),
-    safeFetch('/api/deflated-sharpe/rolling?window=90&days=365'),
     safeFetch('/api/brain/synthesis'),
-    safeFetch('/api/brain/history?limit=48'),
   ]);
+  const preds = null;
+  const inference = null;
+  const tsInf = { rows: [] };
+  const tsSvc = { rows: [] };
+  const vpinResp = null;
+  const dsr = null;
+  const brainHist = null;
 
   // ----- Sapphire Brain hero panel -----
   renderBrainPanel(brainSyn);
-  renderBrainSpark((brainHist && brainHist.rows) || []);
+  renderBrainSpark(brainHist ? brainHist.rows : null);
 
   // ----- THO silo + header health -----
   const tho = silos?.silos?.tho || {};
@@ -2478,10 +2432,10 @@ async function refresh() {
 
   // ----- KPI strip -----
   const services = silos?.services || [];
-  const okSvcs = services.filter(s => (s.status || '').toLowerCase() === 'healthy').length;
-  const totalCalls24h = (inference?.tiers || []).reduce((a, t) => a + (Number(t.calls) || 0), 0);
-  const totalErr24h = (inference?.tiers || []).reduce((a, t) => a + (Number(t.err_count) || 0), 0);
-  const errRate = totalCalls24h > 0 ? totalErr24h / totalCalls24h : 0;
+  const serviceSummary = silos?.service_summary || {};
+  const serviceReporting = Number(serviceSummary.reporting || services.length || 0);
+  const okSvcs = Number(serviceSummary.healthy || services.filter(s => (s.status || '').toLowerCase() === 'healthy').length || 0);
+  const totalCalls24h = 0;
 
   // Threats sparkline data
   const threatsByDay = {};
@@ -2502,9 +2456,8 @@ async function refresh() {
     },
     {
       label: 'Inference 24h',
-      value: fmtN(totalCalls24h),
-      sub: errRate > 0 ? fmtPct(errRate, 3) + ' error rate' : '0% errors',
-      sparkPoints: totalPerHour,
+      value: 'locked',
+      sub: 'admin-only detail',
       sparkColor: '#4ea8ff',
     },
     {
@@ -2514,8 +2467,8 @@ async function refresh() {
     },
     {
       label: 'Service heartbeats',
-      value: services.length ? `${okSvcs} / ${services.length}` : '—',
-      sub: services.length ? 'healthy / reporting' : 'collector offline',
+      value: serviceReporting ? `${okSvcs} / ${serviceReporting}` : '—',
+      sub: serviceReporting ? 'healthy / reporting summary' : 'admin-only detail',
     },
     {
       label: 'Predictions',
@@ -2547,11 +2500,9 @@ async function refresh() {
 
   // ----- Inference 24h chart -----
   const infSvg = document.getElementById('chart-inference');
-  drawMultiLine(infSvg, inferSeries, {});
-  buildLegend(document.getElementById('chart-inference-legend'),
-    inferSeries.map(s => ({ name: s.name, color: s.color })));
-  document.getElementById('chart-inference-meta').textContent =
-    inferSeries.length ? `${fmtN(totalCalls24h)} calls across ${inferSeries.length} tiers` : '';
+  setLockedSvg(infSvg, 'admin-only inference telemetry');
+  buildLegend(document.getElementById('chart-inference-legend'), []);
+  document.getElementById('chart-inference-meta').textContent = 'admin-only';
 
   // ----- Threats 30d chart (stacked by severity) -----
   const sevColors = { CRITICAL: '#f85149', HIGH: '#d29922', MEDIUM: '#4ea8ff', LOW: '#3fb950', UNCLASSIFIED: '#6c7891' };
@@ -2636,7 +2587,8 @@ async function refresh() {
       </tr>`;
     }).join('');
   } else {
-    sh.innerHTML = `<tr><td colspan="6"><div class="empty actionable">No heartbeats in last 60 min. The telemetry collector (<span class="mono">com.sapphire.telemetry-collector</span>) writes every 30 min — check its LaunchAgent on the Mac with <span class="mono">launchctl list | grep telemetry</span>.</div></td></tr>`;
+    sh.innerHTML = `<tr><td colspan="6">${adminLocked('Service heartbeat detail')}</td></tr>`;
+    document.getElementById('services-h-meta').textContent = 'admin-only';
   }
 
   // ----- Inference (rich) -----
@@ -2659,7 +2611,7 @@ async function refresh() {
       </tr>`;
     }).join('');
   } else {
-    ih.innerHTML = `<tr><td colspan="6"><div class="empty actionable">No inference telemetry in last 24h. The proxy writes to BQ via <span class="mono">services/inference-proxy/</span> — verify it's running with <span class="mono">curl -s localhost:11435/health</span>.</div></td></tr>`;
+    ih.innerHTML = `<tr><td colspan="6">${adminLocked('Inference tier detail')}</td></tr>`;
   }
 
   // ----- Regime (filtered to non-null) -----
@@ -2697,7 +2649,7 @@ async function refresh() {
       </tr>`;
     }).join('');
   } else {
-    ph.innerHTML = `<tr><td colspan="5"><div class="empty actionable"><strong>No predictions in window.</strong> Kronos runs daily at 7 AM CT. Check <span class="mono">com.sapphire.kronos-daily</span> LaunchAgent — output lands in <span class="mono">data/intelligence/&lt;date&gt;/predictions.json</span>.</div></td></tr>`;
+    ph.innerHTML = `<tr><td colspan="5">${adminLocked('Model prediction detail')}</td></tr>`;
   }
 
   // ----- VPIN -----
@@ -2709,22 +2661,24 @@ async function refresh() {
     const tox = vpinResp?.toxicity || 'unknown';
     const toxColors = { extreme: '#f85149', high: '#d29922', moderate: '#4ea8ff', normal: '#3fb950', unknown: '#6c7891' };
     const sparkColor = toxColors[tox] || '#6c7891';
-    if (points.length >= 2) {
+    if (!vpinResp) {
+      setLockedSvg(vpinSpark, 'admin-only order-flow research');
+    } else if (points.length >= 2) {
       drawSparkline(vpinSpark, points, sparkColor);
     } else {
       vpinSpark.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#6c7891" font-size="11" font-family="Inter">building tick history…</text>';
       vpinSpark.setAttribute('viewBox', '0 0 600 60');
     }
     document.getElementById('vpin-value').textContent =
-      latest != null ? Number(latest).toFixed(3) : '—';
+      vpinResp ? (latest != null ? Number(latest).toFixed(3) : '—') : 'locked';
     const toxEl = document.getElementById('vpin-tox');
     if (toxEl) {
       const cls = tox === 'extreme' || tox === 'high' ? 'red'
                 : tox === 'moderate' ? 'yellow' : tox === 'normal' ? 'green' : 'gray';
-      toxEl.innerHTML = pill(cls, tox);
+      toxEl.innerHTML = vpinResp ? pill(cls, tox) : pill('gray', 'admin-only');
     }
     document.getElementById('vpin-meta').textContent =
-      `${fmtN(vpinResp?.n_ticks)} ticks · window ${vpinResp?.buckets || 50}`;
+      vpinResp ? `${fmtN(vpinResp?.n_ticks)} ticks · window ${vpinResp?.buckets || 50}` : 'admin-only';
   }
 
   // ----- Deflated Sharpe rolling -----
@@ -2750,11 +2704,12 @@ async function refresh() {
         points: pts.map(p => ({ x_label: (p.date || '').slice(5), y: isNaN(p.value) ? 0 : p.value })),
       };
     }).filter(s => s.points.length);
-    drawMultiLine(dsrSvg, dsrSeries, {});
+    if (!dsr) setLockedSvg(dsrSvg, 'admin-only strategy research');
+    else drawMultiLine(dsrSvg, dsrSeries, {});
     buildLegend(document.getElementById('chart-dsr-legend'),
       dsrSeries.map(s => ({ name: s.name, color: s.color })));
     document.getElementById('chart-dsr-meta').textContent =
-      strategies.length ? `${strategies.length} strategies · ${rolling.length} rolling points` : 'awaiting closed-trade history';
+      dsr ? (strategies.length ? `${strategies.length} strategies · ${rolling.length} rolling points` : 'awaiting closed-trade history') : 'admin-only';
 
     const dsrTbody = document.querySelector('#dsr-summary tbody');
     if (dsrTbody) {
@@ -2772,7 +2727,7 @@ async function refresh() {
         }).join('');
         document.getElementById('dsr-summary-meta').textContent = `window=${dsr?.window || 90}d`;
       } else {
-        dsrTbody.innerHTML = '<tr><td colspan="5"><div class="empty actionable"><strong>Awaiting closed-trade history.</strong> Deflated Sharpe needs ≥90 days of closed trades per strategy. Generate via <span class="mono">python3 -m lib.analytics.run_strategies --days 90</span>.</div></td></tr>';
+        dsrTbody.innerHTML = `<tr><td colspan="5">${adminLocked('Strategy quality detail')}</td></tr>`;
       }
     }
   }
@@ -2923,17 +2878,16 @@ const CMDK_ITEMS = [
   { type: 'jump', name: 'Brain · cross-silo synthesis', hint: '#brain-section-h', target: '#brain-section-h' },
   { type: 'jump', name: 'Global Markets', hint: '#markets-hero', target: '#markets-hero' },
   { type: 'jump', name: 'Threat intelligence feed', hint: '#threats', target: '#threats' },
-  { type: 'jump', name: 'Service health', hint: 'service heartbeats', target: '#services' },
-  { type: 'jump', name: 'Inference proxy tiers', hint: '4-tier failover', target: '#inference' },
-  { type: 'jump', name: 'Predictions (Kronos)', hint: '#predictions', target: '#predictions' },
-  { type: 'jump', name: 'Order-flow toxicity (VPIN)', hint: '#vpin', target: '#vpin' },
-  { type: 'jump', name: 'Strategy quality (Deflated Sharpe)', hint: '#strategy-quality', target: '#strategy-quality' },
+  { type: 'jump', name: 'Service health', hint: 'public summary + admin lock', target: '#services' },
+  { type: 'jump', name: 'Inference proxy tiers', hint: 'admin-only detail', target: '#inference' },
+  { type: 'jump', name: 'Predictions (Kronos)', hint: 'admin-only detail', target: '#predictions' },
+  { type: 'jump', name: 'Order-flow toxicity (VPIN)', hint: 'admin-only detail', target: '#vpin' },
+  { type: 'jump', name: 'Strategy quality (Deflated Sharpe)', hint: 'admin-only detail', target: '#strategy-quality' },
+  { type: 'open', name: 'Admin console', hint: 'passkey-gated controls', url: '/admin' },
   { type: 'open', name: 'THO production console', hint: 'tho.sapphirealpha.xyz', url: 'https://tho.sapphirealpha.xyz/' },
   { type: 'open', name: 'Wildfire admin', hint: 'wildfire.sapphirealpha.xyz', url: 'https://wildfire.sapphirealpha.xyz/' },
   { type: 'open', name: 'Regional admin', hint: 'regional.sapphirealpha.xyz', url: 'https://regional.sapphirealpha.xyz/admin' },
   { type: 'open', name: 'Hackathon submissions', hint: 'hack.sapphirealpha.xyz', url: 'https://hack.sapphirealpha.xyz/' },
-  { type: 'action', name: 'Persist brain snapshot', hint: 'capture to BigQuery', action: () => document.getElementById('brain-persist-btn')?.click() },
-  { type: 'action', name: 'Run cross-silo correlation', hint: 'pattern matches', action: () => document.getElementById('brain-correlate-btn')?.click() },
   { type: 'action', name: 'Refresh data now', hint: 'force refresh', action: () => { refresh(); refreshMarkets(); } },
   { type: 'action', name: 'Show onboarding tour', hint: 'restart tour', action: () => { closeCmdk(); startTour(true); } },
   { type: 'action', name: 'Show help guide', hint: '? key', action: () => { closeCmdk(); openHelp(); } },
@@ -3058,7 +3012,7 @@ const TOUR_STEPS = [
   {
     target: '#brain-hero',
     title: 'Sapphire Brain',
-    body: 'Cross-silo health score (0–100%). The gauge regenerates every 15 min. Click Persist + Run to capture a snapshot to BigQuery; click Correlate for cross-silo pattern matches.',
+    body: 'Cross-silo health score (0-100%). The public gauge regenerates every 15 min; priority actions, persistence, and correlations live in the admin console.',
   },
   {
     target: '#markets-hero',
@@ -3147,18 +3101,14 @@ const WHY_DEFS = {
 FROM &lt;dataset&gt;.threats_unified
 WHERE source IN ('cisa_kev','nvd','mitre_attack')</pre>
 <h4>Inference 24h</h4>
-<pre>SELECT SUM(calls) FROM &lt;dataset&gt;.inference_calls_hourly
-WHERE hour &gt;= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)</pre>
+<p>Admin-only raw tier telemetry. Public view intentionally shows a locked state.</p>
 <h4>Active leads</h4>
 <pre>SELECT COUNT(*) FROM &lt;dataset&gt;.leads
 WHERE status NOT IN ('CLOSED_LOST','REJECTED')</pre>
 <h4>Service heartbeats</h4>
-<pre>SELECT COUNTIF(status='healthy'), COUNT(DISTINCT service)
-FROM &lt;dataset&gt;.service_heartbeats
-WHERE last_seen &gt;= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 60 MINUTE)</pre>
+<p>Public view uses aggregate counts from <span class="mono">/api/silos/health</span>. Service names, hosts, and latency are admin-only.</p>
 <h4>Predictions</h4>
-<pre>SELECT COUNT(*) FROM &lt;dataset&gt;.predictions
-WHERE source='kronos'</pre>
+<p>Only total count is public. Forecast rows, confidence, symbols, and signal detail are admin-only.</p>
 <h4>Regime snapshots</h4>
 <pre>SELECT COUNTIF(regime IS NOT NULL)
 FROM &lt;dataset&gt;.regime_snapshots</pre>
@@ -3171,7 +3121,7 @@ FROM &lt;dataset&gt;.regime_snapshots</pre>
 <pre>health = Σ (silo_weight × silo_status_prob)
        / Σ silo_weight</pre>
 <p>Silos: regime, trading, threat_live, services, inference, tho, content. Each contributes a 0–1 status probability based on its own freshness + error rate.</p>
-<p>Source: <span class="mono">/api/brain/synthesis</span> · history at <span class="mono">/api/brain/history</span>.</p>`,
+<p>Source: public summary at <span class="mono">/api/brain/synthesis</span>. History, priority actions, and correlations require <span class="mono">/admin</span>.</p>`,
   },
   'markets': {
     title: 'Global markets snapshot',
