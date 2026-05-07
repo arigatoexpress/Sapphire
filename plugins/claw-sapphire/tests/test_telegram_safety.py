@@ -7,6 +7,7 @@ goal is to nail down the safety posture so a regression to
 
 from __future__ import annotations
 
+import logging
 import sys
 from pathlib import Path
 
@@ -35,6 +36,20 @@ def test_load_allowed_user_ids_skips_invalid(monkeypatch):
     assert safety.load_allowed_user_ids() == {111, 222}
 
 
+def test_load_allowed_user_ids_logs_invalid_count_without_values(monkeypatch, caplog):
+    monkeypatch.setenv(
+        "SAPPHIRE_PM_BOT_ALLOWED_USER_IDS",
+        "111,not-a-user,222,sk-abcdef0123456789",
+    )
+    caplog.set_level(logging.WARNING, logger=safety.logger.name)
+
+    assert safety.load_allowed_user_ids() == {111, 222}
+
+    assert "2 invalid Telegram allowlist entries" in caplog.text
+    assert "not-a-user" not in caplog.text
+    assert "sk-abcdef0123456789" not in caplog.text
+
+
 def test_load_allowed_user_ids_falls_back_to_file(monkeypatch, tmp_path):
     monkeypatch.delenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", raising=False)
     allowlist_file = tmp_path / "allowed_user_ids.txt"
@@ -49,6 +64,21 @@ def test_load_allowed_user_ids_prefers_env_over_file(monkeypatch, tmp_path):
     monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS_FILE", str(allowlist_file))
     monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "444")
     assert safety.load_allowed_user_ids() == {444}
+
+
+def test_load_allowed_user_ids_file_does_not_log_invalid_values(monkeypatch, tmp_path, caplog):
+    monkeypatch.delenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", raising=False)
+    allowlist_file = tmp_path / "allowed_user_ids.txt"
+    allowlist_file.write_text("111,sk-abcdef0123456789,not-a-user\n")
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS_FILE", str(allowlist_file))
+    caplog.set_level(logging.WARNING, logger=safety.logger.name)
+
+    assert safety.load_allowed_user_ids() == {111}
+
+    assert str(allowlist_file) in caplog.text
+    assert "2 invalid Telegram allowlist entries" in caplog.text
+    assert "sk-abcdef0123456789" not in caplog.text
+    assert "not-a-user" not in caplog.text
 
 
 def test_is_allowed_denies_none_user():

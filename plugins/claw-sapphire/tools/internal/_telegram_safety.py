@@ -219,6 +219,7 @@ def assert_no_live_trading() -> None:
 
 def _parse_allowed_user_ids(raw: str, *, source: str) -> set[int]:
     allowed: set[int] = set()
+    invalid_count = 0
     for item in raw.split(","):
         text = item.strip()
         if not text:
@@ -226,7 +227,14 @@ def _parse_allowed_user_ids(raw: str, *, source: str) -> set[int]:
         try:
             allowed.add(int(text))
         except ValueError:
-            logger.warning("Ignoring invalid Telegram allowlist entry in %s: %r", source, text)
+            invalid_count += 1
+    if invalid_count:
+        logger.warning(
+            "Ignoring %s invalid Telegram allowlist entr%s in %s",
+            invalid_count,
+            "y" if invalid_count == 1 else "ies",
+            source,
+        )
     return allowed
 
 
