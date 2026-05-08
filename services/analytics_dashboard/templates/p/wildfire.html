@@ -6,15 +6,15 @@
 {% block content %}
 <section class="hero">
   <h1>Wildfire Watch</h1>
-  <div class="typed" id="typed-line">$ tail -f /var/log/wildfire/sensors.log</div>
+  <div class="typed" id="typed-line">$ sapphire wildfire public-brief --safe</div>
 </section>
 
 <section class="box">
-  <h2 class="section">SENSOR_HEARTBEAT</h2>
+  <h2 class="section">PUBLIC_HEARTBEAT</h2>
   <div class="grid cols-4" id="kpis">
-    <div class="card"><div class="muted">PUBLIC_ALERTS_24H</div><h3 id="kpi-24h">--</h3></div>
-    <div class="card"><div class="muted">PUBLIC_ALERTS_7D</div><h3 id="kpi-7d">--</h3></div>
-    <div class="card"><div class="muted">HIGH_RISK_ZONE</div><h3 id="kpi-zone">--</h3></div>
+    <div class="card"><div class="muted">PUBLIC_STATUS</div><h3>{% if online %}ONLINE{% else %}UNKNOWN{% endif %}</h3></div>
+    <div class="card"><div class="muted">MISSION_CONTROLS</div><h3>ADMIN</h3></div>
+    <div class="card"><div class="muted">RISK_DETAIL</div><h3>LOCKED</h3></div>
     <div class="card"><div class="muted">SENSOR_PULSE</div>
       <h3 id="kpi-status">{% if online %}<span class="pill green">ONLINE</span>{% else %}<span class="pill amber">UNKNOWN</span>{% endif %}</h3>
     </div>
@@ -38,8 +38,8 @@
     <div class="k">vision</div><div class="v">3D-printed AI drones for wildfire / wildlife / ecology monitoring + fire-dept partnership.</div>
     <div class="k">hardware</div><div class="v">Mavic Mini (camera), Mac mini (compute), Raspberry Pi (sensor edge).</div>
     <div class="k">repo</div><div class="v"><code>~/Code/wildfire-watch</code> &middot; PR #551 (sapphire bridge merged)</div>
-    <div class="k">api</div><div class="v"><a href="{{ wildfire_url }}" target="_blank" rel="noopener">{{ wildfire_url }}</a></div>
-    <div class="k">probe</div><div class="v">{% if online %}<span class="pill green">200 OK</span>{% else %}<span class="pill amber">unreachable</span>{% endif %} <span class="muted">/api/sensors/health</span></div>
+    <div class="k">surface</div><div class="v"><a href="{{ wildfire_url }}" target="_blank" rel="noopener">{{ wildfire_url }}</a></div>
+    <div class="k">public probe</div><div class="v">{% if online %}<span class="pill green">reachable</span>{% else %}<span class="pill amber">unknown</span>{% endif %} <span class="muted">raw sensor metrics and mission controls require <a href="/admin">admin</a></span></div>
   </div>
 </section>
 {% endblock %}
@@ -52,15 +52,6 @@
     var full = line.textContent; line.textContent = ''; var i=0;
     (function tick(){ if (i>=full.length) return; line.textContent += full.charAt(i++); setTimeout(tick, 28); })();
   }
-  fetch('{{ wildfire_url }}api/sensors/health').then(r=>r.ok?r.json():null).then(d=>{
-    if (!d) return;
-    var $24 = document.getElementById('kpi-24h');
-    var $7 = document.getElementById('kpi-7d');
-    var $z = document.getElementById('kpi-zone');
-    if ($24) $24.textContent = d.signals_24h ?? d.signals?.day_24h ?? '--';
-    if ($7)  $7.textContent  = d.signals_7d ?? d.signals?.day_7d ?? '--';
-    if ($z)  $z.textContent  = d.highest_risk_zone ?? d.zone ?? '--';
-  }).catch(()=>{});
 })();
 </script>
 {% endblock %}
