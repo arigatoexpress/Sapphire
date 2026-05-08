@@ -578,6 +578,7 @@ def test_sensitive_endpoints_require_admin_cookie(app_module):
         "/api/deflated-sharpe/rolling",
         "/api/timeseries/inference",
         "/api/timeseries/services",
+        "/api/admin/analysis",
         "/api/silos/business",
         "/api/silos/inference",
         "/api/signals/recent",
@@ -587,6 +588,100 @@ def test_sensitive_endpoints_require_admin_cookie(app_module):
         response = public.get(path)
         assert response.status_code == 401, path
         assert response.get_json()["error"] == "unauthorized"
+
+
+def test_admin_analysis_aggregates_sensitive_operator_evidence(client, app_module, monkeypatch):
+    def fake_rows(sql, params=None):
+        if "AS signals" in sql and "AS predictions" in sql:
+            return [
+                {
+                    "signals": 100,
+                    "predictions": 42,
+                    "regime_snapshots": 7,
+                    "threats": 3,
+                    "leads": 11,
+                    "inference_metrics": 999,
+                    "service_health": 21,
+                    "total_pnl_usd": 12345.67,
+                    "win_rate": 0.61,
+                    "latest_regime": "BULL",
+                    "fear_greed": 55,
+                }
+            ]
+        if "FROM `test-project.test_dataset.service_health`" in sql:
+            return [
+                {
+                    "service": "windows-secret-ollama",
+                    "status": "down",
+                    "host": "100.71.10.48",
+                    "last_seen": datetime(2026, 5, 7, 12, 0, tzinfo=UTC),
+                    "response_ms": 999,
+                },
+                {
+                    "service": "signal-logger",
+                    "status": "healthy",
+                    "host": "mac-commander",
+                    "last_seen": datetime(2026, 5, 7, 12, 1, tzinfo=UTC),
+                    "response_ms": 12,
+                },
+            ]
+        if "FROM `test-project.test_dataset.inference_metrics`" in sql:
+            return [
+                {
+                    "tier": "reason",
+                    "calls": 25,
+                    "avg_latency_ms": 250.0,
+                    "p95_latency_ms": 900.0,
+                    "ok_count": 24,
+                    "err_count": 1,
+                }
+            ]
+        if "ORDER BY timestamp DESC" in sql and "LIMIT @limit" in sql:
+            assert params[0].name == "limit"
+            assert params[0].value == 8
+            return [
+                {
+                    "timestamp": datetime(2026, 5, 7, 12, 2, tzinfo=UTC),
+                    "signal_id": "sig-1",
+                    "symbol": "BTC",
+                    "action": "watch",
+                    "direction": "long",
+                    "confidence": 0.7,
+                    "score": 0.8,
+                    "source": "test",
+                    "outcome": "open",
+                    "pnl_usd": None,
+                    "regime": "BULL",
+                }
+            ]
+        return []
+
+    monkeypatch.setattr(app_module, "_rows", fake_rows)
+    monkeypatch.setattr(
+        app_module,
+        "_http_get_json",
+        lambda url, timeout=3.0: {"status": "ok", "sha": "private-tho-sha"},
+    )
+
+    response = client.get("/api/admin/analysis")
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["mode"] == "admin_analysis"
+    assert body["requires_passkey"] is True
+    assert body["read_only"] is True
+    assert body["metrics"]["signals"] == 100
+    assert body["metrics"]["total_pnl_usd"] == 12345.67
+    assert body["metrics"]["win_rate"] == 0.61
+    assert body["model_telemetry"]["calls_24h"] == 25
+    assert body["model_telemetry"]["errors_24h"] == 1
+    assert body["market_evidence"]["symbols"] == ["BTC"]
+    assert body["failover"]["mode"] == "admin_failover_readiness_detail"
+    encoded = json.dumps(body)
+    assert "windows-secret-ollama" in encoded
+    assert "100.71.10.48" in encoded
+    assert "private-tho-sha" in encoded
+    assert body["priority_actions"]
 
 
 def test_public_silos_health_hides_service_details(app_module, monkeypatch):
