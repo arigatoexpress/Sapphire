@@ -877,6 +877,17 @@ def test_index_renders_project_tab_manifest():
     assert "Open THO Frontend" not in html  # rendered from data, not hard-coded drift
 
 
+def test_index_command_palette_does_not_open_external_admin_surfaces():
+    template_path = REPO_ROOT / "services" / "analytics_dashboard" / "templates" / "index.html"
+    html = template_path.read_text(encoding="utf-8")
+
+    assert "Wildfire admin" not in html
+    assert "Regional admin" not in html
+    assert "regional.sapphirealpha.xyz/admin" not in html
+    assert "Wildfire public surface" in html
+    assert "Regional public surface" in html
+
+
 def test_index_renders_visible_public_console_refactor():
     template_path = REPO_ROOT / "services" / "analytics_dashboard" / "templates" / "index.html"
     html = template_path.read_text(encoding="utf-8")

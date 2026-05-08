@@ -79,7 +79,10 @@ def test_p_wildfire_smoke(monkeypatch):
     client = _load_analytics_app(monkeypatch)
     resp = client.get("/p/wildfire")
     assert resp.status_code == 200
-    assert b"Wildfire" in resp.data
+    body = resp.data.decode("utf-8")
+    assert "Wildfire" in body
+    assert "wildfire.sapphirealpha.xyz/admin" not in body
+    assert "embedded admin console" not in body
 
 
 def test_p_threats_smoke(monkeypatch):
@@ -108,6 +111,8 @@ def test_p_regional_smoke(monkeypatch):
     body = resp.data.decode("utf-8")
     assert "Austin" in body
     assert "Regional" in body or "regional" in body
+    assert "open admin console" not in body.lower()
+    assert "regional.sapphirealpha.xyz/admin" not in body
 
 
 def test_p_brain_smoke(monkeypatch):
@@ -115,6 +120,9 @@ def test_p_brain_smoke(monkeypatch):
     _assert_html_200(client, "/p/brain")
     body = client.get("/p/brain").data.decode("utf-8")
     assert "/api/brain/synthesis" in body
+    assert "SIGNALS_24H" not in body
+    assert "signal_count_24h" not in body
+    assert "threat_count_24h" not in body
 
 
 def test_p_markets_smoke(monkeypatch):
@@ -131,6 +139,11 @@ def test_p_system_smoke(monkeypatch):
     assert "/api/failover/readiness" in body
     assert "/api/silos/health" in body
     assert 'requires <a href="/admin">admin</a>' in body
+    assert "analytics-dashboard" not in body
+    assert "cyber-threat-bot" not in body
+    assert "us-central1" not in body
+    assert "project</div>" not in body
+    assert "dataset</div>" not in body
 
 
 def test_p_about_smoke(monkeypatch):

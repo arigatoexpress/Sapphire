@@ -12,8 +12,8 @@
 <section class="box">
   <h2 class="section">SENSOR_HEARTBEAT</h2>
   <div class="grid cols-4" id="kpis">
-    <div class="card"><div class="muted">SIGNALS_24H</div><h3 id="kpi-24h">--</h3></div>
-    <div class="card"><div class="muted">SIGNALS_7D</div><h3 id="kpi-7d">--</h3></div>
+    <div class="card"><div class="muted">PUBLIC_ALERTS_24H</div><h3 id="kpi-24h">--</h3></div>
+    <div class="card"><div class="muted">PUBLIC_ALERTS_7D</div><h3 id="kpi-7d">--</h3></div>
     <div class="card"><div class="muted">HIGH_RISK_ZONE</div><h3 id="kpi-zone">--</h3></div>
     <div class="card"><div class="muted">SENSOR_PULSE</div>
       <h3 id="kpi-status">{% if online %}<span class="pill green">ONLINE</span>{% else %}<span class="pill amber">UNKNOWN</span>{% endif %}</h3>
@@ -25,9 +25,9 @@
   <h2 class="section">LIVE_MAP</h2>
   <div style="aspect-ratio: 16/9; border:1px solid var(--line); background: var(--bg-2); display: grid; place-items:center;">
     <div style="text-align:center; padding: 32px;">
-      <div class="dim" style="font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 14px;">embedded admin console</div>
-      <a class="btn lg" href="{{ wildfire_url }}admin" target="_blank" rel="noopener">[open wildfire.sapphirealpha.xyz/admin]</a>
-      <div class="muted" style="margin-top: 16px;">Mavic Mini + Mac mini + Pi-class sensors • Phase 0</div>
+      <div class="dim" style="font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 14px;">public operations preview</div>
+      <a class="btn lg" href="{{ wildfire_url }}" target="_blank" rel="noopener">[open wildfire public surface]</a>
+      <div class="muted" style="margin-top: 16px;">Mavic Mini + Mac mini + Pi-class sensors • Phase 0 • raw mission controls require <a href="/admin">admin</a></div>
     </div>
   </div>
 </section>

@@ -1,7 +1,7 @@
 {% extends "_base_subpage.html" %}
 {% block title %}System Health{% endblock %}
 {% block crumb %}p/system{% endblock %}
-{% block meta %}operator console{% endblock %}
+{% block meta %}public posture{% endblock %}
 
 {% block content %}
 <section class="hero">
@@ -21,8 +21,8 @@
 <section class="box">
   <h2 class="section">SERVICE_HEALTH_60M</h2>
   <table class="term">
-    <thead><tr><th>service</th><th>host</th><th>healthy</th><th>degraded</th><th>down</th><th>p50 ms</th><th>p95 ms</th><th>last seen</th></tr></thead>
-    <tbody id="services"><tr><td colspan="8" class="muted">// loading service health ...</td></tr></tbody>
+    <thead><tr><th>summary</th><th>healthy</th><th>reporting</th><th>status counts</th></tr></thead>
+    <tbody id="services"><tr><td colspan="4" class="muted">// loading service health ...</td></tr></tbody>
   </table>
   <div class="muted" style="margin-top:10px;">// service names, hosts, and latency require <a href="/admin">admin</a></div>
 </section>
@@ -37,13 +37,12 @@
 
 <section class="grid cols-2">
   <div class="card">
-    <h3>DEPLOY_REVISIONS</h3>
+    <h3>PUBLIC_LANES</h3>
     <div class="kv">
-      <div class="k">analytics-dashboard</div><div class="v">cloud run, us-central1</div>
-      <div class="k">project</div><div class="v"><code>{{ project }}</code></div>
-      <div class="k">dataset</div><div class="v"><code>{{ dataset }}</code></div>
-      <div class="k">tho</div><div class="v">rev 92+ &middot; <a href="https://tho.sapphirealpha.xyz/healthz/" target="_blank" rel="noopener">[healthz]</a></div>
-      <div class="k">cyber-threat-bot</div><div class="v">cloud run, us-central1</div>
+      <div class="k">public route</div><div class="v">apex route serving sanitized Sapphire OS shell</div>
+      <div class="k">satellites</div><div class="v">public project surfaces report only coarse status here</div>
+      <div class="k">warehouse</div><div class="v">aggregate posture only; project, dataset, and raw table detail require admin</div>
+      <div class="k">topology</div><div class="v">service names, revisions, hosts, ports, and private devices require <a href="/admin">admin</a></div>
     </div>
   </div>
   <div class="card">
@@ -94,46 +93,34 @@
   fetch('/api/silos/health').then(r=>r.json()).then(d=>{
     var rows = d.services || [];
     var tb = document.getElementById('services');
+    var summary = d.service_summary || {};
+    var reporting = Number(summary.reporting || 0);
+    var healthy = Number(summary.healthy || 0);
+    var counts = summary.status_counts || {};
     if (!rows.length) {
-      var summary = d.service_summary || {};
-      var reporting = Number(summary.reporting || 0);
-      var healthy = Number(summary.healthy || 0);
-      tb.innerHTML = '<tr><td colspan="8" class="muted">// public summary: ' + healthy + ' / ' + reporting + ' reporting healthy; detail requires <a href="/admin">admin</a></td></tr>';
+      tb.innerHTML = '<tr><td class="muted">// public service summary; detail requires <a href="/admin">admin</a></td>' +
+        '<td>' + healthy + '</td><td>' + reporting + '</td><td class="dim">' + esc(JSON.stringify(counts)) + '</td></tr>';
       return;
     }
-    tb.innerHTML = rows.map(r => {
-      var down = Number(r.down_n||0), deg = Number(r.degraded_n||0);
-      var pillCls = down ? 'red' : deg ? 'amber' : 'green';
-      var pillTxt = down ? 'DOWN' : deg ? 'DEGRADED' : 'OK';
-      return '<tr>' +
-        '<td><code>' + esc(r.service) + '</code> <span class="pill ' + pillCls + '">' + pillTxt + '</span></td>' +
-        '<td class="dim">' + esc(r.host || '--') + '</td>' +
-        '<td>' + (r.healthy_n || 0) + '</td>' +
-        '<td>' + (r.degraded_n || 0) + '</td>' +
-        '<td>' + (r.down_n || 0) + '</td>' +
-        '<td>' + (r.p50_ms != null ? Math.round(r.p50_ms) : '--') + '</td>' +
-        '<td>' + (r.p95_ms != null ? Math.round(r.p95_ms) : '--') + '</td>' +
-        '<td class="dim">' + ((r.last_seen||'').slice(11,19)) + '</td>' +
-      '</tr>';
-    }).join('');
+    tb.innerHTML = '<tr><td class="muted">// public service summary; raw rows suppressed</td>' +
+      '<td>' + healthy + '</td><td>' + reporting + '</td><td class="dim">' + esc(JSON.stringify(counts)) + '</td></tr>';
   }).catch(()=>{
-    document.getElementById('services').innerHTML = '<tr><td colspan="8" class="muted">// /api/silos/health unreachable</td></tr>';
+    document.getElementById('services').innerHTML = '<tr><td colspan="4" class="muted">// /api/silos/health unreachable</td></tr>';
   });
 
   document.getElementById('inference').innerHTML =
     '<tr><td colspan="7" class="muted">// inference tier detail requires <a href="/admin">admin</a></td></tr>';
 
   fetch('/api/brain/synthesis').then(r=>r.json()).then(d=>{
-    var actions = d.priority_actions || [];
     var degraded = d.degraded_silos || [];
     var $list = document.getElementById('degraded');
-    if (!actions.length && !degraded.length) {
+    if (!degraded.length) {
       $list.innerHTML = '<li class="dim">none — all silos green</li>';
       return;
     }
     var lines = [];
     if (degraded.length) lines.push('<li class="muted">degraded: ' + esc(degraded.join(', ')) + '</li>');
-    actions.slice(0, 8).forEach(a => lines.push('<li>' + esc(a) + '</li>'));
+    if (d.priority_actions_locked) lines.push('<li class="muted">priority actions require <a href="/admin">admin</a></li>');
     $list.innerHTML = lines.join('');
   }).catch(()=>{});
 })();

@@ -17,7 +17,7 @@ PROJECT_TABS: list[dict] = [
         "status": "live",
         "accent": "green",
         "tagline": "Cross-silo synthesis for Sapphire OS.",
-        "summary": "Health, priority actions, and correlation across THO, markets, threats, inference, regional intelligence, and infrastructure.",
+        "summary": "Public health posture and cross-silo synthesis across THO, markets, threats, inference, regional intelligence, and infrastructure.",
         "info_route": "/p/brain",
         "primary_cta": {"label": "Open Brain", "href": "/p/brain", "external": False},
         "resources": [
@@ -35,8 +35,8 @@ PROJECT_TABS: list[dict] = [
         "kind": "core",
         "status": "live",
         "accent": "blue",
-        "tagline": "Crypto market regime, predictions, and intelligence.",
-        "summary": "Live market snapshot, regime context, model predictions, and risk-aware signals for Sapphire's trading research layer.",
+        "tagline": "Crypto market regime and public intelligence.",
+        "summary": "Live market snapshot and regime context for Sapphire's trading research layer, with signals and forecasts kept behind admin.",
         "info_route": "/p/markets",
         "primary_cta": {"label": "Open Markets", "href": "/p/markets", "external": False},
         "resources": [
@@ -83,16 +83,13 @@ PROJECT_TABS: list[dict] = [
         "info_route": "/p/threats",
         "primary_cta": {
             "label": "Open Threat Feed",
-            "href": "https://cyber-threat-bot-691674245427.us-central1.run.app/threats?source=all",
-            "external": True,
+            "href": "/p/threats",
+            "external": False,
         },
         "resources": [
             {"label": "Live Threats", "href": "/api/threats/live"},
             {"label": "Threat Timeseries", "href": "/api/timeseries/threats"},
-            {
-                "label": "Source App",
-                "href": "https://cyber-threat-bot-691674245427.us-central1.run.app/",
-            },
+            {"label": "Admin Source Detail", "href": "/admin"},
         ],
         "proof_points": ["CISA KEV", "NVD CVEs", "MITRE ATT&CK context"],
         "safety_note": "Defensive research only; no offensive automation exposed.",
