@@ -195,6 +195,136 @@
       font-size: 13px;
       margin: 10px 0 0;
     }
+    .quality-strip {
+      margin-top: 20px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(300px, .85fr);
+      gap: 16px;
+      align-items: start;
+    }
+    .quality-strip p {
+      color: var(--muted);
+      margin: 8px 0 0;
+      line-height: 1.5;
+      font-size: 13px;
+    }
+    .source-list {
+      display: grid;
+      gap: 7px;
+    }
+    .source {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(28,34,51,.75);
+      font-size: 12.5px;
+    }
+    .source:last-child { border-bottom: 0; }
+    .source span:first-child { min-width: 0; overflow-wrap: anywhere; }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 76px;
+      padding: 3px 7px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--muted);
+      background: rgba(6,8,13,.45);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11px;
+    }
+    .status.ready { color: var(--ok); border-color: rgba(76,210,139,.35); }
+    .status.degraded,
+    .status.needs_attention,
+    .status.review { color: var(--warn); border-color: rgba(255,180,84,.38); }
+    .status.unavailable,
+    .status.down { color: var(--danger); border-color: rgba(255,95,110,.38); }
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 20px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
+    }
+    .tab {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--bg-2);
+      color: var(--muted);
+      border-radius: 7px;
+      padding: 8px 11px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .tab:hover { color: var(--text); border-color: var(--border-hot); }
+    .tab[aria-selected="true"] {
+      color: var(--text);
+      border-color: rgba(109,167,255,.55);
+      background: rgba(109,167,255,.12);
+    }
+    .section-panel {
+      margin-top: 16px;
+      display: grid;
+      gap: 14px;
+    }
+    .section-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(260px, .75fr);
+      gap: 18px;
+      align-items: start;
+    }
+    .section-copy {
+      color: var(--text);
+      line-height: 1.58;
+      margin: 10px 0 0;
+    }
+    .section-technical {
+      margin: 12px 0 0;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 12.5px;
+      line-height: 1.5;
+    }
+    .section-metrics {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .section-metric {
+      border-top: 1px solid var(--border);
+      padding-top: 8px;
+      min-width: 0;
+    }
+    .section-metric .label {
+      color: var(--muted);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+    .section-metric .value {
+      margin-top: 5px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 15px;
+      overflow-wrap: anywhere;
+    }
+    .section-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .section-links a {
+      color: var(--accent);
+      font-size: 12.5px;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(109,167,255,.35);
+    }
+    .section-links a:hover { border-bottom-color: var(--accent); }
 
     .grid {
       display: grid; gap: 16px;
@@ -261,10 +391,13 @@
       header { padding: 18px 20px; align-items: flex-start; gap: 16px; }
       main { padding: 28px 20px; }
       .analysis-top { grid-template-columns: 1fr; }
+      .quality-strip,
+      .section-layout { grid-template-columns: 1fr; }
       .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (max-width: 520px) {
       .metrics { grid-template-columns: 1fr; }
+      .section-metrics { grid-template-columns: 1fr; }
       .session { align-items: flex-end; flex-direction: column; }
     }
   </style>
@@ -308,6 +441,19 @@
       </div>
 
       <div class="metrics" id="analysisMetrics" aria-label="Admin metrics"></div>
+
+      <div class="quality-strip" aria-label="Data quality">
+        <div>
+          <h3>Data quality</h3>
+          <p id="qualityBrief">Checking source readiness and provenance...</p>
+        </div>
+        <div class="source-list" id="sourceList">
+          <div class="source"><span>Loading sources</span><span class="status">pending</span></div>
+        </div>
+      </div>
+
+      <div class="tabs" id="sectionTabs" role="tablist" aria-label="Analysis sections"></div>
+      <div class="section-panel" id="sectionPanel" aria-live="polite"></div>
 
       <div class="evidence">
         <table>
@@ -442,26 +588,134 @@
       return `<div class="metric"><div class="label">${esc(label)}</div><div class="value">${esc(value)}</div></div>`;
     }
 
-    function renderAnalysis(payload) {
-      const brief = payload.executive_brief || {};
-      document.getElementById("analysisBrief").textContent = brief.plain_english || brief.headline || "Admin analysis loaded.";
-      const meta = document.getElementById("analysisMeta");
-      const tech = Array.isArray(brief.technical) ? brief.technical.slice(0, 6) : [];
-      meta.innerHTML = [
-        `<span class="chip">${esc(payload.mode || "admin_analysis")}</span>`,
-        `<span class="chip">${payload.read_only ? "read-only" : "review required"}</span>`,
-        ...tech.map((item) => `<span class="chip">${esc(item)}</span>`),
-      ].join("");
+    function statusClass(value) {
+      return text(value, "unknown").toLowerCase().replace(/[^a-z0-9_-]/g, "-");
+    }
 
-      const metrics = payload.metrics || {};
-      document.getElementById("analysisMetrics").innerHTML = [
-        metric("signals", number(metrics.signals)),
-        metric("predictions", number(metrics.predictions)),
-        metric("threats", number(metrics.threats)),
-        metric("win rate", percent(metrics.win_rate)),
-        metric("inference calls", number(payload.model_telemetry?.calls_24h)),
-        metric("failover", text(payload.failover?.overall_status)),
-      ].join("");
+    function readable(value) {
+      if (value === null || value === undefined || value === "") return "--";
+      if (typeof value === "number") return number(value);
+      if (typeof value === "object") return JSON.stringify(value);
+      return text(value);
+    }
+
+    function renderDataQuality(payload) {
+      const quality = payload.data_quality || {};
+      const ready = number(quality.ready_sources || 0);
+      const total = number(quality.total_sources || 0);
+      const note = quality.freshness_note || "Source freshness metadata was not returned.";
+      document.getElementById("qualityBrief").textContent =
+        `${text(quality.status, "unknown")} · ${ready}/${total} sources ready. ${note}`;
+
+      const sources = Array.isArray(quality.sources) ? quality.sources : [];
+      document.getElementById("sourceList").innerHTML = sources.map((source) => {
+        const status = text(source.status, "unknown");
+        return `<div class="source" title="${esc(source.provenance)}">
+          <span>${esc(source.label || source.id)} · ${esc(number(source.rows || 0))} row(s)</span>
+          <span class="status ${esc(statusClass(status))}">${esc(status)}</span>
+        </div>`;
+      }).join("") || `<div class="source"><span>No source metadata</span><span class="status">unknown</span></div>`;
+    }
+
+    function renderSectionMetrics(metrics) {
+      if (!Array.isArray(metrics) || !metrics.length) {
+        return `<div class="state">No section metrics returned.</div>`;
+      }
+      return metrics.map((item) => {
+        const unit = item.unit ? ` ${item.unit}` : "";
+        return `<div class="section-metric">
+          <div class="label">${esc(item.label)}</div>
+          <div class="value">${esc(readable(item.value))}${esc(unit)}</div>
+        </div>`;
+      }).join("");
+    }
+
+    function renderSectionRows(rows) {
+      const safeRows = Array.isArray(rows)
+        ? rows.filter((row) => row && typeof row === "object").slice(0, 8)
+        : [];
+      if (!safeRows.length) return `<p class="state">No rows returned for this section.</p>`;
+      const keys = Array.from(new Set(safeRows.flatMap((row) => Object.keys(row)))).slice(0, 8);
+      return `<div class="evidence">
+        <table>
+          <thead><tr>${keys.map((key) => `<th>${esc(key)}</th>`).join("")}</tr></thead>
+          <tbody>
+            ${safeRows.map((row) => `<tr>${keys.map((key) => `<td>${esc(readable(row[key]))}</td>`).join("")}</tr>`).join("")}
+          </tbody>
+        </table>
+      </div>`;
+    }
+
+    function renderSection(section) {
+      const quality = section.quality || {};
+      const technical = Array.isArray(section.technical) ? section.technical : [];
+      const links = Array.isArray(section.links) ? section.links : [];
+      document.getElementById("sectionPanel").innerHTML = `
+        <div class="section-layout">
+          <div>
+            <span class="status ${esc(statusClass(quality.status))}">${esc(quality.status || "unknown")}</span>
+            <p class="state">${esc(quality.basis || "No quality basis returned.")}</p>
+            <p class="section-copy">${esc(section.plain_english || "No plain-English analysis returned.")}</p>
+            <ul class="section-technical">
+              ${technical.map((item) => `<li>${esc(item)}</li>`).join("")}
+            </ul>
+          </div>
+          <div class="section-metrics">
+            ${renderSectionMetrics(section.metrics)}
+          </div>
+        </div>
+        ${renderSectionRows(section.rows)}
+        <div class="section-links">
+          ${links.map((link) => `<a href="${esc(link.href)}">${esc(link.label)}</a>`).join("")}
+        </div>`;
+    }
+
+    function renderSections(payload) {
+      const sections = Array.isArray(payload.sections) ? payload.sections : [];
+      const tabs = document.getElementById("sectionTabs");
+      if (!sections.length) {
+        tabs.innerHTML = "";
+        document.getElementById("sectionPanel").innerHTML =
+          `<p class="state">No structured analysis sections returned.</p>`;
+        return;
+      }
+      tabs.innerHTML = sections.map((section, index) => `
+        <button class="tab" type="button" role="tab" data-index="${index}" aria-selected="${index === 0 ? "true" : "false"}">
+          ${esc(section.title || section.id || `Section ${index + 1}`)}
+        </button>`).join("");
+      const buttons = Array.from(tabs.querySelectorAll("button"));
+      buttons.forEach((button) => {
+        button.addEventListener("click", () => {
+          buttons.forEach((item) => item.setAttribute("aria-selected", "false"));
+          button.setAttribute("aria-selected", "true");
+          renderSection(sections[Number(button.dataset.index || 0)]);
+        });
+      });
+      renderSection(sections[0]);
+    }
+
+	    function renderAnalysis(payload) {
+	      const brief = payload.executive_brief || {};
+	      document.getElementById("analysisBrief").textContent = brief.plain_english || brief.headline || "Admin analysis loaded.";
+	      const meta = document.getElementById("analysisMeta");
+	      const tech = Array.isArray(brief.technical) ? brief.technical.slice(0, 6) : [];
+	      meta.innerHTML = [
+	        `<span class="chip">${esc(payload.mode || "admin_analysis")}</span>`,
+	        `<span class="chip">${payload.read_only ? "read-only" : "review required"}</span>`,
+	        ...tech.map((item) => `<span class="chip">${esc(item)}</span>`),
+	      ].join("");
+
+	      const metrics = payload.metrics || {};
+	      document.getElementById("analysisMetrics").innerHTML = [
+	        metric("signals", number(metrics.signals)),
+	        metric("predictions", number(metrics.predictions)),
+	        metric("threats", number(metrics.threats)),
+	        metric("win rate", percent(metrics.win_rate)),
+	        metric("inference calls", number(payload.model_telemetry?.calls_24h)),
+	        metric("failover", text(payload.failover?.overall_status)),
+	      ].join("");
+	      renderDataQuality(payload);
+	      renderSections(payload);
 
       const priorities = Array.isArray(payload.priority_actions) ? payload.priority_actions : [];
       document.getElementById("priorityList").innerHTML = priorities.map((item) => {

@@ -554,6 +554,368 @@ def _pct(value: object) -> float | None:
         return None
 
 
+def _metric(label: str, value: object, unit: str | None = None) -> dict:
+    payload = {"label": label, "value": value}
+    if unit:
+        payload["unit"] = unit
+    return payload
+
+
+def _round_metric(value: object, digits: int = 2) -> float | None:
+    if value is None:
+        return None
+    try:
+        return round(float(value), digits)
+    except (TypeError, ValueError):
+        return None
+
+
+def _source_status(*, rows: int, error_key: str, errors: list[str], optional: bool = False) -> str:
+    if error_key in errors:
+        return "unavailable"
+    if rows:
+        return "ready"
+    return "quiet" if optional else "empty"
+
+
+def _admin_data_quality(
+    *,
+    summary_row: dict,
+    services: list[dict],
+    inference_tiers: list[dict],
+    recent_signals: list[dict],
+    tho_health: dict | None,
+    errors: list[str],
+) -> dict:
+    sources = [
+        {
+            "id": "warehouse_rollup",
+            "label": "Warehouse rollup",
+            "status": _source_status(
+                rows=1 if summary_row else 0,
+                error_key="summary_rollup_unavailable",
+                errors=errors,
+            ),
+            "rows": 1 if summary_row else 0,
+            "provenance": "BigQuery aggregate across signals, predictions, regimes, threats, leads, inference, and service health.",
+        },
+        {
+            "id": "service_health",
+            "label": "Service health",
+            "status": _source_status(
+                rows=len(services),
+                error_key="service_health_unavailable",
+                errors=errors,
+            ),
+            "rows": len(services),
+            "provenance": "Latest BigQuery service-health row per service in the last 60 minutes.",
+        },
+        {
+            "id": "model_telemetry",
+            "label": "Model telemetry",
+            "status": _source_status(
+                rows=len(inference_tiers),
+                error_key="inference_telemetry_unavailable",
+                errors=errors,
+                optional=True,
+            ),
+            "rows": len(inference_tiers),
+            "provenance": "BigQuery inference_metrics grouped by model tier over the last 24 hours.",
+        },
+        {
+            "id": "recent_signals",
+            "label": "Recent signals",
+            "status": _source_status(
+                rows=len(recent_signals),
+                error_key="recent_signals_unavailable",
+                errors=errors,
+                optional=True,
+            ),
+            "rows": len(recent_signals),
+            "provenance": "Newest admin-only trading_signals rows, capped for dashboard readability.",
+        },
+        {
+            "id": "tho_dependency",
+            "label": "THO dependency",
+            "status": _status_bucket((tho_health or {}).get("status"))
+            if tho_health is not None
+            else "unknown",
+            "rows": 1 if tho_health is not None else 0,
+            "provenance": "Live THO health probe used for cloud failover posture.",
+        },
+    ]
+    ready_sources = sum(1 for source in sources if source["status"] == "ready")
+    if errors:
+        status = "degraded"
+    elif ready_sources >= 3:
+        status = "ready"
+    elif ready_sources:
+        status = "partial"
+    else:
+        status = "unavailable"
+
+    return {
+        "status": status,
+        "ready_sources": ready_sources,
+        "total_sources": len(sources),
+        "sources": sources,
+        "reader_contract": [
+            "Start with the simple read, then open the technical notes only when the decision needs raw context.",
+            "Treat market rows as research evidence, not execution instructions.",
+            "Use source status before trusting a section; quiet data is different from unavailable data.",
+        ],
+        "freshness_note": (
+            "Service health is a 60 minute latest-row view. Model telemetry uses a 24 hour window. "
+            "Recent signal rows are capped to keep the console scannable."
+        ),
+    }
+
+
+def _admin_analysis_sections(
+    *,
+    summary_row: dict,
+    services: list[dict],
+    inference_tiers: list[dict],
+    recent_signals: list[dict],
+    tho_health: dict | None,
+    failover: dict,
+    inference_calls: int,
+    inference_errors: int,
+    symbols: list[str],
+    win_rate: float | None,
+) -> list[dict]:
+    signals = _count(summary_row.get("signals"))
+    predictions_count = _count(summary_row.get("predictions"))
+    threats = _count(summary_row.get("threats"))
+    leads = _count(summary_row.get("leads"))
+    regime_snapshots = _count(summary_row.get("regime_snapshots"))
+    latest_regime = str(summary_row.get("latest_regime") or "unknown")
+    degraded_lanes = failover.get("degraded_lanes") or []
+    degraded_services = [
+        row
+        for row in services
+        if isinstance(row, dict) and _status_bucket(row.get("status")) != "ready"
+    ]
+
+    lane_rows = []
+    for lane in failover.get("lanes", []):
+        if not isinstance(lane, dict):
+            continue
+        counts = lane.get("counts") if isinstance(lane.get("counts"), dict) else {}
+        lane_rows.append(
+            {
+                "lane": lane.get("label") or lane.get("lane"),
+                "status": lane.get("status", "unknown"),
+                "ready": counts.get("ready", 0),
+                "degraded": counts.get("degraded", 0),
+                "down": counts.get("down", 0),
+                "unknown": counts.get("unknown", 0),
+            }
+        )
+
+    model_rows = []
+    for row in inference_tiers[:8]:
+        calls = _count(row.get("calls"))
+        ok_count = _count(row.get("ok_count"))
+        model_rows.append(
+            {
+                "tier": row.get("tier", "unknown"),
+                "calls": calls,
+                "errors": _count(row.get("err_count")),
+                "success_rate": round(ok_count / calls, 4) if calls else None,
+                "avg_latency_ms": _round_metric(row.get("avg_latency_ms")),
+                "p95_latency_ms": _round_metric(row.get("p95_latency_ms")),
+            }
+        )
+
+    market_rows = [
+        {
+            "timestamp": row.get("timestamp"),
+            "symbol": row.get("symbol"),
+            "action": row.get("action"),
+            "direction": row.get("direction"),
+            "confidence": _round_metric(row.get("confidence"), 4),
+            "score": _round_metric(row.get("score"), 4),
+            "outcome": row.get("outcome"),
+            "pnl_usd": row.get("pnl_usd"),
+            "source": row.get("source"),
+        }
+        for row in recent_signals[:8]
+        if isinstance(row, dict)
+    ]
+
+    return [
+        {
+            "id": "operations",
+            "title": "Operations",
+            "quality": {
+                "status": "needs_attention" if degraded_lanes else "ready",
+                "basis": f"{len(degraded_lanes)} degraded failover lane(s), {len(degraded_services)} degraded service row(s).",
+            },
+            "plain_english": (
+                "This section answers whether the public site, cloud data plane, local control plane, "
+                "and compute lanes can support the next operator move."
+            ),
+            "technical": [
+                f"failover_status={failover.get('overall_status', 'unknown')}",
+                f"service_rows_60m={len(services)}",
+                f"degraded_lanes={','.join(degraded_lanes) or 'none'}",
+            ],
+            "metrics": [
+                _metric("failover", failover.get("overall_status", "unknown")),
+                _metric("service rows", len(services)),
+                _metric("degraded lanes", len(degraded_lanes)),
+                _metric("degraded services", len(degraded_services)),
+            ],
+            "rows": lane_rows,
+            "links": [
+                {"label": "Failover JSON", "href": "/api/failover/readiness"},
+                {"label": "Service timeseries", "href": "/api/timeseries/services"},
+            ],
+        },
+        {
+            "id": "models",
+            "title": "Models",
+            "quality": {
+                "status": "review" if inference_errors else "ready",
+                "basis": f"{inference_errors} error(s) across {len(inference_tiers)} tier row(s).",
+            },
+            "plain_english": (
+                "This section shows whether inference is producing usable analysis and where routing "
+                "or latency needs attention before deeper model-generated narratives are trusted."
+            ),
+            "technical": [
+                "window=24h",
+                f"calls={inference_calls}",
+                f"errors={inference_errors}",
+                f"tiers={','.join(str(row.get('tier')) for row in inference_tiers if row.get('tier')) or 'none'}",
+            ],
+            "metrics": [
+                _metric("calls", inference_calls),
+                _metric("errors", inference_errors),
+                _metric("tiers", len(inference_tiers)),
+                _metric(
+                    "error rate",
+                    round(inference_errors / inference_calls, 4) if inference_calls else None,
+                ),
+            ],
+            "rows": model_rows,
+            "links": [
+                {"label": "Inference detail", "href": "/api/silos/inference"},
+                {"label": "Inference timeseries", "href": "/api/timeseries/inference"},
+            ],
+        },
+        {
+            "id": "markets",
+            "title": "Markets",
+            "quality": {
+                "status": "research_only" if signals else "quiet",
+                "basis": f"{signals} signal row(s), {predictions_count} prediction row(s), {len(recent_signals)} recent row(s).",
+            },
+            "plain_english": (
+                "This is evidence for analysis and demos, not live execution. Use it to understand "
+                "what the system is seeing, how confident it is, and whether recent symbols match the current story."
+            ),
+            "technical": [
+                f"latest_regime={latest_regime}",
+                f"win_rate={win_rate if win_rate is not None else 'unknown'}",
+                f"recent_symbols={','.join(symbols) or 'none'}",
+            ],
+            "metrics": [
+                _metric("signals", signals),
+                _metric("predictions", predictions_count),
+                _metric("win rate", win_rate),
+                _metric("recent symbols", len(symbols)),
+            ],
+            "rows": market_rows,
+            "links": [
+                {"label": "Signals JSON", "href": "/api/signals/recent?limit=25"},
+                {"label": "Performance JSON", "href": "/api/performance"},
+                {"label": "Deflated Sharpe", "href": "/api/deflated-sharpe/rolling"},
+            ],
+        },
+        {
+            "id": "business",
+            "title": "Business",
+            "quality": {
+                "status": "ready" if leads or tho_health else "quiet",
+                "basis": f"{leads} lead row(s), THO status={((tho_health or {}).get('status') or 'unknown')}.",
+            },
+            "plain_english": (
+                "This keeps CRM-style rows and THO dependency state in the admin lane, so public pages "
+                "can describe capability without leaking customer, lead, or deployment evidence."
+            ),
+            "technical": [
+                f"leads={leads}",
+                f"tho_status={((tho_health or {}).get('status') or 'unknown')}",
+                f"tho_sha={((tho_health or {}).get('sha') or 'unknown')}",
+            ],
+            "metrics": [
+                _metric("leads", leads),
+                _metric("tho status", ((tho_health or {}).get("status") or "unknown")),
+                _metric("service health rows", _count(summary_row.get("service_health"))),
+            ],
+            "rows": [
+                {
+                    "dataset": "leads",
+                    "rows": leads,
+                    "admin_note": "Lead counts are summarized publicly; raw CRM rows stay admin-only.",
+                },
+                {
+                    "dataset": "tho-production",
+                    "status": ((tho_health or {}).get("status") or "unknown"),
+                    "sha": ((tho_health or {}).get("sha") or "unknown"),
+                },
+            ],
+            "links": [
+                {"label": "Business silo", "href": "/api/silos/business"},
+                {"label": "Decision queue", "href": "/api/asfao/decisions?limit=25"},
+            ],
+        },
+        {
+            "id": "threats",
+            "title": "Threats And Regime",
+            "quality": {
+                "status": "ready" if threats or regime_snapshots else "quiet",
+                "basis": f"{threats} threat record(s), {regime_snapshots} regime snapshot(s).",
+            },
+            "plain_english": (
+                "This is the safer public-facing intelligence layer: aggregate threat and regime context "
+                "can explain the environment while raw operator evidence remains gated here."
+            ),
+            "technical": [
+                f"threat_records={threats}",
+                f"regime_snapshots={regime_snapshots}",
+                f"fear_greed={summary_row.get('fear_greed') if summary_row.get('fear_greed') is not None else 'unknown'}",
+            ],
+            "metrics": [
+                _metric("threats", threats),
+                _metric("regime snapshots", regime_snapshots),
+                _metric("latest regime", latest_regime),
+                _metric("fear greed", summary_row.get("fear_greed")),
+            ],
+            "rows": [
+                {
+                    "dataset": "threat_intel",
+                    "rows": threats,
+                    "public_safe_summary": "aggregate volume only",
+                },
+                {
+                    "dataset": "market_regime",
+                    "rows": regime_snapshots,
+                    "latest_regime": latest_regime,
+                    "fear_greed": summary_row.get("fear_greed"),
+                },
+            ],
+            "links": [
+                {"label": "Threat trend", "href": "/api/threats"},
+                {"label": "Regime snapshots", "href": "/api/regime"},
+                {"label": "Brain synthesis", "href": "/api/brain/synthesis"},
+            ],
+        },
+    ]
+
+
 def _admin_analysis_payload() -> dict:
     errors: list[str] = []
     summary_row: dict = {}
@@ -692,6 +1054,26 @@ def _admin_analysis_payload() -> dict:
     predictions_count = _count(summary_row.get("predictions"))
     threats = _count(summary_row.get("threats"))
     leads = _count(summary_row.get("leads"))
+    data_quality = _admin_data_quality(
+        summary_row=summary_row,
+        services=services,
+        inference_tiers=inference_tiers,
+        recent_signals=recent_signals,
+        tho_health=tho_health,
+        errors=errors,
+    )
+    sections = _admin_analysis_sections(
+        summary_row=summary_row,
+        services=services,
+        inference_tiers=inference_tiers,
+        recent_signals=recent_signals,
+        tho_health=tho_health,
+        failover=failover,
+        inference_calls=inference_calls,
+        inference_errors=inference_errors,
+        symbols=symbols,
+        win_rate=win_rate,
+    )
 
     return {
         "mode": "admin_analysis",
@@ -714,6 +1096,8 @@ def _admin_analysis_payload() -> dict:
                 f"failover_status={failover.get('overall_status', 'unknown')}",
             ],
         },
+        "data_quality": data_quality,
+        "sections": sections,
         "priority_actions": priorities[:6],
         "metrics": {
             "signals": signals,

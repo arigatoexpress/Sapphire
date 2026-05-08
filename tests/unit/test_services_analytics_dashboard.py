@@ -677,6 +677,25 @@ def test_admin_analysis_aggregates_sensitive_operator_evidence(client, app_modul
     assert body["model_telemetry"]["errors_24h"] == 1
     assert body["market_evidence"]["symbols"] == ["BTC"]
     assert body["failover"]["mode"] == "admin_failover_readiness_detail"
+    assert body["data_quality"]["status"] == "ready"
+    assert body["data_quality"]["ready_sources"] >= 5
+    assert {
+        "warehouse_rollup",
+        "service_health",
+        "model_telemetry",
+        "recent_signals",
+        "tho_dependency",
+    } <= {source["id"] for source in body["data_quality"]["sources"]}
+    sections = {section["id"]: section for section in body["sections"]}
+    assert {"operations", "models", "markets", "business", "threats"} <= set(sections)
+    for section in sections.values():
+        assert section["plain_english"]
+        assert section["technical"]
+        assert section["quality"]["status"]
+        assert section["metrics"]
+    assert sections["operations"]["rows"]
+    assert sections["models"]["rows"][0]["tier"] == "reason"
+    assert sections["markets"]["rows"][0]["symbol"] == "BTC"
     encoded = json.dumps(body)
     assert "windows-secret-ollama" in encoded
     assert "100.71.10.48" in encoded

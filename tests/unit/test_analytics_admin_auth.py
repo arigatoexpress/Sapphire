@@ -731,6 +731,9 @@ def test_admin_landing_renders_with_valid_session(auth_pkg):
     # Cards link to the passkey-gated data suites plus public surfaces.
     assert b"Operator analysis" in r.data
     assert b"/api/admin/analysis" in r.data
+    assert b"Data quality" in r.data
+    assert b'id="sectionTabs"' in r.data
+    assert b'id="sectionPanel"' in r.data
     assert b"System Health Detail" in r.data
     assert b"Failover Readiness" in r.data
     assert b"Brain Full Synthesis" in r.data
