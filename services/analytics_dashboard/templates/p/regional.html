@@ -34,13 +34,13 @@
 [ vote-monitor       ] {{ now }} :: snapshotting DeFi pools (Austin lens)
 [ regional-collector ] {{ now }} :: vote-monitor /api/health = ok
 [ digest             ] {{ now }} :: Blanga ops report queued
-[ feed               ] {{ now }} :: Houston watch — no new signals
+[ feed               ] {{ now }} :: Houston watch — no new public alerts
   </pre>
   <div class="muted" style="margin-top: 10px;">// sample feed; full stream at <a href="{{ regional_url }}" target="_blank" rel="noopener">{{ regional_url }}</a></div>
 </section>
 
 <section class="box">
-  <h2 class="section">CONSOLE</h2>
+  <h2 class="section">PUBLIC_STATUS</h2>
   <div class="kv">
     <div class="k">platform</div><div class="v">regional-intel-workbench</div>
     <div class="k">repo</div><div class="v">arigatoexpress/regional-intel-workbench</div>
@@ -51,7 +51,8 @@
     <div class="k">cadence</div><div class="v">vote-monitor every 4h, intel-summary daily</div>
   </div>
   <div style="margin-top: 14px;">
-    <a class="btn lg" href="{{ regional_url }}" target="_blank" rel="noopener">[open admin console]</a>
+    <a class="btn lg" href="{{ regional_url }}" target="_blank" rel="noopener">[open regional public surface]</a>
+    <span class="muted" style="margin-left: 10px;">admin-only workbench detail stays behind <a href="/admin">/admin</a></span>
   </div>
 </section>
 {% endblock %}

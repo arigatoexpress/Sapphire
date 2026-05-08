@@ -2004,7 +2004,7 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
 <div class="panel">
   <h2>
     <span>Recent CISA KEV / NVD / MITRE records</span>
-    <a href="https://cyber-threat-bot-691674245427.us-central1.run.app/threats?source=all" target="_blank" rel="noopener">JSON feed ↗</a>
+    <a href="/api/threats/live" target="_blank" rel="noopener">Public JSON ↗</a>
   </h2>
   <div id="threats-feed"><div class="empty">loading live feed…</div></div>
 </div>
@@ -2132,7 +2132,7 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
     <thead><tr><th>Silo</th><th>What</th><th>Where</th></tr></thead>
     <tbody>
       <tr><td class="t1">THO Operations</td><td>Texas Home Outlet production: CRM, document center, customer ops</td><td><span class="mono">tho.sapphirealpha.xyz</span></td></tr>
-      <tr><td class="t1">Threat Intel</td><td>CISA KEV + NVD + MITRE ATT&amp;CK CVE feed, EPSS-scored</td><td>cyber-threat-bot Cloud Run</td></tr>
+      <tr><td class="t1">Threat Intel</td><td>CISA KEV + NVD + MITRE ATT&amp;CK CVE feed, EPSS-scored</td><td>same-origin public feed</td></tr>
       <tr><td class="t1">Wildfire Watch</td><td>Autonomous drone fleet (Phase 0 — Mavic Mini + Pi)</td><td><span class="mono">wildfire.sapphirealpha.xyz</span></td></tr>
       <tr><td class="t1">Intelligence</td><td>Market regime · Kronos ML predictions · cross-asset signals</td><td>scrolls below</td></tr>
       <tr><td class="t1">Regional</td><td>Geographic watchlist · vote monitor · DeFi pool snapshots</td><td><span class="mono">regional.sapphirealpha.xyz</span></td></tr>
@@ -3011,7 +3011,7 @@ async function refresh() {
     }).join('');
     if (threatsLive?.fetched_at) $('#threats-meta').textContent = `feed @ ${threatsLive.fetched_at.replace('T', ' ').slice(0, 19)}`;
   } else {
-    $('#threats-feed').innerHTML = '<div class="empty actionable">Live feed unavailable. Check <a class="mono" href="https://cyber-threat-bot-691674245427.us-central1.run.app/healthz/" target="_blank" style="color:#4ea8ff">cyber-threat-bot /healthz/</a> and that the Cloud Scheduler job <span class="mono">cyber-threat-bot-refresh</span> is firing every 4h.</div>';
+    $('#threats-feed').innerHTML = '<div class="empty actionable">Live feed unavailable. Check <a class="mono" href="/api/threats/live" target="_blank" style="color:#4ea8ff">same-origin public threat feed</a>; source service and scheduler detail require <a class="mono" href="/admin">admin</a>.</div>';
   }
 
   // ----- Service heartbeats (rich rollup) -----
@@ -3350,9 +3350,9 @@ const CMDK_ITEMS = [
   { type: 'jump', name: 'Order-flow toxicity (VPIN)', hint: 'admin-only detail', target: '#vpin' },
   { type: 'jump', name: 'Strategy quality (Deflated Sharpe)', hint: 'admin-only detail', target: '#strategy-quality' },
   { type: 'open', name: 'Admin console', hint: 'passkey-gated controls', url: '/admin' },
-  { type: 'open', name: 'THO production console', hint: 'tho.sapphirealpha.xyz', url: 'https://tho.sapphirealpha.xyz/' },
-  { type: 'open', name: 'Wildfire admin', hint: 'wildfire.sapphirealpha.xyz', url: 'https://wildfire.sapphirealpha.xyz/' },
-  { type: 'open', name: 'Regional admin', hint: 'regional.sapphirealpha.xyz', url: 'https://regional.sapphirealpha.xyz/admin' },
+  { type: 'open', name: 'THO public surface', hint: 'tho.sapphirealpha.xyz', url: 'https://tho.sapphirealpha.xyz/' },
+  { type: 'open', name: 'Wildfire public surface', hint: 'wildfire.sapphirealpha.xyz', url: 'https://wildfire.sapphirealpha.xyz/' },
+  { type: 'open', name: 'Regional public surface', hint: 'regional.sapphirealpha.xyz', url: 'https://regional.sapphirealpha.xyz/' },
   { type: 'open', name: 'Hackathon submissions', hint: 'hack.sapphirealpha.xyz', url: 'https://hack.sapphirealpha.xyz/' },
   { type: 'action', name: 'Refresh data now', hint: 'force refresh', action: () => { refresh(); refreshMarkets(); } },
   { type: 'action', name: 'Show onboarding tour', hint: 'restart tour', action: () => { closeCmdk(); startTour(true); } },

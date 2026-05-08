@@ -21,9 +21,9 @@
     <div id="kpi-fg" class="muted">fear/greed: --</div>
   </div>
   <div class="card">
-    <div class="muted">SIGNALS_24H</div>
-    <h3 id="kpi-sig">--</h3>
-    <div id="kpi-thr" class="muted">cves: --</div>
+    <div class="muted">ADMIN_DETAIL</div>
+    <h3 id="kpi-detail">LOCKED</h3>
+    <div id="kpi-detail-sub" class="muted">signals, counts, actions</div>
   </div>
 </section>
 
@@ -69,8 +69,10 @@
     document.getElementById('kpi-conf').textContent = 'confidence: ' + (d.confidence != null ? Number(d.confidence).toFixed(2) : '--');
     document.getElementById('kpi-regime').textContent = d.regime || '--';
     document.getElementById('kpi-fg').textContent = 'fear/greed: ' + (d.fear_greed ?? '--');
-    document.getElementById('kpi-sig').textContent = d.signal_count_24h ?? '--';
-    document.getElementById('kpi-thr').textContent = 'cves: ' + (d.threat_count_24h ?? '--');
+    document.getElementById('kpi-detail').textContent = d.mode === 'public_brain_summary' ? 'LOCKED' : 'ADMIN';
+    document.getElementById('kpi-detail-sub').textContent = d.mode === 'public_brain_summary'
+      ? 'signals, counts, actions'
+      : 'full synthesis payload';
     document.getElementById('narrative').textContent = d.narrative || '(no narrative)';
     document.getElementById('silos-list').textContent = (d.silos_observed || []).join(', ') || '--';
     var $a = document.getElementById('actions');
@@ -79,6 +81,8 @@
       $a.innerHTML = actions.map(a => '<li>' + esc(a) + '</li>').join('');
     } else if (d.priority_action_count) {
       $a.innerHTML = '<li class="muted">' + Number(d.priority_action_count) + ' action(s) require <a href="/admin">admin</a></li>';
+    } else if (d.priority_actions_locked) {
+      $a.innerHTML = '<li class="muted">priority actions require <a href="/admin">admin</a></li>';
     } else {
       $a.innerHTML = '<li class="muted">// no actions queued</li>';
     }

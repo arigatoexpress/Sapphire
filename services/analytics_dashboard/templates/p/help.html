@@ -16,12 +16,12 @@
     <tbody>
       <tr><td>Brain</td><td><a href="/p/brain">/p/brain</a></td><td>public-safe cross-silo synthesis: health 0..1, regime, narrative, degraded silos</td><td><code>/api/brain/synthesis</code> summary</td></tr>
       <tr><td>Markets</td><td><a href="/p/markets">/p/markets</a></td><td>top 10 crypto by mcap, sparklines, total mcap, BTC dominance, 24h change</td><td>CoinGecko (60s cache)</td></tr>
-      <tr><td>Threats</td><td><a href="/p/threats">/p/threats</a></td><td>live CVE feed, 30d severity stack, prioritized actions</td><td>cyber-threat-bot (CISA KEV + NVD + MITRE + EPSS)</td></tr>
+      <tr><td>Threats</td><td><a href="/p/threats">/p/threats</a></td><td>live CVE feed, 30d severity stack, public prioritization labels</td><td><code>/api/threats/live</code> public summary</td></tr>
       <tr><td>System</td><td><a href="/p/system">/p/system</a></td><td>public system summary plus admin lock states for raw telemetry</td><td><code>/api/silos/health</code> summary</td></tr>
       <tr><td>Hackathon</td><td><a href="/p/hackathon">/p/hackathon</a></td><td>4 submissions: 0G APAC, MegaETH, Robinhood London, Zama</td><td>hack.sapphirealpha.xyz (fallback: baked-in)</td></tr>
-      <tr><td>Wildfire</td><td><a href="/p/wildfire">/p/wildfire</a></td><td>signal map + KPI strip + Phase-0 status</td><td>wildfire.sapphirealpha.xyz <code>/api/sensors/health</code></td></tr>
+      <tr><td>Wildfire</td><td><a href="/p/wildfire">/p/wildfire</a></td><td>public alert map + KPI strip + Phase-0 status</td><td>wildfire public health summary</td></tr>
       <tr><td>THO</td><td><a href="/p/tho">/p/tho</a></td><td>retail-brand info card &rarr; OPEN OPERATIONS CONSOLE</td><td>tho.sapphirealpha.xyz <code>/healthz/</code></td></tr>
-      <tr><td>Regional</td><td><a href="/p/regional">/p/regional</a></td><td>configured regions, intel feed sample, admin link</td><td>regional.sapphirealpha.xyz <code>/api/health</code></td></tr>
+      <tr><td>Regional</td><td><a href="/p/regional">/p/regional</a></td><td>configured regions, public-safe intel sample, status link</td><td>regional public health summary</td></tr>
       <tr><td>About</td><td><a href="/p/about">/p/about</a></td><td>manifesto, comparison vs Bloomberg/Glassnode/Recorded Future</td><td>static (Sapphire README)</td></tr>
       <tr><td>Help</td><td><a href="/p/help">/p/help</a></td><td>this page</td><td>static</td></tr>
     </tbody>
@@ -51,7 +51,7 @@
     <strong>Trading research.</strong> Signal, forecast, fill, and executor detail exists only in the admin surface. The public site shows market context and readiness labels without exposing operational paths.
   </p>
   <p style="line-height: 1.8;">
-    <strong>Threat intel.</strong> cyber-threat-bot (Cloud Run, us-central1) pulls CISA Known Exploited Vulnerabilities, NVD, MITRE ATT&amp;CK, scores with EPSS + composite actionability. We proxy <code>/api/threats/live</code> same-origin to dodge CORS.
+    <strong>Threat intel.</strong> The threat-intel service pulls CISA Known Exploited Vulnerabilities, NVD, MITRE ATT&amp;CK, scores with EPSS + composite actionability, and exposes only the same-origin public summary at <code>/api/threats/live</code>.
   </p>
   <p style="line-height: 1.8;">
     <strong>Regime.</strong> Daily collector emits regime label (RISK_ON / RISK_OFF / TRANSITION), score, BTC dominance, fear/greed, average funding. We surface valid (non-UNKNOWN) rows + a staleness watermark.
@@ -69,7 +69,7 @@
   <ol style="line-height: 1.85;">
     <li>Visit <a href="/p/brain">/p/brain</a> — health score, regime, public narrative, and degraded silo names are at the top.</li>
     <li><strong>Narrative</strong> is a public-safe plain-English sentence per silo. It avoids raw service names, hosts, signal rows, and action instructions.</li>
-    <li><strong>Priority actions</strong> are counted publicly but hidden until <a href="/admin">admin</a> sign-in.</li>
+    <li><strong>Priority actions</strong> expose only a locked state publicly; action text and counts require <a href="/admin">admin</a> sign-in.</li>
     <li><strong>Correlations</strong> and persisted history match against deterministic catalogs, but those endpoints are admin-only.</li>
     <li>Use <a href="/admin">/admin</a> for persistence, history, correlation, and decision queues.</li>
   </ol>
