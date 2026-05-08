@@ -302,6 +302,87 @@ header.top {
   font-size: 11px;
   line-height: 1.4;
 }
+.public-brief {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+  gap: 24px;
+  margin: -10px 0 34px;
+  padding: 0 0 30px;
+  border-bottom: 1px solid var(--border);
+}
+.brief-main {
+  min-width: 0;
+}
+.brief-title {
+  margin: 8px 0 8px;
+  color: var(--text-1);
+  font-size: 26px;
+  line-height: 1.15;
+  font-weight: 700;
+}
+.brief-headline {
+  margin: 0 0 12px;
+  color: var(--accent-2);
+  font-size: 14px;
+  line-height: 1.55;
+  font-weight: 600;
+}
+.brief-body {
+  max-width: 900px;
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.75;
+}
+.brief-points {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+.brief-point {
+  min-height: 92px;
+  border-top: 1px solid var(--border-bright);
+  padding-top: 10px;
+}
+.brief-point .brief-point-k {
+  color: var(--text-3);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.brief-point .brief-point-v {
+  margin-top: 8px;
+  color: var(--text-1);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.brief-locks {
+  min-width: 0;
+  border-left: 1px solid var(--border);
+  padding-left: 22px;
+}
+.brief-lock-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.brief-lock {
+  border: 1px solid rgba(248,81,73,0.28);
+  background: rgba(248,81,73,0.07);
+  color: #ffb6ae;
+  padding: 6px 8px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+.brief-source {
+  margin-top: 16px;
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 1.55;
+}
 
 /* ========== Silo cards ========== */
 .silo-grid {
@@ -1514,6 +1595,9 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
   .landing-title { font-size: 27px; }
   .public-console { grid-template-columns: 1fr; padding-top: 8px; }
   .public-console-side { border-left: 0; padding-left: 0; }
+  .public-brief { grid-template-columns: 1fr; }
+  .brief-points { grid-template-columns: 1fr; }
+  .brief-locks { border-left: 0; padding-left: 0; }
   .console-metrics { grid-template-columns: 1fr; }
   .lane-grid { grid-template-columns: 1fr; }
   .panel,
@@ -1634,6 +1718,38 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
           <div class="lane-role">Fetching public failover summary.</div>
         </div>
       </div>
+    </div>
+  </aside>
+</section>
+
+<!-- ========== READABLE PUBLIC BRIEF ========== -->
+<section class="public-brief" id="public-brief" aria-labelledby="public-brief-title">
+  <div class="brief-main">
+    <div class="landing-kicker">readable analysis</div>
+    <h2 class="brief-title" id="public-brief-title">Public data should read like a brief, not a database dump.</h2>
+    <p class="brief-headline" id="brief-headline">Loading public-safe summary…</p>
+    <p class="brief-body" id="brief-body">
+      Sapphire is preparing the public operating brief. Sensitive model output, private business data, and raw service telemetry stay behind admin.
+    </p>
+    <div class="brief-points" id="brief-points">
+      <div class="brief-point">
+        <div class="brief-point-k">status</div>
+        <div class="brief-point-v">Fetching the current public metrics.</div>
+      </div>
+    </div>
+  </div>
+  <aside class="brief-locks" aria-label="Admin-only analysis boundary">
+    <div class="boundary-title">
+      <span>admin-only detail</span>
+      <span class="mono">passkey</span>
+    </div>
+    <div class="brief-lock-list" id="brief-admin-locks">
+      <span class="brief-lock">signals</span>
+      <span class="brief-lock">predictions</span>
+      <span class="brief-lock">pnl</span>
+    </div>
+    <div class="brief-source" id="brief-source">
+      Sapphire Brain synthesis and public warehouse rollups are loading.
     </div>
   </aside>
 </section>
@@ -1781,7 +1897,7 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
   <span class="meta" id="kpi-meta">—</span>
 </div>
 <div class="section-sub">
-  Six KPIs sourced from BigQuery · click any value to see the SQL behind it.
+  Public KPIs are redacted to safe posture metrics. Raw SQL-backed trading, CRM, inference, and model details require admin.
   <a class="why-link" data-why="kpis">why these numbers?</a>
 </div>
 <div class="kpi-grid" id="kpis"></div>
@@ -2496,6 +2612,8 @@ function renderBrainPanel(syn) {
       const count = Number(syn.priority_action_count || 0);
       actEl.innerHTML = count > 0
         ? `<div class="brain-actions-empty mono">${count} priority action${count === 1 ? '' : 's'} locked behind admin.</div>`
+        : syn.priority_actions_locked
+          ? '<div class="brain-actions-empty mono">Priority actions locked behind admin.</div>'
         : '<div class="brain-actions-empty mono">No priority actions queued.</div>';
     } else {
       actEl.innerHTML = list.map(a => {
@@ -2605,6 +2723,62 @@ function renderPublicConsole(failover, silos) {
     </div>`;
   }).join('');
 }
+function renderPublicBrief(summary, brainSyn, failover, silos) {
+  const metrics = summary?.public_metrics || {};
+  const analysis = summary?.analysis || {};
+  const headlineEl = document.getElementById('brief-headline');
+  const bodyEl = document.getElementById('brief-body');
+  const pointsEl = document.getElementById('brief-points');
+  const locksEl = document.getElementById('brief-admin-locks');
+  const sourceEl = document.getElementById('brief-source');
+  const headline = analysis.headline || 'Public brief is available with private telemetry locked.';
+  const plain = analysis.plain_english || 'Sapphire is showing public-safe posture while keeping raw trading, CRM, inference, and infrastructure data behind the admin boundary.';
+  if (headlineEl) headlineEl.textContent = headline;
+  if (bodyEl) bodyEl.textContent = plain;
+
+  const serviceSummary = silos?.service_summary || {};
+  const healthy = Number(serviceSummary.healthy || 0);
+  const reporting = Number(serviceSummary.reporting || 0);
+  const status = statusText(failover?.overall_status || 'unknown');
+  const brainNarrative = brainSyn?.narrative ? String(brainSyn.narrative) : '';
+  const publicRead = Array.isArray(analysis.public_read) ? analysis.public_read : [];
+  const pointRows = [
+    {
+      k: 'public metrics',
+      v: [
+        metrics.threat_records != null ? `${fmtN(metrics.threat_records)} threat records` : null,
+        metrics.regime_snapshots != null ? `${fmtN(metrics.regime_snapshots)} regime snapshots` : null,
+        metrics.latest_regime ? `regime ${String(metrics.latest_regime).replace(/_/g, ' ').toLowerCase()}` : null,
+      ].filter(Boolean).join(' · ') || 'warehouse rollup pending',
+    },
+    {
+      k: 'failover',
+      v: reporting ? `${healthy} / ${reporting} public services healthy; readiness is ${status}.` : `readiness is ${status}.`,
+    },
+    {
+      k: 'synthesis',
+      v: brainNarrative || publicRead[0] || 'Sapphire Brain narrative is unavailable; deterministic public summary is active.',
+    },
+  ];
+  if (pointsEl) {
+    pointsEl.innerHTML = pointRows.map(p => `<div class="brief-point">
+      <div class="brief-point-k">${escapeHtml(p.k)}</div>
+      <div class="brief-point-v">${escapeHtml(p.v)}</div>
+    </div>`).join('');
+  }
+
+  const locks = Array.isArray(analysis.admin_locked) && analysis.admin_locked.length
+    ? analysis.admin_locked
+    : (Array.isArray(summary?.admin_required_for) ? summary.admin_required_for : ['signals', 'predictions', 'PnL', 'model telemetry']);
+  if (locksEl) {
+    locksEl.innerHTML = locks.slice(0, 8).map(item => `<span class="brief-lock">${escapeHtml(item)}</span>`).join('');
+  }
+  if (sourceEl) {
+    const brainMode = brainSyn?.mode ? `Sapphire Brain ${String(brainSyn.mode).replace(/_/g, ' ')}` : 'Sapphire Brain public summary';
+    const confidence = typeof brainSyn?.confidence === 'number' ? ` · confidence ${brainSyn.confidence.toFixed(2)}` : '';
+    sourceEl.textContent = `${brainMode}${confidence}. LLM narrative is withheld publicly; admin can inspect model actions, history, and correlations.`;
+  }
+}
 
 // ========== Refresh ==========
 async function refresh() {
@@ -2642,6 +2816,7 @@ async function refresh() {
 
   // ----- Public console first screen -----
   renderPublicConsole(failover, silos);
+  renderPublicBrief(sum, brainSyn, failover, silos);
 
   // ----- Sapphire Brain hero panel -----
   renderBrainPanel(brainSyn);
@@ -2723,6 +2898,10 @@ async function refresh() {
   const serviceReporting = Number(serviceSummary.reporting || services.length || 0);
   const okSvcs = Number(serviceSummary.healthy || services.filter(s => (s.status || '').toLowerCase() === 'healthy').length || 0);
   const totalCalls24h = 0;
+  const publicSummary = sum?.public_metrics || {};
+  const publicThreats = publicSummary.threat_records ?? sum?.threats;
+  const publicRegimeSnapshots = publicSummary.regime_snapshots ?? regime?.meta?.valid_rows ?? sum?.regime_snapshots;
+  const publicFearGreed = publicSummary.fear_greed ?? sum?.fear_greed;
 
   // Threats sparkline data
   const threatsByDay = {};
@@ -2736,7 +2915,7 @@ async function refresh() {
   const kpis = [
     {
       label: 'Threat records',
-      value: fmtN(sum?.threats),
+      value: fmtN(publicThreats),
       sub: liveCt > 0 ? `+${liveCt} live now` : 'cumulative',
       sparkPoints: threatPoints,
       sparkColor: '#f85149',
@@ -2749,8 +2928,8 @@ async function refresh() {
     },
     {
       label: 'Active leads',
-      value: fmtN(sum?.leads),
-      sub: 'CRM pipeline',
+      value: 'locked',
+      sub: 'admin-only CRM detail',
     },
     {
       label: 'Service heartbeats',
@@ -2759,13 +2938,13 @@ async function refresh() {
     },
     {
       label: 'Predictions',
-      value: fmtN(sum?.predictions),
-      sub: 'Kronos ML output',
+      value: 'locked',
+      sub: 'admin-only model output',
     },
     {
       label: 'Regime snapshots',
-      value: fmtN(regime?.meta?.valid_rows),
-      sub: sum?.fear_greed != null ? `F&G index: ${sum.fear_greed}` : `${fmtN(regime?.meta?.total_rows)} total rows`,
+      value: fmtN(publicRegimeSnapshots),
+      sub: publicFearGreed != null ? `F&G index: ${publicFearGreed}` : `${fmtN(regime?.meta?.total_rows)} total rows`,
     },
   ];
   $('#kpis').innerHTML = kpis.map((k, i) => `
@@ -3390,12 +3569,11 @@ WHERE source IN ('cisa_kev','nvd','mitre_attack')</pre>
 <h4>Inference 24h</h4>
 <p>Admin-only raw tier telemetry. Public view intentionally shows a locked state.</p>
 <h4>Active leads</h4>
-<pre>SELECT COUNT(*) FROM &lt;dataset&gt;.leads
-WHERE status NOT IN ('CLOSED_LOST','REJECTED')</pre>
+<p>Admin-only CRM detail. Public view intentionally shows a locked state.</p>
 <h4>Service heartbeats</h4>
 <p>Public view uses aggregate counts from <span class="mono">/api/silos/health</span>. Service names, hosts, and latency are admin-only.</p>
 <h4>Predictions</h4>
-<p>Only total count is public. Forecast rows, confidence, symbols, and signal detail are admin-only.</p>
+<p>Admin-only model output. Forecast rows, confidence, symbols, and signal detail are not exposed publicly.</p>
 <h4>Regime snapshots</h4>
 <pre>SELECT COUNTIF(regime IS NOT NULL)
 FROM &lt;dataset&gt;.regime_snapshots</pre>

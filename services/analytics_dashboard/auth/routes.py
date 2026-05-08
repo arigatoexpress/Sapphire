@@ -358,17 +358,28 @@ def build_blueprint(
     @bp.get("/api/admin/status")
     def status():
         """Public status: tells the login UI whether to show 'register' or
-        'sign in'. Never leaks anything beyond a credential-count integer.
+        'sign in'. Detailed auth metadata is only returned to an active admin
+        session so the public login screen cannot enumerate the boundary.
         """
         try:
             count = ctx["credential_store"].count()
         except Exception as exc:  # noqa: BLE001
             log.info("admin_status count failed: %s", exc)
             count = 0
+        registered = count > 0
+        session_token = request.cookies.get(SESSION_COOKIE_NAME)
+        try:
+            is_admin = bool(ctx["session_manager"].verify_session(session_token))
+        except Exception as exc:  # noqa: BLE001
+            log.info("admin_status session check failed: %s", exc)
+            is_admin = False
+        if not is_admin:
+            return jsonify({"mode": "public_admin_status", "registered": registered})
         return jsonify(
             {
+                "mode": "admin_admin_status",
                 "rp_id": ctx["rp_id"],
-                "registered": count > 0,
+                "registered": registered,
                 "credentials": count,
             }
         )

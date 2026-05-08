@@ -75,7 +75,7 @@ the `auth/` package into another Flask service and call
 |--------|------|------|-------|
 | `GET`  | `/admin/login` | public | Login + register UI |
 | `GET`  | `/admin` | session | Operator landing page |
-| `GET`  | `/api/admin/status` | public | `{rp_id, registered, credentials}` |
+| `GET`  | `/api/admin/status` | public/session | Public: `{mode, registered}`. Session: adds `{rp_id, credentials}` |
 | `POST` | `/api/admin/register/begin` | gated* | Returns options + handle |
 | `POST` | `/api/admin/register/complete` | public | Verifies attestation, stores credential, mints session |
 | `POST` | `/api/admin/login/begin` | public | Returns options + handle (404 if no creds) |

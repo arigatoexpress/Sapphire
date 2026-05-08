@@ -267,9 +267,10 @@ def test_status_reports_unregistered_initially(auth_pkg):
     r = app.test_client().get("/api/admin/status")
     assert r.status_code == 200
     body = r.get_json()
+    assert body["mode"] == "public_admin_status"
     assert body["registered"] is False
-    assert body["credentials"] == 0
-    assert body["rp_id"] == "localhost"
+    assert "credentials" not in body
+    assert "rp_id" not in body
 
 
 def test_status_reports_registered_after_credential_added(auth_pkg):
@@ -282,8 +283,30 @@ def test_status_reports_registered_after_credential_added(auth_pkg):
     )
     app, _ = _make_app(auth_pkg, store=store)
     body = app.test_client().get("/api/admin/status").get_json()
+    assert body["mode"] == "public_admin_status"
+    assert body["registered"] is True
+    assert "credentials" not in body
+
+
+def test_status_reports_admin_metadata_for_authenticated_admin(auth_pkg):
+    store = auth_pkg.InMemoryCredentialStore(
+        seed=[
+            auth_pkg.CredentialRecord(
+                credential_id=b"c1", public_key=b"pk", sign_count=0, user_id="admin"
+            )
+        ]
+    )
+    app, ctx = _make_app(auth_pkg, store=store)
+    token = ctx["session_manager"].issue_session("admin")
+    client = app.test_client()
+    client.set_cookie("sapphire_admin", token)
+
+    body = client.get("/api/admin/status").get_json()
+
+    assert body["mode"] == "admin_admin_status"
     assert body["registered"] is True
     assert body["credentials"] == 1
+    assert body["rp_id"] == "localhost"
 
 
 # ---------------------------------------------------------------------------

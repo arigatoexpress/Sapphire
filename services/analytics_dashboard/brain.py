@@ -82,6 +82,31 @@ def _is_admin_request() -> bool:
         return False
 
 
+def _public_brain_narrative(payload: dict[str, Any]) -> str:
+    score = payload.get("health_score")
+    if isinstance(score, (int, float)):
+        if score >= 0.8:
+            posture = "healthy"
+        elif score >= 0.55:
+            posture = "degraded"
+        else:
+            posture = "needs attention"
+    else:
+        posture = "unknown"
+    regime = payload.get("regime") or "unknown"
+    degraded = list(payload.get("degraded_silos") or [])
+    degraded_count = len(dict.fromkeys(str(s) for s in degraded))
+    if degraded_count:
+        degraded_sentence = f"{degraded_count} silo lane(s) need attention."
+    else:
+        degraded_sentence = "No degraded silo lanes are reporting publicly."
+    return (
+        f"Public Brain sees {posture} cross-silo posture with regime {regime}. "
+        f"{degraded_sentence} Detailed actions, signal counts, inference volume, "
+        "correlations, history, and persistence require admin."
+    )
+
+
 def _public_synthesis_payload(payload: dict[str, Any]) -> dict[str, Any]:
     actions = (
         payload.get("priority_actions") if isinstance(payload.get("priority_actions"), list) else []
@@ -91,14 +116,23 @@ def _public_synthesis_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "health_score": payload.get("health_score"),
         "confidence": payload.get("confidence"),
         "regime": payload.get("regime"),
-        "narrative": payload.get("narrative"),
+        "narrative": _public_brain_narrative(payload),
         "narrative_llm": None,
         "llm_meta": None,
         "degraded_silos": list(payload.get("degraded_silos") or []),
         "silos_observed": list(payload.get("silos_observed") or []),
         "priority_actions": [],
-        "priority_action_count": len(actions),
-        "admin_required_for": ["priority actions", "correlations", "history", "persistence"],
+        "priority_action_count": None,
+        "priority_actions_locked": len(actions) > 0,
+        "admin_required_for": [
+            "priority actions",
+            "action counts",
+            "correlations",
+            "history",
+            "persistence",
+            "signal counts",
+            "inference volume",
+        ],
         "persisted": False,
     }
 
