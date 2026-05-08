@@ -210,6 +210,26 @@
       line-height: 1.5;
       font-size: 13px;
     }
+    .model-strip {
+      margin-top: 20px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(260px, .85fr);
+      gap: 16px;
+      align-items: start;
+    }
+    .model-strip p {
+      margin: 8px 0 0;
+      color: var(--text);
+      line-height: 1.55;
+      font-size: 13.5px;
+    }
+    .model-strip .state { color: var(--muted); }
+    .model-meta {
+      grid-column: 1 / -1;
+      margin-top: 0;
+    }
     .source-list {
       display: grid;
       gap: 7px;
@@ -391,6 +411,7 @@
       header { padding: 18px 20px; align-items: flex-start; gap: 16px; }
       main { padding: 28px 20px; }
       .analysis-top { grid-template-columns: 1fr; }
+      .model-strip,
       .quality-strip,
       .section-layout { grid-template-columns: 1fr; }
       .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -441,6 +462,22 @@
       </div>
 
       <div class="metrics" id="analysisMetrics" aria-label="Admin metrics"></div>
+
+      <div class="model-strip" aria-label="Model-assisted analysis">
+        <div>
+          <h3>Model narrative</h3>
+          <p id="modelNarrative">Preparing model-assisted analysis...</p>
+          <p class="state" id="modelOperatorRead">Waiting for source readiness.</p>
+        </div>
+        <div>
+          <h3>Risk read</h3>
+          <p id="modelRiskRead">Checking priority actions.</p>
+          <p class="state" id="modelNextAction">No action selected yet.</p>
+        </div>
+        <div class="meta-row model-meta" id="modelNarrativeMeta">
+          <span class="chip">model pending</span>
+        </div>
+      </div>
 
       <div class="quality-strip" aria-label="Data quality">
         <div>
@@ -617,6 +654,28 @@
       }).join("") || `<div class="source"><span>No source metadata</span><span class="status">unknown</span></div>`;
     }
 
+    function renderModelNarrative(payload) {
+      const narrative = payload.model_narrative || {};
+      document.getElementById("modelNarrative").textContent =
+        narrative.plain_english || "No model-assisted narrative returned.";
+      document.getElementById("modelOperatorRead").textContent =
+        narrative.operator_read || "No operator read returned.";
+      document.getElementById("modelRiskRead").textContent =
+        narrative.risk_read || "No risk read returned.";
+      document.getElementById("modelNextAction").textContent =
+        narrative.next_action || "No next action returned.";
+
+      const meta = [
+        narrative.status ? `status=${narrative.status}` : "status=unknown",
+        narrative.source ? `source=${narrative.source}` : "source=deterministic",
+        narrative.model ? `model=${narrative.model}` : null,
+        narrative.cached ? "cached=true" : "cached=false",
+        Number.isFinite(Number(narrative.latency_ms)) ? `latency_ms=${number(narrative.latency_ms)}` : null,
+      ].filter(Boolean);
+      document.getElementById("modelNarrativeMeta").innerHTML =
+        meta.map((item) => `<span class="chip">${esc(item)}</span>`).join("");
+    }
+
     function renderSectionMetrics(metrics) {
       if (!Array.isArray(metrics) || !metrics.length) {
         return `<div class="state">No section metrics returned.</div>`;
@@ -715,6 +774,7 @@
 	        metric("failover", text(payload.failover?.overall_status)),
 	      ].join("");
 	      renderDataQuality(payload);
+	      renderModelNarrative(payload);
 	      renderSections(payload);
 
       const priorities = Array.isArray(payload.priority_actions) ? payload.priority_actions : [];
