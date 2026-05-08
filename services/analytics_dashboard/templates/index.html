@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0a0d14">
-<title>Sapphire OS — Unified Operations</title>
+<title>SapphireAlpha - Public Console</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230a0d14'/%3E%3Cpath d='M32 6 56 24 32 58 8 24Z' fill='none' stroke='%234ea8ff' stroke-width='4'/%3E%3Cpath d='M8 24h48M22 24l10 34 10-34M20 8l12 16L44 8' stroke='%2362ff40' stroke-width='3' fill='none'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -137,6 +137,171 @@ header.top {
 }
 .banner.show { display: flex; }
 .banner svg { flex-shrink: 0; }
+
+/* ========== Public console first screen ========== */
+.public-console {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 22px;
+  margin: 0 0 30px;
+  padding: 28px 0 30px;
+  border-bottom: 1px solid var(--border);
+}
+.public-console-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.console-kicker {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+}
+.console-title {
+  margin: 0;
+  max-width: 900px;
+  font-size: clamp(38px, 6vw, 74px);
+  line-height: 0.95;
+  letter-spacing: 0;
+  font-weight: 700;
+}
+.console-copy {
+  max-width: 720px;
+  margin: 0;
+  color: var(--text-2);
+  font-size: 16px;
+  line-height: 1.65;
+}
+.console-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.console-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 9px 14px;
+  border: 1px solid var(--border-bright);
+  border-radius: 8px;
+  color: var(--text-1);
+  background: var(--bg-1);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 13px;
+}
+.console-action.primary {
+  border-color: rgba(78,168,255,0.55);
+  background: rgba(78,168,255,0.12);
+  color: #b8dcff;
+}
+.console-action.secure {
+  border-color: rgba(98,255,64,0.38);
+  background: rgba(98,255,64,0.08);
+  color: var(--accent-2);
+}
+.console-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.console-metric {
+  border: 1px solid var(--border);
+  background: rgba(11,14,22,0.72);
+  padding: 12px;
+  min-height: 86px;
+}
+.console-metric .metric-label {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+.console-metric .metric-value {
+  margin-top: 8px;
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 700;
+}
+.console-metric .metric-value.ready { color: var(--green); }
+.console-metric .metric-value.degraded,
+.console-metric .metric-value.degraded_with_fallback,
+.console-metric .metric-value.needs_attention { color: var(--yellow); }
+.console-metric .metric-value.down { color: var(--red); }
+.console-metric .metric-value.unknown { color: var(--text-3); }
+.console-metric .metric-sub {
+  margin-top: 8px;
+  color: var(--text-3);
+  font-size: 11px;
+}
+.public-console-side {
+  min-width: 0;
+  border-left: 1px solid var(--border);
+  padding-left: 22px;
+}
+.boundary-panel {
+  display: grid;
+  gap: 12px;
+}
+.boundary-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-2);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.boundary-row {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--border);
+  background: rgba(7,9,14,0.82);
+  padding: 11px 12px;
+}
+.boundary-row strong {
+  color: var(--text-1);
+  font-size: 12px;
+}
+.boundary-row span {
+  color: var(--text-3);
+  font-size: 12px;
+  min-width: 0;
+}
+.lane-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.lane-chip {
+  min-height: 72px;
+  border: 1px solid var(--border);
+  background: rgba(17,21,31,0.74);
+  padding: 10px;
+}
+.lane-chip .lane-name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.lane-chip .lane-role {
+  margin-top: 8px;
+  color: var(--text-3);
+  font-size: 11px;
+  line-height: 1.4;
+}
 
 /* ========== Silo cards ========== */
 .silo-grid {
@@ -367,6 +532,9 @@ header.top {
 .silo-status.degraded { background: var(--yellow-dim); color: var(--yellow); }
 .silo-status.down     { background: var(--red-dim); color: var(--red); }
 .silo-status.unknown  { background: rgba(108,120,145,0.14); color: var(--text-3); }
+.silo-status.ready    { background: var(--green-dim); color: var(--green); }
+.silo-status.degraded_with_fallback,
+.silo-status.needs_attention { background: var(--yellow-dim); color: var(--yellow); }
 .silo-status.phase-0  { background: rgba(255,122,0,0.14); color: var(--orange); }
 .silo-status.live     { background: rgba(78,168,255,0.14); color: var(--accent); }
 .silo-status.active   { background: rgba(98,255,64,0.14); color: var(--accent-2); }
@@ -1344,6 +1512,10 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
   .icon-btn { padding: 8px 12px; }
   .landing-shell { padding: 22px; }
   .landing-title { font-size: 27px; }
+  .public-console { grid-template-columns: 1fr; padding-top: 8px; }
+  .public-console-side { border-left: 0; padding-left: 0; }
+  .console-metrics { grid-template-columns: 1fr; }
+  .lane-grid { grid-template-columns: 1fr; }
   .panel,
   .cols-2 > *,
   .cols-3 > * { min-width: 0; }
@@ -1368,7 +1540,7 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
     </div>
     <div>
       <div class="brand-name">Sapphire OS</div>
-      <div class="brand-sub">Unified Operations</div>
+      <div class="brand-sub">Public Console</div>
     </div>
   </div>
   <div class="header-right">
@@ -1403,24 +1575,87 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
 <!-- Toast notification host -->
 <div id="toast-host" aria-live="polite" aria-atomic="true"></div>
 
+<!-- ========== PUBLIC CONSOLE FIRST SCREEN ========== -->
+<section class="public-console" id="public-console" aria-labelledby="public-console-title">
+  <div class="public-console-main">
+    <div class="console-kicker">sapphirealpha.xyz / public-safe operations</div>
+    <h1 class="console-title" id="public-console-title">Sapphire OS is live, gated, and failover-aware.</h1>
+    <p class="console-copy">
+      The public surface now shows verified system posture and product paths without exposing raw telemetry,
+      private device topology, model output, service hosts, or operator actions. Admin unlocks the full suite.
+    </p>
+    <div class="console-actions">
+      <a class="console-action primary" href="#project-map">Open public systems</a>
+      <a class="console-action" href="/p/system">View system posture</a>
+      <a class="console-action secure" href="/admin">Admin console</a>
+    </div>
+    <div class="console-metrics" aria-label="Public status summary">
+      <div class="console-metric">
+        <div class="metric-label">Public mode</div>
+        <div class="metric-value">redacted</div>
+        <div class="metric-sub">summary APIs only</div>
+      </div>
+      <div class="console-metric">
+        <div class="metric-label">Admin boundary</div>
+        <div class="metric-value">locked</div>
+        <div class="metric-sub">passkey-gated detail</div>
+      </div>
+      <div class="console-metric">
+        <div class="metric-label">Failover</div>
+        <div class="metric-value" id="console-failover-status">checking</div>
+        <div class="metric-sub" id="console-failover-sub">loading readiness lanes</div>
+      </div>
+    </div>
+  </div>
+  <aside class="public-console-side" aria-label="Public access boundary">
+    <div class="boundary-panel">
+      <div class="boundary-title">
+        <span>access boundary</span>
+        <span class="mono" id="console-boundary-mode">public</span>
+      </div>
+      <div class="boundary-row">
+        <strong>Visible</strong>
+        <span>health summaries, project routes, public market/threat context</span>
+        <span class="dot ok"></span>
+      </div>
+      <div class="boundary-row">
+        <strong>Admin</strong>
+        <span>signals, predictions, VPIN, DSR, service hosts, raw failover evidence</span>
+        <span class="dot degraded"></span>
+      </div>
+      <div class="boundary-row">
+        <strong>Disabled</strong>
+        <span>live trading, money movement, public action execution</span>
+        <span class="dot down"></span>
+      </div>
+      <div class="lane-grid" id="console-lanes">
+        <div class="lane-chip">
+          <div class="lane-name"><span>Readiness lanes</span><span class="silo-status unknown">loading</span></div>
+          <div class="lane-role">Fetching public failover summary.</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+</section>
+
 <!-- ========== PUBLIC PROJECT MAP ========== -->
 <section class="landing-shell" id="project-map" aria-labelledby="project-map-title">
   <div class="landing-head">
     <div>
-      <div class="landing-kicker">sapphirealpha.xyz / public map</div>
-      <h1 class="landing-title" id="project-map-title">Sapphire project tabs</h1>
+      <div class="landing-kicker">public systems</div>
+      <h2 class="landing-title" id="project-map-title">Product routes, not internal telemetry.</h2>
       <p class="landing-copy">
-        Core Sapphire systems and satellite products, each with a project brief, resources, and a direct launch path to its own frontend.
+        Each public route opens a real product, brief, or sanitized operational surface. Sensitive dashboards and raw data route back to admin.
       </p>
     </div>
     <div class="landing-terminal" aria-label="Public surface status">
-      <div><span>mesh</span><span>online</span></div>
-      <div><span>mode</span><span>read-only</span></div>
-      <div><span>cta</span><span>project-first</span></div>
+      <div><span>public</span><span>summaries</span></div>
+      <div><span>admin</span><span>raw detail</span></div>
+      <div><span>execution</span><span>disabled</span></div>
     </div>
   </div>
   <div class="landing-body">
-    <nav class="project-tabs" aria-label="Sapphire project tabs">
+    <nav class="project-tabs" aria-label="Sapphire public systems">
       {% for tab in project_tabs %}
       <a class="project-tab" href="{{ tab.info_route }}">
         <span>{{ tab.label }}</span>
@@ -2322,6 +2557,54 @@ function renderBrainSpark(rows) {
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
+function statusClass(s) {
+  const val = String(s || 'unknown').toLowerCase();
+  if (['ready', 'ok', 'healthy', 'live', 'active'].includes(val)) return 'ready';
+  if (['degraded', 'degraded_with_fallback', 'needs_attention'].includes(val)) return val;
+  if (['down', 'failed', 'offline'].includes(val)) return 'down';
+  return 'unknown';
+}
+function statusText(s) {
+  return String(s || 'unknown').replace(/_/g, ' ');
+}
+function renderPublicConsole(failover, silos) {
+  const status = failover?.overall_status || 'unknown';
+  const statusEl = document.getElementById('console-failover-status');
+  const subEl = document.getElementById('console-failover-sub');
+  const lanesEl = document.getElementById('console-lanes');
+  if (statusEl) {
+    statusEl.textContent = statusText(status);
+    statusEl.className = 'metric-value ' + statusClass(status);
+  }
+  if (subEl) {
+    const degraded = failover?.degraded_lanes || [];
+    const serviceSummary = silos?.service_summary || {};
+    const healthy = Number(serviceSummary.healthy || 0);
+    const reporting = Number(serviceSummary.reporting || 0);
+    subEl.textContent = degraded.length
+      ? `${degraded.length} lane${degraded.length === 1 ? '' : 's'} degraded; cloud-safe surface remains available`
+      : reporting ? `${healthy} / ${reporting} public services healthy` : 'public failover summary loaded';
+  }
+  if (!lanesEl) return;
+  const lanes = failover?.lanes || [];
+  if (!lanes.length) {
+    lanesEl.innerHTML = `<div class="lane-chip">
+      <div class="lane-name"><span>Readiness lanes</span><span class="silo-status unknown">unknown</span></div>
+      <div class="lane-role">Public failover summary is unavailable.</div>
+    </div>`;
+    return;
+  }
+  lanesEl.innerHTML = lanes.map(lane => {
+    const cls = statusClass(lane.status);
+    return `<div class="lane-chip">
+      <div class="lane-name">
+        <span>${escapeHtml(lane.label || lane.lane || 'Lane')}</span>
+        <span class="silo-status ${cls}">${escapeHtml(statusText(lane.status))}</span>
+      </div>
+      <div class="lane-role">${escapeHtml(lane.role || '')}</div>
+    </div>`;
+  }).join('');
+}
 
 // ========== Refresh ==========
 async function refresh() {
@@ -2340,13 +2623,14 @@ async function refresh() {
   const wmeta = document.getElementById('charts-window-meta');
   if (wmeta) wmeta.textContent = granLbl;
 
-  const [sum, regime, silos, threatsLive, tsThr, brainSyn] = await Promise.all([
+  const [sum, regime, silos, threatsLive, tsThr, brainSyn, failover] = await Promise.all([
     safeFetch('/api/summary'),
     safeFetch('/api/regime?limit=8'),
     safeFetch('/api/silos/health'),
     safeFetch('/api/threats/live'),
     safeFetch('/api/timeseries/threats' + winQ),
     safeFetch('/api/brain/synthesis'),
+    safeFetch('/api/failover/readiness'),
   ]);
   const preds = null;
   const inference = null;
@@ -2355,6 +2639,9 @@ async function refresh() {
   const vpinResp = null;
   const dsr = null;
   const brainHist = null;
+
+  // ----- Public console first screen -----
+  renderPublicConsole(failover, silos);
 
   // ----- Sapphire Brain hero panel -----
   renderBrainPanel(brainSyn);
@@ -2874,7 +3161,7 @@ function applyDensity(d) {
 
 // ---------- Command palette ----------
 const CMDK_ITEMS = [
-  { type: 'jump', name: 'Project tabs', hint: '#project-map', target: '#project-map' },
+  { type: 'jump', name: 'Public systems', hint: '#project-map', target: '#project-map' },
   { type: 'jump', name: 'Brain · cross-silo synthesis', hint: '#brain-section-h', target: '#brain-section-h' },
   { type: 'jump', name: 'Global Markets', hint: '#markets-hero', target: '#markets-hero' },
   { type: 'jump', name: 'Threat intelligence feed', hint: '#threats', target: '#threats' },
@@ -3006,7 +3293,7 @@ document.addEventListener('keydown', (e) => {
 const TOUR_STEPS = [
   {
     target: '#project-map',
-    title: 'Project tabs',
+    title: 'Public systems',
     body: 'The public first screen maps every core Sapphire system and satellite to a project brief plus its direct frontend.',
   },
   {

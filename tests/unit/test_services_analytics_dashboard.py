@@ -788,10 +788,23 @@ def test_index_renders_project_tab_manifest():
     template_path = REPO_ROOT / "services" / "analytics_dashboard" / "templates" / "index.html"
     html = template_path.read_text(encoding="utf-8")
 
-    assert "Project tabs" in html
+    assert "public systems" in html
     assert 'id="project-map"' in html
     assert "project_tabs" in html
+    assert "Sapphire project tabs" not in html
     assert "Open THO Frontend" not in html  # rendered from data, not hard-coded drift
+
+
+def test_index_renders_visible_public_console_refactor():
+    template_path = REPO_ROOT / "services" / "analytics_dashboard" / "templates" / "index.html"
+    html = template_path.read_text(encoding="utf-8")
+
+    assert 'id="public-console"' in html
+    assert "Sapphire OS is live, gated, and failover-aware." in html
+    assert "Product routes, not internal telemetry." in html
+    assert "/api/failover/readiness" in html
+    assert 'id="console-lanes"' in html
+    assert "raw service/device evidence" not in html
 
 
 def test_index_markets_panel_distinguishes_partial_feed_from_total_outage():
