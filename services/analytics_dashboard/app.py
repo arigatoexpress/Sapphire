@@ -170,6 +170,77 @@ def _is_admin_request() -> bool:
         return False
 
 
+_PUBLIC_SUMMARY_ADMIN_LOCKED = [
+    "trading PnL",
+    "win rate",
+    "signals",
+    "predictions",
+    "lead counts",
+    "inference call counts",
+    "raw service-health rows",
+]
+
+
+def _summary_int(row: dict, key: str) -> int | None:
+    value = row.get(key)
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _public_summary_payload(row: dict | None) -> dict:
+    row = row or {}
+    threat_records = _summary_int(row, "threats")
+    regime_snapshots = _summary_int(row, "regime_snapshots")
+    latest_regime = row.get("latest_regime") or "unknown"
+    fear_greed = row.get("fear_greed")
+
+    if threat_records is None and regime_snapshots is None:
+        headline = "Public operating summary is waiting on fresh warehouse data."
+        plain = (
+            "Sapphire is serving the public shell, but the warehouse rollup did not return "
+            "enough data for a fresh public brief. Admin telemetry remains locked behind "
+            "the passkey boundary."
+        )
+        public_read = [
+            "Public-safe project routes and failover summaries can still load independently.",
+            "Raw trading, CRM, inference, and service-health detail remains admin-only.",
+        ]
+    else:
+        regime_text = str(latest_regime).replace("_", " ").lower()
+        headline = "Public brief: threat context and regime posture are visible; operator detail is locked."
+        plain = (
+            f"The public view can show threat-intel volume and market-regime posture without exposing "
+            f"private forecasts, CRM data, PnL, win rate, service hosts, or model telemetry. "
+            f"The latest regime label is {regime_text}."
+        )
+        public_read = [
+            "Threat-intel volume is safe for public situational awareness.",
+            "Market-regime context is shown as a public posture indicator, not a trading signal.",
+            "Inference-backed Sapphire Brain narrative is rendered separately from raw model telemetry.",
+        ]
+
+    return {
+        "mode": "public_operating_summary",
+        "public_metrics": {
+            "threat_records": threat_records,
+            "regime_snapshots": regime_snapshots,
+            "latest_regime": latest_regime,
+            "fear_greed": fear_greed,
+        },
+        "analysis": {
+            "headline": headline,
+            "plain_english": plain,
+            "public_read": public_read,
+            "admin_locked": _PUBLIC_SUMMARY_ADMIN_LOCKED,
+        },
+        "admin_required_for": _PUBLIC_SUMMARY_ADMIN_LOCKED,
+    }
+
+
 def _public_silos_health_payload(payload: dict) -> dict:
     services = payload.get("services") if isinstance(payload.get("services"), list) else []
     status_counts: dict[str, int] = {}
@@ -449,10 +520,15 @@ def summary():
                  WHERE fear_greed_score IS NOT NULL
                  ORDER BY timestamp DESC LIMIT 1) AS fear_greed
         """)
-        return jsonify(_clean(rows)[0] if rows else {})
+        row = _clean(rows)[0] if rows else {}
+        if _is_admin_request():
+            return jsonify(row)
+        return jsonify(_public_summary_payload(row))
     except Exception as exc:
         log.info("summary bq miss: %s", exc)
-        return jsonify({})
+        if _is_admin_request():
+            return jsonify({})
+        return jsonify(_public_summary_payload(None))
 
 
 @app.get("/api/performance")

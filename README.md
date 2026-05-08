@@ -145,7 +145,7 @@ flowchart LR
 
 ## The Brain
 
-`/api/brain/synthesis` is the cross-silo integration layer (PR #583, hero panel #585). One JSON doc per cycle: `health_score`, `confidence`, `regime`, `narrative`, `priority_actions`, `degraded_silos`, `silos_observed`. Hit it: <https://sapphirealpha.xyz/api/brain/synthesis>. The cyber-threat-bot, regional-intel-workbench, and wildfire-watch satellites all feed silos the Brain folds in.
+`/api/brain/synthesis` is the cross-silo integration layer (PR #583, hero panel #585). The public JSON doc exposes safe posture fields (`health_score`, `confidence`, `regime`, redacted `narrative`, `degraded_silos`, `silos_observed`) while action counts, priority actions, correlations, history, persistence, signal counts, and inference volume require admin. Hit it: <https://sapphirealpha.xyz/api/brain/synthesis>. The cyber-threat-bot, regional-intel-workbench, and wildfire-watch satellites all feed silos the Brain folds in.
 
 ## Module map
 

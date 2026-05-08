@@ -323,6 +323,48 @@ def test_summary_endpoint_returns_first_row_as_object(client, app_module, monkey
     assert response.get_json() == summary_row
 
 
+def test_summary_endpoint_redacts_sensitive_fields_for_public_client(app_module, monkeypatch):
+    summary_row = {
+        "signals": 100,
+        "predictions": 42,
+        "regime_snapshots": 7,
+        "threats": 3,
+        "leads": 11,
+        "inference_metrics": 999,
+        "service_health": 21,
+        "total_pnl_usd": 12345.67,
+        "win_rate": 0.6,
+        "latest_regime": "BULL",
+        "fear_greed": 55,
+    }
+    monkeypatch.setattr(app_module, "_rows", lambda sql, params=None: [summary_row])
+
+    response = app_module.app.test_client().get("/api/summary")
+    body = response.get_json()
+
+    assert response.status_code == 200
+    assert body["mode"] == "public_operating_summary"
+    assert body["public_metrics"] == {
+        "threat_records": 3,
+        "regime_snapshots": 7,
+        "latest_regime": "BULL",
+        "fear_greed": 55,
+    }
+    leaked_keys = {
+        "signals",
+        "predictions",
+        "leads",
+        "inference_metrics",
+        "service_health",
+        "total_pnl_usd",
+        "win_rate",
+    }
+    assert leaked_keys.isdisjoint(body)
+    encoded = json.dumps(body)
+    assert "12345.67" not in encoded
+    assert "0.6" not in encoded
+
+
 def test_summary_endpoint_returns_empty_object_when_no_rows(client, app_module, monkeypatch):
     monkeypatch.setattr(app_module, "_rows", lambda sql, params=None: [])
 
@@ -330,6 +372,19 @@ def test_summary_endpoint_returns_empty_object_when_no_rows(client, app_module, 
 
     assert response.status_code == 200
     assert response.get_json() == {}
+
+
+def test_summary_endpoint_returns_public_brief_when_no_rows(app_module, monkeypatch):
+    monkeypatch.setattr(app_module, "_rows", lambda sql, params=None: [])
+
+    response = app_module.app.test_client().get("/api/summary")
+    body = response.get_json()
+
+    assert response.status_code == 200
+    assert body["mode"] == "public_operating_summary"
+    assert body["public_metrics"]["threat_records"] is None
+    assert body["public_metrics"]["regime_snapshots"] is None
+    assert "admin_required_for" in body
 
 
 def test_performance_endpoint_passes_days_param(client, app_module, monkeypatch):
@@ -737,6 +792,33 @@ def test_brain_synthesis_endpoint_returns_payload(client, app_module, monkeypatc
     assert "narrative" in body
     assert "priority_actions" in body
     assert "degraded_silos" in body
+
+
+def test_public_brain_summary_redacts_counts_and_action_totals(app_module):
+    brain = _stub_brain_module(app_module)
+    body = brain._public_synthesis_payload(
+        {
+            "health_score": 0.43,
+            "confidence": 0.6,
+            "regime": "TRANSITION",
+            "narrative": (
+                "Trading: 12 signals/24h. Threat: 90 new CVEs/24h. " "Inference: 945,294 calls/24h."
+            ),
+            "priority_actions": ["trading: restart collector", "inference: check proxy"],
+            "degraded_silos": ["trading", "inference"],
+            "silos_observed": ["trading", "inference", "services"],
+        }
+    )
+
+    encoded = json.dumps(body)
+    assert body["mode"] == "public_brain_summary"
+    assert body["priority_actions"] == []
+    assert body["priority_action_count"] is None
+    assert body["priority_actions_locked"] is True
+    assert "signals/24h" not in encoded
+    assert "calls/24h" not in encoded
+    assert "945,294" not in encoded
+    assert "restart collector" not in encoded
 
 
 def test_brain_history_endpoint_returns_rows_shape(client):
