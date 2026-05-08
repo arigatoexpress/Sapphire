@@ -83,6 +83,11 @@ def test_p_wildfire_smoke(monkeypatch):
     assert "Wildfire" in body
     assert "wildfire.sapphirealpha.xyz/admin" not in body
     assert "embedded admin console" not in body
+    assert "api/sensors/health" not in body
+    assert "signals_24h" not in body
+    assert "signals_7d" not in body
+    assert "PUBLIC_STATUS" in body
+    assert "MISSION_CONTROLS" in body
 
 
 def test_p_threats_smoke(monkeypatch):
