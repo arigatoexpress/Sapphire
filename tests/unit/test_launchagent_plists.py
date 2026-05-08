@@ -47,9 +47,9 @@ def test_launchagents_do_not_target_stale_worktrees() -> None:
     for path in _plist_paths():
         plist = _load_plist(path)
         working_directory = plist.get("WorkingDirectory")
-        assert (
-            working_directory is None or "/Code/_worktrees/" not in working_directory
-        ), f"{path} points WorkingDirectory at stale worktree {working_directory!r}"
+        assert working_directory is None or "/Code/_worktrees/" not in working_directory, (
+            f"{path} points WorkingDirectory at stale worktree {working_directory!r}"
+        )
 
 
 def test_daily_brief_has_one_versioned_launchagent() -> None:

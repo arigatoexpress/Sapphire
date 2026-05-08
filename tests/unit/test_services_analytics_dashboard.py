@@ -916,7 +916,7 @@ def test_public_brain_summary_redacts_counts_and_action_totals(app_module):
             "confidence": 0.6,
             "regime": "TRANSITION",
             "narrative": (
-                "Trading: 12 signals/24h. Threat: 90 new CVEs/24h. " "Inference: 945,294 calls/24h."
+                "Trading: 12 signals/24h. Threat: 90 new CVEs/24h. Inference: 945,294 calls/24h."
             ),
             "priority_actions": ["trading: restart collector", "inference: check proxy"],
             "degraded_silos": ["trading", "inference"],
