@@ -181,6 +181,29 @@ _PUBLIC_SUMMARY_ADMIN_LOCKED = [
 ]
 
 
+def _summary_rollup_row() -> dict:
+    rows = _rows(f"""
+        SELECT
+          (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.trading_signals`)    AS signals,
+          (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.predictions`)        AS predictions,
+          (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.market_regime`)      AS regime_snapshots,
+          (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.threat_intel`)       AS threats,
+          (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.leads`)              AS leads,
+          (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.inference_metrics`)  AS inference_metrics,
+          (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.service_health`)     AS service_health,
+          (SELECT SUM(pnl_usd) FROM `{PROJECT}.{DATASET}.trading_signals`
+             WHERE outcome IN ('win','loss')) AS total_pnl_usd,
+          (SELECT SAFE_DIVIDE(COUNTIF(outcome='win'), COUNTIF(outcome IN ('win','loss')))
+             FROM `{PROJECT}.{DATASET}.trading_signals`) AS win_rate,
+          (SELECT regime FROM `{PROJECT}.{DATASET}.market_regime`
+             ORDER BY timestamp DESC LIMIT 1) AS latest_regime,
+          (SELECT fear_greed_score FROM `{PROJECT}.{DATASET}.market_regime`
+             WHERE fear_greed_score IS NOT NULL
+             ORDER BY timestamp DESC LIMIT 1) AS fear_greed
+    """)
+    return _clean(rows)[0] if rows else {}
+
+
 def _summary_int(row: dict, key: str) -> int | None:
     value = row.get(key)
     if value is None:
@@ -479,6 +502,253 @@ def _is_known_probe_path(path: str) -> bool:
     )
 
 
+def _admin_inference_tiers() -> list[dict]:
+    rows = _rows(f"""
+        SELECT tier,
+               SUM(requests) AS calls,
+               AVG(avg_latency_ms) AS avg_latency_ms,
+               AVG(p95_latency_ms) AS p95_latency_ms,
+               SUM(success) AS ok_count,
+               SUM(errors) AS err_count
+        FROM `{PROJECT}.{DATASET}.inference_metrics`
+        WHERE timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)
+        GROUP BY tier
+        ORDER BY calls DESC
+    """)
+    return _clean(rows)
+
+
+def _admin_recent_signals(limit: int = 8) -> list[dict]:
+    rows = _rows(
+        f"""
+        SELECT timestamp, signal_id, symbol, action, direction, confidence,
+               score, source, outcome, pnl_usd, regime
+        FROM `{PROJECT}.{DATASET}.trading_signals`
+        ORDER BY timestamp DESC
+        LIMIT @limit
+    """,
+        params=[bigquery.ScalarQueryParameter("limit", "INT64", limit)],
+    )
+    return _clean(rows)
+
+
+def _num(value: object, default: float = 0.0) -> float:
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _count(value: object) -> int:
+    return int(_num(value, 0.0))
+
+
+def _pct(value: object) -> float | None:
+    if value is None:
+        return None
+    try:
+        return round(float(value), 4)
+    except (TypeError, ValueError):
+        return None
+
+
+def _admin_analysis_payload() -> dict:
+    errors: list[str] = []
+    summary_row: dict = {}
+    services: list[dict] = []
+    inference_tiers: list[dict] = []
+    recent_signals: list[dict] = []
+
+    try:
+        summary_row = _summary_rollup_row()
+    except Exception as exc:  # noqa: BLE001
+        log.info("admin analysis summary miss: %s", exc)
+        errors.append("summary_rollup_unavailable")
+
+    try:
+        services = _latest_service_health_rows()
+    except Exception as exc:  # noqa: BLE001
+        log.info("admin analysis service-health miss: %s", exc)
+        errors.append("service_health_unavailable")
+
+    try:
+        inference_tiers = _admin_inference_tiers()
+    except Exception as exc:  # noqa: BLE001
+        log.info("admin analysis inference miss: %s", exc)
+        errors.append("inference_telemetry_unavailable")
+
+    try:
+        recent_signals = _admin_recent_signals(limit=8)
+    except Exception as exc:  # noqa: BLE001
+        log.info("admin analysis recent signals miss: %s", exc)
+        errors.append("recent_signals_unavailable")
+
+    tho_health = _http_get_json(THO_HEALTH_URL, timeout=2.5)
+    failover = _build_failover_payload(services, tho_health)
+    degraded_services = [
+        row
+        for row in services
+        if isinstance(row, dict) and _status_bucket(row.get("status")) != "ready"
+    ]
+    inference_calls = sum(_count(row.get("calls")) for row in inference_tiers)
+    inference_errors = sum(_count(row.get("err_count")) for row in inference_tiers)
+    symbols = sorted(
+        {
+            str(row.get("symbol")).upper()
+            for row in recent_signals
+            if isinstance(row, dict) and row.get("symbol")
+        }
+    )
+    win_rate = _pct(summary_row.get("win_rate"))
+    latest_regime = str(summary_row.get("latest_regime") or "unknown")
+
+    priorities: list[dict] = []
+    if failover.get("degraded_lanes"):
+        priorities.append(
+            {
+                "lane": "failover",
+                "severity": "high"
+                if failover.get("overall_status") == "needs_attention"
+                else "medium",
+                "title": "Review degraded failover lanes",
+                "plain_english": (
+                    "One or more operator paths are not fully ready. Public pages can stay "
+                    "up, but admin should inspect the raw lane evidence before relying on "
+                    "local or GPU-side automation."
+                ),
+                "evidence": ", ".join(failover.get("degraded_lanes") or []),
+            }
+        )
+    if degraded_services:
+        names = [str(row.get("service") or "unknown") for row in degraded_services[:5]]
+        priorities.append(
+            {
+                "lane": "services",
+                "severity": "medium",
+                "title": "Triage degraded service-health rows",
+                "plain_english": (
+                    "Some raw service checks are not reporting ready. These are hidden "
+                    "publicly, but they matter for operator routing and failover confidence."
+                ),
+                "evidence": ", ".join(names),
+            }
+        )
+    if inference_errors:
+        priorities.append(
+            {
+                "lane": "models",
+                "severity": "medium",
+                "title": "Inspect inference errors",
+                "plain_english": (
+                    "The model telemetry table reports errors in the last 24 hours. Check "
+                    "tier routing before trusting deep analysis refreshes."
+                ),
+                "evidence": f"{inference_errors} errors across {len(inference_tiers)} tier(s)",
+            }
+        )
+    if win_rate is not None and win_rate < 0.5:
+        priorities.append(
+            {
+                "lane": "markets",
+                "severity": "medium",
+                "title": "Review trading research quality",
+                "plain_english": (
+                    "Win rate is below 50 percent on scored outcomes. Keep this as research "
+                    "evidence, not an execution signal, until the underlying signal family is reviewed."
+                ),
+                "evidence": f"win_rate={win_rate}",
+            }
+        )
+    if not recent_signals:
+        priorities.append(
+            {
+                "lane": "markets",
+                "severity": "low",
+                "title": "Confirm recent signal ingestion",
+                "plain_english": (
+                    "No recent signal rows were returned to the admin aggregate. That can be "
+                    "normal during quiet periods, but it is worth checking before analysis demos."
+                ),
+                "evidence": "recent_signals=0",
+            }
+        )
+    if not priorities:
+        priorities.append(
+            {
+                "lane": "control",
+                "severity": "low",
+                "title": "No urgent admin action detected",
+                "plain_english": (
+                    "The current aggregate does not show degraded lanes, model errors, or "
+                    "missing market evidence. Continue monitoring from the admin console."
+                ),
+                "evidence": "derived checks passed",
+            }
+        )
+
+    signals = _count(summary_row.get("signals"))
+    predictions_count = _count(summary_row.get("predictions"))
+    threats = _count(summary_row.get("threats"))
+    leads = _count(summary_row.get("leads"))
+
+    return {
+        "mode": "admin_analysis",
+        "read_only": True,
+        "requires_passkey": True,
+        "generated_at": datetime.now(UTC).isoformat(),
+        "executive_brief": {
+            "headline": "Admin analysis: raw Sapphire telemetry is available behind passkeys.",
+            "plain_english": (
+                f"Sapphire is tracking {signals} signal row(s), {predictions_count} prediction row(s), "
+                f"{threats} threat record(s), and {leads} lead row(s). Public pages now show "
+                "summaries; this admin view keeps the sensitive evidence, model telemetry, "
+                "and operator actions together."
+            ),
+            "technical": [
+                f"latest_regime={latest_regime}",
+                f"inference_calls_24h={inference_calls}",
+                f"inference_errors_24h={inference_errors}",
+                f"service_rows={len(services)}",
+                f"failover_status={failover.get('overall_status', 'unknown')}",
+            ],
+        },
+        "priority_actions": priorities[:6],
+        "metrics": {
+            "signals": signals,
+            "predictions": predictions_count,
+            "regime_snapshots": _count(summary_row.get("regime_snapshots")),
+            "threats": threats,
+            "leads": leads,
+            "inference_metrics": _count(summary_row.get("inference_metrics")),
+            "service_health": _count(summary_row.get("service_health")),
+            "total_pnl_usd": summary_row.get("total_pnl_usd"),
+            "win_rate": win_rate,
+            "latest_regime": latest_regime,
+            "fear_greed": summary_row.get("fear_greed"),
+        },
+        "model_telemetry": {
+            "calls_24h": inference_calls,
+            "errors_24h": inference_errors,
+            "tiers": inference_tiers,
+        },
+        "market_evidence": {
+            "symbols": symbols,
+            "recent_signals": recent_signals,
+        },
+        "failover": failover,
+        "operator_links": [
+            {"label": "Brain full synthesis", "href": "/api/brain/synthesis"},
+            {"label": "Signals and forecasts", "href": "/api/signals/recent?limit=25"},
+            {"label": "Inference detail", "href": "/api/silos/inference"},
+            {"label": "Service timeseries", "href": "/api/timeseries/services"},
+            {"label": "Decision queue", "href": "/api/asfao/decisions?limit=25"},
+        ],
+        "errors": errors,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -501,26 +771,7 @@ def firebase_hosting_verification():
 @app.get("/api/summary")
 def summary():
     try:
-        rows = _rows(f"""
-            SELECT
-              (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.trading_signals`)    AS signals,
-              (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.predictions`)        AS predictions,
-              (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.market_regime`)      AS regime_snapshots,
-              (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.threat_intel`)       AS threats,
-              (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.leads`)              AS leads,
-              (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.inference_metrics`)  AS inference_metrics,
-              (SELECT COUNT(*) FROM `{PROJECT}.{DATASET}.service_health`)     AS service_health,
-              (SELECT SUM(pnl_usd) FROM `{PROJECT}.{DATASET}.trading_signals`
-                 WHERE outcome IN ('win','loss')) AS total_pnl_usd,
-              (SELECT SAFE_DIVIDE(COUNTIF(outcome='win'), COUNTIF(outcome IN ('win','loss')))
-                 FROM `{PROJECT}.{DATASET}.trading_signals`) AS win_rate,
-              (SELECT regime FROM `{PROJECT}.{DATASET}.market_regime`
-                 ORDER BY timestamp DESC LIMIT 1) AS latest_regime,
-              (SELECT fear_greed_score FROM `{PROJECT}.{DATASET}.market_regime`
-                 WHERE fear_greed_score IS NOT NULL
-                 ORDER BY timestamp DESC LIMIT 1) AS fear_greed
-        """)
-        row = _clean(rows)[0] if rows else {}
+        row = _summary_rollup_row()
         if _is_admin_request():
             return jsonify(row)
         return jsonify(_public_summary_payload(row))
@@ -529,6 +780,18 @@ def summary():
         if _is_admin_request():
             return jsonify({})
         return jsonify(_public_summary_payload(None))
+
+
+@app.get("/api/admin/analysis")
+@requires_admin
+def admin_analysis():
+    """Readable operator aggregate for the passkey-gated admin console.
+
+    This intentionally lives behind the admin session because it combines raw
+    trading counts, model telemetry, service hosts, and failover evidence into
+    one operator-facing payload.
+    """
+    return jsonify(_admin_analysis_payload())
 
 
 @app.get("/api/performance")

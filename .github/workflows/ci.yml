@@ -90,6 +90,18 @@ jobs:
           uv run --python 3.11 --no-project --with-requirements requirements-test.txt \
             python scripts/ops/test_inventory.py --check-readme --max-drift 50
 
+  public-boundary-smoke:
+    name: public boundary smoke
+    if: ${{ vars.SAPPHIRE_RUNNER != '' }}
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - name: scan public routes for admin data leaks
+        run: |
+          uv run --python 3.11 --no-project --with-requirements requirements-test.txt \
+            python scripts/ops/public_boundary_smoke.py
+
   tool-registry:
     name: tool registry invariants
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
