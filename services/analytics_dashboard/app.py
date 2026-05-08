@@ -33,6 +33,7 @@ if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
 from _deflated_sharpe import annualized_sharpe, deflated_sharpe  # noqa: E402
+from admin_narrative import build_admin_narrative  # noqa: E402
 from auth import admin_session_payload, requires_admin  # noqa: E402
 from project_tabs import get_project_tab, public_project_tabs  # noqa: E402
 
@@ -1075,7 +1076,7 @@ def _admin_analysis_payload() -> dict:
         win_rate=win_rate,
     )
 
-    return {
+    payload = {
         "mode": "admin_analysis",
         "read_only": True,
         "requires_passkey": True,
@@ -1131,6 +1132,8 @@ def _admin_analysis_payload() -> dict:
         ],
         "errors": errors,
     }
+    payload["model_narrative"] = build_admin_narrative(payload)
+    return payload
 
 
 # ---------------------------------------------------------------------------

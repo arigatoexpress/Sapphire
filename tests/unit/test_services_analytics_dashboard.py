@@ -662,6 +662,19 @@ def test_admin_analysis_aggregates_sensitive_operator_evidence(client, app_modul
         "_http_get_json",
         lambda url, timeout=3.0: {"status": "ok", "sha": "private-tho-sha"},
     )
+    monkeypatch.setattr(
+        app_module,
+        "build_admin_narrative",
+        lambda payload: {
+            "mode": "admin_model_narrative",
+            "status": "generated",
+            "source": "test",
+            "plain_english": "Admin model read.",
+            "operator_read": "Operator read.",
+            "risk_read": "Risk read.",
+            "next_action": "Next action.",
+        },
+    )
 
     response = client.get("/api/admin/analysis")
 
@@ -696,11 +709,80 @@ def test_admin_analysis_aggregates_sensitive_operator_evidence(client, app_modul
     assert sections["operations"]["rows"]
     assert sections["models"]["rows"][0]["tier"] == "reason"
     assert sections["markets"]["rows"][0]["symbol"] == "BTC"
+    assert body["model_narrative"]["mode"] == "admin_model_narrative"
+    assert body["model_narrative"]["status"] == "generated"
+    assert body["model_narrative"]["plain_english"] == "Admin model read."
     encoded = json.dumps(body)
     assert "windows-secret-ollama" in encoded
     assert "100.71.10.48" in encoded
     assert "private-tho-sha" in encoded
     assert body["priority_actions"]
+
+
+def test_admin_narrative_snapshot_hides_raw_operator_detail(app_module):
+    admin_narrative = sys.modules["admin_narrative"]
+    payload = {
+        "mode": "admin_analysis",
+        "generated_at": "2026-05-08T00:00:00+00:00",
+        "metrics": {"signals": 10, "predictions": 4, "win_rate": 0.6},
+        "data_quality": {
+            "status": "ready",
+            "ready_sources": 2,
+            "total_sources": 2,
+            "sources": [{"id": "service_health", "status": "ready", "rows": 3}],
+        },
+        "model_telemetry": {"calls_24h": 25, "errors_24h": 1, "tiers": [{"tier": "reason"}]},
+        "failover": {
+            "overall_status": "degraded_with_fallback",
+            "degraded_lanes": ["gpu_compute"],
+            "lanes": [
+                {
+                    "lane": "gpu_compute",
+                    "label": "GPU compute lane",
+                    "status": "degraded",
+                    "counts": {"ready": 0, "down": 1},
+                    "services": [
+                        {
+                            "service": "windows-secret-ollama",
+                            "host": "100.71.10.48",
+                            "sha": "private-tho-sha",
+                        }
+                    ],
+                }
+            ],
+        },
+        "priority_actions": [
+            {
+                "lane": "services",
+                "severity": "medium",
+                "title": "Triage degraded service-health rows",
+                "plain_english": "Some raw service checks are not reporting ready.",
+                "evidence": "windows-secret-ollama 100.71.10.48 private-tho-sha",
+            }
+        ],
+        "sections": [
+            {
+                "id": "operations",
+                "title": "Operations",
+                "quality": {"status": "review", "basis": "1 degraded lane"},
+                "plain_english": "Failover needs review.",
+                "technical": ["tho_sha=private-tho-sha"],
+                "rows": [{"service": "windows-secret-ollama", "host": "100.71.10.48"}],
+                "links": [{"label": "raw", "href": "/api/failover/readiness"}],
+                "metrics": [{"label": "degraded lanes", "value": 1}],
+            }
+        ],
+        "operator_links": [{"label": "raw", "href": "/api/failover/readiness"}],
+    }
+
+    snapshot = admin_narrative._safe_snapshot(payload)
+
+    encoded = json.dumps(snapshot)
+    assert "windows-secret-ollama" not in encoded
+    assert "100.71.10.48" not in encoded
+    assert "private-tho-sha" not in encoded
+    assert "/api/failover/readiness" not in encoded
+    assert snapshot["metrics"]["signals"] == 10
 
 
 def test_public_silos_health_hides_service_details(app_module, monkeypatch):
