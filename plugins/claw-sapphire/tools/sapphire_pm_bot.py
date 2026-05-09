@@ -271,7 +271,7 @@ def _normalize_mention_command_body(text: str) -> str:
         if lowered == source:
             return target
         if source.endswith(" ") and lowered.startswith(source):
-            return f"{target}{text[len(source):].strip()}".strip()
+            return f"{target}{text[len(source) :].strip()}".strip()
     return text
 
 

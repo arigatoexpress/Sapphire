@@ -123,8 +123,7 @@ def test_dry_run_completes_with_bypasses(tmp_path: Path) -> None:
 def test_invalid_target_exits_with_usage() -> None:
     result = _run(["--target", "ethereum"])
     assert result.returncode == 1, (
-        f"expected exit 1 for invalid target; got {result.returncode}\n"
-        f"stderr: {result.stderr}"
+        f"expected exit 1 for invalid target; got {result.returncode}\nstderr: {result.stderr}"
     )
     # Both the usage message and the failure reason should be present.
     assert "Usage: scripts/hackathon_smoke.sh" in result.stdout
@@ -173,8 +172,7 @@ def test_target_robinhood_dry_run(tmp_path: Path) -> None:
         if "RPC eth_getBalance failed" in result.stderr or "rpc error" in result.stderr.lower():
             pytest.skip("Robinhood RPC unreachable from test environment")
     assert result.returncode == 0, (
-        f"expected exit 0 for robinhood dry-run; got {result.returncode}\n"
-        f"stderr: {result.stderr}"
+        f"expected exit 0 for robinhood dry-run; got {result.returncode}\nstderr: {result.stderr}"
     )
     assert "DRY-RUN COMPLETE" in result.stderr
     # The robinhood section should appear in the appended summary.
@@ -211,8 +209,7 @@ def test_target_both_dry_run(tmp_path: Path) -> None:
         if "RPC eth_getBalance failed" in result.stderr or "rpc error" in result.stderr.lower():
             pytest.skip("RPC unreachable from test environment")
     assert result.returncode == 0, (
-        f"expected exit 0 for both dry-run; got {result.returncode}\n"
-        f"stderr: {result.stderr}"
+        f"expected exit 0 for both dry-run; got {result.returncode}\nstderr: {result.stderr}"
     )
     assert "DRY-RUN COMPLETE" in result.stderr
     assert SUMMARY_FILE.exists(), "submission_artifacts.md should have been written"
