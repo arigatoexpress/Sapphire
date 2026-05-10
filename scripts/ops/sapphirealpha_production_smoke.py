@@ -43,7 +43,7 @@ class ProbeResult:
 
 PROBES: tuple[ProbeSpec, ...] = (
     ProbeSpec("home_html", "/", "html", ("Sapphire OS",)),
-    ProbeSpec("health_json", "/health", "json"),
+    ProbeSpec("health_json", "/health", "json", ("ok", "project", "dataset")),
     ProbeSpec("projects_json", "/api/projects", "json", ("projects",)),
     ProbeSpec("brain_json", "/api/brain/synthesis", "json"),
     ProbeSpec("markets_json", "/api/markets/snapshot", "json"),
@@ -76,6 +76,24 @@ def _fetch(url: str, timeout: float) -> tuple[int, str, bytes]:
 def _looks_like_static_html(body: bytes) -> bool:
     prefix = body[:512].decode("utf-8", errors="replace").lstrip().lower()
     return prefix.startswith("<!doctype html") or prefix.startswith("<html")
+
+
+def _health_owner_mismatch(payload: Any) -> str | None:
+    if not isinstance(payload, dict):
+        return "health JSON is not an object"
+    service = payload.get("service")
+    if isinstance(service, str) and service and service != "sapphire-analytics-dashboard":
+        return (
+            f"route owner mismatch: /health reports service={service!r}; expected "
+            "Sapphire analytics health JSON with project and dataset keys"
+        )
+    missing_owner_keys = [key for key in ("project", "dataset") if key not in payload]
+    if missing_owner_keys:
+        return (
+            "route owner mismatch: /health missing Sapphire analytics keys: "
+            f"{', '.join(missing_owner_keys)}"
+        )
+    return None
 
 
 def _probe(base_url: str, spec: ProbeSpec, timeout: float) -> ProbeResult:
@@ -136,6 +154,17 @@ def _probe(base_url: str, spec: ProbeSpec, timeout: float) -> ProbeResult:
                 http_status=http_status,
                 content_type=content_type,
             )
+        if spec.name == "health_json":
+            if mismatch := _health_owner_mismatch(payload):
+                return ProbeResult(
+                    spec.name,
+                    spec.path,
+                    "FAIL",
+                    mismatch,
+                    duration_ms,
+                    http_status=http_status,
+                    content_type=content_type,
+                )
         missing = [needle for needle in spec.contains if needle not in payload]
         if missing:
             return ProbeResult(

@@ -66,6 +66,32 @@ def test_smoke_fails_when_api_route_returns_static_html(monkeypatch):
     assert any("static SPA fallback" in probe["evidence"] for probe in failures)
 
 
+def test_smoke_fails_with_crisp_route_owner_mismatch(monkeypatch):
+    module = _load_module()
+
+    def fake_urlopen(request, timeout, **_kwargs):
+        url = request.full_url
+        if url.endswith("/health"):
+            return _FakeResponse(
+                json.dumps({"ok": True, "service": "agent-opportunity-exchange"}).encode()
+            )
+        if url.endswith("/api/projects"):
+            return _FakeResponse(json.dumps({"projects": []}).encode())
+        if "/api/" in url:
+            return _FakeResponse(b'{"ok": true}')
+        return _FakeResponse(b"<html>Sapphire OS</html>", content_type="text/html")
+
+    monkeypatch.setattr(module.urllib.request, "urlopen", fake_urlopen)
+
+    report = module.run_smoke("https://sapphirealpha.xyz", 0.1)
+
+    health_probe = next(probe for probe in report["probes"] if probe["name"] == "health_json")
+    assert report["ok"] is False
+    assert health_probe["status"] == "FAIL"
+    assert "route owner mismatch" in health_probe["evidence"]
+    assert "agent-opportunity-exchange" in health_probe["evidence"]
+
+
 def test_smoke_passes_for_control_plane_backend_shapes(monkeypatch):
     module = _load_module()
 
@@ -73,6 +99,16 @@ def test_smoke_passes_for_control_plane_backend_shapes(monkeypatch):
         url = request.full_url
         if url.endswith("/api/projects"):
             return _FakeResponse(json.dumps({"projects": []}).encode())
+        if url.endswith("/health"):
+            return _FakeResponse(
+                json.dumps(
+                    {
+                        "ok": True,
+                        "project": "sapphire-479610",
+                        "dataset": "analytics",
+                    }
+                ).encode()
+            )
         if "/api/" in url or url.endswith("/health"):
             return _FakeResponse(b'{"ok": true}')
         return _FakeResponse(b"<html>Sapphire OS</html>", content_type="text/html")
