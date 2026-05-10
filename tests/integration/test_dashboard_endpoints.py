@@ -79,6 +79,15 @@ def test_system_api_normalizes_inference_tiers(app_client, monkeypatch):
     dash_app, client = app_client
 
     def fake_fetch(url: str):
+        if ":18082" in url:
+            return {
+                "status": "degraded",
+                "local_process_ready": True,
+                "telegram_delivery_ready": False,
+                "telegram_delivery_reason": "webhook_missing",
+                "telegram_inbound_owner": "pm_bot_webhook_unregistered",
+                "telegram_operator_action": "register_pm_bot_webhook",
+            }
         if url.endswith("/health"):
             return {
                 "status": "ok",
@@ -125,6 +134,11 @@ def test_system_api_normalizes_inference_tiers(app_client, monkeypatch):
     assert tiers["t2a"]["healthy"] is False
     assert body["inference"]["endpoints"]["windows-gpu"] == "healthy"
     assert body["inference"]["raw_tiers"]["t1_windows_gpu"] == "http://100.71.10.48:11434"
+    pm_bot = next(service for service in body["services"] if service["name"] == "pm-bot")
+    assert pm_bot["healthy"] is False
+    assert pm_bot["local_process_ready"] is True
+    assert pm_bot["telegram_delivery_ready"] is False
+    assert pm_bot["telegram_delivery_reason"] == "webhook_missing"
 
 
 def test_opportunities_reads_signals_jsonl(app_client, tmp_path, monkeypatch):

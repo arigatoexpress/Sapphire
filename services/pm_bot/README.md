@@ -173,9 +173,13 @@ Quick manual smoke test with the service running:
 - In a group, tag the bot with `@SapphirePMBot status` if `SAPPHIRE_PM_BOT_BOT_USERNAME` is set
 - Reply to one of the bot's messages with `status` to exercise reply-followup normalization
 
-For LaunchAgent deployments, the easiest live-test setup is:
+For LaunchAgent deployments, keep the shared Sapphire Telegram token owned by
+Hermes polling. The PM bot should stay local/webhook-only unless it has a
+dedicated `SAPPHIRE_PM_BOT_TOKEN`.
+
+Safe live-test setup:
 
 1. put your numeric Telegram user ID in `~/.config/sapphire-secrets/sapphire_pm_bot_allowed_user_ids`
-2. switch the plist to `MODE=polling`
-3. add `SAPPHIRE_PM_BOT_ALLOW_SHARED_POLLING=1` only if you are deliberately testing with the shared Sapphire bot token
-4. reload the LaunchAgent and confirm `/health` reports `telegram_delivery_ready=true`
+2. keep the plist in `MODE=webhook`
+3. register a PM-bot webhook for the shared token, or use a dedicated `SAPPHIRE_PM_BOT_TOKEN` before switching to `MODE=polling`
+4. reload the LaunchAgent and confirm `/health` reports `local_process_ready=true`; `telegram_delivery_ready=false` with `telegram_delivery_reason=webhook_missing` means the local service is up but Telegram is still owned elsewhere or the webhook has not been registered
