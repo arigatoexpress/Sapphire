@@ -2494,6 +2494,23 @@ def _normalize_inference_tiers(proxy_health: dict[str, Any]) -> dict[str, dict[s
     return normalized
 
 
+def _normalize_service_health(name: str, result: Any) -> tuple[bool, dict[str, Any]]:
+    if name != "pm-bot" or not isinstance(result, dict):
+        return bool(result), {}
+
+    local_ready = bool(result.get("local_process_ready", True))
+    telegram_ready = bool(result.get("telegram_delivery_ready"))
+    details = {
+        "status": result.get("status"),
+        "local_process_ready": local_ready,
+        "telegram_delivery_ready": telegram_ready,
+        "telegram_delivery_reason": result.get("telegram_delivery_reason"),
+        "telegram_inbound_owner": result.get("telegram_inbound_owner"),
+        "telegram_operator_action": result.get("telegram_operator_action"),
+    }
+    return local_ready and telegram_ready, details
+
+
 @app.route("/api/system")
 @requires_auth
 def api_system():
@@ -2520,14 +2537,16 @@ def api_system():
             try:
                 if path:
                     result = fetch_sync(f"http://{host}:{port}{path}")
-                    ok = bool(result)
+                    ok, details = _normalize_service_health(name, result)
                 else:
                     s = socket.create_connection((host, port), timeout=2)
                     s.close()
                     ok = True
+                    details = {}
             except Exception:
                 ok = False
-            service_status.append({"name": name, "port": port, "healthy": ok})
+                details = {}
+            service_status.append({"name": name, "port": port, "healthy": ok, **details})
 
         # Add inference-proxy status from already-fetched proxy_health (avoid re-probe)
         service_status.append(
@@ -2748,16 +2767,23 @@ def api_health_summary():
             try:
                 if path:
                     result = fetch_sync(f"http://{host}:{port}{path}")
-                    ok = bool(result)
+                    ok, details = _normalize_service_health(name, result)
                 else:
                     s = socket.create_connection((host, port), timeout=2)
                     s.close()
                     ok = True
+                    details = {}
             except Exception:
                 ok = False
+                details = {}
             elapsed = int((time.time() - t0) * 1000)
 
-            entry = {"name": name, "healthy": ok, "response_time_ms": elapsed if ok else None}
+            entry = {
+                "name": name,
+                "healthy": ok,
+                "response_time_ms": elapsed if ok else None,
+                **details,
+            }
             by_category[category].append(entry)
 
             if ok:

@@ -834,10 +834,13 @@ def test_health_endpoint_full_shape_default_state(monkeypatch, tmp_path, reload_
         "message_reaction_count",
     ]
     body = response.json()
-    assert body["status"] == "ok"
+    assert body["status"] == "degraded"
     assert body["service"] == "sapphire-pm-bot"
+    assert body["local_process_ready"] is True
     assert body["mode"] == "webhook"
     assert body["token_source"] == "explicit_env"
+    assert body["telegram_token_role"] == "dedicated"
+    assert body["telegram_polling_policy"] == "dedicated_polling_allowed"
     assert body["polling_active"] is False
     assert body["last_poll_error"] is None
     assert body["shared_polling_allowed"] is False
@@ -845,10 +848,61 @@ def test_health_endpoint_full_shape_default_state(monkeypatch, tmp_path, reload_
     assert body["bot_username"] == "NemotronRariBot"
     assert body["telegram_delivery_ready"] is False
     assert body["telegram_delivery_reason"] == "webhook_missing"
+    assert body["telegram_inbound_owner"] == "pm_bot_webhook_unregistered"
+    assert body["telegram_operator_action"] == "register_pm_bot_webhook"
     assert body["telegram_probe_ok"] is True
     assert body["telegram_webhook_registered"] is False
     assert body["telegram_pending_update_count"] == 0
     assert body["telegram_allowed_updates"] == ["message", "edited_message"]
+
+
+def test_health_explains_shared_token_webhook_half_state(reload_server, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    server = reload_server()
+    monkeypatch.setattr(
+        server,
+        "SETTINGS",
+        server.Settings(
+            token="abc",
+            webhook_secret="secret",
+            mode="webhook",
+            host="127.0.0.1",
+            port=18082,
+            telegram_timeout_seconds=30.0,
+            token_source="shared_secret_file",
+            shared_polling_allowed=False,
+        ),
+    )
+    monkeypatch.setattr(
+        server,
+        "_telegram_runtime_probe",
+        lambda: {
+            "probe_ok": True,
+            "bot_username": "NemotronRariBot",
+            "bot_id": 123,
+            "webhook_registered": False,
+            "pending_update_count": 0,
+            "allowed_updates": ["message"],
+            "delivery_ready": False,
+            "delivery_mode_reason": "webhook_missing",
+            "probe_error": None,
+        },
+    )
+
+    with TestClient(server.app) as http:
+        response = http.get("/health")
+
+    body = response.json()
+    assert body["status"] == "degraded"
+    assert body["local_process_ready"] is True
+    assert body["telegram_token_role"] == "shared"
+    assert body["telegram_polling_policy"] == "shared_polling_disabled"
+    assert body["telegram_inbound_owner"] == "pm_bot_webhook_unregistered"
+    assert (
+        body["telegram_operator_action"]
+        == "register_pm_bot_webhook_or_leave_shared_token_to_external_poller"
+    )
 
 
 def test_health_reports_polling_active_when_thread_alive(reload_server):

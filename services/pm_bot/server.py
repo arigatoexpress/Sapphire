@@ -58,6 +58,7 @@ _WEBHOOK_SECRET_PATHS = [
 
 _TRUE_VALUES = {"1", "true", "yes", "on"}
 _DEDICATED_TOKEN_SOURCES = {"explicit_env"}
+_SHARED_TOKEN_SOURCES = {"shared_env", "shared_secret_file", "legacy_secret_file", "secret_file"}
 _SUPPORTED_UPDATE_TYPES = [
     "message",
     "edited_message",
@@ -317,6 +318,55 @@ def _validate_startup_config() -> None:
             "Polling mode requires SAPPHIRE_PM_BOT_TOKEN or "
             "SAPPHIRE_PM_BOT_ALLOW_SHARED_POLLING=1"
         )
+
+
+def _telegram_token_role() -> str:
+    if SETTINGS.token_source in _DEDICATED_TOKEN_SOURCES:
+        return "dedicated"
+    if SETTINGS.token_source in _SHARED_TOKEN_SOURCES:
+        return "shared"
+    if SETTINGS.token_source == "missing":
+        return "missing"
+    return "unknown"
+
+
+def _telegram_polling_policy() -> str:
+    token_role = _telegram_token_role()
+    if token_role == "dedicated":
+        return "dedicated_polling_allowed"
+    if SETTINGS.shared_polling_allowed:
+        return "shared_polling_break_glass"
+    if token_role == "shared":
+        return "shared_polling_disabled"
+    return "polling_policy_unknown"
+
+
+def _telegram_inbound_owner_hint(
+    *,
+    polling_active: bool,
+    webhook_registered: bool | None,
+) -> str:
+    if SETTINGS.mode == "polling":
+        return "pm_bot_polling" if polling_active else "pm_bot_polling_inactive"
+    if SETTINGS.mode == "webhook":
+        return "pm_bot_webhook" if webhook_registered else "pm_bot_webhook_unregistered"
+    return "unknown"
+
+
+def _telegram_operator_action(
+    *,
+    polling_active: bool,
+    webhook_registered: bool | None,
+) -> str:
+    if SETTINGS.mode == "webhook":
+        if webhook_registered:
+            return "none"
+        if _telegram_token_role() == "shared":
+            return "register_pm_bot_webhook_or_leave_shared_token_to_external_poller"
+        return "register_pm_bot_webhook"
+    if SETTINGS.mode == "polling" and not polling_active:
+        return "start_pm_bot_polling_or_switch_to_webhook"
+    return "none"
 
 
 def _message_payload(update: dict[str, Any]) -> dict[str, Any]:
@@ -616,22 +666,35 @@ def health() -> dict[str, Any]:
     thread = POLLING_STATE.get("thread")
     polling_active = bool(isinstance(thread, threading.Thread) and thread.is_alive())
     telegram_probe = _telegram_runtime_probe()
+    webhook_registered = telegram_probe.get("webhook_registered")
+    telegram_delivery_ready = bool(telegram_probe.get("delivery_ready"))
     return {
-        "status": "ok",
+        "status": "ok" if telegram_delivery_ready else "degraded",
         "service": "sapphire-pm-bot",
+        "local_process_ready": True,
         "mode": SETTINGS.mode,
         "token_source": SETTINGS.token_source,
+        "telegram_token_role": _telegram_token_role(),
+        "telegram_polling_policy": _telegram_polling_policy(),
         "polling_active": polling_active,
         "last_poll_error": POLLING_STATE.get("last_error"),
         "shared_polling_allowed": SETTINGS.shared_polling_allowed,
         "webhook_secret_configured": bool(SETTINGS.webhook_secret),
         "bot_username": telegram_probe.get("bot_username") or SETTINGS.bot_username,
         "supported_update_types": list(_SUPPORTED_UPDATE_TYPES),
-        "telegram_delivery_ready": bool(telegram_probe.get("delivery_ready")),
+        "telegram_delivery_ready": telegram_delivery_ready,
         "telegram_delivery_reason": telegram_probe.get("delivery_mode_reason"),
+        "telegram_inbound_owner": _telegram_inbound_owner_hint(
+            polling_active=polling_active,
+            webhook_registered=webhook_registered if isinstance(webhook_registered, bool) else None,
+        ),
+        "telegram_operator_action": _telegram_operator_action(
+            polling_active=polling_active,
+            webhook_registered=webhook_registered if isinstance(webhook_registered, bool) else None,
+        ),
         "telegram_probe_ok": bool(telegram_probe.get("probe_ok")),
         "telegram_probe_error": telegram_probe.get("probe_error"),
-        "telegram_webhook_registered": telegram_probe.get("webhook_registered"),
+        "telegram_webhook_registered": webhook_registered,
         "telegram_pending_update_count": telegram_probe.get("pending_update_count"),
         "telegram_allowed_updates": telegram_probe.get("allowed_updates"),
     }
