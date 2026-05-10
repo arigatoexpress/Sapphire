@@ -338,3 +338,69 @@ def test_qwen36_alias_skips_pi_substitution_for_exact_mac_fallback(
         server.shutdown()
         server.server_close()
         thread.join(timeout=2.0)
+
+
+def test_fast_alias_uses_mac_nemotron_equivalent_before_pi_substitution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Windows miss should keep fast on Mac Nemotron, not silently become Hermes."""
+    monkeypatch.setattr(proxy_app, "PI_RARI1_ENABLED", True)
+    monkeypatch.setattr(proxy_app, "PI_RARI2_ENABLED", False)
+    monkeypatch.setattr(proxy_app, "PI_ENABLED", True)
+    monkeypatch.setitem(proxy_app._endpoint_health, "windows-gpu", True)
+    monkeypatch.setitem(proxy_app._endpoint_health, "mac-local", True)
+    monkeypatch.setattr(proxy_app, "_should_preflight", lambda *args, **kwargs: False)
+
+    def fake_ollama_native(
+        endpoint_name: str,
+        base_url: str,
+        model: str,
+        messages: list,
+        max_tokens: int,
+        temperature: float,
+        timeout: int = 60,
+    ) -> dict | None:
+        assert endpoint_name == "windows-gpu"
+        assert model == "nemotron-mini:4b"
+        return None
+
+    def fake_mac_local(path: str, body: bytes, model: str = "") -> tuple[int, bytes]:
+        payload = json.loads(body.decode())
+        assert path == "/v1/chat/completions"
+        assert model == "nemotron-mini:latest"
+        assert payload["model"] == "nemotron-mini:latest"
+        return 200, json.dumps({"model": payload["model"], "choices": []}).encode()
+
+    def fail_pi_tier(*args: Any, **kwargs: Any) -> tuple[str | None, dict | None, list[str]]:
+        pytest.fail("Pi tier should be skipped for Mac-equivalent Nemotron fallback")
+
+    monkeypatch.setattr(proxy_app, "_try_ollama_native", fake_ollama_native)
+    monkeypatch.setattr(proxy_app, "_try_mac_local", fake_mac_local)
+    monkeypatch.setattr(proxy_app, "_try_pi_tier", fail_pi_tier)
+
+    server, thread, base_url = _start_proxy()
+    try:
+        req = urllib.request.Request(
+            f"{base_url}/v1/chat/completions",
+            data=json.dumps(
+                {
+                    "model": "fast",
+                    "messages": [{"role": "user", "content": "reply with ok"}],
+                    "max_tokens": 8,
+                    "temperature": 0.1,
+                }
+            ).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+
+        with urllib.request.urlopen(req, timeout=2) as response:
+            payload = json.loads(response.read().decode())
+
+        assert response.status == 200
+        assert response.headers["X-Inference-Tier"] == "mac-local"
+        assert payload["model"] == "nemotron-mini:latest"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2.0)

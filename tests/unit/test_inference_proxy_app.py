@@ -129,6 +129,7 @@ class TestTierMembership:
         # Models on Mac that aren't Pi-serveable should be preferred on Mac
         # rather than substituted to PI_DEFAULT_MODEL.
         assert "hermes3:8b" in app_module.MAC_EXACT_FALLBACK_MODELS
+        assert "nemotron-mini:4b" in app_module.MAC_EXACT_FALLBACK_MODELS
         # Pi-serveable models should NOT be in the exact-fallback set.
         for m in app_module.PI_SERVE_MODELS:
             assert m not in app_module.MAC_EXACT_FALLBACK_MODELS
@@ -136,6 +137,11 @@ class TestTierMembership:
     def test_select_pi_model_substitutes_when_not_pi_safe(self, app_module):
         assert app_module._select_pi_model("hermes3:8b") == app_module.PI_DEFAULT_MODEL
         assert app_module._select_pi_model("qwen2.5:0.5b") == "qwen2.5:0.5b"
+
+    def test_select_mac_model_preserves_nemotron_alias(self, app_module):
+        assert app_module._select_mac_model("nemotron-mini:4b") == "nemotron-mini:latest"
+        assert app_module._select_mac_model("nemotron-mini") == "nemotron-mini:latest"
+        assert app_module._select_mac_model("ghost-model") == app_module.MAC_FALLBACK_MODEL
 
     def test_enabled_pi_targets_respects_flags(self, app_module, monkeypatch):
         # Monkey-patch the module-level flags rather than env (env is already

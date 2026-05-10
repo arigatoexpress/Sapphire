@@ -196,7 +196,11 @@ MAC_FALLBACK_MODEL = "hermes3:8b"  # model known to be on Mac Ollama
 
 # Mac models (models confirmed available locally)
 MAC_MODELS = {"hermes3:8b", "llama3.2:3b", "nemotron-mini:latest", "llama3.2:latest", "qwen3.6:27b"}
-MAC_EXACT_FALLBACK_MODELS = MAC_MODELS - PI_SERVE_MODELS
+MAC_MODEL_ALIASES = {
+    "nemotron-mini": "nemotron-mini:latest",
+    "nemotron-mini:4b": "nemotron-mini:latest",
+}
+MAC_EXACT_FALLBACK_MODELS = (MAC_MODELS | set(MAC_MODEL_ALIASES)) - PI_SERVE_MODELS
 
 # Enable Pi tiers independently — both Pis are online as of 2026-04-18.
 PI_RARI1_ENABLED = os.getenv("PI_RARI1_ENABLED", os.getenv("PI_OLLAMA_ENABLED", "0")) == "1"
@@ -1267,6 +1271,16 @@ def _select_pi_model(model: str) -> str:
     return model if model in PI_SERVE_MODELS else PI_DEFAULT_MODEL
 
 
+def _select_mac_model(model: str) -> str:
+    """Choose the Mac-local model while preserving known equivalent aliases."""
+    if model in MAC_MODELS:
+        return model
+    aliased = MAC_MODEL_ALIASES.get(model)
+    if aliased in MAC_MODELS:
+        return aliased
+    return MAC_FALLBACK_MODEL
+
+
 def _try_pi_tier(
     model: str,
     messages: list,
@@ -1645,7 +1659,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
         # ── Tier 3: Mac local ────────────────────────────────────────────────
         tried.append("mac-local")
         # Model substitution: use hermes3:8b if requested model not on Mac
-        mac_model = model if model in MAC_MODELS else MAC_FALLBACK_MODEL
+        mac_model = _select_mac_model(model)
         if mac_model != model:
             mac_body = json.dumps({**req_data, "model": mac_model}).encode()
             log.info("Mac fallback: substituting model '%s' → '%s'", model, mac_model)
