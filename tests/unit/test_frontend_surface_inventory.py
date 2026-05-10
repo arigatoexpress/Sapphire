@@ -79,9 +79,10 @@ def test_public_homepage_fetches_have_public_contracts_only() -> None:
     inventory = build_inventory()
     fetches = {str(fetch["path"]): fetch for fetch in inventory["public_template_fetches"]}
 
-    assert inventory["summary"]["public_template_fetch_count"] >= 8
+    assert inventory["summary"]["public_template_fetch_count"] >= 15
     assert inventory["summary"]["public_template_fetch_missing_contract_count"] == 0
     assert inventory["summary"]["public_template_admin_fetch_count"] == 0
+    assert inventory["summary"]["public_template_external_fetch_count"] == 0
     assert {
         "/api/summary",
         "/api/regime",
@@ -92,4 +93,14 @@ def test_public_homepage_fetches_have_public_contracts_only() -> None:
         "/api/failover/readiness",
         "/api/markets/snapshot",
     } <= set(fetches)
-    assert all(fetch["boundary"] == "public_safe" for fetch in fetches.values())
+    assert all(
+        fetch["boundary"] == "public_safe"
+        for fetch in inventory["public_template_fetches"]
+        if fetch["same_origin"]
+    )
+    assert {
+        "services/analytics_dashboard/templates/p/brain.html",
+        "services/analytics_dashboard/templates/p/markets.html",
+        "services/analytics_dashboard/templates/p/system.html",
+        "services/analytics_dashboard/templates/p/threats.html",
+    } <= {str(fetch["template"]) for fetch in inventory["public_template_fetches"]}

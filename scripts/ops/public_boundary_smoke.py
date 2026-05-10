@@ -35,12 +35,18 @@ PUBLIC_ROUTES: tuple[str, ...] = (
     "/p/system",
     "/p/wildfire",
     "/p/regional",
+    "/p/threats",
+    "/p/markets",
     "/p/help",
     "/api/projects",
     "/api/summary",
+    "/api/regime",
+    "/api/threats/live",
+    "/api/timeseries/threats",
     "/api/brain/synthesis",
     "/api/silos/health",
     "/api/failover/readiness",
+    "/api/markets/snapshot",
 )
 
 ADMIN_PROTECTED_ROUTES: tuple[str, ...] = (

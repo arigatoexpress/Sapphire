@@ -99,6 +99,7 @@ class PublicTemplateFetch:
     boundary: str
     contract_present: bool
     admin_route: bool
+    same_origin: bool
 
 
 SURFACE_DEFS: tuple[SurfaceDefinition, ...] = (
@@ -688,7 +689,7 @@ ROUTE_CONTRACTS: tuple[RouteBoundaryContract, ...] = (
     ),
 )
 
-FETCH_PATTERN = re.compile(r"safeFetch\(['\"]([^'\"]+)['\"]")
+FETCH_PATTERN = re.compile(r"(?P<helper>safeFetch|fetch)\(\s*['\"](?P<path>[^'\"]+)['\"]")
 
 
 def _repo_relative(path: Path, *, root: Path = ROOT) -> str:
@@ -730,26 +731,35 @@ def _contract_lookup() -> dict[str, RouteBoundaryContract]:
 
 
 def _public_template_fetches(root: Path = ROOT) -> list[PublicTemplateFetch]:
-    template = "services/analytics_dashboard/templates/index.html"
-    template_path = root / template
-    if not template_path.exists():
-        return []
+    template_paths = [root / "services/analytics_dashboard/templates/index.html"]
+    template_paths.extend(
+        sorted((root / "services/analytics_dashboard/templates/p").glob("*.html"))
+    )
     lookup = _contract_lookup()
     fetches: list[PublicTemplateFetch] = []
-    for match in FETCH_PATTERN.finditer(template_path.read_text(encoding="utf-8")):
-        path = _contract_path(match.group(1))
-        contract = lookup.get(path)
-        fetches.append(
-            PublicTemplateFetch(
-                path=path,
-                template=template,
-                helper="safeFetch",
-                boundary=contract.boundary if contract else "unknown",
-                contract_present=contract is not None,
-                admin_route=path.startswith("/api/admin/"),
+    for template_path in template_paths:
+        if not template_path.exists():
+            continue
+        template = _repo_relative(template_path, root=root)
+        for match in FETCH_PATTERN.finditer(template_path.read_text(encoding="utf-8")):
+            raw_path = match.group("path")
+            same_origin = raw_path.startswith("/")
+            path = _contract_path(raw_path) if same_origin else raw_path
+            contract = lookup.get(path) if same_origin else None
+            fetches.append(
+                PublicTemplateFetch(
+                    path=path,
+                    template=template,
+                    helper=match.group("helper"),
+                    boundary=contract.boundary
+                    if contract
+                    else ("unknown" if same_origin else "external_public_fetch"),
+                    contract_present=(contract is not None) if same_origin else True,
+                    admin_route=same_origin and path.startswith("/api/admin/"),
+                    same_origin=same_origin,
+                )
             )
-        )
-    return sorted(fetches, key=lambda item: item.path)
+    return sorted(fetches, key=lambda item: (item.template, item.path))
 
 
 def _entry(definition: SurfaceDefinition, *, root: Path = ROOT) -> SurfaceInventoryEntry:
@@ -806,10 +816,14 @@ def build_inventory(root: Path = ROOT) -> dict[str, Any]:
             ),
             "public_template_fetch_count": len(public_template_fetches),
             "public_template_fetch_missing_contract_count": sum(
-                not fetch.contract_present for fetch in public_template_fetches
+                fetch.same_origin and not fetch.contract_present
+                for fetch in public_template_fetches
             ),
             "public_template_admin_fetch_count": sum(
                 fetch.admin_route for fetch in public_template_fetches
+            ),
+            "public_template_external_fetch_count": sum(
+                not fetch.same_origin for fetch in public_template_fetches
             ),
             "boundaries": boundaries,
             "stacks": stacks,

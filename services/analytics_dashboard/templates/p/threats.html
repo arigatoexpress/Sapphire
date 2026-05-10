@@ -39,7 +39,7 @@
       <tr><td colspan="5" class="muted">// fetching public threat summary</td></tr>
     </tbody>
   </table>
-  <div class="muted" style="margin-top: 10px;">upstream: <code>{{ threat_bot_url }}</code></div>
+  <div class="muted" style="margin-top: 10px;">upstream: same-origin public summary <code>/api/threats/live</code></div>
 </section>
 
 <section class="box">
@@ -68,7 +68,12 @@
     var crit = rows.filter(r => (r.severity||'').toUpperCase() === 'CRITICAL' || r.kev).length;
     document.getElementById('kpi-crit').textContent = crit;
     var tb = document.getElementById('live-rows');
-    if (!rows.length) { tb.innerHTML = '<tr><td colspan="5" class="muted">// no records returned</td></tr>'; return; }
+    var prio = document.getElementById('prio-list');
+    if (!rows.length) {
+      tb.innerHTML = '<tr><td colspan="5" class="muted">// no records returned</td></tr>';
+      prio.innerHTML = '<li class="muted">// no prioritized public records returned</li>';
+      return;
+    }
     tb.innerHTML = rows.slice(0, 25).map(r => {
       var sev = (r.severity||'').toUpperCase();
       var pillCls = sev === 'CRITICAL' ? 'red' : sev === 'HIGH' ? 'amber' : 'green';
@@ -80,8 +85,14 @@
         '<td class="dim">' + (r.epss != null ? Number(r.epss).toFixed(3) : '--') + '</td>' +
       '</tr>';
     }).join('');
+    prio.innerHTML = rows.slice(0, 8).map(r => {
+      var label = r.cve_id || r.id || '';
+      var s = r.summary || r.description || '';
+      return '<li><code>' + esc(label) + '</code> &mdash; ' + esc(s.slice(0,140)) + '</li>';
+    }).join('');
   }).catch(()=>{
     document.getElementById('live-rows').innerHTML = '<tr><td colspan="5" class="muted">// upstream unreachable</td></tr>';
+    document.getElementById('prio-list').innerHTML = '<li class="muted">// public summary unavailable</li>';
   });
 
   fetch('/api/timeseries/threats').then(r=>r.json()).then(d=>{
@@ -107,17 +118,6 @@
   }).catch(()=>{
     document.getElementById('severity-ascii').textContent = '  // /api/timeseries/threats unreachable';
   });
-
-  fetch('{{ threat_bot_url }}/threats/prioritized').then(r=>r.ok?r.json():null).then(d=>{
-    if (!d) return;
-    var items = (d.records || d.items || d.threats || []).slice(0, 8);
-    if (!items.length) return;
-    document.getElementById('prio-list').innerHTML = items.map(it => {
-      var label = it.cve_id || it.id || '';
-      var s = it.summary || it.description || '';
-      return '<li><code>' + esc(label) + '</code> &mdash; ' + esc(s.slice(0,140)) + '</li>';
-    }).join('');
-  }).catch(()=>{});
 })();
 </script>
 {% endblock %}
