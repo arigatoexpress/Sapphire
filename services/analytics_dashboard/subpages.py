@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import UTC, datetime
 
@@ -29,16 +30,15 @@ WILDFIRE_HEALTH_URL = os.environ.get(
 )
 REGIONAL_URL = os.environ.get("REGIONAL_URL", "https://regional.sapphirealpha.xyz/")
 HACK_URL = os.environ.get("HACK_URL", "https://hack.sapphirealpha.xyz/")
-THREAT_BOT_URL = os.environ.get(
-    "THREAT_BOT_URL",
-    "https://cyber-threat-bot-691674245427.us-central1.run.app",
-)
 
 
 def _http_get_json(url: str, timeout: float = 2.5) -> dict | None:
     try:
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in {"http", "https"}:
+            return None
         req = urllib.request.Request(url, headers={"User-Agent": "sapphire-subpages/1.0"})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310
             if resp.status != 200:
                 return None
             return json.loads(resp.read().decode("utf-8"))
@@ -155,10 +155,7 @@ def register_subpages(app, *, project: str, dataset: str) -> None:
     def _p_threats():
         # The template fetches /api/threats/live + /api/timeseries/threats
         # client-side from same-origin proxies wired in app.py.
-        return render_template(
-            "p/threats.html",
-            **_ctx({"threat_bot_url": THREAT_BOT_URL}),
-        )
+        return render_template("p/threats.html", **_ctx())
 
     @app.get("/p/tho")
     def _p_tho():

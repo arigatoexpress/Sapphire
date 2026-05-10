@@ -22,6 +22,12 @@ def test_control_plane_summary_uses_real_cards_without_live_settlement() -> None
     assert cards["x402 Product Spine"]["value"].startswith("9 products")
     assert "0 live settlement" in cards["x402 Product Spine"]["value"]
     assert cards["AgentWiki Builder Briefs"]["value"].startswith("4 briefs")
+    assert cards["Market Strategy Lab"]["module"] == "Markets"
+    assert cards["Market Strategy Lab"]["mode"] == "paper"
+    assert "live trading is disabled" in cards["Market Strategy Lab"]["summary"]
+    assert cards["Routine Pause Gate"]["module"] == "Automation"
+    assert cards["Capability Contracts"]["module"] == "Settings / Contracts"
+    assert cards["Capability Contracts"]["value"] == "auth-gated · GET only"
     assert cards["Commercial Safety Contract"]["mode"] == "blocked"
     assert cards["Dashboard Surface"]["source"]["path_or_url"].endswith(
         "services/dashboard/config/surface_inventory.json"
@@ -63,6 +69,7 @@ def test_control_plane_summary_rolls_up_all_product_modules() -> None:
         "Automation",
         "Settings / Contracts",
     } <= module_names
+    assert all(module["card_count"] > 0 for module in summary["modules"])
 
 
 def test_control_plane_summary_defers_heavy_org_dirty_sweep() -> None:

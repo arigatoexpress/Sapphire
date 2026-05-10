@@ -16,6 +16,10 @@ SURFACE_INVENTORY = ROOT / "services" / "dashboard" / "config" / "surface_invent
 X402_PRODUCTS = ROOT / "config" / "x402_products.json"
 X402_SOURCES = ROOT / "config" / "x402_source_registry.json"
 AGENTWIKI_ARTIFACTS = ROOT / "config" / "agentwiki_artifacts.json"
+STRATEGY_LAB = ROOT / "lib" / "trading" / "strategy_lab.py"
+FRONTEND_CONTROL_PLANE_API = (
+    ROOT / "services" / "dashboard" / "frontend" / "src" / "api" / "controlPlane.ts"
+)
 
 CARD_STATUSES = {"ok", "warn", "fail", "unknown"}
 CARD_MODES = {"live", "read_only", "paper", "modeled", "stale", "blocked"}
@@ -42,6 +46,32 @@ def _file_source(path: Path, *, now: datetime, kind: str = "file") -> dict[str, 
     return {
         "kind": kind,
         "path_or_url": rel,
+        "generated_at": _iso(mtime),
+        "age_seconds": max(0, int((now - mtime).total_seconds())),
+    }
+
+
+def _routine_pause_source(now: datetime) -> dict[str, Any]:
+    pause_dir = Path.home() / ".sapphire" / "routine_pause"
+    if not pause_dir.exists():
+        return {
+            "kind": "file",
+            "path_or_url": "~/.sapphire/routine_pause",
+            "generated_at": None,
+            "age_seconds": None,
+        }
+    try:
+        mtime = datetime.fromtimestamp(pause_dir.stat().st_mtime, UTC).replace(microsecond=0)
+    except OSError:
+        return {
+            "kind": "file",
+            "path_or_url": "~/.sapphire/routine_pause",
+            "generated_at": _iso(now),
+            "age_seconds": 0,
+        }
+    return {
+        "kind": "file",
+        "path_or_url": "~/.sapphire/routine_pause",
         "generated_at": _iso(mtime),
         "age_seconds": max(0, int((now - mtime).total_seconds())),
     }
@@ -354,6 +384,117 @@ def _agentwiki_card(now: datetime) -> dict[str, Any]:
     )
 
 
+def _markets_research_card(now: datetime) -> dict[str, Any]:
+    try:
+        from lib.trading.strategy_lab import build_strategy_lab_report
+
+        report = build_strategy_lab_report(fetch_live=False)
+        safety = report.get("safety") or {}
+        market = report.get("market_universe") or {}
+        combined_tokens = market.get("combined_tokens")
+        venue_matrix = market.get("venue_matrix")
+        symbol_count = len(combined_tokens) if isinstance(combined_tokens, list) else 0
+        venue_count = len(venue_matrix) if isinstance(venue_matrix, list) else 0
+        source_name = str(market.get("source") or "fallback")
+        stage = str(safety.get("execution_stage") or "paper")
+        live_enabled = safety.get("live_trading_enabled") is True
+        stale = bool(market.get("stale"))
+        status = "fail" if live_enabled else "warn" if stale else "ok"
+        return _card(
+            module="Markets",
+            status=status,
+            mode="paper",
+            title="Market Strategy Lab",
+            value=f"{stage} · {symbol_count} symbols",
+            summary=(
+                f"{venue_count} venue mappings are available from {source_name} data; "
+                "live trading is disabled and order drafts never sign or submit."
+            ),
+            source=_file_source(STRATEGY_LAB, now=now, kind="script"),
+            actions=[
+                {
+                    "label": "Refresh paper strategy lab",
+                    "mode": "read_only",
+                    "requires_confirm": False,
+                }
+            ],
+        )
+    except Exception as exc:  # noqa: BLE001
+        return _card(
+            module="Markets",
+            status="unknown",
+            mode="stale",
+            title="Market Strategy Lab",
+            value="not available",
+            summary=f"Paper strategy-lab posture could not be built: {type(exc).__name__}: {exc}",
+            source=_file_source(STRATEGY_LAB, now=now, kind="script"),
+        )
+
+
+def _automation_pause_card(now: datetime) -> dict[str, Any]:
+    try:
+        from lib.core import routine_pause
+
+        records = routine_pause.list_paused()
+        names = [record.name for record in records]
+        count = len(records)
+        if names:
+            shown = ", ".join(names[:4])
+            suffix = f", +{len(names) - 4} more" if len(names) > 4 else ""
+            detail = f"Paused routines: {shown}{suffix}."
+        else:
+            detail = "No scheduled Sapphire routines are currently paused by the durable flag gate."
+        return _card(
+            module="Automation",
+            status="warn" if records else "ok",
+            mode="read_only",
+            title="Routine Pause Gate",
+            value=f"{count} paused routine{'s' if count != 1 else ''}",
+            summary=detail,
+            source=_routine_pause_source(now),
+            actions=[
+                {
+                    "label": "Review routine pause flags",
+                    "mode": "read_only",
+                    "requires_confirm": False,
+                }
+            ],
+        )
+    except Exception as exc:  # noqa: BLE001
+        return _card(
+            module="Automation",
+            status="unknown",
+            mode="stale",
+            title="Routine Pause Gate",
+            value="not available",
+            summary=f"Routine pause state could not be read safely: {type(exc).__name__}: {exc}",
+            source=_routine_pause_source(now),
+        )
+
+
+def _settings_contracts_card(now: datetime) -> dict[str, Any]:
+    return _card(
+        module="Settings / Contracts",
+        status="ok",
+        mode="read_only",
+        title="Capability Contracts",
+        value="auth-gated · GET only",
+        summary=(
+            "The React preview strips credentials from the browser URL and fetches only the "
+            "authenticated summary endpoint; future write controls require separate confirmed "
+            "contracts."
+        ),
+        source=_file_source(FRONTEND_CONTROL_PLANE_API, now=now),
+        actions=[
+            {
+                "label": "Draft confirmed action schema",
+                "mode": "dry_run",
+                "requires_confirm": True,
+            }
+        ],
+    )
+
+
 def _x402_safety_card(now: datetime, product_index: Mapping[str, Any]) -> dict[str, Any]:
     safety = product_index.get("safety", {})
     summary = product_index.get("summary", {})
@@ -463,7 +604,10 @@ def build_control_plane_summary(
         _dashboard_runtime_card(now),
         x402_card,
         _agentwiki_card(now),
+        _markets_research_card(now),
         _x402_safety_card(now, product_index),
+        _automation_pause_card(now),
+        _settings_contracts_card(now),
         _dashboard_surface_card(now),
         _control_plane_health_card(now, probe_services=probe_services),
         org_card,
