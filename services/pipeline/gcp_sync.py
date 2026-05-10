@@ -151,7 +151,12 @@ def _parse_ts(s: Any) -> str:
 
 
 def transform_signals(files: list[Path]) -> Iterator[dict]:
-    """data/signals/YYYY-MM-DD.jsonl → trading_signals rows."""
+    """Signal JSONL sources → trading_signals rows.
+
+    The scored alpha pipeline writes ``data/signals/YYYY-MM-DD.jsonl`` while
+    the Mac signal logger writes the legacy ``data/trading_signals.jsonl``. Keep
+    both discoverable so hourly GCP sync can backfill either path.
+    """
     now = _now_iso()
     for fp in files:
         # Stream line-by-line; the prior `.read_text().splitlines()` loaded
@@ -174,6 +179,7 @@ def transform_signals(files: list[Path]) -> Iterator[dict]:
                 ts = _parse_ts(r.get("timestamp") or r.get("closed_at"))
                 yield {
                     "signal_id": r.get("pipeline_id")
+                    or r.get("signal_id")
                     or _stable_id(r.get("symbol"), ts, r.get("action")),
                     "symbol": str(r.get("symbol", "UNKNOWN")).upper(),
                     "action": str(r.get("action", "unknown")).lower(),
@@ -554,7 +560,12 @@ class Source:
 
 
 SOURCES: dict[str, Source] = {
-    "signals": Source("signals", "trading_signals", "signals/*.jsonl", transform_signals),
+    "signals": Source(
+        "signals",
+        "trading_signals",
+        ("signals/*.jsonl", "trading_signals.jsonl"),
+        transform_signals,
+    ),
     "predictions": Source(
         "predictions", "predictions", "intelligence/*/predictions.json", transform_predictions
     ),
