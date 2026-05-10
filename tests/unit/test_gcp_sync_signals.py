@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
 import types
 from pathlib import Path
@@ -85,3 +86,60 @@ def test_transform_signals_maps_legacy_signal_logger_rows(monkeypatch, tmp_path)
     assert row["price_at_signal"] == 84500
     assert row["confidence"] == 0.75
     assert row["timestamp"] == "2026-05-10T12:00:00+00:00"
+
+
+def test_signal_source_backfills_new_legacy_pattern_without_lowering_watermark(
+    monkeypatch, tmp_path
+):
+    gcp_sync = _load_gcp_sync(monkeypatch)
+    data_dir = tmp_path / "data"
+    signals_dir = data_dir / "signals"
+    signals_dir.mkdir(parents=True)
+    scored = signals_dir / "2026-04-18.jsonl"
+    legacy = data_dir / "trading_signals.jsonl"
+    scored.write_text(
+        json.dumps(
+            {
+                "timestamp": "2026-04-18T12:00:00+00:00",
+                "symbol": "ETH-USD",
+                "action": "SELL",
+                "pipeline_id": "scored-1",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    legacy.write_text(
+        json.dumps(
+            {
+                "timestamp": "2026-04-17T12:00:00+00:00",
+                "symbol": "BTC-USD",
+                "action": "BUY",
+                "signal_id": "legacy-1",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    os.utime(legacy, (100, 100))
+    os.utime(scored, (200, 200))
+    monkeypatch.setattr(gcp_sync, "DATA_DIR", data_dir)
+    monkeypatch.setattr(
+        gcp_sync,
+        "_upload_to_gcs",
+        lambda *_args, **_kwargs: "gs://sapphire-data-lake/raw/signals/test.ndjson",
+    )
+    state = {"signals": {"mtime": 200.0, "last_rows": 13}}
+
+    result = gcp_sync.sync_source(
+        gcp_sync.SOURCES["signals"],
+        state,
+        bq_client=object(),
+        gcs_client=object(),
+        dry_run=False,
+    )
+
+    assert result.files_scanned == 1
+    assert result.rows_written == 1
+    assert state["signals"]["mtime"] == 200.0
+    assert state["signals"]["patterns"] == ["signals/*.jsonl", "trading_signals.jsonl"]

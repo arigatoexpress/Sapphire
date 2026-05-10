@@ -3,7 +3,8 @@
 Syncs local JSONL/JSON data to GCS (raw/) and BigQuery (sapphire dataset).
 
 Flow per source:
-  1. Discover local files newer than a watermark (state file).
+  1. Discover local files newer than a watermark, plus explicitly marked
+     newly introduced source patterns that need one-time backfill.
   2. Transform raw JSON into BigQuery-ready row dicts (schema matches
      infra/gcp/schemas/*.json).
   3. Upload the transformed rows as NDJSON to GCS under raw/<source>/YYYY-MM-DD/.
@@ -20,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import fnmatch
 import hashlib
 import json
 import logging
@@ -557,6 +559,7 @@ class Source:
     table: str
     glob: str | tuple[str, ...]  # relative to DATA_DIR
     transform: Callable[[list[Path]], Iterator[dict]]
+    backfill_glob: str | tuple[str, ...] = ()
 
 
 SOURCES: dict[str, Source] = {
@@ -565,6 +568,7 @@ SOURCES: dict[str, Source] = {
         "trading_signals",
         ("signals/*.jsonl", "trading_signals.jsonl"),
         transform_signals,
+        backfill_glob="trading_signals.jsonl",
     ),
     "predictions": Source(
         "predictions", "predictions", "intelligence/*/predictions.json", transform_predictions
@@ -593,13 +597,30 @@ SOURCES: dict[str, Source] = {
 # ---------------------------------------------------------------------------
 
 
-def _discover_files(glob: str | tuple[str, ...], since_mtime: float) -> list[Path]:
-    """Find files matching glob with mtime > since_mtime."""
+def _as_patterns(glob: str | tuple[str, ...]) -> tuple[str, ...]:
     patterns = (glob,) if isinstance(glob, str) else glob
+    return tuple(patterns)
+
+
+def _matches_any_pattern(path: Path, patterns: tuple[str, ...]) -> bool:
+    rel = path.relative_to(DATA_DIR).as_posix()
+    return any(fnmatch.fnmatch(rel, pattern) for pattern in patterns)
+
+
+def _discover_files(
+    glob: str | tuple[str, ...],
+    since_mtime: float,
+    force_patterns: tuple[str, ...] = (),
+) -> list[Path]:
+    """Find files newer than since_mtime, plus forced pattern backfills."""
+    patterns = _as_patterns(glob)
     files: set[Path] = set()
     for pattern in patterns:
         files.update(
-            p for p in DATA_DIR.glob(pattern) if p.is_file() and p.stat().st_mtime > since_mtime
+            p
+            for p in DATA_DIR.glob(pattern)
+            if p.is_file()
+            and (p.stat().st_mtime > since_mtime or _matches_any_pattern(p, force_patterns))
         )
     return sorted(files)
 
@@ -658,8 +679,15 @@ def sync_source(
     gcs_client: storage.Client,
     dry_run: bool = False,
 ) -> SyncResult:
-    watermark = float(state.get(source.name, {}).get("mtime", 0.0))
-    files = _discover_files(source.glob, watermark)
+    source_state = state.get(source.name, {})
+    watermark = float(source_state.get("mtime", 0.0))
+    recorded_patterns = tuple(source_state.get("patterns") or ())
+    force_patterns = tuple(
+        pattern
+        for pattern in _as_patterns(source.backfill_glob)
+        if pattern not in recorded_patterns
+    )
+    files = _discover_files(source.glob, watermark, force_patterns=force_patterns)
     if not files:
         return SyncResult(source.name, 0, 0, 0, None, True, "no new files")
 
@@ -695,8 +723,13 @@ def sync_source(
     )
 
     # Advance watermark
-    new_mtime = max(p.stat().st_mtime for p in files)
-    state[source.name] = {"mtime": new_mtime, "last_run": _now_iso(), "last_rows": rows_written}
+    new_mtime = max(watermark, *(p.stat().st_mtime for p in files))
+    state[source.name] = {
+        "mtime": new_mtime,
+        "last_run": _now_iso(),
+        "last_rows": rows_written,
+        "patterns": list(_as_patterns(source.glob)),
+    }
 
     return SyncResult(source.name, len(files), rows_written, rows_written, gcs_uri, True)
 
