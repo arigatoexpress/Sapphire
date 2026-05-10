@@ -40,6 +40,12 @@ clear: `getUpdates` and webhooks are mutually exclusive, and webhook requests
 can be protected with `X-Telegram-Bot-Api-Secret-Token`.
 Source: https://core.telegram.org/bots/api
 
+Engineering implication: Sapphire should treat new Bot API update classes as
+first-class inputs even before it supports every feature. The router now
+classifies `guest_message`, business-account messages, managed-bot events,
+inline queries, payment-ish updates, polls, reactions, and direct-message topic
+scope without sending replies or mutating external state.
+
 Telegram's bot feature docs still emphasize command scopes, menu buttons, and
 server-side command validation. That matches Sapphire's existing stance:
 Telegram UI affordances are helpful, but backend authorization and command
@@ -119,7 +125,10 @@ Telegram work should treat local inference as disabled by default.
 | Direct-message topics | Partial | Preserve context for direct-message topic replies. |
 | Callback queries | Proposed | Inline buttons: approve draft, snooze source, escalate, open runbook. |
 | Message reactions | Proposed | Reaction telemetry becomes source-quality feedback. |
-| Polls | Proposed | Calibration polls and thesis checks, never execution. |
+| Polls | Router-ready | Calibration polls and thesis checks, never execution. |
+| Guest mode | Router-ready | Queue answer drafts only; no direct `answerGuestQuery` path yet. |
+| Business messages | Router-ready | Queue guarded reply drafts only; no business-account writes yet. |
+| Managed bots | Blocked in router | Ownership/token events require manual review. |
 | Mini App | Proposed | Dense queue/source/review console. |
 | Bot-to-bot group | Proposed | Kimi Claw can collaborate in group, but Sapphire router owns outbound sends. |
 | Business bot features | Watchlist | Useful later for customer/comms surfaces, not needed for Ari operator group now. |
@@ -181,9 +190,12 @@ Primary source docs:
    `sendMessage`, no `answerCallbackQuery`, and no draft-state mutation.
 4. Add `telegram-agent-router` as a small module, not a rewrite of the PM bot:
    parse update, validate actor/chat/topic, classify intent, route to command,
-   source review, or draft queue.
+   source review, or draft queue. This is implemented as pure local routing in
+   `lib/telegram/agent_router.py`.
 5. Add a local draft queue table/file with provenance envelope references and
-   confirmation state.
+   confirmation state. This is implemented as JSONL-compatible primitives in
+   `lib/telegram/draft_queue.py`; a future adapter can promote it to a service
+   table without changing the safety contract.
 6. Implement GDELT Cloud and tier-1 RSS adapters next, because they fill the
    largest current news/market gap.
 7. Add Kimi/Gemini provider config after secrets are confirmed present. Store
@@ -225,9 +237,9 @@ enabled. Never configure two consumers to long-poll the same bot token.
 ## Next Engineering Slices
 
 1. Dashboard tile backed by `load_registry()`.
-2. `telegram-agent-router` module with actor/chat/topic validation and a local
-   draft queue.
-3. GDELT Cloud adapter with provenance envelopes.
-4. RSS headline adapter with per-publisher output caps.
-5. Kimi/Gemini provider router config and smoke tests that validate structured
+1. Wire `telegram-agent-router` into the PM bot webhook path behind dry-run
+   flags and no-send assertions.
+2. GDELT Cloud adapter with provenance envelopes.
+3. RSS headline adapter with per-publisher output caps.
+4. Kimi/Gemini provider router config and smoke tests that validate structured
    JSON without hitting live APIs by default.
