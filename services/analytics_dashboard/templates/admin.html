@@ -210,6 +210,28 @@
       line-height: 1.5;
       font-size: 13px;
     }
+    .data-engineering-strip .source-list {
+      gap: 9px;
+    }
+    .gap-row {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 9px;
+      align-items: start;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(28,34,51,.75);
+      font-size: 12.5px;
+    }
+    .gap-row:last-child { border-bottom: 0; }
+    .gap-row strong {
+      display: block;
+      margin-bottom: 3px;
+      font-size: 12.5px;
+    }
+    .gap-row span:last-child {
+      color: var(--muted);
+      line-height: 1.35;
+    }
     .model-strip {
       margin-top: 20px;
       padding-top: 18px;
@@ -259,11 +281,14 @@
       font-size: 11px;
     }
     .status.ready { color: var(--ok); border-color: rgba(76,210,139,.35); }
+    .status.low { color: var(--ok); border-color: rgba(76,210,139,.35); }
     .status.degraded,
     .status.needs_attention,
-    .status.review { color: var(--warn); border-color: rgba(255,180,84,.38); }
+    .status.review,
+    .status.medium { color: var(--warn); border-color: rgba(255,180,84,.38); }
     .status.unavailable,
-    .status.down { color: var(--danger); border-color: rgba(255,95,110,.38); }
+    .status.down,
+    .status.high { color: var(--danger); border-color: rgba(255,95,110,.38); }
     .tabs {
       display: flex;
       flex-wrap: wrap;
@@ -489,6 +514,20 @@
         </div>
       </div>
 
+      <div class="quality-strip data-engineering-strip" aria-label="Data engineering">
+        <div>
+          <h3>Data engineering</h3>
+          <p id="dataEngineeringBrief">Checking warehouse quality and Gemini posture...</p>
+          <div class="meta-row" id="dataEngineeringMeta">
+            <span class="chip">BigQuery pending</span>
+            <span class="chip">Gemini pending</span>
+          </div>
+        </div>
+        <div class="source-list" id="dataEngineeringList">
+          <div class="source"><span>Loading data contract</span><span class="status">pending</span></div>
+        </div>
+      </div>
+
       <div class="tabs" id="sectionTabs" role="tablist" aria-label="Analysis sections"></div>
       <div class="section-panel" id="sectionPanel" aria-live="polite"></div>
 
@@ -548,6 +587,13 @@
         <h3>Operational Timeseries</h3>
         <p>Service response timing and inference telemetry that public pages reduce to summary.</p>
         <span class="tag">read only</span>
+      </a>
+
+      <a class="card warn" href="/api/admin/data-engineering">
+        <div class="icon">GCP</div>
+        <h3>Data Engineering Readiness</h3>
+        <p>BigQuery freshness, source rights, GCP lanes, and Gemini posture for the next build.</p>
+        <span class="tag">sensitive</span>
       </a>
 
       <a class="card warn" href="/api/brain/correlate">
@@ -674,6 +720,44 @@
       ].filter(Boolean);
       document.getElementById("modelNarrativeMeta").innerHTML =
         meta.map((item) => `<span class="chip">${esc(item)}</span>`).join("");
+    }
+
+    function renderDataEngineering(payload) {
+      const readiness = payload.readiness || {};
+      const gemini = payload.gemini || {};
+      const summary = payload.summary || {};
+      document.getElementById("dataEngineeringBrief").textContent =
+        summary.plain_english || "No data-engineering summary returned.";
+
+      const meta = [
+        `status=${text(payload.status, "unknown")}`,
+        `score=${number(payload.score)}`,
+        `critical=${number(readiness.critical_ready || 0)}/${number(readiness.critical_total || 0)}`,
+        `gemini=${text(gemini.status, "unknown")}`,
+        gemini.model ? `model=${gemini.model}` : null,
+      ].filter(Boolean);
+      document.getElementById("dataEngineeringMeta").innerHTML =
+        meta.map((item) => `<span class="chip">${esc(item)}</span>`).join("");
+
+      const gaps = Array.isArray(payload.engineering_gaps) ? payload.engineering_gaps : [];
+      const sources = Array.isArray(payload.sources) ? payload.sources : [];
+      const sourceRows = sources.slice(0, 4).map((source) => {
+        const status = text(source.status, "unknown");
+        return `<div class="source" title="${esc(source.output_policy || "")}">
+          <span>${esc(source.label || source.id)} · ${esc(number(source.rows_recent || 0))} recent</span>
+          <span class="status ${esc(statusClass(status))}">${esc(status)}</span>
+        </div>`;
+      }).join("");
+      const gapRows = gaps.slice(0, 3).map((gap) => {
+        const severity = text(gap.severity, "low");
+        return `<div class="gap-row">
+          <span class="status ${esc(statusClass(severity))}">${esc(severity)}</span>
+          <span><strong>${esc(gap.title)}</strong>${esc(gap.next_step || gap.evidence || "")}</span>
+        </div>`;
+      }).join("");
+      document.getElementById("dataEngineeringList").innerHTML =
+        sourceRows + gapRows ||
+        `<div class="source"><span>No data-engineering rows</span><span class="status">unknown</span></div>`;
     }
 
     function renderSectionMetrics(metrics) {
@@ -813,7 +897,24 @@
         document.getElementById("evidenceRows").innerHTML = `<tr><td colspan="3" class="state">Analysis unavailable.</td></tr>`;
       }
     }
+
+    async function loadDataEngineering() {
+      try {
+        const response = await fetch("/api/admin/data-engineering", {
+          headers: { "Accept": "application/json" },
+          credentials: "include",
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        renderDataEngineering(await response.json());
+      } catch (err) {
+        document.getElementById("dataEngineeringBrief").textContent =
+          "Data engineering readiness could not load.";
+        document.getElementById("dataEngineeringList").innerHTML =
+          `<div class="gap-row"><span class="status unavailable">error</span><span>${esc(err.message || err)}</span></div>`;
+      }
+    }
     loadAnalysis();
+    loadDataEngineering();
   </script>
 </body>
 </html>

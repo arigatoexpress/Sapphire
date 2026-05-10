@@ -82,7 +82,7 @@ def _load_app(monkeypatch):
     monkeypatch.syspath_prepend(str(svc_dir))
     # Drop any stale brain/auth modules from a previous test run so the
     # next exec_module() picks up our shimmed sys.path.
-    for name in ("brain", "auth"):
+    for name in ("brain", "auth", "data_engineering"):
         sys.modules.pop(name, None)
 
     module_name = "sapphire_test_analytics_dashboard_app"
@@ -579,6 +579,7 @@ def test_sensitive_endpoints_require_admin_cookie(app_module):
         "/api/timeseries/inference",
         "/api/timeseries/services",
         "/api/admin/analysis",
+        "/api/admin/data-engineering",
         "/api/silos/business",
         "/api/silos/inference",
         "/api/signals/recent",
@@ -717,6 +718,134 @@ def test_admin_analysis_aggregates_sensitive_operator_evidence(client, app_modul
     assert "100.71.10.48" in encoded
     assert "private-tho-sha" in encoded
     assert body["priority_actions"]
+
+
+def test_admin_data_engineering_reports_bigquery_and_gemini_posture(
+    client, app_module, monkeypatch
+):
+    now = datetime.now(UTC)
+    today = now.date()
+    table_names = {
+        "service_health",
+        "inference_metrics",
+        "trading_signals",
+        "predictions",
+        "market_regime",
+        "daily_threats",
+        "brain_synthesis",
+        "brain_llm_calls",
+    }
+
+    def fake_rows(sql, params=None):
+        if ".__TABLES__" in sql:
+            return [
+                {
+                    "table_name": table,
+                    "row_count": 10,
+                    "size_bytes": 2048,
+                    "last_modified": now,
+                }
+                for table in sorted(table_names)
+            ]
+        if "FROM `test-project.test_dataset.daily_threats`" in sql:
+            return [
+                {
+                    "recent_rows": 3,
+                    "latest_timestamp": today,
+                    "missing_timestamp_rows": 0,
+                }
+            ]
+        for table in table_names - {"daily_threats"}:
+            if f"FROM `test-project.test_dataset.{table}`" in sql:
+                return [
+                    {
+                        "recent_rows": 4,
+                        "latest_timestamp": now,
+                        "missing_timestamp_rows": 0,
+                    }
+                ]
+        return []
+
+    monkeypatch.setattr(app_module, "_rows", fake_rows)
+    monkeypatch.setenv("ADMIN_ANALYSIS_NARRATIVE_MODEL", "gemini-2.5-flash")
+    monkeypatch.setenv("ADMIN_ANALYSIS_NARRATIVE_REGION", "us-central1")
+
+    response = client.get("/api/admin/data-engineering")
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["mode"] == "admin_data_engineering_analysis"
+    assert body["read_only"] is True
+    assert body["requires_passkey"] is True
+    assert body["status"] == "ready"
+    assert body["good_data_to_engineer"] is True
+    assert body["readiness"]["critical_ready"] == body["readiness"]["critical_total"]
+    assert body["gcloud_data_engineering"]["bigquery"]["status"] == "ready"
+    assert body["gemini"]["status"] == "configured"
+    assert body["gemini"]["model"] == "gemini-2.5-flash"
+    assert {source["id"] for source in body["sources"]} >= table_names
+    assert body["engineering_gaps"][0]["severity"] == "low"
+    assert "No training, endpoint deployment" in json.dumps(body)
+
+
+def test_admin_data_engineering_distinguishes_missing_and_stale_sources(
+    client, app_module, monkeypatch
+):
+    now = datetime(2026, 5, 10, 12, 0, tzinfo=UTC)
+    stale = datetime(2026, 5, 6, 12, 0, tzinfo=UTC)
+
+    def fake_rows(sql, params=None):
+        if ".__TABLES__" in sql:
+            return [
+                {
+                    "table_name": "service_health",
+                    "row_count": 2,
+                    "size_bytes": 100,
+                    "last_modified": stale,
+                },
+                {
+                    "table_name": "trading_signals",
+                    "row_count": 2,
+                    "size_bytes": 100,
+                    "last_modified": stale,
+                },
+            ]
+        if "FROM `test-project.test_dataset.service_health`" in sql:
+            return [
+                {
+                    "recent_rows": 1,
+                    "latest_timestamp": stale,
+                    "missing_timestamp_rows": 0,
+                }
+            ]
+        if "FROM `test-project.test_dataset.trading_signals`" in sql:
+            return [
+                {
+                    "recent_rows": 1,
+                    "latest_timestamp": stale,
+                    "missing_timestamp_rows": 0,
+                }
+            ]
+        return []
+
+    monkeypatch.setattr(app_module, "_rows", fake_rows)
+    data_engineering = sys.modules["data_engineering"]
+    report = data_engineering.build_data_engineering_report(
+        project="test-project",
+        dataset="test_dataset",
+        query_rows=fake_rows,
+        env={"ADMIN_ANALYSIS_NARRATIVE_ENABLED": "0"},
+        now=now,
+    )
+
+    assert report["status"] == "degraded"
+    assert report["good_data_to_engineer"] is False
+    assert report["gemini"]["status"] == "disabled"
+    by_id = {source["id"]: source for source in report["sources"]}
+    assert by_id["service_health"]["status"] == "stale"
+    assert by_id["inference_metrics"]["status"] == "missing"
+    assert by_id["market_regime"]["status"] == "missing"
+    assert any(gap["severity"] == "high" for gap in report["engineering_gaps"])
 
 
 def test_admin_narrative_snapshot_hides_raw_operator_detail(app_module):
@@ -998,7 +1127,7 @@ def test_public_brain_summary_redacts_counts_and_action_totals(app_module):
             "confidence": 0.6,
             "regime": "TRANSITION",
             "narrative": (
-                "Trading: 12 signals/24h. Threat: 90 new CVEs/24h. " "Inference: 945,294 calls/24h."
+                "Trading: 12 signals/24h. Threat: 90 new CVEs/24h. Inference: 945,294 calls/24h."
             ),
             "priority_actions": ["trading: restart collector", "inference: check proxy"],
             "degraded_silos": ["trading", "inference"],
