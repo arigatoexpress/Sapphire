@@ -155,6 +155,8 @@ jobs:
     needs: test
     steps:
       - uses: actions/checkout@v4
+      - name: Verify analytics deploy source
+        run: python scripts/ops/verify_analytics_deploy_source.py --source-dir services/analytics_dashboard
       - name: Build analytics dashboard image
         run: |
           docker build \
@@ -200,6 +202,8 @@ jobs:
           service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
+      - name: Verify analytics deploy source
+        run: python scripts/ops/verify_analytics_deploy_source.py --source-dir services/analytics_dashboard
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy sapphire-analytics \
