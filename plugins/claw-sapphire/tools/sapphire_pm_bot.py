@@ -96,6 +96,7 @@ STATUS_HELP_TEXT = (
     "• /status\n"
     "• /health\n"
     "• /services\n"
+    "• /sources\n"
     "• /dev pulse\n"
     "• /svc status\n"
     "• /pm list [--project <id>]\n"
@@ -265,6 +266,7 @@ def _normalize_mention_command_body(text: str) -> str:
         ("status", "/status"),
         ("health", "/health"),
         ("services", "/services"),
+        ("sources", "/sources"),
         ("whoami", "/whoami"),
     )
     for source, target in mapping:
@@ -949,6 +951,95 @@ def _handle_services() -> dict[str, Any]:
     return _response(_format_services_table(services), "MarkdownV2")
 
 
+def _load_agentic_source_helpers() -> tuple[Any, Any]:
+    """Load agentic source-registry helpers without trusting sys.path shape."""
+
+    try:
+        from lib.telegram import agentic_sources  # type: ignore
+
+        return agentic_sources.load_registry, agentic_sources.sources_by_domain
+    except ImportError:
+        module_path = _TOOL_REPO_ROOT / "lib" / "telegram" / "agentic_sources.py"
+        spec = importlib.util.spec_from_file_location(
+            "_sapphire_telegram_agentic_sources",
+            module_path,
+        )
+        if spec is None or spec.loader is None:
+            raise
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        return module.load_registry, module.sources_by_domain
+
+
+def _format_agentic_sources_markdown_v2(
+    registry: dict[str, Any],
+    *,
+    sources_by_domain_fn: Any,
+) -> str:
+    """Format the agentic source registry as a compact Telegram summary."""
+
+    sources = registry.get("sources") if isinstance(registry, dict) else []
+    if not isinstance(sources, list):
+        sources = []
+    policy = registry.get("policy") if isinstance(registry, dict) else {}
+    if not isinstance(policy, dict):
+        policy = {}
+    model_roles = registry.get("model_roles") if isinstance(registry, dict) else []
+    if not isinstance(model_roles, list):
+        model_roles = []
+
+    grouped = sources_by_domain_fn(registry)
+    tier_zero = sorted(str(row.get("id")) for row in sources if row.get("tier") == 0)
+    default_models = [
+        f"{str(row.get('id'))}={str(row.get('recommended_model'))}"
+        for row in model_roles
+        if isinstance(row, dict) and row.get("default") is True
+    ]
+
+    lines = [
+        f"Agentic sources: {len(sources)} sources across {len(grouped)} domains",
+        f"telegram_send_default={policy.get('telegram_send_default', 'unknown')}",
+        f"local_inference_default={policy.get('local_inference_default', 'unknown')}",
+        f"rights_mode={policy.get('rights_mode', 'unknown')}",
+        "Tier 0: " + ", ".join(tier_zero[:12]),
+        "Domains:",
+    ]
+    for domain, ids in grouped.items():
+        lines.append(f"• {domain}: {len(ids)}")
+    if default_models:
+        lines.append("Default model roles: " + "; ".join(default_models[:4]))
+    lines.append("Runbook: docs/ops/agentic-telegram-kimi-gemini-refactor-2026-05-10.md")
+    return "\n".join(escape_markdown_v2(line) for line in lines)
+
+
+def _handle_sources() -> dict[str, Any]:
+    """Read-only summary of the agentic Telegram source registry."""
+
+    safety.assert_no_live_trading()
+    try:
+        load_registry, sources_by_domain_fn = _load_agentic_source_helpers()
+    except Exception as e:
+        return _response(
+            escape_markdown_v2(f"agentic source registry unavailable: {type(e).__name__}"),
+            "MarkdownV2",
+        )
+    try:
+        registry = load_registry()
+    except Exception as e:
+        return _response(
+            escape_markdown_v2(f"agentic source registry failed: {type(e).__name__}: {e}")[:1200],
+            "MarkdownV2",
+        )
+    return _response(
+        _format_agentic_sources_markdown_v2(
+            registry,
+            sources_by_domain_fn=sources_by_domain_fn,
+        ),
+        "MarkdownV2",
+    )
+
+
 def _list_scheduled_tasks() -> list[dict[str, Any]]:
     """Enumerate scheduled-task directories with last-modified hint."""
     if not _SCHEDULED_TASKS_DIR.exists():
@@ -1235,6 +1326,8 @@ def _dispatch(text: str, update: dict[str, Any]) -> dict[str, Any]:
         return _handle_health()
     if text == "/services":
         return _handle_services()
+    if text == "/sources":
+        return _handle_sources()
     if text in {"/dev", "/dev pulse", "/pulse"}:
         return _handle_dev_pulse()
     if text == "/svc status":

@@ -1,0 +1,393 @@
+schema_version: 1
+updated_at: "2026-05-10"
+purpose: "Rights-aware source registry for Sapphire's agentic Telegram curation layer."
+
+policy:
+  telegram_send_default: dry_run_only
+  local_inference_default: disabled
+  rights_mode: metadata_links_short_summaries
+  no_paywall_bypass: true
+  no_secret_sources_in_repo: true
+  no_trading_or_money_movement: true
+  require_provenance_envelope: true
+  require_human_confirm_for_external_send: true
+
+model_roles:
+  - id: kimi_operator
+    provider: kimi
+    recommended_model: kimi-k2.6
+    fallback_model: kimi-k2.5
+    role: "Long-context agent operator for codebase refactors, Telegram group planning, and multi-tool workflows."
+    mode: tool_calling
+    default: true
+    safety: "May draft Telegram output, but cannot send to real chats without the Telegram send confirmation firewall."
+  - id: gemini_structured_triage
+    provider: google
+    recommended_model: gemini-2.5-flash
+    fallback_model: gemini-2.5-flash-lite
+    role: "Fast extraction, clustering, source ranking, duplicate detection, and JSON digest shaping."
+    mode: structured_output
+    default: true
+    safety: "Only emits structured summaries, source links, and confidence fields."
+  - id: gemini_deep_research
+    provider: google
+    recommended_model: gemini-2.5-pro
+    fallback_model: gemini-deep-research-preview
+    role: "Cited research packs, weekly thesis review, and source-quality postmortems."
+    mode: research_synthesis
+    default: true
+    safety: "Research context only; no personalized financial advice or execution recommendations."
+  - id: gemini_latest_preview_lane
+    provider: google
+    recommended_model: gemini-3.1-pro-preview
+    fallback_model: gemini-2.5-pro
+    role: "Opt-in preview lane for evaluating the newest Gemini reasoning model before production routing."
+    mode: eval_only
+    default: false
+    safety: "Preview models must not gate production sends or state changes."
+
+telegram_surfaces:
+  - id: webhook_ingress
+    feature: webhook_updates
+    status: existing
+    use: "Single owner for Bot API updates to avoid getUpdates/webhook conflicts."
+  - id: forum_topics
+    feature: message_thread_id
+    status: existing_partial
+    use: "Route markets, crypto, cyber, ops, and research digests into separate group topics."
+  - id: direct_messages_topics
+    feature: direct_messages_topic_id
+    status: existing_partial
+    use: "Preserve reply context when Telegram direct-message topics are present."
+  - id: reactions
+    feature: message_reaction
+    status: proposed
+    use: "Let Ari rate digest quality with reactions; feed source-quality and ranking."
+  - id: callback_controls
+    feature: callback_query
+    status: proposed
+    use: "Inline approve/snooze/escalate controls for draft digests and alerts."
+  - id: polls
+    feature: rich_polls
+    status: proposed
+    use: "Run market-thesis calibration polls without executing trades."
+  - id: mini_app_console
+    feature: telegram_mini_app
+    status: proposed
+    use: "Dense operator console for queue review, source toggles, and digest preview."
+  - id: bot_to_bot_group
+    feature: bot_to_bot_group_coordination
+    status: proposed
+    use: "Allow Kimi Claw and Sapphire PM bot to coordinate in a group while a router enforces single-send ownership."
+  - id: business_bot_features
+    feature: business_connection
+    status: watchlist
+    use: "Potential future customer/comms surface; not needed for Ari's operator group yet."
+
+sources:
+  - id: telegram_channel_intel
+    name: "Private Telegram channel intel"
+    domain: telegram_native
+    tier: 0
+    owner: "Ari-managed Telegram channels"
+    official_url: "https://core.telegram.org/api"
+    access: mtproto
+    auth: user_session_private
+    cadence: 5m
+    signal: "High-context, operator-selected channel flow for crypto, AI, macro, security, and governance."
+    telegram_use: p1_digest
+    output_policy: internal_only
+    rights: "Internal metadata and short summaries only; never republish private channel payload text."
+    sapphire_status: existing_adapter
+    adapter_hint: "services/telegram_intel"
+    constraints:
+      - "Runtime config stays in ~/.sapphire/telegram_channels.yaml."
+      - "Bot API cannot read arbitrary channels unless the bot is a member/admin."
+
+  - id: defillama
+    name: "DefiLlama public DeFi datasets"
+    domain: crypto_market
+    tier: 0
+    owner: DefiLlama
+    official_url: "https://api-docs.defillama.com/"
+    access: public_api
+    auth: none
+    cadence: 15m
+    signal: "TVL, stablecoins, yields, DEX volume, fees, and open-interest regimes."
+    telegram_use: p1_digest
+    output_policy: metadata_links_short_summaries
+    rights: "Use public API metadata and derived features; link to source for context."
+    sapphire_status: existing_adapter
+    adapter_hint: "lib/sources/defillama.py"
+    constraints:
+      - "Poll with caching; do not mirror large raw endpoint dumps into Telegram."
+
+  - id: coingecko
+    name: "CoinGecko crypto market data"
+    domain: crypto_market
+    tier: 1
+    owner: CoinGecko
+    official_url: "https://www.coingecko.com/en/api"
+    access: public_api
+    auth: api_key_optional
+    cadence: 5m
+    signal: "Broad spot market, exchange, derivatives, on-chain DEX, treasury, NFT, and discovery context."
+    telegram_use: p1_digest
+    output_policy: metadata_links_short_summaries
+    rights: "Respect CoinGecko API plan terms; derived market snapshots only."
+    sapphire_status: existing_adapter
+    adapter_hint: "existing market tooling"
+    constraints:
+      - "Use for broad coverage, not exchange-latency decisions."
+
+  - id: hyperliquid_public
+    name: "Hyperliquid public market data"
+    domain: exchange_market
+    tier: 0
+    owner: Hyperliquid
+    official_url: "https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint"
+    access: public_api
+    auth: none
+    cadence: 30s
+    signal: "Perp/spot metadata, funding, open interest, and exchange microstructure for research-only alerts."
+    telegram_use: p0_alert
+    output_policy: derived_features_only
+    rights: "Read public exchange data; no trading from Telegram."
+    sapphire_status: existing_adapter
+    adapter_hint: "services/hyperliquid"
+    constraints:
+      - "Telegram must never place orders or approve live execution."
+
+  - id: coinbase_public_market_data
+    name: "Coinbase Exchange public market data"
+    domain: exchange_market
+    tier: 1
+    owner: Coinbase
+    official_url: "https://docs.cdp.coinbase.com/exchange/introduction/welcome"
+    access: public_api
+    auth: none
+    cadence: 30s
+    signal: "Liquid spot-market reference for BTC, ETH, SOL, and majors."
+    telegram_use: p1_digest
+    output_policy: derived_features_only
+    rights: "Respect market data terms; use aggregate signals and links."
+    sapphire_status: proposed
+    adapter_hint: "new public-market adapter"
+    constraints:
+      - "No authenticated account or order APIs in the Telegram agent path."
+
+  - id: fred_macro
+    name: "FRED macroeconomic data"
+    domain: macro
+    tier: 0
+    owner: "Federal Reserve Bank of St. Louis"
+    official_url: "https://fred.stlouisfed.org/docs/api/fred/"
+    access: public_api
+    auth: api_key_required
+    cadence: 1h
+    signal: "Rates, inflation, labor, liquidity, credit, and macro regime features."
+    telegram_use: p1_digest
+    output_policy: public_facts_only
+    rights: "Public macro observations with source attribution."
+    sapphire_status: existing_adapter
+    adapter_hint: "lib/macro/fred_loader.py"
+    constraints:
+      - "Respect series release cadence; do not treat monthly data as intraday signal."
+
+  - id: sec_edgar
+    name: "SEC EDGAR submissions and XBRL APIs"
+    domain: equities_regulatory
+    tier: 0
+    owner: "U.S. Securities and Exchange Commission"
+    official_url: "https://www.sec.gov/search-filings/edgar-application-programming-interfaces"
+    access: public_api
+    auth: none
+    cadence: 5m
+    signal: "8-K, 10-Q, 10-K, 13F, Form 4, company facts, and material-event monitoring."
+    telegram_use: p0_alert
+    output_policy: public_facts_only
+    rights: "Public filing metadata, links, and derived classifications only."
+    sapphire_status: existing_adapter
+    adapter_hint: "lib/sources/sec_edgar.py"
+    constraints:
+      - "Use a descriptive User-Agent and cache responsibly."
+
+  - id: gdelt_cloud
+    name: "GDELT Cloud event and story API"
+    domain: global_news
+    tier: 0
+    owner: GDELT
+    official_url: "https://docs.gdeltcloud.com/api-reference/v2"
+    access: public_api
+    auth: api_key_required
+    cadence: 15m
+    signal: "Structured global event/story clusters, geographies, entity links, and article refs."
+    telegram_use: p1_digest
+    output_policy: metadata_links_short_summaries
+    rights: "Use event metadata, article links, and short generated summaries; do not copy full articles."
+    sapphire_status: proposed
+    adapter_hint: "new gdelt_cloud source"
+    constraints:
+      - "Prefer confidence_profile=precise for Telegram; loose mode is research-only."
+
+  - id: tier1_news_rss
+    name: "Tier-1 public RSS headlines"
+    domain: global_news
+    tier: 1
+    owner: "Publisher-specific"
+    official_url: "https://www.reutersagency.com/en/services/products/news-feeds/"
+    access: rss
+    auth: none
+    cadence: 10m
+    signal: "Headline confirmation layer for market-moving business, tech, crypto, and geopolitical stories."
+    telegram_use: p2_context
+    output_policy: metadata_links_short_summaries
+    rights: "RSS title/link/metadata plus short original summary only; no article text redistribution."
+    sapphire_status: proposed
+    adapter_hint: "new rss_pulse source"
+    constraints:
+      - "Per-publisher terms vary; keep links and very short summaries."
+
+  - id: kalshi_public
+    name: "Kalshi public market data"
+    domain: prediction_markets
+    tier: 1
+    owner: Kalshi
+    official_url: "https://docs.kalshi.com/getting_started/api_environments"
+    access: public_api
+    auth: none
+    cadence: 5m
+    signal: "Event probability context across economics, climate, technology, politics, and culture."
+    telegram_use: p2_context
+    output_policy: metadata_links_short_summaries
+    rights: "Public market metadata and prices as context; no betting or trading actions."
+    sapphire_status: proposed
+    adapter_hint: "new prediction_market source"
+    constraints:
+      - "Keep prediction markets as context, not recommendations."
+
+  - id: polymarket_public
+    name: "Polymarket public market data"
+    domain: prediction_markets
+    tier: 1
+    owner: Polymarket
+    official_url: "https://docs.polymarket.us/api-reference"
+    access: public_api
+    auth: none
+    cadence: 5m
+    signal: "Public event/orderbook context and crowd probability shifts."
+    telegram_use: p2_context
+    output_policy: metadata_links_short_summaries
+    rights: "Public metadata and market links only; no wallet, trade, or order-placement integration."
+    sapphire_status: proposed
+    adapter_hint: "new prediction_market source"
+    constraints:
+      - "No execution-capable keys in the agentic Telegram path."
+
+  - id: cisa_kev
+    name: "CISA Known Exploited Vulnerabilities"
+    domain: cyber
+    tier: 0
+    owner: CISA
+    official_url: "https://www.cisa.gov/known-exploited-vulnerabilities-catalog"
+    access: public_dataset
+    auth: none
+    cadence: 1h
+    signal: "Authoritative active-exploitation vulnerability catalog for defensive triage."
+    telegram_use: p0_alert
+    output_policy: public_facts_only
+    rights: "Public federal dataset with source link and defensive framing."
+    sapphire_status: existing_adapter
+    adapter_hint: "plugins/claw-sapphire/tools/internal/threat_intel.py"
+    constraints:
+      - "Defensive use only; never include exploit payloads."
+
+  - id: nvd_cve
+    name: "NVD vulnerability API"
+    domain: cyber
+    tier: 1
+    owner: NIST
+    official_url: "https://nvd.nist.gov/developers/vulnerabilities"
+    access: public_api
+    auth: api_key_optional
+    cadence: 1h
+    signal: "CVE enrichment, CVSS metadata, vendor notes, and change monitoring."
+    telegram_use: p1_digest
+    output_policy: public_facts_only
+    rights: "Public vulnerability metadata with defensive prioritization only."
+    sapphire_status: existing_adapter
+    adapter_hint: "threat-intel tooling"
+    constraints:
+      - "Do not post exploit instructions."
+
+  - id: nasa_firms
+    name: "NASA FIRMS active fire data"
+    domain: physical_world
+    tier: 1
+    owner: NASA
+    official_url: "https://firms.modaps.eosdis.nasa.gov/content/active_fire/"
+    access: authenticated_public_api
+    auth: api_key_required
+    cadence: 15m
+    signal: "Near-real-time active fire and hotspot data for wildfire/regional situational awareness."
+    telegram_use: p1_digest
+    output_policy: public_facts_only
+    rights: "Public NASA observations with source attribution; situational awareness only."
+    sapphire_status: proposed
+    adapter_hint: "wildfire-watch bridge"
+    constraints:
+      - "No dispatch, flight authorization, or incident-command instructions."
+
+  - id: usgs_earthquakes
+    name: "USGS Earthquake GeoJSON feed"
+    domain: physical_world
+    tier: 1
+    owner: "U.S. Geological Survey"
+    official_url: "https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php"
+    access: public_api
+    auth: none
+    cadence: 5m
+    signal: "Regional tail-risk and infrastructure-impact monitoring."
+    telegram_use: p1_digest
+    output_policy: public_facts_only
+    rights: "Public USGS event metadata with source attribution."
+    sapphire_status: proposed
+    adapter_hint: "new physical_events source"
+    constraints:
+      - "Treat as situational awareness; no emergency-response claims."
+
+  - id: bigquery_public_crypto
+    name: "BigQuery public crypto datasets"
+    domain: gcp_public
+    tier: 1
+    owner: Google Cloud
+    official_url: "https://cloud.google.com/bigquery/public-data"
+    access: gcp_public_dataset
+    auth: google_cloud_project
+    cadence: 1d
+    signal: "Daily blockchain history, wallet-flow features, and backtestable public-chain context."
+    telegram_use: research_only
+    output_policy: derived_features_only
+    rights: "Derived features and query results only; enforce cost and partition filters."
+    sapphire_status: proposed
+    adapter_hint: "new lib/bq/public_datasets.py"
+    constraints:
+      - "Set query byte limits and partition filters before enabling schedules."
+
+  - id: huggingface_trending
+    name: "Hugging Face Hub trend metadata"
+    domain: ai_market
+    tier: 2
+    owner: "Hugging Face"
+    official_url: "https://huggingface.co/docs/hub/en/api"
+    access: public_api
+    auth: none
+    cadence: 1d
+    signal: "AI model and dataset trend context for agent/tool opportunity discovery."
+    telegram_use: p2_context
+    output_policy: metadata_links_short_summaries
+    rights: "Public metadata and links only; no model redistribution."
+    sapphire_status: proposed
+    adapter_hint: "new ai_market source"
+    constraints:
+      - "Trend counts are gameable; weight with repo and paper evidence."

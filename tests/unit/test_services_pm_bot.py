@@ -259,6 +259,75 @@ def test_process_update_returns_false_for_non_dict_payload(reload_server, monkey
     assert sent == []
 
 
+def test_process_update_accepts_callback_query_dry_run_without_sending(reload_server, monkeypatch):
+    server = reload_server()
+
+    def fail_send(**_kwargs):
+        raise AssertionError("callback dry-run must not send Telegram messages")
+
+    monkeypatch.setattr(server.TELEGRAM_API, "send_message", fail_send)
+
+    update = {
+        "update_id": 501,
+        "callback_query": {
+            "id": "callback-1",
+            "from": {"id": 123},
+            "data": "draft:approve:abc123",
+            "message": {"message_id": 77, "chat": {"id": -1001}},
+        },
+    }
+
+    assert server.process_update(update) is True
+
+
+def test_process_update_accepts_message_reaction_dry_run_without_sending(
+    reload_server, monkeypatch
+):
+    server = reload_server()
+
+    def fail_send(**_kwargs):
+        raise AssertionError("reaction dry-run must not send Telegram messages")
+
+    monkeypatch.setattr(server.TELEGRAM_API, "send_message", fail_send)
+
+    update = {
+        "update_id": 502,
+        "message_reaction": {
+            "chat": {"id": -1001},
+            "message_id": 88,
+            "date": 1_779_000_000,
+            "old_reaction": [],
+            "new_reaction": [{"type": "emoji", "emoji": "👍"}],
+            "user": {"id": 123},
+        },
+    }
+
+    assert server.process_update(update) is True
+
+
+def test_process_update_accepts_message_reaction_count_dry_run_without_sending(
+    reload_server, monkeypatch
+):
+    server = reload_server()
+
+    def fail_send(**_kwargs):
+        raise AssertionError("reaction-count dry-run must not send Telegram messages")
+
+    monkeypatch.setattr(server.TELEGRAM_API, "send_message", fail_send)
+
+    update = {
+        "update_id": 503,
+        "message_reaction_count": {
+            "chat": {"id": -1001},
+            "message_id": 89,
+            "date": 1_779_000_000,
+            "reactions": [{"type": {"type": "emoji", "emoji": "🔥"}, "total_count": 3}],
+        },
+    }
+
+    assert server.process_update(update) is True
+
+
 # ---------------------------------------------------------------------------
 # TelegramAPI._post error mapping
 # ---------------------------------------------------------------------------
@@ -444,6 +513,9 @@ def test_telegram_get_updates_requests_supported_update_types(reload_server, mon
         "edited_message",
         "channel_post",
         "edited_channel_post",
+        "callback_query",
+        "message_reaction",
+        "message_reaction_count",
     ]
 
 
@@ -757,6 +829,9 @@ def test_health_endpoint_full_shape_default_state(monkeypatch, tmp_path, reload_
         "edited_message",
         "channel_post",
         "edited_channel_post",
+        "callback_query",
+        "message_reaction",
+        "message_reaction_count",
     ]
     body = response.json()
     assert body["status"] == "ok"
