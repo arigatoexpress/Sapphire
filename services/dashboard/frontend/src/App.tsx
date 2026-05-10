@@ -1,20 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   blockedSummary,
+  CardStatus,
   ControlPlaneSummary,
   EnvelopeCard,
   fetchControlPlaneSummary,
 } from "./api/controlPlane";
 
-const modules = [
-  "Home / Worldline",
-  "Operations",
-  "Intelligence",
-  "Markets",
-  "Security",
-  "Products / Diligence",
-  "Automation",
-  "Settings / Contracts",
+const moduleNavigation = [
+  { name: "Home / Worldline", summary: "Current posture and evidence cards." },
+  { name: "Operations", summary: "Services, worktrees, PR lanes, and readiness." },
+  { name: "Intelligence", summary: "Regional, cyber, market, and business loops." },
+  { name: "Markets", summary: "Research-only signals, paper paths, and caveats." },
+  { name: "Security", summary: "SOC, dependency, model, and credential hygiene." },
+  { name: "Products / Diligence", summary: "x402, artifacts, and buyer proof." },
+  { name: "Automation", summary: "Routine previews and dry-run next actions." },
+  { name: "Settings / Contracts", summary: "Capabilities, confirmations, and boundaries." },
 ] as const;
 
 const fallbackModuleContracts = [
@@ -54,9 +55,28 @@ function modeLabel(card: EnvelopeCard): string {
   return `${card.mode} · ${card.source.age_seconds}s old`;
 }
 
-function Card({ card }: { card: EnvelopeCard }) {
+function cardKey(card: EnvelopeCard): string {
+  return `${card.title}-${card.source.path_or_url}`;
+}
+
+function statusTone(status: CardStatus): string {
+  if (status === "ok") return "Ready";
+  if (status === "warn") return "Needs Review";
+  if (status === "fail") return "Blocked";
+  return "Unknown";
+}
+
+function Card({
+  card,
+  selected,
+  onSelect,
+}: {
+  card: EnvelopeCard;
+  selected: boolean;
+  onSelect: (card: EnvelopeCard) => void;
+}) {
   return (
-    <article className={`card card-${card.status}`}>
+    <article className={`card card-${card.status} ${selected ? "card-selected" : ""}`}>
       <div className="card-topline">
         <span className="status-dot" aria-hidden="true" />
         <span>{card.module ? `${card.module} · ${modeLabel(card)}` : modeLabel(card)}</span>
@@ -64,6 +84,9 @@ function Card({ card }: { card: EnvelopeCard }) {
       <h2>{card.title}</h2>
       <strong>{card.value}</strong>
       <p>{card.summary}</p>
+      <button className="inspect-button" type="button" onClick={() => onSelect(card)}>
+        Inspect Evidence
+      </button>
       <footer>
         <span>{card.source.kind}</span>
         <code>{card.source.path_or_url}</code>
@@ -78,6 +101,7 @@ export function App() {
     generated_at: null,
     cards: [],
   });
+  const [selectedCardKey, setSelectedCardKey] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -98,6 +122,20 @@ export function App() {
   }, []);
 
   const visibleCards = useMemo(() => summary.cards, [summary.cards]);
+  const selectedCard = useMemo(() => {
+    if (!visibleCards.length) return null;
+    return visibleCards.find((card) => cardKey(card) === selectedCardKey) ?? visibleCards[0];
+  }, [selectedCardKey, visibleCards]);
+  const summaryStats = useMemo(() => {
+    const cards = visibleCards;
+    return {
+      total: cards.length,
+      ok: cards.filter((card) => card.status === "ok").length,
+      warn: cards.filter((card) => card.status === "warn").length,
+      fail: cards.filter((card) => card.status === "fail").length,
+      blocked: cards.filter((card) => card.mode === "blocked").length,
+    };
+  }, [visibleCards]);
   const moduleRows = useMemo(() => {
     if (summary.modules?.length) {
       return summary.modules.map((module) => ({
@@ -109,27 +147,41 @@ export function App() {
     return fallbackModuleContracts;
   }, [summary.modules]);
 
+  useEffect(() => {
+    if (!visibleCards.length) return;
+    if (!selectedCardKey || !visibleCards.some((card) => cardKey(card) === selectedCardKey)) {
+      setSelectedCardKey(cardKey(visibleCards[0]));
+    }
+  }, [selectedCardKey, visibleCards]);
+
   return (
-    <main className="shell">
+    <main className="operator-shell">
       <aside className="rail" aria-label="Control plane modules">
-        <div className="mark">S</div>
+        <div className="brand-lockup">
+          <div className="mark">S</div>
+          <div>
+            <strong>Sapphire OS</strong>
+            <span>Operator workbench</span>
+          </div>
+        </div>
         <nav>
-          {modules.map((module) => (
-            <a href={`#${module.toLowerCase().replaceAll(" ", "-").replaceAll("/", "")}`} key={module}>
-              {module}
+          {moduleNavigation.map((module) => (
+            <a href={`#${module.name.toLowerCase().replaceAll(" ", "-").replaceAll("/", "")}`} key={module.name}>
+              <strong>{module.name}</strong>
+              <span>{module.summary}</span>
             </a>
           ))}
         </nav>
       </aside>
 
-      <section className="workspace">
+      <section className="workspace" aria-label="Control-plane evidence canvas">
         <header className="hero">
           <div>
-            <p className="eyebrow">Authenticated preview</p>
+            <p className="eyebrow">Authenticated operator preview</p>
             <h1>Sapphire OS Control Plane</h1>
             <p>
-              A single spine for what is happening, what changed, what backs it,
-              and what can be done safely next.
+              A read-only evidence canvas for what is happening, what changed,
+              what backs it, and which actions are blocked or dry-run only.
             </p>
           </div>
           <div className={`posture posture-${summary.status}`}>
@@ -138,9 +190,33 @@ export function App() {
           </div>
         </header>
 
+        <section className="status-strip" aria-label="Summary counts">
+          <div>
+            <span>Total cards</span>
+            <strong>{summaryStats.total}</strong>
+          </div>
+          <div>
+            <span>Ready</span>
+            <strong>{summaryStats.ok}</strong>
+          </div>
+          <div>
+            <span>Review</span>
+            <strong>{summaryStats.warn}</strong>
+          </div>
+          <div>
+            <span>Blocked</span>
+            <strong>{summaryStats.fail + summaryStats.blocked}</strong>
+          </div>
+        </section>
+
         <section className="grid" aria-label="Evidence cards">
           {visibleCards.map((card) => (
-            <Card card={card} key={`${card.title}-${card.source.path_or_url}`} />
+            <Card
+              card={card}
+              key={cardKey(card)}
+              onSelect={(nextCard) => setSelectedCardKey(cardKey(nextCard))}
+              selected={selectedCard ? cardKey(card) === cardKey(selectedCard) : false}
+            />
           ))}
         </section>
 
@@ -154,6 +230,59 @@ export function App() {
           ))}
         </section>
       </section>
+
+      <aside className="inspector" aria-label="Selected evidence inspector">
+        <div className="inspector-panel">
+          <p className="eyebrow">Evidence Inspector</p>
+          {selectedCard ? (
+            <>
+              <h2>{selectedCard.title}</h2>
+              <div className={`inspector-status inspector-status-${selectedCard.status}`}>
+                <span>{statusTone(selectedCard.status)}</span>
+                <strong>{selectedCard.value}</strong>
+              </div>
+              <dl>
+                <div>
+                  <dt>Mode</dt>
+                  <dd>{modeLabel(selectedCard)}</dd>
+                </div>
+                <div>
+                  <dt>Source</dt>
+                  <dd>
+                    <code>{selectedCard.source.path_or_url}</code>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Generated</dt>
+                  <dd>{selectedCard.source.generated_at ?? "Not available"}</dd>
+                </div>
+              </dl>
+              <p>{selectedCard.summary}</p>
+              <section className="actions" aria-label="Available action previews">
+                <h3>Action posture</h3>
+                {selectedCard.actions.length ? (
+                  selectedCard.actions.map((action) => (
+                    <div className={`action action-${action.mode}`} key={`${action.label}-${action.mode}`}>
+                      <strong>{action.label}</strong>
+                      <span>
+                        {action.mode}
+                        {action.requires_confirm ? " · confirm required" : " · no live mutation"}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="action action-blocked">
+                    <strong>No action exposed</strong>
+                    <span>Inspector is evidence-only for this card.</span>
+                  </div>
+                )}
+              </section>
+            </>
+          ) : (
+            <p>No evidence cards are loaded yet.</p>
+          )}
+        </div>
+      </aside>
     </main>
   );
 }

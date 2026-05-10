@@ -34,7 +34,9 @@ surface.
 ## Refactor Order
 
 1. Promote the React operations preview into the primary dashboard shell while
-   keeping API calls read-only.
+   keeping API calls read-only. The first promotion slice is now the React
+   workbench shell: left module navigation, central evidence canvas, and a right
+   evidence/action inspector backed only by `/api/v2/control-plane/summary`.
 2. Split `services/analytics_dashboard` into public-safe pages and authenticated
    admin pages with tests around the passkey/admin boundary.
 3. Collapse legacy dashboard Jinja pages into explicit modules using
@@ -52,6 +54,8 @@ Run these checks after inventory or boundary changes:
 python3 scripts/ops/frontend_surface_inventory.py --fail-on-missing
 python3 scripts/ops/dashboard_surface_inventory.py --check
 pytest tests/unit/test_frontend_surface_inventory.py tests/unit/test_dashboard_surface_inventory.py -q
+pytest tests/unit/test_dashboard_react_preview_shell.py -q
+npm --prefix services/dashboard/frontend run build
 ```
 
 For visible UI changes, also run the relevant local server and verify the page
