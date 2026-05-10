@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from scripts.ops.frontend_surface_inventory import SURFACE_DEFS, build_inventory
+from scripts.ops.frontend_surface_inventory import (
+    ROUTE_CONTRACTS,
+    SURFACE_DEFS,
+    build_inventory,
+)
 
 
 def _surfaces_by_id() -> dict[str, dict[str, object]]:
@@ -54,3 +58,38 @@ def test_frontend_surface_inventory_records_safe_next_slices() -> None:
         assert surface["recommended_next_slice"]
         assert surface["verification"]
         assert surface["safety_notes"]
+
+
+def test_frontend_surface_inventory_records_public_admin_route_contracts() -> None:
+    inventory = build_inventory()
+    contracts = {str(contract["path"]): contract for contract in inventory["route_contracts"]}
+
+    assert inventory["summary"]["route_contract_count"] == len(ROUTE_CONTRACTS)
+    assert inventory["summary"]["public_route_contract_count"] >= 10
+    assert inventory["summary"]["admin_route_contract_count"] >= 10
+    assert contracts["/api/summary"]["boundary"] == "public_safe"
+    assert contracts["/api/summary"]["frontend_fetch"] is True
+    assert contracts["/api/markets/snapshot"]["boundary"] == "public_safe"
+    assert contracts["/api/admin/analysis"]["boundary"] == "authenticated_admin"
+    assert contracts["/api/admin/analysis"]["expected_statuses"] == (401, 403, 503)
+    assert contracts["/api/brain/synthesis?persist=1"]["boundary"] == ("authenticated_admin")
+
+
+def test_public_homepage_fetches_have_public_contracts_only() -> None:
+    inventory = build_inventory()
+    fetches = {str(fetch["path"]): fetch for fetch in inventory["public_template_fetches"]}
+
+    assert inventory["summary"]["public_template_fetch_count"] >= 8
+    assert inventory["summary"]["public_template_fetch_missing_contract_count"] == 0
+    assert inventory["summary"]["public_template_admin_fetch_count"] == 0
+    assert {
+        "/api/summary",
+        "/api/regime",
+        "/api/silos/health",
+        "/api/threats/live",
+        "/api/timeseries/threats",
+        "/api/brain/synthesis",
+        "/api/failover/readiness",
+        "/api/markets/snapshot",
+    } <= set(fetches)
+    assert all(fetch["boundary"] == "public_safe" for fetch in fetches.values())

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -75,6 +76,29 @@ class SurfaceInventoryEntry:
     safety_notes: list[str]
     verification: list[str]
     recommended_next_slice: str
+
+
+@dataclass(frozen=True)
+class RouteBoundaryContract:
+    path: str
+    method: str
+    surface_id: str
+    boundary: str
+    exposure: str
+    expected_statuses: tuple[int, ...]
+    source: str
+    verification: tuple[str, ...]
+    frontend_fetch: bool = False
+
+
+@dataclass(frozen=True)
+class PublicTemplateFetch:
+    path: str
+    template: str
+    helper: str
+    boundary: str
+    contract_present: bool
+    admin_route: bool
 
 
 SURFACE_DEFS: tuple[SurfaceDefinition, ...] = (
@@ -313,6 +337,359 @@ SURFACE_DEFS: tuple[SurfaceDefinition, ...] = (
     ),
 )
 
+ROUTE_CONTRACTS: tuple[RouteBoundaryContract, ...] = (
+    RouteBoundaryContract(
+        path="/",
+        method="GET",
+        surface_id="analytics_public_site",
+        boundary="public_safe",
+        exposure="public_html",
+        expected_statuses=(200,),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+    ),
+    RouteBoundaryContract(
+        path="/p/brain",
+        method="GET",
+        surface_id="analytics_public_site",
+        boundary="public_safe",
+        exposure="public_html",
+        expected_statuses=(200,),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+    ),
+    RouteBoundaryContract(
+        path="/p/system",
+        method="GET",
+        surface_id="analytics_public_site",
+        boundary="public_safe",
+        exposure="public_html",
+        expected_statuses=(200,),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+    ),
+    RouteBoundaryContract(
+        path="/p/wildfire",
+        method="GET",
+        surface_id="analytics_public_site",
+        boundary="public_safe",
+        exposure="public_html",
+        expected_statuses=(200,),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+    ),
+    RouteBoundaryContract(
+        path="/p/regional",
+        method="GET",
+        surface_id="analytics_public_site",
+        boundary="public_safe",
+        exposure="public_html",
+        expected_statuses=(200,),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+    ),
+    RouteBoundaryContract(
+        path="/p/help",
+        method="GET",
+        surface_id="analytics_public_site",
+        boundary="public_safe",
+        exposure="public_html",
+        expected_statuses=(200,),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+    ),
+    RouteBoundaryContract(
+        path="/api/projects",
+        method="GET",
+        surface_id="analytics_public_site",
+        boundary="public_safe",
+        exposure="public_json",
+        expected_statuses=(200,),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+    ),
+    RouteBoundaryContract(
+        path="/api/summary",
+        method="GET",
+        surface_id="analytics_public_site",
+        boundary="public_safe",
+        exposure="public_json",
+        expected_statuses=(200,),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+        frontend_fetch=True,
+    ),
+    RouteBoundaryContract(
+        path="/api/regime",
+        method="GET",
+        surface_id="analytics_public_site",
+        boundary="public_safe",
+        exposure="public_json",
+        expected_statuses=(200,),
+        source="services/analytics_dashboard/app.py",
+        verification=("tests/unit/test_services_analytics_dashboard.py",),
+        frontend_fetch=True,
+    ),
+    RouteBoundaryContract(
+        path="/api/silos/health",
+        method="GET",
+        surface_id="analytics_public_site",
+        boundary="public_safe",
+        exposure="public_json",
+        expected_statuses=(200,),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+        frontend_fetch=True,
+    ),
+    RouteBoundaryContract(
+        path="/api/threats/live",
+        method="GET",
+        surface_id="analytics_public_site",
+        boundary="public_safe",
+        exposure="public_json",
+        expected_statuses=(200,),
+        source="services/analytics_dashboard/app.py",
+        verification=("tests/unit/test_services_analytics_dashboard.py",),
+        frontend_fetch=True,
+    ),
+    RouteBoundaryContract(
+        path="/api/timeseries/threats",
+        method="GET",
+        surface_id="analytics_public_site",
+        boundary="public_safe",
+        exposure="public_json",
+        expected_statuses=(200,),
+        source="services/analytics_dashboard/app.py",
+        verification=("tests/unit/test_services_analytics_dashboard.py",),
+        frontend_fetch=True,
+    ),
+    RouteBoundaryContract(
+        path="/api/brain/synthesis",
+        method="GET",
+        surface_id="analytics_public_site",
+        boundary="public_safe",
+        exposure="public_json",
+        expected_statuses=(200,),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+        frontend_fetch=True,
+    ),
+    RouteBoundaryContract(
+        path="/api/failover/readiness",
+        method="GET",
+        surface_id="analytics_public_site",
+        boundary="public_safe",
+        exposure="public_json",
+        expected_statuses=(200,),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+        frontend_fetch=True,
+    ),
+    RouteBoundaryContract(
+        path="/api/markets/snapshot",
+        method="GET",
+        surface_id="analytics_public_site",
+        boundary="public_safe",
+        exposure="public_json",
+        expected_statuses=(200,),
+        source="services/analytics_dashboard/markets.py",
+        verification=("scripts/ops/sapphirealpha_production_smoke.py",),
+        frontend_fetch=True,
+    ),
+    RouteBoundaryContract(
+        path="/admin",
+        method="GET",
+        surface_id="analytics_admin",
+        boundary="authenticated_admin",
+        exposure="passkey_gate",
+        expected_statuses=(302, 401, 403, 503),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+    ),
+    RouteBoundaryContract(
+        path="/api/admin/whoami",
+        method="GET",
+        surface_id="analytics_admin",
+        boundary="authenticated_admin",
+        exposure="admin_json",
+        expected_statuses=(401, 403, 503),
+        source="services/analytics_dashboard/auth.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+    ),
+    RouteBoundaryContract(
+        path="/api/admin/analysis",
+        method="GET",
+        surface_id="analytics_admin",
+        boundary="authenticated_admin",
+        exposure="admin_json",
+        expected_statuses=(401, 403, 503),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+    ),
+    RouteBoundaryContract(
+        path="/api/performance",
+        method="GET",
+        surface_id="analytics_admin",
+        boundary="authenticated_admin",
+        exposure="admin_json",
+        expected_statuses=(401, 403, 503),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+    ),
+    RouteBoundaryContract(
+        path="/api/predictions",
+        method="GET",
+        surface_id="analytics_admin",
+        boundary="authenticated_admin",
+        exposure="admin_json",
+        expected_statuses=(401, 403, 503),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+    ),
+    RouteBoundaryContract(
+        path="/api/predictions/accuracy",
+        method="GET",
+        surface_id="analytics_admin",
+        boundary="authenticated_admin",
+        exposure="admin_json",
+        expected_statuses=(401, 403, 503),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+    ),
+    RouteBoundaryContract(
+        path="/api/correlation/matrix",
+        method="GET",
+        surface_id="analytics_admin",
+        boundary="authenticated_admin",
+        exposure="admin_json",
+        expected_statuses=(401, 403, 503),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+    ),
+    RouteBoundaryContract(
+        path="/api/vpin",
+        method="GET",
+        surface_id="analytics_admin",
+        boundary="authenticated_admin",
+        exposure="admin_json",
+        expected_statuses=(401, 403, 503),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+    ),
+    RouteBoundaryContract(
+        path="/api/deflated-sharpe/rolling",
+        method="GET",
+        surface_id="analytics_admin",
+        boundary="authenticated_admin",
+        exposure="admin_json",
+        expected_statuses=(401, 403, 503),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+    ),
+    RouteBoundaryContract(
+        path="/api/timeseries/inference",
+        method="GET",
+        surface_id="analytics_admin",
+        boundary="authenticated_admin",
+        exposure="admin_json",
+        expected_statuses=(401, 403, 503),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+    ),
+    RouteBoundaryContract(
+        path="/api/timeseries/services",
+        method="GET",
+        surface_id="analytics_admin",
+        boundary="authenticated_admin",
+        exposure="admin_json",
+        expected_statuses=(401, 403, 503),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+    ),
+    RouteBoundaryContract(
+        path="/api/silos/business",
+        method="GET",
+        surface_id="analytics_admin",
+        boundary="authenticated_admin",
+        exposure="admin_json",
+        expected_statuses=(401, 403, 503),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+    ),
+    RouteBoundaryContract(
+        path="/api/silos/inference",
+        method="GET",
+        surface_id="analytics_admin",
+        boundary="authenticated_admin",
+        exposure="admin_json",
+        expected_statuses=(401, 403, 503),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+    ),
+    RouteBoundaryContract(
+        path="/api/signals/recent",
+        method="GET",
+        surface_id="analytics_admin",
+        boundary="authenticated_admin",
+        exposure="admin_json",
+        expected_statuses=(401, 403, 503),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+    ),
+    RouteBoundaryContract(
+        path="/api/brain/synthesis?persist=1",
+        method="GET",
+        surface_id="analytics_admin",
+        boundary="authenticated_admin",
+        exposure="admin_json",
+        expected_statuses=(401, 403, 503),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+    ),
+    RouteBoundaryContract(
+        path="/api/brain/synthesis?force_llm=1",
+        method="GET",
+        surface_id="analytics_admin",
+        boundary="authenticated_admin",
+        exposure="admin_json",
+        expected_statuses=(401, 403, 503),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+    ),
+    RouteBoundaryContract(
+        path="/api/brain/correlate",
+        method="GET",
+        surface_id="analytics_admin",
+        boundary="authenticated_admin",
+        exposure="admin_json",
+        expected_statuses=(401, 403, 503),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+    ),
+    RouteBoundaryContract(
+        path="/api/brain/history",
+        method="GET",
+        surface_id="analytics_admin",
+        boundary="authenticated_admin",
+        exposure="admin_json",
+        expected_statuses=(401, 403, 503),
+        source="services/analytics_dashboard/app.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+    ),
+    RouteBoundaryContract(
+        path="/api/asfao/decisions",
+        method="GET",
+        surface_id="analytics_admin",
+        boundary="authenticated_admin",
+        exposure="admin_json",
+        expected_statuses=(401, 403, 503),
+        source="services/analytics_dashboard/asfao.py",
+        verification=("scripts/ops/public_boundary_smoke.py",),
+    ),
+)
+
+FETCH_PATTERN = re.compile(r"safeFetch\(['\"]([^'\"]+)['\"]")
+
 
 def _repo_relative(path: Path, *, root: Path = ROOT) -> str:
     return path.resolve().relative_to(root.resolve()).as_posix()
@@ -338,6 +715,41 @@ def _package_scripts(path: Path) -> list[str]:
     data = json.loads(package_json.read_text(encoding="utf-8"))
     scripts = data.get("scripts") or {}
     return sorted(str(name) for name in scripts)
+
+
+def _contract_path(path: str) -> str:
+    return path.split("?", 1)[0]
+
+
+def _contract_lookup() -> dict[str, RouteBoundaryContract]:
+    lookup: dict[str, RouteBoundaryContract] = {}
+    for contract in ROUTE_CONTRACTS:
+        lookup.setdefault(_contract_path(contract.path), contract)
+        lookup[contract.path] = contract
+    return lookup
+
+
+def _public_template_fetches(root: Path = ROOT) -> list[PublicTemplateFetch]:
+    template = "services/analytics_dashboard/templates/index.html"
+    template_path = root / template
+    if not template_path.exists():
+        return []
+    lookup = _contract_lookup()
+    fetches: list[PublicTemplateFetch] = []
+    for match in FETCH_PATTERN.finditer(template_path.read_text(encoding="utf-8")):
+        path = _contract_path(match.group(1))
+        contract = lookup.get(path)
+        fetches.append(
+            PublicTemplateFetch(
+                path=path,
+                template=template,
+                helper="safeFetch",
+                boundary=contract.boundary if contract else "unknown",
+                contract_present=contract is not None,
+                admin_route=path.startswith("/api/admin/"),
+            )
+        )
+    return sorted(fetches, key=lambda item: item.path)
 
 
 def _entry(definition: SurfaceDefinition, *, root: Path = ROOT) -> SurfaceInventoryEntry:
@@ -370,6 +782,8 @@ def _entry(definition: SurfaceDefinition, *, root: Path = ROOT) -> SurfaceInvent
 
 def build_inventory(root: Path = ROOT) -> dict[str, Any]:
     surfaces = [_entry(definition, root=root) for definition in SURFACE_DEFS]
+    route_contracts = list(ROUTE_CONTRACTS)
+    public_template_fetches = _public_template_fetches(root=root)
     stacks = sorted({stack for surface in surfaces for stack in surface.stack})
     boundaries = sorted({surface.boundary for surface in surfaces})
     return {
@@ -383,10 +797,26 @@ def build_inventory(root: Path = ROOT) -> dict[str, Any]:
             ),
             "operator_sensitive_count": sum(surface.operator_sensitive for surface in surfaces),
             "publicly_exposable_count": sum(surface.publicly_exposable for surface in surfaces),
+            "route_contract_count": len(route_contracts),
+            "public_route_contract_count": sum(
+                contract.boundary in PUBLIC_BOUNDARIES for contract in route_contracts
+            ),
+            "admin_route_contract_count": sum(
+                contract.boundary in OPERATOR_BOUNDARIES for contract in route_contracts
+            ),
+            "public_template_fetch_count": len(public_template_fetches),
+            "public_template_fetch_missing_contract_count": sum(
+                not fetch.contract_present for fetch in public_template_fetches
+            ),
+            "public_template_admin_fetch_count": sum(
+                fetch.admin_route for fetch in public_template_fetches
+            ),
             "boundaries": boundaries,
             "stacks": stacks,
         },
         "surfaces": [asdict(surface) for surface in surfaces],
+        "route_contracts": [asdict(contract) for contract in route_contracts],
+        "public_template_fetches": [asdict(fetch) for fetch in public_template_fetches],
     }
 
 
