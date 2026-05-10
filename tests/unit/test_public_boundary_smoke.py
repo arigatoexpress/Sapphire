@@ -50,3 +50,63 @@ def test_scan_text_passes_public_safe_summary():
 
     assert result.status == "PASS"
     assert result.matches == ()
+
+
+def test_scan_admin_boundary_accepts_auth_required_response():
+    script = _load_script()
+
+    result = script.scan_admin_boundary("/api/admin/analysis", 401, '{"error":"unauthorized"}')
+
+    assert result.status == "PASS"
+    assert result.evidence == "admin route required auth or failed closed"
+
+
+def test_scan_admin_boundary_fails_open_json_response():
+    script = _load_script()
+
+    result = script.scan_admin_boundary(
+        "/api/signals/recent",
+        200,
+        '{"recent_signals":[{"symbol":"BTC"}],"pnl_usd":12.34}',
+    )
+
+    assert result.status == "FAIL"
+    assert result.http_status == 200
+
+
+def test_scan_public_json_contract_requires_public_mode():
+    script = _load_script()
+
+    result = script.scan_public_json_contract(
+        "/api/brain/synthesis",
+        200,
+        '{"mode":"admin_brain_synthesis","health_score":1}',
+    )
+
+    assert result.status == "FAIL"
+    assert "expected mode" in result.evidence
+
+
+def test_scan_public_json_contract_flags_raw_signal_count_key():
+    script = _load_script()
+
+    result = script.scan_public_json_contract(
+        "/api/brain/synthesis",
+        200,
+        '{"mode":"public_brain_summary","signal_count_24h":12,"narrative":"safe"}',
+    )
+
+    assert result.status == "FAIL"
+    assert "signal_count_24h" in result.matches
+
+
+def test_scan_public_json_contract_passes_redacted_silos_summary():
+    script = _load_script()
+
+    result = script.scan_public_json_contract(
+        "/api/silos/health",
+        200,
+        '{"mode":"public_silos_health_summary","services":[],"silos":{"tho":{"status":"ok"}}}',
+    )
+
+    assert result.status == "PASS"
