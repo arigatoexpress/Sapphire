@@ -713,6 +713,19 @@ def test_services_command_returns_table(monkeypatch):
     assert "green" in response["text"]
 
 
+def test_sources_command_returns_registry_summary(monkeypatch):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
+
+    response = pm_bot.handle_telegram_command(_make_update("/sources"))
+
+    assert response["parse_mode"] == "MarkdownV2"
+    assert "Agentic sources: 17 sources across 11 domains" in response["text"]
+    assert "telegram\\_send\\_default\\=dry\\_run\\_only" in response["text"]
+    assert "local\\_inference\\_default\\=disabled" in response["text"]
+    assert "defillama" in response["text"]
+    assert "kimi\\-k2\\.6" in response["text"]
+
+
 def test_digest_morning_reads_archive_when_present(monkeypatch, tmp_path):
     monkeypatch.setenv("SAPPHIRE_PM_BOT_ALLOWED_USER_IDS", "123")
     from datetime import UTC as _UTC
@@ -761,6 +774,7 @@ def test_existing_help_command_still_lists_all_commands(monkeypatch):
     # New commands.
     assert "/health" in text
     assert "/services" in text
+    assert "/sources" in text
     assert "/whoami" in text
     assert "/routines" in text
 

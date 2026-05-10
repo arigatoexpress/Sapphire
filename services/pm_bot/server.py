@@ -63,7 +63,15 @@ _SUPPORTED_UPDATE_TYPES = [
     "edited_message",
     "channel_post",
     "edited_channel_post",
+    "callback_query",
+    "message_reaction",
+    "message_reaction_count",
 ]
+_DRY_RUN_CONTROL_UPDATE_TYPES = {
+    "callback_query",
+    "message_reaction",
+    "message_reaction_count",
+}
 
 
 def _read_first_secret_file(paths: list[Path]) -> str:
@@ -319,6 +327,47 @@ def _message_payload(update: dict[str, Any]) -> dict[str, Any]:
     return update
 
 
+def _control_update_payload(update: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
+    """Return a supported non-message Telegram update, if present.
+
+    Callback and reaction updates are intentionally dry-run in this service
+    slice. Recognizing them lets the webhook/polling layer prove routing
+    coverage without sending acknowledgements, posting Telegram replies, or
+    mutating draft state before the agent router exists.
+    """
+
+    for key in _DRY_RUN_CONTROL_UPDATE_TYPES:
+        payload = update.get(key)
+        if isinstance(payload, dict):
+            return key, payload
+    return None
+
+
+def _process_control_update_dry_run(update_type: str, payload: dict[str, Any]) -> bool:
+    """Log and accept callback/reaction updates without external side effects."""
+
+    update_hint = {
+        "type": update_type,
+        "id": payload.get("id"),
+        "data": payload.get("data"),
+        "message_id": payload.get("message_id"),
+    }
+    message = payload.get("message")
+    if isinstance(message, dict):
+        update_hint["message_id"] = message.get("message_id", update_hint["message_id"])
+        chat = message.get("chat")
+        if isinstance(chat, dict):
+            update_hint["chat_id"] = chat.get("id")
+    chat = payload.get("chat")
+    if isinstance(chat, dict):
+        update_hint["chat_id"] = chat.get("id", update_hint.get("chat_id"))
+    logger.info(
+        "Dry-run accepted Telegram control update: %s",
+        _redact_sensitive_text(update_hint),
+    )
+    return True
+
+
 def _message_id(update: dict[str, Any]) -> int | None:
     message = _message_payload(update)
     value = message.get("message_id")
@@ -401,6 +450,11 @@ def process_update(update: dict[str, Any]) -> bool:
     if _mark_update_seen(update):
         logger.info("Ignoring duplicate Telegram update_id=%s", update.get("update_id"))
         return False
+
+    control_update = _control_update_payload(update)
+    if control_update is not None:
+        update_type, payload = control_update
+        return _process_control_update_dry_run(update_type, payload)
 
     message = _message_payload(update)
     if not isinstance(message, dict):

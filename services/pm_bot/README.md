@@ -88,7 +88,7 @@ Set the webhook:
 ```bash
 curl -s "https://api.telegram.org/bot${SAPPHIRE_PM_BOT_TOKEN}/setWebhook" \
   -H "Content-Type: application/json" \
-  -d "{\"url\":\"https://YOUR-PUBLIC-URL/telegram/webhook\",\"allowed_updates\":[\"message\",\"edited_message\",\"channel_post\",\"edited_channel_post\"],\"secret_token\":\"${SAPPHIRE_PM_BOT_WEBHOOK_SECRET}\"}"
+  -d "{\"url\":\"https://YOUR-PUBLIC-URL/telegram/webhook\",\"allowed_updates\":[\"message\",\"edited_message\",\"channel_post\",\"edited_channel_post\",\"callback_query\",\"message_reaction\",\"message_reaction_count\"],\"secret_token\":\"${SAPPHIRE_PM_BOT_WEBHOOK_SECRET}\"}"
 ```
 
 Clear the webhook for polling:

@@ -98,6 +98,7 @@ fired (this is by design; see the threat model).
 | `/status` | Mesh device + inference proxy + paper-trading + THO health. | MarkdownV2 status block. | None. |
 | `/health` | One-line summary from `health_check` tool (brief profile). | `health: GREEN \| green=N yellow=N red=N` | None. |
 | `/services` | LaunchAgent + HTTP service status table. | MarkdownV2 table. | None. |
+| `/sources` | Agentic Telegram source-registry summary. | Source count, safety defaults, Tier 0 IDs, domain counts, default model roles. | None. |
 | `/dev pulse` (also `/dev`, `/pulse`) | Cross-repo PRs + CI + Cloud Run + LaunchAgent health. | MarkdownV2 dev pulse. | None. |
 | `/svc status` | Dry-run preview of the service supervisor (what would be restarted). | MarkdownV2 dry-run summary. | None — `dry_run=True` is hard-coded. |
 | `/whoami` | Echoes back the requester's user_id, username, chat_id. | MarkdownV2 identity block. | None. |
