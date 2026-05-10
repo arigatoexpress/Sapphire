@@ -9,6 +9,10 @@ SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../services/analytics_
 
 log() { printf "\033[36m[run]\033[0m %s\n" "$*"; }
 
+log "verifying Sapphire Analytics deploy source"
+python3 "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../scripts/ops/verify_analytics_deploy_source.py" \
+  --source-dir="$SRC_DIR"
+
 # Grant the default compute SA bigquery.dataViewer (read-only on dataset)
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT" --format="value(projectNumber)")
 COMPUTE_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
