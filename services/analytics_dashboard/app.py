@@ -35,6 +35,7 @@ if str(_HERE) not in sys.path:
 from _deflated_sharpe import annualized_sharpe, deflated_sharpe  # noqa: E402
 from admin_narrative import build_admin_narrative  # noqa: E402
 from auth import admin_session_payload, requires_admin  # noqa: E402
+from data_engineering import build_data_engineering_report  # noqa: E402
 from project_tabs import get_project_tab, public_project_tabs  # noqa: E402
 
 PROJECT = os.environ.get("GCP_PROJECT", "tho-ai-agent")
@@ -1136,6 +1137,15 @@ def _admin_analysis_payload() -> dict:
     return payload
 
 
+def _admin_data_engineering_payload() -> dict:
+    return build_data_engineering_report(
+        project=PROJECT,
+        dataset=DATASET,
+        query_rows=_rows,
+        env=os.environ,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -1179,6 +1189,13 @@ def admin_analysis():
     one operator-facing payload.
     """
     return jsonify(_admin_analysis_payload())
+
+
+@app.get("/api/admin/data-engineering")
+@requires_admin
+def admin_data_engineering():
+    """Passkey-gated BigQuery/Gemini readiness analysis for engineering work."""
+    return jsonify(_admin_data_engineering_payload())
 
 
 @app.get("/api/performance")
