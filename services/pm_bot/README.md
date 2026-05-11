@@ -212,8 +212,13 @@ Quick manual smoke test with the service running:
 - Reply to one of the bot's messages with `status` to exercise reply-followup normalization
 
 For LaunchAgent deployments, keep the shared Sapphire Telegram token owned by
-Hermes polling. The PM bot should stay local/webhook-only unless it has a
-dedicated `SAPPHIRE_PM_BOT_TOKEN`.
+the PM bot webhook. Deprecated Hermes/OpenClaw gateway pollers should stay
+disabled so only one Bot API ingress path consumes updates.
+
+The checked-in LaunchAgent enables the draft queue and agentic dry-run mode, but
+does not hard-code `SAPPHIRE_PM_BOT_WEBHOOK_URL`; set that only in the active
+runtime plist after choosing the current public HTTPS ingress. Avoid committing
+accountless quick-tunnel URLs because they can change when the tunnel restarts.
 
 Safe live-test setup:
 
