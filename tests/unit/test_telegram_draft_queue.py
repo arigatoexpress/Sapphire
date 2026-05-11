@@ -40,6 +40,18 @@ def test_build_draft_has_stable_id_for_same_material() -> None:
     assert first.source_ids == ("defillama", "hyperliquid_public")
 
 
+def test_build_draft_can_mark_non_confirmation_feedback() -> None:
+    draft = build_draft(
+        kind="feedback_signal",
+        topic="research",
+        body="Reaction recorded.",
+        requires_confirmation=False,
+        created_at="2026-05-10T23:00:00+00:00",
+    )
+
+    assert draft.requires_confirmation is False
+
+
 def test_transition_draft_records_history() -> None:
     draft = build_draft(
         kind="digest",

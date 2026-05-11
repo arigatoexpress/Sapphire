@@ -70,6 +70,7 @@ def build_draft(
     created_by: str = "sapphire-agent-router",
     target_chat_id: int | None = None,
     target_thread_id: int | None = None,
+    requires_confirmation: bool = True,
     metadata: dict[str, Any] | None = None,
 ) -> TelegramDraft:
     """Build a draft record with a deterministic content hash id."""
@@ -89,6 +90,7 @@ def build_draft(
         "created_at": timestamp,
         "target_chat_id": target_chat_id,
         "target_thread_id": target_thread_id,
+        "requires_confirmation": requires_confirmation,
     }
     return TelegramDraft(
         draft_id=_draft_id(material),
@@ -101,6 +103,7 @@ def build_draft(
         created_by=str(created_by or "sapphire-agent-router"),
         target_chat_id=target_chat_id,
         target_thread_id=target_thread_id,
+        requires_confirmation=requires_confirmation,
         metadata=dict(metadata or {}),
     )
 

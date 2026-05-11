@@ -28,6 +28,7 @@ if str(TOOL_DIR) not in sys.path:
 import sapphire_pm_bot
 
 from lib.telegram.agent_router import SUPPORTED_UPDATE_TYPES, RouterDecision, route_update
+from lib.telegram.draft_queue import append_draft, build_draft, transition_draft
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
@@ -64,6 +65,7 @@ _TRUE_VALUES = {"1", "true", "yes", "on"}
 _DEDICATED_TOKEN_SOURCES = {"explicit_env"}
 _SHARED_TOKEN_SOURCES = {"shared_env", "shared_secret_file", "legacy_secret_file", "secret_file"}
 _SUPPORTED_UPDATE_TYPES = list(SUPPORTED_UPDATE_TYPES)
+_DEFAULT_DRAFT_QUEUE_PATH = Path.home() / ".cache" / "sapphire" / "telegram" / "pm_bot_drafts.jsonl"
 
 
 def _read_first_secret_file(paths: list[Path]) -> str:
@@ -98,6 +100,13 @@ def _bot_token_file_source(path: Path) -> str:
 
 def _env_flag(name: str) -> bool:
     return os.getenv(name, "").strip().lower() in _TRUE_VALUES
+
+
+def _env_flag_default(name: str, *, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return default
+    return raw.strip().lower() in _TRUE_VALUES
 
 
 def _resolve_bot_token_with_source() -> tuple[str, str]:
@@ -157,6 +166,9 @@ class Settings:
     token_source: str = "explicit_env"
     shared_polling_allowed: bool = False
     bot_username: str = ""
+    draft_queue_path: Path = _DEFAULT_DRAFT_QUEUE_PATH
+    draft_queue_enabled: bool = True
+    agentic_dry_run_enabled: bool = True
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -175,6 +187,17 @@ class Settings:
             token_source=token_source,
             shared_polling_allowed=_env_flag("SAPPHIRE_PM_BOT_ALLOW_SHARED_POLLING"),
             bot_username=os.getenv("SAPPHIRE_PM_BOT_BOT_USERNAME", "").strip().lstrip("@"),
+            draft_queue_path=Path(
+                os.getenv("SAPPHIRE_PM_BOT_DRAFT_QUEUE_PATH", str(_DEFAULT_DRAFT_QUEUE_PATH))
+            ).expanduser(),
+            draft_queue_enabled=_env_flag_default(
+                "SAPPHIRE_PM_BOT_DRAFT_QUEUE_ENABLED",
+                default=True,
+            ),
+            agentic_dry_run_enabled=_env_flag_default(
+                "SAPPHIRE_PM_BOT_AGENTIC_DRY_RUN",
+                default=True,
+            ),
         )
 
 
@@ -368,10 +391,130 @@ def _message_payload(update: dict[str, Any]) -> dict[str, Any]:
     return update
 
 
-def _process_router_decision_no_send(decision: RouterDecision) -> bool:
-    """Log and accept non-command router decisions without external side effects."""
+def _actor_label(decision: RouterDecision) -> str:
+    actor = decision.context.actor
+    if actor.username:
+        return f"telegram:@{actor.username}"
+    if actor.user_id is not None:
+        return f"telegram:{actor.user_id}"
+    return "telegram:unknown"
+
+
+def _draft_topic(decision: RouterDecision) -> str:
+    if decision.route in {"feedback", "source_action"}:
+        return "research"
+    if decision.route in {"blocked", "audit"}:
+        return "ops"
+    return "drafts"
+
+
+def _draft_kind(decision: RouterDecision) -> str:
+    return {
+        "blocked": "blocked_update",
+        "business_message": "guarded_reply",
+        "draft_action": "draft_callback",
+        "feedback": "feedback_signal",
+        "guest_message": "guarded_reply",
+        "inline_query": "guarded_inline_answer",
+        "source_action": "source_review",
+    }.get(decision.route, "telegram_update_dry_run")
+
+
+def _draft_body(decision: RouterDecision) -> str:
+    context = decision.context
+    if decision.route in {"guest_message", "business_message"}:
+        prompt = context.text[:500] if context.text else "(no text)"
+        return (
+            f"Dry-run guarded Telegram reply requested via {context.update_type}.\n"
+            f"Prompt: {prompt}\n"
+            "No Telegram message was sent."
+        )
+    if decision.route == "inline_query":
+        query = context.text[:500] if context.text else "(empty query)"
+        return (
+            f"Dry-run inline answer requested for query: {query}\n"
+            "No answerInlineQuery call was made."
+        )
+    if decision.route == "feedback":
+        return (
+            f"Dry-run Telegram feedback recorded for {context.update_type} "
+            f"on message {context.message_id}; reaction_count={context.reaction_count}."
+        )
+    if decision.route == "draft_action":
+        return (
+            f"Dry-run draft callback received: {decision.action} {decision.draft_id}.\n"
+            "No answerCallbackQuery call was made and no Telegram send was attempted."
+        )
+    if decision.route == "source_action":
+        return (
+            f"Dry-run source callback received: {decision.action} {decision.source_id}.\n"
+            "No source registry mutation was performed."
+        )
+    if decision.route == "blocked":
+        return (
+            f"Blocked Telegram update: {decision.action}.\n"
+            f"Reason: {decision.reason}\n"
+            "No external action was performed."
+        )
+    return (
+        f"Dry-run Telegram update routed as {decision.route}/{decision.action}.\n"
+        "No external side effect was performed."
+    )
+
+
+def _queue_router_decision_draft(decision: RouterDecision) -> str:
+    """Append a local dry-run draft/event for non-command router decisions."""
 
     context = decision.context
+    metadata = {
+        "route": decision.route,
+        "action": decision.action,
+        "reason": decision.reason,
+        "update_id": context.update_id,
+        "update_type": context.update_type,
+        "message_id": context.message_id,
+        "message_thread_id": context.message_thread_id,
+        "direct_messages_topic_id": context.direct_messages_topic_id,
+        "actor_user_id": context.actor.user_id,
+        "actor_username": context.actor.username,
+        "actor_is_bot": context.actor.is_bot,
+        "callback_data": _redact_sensitive_text(context.callback_data)[:256],
+        "draft_id": decision.draft_id,
+        "source_id": decision.source_id,
+        "agentic_dry_run": SETTINGS.agentic_dry_run_enabled,
+        "external_side_effect": False,
+    }
+    draft = build_draft(
+        kind=_draft_kind(decision),
+        topic=_draft_topic(decision),
+        body=_draft_body(decision),
+        provenance_refs=(f"telegram:update:{context.update_id}",)
+        if context.update_id is not None
+        else (),
+        created_by="sapphire-pm-bot",
+        target_chat_id=context.chat_id,
+        target_thread_id=context.message_thread_id or context.direct_messages_topic_id,
+        requires_confirmation=decision.requires_confirmation,
+        metadata=metadata,
+    )
+    if decision.requires_confirmation:
+        draft = transition_draft(
+            draft,
+            status="pending_confirmation",
+            actor=_actor_label(decision),
+            reason=decision.reason,
+        )
+    append_draft(SETTINGS.draft_queue_path, draft)
+    return draft.draft_id
+
+
+def _process_router_decision_no_send(decision: RouterDecision) -> bool:
+    """Queue/log non-command router decisions without external side effects."""
+
+    context = decision.context
+    queued_draft_id = ""
+    if SETTINGS.draft_queue_enabled:
+        queued_draft_id = _queue_router_decision_draft(decision)
     update_hint = {
         "route": decision.route,
         "action": decision.action,
@@ -386,6 +529,8 @@ def _process_router_decision_no_send(decision: RouterDecision) -> bool:
         "source_id": decision.source_id,
         "requires_confirmation": decision.requires_confirmation,
         "external_side_effect": decision.external_side_effect,
+        "queued_draft_id": queued_draft_id,
+        "draft_queue_enabled": SETTINGS.draft_queue_enabled,
     }
     logger.info(
         "Router accepted Telegram update with no external side effects: %s",
@@ -667,6 +812,9 @@ def _health_payload() -> dict[str, Any]:
         "last_poll_error": POLLING_STATE.get("last_error"),
         "shared_polling_allowed": SETTINGS.shared_polling_allowed,
         "webhook_secret_configured": bool(SETTINGS.webhook_secret),
+        "agentic_dry_run_enabled": SETTINGS.agentic_dry_run_enabled,
+        "draft_queue_enabled": SETTINGS.draft_queue_enabled,
+        "draft_queue_path": str(SETTINGS.draft_queue_path),
         "bot_username": telegram_probe.get("bot_username") or SETTINGS.bot_username,
         "supported_update_types": list(_SUPPORTED_UPDATE_TYPES),
         "telegram_delivery_ready": telegram_delivery_ready,
@@ -725,6 +873,8 @@ def telegram_ownership() -> dict[str, Any]:
         "operator_action": payload["telegram_operator_action"],
         "supported_update_types": payload["supported_update_types"],
         "no_send_router_guard": "only command routes may call sendMessage",
+        "draft_queue_enabled": payload["draft_queue_enabled"],
+        "agentic_dry_run_enabled": payload["agentic_dry_run_enabled"],
         "required_before_group": [
             "register_pm_bot_webhook_or_confirm_external_single_ingress",
             "keep_kimi_relay_disabled_until_private_operator_group_exists",
