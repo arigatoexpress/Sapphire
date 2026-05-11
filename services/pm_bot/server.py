@@ -649,8 +649,7 @@ def on_shutdown() -> None:
     POLLING_STOP.set()
 
 
-@app.get("/health")
-def health() -> dict[str, Any]:
+def _health_payload() -> dict[str, Any]:
     thread = POLLING_STATE.get("thread")
     polling_active = bool(isinstance(thread, threading.Thread) and thread.is_alive())
     telegram_probe = _telegram_runtime_probe()
@@ -685,6 +684,53 @@ def health() -> dict[str, Any]:
         "telegram_webhook_registered": webhook_registered,
         "telegram_pending_update_count": telegram_probe.get("pending_update_count"),
         "telegram_allowed_updates": telegram_probe.get("allowed_updates"),
+    }
+
+
+def _agent_group_blockers(payload: dict[str, Any]) -> list[str]:
+    blockers: list[str] = []
+    if not payload.get("telegram_delivery_ready"):
+        blockers.append(
+            str(payload.get("telegram_delivery_reason") or "telegram_delivery_not_ready")
+        )
+    if payload.get("mode") != "webhook":
+        blockers.append("pm_bot_not_in_webhook_mode")
+    if payload.get("telegram_polling_policy") == "shared_polling_break_glass":
+        blockers.append("shared_polling_break_glass_enabled")
+    if payload.get("telegram_probe_ok") is False:
+        blockers.append("telegram_probe_failed")
+    return blockers
+
+
+@app.get("/health")
+def health() -> dict[str, Any]:
+    return _health_payload()
+
+
+@app.get("/telegram/ownership")
+def telegram_ownership() -> dict[str, Any]:
+    payload = _health_payload()
+    blockers = _agent_group_blockers(payload)
+    return {
+        "service": payload["service"],
+        "single_ingress_owner": payload["telegram_inbound_owner"],
+        "agent_group_ready": not blockers,
+        "agent_group_blockers": blockers,
+        "mode": payload["mode"],
+        "bot_username": payload["bot_username"],
+        "token_role": payload["telegram_token_role"],
+        "polling_active": payload["polling_active"],
+        "webhook_registered": payload["telegram_webhook_registered"],
+        "delivery_ready": payload["telegram_delivery_ready"],
+        "operator_action": payload["telegram_operator_action"],
+        "supported_update_types": payload["supported_update_types"],
+        "no_send_router_guard": "only command routes may call sendMessage",
+        "required_before_group": [
+            "register_pm_bot_webhook_or_confirm_external_single_ingress",
+            "keep_kimi_relay_disabled_until_private_operator_group_exists",
+            "invite_kimi_agent_first",
+            "invite_nemotron_agent_only_after_mock_free_text_spam_is_quiet",
+        ],
     }
 
 

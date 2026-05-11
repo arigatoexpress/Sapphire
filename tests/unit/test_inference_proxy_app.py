@@ -129,6 +129,8 @@ class TestTierMembership:
         # Models on Mac that aren't Pi-serveable should be preferred on Mac
         # rather than substituted to PI_DEFAULT_MODEL.
         assert "hermes3:8b" in app_module.MAC_EXACT_FALLBACK_MODELS
+        assert "nemotron-mini" in app_module.MAC_EXACT_FALLBACK_MODELS
+        assert "nemotron-mini:4b" in app_module.MAC_EXACT_FALLBACK_MODELS
         # Pi-serveable models should NOT be in the exact-fallback set.
         for m in app_module.PI_SERVE_MODELS:
             assert m not in app_module.MAC_EXACT_FALLBACK_MODELS
@@ -136,6 +138,11 @@ class TestTierMembership:
     def test_select_pi_model_substitutes_when_not_pi_safe(self, app_module):
         assert app_module._select_pi_model("hermes3:8b") == app_module.PI_DEFAULT_MODEL
         assert app_module._select_pi_model("qwen2.5:0.5b") == "qwen2.5:0.5b"
+
+    def test_select_mac_model_preserves_nemotron_alias(self, app_module):
+        assert app_module._select_mac_model("nemotron-mini") == "nemotron-mini:latest"
+        assert app_module._select_mac_model("nemotron-mini:4b") == "nemotron-mini:latest"
+        assert app_module._select_mac_model("qwen3.6:27b") == "qwen3.6:27b"
 
     def test_enabled_pi_targets_respects_flags(self, app_module, monkeypatch):
         # Monkey-patch the module-level flags rather than env (env is already
@@ -876,6 +883,25 @@ class TestPostValidation:
 
 
 class TestKimiRelayFallback:
+    def test_relay_disabled_by_default_even_when_env_is_present(
+        self,
+        app_module,
+        monkeypatch,
+    ):
+        def boom(_query):
+            raise AssertionError("relay should not be called unless KIMI_RELAY_ENABLED is true")
+
+        monkeypatch.setattr(app_module, "MOONSHOT_API_KEY", "")
+        monkeypatch.setattr(app_module, "OPENROUTER_API_KEY", "")
+        monkeypatch.setattr(app_module, "KIMI_RELAY_ENABLED", False)
+        monkeypatch.setattr(app_module, "_KIMI_RELAY_AVAILABLE", True)
+        monkeypatch.setattr(app_module, "_kimi_relay_fn", boom)
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "sender-token")
+        monkeypatch.setenv("RELAY_READER_TOKEN", "reader-token")
+        monkeypatch.setenv("KIMI_RELAY_CHAT_ID", "-100")
+
+        assert app_module._call_kimi_cloud([{"role": "user", "content": "hello"}]) is None
+
     def test_relay_uses_reader_token_gate_not_legacy_kimi_claw_token(
         self,
         app_module,
@@ -883,6 +909,7 @@ class TestKimiRelayFallback:
     ):
         monkeypatch.setattr(app_module, "MOONSHOT_API_KEY", "")
         monkeypatch.setattr(app_module, "OPENROUTER_API_KEY", "")
+        monkeypatch.setattr(app_module, "KIMI_RELAY_ENABLED", True)
         monkeypatch.setattr(app_module, "_KIMI_RELAY_AVAILABLE", True)
         monkeypatch.setattr(app_module, "_kimi_relay_fn", lambda query: f"relay saw: {query}")
         monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "sender-token")
@@ -902,6 +929,7 @@ class TestKimiRelayFallback:
 
         monkeypatch.setattr(app_module, "MOONSHOT_API_KEY", "")
         monkeypatch.setattr(app_module, "OPENROUTER_API_KEY", "")
+        monkeypatch.setattr(app_module, "KIMI_RELAY_ENABLED", True)
         monkeypatch.setattr(app_module, "_KIMI_RELAY_AVAILABLE", True)
         monkeypatch.setattr(app_module, "_kimi_relay_fn", boom)
         monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "sender-token")
@@ -977,6 +1005,9 @@ class TestGetEndpoints:
         assert payload["fallback_ready"] is True
         assert payload["windows_offline"] is True
         assert payload["sensitive_cloud_block"] is True
+        assert payload["telegram_relay_enabled"] is False
+        assert "telegram_relay_available" in payload
+        assert "cloud_api_configured" in payload
         assert payload["local_fallbacks"] == ["mac-local"]
         assert payload["cloud_fallbacks"] == ["kimi-cloud"]
         assert any("Windows GPU tier is offline" in item for item in payload["recommended_actions"])

@@ -18,6 +18,7 @@ Environment variables (loaded from ~/.hermes/.env):
     TELEGRAM_BOT_TOKEN   — NemotronRariBot token (sends to the group)
     RELAY_READER_TOKEN   — relay-reader bot token (reads @rarikimibot responses)
     KIMI_RELAY_CHAT_ID   — numeric group chat ID (negative integer)
+    KIMI_RELAY_ENABLED   — must be truthy before any real Telegram send
 
 Usage:
     from kimi_relay import relay_query
@@ -61,6 +62,12 @@ SEND_TOKEN: str = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 # relay-reader bot — sits in group, reads @rarikimibot responses
 READER_TOKEN: str = os.environ.get("RELAY_READER_TOKEN", "")
 RELAY_CHAT_ID: str = os.environ.get("KIMI_RELAY_CHAT_ID", "")
+LIVE_SEND_ENABLED: bool = os.environ.get("KIMI_RELAY_ENABLED", "").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
 RESPONSE_TIMEOUT: int = 120
 POLL_INTERVAL: float = 1.0
@@ -89,14 +96,15 @@ def _tg(token: str, method: str, **params) -> dict:
 
         ctx.load_verify_locations(certifi.where())
     except ImportError:
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-    with urllib.request.urlopen(req, timeout=15, context=ctx) as r:
+        pass
+    with urllib.request.urlopen(req, timeout=15, context=ctx) as r:  # nosec B310
         return json.loads(r.read())
 
 
 def _send_message(text: str) -> int:
     """Send a message to RELAY_CHAT_ID via NemotronRariBot. Returns message_id."""
+    if not LIVE_SEND_ENABLED:
+        raise RuntimeError("KIMI_RELAY_ENABLED is not set — refusing live Telegram relay send")
     if not SEND_TOKEN:
         raise RuntimeError("TELEGRAM_BOT_TOKEN not set — cannot send relay query")
     if not RELAY_CHAT_ID:
@@ -175,6 +183,8 @@ def relay_query(query: str, timeout: int = RESPONSE_TIMEOUT) -> str:
 
     Raises RuntimeError on timeout or misconfiguration.
     """
+    if not LIVE_SEND_ENABLED:
+        raise RuntimeError("KIMI_RELAY_ENABLED is not set — refusing live Telegram relay send")
     if not SEND_TOKEN:
         raise RuntimeError("TELEGRAM_BOT_TOKEN not set — cannot use Kimi relay")
     if not READER_TOKEN:
@@ -220,6 +230,7 @@ if __name__ == "__main__":
     query = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else "Hello from Sapphire — are you online?"
     print(f"Sending to relay group as NemotronRariBot: {query!r}")
     print(f"Relay chat: {RELAY_CHAT_ID}")
+    print(f"Live relay enabled: {'yes' if LIVE_SEND_ENABLED else 'NO — set KIMI_RELAY_ENABLED=1'}")
     print(f"Reader bot configured: {'yes' if READER_TOKEN else 'NO — set RELAY_READER_TOKEN'}")
     print("Polling via relay-reader bot every ~1s")
     try:

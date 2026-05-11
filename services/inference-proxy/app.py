@@ -115,6 +115,12 @@ MOONSHOT_API_KEY = os.getenv("MOONSHOT_API_KEY", "")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 MOONSHOT_BASE = "https://api.moonshot.cn/v1"
 OPENROUTER_BASE = "https://openrouter.ai/api/v1"
+KIMI_RELAY_ENABLED = os.getenv("KIMI_RELAY_ENABLED", "").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
 PORT = 11435
 
@@ -196,7 +202,11 @@ MAC_FALLBACK_MODEL = "hermes3:8b"  # model known to be on Mac Ollama
 
 # Mac models (models confirmed available locally)
 MAC_MODELS = {"hermes3:8b", "llama3.2:3b", "nemotron-mini:latest", "llama3.2:latest", "qwen3.6:27b"}
-MAC_EXACT_FALLBACK_MODELS = MAC_MODELS - PI_SERVE_MODELS
+MAC_MODEL_ALIASES = {
+    "nemotron-mini": "nemotron-mini:latest",
+    "nemotron-mini:4b": "nemotron-mini:latest",
+}
+MAC_EXACT_FALLBACK_MODELS = (MAC_MODELS | set(MAC_MODEL_ALIASES)) - PI_SERVE_MODELS
 
 # Enable Pi tiers independently — both Pis are online as of 2026-04-18.
 PI_RARI1_ENABLED = os.getenv("PI_RARI1_ENABLED", os.getenv("PI_OLLAMA_ENABLED", "0")) == "1"
@@ -273,6 +283,7 @@ def _tier_inventory() -> dict[str, str]:
         "t2_pi_rari2": f"{PI_RARI2} (enabled={PI_RARI2_ENABLED})",
         "t3_mac_local": MAC_LOCAL,
         "t4_kimi_cloud": MOONSHOT_BASE,
+        "t4_kimi_telegram_relay": f"enabled={KIMI_RELAY_ENABLED}",
     }
 
 
@@ -294,6 +305,7 @@ def _failover_status_payload() -> dict[str, object]:
     enabled_local = [name for name in local_candidates if endpoints.get(name) != "disabled"]
     healthy_local = [name for name in enabled_local if endpoints.get(name) == "healthy"]
     healthy_cloud = endpoints.get("kimi-cloud") == "healthy"
+    cloud_api_configured = bool(MOONSHOT_API_KEY or OPENROUTER_API_KEY)
     windows_healthy = endpoints.get("windows-gpu") == "healthy"
     active_route = next(
         (name for name in ordered_route if endpoints.get(name) == "healthy"),
@@ -324,7 +336,11 @@ def _failover_status_payload() -> dict[str, object]:
         )
     if not healthy_cloud:
         recommended_actions.append(
-            "Cloud fallback is unavailable; verify MOONSHOT_API_KEY/OpenRouter or Kimi relay configuration."
+            "Cloud fallback is unavailable; verify MOONSHOT_API_KEY or OpenRouter configuration."
+        )
+    if healthy_cloud and not cloud_api_configured and not KIMI_RELAY_ENABLED:
+        recommended_actions.append(
+            "Kimi cloud health is optimistic but no API key is configured; Telegram relay is disabled by default to prevent group spam."
         )
     if endpoints.get("pi-rari1") == "disabled" and endpoints.get("pi-rari2") == "disabled":
         recommended_actions.append(
@@ -384,6 +400,9 @@ def _failover_status_payload() -> dict[str, object]:
         "fallback_ready": bool(healthy_local or healthy_cloud),
         "windows_offline": not windows_healthy,
         "sensitive_cloud_block": True,
+        "cloud_api_configured": cloud_api_configured,
+        "telegram_relay_available": bool(_KIMI_RELAY_AVAILABLE and _kimi_relay_fn),
+        "telegram_relay_enabled": KIMI_RELAY_ENABLED,
         "local_fallbacks": healthy_local,
         "cloud_fallbacks": ["kimi-cloud"] if healthy_cloud else [],
         "endpoints": endpoints,
@@ -1140,8 +1159,11 @@ def _call_kimi_cloud(
         if result:
             return result
 
-    # Telegram relay fallback — @rarikimibot in shared group
-    if _KIMI_RELAY_AVAILABLE and _kimi_relay_fn:
+    # Telegram relay fallback — @rarikimibot in shared group. This can send a
+    # real group message, so it is disabled unless deliberately enabled.
+    if not KIMI_RELAY_ENABLED:
+        log.debug("kimi-relay: disabled by KIMI_RELAY_ENABLED")
+    elif _KIMI_RELAY_AVAILABLE and _kimi_relay_fn:
         relay_chat_id = os.environ.get("KIMI_RELAY_CHAT_ID", "")
         send_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
         reader_token = os.environ.get("RELAY_READER_TOKEN", "")
@@ -1265,6 +1287,16 @@ def _enabled_pi_targets() -> list[tuple[str, str]]:
 def _select_pi_model(model: str) -> str:
     """Choose the Pi-safe model to use for T2 routing."""
     return model if model in PI_SERVE_MODELS else PI_DEFAULT_MODEL
+
+
+def _select_mac_model(model: str) -> str:
+    """Choose the Mac-local model while preserving known equivalent aliases."""
+    if model in MAC_MODELS:
+        return model
+    aliased = MAC_MODEL_ALIASES.get(model)
+    if aliased in MAC_MODELS:
+        return aliased
+    return MAC_FALLBACK_MODEL
 
 
 def _try_pi_tier(
@@ -1645,7 +1677,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
         # ── Tier 3: Mac local ────────────────────────────────────────────────
         tried.append("mac-local")
         # Model substitution: use hermes3:8b if requested model not on Mac
-        mac_model = model if model in MAC_MODELS else MAC_FALLBACK_MODEL
+        mac_model = _select_mac_model(model)
         if mac_model != model:
             mac_body = json.dumps({**req_data, "model": mac_model}).encode()
             log.info("Mac fallback: substituting model '%s' → '%s'", model, mac_model)
@@ -1757,10 +1789,11 @@ if __name__ == "__main__":
     log.info("T2 Pi rari2    : %s enabled=%s", PI_RARI2, PI_RARI2_ENABLED)
     log.info("T3 Mac local   : %s (/v1/ openai-compat)", MAC_LOCAL)
     log.info(
-        "T4 Kimi Cloud  : moonshot=%s openrouter=%s relay=%s (non-sensitive only)",
+        "T4 Kimi Cloud  : moonshot=%s openrouter=%s relay_available=%s relay_enabled=%s (non-sensitive only)",
         bool(MOONSHOT_API_KEY),
         bool(OPENROUTER_API_KEY),
         _KIMI_RELAY_AVAILABLE,
+        KIMI_RELAY_ENABLED,
     )
     log.info("Health cooldown: %ds | Background probe: 30s", HEALTH_COOLDOWN)
     server.serve_forever()

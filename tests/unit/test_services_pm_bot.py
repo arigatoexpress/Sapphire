@@ -967,6 +967,62 @@ def test_health_explains_shared_token_webhook_half_state(reload_server, monkeypa
     )
 
 
+def test_telegram_ownership_endpoint_surfaces_group_readiness_blockers(
+    reload_server,
+    monkeypatch,
+):
+    from fastapi.testclient import TestClient
+
+    server = reload_server()
+    monkeypatch.setattr(
+        server,
+        "SETTINGS",
+        server.Settings(
+            token="abc",
+            webhook_secret="secret",
+            mode="webhook",
+            host="127.0.0.1",
+            port=18082,
+            telegram_timeout_seconds=30.0,
+            token_source="shared_secret_file",
+            shared_polling_allowed=False,
+        ),
+    )
+    monkeypatch.setattr(
+        server,
+        "_telegram_runtime_probe",
+        lambda: {
+            "probe_ok": True,
+            "bot_username": "NemotronRariBot",
+            "bot_id": 123,
+            "webhook_registered": False,
+            "pending_update_count": 0,
+            "allowed_updates": ["message"],
+            "delivery_ready": False,
+            "delivery_mode_reason": "webhook_missing",
+            "probe_error": None,
+        },
+    )
+
+    with TestClient(server.app) as http:
+        response = http.get("/telegram/ownership")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["agent_group_ready"] is False
+    assert body["agent_group_blockers"] == ["webhook_missing"]
+    assert body["single_ingress_owner"] == "pm_bot_webhook_unregistered"
+    assert (
+        body["operator_action"]
+        == "register_pm_bot_webhook_or_leave_shared_token_to_external_poller"
+    )
+    assert body["no_send_router_guard"] == "only command routes may call sendMessage"
+    assert (
+        "keep_kimi_relay_disabled_until_private_operator_group_exists"
+        in body["required_before_group"]
+    )
+
+
 def test_health_reports_polling_active_when_thread_alive(reload_server):
     from fastapi.testclient import TestClient
 
