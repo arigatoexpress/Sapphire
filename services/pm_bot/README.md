@@ -83,7 +83,26 @@ SAPPHIRE_PM_BOT_TOKEN=123456:dedicated-pm-token MODE=polling python3 server.py
 
 The webhook URL must be publicly reachable. In practice that means a tunnel such as Tailscale Funnel or another HTTPS endpoint that forwards to `http://127.0.0.1:18082/telegram/webhook`.
 
-Set the webhook:
+Plan the webhook registration first. This does not call Telegram or mutate the
+bot:
+
+```bash
+python3 scripts/ops/pm_bot_webhook_readiness.py \
+  --url "https://YOUR-PUBLIC-URL/telegram/webhook" \
+  --json
+```
+
+Apply is deliberately double-gated because it mutates Telegram delivery state:
+
+```bash
+SAPPHIRE_PM_BOT_REGISTER_WEBHOOK_APPLY=1 \
+python3 scripts/ops/pm_bot_webhook_readiness.py \
+  --url "https://YOUR-PUBLIC-URL/telegram/webhook" \
+  --apply \
+  --json
+```
+
+The equivalent raw Bot API call is:
 
 ```bash
 curl -s "https://api.telegram.org/bot${SAPPHIRE_PM_BOT_TOKEN}/setWebhook" \
@@ -93,8 +112,12 @@ curl -s "https://api.telegram.org/bot${SAPPHIRE_PM_BOT_TOKEN}/setWebhook" \
 
 The service routes this full Bot API update surface through
 `lib.telegram.agent_router`. Only `command` routes can call `sendMessage`; all
-other routes are accepted as no-send router decisions until a later draft-queue
-adapter is explicitly wired.
+other routes are accepted as no-send router decisions and queued as local
+dry-run draft/event records when `SAPPHIRE_PM_BOT_DRAFT_QUEUE_ENABLED` is true.
+
+Set `SAPPHIRE_PM_BOT_WEBHOOK_URL` on the runtime once a public URL is chosen.
+Health then treats a different registered webhook as `webhook_url_mismatch`
+instead of a false green.
 
 Clear the webhook for polling:
 
@@ -125,12 +148,17 @@ Key fields:
     registered webhook in `MODE=webhook`, or live polling thread in
     `MODE=polling`.
 - `telegram_delivery_reason`
-  - One of `webhook_registered`, `webhook_missing`, `polling_active`,
-    `polling_inactive`, or `probe_failed`.
+  - One of `webhook_registered`, `webhook_missing`, `webhook_url_mismatch`,
+    `polling_active`, `polling_inactive`, or `probe_failed`.
 - `telegram_probe_ok`
   - Whether the read-only Telegram readiness probe succeeded.
 - `telegram_webhook_registered`
   - Whether Telegram currently has a webhook URL for this bot token.
+- `telegram_webhook_url_configured`
+  - Whether `SAPPHIRE_PM_BOT_WEBHOOK_URL` is configured.
+- `telegram_webhook_url_matches_expected`
+  - `true` only when Telegram's registered webhook matches
+    `SAPPHIRE_PM_BOT_WEBHOOK_URL`; `null` when no expected URL is configured.
 - `telegram_pending_update_count`
   - Bot API pending update count when available.
 - `telegram_allowed_updates`

@@ -162,6 +162,7 @@ class Settings:
     host: str
     port: int
     telegram_timeout_seconds: float
+    webhook_url: str = ""
     telegram_probe_timeout_seconds: float = 2.0
     token_source: str = "explicit_env"
     shared_polling_allowed: bool = False
@@ -177,6 +178,7 @@ class Settings:
         return cls(
             token=token,
             webhook_secret=_resolve_webhook_secret(),
+            webhook_url=os.getenv("SAPPHIRE_PM_BOT_WEBHOOK_URL", "").strip(),
             mode=os.getenv("MODE", "webhook").strip().lower() or "webhook",
             host=os.getenv("SAPPHIRE_PM_BOT_HOST", "127.0.0.1").strip() or "127.0.0.1",
             port=int(port_text),
@@ -280,6 +282,22 @@ class TelegramAPI:
     def delete_webhook(self, *, drop_pending_updates: bool = False) -> dict[str, Any]:
         return self._post("deleteWebhook", {"drop_pending_updates": drop_pending_updates})
 
+    def set_webhook(
+        self,
+        *,
+        url: str,
+        secret_token: str = "",
+        drop_pending_updates: bool = False,
+        allowed_updates: list[str] | None = None,
+    ) -> dict[str, Any]:
+        payload = build_webhook_registration_payload(
+            url=url,
+            secret_token=secret_token,
+            drop_pending_updates=drop_pending_updates,
+            allowed_updates=allowed_updates,
+        )
+        return self._post("setWebhook", payload)
+
     def get_me(self, *, timeout_seconds: float | None = None) -> dict[str, Any]:
         return self._get("getMe", timeout_seconds=timeout_seconds)
 
@@ -381,6 +399,63 @@ def _telegram_operator_action(
     if SETTINGS.mode == "polling" and not polling_active:
         return "start_pm_bot_polling_or_switch_to_webhook"
     return "none"
+
+
+def build_webhook_registration_payload(
+    *,
+    url: str,
+    secret_token: str = "",
+    drop_pending_updates: bool = False,
+    allowed_updates: list[str] | None = None,
+) -> dict[str, Any]:
+    """Build the Telegram Bot API ``setWebhook`` payload.
+
+    This helper is side-effect-free so tooling and tests can construct the
+    exact registration request before any operator-gated Telegram mutation.
+    """
+
+    clean_url = str(url or "").strip()
+    if not clean_url:
+        raise ValueError("webhook url is required")
+    if not clean_url.startswith("https://"):
+        raise ValueError("webhook url must be HTTPS")
+    payload: dict[str, Any] = {
+        "url": clean_url,
+        "allowed_updates": list(allowed_updates or _SUPPORTED_UPDATE_TYPES),
+        "drop_pending_updates": bool(drop_pending_updates),
+    }
+    clean_secret = str(secret_token or "").strip()
+    if clean_secret:
+        payload["secret_token"] = clean_secret
+    return payload
+
+
+def sanitized_webhook_registration_plan(
+    *,
+    url: str,
+    secret_token_configured: bool,
+    drop_pending_updates: bool = False,
+    allowed_updates: list[str] | None = None,
+) -> dict[str, Any]:
+    """Return a log-safe webhook registration plan without secret material."""
+
+    payload = build_webhook_registration_payload(
+        url=url,
+        secret_token="configured" if secret_token_configured else "",
+        drop_pending_updates=drop_pending_updates,
+        allowed_updates=allowed_updates,
+    )
+    payload.pop("secret_token", None)
+    return {
+        "method": "setWebhook",
+        "url": payload["url"],
+        "allowed_updates": payload["allowed_updates"],
+        "allowed_update_count": len(payload["allowed_updates"]),
+        "drop_pending_updates": payload["drop_pending_updates"],
+        "secret_token_configured": secret_token_configured,
+        "external_side_effect": "telegram_webhook_registration",
+        "apply_gate": "requires --apply and SAPPHIRE_PM_BOT_REGISTER_WEBHOOK_APPLY=1",
+    }
 
 
 def _message_payload(update: dict[str, Any]) -> dict[str, Any]:
@@ -731,31 +806,42 @@ def _telegram_runtime_probe() -> dict[str, Any]:
         username = str(me.get("username") or username or "").strip().lstrip("@")
         webhook_url = str(webhook.get("url") or "").strip()
         webhook_registered = bool(webhook_url)
+        expected_webhook_url = SETTINGS.webhook_url.strip()
+        webhook_url_matches_expected = (
+            webhook_url == expected_webhook_url if expected_webhook_url else None
+        )
         polling_active = bool(
             isinstance(POLLING_STATE.get("thread"), threading.Thread)
             and POLLING_STATE["thread"].is_alive()
         )
         pending_update_count = webhook.get("pending_update_count")
         allowed_updates = webhook.get("allowed_updates")
+        webhook_delivery_ready = webhook_registered and (webhook_url_matches_expected is not False)
+        if SETTINGS.mode == "webhook" and webhook_delivery_ready:
+            delivery_reason = "webhook_registered"
+        elif SETTINGS.mode == "webhook" and webhook_registered and expected_webhook_url:
+            delivery_reason = "webhook_url_mismatch"
+        elif SETTINGS.mode == "webhook":
+            delivery_reason = "webhook_missing"
+        elif polling_active:
+            delivery_reason = "polling_active"
+        else:
+            delivery_reason = "polling_inactive"
         result = {
             "probe_ok": True,
             "bot_username": username,
             "bot_id": me.get("id"),
             "webhook_registered": webhook_registered,
+            "webhook_url_configured": bool(expected_webhook_url),
+            "webhook_url_matches_expected": webhook_url_matches_expected,
             "pending_update_count": pending_update_count
             if isinstance(pending_update_count, int)
             else None,
             "allowed_updates": allowed_updates if isinstance(allowed_updates, list) else None,
-            "delivery_ready": webhook_registered if SETTINGS.mode == "webhook" else polling_active,
-            "delivery_mode_reason": (
-                "webhook_registered"
-                if SETTINGS.mode == "webhook" and webhook_registered
-                else "webhook_missing"
-                if SETTINGS.mode == "webhook"
-                else "polling_active"
-                if polling_active
-                else "polling_inactive"
-            ),
+            "delivery_ready": webhook_delivery_ready
+            if SETTINGS.mode == "webhook"
+            else polling_active,
+            "delivery_mode_reason": delivery_reason,
             "probe_error": None,
         }
     except Exception as exc:  # pragma: no cover - network/runtime behavior
@@ -764,6 +850,8 @@ def _telegram_runtime_probe() -> dict[str, Any]:
             "bot_username": username,
             "bot_id": None,
             "webhook_registered": None,
+            "webhook_url_configured": bool(SETTINGS.webhook_url.strip()),
+            "webhook_url_matches_expected": None,
             "pending_update_count": None,
             "allowed_updates": None,
             "delivery_ready": False,
@@ -812,6 +900,7 @@ def _health_payload() -> dict[str, Any]:
         "last_poll_error": POLLING_STATE.get("last_error"),
         "shared_polling_allowed": SETTINGS.shared_polling_allowed,
         "webhook_secret_configured": bool(SETTINGS.webhook_secret),
+        "webhook_url_configured": bool(SETTINGS.webhook_url.strip()),
         "agentic_dry_run_enabled": SETTINGS.agentic_dry_run_enabled,
         "draft_queue_enabled": SETTINGS.draft_queue_enabled,
         "draft_queue_path": str(SETTINGS.draft_queue_path),
@@ -830,6 +919,8 @@ def _health_payload() -> dict[str, Any]:
         "telegram_probe_ok": bool(telegram_probe.get("probe_ok")),
         "telegram_probe_error": telegram_probe.get("probe_error"),
         "telegram_webhook_registered": webhook_registered,
+        "telegram_webhook_url_configured": telegram_probe.get("webhook_url_configured"),
+        "telegram_webhook_url_matches_expected": telegram_probe.get("webhook_url_matches_expected"),
         "telegram_pending_update_count": telegram_probe.get("pending_update_count"),
         "telegram_allowed_updates": telegram_probe.get("allowed_updates"),
     }
@@ -869,6 +960,8 @@ def telegram_ownership() -> dict[str, Any]:
         "token_role": payload["telegram_token_role"],
         "polling_active": payload["polling_active"],
         "webhook_registered": payload["telegram_webhook_registered"],
+        "webhook_url_configured": payload["telegram_webhook_url_configured"],
+        "webhook_url_matches_expected": payload["telegram_webhook_url_matches_expected"],
         "delivery_ready": payload["telegram_delivery_ready"],
         "operator_action": payload["telegram_operator_action"],
         "supported_update_types": payload["supported_update_types"],
