@@ -88,8 +88,13 @@ Set the webhook:
 ```bash
 curl -s "https://api.telegram.org/bot${SAPPHIRE_PM_BOT_TOKEN}/setWebhook" \
   -H "Content-Type: application/json" \
-  -d "{\"url\":\"https://YOUR-PUBLIC-URL/telegram/webhook\",\"allowed_updates\":[\"message\",\"edited_message\",\"channel_post\",\"edited_channel_post\",\"callback_query\",\"message_reaction\",\"message_reaction_count\"],\"secret_token\":\"${SAPPHIRE_PM_BOT_WEBHOOK_SECRET}\"}"
+  -d "{\"url\":\"https://YOUR-PUBLIC-URL/telegram/webhook\",\"allowed_updates\":[\"message\",\"edited_message\",\"channel_post\",\"edited_channel_post\",\"business_connection\",\"business_message\",\"edited_business_message\",\"deleted_business_messages\",\"guest_message\",\"callback_query\",\"message_reaction\",\"message_reaction_count\",\"inline_query\",\"chosen_inline_result\",\"shipping_query\",\"pre_checkout_query\",\"purchased_paid_media\",\"poll\",\"poll_answer\",\"my_chat_member\",\"chat_member\",\"chat_join_request\",\"chat_boost\",\"removed_chat_boost\",\"managed_bot\"],\"secret_token\":\"${SAPPHIRE_PM_BOT_WEBHOOK_SECRET}\"}"
 ```
+
+The service routes this full Bot API update surface through
+`lib.telegram.agent_router`. Only `command` routes can call `sendMessage`; all
+other routes are accepted as no-send router decisions until a later draft-queue
+adapter is explicitly wired.
 
 Clear the webhook for polling:
 
