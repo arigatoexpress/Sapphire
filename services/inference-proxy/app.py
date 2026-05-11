@@ -1,27 +1,27 @@
-"""Sapphire Inference Proxy — 4-tier multi-node failover.
+"""Sapphire Inference Proxy - local fallback behind hosted agent lanes.
 
-Tier 1: Windows GPU (100.71.10.48:11434) — RTX 5070 Ti, hermes3/qwen/deepseek/gemma4
-Tier 2: Pi (rari1/rari2 via Tailscale) — Ollama, nemotron-mini / gemma2
-Tier 3: Mac local (127.0.0.1:11434) — always-on fallback
-Tier 4: Kimi Cloud (api.moonshot.cn) — non-sensitive deep research only
+Current agentic Telegram direction:
+  - Kimi/Gemini hosted lanes are primary for operator work and structured triage.
+  - The PM bot owns Telegram ingress; this proxy must not create a sender path.
+  - Local Ollama is fallback-only, with Gemma 4 as the fresh Mac default.
+
+Legacy/local tiers:
+Tier 1: Windows GPU (100.71.10.48:11434) - deprecated for new default routing
+Tier 2: Pi (rari1/rari2 via Tailscale) - disabled unless explicitly enabled
+Tier 3: Mac local (127.0.0.1:11434) - sensitive/local fallback
+Tier 4: Kimi Cloud (api.moonshot.ai/cn) - non-sensitive cloud fallback
 
 Routing rules:
-  - GPU-only models (>8B): Windows only, 503 if down (no cloud fallback)
+  - Kimi/Gemini agentic Telegram work routes outside this local proxy.
   - Sensitive queries: never reach Kimi Cloud (blocked at classifier)
   - Pi: lightweight models only (≤4B), not offered GPU-only jobs
   - All tiers use OpenAI-compatible output regardless of backend format
 
-Benchmark-informed routing (RTX 5070 Ti, 2026-04-14):
-  fast/quick  → nemotron-mini:4b     232 tok/s  2.7 GB  T0 classifier + quick facts
-  balanced    → hermes3:8b           118 tok/s  4.7 GB  general chat, tool calls
-  code        → gemma4:latest        154 tok/s  9.0 GB  code gen (best GPU model, via Ollama)
-  reason      → deepseek-r1:14b       80 tok/s  9.0 GB  structured R1 chain-of-thought
-  qwen-reason → qwen3.5:9b            verified Windows install, fast reasoning
-  deep        → qwen3:14b             verified Windows install, deep analysis
-  qwen3.6     → qwen3.6:27b           Windows primary, Mac exact fallback (~7 tok/s)
-  large       → qwen2.5:32b          2.7 tok/s 19.9 GB  background / batch (RAM spill)
-  # qwen3.6:35b-a3b (24 GB) pending Windows install as next-gen large-class MoE
-  cascade     → nemotron-cascade-2    16 tok/s 22.6 GB  MoE deep analysis (fits in VRAM)
+Fresh routing:
+  auto/fast/quick/balanced/code -> gemma4:latest local fallback
+  qwen3.6                      -> qwen3.6:27b heavy local fallback
+  kimi/cloud/research          -> Kimi Cloud, non-sensitive only
+  nemotron/hermes              -> explicit compatibility only, never default
 
 Endpoints:
   /v1/chat/completions  — OpenAI-compatible (what hermes-agent uses)
@@ -126,16 +126,18 @@ PORT = 11435
 
 # ─── Model Routing ──────────────────────────────────────────────────────────
 MODEL_TIERS = {
-    # General
-    "auto": "hermes3:8b",
-    "balanced": "hermes3:8b",
-    # Pi-eligible (light, ≤4B)
-    "fast": "nemotron-mini:4b",
-    "quick": "nemotron-mini:4b",
-    "tiny": "qwen2.5:0.5b",  # ultra-light, Pi-native
-    # GPU-heavy — benchmark-calibrated 2026-04-14 (RTX 5070 Ti)
+    # Fresh local fallback. Hosted Kimi/Gemini lanes are primary for agentic Telegram;
+    # local aliases are for sensitive/offline work only.
+    "auto": "gemma4:latest",
+    "balanced": "gemma4:latest",
+    "fast": "gemma4:latest",
+    "quick": "gemma4:latest",
+    "tiny": "llama3.2:3b",
+    "local": "gemma4:latest",
+    "local-fallback": "gemma4:latest",
+    # Heavy/local explicit routes
     "deep": "qwen3:14b",  # verified on Windows — deep multi-step
-    "code": "gemma4:latest",  # 154 tok/s, 9.0 GB — best code model (via Ollama)
+    "code": "gemma4:latest",  # fresh local code fallback
     "fast-code": "gemma4:latest",  # alias
     "reason": "deepseek-r1:14b",  # 80 tok/s, 9.0 GB — structured R1 reasoning
     "qwen-reason": "qwen3.5:9b",  # verified on Windows — fast reasoning
@@ -145,6 +147,7 @@ MODEL_TIERS = {
     "moe": "nemotron-cascade-2",  # alias
     "qwen3.6": "qwen3.6:27b",  # latest Qwen generation; Windows primary, Mac exact fallback
     # Legacy aliases (kept for compatibility)
+    "legacy-nemotron": "nemotron-mini:latest",
     "qwen2.5-coder": "qwen2.5-coder:14b",  # 72 tok/s — superseded by gemma4 for code
     "phi4": "phi4:latest",  # 83 tok/s, 9.1 GB — good general + code
     # Kimi Cloud routes (non-sensitive only)
@@ -159,9 +162,8 @@ MODEL_TIERS = {
 
 # Models that require Windows GPU (too large for Pi/Mac).
 # gemma3:27b removed — consistently times out on llama-server b8795 (OOM at 17.4 GB).
-# gemma4:latest is GPU-routed through the Windows Ollama backend.
-# qwen3.6:27b is installed on Windows and Mac. Keep it out of GPU_ONLY_MODELS
-# so an explicit qwen3.6 request can still fall back to the exact Mac model.
+# gemma4:latest and qwen3.6:27b are installed on Mac. Keep them out of
+# GPU_ONLY_MODELS so explicit fresh-runtime requests can fall back locally.
 # qwen3.6:35b-a3b remains GPU-only.
 GPU_ONLY_MODELS = {
     # Benchmarked 14B+ class — confirmed GPU-only (fit in 16 GB VRAM or spill)
@@ -174,8 +176,6 @@ GPU_ONLY_MODELS = {
     "qwen2.5:32b",
     "qwen2.5:14b",
     "qwen3.5:9b",
-    # Via Ollama (no llama-server compat), GPU Windows only
-    "gemma4:latest",
     # Oversized / exotic
     "llama3.3:70b",
     "qwq:latest",
@@ -198,10 +198,17 @@ PI_MODELS = {
 # default instead of blackholing "fast" traffic.
 PI_SERVE_MODELS = {"qwen2.5:0.5b", "smollm2:1.7b", "gemma2:2b"}
 PI_DEFAULT_MODEL = "qwen2.5:0.5b"  # fastest Pi model (~20s cold load)
-MAC_FALLBACK_MODEL = "hermes3:8b"  # model known to be on Mac Ollama
+MAC_FALLBACK_MODEL = "gemma4:latest"
 
 # Mac models (models confirmed available locally)
-MAC_MODELS = {"hermes3:8b", "llama3.2:3b", "nemotron-mini:latest", "llama3.2:latest", "qwen3.6:27b"}
+MAC_MODELS = {
+    "gemma4:latest",
+    "qwen3.6:27b",
+    "llama3.2:3b",
+    "llama3.2:latest",
+    "hermes3:8b",
+    "nemotron-mini:latest",
+}
 MAC_MODEL_ALIASES = {
     "nemotron-mini": "nemotron-mini:latest",
     "nemotron-mini:4b": "nemotron-mini:latest",
@@ -395,11 +402,14 @@ def _failover_status_payload() -> dict[str, object]:
     return {
         "status": status,
         "service": "inference-proxy",
+        "runtime_profile": "kimi_gemini_first_local_fallback",
         "mode": mode,
         "active_route": active_route,
         "fallback_ready": bool(healthy_local or healthy_cloud),
         "windows_offline": not windows_healthy,
         "sensitive_cloud_block": True,
+        "local_fallback_model": MAC_FALLBACK_MODEL,
+        "deprecated_default_models": ["nemotron-mini:4b", "hermes3:8b"],
         "cloud_api_configured": cloud_api_configured,
         "telegram_relay_available": bool(_KIMI_RELAY_AVAILABLE and _kimi_relay_fn),
         "telegram_relay_enabled": KIMI_RELAY_ENABLED,
@@ -1602,7 +1612,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 respond_success(resp, "kimi-cloud")
                 return
             log.warning("Kimi Cloud unavailable, falling back to local tiers")
-            model = "hermes3:8b"
+            model = MAC_FALLBACK_MODEL
             req_data["model"] = model
             body = json.dumps(req_data).encode()
 

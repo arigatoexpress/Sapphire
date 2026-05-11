@@ -185,8 +185,6 @@ def test_scheduled_launchagent_nonzero_last_status_warns(monkeypatch) -> None:
         "com.sapphire.heartbeat",
         "com.sapphire.openbb-api",
         "com.sapphire.cloudflare-tunnel",
-        "com.sapphire.mac-to-windows-tunnel",
-        "ai.hermes.gateway",
         "actions.runner.arigatoexpress-Sapphire.ari-macbook-sapphire",
     ]
     scheduled = [
@@ -216,14 +214,11 @@ def test_scheduled_launchagent_nonzero_last_status_warns(monkeypatch) -> None:
 
 def test_windows_ollama_inventory_passes_with_required_models(monkeypatch) -> None:
     names = [
-        "nemotron-mini:4b",
-        "hermes3:8b",
         "gemma4:latest",
         "deepseek-r1:14b",
         "qwen3.5:9b",
         "qwen3:14b",
         "qwen3.6:27b",
-        "nemotron-cascade-2:latest",
         "qwen2.5:32b",
     ]
 
@@ -237,8 +232,8 @@ def test_windows_ollama_inventory_passes_with_required_models(monkeypatch) -> No
     check = sweep.windows_ollama_inventory_check("http://100.71.10.48:11434")
 
     assert check.status == "PASS"
-    assert "models=9" in check.evidence
-    assert "required_present=9/9" in check.evidence
+    assert "models=6" in check.evidence
+    assert "required_present=8/8" in check.evidence
     assert "missing_aliases" not in check.evidence
 
 
@@ -260,7 +255,7 @@ def test_windows_ollama_inventory_warns_on_missing_aliases(monkeypatch) -> None:
     check = sweep.windows_ollama_inventory_check("http://100.71.10.48:11434")
 
     assert check.status == "WARN"
-    assert "required_present=2/9" in check.evidence
+    assert "required_present=0/8" in check.evidence
     assert "missing_aliases" in check.evidence
     assert "reason" in check.evidence
 
