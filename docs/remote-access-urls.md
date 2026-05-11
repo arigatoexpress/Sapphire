@@ -16,8 +16,9 @@ URL: https://gulf-therapeutic-humanity-folder.trycloudflare.com
 OpenAI-compatible: POST /v1/chat/completions
 Health: GET /health
 
-### Telegram Bot
-@NemotronRariBot — works from anywhere, no URL needed
+### Telegram PM Bot
+@NemotronRariBot — owned by `com.sapphire.pm-bot`; verify readiness with
+`curl http://127.0.0.1:18082/telegram/ownership`.
 
 ### Notes
 - Quick tunnel URLs change if Mac restarts (check ~/autonomy-status/logs/cloudflare-tunnel.log for new URL)

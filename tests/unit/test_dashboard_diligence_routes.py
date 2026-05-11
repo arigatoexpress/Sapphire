@@ -249,7 +249,7 @@ def test_launchagent_summary_api_reports_labels_and_last_exit(client, monkeypatc
     monkeypatch.setattr(
         dashboard_app,
         "_dashboard_launchagent_labels",
-        lambda: ["ai.hermes.gateway", "com.sapphire.dashboard", "com.sapphire.missing"],
+        lambda: ["com.sapphire.pm-bot", "com.sapphire.dashboard", "com.sapphire.missing"],
     )
 
     def fake_run(*args, **kwargs):
@@ -259,7 +259,7 @@ def test_launchagent_summary_api_reports_labels_and_last_exit(client, monkeypatc
             args[0],
             0,
             stdout=(
-                "PID\tStatus\tLabel\n123\t0\tcom.sapphire.dashboard\n-\t-15\tai.hermes.gateway\n"
+                "PID\tStatus\tLabel\n123\t0\tcom.sapphire.dashboard\n456\t0\tcom.sapphire.pm-bot\n"
             ),
             stderr="",
         )
@@ -273,8 +273,8 @@ def test_launchagent_summary_api_reports_labels_and_last_exit(client, monkeypatc
     by_label = {row["label"]: row for row in payload["launchagents"]}
     assert by_label["com.sapphire.dashboard"]["status_label"] == "running"
     assert by_label["com.sapphire.dashboard"]["last_exit"] == 0
-    assert by_label["ai.hermes.gateway"]["status_label"] == "exited"
-    assert by_label["ai.hermes.gateway"]["last_exit"] == -15
+    assert by_label["com.sapphire.pm-bot"]["status_label"] == "running"
+    assert by_label["com.sapphire.pm-bot"]["last_exit"] == 0
     assert by_label["com.sapphire.missing"]["status_label"] == "not_loaded"
 
 
@@ -282,7 +282,7 @@ def test_launchagent_summary_buyer_profile_redacts_operational_identifiers(clien
     monkeypatch.setattr(
         dashboard_app,
         "_dashboard_launchagent_labels",
-        lambda: ["ai.hermes.gateway", "com.sapphire.dashboard"],
+        lambda: ["com.sapphire.pm-bot", "com.sapphire.dashboard"],
     )
 
     def fake_run(*args, **kwargs):
@@ -291,7 +291,7 @@ def test_launchagent_summary_buyer_profile_redacts_operational_identifiers(clien
             args[0],
             0,
             stdout=(
-                "PID\tStatus\tLabel\n123\t0\tcom.sapphire.dashboard\n-\t-15\tai.hermes.gateway\n"
+                "PID\tStatus\tLabel\n123\t0\tcom.sapphire.dashboard\n456\t0\tcom.sapphire.pm-bot\n"
             ),
             stderr="",
         )
@@ -308,9 +308,9 @@ def test_launchagent_summary_buyer_profile_redacts_operational_identifiers(clien
     assert payload["totals"]["labels"] == 2
     assert payload["launchagents"][0]["status_label"] in {"running", "exited"}
     assert "com.sapphire.dashboard" not in serialized
-    assert "ai.hermes.gateway" not in serialized
+    assert "com.sapphire.pm-bot" not in serialized
     assert '"pid": 123' not in serialized
-    assert '"last_exit": -15' not in serialized
+    assert '"pid": 456' not in serialized
 
 
 def test_new_diligence_routes_are_get_only():

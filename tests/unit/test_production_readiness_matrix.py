@@ -35,6 +35,12 @@ def test_parse_launchctl_list_extracts_pid_status_and_label() -> None:
     assert rows["com.sapphire.backtest-weekly"] == {"pid": "-", "status": "0"}
 
 
+def test_readiness_matrix_tracks_pm_bot_tunnel_not_hermes_gateway() -> None:
+    assert "com.sapphire.pm-bot" in matrix.ALWAYS_ON_LAUNCHAGENTS
+    assert "com.sapphire.pm-bot-tunnel" in matrix.ALWAYS_ON_LAUNCHAGENTS
+    assert "ai.hermes.gateway" not in matrix.ALWAYS_ON_LAUNCHAGENTS
+
+
 def test_latest_local_ci_report_uses_newest_valid_json(tmp_path: Path) -> None:
     older = tmp_path / "local-ci-verify-20260101T000000Z.json"
     newer = tmp_path / "local-ci-verify-20260102T000000Z.json"

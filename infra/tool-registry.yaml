@@ -96,7 +96,7 @@ tools:
       - scheduled-tasks.factory-test-guardian
       - scheduled-tasks.trading-research
       - hermes-agent.system-ops
-    description: Send a Telegram notification via NemotronRariBot (p0 urgent / p1 normal / p2 low).
+    description: Create a PM-bot-reviewed Telegram draft notification (p0 urgent / p1 normal / p2 low).
 
   - name: sapphire_market
     path: plugins/claw-sapphire/tools/market.py

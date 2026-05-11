@@ -36,4 +36,4 @@ done
 
 echo ""
 echo "Done. Secrets stored in $SECRETS_DIR"
-echo "Test Telegram: ./telegram_notify.sh 'Secrets pulled successfully' p2"
+echo "Draft Telegram check: ./telegram_notify.sh 'Secrets pulled successfully' p2"

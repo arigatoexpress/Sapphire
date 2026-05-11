@@ -62,7 +62,7 @@ DEFAULT_LAUNCHAGENT_LABELS = [
     "com.sapphire.regional-intel",
     "com.sapphire.logrotate",
     "com.sapphire.pm-bot",
-    "ai.hermes.gateway",
+    "com.sapphire.pm-bot-tunnel",
 ]
 
 SAPPHIRE_ROOT = Path.home() / "Code" / "Sapphire"

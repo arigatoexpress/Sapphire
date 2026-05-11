@@ -79,6 +79,102 @@ def test_notify_tool_defaults_to_drafts_detects_safe_wrapper(tmp_path):
     assert audit.notify_tool_defaults_to_drafts(notify_path) == (True, None)
 
 
+def test_scan_legacy_telegram_source_warns_for_direct_service(tmp_path):
+    service = tmp_path / "services" / "telegram-bot"
+    service.mkdir(parents=True)
+    (service / "app.py").write_text(
+        "def tg_api(method):\n"
+        "    url = f'https://api.telegram.org/botTOKEN/{method}'\n"
+        "    return url\n"
+        "def send_message():\n"
+        "    return tg_api('sendMessage')\n",
+        encoding="utf-8",
+    )
+
+    findings = audit.scan_legacy_telegram_source(tmp_path, notify_tool_draft_default=True)
+
+    by_label = {finding["label"]: finding for finding in findings}
+    assert by_label["legacy_telegram_bot_service"]["status"] == "warn"
+    assert by_label["legacy_telegram_bot_service"]["signals"] == [
+        "sendMessage",
+        "api.telegram.org",
+    ]
+    assert by_label["telegram_notify_wrapper"]["reason"] == "absent"
+
+
+def test_scan_legacy_telegram_source_accepts_draft_safe_and_disabled_paths(tmp_path):
+    script = tmp_path / "scripts"
+    watchdog = tmp_path / "plugins" / "claw-sapphire" / "tools" / "internal"
+    service = tmp_path / "services" / "telegram-bot"
+    script.mkdir()
+    watchdog.mkdir(parents=True)
+    service.mkdir(parents=True)
+    (script / "telegram_notify.sh").write_text(
+        'exec python3 plugins/claw-sapphire/tools/notify.py "$MESSAGE"\n'
+        "# queues to pm_bot_drafts.jsonl unless SAPPHIRE_NOTIFY_TELEGRAM_LIVE=1\n",
+        encoding="utf-8",
+    )
+    (watchdog / "watchdog.py").write_text(
+        "NOTIFY_TOOL = 'notify.py'\nsubprocess.run(['python3', NOTIFY_TOOL])\n",
+        encoding="utf-8",
+    )
+    (service / "app.py").write_text(
+        "# DISABLED legacy service retained for rollback\n"
+        "url = 'https://api.telegram.org/botTOKEN/sendMessage'\n",
+        encoding="utf-8",
+    )
+
+    findings = audit.scan_legacy_telegram_source(tmp_path, notify_tool_draft_default=True)
+
+    assert {finding["status"] for finding in findings} == {"ok"}
+    by_label = {finding["label"]: finding for finding in findings}
+    assert by_label["telegram_notify_wrapper"]["reason"] == "draft_safe"
+    assert by_label["watchdog_notify_subprocess"]["reason"] == "draft_safe"
+    assert by_label["legacy_telegram_bot_service"]["reason"] == "disabled_or_archived"
+
+
+def test_build_report_warns_on_unsafe_legacy_source_even_when_runtime_quiet():
+    report = audit.build_report(
+        launch_agents={},
+        disabled_labels=set(),
+        telegram_socket_offenders=[],
+        pm_bot_ownership={
+            "mode": "webhook",
+            "polling_active": False,
+            "single_ingress_owner": "pm_bot_webhook_unregistered",
+            "agent_group_ready": False,
+            "agent_group_blockers": ["webhook_missing"],
+        },
+        pm_bot_error=None,
+        inference_status={
+            "telegram_relay_available": True,
+            "telegram_relay_enabled": False,
+            "active_route": "mac-local",
+            "mode": "local_failover",
+        },
+        inference_error=None,
+        notify_tool_draft_default=True,
+        legacy_source_findings=[
+            {
+                "path": "services/telegram-bot/app.py",
+                "label": "legacy_telegram_bot_service",
+                "status": "warn",
+                "reason": "direct send",
+                "signals": ["sendMessage"],
+            }
+        ],
+    )
+
+    source_check = next(
+        check
+        for check in report["checks"]
+        if check["name"] == "legacy_telegram_source_surfaces_reviewed"
+    )
+    assert report["status"] == "warn"
+    assert source_check["status"] == "warn"
+    assert source_check["data"]["warn_count"] == 1
+
+
 def test_build_report_fails_legacy_sender_paths():
     report = audit.build_report(
         launch_agents={

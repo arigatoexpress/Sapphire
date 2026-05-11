@@ -83,6 +83,16 @@ def test_routine_health_tracks_trading_shadow_controller() -> None:
     assert "trading-shadow-controller" in routine_names
 
 
+def test_routine_health_tracks_pm_bot_not_hermes_gateway() -> None:
+    launchagents = {routine.launchagent for routine in check_routines.ROUTINES}
+    routine_names = {routine.name for routine in check_routines.ROUTINES}
+
+    assert "com.sapphire.pm-bot" in launchagents
+    assert "pm-bot" in routine_names
+    assert "ai.hermes.gateway" not in launchagents
+    assert "hermes-agent" not in routine_names
+
+
 def test_continuous_intelligence_daily_launchagent_is_artifact_only() -> None:
     plist = _load_plist(INFRA_LAUNCHAGENTS / "com.sapphire.continuous-intelligence-daily.plist")
     env = plist["EnvironmentVariables"]

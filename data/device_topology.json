@@ -11,7 +11,7 @@
       "role": "Commander — all services, all MCPs, primary control node",
       "status": "online",
       "clawProfile": "mac-commander",
-      "agents": ["claude-code", "claw-code", "nemotron-rari-bot"],
+      "agents": ["claude-code", "claw-code", "pm-bot-webhook"],
       "tools": {
         "brew": "5.1.0", "tailscale": "1.96.2", "node": "24.4.0",
         "uv": "0.10.4", "gh": "2.86.0", "ollama": "0.19.0",
@@ -22,7 +22,7 @@
       "services": [
         {"name": "control-plane", "port": 8082, "status": "active", "launchAgent": "com.sapphire.control-plane"},
         {"name": "dashboard", "port": 8080, "status": "active", "launchAgent": "com.sapphire.dashboard"},
-        {"name": "telegram-bot", "status": "active", "launchAgent": "com.sapphire.nemotron-bot"},
+        {"name": "pm-bot", "port": 18082, "status": "active", "launchAgent": "com.sapphire.pm-bot"},
         {"name": "openbb-api", "port": 6900, "status": "active", "launchAgent": "com.sapphire.openbb-api"},
         {"name": "redis", "port": 6379, "status": "active", "launchAgent": "homebrew.mxcl.redis"},
         {"name": "ollama", "port": 11434, "status": "active"}
@@ -30,7 +30,7 @@
       "launchAgents": [
         "com.sapphire.control-plane",
         "com.sapphire.dashboard",
-        "com.sapphire.nemotron-bot",
+        "com.sapphire.pm-bot",
         "com.sapphire.openbb-api",
         "homebrew.mxcl.redis"
       ]

@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-pytestmark = pytest.mark.skipif(sys.platform == 'win32', reason='Unix only (getuid)')
+pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="Unix only (getuid)")
 
 from lib.core import heartbeat as hb
 
@@ -283,7 +283,7 @@ def test_state_degraded_resets_to_healthy_on_success(monkeypatch):
 
 def test_failed_with_launchctl_heals_to_recovering(monkeypatch):
     monitor = _make_monitor(monkeypatch, dry_run=False)
-    monitor._components = [hb.ComponentStatus(name="hermes", launchctl_label="ai.hermes.gateway")]
+    monitor._components = [hb.ComponentStatus(name="pm-bot", launchctl_label="com.sapphire.pm-bot")]
 
     _patch_check(monkeypatch, ok=False, err="down")
     monkeypatch.setattr(hb, "_attempt_heal", lambda comp: True)
@@ -300,8 +300,8 @@ def test_recovering_returns_to_healthy_after_recover_cycles(monkeypatch):
     monitor = _make_monitor(monkeypatch, dry_run=False)
     monitor._components = [
         hb.ComponentStatus(
-            name="hermes",
-            launchctl_label="ai.hermes.gateway",
+            name="pm-bot",
+            launchctl_label="com.sapphire.pm-bot",
             state=hb.ComponentState.RECOVERING,
         )
     ]
@@ -328,7 +328,7 @@ def test_dry_run_skips_telegram_and_heal(monkeypatch):
     monkeypatch.setattr(hb, "_publish_event", lambda payload: None)
 
     monitor = hb.HeartbeatMonitor(interval=1, dry_run=True)
-    monitor._components = [hb.ComponentStatus(name="hermes", launchctl_label="ai.hermes.gateway")]
+    monitor._components = [hb.ComponentStatus(name="pm-bot", launchctl_label="com.sapphire.pm-bot")]
 
     for _ in range(hb.FAIL_THRESHOLD):
         monitor.run_once()
@@ -495,7 +495,7 @@ def test_attempt_heal_kickstart_success(monkeypatch):
         lambda *a, **kw: subprocess.CompletedProcess(args=a[0], returncode=0, stdout="", stderr=""),
     )
 
-    comp = hb.ComponentStatus(name="hermes", launchctl_label="ai.hermes.gateway")
+    comp = hb.ComponentStatus(name="pm-bot", launchctl_label="com.sapphire.pm-bot")
     result = hb._attempt_heal(comp)
 
     assert result is True
@@ -512,7 +512,7 @@ def test_attempt_heal_kickstart_failure_still_increments(monkeypatch):
         ),
     )
 
-    comp = hb.ComponentStatus(name="hermes", launchctl_label="ai.hermes.gateway")
+    comp = hb.ComponentStatus(name="pm-bot", launchctl_label="com.sapphire.pm-bot")
     result = hb._attempt_heal(comp)
 
     assert result is False
@@ -527,7 +527,7 @@ def test_attempt_heal_subprocess_exception_returns_false(monkeypatch):
 
     monkeypatch.setattr(hb.subprocess, "run", boom)
 
-    comp = hb.ComponentStatus(name="hermes", launchctl_label="ai.hermes.gateway")
+    comp = hb.ComponentStatus(name="pm-bot", launchctl_label="com.sapphire.pm-bot")
     result = hb._attempt_heal(comp)
 
     assert result is False

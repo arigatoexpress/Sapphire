@@ -26,7 +26,7 @@ path depends on a SaaS that could rug-pull.
 │                                                                                                  │
 │   Mac M4 Pro 24GB (100.67.171.79) — commander                                                   │
 │   ├── control-plane  :8082       ├── dashboard :8080      ├── signal-logger :18081              │
-│   ├── inference-proxy :11435     ├── content-engine       ├── hermes-agent gateway (Telegram)   │
+│   ├── inference-proxy :11435     ├── content-engine       ├── pm-bot webhook :18082             │
 │   ├── Redis :6379                ├── Ollama :11434        └── OpenBB :6900                      │
 │                                                                                                  │
 │   Windows RTX 5070 Ti 16GB (100.71.10.48) — GPU + webhook                                       │

@@ -40,6 +40,19 @@ LEGACY_NOTIFY_CALLER_LABELS = {
     "com.sapphire.security-pipeline",
     "com.sapphire.service-supervisor",
 }
+DEFAULT_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+@dataclass(frozen=True)
+class LegacySourceSurface:
+    path: str
+    label: str
+    required_patterns: tuple[str, ...]
+    draft_safe_patterns: tuple[str, ...] = ()
+    disabled_patterns: tuple[str, ...] = ()
+    warn_message: str = (
+        "Legacy Telegram sender surface should be archived, disabled, or draft-safe."
+    )
 
 
 @dataclass(frozen=True)
@@ -155,6 +168,109 @@ def notify_tool_defaults_to_drafts(path: Path | str) -> tuple[bool | None, str |
     )
 
 
+LEGACY_SOURCE_SURFACES = (
+    LegacySourceSurface(
+        path="services/telegram-bot/app.py",
+        label="legacy_telegram_bot_service",
+        required_patterns=("sendMessage", "api.telegram.org"),
+        draft_safe_patterns=("SAPPHIRE_PM_BOT_DRAFT_QUEUE", "append_draft", "build_draft"),
+        disabled_patterns=("ARCHIVED", "DISABLED", "deprecated service disabled"),
+        warn_message="Legacy webhook service still contains a direct Bot API sendMessage path.",
+    ),
+    LegacySourceSurface(
+        path="scripts/telegram_notify.sh",
+        label="telegram_notify_wrapper",
+        required_patterns=("notify.py",),
+        draft_safe_patterns=("pm_bot_drafts.jsonl", "SAPPHIRE_NOTIFY_TELEGRAM_LIVE"),
+        disabled_patterns=("ARCHIVED", "DISABLED"),
+        warn_message="telegram_notify.sh should route to drafts by default or be disabled.",
+    ),
+    LegacySourceSurface(
+        path="plugins/claw-sapphire/tools/internal/watchdog.py",
+        label="watchdog_notify_subprocess",
+        required_patterns=("subprocess.run", "NOTIFY_TOOL"),
+        draft_safe_patterns=(),
+        disabled_patterns=("ARCHIVED", "DISABLED"),
+        warn_message="Watchdog still shells to notify.py; require notify.py draft-default or disable/archive this path.",
+    ),
+)
+
+
+def scan_legacy_telegram_source(
+    repo_root: Path | str,
+    *,
+    notify_tool_draft_default: bool | None,
+) -> list[dict[str, Any]]:
+    """Scan known legacy Telegram sender surfaces in source without mutating them."""
+    root = Path(repo_root)
+    findings: list[dict[str, Any]] = []
+    for surface in LEGACY_SOURCE_SURFACES:
+        target = root / surface.path
+        try:
+            source = target.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            findings.append(
+                {
+                    "path": surface.path,
+                    "label": surface.label,
+                    "status": "ok",
+                    "reason": "absent",
+                    "signals": [],
+                }
+            )
+            continue
+        except OSError as exc:
+            findings.append(
+                {
+                    "path": surface.path,
+                    "label": surface.label,
+                    "status": "warn",
+                    "reason": f"{type(exc).__name__}: {exc}",
+                    "signals": [],
+                }
+            )
+            continue
+
+        matched = [pattern for pattern in surface.required_patterns if pattern in source]
+        if not matched:
+            findings.append(
+                {
+                    "path": surface.path,
+                    "label": surface.label,
+                    "status": "ok",
+                    "reason": "known legacy send pattern absent",
+                    "signals": [],
+                }
+            )
+            continue
+
+        disabled = _source_has_disabled_marker(
+            source, surface.disabled_patterns
+        ) or _path_is_archived(target)
+        draft_safe = _source_has_all(source, surface.draft_safe_patterns)
+        if surface.label == "watchdog_notify_subprocess":
+            draft_safe = notify_tool_draft_default is True
+
+        status = "ok" if disabled or draft_safe else "warn"
+        reason = (
+            "disabled_or_archived"
+            if disabled
+            else "draft_safe"
+            if draft_safe
+            else surface.warn_message
+        )
+        findings.append(
+            {
+                "path": surface.path,
+                "label": surface.label,
+                "status": status,
+                "reason": reason,
+                "signals": matched,
+            }
+        )
+    return findings
+
+
 def build_report(
     *,
     launch_agents: dict[str, dict[str, str | int | None]],
@@ -168,6 +284,7 @@ def build_report(
     soc_launch_error: str | None = None,
     notify_tool_draft_default: bool | None = None,
     notify_tool_error: str | None = None,
+    legacy_source_findings: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Build a sanitized Telegram sender ownership report."""
     checks: list[dict[str, Any]] = []
@@ -335,6 +452,20 @@ def build_report(
         )
     )
 
+    source_findings = legacy_source_findings or []
+    source_warns = [finding for finding in source_findings if finding.get("status") == "warn"]
+    checks.append(
+        _check(
+            "legacy_telegram_source_surfaces_reviewed",
+            "warn" if source_warns else "ok",
+            "Known legacy Telegram source surfaces should be draft-safe, archived, disabled, or absent.",
+            {
+                "warn_count": len(source_warns),
+                "findings": source_findings,
+            },
+        )
+    )
+
     status = _overall_status(check["status"] for check in checks)
     return {
         "status": status,
@@ -349,6 +480,7 @@ def collect_report(
     inference_status_url: str,
     include_lsof: bool,
     notify_tool_path: Path | str,
+    repo_root: Path | str,
 ) -> dict[str, Any]:
     launch_agents: dict[str, dict[str, str | int | None]] = {}
     disabled_labels: set[str] = set()
@@ -356,6 +488,13 @@ def collect_report(
     soc_launch_env: dict[str, str] | None = None
     soc_launch_error: str | None = None
     notify_tool_draft_default, notify_tool_error = notify_tool_defaults_to_drafts(notify_tool_path)
+    source_notify_tool_draft_default, _source_notify_error = notify_tool_defaults_to_drafts(
+        Path(repo_root) / "plugins" / "claw-sapphire" / "tools" / "notify.py"
+    )
+    legacy_source_findings = scan_legacy_telegram_source(
+        repo_root,
+        notify_tool_draft_default=source_notify_tool_draft_default,
+    )
 
     if platform.system() == "Darwin":
         launch = run_command(["launchctl", "list"])
@@ -394,6 +533,7 @@ def collect_report(
         soc_launch_error=soc_launch_error,
         notify_tool_draft_default=notify_tool_draft_default,
         notify_tool_error=notify_tool_error,
+        legacy_source_findings=legacy_source_findings,
     )
 
 
@@ -423,6 +563,8 @@ def format_markdown(report: dict[str, Any]) -> str:
             )
         elif check["name"] == "non_desktop_telegram_sockets_absent":
             detail += f" offenders={data.get('offender_count')}"
+        elif check["name"] == "legacy_telegram_source_surfaces_reviewed":
+            detail += f" warnings={data.get('warn_count')}"
         elif "loaded" in data:
             detail += f" loaded={data.get('loaded')} disabled={data.get('disabled')}"
         lines.append(f"| `{check['name']}` | `{check['status']}` | {detail} |")
@@ -448,6 +590,20 @@ def _env_enabled(value: str | None, *, default: bool) -> bool:
     return str(value).strip().lower() not in {"0", "false", "no", "off"}
 
 
+def _source_has_all(source: str, patterns: tuple[str, ...]) -> bool:
+    return bool(patterns) and all(pattern in source for pattern in patterns)
+
+
+def _source_has_disabled_marker(source: str, patterns: tuple[str, ...]) -> bool:
+    normalized = source.lower()
+    return any(pattern.lower() in normalized for pattern in patterns)
+
+
+def _path_is_archived(path: Path) -> bool:
+    archived_parts = {"archive", "archived", "cold-tier"}
+    return any(part.lower() in archived_parts for part in path.parts)
+
+
 def _to_int(value: str) -> int | str:
     try:
         return int(value)
@@ -471,6 +627,11 @@ def main(argv: list[str] | None = None) -> int:
         "--notify-tool-path",
         default=str(DEFAULT_NOTIFY_TOOL_PATH),
     )
+    parser.add_argument(
+        "--repo-root",
+        default=str(DEFAULT_REPO_ROOT),
+        help="Repository root to scan for known legacy Telegram sender source.",
+    )
     args = parser.parse_args(argv)
 
     report = collect_report(
@@ -478,6 +639,7 @@ def main(argv: list[str] | None = None) -> int:
         inference_status_url=args.inference_status_url,
         include_lsof=not args.no_lsof,
         notify_tool_path=args.notify_tool_path,
+        repo_root=args.repo_root,
     )
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))

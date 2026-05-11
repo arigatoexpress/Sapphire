@@ -49,12 +49,12 @@ ALWAYS_ON_LAUNCHAGENTS = (
     "com.sapphire.control-plane",
     "com.sapphire.regional-intel",
     "com.sapphire.cloudflare-tunnel",
+    "com.sapphire.pm-bot-tunnel",
     "com.sapphire.heartbeat",
     "com.sapphire.openbb-api",
     "com.sapphire.inference-proxy",
     "com.sapphire.dashboard",
     "com.sapphire.signal-logger",
-    "ai.hermes.gateway",
     "actions.runner.arigatoexpress-Sapphire.ari-macbook-sapphire",
 )
 
@@ -140,7 +140,7 @@ def run_command(args: list[str], *, timeout: int = 45) -> CommandResult:
 def http_probe(url: str, ok_statuses: tuple[int, ...]) -> dict[str, Any]:
     request = urllib.request.Request(url, method="GET")
     try:
-        with urllib.request.urlopen(request, timeout=4) as response:  # noqa: S310
+        with urllib.request.urlopen(request, timeout=4) as response:  # noqa: S310  # nosec B310
             status = int(response.status)
             return {
                 "available": status in ok_statuses,

@@ -9,14 +9,14 @@ High-level system map for Sapphire — an autonomous trading + project-managemen
                             │  Human operator     │
                             │  (Telegram)         │
                             └──────────┬──────────┘
-                                       │ /focus /steer /autonomy
+                                       │ PM bot webhook / reviewed drafts
                                        │
         ┌──────────────────────────────┼──────────────────────────────┐
         │                              ▼                              │
         │              ┌─────────────────────────────┐                │
-        │              │  hermes-agent gateway       │                │
-        │              │  (NousResearch, polling)    │                │
-        │              │  ai.hermes.gateway          │                │
+        │              │  services/pm_bot            │                │
+        │              │  (webhook, no polling)      │                │
+        │              │  com.sapphire.pm-bot        │                │
         │              └──────────┬──────────────────┘                │
         │                         │ OpenAI-compat                     │
         │                         ▼                                   │
@@ -84,23 +84,24 @@ High-level system map for Sapphire — an autonomous trading + project-managemen
 
 ## 2. Request Lifecycles
 
-### 2.1 Telegram command → claw-code session
+### 2.1 Telegram command → PM bot command/draft path
 
 ```
-Telegram user ──▶ hermes gateway (polling)
+Telegram user ──▶ PM bot webhook (:18082)
                       │
                       ▼
-       inference-proxy (tier failover)
+        command router / authorization
                       │
-           ┌──────────┴──────────┐
-           │                     │
-       Windows GPU           Mac Ollama    ── sensitive? ──▶ classifier
-                                                                │
-                                                           kimi blocked
-                                                          (response via T1–T3)
+         ┌────────────┴────────────┐
+         │                         │
+    command routes             non-command updates
+         │                         │
+     explicit send            local draft queue
 ```
 
-Non-hermes ingress (`services/telegram-bot/app.py` on :8088) is a second Telegram surface that maps `/status /scan /fix /budget …` directly to claw-code subprocesses with the Sapphire plugin loaded.
+The old `services/telegram-bot/` ingress was removed from active source on
+2026-05-11. PM bot is the Telegram owner; other producers write local drafts or
+stay disabled.
 
 ### 2.2 Trading signal → execution
 
@@ -181,7 +182,7 @@ Local JSONL (data/*.jsonl)  ──▶  services/pipeline/gcp_sync.py
 | scout-sandbox | Python | — | GTM outbound + web-intel broker. Env-guarded. |
 | security_pipeline | Python | — | Scheduled full-system security scan → SOC page. |
 | service_supervisor | Python | — | Self-healing LaunchAgent supervisor (per-label cooldowns, restart cap, sparse Telegram escalation). |
-| telegram-bot | FastAPI | 8088 | Thin claw-code webhook (legacy; replaced by hermes-agent for live ops). |
+| pm_bot | FastAPI | 18082 | Telegram PM bot webhook, ownership health, and reviewed draft queue. |
 | webhook (Windows) | — | 9090 | TradingView → HMAC-verified → signal_logger. |
 
 ### Libraries

@@ -42,6 +42,9 @@ def test_frontend_surface_inventory_separates_public_and_operator_boundaries() -
     assert surfaces["control_plane_static"]["boundary"] == "local_operator"
     assert surfaces["telegram_operator_surface"]["boundary"] == "telegram_operator"
     assert surfaces["telegram_operator_surface"]["operator_sensitive"] is True
+    assert surfaces["telegram_operator_surface"]["root"] == "services/pm_bot"
+    assert surfaces["telegram_operator_surface"]["entrypoints"] == ["services/pm_bot/server.py"]
+    assert surfaces["telegram_operator_surface"]["lifecycle"] == "canonical_operator_surface"
 
 
 def test_frontend_surface_inventory_marks_react_preview_as_primary_shell_candidate() -> None:

@@ -55,7 +55,7 @@ ROUTINES: list[Routine] = [
     Routine("signal-logger", "launchagent_always", launchagent="com.sapphire.signal-logger"),
     Routine("openbb-api", "launchagent_always", launchagent="com.sapphire.openbb-api"),
     Routine("regional-intel", "launchagent_always", launchagent="com.sapphire.regional-intel"),
-    Routine("hermes-agent", "launchagent_always", launchagent="ai.hermes.gateway"),
+    Routine("pm-bot", "launchagent_always", launchagent="com.sapphire.pm-bot"),
     # Scheduled Mac jobs
     Routine(
         "chain-refresh",
