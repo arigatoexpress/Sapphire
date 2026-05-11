@@ -21,6 +21,7 @@ def kimi_test_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Disable real credentials and network-adjacent relay state."""
     monkeypatch.setattr(proxy_app, "MOONSHOT_API_KEY", "")
     monkeypatch.setattr(proxy_app, "OPENROUTER_API_KEY", "")
+    monkeypatch.setattr(proxy_app, "KIMI_RELAY_ENABLED", False)
     monkeypatch.setattr(proxy_app, "_KIMI_RELAY_AVAILABLE", False)
     monkeypatch.setattr(proxy_app, "_kimi_relay_fn", None)
     monkeypatch.setattr(proxy_app, "_is_healthy", lambda name: name == "kimi-cloud")
@@ -29,6 +30,8 @@ def kimi_test_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(proxy_app, "_record", lambda *args, **kwargs: None)
     monkeypatch.delenv("KIMI_RELAY_CHAT_ID", raising=False)
     monkeypatch.delenv("KIMI_CLAW_BOT_TOKEN", raising=False)
+    monkeypatch.delenv("RELAY_READER_TOKEN", raising=False)
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
 
 
 def _fake_response(label: str) -> dict[str, Any]:
@@ -140,7 +143,7 @@ def test_kimi_cloud_telegram_relay_requires_explicit_relay_credentials(
     assert relay_calls == []
 
 
-def test_kimi_cloud_telegram_relay_flattens_messages_in_dry_run(
+def test_kimi_cloud_telegram_relay_flattens_messages_when_explicitly_enabled(
     monkeypatch: pytest.MonkeyPatch,
     kimi_test_env: None,
 ) -> None:
@@ -150,10 +153,12 @@ def test_kimi_cloud_telegram_relay_flattens_messages_in_dry_run(
         relay_calls.append(query)
         return "relay ok"
 
+    monkeypatch.setattr(proxy_app, "KIMI_RELAY_ENABLED", True)
     monkeypatch.setattr(proxy_app, "_KIMI_RELAY_AVAILABLE", True)
     monkeypatch.setattr(proxy_app, "_kimi_relay_fn", fake_relay)
     monkeypatch.setenv("KIMI_RELAY_CHAT_ID", "test-chat")
-    monkeypatch.setenv("KIMI_CLAW_BOT_TOKEN", "test-token")
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "sender-token")
+    monkeypatch.setenv("RELAY_READER_TOKEN", "reader-token")
 
     response = proxy_app._call_kimi_cloud(
         [

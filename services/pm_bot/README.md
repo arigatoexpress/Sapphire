@@ -136,6 +136,11 @@ Key fields:
 - `telegram_allowed_updates`
   - Bot API allowed update list when available.
 
+`GET /telegram/ownership` is the shorter operator gate for the future private
+agent group. It reports the single-ingress owner, whether the group is ready,
+the current blockers, and the no-send router guard. Use it before inviting Kimi
+or Nemotron into a shared group.
+
 ## LaunchAgent
 
 The LaunchAgent plist ships here:
