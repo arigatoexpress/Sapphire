@@ -4,7 +4,8 @@
 This script does not call Telegram, mutate launchd, register webhooks, or send
 messages. It checks the local Mac runtime for the old sender paths that can
 compete with the Sapphire PM bot: Hermes polling, the THO health watcher direct
-send path, inference-proxy relay enablement, and non-desktop Telegram sockets.
+send path, SOC direct Telegram alerting, inference-proxy relay enablement, and
+non-desktop Telegram sockets.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ import subprocess
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 TELEGRAM_NETWORK_PATTERNS = (
@@ -26,6 +28,9 @@ TELEGRAM_NETWORK_PATTERNS = (
     "194.221.250.",
 )
 ALLOWED_TELEGRAM_PROCESS_RE = re.compile(r"^Telegram\s+")
+EXPECTED_PM_DRAFT_QUEUE = str(
+    Path.home() / ".cache" / "sapphire" / "telegram" / "pm_bot_drafts.jsonl"
+)
 
 
 @dataclass(frozen=True)
@@ -79,6 +84,26 @@ def parse_disabled(output: str) -> set[str]:
     return disabled
 
 
+def parse_launchctl_environment(output: str) -> dict[str, str]:
+    """Parse the explicit ``environment =`` block from ``launchctl print``."""
+    env: dict[str, str] = {}
+    in_environment = False
+    for raw in output.splitlines():
+        line = raw.strip()
+        if line == "environment = {":
+            in_environment = True
+            continue
+        if in_environment and line == "}":
+            break
+        if not in_environment:
+            continue
+        key, sep, value = line.partition("=>")
+        if not sep:
+            continue
+        env[key.strip()] = value.strip()
+    return env
+
+
 def find_non_desktop_telegram_sockets(lsof_output: str) -> list[str]:
     """Return socket lines that look Telegram-owned but not Telegram Desktop."""
     offenders: list[str] = []
@@ -115,6 +140,8 @@ def build_report(
     pm_bot_error: str | None,
     inference_status: dict[str, Any] | None,
     inference_error: str | None,
+    soc_launch_env: dict[str, str] | None = None,
+    soc_launch_error: str | None = None,
 ) -> dict[str, Any]:
     """Build a sanitized Telegram sender ownership report."""
     checks: list[dict[str, Any]] = []
@@ -146,6 +173,48 @@ def build_report(
             },
         )
     )
+
+    soc = launch_agents.get("com.sapphire.soc-dashboard")
+    if soc and soc_launch_env is None:
+        checks.append(
+            _check(
+                "soc_dashboard_alerts_routed_to_pm_drafts",
+                "warn",
+                "Could not read SOC LaunchAgent environment; verify SOC is not using direct Telegram sends.",
+                {
+                    "loaded": True,
+                    "pid": soc.get("pid"),
+                    "error": soc_launch_error,
+                },
+            )
+        )
+    elif soc:
+        live_telegram_enabled = _env_enabled(
+            soc_launch_env.get("SOC_TELEGRAM_ALERTS_ENABLED"), default=False
+        )
+        draft_queue_enabled = _env_enabled(
+            soc_launch_env.get("SOC_ALERT_DRAFT_QUEUE_ENABLED"), default=True
+        )
+        draft_queue_path = soc_launch_env.get("SOC_ALERT_DRAFT_QUEUE_PATH") or ""
+        routed_to_pm_drafts = draft_queue_path == EXPECTED_PM_DRAFT_QUEUE
+        status = "ok"
+        if live_telegram_enabled or not draft_queue_enabled or not routed_to_pm_drafts:
+            status = "fail"
+        checks.append(
+            _check(
+                "soc_dashboard_alerts_routed_to_pm_drafts",
+                status,
+                "SOC should write local PM bot drafts and keep direct Telegram sends disabled.",
+                {
+                    "loaded": True,
+                    "pid": soc.get("pid"),
+                    "live_telegram_enabled": live_telegram_enabled,
+                    "draft_queue_enabled": draft_queue_enabled,
+                    "draft_queue_path": draft_queue_path,
+                    "expected_draft_queue_path": EXPECTED_PM_DRAFT_QUEUE,
+                },
+            )
+        )
 
     pm_bot = launch_agents.get("com.sapphire.pm-bot")
     checks.append(
@@ -237,6 +306,8 @@ def collect_report(
     launch_agents: dict[str, dict[str, str | int | None]] = {}
     disabled_labels: set[str] = set()
     telegram_socket_offenders: list[str] = []
+    soc_launch_env: dict[str, str] | None = None
+    soc_launch_error: str | None = None
 
     if platform.system() == "Darwin":
         launch = run_command(["launchctl", "list"])
@@ -247,6 +318,13 @@ def collect_report(
         if uid_text:
             disabled = run_command(["launchctl", "print-disabled", f"gui/{uid_text}"])
             disabled_labels = parse_disabled(disabled.stdout) if disabled.returncode == 0 else set()
+            soc_print = run_command(
+                ["launchctl", "print", f"gui/{uid_text}/com.sapphire.soc-dashboard"]
+            )
+            if soc_print.returncode == 0:
+                soc_launch_env = parse_launchctl_environment(soc_print.stdout)
+            else:
+                soc_launch_error = soc_print.stderr or soc_print.stdout or "launchctl_print_failed"
 
         if include_lsof:
             lsof = run_command(["lsof", "-nP", "-iTCP"], timeout=8.0)
@@ -264,6 +342,8 @@ def collect_report(
         pm_bot_error=pm_bot_error,
         inference_status=inference_status,
         inference_error=inference_error,
+        soc_launch_env=soc_launch_env,
+        soc_launch_error=soc_launch_error,
     )
 
 
@@ -281,6 +361,11 @@ def format_markdown(report: dict[str, Any]) -> str:
             detail += f" owner={data.get('single_ingress_owner')} blockers={data.get('agent_group_blockers')}"
         elif check["name"] == "inference_telegram_relay_disabled":
             detail += f" relay_enabled={data.get('telegram_relay_enabled')} route={data.get('active_route')}"
+        elif check["name"] == "soc_dashboard_alerts_routed_to_pm_drafts":
+            detail += (
+                f" live_enabled={data.get('live_telegram_enabled')} "
+                f"queue_enabled={data.get('draft_queue_enabled')}"
+            )
         elif check["name"] == "non_desktop_telegram_sockets_absent":
             detail += f" offenders={data.get('offender_count')}"
         elif "loaded" in data:
@@ -300,6 +385,12 @@ def _overall_status(statuses: Any) -> str:
     if "warn" in seen:
         return "warn"
     return "ok"
+
+
+def _env_enabled(value: str | None, *, default: bool) -> bool:
+    if value is None:
+        return default
+    return str(value).strip().lower() not in {"0", "false", "no", "off"}
 
 
 def _to_int(value: str) -> int | str:

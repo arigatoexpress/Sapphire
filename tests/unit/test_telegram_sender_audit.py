@@ -34,6 +34,29 @@ disabled services = {
     assert audit.parse_disabled(output) == {"ai.hermes.gateway"}
 
 
+def test_parse_launchctl_environment_extracts_explicit_environment_block():
+    output = """
+gui/501/com.sapphire.soc-dashboard = {
+    inherited environment = {
+        SSH_AUTH_SOCK => /tmp/listener
+    }
+    default environment = {
+        PATH => /usr/bin:/bin
+    }
+    environment = {
+        SOC_TELEGRAM_ALERTS_ENABLED => 0
+        SOC_ALERT_DRAFT_QUEUE_ENABLED => 1
+        SOC_ALERT_DRAFT_QUEUE_PATH => /Users/aribs/.cache/sapphire/telegram/pm_bot_drafts.jsonl
+    }
+}
+"""
+    assert audit.parse_launchctl_environment(output) == {
+        "SOC_TELEGRAM_ALERTS_ENABLED": "0",
+        "SOC_ALERT_DRAFT_QUEUE_ENABLED": "1",
+        "SOC_ALERT_DRAFT_QUEUE_PATH": "/Users/aribs/.cache/sapphire/telegram/pm_bot_drafts.jsonl",
+    }
+
+
 def test_find_non_desktop_telegram_sockets_ignores_telegram_app():
     output = """COMMAND   PID USER FD TYPE DEVICE SIZE/OFF NODE NAME
 Telegram 77881 aribs 36u IPv4 0x1 0t0 TCP 10.2.0.2:64307->149.154.175.52:443 (ESTABLISHED)
@@ -54,6 +77,11 @@ def test_build_report_fails_legacy_sender_paths():
                 "label": "com.sapphire.healthz-watcher",
             },
             "com.sapphire.pm-bot": {"pid": 4074, "status": -15, "label": "com.sapphire.pm-bot"},
+            "com.sapphire.soc-dashboard": {
+                "pid": 58438,
+                "status": -15,
+                "label": "com.sapphire.soc-dashboard",
+            },
         },
         disabled_labels=set(),
         telegram_socket_offenders=["Python -> 149.154.166.110:443"],
@@ -72,6 +100,11 @@ def test_build_report_fails_legacy_sender_paths():
             "mode": "local_failover",
         },
         inference_error=None,
+        soc_launch_env={
+            "SOC_TELEGRAM_ALERTS_ENABLED": "1",
+            "SOC_ALERT_DRAFT_QUEUE_ENABLED": "1",
+            "SOC_ALERT_DRAFT_QUEUE_PATH": audit.EXPECTED_PM_DRAFT_QUEUE,
+        },
     )
 
     assert report["status"] == "fail"
@@ -79,6 +112,7 @@ def test_build_report_fails_legacy_sender_paths():
     assert failed == {
         "hermes_gateway_polling_disabled",
         "healthz_watcher_direct_send_paused",
+        "soc_dashboard_alerts_routed_to_pm_drafts",
         "inference_telegram_relay_disabled",
         "non_desktop_telegram_sockets_absent",
     }
@@ -92,6 +126,11 @@ def test_build_report_passes_quiet_rollout_posture():
                 "pid": 4067,
                 "status": -15,
                 "label": "com.sapphire.inference-proxy",
+            },
+            "com.sapphire.soc-dashboard": {
+                "pid": 58438,
+                "status": -15,
+                "label": "com.sapphire.soc-dashboard",
             },
         },
         disabled_labels={"ai.hermes.gateway"},
@@ -111,6 +150,11 @@ def test_build_report_passes_quiet_rollout_posture():
             "mode": "local_failover",
         },
         inference_error=None,
+        soc_launch_env={
+            "SOC_TELEGRAM_ALERTS_ENABLED": "0",
+            "SOC_ALERT_DRAFT_QUEUE_ENABLED": "1",
+            "SOC_ALERT_DRAFT_QUEUE_PATH": audit.EXPECTED_PM_DRAFT_QUEUE,
+        },
     )
 
     assert report["status"] == "ok"
