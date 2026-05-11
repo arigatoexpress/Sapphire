@@ -883,7 +883,7 @@ def _dashboard_launchagent_labels(root: Path | None = None) -> list[str]:
     repo_root = root or _DASHBOARD_REPO_ROOT
     paths = list((repo_root / "infra" / "launchagents").glob("*.plist"))
     paths.extend((repo_root / "services").glob("*/launchagent/*.plist"))
-    labels: set[str] = {"ai.hermes.gateway"}
+    labels: set[str] = set()
     for path in paths:
         try:
             payload = plistlib.loads(path.read_bytes())

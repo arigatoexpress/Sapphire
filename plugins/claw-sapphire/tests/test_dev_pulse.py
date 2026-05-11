@@ -189,12 +189,12 @@ def test_collect_service_statuses_parses_launchctl(fake_run):
         "PID\tStatus\tLabel\n"
         "1234\t0\tcom.sapphire.inference-proxy\n"
         "-\t0\tcom.sapphire.dashboard\n"
-        "5678\t127\tai.hermes.gateway\n",
+        "5678\t127\tcom.sapphire.pm-bot-tunnel\n",
     )
     labels = [
         "com.sapphire.inference-proxy",
         "com.sapphire.dashboard",
-        "ai.hermes.gateway",
+        "com.sapphire.pm-bot-tunnel",
         "com.sapphire.pm-bot",  # not loaded
     ]
     out = dev_pulse.collect_service_statuses(labels)
@@ -203,7 +203,7 @@ def test_collect_service_statuses_parses_launchctl(fake_run):
     assert by_label["com.sapphire.inference-proxy"].pid == 1234
     assert by_label["com.sapphire.inference-proxy"].exit_code == 0
     assert by_label["com.sapphire.dashboard"].pid is None
-    assert by_label["ai.hermes.gateway"].exit_code == 127
+    assert by_label["com.sapphire.pm-bot-tunnel"].exit_code == 127
     assert by_label["com.sapphire.pm-bot"].loaded is False
 
 

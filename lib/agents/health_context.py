@@ -1,9 +1,10 @@
 """Reusable health-context helper.
 
 Centralizes the live-system snapshot logic that was previously inlined across
-``services/telegram-bot/app.py`` (PR #383), ``plugins/claw-sapphire/tools/internal/
-dev_pulse.py``, ``plugins/claw-sapphire/tools/internal/morning_digest.py``, and
-the observability dashboard (Lane 2).
+the deprecated ``services/telegram-bot/app.py`` (PR #383),
+``plugins/claw-sapphire/tools/internal/dev_pulse.py``,
+``plugins/claw-sapphire/tools/internal/morning_digest.py``, and the
+observability dashboard (Lane 2).
 
 The helper is **pure**: no I/O, no globals, no module-load side effects. Callers
 inject the raw JSON payloads from ``health_check.py``, ``status.py``, etc.;
@@ -18,7 +19,7 @@ endpoint. A shared helper keeps every surface honest with one definition of
 "compact health summary".
 
 Scopes:
-    - ``"telegram"``  — system-prompt block for the Nemotron Telegram bot.
+    - ``"telegram"``  — compact prompt block for Telegram operator surfaces.
     - ``"morning"``   — structured snapshot (dict-friendly) for the morning digest.
     - ``"ops"``       — full snapshot for ops dashboards / observability API.
     - ``"minimal"``   — bare overall + summary, for very short surfaces.
@@ -43,7 +44,7 @@ _VALID_SCOPES: tuple[str, ...] = ("telegram", "morning", "ops", "minimal")
 
 
 # ---------------------------------------------------------------------------
-# Status icon table (kept identical to the inline render in services/telegram-bot)
+# Status icon table (kept identical to the historical Telegram render)
 # ---------------------------------------------------------------------------
 
 _STATUS_ICON: dict[str, str] = {"green": "🟢", "yellow": "🟡", "red": "🔴"}

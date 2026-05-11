@@ -34,6 +34,29 @@ disabled services = {
     assert audit.parse_disabled(output) == {"ai.hermes.gateway"}
 
 
+def test_parse_launchctl_environment_extracts_explicit_environment_block():
+    output = """
+gui/501/com.sapphire.soc-dashboard = {
+    inherited environment = {
+        SSH_AUTH_SOCK => /tmp/listener
+    }
+    default environment = {
+        PATH => /usr/bin:/bin
+    }
+    environment = {
+        SOC_TELEGRAM_ALERTS_ENABLED => 0
+        SOC_ALERT_DRAFT_QUEUE_ENABLED => 1
+        SOC_ALERT_DRAFT_QUEUE_PATH => /Users/aribs/.cache/sapphire/telegram/pm_bot_drafts.jsonl
+    }
+}
+"""
+    assert audit.parse_launchctl_environment(output) == {
+        "SOC_TELEGRAM_ALERTS_ENABLED": "0",
+        "SOC_ALERT_DRAFT_QUEUE_ENABLED": "1",
+        "SOC_ALERT_DRAFT_QUEUE_PATH": "/Users/aribs/.cache/sapphire/telegram/pm_bot_drafts.jsonl",
+    }
+
+
 def test_find_non_desktop_telegram_sockets_ignores_telegram_app():
     output = """COMMAND   PID USER FD TYPE DEVICE SIZE/OFF NODE NAME
 Telegram 77881 aribs 36u IPv4 0x1 0t0 TCP 10.2.0.2:64307->149.154.175.52:443 (ESTABLISHED)
@@ -42,6 +65,114 @@ Python   80654 aribs 16u IPv4 0x2 0t0 TCP 10.2.0.2:56123->149.154.166.110:443 (E
     assert audit.find_non_desktop_telegram_sockets(output) == [
         "Python   80654 aribs 16u IPv4 0x2 0t0 TCP 10.2.0.2:56123->149.154.166.110:443 (ESTABLISHED)"
     ]
+
+
+def test_notify_tool_defaults_to_drafts_detects_safe_wrapper(tmp_path):
+    notify_path = tmp_path / "notify.py"
+    notify_path.write_text(
+        "SAPPHIRE_NOTIFY_TELEGRAM_LIVE = '0'\n"
+        "from lib.telegram.draft_queue import build_draft\n"
+        "metadata = {'external_side_effect': False}\n",
+        encoding="utf-8",
+    )
+
+    assert audit.notify_tool_defaults_to_drafts(notify_path) == (True, None)
+
+
+def test_scan_legacy_telegram_source_warns_for_direct_service(tmp_path):
+    service = tmp_path / "services" / "telegram-bot"
+    service.mkdir(parents=True)
+    (service / "app.py").write_text(
+        "def tg_api(method):\n"
+        "    url = f'https://api.telegram.org/botTOKEN/{method}'\n"
+        "    return url\n"
+        "def send_message():\n"
+        "    return tg_api('sendMessage')\n",
+        encoding="utf-8",
+    )
+
+    findings = audit.scan_legacy_telegram_source(tmp_path, notify_tool_draft_default=True)
+
+    by_label = {finding["label"]: finding for finding in findings}
+    assert by_label["legacy_telegram_bot_service"]["status"] == "warn"
+    assert by_label["legacy_telegram_bot_service"]["signals"] == [
+        "sendMessage",
+        "api.telegram.org",
+    ]
+    assert by_label["telegram_notify_wrapper"]["reason"] == "absent"
+
+
+def test_scan_legacy_telegram_source_accepts_draft_safe_and_disabled_paths(tmp_path):
+    script = tmp_path / "scripts"
+    watchdog = tmp_path / "plugins" / "claw-sapphire" / "tools" / "internal"
+    service = tmp_path / "services" / "telegram-bot"
+    script.mkdir()
+    watchdog.mkdir(parents=True)
+    service.mkdir(parents=True)
+    (script / "telegram_notify.sh").write_text(
+        'exec python3 plugins/claw-sapphire/tools/notify.py "$MESSAGE"\n'
+        "# queues to pm_bot_drafts.jsonl unless SAPPHIRE_NOTIFY_TELEGRAM_LIVE=1\n",
+        encoding="utf-8",
+    )
+    (watchdog / "watchdog.py").write_text(
+        "NOTIFY_TOOL = 'notify.py'\nsubprocess.run(['python3', NOTIFY_TOOL])\n",
+        encoding="utf-8",
+    )
+    (service / "app.py").write_text(
+        "# DISABLED legacy service retained for rollback\n"
+        "url = 'https://api.telegram.org/botTOKEN/sendMessage'\n",
+        encoding="utf-8",
+    )
+
+    findings = audit.scan_legacy_telegram_source(tmp_path, notify_tool_draft_default=True)
+
+    assert {finding["status"] for finding in findings} == {"ok"}
+    by_label = {finding["label"]: finding for finding in findings}
+    assert by_label["telegram_notify_wrapper"]["reason"] == "draft_safe"
+    assert by_label["watchdog_notify_subprocess"]["reason"] == "draft_safe"
+    assert by_label["legacy_telegram_bot_service"]["reason"] == "disabled_or_archived"
+
+
+def test_build_report_warns_on_unsafe_legacy_source_even_when_runtime_quiet():
+    report = audit.build_report(
+        launch_agents={},
+        disabled_labels=set(),
+        telegram_socket_offenders=[],
+        pm_bot_ownership={
+            "mode": "webhook",
+            "polling_active": False,
+            "single_ingress_owner": "pm_bot_webhook_unregistered",
+            "agent_group_ready": False,
+            "agent_group_blockers": ["webhook_missing"],
+        },
+        pm_bot_error=None,
+        inference_status={
+            "telegram_relay_available": True,
+            "telegram_relay_enabled": False,
+            "active_route": "mac-local",
+            "mode": "local_failover",
+        },
+        inference_error=None,
+        notify_tool_draft_default=True,
+        legacy_source_findings=[
+            {
+                "path": "services/telegram-bot/app.py",
+                "label": "legacy_telegram_bot_service",
+                "status": "warn",
+                "reason": "direct send",
+                "signals": ["sendMessage"],
+            }
+        ],
+    )
+
+    source_check = next(
+        check
+        for check in report["checks"]
+        if check["name"] == "legacy_telegram_source_surfaces_reviewed"
+    )
+    assert report["status"] == "warn"
+    assert source_check["status"] == "warn"
+    assert source_check["data"]["warn_count"] == 1
 
 
 def test_build_report_fails_legacy_sender_paths():
@@ -54,6 +185,16 @@ def test_build_report_fails_legacy_sender_paths():
                 "label": "com.sapphire.healthz-watcher",
             },
             "com.sapphire.pm-bot": {"pid": 4074, "status": -15, "label": "com.sapphire.pm-bot"},
+            "com.sapphire.soc-dashboard": {
+                "pid": 58438,
+                "status": -15,
+                "label": "com.sapphire.soc-dashboard",
+            },
+            "com.sapphire.heartbeat": {
+                "pid": 44600,
+                "status": 0,
+                "label": "com.sapphire.heartbeat",
+            },
         },
         disabled_labels=set(),
         telegram_socket_offenders=["Python -> 149.154.166.110:443"],
@@ -72,6 +213,12 @@ def test_build_report_fails_legacy_sender_paths():
             "mode": "local_failover",
         },
         inference_error=None,
+        soc_launch_env={
+            "SOC_TELEGRAM_ALERTS_ENABLED": "1",
+            "SOC_ALERT_DRAFT_QUEUE_ENABLED": "1",
+            "SOC_ALERT_DRAFT_QUEUE_PATH": audit.EXPECTED_PM_DRAFT_QUEUE,
+        },
+        notify_tool_draft_default=False,
     )
 
     assert report["status"] == "fail"
@@ -79,6 +226,8 @@ def test_build_report_fails_legacy_sender_paths():
     assert failed == {
         "hermes_gateway_polling_disabled",
         "healthz_watcher_direct_send_paused",
+        "legacy_notify_callers_paused_or_draft_safe",
+        "soc_dashboard_alerts_routed_to_pm_drafts",
         "inference_telegram_relay_disabled",
         "non_desktop_telegram_sockets_absent",
     }
@@ -93,8 +242,18 @@ def test_build_report_passes_quiet_rollout_posture():
                 "status": -15,
                 "label": "com.sapphire.inference-proxy",
             },
+            "com.sapphire.soc-dashboard": {
+                "pid": 58438,
+                "status": -15,
+                "label": "com.sapphire.soc-dashboard",
+            },
+            "com.sapphire.heartbeat": {
+                "pid": 44600,
+                "status": 0,
+                "label": "com.sapphire.heartbeat",
+            },
         },
-        disabled_labels={"ai.hermes.gateway"},
+        disabled_labels={"ai.hermes.gateway", "com.sapphire.heartbeat"},
         telegram_socket_offenders=[],
         pm_bot_ownership={
             "mode": "webhook",
@@ -111,6 +270,12 @@ def test_build_report_passes_quiet_rollout_posture():
             "mode": "local_failover",
         },
         inference_error=None,
+        soc_launch_env={
+            "SOC_TELEGRAM_ALERTS_ENABLED": "0",
+            "SOC_ALERT_DRAFT_QUEUE_ENABLED": "1",
+            "SOC_ALERT_DRAFT_QUEUE_PATH": audit.EXPECTED_PM_DRAFT_QUEUE,
+        },
+        notify_tool_draft_default=False,
     )
 
     assert report["status"] == "ok"

@@ -1,8 +1,8 @@
 """Tests for ``lib.agents.health_context.build_health_context``.
 
 The helper centralizes the live-system snapshot logic that was previously
-inlined across ``services/telegram-bot/app.py``, the morning digest, and the
-observability dashboard. These tests:
+inlined across the deprecated ``services/telegram-bot/app.py``, the morning
+digest, and the observability dashboard. These tests:
 
 - Pin the clock so ``collected_at`` is deterministic.
 - Verify each scope (``telegram``, ``morning``, ``ops``, ``minimal``) produces

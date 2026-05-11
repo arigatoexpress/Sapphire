@@ -1,6 +1,6 @@
 # Sapphire OS — Routines Manifest
 
-Last updated: 2026-04-30
+Last updated: 2026-05-11
 
 Every automated routine in the Sapphire OS mesh. Single source of truth — if a job runs on a schedule, it is listed here with its schedule, owner process, output artifact, and recovery runbook. Anything not on this list should either be added or killed.
 
@@ -17,10 +17,11 @@ Three runtime surfaces host routines:
 | `com.sapphire.inference-proxy`   | 11435 | 4-tier inference failover (GPU → Pi → Mac → Kimi) | `~/Library/Logs/sapphire/inference-proxy.log` |
 | `com.sapphire.control-plane`     | 8082  | PM hub: projects, tasks, events, Kimi bridge | `~/Library/Logs/sapphire/control-plane.log` |
 | `com.sapphire.dashboard`         | 8080  | Flask web UI (auth: sapphire) | `~/Library/Logs/sapphire/dashboard.log` |
-| `com.sapphire.signal-logger`     | 18081 | Webhook receiver → signal pipeline → Telegram | `~/Library/Logs/sapphire/signal-logger.log` |
+| `com.sapphire.signal-logger`     | 18081 | Webhook receiver -> signal pipeline -> PM bot drafts | `~/Library/Logs/sapphire/signal-logger.log` |
 | `com.sapphire.openbb-api`        | 6900  | OpenBB REST gateway (32 providers) | `~/Library/Logs/sapphire/openbb-api.log` |
 | `com.sapphire.regional-intel`    | 8787  | Vote monitor + intelligence console | `~/Library/Logs/sapphire/regional-intel.log` |
-| `ai.hermes.gateway`              | —     | Telegram bot (NousResearch framework) | `~/.hermes/logs/gateway.log` |
+| `com.sapphire.pm-bot`            | 18082 | Telegram PM bot webhook, single Bot API ingress, reviewed draft queue | `~/Library/Logs/sapphire/pm-bot.log` |
+| `com.sapphire.pm-bot-tunnel`     | —     | Cloudflare tunnel for PM bot webhook delivery | `~/Library/Logs/sapphire/pm-bot-tunnel.log` |
 | `com.sapphire.cloudflare-tunnel` | —     | Public tunnel for remote access | `~/Library/Logs/sapphire/cloudflare-tunnel.log` |
 
 Check: `launchctl list | grep sapphire` — every row should show a PID (online) or `-` with exit code 0 (scheduled, last run OK).
@@ -29,8 +30,8 @@ Check: `launchctl list | grep sapphire` — every row should show a PID (online)
 
 | Label | Cadence | Script | Output | Runbook |
 |-------|---------|--------|--------|---------|
-| `com.sapphire.morning-brief`       | 06:00 local / 07:00 CT | `services/intelligence/daily_brief.py`      | `data/intelligence/YYYY-MM-DD/daily_brief.md` + Telegram p1 digest | `morning-brief-runbook.md`; dry-run still writes the dated artifact |
-| `com.sapphire.morning-digest`      | 08:00 local            | `services/morning_digest/run_once.sh`       | Telegram p3 operational digest; archive writer not yet implemented | `morning-digest-runbook.md`; manual no-send: `services/morning_digest/run_once.sh --dry-run` |
+| `com.sapphire.morning-brief`       | 06:00 local / 07:00 CT | `services/intelligence/daily_brief.py`      | `data/intelligence/YYYY-MM-DD/daily_brief.md` + PM bot draft digest | `morning-brief-runbook.md`; dry-run still writes the dated artifact |
+| `com.sapphire.morning-digest`      | 08:00 local            | `services/morning_digest/run_once.sh`       | PM bot draft operational digest; archive writer not yet implemented | `morning-digest-runbook.md`; manual no-send: `services/morning_digest/run_once.sh --dry-run` |
 | `com.sapphire.kronos-daily`        | 07:00 CT           | `scripts/kronos_daily_predictions.py`       | `data/intelligence/YYYY-MM-DD/predictions.json`                    | Manual: `python3 scripts/kronos_daily_predictions.py`; GPU must be up |
 | `com.sapphire.threat-refresh`      | every 4h           | `services/dashboard/refresh_threats.py`     | `data/intelligence/YYYY-MM-DD/threats.json`                        | Manual: `python3 services/dashboard/refresh_threats.py`; check CISA/NVD reachability |
 | `com.sapphire.chain-refresh`       | every 15 min       | `services.pipeline.chain_refresh`           | `data/chain/chain_<ts>.json` + `data/intelligence/latest/chain.json` | Manual: `python3 -m services.pipeline.chain_refresh` |
@@ -173,7 +174,7 @@ gcloud services enable cloudscheduler.googleapis.com --project=tho-ai-agent
   ```bash
   python3 -m services.pipeline.check_routines
   ```
-- Watchdog tool (`plugins/claw-sapphire/tools/watchdog.py`) — runs every 2h, sends Telegram on service state transitions.
+- Watchdog tool (`plugins/claw-sapphire/tools/watchdog.py`) — legacy routine; must remain disabled or route through PM-bot-reviewed drafts.
 - `v_service_uptime_24h` BigQuery view — 24-hour rolling uptime per service, fed by `services.pipeline.telemetry_collector`.
 
 ## 6. Recovery playbook

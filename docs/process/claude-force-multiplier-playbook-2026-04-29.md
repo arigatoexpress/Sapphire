@@ -551,8 +551,8 @@ against live Foundry state, not just the local snapshots.
 
 ### 9.4 Telegram MCP
 
-Today the Telegram surface is consumed via the hermes-agent gateway and the `telegram-bot`
-service; a Telegram MCP (read-only — strictly no send) would let Claude reason about message
+As of 2026-05-11 the Telegram surface is owned by `services/pm_bot` in webhook
+mode; a Telegram MCP (read-only — strictly no send) would let Claude reason about message
 streams the way `tradingview-mcp` lets it reason about charts. Pair carefully with the Tranche 2
 Telegram intel reader's quality filter.
 

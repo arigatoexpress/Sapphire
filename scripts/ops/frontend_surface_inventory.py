@@ -314,26 +314,27 @@ SURFACE_DEFS: tuple[SurfaceDefinition, ...] = (
     ),
     SurfaceDefinition(
         surface_id="telegram_operator_surface",
-        label="Telegram-native operator surface",
-        root="services/telegram-bot",
-        entrypoints=("services/telegram-bot/app.py",),
-        stack=("Python", "Telegram bot adapter"),
+        label="PM bot Telegram operator surface",
+        root="services/pm_bot",
+        entrypoints=("services/pm_bot/server.py",),
+        stack=("Python", "FastAPI", "Telegram webhook", "draft queue"),
         audience="Ari in Telegram",
         boundary="telegram_operator",
-        owner_module="Runtime / Control Plane",
-        lifecycle="extract_into_runtime_control_plane",
+        owner_module="Runtime / PM Bot",
+        lifecycle="canonical_operator_surface",
         risk_level="high",
         safety_notes=(
-            "No live sends from automation runs.",
-            "Expose readiness and dry-run previews before any external message path.",
+            "PM bot is the single Telegram ingress owner.",
+            "Non-command updates and producer alerts must queue PM-bot-reviewed drafts.",
+            "Keep polling and direct live sends disabled outside explicit break-glass windows.",
         ),
         verification=(
-            "python3 -m py_compile services/telegram-bot/app.py",
-            'rg -n "send_message|send_photo|send_document" services/telegram-bot/app.py',
+            "python3 -m py_compile services/pm_bot/server.py",
+            "python3 scripts/ops/telegram_sender_audit.py --json",
         ),
         recommended_next_slice=(
-            "Move Telegram capability metadata into the runtime control-plane inventory "
-            "and keep message execution behind explicit confirmation."
+            "Add an operator review UI for queued drafts before broadening agent-group "
+            "Telegram participation."
         ),
     ),
 )

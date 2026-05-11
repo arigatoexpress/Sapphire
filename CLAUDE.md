@@ -118,7 +118,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `services/pipeline/` | service | GCP sync — events → GCS + BigQuery (hourly watermark). |
 | `services/scout-sandbox/` | service | External-collaborator least-privilege sandbox. |
 | `services/security_pipeline/` | service | Scheduled full-system security scan → SOC page. |
-| `services/telegram-bot/` | service | Legacy bot (replaced by hermes-agent gateway). |
+| `services/pm_bot/` | service | PM bot webhook and reviewed Telegram draft queue [Mac:18082]. |
 | `services/webhook/` | service | TradingView webhook receiver [Windows:9090]. |
 | `plugins/claw-sapphire/` | plugin | 113 tool scripts on disk (63 at top level + 49 in `internal/` + 1 in `_deprecated/`), 10 libs, 567 collected tests. |
 | `contracts/` | solidity | **`SapphireSignalVerifier.sol`** (on-chain signal registry with ZK proof hash field), **`SapphirePaymentGate.sol`** (micropayment gate), **`SapphireSentinelRegistry.sol`** (non-custodial agent mandate/payment receipt anchor). Deployed on Robinhood Chain testnet via `scripts/deploy_robinhood_chain.py`. |
@@ -138,7 +138,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 **Mac (100.67.171.79) — commander, all services:**
 - control-plane:8082, dashboard:8080, signal-logger:18081
 - inference-proxy:11435 (4-tier failover)
-- hermes-agent gateway (ai.hermes.gateway LaunchAgent, Telegram bot)
+- pm-bot:18082 (com.sapphire.pm-bot LaunchAgent, Telegram webhook owner)
 - content-engine (com.sapphire.content-engine LaunchAgent, weekly cadence)
 - OpenBB:6900, Redis:6379, Ollama:11434
 
@@ -268,14 +268,14 @@ Prediction accuracy: 61.1% overall, BTC 83.3% (n=36 scored of 42)
 - Audit: every `execute_signal` appends to `data/hyperliquid_trades.jsonl`; daily realized loss tally at `data/hyperliquid_daily_pnl.json`.
 - Read-only status: `echo '{"action":"live-status"}' | python3 plugins/claw-sapphire/tools/hyperliquid.py`.
 
-## Hermes Agent (Telegram Bot)
+## Telegram PM Bot
 
-hermes-agent (NousResearch) replaced custom bot. Installed at ~/.hermes/.
-- Config: ~/.hermes/config.yaml (model: hermes3:8b, provider: custom, base_url: proxy)
-- Env: ~/.hermes/.env (TELEGRAM_BOT_TOKEN, OPENAI_BASE_URL → proxy)
-- Skills: ~/.hermes/skills/sapphire/ (14 skills: cyber-intel, inference-tier, kimi-delegate, macro-data, paper-trading, regional-intel, repo-discovery, system-health, system-ops, tho-operations, threat-intel, trading-analysis, trading-brain, trading-signals; pending deploy: `tradingview-orchestrator` — read-only orchestrator wrapper, template at `docs/hermes/skills/tradingview-orchestrator/`)
-- Gateway: ai.hermes.gateway LaunchAgent (always-on Telegram polling)
-- Restart: `~/.local/bin/hermes gateway restart`
+PM bot replaced the old custom bot and Hermes polling gateway as Telegram owner.
+- Service: `services/pm_bot/server.py`
+- LaunchAgent: `com.sapphire.pm-bot`
+- Health: `curl http://127.0.0.1:18082/telegram/ownership`
+- Policy: webhook mode, shared-token polling disabled, producer alerts become local drafts.
+- Legacy: `ai.hermes.gateway` must remain disabled unless PM bot is deliberately retired.
 
 ## Event System
 

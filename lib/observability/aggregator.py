@@ -215,7 +215,7 @@ def _enumerate_launchagent_labels(repo_root: Path) -> list[str]:
     paths: list[Path] = []
     paths.extend(sorted((repo_root / "infra" / "launchagents").glob("*.plist")))
     paths.extend(sorted((repo_root / "services").glob("*/launchagent/*.plist")))
-    labels: set[str] = {"ai.hermes.gateway"}  # extra-repo gateway
+    labels: set[str] = set()
     for path in paths:
         try:
             payload = plistlib.loads(path.read_bytes())

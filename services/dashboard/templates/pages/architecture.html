@@ -376,7 +376,7 @@
         gateway:  { label: 'Ingress Bus',     tier: 'Core',    ring: 'ring1', angle: -90,  role: 'Inference proxy — 4-tier failover routing.' },
         alpha:    { label: 'Decision Engine', tier: 'Core',    ring: 'ring1', angle: 0,    role: 'Signal logger — applies policy and logs trades.' },
         pm_hub:   { label: 'Ops Hub',         tier: 'Core',    ring: 'ring1', angle: 90,   role: 'Control plane — project, task, event orchestration.' },
-        telegram: { label: 'Operator Relay',  tier: 'Core',    ring: 'ring1', angle: 180,  role: 'Hermes bot — delivers concise operator updates.' },
+        telegram: { label: 'PM Bot Webhook',  tier: 'Core',    ring: 'ring1', angle: 180,  role: 'PM bot — single Telegram ingress and reviewed draft queue.' },
         scout:    { label: 'Research Intake', tier: 'Support', ring: 'ring2', angle: -90,  role: 'OpenBB API — 32 financial data providers.' },
         tho:      { label: 'Intel Console',   tier: 'Support', ring: 'ring2', angle: -30,  role: 'Regional Intel — vote monitor + intel platform.' },
         blanga:   { label: 'Context Layer',   tier: 'Support', ring: 'ring2', angle: 30,   role: 'Business context overlays (BIS).' },

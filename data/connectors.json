@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-04-06",
+  "updated": "2026-05-11",
   "connectors": [
     {
       "id": "openclaw-gateway",
@@ -10,12 +10,14 @@
       "endpoint": "http://localhost:18789",
       "device": "mac",
       "launchagent": "ai.openclaw.gateway",
-      "status": "active",
+      "status": "quarantined",
       "tags": [
         "agent:openclaw",
-        "device:mac"
+        "device:mac",
+        "legacy",
+        "deprecated"
       ],
-      "description": "Local AI gateway routing requests to NemoClaw, Kimi, Claude, Codex workers"
+      "description": "Deprecated local gateway. Quarantined during PM bot rollout; do not restart without a fresh design."
     },
     {
       "id": "nemoclaw",
@@ -218,17 +220,19 @@
       "description": "Firestore: event log, project state, task queue (sapphire-479610)"
     },
     {
-      "id": "telegram-bot",
-      "name": "Telegram Bot",
+      "id": "pm-bot",
+      "name": "PM Bot",
       "type": "messaging",
       "protocol": "telegram-api",
-      "device": "rari1",
+      "device": "mac",
+      "launchagent": "com.sapphire.pm-bot",
       "status": "active",
       "tags": [
         "type:messaging",
-        "device:rari1"
+        "device:mac",
+        "runtime:pm-bot"
       ],
-      "description": "Primary human-agent interface \u2014 Telegram-first command and status channel"
+      "description": "Primary human-agent interface — PM bot webhook and reviewed draft queue"
     },
     {
       "id": "claw-code",
@@ -316,37 +320,37 @@
     {
       "id": "ai.openclaw.gateway",
       "description": "OpenClaw gateway port 18789",
-      "status": "active"
+      "status": "quarantined"
     },
     {
       "id": "com.aribs.agentic.control-api",
-      "description": "Control plane API server",
-      "status": "active"
+      "description": "Archived pre-PM-bot agentic control API plist",
+      "status": "archived"
     },
     {
       "id": "com.aribs.agentic.worker.claude",
-      "description": "Claude worker",
-      "status": "active"
+      "description": "Archived pre-PM-bot Claude worker plist",
+      "status": "archived"
     },
     {
       "id": "com.aribs.agentic.worker.codex",
-      "description": "Codex worker",
-      "status": "active"
+      "description": "Archived pre-PM-bot Codex worker plist",
+      "status": "archived"
     },
     {
       "id": "com.aribs.agentic.worker.kimi",
-      "description": "Kimi worker",
-      "status": "active"
+      "description": "Archived pre-PM-bot Kimi worker plist",
+      "status": "archived"
     },
     {
       "id": "com.aribs.agentic.worker.antigravity",
-      "description": "Antigravity worker",
-      "status": "active"
+      "description": "Archived pre-PM-bot Antigravity worker plist",
+      "status": "archived"
     },
     {
       "id": "com.aribs.agentic.worker.openclaw-main",
-      "description": "OpenClaw main worker",
-      "status": "active"
+      "description": "Archived pre-PM-bot OpenClaw main worker plist",
+      "status": "archived"
     },
     {
       "id": "com.sapphire.sync-eu-proxy-firewall",

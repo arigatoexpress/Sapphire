@@ -1,7 +1,8 @@
-"""Telegram alerts via NemotronRariBot for claw-code.
+"""Operator-reviewed Telegram drafts via NemotronRariBot for claw-code.
 
-Sends messages to the Sapphire Telegram bot with priority tags (p0-p3).
-Called directly by scripts or invoked by scheduled tasks.
+Creates PM-bot-compatible local draft records with priority tags (p0-p3).
+Called directly by scripts or invoked by scheduled tasks. Live Telegram sends are
+available only through an explicit break-glass environment flag.
 
 Usage:
     python3 notify.py "Your message here"
@@ -13,9 +14,12 @@ from __future__ import annotations
 import json
 import os
 import ssl
+import sys
 import urllib.error
 import urllib.request
+from importlib import util as importlib_util
 from pathlib import Path
+from types import ModuleType
 
 # Telegram bot tokens travel in the URL path — MITM-ing this call leaks the
 # bot credentials. Always verify the server certificate. We prefer certifi's
@@ -34,6 +38,51 @@ SECRET_PATHS = [
     Path.home() / ".config" / "sapphire-secrets" / "telegram_bot_token",
     Path.home() / ".config" / "sapphire" / "telegram_bot_token",
 ]
+REPO_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_DRAFT_QUEUE_PATH = Path.home() / ".cache" / "sapphire" / "telegram" / "pm_bot_drafts.jsonl"
+DISABLED_VALUES = {"0", "false", "no", "off"}
+
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+try:
+    from lib.telegram.draft_queue import append_draft, build_draft  # noqa: E402
+except ModuleNotFoundError:
+    _DRAFT_QUEUE_MODULE_PATH = REPO_ROOT / "lib" / "telegram" / "draft_queue.py"
+    _DRAFT_QUEUE_SPEC = importlib_util.spec_from_file_location(
+        "sapphire_telegram_draft_queue",
+        _DRAFT_QUEUE_MODULE_PATH,
+    )
+    if _DRAFT_QUEUE_SPEC is None or _DRAFT_QUEUE_SPEC.loader is None:
+        raise
+    _DRAFT_QUEUE_MODULE = importlib_util.module_from_spec(_DRAFT_QUEUE_SPEC)
+    sys.modules.setdefault("sapphire_telegram_draft_queue", _DRAFT_QUEUE_MODULE)
+    _DRAFT_QUEUE_SPEC.loader.exec_module(_DRAFT_QUEUE_MODULE)
+    if not isinstance(_DRAFT_QUEUE_MODULE, ModuleType):
+        raise
+    append_draft = _DRAFT_QUEUE_MODULE.append_draft
+    build_draft = _DRAFT_QUEUE_MODULE.build_draft
+
+
+def _env_enabled(name: str, *, default: bool) -> bool:
+    value = os.environ.get(name)
+    if value is None or not value.strip():
+        return default
+    return value.strip().lower() not in DISABLED_VALUES
+
+
+def _draft_queue_path() -> Path:
+    return Path(
+        os.getenv("SAPPHIRE_NOTIFY_DRAFT_QUEUE_PATH", str(DEFAULT_DRAFT_QUEUE_PATH))
+    ).expanduser()
+
+
+def _live_telegram_enabled() -> bool:
+    return _env_enabled("SAPPHIRE_NOTIFY_TELEGRAM_LIVE", default=False)
+
+
+def _draft_queue_enabled() -> bool:
+    return _env_enabled("SAPPHIRE_NOTIFY_DRAFT_QUEUE_ENABLED", default=True)
 
 
 def get_bot_token() -> str | None:
@@ -85,7 +134,7 @@ def send_telegram_message(
     bot_token: str | None = None,
     chat_id: str | None = None,
 ) -> dict:
-    """Send a message via the Telegram Bot API.
+    """Queue an operator-reviewed Telegram draft, or send live behind opt-in.
 
     Args:
         message: The message text (supports Markdown).
@@ -94,8 +143,24 @@ def send_telegram_message(
         chat_id: Override chat ID.
 
     Returns:
-        API response dict or error dict.
+        Draft queue response, live API response, or error dict.
     """
+    # Format with priority prefix
+    prefix_map = {"p0": "🚨", "p1": "📋", "p2": "ℹ️", "p3": "📰"}
+    prefix = prefix_map.get(priority, "📋")
+    formatted = f"{prefix} *Sapphire OS*\n\n{message}"
+
+    if os.environ.get("TELEGRAM_DRY_RUN", "").strip().lower() in {"1", "true", "yes", "on"}:
+        return {
+            "ok": True,
+            "delivery_mode": "dry_run",
+            "method": "sendMessage",
+            "text_len": len(formatted),
+        }
+
+    if not _live_telegram_enabled():
+        return _queue_notify_draft(formatted, priority)
+
     token = bot_token or get_bot_token()
     target = chat_id or get_chat_id()
 
@@ -103,11 +168,6 @@ def send_telegram_message(
         return {"error": "No TELEGRAM_BOT_TOKEN found in env or secrets"}
     if not target:
         return {"error": "No TELEGRAM_CHAT_ID found in env or secrets"}
-
-    # Format with priority prefix
-    prefix_map = {"p0": "🚨", "p1": "📋", "p2": "ℹ️", "p3": "📰"}
-    prefix = prefix_map.get(priority, "📋")
-    formatted = f"{prefix} *Sapphire OS*\n\n{message}"
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
 
@@ -126,7 +186,7 @@ def send_telegram_message(
             method="POST",
         )
         try:
-            with urllib.request.urlopen(req, timeout=10, context=_SSL_CTX) as resp:
+            with urllib.request.urlopen(req, timeout=10, context=_SSL_CTX) as resp:  # nosec B310 - fixed HTTPS Telegram API URL.
                 return json.loads(resp.read())
         except urllib.error.HTTPError as e:
             err_body = e.read().decode() if e.fp else ""
@@ -142,6 +202,38 @@ def send_telegram_message(
     result.pop("_http_code", None)
     result.pop("_body", None)
     return result
+
+
+def _queue_notify_draft(message: str, priority: str) -> dict:
+    if not _draft_queue_enabled():
+        return {
+            "ok": True,
+            "delivery_mode": "disabled",
+            "external_side_effect": False,
+        }
+
+    draft = build_draft(
+        kind="sapphire_notify",
+        topic="ops" if priority in {"p0", "p1", "p2"} else "digest",
+        body=message,
+        source_ids=(f"sapphire_notify:{priority}",),
+        provenance_refs=("plugins/claw-sapphire/tools/notify.py",),
+        created_by="sapphire-notify",
+        requires_confirmation=True,
+        metadata={
+            "priority": priority,
+            "external_side_effect": False,
+            "live_telegram_enabled": False,
+        },
+    )
+    target = append_draft(_draft_queue_path(), draft)
+    return {
+        "ok": True,
+        "delivery_mode": "draft",
+        "draft_id": draft.draft_id,
+        "draft_queue_path": str(target),
+        "external_side_effect": False,
+    }
 
 
 def send_alert(message: str, priority: str = "p1") -> dict:

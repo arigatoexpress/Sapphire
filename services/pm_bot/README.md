@@ -53,9 +53,10 @@ Optional:
     Sapphire Telegram token because it competes with Hermes or webhook consumers.
 - `SAPPHIRE_PM_BOT_HOST=127.0.0.1`
 - `SAPPHIRE_PM_BOT_PORT=18082`
-- `SAPPHIRE_PM_BOT_PROBE_TIMEOUT_SECONDS=2`
+- `SAPPHIRE_PM_BOT_PROBE_TIMEOUT_SECONDS=25`
   - Dedicated timeout for read-only `getMe` / `getWebhookInfo` health probes.
-    Keep this short so local `/health` remains responsive when Telegram is slow.
+    The LaunchAgent uses a wider timeout so slow Telegram API responses do not
+    create false delivery alarms; local development can keep the code default.
 - `THO_API_BASE_URL=https://project-go-forward-trgi34bxuq-uc.a.run.app`
 - `THO_FIRESTORE_PROJECT=tho-ai-agent`
 - `SAPPHIRE_PM_BOT_DEFAULT_PROJECT_ID=<firestore-project-id>`
@@ -114,6 +115,9 @@ The service routes this full Bot API update surface through
 `lib.telegram.agent_router`. Only `command` routes can call `sendMessage`; all
 other routes are accepted as no-send router decisions and queued as local
 dry-run draft/event records when `SAPPHIRE_PM_BOT_DRAFT_QUEUE_ENABLED` is true.
+The legacy `plugins/claw-sapphire/tools/notify.py` wrapper also writes to this
+same local draft queue by default; it only performs live Bot API sends when
+`SAPPHIRE_NOTIFY_TELEGRAM_LIVE=1` is set for an explicit operator window.
 
 Set `SAPPHIRE_PM_BOT_WEBHOOK_URL` on the runtime once a public URL is chosen.
 Health then treats a different registered webhook as `webhook_url_mismatch`
@@ -212,8 +216,13 @@ Quick manual smoke test with the service running:
 - Reply to one of the bot's messages with `status` to exercise reply-followup normalization
 
 For LaunchAgent deployments, keep the shared Sapphire Telegram token owned by
-Hermes polling. The PM bot should stay local/webhook-only unless it has a
-dedicated `SAPPHIRE_PM_BOT_TOKEN`.
+the PM bot webhook. Deprecated Hermes/OpenClaw gateway pollers should stay
+disabled so only one Bot API ingress path consumes updates.
+
+The checked-in LaunchAgent enables the draft queue and agentic dry-run mode, but
+does not hard-code `SAPPHIRE_PM_BOT_WEBHOOK_URL`; set that only in the active
+runtime plist after choosing the current public HTTPS ingress. Avoid committing
+accountless quick-tunnel URLs because they can change when the tunnel restarts.
 
 Safe live-test setup:
 

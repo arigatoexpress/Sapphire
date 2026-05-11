@@ -37,6 +37,14 @@
         <string>/Users/aribs/.config/sapphire-secrets/sapphire_pm_bot_allowed_user_ids</string>
         <key>SAPPHIRE_PM_BOT_BOT_USERNAME</key>
         <string>NemotronRariBot</string>
+        <key>SAPPHIRE_PM_BOT_DRAFT_QUEUE_PATH</key>
+        <string>/Users/aribs/.cache/sapphire/telegram/pm_bot_drafts.jsonl</string>
+        <key>SAPPHIRE_PM_BOT_DRAFT_QUEUE_ENABLED</key>
+        <string>1</string>
+        <key>SAPPHIRE_PM_BOT_AGENTIC_DRY_RUN</key>
+        <string>1</string>
+        <key>SAPPHIRE_PM_BOT_PROBE_TIMEOUT_SECONDS</key>
+        <string>25</string>
     </dict>
 </dict>
 </plist>

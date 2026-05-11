@@ -57,7 +57,7 @@
     },
     {
       "name": "sapphire_notify",
-      "description": "Send a Telegram notification via NemotronRariBot. Priority: p0=urgent, p1=normal, p2=low.",
+      "description": "Create a PM-bot-reviewed Telegram draft notification. Priority: p0=urgent, p1=normal, p2=low.",
       "inputSchema": {"type": "object", "additionalProperties": true},
       "command": "python3",
       "args": ["plugins/claw-sapphire/tools/notify.py"],

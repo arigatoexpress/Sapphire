@@ -85,7 +85,7 @@ def _tcp_ok(host: str, port: int, timeout: float = 3.0) -> tuple[bool, str]:
 def _http_ok(url: str, timeout: float = 5.0) -> tuple[bool, str]:
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "sapphire-heartbeat/1.0"})
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with urllib.request.urlopen(req, timeout=timeout) as r:  # nosec B310
             _ = r.read(512)
         return True, ""
     except urllib.error.HTTPError as exc:
@@ -145,7 +145,7 @@ def _build_components() -> list[ComponentStatus]:
 
     # LaunchAgent-backed (self-healable)
     la_checks = [
-        ("hermes-gateway", "ai.hermes.gateway"),
+        ("pm-bot", "com.sapphire.pm-bot"),
         ("content-engine", "com.sapphire.content-engine"),
     ]
     for name, label in la_checks:
