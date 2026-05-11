@@ -45,6 +45,7 @@ def reload_server(monkeypatch):
     monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
     monkeypatch.delenv("SAPPHIRE_PM_BOT_WEBHOOK_SECRET", raising=False)
     monkeypatch.delenv("TELEGRAM_WEBHOOK_SECRET", raising=False)
+    monkeypatch.delenv("SAPPHIRE_PM_BOT_WEBHOOK_URL", raising=False)
     monkeypatch.delenv("MODE", raising=False)
     monkeypatch.delenv("SAPPHIRE_PM_BOT_ALLOW_SHARED_POLLING", raising=False)
     monkeypatch.delenv("SAPPHIRE_PM_BOT_PROBE_TIMEOUT_SECONDS", raising=False)
@@ -771,6 +772,53 @@ def test_telegram_delete_webhook_default_drop_pending_is_false(reload_server, mo
     assert captured["json"] == {"drop_pending_updates": False}
 
 
+def test_build_webhook_registration_payload_requires_https(reload_server):
+    server = reload_server()
+
+    with pytest.raises(ValueError, match="HTTPS"):
+        server.build_webhook_registration_payload(url="http://example.invalid/telegram/webhook")
+
+
+def test_telegram_set_webhook_payload_is_bot_api_safe(reload_server, monkeypatch):
+    server = reload_server()
+    captured: dict = {}
+
+    def fake_post(url, json, timeout):
+        captured["url"] = url
+        captured["json"] = json
+        return _FakeResponse(status_code=200, json_payload={"ok": True, "result": True})
+
+    monkeypatch.setattr(server.requests, "post", fake_post)
+
+    server.TELEGRAM_API.set_webhook(
+        url="https://example.invalid/telegram/webhook",
+        secret_token="secret-token",
+        drop_pending_updates=False,
+    )
+
+    assert captured["url"].endswith("/setWebhook")
+    assert captured["json"] == {
+        "url": "https://example.invalid/telegram/webhook",
+        "allowed_updates": server._SUPPORTED_UPDATE_TYPES,
+        "drop_pending_updates": False,
+        "secret_token": "secret-token",
+    }
+
+
+def test_sanitized_webhook_registration_plan_omits_secret(reload_server):
+    server = reload_server()
+
+    plan = server.sanitized_webhook_registration_plan(
+        url="https://example.invalid/telegram/webhook",
+        secret_token_configured=True,
+    )
+
+    assert plan["method"] == "setWebhook"
+    assert plan["secret_token_configured"] is True
+    assert "secret_token" not in plan
+    assert plan["allowed_updates"] == server._SUPPORTED_UPDATE_TYPES
+
+
 # ---------------------------------------------------------------------------
 # _validate_startup_config
 # ---------------------------------------------------------------------------
@@ -934,6 +982,13 @@ def test_settings_from_env_reports_token_source_and_polling_override(reload_serv
     assert s.shared_polling_allowed is True
 
 
+def test_settings_from_env_reads_webhook_url(reload_server, monkeypatch):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_WEBHOOK_URL", "https://example.invalid/telegram/webhook")
+    server = reload_server()
+    s = server.Settings.from_env()
+    assert s.webhook_url == "https://example.invalid/telegram/webhook"
+
+
 # ---------------------------------------------------------------------------
 # health endpoint shape
 # ---------------------------------------------------------------------------
@@ -985,6 +1040,54 @@ def test_runtime_probe_uses_dedicated_probe_timeout(reload_server, monkeypatch):
     assert result["probe_ok"] is True
     assert result["bot_username"] == "NemotronRariBot"
     assert result["delivery_ready"] is True
+
+
+def test_runtime_probe_detects_expected_webhook_url_mismatch(reload_server, monkeypatch):
+    server = reload_server()
+    monkeypatch.setattr(
+        server,
+        "SETTINGS",
+        server.Settings(
+            token=server.SETTINGS.token,
+            webhook_secret="",
+            webhook_url="https://expected.example/telegram/webhook",
+            mode="webhook",
+            host="127.0.0.1",
+            port=18082,
+            telegram_timeout_seconds=30.0,
+            telegram_probe_timeout_seconds=1.5,
+        ),
+    )
+    server._TELEGRAM_PROBE_CACHE["expires_at"] = 0.0
+    server._TELEGRAM_PROBE_CACHE["value"] = None
+
+    def fake_get(url, timeout):
+        if url.endswith("/getMe"):
+            return _FakeResponse(
+                status_code=200,
+                json_payload={"ok": True, "result": {"username": "SapphirePMBot", "id": 123}},
+            )
+        return _FakeResponse(
+            status_code=200,
+            json_payload={
+                "ok": True,
+                "result": {
+                    "url": "https://other.example/telegram/webhook",
+                    "pending_update_count": 0,
+                    "allowed_updates": ["message"],
+                },
+            },
+        )
+
+    monkeypatch.setattr(server.requests, "get", fake_get)
+
+    result = server._telegram_runtime_probe()
+
+    assert result["webhook_registered"] is True
+    assert result["webhook_url_configured"] is True
+    assert result["webhook_url_matches_expected"] is False
+    assert result["delivery_ready"] is False
+    assert result["delivery_mode_reason"] == "webhook_url_mismatch"
 
 
 def test_health_endpoint_full_shape_default_state(monkeypatch, tmp_path, reload_server):

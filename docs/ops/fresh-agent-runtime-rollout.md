@@ -69,6 +69,29 @@ The queue is still no-send. Callback updates do not call
 `answerCallbackQuery`, inline queries do not call `answerInlineQuery`, and no
 non-command route calls `sendMessage`.
 
+## PM Bot Webhook Readiness
+
+Webhook registration is now plan-first and explicit-apply:
+
+```bash
+python3 scripts/ops/pm_bot_webhook_readiness.py \
+  --url "https://YOUR-PUBLIC-URL/telegram/webhook" \
+  --json
+```
+
+The dry-run plan prints the Bot API `setWebhook` payload shape without secret
+material and without calling Telegram. To apply, the operator must pass
+`--apply` and set `SAPPHIRE_PM_BOT_REGISTER_WEBHOOK_APPLY=1`.
+
+Set `SAPPHIRE_PM_BOT_WEBHOOK_URL` once a public URL is chosen. PM bot health
+then distinguishes:
+
+- `webhook_missing`
+- `webhook_url_mismatch`
+- `webhook_registered`
+
+This prevents a stale webhook URL from looking group-ready.
+
 ## Kimi Handoff
 
-Kimi Claw should treat this file and `config/agent_runtime_next.yaml` as the new runtime baseline. The next PR should integrate PM bot webhook handling with the draft queue behind dry-run flags only. Kimi should not run a long-poller, hold the Telegram bot token, send Telegram messages, or revive deprecated local gateway services.
+Kimi Claw should treat this file and `config/agent_runtime_next.yaml` as the new runtime baseline. The webhook readiness lane is owned here; Kimi should avoid duplicating it and can focus on source adapters such as GDELT from fresh `origin/main`. Kimi should not run a long-poller, hold the Telegram bot token, send Telegram messages, or revive deprecated local gateway services.
