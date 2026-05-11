@@ -31,6 +31,15 @@ ALLOWED_TELEGRAM_PROCESS_RE = re.compile(r"^Telegram\s+")
 EXPECTED_PM_DRAFT_QUEUE = str(
     Path.home() / ".cache" / "sapphire" / "telegram" / "pm_bot_drafts.jsonl"
 )
+DEFAULT_NOTIFY_TOOL_PATH = (
+    Path.home() / "Code" / "Sapphire" / "plugins" / "claw-sapphire" / "tools" / "notify.py"
+)
+LEGACY_NOTIFY_CALLER_LABELS = {
+    "com.sapphire.heartbeat",
+    "com.sapphire.morning-brief",
+    "com.sapphire.security-pipeline",
+    "com.sapphire.service-supervisor",
+}
 
 
 @dataclass(frozen=True)
@@ -131,6 +140,21 @@ def load_json_url(url: str, *, timeout: float = 2.0) -> tuple[dict[str, Any] | N
         return None, f"{type(exc).__name__}: {exc}"
 
 
+def notify_tool_defaults_to_drafts(path: Path | str) -> tuple[bool | None, str | None]:
+    """Return whether the runtime notify tool defaults to local PM bot drafts."""
+    target = Path(path).expanduser()
+    try:
+        source = target.read_text(encoding="utf-8")
+    except OSError as exc:
+        return None, f"{type(exc).__name__}: {exc}"
+    return (
+        "SAPPHIRE_NOTIFY_TELEGRAM_LIVE" in source
+        and "build_draft" in source
+        and "external_side_effect" in source,
+        None,
+    )
+
+
 def build_report(
     *,
     launch_agents: dict[str, dict[str, str | int | None]],
@@ -142,6 +166,8 @@ def build_report(
     inference_error: str | None,
     soc_launch_env: dict[str, str] | None = None,
     soc_launch_error: str | None = None,
+    notify_tool_draft_default: bool | None = None,
+    notify_tool_error: str | None = None,
 ) -> dict[str, Any]:
     """Build a sanitized Telegram sender ownership report."""
     checks: list[dict[str, Any]] = []
@@ -170,6 +196,26 @@ def build_report(
                 "loaded": bool(healthz),
                 "pid": healthz.get("pid") if healthz else None,
                 "disabled": "com.sapphire.healthz-watcher" in disabled_labels,
+            },
+        )
+    )
+
+    active_legacy_notify_callers = sorted(
+        label
+        for label in LEGACY_NOTIFY_CALLER_LABELS
+        if launch_agents.get(label) and label not in disabled_labels
+    )
+    notify_safe = notify_tool_draft_default is True
+    checks.append(
+        _check(
+            "legacy_notify_callers_paused_or_draft_safe",
+            "fail" if active_legacy_notify_callers and not notify_safe else "ok",
+            "Legacy scheduled notify callers must be disabled until notify.py defaults to PM bot drafts.",
+            {
+                "active_callers": active_legacy_notify_callers,
+                "disabled_callers": sorted(LEGACY_NOTIFY_CALLER_LABELS & disabled_labels),
+                "notify_tool_draft_default": notify_tool_draft_default,
+                "notify_tool_error": notify_tool_error,
             },
         )
     )
@@ -302,12 +348,14 @@ def collect_report(
     pm_bot_ownership_url: str,
     inference_status_url: str,
     include_lsof: bool,
+    notify_tool_path: Path | str,
 ) -> dict[str, Any]:
     launch_agents: dict[str, dict[str, str | int | None]] = {}
     disabled_labels: set[str] = set()
     telegram_socket_offenders: list[str] = []
     soc_launch_env: dict[str, str] | None = None
     soc_launch_error: str | None = None
+    notify_tool_draft_default, notify_tool_error = notify_tool_defaults_to_drafts(notify_tool_path)
 
     if platform.system() == "Darwin":
         launch = run_command(["launchctl", "list"])
@@ -344,6 +392,8 @@ def collect_report(
         inference_error=inference_error,
         soc_launch_env=soc_launch_env,
         soc_launch_error=soc_launch_error,
+        notify_tool_draft_default=notify_tool_draft_default,
+        notify_tool_error=notify_tool_error,
     )
 
 
@@ -365,6 +415,11 @@ def format_markdown(report: dict[str, Any]) -> str:
             detail += (
                 f" live_enabled={data.get('live_telegram_enabled')} "
                 f"queue_enabled={data.get('draft_queue_enabled')}"
+            )
+        elif check["name"] == "legacy_notify_callers_paused_or_draft_safe":
+            detail += (
+                f" active={data.get('active_callers')} "
+                f"notify_draft_default={data.get('notify_tool_draft_default')}"
             )
         elif check["name"] == "non_desktop_telegram_sockets_absent":
             detail += f" offenders={data.get('offender_count')}"
@@ -412,12 +467,17 @@ def main(argv: list[str] | None = None) -> int:
         "--inference-status-url",
         default="http://127.0.0.1:11435/failover/status",
     )
+    parser.add_argument(
+        "--notify-tool-path",
+        default=str(DEFAULT_NOTIFY_TOOL_PATH),
+    )
     args = parser.parse_args(argv)
 
     report = collect_report(
         pm_bot_ownership_url=args.pm_bot_ownership_url,
         inference_status_url=args.inference_status_url,
         include_lsof=not args.no_lsof,
+        notify_tool_path=args.notify_tool_path,
     )
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))

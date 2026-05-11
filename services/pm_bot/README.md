@@ -53,9 +53,10 @@ Optional:
     Sapphire Telegram token because it competes with Hermes or webhook consumers.
 - `SAPPHIRE_PM_BOT_HOST=127.0.0.1`
 - `SAPPHIRE_PM_BOT_PORT=18082`
-- `SAPPHIRE_PM_BOT_PROBE_TIMEOUT_SECONDS=2`
+- `SAPPHIRE_PM_BOT_PROBE_TIMEOUT_SECONDS=25`
   - Dedicated timeout for read-only `getMe` / `getWebhookInfo` health probes.
-    Keep this short so local `/health` remains responsive when Telegram is slow.
+    The LaunchAgent uses a wider timeout so slow Telegram API responses do not
+    create false delivery alarms; local development can keep the code default.
 - `THO_API_BASE_URL=https://project-go-forward-trgi34bxuq-uc.a.run.app`
 - `THO_FIRESTORE_PROJECT=tho-ai-agent`
 - `SAPPHIRE_PM_BOT_DEFAULT_PROJECT_ID=<firestore-project-id>`

@@ -44,7 +44,7 @@
         <key>SAPPHIRE_PM_BOT_AGENTIC_DRY_RUN</key>
         <string>1</string>
         <key>SAPPHIRE_PM_BOT_PROBE_TIMEOUT_SECONDS</key>
-        <string>8</string>
+        <string>25</string>
     </dict>
 </dict>
 </plist>

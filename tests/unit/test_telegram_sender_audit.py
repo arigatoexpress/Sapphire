@@ -67,6 +67,18 @@ Python   80654 aribs 16u IPv4 0x2 0t0 TCP 10.2.0.2:56123->149.154.166.110:443 (E
     ]
 
 
+def test_notify_tool_defaults_to_drafts_detects_safe_wrapper(tmp_path):
+    notify_path = tmp_path / "notify.py"
+    notify_path.write_text(
+        "SAPPHIRE_NOTIFY_TELEGRAM_LIVE = '0'\n"
+        "from lib.telegram.draft_queue import build_draft\n"
+        "metadata = {'external_side_effect': False}\n",
+        encoding="utf-8",
+    )
+
+    assert audit.notify_tool_defaults_to_drafts(notify_path) == (True, None)
+
+
 def test_build_report_fails_legacy_sender_paths():
     report = audit.build_report(
         launch_agents={
@@ -81,6 +93,11 @@ def test_build_report_fails_legacy_sender_paths():
                 "pid": 58438,
                 "status": -15,
                 "label": "com.sapphire.soc-dashboard",
+            },
+            "com.sapphire.heartbeat": {
+                "pid": 44600,
+                "status": 0,
+                "label": "com.sapphire.heartbeat",
             },
         },
         disabled_labels=set(),
@@ -105,6 +122,7 @@ def test_build_report_fails_legacy_sender_paths():
             "SOC_ALERT_DRAFT_QUEUE_ENABLED": "1",
             "SOC_ALERT_DRAFT_QUEUE_PATH": audit.EXPECTED_PM_DRAFT_QUEUE,
         },
+        notify_tool_draft_default=False,
     )
 
     assert report["status"] == "fail"
@@ -112,6 +130,7 @@ def test_build_report_fails_legacy_sender_paths():
     assert failed == {
         "hermes_gateway_polling_disabled",
         "healthz_watcher_direct_send_paused",
+        "legacy_notify_callers_paused_or_draft_safe",
         "soc_dashboard_alerts_routed_to_pm_drafts",
         "inference_telegram_relay_disabled",
         "non_desktop_telegram_sockets_absent",
@@ -132,8 +151,13 @@ def test_build_report_passes_quiet_rollout_posture():
                 "status": -15,
                 "label": "com.sapphire.soc-dashboard",
             },
+            "com.sapphire.heartbeat": {
+                "pid": 44600,
+                "status": 0,
+                "label": "com.sapphire.heartbeat",
+            },
         },
-        disabled_labels={"ai.hermes.gateway"},
+        disabled_labels={"ai.hermes.gateway", "com.sapphire.heartbeat"},
         telegram_socket_offenders=[],
         pm_bot_ownership={
             "mode": "webhook",
@@ -155,6 +179,7 @@ def test_build_report_passes_quiet_rollout_posture():
             "SOC_ALERT_DRAFT_QUEUE_ENABLED": "1",
             "SOC_ALERT_DRAFT_QUEUE_PATH": audit.EXPECTED_PM_DRAFT_QUEUE,
         },
+        notify_tool_draft_default=False,
     )
 
     assert report["status"] == "ok"
