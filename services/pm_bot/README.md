@@ -114,6 +114,9 @@ The service routes this full Bot API update surface through
 `lib.telegram.agent_router`. Only `command` routes can call `sendMessage`; all
 other routes are accepted as no-send router decisions and queued as local
 dry-run draft/event records when `SAPPHIRE_PM_BOT_DRAFT_QUEUE_ENABLED` is true.
+The legacy `plugins/claw-sapphire/tools/notify.py` wrapper also writes to this
+same local draft queue by default; it only performs live Bot API sends when
+`SAPPHIRE_NOTIFY_TELEGRAM_LIVE=1` is set for an explicit operator window.
 
 Set `SAPPHIRE_PM_BOT_WEBHOOK_URL` on the runtime once a public URL is chosen.
 Health then treats a different registered webhook as `webhook_url_mismatch`
