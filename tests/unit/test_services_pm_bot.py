@@ -328,6 +328,84 @@ def test_process_update_accepts_message_reaction_count_dry_run_without_sending(
     assert server.process_update(update) is True
 
 
+def test_process_update_blocks_high_risk_callback_without_sending(reload_server, monkeypatch):
+    server = reload_server()
+
+    def fail_send(**_kwargs):
+        raise AssertionError("blocked callback must not send Telegram messages")
+
+    monkeypatch.setattr(server.TELEGRAM_API, "send_message", fail_send)
+
+    update = {
+        "update_id": 504,
+        "callback_query": {
+            "id": "callback-2",
+            "from": {"id": 123},
+            "data": "trade:BTC:long",
+            "message": {"message_id": 77, "chat": {"id": -1001}},
+        },
+    }
+
+    assert server.process_update(update) is True
+
+
+def test_process_update_accepts_guest_message_as_no_send_draft_route(reload_server, monkeypatch):
+    server = reload_server()
+
+    def fail_send(**_kwargs):
+        raise AssertionError("guest message draft route must not send Telegram messages")
+
+    monkeypatch.setattr(server.TELEGRAM_API, "send_message", fail_send)
+
+    update = {
+        "update_id": 505,
+        "guest_message": {
+            "chat": {"id": -1001},
+            "guest_query_id": "guest-1",
+            "text": "what changed?",
+        },
+    }
+
+    assert server.process_update(update) is True
+
+
+def test_process_update_blocks_payment_update_without_sending(reload_server, monkeypatch):
+    server = reload_server()
+
+    def fail_send(**_kwargs):
+        raise AssertionError("payment update must not send Telegram messages")
+
+    monkeypatch.setattr(server.TELEGRAM_API, "send_message", fail_send)
+
+    update = {
+        "update_id": 506,
+        "pre_checkout_query": {"id": "pcq-1", "from": {"id": 123}},
+    }
+
+    assert server.process_update(update) is True
+
+
+def test_process_update_ignores_unknown_callback_without_sending(reload_server, monkeypatch):
+    server = reload_server()
+
+    def fail_send(**_kwargs):
+        raise AssertionError("unknown callback must not send Telegram messages")
+
+    monkeypatch.setattr(server.TELEGRAM_API, "send_message", fail_send)
+
+    update = {
+        "update_id": 507,
+        "callback_query": {
+            "id": "callback-3",
+            "from": {"id": 123},
+            "data": "unknown:payload",
+            "message": {"message_id": 77, "chat": {"id": -1001}},
+        },
+    }
+
+    assert server.process_update(update) is False
+
+
 # ---------------------------------------------------------------------------
 # TelegramAPI._post error mapping
 # ---------------------------------------------------------------------------
@@ -508,15 +586,7 @@ def test_telegram_get_updates_requests_supported_update_types(reload_server, mon
 
     server.TELEGRAM_API.get_updates(offset=5)
 
-    assert captured["json"]["allowed_updates"] == [
-        "message",
-        "edited_message",
-        "channel_post",
-        "edited_channel_post",
-        "callback_query",
-        "message_reaction",
-        "message_reaction_count",
-    ]
+    assert captured["json"]["allowed_updates"] == server._SUPPORTED_UPDATE_TYPES
 
 
 def test_telegram_get_updates_returns_empty_when_result_not_list(reload_server, monkeypatch):
@@ -824,15 +894,7 @@ def test_health_endpoint_full_shape_default_state(monkeypatch, tmp_path, reload_
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["supported_update_types"] == [
-        "message",
-        "edited_message",
-        "channel_post",
-        "edited_channel_post",
-        "callback_query",
-        "message_reaction",
-        "message_reaction_count",
-    ]
+    assert payload["supported_update_types"] == server._SUPPORTED_UPDATE_TYPES
     body = response.json()
     assert body["status"] == "degraded"
     assert body["service"] == "sapphire-pm-bot"

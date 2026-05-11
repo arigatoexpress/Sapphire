@@ -20,10 +20,14 @@ from fastapi import FastAPI, HTTPException, Request
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TOOL_DIR = REPO_ROOT / "plugins" / "claw-sapphire" / "tools"
 
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 if str(TOOL_DIR) not in sys.path:
     sys.path.insert(0, str(TOOL_DIR))
 
 import sapphire_pm_bot
+
+from lib.telegram.agent_router import SUPPORTED_UPDATE_TYPES, RouterDecision, route_update
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
@@ -59,20 +63,7 @@ _WEBHOOK_SECRET_PATHS = [
 _TRUE_VALUES = {"1", "true", "yes", "on"}
 _DEDICATED_TOKEN_SOURCES = {"explicit_env"}
 _SHARED_TOKEN_SOURCES = {"shared_env", "shared_secret_file", "legacy_secret_file", "secret_file"}
-_SUPPORTED_UPDATE_TYPES = [
-    "message",
-    "edited_message",
-    "channel_post",
-    "edited_channel_post",
-    "callback_query",
-    "message_reaction",
-    "message_reaction_count",
-]
-_DRY_RUN_CONTROL_UPDATE_TYPES = {
-    "callback_query",
-    "message_reaction",
-    "message_reaction_count",
-}
+_SUPPORTED_UPDATE_TYPES = list(SUPPORTED_UPDATE_TYPES)
 
 
 def _read_first_secret_file(paths: list[Path]) -> str:
@@ -377,42 +368,27 @@ def _message_payload(update: dict[str, Any]) -> dict[str, Any]:
     return update
 
 
-def _control_update_payload(update: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
-    """Return a supported non-message Telegram update, if present.
+def _process_router_decision_no_send(decision: RouterDecision) -> bool:
+    """Log and accept non-command router decisions without external side effects."""
 
-    Callback and reaction updates are intentionally dry-run in this service
-    slice. Recognizing them lets the webhook/polling layer prove routing
-    coverage without sending acknowledgements, posting Telegram replies, or
-    mutating draft state before the agent router exists.
-    """
-
-    for key in _DRY_RUN_CONTROL_UPDATE_TYPES:
-        payload = update.get(key)
-        if isinstance(payload, dict):
-            return key, payload
-    return None
-
-
-def _process_control_update_dry_run(update_type: str, payload: dict[str, Any]) -> bool:
-    """Log and accept callback/reaction updates without external side effects."""
-
+    context = decision.context
     update_hint = {
-        "type": update_type,
-        "id": payload.get("id"),
-        "data": payload.get("data"),
-        "message_id": payload.get("message_id"),
+        "route": decision.route,
+        "action": decision.action,
+        "reason": decision.reason,
+        "update_type": context.update_type,
+        "update_id": context.update_id,
+        "chat_id": context.chat_id,
+        "message_id": context.message_id,
+        "message_thread_id": context.message_thread_id,
+        "direct_messages_topic_id": context.direct_messages_topic_id,
+        "draft_id": decision.draft_id,
+        "source_id": decision.source_id,
+        "requires_confirmation": decision.requires_confirmation,
+        "external_side_effect": decision.external_side_effect,
     }
-    message = payload.get("message")
-    if isinstance(message, dict):
-        update_hint["message_id"] = message.get("message_id", update_hint["message_id"])
-        chat = message.get("chat")
-        if isinstance(chat, dict):
-            update_hint["chat_id"] = chat.get("id")
-    chat = payload.get("chat")
-    if isinstance(chat, dict):
-        update_hint["chat_id"] = chat.get("id", update_hint.get("chat_id"))
     logger.info(
-        "Dry-run accepted Telegram control update: %s",
+        "Router accepted Telegram update with no external side effects: %s",
         _redact_sensitive_text(update_hint),
     )
     return True
@@ -501,10 +477,22 @@ def process_update(update: dict[str, Any]) -> bool:
         logger.info("Ignoring duplicate Telegram update_id=%s", update.get("update_id"))
         return False
 
-    control_update = _control_update_payload(update)
-    if control_update is not None:
-        update_type, payload = control_update
-        return _process_control_update_dry_run(update_type, payload)
+    decision = route_update(update)
+    if decision.route == "ignore":
+        logger.info(
+            "Router ignored Telegram update: %s",
+            _redact_sensitive_text(
+                {
+                    "action": decision.action,
+                    "reason": decision.reason,
+                    "update_type": decision.context.update_type,
+                    "update_id": decision.context.update_id,
+                }
+            ),
+        )
+        return False
+    if decision.route != "command":
+        return _process_router_decision_no_send(decision)
 
     message = _message_payload(update)
     if not isinstance(message, dict):
