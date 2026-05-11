@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-pytestmark = pytest.mark.skipif(sys.platform == 'win32', reason='Unix only (getuid)')
+pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="Unix only (getuid)")
 
 from lib.core import heartbeat as hb
 

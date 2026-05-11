@@ -52,9 +52,7 @@ POLISHED_PAGES = [
 @pytest.mark.parametrize("path,_label", POLISHED_PAGES)
 def test_polished_page_renders_200(client, path, _label):
     response = client.get(path, headers=_auth_header())
-    assert response.status_code == 200, (
-        f"{path} returned {response.status_code} — expected 200"
-    )
+    assert response.status_code == 200, f"{path} returned {response.status_code} — expected 200"
 
 
 @pytest.mark.parametrize("path,_label", POLISHED_PAGES)
@@ -89,9 +87,7 @@ def test_polished_page_has_safety_badge(client, path, _label):
 
 def test_base_template_defines_polish_tokens():
     """The shared design tokens live in base.html so every page can opt in."""
-    base = (ROOT / "services" / "dashboard" / "templates" / "base.html").read_text(
-        encoding="utf-8"
-    )
+    base = (ROOT / "services" / "dashboard" / "templates" / "base.html").read_text(encoding="utf-8")
     assert ".panel-headline" in base
     assert "details.tech-disclosure" in base
     assert ".safety-badge" in base

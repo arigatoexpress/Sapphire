@@ -428,9 +428,7 @@ def explain_forecast(
         if len(long_text) > 400:
             long_text = long_text[:397].rstrip() + "..."
     else:
-        long_text = (
-            f"No Kronos or TA data available for {sym}; consensus={pretty_consensus}."
-        )
+        long_text = f"No Kronos or TA data available for {sym}; consensus={pretty_consensus}."
 
     show_math = {
         "raw_edge_score": row.get("edge_score"),
