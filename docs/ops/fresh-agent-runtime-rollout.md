@@ -40,6 +40,35 @@ Expected result after local setup:
 - Google ADK installed or explicitly marked pending
 - PM bot and draft queue remain the only Telegram path for future sends
 
+## PM Bot Draft Queue
+
+Agentic Telegram update types now leave local dry-run records instead of
+disappearing into logs:
+
+- callback queries
+- message reactions and reaction counts
+- guest and business messages
+- inline queries
+- blocked payment or high-risk callback updates
+
+Default queue path:
+
+```bash
+~/.cache/sapphire/telegram/pm_bot_drafts.jsonl
+```
+
+Runtime overrides:
+
+```bash
+SAPPHIRE_PM_BOT_DRAFT_QUEUE_PATH=/path/to/pm_bot_drafts.jsonl
+SAPPHIRE_PM_BOT_DRAFT_QUEUE_ENABLED=1
+SAPPHIRE_PM_BOT_AGENTIC_DRY_RUN=1
+```
+
+The queue is still no-send. Callback updates do not call
+`answerCallbackQuery`, inline queries do not call `answerInlineQuery`, and no
+non-command route calls `sendMessage`.
+
 ## Kimi Handoff
 
 Kimi Claw should treat this file and `config/agent_runtime_next.yaml` as the new runtime baseline. The next PR should integrate PM bot webhook handling with the draft queue behind dry-run flags only. Kimi should not run a long-poller, hold the Telegram bot token, send Telegram messages, or revive deprecated local gateway services.

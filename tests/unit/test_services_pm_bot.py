@@ -48,7 +48,11 @@ def reload_server(monkeypatch):
     monkeypatch.delenv("MODE", raising=False)
     monkeypatch.delenv("SAPPHIRE_PM_BOT_ALLOW_SHARED_POLLING", raising=False)
     monkeypatch.delenv("SAPPHIRE_PM_BOT_PROBE_TIMEOUT_SECONDS", raising=False)
+    monkeypatch.delenv("SAPPHIRE_PM_BOT_DRAFT_QUEUE_PATH", raising=False)
+    monkeypatch.delenv("SAPPHIRE_PM_BOT_DRAFT_QUEUE_ENABLED", raising=False)
+    monkeypatch.delenv("SAPPHIRE_PM_BOT_AGENTIC_DRY_RUN", raising=False)
     monkeypatch.setenv("SAPPHIRE_PM_BOT_TOKEN", "test-token-default")
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_DRAFT_QUEUE_ENABLED", "0")
 
     sys.modules.pop("server", None)
 
@@ -280,6 +284,39 @@ def test_process_update_accepts_callback_query_dry_run_without_sending(reload_se
     assert server.process_update(update) is True
 
 
+def test_process_update_queues_callback_dry_run_draft(reload_server, monkeypatch, tmp_path):
+    draft_queue_path = tmp_path / "pm_bot_drafts.jsonl"
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_DRAFT_QUEUE_ENABLED", "1")
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_DRAFT_QUEUE_PATH", str(draft_queue_path))
+    server = reload_server()
+
+    def fail_send(**_kwargs):
+        raise AssertionError("callback dry-run must not send Telegram messages")
+
+    monkeypatch.setattr(server.TELEGRAM_API, "send_message", fail_send)
+
+    update = {
+        "update_id": 601,
+        "callback_query": {
+            "id": "callback-1",
+            "from": {"id": 123, "username": "ari"},
+            "data": "draft:approve:abc123",
+            "message": {"message_id": 77, "chat": {"id": -1001}},
+        },
+    }
+
+    assert server.process_update(update) is True
+    from lib.telegram.draft_queue import read_drafts
+
+    drafts = read_drafts(draft_queue_path)
+    assert len(drafts) == 1
+    assert drafts[0].kind == "draft_callback"
+    assert drafts[0].status == "pending_confirmation"
+    assert drafts[0].target_chat_id == -1001
+    assert drafts[0].metadata["action"] == "approve"
+    assert drafts[0].metadata["draft_id"] == "abc123"
+
+
 def test_process_update_accepts_message_reaction_dry_run_without_sending(
     reload_server, monkeypatch
 ):
@@ -303,6 +340,40 @@ def test_process_update_accepts_message_reaction_dry_run_without_sending(
     }
 
     assert server.process_update(update) is True
+
+
+def test_process_update_queues_reaction_feedback_draft(reload_server, monkeypatch, tmp_path):
+    draft_queue_path = tmp_path / "pm_bot_drafts.jsonl"
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_DRAFT_QUEUE_ENABLED", "1")
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_DRAFT_QUEUE_PATH", str(draft_queue_path))
+    server = reload_server()
+
+    def fail_send(**_kwargs):
+        raise AssertionError("reaction dry-run must not send Telegram messages")
+
+    monkeypatch.setattr(server.TELEGRAM_API, "send_message", fail_send)
+
+    update = {
+        "update_id": 602,
+        "message_reaction": {
+            "chat": {"id": -1001},
+            "message_id": 88,
+            "date": 1_779_000_000,
+            "old_reaction": [],
+            "new_reaction": [{"type": "emoji", "emoji": "👍"}],
+            "user": {"id": 123},
+        },
+    }
+
+    assert server.process_update(update) is True
+    from lib.telegram.draft_queue import read_drafts
+
+    drafts = read_drafts(draft_queue_path)
+    assert len(drafts) == 1
+    assert drafts[0].kind == "feedback_signal"
+    assert drafts[0].requires_confirmation is False
+    assert drafts[0].metadata["route"] == "feedback"
+    assert drafts[0].metadata["external_side_effect"] is False
 
 
 def test_process_update_accepts_message_reaction_count_dry_run_without_sending(
@@ -349,6 +420,39 @@ def test_process_update_blocks_high_risk_callback_without_sending(reload_server,
     assert server.process_update(update) is True
 
 
+def test_process_update_queues_blocked_callback_for_manual_review(
+    reload_server, monkeypatch, tmp_path
+):
+    draft_queue_path = tmp_path / "pm_bot_drafts.jsonl"
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_DRAFT_QUEUE_ENABLED", "1")
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_DRAFT_QUEUE_PATH", str(draft_queue_path))
+    server = reload_server()
+
+    def fail_send(**_kwargs):
+        raise AssertionError("blocked callback must not send Telegram messages")
+
+    monkeypatch.setattr(server.TELEGRAM_API, "send_message", fail_send)
+
+    update = {
+        "update_id": 603,
+        "callback_query": {
+            "id": "callback-2",
+            "from": {"id": 123},
+            "data": "trade:BTC:long",
+            "message": {"message_id": 77, "chat": {"id": -1001}},
+        },
+    }
+
+    assert server.process_update(update) is True
+    from lib.telegram.draft_queue import read_drafts
+
+    drafts = read_drafts(draft_queue_path)
+    assert len(drafts) == 1
+    assert drafts[0].kind == "blocked_update"
+    assert drafts[0].status == "pending_confirmation"
+    assert "No external action" in drafts[0].body
+
+
 def test_process_update_accepts_guest_message_as_no_send_draft_route(reload_server, monkeypatch):
     server = reload_server()
 
@@ -367,6 +471,37 @@ def test_process_update_accepts_guest_message_as_no_send_draft_route(reload_serv
     }
 
     assert server.process_update(update) is True
+
+
+def test_process_update_queues_guest_message_reply_draft(reload_server, monkeypatch, tmp_path):
+    draft_queue_path = tmp_path / "pm_bot_drafts.jsonl"
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_DRAFT_QUEUE_ENABLED", "1")
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_DRAFT_QUEUE_PATH", str(draft_queue_path))
+    server = reload_server()
+
+    def fail_send(**_kwargs):
+        raise AssertionError("guest message draft route must not send Telegram messages")
+
+    monkeypatch.setattr(server.TELEGRAM_API, "send_message", fail_send)
+
+    update = {
+        "update_id": 604,
+        "guest_message": {
+            "chat": {"id": -1001},
+            "guest_query_id": "guest-1",
+            "text": "what changed?",
+        },
+    }
+
+    assert server.process_update(update) is True
+    from lib.telegram.draft_queue import read_drafts
+
+    drafts = read_drafts(draft_queue_path)
+    assert len(drafts) == 1
+    assert drafts[0].kind == "guarded_reply"
+    assert drafts[0].topic == "drafts"
+    assert drafts[0].status == "pending_confirmation"
+    assert "what changed?" in drafts[0].body
 
 
 def test_process_update_blocks_payment_update_without_sending(reload_server, monkeypatch):
