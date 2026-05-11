@@ -80,13 +80,13 @@ def reset_health_and_metrics(app_module, monkeypatch, tmp_path):
 
 
 class TestModelAliases:
-    def test_fast_resolves_to_nemotron_mini(self, app_module):
-        assert app_module.MODEL_TIERS["fast"] == "nemotron-mini:4b"
-        assert app_module.MODEL_TIERS["quick"] == "nemotron-mini:4b"
+    def test_fast_resolves_to_fresh_local_fallback(self, app_module):
+        assert app_module.MODEL_TIERS["fast"] == "gemma4:latest"
+        assert app_module.MODEL_TIERS["quick"] == "gemma4:latest"
 
-    def test_auto_and_balanced_resolve_to_hermes3(self, app_module):
-        assert app_module.MODEL_TIERS["auto"] == "hermes3:8b"
-        assert app_module.MODEL_TIERS["balanced"] == "hermes3:8b"
+    def test_auto_and_balanced_resolve_to_gemma4(self, app_module):
+        assert app_module.MODEL_TIERS["auto"] == "gemma4:latest"
+        assert app_module.MODEL_TIERS["balanced"] == "gemma4:latest"
 
     def test_kimi_aliases_resolve_to_kimi_cloud(self, app_module):
         for alias in ("kimi", "kimi-fast", "kimi-large", "kimi-cloud", "cloud", "research"):
@@ -95,6 +95,7 @@ class TestModelAliases:
     def test_code_alias_resolves_to_gemma4(self, app_module):
         assert app_module.MODEL_TIERS["code"] == "gemma4:latest"
         assert app_module.MODEL_TIERS["fast-code"] == "gemma4:latest"
+        assert app_module.MODEL_TIERS["local-fallback"] == "gemma4:latest"
 
     def test_reason_alias_resolves_to_deepseek_r1(self, app_module):
         assert app_module.MODEL_TIERS["reason"] == "deepseek-r1:14b"
@@ -115,7 +116,8 @@ class TestTierMembership:
         # smaller tiers.
         assert "deepseek-r1:14b" in app_module.GPU_ONLY_MODELS
         assert "qwen2.5:32b" in app_module.GPU_ONLY_MODELS
-        assert "gemma4:latest" in app_module.GPU_ONLY_MODELS
+        assert "gemma4:latest" not in app_module.GPU_ONLY_MODELS
+        assert "gemma4:latest" in app_module.MAC_MODELS
         assert "nemotron-cascade-2" in app_module.GPU_ONLY_MODELS
 
     def test_pi_serve_models_subset(self, app_module):
@@ -129,6 +131,7 @@ class TestTierMembership:
         # Models on Mac that aren't Pi-serveable should be preferred on Mac
         # rather than substituted to PI_DEFAULT_MODEL.
         assert "hermes3:8b" in app_module.MAC_EXACT_FALLBACK_MODELS
+        assert "gemma4:latest" in app_module.MAC_EXACT_FALLBACK_MODELS
         assert "nemotron-mini" in app_module.MAC_EXACT_FALLBACK_MODELS
         assert "nemotron-mini:4b" in app_module.MAC_EXACT_FALLBACK_MODELS
         # Pi-serveable models should NOT be in the exact-fallback set.
@@ -142,6 +145,7 @@ class TestTierMembership:
     def test_select_mac_model_preserves_nemotron_alias(self, app_module):
         assert app_module._select_mac_model("nemotron-mini") == "nemotron-mini:latest"
         assert app_module._select_mac_model("nemotron-mini:4b") == "nemotron-mini:latest"
+        assert app_module._select_mac_model("gemma4:latest") == "gemma4:latest"
         assert app_module._select_mac_model("qwen3.6:27b") == "qwen3.6:27b"
 
     def test_enabled_pi_targets_respects_flags(self, app_module, monkeypatch):

@@ -1,0 +1,90 @@
+schema_version: 1
+updated_at: "2026-05-11"
+purpose: "Fresh Sapphire agent runtime profile: Kimi/Gemini first, PM bot single-ingress, local models as explicit fallback only."
+
+policy:
+  telegram_send_default: draft_only
+  bot_api_ingress_owner: sapphire_pm_bot
+  no_second_telegram_poller: true
+  no_public_or_customer_sends: true
+  no_live_trading_or_money_movement: true
+  local_inference_default: fallback_only
+  deprecated_runtime_action: quarantined_not_deleted
+
+harnesses:
+  - id: google_adk
+    provider: google
+    package: google-adk
+    status: recommended
+    use: "GCP-native multi-agent harness for Vertex Agent Engine deploys, evals, tool routing, and Gemini model access."
+    env_contract:
+      - GOOGLE_GENAI_USE_VERTEXAI
+      - GOOGLE_CLOUD_PROJECT
+      - GOOGLE_CLOUD_LOCATION
+    safety: "Optional harness; no live deploys or external sends without an explicit operator confirmation flow."
+  - id: sapphire_pm_bot_router
+    provider: sapphire
+    package: internal
+    status: required
+    use: "Single Telegram Bot API ingress owner for updates, draft confirmation, and no-send dry-run paths."
+    safety: "Must not run alongside another long-poller for the same bot token."
+  - id: telegram_draft_queue
+    provider: sapphire
+    package: internal
+    status: required
+    use: "Local provenance-backed queue for proposed Telegram output before Ari confirms any send."
+    safety: "Draft-only until the PM bot confirmation firewall is live."
+
+model_lanes:
+  - id: kimi_operator
+    provider: kimi
+    recommended_model: kimi-k2.6
+    fallback_model: kimi-k2.5
+    default: true
+    use: "Long-context operator work, codebase surveys, Telegram group coordination, and Kimi Claw handoffs."
+    runtime: hosted
+    safety: "May draft actions and status, but must not send Telegram messages or mutate production state directly."
+  - id: gemini_structured_triage
+    provider: google_vertex
+    recommended_model: gemini-2.5-flash
+    preview_model: gemini-3-flash-preview
+    default: true
+    use: "Extraction, clustering, source ranking, duplicate detection, and JSON digest shaping."
+    runtime: hosted
+    safety: "Structured output only; no external sends, trading, or state-changing tools."
+  - id: gemini_deep_research
+    provider: google_vertex
+    recommended_model: gemini-2.5-pro
+    preview_model: gemini-3.1-pro-preview
+    default: true
+    use: "Cited synthesis, research briefs, source-quality postmortems, and eval rubrics."
+    runtime: hosted
+    safety: "Research context only; never personalized financial advice or execution instructions."
+  - id: local_sensitive_fallback
+    provider: ollama
+    recommended_model: gemma4:latest
+    fallback_model: qwen3.6:27b
+    default: false
+    use: "Sensitive local fallback when hosted Kimi/Gemini paths are inappropriate or unavailable."
+    runtime: mac_local
+    safety: "Fallback-only; not the default agentic Telegram reasoning path."
+
+deprecated_runtimes:
+  - label: ai.hermes.gateway
+    expected_state: disabled
+    reason: "Deprecated Telegram responder; PM bot owns ingress."
+  - label: ai.openclaw.gateway
+    expected_state: disabled
+    reason: "Deprecated local gateway; Kimi Claw bridge uses repo/PM bot handoff surfaces."
+  - label: com.sapphire.healthz-watcher
+    expected_state: disabled
+    reason: "Legacy direct-send health watcher; PM bot draft queue should own notifications."
+  - label: com.sapphire.mac-to-windows-tunnel
+    expected_state: disabled
+    reason: "Windows inference path is no longer a default dependency for new agentic Telegram work."
+
+deprecated_default_models:
+  - model: nemotron-mini:4b
+    reason: "Stale fast-path default that repeatedly produced mock/stale operational output."
+  - model: hermes3:8b
+    reason: "Deprecated Telegram-era default; still compatible as an explicit model only."

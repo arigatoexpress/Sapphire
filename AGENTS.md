@@ -11,7 +11,7 @@ into something stronger.
 
 The current useful materials include:
 
-- A 4-tier inference mesh (Windows RTX 5070 Ti → Pi cluster → Mac Ollama → Kimi cloud)
+- A Kimi/Gemini-first agent runtime with Mac Ollama fallback for sensitive/offline work
 - A `claw-sapphire` plugin with 19 tools exposed to the `claw-code` runtime
 - 19 scheduled tasks running 24/7 on the Mac (morning briefing, threat intel, factory, trading research, etc.)
 - A Telegram-first PM bot (`services/pm_bot/`) for operational commands on the go
@@ -42,7 +42,7 @@ latest instruction and verified current state win.
 ## Production state
 
 - Mac services run as LaunchAgents (`~/Library/LaunchAgents/com.sapphire.*.plist`, `ai.hermes.gateway.plist`).
-- Windows services run as Scheduled Tasks (OllamaServe, SapphireWebhook, SapphireDashboard).
+- Windows services were part of the old inference and Telegram support path. Treat them as deprecated for new agentic Telegram work unless a fresh live audit explicitly re-enables them.
 - Cloud Run service `project-go-forward` in project `tho-ai-agent` serves the THO app at `https://sapphirealpha.xyz` and `https://project-go-forward-trgi34bxuq-uc.a.run.app`.
 - Cloud DNS zone for `sapphirealpha.xyz` lives in `sapphire-479610` — **do not delete that project**; the E-pool NS delegation is locked to it.
 - Firestore `(default)` in `tho-ai-agent` has delete protection enabled.
@@ -116,7 +116,8 @@ Rough guidance; Ari can override when needed:
 - **Codex** — primary production-autonomy lead for Sapphire OS. Owns repo hygiene, operational triage, architecture decisions, multi-step implementation, PR coordination, CI follow-through, deployment notes, and cross-repo handoffs unless Ari explicitly assigns another lead.
 - **Claude Code** — constrained reviewer/helper. Useful for second opinions, prose-heavy docs, or isolated review passes, but should not drive production-autonomy, broaden local permissions, merge PRs, or take over operations unless Ari explicitly asks.
 - **Kimi Code / long-context agents** — large code surveys, cross-repo pattern extraction, research-heavy writing.
-- **Local models via inference proxy** (hermes3, deepseek-r1, qwen3) — small, frequent, latency-sensitive tasks (form extraction, quick summaries, classification). Free tier on the mesh.
+- **Hosted Kimi/Gemini lanes** — default for new agentic Telegram work, structured triage, source ranking, research synthesis, and evals.
+- **Local models via inference proxy** (`gemma4:latest`, `qwen3.6:27b`) — fallback-only for sensitive/offline work. Nemotron and Hermes are compatibility paths, not defaults.
 
 When a task involves real money, production credentials, destructive shared
 infrastructure changes, or live external messaging, stop at the safest
@@ -134,24 +135,24 @@ Codex is expected to keep the project moving without waiting for Claude handoffs
 - Prefer non-draft PRs for low-risk docs/test/tooling changes after local checks pass; use draft PRs for risky production behavior until the blast radius is clear.
 - Treat Claude-local settings as a safety surface: narrow allowlists when safe, and do not add broad service-control, workflow-disable, secret-read, or production-mutating permissions.
 
-## Mesh inference (tiers)
+## Agent Runtime And Local Fallback
 
-Call via the inference proxy at `http://127.0.0.1:11435` (Mac LaunchAgent `com.sapphire.inference-proxy`):
+The agentic Telegram path is Kimi/Gemini first:
 
-| Tier alias | Upstream | Use for |
+- Kimi K2.6 for long-context operator work.
+- Gemini on Vertex for structured triage, clustering, cited synthesis, and evals.
+- Sapphire PM bot owns Telegram ingress and sends only through explicit confirmation paths.
+
+Call local fallback through the inference proxy at `http://127.0.0.1:11435` only when a task is sensitive, offline, or explicitly local:
+
+| Alias | Upstream | Use for |
 |-----|-----|-----|
-| `fast` / `quick` | `nemotron-mini:4b` (Windows, 232 tok/s) | classification, simple extraction |
-| `balanced` | `hermes3:8b` (Windows, 118 tok/s) | tool calls, chat |
-| `code` | `gemma4:latest` (Windows, 154 tok/s) | code-only tasks |
-| `reason` | `deepseek-r1:14b` (Windows, 80 tok/s) | structured reasoning |
-| `qwen-reason` | `qwen3.5:9b` (Windows) | faster reasoning |
-| `deep` | `qwen3:14b` (Windows) | multi-step analysis |
-| `cascade/moe` | `nemotron-cascade-2` (Windows, 16 tok/s) | MoE, fits 16 GB VRAM |
-| `large` | `qwen2.5:32b` (Windows, background) | overnight / batch |
-| `qwen3.6` | `qwen3.6:27b` (Windows primary, Mac exact fallback, ~7 tok/s) | latest Qwen generation; explicit alias only |
-| Cloud fallback | Kimi K2 via moonshot.cn | when Windows is offline |
+| `auto` / `fast` / `quick` / `balanced` | `gemma4:latest` (Mac Ollama) | fresh local fallback |
+| `code` / `fast-code` / `local-fallback` | `gemma4:latest` (Mac Ollama) | local coding and tool reasoning fallback |
+| `qwen3.6` | `qwen3.6:27b` (Mac Ollama) | heavy local reasoning fallback |
+| `kimi` / `cloud` / `research` | Kimi Cloud | non-sensitive cloud fallback only |
 
-Windows PC (Tailscale `100.71.10.48`) must be online for tiers 1–5. The proxy falls back to Kimi automatically on timeout; you don't need to handle it.
+Deprecated local Telegram/gateway services (`ai.hermes.gateway`, `ai.openclaw.gateway`, `com.sapphire.healthz-watcher`, `com.sapphire.mac-to-windows-tunnel`) should stay disabled or quarantined during the new Telegram agent rollout.
 
 ## Common commands
 
@@ -165,8 +166,11 @@ python scripts/validate_tool_registry.py
 # Check scheduled tasks
 launchctl list | grep sapphire
 
-# Probe the mesh
+# Probe local fallback
 curl -s http://127.0.0.1:11435/health | python -m json.tool
+
+# Fresh agent runtime readiness
+python3 scripts/ops/fresh_agent_runtime_status.py --json
 
 # PM bot (when SAPPHIRE_PM_BOT_ALLOWED_USER_IDS is set + LaunchAgent loaded)
 launchctl load ~/Library/LaunchAgents/com.sapphire.pm-bot.plist

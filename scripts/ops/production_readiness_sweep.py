@@ -46,14 +46,13 @@ DEFAULT_WINDOWS_SSH_TIMEOUT_SECONDS = 8
 GEMINI_PROBE_PROMPT = "Return exactly SAPPHIRE_GEMINI_PROBE_OK and nothing else."
 GEMINI_PROBE_RESPONSE = "SAPPHIRE_GEMINI_PROBE_OK"
 WINDOWS_REQUIRED_MODELS = {
-    "fast": "nemotron-mini:4b",
-    "balanced": "hermes3:8b",
+    "fast": "gemma4:latest",
+    "balanced": "gemma4:latest",
     "code": "gemma4:latest",
     "reason": "deepseek-r1:14b",
     "qwen-reason": "qwen3.5:9b",
     "deep": "qwen3:14b",
     "qwen3.6": "qwen3.6:27b",
-    "cascade": "nemotron-cascade-2",
     "large": "qwen2.5:32b",
 }
 WINDOWS_SERVICE_PORTS = {
@@ -598,8 +597,6 @@ def probe_launchagents() -> list[Check]:
         "com.sapphire.heartbeat": "always_on",
         "com.sapphire.openbb-api": "always_on",
         "com.sapphire.cloudflare-tunnel": "always_on",
-        "com.sapphire.mac-to-windows-tunnel": "always_on",
-        "ai.hermes.gateway": "always_on",
         "actions.runner.arigatoexpress-Sapphire.ari-macbook-sapphire": "always_on",
         "com.sapphire.gcp-sync": "scheduled",
         "com.sapphire.content-engine": "scheduled",
