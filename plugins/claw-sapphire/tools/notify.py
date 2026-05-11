@@ -17,7 +17,9 @@ import ssl
 import sys
 import urllib.error
 import urllib.request
+from importlib import util as importlib_util
 from pathlib import Path
+from types import ModuleType
 
 # Telegram bot tokens travel in the URL path — MITM-ing this call leaks the
 # bot credentials. Always verify the server certificate. We prefer certifi's
@@ -43,7 +45,23 @@ DISABLED_VALUES = {"0", "false", "no", "off"}
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from lib.telegram.draft_queue import append_draft, build_draft  # noqa: E402
+try:
+    from lib.telegram.draft_queue import append_draft, build_draft  # noqa: E402
+except ModuleNotFoundError:
+    _DRAFT_QUEUE_MODULE_PATH = REPO_ROOT / "lib" / "telegram" / "draft_queue.py"
+    _DRAFT_QUEUE_SPEC = importlib_util.spec_from_file_location(
+        "sapphire_telegram_draft_queue",
+        _DRAFT_QUEUE_MODULE_PATH,
+    )
+    if _DRAFT_QUEUE_SPEC is None or _DRAFT_QUEUE_SPEC.loader is None:
+        raise
+    _DRAFT_QUEUE_MODULE = importlib_util.module_from_spec(_DRAFT_QUEUE_SPEC)
+    sys.modules.setdefault("sapphire_telegram_draft_queue", _DRAFT_QUEUE_MODULE)
+    _DRAFT_QUEUE_SPEC.loader.exec_module(_DRAFT_QUEUE_MODULE)
+    if not isinstance(_DRAFT_QUEUE_MODULE, ModuleType):
+        raise
+    append_draft = _DRAFT_QUEUE_MODULE.append_draft
+    build_draft = _DRAFT_QUEUE_MODULE.build_draft
 
 
 def _env_enabled(name: str, *, default: bool) -> bool:

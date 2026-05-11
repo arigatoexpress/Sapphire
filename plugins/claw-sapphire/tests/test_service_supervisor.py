@@ -100,7 +100,7 @@ def test_no_action_when_everything_healthy(monkeypatch, supervisor_env):
 
 
 def test_restart_triggered_on_nonzero_exit_code(monkeypatch, supervisor_env):
-    label = "ai.hermes.gateway"
+    label = "com.sapphire.pm-bot"
     fake_run = FakeRun()
     monkeypatch.setattr(service_supervisor, "_run", fake_run)
     install_status_sequence(
@@ -116,7 +116,7 @@ def test_restart_triggered_on_nonzero_exit_code(monkeypatch, supervisor_env):
     assert result["ok"] is True
     assert result["attempted"][0]["restart_action"] == "kickstart"
     assert result["recovered"][0]["label"] == label
-    assert fake_run.calls == [["launchctl", "kickstart", "-k", "gui/501/ai.hermes.gateway"]]
+    assert fake_run.calls == [["launchctl", "kickstart", "-k", "gui/501/com.sapphire.pm-bot"]]
 
 
 def test_restart_triggered_on_unloaded_expected_service(monkeypatch, supervisor_env):
@@ -140,7 +140,7 @@ def test_restart_triggered_on_unloaded_expected_service(monkeypatch, supervisor_
 
 
 def test_cooldown_blocks_consecutive_restarts(monkeypatch, supervisor_env):
-    label = "ai.hermes.gateway"
+    label = "com.sapphire.pm-bot"
     fake_run = FakeRun()
     now = datetime(2026, 4, 24, 12, 0, tzinfo=timezone.utc)
     monkeypatch.setattr(service_supervisor, "_run", fake_run)
@@ -164,7 +164,7 @@ def test_cooldown_blocks_consecutive_restarts(monkeypatch, supervisor_env):
 
 
 def test_global_rate_limit_blocks_when_too_many_in_hour(monkeypatch, supervisor_env):
-    label = "ai.hermes.gateway"
+    label = "com.sapphire.pm-bot"
     fake_run = FakeRun()
     now = datetime(2026, 4, 24, 12, 0, tzinfo=timezone.utc)
     monkeypatch.setattr(service_supervisor, "_run", fake_run)
@@ -189,7 +189,7 @@ def test_global_rate_limit_blocks_when_too_many_in_hour(monkeypatch, supervisor_
 
 
 def test_failed_restart_escalates_to_notify(monkeypatch, supervisor_env):
-    label = "ai.hermes.gateway"
+    label = "com.sapphire.pm-bot"
     alerts: list[tuple[str, str]] = []
     monkeypatch.setattr(service_supervisor, "_run", FakeRun())
     monkeypatch.setattr(
@@ -214,7 +214,7 @@ def test_failed_restart_escalates_to_notify(monkeypatch, supervisor_env):
 
 
 def test_recovered_restart_does_not_notify(monkeypatch, supervisor_env):
-    label = "ai.hermes.gateway"
+    label = "com.sapphire.pm-bot"
     alerts: list[tuple[str, str]] = []
     monkeypatch.setattr(service_supervisor, "_run", FakeRun())
     monkeypatch.setattr(
@@ -242,7 +242,7 @@ def test_recovery_detected_via_pid_change_when_exit_code_stale(monkeypatch, supe
     recovered service can still read exit_code=1. Use the PID change (new
     process replaced the old one) as the authoritative recovery signal.
     """
-    label = "ai.hermes.gateway"
+    label = "com.sapphire.pm-bot"
     alerts: list[tuple[str, str]] = []
     monkeypatch.setattr(service_supervisor, "_run", FakeRun())
     monkeypatch.setattr(
@@ -273,7 +273,7 @@ def test_recovery_detected_via_pid_change_when_exit_code_stale(monkeypatch, supe
 
 
 def test_activity_written_to_firestore_on_every_action(monkeypatch, supervisor_env):
-    label = "ai.hermes.gateway"
+    label = "com.sapphire.pm-bot"
     db = FakeDB()
     monkeypatch.setattr(service_supervisor, "_get_firestore_db", lambda: db)
     monkeypatch.setattr(service_supervisor, "_run", FakeRun())
@@ -298,7 +298,7 @@ def test_activity_written_to_firestore_on_every_action(monkeypatch, supervisor_e
 
 
 def test_dry_run_never_calls_restart(monkeypatch, supervisor_env):
-    label = "ai.hermes.gateway"
+    label = "com.sapphire.pm-bot"
     fake_run = FakeRun()
     monkeypatch.setattr(service_supervisor, "_run", fake_run)
     install_status_sequence(monkeypatch, [{label: status(label, exit_code=1, pid=None)}])
@@ -314,11 +314,11 @@ def test_dry_run_never_calls_restart(monkeypatch, supervisor_env):
 
 def test_state_file_round_trip(monkeypatch, supervisor_env):
     payload = {
-        "labels": {"ai.hermes.gateway": {"last_attempt_at": "2026-04-24T12:00:00+00:00"}},
+        "labels": {"com.sapphire.pm-bot": {"last_attempt_at": "2026-04-24T12:00:00+00:00"}},
         "restart_attempts": [
-            {"label": "ai.hermes.gateway", "timestamp": "2026-04-24T12:00:00+00:00"}
+            {"label": "com.sapphire.pm-bot", "timestamp": "2026-04-24T12:00:00+00:00"}
         ],
-        "seen_event_categories": ["ai.hermes.gateway:crashed"],
+        "seen_event_categories": ["com.sapphire.pm-bot:crashed"],
     }
 
     service_supervisor._save_state(payload)

@@ -13,7 +13,7 @@ from dev_pulse import ServiceStatus
 
 def test_reason_ignores_stale_nonzero_exit_for_running_job() -> None:
     status = ServiceStatus(
-        label="ai.hermes.gateway",
+        label="com.sapphire.pm-bot",
         loaded=True,
         pid=12345,
         exit_code=-15,
@@ -25,7 +25,7 @@ def test_reason_ignores_stale_nonzero_exit_for_running_job() -> None:
 
 def test_reason_marks_nonrunning_nonzero_exit_as_crashed() -> None:
     status = ServiceStatus(
-        label="ai.hermes.gateway",
+        label="com.sapphire.pm-bot",
         loaded=True,
         pid=None,
         exit_code=1,
@@ -50,7 +50,7 @@ def test_supervisor_skips_running_jobs_with_stale_exit(monkeypatch) -> None:
     monkeypatch.setattr(service_supervisor, "collect_service_statuses", fake_collect)
 
     summary = service_supervisor.supervise_once(
-        labels=["ai.hermes.gateway", "com.sapphire.signal-logger"],
+        labels=["com.sapphire.pm-bot", "com.sapphire.signal-logger"],
         dry_run=True,
     )
 
