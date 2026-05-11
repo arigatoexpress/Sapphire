@@ -10,12 +10,17 @@ long-pollers or use the shared bot token to send free-form relay chatter.
 Run these read-only probes from the Mac:
 
 ```bash
+python3 scripts/ops/telegram_sender_audit.py --json
 curl -fsS http://127.0.0.1:18082/telegram/ownership | python3 -m json.tool
 curl -fsS http://127.0.0.1:11435/failover/status | python3 -m json.tool
 ```
 
 Expected before group creation:
 
+- `telegram_sender_audit.py` returns `status=ok`.
+- `ai.hermes.gateway` is disabled and not loaded.
+- `com.sapphire.healthz-watcher` is not loaded during Telegram agent rollout.
+- No non-desktop process owns Telegram network sockets.
 - `agent_group_ready=true` on PM bot ownership, or a clearly accepted blocker.
 - `mode=webhook`; polling is not active for the shared bot token.
 - `telegram_delivery_ready=true` after the webhook is registered.
@@ -39,6 +44,8 @@ Expected before group creation:
 ## Never do this
 
 - Do not run two long-pollers against one Telegram bot token.
+- Do not run Hermes Telegram polling beside the PM bot.
+- Do not run legacy direct-send health watchers during the agent group rollout.
 - Do not let inference-proxy use Telegram as an implicit fallback just because
   cloud API keys are missing.
 - Do not send public/customer/external Telegram messages from this rollout.
