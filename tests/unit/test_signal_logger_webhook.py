@@ -211,7 +211,23 @@ def test_health_returns_paper_trading_flag(client):
     assert payload["status"] == "ok"
     assert payload["mode"] == "signal_logger"
     assert payload["paper_trading"] is True
+    assert payload["webhook_secret_configured"] is True
+    assert payload["signal_ingest_ready"] is True
+    assert payload["blockers"] == []
     assert "note" in payload
+
+
+def test_health_reports_missing_webhook_secret(signal_logger, client, monkeypatch):
+    monkeypatch.setattr(signal_logger, "_WEBHOOK_SECRET", "")
+
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "ok"
+    assert payload["webhook_secret_configured"] is False
+    assert payload["signal_ingest_ready"] is False
+    assert payload["blockers"] == ["webhook_secret_unconfigured"]
 
 
 # ── /api/signals secret enforcement ────────────────────────────────────
