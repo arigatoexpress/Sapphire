@@ -13,6 +13,8 @@ The hackathon requires submission through HackQuest. **I cannot submit on your b
 | Hackathon README | ✅ done | `docs/hackathon-0g/README.md` |
 | Demo script | ✅ done | `docs/hackathon-0g/demo-script.md` |
 | X post draft | ✅ done | `docs/hackathon-0g/x-post.md` |
+| Public 0G proof panel | ✅ done | `https://hack.sapphirealpha.xyz/` → Sapphire × 0G → 0G proof |
+| Public 0G proof APIs | ✅ done | `/api/0g/readiness`, `/api/0g/feed`, `/api/hackathon/0g-proof` |
 | **Branch pushed to GitHub** | ⬜ needs you | `git push -u origin feat/0g-integration` |
 | **PR opened + merged to main on the public repo** | ⬜ needs you | https://github.com/arigatoexpress/Sapphire |
 | **Node deps installed for the storage bridge** | ⬜ needs you | `cd lib/og/_ts && npm install` |
@@ -40,6 +42,8 @@ Have these ready when you open the submission form:
 | 0G mainnet contract address | `<SapphireSignalVerifier address>` |
 | 0G Explorer link (proof of activity) | `https://chainscan.0g.ai/address/<addr>` |
 | 0G components used | 0G Storage, 0G Compute (Sealed Inference / TEE), 0G Chain |
+| Judge proof surface | `https://hack.sapphirealpha.xyz/` → Sapphire × 0G → 0G proof |
+| Public proof manifest | `https://hack.sapphirealpha.xyz/api/0g/readiness` |
 | Demo video link | `<YouTube URL>` |
 | Public X post link | `<x.com URL>` |
 | Hackathon README | `https://github.com/arigatoexpress/Sapphire/blob/main/docs/hackathon-0g/README.md` |

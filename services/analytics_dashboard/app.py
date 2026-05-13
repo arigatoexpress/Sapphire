@@ -36,6 +36,7 @@ from _deflated_sharpe import annualized_sharpe, deflated_sharpe  # noqa: E402
 from admin_narrative import build_admin_narrative  # noqa: E402
 from auth import admin_session_payload, requires_admin  # noqa: E402
 from data_engineering import build_data_engineering_report  # noqa: E402
+from og_proof import build_og_proof_manifest  # noqa: E402
 from project_tabs import get_project_tab, public_project_tabs  # noqa: E402
 
 PROJECT = os.environ.get("GCP_PROJECT", "tho-ai-agent")
@@ -2109,6 +2110,12 @@ def project_manifest(slug: str):
     if tab is None:
         return jsonify({"error": "project_not_found"}), 404
     return jsonify({"project": tab})
+
+
+@app.get("/api/hackathon/0g-proof")
+def hackathon_og_proof():
+    """Public-safe 0G integration proof/readiness manifest."""
+    return jsonify(build_og_proof_manifest())
 
 
 @app.route("/<path:path>", methods=["GET", "HEAD", "POST"])

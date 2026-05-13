@@ -66,6 +66,7 @@
         <!-- Tab nav -->
         <nav class="tabs" data-slug="{{ s.slug }}">
           <button class="tab-btn active" data-tab="probe">Live probe</button>
+          {% if s.slug == '0g' %}<button class="tab-btn" data-tab="ogproof">0G proof</button>{% endif %}
           <button class="tab-btn" data-tab="pitch">Pitch</button>
           <button class="tab-btn" data-tab="novelty">Novelty</button>
           <button class="tab-btn" data-tab="criteria">Criteria match</button>
@@ -111,6 +112,21 @@
             </p>
           {% endif %}
         </section>
+
+        {% if s.slug == '0g' %}
+        <!-- Tab: 0G proof -->
+        <section class="tab-pane" data-pane="ogproof">
+          <div class="section-label">Judge fast path</div>
+          <p class="tab-blurb">
+            This panel is read-only. It exposes the public 0G proof path without requiring a wallet,
+            private key, Telegram send, trade, or chain write.
+          </p>
+          <div class="og-proof-panel" id="og-proof-panel">
+            <div class="og-proof-status muted">Loading /api/0g/readiness...</div>
+          </div>
+          <button class="probe-btn og-proof-refresh" type="button">Refresh 0G proof -></button>
+        </section>
+        {% endif %}
 
         <!-- Tab: Pitch -->
         <section class="tab-pane" data-pane="pitch">

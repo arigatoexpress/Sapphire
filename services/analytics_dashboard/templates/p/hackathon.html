@@ -3,10 +3,162 @@
 {% block crumb %}p/hackathon{% endblock %}
 {% block meta %}{{ submissions|length }} submissions{% endblock %}
 
+{% block extra_css %}
+.proof-head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  gap: 16px;
+}
+.proof-flow {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin: 14px 0;
+}
+.proof-step {
+  min-height: 74px;
+  border: 1px solid var(--line-bright);
+  background: #07100a;
+  padding: 10px;
+}
+.proof-step .num {
+  color: var(--text-mute);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+.proof-step .name {
+  color: var(--green);
+  margin-top: 5px;
+  font-size: 12px;
+}
+.artifact-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+.artifact {
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  padding: 10px;
+  min-width: 0;
+}
+.artifact .label {
+  color: var(--text-mute);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.artifact .value {
+  color: var(--text);
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+.readiness-ok { color: var(--green); }
+.readiness-pending { color: var(--amber); }
+@media (max-width: 960px) {
+  .proof-head, .proof-flow, .artifact-grid { grid-template-columns: 1fr; }
+}
+{% endblock %}
+
 {% block content %}
 <section class="hero">
   <h1>Sapphire OS — Hackathon Submissions</h1>
   <div class="typed" id="typed-line">$ ./sapphire submit --all</div>
+</section>
+
+<section class="box">
+  <div class="proof-head">
+    <div>
+      <h2 class="section">0G_VERIFICATION_LAYER</h2>
+      <p class="dim" style="margin:0 0 10px;">
+        Sapphire turns each autonomous signal into a public audit trail: sealed inference, merkle-rooted storage, on-chain timestamp, then read-only verifier replay.
+      </p>
+    </div>
+    <span class="pill {% if og_proof.status == 'live-proof-ready' %}green{% else %}amber{% endif %}">{{ og_proof.status_label }}</span>
+  </div>
+
+  <div class="proof-flow">
+    {% for step in og_proof.proof_flow %}
+    <div class="proof-step">
+      <div class="num">STEP {{ loop.index }}</div>
+      <div class="name">{{ step }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="artifact-grid">
+    <div class="artifact">
+      <div class="label">chain</div>
+      <div class="value">0G mainnet · {{ og_proof.networks.mainnet.chain_id }}</div>
+    </div>
+    <div class="artifact">
+      <div class="label">contract</div>
+      <div class="value">
+        {% if og_proof.public_artifacts.contract_explorer_url %}
+        <a href="{{ og_proof.public_artifacts.contract_explorer_url }}" target="_blank" rel="noopener">{{ og_proof.public_artifacts.contract_address }}</a>
+        {% else %}
+        pending mainnet address
+        {% endif %}
+      </div>
+    </div>
+    <div class="artifact">
+      <div class="label">storage root</div>
+      <div class="value">{{ og_proof.public_artifacts.storage_root_hash or "pending rootHash" }}</div>
+    </div>
+    <div class="artifact">
+      <div class="label">sample tx</div>
+      <div class="value">
+        {% if og_proof.public_artifacts.sample_signal_tx_url %}
+        <a href="{{ og_proof.public_artifacts.sample_signal_tx_url }}" target="_blank" rel="noopener">{{ og_proof.public_artifacts.sample_signal_tx }}</a>
+        {% else %}
+        pending SignalPublished tx
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="grid cols-2" style="margin-top:14px;">
+    <div>
+      <h2 class="section">COMPONENTS</h2>
+      <table class="term">
+        <tbody>
+          {% for c in og_proof.components %}
+          <tr><td>{{ c.name }}</td><td>{{ c.proof }}</td><td><code>{{ c.code }}</code></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <h2 class="section">JUDGE_FAST_PATH</h2>
+      <div class="kv">
+        <div class="k">api</div><div class="v"><a href="/api/hackathon/0g-proof">/api/hackathon/0g-proof</a></div>
+        <div class="k">verify</div><div class="v"><code>{{ og_proof.verify_command }}</code></div>
+        <div class="k">safety</div><div class="v">{{ og_proof.safety_boundaries|join(" · ") }}</div>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
+        {% for link in og_proof.judge_fast_path %}
+        <a class="btn" href="{{ link.href }}" {% if link.href.startswith('http') %}target="_blank" rel="noopener"{% endif %}>[{{ link.label }}]</a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <h2 class="section" style="margin-top:16px;">READINESS</h2>
+  <table class="term">
+    <thead><tr><th>item</th><th>status</th><th>evidence</th><th>next</th></tr></thead>
+    <tbody>
+      {% for row in og_proof.readiness %}
+      <tr>
+        <td>{{ row.label }}</td>
+        <td class="{% if row.ok %}readiness-ok{% else %}readiness-pending{% endif %}">{{ row.status }}</td>
+        <td>{{ row.evidence }}</td>
+        <td>{{ row.next_step }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </section>
 
 <section class="box">
