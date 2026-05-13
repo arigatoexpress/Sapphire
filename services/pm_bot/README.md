@@ -51,6 +51,15 @@ Optional:
 - `SAPPHIRE_PM_BOT_ALLOW_SHARED_POLLING=1`
   - Break-glass only. Polling mode normally refuses to start with the shared
     Sapphire Telegram token because it competes with Hermes or webhook consumers.
+- `SAPPHIRE_PM_BOT_AGENT_CHAT_IDS=-1001234567890`
+  - Optional comma- or whitespace-separated allowlist for the private agent
+    room, such as `Shadow Force`. When set, commands and agentic Telegram
+    updates outside these chat IDs are rejected before PM-bot dispatch and
+    recorded only as local no-send drafts.
+- `SAPPHIRE_PM_BOT_AGENT_THREAD_IDS=7,9`
+  - Optional comma- or whitespace-separated allowlist for Telegram forum topics
+    or direct-message topic IDs inside the allowed agent chat. Leave unset if
+    the agent room is not using stable topic IDs yet.
 - `SAPPHIRE_PM_BOT_HOST=127.0.0.1`
 - `SAPPHIRE_PM_BOT_PORT=18082`
 - `SAPPHIRE_PM_BOT_PROBE_TIMEOUT_SECONDS=25`
@@ -115,6 +124,10 @@ The service routes this full Bot API update surface through
 `lib.telegram.agent_router`. Only `command` routes can call `sendMessage`; all
 other routes are accepted as no-send router decisions and queued as local
 dry-run draft/event records when `SAPPHIRE_PM_BOT_DRAFT_QUEUE_ENABLED` is true.
+If `SAPPHIRE_PM_BOT_AGENT_CHAT_IDS` or `SAPPHIRE_PM_BOT_AGENT_THREAD_IDS` is
+configured, the router applies that scope before dispatching PM-bot commands, so
+out-of-room or out-of-topic updates become local `rejected_update` drafts rather
+than live replies.
 The legacy `plugins/claw-sapphire/tools/notify.py` wrapper also writes to this
 same local draft queue by default; it only performs live Bot API sends when
 `SAPPHIRE_NOTIFY_TELEGRAM_LIVE=1` is set for an explicit operator window.
@@ -167,11 +180,20 @@ Key fields:
   - Bot API pending update count when available.
 - `telegram_allowed_updates`
   - Bot API allowed update list when available.
+- `agent_chat_scope_configured` / `agent_chat_scope_count`
+  - Whether the PM bot is restricted to explicit agent-room chat IDs and how
+    many IDs are configured. The health payload reports counts only, not the
+    chat IDs themselves.
+- `agent_thread_scope_configured` / `agent_thread_scope_count`
+  - Whether forum/direct-message topic scoping is enabled and how many topic
+    IDs are configured.
 
 `GET /telegram/ownership` is the shorter operator gate for the future private
 agent group. It reports the single-ingress owner, whether the group is ready,
-the current blockers, and the no-send router guard. Use it before inviting Kimi
-or Nemotron into a shared group.
+the current blockers, the scoped agent-room posture, and the no-send router
+guard. Use it before inviting Kimi or Nemotron into a shared group. A missing
+agent chat scope is reported as `agent_chat_scope_unconfigured` so the group
+cannot look ready while the bot is still accepting commands from any chat.
 
 ## LaunchAgent
 

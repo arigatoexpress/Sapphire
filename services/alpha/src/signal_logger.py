@@ -101,10 +101,17 @@ def _paper_trading_env_enabled() -> bool:
 @app.get("/health")
 async def health():
     paper_trading = _paper_trading_env_enabled()
+    webhook_secret_configured = bool(_WEBHOOK_SECRET)
+    blockers = []
+    if not webhook_secret_configured:
+        blockers.append("webhook_secret_unconfigured")
     return {
         "status": "ok",
         "mode": "signal_logger",
         "paper_trading": paper_trading,
+        "webhook_secret_configured": webhook_secret_configured,
+        "signal_ingest_ready": webhook_secret_configured,
+        "blockers": blockers,
         "note": "Pis offline — logging only, no execution",
     }
 
