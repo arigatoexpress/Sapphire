@@ -6,8 +6,8 @@ Autonomous trading + intelligence + content ops. Telegram-first, agent-driven, e
 
 ```bash
 # Test
-pytest tests/unit/ --tb=short -q           # 6,140 collected by test_inventory.py
-pytest plugins/claw-sapphire/tests/ -q     # 595 collected by test_inventory.py
+pytest tests/unit/ --tb=short -q           # 6,580 collected by test_inventory.py
+pytest plugins/claw-sapphire/tests/ -q     # 604 collected by test_inventory.py
 
 # Lint
 ruff check .                          # pyproject.toml rules (E501 ignored)
@@ -88,7 +88,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 
 ## Module Map
 
-**Key counts (verified 2026-05-03 via `scripts/ops/test_inventory.py --check-readme`):** 6,735 collected tests (6,140 core + 595 plugin) across 392 files · 50 dashboard pages · 7 quant strategies · 27 LaunchAgent plists in `infra/launchagents/` (TV pair added in PRs #505/#506; tracked definitions remain operator-controlled; see `docs/archive/2026/audits/launchagents-audit-2026-04-21.md`) · 22 scheduled tasks · 3 smart contracts.
+**Key counts (verified 2026-05-12 via `scripts/ops/test_inventory.py --check-readme`):** 7,184 collected tests (6,580 core + 604 plugin) across 436 files · 52 dashboard pages · 7 quant strategies · 29 LaunchAgent plists in `infra/launchagents/` (TV pair added in PRs #505/#506; `continuous-intelligence-daily` + `mac-to-windows-tunnel` added 2026-05-03–12; tracked definitions remain operator-controlled; see `docs/archive/2026/audits/launchagents-audit-2026-04-21.md`) plus 1 disabled template. Note: `com.sapphire.analytics-dashboard`, `com.sapphire.kronos-daily`, `com.sapphire.outcome-resolver`, and `com.sapphire.vpin-materializer` were archived on the Mac side as of 2026-05-12 — these four were installed-only LaunchAgents (no source plist was ever committed to `infra/launchagents/`) · 22 scheduled tasks · 3 smart contracts.
 
 | Path | Type | Description |
 |------|------|-------------|
@@ -109,7 +109,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `services/analytics_dashboard/` | service | Analytics-focused dashboard variant. |
 | `services/aster/` | service | Aster DEX bot — Solana perps (paused). |
 | `services/control-plane/` | service | PM hub: projects, tasks, events, Kimi bridge [Mac:8082]. |
-| `services/dashboard/` | service | Flask dashboard [Mac:8080] — 50 pages including the unified `/showcase`, SSE event stream, lead-intel, performance + forecast + backtest endpoints. |
+| `services/dashboard/` | service | Flask dashboard [Mac:8080] — 52 pages including the unified `/showcase`, SSE event stream, lead-intel, performance + forecast + backtest endpoints. |
 | `services/foundry_sync/` | service | Scheduled Foundry sync daemon — wraps `lib/foundry/sync.py`. |
 | `services/heartbeat/` | service | Heartbeat daemon wrapper (`run.py`, `heartbeat.py`). |
 | `services/hyperliquid/` | service | Hyperliquid L1 bot — public-feed signal subscriber + live-trading executor (`hyperliquid_bot/risk.py`, hard caps: $5/order, 3x lev, 5 positions, $25/day loss, file-killswitch). Mainnet refused until EIP-712 signing is verified on testnet (`policy.signing_verified=False`). |
@@ -120,14 +120,14 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `services/security_pipeline/` | service | Scheduled full-system security scan → SOC page. |
 | `services/pm_bot/` | service | PM bot webhook and reviewed Telegram draft queue [Mac:18082]. |
 | `services/webhook/` | service | TradingView webhook receiver [Windows:9090]. |
-| `plugins/claw-sapphire/` | plugin | 113 tool scripts on disk (63 at top level + 49 in `internal/` + 1 in `_deprecated/`), 10 libs, 567 collected tests. |
+| `plugins/claw-sapphire/` | plugin | 118 tool scripts on disk (64 at top level + 52 in `internal/` + 2 in `_deprecated/`), 10 libs, 604 collected tests. |
 | `contracts/` | solidity | **`SapphireSignalVerifier.sol`** (on-chain signal registry with ZK proof hash field), **`SapphirePaymentGate.sol`** (micropayment gate), **`SapphireSentinelRegistry.sol`** (non-custodial agent mandate/payment receipt anchor). Deployed on Robinhood Chain testnet via `scripts/deploy_robinhood_chain.py`. |
 | `pine/` | pine | 5 TradingView strategies (standalone/: v1, v2, v3 Ultra, MultiSymbol Screener, Mac variant). |
 | `skills/` | skills | Agent-executable capabilities. |
 | `data/content/` | data | Content engine drafts + ready/ queue. |
 | `data/chain/` | data | Deployed contract addresses (`deployments.json`), chain snapshots. |
 | `data/benchmarks/kadima-labs/` | data | Kadima Labs AI benchmark (v1–v3). |
-| `infra/launchagents/` | infra | 27 macOS LaunchAgent plists (folded in by the 2026-04-21 audit: chain-refresh, control-plane, correlation-refresh, daily-brief, gcp-sync, logrotate, openbb-api, signal-logger, telemetry-collector, threat-refresh; TV pair `tradingview-ta-capture` (every 4h) + `tradingview-pine-batch` (daily 13:00 UTC) added 2026-04-30, both read-only) plus 1 disabled template. |
+| `infra/launchagents/` | infra | 29 macOS LaunchAgent plists (folded in by the 2026-04-21 audit: chain-refresh, control-plane, correlation-refresh, daily-brief, gcp-sync, logrotate, openbb-api, signal-logger, telemetry-collector, threat-refresh; TV pair `tradingview-ta-capture` (every 4h) + `tradingview-pine-batch` (daily 13:00 UTC) added 2026-04-30, both read-only; `continuous-intelligence-daily` + `mac-to-windows-tunnel` added 2026-05-03–12) plus 1 disabled template. Four Mac-side-only LaunchAgents (`com.sapphire.analytics-dashboard`, `com.sapphire.kronos-daily`, `com.sapphire.outcome-resolver`, `com.sapphire.vpin-materializer`) archived on the Mac as of 2026-05-12 — no source plist was ever in this directory. |
 | `infra/agent-manifest.yaml` | infra | Lean 5-tool subset the LLM sees. |
 | `infra/tool-registry.yaml` | infra | Full plugin tool registry (CI-enforced by `scripts/validate_tool_registry.py`). |
 | `infra/tailscale-acl.json` | infra | Tailscale mesh ACL. |
