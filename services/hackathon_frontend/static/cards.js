@@ -28,6 +28,7 @@
 
   // ------------------------------------------------------------ probe runner
   document.querySelectorAll(".probe-btn").forEach(function (btn) {
+    if (btn.classList.contains("og-proof-refresh")) return;
     btn.addEventListener("click", function () {
       var slug = btn.dataset.slug;
       if (!slug) return;
@@ -54,6 +55,118 @@
         });
     });
   });
+
+  // ------------------------------------------------------------ 0G proof feed
+  var ogPanel = document.getElementById("og-proof-panel");
+  if (ogPanel) {
+    loadOgProof();
+    document.querySelectorAll(".og-proof-refresh").forEach(function (btn) {
+      btn.addEventListener("click", loadOgProof);
+    });
+  }
+
+  function loadOgProof() {
+    if (!ogPanel) return;
+    ogPanel.innerHTML = '<div class="og-proof-status muted">Loading /api/0g/readiness...</div>';
+    Promise.all([
+      fetch("/api/0g/readiness").then(function (r) {
+        if (!r.ok) throw new Error("readiness HTTP " + r.status);
+        return r.json();
+      }),
+      fetch("/api/0g/feed").then(function (r) {
+        if (!r.ok) throw new Error("feed HTTP " + r.status);
+        return r.json();
+      }),
+    ])
+      .then(function (pair) {
+        renderOgProof(pair[0], pair[1]);
+      })
+      .catch(function (err) {
+        ogPanel.innerHTML =
+          '<div class="og-proof-status err">0G proof load failed: <code>' +
+          escapeHtml(err.message || "network error") +
+          "</code></div>";
+      });
+  }
+
+  function renderOgProof(readiness, feed) {
+    if (!ogPanel) return;
+    var artifacts = readiness.public_artifacts || {};
+    var rows = (readiness.readiness || [])
+      .map(function (row) {
+        var cls = row.ok ? "ok" : "pending";
+        return (
+          '<div class="og-ready-row">' +
+          '<span class="og-ready-label">' +
+          escapeHtml(row.label) +
+          "</span>" +
+          '<span class="og-ready-status ' +
+          cls +
+          '">' +
+          escapeHtml(row.status) +
+          "</span>" +
+          '<span class="og-ready-evidence">' +
+          escapeHtml(row.evidence || "") +
+          "</span>" +
+          "</div>"
+        );
+      })
+      .join("");
+    var feedItems = (feed.items || [])
+      .map(function (item) {
+        var proof = escapeHtml(item.proof || "");
+        var body = item.href
+          ? '<a href="' + escapeHtml(item.href) + '" target="_blank" rel="noopener">' + proof + "</a>"
+          : proof;
+        return (
+          '<div class="og-feed-item">' +
+          '<div class="og-feed-stage">' +
+          escapeHtml(item.stage) +
+          "</div>" +
+          '<div class="og-feed-proof">' +
+          body +
+          "</div>" +
+          "</div>"
+        );
+      })
+      .join("");
+    ogPanel.innerHTML =
+      '<div class="og-proof-status ' +
+      (readiness.status === "live-proof-ready" ? "ok" : "pending") +
+      '">' +
+      escapeHtml(readiness.status_label || readiness.status || "unknown") +
+      "</div>" +
+      '<div class="og-artifacts">' +
+      artifactCell("Chain", "0G mainnet " + ((readiness.networks || {}).mainnet || {}).chain_id) +
+      artifactCell("Contract", artifacts.contract_address || "pending mainnet address") +
+      artifactCell("Storage root", artifacts.storage_root_hash || "pending rootHash") +
+      artifactCell("Sample tx", artifacts.sample_signal_tx || "pending SignalPublished tx") +
+      "</div>" +
+      '<div class="section-label">Proof feed</div>' +
+      '<div class="og-feed">' +
+      feedItems +
+      "</div>" +
+      '<div class="section-label">Readiness</div>' +
+      '<div class="og-ready">' +
+      rows +
+      "</div>" +
+      '<div class="placeholder"><strong>Verify:</strong> <code>' +
+      escapeHtml(readiness.verify_command || "") +
+      "</code></div>";
+  }
+
+  function artifactCell(label, value) {
+    return (
+      '<div class="og-artifact">' +
+      '<div class="og-artifact-label">' +
+      escapeHtml(label) +
+      "</div>" +
+      '<div class="og-artifact-value">' +
+      escapeHtml(value || "") +
+      "</div>" +
+      "</div>"
+    );
+  }
 
   function renderProbeResults(container, data) {
     var contracts = (data && data.contracts) || [];

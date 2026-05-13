@@ -9,6 +9,23 @@ Sapphire is a production autonomous trading + intelligence OS. For the 0G hackat
 <!-- Test count sourced from `python3 scripts/ops/test_inventory.py --check-readme` on 2026-05-02 (6,567 tests collected: 6,000 core + 567 plugin). -->
 The first production-grade trading OS (6,567 tests, live execution) to make every AI prediction cryptographically committed before market impact — sealed by 0G Compute, anchored on 0G Chain.
 
+## Judge fast path
+
+If you have 2 minutes, start here:
+
+1. Open the public judge surface: `https://hack.sapphirealpha.xyz/` and expand **Sapphire × 0G**.
+2. Click the **0G proof** tab. It shows the Compute → Storage → Chain → `og_verify` proof flow, public artifacts, and pending mainnet gaps without requiring a wallet.
+3. Read the machine-readable proof manifest:
+   - Standalone hackathon frontend: `https://hack.sapphirealpha.xyz/api/0g/readiness`
+   - SapphireAlpha project page: `https://sapphirealpha.xyz/api/hackathon/0g-proof`
+4. Once mainnet deploy is complete, verify the sample signal:
+
+```bash
+echo '{"signal_id": <id>}' | python3 plugins/claw-sapphire/tools/og_verify.py
+```
+
+Current public status is intentionally honest: the source code, verifier, and offline tests are ready; the final 0G mainnet contract, `SignalPublished` tx, and 0G Storage `rootHash` must be recorded after the operator signs the mainnet transaction.
+
 ## Why this is hard
 
 When a trading agent claims it predicted BTC at $76,774, three properties must all be true: the prediction **existed before** the move, the model that produced it was **not tampered with**, and the inputs were **not backdated**. Without 0G, none of these are publicly verifiable — operators are trusted, not proven. Sapphire × 0G replaces that trust with cryptographic commitment: 0G Storage proves existed-before, 0G Compute (TEE) proves no-tampering, 0G Chain proves no-backdating.
@@ -123,6 +140,7 @@ echo '{"signal_id": 0}' | python3 plugins/claw-sapphire/tools/og_verify.py
 
 ## What's safe to look at without keys
 
+- **Public readiness APIs are read-only**: `/api/0g/readiness`, `/api/0g/feed`, and `/api/hackathon/0g-proof` expose only public proof artifacts and explicit pending gaps.
 - **All code is open** under `lib/og/`, `plugins/claw-sapphire/tools/og_*.py`, `scripts/deploy_og_chain.py`, `contracts/`.
 - **All tests run offline** with mocked SDK responses: `pytest tests/unit/og_integration/`.
 - The Solidity contracts are unchanged from Sapphire's pre-existing deployment to Robinhood Chain testnet (Arbitrum Orbit) — review at `contracts/`. The hackathon contribution is the **0G integration glue**, not new contract logic.

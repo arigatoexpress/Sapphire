@@ -26,6 +26,7 @@ import urllib.request
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template
+from hackathon_og_proof import build_og_feed, build_og_readiness
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 
@@ -428,6 +429,9 @@ def _hydrate_addresses() -> None:
     """
     here = Path(__file__).resolve()
     candidates: list[Path] = []
+    explicit_deployments = os.environ.get("SAPPHIRE_DEPLOYMENTS_FILE", "").strip()
+    if explicit_deployments:
+        candidates.append(Path(explicit_deployments))
     for n in (1, 2, 3):
         try:
             candidates.append(here.parents[n] / "data" / "chain" / "deployments.json")
@@ -469,6 +473,30 @@ def _hydrate_addresses() -> None:
                 if "/address/" not in explorer_base:
                     c["explorer_url"] = f"{explorer_base}/address/{addr}"
 
+    # If mainnet is not recorded yet but testnet proof exists, surface it
+    # honestly instead of leaving the 0G card looking empty to judges.
+    og_testnet = (deployments.get("og_testnet", {}).get("contracts", {}) or {}).get(
+        "SapphireSignalVerifier", {}
+    )
+    if isinstance(og_testnet, str):
+        og_testnet = {"address": og_testnet}
+    testnet_addr = og_testnet.get("address") if isinstance(og_testnet, dict) else None
+    if not testnet_addr:
+        return
+    og_submission = next((s for s in SUBMISSIONS if s["slug"] == "0g"), None)
+    if og_submission is None:
+        return
+    verifier = next(
+        (c for c in og_submission.get("contracts", []) if c["name"] == "SapphireSignalVerifier"),
+        None,
+    )
+    if verifier is None or verifier.get("address"):
+        return
+    verifier["address"] = testnet_addr
+    verifier["network"] = "0G Chain testnet fallback - chainId 16602"
+    verifier["explorer_url"] = f"https://chainscan-galileo.0g.ai/address/{testnet_addr}"
+    verifier["rpc_url"] = "https://evmrpc-testnet.0g.ai"
+
 
 _hydrate_addresses()
 
@@ -492,6 +520,18 @@ def healthz():
 def api_submissions():
     """Stable JSON snapshot for any tooling that wants it."""
     return jsonify({"submissions": SUBMISSIONS, "repo_url": REPO_URL}), 200
+
+
+@app.route("/api/0g/readiness")
+def api_0g_readiness():
+    """Public-safe 0G proof/readiness manifest."""
+    return jsonify(build_og_readiness()), 200
+
+
+@app.route("/api/0g/feed")
+def api_0g_feed():
+    """Compact 0G proof feed for judge/demo widgets."""
+    return jsonify(build_og_feed()), 200
 
 
 @app.route("/api/probe/<slug>")

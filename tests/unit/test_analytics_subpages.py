@@ -8,6 +8,7 @@ Run, then asserts each ``/p/<name>`` route returns 200 with HTML.
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 import types
 from pathlib import Path
@@ -70,9 +71,27 @@ def test_p_hackathon_smoke(monkeypatch):
     assert resp.status_code == 200
     body = resp.data.decode("utf-8")
     assert "Hackathon" in body or "0G APAC" in body
+    assert "0G_VERIFICATION_LAYER" in body
+    assert "/api/hackathon/0g-proof" in body
+    assert "SOURCE READY / LIVE PROOF PENDING" in body
     assert "MegaETH" in body
     assert "Robinhood" in body
     assert "Zama" in body
+
+
+def test_og_proof_api_is_public_safe(monkeypatch):
+    monkeypatch.setenv("OG_PRIVATE_KEY", "0x" + "aa" * 32)
+    client = _load_analytics_app(monkeypatch)
+
+    resp = client.get("/api/hackathon/0g-proof")
+
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    assert payload["networks"]["mainnet"]["chain_id"] == 16661
+    assert payload["status"] in {"live-proof-ready", "source-ready-live-proof-pending"}
+    assert any(row["id"] == "verifier_tool" and row["ok"] for row in payload["readiness"])
+    assert "OG_PRIVATE_KEY" not in json.dumps(payload)
+    assert ("aa" * 32) not in json.dumps(payload)
 
 
 def test_p_wildfire_smoke(monkeypatch):

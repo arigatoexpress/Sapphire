@@ -19,6 +19,7 @@ import urllib.request
 from datetime import UTC, datetime
 
 from flask import render_template
+from og_proof import build_og_proof_manifest
 
 log = logging.getLogger("sapphire.subpages")
 
@@ -134,7 +135,13 @@ def register_subpages(app, *, project: str, dataset: str) -> None:
         subs = live_subs if isinstance(live_subs, list) and live_subs else HACKATHON_SUBMISSIONS
         return render_template(
             "p/hackathon.html",
-            **_ctx({"submissions": subs, "fallback": not bool(live_subs)}),
+            **_ctx(
+                {
+                    "submissions": subs,
+                    "fallback": not bool(live_subs),
+                    "og_proof": build_og_proof_manifest(),
+                }
+            ),
         )
 
     @app.get("/p/wildfire")
