@@ -45,7 +45,7 @@ redis==5.2.1
 # scientific
 numpy==2.4.4
 pandas==3.0.2
-scipy==1.15.0
+scipy==1.17.1
 scikit-learn==1.8.0
 
 # reporting / pdf — pulled in by lib/research_notes (added by 2026-04-28
