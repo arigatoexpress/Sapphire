@@ -9,9 +9,9 @@
 [![CI](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
 [![Security](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml)
 [![Coverage](https://codecov.io/gh/arigatoexpress/Sapphire/branch/main/graph/badge.svg)](https://codecov.io/gh/arigatoexpress/Sapphire)
-[![Tests](https://img.shields.io/badge/tests-7%2C159%2B%20passing-2ea44f)](scripts/ops/test_inventory.py)
+[![Tests](https://img.shields.io/badge/tests-7%2C184%2B%20passing-2ea44f)](scripts/ops/test_inventory.py)
 [![Tools](https://img.shields.io/badge/tools-72-0d9488)](infra/tool-registry.yaml)
-[![Dashboard](https://img.shields.io/badge/dashboard-50%20pages-6d28d9)](services/dashboard/templates/pages)
+[![Dashboard](https://img.shields.io/badge/dashboard-52%20pages-6d28d9)](services/dashboard/templates/pages)
 [![Brain](https://img.shields.io/badge/brain-live-2ea44f)](https://sapphirealpha.xyz/api/brain/synthesis)
 [![License](https://img.shields.io/badge/license-proprietary-0A2540)](LICENSE)
 
@@ -55,10 +55,10 @@ The differentiator is **integration discipline**. Most stacks sit beside each ot
 
 | Surface | Count | Detail |
 |---|---:|---|
-| Passing tests | **7,159+** | 6,555+ unit · 604 plugin (`scripts/ops/test_inventory.py --check-readme`) |
-| Test files | **432+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
+| Passing tests | **7,184+** | 6,580+ unit · 604 plugin (`scripts/ops/test_inventory.py --check-readme`) |
+| Test files | **436+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
 | Plugin tools | **72** | CI-enforced via `scripts/validate_tool_registry.py` |
-| Dashboard pages | **50** | Flask + SSE + basic-auth, unified `/showcase` |
+| Dashboard pages | **52** | Flask + SSE + basic-auth, unified `/showcase` |
 | LaunchAgent definitions | **34** | Routines + soak gates |
 | Data feeds | **20+** | Market · on-chain · macro · threat · counter-party · internal |
 | Production-readiness sweep | **0 FAIL** | `--no-external` at Tranche 4 closeout |
@@ -135,7 +135,7 @@ flowchart LR
     Bus --> Brain[Brain · /api/brain/synthesis<br/>cross-silo synthesis]:::edge
     Bus --> Narrative[Narrative synthesis<br/>rubric-gated]:::content
     Bus --> Content[Content engine<br/>17 modules · 7-check rubric]:::content --> Pubs[Substack · X · LinkedIn · Typefully]:::content
-    Bus --> Dashboard[Dashboard · 50 pages<br/>SSE · /showcase]:::edge
+    Bus --> Dashboard[Dashboard · 52 pages<br/>SSE · /showcase]:::edge
     Bus --> KS[Global Kill Switch<br/>fails closed]:::security -.-> RK
 
     Operator --> InferenceProxy
@@ -203,7 +203,7 @@ flowchart LR
 ## Testing
 
 ```bash
-# 7,159+ tests · 432 files · CI-enforced
+# 7,184+ tests · 436 files · CI-enforced
 /usr/local/bin/python3 -m pytest tests/unit/ --tb=short -q
 /usr/local/bin/python3 -m pytest plugins/claw-sapphire/tests/ -q
 
