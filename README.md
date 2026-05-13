@@ -56,9 +56,9 @@ The differentiator is **integration discipline**. Most stacks sit beside each ot
 | Surface | Count | Detail |
 |---|---:|---|
 | Passing tests | **7,184+** | 6,580+ unit · 604 plugin (`scripts/ops/test_inventory.py --check-readme`) |
-| Test files | **432+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
+| Test files | **436+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
 | Plugin tools | **72** | CI-enforced via `scripts/validate_tool_registry.py` |
-| Dashboard pages | **50** | Flask + SSE + basic-auth, unified `/showcase` |
+| Dashboard pages | **52** | Flask + SSE + basic-auth, unified `/showcase` |
 | LaunchAgent definitions | **34** | Routines + soak gates |
 | Data feeds | **20+** | Market · on-chain · macro · threat · counter-party · internal |
 | Production-readiness sweep | **0 FAIL** | `--no-external` at Tranche 4 closeout |
