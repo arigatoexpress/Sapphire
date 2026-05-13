@@ -5,8 +5,10 @@
 #
 # Status values:
 #   registered  → agent-facing, listed in plugins/claw-sapphire/plugin.json
-#   internal    → invoked programmatically (scheduled tasks, hermes skills,
+#   internal    → invoked programmatically (scheduled tasks, sapphire internal,
 #                 services); not exposed to the LLM tool manifest
+#                 (Note: "hermes skills" references in consumer labels are historical;
+#                  hermes-agent was archived 2026-05-12; Sapphire PM bot owns Telegram)
 #   deprecated  → in sunset window; a thin wrapper in tools/_deprecated/
 #                 emits a DeprecationWarning on invocation
 #   retired     → removed from disk (listed here as a historical record)
@@ -50,7 +52,7 @@ tools:
     status: registered
     agent_facing: true
     owner: sapphire
-    consumers: [scheduled-tasks.factory-client-delivery, hermes-agent.kimi-delegate]
+    consumers: [scheduled-tasks.factory-client-delivery, sapphire-internal.kimi-delegate]
     description: Route a dev task to the cheapest capable inference tier (T0 Nemotron / T1 Kimi / T3 Claude). Classifies complexity, checks budget, executes.
 
   - name: sapphire_verify
@@ -58,7 +60,7 @@ tools:
     status: registered
     agent_facing: true
     owner: sapphire
-    consumers: [hermes-agent.system-ops, claude-code.manual]
+    consumers: [sapphire-internal.system-ops, claude-code.manual]
     description: Run ruff + pytest on a repo. Returns pass/fail and safe-to-commit status. Use after code changes.
 
   - name: sapphire_budget
@@ -66,7 +68,7 @@ tools:
     status: registered
     agent_facing: false
     owner: sapphire
-    consumers: [scheduled-tasks.factory-repo-fixer, hermes-agent.inference-tier]
+    consumers: [scheduled-tasks.factory-repo-fixer, sapphire-internal.inference-tier]
     description: Show token usage per tier (T0/T1/T3) with budget bars and call counts.
 
   - name: sapphire_state
@@ -82,7 +84,7 @@ tools:
     status: registered
     agent_facing: false
     owner: sapphire
-    consumers: [hermes-agent.system-health]
+    consumers: [sapphire-internal.system-health]
     description: Query Sapphire mesh status — Tailscale devices, Ollama models on GPU and local.
 
   - name: sapphire_notify
@@ -95,7 +97,7 @@ tools:
       - scheduled-tasks.sapphire-ci-monitor
       - scheduled-tasks.factory-test-guardian
       - scheduled-tasks.trading-research
-      - hermes-agent.system-ops
+      - sapphire-internal.system-ops
     description: Create a PM-bot-reviewed Telegram draft notification (p0 urgent / p1 normal / p2 low).
 
   - name: sapphire_market
@@ -103,7 +105,7 @@ tools:
     status: registered
     agent_facing: true
     owner: sapphire
-    consumers: [hermes-agent.trading-analysis, hermes-agent.macro-data]
+    consumers: [sapphire-internal.trading-analysis, sapphire-internal.macro-data]
     description: "Unified market data — equity quotes, crypto OHLCV, FRED macro, news via OpenBB + TradingView live chart data + Pine CI. Actions: quote, crypto, historical, fred, news, snapshot, tv_quote, tv_ohlcv, tv_levels, tv_strategy, pine_ci."
 
   # ── internal / programmatically invoked ──────────────────────────────────
@@ -125,7 +127,7 @@ tools:
     path: plugins/claw-sapphire/tools/internal/audit_panel.py
     status: internal
     owner: sapphire
-    consumers: [scheduled-tasks.audit-panel, hermes-agent.system-ops]
+    consumers: [scheduled-tasks.audit-panel, sapphire-internal.system-ops]
     description: Read-only multi-agent merge audit panel. Scores merged PRs for scope, safety-control, provenance, secret-signature, test-coverage, status-check, and no-spend merge anomalies.
 
   - name: morning_digest
@@ -189,28 +191,28 @@ tools:
     consumers:
       - scheduled-tasks.sapphire-morning-briefing
       - scheduled-tasks.market-pulse
-      - hermes-agent.paper-trading
+      - sapphire-internal.paper-trading
     description: $100K paper portfolio — ATR-based SL/TP (1.67:1 R:R), 10% sizing, round-trip friction.
 
   - name: crypto_portfolio
     path: plugins/claw-sapphire/tools/internal/crypto_portfolio.py
     status: internal
     owner: sapphire
-    consumers: [hermes-agent.trading-analysis]
+    consumers: [sapphire-internal.trading-analysis]
     description: Read-only crypto portfolio snapshot across exchanges.
 
   - name: live_portfolio
     path: plugins/claw-sapphire/tools/internal/live_portfolio.py
     status: internal
     owner: sapphire
-    consumers: [scheduled-tasks.live-portfolio, hermes-agent.trading-analysis]
+    consumers: [scheduled-tasks.live-portfolio, sapphire-internal.trading-analysis]
     description: Operator-seeded live capital ledger and ramp-gate status tool. No broker API calls, no trade execution, account hashes only, provenance required for seeded fills.
 
   - name: backtest
     path: plugins/claw-sapphire/tools/internal/backtest.py
     status: internal
     owner: sapphire
-    consumers: [hermes-agent.trading-analysis, scheduled-tasks.backtest-sweep]
+    consumers: [sapphire-internal.trading-analysis, scheduled-tasks.backtest-sweep]
     description: Strategy backtester — Sortino/Calmar/Sharpe, fee-aware.
 
   - name: trading_brain
@@ -219,14 +221,14 @@ tools:
     owner: sapphire
     consumers:
       - scheduled-tasks.sapphire-morning-briefing
-      - hermes-agent.trading-brain
+      - sapphire-internal.trading-brain
     description: Multi-source decision engine — TA + ensemble + Kronos + macro consensus for BTC/ETH/SOL.
 
   - name: hyperliquid
     path: plugins/claw-sapphire/tools/internal/hyperliquid.py
     status: internal
     owner: sapphire
-    consumers: [scheduled-tasks.market-pulse, hermes-agent.trading-analysis]
+    consumers: [scheduled-tasks.market-pulse, sapphire-internal.trading-analysis]
     description: Hyperliquid public-feed signal tool (status/latest/subscribe-test) plus live-status read-only inspector for the executor (killswitch, trading-enabled flag, daily PnL ledger, recent trades). Does not place or sign orders — execution lives in services/hyperliquid + lib/trading/hyperliquid_live.
 
   - name: market_sentiment
@@ -242,7 +244,7 @@ tools:
     owner: sapphire
     consumers:
       - scheduled-tasks.sapphire-morning-briefing
-      - hermes-agent.macro-data
+      - sapphire-internal.macro-data
     description: FRED macro dashboard (CPI, unemployment, rates, housing). Graceful fallback when FRED_API_KEY unset.
 
   - name: macro_intel
@@ -252,7 +254,7 @@ tools:
     consumers:
       - services.macro-intel
       - scheduled-tasks.market-pulse
-      - hermes-agent.macro-data
+      - sapphire-internal.macro-data
     description: Official regulatory and macro intelligence daemon/tool. Pulls Fed/FOMC, CFTC, SEC, Treasury, BLS, ECB, and BIS sources with dry-run defaults, source citations, cache counters, calendar windows, and heuristic classification.
 
   # Intelligence & ops
@@ -263,7 +265,7 @@ tools:
     consumers:
       - scheduled-tasks.threat-intel-sweep
       - scheduled-tasks.sapphire-morning-briefing
-      - hermes-agent.threat-intel
+      - sapphire-internal.threat-intel
       - tests.integration.test_ecosystem
     description: CISA KEV / NVD / MITRE ATT&CK threat feed aggregation.
 
@@ -274,7 +276,7 @@ tools:
     consumers:
       - scheduled-tasks.github-discovery
       - scheduled-tasks.sapphire-morning-briefing
-      - hermes-agent.repo-discovery
+      - sapphire-internal.repo-discovery
     description: GitHub starred-repo sync + trending project discovery.
 
   - name: vote_monitor
@@ -290,7 +292,7 @@ tools:
     owner: sapphire
     consumers:
       - scheduled-tasks.sapphire-self-improvement
-      - hermes-agent.system-health
+      - sapphire-internal.system-health
     description: Full-mesh health probe — services, Ollama tiers, disk, Redis.
 
   - name: watchdog
@@ -353,21 +355,21 @@ tools:
     path: plugins/claw-sapphire/tools/internal/tho_intel.py
     status: internal
     owner: sapphire
-    consumers: [scheduled-tasks.sapphire-morning-briefing, hermes-agent.tho-operations]
+    consumers: [scheduled-tasks.sapphire-morning-briefing, sapphire-internal.tho-operations]
     description: THO (housing) intelligence report generator.
 
   - name: lumo
     path: plugins/claw-sapphire/tools/internal/lumo.py
     status: internal
     owner: sapphire
-    consumers: [hermes-agent.cyber-intel]
+    consumers: [sapphire-internal.cyber-intel]
     description: Lumo-T5 cyber research workflow (chat mode).
 
   - name: lumo_research
     path: plugins/claw-sapphire/tools/internal/lumo_research.py
     status: internal
     owner: sapphire
-    consumers: [hermes-agent.cyber-intel]
+    consumers: [sapphire-internal.cyber-intel]
     description: Lumo-T5 structured research — briefs, CVE deep-dive, summaries.
 
   - name: solana_wallet
@@ -432,7 +434,7 @@ tools:
     path: plugins/claw-sapphire/tools/internal/telegram_intel.py
     status: internal
     owner: sapphire
-    consumers: [scheduled-tasks.telegram-intel-reader, hermes-agent.intel]
+    consumers: [scheduled-tasks.telegram-intel-reader, sapphire-internal.intel]
     description: Telegram Channel Intel Reader 0.1.0. Gated MTProto/Bot API channel ingestion into provenance-stamped JSONL with pure quality filters, URL defanging, PII redaction, optional local balanced classifier, and caps of 32 channels, 600 messages/hour, 200 classifications/hour. Actions, status/pull-once/recent/quality-test/models.
 
   # Signals — cross-source correlation engine
@@ -504,7 +506,7 @@ tools:
     path: plugins/claw-sapphire/tools/internal/onchain_intel.py
     status: internal
     owner: sapphire
-    consumers: [services.onchain_intel, scheduled-tasks.chain-refresh, hermes-agent.trading-analysis]
+    consumers: [services.onchain_intel, scheduled-tasks.chain-refresh, sapphire-internal.trading-analysis]
     description: On-chain intelligence 0.2.0 across Glassnode, Santiment, Ethereum RPC, and Solana RPC. Fixture by default; live calls require per-provider SAPPHIRE_*_LIVE gates plus key/RPC envs. Enforces local caps of 60/hour, 100k/day, and 730-day backfill. Read-only only; no wallet keys, no transactions, no trading.
 
   # Source quality measurement 0.1.0
@@ -564,7 +566,7 @@ tools:
     shim: plugins/claw-sapphire/tools/timetravel.py
     status: internal
     owner: sapphire
-    consumers: [services.timetravel, hermes-agent.system-ops]
+    consumers: [services.timetravel, sapphire-internal.system-ops]
     description: Time-Travel + Replay 0.1.0. Read-only over append-only JSONL under data/ (correlated_signals, narratives, cross_asset, macro, onchain, events/bus). Builds an interval index cached at ~/.cache/sapphire/timetravel/index.json (idempotent), packages a SystemSnapshot for any UTC timestamp, replays the correlator + narrative engine against snapshot data, and diffs replay vs actual to surface drift. Never writes to data/, never publishes events, never places trades. Actions, snapshot/replay/diff/index-status.
 
   # Walk-forward + regime decomposition 0.1.0 (Tranche 6 Lane 5)
@@ -587,7 +589,7 @@ tools:
     status: registered
     agent_facing: true
     owner: sapphire
-    consumers: [services.alpha.signal_logger, scheduled-tasks.kronos-daily, hermes-agent.trading]
+    consumers: [services.alpha.signal_logger, scheduled-tasks.kronos-daily, sapphire-internal.trading]
     description: |
       Publish a Sapphire trading signal to 0G Storage and anchor its merkle root on 0G Chain via SapphireSignalVerifier.publishSignal. Inert unless SAPPHIRE_OG_ENABLED=1 and OG_PRIVATE_KEY is set. Returns {root_hash, storage_tx, anchor.{signal_id, tx_hash, explorer_url}}.
 
@@ -596,7 +598,7 @@ tools:
     status: registered
     agent_facing: true
     owner: sapphire
-    consumers: [services.dashboard, hermes-agent.trading, audit]
+    consumers: [services.dashboard, sapphire-internal.trading, audit]
     description: |
       Verify a previously-published Sapphire signal against 0G state. Reads the on-chain entry from SapphireSignalVerifier, downloads the blob from 0G Storage with merkle proof verification, and surfaces the TEE attestation chatID for off-chain re-verification. Read-only — no key required.
 
@@ -610,7 +612,7 @@ tools:
     status: registered
     agent_facing: true
     owner: sapphire
-    consumers: [hermes-agent.trading-analysis, claude-code.manual]
+    consumers: [sapphire-internal.trading-analysis, claude-code.manual]
     description: |
       Read protocols on MegaETH (chain 4326): Aave V3 lending state, Kumbaya DEX quotes, USDM peg/health, oracle prices. Use for any "what's happening on MegaETH" question. Read-only — no swaps or borrows. Actions: lend_overview, lend_user_position, oracle_price, quote_swap, dex_overview, stable_health, peg_status, is_safe_for_leverage, list_protocols, describe_actions. Composes lib.chains.megaeth.MegaETHProtocols facade (Wave A + B.1 + B.2) behind one dispatcher to keep the LLM tool manifest lean.
 
@@ -620,7 +622,7 @@ tools:
     shim: plugins/claw-sapphire/tools/wildfire.py
     status: internal
     owner: sapphire
-    consumers: [wildfire-watch.ground-station, services.dashboard, hermes-agent.alerts]
+    consumers: [wildfire-watch.ground-station, services.dashboard, sapphire-internal.alerts]
     description: |
       Ingest, query, and aggregate wildfire-watch drone signals. Validates a payload against the v1 wildfire_signal schema (~/Code/wildfire-watch/sapphire_integration/wildfire_signal_schema.json), appends to data/wildfire_signals.jsonl with idempotency on signal_id, emits a wildfire.signal.detected event_bus envelope, and exposes list/stats/schema_info actions. Never sends Telegram directly; the operator-supervised hermes wildfire-alert skill consumes the bus event.
 
@@ -629,7 +631,7 @@ tools:
     path: plugins/claw-sapphire/tools/internal/megaeth.py
     status: internal
     owner: sapphire
-    consumers: [hermes-agent.trading-analysis, services.intelligence]
+    consumers: [sapphire-internal.trading-analysis, services.intelligence]
     description: |
       Read-only MegaETH JSON-RPC client + plugin tool. Actions, status (chain_id + latest block + gas_price), balance <address> (wei + ETH-equivalent), tx <hash> (receipt summary + explorer URL), mempool_snapshot (txpool_status preferred, falls back to newPendingTransactions WS sample). RPC method allow-list enforced — no signing, no private keys, no state-changing calls. Endpoints configurable via SAPPHIRE_MEGAETH_RPC_URL / SAPPHIRE_MEGAETH_WS_URL / SAPPHIRE_MEGAETH_CHAIN_ID; defaults are MegaETH testnet (carrot.megaeth.com, chain_id 6343).
 
@@ -637,7 +639,7 @@ tools:
     path: plugins/claw-sapphire/tools/internal/megaeth_executor.py
     status: internal
     owner: sapphire
-    consumers: [services.hyperliquid, hermes-agent.trading-analysis]
+    consumers: [services.hyperliquid, sapphire-internal.trading-analysis]
     description: |
       MegaETH live-trading executor scaffold (testnet-only, fail-closed). Mirrors the safety pattern from services/hyperliquid: per-order USD cap ($5), daily realized-loss cap ($25), file-based killswitch, and signing_verified=False policy field. Mainnet path raises NotImplementedError until signing_verified=True is flipped via source-code change. Not wired into any scheduler or dispatch entrypoint; scaffolding only.
 
@@ -651,6 +653,6 @@ tools:
     status: registered
     agent_facing: true
     owner: sapphire
-    consumers: [hermes-agent.trading-analysis, claude-code.manual]
+    consumers: [sapphire-internal.trading-analysis, claude-code.manual]
     description: |
       Read-only TradingView orchestrator surface. Wraps lib.trading.tradingview_orchestrator + lib.trading.pine_templates behind one dispatcher; mutation paths (set_symbol/timeframe, setup_chart, apply_indicator_stack, pine_compile/save/promote/set_from_file, alert_create/delete) are intentionally NOT exposed and the dispatcher constructs the orchestrator with mutation_enabled=False regardless of the SAPPHIRE_TV_MUTATION_ENABLED env var. Actions, probe (state+quote+values), score (latest scoring rows from the most recent capture manifest), list_pine (TV account scripts + local generated under pine/generated/), list_alerts (active TV alerts), generate_pine (symbol, kind=indicator|strategy — emits a Sapphire Pine v5 file under pine/generated/, no TV push), sweep (offline=true, limit=N — read-only TA sweep, returns manifest summary). Mutation lives in scripts/ops/tradingview_ta_capture.py under operator supervision; see docs/ops/tradingview-orchestrator-runbook.md.

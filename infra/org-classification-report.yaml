@@ -1,6 +1,6 @@
 schema_version: 1
 generated_for: sapphire-autonomous-org
-updated_at: "2026-05-06"
+updated_at: "2026-05-12"
 source_manifest: infra/org-repos.yaml
 scope: Core+Satellites only; older experiments remain inventory-only unless they overlap Sapphire autonomy.
 
@@ -16,17 +16,31 @@ active_repos:
     - sapphire
     - project-go-forward
   satellite:
-    - claw-code
     - org-platform
     - cyber-threat-bot
     - regional-intel-workbench
-    - tradingview-mcp
+    - tradingview-mcp-v2
     - crypto-tax-tracker
   integration:
     - agentic-arigato
-    - tradingview-mcp-v2
-    - hermes-agent
-    - kimi-tools
+
+# Repos archived 2026-05-12 (moved to _Archive_2026-05-12/repo-quarantine-2026-05-12/):
+archived_repos:
+  - claw-code         # Rust agent runtime; agent dispatch now internal to Sapphire
+  - hermes-agent      # Telegram gateway; consolidated into Sapphire PM bot
+  - kimi-tools        # Local Kimi client; no live callers found during soak
+  - tradingview-mcp   # Original Ari TV fork; active lane is tradingview-mcp-v2
+  - Cointracker       # Crypto tax workbench
+  - openclaw
+  - NemoClaw
+  - lumo-api
+  - foundry-platform-python
+  - palantir-python-sdk
+  - fredapi
+  - lightweight-charts
+  - goose
+  - career-ops-plugin
+  - aip-community-registry
 
 upstream_integration_fleet:
   source_manifest_section: upstream_repos
@@ -36,64 +50,26 @@ upstream_integration_fleet:
     - Do not force-sync diverged Ari forks without a dedicated review.
   tracked:
     - openbb
-    - openclaw
-    - nemoclaw
     - kronos
-    - lumo-api-v2
-    - hermes-agent-upstream
-    - claw-code-upstream
     - tradingview-mcp-upstream
-    - foundry-platform-python
-    - palantir-python-sdk
-    - fredapi
-    - lightweight-charts
-    - goose
     - rtk
-    - career-ops-plugin
-    - aip-community-registry
+    # All below were archived 2026-05-12 (see archived_repos above):
+    # - openclaw, nemoclaw, lumo-api-v2, hermes-agent-upstream, claw-code-upstream
+    # - foundry-platform-python, palantir-python-sdk, fredapi, lightweight-charts
+    # - goose, career-ops-plugin, aip-community-registry
 
-candidate_absorb:
-  - id: kimi-tools
-    current_classification: integration
-    proposed_target: sapphire
-    stage: absorb_guardrails_tested
-    rationale: Local-only Kimi Cloud utilities overlap Sapphire inference-proxy/router behavior, no live Sapphire imports remain, and Kimi fallback guardrail tests now live in Sapphire.
-    tracking: docs/org/kimi-tools-absorb-map.md
-    prerequisites:
-      - Keep local utility available until replacement has soaked.
-      - Archive only through a later dedicated cleanup PR/report.
-    rollback: Restore Sapphire callers to the local utility path.
-
-  - id: tradingview-mcp-v2
-    current_classification: integration
-    proposed_target: tradingview-mcp
-    stage: conditional
-    rationale: Upstream CDP bridge overlaps Ari-owned tradingview-mcp; upstream hardening is open but not mergeable by Ari.
-    condition: If upstream PR #102 stalls or the integration becomes production-critical, consolidate required behavior into the Ari-owned bridge or pin the Ari fork.
-    prerequisites:
-      - Keep offline CI and agent guardrails from upstream PR #102.
-      - Preserve CDP safety defaults and manual-only chart mutation behavior.
-      - Confirm Sapphire callers before changing package source.
-    rollback: Repoint callers to the upstream integration clone.
+candidate_absorb: []  # All previous absorb candidates were archived 2026-05-12.
 
 candidate_archive:
-  approved: []
-  review_only:
-    - id: kimi-tools
-      after: kimi-tools absorb completes and replacement soaks.
-      reason: Local-only repo should not remain a separate maintenance surface if its behavior moves into Sapphire.
-
+  approved: []  # All candidates were completed via the 2026-05-12 workspace cleanup.
   policy:
     - Do not delete or archive any repo from this list without a dedicated PR.
     - Archive only after inventory, replacement, rollback notes, and a soak window.
     - Do not delete local clones as part of classification work.
 
 blocked_or_watch:
-  - id: tradingview-mcp-v2
-    blocker: Upstream repository is read-only for Ari.
+  - id: tradingview-mcp-upstream
+    blocker: Upstream repository (tradesdontlie/tradingview-mcp) is read-only for Ari; hardening PR #102 awaits upstream maintainer action.
     tracking: https://github.com/tradesdontlie/tradingview-mcp/pull/102
-  - id: hermes-agent
-    blocker: Local patched runtime is mapped; fork, hook, or upstream decision still required before updating runtime Hermes.
-    tracking: docs/org/hermes-agent-consolidation-map.md
 
 next_reviews: []

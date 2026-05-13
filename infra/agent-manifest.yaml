@@ -1,7 +1,7 @@
 # Sapphire Agent Manifest
 #
-# The LEAN subset of the tool registry that the LLM (Claude Code, hermes-agent)
-# sees in its tool-selection context. Kept intentionally small: Kimi research
+# The LEAN subset of the tool registry that the LLM (Claude Code, Sapphire PM bot)
+# sees in its tool-selection context. (hermes-agent was archived 2026-05-12.) Kept intentionally small: Kimi research
 # on tool-boundary architecture found that LLM tool-selection accuracy drops
 # from 74% → 49% as the manifest grows past ~8 tools.
 #

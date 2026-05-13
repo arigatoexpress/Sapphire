@@ -1,7 +1,11 @@
 # Kimi Tools Absorb Map
 
-Verified on 2026-04-26. This is a read-only Wave 3 consolidation map for the
-local-only `/Users/aribs/Code/kimi-tools` repo. No files in `kimi-tools` were
+**COMPLETED 2026-05-12:** `kimi-tools` was archived to `_Archive_2026-05-12/repo-quarantine-2026-05-12/kimi-tools`.
+`~/Code/kimi-tools` no longer exists. If you need to inspect the historical workbench,
+restore from archive. The absorb is complete — all durable behavior is now in Sapphire.
+
+Verified on 2026-04-26. This was a read-only Wave 3 consolidation map for the
+local-only `/Users/aribs/Code/kimi-tools` repo (now archived). No files in `kimi-tools` were
 changed, no Kimi/Moonshot/OpenRouter request was sent, and no secret values were
 read or printed.
 
@@ -54,9 +58,8 @@ Use a two-step absorb, then archive:
    the inference proxy has passed a health soak, mark `kimi-tools` as
    `candidate_archive` review-only with a rollback note pointing to this map.
 
-Do not delete `/Users/aribs/Code/kimi-tools` in the absorb PR. The reversible
-cutover is: keep the repo read-only for 14 days after Sapphire coverage lands,
-then quarantine or archive only with a dedicated cleanup PR/report.
+~~Do not delete `/Users/aribs/Code/kimi-tools` in the absorb PR.~~ **Archived 2026-05-12.**
+Restore from `_Archive_2026-05-12/repo-quarantine-2026-05-12/kimi-tools` if rollback is needed.
 
 ## Guardrail Coverage
 
@@ -67,6 +70,4 @@ then quarantine or archive only with a dedicated cleanup PR/report.
 - `tests/unit/test_sensitivity_filter.py` covers the sensitivity gate that
   blocks Kimi Cloud routing before external calls for secret-like or private
   content.
-- The remaining archive gate is procedural: do not delete or move
-  `/Users/aribs/Code/kimi-tools` until a later cleanup PR/report records a soak
-  and rollback path.
+- Archive gate: completed via the 2026-05-12 workspace cleanup; `kimi-tools` quarantined.

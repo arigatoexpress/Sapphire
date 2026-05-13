@@ -97,8 +97,8 @@ repos:
   - id: claw-code
     name: claw-code
     classification: satellite
-    role: Rust agent runtime hosting the claw-sapphire plugin
-    local_path: /Users/aribs/Code/claw-code
+    role: Rust agent runtime hosting the claw-sapphire plugin (ARCHIVED 2026-05-12)
+    local_path: /Users/aribs/_Archive_2026-05-12/repo-quarantine-2026-05-12/claw-code
     github: instructkr/claw-code
     pr_github: arigatoexpress/claw-code
     issue_github: arigatoexpress/claw-code
@@ -108,7 +108,7 @@ repos:
     required_guardrails:
       - CLAUDE.md
       - CI on PR
-    migration_state: active_runtime
+    migration_state: archived_2026-05-12
 
   - id: cyber-threat-bot
     name: cyber-threat-bot
@@ -143,17 +143,17 @@ repos:
   - id: tradingview-mcp
     name: tradingview-mcp
     classification: satellite
-    role: Ari-owned TradingView MCP automation bridge
-    local_path: /Users/aribs/Code/tradingview-mcp
+    role: Ari-owned TradingView MCP automation bridge (ARCHIVED 2026-05-12; active lane is tradingview-mcp-v2)
+    local_path: /Users/aribs/_Archive_2026-05-12/repo-quarantine-2026-05-12/tradingview-mcp
     github: arigatoexpress/tradingview-mcp
     default_branch: master
     ci_strategy: local_evidence_skip_ci_bootstrap
-    production_adjacent: true
+    production_adjacent: false
     required_guardrails:
       - CLAUDE.md
       - CI on PR
       - no direct main pushes
-    migration_state: active_capability
+    migration_state: archived_2026-05-12
 
   - id: tradingview-mcp-v2
     name: tradingview-mcp-v2
@@ -184,8 +184,8 @@ repos:
   - id: crypto-tax-tracker
     name: crypto-tax-tracker
     classification: satellite
-    role: Crypto tax and Cointracker workbench
-    local_path: /Users/aribs/Code/Cointracker
+    role: Crypto tax and Cointracker workbench (ARCHIVED 2026-05-12; was at ~/Code/Cointracker)
+    local_path: /Users/aribs/_Archive_2026-05-12/repo-quarantine-2026-05-12/Cointracker
     github: arigatoexpress/crypto-tax-tracker
     default_branch: main
     ci_strategy: local_evidence_skip_ci_bootstrap
@@ -195,7 +195,7 @@ repos:
       - CLAUDE.md
       - CI on PR
       - pre-commit or equivalent lint/test parity
-    migration_state: guardrails_complete
+    migration_state: archived_2026-05-12
     hardening_tracking:
       repo_pr: https://github.com/arigatoexpress/crypto-tax-tracker/pull/2
       validated_at: "2026-04-26"
@@ -213,44 +213,35 @@ repos:
   - id: hermes-agent
     name: hermes-agent
     classification: integration
-    role: Hermes Telegram gateway and conversational framework integration
-    local_path: /Users/aribs/Code/hermes-agent
+    role: Hermes Telegram gateway and conversational framework integration (ARCHIVED 2026-05-12; agent shell consolidated into Sapphire PM bot)
+    local_path: /Users/aribs/_Archive_2026-05-12/repo-quarantine-2026-05-12/hermes-agent
     github: NousResearch/hermes-agent
     pr_github: arigatoexpress/hermes-agent
     issue_github: arigatoexpress/hermes-agent
     default_branch: main
     ci_strategy: upstream_fork_local_only
-    production_adjacent: true
+    production_adjacent: false
     required_guardrails:
       - AGENTS.md
       - local override branch documented
-    migration_state: local_runtime_mapped
+    migration_state: archived_2026-05-12
     runtime_tracking:
       consolidation_doc: docs/org/hermes-agent-consolidation-map.md
       launchagent_label: ai.hermes.gateway
-      runtime_path: /Users/aribs/.hermes/hermes-agent
-      runtime_branch: local/sapphire-relay-ignore
-      dev_clone_path: /Users/aribs/Code/hermes-agent
-      validated_at: "2026-04-26"
-      local_runtime_commits:
-        - sha: 5f2af81c
-          purpose: Ignore relay-only Telegram users after hook capture.
-        - sha: 3ba7bd5f
-          purpose: Intercept Sapphire confirmation replies before LLM handling.
-      decision_needed: Upstream patches, convert to supported hooks, or maintain an Ari fork before updating runtime Hermes.
+      note: ai.hermes.gateway plist must remain disabled; runtime was at /Users/aribs/.hermes/hermes-agent (archived).
 
   - id: kimi-tools
     name: kimi-tools
     classification: integration
-    role: Local Kimi Cloud HTTP client utilities
-    local_path: /Users/aribs/Code/kimi-tools
+    role: Local Kimi Cloud HTTP client utilities (ARCHIVED 2026-05-12; no live Sapphire callers found during soak)
+    local_path: /Users/aribs/_Archive_2026-05-12/repo-quarantine-2026-05-12/kimi-tools
     github: null
     default_branch: main
     ci_strategy: local_evidence_skip_ci_bootstrap
     production_adjacent: false
     required_guardrails:
       - local README or AGENTS.md
-    migration_state: absorb_guardrails_tested
+    migration_state: archived_2026-05-12
     absorb_tracking:
       consolidation_doc: docs/org/kimi-tools-absorb-map.md
       validated_at: "2026-04-26"
@@ -258,7 +249,6 @@ repos:
       target_repo: sapphire
       guardrail_tests:
         - tests/unit/test_kimi_cloud_fallback.py
-      next_step: Keep standalone workbench read-only during soak; archive only through a later dedicated cleanup PR.
 
 upstream_repos:
   - id: openbb
@@ -274,19 +264,19 @@ upstream_repos:
     name: openclaw
     upstream: openclaw/openclaw
     ari_fork: arigatoexpress/openclaw
-    local_path: /Users/aribs/Code/openclaw
-    integration_surface: Sapphire still references OpenClaw gateway/runtime surfaces during agent consolidation.
-    sync_state: fork_diverged_do_not_force
-    notes: Ari fork has diverged from upstream; do not force-sync without a dedicated review.
+    local_path: /Users/aribs/_Archive_2026-05-12/repo-quarantine-2026-05-12/openclaw
+    integration_surface: ARCHIVED 2026-05-12; OpenClaw gateway surfaces have been consolidated into Sapphire.
+    sync_state: archived
+    notes: Archived; do not reference ~/Code/openclaw — that path no longer exists.
 
   - id: nemoclaw
     name: NemoClaw
     upstream: NVIDIA/NemoClaw
     ari_fork: arigatoexpress/NemoClaw
-    local_path: /Users/aribs/Code/NemoClaw
-    integration_surface: Candidate secure agent-runtime reference for OpenClaw/NemoClaw consolidation.
-    sync_state: forked_cloned_synced
-    notes: Inventory/reference only until a dedicated integration PR changes runtime behavior.
+    local_path: /Users/aribs/_Archive_2026-05-12/repo-quarantine-2026-05-12/NemoClaw
+    integration_surface: ARCHIVED 2026-05-12; inventory/reference clone only; no integration shipped.
+    sync_state: archived
+    notes: Archived; use Sapphire's existing dispatch stack instead.
 
   - id: kronos
     name: Kronos
@@ -301,28 +291,28 @@ upstream_repos:
     name: Lumo-Api-V2
     upstream: carlostkd/Lumo-Api-V2
     ari_fork: arigatoexpress/Lumo-Api-V2
-    local_path: /Users/aribs/Code/lumo-api
-    integration_surface: Local Lumo API server backs Sapphire security research tools.
-    sync_state: forked_clean_local_workbench
-    notes: Local worktree is clean; keep as a local security-research integration workbench.
+    local_path: /Users/aribs/_Archive_2026-05-12/repo-quarantine-2026-05-12/lumo-api
+    integration_surface: ARCHIVED 2026-05-12; was a local security-research workbench; no production callers.
+    sync_state: archived
+    notes: Archived; ~/Code/lumo-api no longer exists at that path.
 
   - id: hermes-agent-upstream
     name: hermes-agent
     upstream: NousResearch/hermes-agent
     ari_fork: arigatoexpress/hermes-agent
-    local_path: /Users/aribs/Code/hermes-agent
-    integration_surface: Development clone for the Hermes gateway; runtime checkout is tracked separately above.
-    sync_state: forked_cloned_synced
-    notes: Runtime patches remain in /Users/aribs/.hermes/hermes-agent until hook strategy is decided.
+    local_path: /Users/aribs/_Archive_2026-05-12/repo-quarantine-2026-05-12/hermes-agent
+    integration_surface: ARCHIVED 2026-05-12; development clone consolidated into Sapphire PM bot.
+    sync_state: archived
+    notes: Archived; ~/Code/hermes-agent and ~/.hermes/hermes-agent no longer exist at those paths.
 
   - id: claw-code-upstream
     name: claw-code
     upstream: instructkr/claw-code
     ari_fork: arigatoexpress/claw-code
-    local_path: /Users/aribs/Code/claw-code
-    integration_surface: Rust agent runtime hosting the Sapphire plugin.
-    sync_state: fork_synced_local_current
-    notes: Local clone keeps upstream origin plus an Ari fork remote.
+    local_path: /Users/aribs/_Archive_2026-05-12/repo-quarantine-2026-05-12/claw-code
+    integration_surface: ARCHIVED 2026-05-12; Rust agent runtime; agent dispatch now lives in Sapphire.
+    sync_state: archived
+    notes: Archived; ~/Code/claw-code no longer exists at that path.
 
   - id: tradingview-mcp-upstream
     name: tradingview-mcp upstream bridge
@@ -337,46 +327,46 @@ upstream_repos:
     name: foundry-platform-python
     upstream: palantir/foundry-platform-python
     ari_fork: arigatoexpress/foundry-platform-python
-    local_path: /Users/aribs/Code/foundry-platform-python
-    integration_surface: Foundry SDK reference for Sapphire ontology/action readiness and read-back audits.
-    sync_state: forked_cloned_synced
-    notes: Reference clone only; no Foundry success is inferred without real ontology/action read-back.
+    local_path: /Users/aribs/_Archive_2026-05-12/repo-quarantine-2026-05-12/foundry-platform-python
+    integration_surface: ARCHIVED 2026-05-12; Foundry SDK reference clone; no live Sapphire callers.
+    sync_state: archived
+    notes: Archived; ~/Code/foundry-platform-python no longer exists at that path.
 
   - id: palantir-python-sdk
     name: palantir-python-sdk
     upstream: palantir/palantir-python-sdk
     ari_fork: arigatoexpress/palantir-python-sdk
-    local_path: /Users/aribs/Code/palantir-python-sdk
-    integration_surface: Palantir SDK reference for Foundry client behavior.
-    sync_state: forked_cloned_synced
-    notes: Reference clone only.
+    local_path: /Users/aribs/_Archive_2026-05-12/repo-quarantine-2026-05-12/palantir-python-sdk
+    integration_surface: ARCHIVED 2026-05-12; Palantir SDK reference clone only.
+    sync_state: archived
+    notes: Archived; ~/Code/palantir-python-sdk no longer exists at that path.
 
   - id: fredapi
     name: fredapi
     upstream: mortada/fredapi
     ari_fork: arigatoexpress/fredapi
-    local_path: /Users/aribs/Code/fredapi
-    integration_surface: Optional FRED macro data dependency for Sapphire market tools.
-    sync_state: forked_cloned_synced
-    notes: Library reference; secret-bearing FRED configuration is not tracked here.
+    local_path: /Users/aribs/_Archive_2026-05-12/repo-quarantine-2026-05-12/fredapi
+    integration_surface: ARCHIVED 2026-05-12; FRED macro data library reference clone.
+    sync_state: archived
+    notes: Archived; ~/Code/fredapi no longer exists at that path; FRED key configuration is in Sapphire env.
 
   - id: lightweight-charts
     name: lightweight-charts
     upstream: tradingview/lightweight-charts
     ari_fork: arigatoexpress/lightweight-charts
-    local_path: /Users/aribs/Code/lightweight-charts
-    integration_surface: Charting reference for Sapphire dashboards and TradingView-style UI work.
-    sync_state: forked_cloned_synced
-    notes: Reference clone only unless dashboard work explicitly vendors a component.
+    local_path: /Users/aribs/_Archive_2026-05-12/repo-quarantine-2026-05-12/lightweight-charts
+    integration_surface: ARCHIVED 2026-05-12; charting reference clone for Sapphire dashboards.
+    sync_state: archived
+    notes: Archived; ~/Code/lightweight-charts no longer exists at that path.
 
   - id: goose
     name: goose
     upstream: block/goose
     ari_fork: arigatoexpress/goose
-    local_path: /Users/aribs/Code/goose
-    integration_surface: Agent-runtime reference for future Sapphire/Hermes consolidation.
-    sync_state: forked_cloned_synced
-    notes: Inventory/reference only.
+    local_path: /Users/aribs/_Archive_2026-05-12/repo-quarantine-2026-05-12/goose
+    integration_surface: ARCHIVED 2026-05-12; agent-runtime reference clone; no Sapphire integration shipped.
+    sync_state: archived
+    notes: Archived; ~/Code/goose no longer exists at that path.
 
   - id: rtk
     name: rtk
@@ -391,19 +381,19 @@ upstream_repos:
     name: career-ops-plugin
     upstream: andrew-shwetzer/career-ops-plugin
     ari_fork: arigatoexpress/career-ops-plugin
-    local_path: /Users/aribs/Code/career-ops-plugin
-    integration_surface: Claude/Codex plugin reference adjacent to Ari's broader autonomous workspace.
-    sync_state: forked_cloned_synced
-    notes: Not production-adjacent to Sapphire; tracked to keep starred integration clones organized.
+    local_path: /Users/aribs/_Archive_2026-05-12/repo-quarantine-2026-05-12/career-ops-plugin
+    integration_surface: ARCHIVED 2026-05-12; Claude/Codex plugin reference clone; not production-adjacent.
+    sync_state: archived
+    notes: Archived; ~/Code/career-ops-plugin no longer exists at that path.
 
   - id: aip-community-registry
     name: aip-community-registry
     upstream: palantir/aip-community-registry
     ari_fork: arigatoexpress/aip-community-registry
-    local_path: /Users/aribs/Code/aip-community-registry
-    integration_surface: AIP/Foundry schema reference used during ontology provisioning work.
-    sync_state: forked_lfs_filter_bypassed_clean_reference
-    notes: Local reference clone disables LFS clean/smudge filters because upstream zip blobs are committed as full objects while attributes mark them as LFS; old dirty checkout is preserved under /Users/aribs/Code/_cleanup_backups.
+    local_path: /Users/aribs/_Archive_2026-05-12/repo-quarantine-2026-05-12/aip-community-registry
+    integration_surface: ARCHIVED 2026-05-12; AIP/Foundry schema reference clone.
+    sync_state: archived
+    notes: Archived; ~/Code/aip-community-registry no longer exists at that path.
 
 gcp_projects:
   - project_id: tho-ai-agent
@@ -453,10 +443,10 @@ local_runtime:
     - com.sapphire.correlation-refresh
     - com.sapphire.chain-refresh
     - com.sapphire.gcp-sync
-    - com.sapphire.kronos-daily
     - com.sapphire.morning-brief
     - com.sapphire.logrotate
-    - ai.hermes.gateway
+    # com.sapphire.kronos-daily: ARCHIVED 2026-05-12 (plist moved to _Archive_2026-05-12/launchagent-stale-plists/)
+    # ai.hermes.gateway: must remain DISABLED; hermes-agent archived 2026-05-12
   docker_expected:
     - milvus-standalone
     - milvus-minio
@@ -550,8 +540,10 @@ waves:
     status: in_progress
     objective: CI/pre-commit/doc parity across active satellites
   - id: wave-3-agent-consolidation
-    status: in_progress
+    status: completed
     objective: Consolidate Hermes, claw-code, Sapphire plugins, Claude tasks, and OpenClaw remnants
+    completed_at: "2026-05-12"
+    notes: hermes-agent, claw-code, openclaw, kimi-tools archived 2026-05-12; Sapphire PM bot owns Telegram; agent dispatch is internal.
     tracking:
       - docs/org/hermes-agent-consolidation-map.md
       - docs/org/kimi-tools-absorb-map.md

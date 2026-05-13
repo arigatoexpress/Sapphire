@@ -54,7 +54,8 @@ if ($task) {
 
 # 5. Pull latest repos
 Write-Host "`n[5/5] Pulling latest repos..." -ForegroundColor Yellow
-$repos = @("Sapphire", "Project-Go-Forward", "cyber-threat-bot", "regional-intel-workbench", "Cointracker", "claw-code")
+# Note: Cointracker and claw-code were archived 2026-05-12 and no longer exist at ~/Code/.
+$repos = @("Sapphire", "Project-Go-Forward", "cyber-threat-bot", "regional-intel-workbench")
 foreach ($repo in $repos) {
     $path = "E:\Sapphire\Code\$repo"
     if (Test-Path "$path\.git") {

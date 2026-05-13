@@ -1,6 +1,7 @@
 # Lumo AI — T5 Integration
 
-**Status**: MVP shipped (2026-04-15)  
+**Status**: MVP shipped (2026-04-15) — **Note:** `lumo-api` repo was archived 2026-05-12.
+If re-enabling, clone fresh from `carlostkd/Lumo-Api-V2` or restore from `_Archive_2026-05-12/repo-quarantine-2026-05-12/lumo-api`.  
 **Author**: Sapphire autonomous session (Night 2 → Night 3)
 
 ---

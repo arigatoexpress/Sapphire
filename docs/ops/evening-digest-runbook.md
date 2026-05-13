@@ -109,8 +109,8 @@ became unreliable.
 
 - Trading P&L, paper portfolio, signals, regime status. Those belong in
   a separate trading-digest runbook (out of scope here).
-- Cross-repo digest (THO, regional-intel-workbench, claw-code, etc.).
+- Cross-repo digest (THO, regional-intel-workbench, etc.).
   This digest is Sapphire-only by design; cross-repo can be a separate
-  runbook.
+  runbook. (Note: claw-code was archived 2026-05-12.)
 - Telegram delivery. The digest is the issue; subscribe to issue events
   for notification routing.

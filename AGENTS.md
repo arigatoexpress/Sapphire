@@ -12,7 +12,7 @@ into something stronger.
 The current useful materials include:
 
 - A Kimi/Gemini-first agent runtime with Mac Ollama fallback for sensitive/offline work
-- A `claw-sapphire` plugin with 19 tools exposed to the `claw-code` runtime
+- A `claw-sapphire` plugin with 19 tools (formerly also exposed to the now-archived `claw-code` Rust runtime; agent dispatch is now handled inside Sapphire)
 - 19 scheduled tasks running 24/7 on the Mac (morning briefing, threat intel, factory, trading research, etc.)
 - A Telegram-first PM bot (`services/pm_bot/`) for operational commands on the go
 - Production-grade trading + research flows with paper-trading + Kronos daily predictions
@@ -41,7 +41,7 @@ latest instruction and verified current state win.
 
 ## Production state
 
-- Mac services run as LaunchAgents (`~/Library/LaunchAgents/com.sapphire.*.plist`, `ai.hermes.gateway.plist`).
+- Mac services run as LaunchAgents (`~/Library/LaunchAgents/com.sapphire.*.plist`). Note: `ai.hermes.gateway.plist` must remain disabled — `hermes-agent` was archived 2026-05-12.
 - Windows services were part of the old inference and Telegram support path. Treat them as deprecated for new agentic Telegram work unless a fresh live audit explicitly re-enables them.
 - Cloud Run service `project-go-forward` in project `tho-ai-agent` serves the THO app at `https://sapphirealpha.xyz` and `https://project-go-forward-trgi34bxuq-uc.a.run.app`.
 - Cloud DNS zone for `sapphirealpha.xyz` lives in `sapphire-479610` — **do not delete that project**; the E-pool NS delegation is locked to it.
@@ -152,7 +152,7 @@ Call local fallback through the inference proxy at `http://127.0.0.1:11435` only
 | `qwen3.6` | `qwen3.6:27b` (Mac Ollama) | heavy local reasoning fallback |
 | `kimi` / `cloud` / `research` | Kimi Cloud | non-sensitive cloud fallback only |
 
-Deprecated local Telegram/gateway services (`ai.hermes.gateway`, `ai.openclaw.gateway`, `com.sapphire.healthz-watcher`, `com.sapphire.mac-to-windows-tunnel`) should stay disabled or quarantined during the new Telegram agent rollout.
+Deprecated local Telegram/gateway services (`ai.hermes.gateway`, `ai.openclaw.gateway`, `com.sapphire.healthz-watcher`, `com.sapphire.mac-to-windows-tunnel`) must remain disabled or quarantined; `hermes-agent` and `openclaw` repos were archived 2026-05-12 and these plists are no longer maintained.
 
 ## Common commands
 
@@ -195,7 +195,7 @@ easier to understand and operate.
 | Repo | Where | Purpose |
 |-----|-----|-----|
 | `Project-Go-Forward` | `~/Code/Project-Go-Forward` | THO app — customer/deal/doc CRM, Cloud Run deployed |
-| `claw-code` | `~/Code/claw-code` | Rust agent runtime that hosts `claw-sapphire` as a plugin |
+| `claw-code` | archived to `_Archive_2026-05-12/` | Rust agent runtime (archived 2026-05-12; Sapphire now owns agent dispatch directly) |
 | `cyber-threat-bot` | `~/Code/cyber-threat-bot` | CISA/NVD/MITRE threat intel bot |
 | `regional-intel-workbench` | `~/Code/regional-intel-workbench` | Intelligence platform + ve vote monitor |
 | `tradingview-mcp-v2` | `~/Code/tradingview-mcp-v2` | 78-tool TradingView MCP bridge |

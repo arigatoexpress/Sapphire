@@ -34,14 +34,14 @@ git worktree list
 | `project-go-forward` | core | yes | `draft_auto_deploy` | active_cloud_run |
 | `agentic-arigato` | integration | yes | `local_evidence_skip_ci_bootstrap` | guardrails_complete_protected_cloud_run |
 | `org-platform` | satellite | yes | `local_evidence_skip_ci_bootstrap` | active_local_showcase |
-| `claw-code` | satellite | no | `upstream_fork_local_only` | active_runtime |
 | `cyber-threat-bot` | satellite | yes | `local_evidence_skip_ci_bootstrap` | active_capability |
 | `regional-intel-workbench` | satellite | yes | `local_evidence_skip_ci_bootstrap` | active_capability |
-| `tradingview-mcp` | satellite | yes | `local_evidence_skip_ci_bootstrap` | active_capability |
-| `tradingview-mcp-v2` | integration | yes | `upstream_fork_local_only` | upstream_pr_open |
-| `crypto-tax-tracker` | satellite | no | `local_evidence_skip_ci_bootstrap` | guardrails_complete |
-| `hermes-agent` | integration | yes | `upstream_fork_local_only` | local_runtime_mapped |
-| `kimi-tools` | integration | no | `local_evidence_skip_ci_bootstrap` | absorb_guardrails_tested |
+| `tradingview-mcp-v2` | satellite | yes | `upstream_fork_local_only` | upstream_pr_open |
+| `crypto-tax-tracker` | satellite | no | `local_evidence_skip_ci_bootstrap` | archived_2026-05-12 |
+| `claw-code` | satellite | no | `upstream_fork_local_only` | archived_2026-05-12 |
+| `tradingview-mcp` | satellite | no | `local_evidence_skip_ci_bootstrap` | archived_2026-05-12 |
+| `hermes-agent` | integration | no | `upstream_fork_local_only` | archived_2026-05-12 |
+| `kimi-tools` | integration | no | `local_evidence_skip_ci_bootstrap` | archived_2026-05-12 |
 
 ## No-Spend CI Rules
 
@@ -92,7 +92,7 @@ Workers must use disjoint write sets and must not revert other agents' edits.
 | Control Tower | `docs/org/**`, `scripts/ops/**`, `infra/org-repos.yaml` | Keep this prompt, no-spend CI posture, and org status current. |
 | Foundry / Regional | `regional-intel-workbench`, `lib/foundry`, GCP schemas | Provenance manifests, regional OODA packets, and paste-safe readiness. |
 | Media Factory | `lib/media/**`, media tests/docs | Dry-run image/audio/video readiness artifacts before live API calls. |
-| Telegram / Hermes | `hermes-agent` gateway safety and Sapphire Telegram docs | CommandGuard-gated exec paths and dry-run-safe Telegram handling. |
+| Telegram / PM Bot | Sapphire PM bot gateway safety and Telegram docs | CommandGuard-gated exec paths and dry-run-safe Telegram handling. (hermes-agent archived 2026-05-12.) |
 | Data / OODA | `lib/autonomy`, status docs, dashboard APIs | Turn observed data into ranked safe review actions. |
 
 ## OODA Loop

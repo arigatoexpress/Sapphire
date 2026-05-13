@@ -16,10 +16,11 @@ Active classifications:
 - `candidate_absorb`: overlapping systems to merge into a core or satellite repo.
 - `candidate_archive`: stale or duplicative systems to freeze after inventory.
 
-The initial Core+Satellites set is Sapphire, Project-Go-Forward, claw-code,
-cyber-threat-bot, regional-intel-workbench, tradingview-mcp,
-tradingview-mcp-v2, crypto-tax-tracker/Cointracker, hermes-agent, and active
-GCP/local runtime services.
+The active Core+Satellites set (as of 2026-05-12) is Sapphire, Project-Go-Forward,
+cyber-threat-bot, regional-intel-workbench, tradingview-mcp-v2, and active
+GCP/local runtime services. `claw-code`, `hermes-agent`, `tradingview-mcp` (original fork),
+`Cointracker`, `kimi-tools`, and several vendor/reference clones were archived
+2026-05-12 to `_Archive_2026-05-12/repo-quarantine-2026-05-12/`.
 
 `infra/org-repos.yaml` also tracks an **upstream integration fleet** for
 starred or locally integrated repositories that Sapphire depends on or uses as
@@ -81,9 +82,10 @@ in the repo board.
 - **Wave 2: Repo Hardening** - in progress. TradingView MCP v2 guardrails are
   blocked on upstream PR review, and crypto-tax-tracker guardrails are complete
   via [arigatoexpress/crypto-tax-tracker#2](https://github.com/arigatoexpress/crypto-tax-tracker/pull/2).
-- **Wave 3: Agent Consolidation** - in progress. Map Hermes, claw-code, Sapphire
-  plugins, Claude scheduled tasks, OpenClaw remnants, and LaunchAgents. Hermes
-  runtime mapping is documented in `docs/org/hermes-agent-consolidation-map.md`.
+- **Wave 3: Agent Consolidation** - **completed 2026-05-12.** `hermes-agent`, `claw-code`,
+  `openclaw`, `kimi-tools`, and associated vendor clones were archived. Sapphire PM bot
+  owns Telegram; agent dispatch is internal to Sapphire. Historical mapping doc:
+  `docs/org/hermes-agent-consolidation-map.md`.
 - **Wave 4: Data + Intelligence Platform** - in progress. Normalize schemas,
   Foundry, GCS, BigQuery, threat, regional, market, and chain intel flows.
   Regional-intel readiness now has a read-only OODA task and tracked
@@ -143,9 +145,10 @@ in the repo board.
 10. `docs/hermes-sapphire-skill-surface` - shipped Wave 3 audit. It classifies
    all 15 Sapphire Hermes skills by blast radius before any consolidation,
    deletion, or template rewrite.
-11. `infra/upstream-fleet-control` - current. Tracks OpenBB, OpenClaw,
-    NemoClaw, Kronos, Lumo, Hermes, Foundry/Palantir SDKs, FRED, charting,
-    Goose, RTK, and career-ops upstreams with Ari fork/clone posture.
+11. `infra/upstream-fleet-control` - updated 2026-05-12. Tracks OpenBB, Kronos, and
+    tradingview-mcp-upstream with Ari fork/clone posture. OpenClaw, NemoClaw, Lumo,
+    Hermes, Foundry/Palantir SDKs, FRED, charting, Goose, RTK, and career-ops
+    were all archived 2026-05-12; see `infra/org-repos.yaml` `archived_repos` section.
 
 ## Safety Rules
 

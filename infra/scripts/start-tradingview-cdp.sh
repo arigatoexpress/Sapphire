@@ -1,6 +1,6 @@
 #!/bin/bash
 # Start TradingView Desktop with Chrome DevTools Protocol enabled.
-# Used by the tradingview-mcp for live chart control + Pine script automation.
+# Used by the tradingview-mcp-v2 bridge for live chart control + Pine script automation.
 
 set -u
 

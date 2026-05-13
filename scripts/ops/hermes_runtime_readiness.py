@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """Read-only Hermes runtime readiness probe for Sapphire operations.
 
-This script compares the live Hermes gateway checkout used by the
+**ARCHIVED 2026-05-12:** hermes-agent has been archived. The ai.hermes.gateway
+LaunchAgent must remain disabled. This script is retained as a historical
+artifact but will report paths as missing since ~/Code/hermes-agent and
+~/.hermes/hermes-agent no longer exist at their old locations.
+
+This script compared the live Hermes gateway checkout used by the
 ``ai.hermes.gateway`` LaunchAgent with the development clone tracked by
 Sapphire's org manifest. It never restarts Hermes, edits configs, sends
 Telegram messages, or prints command bodies from Hermes config.

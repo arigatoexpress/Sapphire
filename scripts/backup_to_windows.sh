@@ -9,7 +9,8 @@ LOG="$HOME/autonomy-status/logs/backup.log"
 echo "$(date): Starting backup..." >> "$LOG"
 
 # Sync each repo (git-aware, skip .git internals for speed)
-for repo in Sapphire Project-Go-Forward cyber-threat-bot regional-intel-workbench Cointracker claw-code; do
+# Note: Cointracker and claw-code were archived 2026-05-12 and no longer exist at ~/Code/.
+for repo in Sapphire Project-Go-Forward cyber-threat-bot regional-intel-workbench; do
     src="$HOME/Code/$repo/"
     dest="$WINDOWS_HOST:$REMOTE_BASE/Code/$repo/"
     echo "  Syncing $repo..." >> "$LOG"

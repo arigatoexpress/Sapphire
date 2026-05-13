@@ -16,12 +16,16 @@ Sapphire's Telegram system is moving to a fresh runtime:
 
 These local bot and tunnel LaunchAgents should stay disabled or quarantined:
 
-- `ai.hermes.gateway`
-- `ai.openclaw.gateway`
+- `ai.hermes.gateway` — `hermes-agent` archived 2026-05-12; plist must not be re-enabled
+- `ai.openclaw.gateway` — `openclaw` archived 2026-05-12; plist must not be re-enabled
 - `com.sapphire.healthz-watcher`
 - `com.sapphire.mac-to-windows-tunnel`
 
-Rollback is intentionally simple: move the archived plist back into `~/Library/LaunchAgents`, then run `launchctl enable gui/$(id -u)/<label>` and `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/<label>.plist`.
+The following plists were also archived 2026-05-12 (moved to `_Archive_2026-05-12/launchagent-stale-plists/`; not in `~/Library/LaunchAgents`):
+- `com.sapphire.analytics-dashboard`
+- `com.sapphire.kronos-daily`
+- `com.sapphire.outcome-resolver`
+- `com.sapphire.vpin-materializer`
 
 ## Readiness Check
 

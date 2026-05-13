@@ -163,14 +163,12 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 
 | Repo | GitHub | Role |
 |------|--------|------|
-| `~/Code/claw-code` | instructkr/claw-code | Rust agent runtime |
 | `~/Code/Project-Go-Forward` | arigatoexpress/Project-Go-Forward | THO client PM |
 | `~/Code/regional-intel-workbench` | arigatoexpress/regional-intel-workbench | Intelligence platform |
-| `~/Code/tradingview-mcp` | arigatoexpress/tradingview-mcp | TradingView MCP |
-| `~/Code/Cointracker` | arigatoexpress/crypto-tax-tracker | Crypto tax engine |
+| `~/Code/tradingview-mcp-v2` | tradesdontlie/tradingview-mcp (Ari fork: arigatoexpress/tradingview-mcp-upstream) | TradingView MCP bridge (78 tools) |
 | `~/Code/cyber-threat-bot` | arigatoexpress/cyber-threat-bot | Threat intel feeds |
-| `~/Code/hermes-agent` | NousResearch/hermes-agent | Conversational framework (Telegram bot) |
-| `~/Code/kimi-tools` | local | Kimi Cloud HTTP client |
+
+> **Archived 2026-05-12:** `claw-code`, `hermes-agent`, `kimi-tools`, `Cointracker`, and several vendor/reference clones were moved to `_Archive_2026-05-12/repo-quarantine-2026-05-12/`. Sapphire is now the canonical owner of the agent shell previously split across those repos. Active TradingView lane is `tradingview-mcp-v2` (not `tradingview-mcp`).
 
 ## Sapphire Plugin (117 tools on disk, 17 registered in plugin.json)
 
@@ -240,7 +238,7 @@ Manage at https://claude.ai/code/routines.
 
 ## Inference Proxy (`services/inference-proxy/`)
 
-4-tier failover (threaded server — concurrent requests safe). hermes-agent and all plugin tools talk to this.
+4-tier failover (threaded server — concurrent requests safe). All plugin tools talk to this (hermes-agent was archived 2026-05-12; Sapphire PM bot is now the Telegram owner).
 - **T1 Windows GPU** (100.71.10.48:11434): native `/api/chat` (NOT `/v1/` — returns empty on Windows). ~0.4s.
 - **T2 Pi rari1** (100.120.191.1:11434): nemotron-mini, smollm2, qwen2.5:0.5b, gemma2:2b. `PI_RARI1_ENABLED=1`. T2 routing should downshift to the smaller Pi-safe models for live traffic instead of trying `nemotron-mini:latest`.
 - **T2 Pi rari2** (100.87.225.89:11434): ONLINE as of 2026-04-18 (5 models). `PI_RARI2_ENABLED=1`.

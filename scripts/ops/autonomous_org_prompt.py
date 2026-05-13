@@ -225,7 +225,7 @@ def build_prompt(manifest: dict[str, Any], status: dict[str, Any]) -> str:
             "| Control Tower | `docs/org/**`, `scripts/ops/**`, `infra/org-repos.yaml` | Keep this prompt, no-spend CI posture, and org status current. |",
             "| Foundry / Regional | `regional-intel-workbench`, `lib/foundry`, GCP schemas | Provenance manifests, regional OODA packets, and paste-safe readiness. |",
             "| Media Factory | `lib/media/**`, media tests/docs | Dry-run image/audio/video readiness artifacts before live API calls. |",
-            "| Telegram / Hermes | `hermes-agent` gateway safety and Sapphire Telegram docs | CommandGuard-gated exec paths and dry-run-safe Telegram handling. |",
+            "| Telegram / PM Bot | Sapphire PM bot gateway safety and Telegram docs | CommandGuard-gated exec paths and dry-run-safe Telegram handling. (hermes-agent archived 2026-05-12.) |",
             "| Data / OODA | `lib/autonomy`, status docs, dashboard APIs | Turn observed data into ranked safe review actions. |",
             "",
             "## OODA Loop",

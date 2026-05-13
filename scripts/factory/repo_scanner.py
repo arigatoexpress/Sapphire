@@ -2,7 +2,7 @@
 """Sapphire Autonomous Factory — Repo Health Scanner.
 
 Scans all registered repos for issues and outputs a structured report.
-Designed to be called by Claude Dispatch tasks or claw-code agents.
+Designed to be called by Claude Dispatch tasks.
 
 Usage:
     python3 scripts/factory/repo_scanner.py              # Full scan, JSON output
@@ -24,9 +24,8 @@ REPOS = {
     "Sapphire": Path.home() / "Code" / "Sapphire",
     "Project-Go-Forward": Path.home() / "Code" / "Project-Go-Forward",
     "regional-intel-workbench": Path.home() / "Code" / "regional-intel-workbench",
-    "tradingview-mcp": Path.home() / "Code" / "tradingview-mcp",
-    "Cointracker": Path.home() / "Code" / "Cointracker",
-    "claw-code": Path.home() / "Code" / "claw-code",
+    "tradingview-mcp-v2": Path.home() / "Code" / "tradingview-mcp-v2",
+    # tradingview-mcp, Cointracker, and claw-code were archived 2026-05-12.
 }
 
 

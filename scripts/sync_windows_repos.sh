@@ -3,7 +3,8 @@
 # Run from Mac via SSH to Windows
 
 WINDOWS="aribs@100.71.10.48"
-REPOS="Sapphire Project-Go-Forward cyber-threat-bot regional-intel-workbench Cointracker claw-code"
+# Note: Cointracker and claw-code were archived 2026-05-12 and no longer exist at ~/Code/.
+REPOS="Sapphire Project-Go-Forward cyber-threat-bot regional-intel-workbench"
 
 echo "$(date): Syncing Windows repos..."
 

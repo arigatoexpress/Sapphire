@@ -2,7 +2,9 @@
 
 macOS LaunchAgent definitions for Sapphire background services and schedulers.
 
-Current inventory: 29 active plists in this directory, plus 1 disabled template (`com.sapphire.lumo-api.plist.disabled`). The 2026-04-21 audit folded in the production plists that had been running un-versioned on Ari's Mac — see `docs/archive/2026/audits/launchagents-audit-2026-04-21.md`. Some service-owned LaunchAgents live with their service code under `services/*/launchagent/`; this currently includes `services/dashboard/launchagent/com.sapphire.dashboard.plist`, `services/inference-proxy/launchagent/com.sapphire.inference-proxy.plist`, `services/pm_bot/launchagent/com.sapphire.pm-bot.plist`, and `services/service_supervisor/launchagent/com.sapphire.service-supervisor.plist`. PM bot now owns Telegram ingress; old extra-repo Telegram/gateway plists such as `ai.hermes.gateway` and `ai.openclaw.gateway` are deprecated and should stay quarantined.
+Current inventory: 29 active plists in this directory, plus 1 disabled template (`com.sapphire.lumo-api.plist.disabled`). The 2026-04-21 audit folded in the production plists that had been running un-versioned on Ari's Mac — see `docs/archive/2026/audits/launchagents-audit-2026-04-21.md`. Some service-owned LaunchAgents live with their service code under `services/*/launchagent/`; this currently includes `services/dashboard/launchagent/com.sapphire.dashboard.plist`, `services/inference-proxy/launchagent/com.sapphire.inference-proxy.plist`, `services/pm_bot/launchagent/com.sapphire.pm-bot.plist`, and `services/service_supervisor/launchagent/com.sapphire.service-supervisor.plist`. PM bot now owns Telegram ingress; old extra-repo Telegram/gateway plists such as `ai.hermes.gateway` and `ai.openclaw.gateway` must remain quarantined — `hermes-agent` and `openclaw` repos were archived 2026-05-12 and those plists are no longer maintained.
+
+**Archived plists (2026-05-12):** `com.sapphire.analytics-dashboard`, `com.sapphire.kronos-daily`, `com.sapphire.outcome-resolver`, and `com.sapphire.vpin-materializer` were moved to `_Archive_2026-05-12/launchagent-stale-plists/` and are not loaded by launchd.
 
 ## Active Plists
 

@@ -237,7 +237,9 @@ Sapphire is the orchestration layer. Satellites stand alone but the Brain unites
 - [cyber-threat-bot](https://github.com/arigatoexpress/cyber-threat-bot) — CISA KEV / NVD / MITRE aggregator, live on Cloud Run
 - [regional-intel-workbench](https://github.com/arigatoexpress/regional-intel-workbench) — public-source analyst console at regional.sapphirealpha.xyz
 - [wildfire-watch](https://github.com/arigatoexpress/wildfire-watch) — county-scale autonomous drone fleet (Sapphire bridge merged PR #551)
-- [Project-Go-Forward](https://github.com/arigatoexpress/Project-Go-Forward) (THO production) · [tradingview-mcp](https://github.com/arigatoexpress/tradingview-mcp) (78-tool CDP bridge) · [crypto-tax-tracker](https://github.com/arigatoexpress/crypto-tax-tracker) · [hermes-agent](https://github.com/NousResearch/hermes-agent) · [claw-code](https://github.com/instructkr/claw-code)
+- [Project-Go-Forward](https://github.com/arigatoexpress/Project-Go-Forward) (THO production) · [tradingview-mcp-v2](https://github.com/arigatoexpress/tradingview-mcp-upstream) (78-tool CDP bridge; active lane) · [crypto-tax-tracker](https://github.com/arigatoexpress/crypto-tax-tracker)
+
+> **Note (2026-05-12):** `claw-code`, `hermes-agent`, `tradingview-mcp` (original fork), `Cointracker`, and several vendor/reference clones were archived to `_Archive_2026-05-12/`. Sapphire is now the canonical owner of the agent shell.
 
 ## Documentation
 

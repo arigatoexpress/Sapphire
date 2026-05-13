@@ -74,7 +74,7 @@
 >
 > 1. **TradingView webhook → signal logger → 0G publish.** The Windows webhook (port 9090) → Mac signal logger (port 18081) pipeline triggers a 0G publish path (`fire_and_forget`) for every alert. Production safety: the publish runs out-of-band so a 0G outage never blocks a trade. **Daily volume:** `<TBD post-mainnet-deploy; expect 5–50 signals/day initially based on TradingView alert cadence>`.
 >
-> 2. **Kronos daily prediction → 0G publish.** The 7 AM CT Kronos LaunchAgent (`com.sapphire.kronos-daily`) generates 24-bar horizon forecasts for BTC/ETH/SOL/SPY/TSLA and writes them to `data/intelligence/YYYY-MM-DD/predictions.json` — the same data is bundled into a daily 0G envelope and anchored. **Cadence:** 1 anchor batch per day (5 symbols), evergreen.
+> 2. **Kronos daily prediction → 0G publish.** The Kronos predictions script (`scripts/kronos_daily_predictions.py`) generates 24-bar horizon forecasts for BTC/ETH/SOL/SPY/TSLA and writes them to `data/intelligence/YYYY-MM-DD/predictions.json` — the same data is bundled into a daily 0G envelope and anchored. **Cadence:** 1 anchor batch per day (5 symbols), evergreen. (Note: `com.sapphire.kronos-daily` LaunchAgent was archived 2026-05-12; run the script manually or via scheduled task.)
 >
 > Combined, this is **6 to 51 expected on-chain transactions per day** once mainnet is live. That's the streak (not one-shot) that judges and ecosystem partners look for to confirm a deployed app is real, not a demo.
 
