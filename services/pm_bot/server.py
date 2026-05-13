@@ -109,6 +109,21 @@ def _env_flag_default(name: str, *, default: bool) -> bool:
     return raw.strip().lower() in _TRUE_VALUES
 
 
+def _parse_int_tuple_env(name: str) -> tuple[int, ...] | None:
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return None
+    values: list[int] = []
+    for item in re.split(r"[,\s]+", raw):
+        if not item:
+            continue
+        try:
+            values.append(int(item))
+        except ValueError as exc:
+            raise ValueError(f"{name} must contain only integer ids") from exc
+    return tuple(dict.fromkeys(values))
+
+
 def _resolve_bot_token_with_source() -> tuple[str, str]:
     explicit = os.getenv("SAPPHIRE_PM_BOT_TOKEN", "").strip()
     if explicit:
@@ -170,6 +185,8 @@ class Settings:
     draft_queue_path: Path = _DEFAULT_DRAFT_QUEUE_PATH
     draft_queue_enabled: bool = True
     agentic_dry_run_enabled: bool = True
+    agent_allowed_chat_ids: tuple[int, ...] | None = None
+    agent_allowed_thread_ids: tuple[int, ...] | None = None
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -200,6 +217,8 @@ class Settings:
                 "SAPPHIRE_PM_BOT_AGENTIC_DRY_RUN",
                 default=True,
             ),
+            agent_allowed_chat_ids=_parse_int_tuple_env("SAPPHIRE_PM_BOT_AGENT_CHAT_IDS"),
+            agent_allowed_thread_ids=_parse_int_tuple_env("SAPPHIRE_PM_BOT_AGENT_THREAD_IDS"),
         )
 
 
@@ -478,7 +497,7 @@ def _actor_label(decision: RouterDecision) -> str:
 def _draft_topic(decision: RouterDecision) -> str:
     if decision.route in {"feedback", "source_action"}:
         return "research"
-    if decision.route in {"blocked", "audit"}:
+    if decision.route in {"blocked", "audit", "reject"}:
         return "ops"
     return "drafts"
 
@@ -491,6 +510,7 @@ def _draft_kind(decision: RouterDecision) -> str:
         "feedback": "feedback_signal",
         "guest_message": "guarded_reply",
         "inline_query": "guarded_inline_answer",
+        "reject": "rejected_update",
         "source_action": "source_review",
     }.get(decision.route, "telegram_update_dry_run")
 
@@ -530,6 +550,12 @@ def _draft_body(decision: RouterDecision) -> str:
             f"Blocked Telegram update: {decision.action}.\n"
             f"Reason: {decision.reason}\n"
             "No external action was performed."
+        )
+    if decision.route == "reject":
+        return (
+            f"Rejected Telegram update outside configured agent scope: {decision.action}.\n"
+            f"Reason: {decision.reason}\n"
+            "No PM-bot command was dispatched and no Telegram message was sent."
         )
     return (
         f"Dry-run Telegram update routed as {decision.route}/{decision.action}.\n"
@@ -697,7 +723,11 @@ def process_update(update: dict[str, Any]) -> bool:
         logger.info("Ignoring duplicate Telegram update_id=%s", update.get("update_id"))
         return False
 
-    decision = route_update(update)
+    decision = route_update(
+        update,
+        allowed_chat_ids=SETTINGS.agent_allowed_chat_ids,
+        allowed_thread_ids=SETTINGS.agent_allowed_thread_ids,
+    )
     if decision.route == "ignore":
         logger.info(
             "Router ignored Telegram update: %s",
@@ -904,6 +934,10 @@ def _health_payload() -> dict[str, Any]:
         "agentic_dry_run_enabled": SETTINGS.agentic_dry_run_enabled,
         "draft_queue_enabled": SETTINGS.draft_queue_enabled,
         "draft_queue_path": str(SETTINGS.draft_queue_path),
+        "agent_chat_scope_configured": SETTINGS.agent_allowed_chat_ids is not None,
+        "agent_chat_scope_count": len(SETTINGS.agent_allowed_chat_ids or ()),
+        "agent_thread_scope_configured": SETTINGS.agent_allowed_thread_ids is not None,
+        "agent_thread_scope_count": len(SETTINGS.agent_allowed_thread_ids or ()),
         "bot_username": telegram_probe.get("bot_username") or SETTINGS.bot_username,
         "supported_update_types": list(_SUPPORTED_UPDATE_TYPES),
         "telegram_delivery_ready": telegram_delivery_ready,
@@ -938,6 +972,8 @@ def _agent_group_blockers(payload: dict[str, Any]) -> list[str]:
         blockers.append("shared_polling_break_glass_enabled")
     if payload.get("telegram_probe_ok") is False:
         blockers.append("telegram_probe_failed")
+    if not payload.get("agent_chat_scope_configured"):
+        blockers.append("agent_chat_scope_unconfigured")
     return blockers
 
 
@@ -965,6 +1001,12 @@ def telegram_ownership() -> dict[str, Any]:
         "delivery_ready": payload["telegram_delivery_ready"],
         "operator_action": payload["telegram_operator_action"],
         "supported_update_types": payload["supported_update_types"],
+        "agent_scope": {
+            "chat_scope_configured": payload["agent_chat_scope_configured"],
+            "chat_scope_count": payload["agent_chat_scope_count"],
+            "thread_scope_configured": payload["agent_thread_scope_configured"],
+            "thread_scope_count": payload["agent_thread_scope_count"],
+        },
         "no_send_router_guard": "only command routes may call sendMessage",
         "draft_queue_enabled": payload["draft_queue_enabled"],
         "agentic_dry_run_enabled": payload["agentic_dry_run_enabled"],

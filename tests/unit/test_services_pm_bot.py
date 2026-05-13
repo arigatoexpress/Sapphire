@@ -52,6 +52,8 @@ def reload_server(monkeypatch):
     monkeypatch.delenv("SAPPHIRE_PM_BOT_DRAFT_QUEUE_PATH", raising=False)
     monkeypatch.delenv("SAPPHIRE_PM_BOT_DRAFT_QUEUE_ENABLED", raising=False)
     monkeypatch.delenv("SAPPHIRE_PM_BOT_AGENTIC_DRY_RUN", raising=False)
+    monkeypatch.delenv("SAPPHIRE_PM_BOT_AGENT_CHAT_IDS", raising=False)
+    monkeypatch.delenv("SAPPHIRE_PM_BOT_AGENT_THREAD_IDS", raising=False)
     monkeypatch.setenv("SAPPHIRE_PM_BOT_TOKEN", "test-token-default")
     monkeypatch.setenv("SAPPHIRE_PM_BOT_DRAFT_QUEUE_ENABLED", "0")
 
@@ -198,6 +200,97 @@ def test_process_update_replies_in_thread_with_defaults(reload_server, monkeypat
             "direct_messages_topic_id": 7,
         }
     ]
+
+
+def test_process_update_dispatches_command_inside_agent_chat_scope(reload_server, monkeypatch):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_AGENT_CHAT_IDS", "-1001")
+    server = reload_server()
+
+    if str(TOOL_DIR) not in sys.path:
+        sys.path.insert(0, str(TOOL_DIR))
+    import sapphire_pm_bot
+
+    monkeypatch.setattr(
+        sapphire_pm_bot,
+        "handle_telegram_command",
+        lambda upd: {"text": "PONG", "parse_mode": "Markdown"},
+    )
+
+    sent: list[dict[str, Any]] = []
+    monkeypatch.setattr(server.TELEGRAM_API, "send_message", lambda **kw: sent.append(kw))
+
+    update = {"update_id": 101, "message": {"chat": {"id": -1001}, "text": "/help"}}
+    assert server.process_update(update) is True
+    assert sent[0]["chat_id"] == -1001
+    assert sent[0]["text"] == "PONG"
+
+
+def test_process_update_rejects_command_outside_agent_chat_scope(
+    reload_server, monkeypatch, tmp_path
+):
+    draft_queue_path = tmp_path / "pm_bot_drafts.jsonl"
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_AGENT_CHAT_IDS", "-1001")
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_DRAFT_QUEUE_ENABLED", "1")
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_DRAFT_QUEUE_PATH", str(draft_queue_path))
+    server = reload_server()
+
+    if str(TOOL_DIR) not in sys.path:
+        sys.path.insert(0, str(TOOL_DIR))
+    import sapphire_pm_bot
+
+    monkeypatch.setattr(
+        sapphire_pm_bot,
+        "handle_telegram_command",
+        lambda _upd: pytest.fail("out-of-scope command must not dispatch"),
+    )
+
+    def fail_send(**_kwargs):
+        raise AssertionError("out-of-scope command must not send Telegram messages")
+
+    monkeypatch.setattr(server.TELEGRAM_API, "send_message", fail_send)
+
+    update = {"update_id": 102, "message": {"chat": {"id": -2002}, "text": "/help"}}
+    assert server.process_update(update) is True
+
+    from lib.telegram.draft_queue import read_drafts
+
+    drafts = read_drafts(draft_queue_path)
+    assert len(drafts) == 1
+    assert drafts[0].kind == "rejected_update"
+    assert drafts[0].topic == "ops"
+    assert drafts[0].status == "pending_confirmation"
+    assert drafts[0].metadata["action"] == "chat_not_allowed"
+    assert "No PM-bot command was dispatched" in drafts[0].body
+
+
+def test_process_update_rejects_command_outside_agent_thread_scope(
+    reload_server, monkeypatch, tmp_path
+):
+    draft_queue_path = tmp_path / "pm_bot_drafts.jsonl"
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_AGENT_CHAT_IDS", "-1001")
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_AGENT_THREAD_IDS", "7")
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_DRAFT_QUEUE_ENABLED", "1")
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_DRAFT_QUEUE_PATH", str(draft_queue_path))
+    server = reload_server()
+
+    monkeypatch.setattr(
+        server.TELEGRAM_API,
+        "send_message",
+        lambda **_kw: pytest.fail("out-of-scope topic must not send"),
+    )
+
+    update = {
+        "update_id": 103,
+        "message": {"chat": {"id": -1001}, "message_thread_id": 9, "text": "/help"},
+    }
+    assert server.process_update(update) is True
+
+    from lib.telegram.draft_queue import read_drafts
+
+    drafts = read_drafts(draft_queue_path)
+    assert len(drafts) == 1
+    assert drafts[0].metadata["action"] == "topic_not_allowed"
+    assert drafts[0].metadata["message_thread_id"] == 9
 
 
 def test_process_update_returns_false_when_no_text(reload_server, monkeypatch):
@@ -989,6 +1082,22 @@ def test_settings_from_env_reads_webhook_url(reload_server, monkeypatch):
     assert s.webhook_url == "https://example.invalid/telegram/webhook"
 
 
+def test_settings_from_env_reads_agent_scope_ids(reload_server, monkeypatch):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_AGENT_CHAT_IDS", "-1001, -1002 -1001")
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_AGENT_THREAD_IDS", "7,9")
+    server = reload_server()
+    s = server.Settings.from_env()
+    assert s.agent_allowed_chat_ids == (-1001, -1002)
+    assert s.agent_allowed_thread_ids == (7, 9)
+
+
+def test_settings_from_env_rejects_invalid_agent_scope_ids(reload_server, monkeypatch):
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_AGENT_CHAT_IDS", "-1001, nope")
+
+    with pytest.raises(ValueError, match="SAPPHIRE_PM_BOT_AGENT_CHAT_IDS"):
+        reload_server()
+
+
 # ---------------------------------------------------------------------------
 # health endpoint shape
 # ---------------------------------------------------------------------------
@@ -1145,6 +1254,10 @@ def test_health_endpoint_full_shape_default_state(monkeypatch, tmp_path, reload_
     assert body["last_poll_error"] is None
     assert body["shared_polling_allowed"] is False
     assert body["webhook_secret_configured"] is False
+    assert body["agent_chat_scope_configured"] is False
+    assert body["agent_chat_scope_count"] == 0
+    assert body["agent_thread_scope_configured"] is False
+    assert body["agent_thread_scope_count"] == 0
     assert body["bot_username"] == "NemotronRariBot"
     assert body["telegram_delivery_ready"] is False
     assert body["telegram_delivery_reason"] == "webhook_missing"
@@ -1248,13 +1361,19 @@ def test_telegram_ownership_endpoint_surfaces_group_readiness_blockers(
     assert response.status_code == 200
     body = response.json()
     assert body["agent_group_ready"] is False
-    assert body["agent_group_blockers"] == ["webhook_missing"]
+    assert body["agent_group_blockers"] == ["webhook_missing", "agent_chat_scope_unconfigured"]
     assert body["single_ingress_owner"] == "pm_bot_webhook_unregistered"
     assert (
         body["operator_action"]
         == "register_pm_bot_webhook_or_leave_shared_token_to_external_poller"
     )
     assert body["no_send_router_guard"] == "only command routes may call sendMessage"
+    assert body["agent_scope"] == {
+        "chat_scope_configured": False,
+        "chat_scope_count": 0,
+        "thread_scope_configured": False,
+        "thread_scope_count": 0,
+    }
     assert (
         "keep_kimi_relay_disabled_until_private_operator_group_exists"
         in body["required_before_group"]
