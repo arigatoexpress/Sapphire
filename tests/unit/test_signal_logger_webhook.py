@@ -29,6 +29,11 @@ def signal_logger(tmp_path, monkeypatch):
     bound to the env we control.
     """
     monkeypatch.setenv("WEBHOOK_SECRET", "test-secret")
+    monkeypatch.setenv("TELEGRAM_DRY_RUN", "1")
+    monkeypatch.setenv(
+        "SAPPHIRE_NOTIFY_DRAFT_QUEUE_PATH",
+        str(tmp_path / "pm_bot_drafts.jsonl"),
+    )
     monkeypatch.syspath_prepend(str(SIGNAL_LOGGER_DIR))
     sys.modules.pop("signal_logger", None)
 
