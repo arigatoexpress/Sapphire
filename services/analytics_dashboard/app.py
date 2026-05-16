@@ -36,6 +36,7 @@ from _deflated_sharpe import annualized_sharpe, deflated_sharpe  # noqa: E402
 from admin_narrative import build_admin_narrative  # noqa: E402
 from auth import admin_session_payload, requires_admin  # noqa: E402
 from data_engineering import build_data_engineering_report  # noqa: E402
+from og_guard import build_0guard_progress  # noqa: E402
 from og_proof import build_og_proof_manifest  # noqa: E402
 from project_tabs import get_project_tab, public_project_tabs  # noqa: E402
 
@@ -2116,6 +2117,12 @@ def project_manifest(slug: str):
 def hackathon_og_proof():
     """Public-safe 0G integration proof/readiness manifest."""
     return jsonify(build_og_proof_manifest())
+
+
+@app.get("/api/0guard/progress")
+def oguard_progress():
+    """Public-safe live 0guard progress snapshot for the apex dashboard."""
+    return jsonify(build_0guard_progress())
 
 
 @app.route("/<path:path>", methods=["GET", "HEAD", "POST"])

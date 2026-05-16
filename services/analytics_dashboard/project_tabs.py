@@ -141,6 +141,35 @@ PROJECT_TABS: list[dict] = [
         "status_id": None,
     },
     {
+        "slug": "0guard",
+        "label": "0guard",
+        "kind": "satellite",
+        "status": "review-ready",
+        "accent": "green",
+        "tagline": "0G-native agentic transaction defense.",
+        "summary": "Live public progress surface for the 0guard wallet and protocol-risk system: source-linked incident data, detector coverage, 0G mainnet proof posture, and read-only Telegram/Mira readiness.",
+        "info_route": "/p/0guard",
+        "primary_cta": {
+            "label": "Open 0guard",
+            "href": "/p/0guard",
+            "external": False,
+        },
+        "resources": [
+            {"label": "Progress API", "href": "/api/0guard/progress"},
+            {
+                "label": "Live Service Health",
+                "href": "https://guard0-miniapp-s77j6bxyra-uc.a.run.app/api/healthz",
+            },
+            {
+                "label": "Detector Coverage",
+                "href": "https://guard0-miniapp-s77j6bxyra-uc.a.run.app/api/data/detection-coverage",
+            },
+        ],
+        "proof_points": ["0G mainnet", "28/28 detector coverage", "Telegram mini-app preview"],
+        "safety_note": "Public surface is read-only: no signing, swapping, bridging, posting, Telegram sends, or private-key access.",
+        "status_id": None,
+    },
+    {
         "slug": "hackathon",
         "label": "Hackathon",
         "kind": "satellite",

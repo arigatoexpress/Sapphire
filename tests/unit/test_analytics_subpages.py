@@ -44,6 +44,56 @@ def _load_analytics_app(monkeypatch):
     def _no_http(*_a, **_kw):
         return None
 
+    def _fake_0guard_fetch(_base_url, endpoint, *, timeout=2.5):
+        del timeout
+        payloads = {
+            "/api/healthz": {"ok": True},
+            "/api/readyz": {
+                "ok": False,
+                "readiness": "production_review",
+                "checks": [
+                    {
+                        "id": "detector_coverage",
+                        "status": "ok",
+                        "summary": "Detector seeds cover the public incident set.",
+                    },
+                    {
+                        "id": "telegram_state_store",
+                        "status": "review",
+                        "summary": "Persistent opt-in storage is still under review.",
+                    },
+                ],
+            },
+            "/api/data/summary": {
+                "meta": {
+                    "month": "April 2026",
+                    "total_incidents": 28,
+                    "total_loss_usd": 634862000,
+                    "source_urls": ["https://defillama.com/hacks"],
+                },
+                "stats": {
+                    "incidentCount": 28,
+                    "chainCounts": {"Ethereum": 11, "Arbitrum": 1},
+                    "attackVectorCounts": {"signature replay": 1},
+                },
+            },
+            "/api/data/detection-coverage": {
+                "coverage": [
+                    {
+                        "matched": True,
+                        "blockerCount": 1,
+                        "warningCount": 1,
+                        "incident": {
+                            "protocol": "Silo V2",
+                            "chain": "Arbitrum",
+                            "attack_vector": "oracle misconfiguration",
+                        },
+                    }
+                ]
+            },
+        }
+        return payloads.get(endpoint), "ok" if endpoint in payloads else "http_404"
+
     spec = importlib.util.spec_from_file_location("analytics_dashboard_app_subpages", module_path)
     assert spec is not None
     module = importlib.util.module_from_spec(spec)
@@ -54,6 +104,9 @@ def _load_analytics_app(monkeypatch):
     sub = sys.modules.get("subpages")
     if sub is not None:
         monkeypatch.setattr(sub, "_http_get_json", _no_http, raising=False)
+    guard = sys.modules.get("og_guard")
+    if guard is not None:
+        monkeypatch.setattr(guard, "_fetch_json", _fake_0guard_fetch, raising=False)
 
     return module.app.test_client()
 
@@ -77,6 +130,36 @@ def test_p_hackathon_smoke(monkeypatch):
     assert "MegaETH" in body
     assert "Robinhood" in body
     assert "Zama" in body
+
+
+def test_p_0guard_smoke(monkeypatch):
+    client = _load_analytics_app(monkeypatch)
+    resp = client.get("/p/0guard")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+    assert "0guard turns wallet behavior into auditable verdicts" in body
+    assert "28/1" not in body
+    assert "28" in body
+    assert "634.9M" in body
+    assert "0G_NATIVE_SECURITY_SURFACE" in body
+    assert "not present on the active public route yet" in body
+    assert "OG_PRIVATE_KEY" not in body
+
+
+def test_0guard_progress_api_is_public_safe(monkeypatch):
+    monkeypatch.setenv("OG_PRIVATE_KEY", "0x" + "aa" * 32)
+    client = _load_analytics_app(monkeypatch)
+
+    resp = client.get("/api/0guard/progress")
+
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    assert payload["schema"] == "sapphire.0guard.progress.v1"
+    assert payload["metrics"]["incident_count"] == 28
+    assert payload["metrics"]["coverage"] == "100%"
+    encoded = json.dumps(payload)
+    assert "OG_PRIVATE_KEY" not in encoded
+    assert ("aa" * 32) not in encoded
 
 
 def test_og_proof_api_is_public_safe(monkeypatch):
@@ -191,6 +274,7 @@ def test_subpages_all_register(monkeypatch):
     """Defensive: every advertised /p/<name> route returns 200."""
     client = _load_analytics_app(monkeypatch)
     for path in [
+        "/p/0guard",
         "/p/hackathon",
         "/p/wildfire",
         "/p/threats",
@@ -222,6 +306,7 @@ def test_projects_manifest_api_is_safe_and_complete(monkeypatch):
         "threats",
         "wildfire",
         "regional",
+        "0guard",
         "hackathon",
         "system",
     }.issubset(slugs)

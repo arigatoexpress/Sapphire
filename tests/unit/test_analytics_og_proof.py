@@ -76,3 +76,14 @@ def test_manifest_never_leaks_private_key_env(monkeypatch):
 
     assert "OG_PRIVATE_KEY" not in encoded
     assert secret not in encoded
+
+
+def test_repo_root_inference_handles_flat_cloud_run_layout(monkeypatch, tmp_path):
+    mod = _load_module()
+    flat_module = tmp_path / "app" / "og_proof.py"
+    flat_module.parent.mkdir()
+    flat_module.touch()
+
+    monkeypatch.setattr(mod, "__file__", str(flat_module))
+
+    assert mod._infer_repo_root() == flat_module.parent

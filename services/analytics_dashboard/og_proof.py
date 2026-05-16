@@ -14,7 +14,16 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+
+def _infer_repo_root() -> Path:
+    """Infer repo root in both source checkout and flat Cloud Run image layouts."""
+    here = Path(__file__).resolve()
+    if len(here.parents) > 2 and (here.parents[2] / "services").exists():
+        return here.parents[2]
+    return here.parent
+
+
+REPO_ROOT = Path(os.environ.get("SAPPHIRE_REPO_ROOT") or _infer_repo_root())
 
 DEPLOYMENTS_FILE = REPO_ROOT / "data" / "chain" / "deployments.json"
 

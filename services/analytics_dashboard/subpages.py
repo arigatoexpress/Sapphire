@@ -19,6 +19,7 @@ import urllib.request
 from datetime import UTC, datetime
 
 from flask import render_template
+from og_guard import build_0guard_progress
 from og_proof import build_og_proof_manifest
 
 log = logging.getLogger("sapphire.subpages")
@@ -143,6 +144,10 @@ def register_subpages(app, *, project: str, dataset: str) -> None:
                 }
             ),
         )
+
+    @app.get("/p/0guard")
+    def _p_0guard():
+        return render_template("p/0guard.html", **_ctx({"oguard": build_0guard_progress()}))
 
     @app.get("/p/wildfire")
     def _p_wildfire():
