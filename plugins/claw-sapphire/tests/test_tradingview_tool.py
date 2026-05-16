@@ -212,9 +212,7 @@ def test_unknown_action_reports_valid_actions():
 def test_main_unknown_action_returns_exit_1():
     out = io.StringIO()
 
-    code = tradingview.main(
-        stream_in=io.StringIO('{"action":"bogus"}'), stream_out=out
-    )
+    code = tradingview.main(stream_in=io.StringIO('{"action":"bogus"}'), stream_out=out)
 
     assert code == 1
     body = json.loads(out.getvalue())
@@ -389,9 +387,7 @@ def test_generate_pine_missing_symbol_errors():
 
 
 def test_generate_pine_invalid_kind_errors():
-    result = tradingview.handle(
-        {"action": "generate_pine", "symbol": "BTC", "kind": "bogus"}
-    )
+    result = tradingview.handle({"action": "generate_pine", "symbol": "BTC", "kind": "bogus"})
 
     assert result["ok"] is False
     assert "invalid kind" in result["error"]
@@ -399,9 +395,7 @@ def test_generate_pine_invalid_kind_errors():
 
 def test_generate_pine_custom_name_overrides_default(monkeypatch):
     _patch_orchestrator(monkeypatch)
-    monkeypatch.setattr(
-        tradingview, "render_sapphire_watch_indicator", lambda s: "// pine"
-    )
+    monkeypatch.setattr(tradingview, "render_sapphire_watch_indicator", lambda s: "// pine")
 
     def fake_write_template(name, source, *, metadata=None, **_kw):
         return {
@@ -424,9 +418,7 @@ def test_generate_pine_custom_name_overrides_default(monkeypatch):
 def test_sweep_returns_summary_with_artifact_counts(monkeypatch):
     constructed = _patch_orchestrator(monkeypatch)
 
-    fake_machine = {
-        "watchlist": {"symbols": ["BTC", "ETH", "SOL", "AAPL", "TSLA", "SPY"]}
-    }
+    fake_machine = {"watchlist": {"symbols": ["BTC", "ETH", "SOL", "AAPL", "TSLA", "SPY"]}}
     monkeypatch.setattr(
         tradingview,
         "build_tradingview_ta_machine",
@@ -565,9 +557,7 @@ def test_orchestrator_factory_forces_mutation_disabled(monkeypatch):
 
 
 def test_top_level_shim_re_exports_handle():
-    spec = importlib.util.spec_from_file_location(
-        "tradingview_shim", TOOLS / "tradingview.py"
-    )
+    spec = importlib.util.spec_from_file_location("tradingview_shim", TOOLS / "tradingview.py")
     shim = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(shim)
@@ -579,9 +569,7 @@ def test_top_level_shim_re_exports_handle():
 
 
 def test_shim_handle_routes_to_real_dispatcher(monkeypatch):
-    spec = importlib.util.spec_from_file_location(
-        "tradingview_shim2", TOOLS / "tradingview.py"
-    )
+    spec = importlib.util.spec_from_file_location("tradingview_shim2", TOOLS / "tradingview.py")
     shim = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(shim)
