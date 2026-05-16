@@ -26,9 +26,20 @@ PUBLIC_ENDPOINTS = {
     "summary": "/api/data/summary",
     "coverage": "/api/data/detection-coverage",
     "events": "/api/intelligence/events",
+    "events_live": "/api/intelligence/events?live=1&limit=6",
+    "reputation_worker": "/api/reputation/connectors/live?live=1&limit=3",
+    "detector_candidates": "/api/intelligence/detector-candidates?live=1&limit=5",
     "arbitrum": "/api/integrations/arbitrum",
     "metamask": "/api/integrations/metamask",
     "hackathons": "/api/hackathons/next",
+}
+
+PUBLIC_ENDPOINT_TIMEOUTS = {
+    "events_live": 12.0,
+    "reputation_worker": 12.0,
+    "detector_candidates": 12.0,
+    "arbitrum": 4.0,
+    "metamask": 4.0,
 }
 
 
@@ -160,12 +171,23 @@ def _optional_feed_status(
 ) -> list[dict[str, Any]]:
     labels = {
         "events": "intelligence events",
+        "events_live": "live intelligence poll",
+        "reputation_worker": "PhishDestroy worker",
+        "detector_candidates": "detector candidates",
         "arbitrum": "Arbitrum lane",
         "metamask": "MetaMask lane",
         "hackathons": "hackathon roadmap",
     }
     rows = []
-    for key in ("events", "arbitrum", "metamask", "hackathons"):
+    for key in (
+        "events",
+        "events_live",
+        "reputation_worker",
+        "detector_candidates",
+        "arbitrum",
+        "metamask",
+        "hackathons",
+    ):
         payload, status = feeds.get(key, (None, "missing"))
         rows.append(
             {
@@ -178,6 +200,28 @@ def _optional_feed_status(
     return rows
 
 
+def _live_stream_stats(
+    feeds: dict[str, tuple[dict[str, Any] | None, str]],
+) -> dict[str, Any]:
+    worker = feeds.get("reputation_worker", (None, "missing"))[0]
+    candidates = feeds.get("detector_candidates", (None, "missing"))[0]
+    events = feeds.get("events_live", (None, "missing"))[0]
+    fetch = worker.get("fetch") if isinstance(worker, dict) else {}
+    fetch = fetch if isinstance(fetch, dict) else {}
+    return {
+        "active_domain_count": int(fetch.get("parsedDomainCount") or 0),
+        "sampled_evidence_count": int(fetch.get("sampledEvidenceCount") or 0),
+        "detector_candidate_count": int(candidates.get("candidateCount") or 0)
+        if isinstance(candidates, dict)
+        else 0,
+        "high_priority_candidate_count": int(candidates.get("highPriorityCount") or 0)
+        if isinstance(candidates, dict)
+        else 0,
+        "live_event_count": int(events.get("eventCount") or 0) if isinstance(events, dict) else 0,
+        "raw_payloads_returned": False,
+    }
+
+
 def build_0guard_progress(*, now: datetime | None = None) -> dict[str, Any]:
     """Return a normalized, public-safe progress snapshot for 0guard."""
     generated_at = (now or datetime.now(UTC)).isoformat()
@@ -186,7 +230,11 @@ def build_0guard_progress(*, now: datetime | None = None) -> dict[str, Any]:
 
     fetched: dict[str, tuple[dict[str, Any] | None, str]] = {}
     for key, endpoint in PUBLIC_ENDPOINTS.items():
-        fetched[key] = _fetch_json(base_url, endpoint)
+        fetched[key] = _fetch_json(
+            base_url,
+            endpoint,
+            timeout=PUBLIC_ENDPOINT_TIMEOUTS.get(key, 2.5),
+        )
 
     health, health_status = fetched["health"]
     ready, ready_status = fetched["ready"]
@@ -216,6 +264,7 @@ def build_0guard_progress(*, now: datetime | None = None) -> dict[str, Any]:
         posture = "degraded"
 
     optional_feeds = _optional_feed_status(fetched)
+    live_streams = _live_stream_stats(fetched)
     return {
         "schema": "sapphire.0guard.progress.v1",
         "generated_at": generated_at,
@@ -237,6 +286,8 @@ def build_0guard_progress(*, now: datetime | None = None) -> dict[str, Any]:
             "coverage_total": coverage_view["total"],
             "blocker_rules": coverage_view["blockers"],
             "warning_rules": coverage_view["warnings"],
+            "active_phishing_domains": live_streams["active_domain_count"],
+            "detector_candidates": live_streams["detector_candidate_count"],
         },
         "sources": meta.get("source_urls") if isinstance(meta.get("source_urls"), list) else [],
         "chain_counts": _top_counts(stats.get("chainCounts")),
@@ -244,6 +295,7 @@ def build_0guard_progress(*, now: datetime | None = None) -> dict[str, Any]:
         "coverage_sample": coverage_view["sample"],
         "ready_checks": _ready_checks(ready),
         "optional_feeds": optional_feeds,
+        "live_streams": live_streams,
         "safety": {
             "read_only": True,
             "secret_display_enabled": False,

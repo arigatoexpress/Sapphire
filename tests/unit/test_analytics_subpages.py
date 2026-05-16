@@ -91,6 +91,26 @@ def _load_analytics_app(monkeypatch):
                     }
                 ]
             },
+            "/api/intelligence/events?live=1&limit=6": {
+                "schema": "0guard.intelligence_events_snapshot.v1",
+                "eventCount": 3,
+                "safety": {"rawPayloadsReturned": False},
+            },
+            "/api/reputation/connectors/live?live=1&limit=3": {
+                "schema": "0guard.reputation_connector_snapshot.v1",
+                "fetch": {
+                    "status": "ok",
+                    "parsedDomainCount": 81256,
+                    "sampledEvidenceCount": 3,
+                },
+                "safety": {"rawPayloadsReturned": False, "rawDomainsReturned": False},
+            },
+            "/api/intelligence/detector-candidates?live=1&limit=5": {
+                "schema": "0guard.detector_candidates.v1",
+                "candidateCount": 5,
+                "highPriorityCount": 2,
+                "safety": {"rawPayloadsReturned": False},
+            },
         }
         return payloads.get(endpoint), "ok" if endpoint in payloads else "http_404"
 
@@ -141,6 +161,8 @@ def test_p_0guard_smoke(monkeypatch):
     assert "28/1" not in body
     assert "28" in body
     assert "634.9M" in body
+    assert "81256" in body
+    assert "candidate queue" in body
     assert "0G_NATIVE_SECURITY_SURFACE" in body
     assert "not present on the active public route yet" in body
     assert "OG_PRIVATE_KEY" not in body
@@ -157,6 +179,9 @@ def test_0guard_progress_api_is_public_safe(monkeypatch):
     assert payload["schema"] == "sapphire.0guard.progress.v1"
     assert payload["metrics"]["incident_count"] == 28
     assert payload["metrics"]["coverage"] == "100%"
+    assert payload["metrics"]["active_phishing_domains"] == 81256
+    assert payload["metrics"]["detector_candidates"] == 5
+    assert payload["live_streams"]["raw_payloads_returned"] is False
     encoded = json.dumps(payload)
     assert "OG_PRIVATE_KEY" not in encoded
     assert ("aa" * 32) not in encoded

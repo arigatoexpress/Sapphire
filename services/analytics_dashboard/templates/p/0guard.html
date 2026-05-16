@@ -212,6 +212,16 @@
       <div class="value">{{ oguard.metrics.blocker_rules + oguard.metrics.warning_rules }}</div>
       <div class="sub">{{ oguard.metrics.blocker_rules }} blockers, {{ oguard.metrics.warning_rules }} warnings</div>
     </div>
+    <div class="guard-metric">
+      <div class="label">phishing feed</div>
+      <div class="value">{{ oguard.metrics.active_phishing_domains }}</div>
+      <div class="sub">derived-only live PhishDestroy read</div>
+    </div>
+    <div class="guard-metric">
+      <div class="label">candidate queue</div>
+      <div class="value">{{ oguard.metrics.detector_candidates }}</div>
+      <div class="sub">OSINT signals awaiting regression tests</div>
+    </div>
   </div>
 </section>
 
