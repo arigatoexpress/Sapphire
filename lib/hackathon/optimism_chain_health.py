@@ -230,9 +230,7 @@ async def evaluate_optimism_chain_health(client: Any) -> OptimismChainHealthVerd
                 f"Pyth fallback active on {[str(r.symbol) for r in fresh]}",
             ],
             pyth_fresh_symbols=[str(r.symbol) for r in fresh],
-            pyth_stale_symbols=[
-                str(r.symbol) for r in pyth_readings if getattr(r, "stale", False)
-            ],
+            pyth_stale_symbols=[str(r.symbol) for r in pyth_readings if getattr(r, "stale", False)],
         )
 
     return classify_optimism(lend, pyth_readings=pyth_readings)
