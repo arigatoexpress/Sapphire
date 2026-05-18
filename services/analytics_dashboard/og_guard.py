@@ -14,7 +14,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from copy import deepcopy
 from datetime import UTC, datetime
+from threading import Lock
 from typing import Any
 
 DEFAULT_0GUARD_URL = "https://guard0-miniapp-s77j6bxyra-uc.a.run.app"
@@ -40,13 +42,82 @@ PUBLIC_ENDPOINT_TIMEOUTS = {
     "ready": 6.0,
     "summary": 6.0,
     "coverage": 6.0,
-    "events": 6.0,
-    "events_live": 12.0,
-    "reputation_worker": 12.0,
-    "detector_candidates": 12.0,
+    "events": 10.0,
+    "events_live": 22.0,
+    "reputation_worker": 22.0,
+    "detector_candidates": 22.0,
     "arbitrum": 4.0,
     "metamask": 4.0,
 }
+
+PROGRESS_CACHE_TTL_SECONDS = 120.0
+PROGRESS_STALE_TTL_SECONDS = 300.0
+
+_progress_cache_lock = Lock()
+_progress_cache: dict[str, Any] | None = None
+_progress_cache_at: datetime | None = None
+_progress_cache_key: tuple[str, str, int] | None = None
+
+
+def _cache_key(base_url: str, candidate_url: str) -> tuple[str, str, int]:
+    return (base_url, candidate_url, id(_fetch_json))
+
+
+def _has_live_stream_counts(live_streams: dict[str, Any] | None) -> bool:
+    if not isinstance(live_streams, dict):
+        return False
+    return any(
+        int(live_streams.get(key) or 0) > 0
+        for key in (
+            "active_domain_count",
+            "detector_candidate_count",
+            "live_event_count",
+            "sampled_evidence_count",
+        )
+    )
+
+
+def _cached_progress(
+    key: tuple[str, str, int], now: datetime
+) -> tuple[dict[str, Any] | None, float | None]:
+    with _progress_cache_lock:
+        if _progress_cache is None or _progress_cache_at is None or _progress_cache_key != key:
+            return None, None
+        age = max(0.0, (now - _progress_cache_at).total_seconds())
+        if age > PROGRESS_CACHE_TTL_SECONDS:
+            return None, age
+        cached = deepcopy(_progress_cache)
+    cached["cache"] = {
+        "status": "fresh",
+        "age_seconds": int(age),
+        "ttl_seconds": int(PROGRESS_CACHE_TTL_SECONDS),
+    }
+    return cached, age
+
+
+def _cached_live_streams(
+    key: tuple[str, str, int], now: datetime
+) -> tuple[dict[str, Any] | None, float | None]:
+    with _progress_cache_lock:
+        if _progress_cache is None or _progress_cache_at is None or _progress_cache_key != key:
+            return None, None
+        age = max(0.0, (now - _progress_cache_at).total_seconds())
+        if age > PROGRESS_STALE_TTL_SECONDS:
+            return None, age
+        live_streams = deepcopy(_progress_cache.get("live_streams"))
+    if not _has_live_stream_counts(live_streams):
+        return None, age
+    return live_streams, age
+
+
+def _store_progress(key: tuple[str, str, int], now: datetime, payload: dict[str, Any]) -> None:
+    if not _has_live_stream_counts(payload.get("live_streams")):
+        return
+    with _progress_cache_lock:
+        global _progress_cache, _progress_cache_at, _progress_cache_key
+        _progress_cache = deepcopy(payload)
+        _progress_cache_at = now
+        _progress_cache_key = key
 
 
 def _clean_base_url(url: str | None) -> str:
@@ -230,12 +301,17 @@ def _live_stream_stats(
 
 def build_0guard_progress(*, now: datetime | None = None) -> dict[str, Any]:
     """Return a normalized, public-safe progress snapshot for 0guard."""
-    generated_at = (now or datetime.now(UTC)).isoformat()
+    observed_at = now or datetime.now(UTC)
+    generated_at = observed_at.isoformat()
     base_url = _clean_base_url(os.environ.get(ENV_0GUARD_URL))
     candidate_url = _clean_base_url(os.environ.get(ENV_0GUARD_CANDIDATE_URL) or base_url)
+    cache_key = _cache_key(base_url, candidate_url)
+    cached, _age = _cached_progress(cache_key, observed_at)
+    if cached is not None:
+        return cached
 
     fetched: dict[str, tuple[dict[str, Any] | None, str]] = {}
-    with ThreadPoolExecutor(max_workers=min(4, len(PUBLIC_ENDPOINTS))) as pool:
+    with ThreadPoolExecutor(max_workers=min(8, len(PUBLIC_ENDPOINTS))) as pool:
         futures = {
             pool.submit(
                 _fetch_json,
@@ -281,7 +357,15 @@ def build_0guard_progress(*, now: datetime | None = None) -> dict[str, Any]:
 
     optional_feeds = _optional_feed_status(fetched)
     live_streams = _live_stream_stats(fetched)
-    return {
+    stale_live_streams, stale_age = _cached_live_streams(cache_key, observed_at)
+    live_streams_source = "live_fetch"
+    if not _has_live_stream_counts(live_streams) and stale_live_streams is not None:
+        live_streams = stale_live_streams
+        live_streams_source = "stale_success_cache"
+        live_streams["stale_age_seconds"] = int(stale_age or 0)
+    live_streams["source"] = live_streams_source
+
+    payload = {
         "schema": "sapphire.0guard.progress.v1",
         "generated_at": generated_at,
         "base_url": base_url,
@@ -321,3 +405,5 @@ def build_0guard_progress(*, now: datetime | None = None) -> dict[str, Any]:
             "money_movement_enabled": False,
         },
     }
+    _store_progress(cache_key, observed_at, payload)
+    return payload
