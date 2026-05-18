@@ -10,6 +10,8 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+import threading
+import time
 import types
 from pathlib import Path
 
@@ -181,10 +183,62 @@ def test_0guard_progress_api_is_public_safe(monkeypatch):
     assert payload["metrics"]["coverage"] == "100%"
     assert payload["metrics"]["active_phishing_domains"] == 81256
     assert payload["metrics"]["detector_candidates"] == 5
+    assert payload["raw_payloads_returned"] is False
     assert payload["live_streams"]["raw_payloads_returned"] is False
     encoded = json.dumps(payload)
     assert "OG_PRIVATE_KEY" not in encoded
     assert ("aa" * 32) not in encoded
+
+
+def test_0guard_progress_fetches_public_endpoints_concurrently(monkeypatch):
+    _load_analytics_app(monkeypatch)
+    guard = sys.modules["og_guard"]
+    active = 0
+    max_active = 0
+    lock = threading.Lock()
+
+    def _fake_fetch(_base_url, endpoint, *, timeout=2.5):
+        del timeout
+        nonlocal active, max_active
+        with lock:
+            active += 1
+            max_active = max(max_active, active)
+        try:
+            time.sleep(0.02)
+            payloads = {
+                "/api/healthz": {"ok": True},
+                "/api/readyz": {"ok": True, "readiness": "ready", "checks": []},
+                "/api/data/summary": {
+                    "meta": {"month": "April 2026", "total_loss_usd": 100, "source_urls": []},
+                    "stats": {"incidentCount": 1, "chainCounts": {}, "attackVectorCounts": {}},
+                },
+                "/api/data/detection-coverage": {"coverage": [{"matched": True}]},
+                "/api/intelligence/events?live=1&limit=6": {
+                    "eventCount": 2,
+                    "safety": {"rawPayloadsReturned": False},
+                },
+                "/api/reputation/connectors/live?live=1&limit=3": {
+                    "fetch": {"parsedDomainCount": 10, "sampledEvidenceCount": 1},
+                    "safety": {"rawPayloadsReturned": False},
+                },
+                "/api/intelligence/detector-candidates?live=1&limit=5": {
+                    "candidateCount": 3,
+                    "highPriorityCount": 1,
+                    "safety": {"rawPayloadsReturned": False},
+                },
+            }
+            return payloads.get(endpoint, {}), "ok"
+        finally:
+            with lock:
+                active -= 1
+
+    monkeypatch.setattr(guard, "_fetch_json", _fake_fetch, raising=True)
+
+    payload = guard.build_0guard_progress()
+
+    assert max_active > 1
+    assert payload["raw_payloads_returned"] is False
+    assert payload["live_streams"]["active_domain_count"] == 10
 
 
 def test_og_proof_api_is_public_safe(monkeypatch):

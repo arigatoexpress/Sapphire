@@ -13,6 +13,7 @@ import os
 import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from typing import Any
 
@@ -35,6 +36,11 @@ PUBLIC_ENDPOINTS = {
 }
 
 PUBLIC_ENDPOINT_TIMEOUTS = {
+    "health": 6.0,
+    "ready": 6.0,
+    "summary": 6.0,
+    "coverage": 6.0,
+    "events": 6.0,
     "events_live": 12.0,
     "reputation_worker": 12.0,
     "detector_candidates": 12.0,
@@ -229,12 +235,22 @@ def build_0guard_progress(*, now: datetime | None = None) -> dict[str, Any]:
     candidate_url = _clean_base_url(os.environ.get(ENV_0GUARD_CANDIDATE_URL) or base_url)
 
     fetched: dict[str, tuple[dict[str, Any] | None, str]] = {}
-    for key, endpoint in PUBLIC_ENDPOINTS.items():
-        fetched[key] = _fetch_json(
-            base_url,
-            endpoint,
-            timeout=PUBLIC_ENDPOINT_TIMEOUTS.get(key, 2.5),
-        )
+    with ThreadPoolExecutor(max_workers=min(4, len(PUBLIC_ENDPOINTS))) as pool:
+        futures = {
+            pool.submit(
+                _fetch_json,
+                base_url,
+                endpoint,
+                timeout=PUBLIC_ENDPOINT_TIMEOUTS.get(key, 2.5),
+            ): key
+            for key, endpoint in PUBLIC_ENDPOINTS.items()
+        }
+        for future in as_completed(futures):
+            key = futures[future]
+            try:
+                fetched[key] = future.result()
+            except Exception:
+                fetched[key] = (None, "unreachable")
 
     health, health_status = fetched["health"]
     ready, ready_status = fetched["ready"]
@@ -296,6 +312,7 @@ def build_0guard_progress(*, now: datetime | None = None) -> dict[str, Any]:
         "ready_checks": _ready_checks(ready),
         "optional_feeds": optional_feeds,
         "live_streams": live_streams,
+        "raw_payloads_returned": False,
         "safety": {
             "read_only": True,
             "secret_display_enabled": False,
