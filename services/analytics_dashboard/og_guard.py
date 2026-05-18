@@ -37,11 +37,14 @@ PUBLIC_ENDPOINTS = {
     "hackathons": "/api/hackathons/next",
 }
 
+CORE_ENDPOINT_KEYS = ("health", "ready", "summary", "coverage")
+OPTIONAL_ENDPOINT_KEYS = tuple(key for key in PUBLIC_ENDPOINTS if key not in CORE_ENDPOINT_KEYS)
+
 PUBLIC_ENDPOINT_TIMEOUTS = {
-    "health": 6.0,
-    "ready": 6.0,
-    "summary": 6.0,
-    "coverage": 6.0,
+    "health": 12.0,
+    "ready": 12.0,
+    "summary": 12.0,
+    "coverage": 12.0,
     "events": 10.0,
     "events_live": 22.0,
     "reputation_worker": 22.0,
@@ -111,7 +114,14 @@ def _cached_live_streams(
 
 
 def _store_progress(key: tuple[str, str, int], now: datetime, payload: dict[str, Any]) -> None:
-    if not _has_live_stream_counts(payload.get("live_streams")):
+    metrics = payload.get("metrics") if isinstance(payload.get("metrics"), dict) else {}
+    if (
+        int(metrics.get("incident_count") or 0) <= 0
+        or int(metrics.get("coverage_total") or 0) <= 0
+        or int(metrics.get("active_phishing_domains") or 0) <= 0
+        or int(metrics.get("detector_candidates") or 0) <= 0
+        or not _has_live_stream_counts(payload.get("live_streams"))
+    ):
         return
     with _progress_cache_lock:
         global _progress_cache, _progress_cache_at, _progress_cache_key
@@ -149,6 +159,43 @@ def _fetch_json(
         return None, f"http_{exc.code}"
     except (urllib.error.URLError, TimeoutError, ValueError, OSError):
         return None, "unreachable"
+
+
+def _fetch_endpoint_group(
+    base_url: str, keys: tuple[str, ...], *, max_workers: int
+) -> dict[str, tuple[dict[str, Any] | None, str]]:
+    fetched: dict[str, tuple[dict[str, Any] | None, str]] = {}
+    with ThreadPoolExecutor(max_workers=min(max_workers, len(keys))) as pool:
+        futures = {
+            pool.submit(
+                _fetch_json,
+                base_url,
+                PUBLIC_ENDPOINTS[key],
+                timeout=PUBLIC_ENDPOINT_TIMEOUTS.get(key, 2.5),
+            ): key
+            for key in keys
+        }
+        for future in as_completed(futures):
+            key = futures[future]
+            try:
+                fetched[key] = future.result()
+            except Exception:
+                fetched[key] = (None, "unreachable")
+    return fetched
+
+
+def _retry_failed_core_endpoints(
+    base_url: str, fetched: dict[str, tuple[dict[str, Any] | None, str]]
+) -> None:
+    for key in CORE_ENDPOINT_KEYS:
+        payload, status = fetched.get(key, (None, "missing"))
+        if payload is not None and status == "ok":
+            continue
+        fetched[key] = _fetch_json(
+            base_url,
+            PUBLIC_ENDPOINTS[key],
+            timeout=max(PUBLIC_ENDPOINT_TIMEOUTS.get(key, 2.5), 18.0),
+        )
 
 
 def _money(value: int | float | None) -> str:
@@ -310,23 +357,9 @@ def build_0guard_progress(*, now: datetime | None = None) -> dict[str, Any]:
     if cached is not None:
         return cached
 
-    fetched: dict[str, tuple[dict[str, Any] | None, str]] = {}
-    with ThreadPoolExecutor(max_workers=min(8, len(PUBLIC_ENDPOINTS))) as pool:
-        futures = {
-            pool.submit(
-                _fetch_json,
-                base_url,
-                endpoint,
-                timeout=PUBLIC_ENDPOINT_TIMEOUTS.get(key, 2.5),
-            ): key
-            for key, endpoint in PUBLIC_ENDPOINTS.items()
-        }
-        for future in as_completed(futures):
-            key = futures[future]
-            try:
-                fetched[key] = future.result()
-            except Exception:
-                fetched[key] = (None, "unreachable")
+    fetched = _fetch_endpoint_group(base_url, CORE_ENDPOINT_KEYS, max_workers=4)
+    _retry_failed_core_endpoints(base_url, fetched)
+    fetched.update(_fetch_endpoint_group(base_url, OPTIONAL_ENDPOINT_KEYS, max_workers=6))
 
     health, health_status = fetched["health"]
     ready, ready_status = fetched["ready"]

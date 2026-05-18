@@ -337,6 +337,54 @@ def test_0guard_progress_uses_stale_live_stream_cache(monkeypatch):
     assert second["live_streams"]["source"] == "stale_success_cache"
 
 
+def test_0guard_progress_does_not_cache_partial_core_failure(monkeypatch):
+    _load_analytics_app(monkeypatch)
+    guard = sys.modules["og_guard"]
+    with guard._progress_cache_lock:
+        guard._progress_cache = None
+        guard._progress_cache_at = None
+        guard._progress_cache_key = None
+    fail_core = True
+
+    def _fake_fetch(_base_url, endpoint, *, timeout=2.5):
+        del timeout
+        core_payloads = {
+            "/api/healthz": {"ok": True},
+            "/api/readyz": {"ok": True, "readiness": "ready", "checks": []},
+            "/api/data/summary": {
+                "meta": {"month": "April 2026", "total_loss_usd": 100, "source_urls": []},
+                "stats": {"incidentCount": 1, "chainCounts": {}, "attackVectorCounts": {}},
+            },
+            "/api/data/detection-coverage": {"coverage": [{"matched": True}]},
+        }
+        optional_payloads = {
+            "/api/intelligence/events?live=1&limit=6": {"eventCount": 2},
+            "/api/reputation/connectors/live?live=1&limit=3": {
+                "fetch": {"parsedDomainCount": 10, "sampledEvidenceCount": 1}
+            },
+            "/api/intelligence/detector-candidates?live=1&limit=5": {
+                "candidateCount": 3,
+                "highPriorityCount": 1,
+            },
+        }
+        if endpoint == "/api/data/summary" and fail_core:
+            return None, "unreachable"
+        payloads = core_payloads | optional_payloads
+        return payloads.get(endpoint, {}), "ok"
+
+    monkeypatch.setattr(guard, "_fetch_json", _fake_fetch, raising=True)
+
+    first = guard.build_0guard_progress()
+    fail_core = False
+    second = guard.build_0guard_progress()
+
+    assert first["metrics"]["incident_count"] == 0
+    assert first["metrics"]["detector_candidates"] == 3
+    assert "cache" not in second
+    assert second["metrics"]["incident_count"] == 1
+    assert second["metrics"]["active_phishing_domains"] == 10
+
+
 def test_og_proof_api_is_public_safe(monkeypatch):
     monkeypatch.setenv("OG_PRIVATE_KEY", "0x" + "aa" * 32)
     client = _load_analytics_app(monkeypatch)
