@@ -193,6 +193,10 @@ def test_0guard_progress_api_is_public_safe(monkeypatch):
 def test_0guard_progress_fetches_public_endpoints_concurrently(monkeypatch):
     _load_analytics_app(monkeypatch)
     guard = sys.modules["og_guard"]
+    with guard._progress_cache_lock:
+        guard._progress_cache = None
+        guard._progress_cache_at = None
+        guard._progress_cache_key = None
     active = 0
     max_active = 0
     lock = threading.Lock()
@@ -239,6 +243,98 @@ def test_0guard_progress_fetches_public_endpoints_concurrently(monkeypatch):
     assert max_active > 1
     assert payload["raw_payloads_returned"] is False
     assert payload["live_streams"]["active_domain_count"] == 10
+
+
+def test_0guard_progress_reuses_fresh_success_cache(monkeypatch):
+    _load_analytics_app(monkeypatch)
+    guard = sys.modules["og_guard"]
+    with guard._progress_cache_lock:
+        guard._progress_cache = None
+        guard._progress_cache_at = None
+        guard._progress_cache_key = None
+    calls = 0
+
+    def _fake_fetch(_base_url, endpoint, *, timeout=2.5):
+        del timeout
+        nonlocal calls
+        calls += 1
+        payloads = {
+            "/api/healthz": {"ok": True},
+            "/api/readyz": {"ok": True, "readiness": "ready", "checks": []},
+            "/api/data/summary": {
+                "meta": {"month": "April 2026", "total_loss_usd": 100, "source_urls": []},
+                "stats": {"incidentCount": 1, "chainCounts": {}, "attackVectorCounts": {}},
+            },
+            "/api/data/detection-coverage": {"coverage": [{"matched": True}]},
+            "/api/intelligence/events?live=1&limit=6": {"eventCount": 2},
+            "/api/reputation/connectors/live?live=1&limit=3": {
+                "fetch": {"parsedDomainCount": 10, "sampledEvidenceCount": 1}
+            },
+            "/api/intelligence/detector-candidates?live=1&limit=5": {
+                "candidateCount": 3,
+                "highPriorityCount": 1,
+            },
+        }
+        return payloads.get(endpoint, {}), "ok"
+
+    monkeypatch.setattr(guard, "_fetch_json", _fake_fetch, raising=True)
+
+    first = guard.build_0guard_progress()
+    first_call_count = calls
+    second = guard.build_0guard_progress()
+
+    assert first["live_streams"]["active_domain_count"] == 10
+    assert second["live_streams"]["active_domain_count"] == 10
+    assert second["cache"]["status"] == "fresh"
+    assert calls == first_call_count
+
+
+def test_0guard_progress_uses_stale_live_stream_cache(monkeypatch):
+    _load_analytics_app(monkeypatch)
+    guard = sys.modules["og_guard"]
+    with guard._progress_cache_lock:
+        guard._progress_cache = None
+        guard._progress_cache_at = None
+        guard._progress_cache_key = None
+    fail_optional = False
+
+    def _fake_fetch(_base_url, endpoint, *, timeout=2.5):
+        del timeout
+        core_payloads = {
+            "/api/healthz": {"ok": True},
+            "/api/readyz": {"ok": True, "readiness": "ready", "checks": []},
+            "/api/data/summary": {
+                "meta": {"month": "April 2026", "total_loss_usd": 100, "source_urls": []},
+                "stats": {"incidentCount": 1, "chainCounts": {}, "attackVectorCounts": {}},
+            },
+            "/api/data/detection-coverage": {"coverage": [{"matched": True}]},
+        }
+        optional_payloads = {
+            "/api/intelligence/events?live=1&limit=6": {"eventCount": 2},
+            "/api/reputation/connectors/live?live=1&limit=3": {
+                "fetch": {"parsedDomainCount": 10, "sampledEvidenceCount": 1}
+            },
+            "/api/intelligence/detector-candidates?live=1&limit=5": {
+                "candidateCount": 3,
+                "highPriorityCount": 1,
+            },
+        }
+        if endpoint in optional_payloads and fail_optional:
+            return None, "unreachable"
+        payloads = core_payloads | optional_payloads
+        return payloads.get(endpoint, {}), "ok"
+
+    monkeypatch.setattr(guard, "_fetch_json", _fake_fetch, raising=True)
+
+    first = guard.build_0guard_progress()
+    fail_optional = True
+    monkeypatch.setattr(guard, "PROGRESS_CACHE_TTL_SECONDS", -1.0, raising=True)
+    second = guard.build_0guard_progress()
+
+    assert first["live_streams"]["active_domain_count"] == 10
+    assert second["live_streams"]["active_domain_count"] == 10
+    assert second["live_streams"]["detector_candidate_count"] == 3
+    assert second["live_streams"]["source"] == "stale_success_cache"
 
 
 def test_og_proof_api_is_public_safe(monkeypatch):
