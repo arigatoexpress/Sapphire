@@ -203,7 +203,7 @@ PROJECT_TABS: list[dict] = [
         "info_route": "/p/system",
         "primary_cta": {"label": "Open System", "href": "/p/system", "external": False},
         "resources": [
-            {"label": "Health", "href": "/healthz"},
+            {"label": "Health", "href": "/health"},
             {"label": "Silo Health", "href": "/api/silos/health"},
             {"label": "Admin Service Timeseries", "href": "/admin"},
         ],
