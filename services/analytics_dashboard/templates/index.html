@@ -11,19 +11,19 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg-0: #07090e;
-  --bg-1: #0b0e16;
-  --bg-2: #11151f;
-  --bg-3: #1a2030;
-  --border: #1d2331;
-  --border-bright: #2c3548;
-  --text-1: #e8eef7;
-  --text-2: #a8b3c7;
-  --text-3: #6c7891;
-  --text-4: #424d65;
-  --accent: #4ea8ff;
-  --accent-2: #62ff40;
-  --green: #3fb950;
+  --bg-0: #f4f7f3;
+  --bg-1: #ffffff;
+  --bg-2: #eef4f0;
+  --bg-3: #dde8e2;
+  --border: #c7d5cf;
+  --border-bright: #95aca4;
+  --text-1: #17211f;
+  --text-2: #42534f;
+  --text-3: #64736f;
+  --text-4: #9aa7a2;
+  --accent: #1f63b5;
+  --accent-2: #147d59;
+  --green: #158044;
   --green-dim: rgba(63,185,80,0.16);
   --red: #f85149;
   --red-dim: rgba(248,81,73,0.16);
@@ -34,8 +34,8 @@
   --r-sm: 6px;
   --r: 10px;
   --r-lg: 14px;
-  --shadow-1: 0 1px 2px rgba(0,0,0,0.3);
-  --shadow-2: 0 6px 20px rgba(0,0,0,0.35);
+  --shadow-1: 0 1px 2px rgba(23,33,31,0.08);
+  --shadow-2: 0 12px 32px rgba(23,33,31,0.12);
   --t-fast: 120ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 * { box-sizing: border-box; }
@@ -71,7 +71,7 @@ header.top {
 .brand-mark {
   width: 44px; height: 44px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #1f2a45 0%, #0d1322 100%);
+  background: linear-gradient(135deg, #dce7f6 0%, #f6faf8 100%);
   border: 1px solid var(--border-bright);
   display: grid; place-items: center;
   box-shadow: var(--shadow-1), inset 0 1px 0 rgba(255,255,255,0.04);
@@ -195,9 +195,9 @@ header.top {
   font-size: 13px;
 }
 .console-action.primary {
-  border-color: rgba(78,168,255,0.55);
-  background: rgba(78,168,255,0.12);
-  color: #b8dcff;
+  border-color: rgba(31,99,181,0.5);
+  background: rgba(31,99,181,0.08);
+  color: var(--accent);
 }
 .console-action.secure {
   border-color: rgba(98,255,64,0.38);
@@ -211,7 +211,7 @@ header.top {
 }
 .console-metric {
   border: 1px solid var(--border);
-  background: rgba(11,14,22,0.72);
+  background: rgba(255,255,255,0.94);
   padding: 12px;
   min-height: 86px;
 }
@@ -265,7 +265,7 @@ header.top {
   gap: 12px;
   align-items: center;
   border: 1px solid var(--border);
-  background: rgba(7,9,14,0.82);
+  background: rgba(255,255,255,0.94);
   padding: 11px 12px;
 }
 .boundary-row strong {
@@ -273,7 +273,7 @@ header.top {
   font-size: 12px;
 }
 .boundary-row span {
-  color: var(--text-3);
+  color: var(--text-2);
   font-size: 12px;
   min-width: 0;
 }
@@ -285,7 +285,7 @@ header.top {
 .lane-chip {
   min-height: 72px;
   border: 1px solid var(--border);
-  background: rgba(17,21,31,0.74);
+  background: rgba(255,255,255,0.86);
   padding: 10px;
 }
 .lane-chip .lane-name {
@@ -298,7 +298,7 @@ header.top {
 }
 .lane-chip .lane-role {
   margin-top: 8px;
-  color: var(--text-3);
+  color: var(--text-2);
   font-size: 11px;
   line-height: 1.4;
 }
@@ -371,7 +371,7 @@ header.top {
 .brief-lock {
   border: 1px solid rgba(248,81,73,0.28);
   background: rgba(248,81,73,0.07);
-  color: #ffb6ae;
+  color: #b42332;
   padding: 6px 8px;
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-size: 10px;
@@ -393,7 +393,7 @@ header.top {
 }
 .silo-card {
   position: relative;
-  background: linear-gradient(180deg, var(--bg-2) 0%, var(--bg-1) 100%);
+  background: linear-gradient(180deg, #ffffff 0%, var(--bg-2) 100%);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   padding: 18px 20px 16px;
@@ -408,7 +408,6 @@ header.top {
   transform: translateY(-1px);
   box-shadow: var(--shadow-2);
 }
-.silo-card.tho:hover { border-color: var(--accent); }
 .silo-card.threat:hover { border-color: var(--red); }
 .silo-card.wildfire:hover { border-color: var(--orange); }
 .silo-card.intel:hover { border-color: var(--purple); }
@@ -430,7 +429,6 @@ header.top {
   background: var(--text-4);
   transition: background var(--t-fast);
 }
-.silo-card.tho .accent-bar { background: var(--accent); }
 .silo-card.threat .accent-bar { background: var(--red); }
 .silo-card.wildfire .accent-bar { background: var(--orange); }
 .silo-card.intel .accent-bar { background: var(--purple); }
@@ -487,7 +485,7 @@ header.top {
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text-2);
-  background: rgba(255,255,255,0.02);
+  background: rgba(255,255,255,0.64);
   text-decoration: none;
   font-size: 11px;
   font-weight: 600;
@@ -513,7 +511,7 @@ header.top {
 .landing-shell {
   border: 1px solid var(--border-bright);
   background:
-    linear-gradient(180deg, rgba(98,255,64,0.06), rgba(78,168,255,0.02) 44%, rgba(7,9,14,0)),
+    linear-gradient(180deg, rgba(20,125,89,0.08), rgba(31,99,181,0.04) 44%, rgba(244,247,243,0)),
     var(--bg-1);
   padding: 22px;
   margin-bottom: 28px;
@@ -583,11 +581,114 @@ header.top {
 .landing-terminal span:last-child { color: var(--text-2); }
 .project-grid .silo-card {
   border-radius: 6px;
-  background: rgba(11,14,22,0.86);
+  background: rgba(255,255,255,0.92);
 }
 .project-grid .silo-card,
 .project-grid .silo-card:hover {
   transform: none;
+}
+
+.current-products {
+  border: 1px solid var(--border-bright);
+  background:
+    linear-gradient(135deg, rgba(20,125,89,0.09), rgba(31,99,181,0.06) 48%, rgba(210,153,34,0.06)),
+    var(--bg-1);
+  padding: 22px;
+  margin: 0 0 28px;
+}
+.current-products-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-end;
+  margin-bottom: 16px;
+}
+.current-products-head p {
+  max-width: 720px;
+  margin: 8px 0 0;
+  color: var(--text-2);
+}
+.sunset-pill {
+  flex: 0 0 auto;
+  border: 1px solid rgba(210,153,34,0.36);
+  background: rgba(210,153,34,0.11);
+  color: #8a5b12;
+  padding: 8px 11px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+.current-products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(245px, 1fr));
+  gap: 12px;
+}
+.current-product-card {
+  display: grid;
+  gap: 10px;
+  min-height: 250px;
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--accent);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.94);
+  padding: 16px;
+}
+.current-product-card.accent-green { border-top-color: var(--accent-2); }
+.current-product-card.accent-purple { border-top-color: var(--purple); }
+.current-product-card.accent-orange { border-top-color: var(--orange); }
+.current-product-card.accent-red { border-top-color: var(--red); }
+.current-product-card h3 {
+  margin: 0;
+  color: var(--text-1);
+  font-size: 17px;
+  line-height: 1.2;
+}
+.current-product-card p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+.current-product-card .tagline {
+  color: var(--text-3);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.current-product-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.current-product-meta span {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: var(--text-3);
+  font-size: 10.5px;
+}
+.current-product-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-self: end;
+}
+.current-product-actions a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 10px;
+  color: var(--text-2);
+  text-decoration: none;
+  font-weight: 650;
+  font-size: 11.5px;
+}
+.current-product-actions a.primary {
+  border-color: rgba(20,125,89,0.36);
+  background: rgba(20,125,89,0.08);
+  color: var(--accent-2);
 }
 
 .silo-head {
@@ -619,6 +720,10 @@ header.top {
 .silo-status.phase-0  { background: rgba(255,122,0,0.14); color: var(--orange); }
 .silo-status.live     { background: rgba(78,168,255,0.14); color: var(--accent); }
 .silo-status.active   { background: rgba(98,255,64,0.14); color: var(--accent-2); }
+.silo-status.buyer-ready,
+.silo-status.review-ready { background: rgba(20,125,89,0.12); color: var(--accent-2); }
+.silo-status.paper-demo { background: rgba(255,122,0,0.14); color: var(--orange); }
+.silo-status.sunset { background: rgba(108,120,145,0.14); color: var(--text-3); }
 
 .silo-desc {
   font-size: 12px;
@@ -990,7 +1095,6 @@ td.muted { color: var(--text-3); }
 .brain-action .b-tag.service   { background: rgba(78,168,255,0.16); color: var(--accent); }
 .brain-action .b-tag.services  { background: rgba(78,168,255,0.16); color: var(--accent); }
 .brain-action .b-tag.inference { background: rgba(98,255,64,0.14); color: var(--accent-2); }
-.brain-action .b-tag.tho       { background: var(--yellow-dim); color: var(--yellow); }
 .brain-action .b-tag.other     { background: rgba(108,120,145,0.18); color: var(--text-3); }
 .brain-action .b-text { flex: 1; min-width: 0; word-break: break-word; }
 .brain-actions-empty {
@@ -1600,6 +1704,8 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
   .brief-locks { border-left: 0; padding-left: 0; }
   .console-metrics { grid-template-columns: 1fr; }
   .lane-grid { grid-template-columns: 1fr; }
+  .current-products-head { flex-direction: column; align-items: flex-start; }
+  .sunset-pill { max-width: 100%; white-space: normal; }
   .panel,
   .cols-2 > *,
   .cols-3 > * { min-width: 0; }
@@ -1660,16 +1766,19 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
 <div id="toast-host" aria-live="polite" aria-atomic="true"></div>
 
 <!-- ========== PUBLIC CONSOLE FIRST SCREEN ========== -->
+{% set public_tabs = project_tabs | list %}
+{% set featured_tabs = public_tabs | selectattr("featured") | list %}
 <section class="public-console" id="public-console" aria-labelledby="public-console-title">
   <div class="public-console-main">
     <div class="console-kicker">sapphirealpha.xyz / public-safe operations</div>
-    <h1 class="console-title" id="public-console-title">Sapphire OS is live, gated, and failover-aware.</h1>
+    <h1 class="console-title" id="public-console-title">SapphireAlpha is now the public product front door.</h1>
     <p class="console-copy">
-      The public surface now shows verified system posture and product paths without exposing raw telemetry,
-      private device topology, model output, service hosts, or operator actions. Admin unlocks the full suite.
+      The public surface now foregrounds the current products: agent safety, paid intelligence artifacts,
+      field-ops intelligence, delivery-market simulation, markets, threats, and system posture. Retired
+      aggregate demos and raw operator details move out of the first path.
     </p>
     <div class="console-actions">
-      <a class="console-action primary" href="#project-map">Open public systems</a>
+      <a class="console-action primary" href="#current-products">Open current products</a>
       <a class="console-action" href="/p/system">View system posture</a>
       <a class="console-action secure" href="/admin">Admin console</a>
     </div>
@@ -1704,7 +1813,7 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
       </div>
       <div class="boundary-row">
         <strong>Admin</strong>
-        <span>signals, predictions, VPIN, DSR, service hosts, raw failover evidence</span>
+        <span>raw signals, forecasts, service hosts, private evidence, and operator actions</span>
         <span class="dot degraded"></span>
       </div>
       <div class="boundary-row">
@@ -1720,6 +1829,39 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
       </div>
     </div>
   </aside>
+</section>
+
+<!-- ========== CURRENT PRODUCT RAIL ========== -->
+<section class="current-products" id="current-products" aria-labelledby="current-products-title">
+  <div class="current-products-head">
+    <div>
+      <div class="landing-kicker">current official surface</div>
+      <h2 class="landing-title" id="current-products-title">Newest useful products, not inherited scaffolding.</h2>
+      <p>
+        These are the front-door lanes worth showing now. Older omnibus hackathon views, local monitoring
+        history, model-output panels, and raw control surfaces are treated as archive or admin context.
+      </p>
+    </div>
+    <div class="sunset-pill">deprecated first-paths sunset</div>
+  </div>
+  <div class="current-products-grid">
+    {% for tab in featured_tabs %}
+    <article class="current-product-card accent-{{ tab.accent }}">
+      <div class="tagline">{{ tab.kind }} / {{ tab.status }}</div>
+      <h3>{{ tab.label }}</h3>
+      <p>{{ tab.summary }}</p>
+      <div class="current-product-meta">
+        {% for proof in tab.proof_points[:3] %}
+        <span>{{ proof }}</span>
+        {% endfor %}
+      </div>
+      <div class="current-product-actions">
+        <a href="{{ tab.info_route }}" {% if tab.info_route.startswith('http') %}target="_blank" rel="noopener"{% endif %}>Brief</a>
+        <a class="primary" href="{{ tab.primary_cta.href }}" {% if tab.primary_cta.external %}target="_blank" rel="noopener"{% endif %}>{{ tab.primary_cta.label }}</a>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
 </section>
 
 <!-- ========== READABLE PUBLIC BRIEF ========== -->
@@ -1745,7 +1887,7 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
     </div>
     <div class="brief-lock-list" id="brief-admin-locks">
       <span class="brief-lock">signals</span>
-      <span class="brief-lock">predictions</span>
+      <span class="brief-lock">forecasts</span>
       <span class="brief-lock">pnl</span>
     </div>
     <div class="brief-source" id="brief-source">
@@ -1759,9 +1901,9 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
   <div class="landing-head">
     <div>
       <div class="landing-kicker">public systems</div>
-      <h2 class="landing-title" id="project-map-title">Product routes, not internal telemetry.</h2>
+      <h2 class="landing-title" id="project-map-title">Curated product routes, not internal telemetry.</h2>
       <p class="landing-copy">
-        Each public route opens a real product, brief, or sanitized operational surface. Sensitive dashboards and raw data route back to admin.
+        Each public route opens a real product, brief, or sanitized operational surface. Sensitive dashboards, deprecated aggregates, and raw data route back to admin or archive context.
       </p>
     </div>
     <div class="landing-terminal" aria-label="Public surface status">
@@ -1772,7 +1914,7 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
   </div>
   <div class="landing-body">
     <nav class="project-tabs" aria-label="Sapphire public systems">
-      {% for tab in project_tabs %}
+      {% for tab in public_tabs %}
       <a class="project-tab" href="{{ tab.info_route }}">
         <span>{{ tab.label }}</span>
         <span class="project-kind">{{ tab.kind }}</span>
@@ -1780,7 +1922,7 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
       {% endfor %}
     </nav>
     <div class="silo-grid project-grid">
-      {% for tab in project_tabs %}
+      {% for tab in public_tabs %}
       <div class="silo-card accent-{{ tab.accent }}">
         <span class="accent-bar"></span>
         <div class="silo-head">
@@ -1930,69 +2072,6 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
   </div>
 </div>
 
-<!-- ========== VPIN — order-flow toxicity ========== -->
-<div class="section-h" id="vpin">
-  <span>Order-flow toxicity (VPIN)</span>
-  <span class="meta">Volume-Synchronized Probability of Informed Trading</span>
-</div>
-<div class="section-sub">
-  Toxicity detail is admin-only research IP. Bucket thresholds are shown publicly; live bucket history requires an admin session.
-  <span style="color:var(--green)">normal</span> &lt; 0.3 ·
-  <span style="color:var(--accent)">moderate</span> 0.3-0.5 ·
-  <span style="color:var(--yellow)">high</span> 0.5-0.7 ·
-  <span style="color:var(--red)">extreme</span> &gt; 0.7.
-</div>
-<div class="panel">
-  <h2>
-    <span>BTC — last 120 buckets <span class="h-meta" id="vpin-meta">—</span></span>
-  </h2>
-  <div style="display:flex; align-items:center; gap:24px; flex-wrap:wrap; padding:8px 0;">
-    <div>
-      <div class="kpi-label" style="margin-bottom:6px;">Latest VPIN</div>
-      <div class="kpi-value mono" id="vpin-value" style="font-size:28px;">—</div>
-    </div>
-    <div>
-      <div class="kpi-label" style="margin-bottom:6px;">Toxicity</div>
-      <div id="vpin-tox" style="font-size:14px;">—</div>
-    </div>
-    <div style="flex:1; min-width:280px;">
-      <div class="chart-wrap" style="height:60px;"><svg id="vpin-spark"></svg></div>
-    </div>
-  </div>
-</div>
-
-<!-- ========== Strategy quality (Deflated Sharpe) ========== -->
-<div class="section-h" id="strategy-quality">
-  <span>Strategy quality — rolling Deflated Sharpe</span>
-  <span class="meta">90-day window · Bailey & López de Prado 2014</span>
-</div>
-<div class="section-sub">
-  Deflated Sharpe penalizes Sharpe for the number of strategy trials. Live strategy results are admin-only research IP.
-</div>
-<div class="cols-2">
-  <div class="panel">
-    <h2>
-      <span>Rolling deflated Sharpe by strategy</span>
-      <span class="h-meta" id="chart-dsr-meta">—</span>
-    </h2>
-    <div class="chart-wrap"><svg id="chart-dsr"></svg></div>
-    <div class="legend" id="chart-dsr-legend"></div>
-  </div>
-  <div class="panel">
-    <h2>
-      <span>Latest snapshot</span>
-      <span class="h-meta" id="dsr-summary-meta">—</span>
-    </h2>
-    <table id="dsr-summary">
-      <thead><tr>
-        <th>Strategy</th><th class="num">Sharpe</th><th class="num">DSR</th>
-        <th class="num">Prob</th><th class="num">N</th>
-      </tr></thead>
-      <tbody><tr><td colspan="5" class="empty">loading…</td></tr></tbody>
-    </table>
-  </div>
-</div>
-
 <!-- ========== Live threat feed ========== -->
 <div class="section-h" id="threats">
   <span>Threat Intelligence</span>
@@ -2054,38 +2133,23 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
   </table>
 </div>
 
-<!-- ========== Intelligence (regime + predictions) ========== -->
-<div class="section-h" id="predictions">
-  <span>Intelligence — Market regime &amp; predictions</span>
-  <span class="meta">read-only research surface — not trading instructions</span>
+<!-- ========== Intelligence (market regime) ========== -->
+<div class="section-h" id="regime-section">
+  <span>Intelligence — Market regime</span>
+  <span class="meta">read-only context, not trading instructions</span>
 </div>
 <div class="section-sub">
-  <strong>Market regime:</strong> macro state machine, BTC funding × Fear &amp; Greed × dominance. Output:
-  <span style="color:var(--green)">RISK_ON</span> /
-  <span style="color:var(--yellow)">TRANSITION</span> /
-  <span style="color:var(--red)">RISK_OFF</span>.
-  <strong>Predictions:</strong> admin-only model output. The public surface shows regime context without exposing signals or forecasts.
+  Public market intelligence is limited to the regime state machine and source freshness. Forecasts,
+  signals, portfolio logic, and strategy research stay behind admin.
 </div>
-<div class="cols-2">
-  <div class="panel">
-    <h2>
-      <span>Market regime <span class="h-meta" id="regime-meta">—</span></span>
-    </h2>
-    <table id="regime">
-      <thead><tr><th>Time</th><th>Regime</th><th class="num">Score</th><th class="num">BTC</th><th class="num">F&G</th></tr></thead>
-      <tbody><tr><td colspan="5" class="empty">loading…</td></tr></tbody>
-    </table>
-  </div>
-  <div class="panel">
-    <h2>
-      <span>Latest predictions</span>
-      <span class="h-meta">ML output (Kronos)</span>
-    </h2>
-    <table id="preds">
-      <thead><tr><th>Time</th><th>Sym</th><th>Dir</th><th class="num">Conf</th><th class="num">24h move</th></tr></thead>
-      <tbody><tr><td colspan="5" class="empty">loading…</td></tr></tbody>
-    </table>
-  </div>
+<div class="panel">
+  <h2>
+    <span>Market regime <span class="h-meta" id="regime-meta">—</span></span>
+  </h2>
+  <table id="regime">
+    <thead><tr><th>Time</th><th>Regime</th><th class="num">Score</th><th class="num">BTC</th><th class="num">F&amp;G</th></tr></thead>
+    <tbody><tr><td colspan="5" class="empty">loading…</td></tr></tbody>
+  </table>
 </div>
 
 <!-- ========== Footer ========== -->
@@ -2115,7 +2179,7 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
   <div class="modal-sub">Unified production dashboard at <span class="mono">sapphirealpha.xyz</span> · auto-refresh every 60s</div>
 
   <h4>What is Sapphire OS</h4>
-  <p>An autonomous trading + intelligence + content operating system. Six independent <em>silos</em> (THO production, Threat Intel, Wildfire, Intelligence, Regional, Hackathons) feed a synthesis layer ("Sapphire Brain") that scores cross-silo health every 15 minutes and surfaces priority actions. All telemetry is real — no paper numbers — and BigQuery-backed.</p>
+  <p>SapphireAlpha is the public front door for current Sapphire products: agent safety, rights-cleared intelligence artifacts, regional field-ops intelligence, delivery-market simulation, market regime context, threat intelligence, and system posture. Raw controls, customer detail, and retired aggregate demos stay out of the first path.</p>
 
   <h4>How to read the brain panel</h4>
   <p>The Sapphire Brain hero shows three things side-by-side:</p>
@@ -2131,12 +2195,13 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
   <table class="silo-table">
     <thead><tr><th>Silo</th><th>What</th><th>Where</th></tr></thead>
     <tbody>
-      <tr><td class="t1">THO Operations</td><td>Texas Home Outlet production: CRM, document center, customer ops</td><td><span class="mono">tho.sapphirealpha.xyz</span></td></tr>
+      <tr><td class="t1">Agent Exchange</td><td>Rights-cleared x402 intelligence contracts with simulated/testnet payment rails</td><td>external product preview</td></tr>
+      <tr><td class="t1">Delivery Markets</td><td>Paper delivery-time event-contract simulator with synthetic tracking data</td><td><span class="mono">delivery-markets.sapphirealpha.xyz</span></td></tr>
+      <tr><td class="t1">0guard</td><td>Wallet and protocol-risk protection surface with read-only progress proof</td><td><span class="mono">/p/0guard</span></td></tr>
       <tr><td class="t1">Threat Intel</td><td>CISA KEV + NVD + MITRE ATT&amp;CK CVE feed, EPSS-scored</td><td>same-origin public feed</td></tr>
-      <tr><td class="t1">Wildfire Watch</td><td>Autonomous drone fleet (Phase 0 — Mavic Mini + Pi)</td><td><span class="mono">/p/wildfire</span></td></tr>
-      <tr><td class="t1">Intelligence</td><td>Market regime · Kronos ML predictions · cross-asset signals</td><td>scrolls below</td></tr>
-      <tr><td class="t1">Regional</td><td>Geographic watchlist · vote monitor · DeFi pool snapshots</td><td><span class="mono">regional.sapphirealpha.xyz</span></td></tr>
-      <tr><td class="t1">Hackathon Lanes</td><td>0G APAC · MegaETH · Robinhood London · Zama</td><td><span class="mono">hack.sapphirealpha.xyz</span></td></tr>
+      <tr><td class="t1">Regional</td><td>Public-source regional intelligence, OODA packets, and field-ops readiness</td><td><span class="mono">regional.sapphirealpha.xyz</span></td></tr>
+      <tr><td class="t1">Markets</td><td>Market regime context and public snapshot without forecasts or signals</td><td><span class="mono">/p/markets</span></td></tr>
+      <tr><td class="t1">System</td><td>Public failover and service posture with raw topology gated behind admin</td><td><span class="mono">/p/system</span></td></tr>
     </tbody>
   </table>
 
@@ -2145,7 +2210,7 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
     <span class="pill green">green</span> healthy / RISK_ON / live ·
     <span class="pill yellow">yellow</span> degraded / TRANSITION / stale ·
     <span class="pill red">red</span> down / RISK_OFF / critical ·
-    <span class="pill blue">blue</span> informational / predictions ·
+    <span class="pill blue">blue</span> informational / forecasts ·
     <span class="pill purple">purple</span> regional / intel ·
     <span class="pill orange">orange</span> wildfire / phase-0
   </p>
@@ -2164,7 +2229,7 @@ body.density-roomy .section-h { margin: 44px 0 18px; }
   <p style="font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.8;color:var(--text-2);">
     /api/markets/snapshot · /api/brain/synthesis · /api/silos/health<br>
     /api/timeseries/threats · /api/regime · /api/threats/live<br>
-    Admin-only: predictions, signals, service timeseries, inference metrics, VPIN, DSR, Brain history/correlation/persistence.
+    Admin-only: forecasts, signals, service timeseries, inference metrics, strategy research, Brain history/correlation/persistence.
   </p>
 
   <h4>Information density</h4>
@@ -2536,7 +2601,7 @@ function toast({title, body, meta, kind = 'ok', ttl = 5000}) {
 }
 
 // ========== Sapphire Brain panel ==========
-const BRAIN_SILO_TAGS = ['regime','trading','threat','threat_live','services','service','inference','tho'];
+const BRAIN_SILO_TAGS = ['regime','trading','threat','threat_live','services','service','inference'];
 function brainTagClass(action) {
   // Action strings start with "<silo>: ..." per brain.py.
   const m = (action || '').match(/^([a-z_]+)\s*:/i);
@@ -2601,7 +2666,7 @@ function renderBrainPanel(syn) {
       degEl.innerHTML = '<span class="deg-label">Degraded:</span>' +
         list.map(s => {
           const tag = BRAIN_SILO_TAGS.includes((s||'').toLowerCase()) ? s.toLowerCase() : 'other';
-          const cls = ({regime:'purple', trading:'green', threat:'red', threat_live:'red', services:'blue', service:'blue', inference:'green', tho:'yellow', other:'gray'})[tag] || 'gray';
+          const cls = ({regime:'purple', trading:'green', threat:'red', threat_live:'red', services:'blue', service:'blue', inference:'green', other:'gray'})[tag] || 'gray';
           return `<span class="pill ${cls}">${escapeHtml(String(s))}</span>`;
         }).join('');
     }
@@ -2769,9 +2834,10 @@ function renderPublicBrief(summary, brainSyn, failover, silos) {
 
   const locks = Array.isArray(analysis.admin_locked) && analysis.admin_locked.length
     ? analysis.admin_locked
-    : (Array.isArray(summary?.admin_required_for) ? summary.admin_required_for : ['signals', 'predictions', 'PnL', 'model telemetry']);
+    : (Array.isArray(summary?.admin_required_for) ? summary.admin_required_for : ['signals', 'forecasts', 'PnL', 'model telemetry']);
+  const lockLabel = (item) => String(item).replace(/^predictions$/i, 'forecasts');
   if (locksEl) {
-    locksEl.innerHTML = locks.slice(0, 8).map(item => `<span class="brief-lock">${escapeHtml(item)}</span>`).join('');
+    locksEl.innerHTML = locks.slice(0, 8).map(item => `<span class="brief-lock">${escapeHtml(lockLabel(item))}</span>`).join('');
   }
   if (sourceEl) {
     const brainMode = brainSyn?.mode ? `Sapphire Brain ${String(brainSyn.mode).replace(/_/g, ' ')}` : 'Sapphire Brain public summary';
@@ -2806,12 +2872,9 @@ async function refresh() {
     safeFetch('/api/brain/synthesis'),
     safeFetch('/api/failover/readiness'),
   ]);
-  const preds = null;
   const inference = null;
   const tsInf = { rows: [] };
   const tsSvc = { rows: [] };
-  const vpinResp = null;
-  const dsr = null;
   const brainHist = null;
 
   // ----- Public console first screen -----
@@ -2822,17 +2885,7 @@ async function refresh() {
   renderBrainPanel(brainSyn);
   renderBrainSpark(brainHist ? brainHist.rows : null);
 
-  // ----- THO silo + header health -----
-  const tho = silos?.silos?.tho || {};
-  const thoStatus = tho.status || 'unknown';
-  const thoLink = document.getElementById('silo-tho-link');
-  const thoBadge = document.getElementById('silo-tho-status');
-  if (thoLink) thoLink.href = tho.url || 'https://tho.sapphirealpha.xyz/';
-  if (thoBadge) {
-    thoBadge.className = 'silo-status ' + thoStatus;
-    thoBadge.textContent = thoStatus;
-  }
-
+  // ----- Current product status + header health -----
   const liveCt = (threatsLive?.records || []).length;
   const threatBadge = document.getElementById('silo-threat-status');
   if (threatBadge) {
@@ -2849,8 +2902,9 @@ async function refresh() {
     intelBadge.textContent = regimeStale ? 'stale' : 'live';
   }
 
-  const overall = (thoStatus === 'ok' && liveCt > 0 && !regimeStale) ? 'ok'
-                : (thoStatus === 'down' ? 'down' : 'degraded');
+  const failoverState = statusClass(failover?.overall_status);
+  const overall = (liveCt > 0 && !regimeStale && failoverState !== 'down') ? 'ok'
+                : (failoverState === 'down' ? 'down' : 'degraded');
   $('#header-health').innerHTML =
     `<span class="dot ${overall}"></span><span>${overall === 'ok' ? 'all systems nominal' : overall === 'degraded' ? 'partial telemetry' : 'check status'}</span>`;
 
@@ -2937,7 +2991,7 @@ async function refresh() {
       sub: serviceReporting ? 'healthy / reporting summary' : 'admin-only detail',
     },
     {
-      label: 'Predictions',
+      label: 'Forecasts',
       value: 'locked',
       sub: 'admin-only model output',
     },
@@ -3097,107 +3151,6 @@ async function refresh() {
     rh.innerHTML = `<tr><td colspan="5"><div class="empty actionable">No valid regime snapshots${recent ? `. Most recent ANY row: <span class="mono">${shortTs(recent)}</span> (${ago(recent)})` : ''}. Restart <span class="mono">com.sapphire.regime-collector</span> on the Mac to resume.</div></td></tr>`;
   }
 
-  // ----- Predictions -----
-  const ph = $('#preds tbody');
-  const pRows = preds?.rows || [];
-  if (pRows.length) {
-    ph.innerHTML = pRows.map(r => {
-      const dir = r.direction || '—';
-      const lower = String(dir).toLowerCase();
-      const dirCls = lower.includes('bull') || lower.includes('up') || lower.includes('long') ? 'green'
-                   : lower.includes('bear') || lower.includes('down') || lower.includes('short') ? 'red' : 'gray';
-      return `<tr>
-        <td class="num muted">${shortTs(r.timestamp)}</td>
-        <td class="t1">${r.symbol || '—'}</td>
-        <td>${pill(dirCls, dir)}</td>
-        <td class="num">${r.confidence != null ? Number(r.confidence).toFixed(2) : '—'}</td>
-        <td class="num">${r.predicted_move_pct != null ? Number(r.predicted_move_pct).toFixed(2) + '%' : '—'}</td>
-      </tr>`;
-    }).join('');
-  } else {
-    ph.innerHTML = `<tr><td colspan="5">${adminLocked('Model prediction detail')}</td></tr>`;
-  }
-
-  // ----- VPIN -----
-  const vpinSpark = document.getElementById('vpin-spark');
-  if (vpinSpark) {
-    const hist = vpinResp?.history || [];
-    const points = hist.map(h => Number(h.vpin)).filter(v => !isNaN(v));
-    const latest = vpinResp?.vpin;
-    const tox = vpinResp?.toxicity || 'unknown';
-    const toxColors = { extreme: '#f85149', high: '#d29922', moderate: '#4ea8ff', normal: '#3fb950', unknown: '#6c7891' };
-    const sparkColor = toxColors[tox] || '#6c7891';
-    if (!vpinResp) {
-      setLockedSvg(vpinSpark, 'admin-only order-flow research');
-    } else if (points.length >= 2) {
-      drawSparkline(vpinSpark, points, sparkColor);
-    } else {
-      vpinSpark.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#6c7891" font-size="11" font-family="Inter">building tick history…</text>';
-      vpinSpark.setAttribute('viewBox', '0 0 600 60');
-    }
-    document.getElementById('vpin-value').textContent =
-      vpinResp ? (latest != null ? Number(latest).toFixed(3) : '—') : 'locked';
-    const toxEl = document.getElementById('vpin-tox');
-    if (toxEl) {
-      const cls = tox === 'extreme' || tox === 'high' ? 'red'
-                : tox === 'moderate' ? 'yellow' : tox === 'normal' ? 'green' : 'gray';
-      toxEl.innerHTML = vpinResp ? pill(cls, tox) : pill('gray', 'admin-only');
-    }
-    document.getElementById('vpin-meta').textContent =
-      vpinResp ? `${fmtN(vpinResp?.n_ticks)} ticks · window ${vpinResp?.buckets || 50}` : 'admin-only';
-  }
-
-  // ----- Deflated Sharpe rolling -----
-  const dsrSvg = document.getElementById('chart-dsr');
-  if (dsrSvg) {
-    const rolling = dsr?.rolling || [];
-    const summary = dsr?.summary || [];
-    const strategySet = new Set();
-    const dsrByStrat = {};
-    for (const r of rolling) {
-      const s = r.strategy || 'unknown';
-      strategySet.add(s);
-      dsrByStrat[s] = dsrByStrat[s] || [];
-      dsrByStrat[s].push({ date: r.date, value: Number(r.deflated_sharpe) });
-    }
-    const strategies = Array.from(strategySet).slice(0, 8);
-    const palette = ['#4ea8ff', '#62ff40', '#a371f7', '#d29922', '#f85149', '#3fb950', '#ff7a00', '#6c7891'];
-    const dsrSeries = strategies.map((s, i) => {
-      const pts = (dsrByStrat[s] || []).sort((a, b) => a.date.localeCompare(b.date));
-      return {
-        name: s,
-        color: palette[i % palette.length],
-        points: pts.map(p => ({ x_label: (p.date || '').slice(5), y: isNaN(p.value) ? 0 : p.value })),
-      };
-    }).filter(s => s.points.length);
-    if (!dsr) setLockedSvg(dsrSvg, 'admin-only strategy research');
-    else drawMultiLine(dsrSvg, dsrSeries, {});
-    buildLegend(document.getElementById('chart-dsr-legend'),
-      dsrSeries.map(s => ({ name: s.name, color: s.color })));
-    document.getElementById('chart-dsr-meta').textContent =
-      dsr ? (strategies.length ? `${strategies.length} strategies · ${rolling.length} rolling points` : 'awaiting closed-trade history') : 'admin-only';
-
-    const dsrTbody = document.querySelector('#dsr-summary tbody');
-    if (dsrTbody) {
-      if (summary.length) {
-        dsrTbody.innerHTML = summary.map(r => {
-          const prob = Number(r.latest_probability);
-          const cls = prob >= 0.95 ? 'green' : prob >= 0.8 ? 'yellow' : 'red';
-          return `<tr>
-            <td class="t1">${r.strategy}</td>
-            <td class="num">${Number(r.latest_sharpe).toFixed(2)}</td>
-            <td class="num">${Number(r.latest_deflated).toFixed(2)}</td>
-            <td class="num">${pill(cls, fmtPct(prob, 1))}</td>
-            <td class="num muted">${fmtN(r.n_windows)}</td>
-          </tr>`;
-        }).join('');
-        document.getElementById('dsr-summary-meta').textContent = `window=${dsr?.window || 90}d`;
-      } else {
-        dsrTbody.innerHTML = `<tr><td colspan="5">${adminLocked('Strategy quality detail')}</td></tr>`;
-      }
-    }
-  }
-
   $('#ts').textContent = isoTs();
 }
 
@@ -3340,20 +3293,19 @@ function applyDensity(d) {
 
 // ---------- Command palette ----------
 const CMDK_ITEMS = [
-  { type: 'jump', name: 'Public systems', hint: '#project-map', target: '#project-map' },
+  { type: 'jump', name: 'Current products', hint: '#current-products', target: '#current-products' },
+  { type: 'open', name: 'Agent Exchange', hint: 'rights-cleared x402 artifacts', url: 'https://aoe-hackathon-preview-s77j6bxyra-uc.a.run.app/' },
+  { type: 'open', name: 'Delivery Markets', hint: 'paper demo', url: 'https://delivery-markets.sapphirealpha.xyz/' },
+  { type: 'open', name: '0guard', hint: 'pre-wallet safety', url: '/p/0guard' },
+  { type: 'open', name: 'Regional field ops', hint: 'public-source OODA', url: '/p/regional' },
   { type: 'jump', name: 'Brain · cross-silo synthesis', hint: '#brain-section-h', target: '#brain-section-h' },
   { type: 'jump', name: 'Global Markets', hint: '#markets-hero', target: '#markets-hero' },
   { type: 'jump', name: 'Threat intelligence feed', hint: '#threats', target: '#threats' },
   { type: 'jump', name: 'Service health', hint: 'public summary + admin lock', target: '#services' },
   { type: 'jump', name: 'Inference proxy tiers', hint: 'admin-only detail', target: '#inference' },
-  { type: 'jump', name: 'Predictions (Kronos)', hint: 'admin-only detail', target: '#predictions' },
-  { type: 'jump', name: 'Order-flow toxicity (VPIN)', hint: 'admin-only detail', target: '#vpin' },
-  { type: 'jump', name: 'Strategy quality (Deflated Sharpe)', hint: 'admin-only detail', target: '#strategy-quality' },
   { type: 'open', name: 'Admin console', hint: 'passkey-gated controls', url: '/admin' },
-  { type: 'open', name: 'THO public surface', hint: 'tho.sapphirealpha.xyz', url: 'https://tho.sapphirealpha.xyz/' },
   { type: 'open', name: 'Wildfire public summary', hint: '/p/wildfire', url: '/p/wildfire' },
-  { type: 'open', name: 'Regional public surface', hint: 'regional.sapphirealpha.xyz', url: 'https://regional.sapphirealpha.xyz/' },
-  { type: 'open', name: 'Hackathon submissions', hint: 'hack.sapphirealpha.xyz', url: 'https://hack.sapphirealpha.xyz/' },
+  { type: 'open', name: 'Hackathon archive', hint: 'superseded aggregate', url: '/p/hackathon' },
   { type: 'action', name: 'Refresh data now', hint: 'force refresh', action: () => { refresh(); refreshMarkets(); } },
   { type: 'action', name: 'Show onboarding tour', hint: 'restart tour', action: () => { closeCmdk(); startTour(true); } },
   { type: 'action', name: 'Show help guide', hint: '? key', action: () => { closeCmdk(); openHelp(); } },
@@ -3471,9 +3423,9 @@ document.addEventListener('keydown', (e) => {
 // ---------- Onboarding tour ----------
 const TOUR_STEPS = [
   {
-    target: '#project-map',
-    title: 'Public systems',
-    body: 'The public first screen maps every core Sapphire system and satellite to a project brief plus its direct frontend.',
+    target: '#current-products',
+    title: 'Current products',
+    body: 'The public first path now favors the current product lanes and moves older aggregate demos into archive context.',
   },
   {
     target: '#brain-hero',
@@ -3572,7 +3524,7 @@ WHERE source IN ('cisa_kev','nvd','mitre_attack')</pre>
 <p>Admin-only CRM detail. Public view intentionally shows a locked state.</p>
 <h4>Service heartbeats</h4>
 <p>Public view uses aggregate counts from <span class="mono">/api/silos/health</span>. Service names, hosts, and latency are admin-only.</p>
-<h4>Predictions</h4>
+<h4>Forecasts</h4>
 <p>Admin-only model output. Forecast rows, confidence, symbols, and signal detail are not exposed publicly.</p>
 <h4>Regime snapshots</h4>
 <pre>SELECT COUNTIF(regime IS NOT NULL)
@@ -3585,7 +3537,7 @@ FROM &lt;dataset&gt;.regime_snapshots</pre>
     body: `<p>Score = weighted average of per-silo health probabilities, computed by <span class="mono">services/analytics_dashboard/brain.py</span>.</p>
 <pre>health = Σ (silo_weight × silo_status_prob)
        / Σ silo_weight</pre>
-<p>Silos: regime, trading, threat_live, services, inference, tho, content. Each contributes a 0–1 status probability based on its own freshness + error rate.</p>
+<p>Public synthesis uses regime, market research, threat intelligence, service health, inference posture, and content readiness. Protected client or operator dependencies are summarized without exposing their raw identifiers on the front door.</p>
 <p>Source: public summary at <span class="mono">/api/brain/synthesis</span>. History, priority actions, and correlations require <span class="mono">/admin</span>.</p>`,
   },
   'markets': {

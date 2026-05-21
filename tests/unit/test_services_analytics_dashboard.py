@@ -1199,10 +1199,14 @@ def test_index_renders_project_tab_manifest():
     html = template_path.read_text(encoding="utf-8")
 
     assert "public systems" in html
+    assert "current official surface" in html
     assert 'id="project-map"' in html
+    assert 'id="current-products"' in html
     assert "project_tabs" in html
+    assert "featured_tabs" in html
     assert "Sapphire project tabs" not in html
     assert "Open THO Frontend" not in html  # rendered from data, not hard-coded drift
+    assert "Deprecated" not in html
 
 
 def test_index_command_palette_does_not_open_external_admin_surfaces():
@@ -1214,7 +1218,29 @@ def test_index_command_palette_does_not_open_external_admin_surfaces():
     assert "regional.sapphirealpha.xyz/admin" not in html
     assert "Wildfire public summary" in html
     assert "https://wildfire.sapphirealpha.xyz/" not in html
-    assert "Regional public surface" in html
+    assert "Regional field ops" in html
+    assert "THO public surface" not in html
+    assert "Predictions (Kronos)" not in html
+    assert "Latest predictions" not in html
+    assert "Order-flow toxicity (VPIN)" not in html
+    assert "Strategy quality (Deflated Sharpe)" not in html
+
+
+def test_project_tabs_surface_current_non_tho_products(app_module):
+    tabs = {tab["slug"]: tab for tab in app_module.public_project_tabs()}
+
+    assert "tho" not in tabs
+    assert tabs["agent-exchange"]["featured"] is True
+    assert tabs["agent-exchange"]["status"] == "buyer-ready"
+    assert "no scans, sends, trades" in tabs["agent-exchange"]["safety_note"]
+    assert "no live settlement" in tabs["agent-exchange"]["proof_points"]
+    assert tabs["delivery-markets"]["featured"] is True
+    assert tabs["delivery-markets"]["status"] == "paper-demo"
+    assert "No real FedEx API calls" in tabs["delivery-markets"]["safety_note"]
+    assert tabs["hackathon"]["status"] == "sunset"
+    assert tabs["regional"]["featured"] is True
+    assert "field-ops" in tabs["regional"]["summary"].lower()
+    assert tabs["0guard"]["featured"] is True
 
 
 def test_dashboard_deploy_targets_live_sapphire_service():
@@ -1240,8 +1266,10 @@ def test_index_renders_visible_public_console_refactor():
     html = template_path.read_text(encoding="utf-8")
 
     assert 'id="public-console"' in html
-    assert "Sapphire OS is live, gated, and failover-aware." in html
-    assert "Product routes, not internal telemetry." in html
+    assert "SapphireAlpha is now the public product front door." in html
+    assert "Curated product routes, not internal telemetry." in html
+    assert "Newest useful products, not inherited scaffolding." in html
+    assert "retired aggregate demos" in html
     assert "/api/failover/readiness" in html
     assert 'id="console-lanes"' in html
     assert "raw service/device evidence" not in html

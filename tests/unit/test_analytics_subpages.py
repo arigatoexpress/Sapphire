@@ -526,7 +526,8 @@ def test_projects_manifest_api_is_safe_and_complete(monkeypatch):
     assert {
         "brain",
         "markets",
-        "tho",
+        "agent-exchange",
+        "delivery-markets",
         "threats",
         "wildfire",
         "regional",
@@ -534,9 +535,14 @@ def test_projects_manifest_api_is_safe_and_complete(monkeypatch):
         "hackathon",
         "system",
     }.issubset(slugs)
+    assert "tho" not in slugs
     forbidden = ("localhost", "127.0.0.1", "file://", "secret", "token")
     for project in projects:
-        assert project["info_route"].startswith("/p/")
+        if project["slug"] in {"agent-exchange", "delivery-markets"}:
+            assert project["info_route"].startswith("https://")
+            assert project["primary_cta"]["external"] is True
+        else:
+            assert project["info_route"].startswith("/p/")
         assert project["primary_cta"]["label"]
         if project["slug"] == "wildfire":
             assert project["primary_cta"] == {
