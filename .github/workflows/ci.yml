@@ -156,7 +156,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Verify analytics deploy source
-        run: python scripts/ops/verify_analytics_deploy_source.py --source-dir services/analytics_dashboard
+        run: python3 scripts/ops/verify_analytics_deploy_source.py --source-dir services/analytics_dashboard
       - name: Build analytics dashboard image
         run: |
           docker build \
@@ -181,7 +181,9 @@ jobs:
           exit 1
       - name: Stop container
         if: always()
-        run: docker stop analytics-smoke && docker rm analytics-smoke
+        run: |
+          docker stop analytics-smoke 2>/dev/null || true
+          docker rm analytics-smoke 2>/dev/null || true
 
   deploy:
     name: deploy analytics dashboard
@@ -203,7 +205,7 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
       - name: Verify analytics deploy source
-        run: python scripts/ops/verify_analytics_deploy_source.py --source-dir services/analytics_dashboard
+        run: python3 scripts/ops/verify_analytics_deploy_source.py --source-dir services/analytics_dashboard
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy sapphire-analytics \
