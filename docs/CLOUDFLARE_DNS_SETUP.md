@@ -5,9 +5,15 @@
 | Domain | Service | Status |
 |--------|---------|--------|
 | `sapphirealpha.xyz` | sapphire-command-deck | ⏳ Pending DNS |
-| `dashboard.sapphirealpha.xyz` | sapphire-dashboard | ⏳ Pending DNS |
+| `dashboard.sapphirealpha.xyz` | sapphire-dashboard | ✅ Active |
 | `gateway.sapphirealpha.xyz` | sapphire-gateway | ✅ Active |
-| `pm.sapphirealpha.xyz` | agentic-pm-hub | ✅ Active |
+| `pm.sapphirealpha.xyz` | agentic-pm-hub | ⚠️ Stale mapping; service not present in `sapphire-479610` |
+
+`pm.sapphirealpha.xyz` should not be advertised as a live public Sapphire
+surface until the domain mapping is remapped or removed through a dedicated
+rollback-reviewed infrastructure change. The protected historical
+`agentic-pm-hub` service belongs to the separate AgenticArigato/THO-adjacent
+lane and must not be changed from this Sapphire DNS checklist.
 
 ---
 
@@ -125,7 +131,7 @@ If you re-enable Cloudflare proxy (orange cloud) after certificate provisioning:
 | https://sapphirealpha.xyz | Command Deck v2.0 (NEW) |
 | https://dashboard.sapphirealpha.xyz | Old Dashboard |
 | https://gateway.sapphirealpha.xyz | API Gateway |
-| https://pm.sapphirealpha.xyz | Project Management Hub |
+| https://pm.sapphirealpha.xyz | Stale domain mapping; do not advertise as live |
 
 ---
 

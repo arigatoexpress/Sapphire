@@ -49,7 +49,7 @@ def _load_analytics_app(monkeypatch):
     def _fake_0guard_fetch(_base_url, endpoint, *, timeout=2.5):
         del timeout
         payloads = {
-            "/api/healthz": {"ok": True},
+            "/api/health": {"ok": True},
             "/api/readyz": {
                 "ok": False,
                 "readiness": "production_review",
@@ -210,7 +210,7 @@ def test_0guard_progress_fetches_public_endpoints_concurrently(monkeypatch):
         try:
             time.sleep(0.02)
             payloads = {
-                "/api/healthz": {"ok": True},
+                "/api/health": {"ok": True},
                 "/api/readyz": {"ok": True, "readiness": "ready", "checks": []},
                 "/api/data/summary": {
                     "meta": {"month": "April 2026", "total_loss_usd": 100, "source_urls": []},
@@ -259,7 +259,7 @@ def test_0guard_progress_reuses_fresh_success_cache(monkeypatch):
         nonlocal calls
         calls += 1
         payloads = {
-            "/api/healthz": {"ok": True},
+            "/api/health": {"ok": True},
             "/api/readyz": {"ok": True, "readiness": "ready", "checks": []},
             "/api/data/summary": {
                 "meta": {"month": "April 2026", "total_loss_usd": 100, "source_urls": []},
@@ -301,7 +301,7 @@ def test_0guard_progress_uses_stale_live_stream_cache(monkeypatch):
     def _fake_fetch(_base_url, endpoint, *, timeout=2.5):
         del timeout
         core_payloads = {
-            "/api/healthz": {"ok": True},
+            "/api/health": {"ok": True},
             "/api/readyz": {"ok": True, "readiness": "ready", "checks": []},
             "/api/data/summary": {
                 "meta": {"month": "April 2026", "total_loss_usd": 100, "source_urls": []},
@@ -349,7 +349,7 @@ def test_0guard_progress_does_not_cache_partial_core_failure(monkeypatch):
     def _fake_fetch(_base_url, endpoint, *, timeout=2.5):
         del timeout
         core_payloads = {
-            "/api/healthz": {"ok": True},
+            "/api/health": {"ok": True},
             "/api/readyz": {"ok": True, "readiness": "ready", "checks": []},
             "/api/data/summary": {
                 "meta": {"month": "April 2026", "total_loss_usd": 100, "source_urls": []},
@@ -409,6 +409,7 @@ def test_p_wildfire_smoke(monkeypatch):
     assert "wildfire.sapphirealpha.xyz/admin" not in body
     assert "embedded admin console" not in body
     assert "api/sensors/health" not in body
+    assert "https://wildfire.sapphirealpha.xyz/" not in body
     assert "signals_24h" not in body
     assert "signals_7d" not in body
     assert "PUBLIC_STATUS" in body
@@ -537,6 +538,16 @@ def test_projects_manifest_api_is_safe_and_complete(monkeypatch):
     for project in projects:
         assert project["info_route"].startswith("/p/")
         assert project["primary_cta"]["label"]
+        if project["slug"] == "wildfire":
+            assert project["primary_cta"] == {
+                "label": "Open Wildfire Summary",
+                "href": "/p/wildfire",
+                "external": False,
+            }
+        if project["slug"] == "0guard":
+            resources = {resource["label"]: resource["href"] for resource in project["resources"]}
+            assert resources["Live Service Health"].endswith("/api/readyz")
+            assert not resources["Live Service Health"].endswith("/api/healthz")
         for value in str(project).lower().split():
             assert not any(term in value for term in forbidden)
 

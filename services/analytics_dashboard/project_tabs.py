@@ -105,15 +105,15 @@ PROJECT_TABS: list[dict] = [
         "summary": "A public-facing operational lane for autonomous wildfire monitoring, sensor health, and environmental intelligence.",
         "info_route": "/p/wildfire",
         "primary_cta": {
-            "label": "Open Wildfire",
-            "href": "https://wildfire.sapphirealpha.xyz/",
-            "external": True,
+            "label": "Open Wildfire Summary",
+            "href": "/p/wildfire",
+            "external": False,
         },
         "resources": [
             {"label": "Health", "href": "https://wildfire.sapphirealpha.xyz/healthz/"},
             {"label": "Detail Page", "href": "/p/wildfire"},
         ],
-        "proof_points": ["Public dashboard", "Health-gated", "Phase-0 status labeled"],
+        "proof_points": ["Public-safe summary", "Health-gated", "Phase-0 status labeled"],
         "safety_note": "Operational status is informational until field hardware is explicitly connected.",
         "status_id": None,
     },
@@ -158,7 +158,7 @@ PROJECT_TABS: list[dict] = [
             {"label": "Progress API", "href": "/api/0guard/progress"},
             {
                 "label": "Live Service Health",
-                "href": "https://guard0-miniapp-s77j6bxyra-uc.a.run.app/api/healthz",
+                "href": "https://guard0-miniapp-s77j6bxyra-uc.a.run.app/api/readyz",
             },
             {
                 "label": "Detector Coverage",

@@ -26,7 +26,7 @@ log = logging.getLogger("sapphire.subpages")
 
 THO_HEALTH_URL = os.environ.get("THO_HEALTH_URL", "https://tho.sapphirealpha.xyz/healthz/")
 THO_PUBLIC_URL = os.environ.get("THO_PUBLIC_URL", "https://tho.sapphirealpha.xyz/")
-WILDFIRE_URL = os.environ.get("WILDFIRE_URL", "https://wildfire.sapphirealpha.xyz/")
+WILDFIRE_PUBLIC_URL = "/p/wildfire"
 WILDFIRE_HEALTH_URL = os.environ.get(
     "WILDFIRE_HEALTH_URL", "https://wildfire.sapphirealpha.xyz/api/sensors/health"
 )
@@ -156,7 +156,7 @@ def register_subpages(app, *, project: str, dataset: str) -> None:
             "p/wildfire.html",
             **_ctx(
                 {
-                    "wildfire_url": WILDFIRE_URL,
+                    "wildfire_url": WILDFIRE_PUBLIC_URL,
                     "health": health,
                     "online": bool(health and health.get("ok") is not False),
                 }

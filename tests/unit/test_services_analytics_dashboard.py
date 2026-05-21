@@ -1209,7 +1209,8 @@ def test_index_command_palette_does_not_open_external_admin_surfaces():
     assert "Wildfire admin" not in html
     assert "Regional admin" not in html
     assert "regional.sapphirealpha.xyz/admin" not in html
-    assert "Wildfire public surface" in html
+    assert "Wildfire public summary" in html
+    assert "https://wildfire.sapphirealpha.xyz/" not in html
     assert "Regional public surface" in html
 
 
