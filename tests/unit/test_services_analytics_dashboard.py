@@ -1059,6 +1059,9 @@ def test_index_route_uses_template(client, app_module, monkeypatch):
     assert captured["ctx"]["project"] == "test-project"
     assert captured["ctx"]["dataset"] == "test_dataset"
     assert [tab["slug"] for tab in captured["ctx"]["project_tabs"]]
+    system_tab = next(tab for tab in captured["ctx"]["project_tabs"] if tab["slug"] == "system")
+    system_resources = {resource["label"]: resource["href"] for resource in system_tab["resources"]}
+    assert system_resources["Health"] == "/health"
 
 
 def test_unknown_post_path_falls_through_to_probe_sink(client, app_module, monkeypatch):
@@ -1212,6 +1215,24 @@ def test_index_command_palette_does_not_open_external_admin_surfaces():
     assert "Wildfire public summary" in html
     assert "https://wildfire.sapphirealpha.xyz/" not in html
     assert "Regional public surface" in html
+
+
+def test_dashboard_deploy_targets_live_sapphire_service():
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    deploy_script = (REPO_ROOT / "infra" / "gcp" / "deploy_cloud_run.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert "gcloud run deploy sapphire-dashboard" in workflow
+    assert "--project sapphire-479610" in workflow
+    assert "--no-traffic" in workflow
+    assert 'PROJECT="${PROJECT:-sapphire-479610}"' in deploy_script
+    assert 'SERVICE="${SERVICE:-sapphire-dashboard}"' in deploy_script
+    assert "--update-env-vars" in deploy_script
+    assert "--no-traffic" in deploy_script
+    assert "--allow-unauthenticated" not in workflow
+    assert "--allow-unauthenticated" not in deploy_script
+    assert "roles/bigquery" not in deploy_script
 
 
 def test_index_renders_visible_public_console_refactor():

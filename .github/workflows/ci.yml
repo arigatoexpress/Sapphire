@@ -186,7 +186,7 @@ jobs:
           docker rm analytics-smoke 2>/dev/null || true
 
   deploy:
-    name: deploy analytics dashboard
+    name: deploy dashboard candidate
     # Deploy only when the self-hosted runner and Google WIF variables are
     # configured. Otherwise the auth action fails before it can no-op.
     if: github.ref == 'refs/heads/main' && vars.SAPPHIRE_RUNNER != '' && vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_SERVICE_ACCOUNT != ''
@@ -208,12 +208,19 @@ jobs:
         run: python3 scripts/ops/verify_analytics_deploy_source.py --source-dir services/analytics_dashboard
       - name: Deploy to Cloud Run
         run: |
-          gcloud run deploy sapphire-analytics \
+          tag="ci-${GITHUB_SHA::7}"
+          gcloud run deploy sapphire-dashboard \
             --source services/analytics_dashboard \
+            --project sapphire-479610 \
             --region us-central1 \
             --platform managed \
-            --allow-unauthenticated \
+            --no-traffic \
+            --tag "$tag" \
             --quiet
+          gcloud run services describe sapphire-dashboard \
+            --project sapphire-479610 \
+            --region us-central1 \
+            --format="value(status.traffic[?tag='$tag'].url)"
 
   secrets-scan:
     name: gitleaks (secrets)
