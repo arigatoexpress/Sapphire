@@ -24,7 +24,7 @@ ENV_0GUARD_URL = "SAPPHIRE_0GUARD_URL"
 ENV_0GUARD_CANDIDATE_URL = "SAPPHIRE_0GUARD_CANDIDATE_URL"
 
 PUBLIC_ENDPOINTS = {
-    "health": "/api/healthz",
+    "health": "/api/health",
     "ready": "/api/readyz",
     "summary": "/api/data/summary",
     "coverage": "/api/data/detection-coverage",

@@ -188,6 +188,19 @@ def test_agentic_arigato_tracks_protected_cloud_run_service() -> None:
     assert tracking["public_invoker"] is False
     assert tracking["authenticated_health_paths"] == ["/health", "/healthz/"]
     assert tracking["warning_kind"] == "cloud_run_auth_required"
+    assert tracking["sapphire_domain_mapping_overlay"] == {
+        "domain": "pm.sapphirealpha.xyz",
+        "observed_project_id": "sapphire-479610",
+        "observed_region": "us-central1",
+        "observed_service": "agentic-pm-hub",
+        "observed_service_present": False,
+        "observed_at": "2026-05-21T00:57:00Z",
+        "warning_kind": "stale_cloud_run_domain_mapping",
+        "next_step": (
+            "Do not treat pm.sapphirealpha.xyz as a live Sapphire surface; prepare a "
+            "dedicated reversible DNS/domain-mapping cleanup before any cloud mutation."
+        ),
+    }
     assert tracking["repo_pr"] == "https://github.com/arigatoexpress/AgenticArigato/pull/1"
     assert (
         tracking["authenticated_health_runbook"]
