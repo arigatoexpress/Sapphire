@@ -42,6 +42,7 @@ from project_tabs import get_project_tab, public_project_tabs  # noqa: E402
 
 PROJECT = os.environ.get("GCP_PROJECT", "tho-ai-agent")
 DATASET = os.environ.get("BQ_DATASET", "sapphire")
+_LLMS_TXT_PATH = _HERE / "llms.txt"
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("analytics")
@@ -2095,6 +2096,19 @@ def index():
         project=PROJECT,
         dataset=DATASET,
         project_tabs=public_project_tabs(),
+    )
+
+
+@app.get("/llms.txt")
+def llms_txt():
+    body = _LLMS_TXT_PATH.read_text(encoding="utf-8")
+    return (
+        body,
+        200,
+        {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Cache-Control": "public, max-age=3600",
+        },
     )
 
 

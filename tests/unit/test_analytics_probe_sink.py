@@ -58,6 +58,20 @@ def test_known_public_probes_return_no_content(monkeypatch):
         assert response.headers["Cache-Control"] == "no-store"
 
 
+def test_llms_txt_route_serves_agent_context(monkeypatch):
+    client = _load_analytics_app(monkeypatch)
+
+    response = client.get("/llms.txt")
+
+    assert response.status_code == 200
+    assert response.mimetype == "text/plain"
+    assert response.headers["Cache-Control"] == "public, max-age=3600"
+    body = response.get_data(as_text=True)
+    assert "# SapphireAlpha" in body
+    assert "https://sapphirealpha.xyz/api/0guard/progress" in body
+    assert "No public route on SapphireAlpha authorizes live trading" in body
+
+
 def test_config_probe_patterns_return_no_content(monkeypatch):
     client = _load_analytics_app(monkeypatch)
 
