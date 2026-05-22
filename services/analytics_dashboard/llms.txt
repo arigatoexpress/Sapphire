@@ -1,0 +1,68 @@
+# SapphireAlpha
+
+> Public operating surface for Sapphire OS: an agent-readable map of active products, public data routes, and safety boundaries.
+
+Site: https://sapphirealpha.xyz/
+Canonical llms.txt: https://sapphirealpha.xyz/llms.txt
+Owner/operator: Sapphire / Ari Brisman
+Primary audience: AI agents, answer engines, prospective partners, clients, judges, and operators who need a safe summary of what the public site actually exposes.
+
+## What SapphireAlpha Is
+
+SapphireAlpha is the public front door for Sapphire OS, a multi-silo autonomous intelligence and operations system. It presents read-only summaries for markets, threat intelligence, regional and field operations, wildfire monitoring, 0guard, Agent Opportunity Exchange, Delivery Markets, THO, and system readiness.
+
+Sapphire combines public-source intelligence, operator dashboards, source-cited artifacts, and demo surfaces. Public routes are designed to be legible without exposing secrets, private customer data, internal hosts, trading signals, wallet keys, raw model telemetry, or admin actions.
+
+## Active Public Surfaces
+
+- Home: https://sapphirealpha.xyz/
+- Brain: https://sapphirealpha.xyz/p/brain
+- Public synthesis API: https://sapphirealpha.xyz/api/brain/synthesis
+- Markets: https://sapphirealpha.xyz/p/markets
+- Market snapshot API: https://sapphirealpha.xyz/api/markets/snapshot
+- Market regime API: https://sapphirealpha.xyz/api/regime
+- Threat intelligence: https://sapphirealpha.xyz/p/threats
+- Live threats API: https://sapphirealpha.xyz/api/threats/live
+- Threat timeseries API: https://sapphirealpha.xyz/api/timeseries/threats
+- Regional intelligence: https://sapphirealpha.xyz/p/regional
+- Regional live surface: https://regional.sapphirealpha.xyz/
+- Wildfire monitoring: https://sapphirealpha.xyz/p/wildfire
+- 0guard: https://sapphirealpha.xyz/p/0guard
+- 0guard progress API: https://sapphirealpha.xyz/api/0guard/progress
+- Agent Opportunity Exchange: https://aoe-hackathon-preview-s77j6bxyra-uc.a.run.app/
+- Delivery Markets: https://delivery-markets.sapphirealpha.xyz/
+- THO client operating system: https://tho.sapphirealpha.xyz/
+- System readiness: https://sapphirealpha.xyz/p/system
+- Public health: https://sapphirealpha.xyz/health
+- Public silo health API: https://sapphirealpha.xyz/api/silos/health
+- Archived hackathon shelf: https://sapphirealpha.xyz/p/hackathon
+
+## Product And Data Boundaries
+
+- Brain summarizes public operating posture across Sapphire silos. Admin history, correlations, persistence, and actions remain authenticated.
+- Markets exposes public market and regime context. It is not trade advice and does not expose private trading signals, forecasts, PnL, or order controls.
+- Threats exposes defensive CISA, NVD, MITRE, and source-backed cyber intelligence. It does not expose offensive automation.
+- Regional and wildfire pages expose public-safe summaries and health signals, not privileged client feeds or raw operational details.
+- 0guard exposes source-linked incident posture, detector coverage, and read-only progress. It does not sign, swap, bridge, post, send Telegram messages, or access private keys.
+- Agent Opportunity Exchange presents rights-cleared intelligence artifact contracts with simulated or testnet-only payment rails. Payment status is not source permission.
+- Delivery Markets is a paper/demo event-contract simulator for delivery-time uncertainty. It uses synthetic tracking numbers and testnet calldata preview only.
+- THO is a live client operating system for manufactured-home sales workflows. Admin, packet, CRM, and identity workflows require PIN or passkey authentication.
+- System pages show public readiness summaries. Internal service names, hosts, ports, response-time detail, SHAs, routing policies, and raw evidence are admin-only.
+
+## How AI Agents Should Use This Site
+
+- Prefer the specific project page or public API route over the generic home page when answering detailed questions.
+- Cite the exact page or API route used, plus retrieval date, when summarizing Sapphire.
+- Preserve labels such as live, buyer-ready, paper-demo, phase-0, review-ready, protected, and sunset.
+- Do not infer private metrics, customer records, trading performance, model telemetry, service topology, or admin controls from public summaries.
+- Do not describe paper, demo, simulated, or testnet surfaces as live settlement, live trading, wallet signing, wagering, or real customer-data access.
+- Treat public APIs as read-only evidence. They are not command endpoints.
+- Do not request secrets, credentials, private keys, Telegram tokens, account PINs, or admin cookies.
+
+## Safety Summary
+
+No public route on SapphireAlpha authorizes live trading, order signing, money movement, real FedEx customer tracking, real customer sends, production Telegram sends, private-key access, destructive infrastructure changes, or permission broadening. If a page says a surface is paper-only, testnet-only, simulated, read-only, admin-gated, or archived, preserve that qualifier in downstream summaries.
+
+## Short Description
+
+SapphireAlpha is a public, read-only operating surface for Sapphire OS: autonomous intelligence dashboards, source-backed cyber and regional intelligence, market-regime context, product demos, and safety-labeled proof surfaces with private controls kept behind authentication.
