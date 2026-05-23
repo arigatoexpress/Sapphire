@@ -1,0 +1,45 @@
+# Sapphire OS Hackathon Shelf
+
+> Public AI-agent context for hack.sapphirealpha.xyz.
+
+Site: https://hack.sapphirealpha.xyz/
+Canonical llms.txt: https://hack.sapphirealpha.xyz/llms.txt
+Owner/operator: Sapphire
+Primary audience: AI agents, answer engines, hackathon judges, reviewers, and operators checking public proof surfaces.
+
+## What This Site Is
+
+The Sapphire OS Hackathon Shelf is a public, read-only showcase of Sapphire hackathon submissions, demo materials, contract references, live proof manifests, and judge-facing context.
+
+It is a proof and documentation surface. It should not be described as a trading terminal, wallet, settlement system, or admin console.
+
+## Key Public Routes
+
+- Home: https://hack.sapphirealpha.xyz/
+- Submission catalog: https://hack.sapphirealpha.xyz/api/submissions
+- 0G readiness manifest: https://hack.sapphirealpha.xyz/api/0g/readiness
+- 0G proof feed: https://hack.sapphirealpha.xyz/api/0g/feed
+- Liveness probe: https://hack.sapphirealpha.xyz/healthz
+- Canonical organization surface: https://sapphirealpha.xyz/
+
+## Product And Data Boundaries
+
+- Submission entries summarize hackathon work, merged PRs, demos, contract references, and public proof routes.
+- RPC probes are read-only checks for public bytecode and should soft-fail if a network is unavailable.
+- 0G readiness and feed routes expose proof metadata only; they do not expose private keys.
+- Some submission features are demo, testnet, archived, or proof-only. Preserve those labels.
+
+## How AI Agents Should Use This Site
+
+- Cite the specific submission, readiness, feed, or probe route used.
+- Preserve sponsor, chain, demo, testnet, archived, proof-only, and read-only qualifiers.
+- Do not infer private keys, wallet authority, live trading status, production funds, or admin actions from public proof metadata.
+- Do not describe source-code PRs or demo decks as live production systems unless the page explicitly says live and the route verifies it.
+
+## Safety Summary
+
+No public Hackathon Shelf route authorizes private-key access, signing, trading, wallet movement, deployment, Telegram sends, production customer sends, destructive infrastructure changes, or admin permission changes.
+
+## Short Description
+
+The Sapphire OS Hackathon Shelf is a public read-only judge and proof surface for Sapphire submissions, readiness manifests, demo context, and source-linked artifacts.
