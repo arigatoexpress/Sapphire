@@ -24,14 +24,16 @@ import json
 import os
 import urllib.request
 from pathlib import Path
+from urllib.parse import urlparse
 
-from flask import Flask, jsonify, render_template
+from flask import Flask, Response, jsonify, render_template
 from hackathon_og_proof import build_og_feed, build_og_readiness
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 
 REPO_URL = "https://github.com/arigatoexpress/Sapphire"
 DOCS_URL = f"{REPO_URL}/blob/main/docs"
+LLMS_TXT_PATH = Path(__file__).resolve().parent / "llms.txt"
 
 
 # ---------------------------------------------------------------------------
@@ -516,6 +518,15 @@ def healthz():
     return {"ok": True, "submissions": len(SUBMISSIONS)}, 200
 
 
+@app.route("/llms.txt")
+def llms_txt():
+    return Response(
+        LLMS_TXT_PATH.read_text(encoding="utf-8"),
+        mimetype="text/plain",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
 @app.route("/api/submissions")
 def api_submissions():
     """Stable JSON snapshot for any tooling that wants it."""
@@ -564,6 +575,13 @@ def api_probe(slug: str):
             entry["bytecode_size"] = 0
             results.append(entry)
             continue
+        if urlparse(rpc_url).scheme not in {"http", "https"}:
+            entry["ok"] = False
+            entry["status"] = "unsupported_rpc_scheme"
+            entry["bytecode_preview"] = None
+            entry["bytecode_size"] = 0
+            results.append(entry)
+            continue
 
         payload = json.dumps(
             {
@@ -586,7 +604,7 @@ def api_probe(slug: str):
             method="POST",
         )
         try:
-            with urllib.request.urlopen(req, timeout=6) as resp:
+            with urllib.request.urlopen(req, timeout=6) as resp:  # nosec B310
                 body = json.loads(resp.read().decode())
             code = body.get("result", "0x")
             has_code = bool(code) and code != "0x"
@@ -608,4 +626,5 @@ def api_probe(slug: str):
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8080"))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    host = os.environ.get("HOST", "0.0.0.0")  # nosec B104
+    app.run(host=host, port=port, debug=False)

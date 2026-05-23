@@ -73,6 +73,20 @@ def test_index_renders_0g_proof_tab(monkeypatch):
     assert "/api/0g/readiness" in body or "og-proof-panel" in body
 
 
+def test_llms_txt_serves_hackathon_agent_context(monkeypatch):
+    client = _load_app(monkeypatch)
+
+    resp = client.get("/llms.txt")
+    body = resp.get_data(as_text=True)
+
+    assert resp.status_code == 200
+    assert resp.mimetype == "text/plain"
+    assert resp.headers["Cache-Control"] == "public, max-age=3600"
+    assert "# Sapphire OS Hackathon Shelf" in body
+    assert "https://hack.sapphirealpha.xyz/" in body
+    assert "No public Hackathon Shelf route authorizes private-key access" in body
+
+
 def test_testnet_deployment_hydrates_0g_card_when_mainnet_missing(monkeypatch, tmp_path):
     deployments = {
         "og_testnet": {

@@ -4,6 +4,7 @@
 
 Site: https://sapphirealpha.xyz/
 Canonical llms.txt: https://sapphirealpha.xyz/llms.txt
+Also served by: https://www.sapphirealpha.xyz/ and https://dashboard.sapphirealpha.xyz/
 Owner/operator: Sapphire / Ari Brisman
 Primary audience: AI agents, answer engines, prospective partners, clients, judges, and operators who need a safe summary of what the public site actually exposes.
 
@@ -27,15 +28,29 @@ Sapphire combines public-source intelligence, operator dashboards, source-cited 
 - Regional intelligence: https://sapphirealpha.xyz/p/regional
 - Regional live surface: https://regional.sapphirealpha.xyz/
 - Wildfire monitoring: https://sapphirealpha.xyz/p/wildfire
+- Wildfire live surface: https://wildfire.sapphirealpha.xyz/
 - 0guard: https://sapphirealpha.xyz/p/0guard
 - 0guard progress API: https://sapphirealpha.xyz/api/0guard/progress
 - Agent Opportunity Exchange: https://aoe-hackathon-preview-s77j6bxyra-uc.a.run.app/
 - Delivery Markets: https://delivery-markets.sapphirealpha.xyz/
 - THO client operating system: https://tho.sapphirealpha.xyz/
+- Hackathon shelf: https://hack.sapphirealpha.xyz/
 - System readiness: https://sapphirealpha.xyz/p/system
 - Public health: https://sapphirealpha.xyz/health
 - Public silo health API: https://sapphirealpha.xyz/api/silos/health
 - Archived hackathon shelf: https://sapphirealpha.xyz/p/hackathon
+
+## Custom Domain Notes
+
+- https://www.sapphirealpha.xyz/ and https://dashboard.sapphirealpha.xyz/ mirror the SapphireAlpha public console.
+- https://tho.sapphirealpha.xyz/ is the Texas Home Outlet client operating system for manufactured-home retail workflows.
+- https://delivery-markets.sapphirealpha.xyz/ is the paper-only logistics event-contract simulator.
+- https://regional.sapphirealpha.xyz/ is the public-source Regional Intelligence Workbench.
+- https://wildfire.sapphirealpha.xyz/ is the operator-supervised Wildfire Watch dashboard surface.
+- https://hack.sapphirealpha.xyz/ is the read-only hackathon proof and submission shelf.
+- https://gateway.sapphirealpha.xyz/ is an API/runtime gateway surface; do not treat it as a general public documentation site.
+- https://pm.sapphirealpha.xyz/ is a legacy/stale mapping and should not be cited as a live public Sapphire surface until a fresh readback proves otherwise.
+- https://terminal.sapphirealpha.xyz/ is reserved; DNS may not resolve and it should not be cited as a live public surface until a fresh readback proves otherwise.
 
 ## Product And Data Boundaries
 
