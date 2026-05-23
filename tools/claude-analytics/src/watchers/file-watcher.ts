@@ -1,4 +1,4 @@
-import chokidar from "chokidar";
+import chokidar, { type FSWatcher } from "chokidar";
 import { EventEmitter } from "node:events";
 
 export interface FileChangeEvent {
@@ -17,7 +17,7 @@ function categorize(filePath: string): FileChangeEvent["category"] {
 }
 
 export class ClaudeFileWatcher extends EventEmitter {
-  private watcher: chokidar.FSWatcher | null = null;
+  private watcher: FSWatcher | null = null;
   private claudeDataDir: string;
 
   constructor(claudeDataDir: string) {
@@ -43,9 +43,9 @@ export class ClaudeFileWatcher extends EventEmitter {
     });
 
     this.watcher
-      .on("add", (path) => this.handleEvent("add", path))
-      .on("change", (path) => this.handleEvent("change", path))
-      .on("unlink", (path) => this.handleEvent("unlink", path));
+      .on("add", (path: string) => this.handleEvent("add", path))
+      .on("change", (path: string) => this.handleEvent("change", path))
+      .on("unlink", (path: string) => this.handleEvent("unlink", path));
   }
 
   private handleEvent(type: FileChangeEvent["type"], path: string): void {
