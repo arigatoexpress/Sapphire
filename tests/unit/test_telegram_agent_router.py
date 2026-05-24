@@ -103,6 +103,7 @@ def test_route_business_message_to_guarded_reply_draft() -> None:
     decision = route_update(
         {
             "business_message": {
+                "business_connection_id": "biz-1",
                 "chat": {"id": -1001},
                 "text": "draft a client-safe market summary",
             }
@@ -111,8 +112,47 @@ def test_route_business_message_to_guarded_reply_draft() -> None:
 
     assert decision.route == "business_message"
     assert decision.action == "queue_business_reply_draft"
+    assert decision.context.business_connection_id == "biz-1"
     assert decision.requires_confirmation is True
     assert decision.external_side_effect is False
+
+
+def test_business_message_uses_telegram_business_scope_not_agent_room_scope() -> None:
+    decision = route_update(
+        {
+            "business_message": {
+                "business_connection_id": "biz-1",
+                "chat": {"id": 987},
+                "text": "customer inbox question",
+            }
+        },
+        allowed_chat_ids={-1001},
+    )
+
+    assert decision.route == "business_message"
+    assert decision.action == "queue_business_reply_draft"
+
+
+def test_extract_context_from_business_connection_update() -> None:
+    context = extract_context(
+        {
+            "update_id": 701,
+            "business_connection": {
+                "id": "biz-1",
+                "user": {"id": 42, "username": "ari"},
+                "user_chat_id": 4200,
+                "is_enabled": True,
+                "rights": {"can_read_messages": True, "can_reply": True},
+            },
+        }
+    )
+
+    assert context.update_type == "business_connection"
+    assert context.business_connection_id == "biz-1"
+    assert context.business_user_chat_id == 4200
+    assert context.business_is_enabled is True
+    assert context.business_can_reply is True
+    assert context.actor.user_id == 42
 
 
 def test_route_draft_callback_requires_confirmation() -> None:

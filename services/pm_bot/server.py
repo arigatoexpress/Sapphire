@@ -266,6 +266,7 @@ class TelegramAPI:
         chat_id: int,
         text: str,
         parse_mode: str | None,
+        business_connection_id: str = "",
         disable_notification: bool = False,
         reply_parameters: dict[str, Any] | None = None,
         message_thread_id: int | None = None,
@@ -278,6 +279,9 @@ class TelegramAPI:
         }
         if parse_mode:
             payload["parse_mode"] = parse_mode
+        clean_business_connection_id = str(business_connection_id or "").strip()
+        if clean_business_connection_id:
+            payload["business_connection_id"] = clean_business_connection_id
         if disable_notification:
             payload["disable_notification"] = True
         if reply_parameters:
@@ -339,6 +343,27 @@ _RECENT_UPDATE_LIMIT = 2048
 _TELEGRAM_PROBE_TTL_SECONDS = 60.0
 _TELEGRAM_PROBE_CACHE: dict[str, Any] = {"expires_at": 0.0, "value": None}
 _TELEGRAM_PROBE_CACHE_LOCK = threading.Lock()
+_BUSINESS_CONNECTIONS: dict[str, dict[str, Any]] = {}
+_BUSINESS_CONNECTIONS_LOCK = threading.Lock()
+_BUSINESS_RIGHT_KEYS = (
+    "can_reply",
+    "can_read_messages",
+    "can_delete_sent_messages",
+    "can_delete_all_messages",
+    "can_edit_name",
+    "can_edit_bio",
+    "can_edit_profile_photo",
+    "can_edit_username",
+    "can_change_gift_settings",
+    "can_view_gifts_and_stars",
+    "can_convert_gifts_to_stars",
+    "can_transfer_and_upgrade_gifts",
+    "can_transfer_stars",
+    "can_manage_stories",
+    "can_post_stories",
+    "can_edit_stories",
+    "can_delete_stories",
+)
 
 app = FastAPI(title="Sapphire PM Bot", version="0.1.0")
 
@@ -485,6 +510,81 @@ def _message_payload(update: dict[str, Any]) -> dict[str, Any]:
     return update
 
 
+def _coerce_int(value: object) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _business_connection_snapshot(update: dict[str, Any]) -> dict[str, Any] | None:
+    payload = update.get("business_connection")
+    if not isinstance(payload, dict):
+        return None
+    connection_id = str(payload.get("id") or "").strip()
+    if not connection_id:
+        return None
+    rights = payload.get("rights")
+    rights_payload = rights if isinstance(rights, dict) else {}
+    user = payload.get("user")
+    user_payload = user if isinstance(user, dict) else {}
+    clean_rights = {
+        key: bool(rights_payload[key]) for key in _BUSINESS_RIGHT_KEYS if key in rights_payload
+    }
+    return {
+        "id": connection_id,
+        "user_id": _coerce_int(user_payload.get("id")),
+        "user_chat_id": _coerce_int(payload.get("user_chat_id")),
+        "date": _coerce_int(payload.get("date")),
+        "is_enabled": bool(payload.get("is_enabled", False)),
+        "can_reply": bool(rights_payload.get("can_reply", False)),
+        "can_read_messages": bool(rights_payload.get("can_read_messages", False)),
+        "rights": clean_rights,
+        "last_update_id": _coerce_int(update.get("update_id")),
+        "observed_at": int(time.time()),
+    }
+
+
+def _remember_business_connection(update: dict[str, Any]) -> dict[str, Any] | None:
+    snapshot = _business_connection_snapshot(update)
+    if snapshot is None:
+        return None
+    with _BUSINESS_CONNECTIONS_LOCK:
+        _BUSINESS_CONNECTIONS[snapshot["id"]] = dict(snapshot)
+    return snapshot
+
+
+def _business_connection_for(connection_id: str) -> dict[str, Any] | None:
+    clean_connection_id = str(connection_id or "").strip()
+    if not clean_connection_id:
+        return None
+    with _BUSINESS_CONNECTIONS_LOCK:
+        snapshot = _BUSINESS_CONNECTIONS.get(clean_connection_id)
+        return dict(snapshot) if isinstance(snapshot, dict) else None
+
+
+def _business_connection_summary() -> dict[str, Any]:
+    with _BUSINESS_CONNECTIONS_LOCK:
+        snapshots = [dict(item) for item in _BUSINESS_CONNECTIONS.values()]
+    active = [item for item in snapshots if item.get("is_enabled")]
+    reply_capable = [
+        item for item in active if item.get("can_reply") and item.get("can_read_messages")
+    ]
+    latest_update_ids = [
+        int(item["last_update_id"])
+        for item in snapshots
+        if isinstance(item.get("last_update_id"), int)
+    ]
+    return {
+        "observed_connection_count": len(snapshots),
+        "active_connection_count": len(active),
+        "reply_capable_connection_count": len(reply_capable),
+        "latest_update_id": max(latest_update_ids) if latest_update_ids else None,
+    }
+
+
 def _actor_label(decision: RouterDecision) -> str:
     actor = decision.context.actor
     if actor.username:
@@ -504,6 +604,11 @@ def _draft_topic(decision: RouterDecision) -> str:
 
 def _draft_kind(decision: RouterDecision) -> str:
     return {
+        "audit": (
+            "business_connection_audit"
+            if decision.context.update_type == "business_connection"
+            else "telegram_audit"
+        ),
         "blocked": "blocked_update",
         "business_message": "guarded_reply",
         "draft_action": "draft_callback",
@@ -517,12 +622,30 @@ def _draft_kind(decision: RouterDecision) -> str:
 
 def _draft_body(decision: RouterDecision) -> str:
     context = decision.context
-    if decision.route in {"guest_message", "business_message"}:
+    if decision.route == "business_message":
+        prompt = context.text[:500] if context.text else "(no text)"
+        connection_id = context.business_connection_id or "unknown"
+        return (
+            f"Dry-run Telegram Business reply requested for connection {connection_id}.\n"
+            f"Prompt: {prompt}\n"
+            "No Telegram message was sent. A live reply requires the latest "
+            "BusinessConnection.can_reply grant and explicit operator approval."
+        )
+    if decision.route == "guest_message":
         prompt = context.text[:500] if context.text else "(no text)"
         return (
             f"Dry-run guarded Telegram reply requested via {context.update_type}.\n"
             f"Prompt: {prompt}\n"
             "No Telegram message was sent."
+        )
+    if decision.route == "audit" and context.update_type == "business_connection":
+        status = "enabled" if context.business_is_enabled else "disabled"
+        can_reply = "yes" if context.business_can_reply else "no"
+        connection_id = context.business_connection_id or "unknown"
+        return (
+            f"Telegram Business connection {connection_id} is {status}; "
+            f"can_reply={can_reply}.\n"
+            "Recorded for Secretary Mode readiness. No Telegram message was sent."
         )
     if decision.route == "inline_query":
         query = context.text[:500] if context.text else "(empty query)"
@@ -585,6 +708,30 @@ def _queue_router_decision_draft(decision: RouterDecision) -> str:
         "agentic_dry_run": SETTINGS.agentic_dry_run_enabled,
         "external_side_effect": False,
     }
+    if context.business_connection_id:
+        business_state = _business_connection_for(context.business_connection_id)
+        metadata.update(
+            {
+                "business_connection_id": context.business_connection_id,
+                "business_connection_observed": business_state is not None,
+                "business_connection_active": (
+                    business_state.get("is_enabled") if business_state else None
+                ),
+                "business_can_reply": business_state.get("can_reply") if business_state else None,
+                "business_can_read_messages": (
+                    business_state.get("can_read_messages") if business_state else None
+                ),
+            }
+        )
+    if context.update_type == "business_connection":
+        metadata.update(
+            {
+                "business_connection_id": context.business_connection_id,
+                "business_connection_active": context.business_is_enabled,
+                "business_can_reply": context.business_can_reply,
+                "business_user_chat_id": context.business_user_chat_id,
+            }
+        )
     draft = build_draft(
         kind=_draft_kind(decision),
         topic=_draft_topic(decision),
@@ -728,6 +875,21 @@ def process_update(update: dict[str, Any]) -> bool:
         allowed_chat_ids=SETTINGS.agent_allowed_chat_ids,
         allowed_thread_ids=SETTINGS.agent_allowed_thread_ids,
     )
+    if decision.context.update_type == "business_connection":
+        snapshot = _remember_business_connection(update)
+        if snapshot is not None:
+            logger.info(
+                "Recorded Telegram Business connection update: %s",
+                _redact_sensitive_text(
+                    {
+                        "id": snapshot["id"],
+                        "is_enabled": snapshot["is_enabled"],
+                        "can_reply": snapshot["can_reply"],
+                        "can_read_messages": snapshot["can_read_messages"],
+                        "last_update_id": snapshot["last_update_id"],
+                    }
+                ),
+            )
     if decision.route == "ignore":
         logger.info(
             "Router ignored Telegram update: %s",
@@ -934,6 +1096,17 @@ def _health_payload() -> dict[str, Any]:
         "agentic_dry_run_enabled": SETTINGS.agentic_dry_run_enabled,
         "draft_queue_enabled": SETTINGS.draft_queue_enabled,
         "draft_queue_path": str(SETTINGS.draft_queue_path),
+        "telegram_secretary_updates_supported": all(
+            update_type in _SUPPORTED_UPDATE_TYPES
+            for update_type in (
+                "business_connection",
+                "business_message",
+                "edited_business_message",
+                "deleted_business_messages",
+            )
+        ),
+        "telegram_business_connections": _business_connection_summary(),
+        "telegram_business_reply_policy": "draft_only_until_operator_approved",
         "agent_chat_scope_configured": SETTINGS.agent_allowed_chat_ids is not None,
         "agent_chat_scope_count": len(SETTINGS.agent_allowed_chat_ids or ()),
         "agent_thread_scope_configured": SETTINGS.agent_allowed_thread_ids is not None,
@@ -1010,11 +1183,55 @@ def telegram_ownership() -> dict[str, Any]:
         "no_send_router_guard": "only command routes may call sendMessage",
         "draft_queue_enabled": payload["draft_queue_enabled"],
         "agentic_dry_run_enabled": payload["agentic_dry_run_enabled"],
+        "secretary_mode": {
+            "updates_supported": payload["telegram_secretary_updates_supported"],
+            "business_connections": payload["telegram_business_connections"],
+            "reply_policy": payload["telegram_business_reply_policy"],
+        },
         "required_before_group": [
             "register_pm_bot_webhook_or_confirm_external_single_ingress",
             "keep_kimi_relay_disabled_until_private_operator_group_exists",
             "invite_kimi_agent_first",
             "invite_nemotron_agent_only_after_mock_free_text_spam_is_quiet",
+        ],
+    }
+
+
+@app.get("/telegram/secretary")
+def telegram_secretary() -> dict[str, Any]:
+    payload = _health_payload()
+    business_summary = payload["telegram_business_connections"]
+    active_connections = int(business_summary["active_connection_count"])
+    reply_capable_connections = int(business_summary["reply_capable_connection_count"])
+    blockers: list[str] = []
+    if not payload["telegram_secretary_updates_supported"]:
+        blockers.append("business_update_types_not_registered_in_code")
+    if not payload["telegram_delivery_ready"]:
+        blockers.append(
+            str(payload.get("telegram_delivery_reason") or "telegram_delivery_not_ready")
+        )
+    if active_connections == 0:
+        blockers.append("no_active_business_connection_observed")
+    return {
+        "service": payload["service"],
+        "secretary_mode_ready": not blockers,
+        "secretary_mode_blockers": blockers,
+        "supported_business_update_types": [
+            "business_connection",
+            "business_message",
+            "edited_business_message",
+            "deleted_business_messages",
+        ],
+        "business_connections": business_summary,
+        "can_reply_observed": reply_capable_connections > 0,
+        "reply_policy": payload["telegram_business_reply_policy"],
+        "live_send_gate": "requires business_connection_id, can_reply, and explicit operator approval",
+        "no_send_router_guard": "business messages are queued as guarded local drafts",
+        "operator_setup": [
+            "enable Secretary Mode in BotFather",
+            "register the PM-bot webhook with business_* allowed_updates",
+            "connect the bot from the Telegram account and grant only intended chats",
+            "review /telegram/secretary before enabling any live reply adapter",
         ],
     }
 
