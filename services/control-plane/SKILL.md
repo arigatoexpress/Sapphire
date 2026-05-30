@@ -34,6 +34,6 @@ Agents subscribe to relevant tags for notifications.
 
 ```bash
 bash infra/pi/rari1/deploy-control-plane.sh
-# Service: http://100.120.191.1:8082
+# Service: http://100.x.x.x:8082
 # Kimi bridge: POST /api/kimi/pm  X-Control-Token: <CONTROL_PLANE_TOKEN>
 ```

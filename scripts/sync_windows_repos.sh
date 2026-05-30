@@ -2,7 +2,7 @@
 # Sync all repos on Windows by pulling latest from GitHub
 # Run from Mac via SSH to Windows
 
-WINDOWS="aribs@100.71.10.48"
+WINDOWS="aribs@100.x.x.z"
 REPOS="Sapphire Project-Go-Forward cyber-threat-bot regional-intel-workbench Cointracker claw-code"
 
 echo "$(date): Syncing Windows repos..."

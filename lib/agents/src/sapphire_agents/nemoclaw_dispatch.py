@@ -1,6 +1,6 @@
 """NemoClaw dispatch — route tasks to NVIDIA NemoClaw runtime on Windows PC.
 
-NemoClaw runs on the Windows PC (RTX 5070 Ti, Tailscale 100.71.10.48) via the
+NemoClaw runs on the Windows PC (RTX 5070 Ti, Tailscale 100.x.x.z) via the
 OpenClaw gateway. It handles GPU-heavy work: backtesting, inference, forecasting.
 
 Task routing:
@@ -21,7 +21,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-NEMOCLAW_BASE_URL = os.getenv("NEMOCLAW_URL", "http://100.71.10.48:18789")
+NEMOCLAW_BASE_URL = os.getenv("NEMOCLAW_URL", "http://100.x.x.z:18789")
 OPENCLAW_BASE_URL = os.getenv("OPENCLAW_URL", "http://localhost:18789")
 REQUEST_TIMEOUT = 60.0
 

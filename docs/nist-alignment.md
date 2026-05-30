@@ -14,7 +14,7 @@ Last reviewed: **2026-04-17**.
 
 | Subcategory | Control | Status | Evidence / Gap |
 |-------------|---------|--------|----------------|
-| ID.AM-1 | Physical assets inventoried | **IMPLEMENTED** | `CLAUDE.md` lists Mac (100.67.171.79), Windows (100.71.10.48), Pi rari1/rari2 with IPs, roles, and hardware |
+| ID.AM-1 | Physical assets inventoried | **IMPLEMENTED** | `CLAUDE.md` lists Mac (100.x.x.w), Windows (100.x.x.z), Pi rari1/rari2 with IPs, roles, and hardware |
 | ID.AM-2 | Software platforms and applications inventoried | **IMPLEMENTED** | Module map in `CLAUDE.md`; service manifest in `routines-manifest.md` and `data/device_topology.json` |
 | ID.AM-3 | Communication/data flows mapped | **PARTIAL** | Proxy tiers documented; formal data-flow diagram missing for webhook → signal logger → event bus → Telegram |
 | ID.AM-4 | External systems catalogued | **IMPLEMENTED** | `data/connectors.json` tracks OpenBB, Cointracker, CISA KEV, NVD, Moonshot, yfinance |

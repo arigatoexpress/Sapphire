@@ -250,4 +250,4 @@ Total: 8 build PRs + 1 integration PR. All PRs landed within a single
 ~24-hour window via parallel-worktree execution per ADR 0002.
 
 Generator: Claude Code (`claude-opus-4-7[1m]`, agent harness mode) on
-the operator's Mac (`100.67.171.79`).
+the operator's Mac (`100.x.x.w`).

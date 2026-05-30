@@ -63,7 +63,7 @@ The Brain synthesis endpoint currently reports:
 ## 🛠️ HIGH: Enable Remote Login for Windows Agent Access
 
 **Issue:** Windows agent cannot SSH to Mac. Port 22 is closed.
-- Tailscale IP: `100.67.171.79`
+- Tailscale IP: `100.x.x.w`
 - Local IP: `192.168.1.28`
 - Tailscale ping works (4ms direct via `192.168.1.27:41641`)
 - `Test-NetConnection -Port 22` fails
@@ -104,7 +104,7 @@ After completing the above, confirm:
 - [ ] `launchctl print gui/$(id -u)/com.sapphire.regime-collector` shows `state = running`
 - [ ] Brain synthesis shows `trading_signals_24h > 0`
 - [ ] Brain synthesis shows `degraded_silos` does **not** contain `trading`
-- [ ] Windows agent can `ssh aribs@100.67.171.79`
+- [ ] Windows agent can `ssh aribs@100.x.x.w`
 - [ ] B1 scan shows ≤ 3 WARNs
 
 ---

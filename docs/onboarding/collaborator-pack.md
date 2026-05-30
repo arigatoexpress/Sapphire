@@ -24,15 +24,15 @@ path depends on a SaaS that could rug-pull.
                                            ▼
 ┌───────────────────────────── Tailscale mesh (6 ACL trust zones) ────────────────────────────────┐
 │                                                                                                  │
-│   Mac M4 Pro 24GB (100.67.171.79) — commander                                                   │
+│   Mac M4 Pro 24GB (100.x.x.w) — commander                                                   │
 │   ├── control-plane  :8082       ├── dashboard :8080      ├── signal-logger :18081              │
 │   ├── inference-proxy :11435     ├── content-engine       ├── pm-bot webhook :18082             │
 │   ├── Redis :6379                ├── Ollama :11434        └── OpenBB :6900                      │
 │                                                                                                  │
-│   Windows RTX 5070 Ti 16GB (100.71.10.48) — GPU + webhook                                       │
+│   Windows RTX 5070 Ti 16GB (100.x.x.z) — GPU + webhook                                       │
 │   ├── Ollama :11434 (28 models, OLLAMA_HOST=0.0.0.0)   └── TradingView webhook :9090            │
 │                                                                                                  │
-│   Pi rari1 (100.120.191.1) — small-model research       Pi rari2 (100.87.225.89) — backup      │
+│   Pi rari1 (100.x.x.x) — small-model research       Pi rari2 (100.x.x.y) — backup      │
 │   └── Ollama :11434 (4 tiny models)                     └── Ollama :11434 (5 models)            │
 │                                                                                                  │
 └──────────────────────────────────────────────────────────────────────────────────────────────────┘

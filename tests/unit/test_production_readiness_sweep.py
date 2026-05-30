@@ -229,7 +229,7 @@ def test_windows_ollama_inventory_passes_with_required_models(monkeypatch) -> No
 
     monkeypatch.setattr(sweep.urllib.request, "urlopen", fake_urlopen)
 
-    check = sweep.windows_ollama_inventory_check("http://100.71.10.48:11434")
+    check = sweep.windows_ollama_inventory_check("http://100.x.x.z:11434")
 
     assert check.status == "PASS"
     assert "models=6" in check.evidence
@@ -252,7 +252,7 @@ def test_windows_ollama_inventory_warns_on_missing_aliases(monkeypatch) -> None:
 
     monkeypatch.setattr(sweep.urllib.request, "urlopen", fake_urlopen)
 
-    check = sweep.windows_ollama_inventory_check("http://100.71.10.48:11434")
+    check = sweep.windows_ollama_inventory_check("http://100.x.x.z:11434")
 
     assert check.status == "WARN"
     assert "required_present=0/8" in check.evidence
@@ -268,7 +268,7 @@ def test_tcp_check_can_warn_for_optional_desktop_ports(monkeypatch) -> None:
     monkeypatch.setattr(sweep.socket, "create_connection", fake_create_connection)
 
     check = sweep.tcp_check(
-        "windows", "telemetry_dashboard_tcp", "100.71.10.48", 3001, warn_on_error=True
+        "windows", "telemetry_dashboard_tcp", "100.x.x.z", 3001, warn_on_error=True
     )
 
     assert check.status == "WARN"
@@ -284,7 +284,7 @@ def test_windows_probe_timeouts_are_env_tunable(monkeypatch) -> None:
     monkeypatch.setenv("SAPPHIRE_WINDOWS_HTTP_TIMEOUT_SECONDS", "1.5")
     monkeypatch.setattr(sweep.urllib.request, "urlopen", fake_urlopen)
 
-    check = sweep.windows_ollama_inventory_check("http://100.71.10.48:11434")
+    check = sweep.windows_ollama_inventory_check("http://100.x.x.z:11434")
 
     assert check.status == "WARN"
     assert timeouts == [1.5]
@@ -308,7 +308,7 @@ def test_windows_webhook_health_surfaces_degraded_subservices(monkeypatch) -> No
 
     monkeypatch.setattr(sweep.urllib.request, "urlopen", fake_urlopen)
 
-    check = sweep.windows_webhook_health_check("100.71.10.48")
+    check = sweep.windows_webhook_health_check("100.x.x.z")
 
     assert check.status == "WARN"
     assert "status=healthy" in check.evidence
@@ -336,7 +336,7 @@ def test_windows_webhook_health_treats_agent_only_as_pass(monkeypatch) -> None:
 
     monkeypatch.setattr(sweep.urllib.request, "urlopen", fake_urlopen)
 
-    check = sweep.windows_webhook_health_check("100.71.10.48")
+    check = sweep.windows_webhook_health_check("100.x.x.z")
 
     assert check.status == "PASS"
     assert "agent_only_services=windows_tv_agent" in check.evidence
@@ -362,7 +362,7 @@ def test_windows_tv_agent_cdp_status_passes_when_cdp_is_healthy(monkeypatch) -> 
 
     monkeypatch.setattr(sweep.urllib.request, "urlopen", fake_urlopen)
 
-    check = sweep.windows_tv_agent_cdp_check("100.71.10.48")
+    check = sweep.windows_tv_agent_cdp_check("100.x.x.z")
 
     assert check.status == "PASS"
     assert "cdp=ready" in check.evidence
@@ -385,7 +385,7 @@ def test_windows_tv_agent_cdp_status_warns_when_cdp_is_agent_only(monkeypatch) -
 
     monkeypatch.setattr(sweep.urllib.request, "urlopen", fake_urlopen)
 
-    check = sweep.windows_tv_agent_cdp_check("100.71.10.48")
+    check = sweep.windows_tv_agent_cdp_check("100.x.x.z")
 
     assert check.status == "WARN"
     assert "status=agent_only" in check.evidence
@@ -404,14 +404,14 @@ def test_windows_scheduled_tasks_pass_when_expected_tasks_are_ready_or_running(
         host: str, script: str, *, timeout: int | None = None
     ) -> sweep.RunResult:
         del timeout
-        assert host == "100.71.10.48"
+        assert host == "100.x.x.z"
         assert "Get-ScheduledTask" in script
         assert "SapphireTradingViewCDP" in script
         return sweep.RunResult(0, json.dumps(payload), "", 25)
 
     monkeypatch.setattr(sweep, "windows_powershell_json", fake_windows_powershell_json)
 
-    check = sweep.windows_scheduled_tasks_check("100.71.10.48")
+    check = sweep.windows_scheduled_tasks_check("100.x.x.z")
 
     assert check.status == "PASS"
     assert "checked=6" in check.evidence
@@ -430,7 +430,7 @@ def test_windows_scheduled_tasks_warn_when_expected_task_is_missing(monkeypatch)
         lambda _host, _script, timeout=None: sweep.RunResult(0, json.dumps(payload), "", 25),
     )
 
-    check = sweep.windows_scheduled_tasks_check("100.71.10.48")
+    check = sweep.windows_scheduled_tasks_check("100.x.x.z")
 
     assert check.status == "WARN"
     assert "missing=Sapphire-TV-Agent" in check.evidence
@@ -457,7 +457,7 @@ def test_windows_power_availability_passes_with_never_sleep_readback(monkeypatch
         lambda _host, _script, timeout=None: sweep.RunResult(0, json.dumps(payload), "", 19),
     )
 
-    check = sweep.windows_power_availability_check("100.71.10.48")
+    check = sweep.windows_power_availability_check("100.x.x.z")
 
     assert check.status == "PASS"
     assert "sleep=never" in check.evidence
@@ -484,7 +484,7 @@ def test_windows_power_availability_warns_on_lock_or_sleep_readback(monkeypatch)
         lambda _host, _script, timeout=None: sweep.RunResult(0, json.dumps(payload), "", 19),
     )
 
-    check = sweep.windows_power_availability_check("100.71.10.48")
+    check = sweep.windows_power_availability_check("100.x.x.z")
 
     assert check.status == "WARN"
     assert "sleep_timeout" in check.evidence
@@ -517,7 +517,7 @@ def test_windows_research_worker_passes_with_fresh_safe_manifest(monkeypatch) ->
 
     monkeypatch.setattr(sweep.urllib.request, "urlopen", fake_urlopen)
 
-    check = sweep.windows_research_worker_check("100.71.10.48")
+    check = sweep.windows_research_worker_check("100.x.x.z")
 
     assert check.status == "PASS"
     assert "run_id=20260429T215406Z" in check.evidence
@@ -554,7 +554,7 @@ def test_windows_research_worker_warns_on_stale_manifest(monkeypatch) -> None:
 
     monkeypatch.setattr(sweep.urllib.request, "urlopen", fake_urlopen)
 
-    check = sweep.windows_research_worker_check("100.71.10.48")
+    check = sweep.windows_research_worker_check("100.x.x.z")
 
     assert check.status == "WARN"
     assert "manifest_stale" in check.evidence
@@ -584,7 +584,7 @@ def test_windows_research_worker_warns_on_failed_task_result(monkeypatch) -> Non
 
     monkeypatch.setattr(sweep.urllib.request, "urlopen", fake_urlopen)
 
-    check = sweep.windows_research_worker_check("100.71.10.48")
+    check = sweep.windows_research_worker_check("100.x.x.z")
 
     assert check.status == "WARN"
     assert "task_result=code_1" in check.evidence

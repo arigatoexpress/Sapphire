@@ -51,6 +51,6 @@ pip install -r requirements.txt
 ## Deploy to rari2
 
 ```bash
-rsync -av services/aster/ rari@100.87.225.89:/home/rari/Sapphire/services/bot-aster/
-ssh rari@100.87.225.89 "cd ~/Sapphire/services/bot-aster && source .venv/bin/activate && pip install -r requirements.txt"
+rsync -av services/aster/ rari@100.x.x.y:/home/rari/Sapphire/services/bot-aster/
+ssh rari@100.x.x.y "cd ~/Sapphire/services/bot-aster && source .venv/bin/activate && pip install -r requirements.txt"
 ```

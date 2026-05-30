@@ -1,5 +1,5 @@
 # TradingView Desktop — CDP Setup Guide
-**Target:** Windows PC (100.71.10.48, user: aribs)  
+**Target:** Windows PC (100.x.x.z, user: aribs)  
 **Goal:** Enable Chrome DevTools Protocol on port 9222 for TradingView MCP
 
 ---
@@ -37,7 +37,7 @@ netstat -an | findstr 9222
 
 Or verify from Mac:
 ```bash
-curl http://100.71.10.48:9222/json
+curl http://100.x.x.z:9222/json
 # Should return a JSON array of tabs
 ```
 
@@ -75,7 +75,7 @@ Edit `~/.claude/settings.json` and add under `mcpServers`:
       "command": "node",
       "args": ["/Users/aribs/Code/tradingview-mcp-v2/src/server.js"],
       "env": {
-        "CDP_HOST": "100.71.10.48",
+        "CDP_HOST": "100.x.x.z",
         "CDP_PORT": "9222"
       }
     }
@@ -100,7 +100,7 @@ tv get-indicators            # List active indicators
 From Mac, after Windows CDP is enabled:
 ```bash
 # Test CDP directly
-curl -s http://100.71.10.48:9222/json | python3 -c "
+curl -s http://100.x.x.z:9222/json | python3 -c "
 import json, sys
 tabs = json.load(sys.stdin)
 tv = [t for t in tabs if 'tradingview' in t.get('url','').lower()]
@@ -120,7 +120,7 @@ curl -su "sapphire:sapphire" http://127.0.0.1:8080/api/system | \
 | Problem | Fix |
 |---------|-----|
 | Port 9222 not listening after bat run | MSIX app may ignore CLI args — see Alternative below |
-| `curl 100.71.10.48:9222` times out from Mac | Firewall rule not applied — run bat as Admin or check Tailscale routing |
+| `curl 100.x.x.z:9222` times out from Mac | Firewall rule not applied — run bat as Admin or check Tailscale routing |
 | TradingView starts but no chart tab | Log into TradingView, open a chart; CDP needs a live chart to expose TV tab |
 | MCP connects but tools fail | TV Desktop may need to be on a chart page (not screener/watchlist) |
 
@@ -138,7 +138,7 @@ Some MSIX-packaged Electron apps don't pass CLI args through the MSIX activation
 Claude Code (Mac)
     └── tradingview-mcp v2 (node, stdio)
             └── chrome-remote-interface
-                    └── CDP http://100.71.10.48:9222
+                    └── CDP http://100.x.x.z:9222
                             └── TradingView Desktop (Electron, Windows)
                                     └── Chart: BTCUSDT, indicators, Pine editor
 ```

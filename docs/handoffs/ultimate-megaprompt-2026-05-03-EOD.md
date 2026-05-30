@@ -58,10 +58,10 @@ Per memory: "broad autonomy → parallel Agent tasks + admin-squash-merge; reser
 
 ### Sapphire infrastructure status
 
-- **Mac (100.67.171.79)** commander, all services. ALL services healthy.
-- **Windows PC (100.71.10.48)** RTX 5070 Ti, GPU stack. `:3001` telemetry-dashboard may be down — check `Get-ScheduledTask -TaskName 'SapphireDashboard'` from PowerShell.
-- **Pi rari1 (100.120.191.1)** Tailscale ONLINE, Ollama working, SSH refused.
-- **Pi rari2 (100.87.225.89)** Tailscale ONLINE, Ollama working.
+- **Mac (100.x.x.w)** commander, all services. ALL services healthy.
+- **Windows PC (100.x.x.z)** RTX 5070 Ti, GPU stack. `:3001` telemetry-dashboard may be down — check `Get-ScheduledTask -TaskName 'SapphireDashboard'` from PowerShell.
+- **Pi rari1 (100.x.x.x)** Tailscale ONLINE, Ollama working, SSH refused.
+- **Pi rari2 (100.x.x.y)** Tailscale ONLINE, Ollama working.
 
 Live counts: see `~/Code/Sapphire/CLAUDE.md` (canonical).
 

@@ -63,7 +63,7 @@ _ROUTINE_PAUSE_DIR = Path.home() / ".sapphire" / "routine_pause"
 # Configuration
 # Pi-less mode: services run on Mac (localhost) and rari2 (Tailscale)
 RARI1_IP = os.environ.get("RARI1_IP", "127.0.0.1")  # control-plane on Mac
-RARI2_IP = os.environ.get("RARI2_IP", "100.87.225.89")  # rari2 via Tailscale
+RARI2_IP = os.environ.get("RARI2_IP", "100.x.x.y")  # rari2 via Tailscale
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 
 # Auth configuration — credentials required via environment variables
@@ -2686,11 +2686,11 @@ def api_agents():
         for agent_name, pi_ip, pi_port, _log_path in [
             (
                 "market-watchdog",
-                "100.120.191.1",
+                "100.x.x.x",
                 19001,
                 "/home/rari/sapphire/logs/market-watchdog.log",
             ),
-            ("health-monitor", "100.87.225.89", 19002, "/home/rari/sapphire/uptime.jsonl"),
+            ("health-monitor", "100.x.x.y", 19002, "/home/rari/sapphire/uptime.jsonl"),
         ]:
             status = {
                 "name": agent_name,
@@ -2753,9 +2753,9 @@ def api_health_summary():
             ("inference-proxy", "cloud", "127.0.0.1", 11435, "/health"),
             ("openbb-api", "cloud", "127.0.0.1", 6900, None),
             ("redis", "cloud", "127.0.0.1", 6379, None),
-            ("windows-ollama", "windows", "100.71.10.48", 11434, None),
-            ("rari1-ollama", "pi", "100.120.191.1", 11434, None),
-            ("rari2-ollama", "pi", "100.87.225.89", 11434, None),
+            ("windows-ollama", "windows", "100.x.x.z", 11434, None),
+            ("rari1-ollama", "pi", "100.x.x.x", 11434, None),
+            ("rari2-ollama", "pi", "100.x.x.y", 11434, None),
         ]
 
         by_category = {"cloud": [], "windows": [], "pi": [], "firestore": []}
@@ -2931,7 +2931,7 @@ def api_production_readiness():
         cloud_services = {}
         for name, host, port in [
             ("mac-ollama", "127.0.0.1", 11434),
-            ("windows-ollama", "100.71.10.48", 11434),
+            ("windows-ollama", "100.x.x.z", 11434),
             ("openbb-api", "127.0.0.1", 6900),
             ("redis", "127.0.0.1", 6379),
         ]:
@@ -2958,7 +2958,7 @@ def api_production_readiness():
 
         # Gate C — edge fleet (Pi nodes)
         pi_nodes = {}
-        for name, host in [("rari1", "100.120.191.1"), ("rari2", "100.87.225.89")]:
+        for name, host in [("rari1", "100.x.x.x"), ("rari2", "100.x.x.y")]:
             t0 = time.time()
             try:
                 s = socket.create_connection((host, 11434), timeout=3)
@@ -3558,7 +3558,7 @@ def api_soc_security():
             result = subprocess.run(
                 ["tailscale", "status"], capture_output=True, text=True, timeout=8
             )
-            known_ips = {"100.67.171.79", "100.71.10.48", "100.120.191.1", "100.87.225.89"}
+            known_ips = {"100.x.x.w", "100.x.x.z", "100.x.x.x", "100.x.x.y"}
             lines = [
                 ln for ln in result.stdout.splitlines() if ln.strip() and not ln.startswith("#")
             ]
@@ -7299,11 +7299,11 @@ def api_backtest_results():
 _WALKFORWARD_RESULTS_ROOT = _DASHBOARD_REPO_ROOT / "data" / "backtests" / "walkforward"
 _WINDOWS_RESEARCH_WORKER_URL = os.environ.get(
     "WINDOWS_RESEARCH_WORKER_URL",
-    "http://100.71.10.48:9090/windows/research-worker/latest",
+    "http://100.x.x.z:9090/windows/research-worker/latest",
 )
 _WINDOWS_WEBHOOK_HEALTH_URL = os.environ.get(
     "WINDOWS_WEBHOOK_HEALTH_URL",
-    "http://100.71.10.48:9090/webhook/health",
+    "http://100.x.x.z:9090/webhook/health",
 )
 
 

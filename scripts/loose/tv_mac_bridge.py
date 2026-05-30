@@ -17,7 +17,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(
 logger = logging.getLogger(__name__)
 
 # Forward to Windows webhook
-WINDOWS_WEBHOOK = "http://100.71.10.48:9090/webhook/tradingview"
+WINDOWS_WEBHOOK = "http://100.x.x.z:9090/webhook/tradingview"
 
 
 class MacStrategyBridge:

@@ -6,7 +6,7 @@
   "devices": {
     "mac": {
       "hostname": "macbook-pro-8",
-      "tailscaleIp": "100.67.171.79",
+      "tailscaleIp": "100.x.x.w",
       "os": "macOS",
       "role": "Commander — all services, all MCPs, primary control node",
       "status": "online",
@@ -38,7 +38,7 @@
 
     "windows-pc": {
       "hostname": "DESKTOP-HFCK6U9",
-      "tailscaleIp": "100.71.10.48",
+      "tailscaleIp": "100.x.x.z",
       "os": "Windows",
       "role": "GPU Workbench — inference, webhook relay, backtesting",
       "status": "online",
@@ -54,7 +54,7 @@
 
     "rari1": {
       "hostname": "rari1",
-      "tailscaleIp": "100.120.191.1",
+      "tailscaleIp": "100.x.x.x",
       "os": "Linux (Raspberry Pi OS)",
       "role": "DECOMMISSIONED — services moved to Mac",
       "status": "offline",
@@ -64,7 +64,7 @@
 
     "rari2": {
       "hostname": "rari2",
-      "tailscaleIp": "100.87.225.89",
+      "tailscaleIp": "100.x.x.y",
       "lanIp": "192.168.1.21",
       "os": "Linux (Raspberry Pi OS Bookworm, aarch64)",
       "role": "Inference Pi + Trading Pi — Tier 2 Ollama node (lightweight models), signal logger",

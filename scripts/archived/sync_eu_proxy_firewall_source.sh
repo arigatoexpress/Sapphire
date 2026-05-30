@@ -3,12 +3,12 @@ set -euo pipefail
 
 # Keep EU proxy firewall allowlist in sync with rari2's current public IPv4.
 # Default targets:
-#   - remote host: rari@100.87.225.89
+#   - remote host: rari@100.x.x.y
 #   - firewall rule: allow-sapphire-eu-proxy-3128
 #   - project: sapphire-479610
 
 PROJECT_ID="${PROJECT_ID:-sapphire-479610}"
-REMOTE_HOST="${REMOTE_HOST:-rari@100.87.225.89}"
+REMOTE_HOST="${REMOTE_HOST:-rari@100.x.x.y}"
 FIREWALL_RULE="${FIREWALL_RULE:-allow-sapphire-eu-proxy-3128}"
 
 require_cmd() {

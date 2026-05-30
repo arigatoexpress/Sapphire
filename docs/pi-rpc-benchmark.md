@@ -9,8 +9,8 @@
 
 | Node | Tailscale IP | RPC Port | Status |
 |------|-------------|----------|--------|
-| rari1 | 100.120.191.1 | 50052 | **ACTIVE** — systemd service, enabled, auto-start |
-| rari2 | 100.87.225.89 | 50052 | **ACTIVE** — systemd service, enabled, auto-start |
+| rari1 | 100.x.x.x | 50052 | **ACTIVE** — systemd service, enabled, auto-start |
+| rari2 | 100.x.x.y | 50052 | **ACTIVE** — systemd service, enabled, auto-start |
 
 Both Pi nodes running `rpc-server --host 0.0.0.0 --port 50052` as user `rari`.  
 Binary: `/home/rari/llama.cpp/build/bin/rpc-server` (180 KB ARM64, ggml RPC backend)  
@@ -97,13 +97,13 @@ and offloading layers to the **other Pi** via the fast local link. This enables 
 
 ```bash
 # Check status
-ssh rari@100.120.191.1 'systemctl status llama-rpc'
-ssh rari@100.87.225.89 'systemctl status llama-rpc'
+ssh rari@100.x.x.x 'systemctl status llama-rpc'
+ssh rari@100.x.x.y 'systemctl status llama-rpc'
 
 # Test connectivity  
-nc -zv 100.120.191.1 50052 && echo "rari1 OK"
-nc -zv 100.87.225.89 50052 && echo "rari2 OK"
+nc -zv 100.x.x.x 50052 && echo "rari1 OK"
+nc -zv 100.x.x.y 50052 && echo "rari2 OK"
 
 # Pi-to-Pi RPC test (from rari1)
-ssh rari@100.120.191.1 'nc -zv 10.0.0.2 50052 && echo "rari2 direct OK"'
+ssh rari@100.x.x.x 'nc -zv 10.0.0.2 50052 && echo "rari2 direct OK"'
 ```

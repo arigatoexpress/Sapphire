@@ -611,7 +611,7 @@ async def test_publish_signal_records_partial_success(monkeypatch, receiver):
 
     def _per_url(url: str) -> _StubResponse:
         # Mac succeeds, Pis fail
-        if "100.67.171.79" in url:
+        if "100.x.x.w" in url:
             return _StubResponse(200)
         return _StubResponse(503)
 

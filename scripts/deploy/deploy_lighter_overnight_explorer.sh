@@ -38,7 +38,7 @@ set -euo pipefail
 #   PROVIDER_CYCLE_SUMMARY_EVERY=1 cycle log cadence
 #   TIMEOUT_STOP_SEC=120          service stop timeout seconds
 
-HOST="${1:-rari@100.87.225.89}"
+HOST="${1:-rari@100.x.x.y}"
 REMOTE_ROOT="/home/rari/Sapphire"
 REMOTE_SCRIPT="${REMOTE_ROOT}/scripts/overnight_multi_symbol_explorer.py"
 REMOTE_ENV="${REMOTE_ROOT}/services/bot-lighter/overnight_explorer.env"

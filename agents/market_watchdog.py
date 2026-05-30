@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Sapphire Market Watchdog Agent — runs on rari1 (100.120.191.1).
+Sapphire Market Watchdog Agent — runs on rari1 (100.x.x.x).
 
 Monitors market conditions and fires Telegram alerts:
   - Major index moves (SPY, QQQ > 2% daily)
@@ -55,8 +55,8 @@ log = logging.getLogger("market-watchdog")
 DEFAULT_CONFIG = {
     "agent": {"name": "market-watchdog", "health_port": 19001},
     "intervals": {"market_check": 300, "crypto_check": 180, "heartbeat": 60},
-    "openbb": {"base_url": "http://100.67.171.79:6900", "timeout": 10},
-    "telegram": {"proxy_url": "http://100.67.171.79:11435", "priority": "p1"},
+    "openbb": {"base_url": "http://100.x.x.w:6900", "timeout": 10},
+    "telegram": {"proxy_url": "http://100.x.x.w:11435", "priority": "p1"},
     "indices": [
         {"symbol": "SPY", "name": "S&P 500", "alert_threshold_pct": 2.0},
         {"symbol": "QQQ", "name": "NASDAQ", "alert_threshold_pct": 2.5},
@@ -286,11 +286,9 @@ class MarketWatchdog:
         self._crypto_interval = int(interval_cfg.get("crypto_check", 180))
         self._market_interval = int(interval_cfg.get("market_check", 300))
 
-        self._openbb_url = config.get("openbb", {}).get("base_url", "http://100.67.171.79:6900")
+        self._openbb_url = config.get("openbb", {}).get("base_url", "http://100.x.x.w:6900")
         self._openbb_timeout = int(config.get("openbb", {}).get("timeout", 10))
-        self._telegram_url = config.get("telegram", {}).get(
-            "proxy_url", "http://100.67.171.79:11435"
-        )
+        self._telegram_url = config.get("telegram", {}).get("proxy_url", "http://100.x.x.w:11435")
         self._telegram_priority = config.get("telegram", {}).get("priority", "p1")
         self._cooldown = int(config.get("cooldown", {}).get("same_alert_seconds", 3600))
         self._max_per_hour = int(config.get("cooldown", {}).get("max_alerts_per_hour", 10))

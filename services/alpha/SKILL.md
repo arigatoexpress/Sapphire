@@ -41,11 +41,11 @@ TradingView → webhook.sapphirealpha.xyz (Cloudflare Tunnel)
 ## Deploy (on-prem)
 
 Runs on both rari1 and rari2 (port 18081). See `infra/pi/` for systemd services.
-Signal broker: Redis on rari1 (`REDIS_URL=redis://100.120.191.1:6379`).
+Signal broker: Redis on rari1 (`REDIS_URL=redis://100.x.x.x:6379`).
 
 ```bash
 # Install Redis on rari1 first:
-ssh rari@100.120.191.1 'bash -s' < infra/pi/rari1/setup-redis.sh
+ssh rari@100.x.x.x 'bash -s' < infra/pi/rari1/setup-redis.sh
 # Then deploy control-plane:
 bash infra/pi/rari1/deploy-control-plane.sh
 ```

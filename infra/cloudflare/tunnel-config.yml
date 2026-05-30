@@ -22,13 +22,13 @@ ingress:
     service: http://localhost:9090
 
   # Dashboard → rari1:8080 (routed via Tailscale from Windows PC)
-  # If tunnel runs on Mac instead, use http://100.120.191.1:8080
+  # If tunnel runs on Mac instead, use http://100.x.x.x:8080
   - hostname: dashboard.sapphirealpha.xyz
-    service: http://100.120.191.1:8080
+    service: http://100.x.x.x:8080
 
   # Control plane PM hub → rari1:8082
   - hostname: pm.sapphirealpha.xyz
-    service: http://100.120.191.1:8082
+    service: http://100.x.x.x:8082
 
   # Catch-all
   - service: http_status:404

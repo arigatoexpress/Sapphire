@@ -144,12 +144,12 @@ echo '{"action": "list_pine"}' | python3 plugins/claw-sapphire/tools/tradingview
 
 2. **Set webhook URL** in TradingView alert:
    ```
-   http://100.71.10.48:9090/webhook/tradingview
+   http://100.x.x.z:9090/webhook/tradingview
    ```
 
 3. **Test the pipeline**:
    ```bash
-   curl -X POST http://100.71.10.48:9090/webhook/tradingview \
+   curl -X POST http://100.x.x.z:9090/webhook/tradingview \
      -H "Content-Type: application/json" \
      -d '{"symbol":"BTCUSDT","action":"buy","price":76000,"confidence":0.85}'
    ```

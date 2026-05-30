@@ -102,7 +102,7 @@ def _fetch_pi_vitals():
     """Ping Pi health endpoints, return vitals dict keyed by 'rari1'/'rari2'."""
     import urllib.request
 
-    agents = {"rari1": ("100.120.191.1", 19001), "rari2": ("100.87.225.89", 19002)}
+    agents = {"rari1": ("100.x.x.x", 19001), "rari2": ("100.x.x.y", 19002)}
     result = {}
     for name, (ip, port) in agents.items():
         try:

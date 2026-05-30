@@ -375,7 +375,7 @@ class TestKnownNodes:
         assert "pi-rari2" in KNOWN_NODES
 
     def test_known_ips_match_claude_md(self):
-        assert KNOWN_NODES["mac-commander"]["ip"] == "100.67.171.79"
-        assert KNOWN_NODES["windows-gpu"]["ip"] == "100.71.10.48"
-        assert KNOWN_NODES["pi-rari1"]["ip"] == "100.120.191.1"
-        assert KNOWN_NODES["pi-rari2"]["ip"] == "100.87.225.89"
+        assert KNOWN_NODES["mac-commander"]["ip"] == "100.x.x.w"
+        assert KNOWN_NODES["windows-gpu"]["ip"] == "100.x.x.z"
+        assert KNOWN_NODES["pi-rari1"]["ip"] == "100.x.x.x"
+        assert KNOWN_NODES["pi-rari2"]["ip"] == "100.x.x.y"

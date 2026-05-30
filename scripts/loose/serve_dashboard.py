@@ -45,7 +45,7 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
             "services": {
                 "ai_orchestrator": {"port": 8087, "status": "unknown"},
                 "mac_bridge": {"port": 8083, "status": "unknown"},
-                "windows_webhook": {"port": 9090, "host": "100.71.10.48", "status": "unknown"},
+                "windows_webhook": {"port": 9090, "host": "100.x.x.z", "status": "unknown"},
             },
         }
 

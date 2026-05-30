@@ -52,8 +52,8 @@ fi
 echo ""
 
 # Test 4: Windows Webhook
-echo "📡 Test 4: Windows Webhook (100.71.10.48:9090)"
-RESP=$(curl -s --max-time 5 http://100.71.10.48:9090/status)
+echo "📡 Test 4: Windows Webhook (100.x.x.z:9090)"
+RESP=$(curl -s --max-time 5 http://100.x.x.z:9090/status)
 if [ -n "$RESP" ]; then
     echo -e "${GREEN}✅ Windows Webhook responding${NC}"
     TOTAL=$(echo $RESP | grep -o '"total":[0-9]*' | cut -d: -f2)

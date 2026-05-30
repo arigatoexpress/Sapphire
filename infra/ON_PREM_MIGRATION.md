@@ -50,14 +50,14 @@ to on-prem hardware (rari1, rari2, Windows PC) over Tailscale.
 ### 1. Install Redis on rari1
 
 ```bash
-ssh rari@100.120.191.1 'bash -s' < infra/pi/rari1/setup-redis.sh
+ssh rari@100.x.x.x 'bash -s' < infra/pi/rari1/setup-redis.sh
 ```
 
 ### 2. Update service .env files on rari1 + rari2
 
 Add to each service's `.env`:
 ```
-REDIS_URL=redis://100.120.191.1:6379
+REDIS_URL=redis://100.x.x.x:6379
 ```
 
 Reference: `infra/pi/rari1/env.example`, `infra/pi/rari2/env.example`
@@ -65,7 +65,7 @@ Reference: `infra/pi/rari1/env.example`, `infra/pi/rari2/env.example`
 ### 3. Restart aster + hyperliquid on rari2
 
 ```bash
-ssh rari@100.87.225.89
+ssh rari@100.x.x.y
 sudo systemctl restart sapphire-aster sapphire-hyperliquid
 sudo systemctl status sapphire-aster sapphire-hyperliquid
 ```
@@ -96,7 +96,7 @@ Update TradingView alerts to: `https://webhook.sapphirealpha.xyz/webhook/trading
 
 ```bash
 # Test from Mac:
-curl -X POST http://100.71.10.48:9090/webhook/tradingview \
+curl -X POST http://100.x.x.z:9090/webhook/tradingview \
   -H "Content-Type: application/json" \
   -d '{"symbol":"ETHUSD","action":"buy","price":3500,"secret":"sapphire_trading_2024"}'
 ```

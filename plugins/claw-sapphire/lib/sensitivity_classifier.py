@@ -191,7 +191,7 @@ if __name__ == "__main__":
         ("token=eyJhbGciOiJIUzI1NiJ9", False),
         ("Private key: 0xabcdef123456", False),
         ("bearer abc123token", False),
-        ("Tailscale IP is 100.67.171.79", False),
+        ("Tailscale IP is 100.x.x.w", False),
         ("THO customer John enrolled", False),
         ("email me at user@example.com", False),
         ("Call 555-867-5309 for support", False),

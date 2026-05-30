@@ -22,7 +22,7 @@ execution dependency.
 | Health route | `/webhook/health` |
 | Main route | `/webhook/tradingview` |
 | Default log file | `C:/sapphire/webhook.log` |
-| Primary forward target | `SIGNAL_LOGGER_MAC` -> `http://100.67.171.79:18081` |
+| Primary forward target | `SIGNAL_LOGGER_MAC` -> `http://100.x.x.w:18081` |
 
 ## Current Safety Posture
 
@@ -56,13 +56,13 @@ python -m uvicorn src.receiver:app --host 0.0.0.0 --port 9090
 From the commander Mac, check health over Tailscale:
 
 ```bash
-curl -fsS http://100.71.10.48:9090/webhook/health | python3 -m json.tool
+curl -fsS http://100.x.x.z:9090/webhook/health | python3 -m json.tool
 ```
 
 Check receiver status:
 
 ```bash
-curl -fsS http://100.71.10.48:9090/status | python3 -m json.tool
+curl -fsS http://100.x.x.z:9090/status | python3 -m json.tool
 ```
 
 Tail the Windows log on the Windows host:
@@ -77,7 +77,7 @@ Use only paper/test routing. Do not send a real TradingView alert while
 debugging.
 
 ```bash
-curl -sS -X POST http://100.71.10.48:9090/webhook/tradingview \
+curl -sS -X POST http://100.x.x.z:9090/webhook/tradingview \
   -H 'Content-Type: application/json' \
   -d '{
     "symbol":"BTCUSDT",

@@ -117,7 +117,7 @@ def run() -> str:
         "inference": {
             "proxy_health": get_proxy_health(),
             "local_models": get_ollama_models("localhost"),
-            "gpu_models": get_ollama_models("100.71.10.48"),
+            "gpu_models": get_ollama_models("100.x.x.z"),
         },
     }
 

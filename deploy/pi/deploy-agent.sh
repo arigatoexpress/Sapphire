@@ -8,7 +8,7 @@
 #   ./deploy-agent.sh health-monitor  rari2
 #
 # Agent names: market-watchdog, health-monitor
-# Pi targets:  rari1 (100.120.191.1), rari2 (100.87.225.89)
+# Pi targets:  rari1 (100.x.x.x), rari2 (100.x.x.y)
 
 set -euo pipefail
 
@@ -20,8 +20,8 @@ REMOTE_DIR="/home/rari/sapphire"
 REMOTE_USER="rari"
 
 declare -A PI_IPS=(
-    ["rari1"]="100.120.191.1"
-    ["rari2"]="100.87.225.89"
+    ["rari1"]="100.x.x.x"
+    ["rari2"]="100.x.x.y"
 )
 
 declare -A AGENT_FILES=(

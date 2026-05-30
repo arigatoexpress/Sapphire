@@ -60,14 +60,14 @@ Telegram sends are false, and browser mutation is false.
 
 ## Runtime State
 
-Windows host: `100.71.10.48`
+Windows host: `100.x.x.z`
 
 Current healthy surfaces:
 
-- SSH: `100.71.10.48:22`
-- Windows TV agent: `100.71.10.48:8081`
-- Windows webhook: `100.71.10.48:9090`
-- Telemetry dashboard: `100.71.10.48:3001`
+- SSH: `100.x.x.z:22`
+- Windows TV agent: `100.x.x.z:8081`
+- Windows webhook: `100.x.x.z:9090`
+- Telemetry dashboard: `100.x.x.z:3001`
 - Windows Ollama: healthy through webhook readiness
 - TradingView CDP: healthy on Windows loopback at `127.0.0.1:9222`
 
@@ -102,10 +102,10 @@ Focused PR #492 gates:
 
 Live runtime checks after hot-apply:
 
-- `curl http://100.71.10.48:8081/health`
-- `curl http://100.71.10.48:8081/tabs`
-- `curl http://100.71.10.48:9090/webhook/health`
-- `curl http://100.71.10.48:9090/windows/research-worker/latest`
+- `curl http://100.x.x.z:8081/health`
+- `curl http://100.x.x.z:8081/tabs`
+- `curl http://100.x.x.z:9090/webhook/health`
+- `curl http://100.x.x.z:9090/windows/research-worker/latest`
 
 Final production readiness:
 

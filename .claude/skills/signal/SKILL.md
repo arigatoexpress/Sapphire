@@ -20,9 +20,9 @@ Send a test signal through the full pipeline: webhook (Windows) → signal logge
 
 ```
 TradingView alert (simulated)
-  → POST http://100.71.10.48:9090/webhook/tradingview
+  → POST http://100.x.x.z:9090/webhook/tradingview
   → webhook validates + enriches
-  → POST http://100.67.171.79:18081/api/signals
+  → POST http://100.x.x.w:18081/api/signals
   → signal logger saves to data/trading_signals.jsonl
   → Nemotron AI assessment
   → Telegram notification via NemotronRariBot
@@ -44,7 +44,7 @@ TradingView alert (simulated)
 
 2. Send to webhook:
 ```bash
-curl -s -X POST http://100.71.10.48:9090/webhook/tradingview \
+curl -s -X POST http://100.x.x.z:9090/webhook/tradingview \
   -H "Content-Type: application/json" \
   -d '<payload>'
 ```

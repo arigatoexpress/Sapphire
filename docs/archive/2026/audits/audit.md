@@ -17,9 +17,9 @@
 | Dashboard on :8080 | ✅ LIVE | Requires AUTH_PASSWORD; real data (CoinGecko, JSONL), no fabricated endpoints |
 | Signal logger on :18081 | ✅ LIVE | Accepts webhook posts; `WEBHOOK_SECRET` optional auth |
 | OpenBB :6900, regional-intel :8787, hermes gateway | ✅ LIVE | LaunchAgents loaded, PIDs confirmed |
-| Windows GPU Ollama (100.71.10.48:11434) | ✅ LIVE | 28 models, 55% proxy success rate |
-| Pi rari1 (100.120.191.1:11434) | ✅ LIVE | 4 models (nemotron-mini, smollm2, qwen2.5:0.5b, gemma2:2b), proxy-recovered 2026-04-17 |
-| Pi rari2 (100.87.225.89:11434) | ✅ LIVE | 5 models — CLAUDE.md previously said OFFLINE, that's wrong |
+| Windows GPU Ollama (100.x.x.z:11434) | ✅ LIVE | 28 models, 55% proxy success rate |
+| Pi rari1 (100.x.x.x:11434) | ✅ LIVE | 4 models (nemotron-mini, smollm2, qwen2.5:0.5b, gemma2:2b), proxy-recovered 2026-04-17 |
+| Pi rari2 (100.x.x.y:11434) | ✅ LIVE | 5 models — CLAUDE.md previously said OFFLINE, that's wrong |
 | 58% prediction accuracy (BTC 75%) | ✅ VERIFIED | 24/24 scored, 14 correct. Per-symbol: BTC 6/8, ETH 5/8, SOL 3/8. Scoring methodology fixed to wait for timeframe elapse (predict.py:202-215) |
 | Sensitivity gate on inference-proxy | ✅ REAL | Regex at `app.py:236` blocks API keys / JWTs / SSNs from Kimi Cloud |
 | event_bus wired | ✅ REAL | Imported by dashboard, daily_brief, chain_refresh, signal_pipeline, content/publisher |

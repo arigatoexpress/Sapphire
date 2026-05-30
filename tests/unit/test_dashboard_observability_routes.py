@@ -150,7 +150,7 @@ def _stub_snapshot_payload() -> dict:
             "tiers": [
                 {
                     "tier": "T1_GPU",
-                    "endpoint": "100.71.10.48:11434",
+                    "endpoint": "100.x.x.z:11434",
                     "healthy": True,
                     "latency_ms": 410,
                     "last_check": "2026-04-28T12:00:00+00:00",
@@ -500,7 +500,7 @@ def test_build_observability_system_summary_redacts_pii(monkeypatch):
                     "name": "Jane Doe",
                     "phone": "+1 555 123 9876",
                     "email": "jane@example.com",
-                    "endpoint": "100.71.10.48:11434",
+                    "endpoint": "100.x.x.z:11434",
                     "label": "com.sapphire.demo",
                 }
 
@@ -515,7 +515,7 @@ def test_build_observability_system_summary_redacts_pii(monkeypatch):
     assert "9876" in payload["phone"]
     assert payload["email"].startswith("ja***")
     # Non-PII fields stay intact.
-    assert payload["endpoint"] == "100.71.10.48:11434"
+    assert payload["endpoint"] == "100.x.x.z:11434"
     assert payload["label"] == "com.sapphire.demo"
 
 
@@ -541,7 +541,7 @@ def test_observability_system_summary_buyer_profile_redacts_operational_identifi
     assert payload["heartbeat"]["totals"]["running"] == 1
     assert payload["inference_proxy"]["tiers"][0]["endpoint"] == "[buyer-safe redacted]"
     assert payload["signal_streams"][0]["rate_24h"] == 21
-    assert "100.71.10.48:11434" not in serialized
+    assert "100.x.x.z:11434" not in serialized
     assert "com.sapphire.demo" not in serialized
     assert "~/.cache/sapphire" not in serialized
     assert "data/signals" not in serialized

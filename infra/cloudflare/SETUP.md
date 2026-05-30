@@ -41,8 +41,8 @@ cloudflared service install --config C:\sapphire\tunnel-config.yml
 | Public URL | Internal target | Host |
 |-----------|----------------|------|
 | webhook.sapphirealpha.xyz | localhost:9090 | Windows PC |
-| dashboard.sapphirealpha.xyz | 100.120.191.1:8080 | rari1 (via Tailscale) |
-| pm.sapphirealpha.xyz | 100.120.191.1:8082 | rari1 (via Tailscale) |
+| dashboard.sapphirealpha.xyz | 100.x.x.x:8080 | rari1 (via Tailscale) |
+| pm.sapphirealpha.xyz | 100.x.x.x:8082 | rari1 (via Tailscale) |
 
 ## TradingView Pine Script update
 

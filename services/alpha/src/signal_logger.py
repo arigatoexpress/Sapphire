@@ -5,10 +5,10 @@ Receives signals from the webhook (Windows PC :9090), logs them to JSONL,
 analyzes with Nemotron, and notifies via Telegram.
 
 Usage:
-    WEBHOOK_SECRET=<secret> uvicorn signal_logger:app --host 100.67.171.79 --port 18081
+    WEBHOOK_SECRET=<secret> uvicorn signal_logger:app --host 100.x.x.w --port 18081
 
 Security:
-    - Bind to Tailscale interface (100.67.171.79), NOT 0.0.0.0
+    - Bind to Tailscale interface (100.x.x.w), NOT 0.0.0.0
     - WEBHOOK_SECRET must be set — all requests are rejected without it
     - All endpoints only accept connections from localhost or Tailscale CGNAT (100.x.x.x)
 """
@@ -47,7 +47,7 @@ except Exception:
 
 # ─── Security: Tailscale IP allowlist ────────────────────────────────────────
 # Only localhost and Tailscale CGNAT (100.64.0.0/10) are permitted.
-# The Windows webhook (100.71.10.48) and Pi nodes sit inside this range.
+# The Windows webhook (100.x.x.z) and Pi nodes sit inside this range.
 _TAILSCALE_NET = ipaddress.ip_network("100.64.0.0/10")
 _LOCALHOST = ipaddress.ip_address("127.0.0.1")
 
@@ -246,5 +246,5 @@ if __name__ == "__main__":
 
     port = int(os.environ.get("PORT", "18081"))
     # Bind to Tailscale IP only — never 0.0.0.0
-    host = os.environ.get("HOST", "100.67.171.79")
+    host = os.environ.get("HOST", "100.x.x.w")
     uvicorn.run(app, host=host, port=port)

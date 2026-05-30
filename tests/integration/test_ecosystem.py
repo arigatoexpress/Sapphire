@@ -189,7 +189,7 @@ def main():
     print("\n5. Inference")
     status, _ = http_get("http://127.0.0.1:11434/api/tags", timeout=3)
     check("Mac Ollama", status == 200, f"HTTP {status}")
-    status, _ = http_get("http://100.71.10.48:11434/api/tags", timeout=3)
+    status, _ = http_get("http://100.x.x.z:11434/api/tags", timeout=3)
     check("Windows GPU Ollama", status == 200, f"HTTP {status}")
 
     # 6. GitHub Integration

@@ -55,9 +55,9 @@ class AutoHealSystem:
             },
             # Windows services (just monitoring, can't auto-heal without SSH)
             "windows_webhook": {
-                "host": "100.71.10.48",
+                "host": "100.x.x.z",
                 "port": 9090,
-                "check_url": "http://100.71.10.48:9090/status",
+                "check_url": "http://100.x.x.z:9090/status",
                 "type": "windows",
                 "auto_heal": False,
             },

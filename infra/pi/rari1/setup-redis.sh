@@ -1,6 +1,6 @@
 #!/bin/bash
 # Install and configure Redis on rari1 (on SSD, not SD card)
-# Run from Mac: ssh rari@100.120.191.1 'bash -s' < infra/pi/rari1/setup-redis.sh
+# Run from Mac: ssh rari@100.x.x.x 'bash -s' < infra/pi/rari1/setup-redis.sh
 set -euo pipefail
 
 REDIS_DATA_DIR="/mnt/ssd/redis"
@@ -48,4 +48,4 @@ redis-cli ping
 echo ""
 echo "✅ Redis ready on rari1:${REDIS_PORT}"
 echo "   Add to all service .env files:"
-echo "   REDIS_URL=redis://100.120.191.1:${REDIS_PORT}"
+echo "   REDIS_URL=redis://100.x.x.x:${REDIS_PORT}"

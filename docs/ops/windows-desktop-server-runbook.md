@@ -3,7 +3,7 @@
 Last reviewed: 2026-04-29
 
 This runbook covers `DESKTOP-HFCK6U9`, the Windows machine on Tailscale
-`100.71.10.48`. Treat it as Sapphire's private desktop accelerator: GPU
+`100.x.x.z`. Treat it as Sapphire's private desktop accelerator: GPU
 inference first, historical backtesting and strategy experiments second, and
 persistent service host third.
 
@@ -15,11 +15,11 @@ unless a later operator-reviewed PR explicitly enables a narrow path.
 
 | Role | Surface | Default posture |
 |---|---|---|
-| GPU inference | Ollama on `100.71.10.48:11434` through the Mac inference proxy on `127.0.0.1:11435` | Read-only prompts and local model calls |
+| GPU inference | Ollama on `100.x.x.z:11434` through the Mac inference proxy on `127.0.0.1:11435` | Read-only prompts and local model calls |
 | Strategy research | `lib.analytics.run_strategies` and `lib.analytics.backtest_harness` | Dry-run artifacts, noncanonical output directory for smoke work |
-| TradingView intake | Windows webhook on `100.71.10.48:9090` | Payload validation and paper paths only |
-| Telemetry | Windows telemetry dashboard on `100.71.10.48:3001` when loaded | Read-only status |
-| Remote shell | SSH as `aribs@100.71.10.48` | Read-only status by default |
+| TradingView intake | Windows webhook on `100.x.x.z:9090` | Payload validation and paper paths only |
+| Telemetry | Windows telemetry dashboard on `100.x.x.z:3001` when loaded | Read-only status |
+| Remote shell | SSH as `aribs@100.x.x.z` | Read-only status by default |
 
 ## Health Checks
 
@@ -32,15 +32,15 @@ python3 scripts/ops/production_readiness_sweep.py --no-external --format markdow
 Direct probes:
 
 ```bash
-/usr/bin/curl -sS --max-time 5 http://100.71.10.48:11434/api/tags | python3 -m json.tool
+/usr/bin/curl -sS --max-time 5 http://100.x.x.z:11434/api/tags | python3 -m json.tool
 /usr/bin/curl -sS --max-time 5 http://127.0.0.1:11435/health | python3 -m json.tool
-ssh -o BatchMode=yes -o ConnectTimeout=5 aribs@100.71.10.48 hostname
+ssh -o BatchMode=yes -o ConnectTimeout=5 aribs@100.x.x.z hostname
 ```
 
 Read Scheduled Tasks without changing them:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=5 aribs@100.71.10.48 \
+ssh -o BatchMode=yes -o ConnectTimeout=5 aribs@100.x.x.z \
   'powershell -NoProfile -Command "Get-ScheduledTask -TaskName OllamaServe,SapphireWebhook,SapphireDashboard -ErrorAction SilentlyContinue | Select-Object TaskName,State | ConvertTo-Json"'
 ```
 
@@ -80,7 +80,7 @@ When running remotely on Windows, keep output under a scratch directory until a
 separate PR decides whether any artifact belongs in the canonical repo:
 
 ```bash
-ssh aribs@100.71.10.48 \
+ssh aribs@100.x.x.z \
   'powershell -NoProfile -Command "cd E:\Sapphire\Code\Sapphire; python -m lib.analytics.run_strategies --days 90 --bankroll 10000 --output-dir E:\Sapphire\scratch\backtests\manual"'
 ```
 
@@ -116,7 +116,7 @@ commands, logs, and artifact paths. Keep `WalkforwardBarsSource` as
 The Windows webhook exposes the latest run at:
 
 ```text
-http://100.71.10.48:9090/windows/research-worker/latest
+http://100.x.x.z:9090/windows/research-worker/latest
 ```
 
 That payload includes manifest freshness (`age_seconds`, `max_age_seconds`,

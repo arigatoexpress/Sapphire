@@ -3,10 +3,10 @@
 // Last updated: 2026-05-03
 //
 // Nodes:
-//   macbook-pro-8    100.67.171.79  — Mac commander (all services)
-//   desktop-hfck6u9  100.71.10.48   — Windows GPU node
-//   rari1            100.120.191.1  — Raspberry Pi 1
-//   rari2            100.87.225.89  — Raspberry Pi 2
+//   macbook-pro-8    100.x.x.w  — Mac commander (all services)
+//   desktop-hfck6u9  100.x.x.z   — Windows GPU node
+//   rari1            100.x.x.x  — Raspberry Pi 1
+//   rari2            100.x.x.y  — Raspberry Pi 2
 //
 // Trust model:
 //   - Mac can reach all nodes on all Sapphire service ports
@@ -45,10 +45,10 @@
   // Hosts: named aliases for each node IP
   // -------------------------------------------------------------------------
   "hosts": {
-    "macbook-pro-8":   "100.67.171.79",
-    "desktop-hfck6u9": "100.71.10.48",
-    "rari1":           "100.120.191.1",
-    "rari2":           "100.87.225.89",
+    "macbook-pro-8":   "100.x.x.w",
+    "desktop-hfck6u9": "100.x.x.z",
+    "rari1":           "100.x.x.x",
+    "rari2":           "100.x.x.y",
 
     // Convenience group CIDRs (individual hosts referenced by IP above)
     "sapphire-mesh-cidr": "100.64.0.0/10"
@@ -196,10 +196,10 @@
   "autoApprovers": {
     // Mac commander may advertise subnet routes (e.g. local LAN segments)
     "routes": {
-      "100.67.171.79/32":  ["aristotlespec@"],
-      "100.71.10.48/32":   ["aristotlespec@"],
-      "100.120.191.1/32":  ["aristotlespec@"],
-      "100.87.225.89/32":  ["aristotlespec@"]
+      "100.x.x.w/32":  ["aristotlespec@"],
+      "100.x.x.z/32":   ["aristotlespec@"],
+      "100.x.x.x/32":  ["aristotlespec@"],
+      "100.x.x.y/32":  ["aristotlespec@"]
     },
 
     // Allow the Mac to act as an exit node if configured

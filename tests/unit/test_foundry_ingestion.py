@@ -258,7 +258,7 @@ class TestTransformServiceHealth:
             json.dumps(
                 {
                     "devices": [
-                        {"name": "mac", "ip": "100.67.171.79", "services": ["dashboard", "proxy"]},
+                        {"name": "mac", "ip": "100.x.x.w", "services": ["dashboard", "proxy"]},
                     ]
                 }
             )
@@ -280,7 +280,7 @@ class TestTransformServiceHealth:
             json.dumps(
                 {
                     "service_name": "ollama_windows",
-                    "ip": "100.71.10.48",
+                    "ip": "100.x.x.z",
                     "status": "healthy",
                     "response_ms": 412,
                     "timestamp": "2026-04-19T10:00:00Z",

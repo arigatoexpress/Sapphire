@@ -27,16 +27,16 @@ from a Samsung Galaxy S20 in Virginia at ~3 PM ET.
 
 ## Check 1: Pi SSH Auth Logs
 
-**rari1 (100.120.191.1) — CLEAN**
+**rari1 (100.x.x.x) — CLEAN**
 ```
 Apr 14 22:27:47  sshd started
-Apr 14 22:51:08  Accepted publickey for rari from 100.67.171.79 (Mac) — ED25519
+Apr 14 22:51:08  Accepted publickey for rari from 100.x.x.w (Mac) — ED25519
 ```
-Only one login: from the Mac (100.67.171.79), public key auth. No password attempts, no unknown IPs.
+Only one login: from the Mac (100.x.x.w), public key auth. No password attempts, no unknown IPs.
 
-**rari2 (100.87.225.89) — CLEAN**
+**rari2 (100.x.x.y) — CLEAN**
 ```
-Apr 15 17:17:31  Accepted publickey for rari from 100.67.171.79 (Mac) — ED25519
+Apr 15 17:17:31  Accepted publickey for rari from 100.x.x.w (Mac) — ED25519
 ```
 Only one login: from the Mac, public key auth. No suspicious activity.
 
@@ -60,10 +60,10 @@ Only one login: from the Mac, public key auth. No suspicious activity.
 ## Check 3: Tailscale Network — CLEAN
 
 ```
-100.67.171.79  macbook-pro-8    aristotlespec@  macOS    ← This Mac
-100.71.10.48   desktop-hfck6u9  aristotlespec@  windows  active, direct
-100.120.191.1  rari1            aristotlespec@  linux    idle
-100.87.225.89  rari2            aristotlespec@  linux    active
+100.x.x.w  macbook-pro-8    aristotlespec@  macOS    ← This Mac
+100.x.x.z   desktop-hfck6u9  aristotlespec@  windows  active, direct
+100.x.x.x  rari1            aristotlespec@  linux    idle
+100.x.x.y  rari2            aristotlespec@  linux    active
 ```
 
 All 4 devices are expected and under `aristotlespec@` account. **No unknown devices.**

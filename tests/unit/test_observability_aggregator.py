@@ -183,7 +183,7 @@ def test_inference_proxy_reads_token_consumption_when_present(tmp_path):
             [
                 {
                     "tier": "T1_GPU",
-                    "endpoint": "100.71.10.48:11434",
+                    "endpoint": "100.x.x.z:11434",
                     "healthy": True,
                     "latency_ms": 410,
                 }
@@ -447,7 +447,7 @@ def test_build_system_snapshot_full_envelope_serializable(tmp_path):
 def test_display_path_abbreviates_home_directory(tmp_path, monkeypatch):
     monkeypatch.setattr(aggregator.Path, "home", classmethod(lambda cls: Path("/Users/aribs")))
     abbreviated = aggregator._display_path(Path("/Users/aribs/.cache/sapphire/inference_proxy"))
-    assert abbreviated.replace('\\', '/') == "~/.cache/sapphire/inference_proxy"
+    assert abbreviated.replace("\\", "/") == "~/.cache/sapphire/inference_proxy"
 
 
 def test_aggregate_status_warn_overrides(tmp_path):

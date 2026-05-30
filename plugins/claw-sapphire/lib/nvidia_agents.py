@@ -23,7 +23,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 OLLAMA_ENDPOINTS = [
-    ("gpu", "http://100.71.10.48:11434"),
+    ("gpu", "http://100.x.x.z:11434"),
     ("local", "http://localhost:11434"),
 ]
 

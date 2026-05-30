@@ -8,7 +8,7 @@ open-source model layer inside Sapphire. Read
 
 ## 1. Why this engagement exists
 
-Sapphire runs **28 open-source LLMs** on a private GPU node (`100.71.10.48`,
+Sapphire runs **28 open-source LLMs** on a private GPU node (`100.x.x.z`,
 RTX 5070 Ti 16 GB), routed through a **4-tier sensitivity-gated proxy**, with
 a **first-party model-integrity scanner** that fingerprints Ollama blobs and
 searches Jinja2 templates for known backdoor patterns. All of that is

@@ -24,7 +24,7 @@
       "name": "NemoClaw (NVIDIA)",
       "type": "inference",
       "protocol": "openclaw",
-      "endpoint": "http://100.71.10.48:18789",
+      "endpoint": "http://100.x.x.z:18789",
       "device": "windows-pc",
       "status": "planned",
       "tags": [
@@ -185,10 +185,10 @@
         "type:network"
       ],
       "nodes": {
-        "mac": "100.67.171.79",
-        "windows-pc": "100.71.10.48",
-        "rari1": "100.120.191.1",
-        "rari2": "100.87.225.89"
+        "mac": "100.x.x.w",
+        "windows-pc": "100.x.x.z",
+        "rari1": "100.x.x.x",
+        "rari2": "100.x.x.y"
       },
       "description": "WireGuard mesh VPN connecting all 4 devices"
     },

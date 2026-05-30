@@ -16,8 +16,8 @@
 # =============================================================================
 set -euo pipefail
 
-RARI1="${RARI1:-rari@100.120.191.1}"
-RARI2="${RARI2:-rari@100.87.225.89}"
+RARI1="${RARI1:-rari@100.x.x.x}"
+RARI2="${RARI2:-rari@100.x.x.y}"
 SSD_ROOT="/mnt/ssd/kimi-claw"
 KIMI_HOME="/home/rari/kimi-claw"
 SERVICE_NAME="openclaw-agent"
@@ -195,7 +195,7 @@ echo
 echo "  NEXT STEPS:"
 echo "  1. SSH rari1: nano /mnt/ssd/kimi-claw/config/.env"
 echo "  2. Fill in: ANTHROPIC_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_OWNER_USER_ID"
-echo "  3. Copy GCP service account: scp key.json rari@100.120.191.1:/mnt/ssd/kimi-claw/config/service-account.json"
+echo "  3. Copy GCP service account: scp key.json rari@100.x.x.x:/mnt/ssd/kimi-claw/config/service-account.json"
 echo "  4. Start agent: ssh $RARI1 'sudo systemctl start openclaw-agent'"
 echo "  5. Check logs: ssh $RARI1 'tail -f /mnt/ssd/kimi-claw/logs/openclaw.log'"
 echo "  6. IMPORTANT: Update Telegram allowed_users in kimi-claw config"

@@ -99,9 +99,9 @@ def test_system_api_normalizes_inference_tiers(app_client, monkeypatch):
                     "kimi-cloud": "healthy",
                 },
                 "tiers": {
-                    "t1_windows_gpu": "http://100.71.10.48:11434",
-                    "t2_pi_rari1": "http://100.120.191.1:11434 (enabled=True)",
-                    "t2_pi_rari2": "http://100.87.225.89:11434 (enabled=True)",
+                    "t1_windows_gpu": "http://100.x.x.z:11434",
+                    "t2_pi_rari1": "http://100.x.x.x:11434 (enabled=True)",
+                    "t2_pi_rari2": "http://100.x.x.y:11434 (enabled=True)",
                     "t3_mac_local": "http://127.0.0.1:11434",
                     "t4_kimi_cloud": "https://api.moonshot.cn/v1",
                 },
@@ -130,10 +130,10 @@ def test_system_api_normalizes_inference_tiers(app_client, monkeypatch):
     tiers = body["inference"]["tiers"]
     assert tiers["t1"]["healthy"] is True
     assert tiers["t1"]["endpoint_key"] == "windows-gpu"
-    assert tiers["t1"]["url"] == "http://100.71.10.48:11434"
+    assert tiers["t1"]["url"] == "http://100.x.x.z:11434"
     assert tiers["t2a"]["healthy"] is False
     assert body["inference"]["endpoints"]["windows-gpu"] == "healthy"
-    assert body["inference"]["raw_tiers"]["t1_windows_gpu"] == "http://100.71.10.48:11434"
+    assert body["inference"]["raw_tiers"]["t1_windows_gpu"] == "http://100.x.x.z:11434"
     pm_bot = next(service for service in body["services"] if service["name"] == "pm-bot")
     assert pm_bot["healthy"] is False
     assert pm_bot["local_process_ready"] is True

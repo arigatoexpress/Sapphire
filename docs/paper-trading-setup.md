@@ -46,9 +46,9 @@ curl -s http://localhost:18081/health | python3 -m json.tool
 
 ### Webhook URL
 ```
-http://100.71.10.48:9090/webhook/tradingview
+http://100.x.x.z:9090/webhook/tradingview
 ```
-(Windows receiver → Mac signal logger at 100.67.171.79:18081)
+(Windows receiver → Mac signal logger at 100.x.x.w:18081)
 
 ### Alert Message Format (copy-paste into TradingView alert body)
 
@@ -127,7 +127,7 @@ Score: 72/100
 
 ### Check Windows webhook is live
 ```bash
-ssh aribs@100.71.10.48 'netstat -an | findstr 9090'
+ssh aribs@100.x.x.z 'netstat -an | findstr 9090'
 # Should show: TCP 0.0.0.0:9090 ... LISTENING
 ```
 
@@ -182,7 +182,7 @@ When you're satisfied with paper trading results:
 
 | Problem | Check |
 |---------|-------|
-| No signals appearing | `curl http://100.71.10.48:9090/webhook/health` — is Windows receiver alive? |
+| No signals appearing | `curl http://100.x.x.z:9090/webhook/health` — is Windows receiver alive? |
 | Signal received but no Telegram | `tail -50 ~/Code/Sapphire/logs/signal-logger.log` |
 | Score always 0 | Signal missing `confidence` field — add it to TV alert JSON |
 | PAPER prefix not showing | `curl http://localhost:18081/health` — confirm `paper_trading: true` |

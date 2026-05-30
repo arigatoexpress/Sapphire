@@ -85,7 +85,7 @@ class NetworkScanResult:
 
 KNOWN_NODES: dict[str, dict[str, Any]] = {
     "mac-commander": {
-        "ip": "100.67.171.79",
+        "ip": "100.x.x.w",
         "role": "commander",
         "trust_zone": "core",
         "os": "macOS",
@@ -100,7 +100,7 @@ KNOWN_NODES: dict[str, dict[str, Any]] = {
         ],
     },
     "windows-gpu": {
-        "ip": "100.71.10.48",
+        "ip": "100.x.x.z",
         "role": "gpu",
         "trust_zone": "trusted",
         "os": "Windows",
@@ -111,7 +111,7 @@ KNOWN_NODES: dict[str, dict[str, Any]] = {
         ],
     },
     "pi-rari1": {
-        "ip": "100.120.191.1",
+        "ip": "100.x.x.x",
         "role": "edge",
         "trust_zone": "dmz",
         "os": "Linux",
@@ -120,7 +120,7 @@ KNOWN_NODES: dict[str, dict[str, Any]] = {
         ],
     },
     "pi-rari2": {
-        "ip": "100.87.225.89",
+        "ip": "100.x.x.y",
         "role": "edge",
         "trust_zone": "dmz",
         "os": "Linux",

@@ -8,7 +8,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 PROJECT_ID="${PROJECT_ID:-sapphire-479610}"
 REGION="${REGION:-us-central1}"
-PI_HOST="${PI_HOST:-rari@100.87.225.89}"
+PI_HOST="${PI_HOST:-rari@100.x.x.y}"
 EDGE_PRINCIPAL="${EDGE_PRINCIPAL:-serviceAccount:pi-trading-agent@sapphire-479610.iam.gserviceaccount.com}"
 AUTO_SIZE_NOTIONAL_USD="${AUTO_SIZE_NOTIONAL_USD:-25}"
 FALLBACK_QTY="${FALLBACK_QTY:-0.01}"

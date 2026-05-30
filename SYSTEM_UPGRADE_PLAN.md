@@ -43,8 +43,8 @@ sapphire_dispatch tool
 hermes-agent (Telegram bot)
     └── inference-proxy:11435
             ├── T1: Windows GPU Ollama:11434    ← primary (native /api/chat) ~0.4s
-            ├── T2: Pi rari1 (100.120.191.1)    ← fallback 1, nemotron-mini:latest, 90s timeout
-            │   Pi rari2 (100.87.225.89)        ← fallback 1b, nemotron-mini:latest, 90s timeout
+            ├── T2: Pi rari1 (100.x.x.x)    ← fallback 1, nemotron-mini:latest, 90s timeout
+            │   Pi rari2 (100.x.x.y)        ← fallback 1b, nemotron-mini:latest, 90s timeout
             ├── T3: Mac Local Ollama:11434       ← fallback 2 (/v1/ compat, CPU ~90s)
             └── T4: Kimi Cloud API               ← fallback 3 (Moonshot — needs API key renewal)
 
@@ -123,13 +123,13 @@ Both Pis are live inference nodes on the Tailscale mesh:
 
 | Node | IP | Status | Models | Agent |
 |------|-----|--------|--------|-------|
-| rari1 | 100.120.191.1 | ✅ ONLINE | nemotron-mini:latest, smollm2:1.7b, qwen2.5:0.5b, qwen3:0.6b | market-watchdog :19001 |
-| rari2 | 100.87.225.89 | ✅ ONLINE | nemotron-mini:latest, nemotron-mini:4b, gemma2:2b, qwen2.5:0.5b, smollm2:1.7b, qwen3:0.6b | health-monitor :19002 |
+| rari1 | 100.x.x.x | ✅ ONLINE | nemotron-mini:latest, smollm2:1.7b, qwen2.5:0.5b, qwen3:0.6b | market-watchdog :19001 |
+| rari2 | 100.x.x.y | ✅ ONLINE | nemotron-mini:latest, nemotron-mini:4b, gemma2:2b, qwen2.5:0.5b, smollm2:1.7b, qwen3:0.6b | health-monitor :19002 |
 
 ```python
 # inference-proxy — Pi T2 tier (both enabled)
-PI_RARI1 = "http://100.120.191.1:11434"
-PI_RARI2 = "http://100.87.225.89:11434"
+PI_RARI1 = "http://100.x.x.x:11434"
+PI_RARI2 = "http://100.x.x.y:11434"
 PI_DEFAULT_MODEL = "nemotron-mini:latest"
 PI_TIMEOUT = 90  # seconds (cold load ~72s on ARM)
 ```

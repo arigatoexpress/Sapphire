@@ -15,7 +15,7 @@ set -euo pipefail
 #   failover_canary_only
 
 PROFILE="${1:-luxalgo_sol_15m_safe}"
-TARGET_HOST="${2:-rari@100.87.225.89}"
+TARGET_HOST="${2:-rari@100.x.x.y}"
 ENV_FILE="/home/rari/Sapphire/services/bot-lighter/.env"
 SERVICE="lighter-trading"
 

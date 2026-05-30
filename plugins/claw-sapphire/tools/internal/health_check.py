@@ -337,7 +337,7 @@ def check_inference(profile: str = "full") -> dict:
         return results
 
     # Windows GPU Ollama
-    ok, msg = _check_url("http://100.71.10.48:11434/api/tags", timeout=3)
+    ok, msg = _check_url("http://100.x.x.z:11434/api/tags", timeout=3)
     results["windows_gpu_ollama"] = {"status": "green" if ok else "red", "detail": msg}
 
     return results

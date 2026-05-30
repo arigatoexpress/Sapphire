@@ -4,7 +4,7 @@ set -euo pipefail
 DOMAIN_URL="${DOMAIN_URL:-https://sapphirealpha.xyz}"
 API_USER="${API_USER:-sapphire}"
 API_PASS="${API_PASS:-alpha2024}"
-WINDOWS_WEBHOOK_URL="${WINDOWS_WEBHOOK_URL:-http://100.71.10.48:9090}"
+WINDOWS_WEBHOOK_URL="${WINDOWS_WEBHOOK_URL:-http://100.x.x.z:9090}"
 TEST_SYMBOL="${TEST_SYMBOL:-SOLUSDT}"
 TEST_ACTION="${TEST_ACTION:-buy}"
 POLL_SECONDS="${POLL_SECONDS:-30}"
@@ -48,7 +48,7 @@ else
   exit 1
 fi
 
-tv_health_code="$(curl -sS -o /tmp/sapphire_tv_health.json -w '%{http_code}' "http://100.71.10.48:8081/health" || true)"
+tv_health_code="$(curl -sS -o /tmp/sapphire_tv_health.json -w '%{http_code}' "http://100.x.x.z:8081/health" || true)"
 if [[ "$tv_health_code" == "200" ]]; then
   pass "windows tv-agent health 200"
 else

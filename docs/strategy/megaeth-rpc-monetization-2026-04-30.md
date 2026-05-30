@@ -146,7 +146,7 @@
 1. **Pick a MegaETH client and sync the node on Ari's Windows PC (Day 1-2).**
    The official docs are at [docs.megaeth.com](https://docs.megaeth.com/). Start with the [public RPC endpoint](https://chainlist.org/chain/4326) for read traffic, and follow the official MegaETH node-running guide for full sync. Verify chain ID 4326, confirm peer count > 5, confirm height matches a public endpoint within 2 blocks.
 2. **Add the local endpoint to Sapphire's RPC config (Day 2-3).**
-   Pattern: env var `MEGAETH_RPC_URL=http://100.71.10.48:<port>` with fallback to a public endpoint. Use the same tier-fallback pattern as inference-proxy. Wire into any plugin tool that touches MegaETH state.
+   Pattern: env var `MEGAETH_RPC_URL=http://100.x.x.z:<port>` with fallback to a public endpoint. Use the same tier-fallback pattern as inference-proxy. Wire into any plugin tool that touches MegaETH state.
 3. **Add health-check + supervisor entry (Day 3).**
    Slot under `services/megaeth-node/launchagent/` (Mac side proxy) or as a Windows scheduled task on the Windows PC. Re-use the `service-supervisor` pattern; surface in `dashboard:8080` services panel.
 4. **List on ChainList (Day 4, free).**
@@ -167,7 +167,7 @@ If Option D is greenlit, the metering layer follows existing Sapphire patterns �
 **Auth:** Reuse the JWT/API-key pattern already in `services/control-plane/app/control_plane.py` (admin-PIN-hash style for Sapphire-internal callers; per-customer API keys for paying users). Issue keys via a new `/admin/megaeth-rpc/keys` endpoint gated by the existing admin PIN.
 
 **Routing:** A thin reverse proxy in front of the local MegaETH node:
-- `https://rpc.sapphirealpha.xyz/megaeth/<key>` → forwards to `http://100.71.10.48:<rpc-port>` after key validation.
+- `https://rpc.sapphirealpha.xyz/megaeth/<key>` → forwards to `http://100.x.x.z:<rpc-port>` after key validation.
 - Cloud Run service in `sapphire-479610` (existing project) using the same Cloud Run + Firestore pattern as the THO admin work. Keep it stateless; auth state lives in Firestore.
 
 **Metering:** Per-key request counter in Redis (`redis:6379` already running on Mac). Increment per request. Daily flush to Firestore for billing aggregation. Tier check on each request: deny if over monthly limit, surface remaining quota in `X-RateLimit-Remaining` headers.

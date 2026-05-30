@@ -1,6 +1,6 @@
 # Windows PC (DESKTOP-HFCK6U9) — GPU Workbench Setup
 
-Tailscale IP: `100.71.10.48` | GPU: RTX 5070 Ti | Hostname: `workbench`
+Tailscale IP: `100.x.x.z` | GPU: RTX 5070 Ti | Hostname: `workbench`
 
 ## 1. Expose Ollama to Tailscale Network
 
@@ -38,7 +38,7 @@ This restricts access to Tailscale IPs only (100.64.0.0/10 CGNAT range).
 ## 4. Verify from Mac
 
 ```bash
-curl http://100.71.10.48:11434/api/tags
+curl http://100.x.x.z:11434/api/tags
 # Should return JSON with model list
 ```
 
@@ -64,7 +64,7 @@ mkdir C:\Users\aribs\.claw\profiles
 
 ```bash
 # Quick test
-curl -X POST http://100.71.10.48:11434/api/generate \
+curl -X POST http://100.x.x.z:11434/api/generate \
   -H "Content-Type: application/json" \
   -d '{"model": "llama3.2:3b", "prompt": "Hello from Sapphire OS", "stream": false}'
 

@@ -2,7 +2,7 @@
 # Sapphire OS — Automated backup to Windows E: drive via Tailscale
 # Syncs all code repos + Sapphire data to E:\Sapphire\
 
-WINDOWS_HOST="aribs@100.71.10.48"
+WINDOWS_HOST="aribs@100.x.x.z"
 REMOTE_BASE="/cygdrive/e/Sapphire"
 LOG="$HOME/autonomy-status/logs/backup.log"
 

@@ -6,7 +6,7 @@ Current agentic Telegram direction:
   - Local Ollama is fallback-only, with Gemma 4 as the fresh Mac default.
 
 Legacy/local tiers:
-Tier 1: Windows GPU (100.71.10.48:11434) - deprecated for new default routing
+Tier 1: Windows GPU (100.x.x.z:11434) - deprecated for new default routing
 Tier 2: Pi (rari1/rari2 via Tailscale) - disabled unless explicitly enabled
 Tier 3: Mac local (127.0.0.1:11434) - sensitive/local fallback
 Tier 4: Kimi Cloud (api.moonshot.ai/cn) - non-sensitive cloud fallback
@@ -101,9 +101,9 @@ except Exception as e:
     _X402_AVAILABLE = False
 
 # ─── Endpoints (overridable via env vars for network changes) ────────────────
-WINDOWS_GPU = os.getenv("WINDOWS_GPU_URL", "http://100.71.10.48:11434")
-PI_RARI1 = os.getenv("PI_RARI1_URL", "http://100.120.191.1:11434")
-PI_RARI2 = os.getenv("PI_RARI2_URL", "http://100.87.225.89:11434")
+WINDOWS_GPU = os.getenv("WINDOWS_GPU_URL", "http://100.x.x.z:11434")
+PI_RARI1 = os.getenv("PI_RARI1_URL", "http://100.x.x.x:11434")
+PI_RARI2 = os.getenv("PI_RARI2_URL", "http://100.x.x.y:11434")
 MAC_LOCAL = os.getenv("MAC_LOCAL_URL", "http://127.0.0.1:11434")
 
 # Kimi Cloud — permanent API keys only (no expiring CLI tokens)

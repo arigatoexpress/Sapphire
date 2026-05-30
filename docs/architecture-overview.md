@@ -239,10 +239,10 @@ Buyer-readable product surfaces shipped 2026-04-28:
 
 | Node | Addr | Role |
 |------|------|------|
-| Mac (commander) | 100.67.171.79 | inference-proxy, dashboard, control-plane, signal-logger, hermes, OpenBB, Redis, Ollama |
-| Windows PC | 100.71.10.48 | RTX 5070 Ti (Ollama + 26 models), webhook :9090, telemetry-dashboard :3001 |
-| Pi rari2 | 100.87.225.89 | ethernet, 3.8 GB RAM, online; Ollama 4 models (`PI_RARI2_ENABLED=0` post-2026-04-28 plist drift fix). |
-| Pi rari1 | 100.120.191.1 | online via Tailscale; Ollama 4 models; SSH refused (needs physical access to start sshd). |
+| Mac (commander) | 100.x.x.w | inference-proxy, dashboard, control-plane, signal-logger, hermes, OpenBB, Redis, Ollama |
+| Windows PC | 100.x.x.z | RTX 5070 Ti (Ollama + 26 models), webhook :9090, telemetry-dashboard :3001 |
+| Pi rari2 | 100.x.x.y | ethernet, 3.8 GB RAM, online; Ollama 4 models (`PI_RARI2_ENABLED=0` post-2026-04-28 plist drift fix). |
+| Pi rari1 | 100.x.x.x | online via Tailscale; Ollama 4 models; SSH refused (needs physical access to start sshd). |
 
 Tailscale mesh connects everything. Cloudflare Tunnel exposes `webhook.sapphirealpha.xyz` → Windows :9090.
 

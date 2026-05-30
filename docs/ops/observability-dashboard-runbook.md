@@ -83,7 +83,7 @@ lets the unit suite mock the entire surface without touching real
    `open http://localhost:8080/observability`
    Auth: `AUTH_USERNAME` / `AUTH_PASSWORD` from `~/.sapphire/secrets.env`.
 2. From a remote machine on the Tailnet:
-   `curl -u sapphire:<password> http://100.67.171.79:8080/api/observability-system-summary | jq .`
+   `curl -u sapphire:<password> http://100.x.x.w:8080/api/observability-system-summary | jq .`
 
 ### Read just the LaunchAgent table (no proxy / no streams):
 

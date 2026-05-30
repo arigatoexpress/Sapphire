@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Sapphire Health Monitor Agent — runs on rari2 (100.87.225.89).
+Sapphire Health Monitor Agent — runs on rari2 (100.x.x.y).
 
 Monitors all Sapphire services and hardware vitals:
   - Pings all Mac services (inference proxy, dashboard, signal logger, etc.)
@@ -43,10 +43,10 @@ log = logging.getLogger("health-monitor")
 
 # ─── Endpoints to Monitor ─────────────────────────────────────────────────────
 
-MAC_IP = "100.67.171.79"
-GPU_IP = "100.71.10.48"
-RARI1_IP = "100.120.191.1"
-RARI2_IP = "100.87.225.89"  # self
+MAC_IP = "100.x.x.w"
+GPU_IP = "100.x.x.z"
+RARI1_IP = "100.x.x.x"
+RARI2_IP = "100.x.x.y"  # self
 
 UPTIME_LOG = Path("/home/rari/sapphire/uptime.jsonl")
 HEALTH_PORT = 19002

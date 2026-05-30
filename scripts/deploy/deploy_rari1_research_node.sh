@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-HOST="${HOST:-rari@100.120.191.1}"
+HOST="${HOST:-rari@100.x.x.x}"
 REMOTE_ROOT="${REMOTE_ROOT:-/home/rari/research-node}"
 LOCAL_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SYSTEMD_DIR="$LOCAL_ROOT/services/research-node/systemd"

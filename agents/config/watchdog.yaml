@@ -1,5 +1,5 @@
 ﻿# Market Watchdog Agent Configuration
-# Runs on rari1 (100.120.191.1) â€” lightweight, stays within 3.8GB RAM
+# Runs on rari1 (100.x.x.x) â€” lightweight, stays within 3.8GB RAM
 # Restart: sudo systemctl restart market-watchdog
 
 agent:
@@ -30,7 +30,7 @@ openbb:
 
 # Telegram gateway (hermes on Mac)
 telegram:
-  proxy_url: "http://100.67.171.79:11435"   # Mac inference proxy
+  proxy_url: "http://100.x.x.w:11435"   # Mac inference proxy
   bot_token_env: "TELEGRAM_BOT_TOKEN"
   priority: "p1"
 

@@ -60,13 +60,13 @@ Store in Secret Manager as `hyperliquid-private-key`:
 
 ```bash
 # Copy to rari2
-rsync -av services/hyperliquid/ rari@100.87.225.89:/home/rari/Sapphire/services/bot-hyperliquid/
+rsync -av services/hyperliquid/ rari@100.x.x.y:/home/rari/Sapphire/services/bot-hyperliquid/
 
 # Install deps in isolated venv
-ssh rari@100.87.225.89 "cd ~/Sapphire/services/bot-hyperliquid && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
+ssh rari@100.x.x.y "cd ~/Sapphire/services/bot-hyperliquid && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
 
 # Install systemd service
-ssh rari@100.87.225.89 "sudo systemctl enable --now hyperliquid-trading.service"
+ssh rari@100.x.x.y "sudo systemctl enable --now hyperliquid-trading.service"
 ```
 
 ## Target Pairs

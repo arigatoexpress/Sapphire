@@ -163,12 +163,12 @@ def _call_backtest_state() -> tuple[dict[str, Any], list[str]]:
 
 
 def _runtime_targets() -> list[dict[str, Any]]:
-    windows_url = os.getenv("WINDOWS_GPU_URL", "http://100.71.10.48:11434")
+    windows_url = os.getenv("WINDOWS_GPU_URL", "http://100.x.x.z:11434")
     return [
         {
             "id": "windows-gpu",
             "host": "desktop-hfck6u9",
-            "tailscale_ip": "100.71.10.48",
+            "tailscale_ip": "100.x.x.z",
             "url": windows_url,
             "role": "deep local inference, strategy mutation, confluence synthesis",
             "allowed_modes": ["read_only", "dry_run"],

@@ -3,8 +3,8 @@
 Sapphire System Monitor
 
 Monitors all components of the trading infrastructure:
-- Windows PC: TV Agent (100.71.10.48:8081), Webhook (100.71.10.48:9090)
-- Pi Cluster: rari1 (100.120.191.1), rari2 (100.87.225.89)
+- Windows PC: TV Agent (100.x.x.z:8081), Webhook (100.x.x.z:9090)
+- Pi Cluster: rari1 (100.x.x.x), rari2 (100.x.x.y)
 - Cloud: Command Deck, Gateway, etc.
 """
 
@@ -28,36 +28,36 @@ class ServiceStatus:
 
 class SystemMonitor:
     """Monitor all Sapphire infrastructure components"""
-    
+
     SERVICES = {
         # Windows PC (AI Workbench)
         "tv_agent": {
             "name": "TV Agent",
-            "host": "100.71.10.48",
+            "host": "100.x.x.z",
             "port": 8081,
             "endpoint": "/health"
         },
         "webhook_receiver": {
             "name": "Webhook Receiver",
-            "host": "100.71.10.48",
+            "host": "100.x.x.z",
             "port": 9090,
             "endpoint": "/health"
         },
-        
+
         # Pi Cluster
         "rari1_research": {
             "name": "RARI1 Research Node",
-            "host": "100.120.191.1",
+            "host": "100.x.x.x",
             "port": 8000,
             "endpoint": "/output/latest_hourly.json"
         },
         "rari2_trading": {
             "name": "RARI2 Trading",
-            "host": "100.87.225.89",
+            "host": "100.x.x.y",
             "port": 18888,
             "endpoint": "/status"
         },
-        
+
         # Cloud
         "command_deck": {
             "name": "Command Deck",
@@ -81,20 +81,20 @@ class SystemMonitor:
             "https": True
         },
     }
-    
+
     def __init__(self):
         self.statuses: dict[str, ServiceStatus] = {}
         self.session: aiohttp.ClientSession | None = None
-    
+
     async def __aenter__(self):
         timeout = aiohttp.ClientTimeout(total=10)
         self.session = aiohttp.ClientSession(timeout=timeout)
         return self
-    
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self.session:
             await self.session.close()
-    
+
     async def check_service(self, key: str, config: dict) -> ServiceStatus:
         """Check a single service"""
         name = config["name"]
@@ -102,21 +102,21 @@ class SystemMonitor:
         port = config["port"]
         endpoint = config.get("endpoint", "/")
         https = config.get("https", False)
-        
+
         url = f"{'https' if https else 'http'}://{host}:{port}{endpoint or ''}"
-        
+
         start_time = datetime.now()
         try:
             if endpoint:
                 async with self.session.get(url) as resp:
                     latency = (datetime.now() - start_time).total_seconds() * 1000
-                    
+
                     if resp.status == 200:
                         try:
                             details = await resp.json()
                         except:
                             details = {"status": "ok"}
-                        
+
                         return ServiceStatus(
                             name=name,
                             url=url,
@@ -141,7 +141,7 @@ class SystemMonitor:
                 )
                 writer.close()
                 await writer.wait_closed()
-                
+
                 latency = (datetime.now() - start_time).total_seconds() * 1000
                 return ServiceStatus(
                     name=name,
@@ -150,7 +150,7 @@ class SystemMonitor:
                     latency_ms=round(latency, 2),
                     last_check=datetime.now().isoformat()
                 )
-                
+
         except TimeoutError:
             return ServiceStatus(
                 name=name,
@@ -168,16 +168,16 @@ class SystemMonitor:
                 last_check=datetime.now().isoformat(),
                 details={"error": str(e)}
             )
-    
+
     async def check_all(self) -> dict[str, ServiceStatus]:
         """Check all services"""
         tasks = [
             self.check_service(key, config)
             for key, config in self.SERVICES.items()
         ]
-        
+
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        
+
         for key, result in zip(self.SERVICES.keys(), results):
             if isinstance(result, Exception):
                 config = self.SERVICES[key]
@@ -191,31 +191,31 @@ class SystemMonitor:
                 )
             else:
                 self.statuses[key] = result
-        
+
         return self.statuses
-    
+
     def print_status(self):
         """Print status to console"""
         print("\n" + "="*70)
         print(f"  SAPPHIRE SYSTEM MONITOR - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print("="*70)
-        
+
         online = sum(1 for s in self.statuses.values() if s.status == "online")
         total = len(self.statuses)
-        
+
         print(f"\n  Overall: {online}/{total} services online")
         print()
-        
+
         # Windows PC
-        print("  🖥️  WINDOWS PC (100.71.10.48)")
+        print("  🖥️  WINDOWS PC (100.x.x.z)")
         for key in ["tv_agent", "webhook_receiver"]:
             if key in self.statuses:
                 s = self.statuses[key]
                 icon = "🟢" if s.status == "online" else "🔴"
                 print(f"     {icon} {s.name:<25} {s.status:<10} ({s.latency_ms}ms)")
-        
+
         print()
-        
+
         # Pi Cluster
         print("  🥧 PI CLUSTER")
         for key in ["rari1_research", "rari2_trading"]:
@@ -223,9 +223,9 @@ class SystemMonitor:
                 s = self.statuses[key]
                 icon = "🟢" if s.status == "online" else "🔴"
                 print(f"     {icon} {s.name:<25} {s.status:<10} ({s.latency_ms}ms)")
-        
+
         print()
-        
+
         # Cloud
         print("  ☁️  CLOUD SERVICES")
         for key in ["command_deck", "gateway", "log_viewer"]:
@@ -233,10 +233,10 @@ class SystemMonitor:
                 s = self.statuses[key]
                 icon = "🟢" if s.status == "online" else "🔴"
                 print(f"     {icon} {s.name:<25} {s.status:<10} ({s.latency_ms}ms)")
-        
+
         print()
         print("="*70)
-    
+
     def export_json(self) -> str:
         """Export status as JSON"""
         data = {
@@ -261,7 +261,7 @@ async def main():
     async with SystemMonitor() as monitor:
         await monitor.check_all()
         monitor.print_status()
-        
+
         # Optionally save to file
         # with open('status.json', 'w') as f:
         #     f.write(monitor.export_json())

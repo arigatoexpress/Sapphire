@@ -31,7 +31,7 @@ Public access: `dashboard.sapphirealpha.xyz` via Cloudflare Tunnel → rari1:808
 
 ```bash
 # Restart with auth enabled:
-ssh rari@100.120.191.1
+ssh rari@100.x.x.x
 sudo systemctl restart sapphire-dashboard
 ```
 

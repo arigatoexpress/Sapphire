@@ -176,7 +176,7 @@ flowchart LR
 
 | Tier | Host | p50 | Notes |
 |---|---|---:|---|
-| T1 GPU | `100.71.10.48:11434` | 0.4 s | RTX 5070 Ti · 28 models |
+| T1 GPU | `100.x.x.z:11434` | 0.4 s | RTX 5070 Ti · 28 models |
 | T2 Pi (×2) | rari1 / rari2 | 2–5 s | Pi-safe models only |
 | T3 Mac CPU | `127.0.0.1:11434` | ~90 s | Failsafe |
 | T4 Kimi Cloud | `api.moonshot.cn` | 2–6 s | Sensitivity-gated; per-call/hour/month caps |

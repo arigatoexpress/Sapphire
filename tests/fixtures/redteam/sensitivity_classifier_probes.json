@@ -114,7 +114,7 @@
   {
     "id": "021_tailscale_ip",
     "description": "Baseline — Tailscale CGNAT address",
-    "input": "the control plane is at 100.67.171.79:8082",
+    "input": "the control plane is at 100.x.x.w:8082",
     "expected": "sensitive",
     "xfail": false,
     "category": "baseline"

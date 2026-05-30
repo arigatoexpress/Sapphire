@@ -332,7 +332,7 @@ class TestNetworkMapperBuild:
         nodes = mapper._build_node_list()
         peers = [
             {
-                "ip": "100.67.171.79",
+                "ip": "100.x.x.w",
                 "hostname": "mac-commander",
                 "os": "macOS",
                 "online": True,
@@ -421,13 +421,13 @@ class TestNetworkMapperTailscaleSubprocess:
         mapper = nm.NetworkMapper(probe_ports=False)
         sample = {
             "Self": {
-                "TailscaleIPs": ["100.67.171.79"],
+                "TailscaleIPs": ["100.x.x.w"],
                 "HostName": "mac",
                 "OS": "macOS",
             },
             "Peer": {
                 "abc": {
-                    "TailscaleIPs": ["100.71.10.48"],
+                    "TailscaleIPs": ["100.x.x.z"],
                     "HostName": "windows",
                     "OS": "Windows",
                     "Online": True,

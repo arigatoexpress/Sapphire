@@ -614,7 +614,7 @@ def test_admin_analysis_aggregates_sensitive_operator_evidence(client, app_modul
                 {
                     "service": "windows-secret-ollama",
                     "status": "down",
-                    "host": "100.71.10.48",
+                    "host": "100.x.x.z",
                     "last_seen": datetime(2026, 5, 7, 12, 0, tzinfo=UTC),
                     "response_ms": 999,
                 },
@@ -715,7 +715,7 @@ def test_admin_analysis_aggregates_sensitive_operator_evidence(client, app_modul
     assert body["model_narrative"]["plain_english"] == "Admin model read."
     encoded = json.dumps(body)
     assert "windows-secret-ollama" in encoded
-    assert "100.71.10.48" in encoded
+    assert "100.x.x.z" in encoded
     assert "private-tho-sha" in encoded
     assert body["priority_actions"]
 
@@ -873,7 +873,7 @@ def test_admin_narrative_snapshot_hides_raw_operator_detail(app_module):
                     "services": [
                         {
                             "service": "windows-secret-ollama",
-                            "host": "100.71.10.48",
+                            "host": "100.x.x.z",
                             "sha": "private-tho-sha",
                         }
                     ],
@@ -886,7 +886,7 @@ def test_admin_narrative_snapshot_hides_raw_operator_detail(app_module):
                 "severity": "medium",
                 "title": "Triage degraded service-health rows",
                 "plain_english": "Some raw service checks are not reporting ready.",
-                "evidence": "windows-secret-ollama 100.71.10.48 private-tho-sha",
+                "evidence": "windows-secret-ollama 100.x.x.z private-tho-sha",
             }
         ],
         "sections": [
@@ -896,7 +896,7 @@ def test_admin_narrative_snapshot_hides_raw_operator_detail(app_module):
                 "quality": {"status": "review", "basis": "1 degraded lane"},
                 "plain_english": "Failover needs review.",
                 "technical": ["tho_sha=private-tho-sha"],
-                "rows": [{"service": "windows-secret-ollama", "host": "100.71.10.48"}],
+                "rows": [{"service": "windows-secret-ollama", "host": "100.x.x.z"}],
                 "links": [{"label": "raw", "href": "/api/failover/readiness"}],
                 "metrics": [{"label": "degraded lanes", "value": 1}],
             }
@@ -908,7 +908,7 @@ def test_admin_narrative_snapshot_hides_raw_operator_detail(app_module):
 
     encoded = json.dumps(snapshot)
     assert "windows-secret-ollama" not in encoded
-    assert "100.71.10.48" not in encoded
+    assert "100.x.x.z" not in encoded
     assert "private-tho-sha" not in encoded
     assert "/api/failover/readiness" not in encoded
     assert snapshot["metrics"]["signals"] == 10
@@ -949,7 +949,7 @@ def test_public_failover_readiness_hides_device_detail(app_module, monkeypatch):
             {
                 "service": "windows-secret-ollama",
                 "status": "down",
-                "host": "100.71.10.48",
+                "host": "100.x.x.z",
                 "last_seen": datetime(2026, 5, 7, 12, 0, tzinfo=UTC),
                 "response_ms": 999,
             },
@@ -979,7 +979,7 @@ def test_public_failover_readiness_hides_device_detail(app_module, monkeypatch):
     assert all("services" not in lane for lane in body["lanes"])
     serialized = json.dumps(body)
     assert "windows-secret-ollama" not in serialized
-    assert "100.71.10.48" not in serialized
+    assert "100.x.x.z" not in serialized
     assert "private-tho-sha" not in serialized
     assert "GPU" not in serialized
     assert "Mac" not in serialized
@@ -994,7 +994,7 @@ def test_admin_failover_readiness_includes_operator_detail(client, app_module, m
             {
                 "service": "windows-secret-ollama",
                 "status": "down",
-                "host": "100.71.10.48",
+                "host": "100.x.x.z",
                 "last_seen": datetime(2026, 5, 7, 12, 0, tzinfo=UTC),
                 "response_ms": 999,
             }
@@ -1014,7 +1014,7 @@ def test_admin_failover_readiness_includes_operator_detail(client, app_module, m
     assert body["routing_policy"]
     serialized = json.dumps(body)
     assert "windows-secret-ollama" in serialized
-    assert "100.71.10.48" in serialized
+    assert "100.x.x.z" in serialized
     assert "private-tho-sha" in serialized
 
 

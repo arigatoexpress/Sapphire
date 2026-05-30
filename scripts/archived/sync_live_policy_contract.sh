@@ -15,7 +15,7 @@ set -euo pipefail
 #   sol_5m_chartprime
 
 PROFILE="${1:-sol_5m_ev_guarded}"
-HOST="${2:-rari@100.87.225.89}"
+HOST="${2:-rari@100.x.x.y}"
 PROJECT_ID="${PROJECT_ID:-sapphire-479610}"
 REGION="${REGION:-us-central1}"
 GATEWAY_SERVICE="${GATEWAY_SERVICE:-sapphire-gateway}"

@@ -428,7 +428,7 @@ def test_schema_audit_accepts_topology_service_health_last_check_fallback(tmp_pa
                 "devices": [
                     {
                         "name": "mac",
-                        "ip": "100.67.171.79",
+                        "ip": "100.x.x.w",
                         "services": ["dashboard", "proxy"],
                     }
                 ]

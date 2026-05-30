@@ -129,8 +129,8 @@ CDP-status endpoint. By default `WINDOWS_TV_AGENT_CDP_REQUIRED=0`,
 which means the agent reports `status="agent_only"` (process is up,
 TV CDP is not reachable) rather than `status="degraded"`. This
 matches the canonical Sapphire topology: TradingView Desktop runs on
-the **Mac commander** (100.67.171.79), not on the Windows host
-(100.71.10.48) which serves Ollama / webhook / research.
+the **Mac commander** (100.x.x.w), not on the Windows host
+(100.x.x.z) which serves Ollama / webhook / research.
 
 Sites that DO run TV on Windows can set
 `WINDOWS_TV_AGENT_CDP_REQUIRED=1` and the agent will require a

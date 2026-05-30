@@ -83,10 +83,10 @@ Static read only. No live `tailscale status` and no TCP probes.
 
 | Hostname (ACL alias) | Tailscale IP    | Trust zone | Role      | Declared inbound (from `KNOWN_NODES`)                                                  |
 | -------------------- | --------------- | ---------- | --------- | --------------------------------------------------------------------------------------- |
-| `mac-commander`      | `100.67.171.79` | `core`     | commander | `8082` (auth), `8080` (auth), `18081`, `11435`, `6900`, `6379`, `11434`                 |
-| `windows-gpu`        | `100.71.10.48`  | `trusted`  | gpu       | `11434`, `9090`, `3001`                                                                 |
-| `pi-rari1`           | `100.120.191.1` | `dmz`      | edge      | `11434`                                                                                 |
-| `pi-rari2`           | `100.87.225.89` | `dmz`      | edge      | `11434`                                                                                 |
+| `mac-commander`      | `100.x.x.w` | `core`     | commander | `8082` (auth), `8080` (auth), `18081`, `11435`, `6900`, `6379`, `11434`                 |
+| `windows-gpu`        | `100.x.x.z`  | `trusted`  | gpu       | `11434`, `9090`, `3001`                                                                 |
+| `pi-rari1`           | `100.x.x.x` | `dmz`      | edge      | `11434`                                                                                 |
+| `pi-rari2`           | `100.x.x.y` | `dmz`      | edge      | `11434`                                                                                 |
 
 ### Trust zones
 

@@ -26,9 +26,9 @@ TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID', '6826484357')
 GCP_PROJECT = os.getenv('GCP_PROJECT', 'sapphire-479610')
 
 # Service endpoints
-RARI1_IP = os.getenv("RARI1_IP", "100.120.191.1")
-RARI2_IP = os.getenv("RARI2_IP", "100.87.225.89")
-WINDOWS_IP = os.getenv("WINDOWS_IP", "100.71.10.48")
+RARI1_IP = os.getenv("RARI1_IP", "100.x.x.x")
+RARI2_IP = os.getenv("RARI2_IP", "100.x.x.y")
+WINDOWS_IP = os.getenv("WINDOWS_IP", "100.x.x.z")
 WINDOWS_WEBHOOK_PORT = int(os.getenv("WINDOWS_WEBHOOK_PORT", "9090"))
 WINDOWS_TV_AGENT_PORT = int(os.getenv("WINDOWS_TV_AGENT_PORT", "8081"))
 OPTIONAL_HEALTH_CATEGORIES = {
@@ -80,21 +80,21 @@ class HealthStatus:
     last_checked: str
     error: str | None = None
     details: dict | None = None
-    
+
     def to_dict(self) -> dict:
         return asdict(self)
 
 
 class UnifiedHealthMonitor:
     """Unified health monitoring for Sapphire trading system"""
-    
+
     def __init__(self):
         self.status_history: list[HealthStatus] = []
         self.alert_state_file = Path.home() / '.sapphire_health_state.json'
         self.state = self._load_state()
         self.db = None
         self._init_firestore()
-        
+
     def _init_firestore(self):
         """Initialize Firestore connection"""
         try:
@@ -108,7 +108,7 @@ class UnifiedHealthMonitor:
                 self.db = firestore.client()
             except Exception as e:
                 print(f"Warning: Firestore not available: {e}")
-                
+
     def _load_state(self) -> dict:
         """Load alert state to prevent spam"""
         if self.alert_state_file.exists():
@@ -119,12 +119,12 @@ class UnifiedHealthMonitor:
             'alert_count': 0,
             'service_states': {}
         }
-    
+
     def _save_state(self):
         """Save alert state"""
         with open(self.alert_state_file, 'w') as f:
             json.dump(self.state, f)
-    
+
     def _should_alert(self, service: str, cooldown_minutes: int = 30) -> bool:
         """Check if enough time has passed since last alert"""
         now = datetime.now()
@@ -133,15 +133,15 @@ class UnifiedHealthMonitor:
             last_time = datetime.fromisoformat(last)
             if now - last_time < timedelta(minutes=cooldown_minutes):
                 return False
-        
+
         if service not in self.state['service_states']:
             self.state['service_states'][service] = {}
         self.state['service_states'][service]['last_alert'] = now.isoformat()
         self.state['alert_count'] += 1
         return True
-    
+
     async def check_http_endpoint(
-        self, 
+        self,
         session: aiohttp.ClientSession,
         name: str,
         url: str,
@@ -158,7 +158,7 @@ class UnifiedHealthMonitor:
                 healthy = response.status in status_set
                 if not healthy and response.status in (401, 403) and any(code in status_set for code in (401, 403)):
                     healthy = True
-                
+
                 try:
                     details = await response.json()
                 except:
@@ -167,7 +167,7 @@ class UnifiedHealthMonitor:
                 if response.status in (401, 403):
                     details['auth_protected'] = True
                 details['url'] = url
-                
+
                 return HealthStatus(
                     name=name,
                     category=category,
@@ -197,7 +197,7 @@ class UnifiedHealthMonitor:
                 error=str(e)[:100],
                 details=None
             )
-    
+
     async def check_pi_services(self) -> list[HealthStatus]:
         """Check all Pi services"""
         async with aiohttp.ClientSession() as session:
@@ -206,7 +206,7 @@ class UnifiedHealthMonitor:
                 for service in pi_config['services']:
                     tasks.append(self._check_pi_service(session, pi_name, pi_config['ip'], service))
             results = await asyncio.gather(*tasks, return_exceptions=True)
-        
+
         # Handle any exceptions
         processed = []
         for i, result in enumerate(results):
@@ -222,7 +222,7 @@ class UnifiedHealthMonitor:
                 ))
             else:
                 processed.append(result)
-        
+
         return processed
 
     async def _check_pi_service(
@@ -259,7 +259,7 @@ class UnifiedHealthMonitor:
             error='No paths configured',
             details=None,
         )
-    
+
     async def check_windows_services(self) -> list[HealthStatus]:
         """Check Windows webhook and TV agent endpoints."""
         async with aiohttp.ClientSession() as session:
@@ -299,7 +299,7 @@ class UnifiedHealthMonitor:
                 )
 
             return [webhook, tv_agent]
-    
+
     async def check_cloud_run_services(self) -> list[HealthStatus]:
         """Check all Cloud Run services"""
         results = []
@@ -327,9 +327,9 @@ class UnifiedHealthMonitor:
 
                 if result is not None:
                     results.append(result)
-        
+
         return results
-    
+
     def check_firestore(self) -> HealthStatus:
         """Check Firestore connectivity"""
         start = datetime.now()
@@ -367,21 +367,21 @@ class UnifiedHealthMonitor:
                 error=str(e)[:100],
                 details=None
             )
-    
+
     async def run_all_checks(self) -> dict[str, Any]:
         """Run all health checks"""
         print(f"[{datetime.now().isoformat()}] Starting health checks...")
-        
+
         # Run async checks
         pi_results, cloud_results, windows_results = await asyncio.gather(
             self.check_pi_services(),
             self.check_cloud_run_services(),
             self.check_windows_services()
         )
-        
+
         # Run sync checks
         firestore_result = self.check_firestore()
-        
+
         # Combine all results
         all_results = pi_results + cloud_results + windows_results + [firestore_result]
         core_results = [r for r in all_results if not self._is_optional_service(r)]
@@ -416,7 +416,7 @@ class UnifiedHealthMonitor:
                 r.to_dict() for r in optional_degraded
             ],
         }
-        
+
         # Store in Firestore if available
         if self.db:
             try:
@@ -425,13 +425,13 @@ class UnifiedHealthMonitor:
                 self.db.collection('system_status').document('current').set(summary)
             except Exception as e:
                 print(f"Failed to store health check: {e}")
-        
+
         # Check for alerts
         await self._send_alerts(all_results)
-        
+
         print(f"[{datetime.now().isoformat()}] Health checks complete: "
               f"{summary['healthy_count']}/{summary['total_services']} healthy")
-        
+
         return summary
 
     def _is_optional_service(self, status: HealthStatus) -> bool:
@@ -445,11 +445,11 @@ class UnifiedHealthMonitor:
 
         if not unhealthy:
             return
-        
+
         # Check if we should send alert
         if not self._should_alert('health_alert', cooldown_minutes=15):
             return
-        
+
         # Build alert message
         lines = [
             "🚨 *Sapphire Health Alert*",
@@ -458,7 +458,7 @@ class UnifiedHealthMonitor:
             f"*{len(unhealthy)} services unhealthy:*",
             ""
         ]
-        
+
         for r in unhealthy:
             emoji = {
                 'pi': '🥧',
@@ -467,9 +467,9 @@ class UnifiedHealthMonitor:
                 'firestore': '🔥'
             }.get(r.category, '⚠️')
             lines.append(f"{emoji} *{r.name}*: {r.error or 'Unknown error'}")
-        
+
         message = '\n'.join(lines)
-        
+
         # Send Telegram alert
         if TELEGRAM_BOT_TOKEN:
             try:
@@ -489,14 +489,14 @@ class UnifiedHealthMonitor:
                 print(f"Failed to send Telegram alert: {e}")
         else:
             print(f"[ALERT - no token] {message}")
-        
+
         self._save_state()
-    
+
     def get_system_status(self) -> dict:
         """Get current system status from Firestore"""
         if not self.db:
             return {'error': 'Firestore not available'}
-        
+
         try:
             doc = self.db.collection('system_status').document('current').get()
             if doc.exists:
@@ -515,17 +515,17 @@ def main():
     parser.add_argument('--interval', type=int, default=300, help='Check interval in seconds')
     parser.add_argument('--status', action='store_true', help='Show current status')
     args = parser.parse_args()
-    
+
     monitor = UnifiedHealthMonitor()
-    
+
     if args.status:
         status = monitor.get_system_status()
         print(json.dumps(status, indent=2))
-    
+
     elif args.check:
         result = asyncio.run(monitor.run_all_checks())
         print(json.dumps(result, indent=2))
-    
+
     elif args.watch:
         print(f"Starting continuous monitoring (interval: {args.interval}s)...")
         while True:
@@ -537,7 +537,7 @@ def main():
             except KeyboardInterrupt:
                 print("\n👋 Monitor stopped")
                 break
-    
+
     else:
         print("Usage: unified_health_monitor.py --check | --watch | --status")
         print("\nExamples:")

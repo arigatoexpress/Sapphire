@@ -3,7 +3,7 @@
 # Enables distributed inference: Windows GPU offloads layers to Pi RAM
 #
 # Architecture:
-#   Windows GPU (llama-server --rpc 100.120.191.1:50052,100.87.225.89:50052)
+#   Windows GPU (llama-server --rpc 100.x.x.x:50052,100.x.x.y:50052)
 #     └── rari1 (rpc-server :50052) — ARM64, ~4 GB RAM available
 #     └── rari2 (rpc-server :50052) — ARM64, ~4 GB RAM available
 #
@@ -21,7 +21,7 @@
 #
 # Usage:
 #   # From Mac, run against rari1 when SSH is available:
-#   ssh rari@100.120.191.1 "bash -s" < infra/pi/rpc-server-setup.sh
+#   ssh rari@100.x.x.x "bash -s" < infra/pi/rpc-server-setup.sh
 
 set -e
 

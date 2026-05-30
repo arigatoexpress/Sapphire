@@ -135,21 +135,21 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 
 ## Infrastructure (verified 2026-04-18)
 
-**Mac (100.67.171.79) — commander, all services:**
+**Mac (100.x.x.w) — commander, all services:**
 - control-plane:8082, dashboard:8080, signal-logger:18081
 - inference-proxy:11435 (4-tier failover)
 - pm-bot:18082 (com.sapphire.pm-bot LaunchAgent, Telegram webhook owner)
 - content-engine (com.sapphire.content-engine LaunchAgent, weekly cadence)
 - OpenBB:6900, Redis:6379, Ollama:11434
 
-**Windows PC (100.71.10.48) — GPU + services:**
+**Windows PC (100.x.x.z) — GPU + services:**
 - Ollama:11434 (28 models, RTX 5070 Ti 16GB VRAM, OLLAMA_HOST=0.0.0.0)
 - OLLAMA_MODELS=D:\OllamaModels set at Machine scope (required — SYSTEM service doesn't inherit user env)
 - webhook:9090, telemetry-dashboard:3001, OllamaServe (auto-start)
-- SSH: `ssh aribs@100.71.10.48`
+- SSH: `ssh aribs@100.x.x.z`
 
-**Pi rari1 (100.120.191.1) — ONLINE** (Tailscale): Ollama:11434 serves nemotron-mini, smollm2:1.7b, qwen2.5:0.5b, gemma2:2b. SSH port 22 refused — needs physical access to start sshd. Proxy routing disabled by default (`PI_RARI1_ENABLED=0`); set to `1` after the Pi is stable.
-**Pi rari2 (100.87.225.89) — ONLINE** (as of 2026-04-18): Ollama:11434 serves nemotron-mini, gemma2:2b, smollm2:1.7b, qwen2.5:0.5b. Previously marked OFFLINE in the proxy — `inference-proxy/app.py:148` comment + CLAUDE.md were stale. `PI_RARI2_ENABLED=1` to route.
+**Pi rari1 (100.x.x.x) — ONLINE** (Tailscale): Ollama:11434 serves nemotron-mini, smollm2:1.7b, qwen2.5:0.5b, gemma2:2b. SSH port 22 refused — needs physical access to start sshd. Proxy routing disabled by default (`PI_RARI1_ENABLED=0`); set to `1` after the Pi is stable.
+**Pi rari2 (100.x.x.y) — ONLINE** (as of 2026-04-18): Ollama:11434 serves nemotron-mini, gemma2:2b, smollm2:1.7b, qwen2.5:0.5b. Previously marked OFFLINE in the proxy — `inference-proxy/app.py:148` comment + CLAUDE.md were stale. `PI_RARI2_ENABLED=1` to route.
 
 ## Code Style
 
@@ -241,9 +241,9 @@ Manage at https://claude.ai/code/routines.
 ## Inference Proxy (`services/inference-proxy/`)
 
 4-tier failover (threaded server — concurrent requests safe). hermes-agent and all plugin tools talk to this.
-- **T1 Windows GPU** (100.71.10.48:11434): native `/api/chat` (NOT `/v1/` — returns empty on Windows). ~0.4s.
-- **T2 Pi rari1** (100.120.191.1:11434): nemotron-mini, smollm2, qwen2.5:0.5b, gemma2:2b. `PI_RARI1_ENABLED=1`. T2 routing should downshift to the smaller Pi-safe models for live traffic instead of trying `nemotron-mini:latest`.
-- **T2 Pi rari2** (100.87.225.89:11434): ONLINE as of 2026-04-18 (5 models). `PI_RARI2_ENABLED=1`.
+- **T1 Windows GPU** (100.x.x.z:11434): native `/api/chat` (NOT `/v1/` — returns empty on Windows). ~0.4s.
+- **T2 Pi rari1** (100.x.x.x:11434): nemotron-mini, smollm2, qwen2.5:0.5b, gemma2:2b. `PI_RARI1_ENABLED=1`. T2 routing should downshift to the smaller Pi-safe models for live traffic instead of trying `nemotron-mini:latest`.
+- **T2 Pi rari2** (100.x.x.y:11434): ONLINE as of 2026-04-18 (5 models). `PI_RARI2_ENABLED=1`.
 - **T3 Mac local** (127.0.0.1:11434): `/v1/chat/completions` passthrough. ~90s (CPU inference).
 - **T4 Kimi Cloud** (api.moonshot.cn): non-sensitive only. `MOONSHOT_API_KEY` loaded from `~/.sapphire/secrets.env` (mode 0600, not in plist).
 - Model aliases: `fast`/`quick`→nemotron-mini:latest, `auto`/`balanced`→hermes3:8b, `deep`→qwen3:14b, `code`→gemma4:latest, `reason`→deepseek-r1:14b, `qwen-reason`→qwen3.5:9b, `qwen3.6`→qwen3.6:27b (Windows primary, Mac exact fallback, explicit only), `cascade`/`moe`→nemotron-cascade-2, `large`→qwen2.5:32b, `kimi`→kimi-cloud

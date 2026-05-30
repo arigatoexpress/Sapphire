@@ -1,6 +1,6 @@
 # MegaETH Windows Node — Operator Runbook
 
-Stand up MegaETH self-hosted verification on the Windows PC (Tailnet `100.71.10.48`) and wire it into Sapphire so the Mac dashboard can hit a private endpoint over Tailscale.
+Stand up MegaETH self-hosted verification on the Windows PC (Tailnet `100.x.x.z`) and wire it into Sapphire so the Mac dashboard can hit a private endpoint over Tailscale.
 
 > **TL;DR — node software readiness (2026-04-30).** MegaETH does **not** publish open-source replica or full-node client software. RPC nodes (replica + full) are operated only by the MegaETH team and managed providers (Alchemy, QuickNode, Tatum). The single piece of self-hostable, official software is the [`stateless-validator`](https://github.com/megaeth-labs/stateless-validator) — a Rust client that re-executes every block against a SALT witness fetched from the public RPC. That is what this runbook stands up. **You are not running an RPC node; you are running an independent verifier of the public RPC.** A "self-hosted RPC" still means proxying `https://mainnet.megaeth.com/rpc` from the Windows box.
 
@@ -67,8 +67,8 @@ A Windows-native build is *technically* possible (the deps are mostly alloy + re
 | Check | Command (PowerShell as Admin) | Expected |
 |---|---|---|
 | Win11 build | `winver` | 22H2 or later (23H2+ for mirrored networking) |
-| Tailscale up | `tailscale status` | Includes `100.71.10.48` |
-| Tailnet IP | `tailscale ip -4` | `100.71.10.48` (substitute below as `<TAILNET_IP>`) |
+| Tailscale up | `tailscale status` | Includes `100.x.x.z` |
+| Tailnet IP | `tailscale ip -4` | `100.x.x.z` (substitute below as `<TAILNET_IP>`) |
 | E: free space | `Get-PSDrive E` | ≥ 200 GB free (chain data + witness cache) |
 | Existing services | `Get-ScheduledTask \| ? TaskName -like 'Sapphire*'` | OllamaServe, SapphireWebhook, SapphireDashboard — leave alone |
 
@@ -150,7 +150,7 @@ echo "Anchor: $ANCHOR_HASH"
 ### 3.5 First run (foreground, smoke test)
 
 ```bash
-TAILNET_IP=100.71.10.48   # output of `tailscale ip -4` on Windows host
+TAILNET_IP=100.x.x.z   # output of `tailscale ip -4` on Windows host
 
 cd /mnt/e/megaeth/stateless-validator
 
@@ -175,7 +175,7 @@ Healthy first-run output (per upstream README) shows `Replay block`, `Successful
 
 ### 3.6 Bind metrics on the tailnet IP
 
-The validator's Prometheus metrics port should be reachable from the Mac at `100.67.171.79` over the tailnet, **not** from the public internet. With WSL mirrored networking, binding `9090` inside WSL exposes it on every Windows interface; you must restrict at the firewall layer.
+The validator's Prometheus metrics port should be reachable from the Mac at `100.x.x.w` over the tailnet, **not** from the public internet. With WSL mirrored networking, binding `9090` inside WSL exposes it on every Windows interface; you must restrict at the firewall layer.
 
 PowerShell as Admin on the Windows host:
 
@@ -267,14 +267,14 @@ From the Windows host (or the Mac via tailnet):
 
 ```bash
 # Liveness — Prometheus metrics endpoint
-curl -s --max-time 2 http://100.71.10.48:9090/metrics | head -20
+curl -s --max-time 2 http://100.x.x.z:9090/metrics | head -20
 
 # Block-tip lag — fetch latest from public RPC, compare against validator's own report
 LATEST=$(curl -sX POST https://mainnet.megaeth.com/rpc \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
   | jq -r '.result' | python3 -c 'import sys; print(int(sys.stdin.read().strip(), 16))')
-VALIDATED=$(curl -s http://100.71.10.48:9090/metrics \
+VALIDATED=$(curl -s http://100.x.x.z:9090/metrics \
   | awk '/^stateless_validator_chain_tip_block_number/{print $2}')
 echo "public_tip=$LATEST validator_tip=$VALIDATED lag=$((LATEST - ${VALIDATED%.*}))"
 ```
@@ -294,10 +294,10 @@ What actually changes:
 | Env var | Old | New | Why |
 |---|---|---|---|
 | `SAPPHIRE_MEGAETH_RPC` | `https://mainnet.megaeth.com/rpc` | (same — validator is not an RPC server) | No change. Public RPC is still the only `eth_*` source. |
-| `SAPPHIRE_MEGAETH_VALIDATOR_METRICS` | unset | `http://100.71.10.48:9090/metrics` | New — surfaces validator health into the Mac dashboard. Add to `.envrc` or LaunchAgent EnvironmentVariables. |
+| `SAPPHIRE_MEGAETH_VALIDATOR_METRICS` | unset | `http://100.x.x.z:9090/metrics` | New — surfaces validator health into the Mac dashboard. Add to `.envrc` or LaunchAgent EnvironmentVariables. |
 | `SAPPHIRE_MEGAETH_VALIDATOR_TIP_FRESHNESS_SECS` | unset | `30` | Max acceptable lag (validator tip behind public tip) in seconds before health degrades. |
 
-If a future MegaETH release ships a self-hostable RPC, swap `SAPPHIRE_MEGAETH_RPC` to `http://100.71.10.48:8545/rpc` at that point — the env-var seam is already there.
+If a future MegaETH release ships a self-hostable RPC, swap `SAPPHIRE_MEGAETH_RPC` to `http://100.x.x.z:8545/rpc` at that point — the env-var seam is already there.
 
 ### 5.2 Mac-side healthcheck
 
@@ -309,7 +309,7 @@ curl -s --max-time 2 https://mainnet.megaeth.com/rpc \
 # → {"jsonrpc":"2.0","id":1,"result":"0x10e6"}    # 4326 = MegaETH mainnet
 
 # Validator co-signer reachability over Tailscale
-curl -s --max-time 2 http://100.71.10.48:9090/metrics \
+curl -s --max-time 2 http://100.x.x.z:9090/metrics \
   | grep -E '^stateless_validator_(chain_tip|advanced_blocks|errors)' | head -5
 ```
 
@@ -322,7 +322,7 @@ PR #528 (`feat/megaeth-docs`, currently open) is the place to add a "self-hosted
 ```markdown
 ## Self-hosted validator co-signer (Windows PC)
 
-Sapphire optionally runs the official MegaETH `stateless-validator` on the Windows PC (`100.71.10.48`) as an independent verifier of the public RPC. Setup, supervision, and decommission are documented in [docs/ops/megaeth-windows-node.md](../ops/megaeth-windows-node.md). It does **not** replace `SAPPHIRE_MEGAETH_RPC`; it sits alongside it as a verifier and feeds health into the dashboard.
+Sapphire optionally runs the official MegaETH `stateless-validator` on the Windows PC (`100.x.x.z`) as an independent verifier of the public RPC. Setup, supervision, and decommission are documented in [docs/ops/megaeth-windows-node.md](../ops/megaeth-windows-node.md). It does **not** replace `SAPPHIRE_MEGAETH_RPC`; it sits alongside it as a verifier and feeds health into the dashboard.
 ```
 
 ---
@@ -402,7 +402,7 @@ These are the must-answers before scheduling install:
 1. **RAM on the Windows box**: ≥ 32 GB confirmed? (Validator needs ~4-8 GB resident; rest is for existing Sapphire/Ollama load. Full node is moot — no software exists.)
 2. **E: drive**: ≥ 200 GB free for `E:\megaeth`? (Far less than the "2 TB" originally scoped, because we're running validator-only.)
 3. **ISP bandwidth + monthly cap**: gigabit symmetric assumed; cap < 1 TB/mo would be a non-issue but worth confirming.
-4. **Tailscale ACL**: lock `100.71.10.48:9090` to Mac (`100.67.171.79`) and any future Sapphire devices only. Do **not** open it tagwide. Default ACL likely already restrictive — needs an explicit check.
+4. **Tailscale ACL**: lock `100.x.x.z:9090` to Mac (`100.x.x.w`) and any future Sapphire devices only. Do **not** open it tagwide. Default ACL likely already restrictive — needs an explicit check.
 5. **WSL mirrored networking**: confirm Win11 build is 23H2 or later. If 22H2, fall back to NAT + `netsh portproxy` and accept the brittleness.
 6. **Validator metric names**: `stateless_validator_chain_tip_*` is inferred from the README; the actual Prometheus metric names need a one-time read of `stateless_core::pipeline` source on first deploy. Healthcheck commands above use placeholder names.
 7. **Anchor independence source**: Blockscout is used as the cross-check above. If Ari wants a stronger anchor (e.g. cross-check against a second managed RPC like Alchemy), set up that second endpoint at install time — it's a one-line change to step 3.4.

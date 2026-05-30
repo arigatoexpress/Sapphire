@@ -3,7 +3,7 @@
 # Run from Mac: bash infra/pi/rari1/deploy-control-plane.sh
 set -euo pipefail
 
-RARI1="rari@100.120.191.1"
+RARI1="rari@100.x.x.x"
 REMOTE_DIR="/mnt/ssd/sapphire/control-plane"
 SERVICE="sapphire-control-plane"
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
@@ -52,5 +52,5 @@ echo ""
 echo "✅ Control plane deployed to rari1:8082"
 echo "   Check logs: ssh ${RARI1} journalctl -u sapphire-control-plane -f"
 echo ""
-echo "   Kimi bridge: POST http://100.120.191.1:8082/api/kimi/pm"
+echo "   Kimi bridge: POST http://100.x.x.x:8082/api/kimi/pm"
 echo "                X-Control-Token: <CONTROL_PLANE_TOKEN>"

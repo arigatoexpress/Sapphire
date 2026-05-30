@@ -477,14 +477,14 @@ def _mock_tier_health(now: datetime) -> list[dict[str, Any]]:
     return [
         {
             "tier": "T1_GPU",
-            "endpoint": "100.71.10.48:11434",
+            "endpoint": "100.x.x.z:11434",
             "healthy": False,
             "latency_ms": None,
             "last_check": iso,
         },
         {
             "tier": "T2_PI",
-            "endpoint": "100.120.191.1:11434",
+            "endpoint": "100.x.x.x:11434",
             "healthy": False,
             "latency_ms": None,
             "last_check": iso,
