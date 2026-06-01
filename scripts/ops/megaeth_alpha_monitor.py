@@ -13,7 +13,7 @@ import os
 import sys
 import traceback
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -58,7 +58,7 @@ async def _rpc(method: str, params: list[Any] | None = None) -> Any:
 
 
 async def run_snapshot() -> dict[str, Any]:
-    ts = datetime.now(timezone.utc).isoformat()
+    ts = datetime.now(UTC).isoformat()
     snapshot: dict[str, Any] = {"ts": ts}
 
     # ── chain liveness ───────────────────────────────────────────────────────
@@ -238,7 +238,7 @@ def check_block_staleness(snapshot: dict[str, Any], last: dict[str, Any] | None)
 
 
 async def main() -> None:
-    print(f"[megaeth-monitor] starting snapshot at {datetime.now(timezone.utc).isoformat()}")
+    print(f"[megaeth-monitor] starting snapshot at {datetime.now(UTC).isoformat()}")
 
     last_snapshot = _load_last_snapshot()
     snapshot = await run_snapshot()
@@ -251,7 +251,6 @@ async def main() -> None:
 
     # Write snapshot to temp file for git ingestion
     os.makedirs("data/megaeth", exist_ok=True)
-    snapshot_line = json.dumps(snapshot, default=str)
     with open("/tmp/megaeth_snapshot.json", "w") as f:
         json.dump(snapshot, f, default=str, indent=2)
 
@@ -260,7 +259,7 @@ async def main() -> None:
     block = snapshot.get("block_number", "N/A")
     cid = hex(snapshot["chain_id"]) if snapshot.get("chain_id") else "N/A"
 
-    print(f"\n--- MegaETH Alpha Snapshot ---")
+    print("\n--- MegaETH Alpha Snapshot ---")
     print(f"  ts:          {snapshot['ts']}")
     print(f"  mode:        {mode}")
     print(f"  chain_id:    {cid}  block: {block}")
@@ -297,7 +296,7 @@ async def main() -> None:
         for a in alerts:
             print(f"    [{a['severity']}] {a['type']}: {json.dumps({k: v for k, v in a.items() if k not in ('type','severity')})}")
     else:
-        print(f"  ALERTS:      NONE")
+        print("  ALERTS:      NONE")
 
     # Write result for shell consumption
     with open("/tmp/megaeth_alerts.json", "w") as f:
