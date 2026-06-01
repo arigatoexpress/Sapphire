@@ -66,4 +66,9 @@ paths = [
     '''tests/lib/chains/cross_chain/test_pyth_divergence\.py''',
     '''tests/lib/trading/test_pyth_divergence_arb_backtest\.py''',
     '''tests/unit/test_dashboard_perps_panel\.py''',
+    # MegaETH monitoring data (monitoring/megaeth-alpha-log branch) — snapshot
+    # JSONL files contain Aave V3 on-chain contract addresses
+    # (aTokenAddress, variableDebtTokenAddress, etc.) captured live from
+    # the chain. These are public addresses, not secrets.
+    '''data/megaeth/.*\.jsonl''',
 ]
