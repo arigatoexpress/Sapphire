@@ -43,6 +43,11 @@ README_BADGE_RE = re.compile(
 def _resolve_collection_python() -> str:
     if env := os.environ.get("PYTHON3"):
         return env
+    # When invoked via `uv run`, sys.executable points to the uv-managed
+    # interpreter that has all test deps installed. Prefer it over the
+    # system /usr/local/bin/python3 (brew Python, no project packages).
+    if os.environ.get("UV_VIRTUAL_ENV") or os.environ.get("VIRTUAL_ENV"):
+        return sys.executable
     if Path("/usr/local/bin/python3").exists():
         return "/usr/local/bin/python3"
     return shutil.which("python3") or sys.executable
