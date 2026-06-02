@@ -31,10 +31,9 @@ SUITES = (
 FILE_COUNT_RE = re.compile(r"^(?P<path>.+\.py):\s+(?P<count>\d+)\s*$")
 SUMMARY_RE = re.compile(r"(?P<count>\d+)\s+tests?\s+collected")
 README_TESTS_RE = re.compile(
-    r"\| Passing tests \| \*\*(?P<total>[\d,]+)\+\*\* \| "
-    r"(?P<unit>[\d,]+)\+ unit · (?P<plugin>[\d,]+) plugin"
+    r"(?P<total>[\d,]+)\+\s*passing tests\s+\((?P<unit>[\d,]+)\+?\s*unit\s+·\s+(?P<plugin>[\d,]+)\s*plugin\)"
 )
-README_FILES_RE = re.compile(r"\| Test files \| \*\*(?P<files>[\d,]+)\+\*\* \|")
+README_FILES_RE = re.compile(r"\bacross\s+(?P<files>[\d,]+)\+?\s*files\b")
 README_BADGE_RE = re.compile(
     r"\[!\[Tests\]\(https://img\.shields\.io/badge/tests-(?P<label>[^-]+)-2ea44f\)\]"
 )

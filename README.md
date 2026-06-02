@@ -57,7 +57,7 @@ Six concerns share one event bus (Redis Streams + JSONL fallback):
 - Fail-closed trading: $5/order cap, $25/day loss limit, global kill switch
 - 4-tier inference mesh (GPU → Pi ×2 → Mac CPU → Kimi Cloud)
 - Live Brain synthesis endpoint at `sapphirealpha.xyz/api/brain/synthesis`
-- 7,184+ passing tests across 436 files
+- 7,184+ passing tests (6,580 unit · 604 plugin) across 436 files
 - 3 Solidity contracts on Robinhood Chain testnet
 
 ## Tech stack

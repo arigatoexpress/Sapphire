@@ -83,7 +83,7 @@ async def test_middleware_allows_localhost(signal_logger):
 async def test_middleware_allows_tailscale_cgnat(signal_logger):
     middleware = signal_logger._TailscaleOnlyMiddleware(app=signal_logger.app)
     request = MagicMock()
-    request.client.host = "100.x.x.z"  # Windows webhook in Tailscale CGNAT
+    request.client.host = "100.64.1.2"  # Windows webhook in Tailscale CGNAT (example)
     call_next = AsyncMock(return_value=JSONResponse({"ok": True}))
 
     response = await middleware.dispatch(request, call_next)
@@ -96,7 +96,7 @@ async def test_middleware_allows_tailscale_cgnat(signal_logger):
 async def test_middleware_allows_tailscale_pi(signal_logger):
     middleware = signal_logger._TailscaleOnlyMiddleware(app=signal_logger.app)
     request = MagicMock()
-    request.client.host = "100.x.x.x"  # rari1 Pi node
+    request.client.host = "100.64.1.3"  # rari1 Pi node (example Tailscale CGNAT)
     call_next = AsyncMock(return_value=JSONResponse({"ok": True}))
 
     response = await middleware.dispatch(request, call_next)
