@@ -38,8 +38,7 @@ def test_readme_inventory_check_allows_small_undercount(tmp_path: Path) -> None:
         "\n".join(
             [
                 "[![Tests](https://img.shields.io/badge/tests-3%2C550%2B%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)",
-                "| Passing tests | **3,550+** | 3,420+ unit · 130 plugin (`pytest`) |",
-                "| Test files | **185+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |",
+                "- 3,550+ passing tests (3,420 unit · 130 plugin) across 185 files",
             ]
         ),
         encoding="utf-8",
@@ -67,8 +66,7 @@ def test_readme_inventory_check_rejects_overclaim(tmp_path: Path) -> None:
         "\n".join(
             [
                 "[![Tests](https://img.shields.io/badge/tests-3%2C550%2B%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)",
-                "| Passing tests | **3,600+** | 3,420+ unit · 130 plugin (`pytest`) |",
-                "| Test files | **185+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |",
+                "- 3,600+ passing tests (3,420 unit · 130 plugin) across 185 files",
             ]
         ),
         encoding="utf-8",
@@ -94,8 +92,7 @@ def test_readme_inventory_check_rejects_file_count_overclaim(tmp_path: Path) -> 
         "\n".join(
             [
                 "[![Tests](https://img.shields.io/badge/tests-3%2C550%2B%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)",
-                "| Passing tests | **3,550+** | 3,420+ unit · 130 plugin (`pytest`) |",
-                "| Test files | **200+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |",
+                "- 3,550+ passing tests (3,420 unit · 130 plugin) across 200 files",
             ]
         ),
         encoding="utf-8",
@@ -121,8 +118,7 @@ def test_readme_inventory_check_rejects_badge_overclaim(tmp_path: Path) -> None:
         "\n".join(
             [
                 "[![Tests](https://img.shields.io/badge/tests-3%2C600%2B%20passing-2ea44f)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)",
-                "| Passing tests | **3,550+** | 3,420+ unit · 130 plugin (`pytest`) |",
-                "| Test files | **185+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |",
+                "- 3,550+ passing tests (3,420 unit · 130 plugin) across 185 files",
             ]
         ),
         encoding="utf-8",
