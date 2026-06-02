@@ -6,7 +6,7 @@ Autonomous trading + intelligence + content ops. Telegram-first, agent-driven, e
 
 ```bash
 # Test
-pytest tests/unit/ --tb=short -q           # 6,580 collected by test_inventory.py
+pytest tests/unit/ --tb=short -q           # 6,538 collected by test_inventory.py
 pytest plugins/claw-sapphire/tests/ -q     # 604 collected by test_inventory.py
 
 # Lint
@@ -88,7 +88,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 
 ## Module Map
 
-**Key counts (verified 2026-05-12 via `scripts/ops/test_inventory.py --check-readme`):** 7,184 collected tests (6,580 core + 604 plugin) across 436 files · 52 dashboard pages · 7 quant strategies · 29 LaunchAgent plists in `infra/launchagents/` (TV pair added in PRs #505/#506; `continuous-intelligence-daily` + `mac-to-windows-tunnel` added 2026-05-03–12; tracked definitions remain operator-controlled; see `docs/archive/2026/audits/launchagents-audit-2026-04-21.md`) plus 1 disabled template. Note: `com.sapphire.analytics-dashboard`, `com.sapphire.kronos-daily`, `com.sapphire.outcome-resolver`, and `com.sapphire.vpin-materializer` were archived on the Mac side as of 2026-05-12 — these four were installed-only LaunchAgents (no source plist was ever committed to `infra/launchagents/`) · 22 scheduled tasks · 3 smart contracts.
+**Key counts (verified 2026-06-02 via `scripts/ops/test_inventory.py --check-readme`):** 7,142 collected tests (6,538 core + 604 plugin) across 436 files · 52 dashboard pages · 7 quant strategies · 29 LaunchAgent plists in `infra/launchagents/` (TV pair added in PRs #505/#506; `continuous-intelligence-daily` + `mac-to-windows-tunnel` added 2026-05-03–12; tracked definitions remain operator-controlled; see `docs/archive/2026/audits/launchagents-audit-2026-04-21.md`) plus 1 disabled template. Note: `com.sapphire.analytics-dashboard`, `com.sapphire.kronos-daily`, `com.sapphire.outcome-resolver`, and `com.sapphire.vpin-materializer` were archived on the Mac side as of 2026-05-12 — these four were installed-only LaunchAgents (no source plist was ever committed to `infra/launchagents/`) · 22 scheduled tasks · 3 smart contracts.
 
 | Path | Type | Description |
 |------|------|-------------|
