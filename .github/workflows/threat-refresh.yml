@@ -27,7 +27,7 @@ jobs:
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Refresh threats
         env:
           PYTHONPATH: ${{ github.workspace }}
@@ -37,7 +37,7 @@ jobs:
           mkdir -p data/intelligence
           uv run --python 3.11 --no-project python services/dashboard/refresh_threats.py | tee threat-refresh.log
       - name: Upload threat artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: threat-refresh-${{ github.run_id }}
