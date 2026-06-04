@@ -32,7 +32,7 @@ jobs:
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Install osv-scanner
         env:
           OSV_SCANNER_VERSION: v1.9.1
@@ -59,7 +59,7 @@ jobs:
       - name: Scan
         run: |
           osv-scanner --recursive --skip-git --format=sarif --output=osv.sarif ./ || true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: ${{ always() && hashFiles('osv.sarif') != '' }}
         with:
           name: osv-scanner-sarif
@@ -74,8 +74,8 @@ jobs:
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v4
-      - uses: aquasecurity/trivy-action@v0.36.0
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: "fs"
           scan-ref: "."
@@ -84,7 +84,7 @@ jobs:
           severity: "CRITICAL,HIGH"
           ignore-unfixed: true
           timeout: "20m"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: ${{ always() && hashFiles('trivy-fs.sarif') != '' }}
         with:
           name: trivy-fs-sarif
@@ -99,7 +99,7 @@ jobs:
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: bandit — general scan (excludes analytics dashboard false positives)
         # -ll = high + medium severity only. Skip tests and archived/legacy.
         # This broad scan currently reports legacy findings without a checked-in
