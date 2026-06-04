@@ -348,8 +348,7 @@ def test_funding_decays_only_to_zero_never_overshoots() -> None:
 
     # Sample across periods 0..200 with hourly funding + 7d decay.
     samples = [
-        _funding_at_period(0.50, i, funding_period_hours=1.0, decay_days=7.0)
-        for i in range(200)
+        _funding_at_period(0.50, i, funding_period_hours=1.0, decay_days=7.0) for i in range(200)
     ]
     # Magnitude monotonically decreasing (allow equal for the post-decay zeros).
     for a, b in zip(samples, samples[1:]):
