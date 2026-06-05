@@ -65,7 +65,7 @@ SAMPLE_ROADMAP = """\
 @pytest.fixture
 def roadmap_file(tmp_path):
     p = tmp_path / "ROADMAP.md"
-    p.write_text(SAMPLE_ROADMAP, encoding='utf-8')
+    p.write_text(SAMPLE_ROADMAP, encoding="utf-8")
     return str(p)
 
 

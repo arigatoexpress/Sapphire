@@ -118,11 +118,11 @@ def test_normal_inputs_unaffected_by_clamp() -> None:
 @pytest.mark.parametrize(
     "skew,kurt,sr,n_obs",
     [
-        (1.0, 1.0, 1.2, 250),    # original CI repro
-        (0.5, 0.5, 3.0, 100),    # kurtosis below 1
-        (10.0, 3.0, 5.0, 50),    # large skew * sr
+        (1.0, 1.0, 1.2, 250),  # original CI repro
+        (0.5, 0.5, 3.0, 100),  # kurtosis below 1
+        (10.0, 3.0, 5.0, 50),  # large skew * sr
         (-5.0, 2.0, -2.0, 100),  # negative branch
-        (0.0, 1.0, 1.0, 1),      # n_obs=1 borderline
+        (0.0, 1.0, 1.0, 1),  # n_obs=1 borderline
     ],
 )
 def test_no_math_domain_error_on_adversarial_moments(

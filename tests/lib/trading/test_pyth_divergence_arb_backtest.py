@@ -94,13 +94,13 @@ def test_bridge_cost_tiers_are_pinned() -> None:
     [
         (0.0, 3.0),
         (1.0, 3.0),
-        (10_000.0, 3.0),       # boundary inclusive on tier 1
+        (10_000.0, 3.0),  # boundary inclusive on tier 1
         (10_000.01, 3.5),
         (50_000.0, 3.5),
-        (100_000.0, 3.5),      # boundary inclusive on tier 2
+        (100_000.0, 3.5),  # boundary inclusive on tier 2
         (100_000.01, 4.0),
         (500_000.0, 4.0),
-        (1_000_000.0, 4.0),    # boundary inclusive on tier 3
+        (1_000_000.0, 4.0),  # boundary inclusive on tier 3
         (1_000_000.01, 5.0),
         (10_000_000.0, 5.0),
         (1e15, 5.0),
@@ -157,9 +157,7 @@ def test_bridge_cost_property_returns_tier_when_no_override() -> None:
 
 
 def test_bridge_cost_property_returns_explicit_override() -> None:
-    bt = PythArbBacktest(
-        capital_usd=50_000, bridge_cost_bps_per_round_trip=1.5
-    )
+    bt = PythArbBacktest(capital_usd=50_000, bridge_cost_bps_per_round_trip=1.5)
     assert bt.bridge_cost_bps_per_round_trip == 1.5
 
 
@@ -405,6 +403,7 @@ def test_to_dict_serializes_inf_as_string() -> None:
     assert d["calmar"] == "inf"
     # Confirm json round-trip works.
     import json
+
     payload = json.dumps(d)
     parsed = json.loads(payload)
     assert parsed["sortino"] == "inf"

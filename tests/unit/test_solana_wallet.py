@@ -86,7 +86,7 @@ def test_init_creates_keypair_and_files(wallet_mod):
     # Files are mode 0600
     wallet_mode = os.stat(wallet_mod.WALLET_PATH).st_mode & 0o777
     key_mode = os.stat(wallet_mod.KEY_PATH).st_mode & 0o777
-    if sys.platform != 'win32':
+    if sys.platform != "win32":
         assert wallet_mode == 0o600
     assert key_mode == 0o600
 
