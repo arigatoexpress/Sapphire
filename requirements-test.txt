@@ -15,7 +15,7 @@ pytest-cov==7.1.0
 # property-based + mutation testing (Tranche 6 Lane 1 — see
 # docs/products/test-rigor-0.1.0.md). Authorized for the test-rigor lane only;
 # do not leak into runtime requirements.
-hypothesis>=6.152.7,<7
+hypothesis>=6.155.1,<7
 # mutmut 3.x dropped the glob2 transitive (glob2 setup.py imports
 # distutils.command.install.install_layout, removed in setuptools 74+, which
 # bricks `pip install -r requirements-test.txt` in clean cloud envs and
