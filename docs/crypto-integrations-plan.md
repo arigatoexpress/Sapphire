@@ -1,14 +1,13 @@
 # Crypto / Privacy / Payments Integration Plan
 
-Five complementary technologies that, together, make Sapphire OS *private*, *paid*, and *verifiable*:
+Four complementary technologies that, together, make Sapphire OS *private*, *paid*, and *verifiable*:
 
 | # | Tech | Purpose | Status |
 |---|------|---------|--------|
 | 1 | **x402 (Coinbase)** | HTTP 402 micropayments in USDC on Base | **Implemented** — `lib/payments/x402_middleware.py` |
 | 2 | **Robinhood Chain (Arbitrum Orbit)** | On-chain signal anchoring + payment gate | **Implemented** — `lib/chain/robinhood_chain.py`, `contracts/` |
 | 3 | **Zama Concrete ML (FHE)** | Privacy-preserving cloud inference | Designed |
-| 4 | **Ika 2PC-MPC** | Decentralized wallet signing for trading | Designed |
-| 5 | **Aztec Noir** | Private on-chain strategy execution | Designed |
+| 4 | **Aztec Noir** | Private on-chain strategy execution | Designed |
 
 All four plug into the existing event bus (`lib/core/event_bus.py`) so they become observable in the dashboard overview and auditable in the NIST compliance view.
 
@@ -160,84 +159,7 @@ Dashboard shows the fraction of classifications that ran in FHE vs. plaintext.
 
 ---
 
-## 3. Ika 2PC-MPC — **DESIGNED**
-
-### Motivation
-
-Today, every live trade flows through `confirmation_firewall.py` — a process-level
-gate. A compromised Mac bypasses it. 2PC-MPC replaces that single point of
-compromise with a cryptographic threshold: **two devices must both sign** before a
-transaction can move funds. Neither device has the full private key.
-
-### Architecture
-
-```
-┌─────────────────┐                  ┌─────────────────┐
-│  Mac (commander)│                  │ Windows (GPU)   │
-│  key share A    │<─── protocol ───>│  key share B    │
-│                 │      (Ika)       │                 │
-└────────┬────────┘                  └────────┬────────┘
-         │                                    │
-         └──────────── joint sig ─────────────┘
-                         │
-                         ▼
-                  Sui blockchain
-                  (or EVM via Ika bridge)
-```
-
-### Dependencies
-
-- Ika Rust SDK (github.com/ika-network — TBD exact pip/npm ship date)
-- Sui mainnet RPC endpoint (`https://fullnode.mainnet.sui.io`)
-- Two signing devices (Mac + Windows already have Tailscale connectivity)
-
-### Effort estimate: **XL (1–2 weeks)**
-
-1. **Day 1–2** — Ika research: confirm SDK languages, key-share ceremony, transport
-   protocol (likely WebRTC or mutual TLS over Tailscale).
-2. **Day 3–4** — Run the key-generation ceremony on Mac + Windows. Store shares in
-   respective secure enclaves (Keychain on Mac, DPAPI on Windows).
-3. **Day 5–7** — Build `lib/signing/ika_cosigner.py`:
-   - `propose(tx_bytes) -> proposal_id`
-   - `sign(proposal_id) -> partial_sig` (runs on both devices)
-   - `combine(proposal_id) -> full_sig`
-4. **Day 8–9** — Replace `ConfirmationFirewall` calls for financial actions with
-   a wrapper that requires both shares to sign. Telegram becomes a *second factor*
-   via the commander device, not the sole gate.
-5. **Day 10–14** — Integrate on Sui testnet; trade a small USDC balance; proceed
-   to mainnet after 100 clean trades.
-
-### Event bus integration
-
-Publishes:
-- `signing.proposed` — `{proposal_id, resource, amount, nonce}`
-- `signing.partial` — one per device
-- `signing.completed` — full signature ready
-- `signing.rejected` — either device refused
-
-### NIST controls covered
-
-- **PR.AA-5** (authorization enforced) — no single compromised device can move funds
-- **MANAGE 2.3** (incidents tracked) — every proposal + outcome on the event bus
-- **RS.MI-1** (incidents contained) — a single device loss does not drain the wallet
-
-### Risks
-
-- **Liveness dependency** — if Windows is offline, Mac can't sign alone. Mitigate
-  by running a third share on Pi rari2 (2-of-3 threshold).
-- **Ceremony complexity** — initial key gen is a one-shot, high-stakes ritual.
-  Practice on testnet first.
-
-### Prerequisites
-
-- Ika Rust SDK available (confirm current release; currently pre-v1)
-- Tailscale mesh stable between Mac + Windows (already is)
-- Sui CLI + mainnet RPC access
-- Cold-wallet backup of each share (worst-case recovery)
-
----
-
-## 4. Aztec Noir — **DESIGNED**
+## 3. Aztec Noir — **DESIGNED**
 
 ### Motivation
 
@@ -325,7 +247,6 @@ Publishes:
 |---|---|---|
 | **Now** | x402 | Already built. Testnet → mainnet is a config change. Creates direct revenue. |
 | **Q2 2026** | Zama FHE classifier | Biggest trust moat for THO customers. No on-chain risk. |
-| **Q3 2026** | Ika 2PC-MPC | Required before any non-paper live trading at size. |
 | **Q4 2026+** | Aztec Noir | Only meaningful if (a) on-chain trading is live and (b) MEV loss > privacy cost. |
 
 ## 2a. Robinhood Chain — **IMPLEMENTED** (2026-04-19)
@@ -394,5 +315,4 @@ This is why the event bus ships in the same PR.
 
 - x402: <https://github.com/coinbase/x402>, <https://docs.cdp.coinbase.com/x402/welcome>
 - Zama Concrete ML: <https://docs.zama.ai/concrete-ml>
-- Ika Network: <https://ika.xyz>, <https://github.com/ika-network>
 - Aztec Noir: <https://noir-lang.org>, <https://aztec.network>

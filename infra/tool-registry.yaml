@@ -282,7 +282,7 @@ tools:
     status: internal
     owner: sapphire
     consumers: [scheduled-tasks.vote-monitor-collector]
-    description: DeFi vote-escrow pool snapshots (Blackhole/Supernova/FullSail) + strategy recs.
+    description: DeFi vote-escrow pool snapshots (Blackhole/Supernova) + strategy recs.
 
   - name: health_check
     path: plugins/claw-sapphire/tools/internal/health_check.py
