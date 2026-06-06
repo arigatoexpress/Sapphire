@@ -13,7 +13,7 @@ Sapphire is the command repo for Ari's autonomous system. It orchestrates tradin
 | `lib/core/` | Risk kernel, event bus, kill switch, confirmation firewall |
 | `lib/analytics/` | Strategies, backtests, regimes, forecasts |
 | `lib/chain/` | On-chain intel (Glassnode, Santiment, Dune, etc.) |
-| `lib/content/` | 17-module research-to-publish pipeline |
+| `lib/content/` | 16-module research-to-publish pipeline |
 | `lib/security/` | SBOM, model verification, network mapper |
 | `services/` | 16 services (alpha, dashboard, control-plane, inference-proxy, etc.) |
 | `plugins/claw-sapphire/` | 72 registered tools for the agent runtime |
