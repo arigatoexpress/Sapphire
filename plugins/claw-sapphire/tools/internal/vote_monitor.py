@@ -5,7 +5,6 @@ Bridges the regional-intel-workbench vote escrow monitoring system into
 Sapphire for autonomous strategy tracking across:
 - Blackhole (veBLACK on Avalanche)
 - Supernova (veNOVA on Ethereum)
-- Full Sail (veSAIL on Sui)
 
 Actions:
     snapshot  — Fetch live pool data from all protocols
@@ -16,7 +15,7 @@ Actions:
 Usage (stdin JSON):
     echo '{"action":"snapshot"}' | python3 vote_monitor.py
     echo '{"action":"strategy","profile":"aggressive"}' | python3 vote_monitor.py
-    echo '{"action":"digest","blackhole":15000,"supernova":8000,"fullsail":50000}' | python3 vote_monitor.py
+    echo '{"action":"digest","blackhole":15000,"supernova":8000}' | python3 vote_monitor.py
 """
 
 from __future__ import annotations
@@ -38,7 +37,6 @@ VE_API_BASE = "http://127.0.0.1:8787"
 DEFAULT_BALANCES = {
     "blackhole": 15000,
     "supernova": 8000,
-    "fullsail": 50000,
 }
 
 
@@ -53,7 +51,7 @@ def _call_api(endpoint: str, params: dict = None) -> dict | None:
 
     try:
         req = urllib.request.Request(url, headers={"Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=15) as resp:  # nosec B310 — fixed localhost ve API base
             return json.loads(resp.read().decode())
     except Exception as e:
         return {"error": str(e)}
@@ -95,7 +93,6 @@ def action_strategy(profile: str = "conservative", **balances) -> dict:
     params = {
         "blackhole": balances.get("blackhole", DEFAULT_BALANCES["blackhole"]),
         "supernova": balances.get("supernova", DEFAULT_BALANCES["supernova"]),
-        "fullsail": balances.get("fullsail", DEFAULT_BALANCES["fullsail"]),
         "profile": profile,
     }
     data = _call_api("/api/strategy", params)
@@ -111,7 +108,6 @@ def action_digest(profile: str = "conservative", **balances) -> dict:
     params = {
         "blackhole": balances.get("blackhole", DEFAULT_BALANCES["blackhole"]),
         "supernova": balances.get("supernova", DEFAULT_BALANCES["supernova"]),
-        "fullsail": balances.get("fullsail", DEFAULT_BALANCES["fullsail"]),
         "profile": profile,
         "format": "text",
     }
@@ -135,7 +131,6 @@ def action_performance(profile: str = "conservative", **balances) -> dict:
     params = {
         "blackhole": balances.get("blackhole", DEFAULT_BALANCES["blackhole"]),
         "supernova": balances.get("supernova", DEFAULT_BALANCES["supernova"]),
-        "fullsail": balances.get("fullsail", DEFAULT_BALANCES["fullsail"]),
         "profile": profile,
     }
     data = _call_api("/api/performance", params)
@@ -157,9 +152,7 @@ def main():
 
     action = params.get("action", "snapshot")
     profile = params.get("profile", "conservative")
-    balances = {
-        k: params.get(k, DEFAULT_BALANCES.get(k)) for k in ["blackhole", "supernova", "fullsail"]
-    }
+    balances = {k: params.get(k, DEFAULT_BALANCES.get(k)) for k in ["blackhole", "supernova"]}
 
     if action == "snapshot":
         result = action_snapshot()
