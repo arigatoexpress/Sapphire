@@ -31,8 +31,16 @@ jobs:
     name: lint (ruff)
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/Library/Caches/uv
+            ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ hashFiles('requirements-test.txt') }}
+          restore-keys: uv-${{ runner.os }}-
       - name: ruff check
         run: uv run --python 3.11 --no-project --with ruff==0.7.4 ruff check --output-format=github .
       # Note: `ruff format --check` would currently flag 373 pre-existing
@@ -42,13 +50,21 @@ jobs:
   test:
     name: test (pytest)
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
-    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
     needs: lint
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
+    timeout-minutes: 15
     env:
       AUTH_PASSWORD: ci-placeholder
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/Library/Caches/uv
+            ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ hashFiles('requirements-test.txt') }}
+          restore-keys: uv-${{ runner.os }}-
       - name: pytest (unit + coverage)
         # PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 is set at the job level to avoid
         # loading stray plugins. pytest-asyncio must then be loaded explicitly
@@ -75,20 +91,36 @@ jobs:
   plugin-test:
     name: plugin tests
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
-    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
     needs: lint
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/Library/Caches/uv
+            ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ hashFiles('requirements-test.txt') }}}
+          restore-keys: uv-${{ runner.os }}-
       - name: pytest (claw-sapphire)
         run: uv run --python 3.11 --no-project --with-requirements requirements-test.txt pytest plugins/claw-sapphire/tests/ -q
 
   test-inventory:
     name: test inventory
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
-    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
     needs: lint
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/Library/Caches/uv
+            ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ hashFiles('requirements-test.txt') }}
+          restore-keys: uv-${{ runner.os }}-
       - name: README test inventory
         run: |
           uv run --python 3.11 --no-project --with-requirements requirements-test.txt \
@@ -97,10 +129,18 @@ jobs:
   public-boundary-smoke:
     name: public boundary smoke
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
-    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
     needs: lint
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/Library/Caches/uv
+            ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ hashFiles('requirements-test.txt') }}
+          restore-keys: uv-${{ runner.os }}-
       - name: scan public routes for admin data leaks
         run: |
           uv run --python 3.11 --no-project --with-requirements requirements-test.txt \
@@ -110,18 +150,27 @@ jobs:
     name: tool registry invariants
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/Library/Caches/uv
+            ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ hashFiles('requirements-test.txt') }}
+          restore-keys: uv-${{ runner.os }}-
       - run: uv run --python 3.11 --no-project --with pyyaml python scripts/validate_tool_registry.py
 
   pine-lint:
     name: pine static analyzer
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          fetch-depth: 0
+          fetch-depth: 2
       - name: detect pine-relevant changes
         id: changed
         run: |
@@ -154,11 +203,23 @@ jobs:
 
   smoke-test:
     name: container smoke test
-    if: github.ref == 'refs/heads/main' && vars.SAPPHIRE_RUNNER != ''
-    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
+    if: (github.event_name == 'pull_request' || github.ref == 'refs/heads/main') && vars.SAPPHIRE_RUNNER != ''
     needs: test
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Ensure Docker Desktop is running
+        run: |
+          if ! docker info >/dev/null 2>&1; then
+            open -a Docker
+            for i in $(seq 1 60); do
+              docker info >/dev/null 2>&1 && exit 0
+              sleep 2
+            done
+            echo "Docker Desktop did not start" >&2
+            exit 1
+          fi
       - name: Verify analytics deploy source
         run: python3 scripts/ops/verify_analytics_deploy_source.py --source-dir services/analytics_dashboard
       - name: Build analytics dashboard image
@@ -194,8 +255,9 @@ jobs:
     # Deploy only when the self-hosted runner and Google WIF variables are
     # configured. Otherwise the auth action fails before it can no-op.
     if: github.ref == 'refs/heads/main' && vars.SAPPHIRE_RUNNER != '' && vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_SERVICE_ACCOUNT != ''
-    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     needs: [test, smoke-test]
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
+    timeout-minutes: 10
     permissions:
       contents: read
       id-token: write
@@ -230,11 +292,19 @@ jobs:
     name: gitleaks (secrets)
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
+    timeout-minutes: 15
     permissions:
       contents: read
       pull-requests: read
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/Library/Caches/uv
+            ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ hashFiles('requirements-test.txt') }}
+          restore-keys: uv-${{ runner.os }}-
       - name: Install gitleaks when missing
         run: |
           if ! command -v gitleaks >/dev/null 2>&1; then
