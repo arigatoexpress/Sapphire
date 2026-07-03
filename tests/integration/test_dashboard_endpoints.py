@@ -1313,3 +1313,60 @@ def test_readiness_check_endpoint_404_when_missing(app_client, tmp_path, monkeyp
     body = r.get_json()
     assert body["status"] == "error"
     assert body["error"] == "check not found"
+
+
+# --------------------------------------------------------------------------- #
+# /api/forecast/explain/<symbol> — the "Why?" panel backend
+# --------------------------------------------------------------------------- #
+
+
+def _forecast_fixture():
+    return {
+        "rows": [
+            {
+                "symbol": "BTC",
+                "kronos": {"direction": "bullish", "confidence": 0.8},
+                "ta": {"direction": "bullish", "confidence": 0.75},
+                "consensus": "AGREE_BULL",
+                "edge_score": 0.78,
+            }
+        ]
+    }
+
+
+def test_api_forecast_explain_requires_auth(app_client):
+    _, client = app_client
+    r = client.get("/api/forecast/explain/BTC")
+    assert r.status_code == 401
+
+
+def test_api_forecast_explain_returns_structured_rationale(app_client, monkeypatch):
+    _, client = app_client
+    import lib.analytics.forecast as forecast_mod
+
+    monkeypatch.setattr(forecast_mod, "forecast", _forecast_fixture)
+
+    r = client.get("/api/forecast/explain/btc", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["kind"] == "forecast"
+    assert data["symbol"] == "BTC"
+    assert data["regime"] == "STRONG_BULL"
+    assert data["components"]
+    assert data["rationale_short"]
+    assert data["confidence_band"] == "high"
+
+
+def test_api_forecast_explain_unknown_symbol_is_graceful(app_client, monkeypatch):
+    _, client = app_client
+    import lib.analytics.forecast as forecast_mod
+
+    monkeypatch.setattr(forecast_mod, "forecast", _forecast_fixture)
+
+    r = client.get("/api/forecast/explain/DOGE", headers={"Authorization": _AUTH})
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["kind"] == "forecast"
+    assert data["symbol"] == "DOGE"
+    assert data["regime"] == "NEUTRAL"
+    assert data["components"] == []

@@ -7254,6 +7254,37 @@ def api_forecast():
         ), 200
 
 
+@app.route("/api/forecast/explain/<symbol>")
+@requires_auth
+def api_forecast_explain(symbol):
+    """Structured rationale for one symbol's forecast row (the "Why?" panel)."""
+    sym = (symbol or "?").upper()
+    try:
+        from lib.analytics.forecast import forecast
+        from lib.analytics.forecast_explain import explain_forecast
+
+        rows = forecast().get("rows") or []
+        row = next((r for r in rows if r.get("symbol") == sym), {})
+        return jsonify(explain_forecast(row, symbol=sym))
+    except Exception as e:
+        log.warning("forecast explain API error for %s: %s", sym, e)
+        return jsonify(
+            {
+                "kind": "forecast",
+                "symbol": sym,
+                "headline": f"{sym}: no data",
+                "regime": "NEUTRAL",
+                "score": 0.0,
+                "components": [],
+                "rationale_short": "forecast data unavailable",
+                "rationale_long": f"Failed to build rationale for {sym}.",
+                "confidence_band": "low",
+                "show_math": {},
+                "error": str(e),
+            }
+        ), 200
+
+
 @app.route("/api/backtest-results")
 @requires_auth
 def api_backtest_results():
