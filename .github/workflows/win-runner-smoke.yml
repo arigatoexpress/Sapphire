@@ -18,6 +18,7 @@ defaults:
 jobs:
   smoke:
     name: windows runner smoke
+    if: ${{ vars.SAPPHIRE_RUNNER != '' }}
     runs-on: [self-hosted, Windows, X64, sapphire-win]
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
