@@ -8,7 +8,7 @@
 
 [![CI](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/ci.yml)
 [![Security](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/arigatoexpress/Sapphire/actions/workflows/security.yml)
-[![Tests](https://img.shields.io/badge/tests-7%2C184%2B%20passing-2ea44f)](scripts/ops/test_inventory.py)
+[![Tests](https://img.shields.io/badge/tests-7%2C150%2B%20passing-2ea44f)](scripts/ops/test_inventory.py)
 [![License](https://img.shields.io/badge/license-proprietary-0A2540)](LICENSE)
 
 **A self-sovereign operating system for capital intelligence, autonomous operations, and acquisition-grade diligence.**
@@ -57,8 +57,18 @@ Six concerns share one event bus (Redis Streams + JSONL fallback):
 - Fail-closed trading: $5/order cap, $25/day loss limit, global kill switch
 - 4-tier inference mesh (GPU → Pi ×2 → Mac CPU → Kimi Cloud)
 - Live Brain synthesis endpoint at `sapphirealpha.xyz/api/brain/synthesis`
-- 7,184+ passing tests across 436 files
+- 7,150+ passing tests across 435+ files
 - 3 Solidity contracts on Robinhood Chain testnet
+
+## Test inventory
+
+Counts are enforced in CI by `scripts/ops/test_inventory.py --check-readme` (no
+overclaiming; refresh when actuals drift more than 50).
+
+| Metric | Count | Detail |
+|---|---|---|
+| Passing tests | **7,150+** | 6,550+ unit · 604 plugin (`scripts/ops/test_inventory.py --check-readme`) |
+| Test files | **435+** | `tests/unit/` and `plugins/claw-sapphire/tests/` |
 
 ## Tech stack
 
