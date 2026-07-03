@@ -22,11 +22,15 @@ permissions:
   contents: read
   pull-requests: read
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   lint:
     name: lint (ruff)
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
-    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: ruff check
@@ -38,7 +42,7 @@ jobs:
   test:
     name: test (pytest)
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
-    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
     needs: lint
     env:
       AUTH_PASSWORD: ci-placeholder
@@ -71,7 +75,7 @@ jobs:
   plugin-test:
     name: plugin tests
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
-    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
     needs: lint
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -81,7 +85,7 @@ jobs:
   test-inventory:
     name: test inventory
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
-    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
     needs: lint
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -93,7 +97,7 @@ jobs:
   public-boundary-smoke:
     name: public boundary smoke
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
-    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
     needs: lint
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -105,7 +109,7 @@ jobs:
   tool-registry:
     name: tool registry invariants
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
-    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - run: uv run --python 3.11 --no-project --with pyyaml python scripts/validate_tool_registry.py
@@ -113,7 +117,7 @@ jobs:
   pine-lint:
     name: pine static analyzer
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
-    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:

@@ -1,0 +1,45 @@
+name: win-runner-smoke
+
+# One-shot validation that the Windows runner (win-sapphire) can execute the
+# repo's portable CI jobs, BEFORE flipping SAPPHIRE_RUNNER_TESTS. Dispatch:
+#   gh workflow run win-runner-smoke.yml
+# Safe to keep around: manual-only, no schedule, no PR trigger.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  smoke:
+    name: windows runner smoke
+    if: ${{ vars.SAPPHIRE_RUNNER != '' }}
+    runs-on: [self-hosted, Windows, X64, sapphire-win]
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: toolchain sanity
+        run: |
+          uv --version
+          git --version
+          uv run --python 3.11 --no-project python -c "import sys; print(sys.version)"
+      - name: ruff (same as lint job)
+        run: uv run --python 3.11 --no-project --with ruff==0.7.4 ruff check --output-format=github . || true
+      - name: unit tests (subset, same harness as test job)
+        env:
+          AUTH_PASSWORD: ci-placeholder
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: |
+          uv run --python 3.11 --no-project --with-requirements requirements-test.txt pytest \
+            tests/unit/test_forecast.py tests/unit/test_forecast_explain.py \
+            --tb=short -q \
+            -p no:cacheprovider \
+            -p pytest_asyncio.plugin
+      - name: test inventory script parses README
+        run: |
+          uv run --python 3.11 --no-project --with-requirements requirements-test.txt \
+            python scripts/ops/test_inventory.py --check-readme --max-drift 50
