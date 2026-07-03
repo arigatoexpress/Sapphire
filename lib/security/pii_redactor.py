@@ -93,7 +93,7 @@ _REDACTED_EMAIL_RE = re.compile(
 )
 
 # Already-redacted markers so we can short-circuit the idempotence guarantee.
-_REDACTED_NAME_RE = re.compile(r"^customer_[0-9a-f]{6}$")
+_REDACTED_NAME_RE = re.compile(r"^customer_([0-9a-f]{6}|unknown)$")
 _REDACTED_PHONE_RE = re.compile(r"\*{3}-\*{3}-\d{4}")
 _REDACTED_EMAIL_LOCAL_RE = re.compile(r"^[A-Za-z0-9._%+-]{1,2}\*{3}$")
 
