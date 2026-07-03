@@ -30,11 +30,12 @@ SUITES = (
 )
 FILE_COUNT_RE = re.compile(r"^(?P<path>.+\.py):\s+(?P<count>\d+)\s*$")
 SUMMARY_RE = re.compile(r"(?P<count>\d+)\s+tests?\s+collected")
+# The 2026-05-30 README overhaul (d762e899) replaced the counts table with a
+# single prose bullet; parse that instead. Unit/plugin split is no longer
+# advertised, so only total + files are checked against the README.
 README_TESTS_RE = re.compile(
-    r"\| Passing tests \| \*\*(?P<total>[\d,]+)\+\*\* \| "
-    r"(?P<unit>[\d,]+)\+ unit · (?P<plugin>[\d,]+) plugin"
+    r"- (?P<total>[\d,]+)\+ passing tests across (?P<files>[\d,]+) files"
 )
-README_FILES_RE = re.compile(r"\| Test files \| \*\*(?P<files>[\d,]+)\+\*\* \|")
 README_BADGE_RE = re.compile(
     r"\[!\[Tests\]\(https://img\.shields\.io/badge/tests-(?P<label>[^-]+)-2ea44f\)\]"
 )
@@ -162,13 +163,9 @@ def read_readme_counts(readme_path: Path = README) -> dict[str, int]:
         raise ValueError("README Tests badge was not found")
     tests_match = README_TESTS_RE.search(text)
     if not tests_match:
-        raise ValueError("README Passing tests row was not found")
-    files_match = README_FILES_RE.search(text)
-    if not files_match:
-        raise ValueError("README Test files row was not found")
+        raise ValueError("README passing-tests bullet was not found")
     counts = {name: int(value.replace(",", "")) for name, value in tests_match.groupdict().items()}
     counts["badge_total"] = parse_badge_total(badge_match.group("label"))
-    counts["files"] = int(files_match.group("files").replace(",", ""))
     return counts
 
 
@@ -192,7 +189,7 @@ def check_readme_inventory(
         **{suite.name: suite.tests for suite in inventory.suites},
     }
     advertised = read_readme_counts(readme_path)
-    deltas = {key: actual[key] - advertised[key] for key in ("total", "unit", "plugin", "files")}
+    deltas = {key: actual[key] - advertised[key] for key in ("total", "files")}
     deltas["badge_total"] = actual["total"] - advertised["badge_total"]
     overclaims = {key: delta for key, delta in deltas.items() if delta < 0}
     stale = {key: delta for key, delta in deltas.items() if delta > max_drift}
