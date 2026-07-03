@@ -36,7 +36,8 @@ def test_weekly_backtest_runs_strategy_sweep_and_uploads_artifacts() -> None:
     assert "data/backtests/strategies/*.json" in run_blocks or any(
         "data/backtests/strategies/*.json" in str(step.get("with", {})) for step in steps
     )
-    assert "actions/upload-artifact@v4" in used_actions
+    # Workflows SHA-pin actions (security hardening); accept any pinned rev.
+    assert any(a.startswith("actions/upload-artifact@") for a in used_actions)
 
 
 def test_weekly_backtest_needs_no_repository_write_permission() -> None:
@@ -60,7 +61,8 @@ def test_threat_refresh_uses_native_public_sources_and_uploads_artifacts() -> No
     env_blocks = [step.get("env", {}) for step in steps]
 
     assert "python services/dashboard/refresh_threats.py" in run_blocks
-    assert "actions/upload-artifact@v4" in used_actions
+    # Workflows SHA-pin actions (security hardening); accept any pinned rev.
+    assert any(a.startswith("actions/upload-artifact@") for a in used_actions)
     assert any("data/intelligence/**/threats.json" in str(step.get("with", {})) for step in steps)
     assert any(
         env.get("SAPPHIRE_THREATS_BOT_BIN") == "native"
