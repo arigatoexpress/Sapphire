@@ -31,6 +31,7 @@ jobs:
     name: lint (ruff)
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: ruff check
@@ -42,8 +43,9 @@ jobs:
   test:
     name: test (pytest)
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
-    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
     needs: lint
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
+    timeout-minutes: 15
     env:
       AUTH_PASSWORD: ci-placeholder
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
@@ -75,8 +77,9 @@ jobs:
   plugin-test:
     name: plugin tests
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
-    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
     needs: lint
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: pytest (claw-sapphire)
@@ -85,8 +88,9 @@ jobs:
   test-inventory:
     name: test inventory
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
-    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
     needs: lint
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: README test inventory
@@ -97,8 +101,9 @@ jobs:
   public-boundary-smoke:
     name: public boundary smoke
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
-    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
     needs: lint
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: scan public routes for admin data leaks
@@ -110,6 +115,7 @@ jobs:
     name: tool registry invariants
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - run: uv run --python 3.11 --no-project --with pyyaml python scripts/validate_tool_registry.py
@@ -118,10 +124,11 @@ jobs:
     name: pine static analyzer
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          fetch-depth: 0
+          fetch-depth: 2
       - name: detect pine-relevant changes
         id: changed
         run: |
@@ -154,11 +161,23 @@ jobs:
 
   smoke-test:
     name: container smoke test
-    if: github.ref == 'refs/heads/main' && vars.SAPPHIRE_RUNNER != ''
-    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
+    if: (github.event_name == 'pull_request' || github.ref == 'refs/heads/main') && vars.SAPPHIRE_RUNNER != ''
     needs: test
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Ensure Docker Desktop is running
+        run: |
+          if ! docker info >/dev/null 2>&1; then
+            open -a Docker
+            for i in $(seq 1 60); do
+              docker info >/dev/null 2>&1 && exit 0
+              sleep 2
+            done
+            echo "Docker Desktop did not start" >&2
+            exit 1
+          fi
       - name: Verify analytics deploy source
         run: python3 scripts/ops/verify_analytics_deploy_source.py --source-dir services/analytics_dashboard
       - name: Build analytics dashboard image
@@ -194,8 +213,9 @@ jobs:
     # Deploy only when the self-hosted runner and Google WIF variables are
     # configured. Otherwise the auth action fails before it can no-op.
     if: github.ref == 'refs/heads/main' && vars.SAPPHIRE_RUNNER != '' && vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_SERVICE_ACCOUNT != ''
-    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
     needs: [test, smoke-test]
+    runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
+    timeout-minutes: 10
     permissions:
       contents: read
       id-token: write
@@ -230,6 +250,7 @@ jobs:
     name: gitleaks (secrets)
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER) }}
+    timeout-minutes: 15
     permissions:
       contents: read
       pull-requests: read
