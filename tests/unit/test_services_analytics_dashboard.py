@@ -1545,3 +1545,139 @@ def test_brain_synthesize_llm_short_circuits_on_blocklist_hit(app_module, monkey
     result = brain._synthesize_llm({"ts": "t", "silos": {}})
     assert result is None
     assert sentinel["called"] is False
+
+
+# ---------------------------------------------------------------------------
+# /api/wildfire/situation — public-safe bridge to the wildfire tool
+# ---------------------------------------------------------------------------
+
+
+def _fake_wildfire_tool(result):
+    return types.SimpleNamespace(handle=lambda payload: result)
+
+
+def _situation_result(**overrides):
+    result = {
+        "ok": True,
+        "cached": True,
+        "situation": {
+            "as_of": "2026-07-03T12:00:00+00:00",
+            "home": {"lat": 39.7, "lon": -105.0, "label": "home"},
+            "radius_km": 80.0,
+            "level": "high",
+            "alerts": [
+                {
+                    "event": "Red Flag Warning",
+                    "headline": "Red Flag Warning until 8 PM",
+                    "severity": "Severe",
+                    "area": "Front Range Foothills",
+                    "onset": "2026-07-03T10:00:00-06:00",
+                    "ends": "2026-07-03T20:00:00-06:00",
+                }
+            ],
+            "incidents": [
+                {
+                    "name": "Alpha Fire",
+                    "acres": 1200,
+                    "percent_contained": 35,
+                    "category": "WF",
+                    "county": "Jefferson",
+                    "state": "US-CO",
+                    "discovered": "2026-07-01T00:00:00+00:00",
+                    "lat": 39.9,
+                    "lon": -105.3,
+                    "distance_km": 32.5,
+                }
+            ],
+            "hotspots": [{"lat": 39.8, "lon": -105.1, "distance_km": 12.0}],
+            "feed_errors": {"firms_hotspots": "URLError: boom"},
+            "sources": {},
+        },
+    }
+    result.update(overrides)
+    return result
+
+
+def test_wildfire_situation_unavailable_when_tool_missing(app_module, client, tmp_path):
+    app_module._WILDFIRE_TOOL_PATH = tmp_path / "does-not-exist.py"
+    app_module._wildfire_tool = None
+    resp = client.get("/api/wildfire/situation")
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    assert payload == {"available": False, "level": "unknown"}
+
+
+def test_wildfire_situation_returns_public_safe_payload(app_module, client):
+    app_module._wildfire_tool = _fake_wildfire_tool(_situation_result())
+    resp = client.get("/api/wildfire/situation")
+    assert resp.status_code == 200
+    payload = resp.get_json()
+
+    assert payload["available"] is True
+    assert payload["level"] == "high"
+    assert payload["as_of"] == "2026-07-03T12:00:00+00:00"
+    assert payload["cached"] is True
+    assert payload["stale"] is False
+    assert payload["alerts"] == [
+        {
+            "event": "Red Flag Warning",
+            "headline": "Red Flag Warning until 8 PM",
+            "severity": "Severe",
+            "area": "Front Range Foothills",
+            "onset": "2026-07-03T10:00:00-06:00",
+            "ends": "2026-07-03T20:00:00-06:00",
+        }
+    ]
+    assert payload["incidents"] == [
+        {
+            "name": "Alpha Fire",
+            "distance_km": 32.5,
+            "acres": 1200,
+            "percent_contained": 35,
+            "category": "WF",
+            "county": "Jefferson",
+            "state": "US-CO",
+            "discovered": "2026-07-01T00:00:00+00:00",
+        }
+    ]
+    assert payload["hotspot_count"] == 1
+    assert payload["degraded_feeds"] == ["firms_hotspots"]
+
+
+def test_wildfire_situation_never_leaks_home_or_hotspot_coords(app_module, client):
+    """The raw situation carries home + hotspot lat/lons — an unauthenticated
+    endpoint must never echo them (field whitelist, not blacklist)."""
+    app_module._wildfire_tool = _fake_wildfire_tool(_situation_result())
+    body = client.get("/api/wildfire/situation").get_data(as_text=True)
+    assert "home" not in body
+    assert "39.7" not in body and "-105.0" not in body  # home coords
+    assert "39.8" not in body and "-105.1" not in body  # hotspot coords
+    payload = json.loads(body)
+    assert "hotspots" not in payload  # only hotspot_count survives
+    assert "lat" not in payload["incidents"][0]
+    assert "lon" not in payload["incidents"][0]
+
+
+def test_wildfire_situation_degrades_on_tool_error(app_module, client):
+    def _boom(payload):
+        raise RuntimeError("feed exploded")
+
+    app_module._wildfire_tool = types.SimpleNamespace(handle=_boom)
+    resp = client.get("/api/wildfire/situation")
+    assert resp.status_code == 200
+    assert resp.get_json() == {"available": False, "level": "unknown"}
+
+
+def test_wildfire_situation_degrades_on_not_ok_result(app_module, client):
+    app_module._wildfire_tool = _fake_wildfire_tool({"ok": False, "error": "bad config"})
+    resp = client.get("/api/wildfire/situation")
+    assert resp.get_json() == {"available": False, "level": "unknown"}
+
+
+def test_wildfire_tool_loads_from_repo_checkout(app_module):
+    """In a full repo checkout the real plugin module loads and is memoized."""
+    assert app_module._WILDFIRE_TOOL_PATH.exists()
+    tool = app_module._load_wildfire_tool()
+    assert tool is not None
+    assert callable(tool.handle)
+    assert app_module._load_wildfire_tool() is tool

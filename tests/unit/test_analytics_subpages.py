@@ -413,6 +413,10 @@ def test_p_wildfire_smoke(monkeypatch):
     assert "signals_24h" not in body
     assert "signals_7d" not in body
     assert "PUBLIC_STATUS" in body
+    # Live situation panel (PR #882 monitor) is wired client-side.
+    assert "/api/wildfire/situation" in body
+    assert "LIVE_SITUATION" in body
+    assert "wf-incidents" in body
     assert "MISSION_CONTROLS" in body
 
 
