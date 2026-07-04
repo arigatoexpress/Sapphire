@@ -25,6 +25,17 @@ paths = [
     '''tests/unit/test_ws_dashboard\.py''',
     # Property test intentionally generates fake token shapes and asserts redaction.
     '''tests/property/test_audit_panel_heuristics_properties\.py''',
+    # Unit tests that use fake sk-* key shapes as test fixtures to assert redaction.
+    # None of these are real secrets — they are adversarial inputs passed to the
+    # sensitivity classifier / audit-panel reporter under test.
+    '''tests/unit/test_adversarial_telemetry\.py''',
+    '''tests/unit/test_audit_panel_heuristics\.py''',
+    '''tests/unit/test_audit_panel_reporter\.py''',
+    '''tests/unit/test_tranche5_live_soak_readiness\.py''',
+    # Model-memberships task IDs contain hex strings of the form `task-<32-hex>`
+    # where the trailing `sk-<hex>` substring (from "ta-sk-") looks like a key.
+    # These are internal task tracking IDs, not secrets.
+    '''data/model_memberships\.json''',
     # Doc-fixture curl examples with placeholder bearer tokens — not real keys.
     '''docs/ops/customer-api-runbook\.md''',
     '''docs/products/customer-product-surface-0\.1\.0\.md''',
