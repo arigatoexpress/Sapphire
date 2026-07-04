@@ -12,6 +12,7 @@ Exposes:
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import logging
 import math
@@ -2137,6 +2138,104 @@ def hackathon_og_proof():
 def oguard_progress():
     """Public-safe live 0guard progress snapshot for the apex dashboard."""
     return jsonify(build_0guard_progress())
+
+
+# Wildfire situation monitor — bridges the claw-sapphire wildfire tool's
+# `situation` action (NWS + NIFC + optional FIRMS, PR #882) onto the public
+# dashboard. The tool module only exists in a full repo checkout; the Cloud Run
+# image is built from services/analytics_dashboard/ alone, so the endpoint
+# degrades to {"available": false} there instead of erroring.
+_WILDFIRE_TOOL_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "plugins"
+    / "claw-sapphire"
+    / "tools"
+    / "internal"
+    / "wildfire.py"
+)
+_wildfire_tool = None
+
+
+def _load_wildfire_tool():
+    """Load (and memoize) the wildfire tool module, or None if unavailable."""
+    global _wildfire_tool
+    if _wildfire_tool is not None:
+        return _wildfire_tool
+    if not _WILDFIRE_TOOL_PATH.exists():
+        return None
+    spec = importlib.util.spec_from_file_location(
+        "sapphire_dashboard_wildfire_tool", _WILDFIRE_TOOL_PATH
+    )
+    if spec is None or spec.loader is None:
+        return None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    _wildfire_tool = module
+    return module
+
+
+def _public_wildfire_payload(result: dict) -> dict:
+    """Whitelist the situation result down to public-safe fields.
+
+    The raw situation includes the operator's home coordinates and raw hotspot
+    lat/lons; this is an unauthenticated endpoint, so only the level, alert
+    rows, and incident rows (public NIFC data) pass through.
+    """
+    situation = result.get("situation") or {}
+    alerts = [
+        {k: a.get(k) for k in ("event", "headline", "severity", "area", "onset", "ends")}
+        for a in situation.get("alerts") or []
+    ]
+    incidents = [
+        {
+            k: i.get(k)
+            for k in (
+                "name",
+                "distance_km",
+                "acres",
+                "percent_contained",
+                "category",
+                "county",
+                "state",
+                "discovered",
+            )
+        }
+        for i in situation.get("incidents") or []
+    ]
+    return {
+        "available": True,
+        "level": situation.get("level", "unknown"),
+        "as_of": situation.get("as_of"),
+        "radius_km": situation.get("radius_km"),
+        "cached": bool(result.get("cached")),
+        "stale": bool(result.get("stale")),
+        "alerts": alerts,
+        "incidents": incidents,
+        "hotspot_count": len(situation.get("hotspots") or []),
+        "degraded_feeds": sorted(situation.get("feed_errors") or {}),
+    }
+
+
+@app.get("/api/wildfire/situation")
+def wildfire_situation():
+    """Public-safe live fire-situation snapshot for /p/wildfire.
+
+    Read-only: delegates to the wildfire tool's cached `situation` action
+    (never forces a refresh), so browser polling stays within the tool's own
+    feed-cache TTL.
+    """
+    tool = _load_wildfire_tool()
+    if tool is None:
+        return jsonify({"available": False, "level": "unknown"})
+    try:
+        result = tool.handle({"action": "situation"})
+        if not result.get("ok"):
+            raise ValueError(result.get("error") or "situation action failed")
+    except Exception as exc:
+        log.info("wildfire situation miss: %s", exc)
+        return jsonify({"available": False, "level": "unknown"})
+    return jsonify(_public_wildfire_payload(result))
 
 
 @app.route("/<path:path>", methods=["GET", "HEAD", "POST"])
