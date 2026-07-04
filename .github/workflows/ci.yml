@@ -34,13 +34,6 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: |
-            ~/Library/Caches/uv
-            ~/.cache/uv
-          key: uv-${{ runner.os }}-${{ hashFiles('requirements-test.txt') }}
-          restore-keys: uv-${{ runner.os }}-
       - name: ruff check
         run: uv run --python 3.11 --no-project --with ruff==0.7.4 ruff check --output-format=github .
       # Note: `ruff format --check` would currently flag 373 pre-existing
@@ -58,13 +51,6 @@ jobs:
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: |
-            ~/Library/Caches/uv
-            ~/.cache/uv
-          key: uv-${{ runner.os }}-${{ hashFiles('requirements-test.txt') }}
-          restore-keys: uv-${{ runner.os }}-
       - name: pytest (unit + coverage)
         # PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 is set at the job level to avoid
         # loading stray plugins. pytest-asyncio must then be loaded explicitly
@@ -96,13 +82,6 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: |
-            ~/Library/Caches/uv
-            ~/.cache/uv
-          key: uv-${{ runner.os }}-${{ hashFiles('requirements-test.txt') }}}
-          restore-keys: uv-${{ runner.os }}-
       - name: pytest (claw-sapphire)
         run: uv run --python 3.11 --no-project --with-requirements requirements-test.txt pytest plugins/claw-sapphire/tests/ -q
 
@@ -114,13 +93,6 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: |
-            ~/Library/Caches/uv
-            ~/.cache/uv
-          key: uv-${{ runner.os }}-${{ hashFiles('requirements-test.txt') }}
-          restore-keys: uv-${{ runner.os }}-
       - name: README test inventory
         run: |
           uv run --python 3.11 --no-project --with-requirements requirements-test.txt \
@@ -134,13 +106,6 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: |
-            ~/Library/Caches/uv
-            ~/.cache/uv
-          key: uv-${{ runner.os }}-${{ hashFiles('requirements-test.txt') }}
-          restore-keys: uv-${{ runner.os }}-
       - name: scan public routes for admin data leaks
         run: |
           uv run --python 3.11 --no-project --with-requirements requirements-test.txt \
@@ -153,13 +118,6 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: |
-            ~/Library/Caches/uv
-            ~/.cache/uv
-          key: uv-${{ runner.os }}-${{ hashFiles('requirements-test.txt') }}
-          restore-keys: uv-${{ runner.os }}-
       - run: uv run --python 3.11 --no-project --with pyyaml python scripts/validate_tool_registry.py
 
   pine-lint:
@@ -298,13 +256,6 @@ jobs:
       pull-requests: read
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: |
-            ~/Library/Caches/uv
-            ~/.cache/uv
-          key: uv-${{ runner.os }}-${{ hashFiles('requirements-test.txt') }}
-          restore-keys: uv-${{ runner.os }}-
       - name: Install gitleaks when missing
         run: |
           if ! command -v gitleaks >/dev/null 2>&1; then
