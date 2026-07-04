@@ -443,6 +443,17 @@ ROUTE_CONTRACTS: tuple[RouteBoundaryContract, ...] = (
         frontend_fetch=True,
     ),
     RouteBoundaryContract(
+        path="/api/wildfire/situation",
+        method="GET",
+        surface_id="analytics_public_site",
+        boundary="public_safe",
+        exposure="public_json",
+        expected_statuses=(200,),
+        source="services/analytics_dashboard/app.py",
+        verification=("tests/unit/test_services_analytics_dashboard.py",),
+        frontend_fetch=True,
+    ),
+    RouteBoundaryContract(
         path="/api/regime",
         method="GET",
         surface_id="analytics_public_site",
