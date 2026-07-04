@@ -15,11 +15,18 @@ RUNNER_IF_MAIN_WITH_GCP_WIF = (
     "github.ref == 'refs/heads/main' && vars.SAPPHIRE_RUNNER != '' "
     "&& vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_SERVICE_ACCOUNT != ''"
 )
+# Smoke test runs on PRs as well as main (2026-07-03 CI hardening) but still
+# skips when no self-hosted runner is configured.
+RUNNER_IF_PR_OR_MAIN = (
+    "(github.event_name == 'pull_request' || github.ref == 'refs/heads/main') "
+    "&& vars.SAPPHIRE_RUNNER != ''"
+)
 ALLOWED_RUNNER_IFS = {
     RUNNER_IF,
     RUNNER_IF_ALWAYS,
     RUNNER_IF_MAIN,
     RUNNER_IF_MAIN_WITH_GCP_WIF,
+    RUNNER_IF_PR_OR_MAIN,
 }
 RUNS_ON = "${{ fromJSON(vars.SAPPHIRE_RUNNER) }}"
 # Hybrid split (2026-07-03): portable jobs may prefer the always-on Windows
