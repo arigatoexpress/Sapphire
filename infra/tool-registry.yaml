@@ -622,7 +622,7 @@ tools:
     owner: sapphire
     consumers: [wildfire-watch.ground-station, services.dashboard, hermes-agent.alerts]
     description: |
-      Ingest, query, and aggregate wildfire-watch drone signals. Validates a payload against the v1 wildfire_signal schema (~/Code/wildfire-watch/sapphire_integration/wildfire_signal_schema.json), appends to data/wildfire_signals.jsonl with idempotency on signal_id, emits a wildfire.signal.detected event_bus envelope, and exposes list/stats/schema_info actions. Never sends Telegram directly; the operator-supervised hermes wildfire-alert skill consumes the bus event.
+      Ingest, query, and aggregate wildfire-watch drone signals, plus monitor the local fire situation from public feeds. Drone path: validates a payload against the v1 wildfire_signal schema, appends to data/wildfire_signals.jsonl with idempotency on signal_id, emits wildfire.signal.detected, and exposes list/stats/schema_info. Public-feed path: `situation` fuses NWS fire-weather alerts + NIFC/WFIGS live incidents (+ optional NASA FIRMS hotspots via FIRMS_MAP_KEY) around the configured home location (data/wildfire_config.json, `config` action) into a leveled picture (none/elevated/high/critical), caches it, and emits wildfire.situation.updated; `fire_dept_brief` renders a public-safe markdown draft under data/wildfire/briefs/. Never sends Telegram or email directly; the operator-supervised hermes wildfire-alert skill consumes the bus events, and briefs are drafts a human sends.
 
   # MegaETH read-only RPC client (real-time L2, ~10ms blocks) — Tranche 7
   - name: megaeth
