@@ -18,7 +18,7 @@ dev = [
     # has the optional service deps the unit suite imports.
     "aiohttp==3.14.0",
     "annotated-doc==0.0.4",
-    "fastapi==0.136.1",
+    "fastapi==0.139.0",
     "feedparser==6.0.12",
     "flask==3.1.3",
     "google-generativeai==0.8.6",
