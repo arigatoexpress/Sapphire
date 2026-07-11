@@ -76,6 +76,10 @@ if not AUTH_PASSWORD:
 if AUTH_PASSWORD.lower() in WEAK_AUTH_PASSWORDS:
     raise RuntimeError("AUTH_PASSWORD must not use a known default value")
 
+# Dashboard port — honour the PORT env var so internal self-references stay
+# correct regardless of how the service is launched.
+DASHBOARD_PORT = int(os.environ.get("PORT", 8082))
+
 # x402 payment gate — optional, disabled unless X402_ENABLED=1
 import sys as _sys  # noqa: E402
 
@@ -203,6 +207,7 @@ STRATEGY_PERFORMANCE_CACHE_DURATION = 30
 MARKET_UNIVERSE_CACHE_DURATION = 60
 STRATEGY_LAB_CACHE_DURATION = 300
 CROSS_ASSET_CACHE_DURATION = 300
+RH_CHAIN_LOCAL_CACHE_DURATION = 5
 
 # ── In-process latency metrics (per-route rolling) ─────────────────────────
 # Keeps a bounded ring buffer of (method, path, ms) samples plus per-route
@@ -2523,7 +2528,7 @@ def api_system():
 
         services = [
             ("control-plane", "127.0.0.1", 8082, "/health"),
-            ("dashboard", "127.0.0.1", 8080, "/health"),
+            ("dashboard", "127.0.0.1", DASHBOARD_PORT, "/health"),
             ("signal-logger", "127.0.0.1", 18081, "/health"),
             ("pm-bot", "127.0.0.1", 18082, "/health"),
             ("openbb-api", "127.0.0.1", 6900, None),  # TCP: /api/v1/system/status 404s
@@ -2747,7 +2752,7 @@ def api_health_summary():
         checks = [
             # (name, category, host, port, path)
             ("control-plane", "cloud", "127.0.0.1", 8082, "/health"),
-            ("dashboard", "cloud", "127.0.0.1", 8080, "/health"),
+            ("dashboard", "cloud", "127.0.0.1", DASHBOARD_PORT, "/health"),
             ("signal-logger", "cloud", "127.0.0.1", 18081, "/health"),
             ("pm-bot", "cloud", "127.0.0.1", 18082, "/health"),
             ("inference-proxy", "cloud", "127.0.0.1", 11435, "/health"),
@@ -2905,7 +2910,7 @@ def api_production_readiness():
             ("signal-logger /health", "http://127.0.0.1:18081/health"),
             ("inference-proxy /health", "http://127.0.0.1:11435/health"),
             ("control-plane /health", "http://127.0.0.1:8082/health"),
-            ("dashboard /health", "http://127.0.0.1:8080/health"),
+            ("dashboard /health", f"http://127.0.0.1:{DASHBOARD_PORT}/health"),
         ]:
             t0 = time.time()
             result = fetch_sync(url)
@@ -3219,6 +3224,51 @@ def api_robinhood_payment_stats():
     except Exception as e:
         log.exception("robinhood payment stats failed")
         return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+
+
+@app.route("/api/chain/robinhood/local-state")
+@requires_auth
+def api_robinhood_chain_local_state():
+    """Compact summary of the local Robinhood Chain stack (ops-state/rh-chain)."""
+    try:
+        from lib.chain.rh_chain_local import build_local_state_summary
+
+        data = get_cached(
+            "rh_chain_local_state",
+            build_local_state_summary,
+            ttl=RH_CHAIN_LOCAL_CACHE_DURATION,
+            raise_on_miss=True,
+        )
+        return jsonify(_maybe_buyer_safe_payload(data))
+    except Exception as e:
+        log.exception("robinhood chain local state failed")
+        return jsonify({"ok": False, "error": f"{type(e).__name__}: {e}"}), 500
+
+
+@app.route("/api/chain/robinhood/local-memes")
+@requires_auth
+def api_robinhood_chain_local_memes():
+    """Full memes-state.json from the local orderflow collector."""
+    try:
+        from lib.chain.rh_chain_local import load_memes_state
+
+        return jsonify(_maybe_buyer_safe_payload(load_memes_state()))
+    except Exception as e:
+        log.exception("robinhood chain local memes failed")
+        return jsonify({"ok": False, "error": f"{type(e).__name__}: {e}"}), 500
+
+
+@app.route("/api/chain/robinhood/local-feed")
+@requires_auth
+def api_robinhood_chain_local_feed():
+    """Full rh-feed-state.json from the local sequencer feed listener."""
+    try:
+        from lib.chain.rh_chain_local import load_feed_state
+
+        return jsonify(_maybe_buyer_safe_payload(load_feed_state()))
+    except Exception as e:
+        log.exception("robinhood chain local feed failed")
+        return jsonify({"ok": False, "error": f"{type(e).__name__}: {e}"}), 500
 
 
 @app.route("/chain/sentinel")
@@ -7820,6 +7870,85 @@ def api_trading_brain():
         return jsonify({"error": str(e), "decisions": {}}), 200
 
 
+@app.route("/api/brain/advisory")
+@requires_auth
+def api_brain_advisory():
+    """Quant-perps brain.advisory output exposed for the Sapphire dashboard.
+
+    Mirrors the crypto-proxy equity signals (MSTR / IBIT / TSLA / SPY) that the
+    RH Chain visualizer already consumes. Query params:
+      action — read (default) | decide | dashboard | publish
+      symbol — required when action=decide
+      live   — set "true" to arm publish (still requires private key elsewhere)
+    """
+    import subprocess as _sp
+
+    action = request.args.get("action", "read")
+    symbol = request.args.get("symbol", "")
+    live = request.args.get("live", "false").lower() == "true"
+
+    if action not in ("read", "decide", "dashboard", "publish"):
+        return jsonify({"error": f"Unknown action {action!r}"}), 400
+    if action == "decide" and not symbol:
+        return jsonify({"error": "symbol required for action=decide"}), 400
+
+    cache_key = f"brain_advisory_{action}_{symbol or 'all'}_{live}"
+    ADVISORY_CACHE = 60  # advisory file itself is updated daily; bridge is cheap
+
+    now = time.time()
+    if cache_key in _cache and now - _cache_time.get(cache_key, 0) < ADVISORY_CACHE:
+        return jsonify(_cache[cache_key])
+
+    tool_path = (
+        Path.home()
+        / "Code"
+        / "Sapphire"
+        / "plugins"
+        / "claw-sapphire"
+        / "tools"
+        / "internal"
+        / "brain_advisory_bridge.py"
+    )
+    lib_path = Path.home() / "Code" / "Sapphire" / "plugins" / "claw-sapphire" / "lib"
+
+    params: dict = {"action": action}
+    if symbol:
+        params["symbol"] = symbol
+    if action == "publish":
+        params["live"] = live
+
+    env = {**__import__("os").environ, "PYTHONPATH": str(lib_path)}
+
+    try:
+        result = _sp.run(
+            ["python3", str(tool_path)],
+            input=json.dumps(params),
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=env,
+        )
+        if result.returncode != 0:
+            log.warning(
+                "brain_advisory_bridge failed (rc=%s): %s",
+                result.returncode,
+                (result.stderr or "")[-500:],
+            )
+            return jsonify({"error": "brain_advisory_bridge process failed"}), 200
+        data = json.loads(result.stdout)
+        _cache[cache_key] = data
+        _cache_time[cache_key] = now
+        return jsonify(data)
+    except _sp.TimeoutExpired:
+        return jsonify({"error": "brain_advisory_bridge timed out (30s)"}), 200
+    except json.JSONDecodeError as e:
+        log.warning("brain_advisory_bridge returned invalid JSON: %s", e)
+        return jsonify({"error": "Invalid JSON from brain_advisory_bridge"}), 200
+    except Exception as e:
+        log.warning("brain advisory endpoint error: %s", e)
+        return jsonify({"error": str(e)}), 200
+
+
 @app.route("/api/tho/market-intel")
 @requires_auth
 def api_tho_market_intel():
@@ -8599,6 +8728,6 @@ if __name__ == "__main__":
         start_collector()
     except Exception:
         pass
-    port = int(os.environ.get("PORT", 8080))
+    port = int(os.environ.get("PORT", 8082))
     host = os.environ.get("HOST", "127.0.0.1")
     app.run(host=host, port=port, debug=False)

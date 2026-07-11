@@ -26,7 +26,7 @@
         <key>PATH</key>
         <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
         <key>PORT</key>
-        <string>8080</string>
+        <string>8082</string>
     </dict>
 
     <key>StandardOutPath</key>
