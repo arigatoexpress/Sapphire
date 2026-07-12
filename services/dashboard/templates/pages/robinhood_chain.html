@@ -169,6 +169,49 @@
     <span>Robinhood Chain testnet deployment — Arbitrum Orbit, Chain ID 46630. Target: June 25–28 2026.</span>
 </div>
 
+<!-- Local stack mission control (reads ops-state/rh-chain) -->
+<div class="rh-card" style="margin-bottom:24px;">
+    <div class="rh-card-title" style="justify-content:space-between;">
+        <span>Local Stack Mission Control</span>
+        <span id="local-updated" style="font-size:10px; color:var(--text-muted); font-weight:400;">—</span>
+    </div>
+    <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
+        Live summary from the Mac-side collector at
+        <code style="background:rgba(99,102,241,0.08); padding:2px 6px; border-radius:4px;">~/ops-state/rh-chain</code>.
+        Advisory only; no signing.
+    </p>
+    <div class="rh-grid" style="margin-bottom:0;">
+        <div class="rh-stat-row">
+            <span class="rh-stat-label">Mainnet</span>
+            <span class="rh-stat-value" id="local-mainnet">—</span>
+        </div>
+        <div class="rh-stat-row">
+            <span class="rh-stat-label">Testnet</span>
+            <span class="rh-stat-value" id="local-testnet">—</span>
+        </div>
+        <div class="rh-stat-row">
+            <span class="rh-stat-label">Sequencer feed</span>
+            <span class="rh-stat-value" id="local-feed">—</span>
+        </div>
+        <div class="rh-stat-row">
+            <span class="rh-stat-label">AI advisory</span>
+            <span class="rh-stat-value" id="local-advisory">—</span>
+        </div>
+        <div class="rh-stat-row">
+            <span class="rh-stat-label">Meme flow</span>
+            <span class="rh-stat-value" id="local-memes">—</span>
+        </div>
+        <div class="rh-stat-row">
+            <span class="rh-stat-label">Reactive events</span>
+            <span class="rh-stat-value" id="local-events">—</span>
+        </div>
+    </div>
+    <div style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap;">
+        <a class="rh-refresh-btn" href="http://127.0.0.1:8146/" target="_blank" style="text-decoration:none;">open visualizer →</a>
+        <a class="rh-refresh-btn" href="http://127.0.0.1:8146/memes.html" target="_blank" style="text-decoration:none;">meme flow →</a>
+    </div>
+</div>
+
 <!-- Hero: connection status -->
 <div class="rh-hero">
     <div class="rh-chain-badge">
@@ -264,6 +307,10 @@
 
 <script>
 const EXPLORER = 'https://explorer.testnet.chain.robinhood.com';
+
+function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+}
 
 function shortAddr(addr) {
     if (!addr || addr.length < 10) return addr || '—';
@@ -368,13 +415,58 @@ async function loadSignals() {
     }
 }
 
+async function loadLocalState() {
+    try {
+        const r = await fetch('/api/chain/robinhood/local-state');
+        const d = await r.json();
+        const main = (d.networks || {}).mainnet || {};
+        const test = (d.networks || {}).testnet || {};
+
+        function netText(n) {
+            if (n.rpc_ok === false) return '<span style="color:var(--red)">rpc err</span>';
+            const block = n.latest_block != null ? n.latest_block.toLocaleString() : '—';
+            const gas = n.gas_gwei != null ? n.gas_gwei + ' gwei' : '—';
+            return esc(`${n.chain || '—'} #${block} · ${gas}`);
+        }
+
+        document.getElementById('local-mainnet').innerHTML = netText(main);
+        document.getElementById('local-testnet').innerHTML = netText(test);
+
+        const feed = d.feed || {};
+        document.getElementById('local-feed').textContent = feed.connected
+            ? `${feed.msgs_per_min ?? '—'}/min · ${feed.feed_lag_s ?? '—'}s lag`
+            : 'down';
+
+        const ai = d.ai || {};
+        const adv = ai.advisory_row_count != null
+            ? `${ai.advisory_row_count} rows${ai.advisory_stale ? ' (stale)' : ''}`
+            : '—';
+        document.getElementById('local-advisory').textContent = adv;
+
+        const memes = d.memes || {};
+        document.getElementById('local-memes').textContent = memes.token_count != null
+            ? `${memes.token_count} tokens · ${memes.tape_count ?? 0} tape`
+            : '—';
+        document.getElementById('local-events').textContent = d.event_count != null
+            ? `${d.event_count} events`
+            : '—';
+        document.getElementById('local-updated').textContent = d.updated
+            ? new Date(d.updated * 1000).toISOString().replace('T', ' ').slice(0, 16) + ' UTC'
+            : '—';
+    } catch (e) {
+        document.getElementById('local-mainnet').textContent = 'fetch error';
+    }
+}
+
 function loadAll() {
     loadStatus();
     loadPayment();
     loadSignals();
+    loadLocalState();
 }
 
 loadAll();
 setInterval(loadStatus, 30000);
+setInterval(loadLocalState, 10000);
 </script>
 {% endblock %}

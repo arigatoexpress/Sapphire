@@ -31,7 +31,9 @@ sys.path.insert(0, str(LIB_DIR))
 
 def _run_tool(tool_name: str, params: dict) -> dict:
     """Run a Sapphire plugin tool and return parsed JSON."""
-    tool_path = TOOLS_DIR / f"{tool_name}.py"
+    # Internal tools live in tools/internal/; registered tools live in tools/.
+    candidates = [TOOLS_DIR / f"{tool_name}.py", TOOLS_DIR / "internal" / f"{tool_name}.py"]
+    tool_path = next((p for p in candidates if p.exists()), candidates[0])
     env = {**__import__("os").environ, "PYTHONPATH": str(LIB_DIR)}
     try:
         r = subprocess.run(
@@ -127,6 +129,33 @@ def _get_paper_track_record() -> dict:
     return {"modifier": 0, "reason": f"mixed track ({win_rate:.0%})"}
 
 
+def _get_brain_advisory_vote(symbol: str) -> tuple[str, float, str, str]:
+    """Vote from the quant-perps brain.advisory output (crypto-proxy equities).
+
+    BTC is proxied by IBIT; ETH/SOL have no proxy in the current advisory cluster
+    (MSTR / IBIT / TSLA / SPY) and receive a neutral "no advisory row" vote. The
+    advisory is advisory-only and stale-aware; stale or missing data contributes a
+    small neutral vote rather than blocking the ensemble.
+    """
+    advisory = _run_tool("brain_advisory_bridge", {"action": "decide", "symbol": symbol})
+    if "error" in advisory:
+        return ("neutral", 0.05, "BrainAdvisory", f"unavailable: {advisory.get('error', '')[:60]}")
+
+    direction = advisory.get("direction", "neutral")
+    confidence = float(advisory.get("confidence", 0) or 0)
+    proxy = advisory.get("proxy_symbol", symbol)
+    detail = advisory.get("detail", "no detail")
+    stale = advisory.get("advisory_stale", True)
+
+    # Weight is confidence-scaled but capped so the equity brain never dominates
+    # the native crypto ensemble; stale data gets a near-zero neutral vote.
+    if stale:
+        return ("neutral", 0.05, "BrainAdvisory", f"stale | {proxy}: {detail[:60]}")
+
+    weight = min(0.15, confidence * 0.15)
+    return (direction, weight, "BrainAdvisory", f"{proxy}: {detail[:80]}")
+
+
 def action_decide(symbol: str = "BTC") -> dict:
     """Produce a unified GO/WAIT/EXIT decision for a symbol."""
     now = datetime.now(UTC)
@@ -201,7 +230,11 @@ def action_decide(symbol: str = "BTC") -> dict:
         )
     )
 
-    # ─── Source 5: Track Record Modifier ───
+    # ─── Source 5: Brain Advisory (crypto-proxy equities) ───
+    adv_dir, adv_weight, adv_src, adv_detail = _get_brain_advisory_vote(symbol)
+    votes.append((adv_dir, adv_weight, adv_src, adv_detail))
+
+    # ─── Source 6: Track Record Modifier ───
     track = _get_paper_track_record()
 
     # ─── Aggregate Votes ───

@@ -222,6 +222,15 @@ tools:
       - hermes-agent.trading-brain
     description: Multi-source decision engine — TA + ensemble + Kronos + macro consensus for BTC/ETH/SOL.
 
+  - name: brain_advisory_bridge
+    path: plugins/claw-sapphire/tools/internal/brain_advisory_bridge.py
+    status: internal
+    owner: sapphire
+    consumers:
+      - services.dashboard.api_brain_advisory
+      - tools.internal.trading_brain
+    description: Bridge from quant-perps brain.advisory output to Sapphire decisions. Reads advisory-latest.json, emits GO/WAIT decisions for crypto-proxy equities, and dry-runs RH Chain signal publishing.
+
   - name: hyperliquid
     path: plugins/claw-sapphire/tools/internal/hyperliquid.py
     status: internal
