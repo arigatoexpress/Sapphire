@@ -216,3 +216,14 @@ def test_pine_payload_field_names_match_receiver_contract(receiver):
     assert "price" in payload
     assert "interval" in payload
     assert "exchange" in payload
+
+
+def test_receiver_deduplicates_identical_alerts(receiver):
+    """Identical Pine payloads within the dedup window are reported as duplicates."""
+    pine_source = render_sapphire_watch_indicator("BINANCE:ETHUSDT")
+    templates = _extract_alert_payload_templates(pine_source)
+    payload = _payload_template_to_dict(templates[0])
+    fingerprint = receiver._alert_fingerprint(payload)
+    assert not receiver._is_duplicate(fingerprint)
+    receiver._record_seen(fingerprint)
+    assert receiver._is_duplicate(fingerprint)

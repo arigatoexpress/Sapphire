@@ -14,6 +14,7 @@ Signal flow:
 import asyncio
 import base64
 import contextlib
+import hashlib
 import hmac
 import json
 import logging
@@ -54,12 +55,15 @@ MAX_WEBHOOK_BODY_BYTES = int(
     os.getenv("WEBHOOK_MAX_BODY_BYTES", os.getenv("MAX_WEBHOOK_BODY_BYTES", "8192"))
 )
 
-# On-prem signal routing — api-gateway endpoints over Tailscale
-# POST /api/signals/create with X-Sapphire-Control-Token header
-ALPHA_ENGINE_RARI1 = os.getenv("ALPHA_ENGINE_RARI1", "http://100.x.x.x:18080")
-ALPHA_ENGINE_RARI2 = os.getenv("ALPHA_ENGINE_RARI2", "http://100.x.x.y:18080")
-# Mac signal logger — primary target now that Pis are decommissioned
-SIGNAL_LOGGER_MAC = os.getenv("SIGNAL_LOGGER_MAC", "http://100.x.x.w:18081")
+# On-prem signal routing — env-driven; no hardcoded Tailscale IPs.
+# Examples:
+#   SIGNAL_LOGGER_MAC=http://100.x.y.z:18081
+#   ALPHA_ENGINE_RARI1=http://100.x.y.z:18080
+#   ALPHA_ENGINE_RARI2=http://100.x.y.z:18080
+#   SIGNAL_TARGETS=mac-logger=http://host:18081,desk=http://host:18082
+ALPHA_ENGINE_RARI1 = os.getenv("ALPHA_ENGINE_RARI1", "").strip()
+ALPHA_ENGINE_RARI2 = os.getenv("ALPHA_ENGINE_RARI2", "").strip()
+SIGNAL_LOGGER_MAC = os.getenv("SIGNAL_LOGGER_MAC", "").strip()
 SAPPHIRE_CONTROL_TOKEN = os.getenv("SAPPHIRE_CONTROL_API_TOKEN", "")
 
 # Legacy GCP vars — kept for reference, no longer used
@@ -73,6 +77,56 @@ RESEARCH_WORKER_OUTPUT_ROOT = os.getenv(
 )
 RESEARCH_WORKER_MAX_AGE_SECONDS = int(os.getenv("RESEARCH_WORKER_MAX_AGE_SECONDS", "129600"))
 RESEARCH_WORKER_TASK_NAME = os.getenv("RESEARCH_WORKER_TASK_NAME", "SapphireResearchWorker")
+
+# Idempotency: reject duplicate alerts within the dedup window.
+# TradingView may retry a webhook on timeout; duplicate alerts share the same
+# symbol/action/bar-time/exchange/interval/strategy fingerprint.
+IDEMPOTENCY_WINDOW_SECONDS = int(os.getenv("IDEMPOTENCY_WINDOW_SECONDS", "300"))
+_seen_alert_ids: set[str] = set()
+_seen_alert_times: dict[str, datetime] = {}
+
+
+def _alert_fingerprint(data: dict[str, Any]) -> str:
+    """Stable idempotency key for a TradingView alert payload."""
+    keys = ("symbol", "action", "time", "exchange", "interval", "strategy")
+    parts = [str(data.get(k) or "").strip().lower() for k in keys]
+    return hmac.new(
+        (WEBHOOK_SECRET or "sapphire-webhook").encode(),
+        "|".join(parts).encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def _record_seen(alert_id: str, *, now: datetime | None = None) -> None:
+    """Track a seen alert id and expire stale entries."""
+    current = now or datetime.now(UTC)
+    _seen_alert_ids.add(alert_id)
+    _seen_alert_times[alert_id] = current
+    if len(_seen_alert_times) <= 1000:
+        return
+    cutoff = current.timestamp() - IDEMPOTENCY_WINDOW_SECONDS
+    stale = [
+        aid
+        for aid, ts in _seen_alert_times.items()
+        if ts.timestamp() < cutoff
+    ]
+    for aid in stale:
+        _seen_alert_ids.discard(aid)
+        _seen_alert_times.pop(aid, None)
+
+
+def _is_duplicate(alert_id: str, *, now: datetime | None = None) -> bool:
+    """Return True if this alert id was seen recently."""
+    if alert_id not in _seen_alert_ids:
+        return False
+    ts = _seen_alert_times.get(alert_id)
+    if ts is None:
+        return False
+    current = now or datetime.now(UTC)
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=UTC)
+    return (current - ts).total_seconds() <= IDEMPOTENCY_WINDOW_SECONDS
+
 
 # Supported symbols → canonical Sapphire format
 SYMBOL_MAP = {
@@ -812,18 +866,48 @@ def build_trade_signal(alert: TradingViewAlert) -> dict:
 # ─── Pub/Sub publish ──────────────────────────────────────────────────────────
 
 
+def _resolve_signal_targets() -> list[tuple[str, str]]:
+    """Build target list from SIGNAL_TARGETS env, then legacy env vars."""
+    targets: list[tuple[str, str]] = []
+    seen_urls: set[str] = set()
+
+    raw = os.getenv("SIGNAL_TARGETS", "").strip()
+    if raw:
+        for item in raw.split(","):
+            item = item.strip()
+            if "=" not in item:
+                continue
+            name, url = item.split("=", 1)
+            name = name.strip()
+            url = url.strip().rstrip("/")
+            if not name or not url or url in seen_urls:
+                continue
+            seen_urls.add(url)
+            targets.append((name, url))
+        if targets:
+            return targets
+
+    # Legacy env-driven fallback (no hardcoded defaults).
+    if SIGNAL_LOGGER_MAC:
+        targets.append(("mac-logger", f"{SIGNAL_LOGGER_MAC}/api/signals"))
+    if ALPHA_ENGINE_RARI2:
+        targets.append(("rari2", f"{ALPHA_ENGINE_RARI2}/api/signals/create"))
+    if ALPHA_ENGINE_RARI1:
+        targets.append(("rari1", f"{ALPHA_ENGINE_RARI1}/api/signals/create"))
+    return targets
+
+
 async def publish_signal(signal: dict) -> dict:
     """
-    On-prem signal routing over Tailscale. Targets (in priority order):
-    1. Mac signal logger (primary — always-on, logs + AI assessment)
-    2. rari2 api-gateway (secondary — if Pi is online)
-    3. rari1 api-gateway (tertiary — rari1 is offline per CLAUDE.md, kept for legacy)
+    On-prem signal routing over Tailscale. Targets are env-driven via
+    SIGNAL_TARGETS or legacy ALPHA_ENGINE_*/SIGNAL_LOGGER_MAC variables.
     """
-    targets = [
-        ("mac-logger", f"{SIGNAL_LOGGER_MAC}/api/signals"),
-        ("rari2", f"{ALPHA_ENGINE_RARI2}/api/signals/create"),
-        ("rari1", f"{ALPHA_ENGINE_RARI1}/api/signals/create"),
-    ]
+    targets = _resolve_signal_targets()
+    if not targets:
+        log.warning("No signal targets configured; signal logged but not routed")
+        stats["errors"] += 1
+        return {"published": False, "channel": "none", "targets": [], "reason": "no_targets"}
+
     headers = {"Content-Type": "application/json"}
     if SAPPHIRE_CONTROL_TOKEN:
         headers["X-Sapphire-Control-Token"] = SAPPHIRE_CONTROL_TOKEN
@@ -1110,6 +1194,23 @@ async def receive_tradingview(request: Request, background_tasks: BackgroundTask
             detail="Invalid payload — check symbol/action fields",
         )
 
+    alert_id = _alert_fingerprint(data)
+    if _is_duplicate(alert_id):
+        log.info(
+            "🔄 Duplicate alert ignored: %s %s",
+            data.get("action", ""),
+            data.get("symbol", ""),
+        )
+        return JSONResponse(
+            {
+                "status": "duplicate",
+                "alert_id": alert_id[:16],
+                "detail": "Alert already processed within dedup window",
+            },
+            status_code=200,
+        )
+
+    _record_seen(alert_id)
     alert = TradingViewAlert.from_webhook(data)
     stats["total"] += 1
     log.info(
