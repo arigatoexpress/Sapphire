@@ -80,6 +80,12 @@ jobs:
     needs: lint
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
     timeout-minutes: 15
+    env:
+      # The self-hosted runner's system Python has stray packages (e.g.
+      # pytest-ethereum) that register pytest11 entry points and import
+      # modules not present in the isolated uv dependency set. Disable
+      # autoload so only the explicitly requested test path runs.
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: pytest (claw-sapphire)

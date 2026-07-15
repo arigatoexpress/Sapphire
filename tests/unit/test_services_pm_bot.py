@@ -598,6 +598,64 @@ def test_process_update_queues_guest_message_reply_draft(reload_server, monkeypa
     assert "what changed?" in drafts[0].body
 
 
+def test_process_update_records_business_connection_and_queues_reply_draft(
+    reload_server, monkeypatch, tmp_path
+):
+    draft_queue_path = tmp_path / "pm_bot_drafts.jsonl"
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_DRAFT_QUEUE_ENABLED", "1")
+    monkeypatch.setenv("SAPPHIRE_PM_BOT_DRAFT_QUEUE_PATH", str(draft_queue_path))
+    server = reload_server()
+
+    def fail_send(**_kwargs):
+        raise AssertionError("business message draft route must not send Telegram messages")
+
+    monkeypatch.setattr(server.TELEGRAM_API, "send_message", fail_send)
+
+    assert (
+        server.process_update(
+            {
+                "update_id": 605,
+                "business_connection": {
+                    "id": "biz-1",
+                    "user": {"id": 123, "username": "ari"},
+                    "user_chat_id": 987,
+                    "date": 1_774_000_000,
+                    "is_enabled": True,
+                    "rights": {"can_read_messages": True, "can_reply": True},
+                },
+            }
+        )
+        is True
+    )
+    assert (
+        server.process_update(
+            {
+                "update_id": 606,
+                "business_message": {
+                    "business_connection_id": "biz-1",
+                    "message_id": 9,
+                    "chat": {"id": 987},
+                    "from": {"id": 456},
+                    "text": "reply to this customer",
+                },
+            }
+        )
+        is True
+    )
+
+    from lib.telegram.draft_queue import read_drafts
+
+    drafts = read_drafts(draft_queue_path)
+    assert [draft.kind for draft in drafts] == ["business_connection_audit", "guarded_reply"]
+    assert drafts[0].metadata["business_connection_id"] == "biz-1"
+    assert drafts[0].metadata["business_can_reply"] is True
+    assert drafts[1].metadata["business_connection_id"] == "biz-1"
+    assert drafts[1].metadata["business_connection_active"] is True
+    assert drafts[1].metadata["business_can_reply"] is True
+    assert drafts[1].metadata["business_can_read_messages"] is True
+    assert "BusinessConnection.can_reply" in drafts[1].body
+
+
 def test_process_update_blocks_payment_update_without_sending(reload_server, monkeypatch):
     server = reload_server()
 
@@ -762,6 +820,26 @@ def test_telegram_send_message_supports_reply_and_silent_delivery(reload_server,
     assert captured["json"]["reply_parameters"] == {"message_id": 99}
     assert captured["json"]["message_thread_id"] == 10
     assert captured["json"]["direct_messages_topic_id"] == 11
+
+
+def test_telegram_send_message_supports_business_connection_id(reload_server, monkeypatch):
+    server = reload_server()
+    captured: dict[str, Any] = {}
+
+    def fake_post(url, json, timeout):
+        captured["json"] = json
+        return _FakeResponse(status_code=200, json_payload={"ok": True, "result": {}})
+
+    monkeypatch.setattr(server.requests, "post", fake_post)
+
+    server.TELEGRAM_API.send_message(
+        chat_id=42,
+        text="hello",
+        parse_mode=None,
+        business_connection_id="biz-1",
+    )
+
+    assert captured["json"]["business_connection_id"] == "biz-1"
 
 
 def test_telegram_send_message_omits_parse_mode_when_none(reload_server, monkeypatch):
@@ -1378,6 +1456,61 @@ def test_telegram_ownership_endpoint_surfaces_group_readiness_blockers(
         "keep_kimi_relay_disabled_until_private_operator_group_exists"
         in body["required_before_group"]
     )
+
+
+def test_telegram_secretary_endpoint_reports_business_readiness(
+    reload_server,
+    monkeypatch,
+):
+    from fastapi.testclient import TestClient
+
+    server = reload_server()
+    monkeypatch.setattr(
+        server,
+        "_telegram_runtime_probe",
+        lambda: {
+            "probe_ok": True,
+            "bot_username": "SapphirePMBot",
+            "bot_id": 123,
+            "webhook_registered": True,
+            "webhook_url_configured": True,
+            "webhook_url_matches_expected": True,
+            "pending_update_count": 0,
+            "allowed_updates": server._SUPPORTED_UPDATE_TYPES,
+            "delivery_ready": True,
+            "delivery_mode_reason": "webhook_registered",
+            "probe_error": None,
+        },
+    )
+    server.process_update(
+        {
+            "update_id": 991,
+            "business_connection": {
+                "id": "biz-1",
+                "user": {"id": 42},
+                "user_chat_id": 4200,
+                "date": 1_774_000_000,
+                "is_enabled": True,
+                "rights": {"can_read_messages": True, "can_reply": True},
+            },
+        }
+    )
+
+    with TestClient(server.app) as http:
+        response = http.get("/telegram/secretary")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["secretary_mode_ready"] is True
+    assert body["secretary_mode_blockers"] == []
+    assert body["can_reply_observed"] is True
+    assert body["reply_policy"] == "draft_only_until_operator_approved"
+    assert body["business_connections"] == {
+        "observed_connection_count": 1,
+        "active_connection_count": 1,
+        "reply_capable_connection_count": 1,
+        "latest_update_id": 991,
+    }
 
 
 def test_health_reports_polling_active_when_thread_alive(reload_server):

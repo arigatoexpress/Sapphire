@@ -59,6 +59,14 @@ AUDIT_UPDATE_TYPES = frozenset(
         "chat_join_request",
     }
 )
+BUSINESS_UPDATE_TYPES = frozenset(
+    {
+        "business_connection",
+        "business_message",
+        "edited_business_message",
+        "deleted_business_messages",
+    }
+)
 FEEDBACK_UPDATE_TYPES = frozenset(
     {
         "message_reaction",
@@ -108,6 +116,10 @@ class TelegramContext:
     text: str = ""
     callback_data: str = ""
     reaction_count: int = 0
+    business_connection_id: str = ""
+    business_user_chat_id: int | None = None
+    business_is_enabled: bool | None = None
+    business_can_reply: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -159,6 +171,18 @@ def _chat_id_from(payload: Mapping[str, Any]) -> int | None:
     return _coerce_int(payload.get("chat_id"))
 
 
+def _business_connection_id_from(payload: Mapping[str, Any]) -> str:
+    value = payload.get("business_connection_id") or payload.get("id")
+    return str(value or "").strip()
+
+
+def _business_can_reply_from(payload: Mapping[str, Any]) -> bool | None:
+    rights = payload.get("rights")
+    if not isinstance(rights, Mapping) or "can_reply" not in rights:
+        return None
+    return bool(rights.get("can_reply"))
+
+
 def _message_context(
     update_id: int | None,
     update_type: str,
@@ -173,6 +197,7 @@ def _message_context(
         direct_messages_topic_id=_coerce_int(payload.get("direct_messages_topic_id")),
         actor=_actor_from(payload),
         text=str(payload.get("text") or payload.get("caption") or "").strip(),
+        business_connection_id=_business_connection_id_from(payload),
     )
 
 
@@ -223,6 +248,10 @@ def _generic_context(
         chat_id=_chat_id_from(payload),
         actor=_actor_from(payload),
         text=str(payload.get("query") or payload.get("text") or "").strip(),
+        business_connection_id=_business_connection_id_from(payload),
+        business_user_chat_id=_coerce_int(payload.get("user_chat_id")),
+        business_is_enabled=(bool(payload.get("is_enabled")) if "is_enabled" in payload else None),
+        business_can_reply=_business_can_reply_from(payload),
     )
 
 
@@ -272,7 +301,10 @@ def route_update(
             context=context,
             requires_confirmation=False,
         )
-    if not _allowed(context.chat_id, allowed_chat_ids):
+    if context.update_type not in BUSINESS_UPDATE_TYPES and not _allowed(
+        context.chat_id,
+        allowed_chat_ids,
+    ):
         return RouterDecision(
             route="reject",
             action="chat_not_allowed",
@@ -280,9 +312,13 @@ def route_update(
             context=context,
         )
     topic_scope_id = _topic_scope_id(context)
-    if topic_scope_id is not None and not _allowed(
-        topic_scope_id,
-        allowed_thread_ids,
+    if (
+        context.update_type not in BUSINESS_UPDATE_TYPES
+        and topic_scope_id is not None
+        and not _allowed(
+            topic_scope_id,
+            allowed_thread_ids,
+        )
     ):
         return RouterDecision(
             route="reject",
