@@ -61,7 +61,7 @@ google-cloud-firestore==2.27.0
 google-cloud-pubsub==2.39.0
 google-cloud-storage==3.12.1
 google-generativeai==0.8.6
-firebase-admin==6.9.0
+firebase-admin==7.5.0
 
 # crypto / chain
 web3>=7.0,<8
