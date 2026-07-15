@@ -124,6 +124,15 @@ The service routes this full Bot API update surface through
 `lib.telegram.agent_router`. Only `command` routes can call `sendMessage`; all
 other routes are accepted as no-send router decisions and queued as local
 dry-run draft/event records when `SAPPHIRE_PM_BOT_DRAFT_QUEUE_ENABLED` is true.
+Telegram Business / Secretary Bot updates are included in this surface:
+`business_connection`, `business_message`, `edited_business_message`, and
+`deleted_business_messages`. `business_connection` updates are recorded as
+local Secretary Mode readiness events, and `business_message` updates become
+guarded reply drafts with the `business_connection_id` and latest observed
+connection permissions in draft metadata. They do not send automatically.
+Business updates rely on Telegram's own Secretary Bot chat access grant rather
+than the private agent-room allowlist; the app-side safety boundary is the
+draft-only reply policy.
 If `SAPPHIRE_PM_BOT_AGENT_CHAT_IDS` or `SAPPHIRE_PM_BOT_AGENT_THREAD_IDS` is
 configured, the router applies that scope before dispatching PM-bot commands, so
 out-of-room or out-of-topic updates become local `rejected_update` drafts rather
@@ -180,6 +189,18 @@ Key fields:
   - Bot API pending update count when available.
 - `telegram_allowed_updates`
   - Bot API allowed update list when available.
+- `telegram_secretary_updates_supported`
+  - Whether the PM bot code and webhook registration payload include Telegram
+    Business / Secretary Bot update types.
+- `telegram_business_connections`
+  - Counts for Business connections observed since process start:
+    `observed_connection_count`, `active_connection_count`,
+    `reply_capable_connection_count`, and `latest_update_id`.
+- `telegram_business_reply_policy`
+  - Always `draft_only_until_operator_approved` for this service. A future live
+    reply adapter must pass `business_connection_id`, confirm the latest
+    `can_reply` grant, and require explicit operator approval before calling
+    `sendMessage`.
 - `agent_chat_scope_configured` / `agent_chat_scope_count`
   - Whether the PM bot is restricted to explicit agent-room chat IDs and how
     many IDs are configured. The health payload reports counts only, not the
@@ -194,6 +215,14 @@ the current blockers, the scoped agent-room posture, and the no-send router
 guard. Use it before inviting Kimi or Nemotron into a shared group. A missing
 agent chat scope is reported as `agent_chat_scope_unconfigured` so the group
 cannot look ready while the bot is still accepting commands from any chat.
+
+`GET /telegram/secretary` is the narrower readiness gate for Telegram's
+Secretary Bot feature. It reports whether the PM-bot webhook is ready for
+Business updates, how many active/reply-capable Business connections have been
+observed, and the current no-send policy. Use it after enabling Secretary Mode
+in BotFather and after connecting the bot to Ari's Telegram account with the
+intended granular chat permissions. This endpoint is read-only and does not
+call Telegram.
 
 ## LaunchAgent
 
