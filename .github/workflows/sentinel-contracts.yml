@@ -60,10 +60,10 @@ jobs:
       - name: Install forge-std
         run: |
           # Pinned to v1.9.4 (last stable as of 2026-04). Update via
-          #   forge install foundry-rs/forge-std@v1.9.4 --no-commit
-          # then commit the updated submodule SHA. We use --no-commit
-          # because this is CI, not a local checkout.
-          forge install foundry-rs/forge-std@v1.9.4 --no-commit
+          #   forge install foundry-rs/forge-std@v1.9.4
+          # then commit the updated submodule SHA. Modern forge removed the
+          # --no-commit flag (no-commit is now the default behavior in CI).
+          forge install foundry-rs/forge-std@v1.9.4
           # Sanity check the dependency landed.
           test -f contracts/lib/forge-std/src/Test.sol
 
