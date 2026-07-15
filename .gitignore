@@ -101,7 +101,11 @@ data/starred_repos/synergies.json
 data/starred_repos/synergy_report.md
 data/starred_repos/trending.json
 data/leads/pipeline_*.json
+data/leads/*.jsonl
 data/leads/.enrich_cache/
+data/agents/
+data/wildfire/
+data/wildfire_config.json
 data/market_pulse/
 data/performance/
 data/threat_intel/
