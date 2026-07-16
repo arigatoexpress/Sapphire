@@ -12,7 +12,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import subprocess
 import sys
@@ -82,7 +81,9 @@ def _update_cloud_run(url: str, dry_run: bool) -> bool:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dry-run", action="store_true", help="Log what would change without calling gcloud")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Log what would change without calling gcloud"
+    )
     args = parser.parse_args()
 
     current = _current_tunnel_url()

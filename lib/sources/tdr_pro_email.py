@@ -15,6 +15,7 @@ Live access is gated by ``SAPPHIRE_TDR_PRO_LIVE=1`` AND
 No credentials are handled by this agent. The code is shipped inert and becomes
 active only after Ari completes the OAuth flow and stores the token.
 """
+
 from __future__ import annotations
 
 import base64
@@ -190,7 +191,9 @@ class TDRProEmailItem:
             escaped = text.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
             return f'"{escaped}"'
 
-        frontmatter = "---\n" + "\n".join(f"{k}: {_yaml_value(v)}" for k, v in fm.items()) + "\n---\n"
+        frontmatter = (
+            "---\n" + "\n".join(f"{k}: {_yaml_value(v)}" for k, v in fm.items()) + "\n---\n"
+        )
 
         lines = [
             f"# TDR Pro — {self.subject}",
@@ -218,7 +221,9 @@ class TDRProEmailSource:
 
     name: str = "tdr_pro_email"
     label: str = "The DeFi Report Pro member email"
-    inbox_dir: Path = field(default_factory=lambda: Path.home() / "Knowledge" / "0-Inbox" / "Clippings")
+    inbox_dir: Path = field(
+        default_factory=lambda: Path.home() / "Knowledge" / "0-Inbox" / "Clippings"
+    )
     credentials_path: str | None = None
     token_path: str | None = None
     service_builder: Any | None = None
@@ -243,9 +248,7 @@ class TDRProEmailSource:
     def _load_gmail_service(self) -> Any:
         """Lazy-load Gmail API; raise SourceError if deps or tokens missing."""
         if not self._live_allowed():
-            raise SourceError(
-                "SAPPHIRE_TDR_PRO_LIVE=1 and SAPPHIRE_TDR_PRO_EMAIL_LIVE=1 required"
-            )
+            raise SourceError("SAPPHIRE_TDR_PRO_LIVE=1 and SAPPHIRE_TDR_PRO_EMAIL_LIVE=1 required")
 
         try:
             from google.auth.transport.requests import Request
@@ -319,14 +322,18 @@ class TDRProEmailSource:
         limit: int = 10,
     ) -> list[TDRProEmailItem]:
         """Search Gmail and return TDR Pro member emails (newest first)."""
-        service = self._load_gmail_service() if self.service_builder is None else self.service_builder()
+        service = (
+            self._load_gmail_service() if self.service_builder is None else self.service_builder()
+        )
         query = self._search_query()
         if since is not None:
             after = since.strftime("%Y/%m/%d")
             query = f"{query} after:{after}"
 
         try:
-            results = service.users().messages().list(userId="me", q=query, maxResults=limit).execute()
+            results = (
+                service.users().messages().list(userId="me", q=query, maxResults=limit).execute()
+            )
         except Exception as exc:
             raise SourceError(f"Gmail search failed: {exc}") from exc
 

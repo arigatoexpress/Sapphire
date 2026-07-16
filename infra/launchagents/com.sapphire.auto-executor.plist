@@ -28,7 +28,7 @@
         <key>PAPER_TRADING</key>
         <string>1</string>
         <!-- Live trading is intentionally NOT enabled here. -->
-        <!-- To run live, start manually with both --live and AUTO_EXECUTOR_LIVE=1. -->
+        <!-- To run live, start manually with the live flag and AUTO_EXECUTOR_LIVE=1. -->
     </dict>
 </dict>
 </plist>
