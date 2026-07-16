@@ -243,7 +243,7 @@ def _read_alert_log_entries(*, limit: int = 100, offset: int = 0) -> list[dict[s
     try:
         if not os.path.exists(ALERT_LOG_FILE):
             return entries
-        with open(ALERT_LOG_FILE, "r", encoding="utf-8", errors="ignore") as fh:
+        with open(ALERT_LOG_FILE, encoding="utf-8", errors="ignore") as fh:
             for raw_line in fh:
                 raw_line = raw_line.strip()
                 if not raw_line:
@@ -1283,7 +1283,7 @@ def _alert_log_total_count() -> int:
     try:
         if not os.path.exists(ALERT_LOG_FILE):
             return 0
-        with open(ALERT_LOG_FILE, "r", encoding="utf-8", errors="ignore") as fh:
+        with open(ALERT_LOG_FILE, encoding="utf-8", errors="ignore") as fh:
             for line in fh:
                 if line.strip():
                     count += 1

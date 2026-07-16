@@ -102,7 +102,7 @@ From any machine:
 curl https://webhook.sapphirealpha.xyz/health
 curl -X POST https://webhook.sapphirealpha.xyz/webhook/tradingview \
   -H 'Content-Type: application/json' \
-  -d '{"symbol":"BTCUSDT","action":"buy","price":100000,"time":1234567890,"secret":"sapphire_trading_2024"}'
+  -d '{"symbol":"BTCUSDT","action":"buy","price":100000,"time":1234567890,"secret":"YOUR_WEBHOOK_SECRET_HERE"}'
 ```
 
 Expected:
@@ -120,8 +120,8 @@ In your Pine Script alert configuration, set the webhook URL to:
 https://webhook.sapphirealpha.xyz/webhook/tradingview
 ```
 
-Ensure the alert body still includes `"secret": "sapphire_trading_2024"` or the
-value you configured in `C:\sapphire\webhook\.env`.
+Ensure the alert body still includes `"secret": "YOUR_WEBHOOK_SECRET_HERE"` or
+the value you configured in `C:\sapphire\webhook\.env`.
 
 ---
 
