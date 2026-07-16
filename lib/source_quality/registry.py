@@ -126,6 +126,16 @@ BUILTIN_SOURCES: tuple[SourceQualityEntry, ...] = (
         ),
         tags=("earnings", "filings", "tranche-7"),
     ),
+    # ── DeFi Report Pro podcast (public RSS + transcripts). ────────────────
+    SourceQualityEntry(
+        name="tdr_pro",
+        lookahead_hours=168,
+        description=(
+            "The DeFi Report Pro podcast. Public RSS polling with optional "
+            "transcript fetch; clippings route into the Knowledge vault."
+        ),
+        tags=("macro", "research", "podcast", "trading"),
+    ),
 )
 
 
