@@ -679,6 +679,45 @@ def _section_robinhood() -> dict:
     }
 
 
+def _section_tdr_pro() -> dict:
+    """Latest The DeFi Report Pro episode summary (from tdr_pro_sync)."""
+    try:
+        from lib.sources import read_json
+
+        latest_path = ROOT / "data" / "intelligence" / "latest" / "tdr_pro_latest.json"
+        data = read_json(latest_path) or {}
+    except Exception as e:
+        log.warning("tdr_pro summary unavailable: %s", e)
+        return {"status": "unavailable", "text": f"  TDR Pro unavailable: {e}"}
+
+    episodes = data.get("episodes") or []
+    if not episodes:
+        return {"status": "empty", "text": "  TDR Pro: no recent episodes ingested."}
+
+    top = episodes[0]
+    title = top.get("title", "Untitled")
+    episode = top.get("episode")
+    published = top.get("published", "")
+    duration = top.get("duration_label", "")
+    url = top.get("url", "")
+
+    header = f"🎙️ *TDR Pro* — E{episode}: {title}" if episode else f"🎙️ *TDR Pro* — {title}"
+    lines = [header]
+    meta = []
+    if published:
+        meta.append(f"published {published}")
+    if duration:
+        meta.append(f"duration {duration}")
+    if meta:
+        lines.append(f"  {' · '.join(meta)}")
+    if url:
+        lines.append(f"  [Listen / transcript]({url})")
+    if len(episodes) > 1:
+        lines.append(f"  ({len(episodes) - 1} older episode(s) in the lookback window)")
+
+    return {"status": "ok", "title": title, "text": "\n".join(lines)}
+
+
 def _section_leads() -> dict:
     """Houston home-lead pipeline summary (count, hot, top lead).
 
@@ -824,6 +863,7 @@ def build_brief() -> str:
     port = _section_portfolio()
     cascade = _section_cascade()
     robinhood = _section_robinhood()
+    tdr_pro = _section_tdr_pro()
     kron = _section_kronos()
     threats = _section_threats()
     health = _section_health()
@@ -866,6 +906,9 @@ def build_brief() -> str:
         "",
         "*Robinhood Crypto*",
         _t(robinhood, "robinhood"),
+        "",
+        "*The DeFi Report Pro*",
+        _t(tdr_pro, "tdr_pro"),
         "",
         "*Trading Brain*",
         brain_text,

@@ -116,6 +116,13 @@ ROUTINES: list[Routine] = [
         max_age_secs=36 * 60 * 60,
     ),
     Routine(
+        "tdr-pro-sync",
+        "launchagent_scheduled",
+        launchagent="com.sapphire.tdr-pro-sync",
+        artifact=str(DATA / "intelligence" / "latest" / "tdr_pro_latest.json"),
+        max_age_secs=36 * 60 * 60,
+    ),
+    Routine(
         "logrotate",
         "launchagent_scheduled",
         launchagent="com.sapphire.logrotate",
