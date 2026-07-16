@@ -61,7 +61,7 @@ ROUTINES: list[Routine] = [
         "launchagent_always",
         launchagent="com.sapphire.webhook-receiver-mac",
         artifact=str(DATA / "webhook" / "alerts.jsonl"),
-        max_age_secs=15 * 60,
+        max_age_secs=60 * 60,
     ),
     Routine(
         "webhook-tunnel",
@@ -69,6 +69,13 @@ ROUTINES: list[Routine] = [
         launchagent="com.sapphire.webhook-tunnel",
         artifact=str(DATA / "webhook" / "tunnel_url.txt"),
         max_age_secs=15 * 60,
+    ),
+    Routine(
+        "fleet-status",
+        "launchagent_scheduled",
+        launchagent="com.sapphire.fleet-status",
+        artifact=str(DATA / "intelligence" / "latest" / "fleet_status.json"),
+        max_age_secs=10 * 60,
     ),
     # Scheduled Mac jobs
     Routine(

@@ -3,31 +3,35 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.sapphire.webhook-tunnel</string>
+    <string>com.sapphire.fleet-status</string>
 
     <key>ProgramArguments</key>
     <array>
         <string>/usr/local/bin/python3</string>
-        <string>/Users/aribs/Code/Sapphire/infra/scripts/start-webhook-tunnel.py</string>
+        <string>/Users/aribs/Code/Sapphire/services/pipeline/fleet_status.py</string>
     </array>
 
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
+    <!-- Every 5 minutes -->
+    <key>StartInterval</key>
+    <integer>300</integer>
 
     <key>EnvironmentVariables</key>
     <dict>
         <key>HOME</key>
         <string>/Users/aribs</string>
         <key>PATH</key>
-        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+        <key>PYTHONPATH</key>
+        <string>/Users/aribs/Code/Sapphire</string>
     </dict>
 
     <key>StandardOutPath</key>
-    <string>/Users/aribs/Code/Sapphire/data/logs/webhook-tunnel.log</string>
+    <string>/Users/aribs/Code/Sapphire/data/logs/fleet-status.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/aribs/Code/Sapphire/data/logs/webhook-tunnel-err.log</string>
+    <string>/Users/aribs/Code/Sapphire/data/logs/fleet-status-err.log</string>
+
+    <key>RunAtLoad</key>
+    <true/>
 
     <key>WorkingDirectory</key>
     <string>/Users/aribs/Code/Sapphire</string>

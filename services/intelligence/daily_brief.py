@@ -718,6 +718,35 @@ def _section_tdr_pro() -> dict:
     return {"status": "ok", "title": title, "text": "\n".join(lines)}
 
 
+def _section_fleet_status() -> dict:
+    """Unified fleet health from services/pipeline/fleet_status.py."""
+    try:
+        from lib.sources import read_json
+
+        data = read_json(ROOT / "data" / "intelligence" / "latest" / "fleet_status.json") or {}
+    except Exception as e:
+        log.warning("fleet status unavailable: %s", e)
+        return {"status": "unavailable", "text": f"  Fleet status unavailable: {e}"}
+
+    subsystems = data.get("subsystem", {})
+    healthy = sum(1 for s in subsystems.values() if s.get("healthy"))
+    total = len(subsystems)
+
+    lines = [f"🛰️ *Fleet:* {healthy}/{total} subsystems healthy"]
+    for name, status in subsystems.items():
+        ok = bool(status.get("healthy"))
+        emoji = "🟢" if ok else "🔴"
+        label = name.replace("_", " ").title()
+        lines.append(f"  {emoji} {label}")
+
+    agents = data.get("launchagents", {})
+    if agents:
+        agents_ok = sum(1 for v in agents.values() if v)
+        lines.append(f"  {agents_ok}/{len(agents)} critical LaunchAgents running")
+
+    return {"status": "ok", "healthy": healthy, "total": total, "text": "\n".join(lines)}
+
+
 def _section_leads() -> dict:
     """Houston home-lead pipeline summary (count, hot, top lead).
 
@@ -864,6 +893,7 @@ def build_brief() -> str:
     cascade = _section_cascade()
     robinhood = _section_robinhood()
     tdr_pro = _section_tdr_pro()
+    fleet = _section_fleet_status()
     kron = _section_kronos()
     threats = _section_threats()
     health = _section_health()
@@ -909,6 +939,9 @@ def build_brief() -> str:
         "",
         "*The DeFi Report Pro*",
         _t(tdr_pro, "tdr_pro"),
+        "",
+        "*Fleet Status*",
+        _t(fleet, "fleet_status"),
         "",
         "*Trading Brain*",
         brain_text,
