@@ -160,7 +160,7 @@ class BraveSession:
 
     async def navigate(self, url: str, wait_load: bool = True) -> None:
         await self._send("Page.enable")
-        frame_id = (await self._send("Page.navigate", {"url": url})).get("frameId")
+        await self._send("Page.navigate", {"url": url})
         if wait_load:
             await self._wait_for_load()
 

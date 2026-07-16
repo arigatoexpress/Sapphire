@@ -274,9 +274,8 @@ def _append_executor_decision(
 def _paper_trading_enabled() -> bool:
     """Return True unless PAPER_TRADING is explicitly set to a false value."""
     raw = os.environ.get(PAPER_TRADING_ENV, "").strip().lower()
-    if raw in {"0", "false", "no", "off", "n"}:
-        return False
-    return True  # default on, including unset
+    # Default on, including unset — paper trading only turns off when explicitly disabled.
+    return raw not in {"0", "false", "no", "off", "n"}
 
 
 def _killswitch_active(killswitch_path: Path) -> bool:
