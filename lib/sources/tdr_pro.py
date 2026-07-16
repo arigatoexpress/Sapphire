@@ -56,10 +56,13 @@ class TDRProEpisode:
     audio_url: str | None = None
     author: str = "Michael Nadeau"
     source: str = "tdr_pro"
+    slug_override: str | None = None
 
     @property
     def slug(self) -> str:
         """File-name-safe slug, e.g. ``e28-portfolio-audit``."""
+        if self.slug_override:
+            return self.slug_override
         safe = re.sub(r"[^a-z0-9]+", "-", self.title.lower()).strip("-")
         prefix = f"e{self.episode}" if self.episode else "tdr"
         return f"{prefix}-{safe}"[:80].strip("-")
@@ -89,8 +92,33 @@ class TDRProEpisode:
             confidence=0.5,
         )
 
-    def to_clipping(self, transcript: str | None = None) -> str:
-        """Render a markdown clipping with YAML frontmatter."""
+    def _index_label(self) -> str:
+        return f"E{self.episode}" if self.episode else "Special"
+
+    def to_index_entry(self) -> str:
+        """Return one markdown list item linking to this episode."""
+        links: list[str] = []
+        if self.audio_url:
+            links.append(f"[Audio]({self.audio_url})")
+        if self.transcript_url:
+            links.append(f"[Transcript]({self.transcript_url})")
+        link_part = " · ".join(links)
+        if link_part:
+            link_part = f" — {link_part}"
+        return (
+            f"- **{self._index_label()}** — "
+            f"[{self.title}]({self.slug}.md){link_part} — {self.published_date}"
+        )
+
+    def to_clipping(
+        self,
+        transcript: str | None = None,
+        *,
+        prev_episode: TDRProEpisode | None = None,
+        next_episode: TDRProEpisode | None = None,
+        index_path: str = "tdr-pro-index.md",
+    ) -> str:
+        """Render a markdown clipping with YAML frontmatter and hub links."""
         description_one_liner = (
             self.description.split("\n")[0] if self.description else "The DeFi Report episode."
         )
@@ -109,6 +137,10 @@ class TDRProEpisode:
             fm["episode"] = f"E{self.episode}"
         if self.duration_label:
             fm["duration"] = self.duration_label
+        if self.audio_url:
+            fm["audio_url"] = self.audio_url
+        if self.transcript_url:
+            fm["transcript_url"] = self.transcript_url
         fm["tags"] = f"[{', '.join(_DEFAULT_TAGS)}]"
         today = utc_now().date().isoformat()
         fm["created"] = today
@@ -145,6 +177,28 @@ class TDRProEpisode:
             body_lines.append("")
             body_lines.append(self.description.strip())
             body_lines.append("")
+
+        # Hub navigation links.
+        body_lines.append("---")
+        body_lines.append("")
+        body_lines.append("## TDR Pro Hub")
+        body_lines.append("")
+        if prev_episode:
+            body_lines.append(
+                f"- ← Previous: [{prev_episode._index_label()} — {prev_episode.title}]"
+                f"({prev_episode.slug}.md)"
+            )
+        else:
+            body_lines.append("- ← Previous: (none yet)")
+        if next_episode:
+            body_lines.append(
+                f"- → Next: [{next_episode._index_label()} — {next_episode.title}]"
+                f"({next_episode.slug}.md)"
+            )
+        else:
+            body_lines.append("- → Next: (latest episode)")
+        body_lines.append(f"- 📋 Master index: [All TDR Pro episodes]({index_path})")
+        body_lines.append("")
 
         return frontmatter + "\n".join(body_lines)
 
@@ -342,13 +396,37 @@ class TDRProSource:
         *,
         transcripts: dict[str, str | None] | None = None,
         dry_run: bool = False,
+        index_path: str = "tdr-pro-index.md",
     ) -> list[Path]:
-        """Write markdown clippings for ``episodes`` into ``inbox_dir``."""
+        """Write markdown clippings for ``episodes`` into ``inbox_dir``.
+
+        Each clipping includes previous/next navigation links computed from the
+        chronological order of the provided episode list.
+        """
         transcripts = transcripts or {}
+
+        def _sort_key(ep: TDRProEpisode) -> tuple:
+            try:
+                ep_num = int(ep.episode) if ep.episode else 0
+            except ValueError:
+                ep_num = 0
+            return (ep.published_at, ep_num)
+
+        sorted_eps = sorted(episodes, key=_sort_key)
+        ep_index = {ep.guid: i for i, ep in enumerate(sorted_eps)}
+
         written: list[Path] = []
         for ep in episodes:
             transcript = transcripts.get(ep.guid)
-            markdown = ep.to_clipping(transcript=transcript or None)
+            idx = ep_index[ep.guid]
+            prev_ep = sorted_eps[idx - 1] if idx > 0 else None
+            next_ep = sorted_eps[idx + 1] if idx < len(sorted_eps) - 1 else None
+            markdown = ep.to_clipping(
+                transcript=transcript or None,
+                prev_episode=prev_ep,
+                next_episode=next_ep,
+                index_path=index_path,
+            )
             filename = f"{ep.slug}.md"
             path = self.inbox_dir / filename
             if not dry_run:
@@ -356,6 +434,75 @@ class TDRProSource:
                 path.write_text(markdown, encoding="utf-8")
             written.append(path)
         return written
+
+    def write_hub_index(
+        self,
+        episodes: list[TDRProEpisode],
+        *,
+        index_path: Path | None = None,
+        dry_run: bool = False,
+    ) -> Path:
+        """Write or update the master TDR Pro episode index markdown page.
+
+        Episodes are sorted newest-first by episode number, falling back to
+        publication date.  The default ``index_path`` is the parent of
+        ``inbox_dir`` so the index lives next to the clippings it catalogs.
+        """
+        if index_path is None:
+            index_path = self.inbox_dir.parent / "tdr-pro-index.md"
+        else:
+            index_path = Path(index_path)
+
+        def _sort_key(ep: TDRProEpisode) -> tuple:
+            try:
+                ep_num = int(ep.episode) if ep.episode else 0
+            except ValueError:
+                ep_num = 0
+            return (ep.published_at, ep_num)
+
+        sorted_eps = sorted(episodes, key=_sort_key, reverse=True)
+        today = utc_now().date().isoformat()
+        tags_value = ", ".join(_DEFAULT_TAGS)
+        fm_lines = [
+            "---",
+            'title: "TDR Pro Episode Index"',
+            'description: "Master index of The DeFi Report Pro podcast episodes."',
+            'type: "index"',
+            'status: "seed"',
+            'domain: "Trading"',
+            'source: "tdr_pro"',
+            f'tags: "[{tags_value}]"',
+            f'created: "{today}"',
+            f'modified: "{today}"',
+            "---",
+        ]
+        body = [
+            "# TDR Pro Episode Index",
+            "",
+            "Master list of [The DeFi Report Pro](https://thedefireport.io/) podcast episodes ingested into the Knowledge vault.",
+            "",
+            f"**Episodes indexed:** {len(sorted_eps)}",
+            "",
+            "## Episodes",
+            "",
+        ]
+        body.extend(ep.to_index_entry() for ep in sorted_eps)
+        body.extend([
+            "",
+            "---",
+            "",
+            "## RSS source",
+            "",
+            f"- Feed: <{TDR_PRO_RSS_URL}>",
+            f"- Website: <{TDR_PRO_DOMAIN}>",
+            "",
+        ])
+
+        markdown = "\n".join(fm_lines) + "\n" + "\n".join(body) + "\n"
+        if not dry_run:
+            index_path.parent.mkdir(parents=True, exist_ok=True)
+            index_path.write_text(markdown, encoding="utf-8")
+        return index_path
 
     def latest_clippings(
         self,

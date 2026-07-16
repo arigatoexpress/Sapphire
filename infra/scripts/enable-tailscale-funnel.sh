@@ -10,7 +10,7 @@
 
 set -euo pipefail
 
-PORT="${PORT:-9090}"
+PORT="${SAPPHIRE_TV_FUNNEL_PORT:-9090}"
 TAILSCALE_BIN="$(command -v tailscale || true)"
 
 admin_url="https://login.tailscale.com/admin/machines"
@@ -35,7 +35,6 @@ echo "tailscale logged in: $("${TAILSCALE_BIN}" status --self | head -n1 || true
 echo
 
 # Check whether funnel is already enabled for this port.
-# tailscale serve status returns JSON when --json is passed; text otherwise.
 if "${TAILSCALE_BIN}" serve status 2>/dev/null | grep -qE "funnel.*:${PORT}|:${PORT}.*funnel"; then
     echo "Tailscale funnel appears to already be enabled on port ${PORT}."
     echo "Current serve/funnel status:"
@@ -44,14 +43,44 @@ if "${TAILSCALE_BIN}" serve status 2>/dev/null | grep -qE "funnel.*:${PORT}|:${P
 fi
 
 echo "Enabling Tailscale funnel on port ${PORT} ..."
-"${TAILSCALE_BIN}" funnel --bg "tcp:${PORT}" >/dev/null 2>&1 || {
-    echo "Failed to enable funnel. Common causes:"
-    echo "  - Funnel is not enabled for your tailnet (see ${admin_url})"
-    echo "  - ACLs block funnel for this machine"
-    echo "  - Port ${PORT} is already in use by another listener"
-    exit 1
-}
 
-echo "Tailscale funnel enabled on port ${PORT}."
-echo "Verify with: tailscale serve status"
-echo "Admin console: ${admin_url}"
+# Run in the background so a hung auth/tailnet prompt does not block forever.
+funnel_log="$(mktemp)"
+"${TAILSCALE_BIN}" funnel --bg "tcp:${PORT}" >"${funnel_log}" 2>&1 &
+funnel_pid=$!
+sleep 5
+
+if ! kill -0 "${funnel_pid}" 2>/dev/null; then
+    # Process exited quickly — inspect the log.
+    wait "${funnel_pid}" 2>/dev/null || true
+    if "${TAILSCALE_BIN}" serve status 2>/dev/null | grep -qE "funnel.*:${PORT}|:${PORT}.*funnel"; then
+        echo "Tailscale funnel enabled on port ${PORT}."
+        echo "Verify with: tailscale serve status"
+        echo "Admin console: ${admin_url}"
+        rm -f "${funnel_log}"
+        exit 0
+    fi
+fi
+
+# Still running or not confirmed enabled; terminate the background job.
+kill "${funnel_pid}" 2>/dev/null || true
+wait "${funnel_pid}" 2>/dev/null || true
+
+if "${TAILSCALE_BIN}" serve status 2>/dev/null | grep -qE "funnel.*:${PORT}|:${PORT}.*funnel"; then
+    echo "Tailscale funnel enabled on port ${PORT}."
+    echo "Verify with: tailscale serve status"
+    echo "Admin console: ${admin_url}"
+    rm -f "${funnel_log}"
+    exit 0
+fi
+
+echo "Could not confirm funnel is enabled on port ${PORT}."
+echo "Tailscale output:"
+cat "${funnel_log}" || true
+rm -f "${funnel_log}"
+echo
+echo "Common causes:"
+echo "  - Funnel is not enabled for your tailnet (see ${admin_url})"
+echo "  - ACLs block funnel for this machine"
+echo "  - Port ${PORT} is already in use by another listener"
+exit 1
