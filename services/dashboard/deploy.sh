@@ -9,10 +9,9 @@ fi
 
 echo "Deploying Sapphire Alpha Dashboard..."
 
-cd "${SERVICE_DIR}"
+cd "${ROOT_DIR}"
 gcloud builds submit \
-  --config cloudbuild.yaml \
-  --service-account="projects/${PROJECT_ID}/serviceAccounts/sapphirev3@sapphire-479610.iam.gserviceaccount.com" \
+  --config cloudbuild-dashboard.yaml \
   .
 
 echo
