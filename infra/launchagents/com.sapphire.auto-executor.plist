@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.sapphire.auto-executor</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/python3</string>
+        <string>/Users/aribs/Code/Sapphire/services/alpha/auto_executor.py</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/aribs/Code/Sapphire</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/aribs/autonomy-status/logs/auto_executor.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/aribs/autonomy-status/logs/auto_executor.err</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>PAPER_TRADING</key>
+        <string>1</string>
+        <!-- Live trading is intentionally NOT enabled here. -->
+        <!-- To run live, start manually with both --live and AUTO_EXECUTOR_LIVE=1. -->
+    </dict>
+</dict>
+</plist>
