@@ -119,17 +119,31 @@ async def test_middleware_rejects_public_ip(signal_logger):
 
 
 @pytest.mark.asyncio
-async def test_middleware_rejects_private_rfc1918(signal_logger):
-    """RFC1918 (192.168.x.x) is NOT in Tailscale CGNAT and must be blocked."""
+async def test_middleware_allows_home_lan_subnet(signal_logger):
+    """192.168.1.0/24 is allowlisted so the Windows webhook box can forward over LAN."""
     middleware = signal_logger._TailscaleOnlyMiddleware(app=signal_logger.app)
     request = MagicMock()
-    request.client.host = "192.168.1.21"  # rari2 LAN address
+    request.client.host = "192.168.1.21"
     call_next = AsyncMock()
 
-    response = await middleware.dispatch(request, call_next)
+    await middleware.dispatch(request, call_next)
 
-    assert response.status_code == 403
-    call_next.assert_not_awaited()
+    call_next.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_middleware_rejects_other_private_rfc1918(signal_logger):
+    """Private ranges outside the home LAN subnet stay blocked."""
+    middleware = signal_logger._TailscaleOnlyMiddleware(app=signal_logger.app)
+    for ip in ("10.0.0.5", "172.16.3.9", "192.168.2.21"):
+        request = MagicMock()
+        request.client.host = ip
+        call_next = AsyncMock()
+
+        response = await middleware.dispatch(request, call_next)
+
+        assert response.status_code == 403, ip
+        call_next.assert_not_awaited()
 
 
 @pytest.mark.asyncio
