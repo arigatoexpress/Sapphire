@@ -30,11 +30,8 @@ import contextlib
 import json
 import logging
 import os
-import ssl
 import sys
 import time
-import urllib.error
-import urllib.request
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, date
@@ -77,6 +74,15 @@ try:
 except Exception as _e:  # pragma: no cover - runtime import guard
     log.debug("RobinhoodReader unavailable: %s", _e)
 
+# Confirmation firewall pending-file poller (no Telegram socket competition)
+_POLL_PENDING_AVAILABLE = False
+try:
+    from confirmation_firewall import _poll_pending
+
+    _POLL_PENDING_AVAILABLE = True
+except Exception as _e:  # pragma: no cover - runtime import guard
+    log.debug("confirmation_firewall._poll_pending unavailable: %s", _e)
+
 # Strategy lab order drafts
 try:
     from lib.trading.strategy_lab import (
@@ -101,9 +107,8 @@ KILLSWITCH_PATH = Path.home() / ".sapphire" / "autonomous_trading_pause"
 # Daily loss tracker (file-backed, so it survives restarts).
 DAILY_LOSS_FILE = Path.home() / ".sapphire" / "auto_executor_daily_loss.json"
 
-# Telegram polling / send state
+# Polling state
 DEFAULT_POLL_INTERVAL_SECONDS = 30
-DEFAULT_TELEGRAM_TIMEOUT_SECONDS = 30
 
 # Safety caps
 DEFAULT_MAX_NOTIONAL_USD = ROBINHOOD_FIRST_REAL_FUNDS_TEST_MAX_USD if (
@@ -114,10 +119,6 @@ DEFAULT_DAILY_LOSS_LIMIT_USD = 20.0
 # Env vars
 AUTO_EXECUTOR_LIVE_ENV = "AUTO_EXECUTOR_LIVE"
 PAPER_TRADING_ENV = "PAPER_TRADING"
-
-# Telegram credentials (same precedence as the rest of Sapphire)
-TELEGRAM_BOT_TOKEN_ENV = "TELEGRAM_BOT_TOKEN"
-TELEGRAM_CHAT_ID_ENV = "TELEGRAM_CHAT_ID"
 
 # ─── Data classes ─────────────────────────────────────────────────────────────
 
@@ -137,7 +138,6 @@ class ExecutorConfig:
     daily_loss_file: Path = field(default_factory=lambda: Path(DAILY_LOSS_FILE))
 
     # Injectable for tests
-    telegram_api_class: type["TelegramAPI"] | None = None
     robinhood_submit_fn: Any | None = None
     readiness_fn: Any | None = None
     time_fn: Any | None = None
@@ -164,135 +164,8 @@ class SignalRecord:
     take_profit: float = 0.0
     stop_loss: float = 0.0
     rr_ratio: float = 0.0
+    confirmation_code: str = ""
     raw: dict[str, Any] = field(default_factory=dict)
-
-
-# ─── Telegram client (minimal, no external deps) ──────────────────────────────
-
-
-class TelegramAPI:
-    """Thin Telegram Bot API client for the executor's approval flow."""
-
-    def __init__(self, token: str, chat_id: str, timeout_seconds: float = 30.0) -> None:
-        self._token = token
-        self._chat_id = chat_id
-        self._timeout = timeout_seconds
-        self._ssl_ctx = ssl.create_default_context()
-
-    def _url(self, method: str) -> str:
-        return f"https://api.telegram.org/bot{self._token}/{method}"
-
-    def _post(self, method: str, payload: dict[str, Any]) -> dict[str, Any]:
-        body = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(
-            self._url(method),
-            data=body,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=self._timeout, context=self._ssl_ctx) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-
-    def send_confirmation_request(self, signal: SignalRecord) -> dict[str, Any] | None:
-        """Send an inline-keyboard Approve/Reject message for a signal."""
-        if not self._token or not self._chat_id:
-            log.warning("Telegram not configured; cannot send confirmation request")
-            return None
-
-        icon = "🟢" if signal.direction == "long" else "🔴" if signal.direction == "short" else "⚪"
-        text = (
-            f"{icon} *Auto-Executor Approval Required*\n\n"
-            f"Signal: `{signal.pipeline_id}`\n"
-            f"Action: *{signal.action.upper()} {signal.symbol}*\n"
-            f"Price: `${signal.price:,.4f}`\n"
-            f"Confidence: `{signal.confidence:.0%}` | Score: `{signal.score:.0f}/100`\n"
-            f"Recommended size: `${signal.position_usd:.2f}` ({signal.position_pct:.1%})\n"
-            f"Strategy: `{signal.strategy}`\n\n"
-            f"Tap *Approve* to queue for execution, *Reject* to discard."
-        )
-
-        payload = {
-            "chat_id": self._chat_id,
-            "text": text,
-            "parse_mode": "Markdown",
-            "reply_markup": {
-                "inline_keyboard": [
-                    [
-                        {
-                            "text": "✅ Approve",
-                            "callback_data": f"ae:{signal.pipeline_id}:approve",
-                        },
-                        {
-                            "text": "❌ Reject",
-                            "callback_data": f"ae:{signal.pipeline_id}:reject",
-                        },
-                    ]
-                ]
-            },
-        }
-        try:
-            data = self._post("sendMessage", payload)
-            log.info("Telegram confirmation request sent for %s", signal.pipeline_id)
-            return data
-        except Exception as exc:
-            log.warning("Telegram send failed for %s: %s", signal.pipeline_id, exc)
-            return None
-
-    def get_callback_updates(self, offset: int = 0) -> list[dict[str, Any]]:
-        """Poll Telegram for callback queries from inline keyboards."""
-        if not self._token:
-            return []
-        payload = {
-            "offset": offset,
-            "limit": 100,
-            "timeout": min(10, int(self._timeout)),
-            "allowed_updates": ["callback_query"],
-        }
-        try:
-            data = self._post("getUpdates", payload)
-            result = data.get("result", [])
-            return [item for item in result if isinstance(item, dict)]
-        except Exception as exc:
-            log.warning("Telegram getUpdates failed: %s", exc)
-            return []
-
-    def answer_callback_query(self, callback_query_id: str) -> None:
-        """Acknowledge a callback query so the spinner disappears."""
-        if not self._token:
-            return
-        try:
-            self._post("answerCallbackQuery", {"callback_query_id": callback_query_id})
-        except Exception as exc:
-            log.warning("answerCallbackQuery failed: %s", exc)
-
-
-# ─── Telegram credentials resolution ──────────────────────────────────────────
-
-
-def _resolve_telegram_credentials() -> tuple[str, str]:
-    """Resolve Telegram bot token and chat id from env or secret files."""
-    token = os.environ.get(TELEGRAM_BOT_TOKEN_ENV, "").strip()
-    chat_id = os.environ.get(TELEGRAM_CHAT_ID_ENV, "").strip()
-
-    if not token:
-        for path in [
-            Path.home() / ".config" / "sapphire-secrets" / "telegram_bot_token",
-            Path.home() / ".config" / "sapphire" / "telegram_bot_token",
-        ]:
-            if path.exists():
-                token = path.read_text().strip()
-                break
-
-    if not chat_id:
-        for path in [
-            Path.home() / ".config" / "sapphire-secrets" / "telegram_chat_id",
-            Path.home() / ".config" / "sapphire" / "telegram_chat_id",
-        ]:
-            if path.exists():
-                chat_id = path.read_text().strip()
-                break
-
-    return token, chat_id
 
 
 # ─── Signal reading / writing ─────────────────────────────────────────────────
@@ -343,6 +216,7 @@ def _parse_signal_record(raw: dict[str, Any]) -> SignalRecord | None:
         take_profit=float(raw.get("take_profit", 0.0) or 0.0),
         stop_loss=float(raw.get("stop_loss", 0.0) or 0.0),
         rr_ratio=float(raw.get("rr_ratio", 0.0) or 0.0),
+        confirmation_code=str(raw.get("confirmation_code", "")).upper(),
         raw=raw,
     )
 
@@ -393,30 +267,6 @@ def _append_executor_decision(
     }
     with open(path, "a") as f:
         f.write(json.dumps(record) + "\n")
-
-
-def _mark_confirmation_sent(signals_dir: Path, pipeline_id: str) -> None:
-    """Record that a confirmation request was sent so we do not spam."""
-    path = _signal_path(signals_dir)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    record = {
-        "record_type": "executor_confirmation_sent",
-        "pipeline_id": pipeline_id,
-        "timestamp": datetime.now(UTC).isoformat(),
-    }
-    with open(path, "a") as f:
-        f.write(json.dumps(record) + "\n")
-
-
-def _already_sent_confirmation(signals_dir: Path, pipeline_id: str) -> bool:
-    path = _signal_path(signals_dir)
-    for raw in _load_jsonl_records(path):
-        if (
-            raw.get("record_type") == "executor_confirmation_sent"
-            and raw.get("pipeline_id") == pipeline_id
-        ):
-            return True
-    return False
 
 
 # ─── Safety / pre-flight checks ───────────────────────────────────────────────
@@ -749,72 +599,57 @@ def _execute_signal(signal: SignalRecord, config: ExecutorConfig) -> dict[str, A
         return {"verdict": "SUBMIT_ERROR", "error": str(exc)}
 
 
-def _process_pending_confirmations(
-    signals_dir: Path,
-    telegram: TelegramAPI,
-    offset: int,
-) -> tuple[dict[str, str], int]:
-    """Poll Telegram callbacks and return decisions + new offset."""
-    decisions: dict[str, str] = {}
-    try:
-        updates = telegram.get_callback_updates(offset=offset)
-    except Exception as exc:
-        log.warning("Failed to poll Telegram callbacks: %s", exc)
-        return decisions, offset
-
-    for update in updates:
-        update_id = update.get("update_id")
-        if isinstance(update_id, int):
-            offset = max(offset, update_id + 1)
-
-        callback = update.get("callback_query", {})
-        callback_id = callback.get("id")
-        data = str(callback.get("data", ""))
-        if not data.startswith("ae:"):
-            continue
-
-        parts = data.split(":")
-        if len(parts) != 3:
-            continue
-        _, pipeline_id, action = parts
-        decision = "APPROVED" if action == "approve" else "REJECTED"
-        decisions[pipeline_id] = decision
-
-        if callback_id:
-            try:
-                telegram.answer_callback_query(callback_id)
-            except Exception:
-                pass
-
-        _append_executor_decision(
-            signals_dir,
-            pipeline_id,
-            decision,
-            reason=f"telegram_inline_button:{action}",
-        )
-        log.info("Executor decision recorded: %s -> %s", pipeline_id, decision)
-
-    return decisions, offset
-
-
-def _send_confirmation_requests(
+def _poll_firewall_decisions(
     signals: list[SignalRecord],
-    decisions: dict[str, str],
     signals_dir: Path,
-    telegram: TelegramAPI,
-) -> None:
-    """Send Telegram confirmation requests for signals that need one."""
+    decisions: dict[str, str],
+) -> dict[str, str]:
+    """Poll the confirmation-firewall pending files for each signal's code.
+
+    The signal pipeline already sent a Telegram request with an 8-character
+    code; the human replies via the existing bot handler, which writes the
+    status back to ``~/.sapphire/pending_confirmations/<code>.json``. We poll
+    those files so the auto-executor never competes with the PM bot for the
+    Telegram getUpdates socket.
+    """
+    if not _POLL_PENDING_AVAILABLE:
+        log.warning("confirmation_firewall unavailable; cannot poll approvals")
+        return decisions
+
     for signal in signals:
         if signal.pipeline_id in decisions:
             continue
-        if _already_sent_confirmation(signals_dir, signal.pipeline_id):
+        code = signal.confirmation_code
+        if not code:
+            log.warning(
+                "Signal %s has no confirmation_code; skipping (legacy record)",
+                signal.pipeline_id,
+            )
             continue
-        telegram.send_confirmation_request(signal)
-        _mark_confirmation_sent(signals_dir, signal.pipeline_id)
+        status = _poll_pending(code)
+        if status == "approved":
+            decisions[signal.pipeline_id] = "APPROVED"
+            _append_executor_decision(
+                signals_dir,
+                signal.pipeline_id,
+                "APPROVED",
+                reason=f"confirmation_firewall:{code}",
+            )
+            log.info("Executor approval recorded: %s -> APPROVED", signal.pipeline_id)
+        elif status == "denied":
+            decisions[signal.pipeline_id] = "REJECTED"
+            _append_executor_decision(
+                signals_dir,
+                signal.pipeline_id,
+                "REJECTED",
+                reason=f"confirmation_firewall:{code}",
+            )
+            log.info("Executor rejection recorded: %s -> REJECTED", signal.pipeline_id)
+    return decisions
 
 
 def run_once(config: ExecutorConfig) -> None:
-    """Single executor pass: send confirmations, process approvals, execute."""
+    """Single executor pass: poll approvals, execute approved signals."""
     if _killswitch_active(config.killswitch_path):
         log.info("Kill switch active at %s; skipping execution", config.killswitch_path)
         return
@@ -826,17 +661,8 @@ def run_once(config: ExecutorConfig) -> None:
 
     decisions = _executor_decisions_for_day(config.signals_dir)
 
-    # Send confirmation requests for signals that have not been decided yet.
-    token, chat_id = _resolve_telegram_credentials()
-    telegram_cls = config.telegram_api_class or TelegramAPI
-    telegram = telegram_cls(token=token, chat_id=chat_id)
-    _send_confirmation_requests(signals, decisions, config.signals_dir, telegram)
-
-    # Poll for any new Telegram callback decisions.
-    new_decisions, _ = _process_pending_confirmations(
-        config.signals_dir, telegram, offset=0
-    )
-    decisions.update(new_decisions)
+    # Poll confirmation-firewall pending files (no Telegram socket use here).
+    decisions = _poll_firewall_decisions(signals, config.signals_dir, decisions)
 
     # Execute approved signals.
     for signal in signals:

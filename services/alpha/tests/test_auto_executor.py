@@ -60,6 +60,7 @@ def fake_signal_record():
         "take_profit": 67000.0,
         "stop_loss": 64000.0,
         "rr_ratio": 2.0,
+        "confirmation_code": "A1B2C3D4",
     }
 
 
@@ -75,37 +76,26 @@ def config(tmp_dirs):
         audit_log=tmp_dirs["audit_log"],
         killswitch_path=tmp_dirs["killswitch"],
         daily_loss_file=tmp_dirs["daily_loss"],
-        telegram_api_class=FakeTelegramAPI,
         readiness_fn=fake_readiness_fn,
     )
 
 
+@pytest.fixture
+def poll_pending(monkeypatch):
+    """Monkey-patch confirmation_firewall._poll_pending for deterministic tests."""
+    calls: list[str] = []
+    return_values: dict[str, str | None] = {}
+
+    def _fake_poll(code: str) -> str | None:
+        calls.append(code)
+        return return_values.get(code)
+
+    monkeypatch.setattr(ae, "_poll_pending", _fake_poll)
+    monkeypatch.setattr(ae, "_POLL_PENDING_AVAILABLE", True)
+    return calls, return_values
+
+
 # ─── Helpers ──────────────────────────────────────────────────────────────────
-
-
-class FakeTelegramAPI(ae.TelegramAPI):
-    """In-memory Telegram API stub that records sent confirmation requests."""
-
-    sent: list[ae.SignalRecord] = []
-    callbacks: list[dict] = []
-
-    def __init__(self, token: str = "", chat_id: str = "", timeout_seconds: float = 1.0) -> None:
-        super().__init__(token=token, chat_id=chat_id, timeout_seconds=timeout_seconds)
-
-    def send_confirmation_request(self, signal: ae.SignalRecord) -> dict:
-        self.sent.append(signal)
-        return {"ok": True, "result": {"message_id": 1}}
-
-    def get_callback_updates(self, offset: int = 0) -> list[dict]:
-        return list(self.callbacks)
-
-    def answer_callback_query(self, callback_query_id: str) -> None:
-        pass
-
-    @classmethod
-    def reset(cls) -> None:
-        cls.sent.clear()
-        cls.callbacks.clear()
 
 
 def fake_readiness_fn(*, symbol, action, notional_usd, live_read_only, max_spread_bps):
@@ -152,32 +142,28 @@ def test_killswitch_blocks_execution(tmp_dirs, config, fake_signal_record):
     assert audit == []
 
 
-def test_confirmation_request_sent_for_pending_signal(tmp_dirs, config, fake_signal_record):
-    FakeTelegramAPI.reset()
+def test_no_confirmation_code_skips_signal(tmp_dirs, config, fake_signal_record, poll_pending):
+    calls, _ = poll_pending
+    fake_signal_record.pop("confirmation_code", None)
     write_signal(tmp_dirs["signals_dir"], fake_signal_record)
 
     ae.run_once(config)
 
-    assert len(FakeTelegramAPI.sent) == 1
-    assert FakeTelegramAPI.sent[0].pipeline_id == "abc12345"
+    assert calls == []
+    audit = load_jsonl(config.audit_log)
+    assert audit == []
 
 
-def test_approval_record_triggers_paper_execution(tmp_dirs, config, fake_signal_record):
-    FakeTelegramAPI.reset()
+def test_approval_poll_triggers_paper_execution(
+    tmp_dirs, config, fake_signal_record, poll_pending
+):
+    calls, return_values = poll_pending
+    return_values["A1B2C3D4"] = "approved"
     write_signal(tmp_dirs["signals_dir"], fake_signal_record)
 
-    # Simulate an approval callback
-    FakeTelegramAPI.callbacks.append(
-        {
-            "update_id": 1,
-            "callback_query": {
-                "id": "cb1",
-                "data": "ae:abc12345:approve",
-            },
-        }
-    )
-
     ae.run_once(config)
+
+    assert "A1B2C3D4" in calls
 
     # Signal audit should contain an APPROVED decision
     signal_lines = load_jsonl(
@@ -197,21 +183,14 @@ def test_approval_record_triggers_paper_execution(tmp_dirs, config, fake_signal_
     assert audit[0]["order_body"]["symbol"] == "BTC-USD"
 
 
-def test_rejection_record_skips_execution(tmp_dirs, config, fake_signal_record):
-    FakeTelegramAPI.reset()
+def test_rejection_poll_skips_execution(tmp_dirs, config, fake_signal_record, poll_pending):
+    calls, return_values = poll_pending
+    return_values["A1B2C3D4"] = "denied"
     write_signal(tmp_dirs["signals_dir"], fake_signal_record)
 
-    FakeTelegramAPI.callbacks.append(
-        {
-            "update_id": 2,
-            "callback_query": {
-                "id": "cb2",
-                "data": "ae:abc12345:reject",
-            },
-        }
-    )
-
     ae.run_once(config)
+
+    assert "A1B2C3D4" in calls
 
     signal_lines = load_jsonl(
         tmp_dirs["signals_dir"] / f"{datetime.now(UTC).strftime('%Y-%m-%d')}.jsonl"
@@ -224,20 +203,11 @@ def test_rejection_record_skips_execution(tmp_dirs, config, fake_signal_record):
     assert audit == []
 
 
-def test_notional_cap_blocks_execution(tmp_dirs, config, fake_signal_record):
-    FakeTelegramAPI.reset()
+def test_notional_cap_blocks_execution(tmp_dirs, config, fake_signal_record, poll_pending):
+    _, return_values = poll_pending
+    return_values["A1B2C3D4"] = "approved"
     fake_signal_record["position_usd"] = 100.0
     write_signal(tmp_dirs["signals_dir"], fake_signal_record)
-
-    FakeTelegramAPI.callbacks.append(
-        {
-            "update_id": 3,
-            "callback_query": {
-                "id": "cb3",
-                "data": "ae:abc12345:approve",
-            },
-        }
-    )
 
     ae.run_once(config)
 
@@ -247,18 +217,10 @@ def test_notional_cap_blocks_execution(tmp_dirs, config, fake_signal_record):
     assert any("notional_cap_exceeded" in b for b in audit[0]["blockers"])
 
 
-def test_live_mode_requires_env_var(tmp_dirs, config, fake_signal_record, monkeypatch):
-    FakeTelegramAPI.reset()
+def test_live_mode_requires_env_var(tmp_dirs, config, fake_signal_record, monkeypatch, poll_pending):
+    _, return_values = poll_pending
+    return_values["A1B2C3D4"] = "approved"
     write_signal(tmp_dirs["signals_dir"], fake_signal_record)
-    FakeTelegramAPI.callbacks.append(
-        {
-            "update_id": 4,
-            "callback_query": {
-                "id": "cb4",
-                "data": "ae:abc12345:approve",
-            },
-        }
-    )
 
     config.live = True
     config.confirm_token = "AUTO_EXECUTOR_LIVE_BUY_BTC-USD_5.00"
@@ -275,19 +237,11 @@ def test_live_mode_requires_confirm_token(tmp_dirs, monkeypatch):
 
 
 def test_live_mode_with_valid_token_uses_robinhood_submit(
-    tmp_dirs, config, fake_signal_record, monkeypatch
+    tmp_dirs, config, fake_signal_record, monkeypatch, poll_pending
 ):
-    FakeTelegramAPI.reset()
+    _, return_values = poll_pending
+    return_values["A1B2C3D4"] = "approved"
     write_signal(tmp_dirs["signals_dir"], fake_signal_record)
-    FakeTelegramAPI.callbacks.append(
-        {
-            "update_id": 5,
-            "callback_query": {
-                "id": "cb5",
-                "data": "ae:abc12345:approve",
-            },
-        }
-    )
 
     config.live = True
     config.confirm_token = "AUTO_EXECUTOR_LIVE_BUY_BTC-USD_5.00"
@@ -309,20 +263,12 @@ def test_live_mode_with_valid_token_uses_robinhood_submit(
     assert audit[0]["real_order_submitted"] is True
 
 
-def test_daily_loss_limit_blocks_execution(tmp_dirs, config, fake_signal_record):
-    FakeTelegramAPI.reset()
+def test_daily_loss_limit_blocks_execution(tmp_dirs, config, fake_signal_record, poll_pending):
+    _, return_values = poll_pending
+    return_values["A1B2C3D4"] = "approved"
     # Seed daily loss at the limit
     tmp_dirs["daily_loss"].write_text(json.dumps({"date": str(__import__("datetime").date.today()), "loss_usd": 25.0}))
     write_signal(tmp_dirs["signals_dir"], fake_signal_record)
-    FakeTelegramAPI.callbacks.append(
-        {
-            "update_id": 6,
-            "callback_query": {
-                "id": "cb6",
-                "data": "ae:abc12345:approve",
-            },
-        }
-    )
 
     ae.run_once(config)
 

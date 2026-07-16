@@ -312,7 +312,7 @@ class SignalPipeline:
         # LOG_ONLY: write audit but no Telegram
 
         # Always write audit
-        audit_path = self._write_audit(scored)
+        audit_path = self._write_audit(scored, confirmation_code=confirmation_code)
 
         # Track active signals (open positions) — keyed by symbol (not direction).
         # A new entry on a symbol that already has an open position implicitly
@@ -979,7 +979,7 @@ class SignalPipeline:
         threading.Thread(target=_send_bg, daemon=True).start()
         return code
 
-    def _write_audit(self, s: ScoredSignal) -> Path:
+    def _write_audit(self, s: ScoredSignal, confirmation_code: str = "") -> Path:
         """Append scored signal to today's JSONL audit file.
 
         When PAPER_TRADING is enabled, also appends to paper_trading.jsonl
@@ -991,6 +991,8 @@ class SignalPipeline:
         record.pop("raw", None)  # raw is noisy; already in signal_logger's log
         if PAPER_TRADING:
             record["paper_mode"] = True
+        if confirmation_code:
+            record["confirmation_code"] = confirmation_code
         with open(path, "a") as f:
             f.write(json.dumps(record) + "\n")
             # Durability: ensure the record hits disk before we call the
