@@ -59,4 +59,5 @@ manifest stage change. The local LaunchAgent remains untouched.
 | Cycle | Date (UTC) | Trigger | Run ID | Verdict | FAIL | Missing | Notes |
 |-------|------------|---------|--------|---------|-----:|--------:|-------|
 | 1 | 2026-04-26T20:39Z | workflow_dispatch | [24966520333](https://github.com/arigatoexpress/Sapphire/actions/runs/24966520333) | WARN | 0 | 0 | Body length and rendered-file hash drift across all 4 kinds, all deltas under 50% — expected for first-cycle freshness skew. No remote-only quality failures. Report: `data/content/shadow-reports/content-shadow-comparison-20260426T204118Z.json`. |
+| 2 | 2026-07-15T13:03Z | schedule | [29417631595](https://github.com/arigatoexpress/Sapphire/actions/runs/29417631595) | FAIL | 2 | 0 | Remote ai_intel fails substack quality (evidence_coverage_low, argument_coherence_low) and market_pulse body-length delta is 58% — file hash and body drift across ai_intel and market_pulse on all platforms. |
 
