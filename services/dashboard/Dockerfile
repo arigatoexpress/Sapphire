@@ -11,14 +11,15 @@ RUN npm run build
 
 FROM python:3.11-slim
 
-WORKDIR /app
+# Preserve the repo path shape so app.py can resolve parents[2] as the repo root.
+WORKDIR /app/services/dashboard
 
 # Install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application
-COPY . .
+# Copy application preserving the services/dashboard/ layout.
+COPY . /app/services/dashboard/
 COPY --from=frontend-build /frontend/dist ./frontend/dist
 
 # Set environment variables
