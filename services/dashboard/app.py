@@ -37,7 +37,11 @@ for _r in reversed(_DASHBOARD_ROOTS):
         sys.path.remove(_rs)
     sys.path.insert(0, _rs)
 
+# Debug: verify container layout on import failures
+import os as _os
 log = logging.getLogger("dashboard")
+log.warning("DASHBOARD_DEBUG __file__=%s cwd=%s app_root=%s lib_exists=%s sys.path_head=%s",
+            __file__, _os.getcwd(), _DASHBOARD_ROOTS[0], _os.path.isdir(str(_DASHBOARD_ROOTS[0]) / "lib"), sys.path[:3])
 
 import contextlib
 
