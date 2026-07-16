@@ -8,27 +8,26 @@
 #   cloudflared tunnel route dns sapphire-tunnel webhook.sapphirealpha.xyz
 #   cloudflared tunnel route dns sapphire-tunnel dashboard.sapphirealpha.xyz
 #
-# Then run: cloudflared tunnel --config infra/cloudflare/tunnel-config.yml run
+# Then run: cloudflared tunnel --config C:\sapphire\tunnel-config.yml run
 #
 # Or install as Windows service:
-#   cloudflared service install
+#   cloudflared service install --config C:\sapphire\tunnel-config.yml
 
-tunnel: <YOUR_TUNNEL_ID>  # from: cloudflared tunnel list
+tunnel: <TUNNEL_ID>  # from: cloudflared tunnel list
 credentials-file: C:\Users\<USERNAME>\.cloudflared\<TUNNEL_ID>.json
 
 ingress:
-  # TradingView webhook → Windows PC:9090 (primary path)
+  # TradingView webhook → Windows PC :9090 (webhook receiver binds 0.0.0.0:9090)
   - hostname: webhook.sapphirealpha.xyz
     service: http://localhost:9090
 
-  # Dashboard → rari1:8080 (routed via Tailscale from Windows PC)
-  # If tunnel runs on Mac instead, use http://100.x.x.x:8080
+  # Dashboard → Tailscale target (fill in <DASHBOARD_TAILSCALE_IP:PORT>)
   - hostname: dashboard.sapphirealpha.xyz
-    service: http://100.x.x.x:8080
+    service: http://<DASHBOARD_TAILSCALE_IP:PORT>
 
-  # Control plane PM hub → rari1:8082
+  # Control plane PM hub → Tailscale target (fill in <PM_HUB_TAILSCALE_IP:PORT>)
   - hostname: pm.sapphirealpha.xyz
-    service: http://100.x.x.x:8082
+    service: http://<PM_HUB_TAILSCALE_IP:PORT>
 
   # Catch-all
   - service: http_status:404
