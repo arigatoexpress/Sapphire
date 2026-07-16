@@ -173,6 +173,7 @@ from .earnings_calls import EarningsCallSource
 from .labor import LaborSource
 from .news import NewsAPISource
 from .sec_edgar import SECEdgarSource
+from .tdr_pro import TDRProSource
 from .x_sentiment import XSentimentSource
 
 __all__ = [
@@ -184,6 +185,7 @@ __all__ = [
     "NewsAPISource",
     "SECEdgarSource",
     "SourceError",
+    "TDRProSource",
     "XSentimentSource",
     "age_seconds",
     "build_url",

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"
+     xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"
+     xmlns:podcast="https://podcastindex.org/namespace/1.0"
+     xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>The DeFi Report</title>
+    <link>https://thedefireport.io/</link>
+    <description>Weekly crypto portfolio research.</description>
+    <item>
+      <title>TDR Pro’s 1st-Year Portfolio Audit</title>
+      <itunes:episode>28</itunes:episode>
+      <itunes:duration>2893</itunes:duration>
+      <guid isPermaLink="false">34ee498d-50da-428a-a4e1-005d81826200</guid>
+      <link>https://share.transistor.fm/s/09b6f51a</link>
+      <description><![CDATA[<p>Mike opens the books on TDR Pro’s first year.</p>]]></description>
+      <pubDate>Wed, 15 Jul 2026 06:55:35 -0700</pubDate>
+      <author>Michael Nadeau</author>
+      <enclosure url="https://media.transistor.fm/09b6f51a/babefc46.mp3" length="46387257" type="audio/mpeg"/>
+      <podcast:transcript url="https://share.transistor.fm/s/09b6f51a/transcript.txt" type="text/plain"/>
+    </item>
+    <item>
+      <title>Is the Bitcoin Low Really In?</title>
+      <itunes:episode>27</itunes:episode>
+      <itunes:duration>2367</itunes:duration>
+      <guid isPermaLink="false">4fc06290-f969-44aa-9126-9e370a71583f</guid>
+      <link>https://share.transistor.fm/s/708bb0a3</link>
+      <description><![CDATA[<p>Bitcoin bounced, but the bottom still isn’t confirmed.</p>]]></description>
+      <pubDate>Wed, 08 Jul 2026 10:57:20 -0700</pubDate>
+      <author>Michael Nadeau</author>
+      <enclosure url="https://media.transistor.fm/708bb0a3/958e58da.mp3" length="37986899" type="audio/mpeg"/>
+      <podcast:transcript url="https://share.transistor.fm/s/708bb0a3/transcript.txt" type="text/plain"/>
+    </item>
+  </channel>
+</rss>

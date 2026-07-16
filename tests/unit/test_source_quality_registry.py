@@ -33,11 +33,23 @@ def test_sec_and_earnings_are_registered_by_default() -> None:
     assert "earnings_calls" in names
 
 
+def test_tdr_pro_is_registered_by_default() -> None:
+    """Built-in registry must include tdr_pro (DeFi Report Pro podcast)."""
+    names = registered_sources()
+    assert "tdr_pro" in names
+
+
 def test_builtin_sources_have_72h_lookahead_for_filings() -> None:
     """Filings have a slower half-life → 72h lookahead, not the 24h default."""
     by_name = {e.name: e for e in BUILTIN_SOURCES}
     assert by_name["sec_edgar"].lookahead_hours == 72
     assert by_name["earnings_calls"].lookahead_hours == 72
+
+
+def test_tdr_pro_has_weekly_lookahead() -> None:
+    """Macro research podcast uses a 7-day (168h) lookahead."""
+    by_name = {e.name: e for e in BUILTIN_SOURCES}
+    assert by_name["tdr_pro"].lookahead_hours == 168
 
 
 # ---------------------------------------------------------------------------
