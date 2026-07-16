@@ -34,7 +34,7 @@ import sys
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, date
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -88,7 +88,6 @@ try:
     from lib.trading.strategy_lab import (
         ROBINHOOD_FIRST_REAL_FUNDS_TEST_MAX_USD,
         asset_spec,
-        build_order_drafts,
     )
 
     _STRATEGY_LAB_AVAILABLE = True
@@ -111,9 +110,9 @@ DAILY_LOSS_FILE = Path.home() / ".sapphire" / "auto_executor_daily_loss.json"
 DEFAULT_POLL_INTERVAL_SECONDS = 30
 
 # Safety caps
-DEFAULT_MAX_NOTIONAL_USD = ROBINHOOD_FIRST_REAL_FUNDS_TEST_MAX_USD if (
-    _STRATEGY_LAB_AVAILABLE
-) else 5.0
+DEFAULT_MAX_NOTIONAL_USD = (
+    ROBINHOOD_FIRST_REAL_FUNDS_TEST_MAX_USD if (_STRATEGY_LAB_AVAILABLE) else 5.0
+)
 DEFAULT_DAILY_LOSS_LIMIT_USD = 20.0
 
 # Env vars
@@ -367,7 +366,9 @@ def _run_preflight_checks(
             f"daily_loss_limit_reached:{daily_loss:.2f}>={config.daily_loss_limit_usd:.2f}"
         )
 
-    readiness = _collect_readiness(signal, live_read_only=live_read_only, readiness_fn=config.readiness_fn)
+    readiness = _collect_readiness(
+        signal, live_read_only=live_read_only, readiness_fn=config.readiness_fn
+    )
     readiness_verdict = readiness.get("verdict", "")
     if live_read_only and readiness_verdict != "READY_FOR_MANUAL_CONFIRMATION":
         blockers.append(f"readiness_not_ready:{readiness_verdict}")
@@ -530,9 +531,7 @@ def _execute_signal(signal: SignalRecord, config: ExecutorConfig) -> dict[str, A
     mode = "live" if is_live else "paper"
 
     # Pre-flight checks (live mode runs read-only Robinhood probes)
-    ok, blockers = _run_preflight_checks(
-        signal, config, live_read_only=is_live
-    )
+    ok, blockers = _run_preflight_checks(signal, config, live_read_only=is_live)
     if not ok:
         _append_executor_audit(
             config.audit_log,

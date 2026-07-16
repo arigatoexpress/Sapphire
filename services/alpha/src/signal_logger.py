@@ -60,11 +60,7 @@ class _TailscaleOnlyMiddleware(BaseHTTPMiddleware):
             addr = ipaddress.ip_address(client_ip)
         except ValueError:
             return JSONResponse({"error": "forbidden"}, status_code=403)
-        allowed = (
-            addr == _LOCALHOST
-            or addr in _TAILSCALE_NET
-            or addr in _HOME_LAN_NET
-        )
+        allowed = addr == _LOCALHOST or addr in _TAILSCALE_NET or addr in _HOME_LAN_NET
         if not allowed:
             log.warning("signal_logger: blocked request from non-allowlisted IP %s", client_ip)
             return JSONResponse({"error": "forbidden"}, status_code=403)
@@ -73,6 +69,7 @@ class _TailscaleOnlyMiddleware(BaseHTTPMiddleware):
 
 app = FastAPI(title="Sapphire Signal Logger", version="0.1.0")
 app.add_middleware(_TailscaleOnlyMiddleware)
+
 
 def _load_webhook_secret() -> str:
     """Load WEBHOOK_SECRET from env or the sapphire secrets dir."""

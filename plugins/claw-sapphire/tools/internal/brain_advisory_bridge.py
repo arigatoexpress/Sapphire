@@ -101,11 +101,17 @@ def _advisory_to_decision(
     if signal == "LONG":
         decision = "GO_LONG"
         direction = "bullish"
-        confidence = min(0.95, max(0.5, (score + 0.5) / 1.5)) if isinstance(score, (int, float)) else 0.6
+        confidence = (
+            min(0.95, max(0.5, (score + 0.5) / 1.5)) if isinstance(score, (int, float)) else 0.6
+        )
     elif signal == "SHORT":
         decision = "GO_SHORT"
         direction = "bearish"
-        confidence = min(0.95, max(0.5, (abs(score) + 0.5) / 1.5)) if isinstance(score, (int, float)) else 0.6
+        confidence = (
+            min(0.95, max(0.5, (abs(score) + 0.5) / 1.5))
+            if isinstance(score, (int, float))
+            else 0.6
+        )
     else:
         decision = "WAIT"
         direction = "neutral"
@@ -217,7 +223,9 @@ def action_publish(live: bool = False) -> dict[str, Any]:
             continue
         direction = "long" if signal == "LONG" else "short"
         score = row.get("score")
-        confidence = min(0.95, max(0.5, (score + 0.5) / 1.5)) if isinstance(score, (int, float)) else 0.6
+        confidence = (
+            min(0.95, max(0.5, (score + 0.5) / 1.5)) if isinstance(score, (int, float)) else 0.6
+        )
 
         signals.append(
             {
@@ -237,7 +245,9 @@ def action_publish(live: bool = False) -> dict[str, Any]:
         "signals": signals,
         "advisory_path": str(ADVISORY_PATH),
         "stale": _is_stale(payload),
-        "note": "dry-run: no transaction signed or sent" if not live else "live: caller must supply private key",
+        "note": "dry-run: no transaction signed or sent"
+        if not live
+        else "live: caller must supply private key",
     }
     if not live:
         result["next_step"] = "set live=true and configure RH private key to publish on-chain"

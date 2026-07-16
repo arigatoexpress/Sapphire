@@ -294,7 +294,7 @@ class RobinhoodReader:
                 err = str(exc)
                 # Robinhood rejects the whole batch if any symbol is invalid.
                 # Parse the offender, drop it, and retry the rest.
-                invalid_match = re.search(r'Invalid symbol:\s*([A-Z0-9._-]+)', err, re.IGNORECASE)
+                invalid_match = re.search(r"Invalid symbol:\s*([A-Z0-9._-]+)", err, re.IGNORECASE)
                 if invalid_match:
                     invalid = invalid_match.group(1).upper()
                     remaining = [s for s in remaining if s != invalid]

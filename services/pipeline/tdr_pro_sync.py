@@ -14,6 +14,7 @@ CLI flags are available for ad-hoc runs:
     SAPPHIRE_TDR_PRO_LIVE=1 python -m services.pipeline.tdr_pro_sync --dry-run --limit 3
     python -m services.pipeline.tdr_pro_sync --index-only
 """
+
 from __future__ import annotations
 
 import argparse
@@ -76,7 +77,11 @@ def _load_local_episodes(source: TDRProSource) -> list[TDRProEpisode]:
                 continue
             text = path.read_text(encoding="utf-8")
             source_field = next(
-                (line.split(":", 1)[1].strip().strip('"').lower() for line in text.splitlines() if line.strip().startswith("source:")),
+                (
+                    line.split(":", 1)[1].strip().strip('"').lower()
+                    for line in text.splitlines()
+                    if line.strip().startswith("source:")
+                ),
                 "",
             )
             if "tdr_pro" not in source_field and "defi report" not in source_field:
@@ -96,7 +101,11 @@ def _load_local_episodes(source: TDRProSource) -> list[TDRProEpisode]:
                 episode = fields.get("episode", "").lstrip("Ee")
                 title = fields.get("title", path.stem)
                 published = fields.get("published", "")
-                pub_dt = datetime.fromisoformat(published).replace(tzinfo=UTC) if published else datetime.now(UTC)
+                pub_dt = (
+                    datetime.fromisoformat(published).replace(tzinfo=UTC)
+                    if published
+                    else datetime.now(UTC)
+                )
                 audio_url = fields.get("audio_url", "")
                 transcript_url = fields.get("transcript_url", "")
                 url = fields.get("url", "")
@@ -190,11 +199,19 @@ def sync(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Sync The DeFi Report Pro podcast into the Knowledge vault.")
+    parser = argparse.ArgumentParser(
+        description="Sync The DeFi Report Pro podcast into the Knowledge vault."
+    )
     parser.add_argument("--dry-run", action="store_true", help="Do not write any files.")
-    parser.add_argument("--lookback-days", type=int, default=DEFAULT_LOOKBACK_DAYS, help="Days to look back.")
+    parser.add_argument(
+        "--lookback-days", type=int, default=DEFAULT_LOOKBACK_DAYS, help="Days to look back."
+    )
     parser.add_argument("--limit", type=int, default=5, help="Maximum episodes to fetch.")
-    parser.add_argument("--index-only", action="store_true", help="Rebuild the hub index from local clippings without polling RSS.")
+    parser.add_argument(
+        "--index-only",
+        action="store_true",
+        help="Rebuild the hub index from local clippings without polling RSS.",
+    )
     args = parser.parse_args(argv)
 
     try:

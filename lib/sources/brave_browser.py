@@ -16,6 +16,7 @@ lock, or launch Brave when the user has quit the browser.
 No credentials are handled by this module.  It only drives an already
 authenticated browser session.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -34,7 +35,9 @@ import websockets
 log = logging.getLogger(__name__)
 
 _BRAVE_BINARY = "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"
-_BRAVE_PROFILE_ROOT = Path.home() / "Library" / "Application Support" / "BraveSoftware" / "Brave-Browser"
+_BRAVE_PROFILE_ROOT = (
+    Path.home() / "Library" / "Application Support" / "BraveSoftware" / "Brave-Browser"
+)
 
 
 def _http_get_json(url: str) -> Any:
@@ -70,14 +73,19 @@ class BraveSession:
                 continue
             try:
                 if item.is_dir():
-                    shutil.copytree(item, dest / item.name, dirs_exist_ok=True, ignore=shutil.ignore_patterns("*lock*", "*running*"))
+                    shutil.copytree(
+                        item,
+                        dest / item.name,
+                        dirs_exist_ok=True,
+                        ignore=shutil.ignore_patterns("*lock*", "*running*"),
+                    )
                 else:
                     shutil.copy2(item, dest / item.name)
             except (shutil.Error, OSError) as exc:
                 log.debug("skipped %s during profile copy: %s", item, exc)
         return Path(self._tempdir.name)
 
-    async def start(self) -> "BraveSession":
+    async def start(self) -> BraveSession:
         if self.profile_dir is None:
             self._tempdir = tempfile.TemporaryDirectory(prefix="brave-profile-")
             profile_arg = str(self._tempdir.name)
@@ -131,7 +139,7 @@ class BraveSession:
         if self._tempdir:
             self._tempdir.cleanup()
 
-    async def __aenter__(self) -> "BraveSession":
+    async def __aenter__(self) -> BraveSession:
         return await self.start()
 
     async def __aexit__(self, exc_type, exc, tb) -> None:  # noqa: ANN001
@@ -171,7 +179,9 @@ class BraveSession:
         await asyncio.sleep(seconds)
 
     async def evaluate(self, expression: str) -> Any:
-        result = await self._send("Runtime.evaluate", {"expression": expression, "returnByValue": True})
+        result = await self._send(
+            "Runtime.evaluate", {"expression": expression, "returnByValue": True}
+        )
         value = result.get("result", {}).get("value")
         if value is None and result.get("result", {}).get("type") == "undefined":
             return None
@@ -182,9 +192,7 @@ class BraveSession:
         return str(text or "")
 
     async def query_selector_text(self, selector: str) -> str | None:
-        expression = (
-            "document.querySelector(" + json.dumps(selector) + ")?.innerText"
-        )
+        expression = "document.querySelector(" + json.dumps(selector) + ")?.innerText"
         result = await self.evaluate(expression)
         return result
 
