@@ -45,10 +45,11 @@ try:
 except Exception:
     _PIPELINE_AVAILABLE = False
 
-# ─── Security: Tailscale IP allowlist ────────────────────────────────────────
-# Only localhost and Tailscale CGNAT (100.64.0.0/10) are permitted.
-# The Windows webhook (100.x.x.z) and Pi nodes sit inside this range.
+# ─── Security: private-network allowlist ─────────────────────────────────────
+# Permit localhost, Tailscale CGNAT (100.64.0.0/10), and the home LAN subnet
+# so the Windows webhook box can forward signals when Tailscale is down.
 _TAILSCALE_NET = ipaddress.ip_network("100.64.0.0/10")
+_HOME_LAN_NET = ipaddress.ip_network("192.168.1.0/24")
 _LOCALHOST = ipaddress.ip_address("127.0.0.1")
 
 
@@ -59,8 +60,13 @@ class _TailscaleOnlyMiddleware(BaseHTTPMiddleware):
             addr = ipaddress.ip_address(client_ip)
         except ValueError:
             return JSONResponse({"error": "forbidden"}, status_code=403)
-        if addr != _LOCALHOST and addr not in _TAILSCALE_NET:
-            log.warning("signal_logger: blocked request from non-Tailscale IP %s", client_ip)
+        allowed = (
+            addr == _LOCALHOST
+            or addr in _TAILSCALE_NET
+            or addr in _HOME_LAN_NET
+        )
+        if not allowed:
+            log.warning("signal_logger: blocked request from non-allowlisted IP %s", client_ip)
             return JSONResponse({"error": "forbidden"}, status_code=403)
         return await call_next(request)
 
