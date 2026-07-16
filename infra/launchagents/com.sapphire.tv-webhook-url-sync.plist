@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.sapphire.tv-webhook-url-sync</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/python3</string>
+        <string>/Users/aribs/Code/Sapphire/infra/scripts/update-tv-webhook-url.py</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/aribs/Code/Sapphire</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StartInterval</key>
+    <integer>300</integer>
+    <key>KeepAlive</key>
+    <false/>
+    <key>StandardOutPath</key>
+    <string>/Users/aribs/Code/Sapphire/data/logs/tv-webhook-url-sync.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/aribs/Code/Sapphire/data/logs/tv-webhook-url-sync.err</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HOME</key>
+        <string>/Users/aribs</string>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+</dict>
+</plist>
