@@ -1,0 +1,26 @@
+{
+  "id": "186a1b2c3d4e5f67",
+  "threadId": "89abcdef01234567",
+  "payload": {
+    "mimeType": "multipart/alternative",
+    "headers": [
+      {"name": "From", "value": "Michael Nadeau <michael@thedefireport.com>"},
+      {"name": "Subject", "value": "TDR Pro Portfolio Update — July 2026"},
+      {"name": "Date", "value": "Wed, 15 Jul 2026 09:00:00 -0700"}
+    ],
+    "parts": [
+      {
+        "mimeType": "text/plain",
+        "body": {
+          "data": "SGVsbG8gQXJpLApUaGUgQ3liZWwgQ3ljbGUgQ3ljbG9wZWRpYSByZXBvcnQgaXMgbGl2ZS4KUG9ydGZvbGlvOiBodHRwczovL2RvY3MuZ29vZ2xlLmNvbS9zcHJlYWRzaGVldHMvZC90ZHItcHJvLXBvcnRmb2xpby9lZGl0CkhvdXNlIENhbGw6IGh0dHBzOi8vdGhlZGVmaXJlcG9ydC5pby9yZXNlYXJjaC9ob3VzZS1jYWxsLWp1bHktMjAyNgoKVGhlIHdlZWsgaGVhZDogQlRFIG1vbWVudHVtIHJlbWFpbnMgaW50YWN0Li4u"
+        }
+      },
+      {
+        "mimeType": "text/html",
+        "body": {
+          "data": "PGh0bWw+PGJvZHk+PHA+SGVsbG8gQXJpLDwvcD48cD48YSBocmVmPSJodHRwczovL2RvY3MuZ29vZ2xlLmNvbS9zcHJlYWRzaGVldHMvZC90ZHItcHJvLXBvcnRmb2xpby9lZGl0Ij5Qb3J0Zm9saW88L2E+PC9wPjxwPjxhIGhyZWY9Imh0dHBzOi8vdGhlZGVmaXJlcG9ydC5pby9yZXNlYXJjaC9ob3VzZS1jYWxsLWp1bHktMjAyNiI+SG91c2UgQ2FsbDwvYT48L3A+PC9ib2R5PjwvaHRtbD4="
+        }
+      }
+    ]
+  }
+}
