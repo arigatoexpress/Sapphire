@@ -56,6 +56,20 @@ ROUTINES: list[Routine] = [
     Routine("openbb-api", "launchagent_always", launchagent="com.sapphire.openbb-api"),
     Routine("regional-intel", "launchagent_always", launchagent="com.sapphire.regional-intel"),
     Routine("pm-bot", "launchagent_always", launchagent="com.sapphire.pm-bot"),
+    Routine(
+        "webhook-receiver-mac",
+        "launchagent_always",
+        launchagent="com.sapphire.webhook-receiver-mac",
+        artifact=str(DATA / "webhook" / "alerts.jsonl"),
+        max_age_secs=15 * 60,
+    ),
+    Routine(
+        "webhook-tunnel",
+        "launchagent_always",
+        launchagent="com.sapphire.webhook-tunnel",
+        artifact=str(DATA / "webhook" / "tunnel_url.txt"),
+        max_age_secs=15 * 60,
+    ),
     # Scheduled Mac jobs
     Routine(
         "chain-refresh",

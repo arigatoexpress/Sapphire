@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.sapphire.webhook-receiver-mac</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/aribs/Code/Sapphire/infra/scripts/start-webhook-receiver-mac.sh</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HOME</key>
+        <string>/Users/aribs</string>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>PYTHONPATH</key>
+        <string>/Users/aribs/Code/Sapphire/services/webhook:/Users/aribs/Code/Sapphire</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/aribs/Code/Sapphire/data/logs/webhook-receiver-mac.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/aribs/Code/Sapphire/data/logs/webhook-receiver-mac-err.log</string>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/aribs/Code/Sapphire/services/webhook</string>
+</dict>
+</plist>

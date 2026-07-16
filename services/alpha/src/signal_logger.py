@@ -68,13 +68,25 @@ class _TailscaleOnlyMiddleware(BaseHTTPMiddleware):
 app = FastAPI(title="Sapphire Signal Logger", version="0.1.0")
 app.add_middleware(_TailscaleOnlyMiddleware)
 
+def _load_webhook_secret() -> str:
+    """Load WEBHOOK_SECRET from env or the sapphire secrets dir."""
+    secret = os.environ.get("WEBHOOK_SECRET", "")
+    if secret:
+        return secret
+    fallback = Path.home() / ".config" / "sapphire-secrets" / "telegram_webhook_secret"
+    try:
+        return fallback.read_text().strip()
+    except OSError:
+        return ""
+
+
 # WEBHOOK_SECRET is required — all signal POST requests are rejected without it.
-# Set via WEBHOOK_SECRET env var. TradingView sends it as {"secret": "...", ...} in body.
-_WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
+# Set via WEBHOOK_SECRET env var, or place it in ~/.config/sapphire-secrets/telegram_webhook_secret.
+_WEBHOOK_SECRET = _load_webhook_secret()
 if not _WEBHOOK_SECRET:
     log.warning(
         "WEBHOOK_SECRET is not set — /api/signals endpoint will reject all requests. "
-        "Set WEBHOOK_SECRET env var before starting."
+        "Set WEBHOOK_SECRET env var or store it in ~/.config/sapphire-secrets/telegram_webhook_secret."
     )
 
 

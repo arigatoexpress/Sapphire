@@ -932,12 +932,20 @@ def build_brief() -> str:
 
 
 def persist_brief(text: str) -> Path:
-    """Write brief to data/intelligence/YYYY-MM-DD/daily_brief.md."""
+    """Write brief to data/intelligence/YYYY-MM-DD/daily_brief.md and mirror to latest/."""
     today = datetime.now().strftime("%Y-%m-%d")
     out_dir = ROOT / "data" / "intelligence" / today
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / "daily_brief.md"
     path.write_text(text + "\n")
+
+    latest_dir = ROOT / "data" / "intelligence" / "latest"
+    latest_dir.mkdir(parents=True, exist_ok=True)
+    latest_path = latest_dir / "daily_brief.md"
+    if latest_path.is_symlink() or latest_path.exists():
+        latest_path.unlink()
+    latest_path.symlink_to(path)
+
     return path
 
 

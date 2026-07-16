@@ -1004,8 +1004,13 @@ async def publish_signal(signal: dict) -> dict:
     any_ok = False
     async with httpx.AsyncClient(timeout=8.0) as client:
         for name, url in targets:
+            payload = dict(signal)
+            # The Mac signal logger validates the webhook secret in the body.
+            # Include it so internal routing over localhost/Tailscale succeeds.
+            if WEBHOOK_SECRET and url.endswith("/api/signals"):
+                payload["secret"] = WEBHOOK_SECRET
             try:
-                r = await client.post(url, json=signal, headers=headers)
+                r = await client.post(url, json=payload, headers=headers)
                 ok = r.status_code < 300
                 if ok:
                     any_ok = True

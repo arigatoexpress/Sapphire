@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.sapphire.webhook-tunnel</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/aribs/Code/Sapphire/infra/scripts/start-webhook-tunnel.sh</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <!-- Cloudflare Quick Tunnel URL is stable for the lifetime of the
+         cloudflared process.  KeepAlive=false so a crash does not silently
+         rotate the URL and break TradingView alerts. -->
+    <key>KeepAlive</key>
+    <false/>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HOME</key>
+        <string>/Users/aribs</string>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/aribs/Code/Sapphire/data/logs/webhook-tunnel.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/aribs/Code/Sapphire/data/logs/webhook-tunnel-err.log</string>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/aribs/Code/Sapphire</string>
+</dict>
+</plist>
