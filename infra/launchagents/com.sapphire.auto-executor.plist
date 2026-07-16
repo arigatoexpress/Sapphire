@@ -23,6 +23,8 @@
     <dict>
         <key>PATH</key>
         <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>PYTHONPATH</key>
+        <string>/Users/aribs/Code/Sapphire:/Users/aribs/Code/Sapphire/lib/core:/Users/aribs/Code/Sapphire/scripts/ops</string>
         <key>PAPER_TRADING</key>
         <string>1</string>
         <!-- Live trading is intentionally NOT enabled here. -->
