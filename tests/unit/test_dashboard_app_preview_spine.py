@@ -45,6 +45,9 @@ def test_dashboard_container_builds_preview_assets() -> None:
     dockerfile = DOCKERFILE.read_text(encoding="utf-8")
 
     assert "FROM node:24-slim AS frontend-build" in dockerfile
-    assert "RUN npm ci" in dockerfile
+    assert "RUN npm install" in dockerfile
     assert "RUN npm run build" in dockerfile
-    assert "COPY --from=frontend-build /frontend/dist ./frontend/dist" in dockerfile
+    assert (
+        "COPY --from=frontend-build /frontend/dist /app/services/dashboard/frontend/dist"
+        in dockerfile
+    )

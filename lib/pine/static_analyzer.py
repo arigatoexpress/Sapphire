@@ -52,9 +52,7 @@ _CLOSE_RE = re.compile(r'strategy\.close\s*\(\s*"([^"]+)"')
 # tuple-binding validation. The screener generator binds every call to a
 # 5-tuple `[long, short, exit_long, exit_short, close]`.
 _REQUEST_SECURITY_RE = re.compile(r"request\.security\s*\(")
-_TUPLE_BINDING_RE = re.compile(
-    r"\[\s*[A-Za-z_][\w,\s]*\s*\]\s*=\s*request\.security\s*\("
-)
+_TUPLE_BINDING_RE = re.compile(r"\[\s*[A-Za-z_][\w,\s]*\s*\]\s*=\s*request\.security\s*\(")
 
 
 def _line_of(text: str, idx: int) -> int:

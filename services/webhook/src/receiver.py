@@ -108,11 +108,7 @@ def _record_seen(alert_id: str, *, now: datetime | None = None) -> None:
     if len(_seen_alert_times) <= 1000:
         return
     cutoff = current.timestamp() - IDEMPOTENCY_WINDOW_SECONDS
-    stale = [
-        aid
-        for aid, ts in _seen_alert_times.items()
-        if ts.timestamp() < cutoff
-    ]
+    stale = [aid for aid, ts in _seen_alert_times.items() if ts.timestamp() < cutoff]
     for aid in stale:
         _seen_alert_ids.discard(aid)
         _seen_alert_times.pop(aid, None)

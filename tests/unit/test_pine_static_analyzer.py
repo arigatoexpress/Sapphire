@@ -159,8 +159,8 @@ def test_screener_with_syminfo_ticker_alert_errors():
         "[s1_long, s1_short, s1_xl, s1_xs, s1_close] = "
         'request.security("BINANCE:BTCUSDT", timeframe.period, close)\n'
         "if s0_long\n"
-        "    alert('{\"symbol\": \"' + syminfo.ticker + '\", "
-        "\"action\": \"long\", \"price\": ' + str.tostring(s0_close) + "
+        '    alert(\'{"symbol": "\' + syminfo.ticker + \'", '
+        '"action": "long", "price": \' + str.tostring(s0_close) + '
         "', \"time\": ' + str.tostring(time) + '}', alert.freq_once_per_bar_close)\n"
     )
     result = analyze_pine_source(src)
@@ -180,18 +180,14 @@ def test_screener_over_max_symbols_errors():
     alert_line = (
         "if s0_long\n"
         '    alert(\'{"symbol": "X0", "action": "long", '
-        '"price": \' + str.tostring(s0_close) + \', '
-        '"time": \' + str.tostring(time) + \'}\', '
+        "\"price\": ' + str.tostring(s0_close) + ', "
+        "\"time\": ' + str.tostring(time) + '}', "
         "alert.freq_once_per_bar_close)"
     )
     src = (
         f"{SAPPHIRE_HEADER}\n"
         "//@version=5\n"
-        'indicator("X", overlay=false)\n'
-        + "\n".join(sec_lines)
-        + "\n"
-        + alert_line
-        + "\n"
+        'indicator("X", overlay=false)\n' + "\n".join(sec_lines) + "\n" + alert_line + "\n"
     )
     result = analyze_pine_source(src)
     cap_errors = [e for e in result["errors"] if "request.security() calls" in e["msg"]]
@@ -203,9 +199,7 @@ def test_screener_over_max_symbols_errors():
 def test_screener_generator_offline_passes_zero_zero():
     """Real-world generator output for 3 symbols — must pass 0/0 after the
     new screener rules land (regression guard for the analyzer change)."""
-    src = render_sapphire_screener(
-        ["BINANCE:ETHUSDT", "BINANCE:BTCUSDT", "BINANCE:SOLUSDT"]
-    )
+    src = render_sapphire_screener(["BINANCE:ETHUSDT", "BINANCE:BTCUSDT", "BINANCE:SOLUSDT"])
     result = analyze_pine_source(src)
     assert result == {"ok": True, "errors": [], "warnings": []}
 

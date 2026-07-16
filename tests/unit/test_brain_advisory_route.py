@@ -70,9 +70,7 @@ def test_brain_advisory_requires_auth(client):
 
 
 def test_brain_advisory_read_returns_bridge_payload(client):
-    with patch(
-        "services.dashboard.app.subprocess.run"
-    ) as mock_run:
+    with patch("services.dashboard.app.subprocess.run") as mock_run:
         mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = json.dumps(_sample_bridge_response("read"))
         mock_run.return_value.stderr = ""
@@ -92,9 +90,7 @@ def test_brain_advisory_decide_requires_symbol(client):
 
 
 def test_brain_advisory_decide_passes_symbol(client):
-    with patch(
-        "services.dashboard.app.subprocess.run"
-    ) as mock_run:
+    with patch("services.dashboard.app.subprocess.run") as mock_run:
         mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = json.dumps(_sample_bridge_response("decide"))
         mock_run.return_value.stderr = ""
@@ -110,9 +106,7 @@ def test_brain_advisory_decide_passes_symbol(client):
 
 
 def test_brain_advisory_publish_respects_live_flag(client):
-    with patch(
-        "services.dashboard.app.subprocess.run"
-    ) as mock_run:
+    with patch("services.dashboard.app.subprocess.run") as mock_run:
         mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = json.dumps(_sample_bridge_response("publish"))
         mock_run.return_value.stderr = ""

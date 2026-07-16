@@ -210,11 +210,7 @@ def _action_generate_pine(payload: dict[str, Any]) -> dict[str, Any]:
         kind_meta = "sapphire_watch_indicator"
 
     name_raw = payload.get("name")
-    name = (
-        str(name_raw).strip()
-        if isinstance(name_raw, str) and name_raw.strip()
-        else default_name
-    )
+    name = str(name_raw).strip() if isinstance(name_raw, str) and name_raw.strip() else default_name
 
     written = write_template(
         name,
@@ -290,9 +286,7 @@ def _action_sweep(payload: dict[str, Any]) -> dict[str, Any]:
                     "symbol": s.get("symbol"),
                     "tradingview_symbol": s.get("tradingview_symbol"),
                     "rank": s.get("rank"),
-                    "artifacts_ok": sum(
-                        1 for a in (s.get("artifacts") or []) if a.get("ok")
-                    ),
+                    "artifacts_ok": sum(1 for a in (s.get("artifacts") or []) if a.get("ok")),
                     "score": s.get("score"),
                 }
                 for s in (manifest.get("symbols") or [])

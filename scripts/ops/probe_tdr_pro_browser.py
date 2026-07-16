@@ -3,6 +3,7 @@
 No credentials are used. If Brave has an active thedefireport.io session,
 this prints the latest members-only page title and links.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -14,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from lib.sources.brave_browser import BraveSession, _BRAVE_PROFILE_ROOT  # noqa: E402
+from lib.sources.brave_browser import _BRAVE_PROFILE_ROOT, BraveSession  # noqa: E402
 
 
 async def main() -> int:
@@ -26,12 +27,19 @@ async def main() -> int:
         title = await session.evaluate("document.title")
         text = await session.get_text()
 
-        print(json.dumps({
-            "url": url,
-            "title": title,
-            "members_gated": "/login" in str(url) or "Sign in" in text or "Subscribe" in text,
-            "page_sample": text[:400].replace("\n", " ").strip(),
-        }, indent=2))
+        print(
+            json.dumps(
+                {
+                    "url": url,
+                    "title": title,
+                    "members_gated": "/login" in str(url)
+                    or "Sign in" in text
+                    or "Subscribe" in text,
+                    "page_sample": text[:400].replace("\n", " ").strip(),
+                },
+                indent=2,
+            )
+        )
         return 0
 
 

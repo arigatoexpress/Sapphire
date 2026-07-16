@@ -33,9 +33,7 @@ SUMMARY_RE = re.compile(r"(?P<count>\d+)\s+tests?\s+collected")
 # The 2026-05-30 README overhaul (d762e899) replaced the counts table with a
 # single prose bullet; parse that instead. Unit/plugin split is no longer
 # advertised, so only total + files are checked against the README.
-README_TESTS_RE = re.compile(
-    r"- (?P<total>[\d,]+)\+ passing tests across (?P<files>[\d,]+) files"
-)
+README_TESTS_RE = re.compile(r"- (?P<total>[\d,]+)\+ passing tests across (?P<files>[\d,]+) files")
 README_BADGE_RE = re.compile(
     r"\[!\[Tests\]\(https://img\.shields\.io/badge/tests-(?P<label>[^-]+)-2ea44f\)\]"
 )

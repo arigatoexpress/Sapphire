@@ -142,9 +142,7 @@ class ChainHealthGate:
                 chain_id=chain_id,
                 chain_name=_chain_name_for(chain_id),
                 severity="BLOCK",
-                reasons=[
-                    f"gate unavailable: {self._unavailable_chains[chain_id]}"
-                ],
+                reasons=[f"gate unavailable: {self._unavailable_chains[chain_id]}"],
             )
         if chain_id != MEGAETH_CHAIN_ID:
             return ChainHealthVerdict(
@@ -208,18 +206,14 @@ class ChainHealthGate:
         proto = MegaETHProtocols(client)
 
         try:
-            stable = await asyncio.wait_for(
-                proto.stable_health(), timeout=self._read_timeout_s
-            )
+            stable = await asyncio.wait_for(proto.stable_health(), timeout=self._read_timeout_s)
         except TimeoutError:
             return self._unavailable_verdict(MEGAETH_CHAIN_ID, "rpc timeout (stable_health)")
         except Exception as exc:  # noqa: BLE001
             return self._unavailable_verdict(MEGAETH_CHAIN_ID, f"stable_health failed: {exc}")
 
         try:
-            lend = await asyncio.wait_for(
-                proto.lend_overview(), timeout=self._read_timeout_s
-            )
+            lend = await asyncio.wait_for(proto.lend_overview(), timeout=self._read_timeout_s)
         except TimeoutError:
             return self._unavailable_verdict(MEGAETH_CHAIN_ID, "rpc timeout (lend_overview)")
         except Exception as exc:  # noqa: BLE001
@@ -316,14 +310,12 @@ def _classify(
     ):
         severity = "BLOCK"
         reasons.append(
-            f"USDM depegging: severity={stable_severity.name}, "
-            f"divergence={peg_divergence} bps"
+            f"USDM depegging: severity={stable_severity.name}, divergence={peg_divergence} bps"
         )
     elif stable_severity is PegBreak.WARNING_50BP:
         severity = "WARNING"
         reasons.append(
-            f"USDM peg drift: severity={stable_severity.name}, "
-            f"divergence={peg_divergence} bps"
+            f"USDM peg drift: severity={stable_severity.name}, divergence={peg_divergence} bps"
         )
 
     # --- aave-side classification -------------------------------------------
@@ -340,9 +332,7 @@ def _classify(
 
     if paused_high_util:
         severity = "BLOCK"
-        reasons.append(
-            f"Aave reserves paused with high utilization (>80%): {paused_high_util}"
-        )
+        reasons.append(f"Aave reserves paused with high utilization (>80%): {paused_high_util}")
     elif severity != "BLOCK" and frozen:
         severity = "WARNING"
         reasons.append(f"Aave reserves frozen: {frozen}")
@@ -371,8 +361,7 @@ def _classify(
             reasons.extend(resolved.reasons)
         elif resolved.source == PriceSource.HERMES_PRIMARY:
             reasons.append(
-                f"price-source: Hermes primary ({resolved.symbol} fresh, "
-                f"age {resolved.age_s}s)"
+                f"price-source: Hermes primary ({resolved.symbol} fresh, age {resolved.age_s}s)"
             )
 
     return ChainHealthVerdict(
@@ -404,20 +393,11 @@ def _load_megaeth_rpc_client_class() -> Any:
 
     repo_root = Path(__file__).resolve().parents[2]
     module_path = (
-        repo_root
-        / "plugins"
-        / "claw-sapphire"
-        / "tools"
-        / "internal"
-        / "megaeth_protocols.py"
+        repo_root / "plugins" / "claw-sapphire" / "tools" / "internal" / "megaeth_protocols.py"
     )
-    spec = importlib.util.spec_from_file_location(
-        "_sentinel_megaeth_rpc_client", str(module_path)
-    )
+    spec = importlib.util.spec_from_file_location("_sentinel_megaeth_rpc_client", str(module_path))
     if spec is None or spec.loader is None:
-        raise ImportError(
-            f"could not load megaeth_protocols plugin module from {module_path}"
-        )
+        raise ImportError(f"could not load megaeth_protocols plugin module from {module_path}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     klass = module._HttpJsonRpcClient
