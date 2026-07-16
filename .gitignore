@@ -131,6 +131,8 @@ world_knowledge/
 # SOPS age keys (NEVER commit)
 **/keys.txt
 data/tradingview_ta/
+data/webhook/
+services/alpha/data/
 
 # Generated Pine scripts (runtime artifacts of lib.trading.pine_templates)
 pine/generated/
