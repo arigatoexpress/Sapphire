@@ -15,7 +15,7 @@ Sapphire is the command repo for Ari's autonomous system. It orchestrates tradin
 | `lib/chain/` | On-chain intel (Glassnode, Santiment, Dune, etc.) |
 | `lib/content/` | 17-module research-to-publish pipeline |
 | `lib/security/` | SBOM, model verification, network mapper |
-| `services/` | 16 services (alpha, dashboard, control-plane, inference-proxy, etc.) |
+| `services/` | 16+ services including alpha, dashboard, control-plane, inference-proxy, tdr_pro_sync, fleet_status |
 | `plugins/claw-sapphire/` | 72 registered tools for the agent runtime |
 | `infra/tool-registry.yaml` | Required registry for every tool |
 | `contracts/` | 3 Solidity contracts |
@@ -70,3 +70,15 @@ python3 services/inference-proxy/app.py     # :11435
 - `sapphirealpha.xyz` is served from Cloud Run; do not delete the hosting GCP project.
 - Firestore `(default)` in `tho-ai-agent` has delete protection enabled.
 - Windows inference path is deprecated for new agentic work.
+
+### Autonomous surfaces added 2026-07-16
+
+- `com.sapphire.tdr-pro-sync` — polls public TDR Pro RSS, writes Knowledge clippings.
+- `com.sapphire.webhook-receiver-mac` — Mac TradingView webhook receiver on `:9090`.
+- `com.sapphire.webhook-tunnel` — Cloudflare Quick Tunnel exposing the receiver publicly.
+- `com.sapphire.fleet-status` — 5-minute fleet health snapshot to `data/intelligence/latest/fleet_status.json`.
+- `lib/sources/brave_browser.py` — CDP automation adapter for authenticated Brave sessions.
+
+These agents were loaded into launchd under explicit operator authority. The normal
+rule "ship the plist and tell the human to load it" still applies to routine,
+unauthorized edits.
