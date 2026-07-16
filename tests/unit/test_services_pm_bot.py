@@ -1647,3 +1647,30 @@ def test_webhook_returns_processed_false_when_handler_skips(reload_server, monke
 
     assert response.status_code == 200
     assert response.json() == {"ok": True, "processed": False}
+
+
+def test_get_updates_http_timeout_exceeds_long_poll_hold(reload_server, monkeypatch):
+    """The HTTP read timeout must be longer than the getUpdates long-poll hold."""
+    server = reload_server()
+    captured: dict[str, Any] = {}
+
+    class _Resp:
+        status_code = 200
+        text = "{}"
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"ok": True, "result": []}
+
+    def fake_post(url, json=None, timeout=None):
+        captured["timeout"] = timeout
+        captured["poll_hold"] = json.get("timeout")
+        return _Resp()
+
+    monkeypatch.setattr(server.requests, "post", fake_post)
+    client = server.TelegramAPI("dummy-token", timeout_seconds=30.0)
+    client.get_updates(offset=0, timeout=30)
+
+    assert captured["timeout"] > captured["poll_hold"]
