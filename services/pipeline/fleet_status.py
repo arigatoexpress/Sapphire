@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import logging
+import ssl
 import subprocess
 import sys
 import urllib.request
@@ -37,8 +38,27 @@ logging.basicConfig(
 OUT_PATH = ROOT / "data" / "intelligence" / "latest" / "fleet_status.json"
 
 
+def _ssl_context() -> ssl.SSLContext:
+    """Return a default SSL context, loading certifi if available.
+
+    macOS system Python sometimes fails to verify Let's Encrypt / Cloudflare
+    certs with the built-in store; certifi fixes it without disabling verification.
+    """
+    ctx = ssl.create_default_context()
+    try:
+        import certifi
+
+        ctx.load_verify_locations(certifi.where())
+    except Exception:
+        pass
+    return ctx
+
+
 def _http_get(url: str, timeout: float = 5.0) -> tuple[bool, dict]:
     try:
+        if url.startswith("https://"):
+            with urllib.request.urlopen(url, timeout=timeout, context=_ssl_context()) as response:
+                return True, json.loads(response.read())
         with urllib.request.urlopen(url, timeout=timeout) as response:
             return True, json.loads(response.read())
     except Exception as exc:
@@ -85,7 +105,9 @@ def _signal_logger() -> dict:
 def _dashboard() -> dict:
     # Probe the public root; auth prevents detail, but a 401 means it is up.
     try:
-        with urllib.request.urlopen("https://sapphirealpha.xyz/", timeout=8) as response:
+        with urllib.request.urlopen(
+            "https://sapphirealpha.xyz/", timeout=8, context=_ssl_context()
+        ) as response:
             return {"healthy": True, "reachable": True, "http_status": response.status}
     except urllib.error.HTTPError as exc:
         return {"healthy": True, "reachable": True, "http_status": exc.code}
@@ -193,6 +215,7 @@ def build_snapshot() -> dict:
             "webhook-tunnel": _launchctl_running("com.sapphire.webhook-tunnel"),
             "signal-logger": _launchctl_running("com.sapphire.signal-logger"),
             "tdr-pro-sync": _launchctl_running("com.sapphire.tdr-pro-sync"),
+            "pm-bot": _launchctl_running("com.sapphire.pm-bot"),
         },
     }
 
