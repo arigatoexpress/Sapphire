@@ -131,6 +131,50 @@ def _tdr_pro() -> dict:
         return {"healthy": False, "error": str(exc)}
 
 
+def _robinhood_chain() -> dict:
+    """Robinhood Chain (L2 wallet) connection + balance snapshot."""
+    try:
+        from lib.chain.robinhood_chain import RobinhoodChainClient
+
+        deploy_key_path = Path.home() / ".config" / "sapphire-secrets" / "robinhood_deploy_key"
+        deploy_key = deploy_key_path.read_text().strip() if deploy_key_path.exists() else ""
+        if not deploy_key:
+            return {"healthy": False, "error": "robinhood_deploy_key not found"}
+
+        mainnet = RobinhoodChainClient(
+            rpc_url="https://rpc.mainnet.chain.robinhood.com",
+            private_key=deploy_key,
+        )
+        testnet = RobinhoodChainClient(
+            rpc_url="https://rpc.testnet.chain.robinhood.com",
+            private_key=deploy_key,
+        )
+
+        main_status = mainnet.get_chain_status()
+        test_status = testnet.get_chain_status()
+
+        def _balance_eth(client):
+            if not client._w3 or not client._account:
+                return None
+            try:
+                return float(client._w3.from_wei(client._w3.eth.get_balance(client._account.address), "ether"))
+            except Exception:
+                return None
+
+        return {
+            "healthy": main_status.connected or test_status.connected,
+            "address": mainnet._account.address if mainnet._account else None,
+            "mainnet_connected": main_status.connected,
+            "mainnet_block": main_status.block_number,
+            "mainnet_balance_eth": _balance_eth(mainnet),
+            "testnet_connected": test_status.connected,
+            "testnet_block": test_status.block_number,
+            "testnet_balance_eth": _balance_eth(testnet),
+        }
+    except Exception as exc:
+        return {"healthy": False, "error": str(exc)}
+
+
 def build_snapshot() -> dict:
     return {
         "timestamp": datetime.now(UTC).isoformat(),
@@ -141,6 +185,7 @@ def build_snapshot() -> dict:
             "signal_logger": _signal_logger(),
             "dashboard": _dashboard(),
             "robinhood_crypto": _robinhood_crypto(),
+            "robinhood_chain": _robinhood_chain(),
             "tdr_pro": _tdr_pro(),
         },
         "launchagents": {

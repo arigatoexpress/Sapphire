@@ -679,6 +679,30 @@ def _section_robinhood() -> dict:
     }
 
 
+def _section_robinhood_chain() -> dict:
+    """Robinhood Chain L2 wallet status."""
+    try:
+        from lib.sources import read_json
+
+        data = read_json(ROOT / "data" / "intelligence" / "latest" / "fleet_status.json") or {}
+        chain = data.get("subsystem", {}).get("robinhood_chain", {})
+    except Exception as e:
+        log.warning("robinhood chain unavailable: %s", e)
+        return {"status": "unavailable", "text": f"  Robinhood Chain unavailable: {e}"}
+
+    if not chain.get("healthy"):
+        return {"status": "unavailable", "text": "  Robinhood Chain: not connected."}
+
+    address = chain.get("address", "")
+    short_addr = f"{address[:6]}...{address[-4:]}" if address else "unknown"
+    lines = [
+        f"⛓️ *Robinhood Chain* — `{short_addr}`",
+        f"  Mainnet: block {chain.get('mainnet_block')} · balance {chain.get('mainnet_balance_eth', 0):.6f} ETH",
+        f"  Testnet: block {chain.get('testnet_block')} · balance {chain.get('testnet_balance_eth', 0):.6f} ETH",
+    ]
+    return {"status": "ok", "text": "\n".join(lines)}
+
+
 def _section_tdr_pro() -> dict:
     """Latest The DeFi Report Pro episode summary (from tdr_pro_sync)."""
     try:
@@ -892,6 +916,7 @@ def build_brief() -> str:
     port = _section_portfolio()
     cascade = _section_cascade()
     robinhood = _section_robinhood()
+    rh_chain = _section_robinhood_chain()
     tdr_pro = _section_tdr_pro()
     fleet = _section_fleet_status()
     kron = _section_kronos()
@@ -936,6 +961,9 @@ def build_brief() -> str:
         "",
         "*Robinhood Crypto*",
         _t(robinhood, "robinhood"),
+        "",
+        "*Robinhood Chain (L2)*",
+        _t(rh_chain, "rh_chain"),
         "",
         "*The DeFi Report Pro*",
         _t(tdr_pro, "tdr_pro"),
