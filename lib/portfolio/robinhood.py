@@ -26,6 +26,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import re
 import ssl
 import sys
 import time
@@ -279,21 +280,39 @@ class RobinhoodReader:
     def _get_best_bid_ask(self, symbols: list[str]) -> dict[str, float]:
         if not symbols:
             return {}
-        try:
-            results = self._get_results(
-                "/api/v2/crypto/marketdata/best_bid_ask/",
-                params={"symbol": symbols},
-            )
-        except Exception as exc:
-            log.warning("get_best_bid_ask failed: %s", exc)
-            return {}
 
+        remaining = list(dict.fromkeys(s.upper() for s in symbols if s))
         prices: dict[str, float] = {}
-        for item in results:
-            symbol = str(item.get("symbol") or "").upper()
-            price = _quote_midpoint(item)
-            if symbol and price is not None:
-                prices[symbol] = price
+
+        while remaining:
+            try:
+                results = self._get_results(
+                    "/api/v2/crypto/marketdata/best_bid_ask/",
+                    params={"symbol": remaining},
+                )
+            except RuntimeError as exc:
+                err = str(exc)
+                # Robinhood rejects the whole batch if any symbol is invalid.
+                # Parse the offender, drop it, and retry the rest.
+                invalid_match = re.search(r'Invalid symbol:\s*([A-Z0-9._-]+)', err, re.IGNORECASE)
+                if invalid_match:
+                    invalid = invalid_match.group(1).upper()
+                    remaining = [s for s in remaining if s != invalid]
+                    log.debug("dropped invalid RH symbol %s", invalid)
+                    continue
+                log.warning("get_best_bid_ask failed: %s", exc)
+                return prices
+            except Exception as exc:
+                log.warning("get_best_bid_ask failed: %s", exc)
+                return prices
+
+            for item in results:
+                symbol = str(item.get("symbol") or "").upper()
+                price = _quote_midpoint(item)
+                if symbol and price is not None:
+                    prices[symbol] = price
+            break
+
         return prices
 
     def _reconstruct_cost_basis(self, account_number: str) -> dict[str, dict[str, float]]:
