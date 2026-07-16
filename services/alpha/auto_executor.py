@@ -646,6 +646,28 @@ def _poll_firewall_decisions(
     return decisions
 
 
+_TERMINAL_VERDICTS = frozenset({"PAPER_EXECUTED", "SUBMITTED"})
+
+
+def _already_executed_ids(audit_log: Path) -> set[str]:
+    """Pipeline ids with a terminal verdict in the audit log (durable dedup ledger)."""
+    executed: set[str] = set()
+    if not audit_log.exists():
+        return executed
+    with open(audit_log) as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if record.get("verdict") in _TERMINAL_VERDICTS and record.get("pipeline_id"):
+                executed.add(record["pipeline_id"])
+    return executed
+
+
 def run_once(config: ExecutorConfig) -> None:
     """Single executor pass: poll approvals, execute approved signals."""
     if _killswitch_active(config.killswitch_path):
@@ -662,13 +684,59 @@ def run_once(config: ExecutorConfig) -> None:
     # Poll confirmation-firewall pending files (no Telegram socket use here).
     decisions = _poll_firewall_decisions(signals, config.signals_dir, decisions)
 
-    # Execute approved signals.
+    # Execute approved signals exactly once: the audit log is the consume ledger.
+    executed = _already_executed_ids(config.audit_log)
     for signal in signals:
         decision = decisions.get(signal.pipeline_id)
         if decision == "APPROVED":
+            if signal.pipeline_id in executed:
+                log.debug("Signal %s already executed; skipping", signal.pipeline_id)
+                continue
             _execute_signal(signal, config)
         elif decision == "REJECTED":
             log.info("Signal %s rejected; skipping execution", signal.pipeline_id)
+
+
+LOCK_PATH = Path.home() / ".sapphire" / "auto_executor.lock"
+
+
+def _acquire_single_instance_lock(lock_path: Path = LOCK_PATH) -> bool:
+    """Atomically claim the single-instance lock; reclaim only if the holder is dead.
+
+    Uses O_CREAT|O_EXCL so two processes cannot both win the race (no TOCTOU).
+    """
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    for _ in range(2):
+        try:
+            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            with os.fdopen(fd, "w") as f:
+                f.write(str(os.getpid()))
+            return True
+        except FileExistsError:
+            try:
+                holder_pid = int(lock_path.read_text().strip())
+            except (ValueError, OSError):
+                holder_pid = 0
+            if holder_pid > 0:
+                try:
+                    os.kill(holder_pid, 0)
+                    return False  # holder alive
+                except ProcessLookupError:
+                    pass  # holder dead — reclaim
+                except PermissionError:
+                    return False  # exists under another uid; treat as held
+            with contextlib.suppress(FileNotFoundError):
+                lock_path.unlink()
+    return False
+
+
+def _release_single_instance_lock(lock_path: Path = LOCK_PATH) -> None:
+    """Release the lock only if this process owns it."""
+    try:
+        if int(lock_path.read_text().strip()) == os.getpid():
+            lock_path.unlink()
+    except (ValueError, OSError):
+        pass
 
 
 def run_loop(config: ExecutorConfig) -> None:
@@ -790,7 +858,13 @@ def main(argv: list[str] | None = None) -> int:
         run_once(config)
         return 0
 
-    run_loop(config)
+    if not _acquire_single_instance_lock():
+        log.error("Another auto-executor instance holds %s. Refusing to start.", LOCK_PATH)
+        return 1
+    try:
+        run_loop(config)
+    finally:
+        _release_single_instance_lock()
     return 0
 
 

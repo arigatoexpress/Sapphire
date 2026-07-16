@@ -230,8 +230,12 @@ class TelegramAPI:
     def _url(self, method: str) -> str:
         return f"https://api.telegram.org/bot{self._token}/{method}"
 
-    def _post(self, method: str, payload: dict[str, Any]) -> dict[str, Any]:
-        response = requests.post(self._url(method), json=payload, timeout=self._timeout)
+    def _post(
+        self, method: str, payload: dict[str, Any], *, timeout_seconds: float | None = None
+    ) -> dict[str, Any]:
+        response = requests.post(
+            self._url(method), json=payload, timeout=timeout_seconds or self._timeout
+        )
         try:
             response.raise_for_status()
         except requests.HTTPError as exc:
@@ -293,9 +297,12 @@ class TelegramAPI:
         return self._post("sendMessage", payload)
 
     def get_updates(self, *, offset: int, timeout: int = 30) -> list[dict[str, Any]]:
+        # The HTTP read timeout must exceed the long-poll hold, or every empty
+        # poll dies with "Read timed out" right at the boundary.
         data = self._post(
             "getUpdates",
             {"offset": offset, "timeout": timeout, "allowed_updates": _SUPPORTED_UPDATE_TYPES},
+            timeout_seconds=float(timeout) + 10.0,
         )
         result = data.get("result")
         if isinstance(result, list):
