@@ -167,7 +167,7 @@ def test_tradingview_pine_batch_global_args_precede_subcommand() -> None:
 
     assert plist["Label"] == "com.sapphire.tradingview-pine-batch"
     assert arguments[:4] == [
-        "/opt/homebrew/bin/python3",
+        "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
         "/Users/aribs/Code/Sapphire/scripts/ops/tradingview_ta_capture.py",
         "--out",
         "/Users/aribs/autonomy-status/logs/tradingview-pine-batch-latest.json",
