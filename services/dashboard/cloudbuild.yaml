@@ -25,12 +25,8 @@ steps:
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
-      - '--service-account'
-      - 'sapphirev3@sapphire-479610.iam.gserviceaccount.com'
       - '--update-env-vars'
       - 'GCP_PROJECT=sapphire-479610,ENABLE_AUTH=false,PUBLIC_READ_ONLY=true,ENABLE_INTERNAL_JOBS=false,MAC_OPERATOR_APP_URL=sapphirebook://operator,MAC_OPERATOR_APP_LABEL=Open macOS Operator App'
-      - '--update-secrets'
-      - 'SAPPHIRE_CONTROL_API_TOKEN=SAPPHIRE_CONTROL_API_TOKEN:latest'
 
 images:
   - 'gcr.io/$PROJECT_ID/sapphire-alpha-dashboard:latest'
