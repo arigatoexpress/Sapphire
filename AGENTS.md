@@ -82,3 +82,10 @@ python3 services/inference-proxy/app.py     # :11435
 These agents were loaded into launchd under explicit operator authority. The normal
 rule "ship the plist and tell the human to load it" still applies to routine,
 unauthorized edits.
+
+## Knowledge base (one brain)
+Shared vault: `~/Knowledge`. For deep research/context questions (never general coding):
+1. Read `~/Knowledge/wiki/hot.md` (session cache), then `~/Knowledge/wiki/index.md`.
+2. Then the relevant domain sub-index; only then drill into individual pages.
+3. Retrieval: `python3 ~/Knowledge/wiki/wiki_query.py "question"` (lexical, cited) —
+   add `--rag` (run with `~/Knowledge/7-Visual-Graphs/.venv/bin/python`) for semantic, cited retrieval.
