@@ -1619,9 +1619,12 @@ def _build_unified_dashboard_payload() -> dict[str, Any]:
 @app.route("/")
 @requires_auth
 def index():
-    """Main dashboard — overview page"""
+    """Main dashboard — curated read-only front door."""
     return render_template(
-        "pages/overview.html", current_page="overview", page_title="System Overview"
+        "pages/showcase.html",
+        current_page="showcase",
+        page_title="Unified Dashboard",
+        unified_dashboard=_build_unified_dashboard_payload(),
     )
 
 

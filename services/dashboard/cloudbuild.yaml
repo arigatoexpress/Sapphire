@@ -4,22 +4,22 @@ steps:
     args:
       - 'build'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/sapphire-unified-frontend:latest'
+      - 'gcr.io/$PROJECT_ID/sapphire-alpha-dashboard:latest'
       - '.'
   # Push the container image
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'gcr.io/$PROJECT_ID/sapphire-unified-frontend:latest'
+      - 'gcr.io/$PROJECT_ID/sapphire-alpha-dashboard:latest'
   # Deploy to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
       - 'run'
       - 'deploy'
-      - 'sapphire-unified-frontend'
+      - 'sapphire-alpha-dashboard'
       - '--image'
-      - 'gcr.io/$PROJECT_ID/sapphire-unified-frontend:latest'
+      - 'gcr.io/$PROJECT_ID/sapphire-alpha-dashboard:latest'
       - '--region'
       - 'us-central1'
       - '--platform'
@@ -33,7 +33,7 @@ steps:
       - 'SAPPHIRE_CONTROL_API_TOKEN=SAPPHIRE_CONTROL_API_TOKEN:latest'
 
 images:
-  - 'gcr.io/$PROJECT_ID/sapphire-unified-frontend:latest'
+  - 'gcr.io/$PROJECT_ID/sapphire-alpha-dashboard:latest'
 
 options:
   logging: CLOUD_LOGGING_ONLY

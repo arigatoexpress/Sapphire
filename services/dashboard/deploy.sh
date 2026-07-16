@@ -7,7 +7,7 @@ if [[ -x "${ROOT_DIR}/scripts/check_source_of_truth.sh" ]]; then
   "${ROOT_DIR}/scripts/check_source_of_truth.sh"
 fi
 
-echo "Deploying Sapphire Unified Frontend..."
+echo "Deploying Sapphire Alpha Dashboard..."
 
 cd "${SERVICE_DIR}"
 gcloud builds submit \
@@ -17,8 +17,8 @@ gcloud builds submit \
 
 echo
 echo "Deployment complete."
-echo "Unified Frontend URL:"
-gcloud run services describe sapphire-unified-frontend \
+echo "Dashboard URL:"
+gcloud run services describe sapphire-alpha-dashboard \
   --region us-central1 \
   --format 'value(status.url)'
 
