@@ -4,6 +4,7 @@
 Starts cloudflared, extracts the public URL, writes it to
 data/webhook/tunnel_url.txt, and stays alive as long as the tunnel is up.
 """
+
 from __future__ import annotations
 
 import re

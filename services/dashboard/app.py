@@ -1628,6 +1628,15 @@ def index():
     )
 
 
+@app.route("/overview")
+@requires_auth
+def overview():
+    """Legacy system-overview page (root now serves the showcase)."""
+    return render_template(
+        "pages/overview.html", current_page="overview", page_title="System Overview"
+    )
+
+
 @app.route("/showcase")
 @app.route("/unified")
 @app.route("/unified-dashboard")

@@ -21,7 +21,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "scripts" / 
 
 import auto_executor as ae  # type: ignore
 
-
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
 
 
@@ -154,9 +153,7 @@ def test_no_confirmation_code_skips_signal(tmp_dirs, config, fake_signal_record,
     assert audit == []
 
 
-def test_approval_poll_triggers_paper_execution(
-    tmp_dirs, config, fake_signal_record, poll_pending
-):
+def test_approval_poll_triggers_paper_execution(tmp_dirs, config, fake_signal_record, poll_pending):
     calls, return_values = poll_pending
     return_values["A1B2C3D4"] = "approved"
     write_signal(tmp_dirs["signals_dir"], fake_signal_record)
@@ -217,7 +214,9 @@ def test_notional_cap_blocks_execution(tmp_dirs, config, fake_signal_record, pol
     assert any("notional_cap_exceeded" in b for b in audit[0]["blockers"])
 
 
-def test_live_mode_requires_env_var(tmp_dirs, config, fake_signal_record, monkeypatch, poll_pending):
+def test_live_mode_requires_env_var(
+    tmp_dirs, config, fake_signal_record, monkeypatch, poll_pending
+):
     _, return_values = poll_pending
     return_values["A1B2C3D4"] = "approved"
     write_signal(tmp_dirs["signals_dir"], fake_signal_record)
@@ -247,10 +246,12 @@ def test_live_mode_with_valid_token_uses_robinhood_submit(
     config.confirm_token = "AUTO_EXECUTOR_LIVE_BUY_BTC-USD_5.00"
     monkeypatch.setenv(ae.AUTO_EXECUTOR_LIVE_ENV, "1")
 
-    fake_submit = MagicMock(return_value={
-        "client_order_id": "live-order-1",
-        "submit_response": {"id": "rh-order-1", "state": "queued"},
-    })
+    fake_submit = MagicMock(
+        return_value={
+            "client_order_id": "live-order-1",
+            "submit_response": {"id": "rh-order-1", "state": "queued"},
+        }
+    )
     config.robinhood_submit_fn = fake_submit
 
     ae.run_once(config)
@@ -267,7 +268,9 @@ def test_daily_loss_limit_blocks_execution(tmp_dirs, config, fake_signal_record,
     _, return_values = poll_pending
     return_values["A1B2C3D4"] = "approved"
     # Seed daily loss at the limit
-    tmp_dirs["daily_loss"].write_text(json.dumps({"date": str(__import__("datetime").date.today()), "loss_usd": 25.0}))
+    tmp_dirs["daily_loss"].write_text(
+        json.dumps({"date": str(__import__("datetime").date.today()), "loss_usd": 25.0})
+    )
     write_signal(tmp_dirs["signals_dir"], fake_signal_record)
 
     ae.run_once(config)

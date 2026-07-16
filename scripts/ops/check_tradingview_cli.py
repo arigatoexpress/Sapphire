@@ -21,9 +21,7 @@ import argparse
 import json
 import os
 import subprocess
-import sys
 import urllib.request
-from pathlib import Path
 from typing import Any
 
 DEFAULT_CDP_HOST = os.getenv("CDP_HOST", "127.0.0.1")

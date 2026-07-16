@@ -152,7 +152,9 @@ class TDRProEpisode:
             escaped = text.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
             return f'"{escaped}"'
 
-        frontmatter = "---\n" + "\n".join(f"{k}: {_yaml_value(v)}" for k, v in fm.items()) + "\n---\n"
+        frontmatter = (
+            "---\n" + "\n".join(f"{k}: {_yaml_value(v)}" for k, v in fm.items()) + "\n---\n"
+        )
 
         body_lines: list[str] = [
             f"# {self.title}",
@@ -210,7 +212,9 @@ class TDRProSource:
     name: str = "tdr_pro"
     label: str = "The DeFi Report Pro podcast"
     url: str = TDR_PRO_RSS_URL
-    inbox_dir: Path = field(default_factory=lambda: Path.home() / "Knowledge" / "0-Inbox" / "Clippings")
+    inbox_dir: Path = field(
+        default_factory=lambda: Path.home() / "Knowledge" / "0-Inbox" / "Clippings"
+    )
     fetcher: Any = None
 
     def __post_init__(self) -> None:
@@ -487,16 +491,18 @@ class TDRProSource:
             "",
         ]
         body.extend(ep.to_index_entry() for ep in sorted_eps)
-        body.extend([
-            "",
-            "---",
-            "",
-            "## RSS source",
-            "",
-            f"- Feed: <{TDR_PRO_RSS_URL}>",
-            f"- Website: <{TDR_PRO_DOMAIN}>",
-            "",
-        ])
+        body.extend(
+            [
+                "",
+                "---",
+                "",
+                "## RSS source",
+                "",
+                f"- Feed: <{TDR_PRO_RSS_URL}>",
+                f"- Website: <{TDR_PRO_DOMAIN}>",
+                "",
+            ]
+        )
 
         markdown = "\n".join(fm_lines) + "\n" + "\n".join(body) + "\n"
         if not dry_run:

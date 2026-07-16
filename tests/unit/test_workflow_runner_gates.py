@@ -48,9 +48,9 @@ def test_workflow_jobs_do_not_fall_back_to_github_hosted_runners() -> None:
     for path in sorted(WORKFLOWS.glob("*.yml")):
         workflow = _workflow(path)
         for job_name, job in workflow.get("jobs", {}).items():
-            assert (
-                job.get("if") in ALLOWED_RUNNER_IFS
-            ), f"{path.name}:{job_name} must skip when no runner is set"
+            assert job.get("if") in ALLOWED_RUNNER_IFS, (
+                f"{path.name}:{job_name} must skip when no runner is set"
+            )
             runs_on = job.get("runs-on")
             if path.name == WIN_SMOKE_WORKFLOW:
                 assert runs_on in ALLOWED_RUNS_ON or runs_on == WIN_SMOKE_RUNS_ON, (
@@ -60,6 +60,6 @@ def test_workflow_jobs_do_not_fall_back_to_github_hosted_runners() -> None:
                 assert runs_on in ALLOWED_RUNS_ON, (
                     f"{path.name}:{job_name} must use SAPPHIRE_RUNNER (or the TESTS hybrid)"
                 )
-            assert "ubuntu-latest" not in str(
-                job
-            ), f"{path.name}:{job_name} reintroduced hosted runner fallback"
+            assert "ubuntu-latest" not in str(job), (
+                f"{path.name}:{job_name} reintroduced hosted runner fallback"
+            )

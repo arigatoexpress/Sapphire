@@ -179,9 +179,7 @@ class FundingCarryBacktestResult:
             "sortino": _safe(
                 round(self.sortino, 4) if not math.isinf(self.sortino) else self.sortino
             ),
-            "calmar": _safe(
-                round(self.calmar, 4) if not math.isinf(self.calmar) else self.calmar
-            ),
+            "calmar": _safe(round(self.calmar, 4) if not math.isinf(self.calmar) else self.calmar),
             "max_drawdown_pct": round(self.max_drawdown_pct, 4),
             "cost_basis_pct_of_pnl": round(self.cost_basis_pct_of_pnl, 2),
             "viable": self.viable,
@@ -348,9 +346,7 @@ class FundingCarryBacktest:
         self.capital_usd = float(capital_usd)
         self.days = int(days)
         self.gmx_open_close_bps = float(gmx_open_close_bps)
-        self.gmx_keeper_cost_per_funding_period_usd = float(
-            gmx_keeper_cost_per_funding_period_usd
-        )
+        self.gmx_keeper_cost_per_funding_period_usd = float(gmx_keeper_cost_per_funding_period_usd)
         self.leverage = float(leverage)
         self.funding_period_hours = float(funding_period_hours)
         self.decay_days = float(decay_days)
@@ -389,9 +385,7 @@ class FundingCarryBacktest:
         # true amortized burden — operator's equity curve doesn't show a
         # huge step at t=0 / t=horizon, and Sortino isn't artificially
         # punished by two outliers.
-        open_close_costs_usd = (
-            self.gmx_open_close_bps / 10_000.0 * notional
-        )
+        open_close_costs_usd = self.gmx_open_close_bps / 10_000.0 * notional
         per_period_open_close = open_close_costs_usd / n_periods
         per_period_keeper = self.gmx_keeper_cost_per_funding_period_usd
         per_period_cost = per_period_open_close + per_period_keeper
@@ -511,9 +505,7 @@ class FundingCarryBacktest:
         total_capital = self.capital_usd * max(n_markets, 1)
         actual_years = self.days / 365.0
         portfolio_apr = (
-            (total_net / total_capital) / max(actual_years, 1e-9)
-            if total_capital > 0
-            else 0.0
+            (total_net / total_capital) / max(actual_years, 1e-9) if total_capital > 0 else 0.0
         )
 
         return PortfolioBacktestResult(

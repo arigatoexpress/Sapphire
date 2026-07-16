@@ -76,10 +76,10 @@ from lib.chains.cross_chain.pyth_divergence import (
 # Re-survey monthly. Update tiers if any value shifts more than 0.5 bps.
 # ---------------------------------------------------------------------------
 BRIDGE_COST_TIERS: tuple[tuple[float, float], ...] = (
-    (10_000.0, 3.0),       # <= $10k:    ~1.5 bps x 2 legs (Across)
-    (100_000.0, 3.5),      # <= $100k:   ~1.5-1.75 bps x 2 legs (Across)
-    (1_000_000.0, 4.0),    # <= $1M:     ~2 bps x 2 legs (LP fee creep)
-    (math.inf, 5.0),       # >  $1M:     ~2.5 bps x 2 legs (whale, slippage)
+    (10_000.0, 3.0),  # <= $10k:    ~1.5 bps x 2 legs (Across)
+    (100_000.0, 3.5),  # <= $100k:   ~1.5-1.75 bps x 2 legs (Across)
+    (1_000_000.0, 4.0),  # <= $1M:     ~2 bps x 2 legs (LP fee creep)
+    (math.inf, 5.0),  # >  $1M:     ~2.5 bps x 2 legs (whale, slippage)
 )
 
 
@@ -186,6 +186,7 @@ class BacktestResult:
 
     def to_dict(self) -> dict[str, Any]:
         """JSON-friendly dict (Python ``inf``/``-inf`` → strings)."""
+
         def _safe(v: float) -> float | str:
             if math.isinf(v):
                 return "inf" if v > 0 else "-inf"
@@ -206,9 +207,7 @@ class BacktestResult:
             "sortino": _safe(
                 round(self.sortino, 4) if not math.isinf(self.sortino) else self.sortino
             ),
-            "calmar": _safe(
-                round(self.calmar, 4) if not math.isinf(self.calmar) else self.calmar
-            ),
+            "calmar": _safe(round(self.calmar, 4) if not math.isinf(self.calmar) else self.calmar),
             "max_drawdown_pct": round(self.max_drawdown_pct, 4),
             "cost_basis_pct_of_pnl": round(self.cost_basis_pct_of_pnl, 2),
             "bridge_cost_bps_used": round(self.bridge_cost_bps_used, 4),
@@ -303,10 +302,7 @@ class PythArbBacktest:
             raise ValueError("days must be positive")
         if holding_period_hours <= 0:
             raise ValueError("holding_period_hours must be positive")
-        if (
-            bridge_cost_bps_per_round_trip is not None
-            and bridge_cost_bps_per_round_trip < 0
-        ):
+        if bridge_cost_bps_per_round_trip is not None and bridge_cost_bps_per_round_trip < 0:
             raise ValueError("bridge_cost_bps_per_round_trip must be non-negative")
         if gas_cost_usd_per_action < 0:
             raise ValueError("gas_cost_usd_per_action must be non-negative")
@@ -373,9 +369,7 @@ class PythArbBacktest:
             initial_divergence_bps=float(signal.max_divergence_bps),
         )
 
-    def simulate_with_divergence(
-        self, asset: str, initial_divergence_bps: float
-    ) -> BacktestResult:
+    def simulate_with_divergence(self, asset: str, initial_divergence_bps: float) -> BacktestResult:
         """Project PnL given an explicit initial divergence (bps).
 
         Public hook used by tests to drive the model with synthetic
@@ -465,9 +459,7 @@ class PythArbBacktest:
             period_returns=period_returns,
         )
 
-    def _zero_result(
-        self, asset: str, *, initial_divergence_bps: float
-    ) -> BacktestResult:
+    def _zero_result(self, asset: str, *, initial_divergence_bps: float) -> BacktestResult:
         """Flat zero-PnL result (used when there's no signal)."""
         return BacktestResult(
             asset=asset,
