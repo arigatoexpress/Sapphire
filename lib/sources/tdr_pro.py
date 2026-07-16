@@ -24,7 +24,6 @@ from lib.source_quality.snr import SignalRecord
 
 from . import SourceError, http_get_text, live_enabled, utc_now
 
-
 # Register with the source-quality layer at import time.  Weekly macro research
 # has a slower half-life than intraday TA signals; use a 168h (7-day) lookahead.
 register_source(
