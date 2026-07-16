@@ -391,8 +391,7 @@ def _validate_startup_config() -> None:
             SETTINGS.token_source,
         )
         raise RuntimeError(
-            "Polling mode requires SAPPHIRE_PM_BOT_TOKEN or "
-            "SAPPHIRE_PM_BOT_ALLOW_SHARED_POLLING=1"
+            "Polling mode requires SAPPHIRE_PM_BOT_TOKEN or SAPPHIRE_PM_BOT_ALLOW_SHARED_POLLING=1"
         )
 
 

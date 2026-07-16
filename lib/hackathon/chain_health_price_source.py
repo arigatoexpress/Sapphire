@@ -333,9 +333,7 @@ class ChainHealthPriceResolver:
 
     # -- internals ---------------------------------------------------------
 
-    def _fetch_hermes(
-        self, symbol: str
-    ) -> tuple[Decimal | None, int | None, str | None]:
+    def _fetch_hermes(self, symbol: str) -> tuple[Decimal | None, int | None, str | None]:
         """Fetch one Hermes price, swallow expected exceptions.
 
         Returns ``(price, publish_time, error_str)``. Exactly one of
@@ -405,9 +403,7 @@ class ChainHealthPriceResolver:
                 publish_time_s=None,
                 age_s=None,
                 severity_contribution="WARNING",
-                reasons=[
-                    f"price-source: settlement-mode read returned no value for {symbol}"
-                ],
+                reasons=[f"price-source: settlement-mode read returned no value for {symbol}"],
                 settlement_opt_out=True,
             )
         price, pt = observation
@@ -444,8 +440,7 @@ class ChainHealthPriceResolver:
             why_hermes_failed = f"hermes unavailable: {hermes_error}"
         elif hermes_stale_age is not None:
             why_hermes_failed = (
-                f"hermes stale by {hermes_stale_age}s "
-                f"(threshold {self._freshness_threshold_s}s)"
+                f"hermes stale by {hermes_stale_age}s (threshold {self._freshness_threshold_s}s)"
             )
         else:  # pragma: no cover — defensive
             why_hermes_failed = "hermes returned no usable price"
@@ -512,10 +507,7 @@ class ChainHealthPriceResolver:
             publish_time_s=pt,
             age_s=age,
             severity_contribution="WARNING",
-            reasons=[
-                f"price-source: {why_hermes_failed}; "
-                f"using on-chain {symbol} (age {age}s)"
-            ],
+            reasons=[f"price-source: {why_hermes_failed}; using on-chain {symbol} (age {age}s)"],
         )
 
     @staticmethod

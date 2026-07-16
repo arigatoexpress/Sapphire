@@ -69,7 +69,9 @@ def test_extract_google_sheet_links() -> None:
 
 def test_extract_research_links() -> None:
     text = "Research: https://thedefireport.io/research/house-call-july-2026"
-    assert _extract_research_links(text) == ["https://thedefireport.io/research/house-call-july-2026"]
+    assert _extract_research_links(text) == [
+        "https://thedefireport.io/research/house-call-july-2026"
+    ]
 
 
 def test_parse_message_from_fixture() -> None:
@@ -80,7 +82,9 @@ def test_parse_message_from_fixture() -> None:
     assert item.subject == "TDR Pro Portfolio Update — July 2026"
     assert item.sender == "Michael Nadeau <michael@thedefireport.com>"
     assert item.published_at == datetime(2026, 7, 15, 16, 0, 0, tzinfo=UTC)
-    assert any("thedefireport.io/research/house-call-july-2026" in link for link in item.research_links)
+    assert any(
+        "thedefireport.io/research/house-call-july-2026" in link for link in item.research_links
+    )
     assert any("docs.google.com/spreadsheets" in link for link in item.sheet_links)
 
 

@@ -11,6 +11,7 @@ Run manually:
 Or via LaunchAgent (recommended every 5 minutes):
     launchctl kickstart -k gui/$UID/com.sapphire.fleet-status
 """
+
 from __future__ import annotations
 
 import json
@@ -67,7 +68,9 @@ def _http_get(url: str, timeout: float = 5.0) -> tuple[bool, dict]:
 
 def _launchctl_running(label: str) -> bool:
     try:
-        out = subprocess.run(["launchctl", "list", label], capture_output=True, text=True, timeout=5)
+        out = subprocess.run(
+            ["launchctl", "list", label], capture_output=True, text=True, timeout=5
+        )
         return out.returncode == 0 and out.stdout.strip().split()[0] != "-"
     except Exception:
         return False
@@ -179,7 +182,11 @@ def _robinhood_chain() -> dict:
             if not client._w3 or not client._account:
                 return None
             try:
-                return float(client._w3.from_wei(client._w3.eth.get_balance(client._account.address), "ether"))
+                return float(
+                    client._w3.from_wei(
+                        client._w3.eth.get_balance(client._account.address), "ether"
+                    )
+                )
             except Exception:
                 return None
 
@@ -225,7 +232,9 @@ def main() -> int:
     snapshot = build_snapshot()
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUT_PATH.write_text(json.dumps(snapshot, indent=2, default=str), encoding="utf-8")
-    healthy = sum(1 for s in snapshot["subsystem"].values() if s.get("healthy") or s.get("reachable"))
+    healthy = sum(
+        1 for s in snapshot["subsystem"].values() if s.get("healthy") or s.get("reachable")
+    )
     total = len(snapshot["subsystem"])
     log.info("fleet status: %d/%d subsystems healthy → %s", healthy, total, OUT_PATH)
     return 0

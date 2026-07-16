@@ -4,6 +4,7 @@ No credentials are used. If Brave has an active robinhood.com session, this
 prints the account nickname and a session-health summary. If not, it reports
 that the user needs to log in via Brave first.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -15,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from lib.sources.brave_browser import BraveSession, _BRAVE_PROFILE_ROOT  # noqa: E402
+from lib.sources.brave_browser import _BRAVE_PROFILE_ROOT, BraveSession  # noqa: E402
 
 
 async def main() -> int:
@@ -30,14 +31,21 @@ async def main() -> int:
         cookies = await session.get_cookies(".robinhood.com")
         session_cookie_names = {c.get("name") for c in cookies}
 
-        logged_in = "/login" not in str(url) and ("Portfolio" in text or "Account" in text or "session_id" in session_cookie_names)
+        logged_in = "/login" not in str(url) and (
+            "Portfolio" in text or "Account" in text or "session_id" in session_cookie_names
+        )
 
-        print(json.dumps({
-            "url": url,
-            "logged_in": logged_in,
-            "robinhood_cookie_names": sorted(session_cookie_names),
-            "page_sample": text[:300].replace("\n", " ").strip(),
-        }, indent=2))
+        print(
+            json.dumps(
+                {
+                    "url": url,
+                    "logged_in": logged_in,
+                    "robinhood_cookie_names": sorted(session_cookie_names),
+                    "page_sample": text[:300].replace("\n", " ").strip(),
+                },
+                indent=2,
+            )
+        )
         return 0 if logged_in else 1
 
 

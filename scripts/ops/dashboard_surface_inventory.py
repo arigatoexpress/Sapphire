@@ -59,6 +59,7 @@ OWNER_RULES: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
         "Home / Worldline",
         (
             "/",
+            "/overview",
             "/app-preview",
             "/app-preview/",
             "/app-preview/assets/<path:filename>",
