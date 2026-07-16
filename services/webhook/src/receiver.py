@@ -50,6 +50,9 @@ WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")  # Must match Pine Script alert
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")  # Local Ollama (RTX 5070 Ti)
 WEBHOOK_PORT = int(os.getenv("WEBHOOK_PORT", "9090"))
 LOG_FILE = os.getenv("WEBHOOK_LOG_FILE", "C:/sapphire/webhook.log")
+ALERT_LOG_FILE = os.getenv("ALERT_LOG_FILE", "C:/sapphire/webhook/alerts.jsonl")
+ALERT_LOG_MAX_BYTES = int(os.getenv("ALERT_LOG_MAX_BYTES", "10485760"))  # 10 MiB
+ALERT_LOG_BACKUP_COUNT = int(os.getenv("ALERT_LOG_BACKUP_COUNT", "3"))
 MAX_HISTORY = 200
 MAX_WEBHOOK_BODY_BYTES = int(
     os.getenv("WEBHOOK_MAX_BODY_BYTES", os.getenv("MAX_WEBHOOK_BODY_BYTES", "8192"))
@@ -171,6 +174,92 @@ logging.basicConfig(
     ],
 )
 log = logging.getLogger("sapphire-webhook")
+
+# ─── Durable alert log ────────────────────────────────────────────────────────
+
+_alert_log_lock = asyncio.Lock()
+
+
+def _ensure_alert_log_dir() -> None:
+    log_dir = os.path.dirname(ALERT_LOG_FILE)
+    if log_dir:
+        os.makedirs(log_dir, exist_ok=True)
+
+
+def _alert_log_size_bytes() -> int:
+    try:
+        return os.path.getsize(ALERT_LOG_FILE)
+    except FileNotFoundError:
+        return 0
+    except OSError:
+        return 0
+
+
+def _rotate_alert_log() -> None:
+    """Simple rotation: move current file to .1, .2, .3, etc."""
+    if _alert_log_size_bytes() < ALERT_LOG_MAX_BYTES:
+        return
+    for i in range(ALERT_LOG_BACKUP_COUNT, 0, -1):
+        src = f"{ALERT_LOG_FILE}.{i}"
+        dst = f"{ALERT_LOG_FILE}.{i + 1}"
+        if os.path.exists(src):
+            try:
+                os.replace(src, dst)
+            except OSError:
+                pass
+    if os.path.exists(ALERT_LOG_FILE):
+        try:
+            os.replace(ALERT_LOG_FILE, f"{ALERT_LOG_FILE}.1")
+        except OSError:
+            pass
+
+
+async def _append_alert_log(entry: dict[str, Any]) -> None:
+    """Append a single alert entry to the durable JSONL log.
+
+    Uses rotation to cap disk usage. Runs under a lock so concurrent alerts
+    never interleave JSON lines.
+    """
+    async with _alert_log_lock:
+        await asyncio.to_thread(_ensure_alert_log_dir)
+        await asyncio.to_thread(_rotate_alert_log)
+        line = json.dumps(entry, default=str, ensure_ascii=False)
+        await asyncio.to_thread(_write_alert_log_line, line)
+
+
+def _write_alert_log_line(line: str) -> None:
+    try:
+        with open(ALERT_LOG_FILE, "a", encoding="utf-8") as fh:
+            fh.write(line + "\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+    except OSError as exc:
+        log.warning("Failed to write alert log: %s", exc)
+
+
+def _read_alert_log_entries(*, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
+    """Read durable alert log newest-first."""
+    entries: list[dict[str, Any]] = []
+    try:
+        if not os.path.exists(ALERT_LOG_FILE):
+            return entries
+        with open(ALERT_LOG_FILE, "r", encoding="utf-8", errors="ignore") as fh:
+            for raw_line in fh:
+                raw_line = raw_line.strip()
+                if not raw_line:
+                    continue
+                try:
+                    entries.append(json.loads(raw_line))
+                except json.JSONDecodeError:
+                    continue
+    except OSError:
+        return entries
+    # Newest first.
+    entries.reverse()
+    if offset:
+        entries = entries[offset:]
+    return entries[:limit]
+
 
 # ─── Data Models ──────────────────────────────────────────────────────────────
 
@@ -1163,8 +1252,44 @@ async def windows_research_worker_latest():
 
 
 @app.get("/alerts")
-async def get_alerts(limit: int = 20):
-    return {"alerts": alert_history[-limit:], "total": len(alert_history)}
+async def get_alerts(limit: int = 20, persisted: bool = False, offset: int = 0):
+    """Return recent alerts.
+
+    By default returns the in-memory sliding window (fast). Set persisted=true
+    to read from the durable JSONL alert log instead.
+    """
+    if persisted:
+        entries = await asyncio.to_thread(_read_alert_log_entries, limit=limit, offset=offset)
+        total = await asyncio.to_thread(_alert_log_total_count)
+        return {
+            "alerts": entries,
+            "total": total,
+            "source": "durable_log",
+            "log_file": ALERT_LOG_FILE,
+            "limit": limit,
+            "offset": offset,
+        }
+    return {
+        "alerts": alert_history[-limit:],
+        "total": len(alert_history),
+        "source": "memory",
+        "limit": limit,
+    }
+
+
+def _alert_log_total_count() -> int:
+    """Count lines in the durable alert log."""
+    count = 0
+    try:
+        if not os.path.exists(ALERT_LOG_FILE):
+            return 0
+        with open(ALERT_LOG_FILE, "r", encoding="utf-8", errors="ignore") as fh:
+            for line in fh:
+                if line.strip():
+                    count += 1
+    except OSError:
+        pass
+    return count
 
 
 @app.post("/webhook/tradingview")
@@ -1278,7 +1403,7 @@ async def receive_tradingview(request: Request, background_tasks: BackgroundTask
             },
         )
 
-    # Step 4 — Store in local history
+    # Step 4 — Store in local history and durable JSONL log
     entry = {
         "received_at": datetime.now(UTC).isoformat(),
         "alert": alert.to_dict(),
@@ -1290,6 +1415,7 @@ async def receive_tradingview(request: Request, background_tasks: BackgroundTask
     alert_history.append(entry)
     if len(alert_history) > MAX_HISTORY:
         alert_history.pop(0)
+    await _append_alert_log(entry)
 
     return JSONResponse(
         {

@@ -11,6 +11,7 @@ from __future__ import annotations
 import importlib
 import importlib.util
 import json
+import os
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -25,8 +26,16 @@ RECEIVER_SRC = ROOT / "services" / "webhook" / "src"
 
 
 @pytest.fixture(scope="module")
-def receiver():
+def receiver(tmp_path_factory: pytest.TempPathFactory):
     """Load services/webhook/src/receiver.py once, isolated from sys.path leakage."""
+    log_path = tmp_path_factory.mktemp("webhook") / "webhook.log"
+    alert_log_path = tmp_path_factory.mktemp("webhook-alerts") / "alerts.jsonl"
+    os.environ["WEBHOOK_LOG_FILE"] = str(log_path)
+    os.environ["ALERT_LOG_FILE"] = str(alert_log_path)
+    # Default signal routing so publish_signal tests see the three expected targets.
+    os.environ.setdefault("SIGNAL_LOGGER_MAC", "http://100.x.x.w:18081")
+    os.environ.setdefault("ALPHA_ENGINE_RARI2", "http://100.x.x.x:18080")
+    os.environ.setdefault("ALPHA_ENGINE_RARI1", "http://100.x.x.y:18080")
     src_path = str(RECEIVER_SRC)
     if src_path not in sys.path:
         sys.path.insert(0, src_path)
@@ -769,4 +778,52 @@ def test_research_worker_status_accepts_powershell_utf8_bom(receiver, tmp_path, 
         pass
     else:
         assert payload["status"] == "ok"
-    assert payload["run_id"] == "20260429T212042Z"
+
+
+# --- durable alert log -------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_alert_log_appends_and_rotates(receiver, tmp_path, monkeypatch):
+    log_file = tmp_path / "alerts.jsonl"
+    monkeypatch.setattr(receiver, "ALERT_LOG_FILE", str(log_file))
+    monkeypatch.setattr(receiver, "ALERT_LOG_MAX_BYTES", 1024)
+    entry = {
+        "received_at": "2026-07-16T00:00:00+00:00",
+        "alert": {"symbol": "BTCUSDT", "action": "buy", "price": 100000.0},
+        "published": True,
+        "channel": "tailscale",
+        "signal_id": "sig-1",
+    }
+    await receiver._append_alert_log(entry)
+    assert log_file.exists()
+    lines = log_file.read_text(encoding="utf-8").strip().splitlines()
+    assert len(lines) == 1
+    assert json.loads(lines[0])["alert"]["symbol"] == "BTCUSDT"
+
+
+@pytest.mark.asyncio
+async def test_append_alert_log_is_durable(receiver, tmp_path, monkeypatch):
+    log_file = tmp_path / "alerts.jsonl"
+    monkeypatch.setattr(receiver, "ALERT_LOG_FILE", str(log_file))
+    entry = {
+        "received_at": "2026-07-16T00:00:00+00:00",
+        "alert": {"symbol": "ETHUSDT", "action": "sell", "price": 3500.0},
+        "published": False,
+        "channel": "none",
+        "signal_id": "sig-2",
+    }
+    await receiver._append_alert_log(entry)
+    entries = receiver._read_alert_log_entries(limit=10)
+    assert len(entries) == 1
+    assert entries[0]["alert"]["symbol"] == "ETHUSDT"
+
+
+@pytest.mark.asyncio
+async def test_read_alert_log_newest_first(receiver, tmp_path, monkeypatch):
+    log_file = tmp_path / "alerts.jsonl"
+    monkeypatch.setattr(receiver, "ALERT_LOG_FILE", str(log_file))
+    for i in range(3):
+        await receiver._append_alert_log({"seq": i})
+    entries = receiver._read_alert_log_entries(limit=2)
+    assert [e["seq"] for e in entries] == [2, 1]

@@ -58,8 +58,10 @@ def receiver(tmp_path_factory: pytest.TempPathFactory):
     the capability sync loop only fires under ``lifespan``.
     """
     log_path = tmp_path_factory.mktemp("webhook") / "webhook.log"
+    alert_log_path = tmp_path_factory.mktemp("webhook-alerts") / "alerts.jsonl"
     monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setenv("WEBHOOK_LOG_FILE", str(log_path))
+    monkeypatch.setenv("ALERT_LOG_FILE", str(alert_log_path))
 
     src_path = str(RECEIVER_SRC)
     if src_path not in sys.path:
