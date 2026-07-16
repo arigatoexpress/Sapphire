@@ -216,6 +216,7 @@ def build_snapshot() -> dict:
             "signal-logger": _launchctl_running("com.sapphire.signal-logger"),
             "tdr-pro-sync": _launchctl_running("com.sapphire.tdr-pro-sync"),
             "pm-bot": _launchctl_running("com.sapphire.pm-bot"),
+            "auto-executor": _launchctl_running("com.sapphire.auto-executor"),
         },
     }
 
