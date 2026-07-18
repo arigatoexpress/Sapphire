@@ -49,8 +49,33 @@ SYSTEM_LOGS_COLLECTION = "system_logs"
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")  # Must match Pine Script alert body
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")  # Local Ollama (RTX 5070 Ti)
 WEBHOOK_PORT = int(os.getenv("WEBHOOK_PORT", "9090"))
-LOG_FILE = os.getenv("WEBHOOK_LOG_FILE", "C:/sapphire/webhook.log")
-ALERT_LOG_FILE = os.getenv("ALERT_LOG_FILE", "C:/sapphire/webhook/alerts.jsonl")
+
+
+def default_webhook_log_paths(
+    *, system: str | None = None, home: Path | None = None
+) -> tuple[str, str]:
+    """Return (webhook_log, alert_log) defaults for the host platform.
+
+    Windows keeps the historical ``C:/sapphire/...`` layout used by existing
+    Windows deployments and runbooks.
+
+    On macOS/Linux, default under ``~/.local/share/sapphire/`` so a bare import
+    (no ``WEBHOOK_LOG_FILE`` / ``ALERT_LOG_FILE``) never creates a literal
+    ``C:`` directory under the process CWD — the 2026-07 Mac checkout footgun
+    that left an empty ``C:/sapphire/webhook.log`` tree in the repo root.
+    LaunchAgents should still set explicit paths (see
+    ``infra/scripts/start-webhook-receiver-mac.sh``).
+    """
+    sys_name = (system if system is not None else platform.system()).lower()
+    if sys_name == "windows":
+        return "C:/sapphire/webhook.log", "C:/sapphire/webhook/alerts.jsonl"
+    base = (home if home is not None else Path.home()) / ".local" / "share" / "sapphire"
+    return str(base / "webhook.log"), str(base / "webhook" / "alerts.jsonl")
+
+
+_DEFAULT_LOG_FILE, _DEFAULT_ALERT_LOG_FILE = default_webhook_log_paths()
+LOG_FILE = os.getenv("WEBHOOK_LOG_FILE", _DEFAULT_LOG_FILE)
+ALERT_LOG_FILE = os.getenv("ALERT_LOG_FILE", _DEFAULT_ALERT_LOG_FILE)
 ALERT_LOG_MAX_BYTES = int(os.getenv("ALERT_LOG_MAX_BYTES", "10485760"))  # 10 MiB
 ALERT_LOG_BACKUP_COUNT = int(os.getenv("ALERT_LOG_BACKUP_COUNT", "3"))
 MAX_HISTORY = 200

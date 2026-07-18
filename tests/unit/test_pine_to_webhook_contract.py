@@ -50,12 +50,13 @@ _RUNTIME_VALUES = {
 def receiver(tmp_path_factory: pytest.TempPathFactory):
     """Import ``services/webhook/src/receiver.py`` with side effects neutralised.
 
-    The receiver hard-codes ``LOG_FILE = C:/sapphire/webhook.log`` (Windows
-    path) and unconditionally creates the directory + a FileHandler at import
-    time. We redirect the log file to a tmp path before the import so the
-    module loads cleanly on macOS / Linux CI. No network calls happen at
-    import time — pubsub/firestore are stubbed out (set to ``None``) and
-    the capability sync loop only fires under ``lifespan``.
+    The receiver resolves log paths at import time and creates the directory +
+    a FileHandler immediately. Defaults are platform-aware (Windows
+    ``C:/sapphire/...``, Unix ``~/.local/share/sapphire/...``), but tests still
+    redirect to a tmp path before import so they never touch the operator home
+    directory. No network calls happen at import time — pubsub/firestore are
+    stubbed out (set to ``None``) and the capability sync loop only fires under
+    ``lifespan``.
     """
     log_path = tmp_path_factory.mktemp("webhook") / "webhook.log"
     alert_log_path = tmp_path_factory.mktemp("webhook-alerts") / "alerts.jsonl"

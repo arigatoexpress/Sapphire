@@ -46,6 +46,10 @@ data/backtests/
 data/backups/
 data/decisions/
 
+# Windows-drive path literal created when webhook receiver defaults ran on
+# Unix without WEBHOOK_LOG_FILE (fixed 2026-07-17). Never commit this tree.
+/C:
+
 # Build
 *.so
 *.dylib

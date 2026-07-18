@@ -47,6 +47,8 @@ policy, and a rule for what must not drift into it.
 - `results/` — dated generated report remnants. Retention: deprecated in git;
   new generated results belong in `artifacts/` or cold storage.
 - `scripts/` — operator scripts, CI helpers, deploy wrappers, and generators.
+  `scripts/archived/` is the in-git cold shelf for zero-ref operator one-offs
+  (archive-over-delete; do not mass-exit to Proton until cold-tier re-verify).
   Retention: git.
 - `services/` — deployable services and service-owned LaunchAgents. Retention:
   git for source/config; logs and state are external.
@@ -91,6 +93,7 @@ policy, and a rule for what must not drift into it.
 - `SECURITY.md`
 - `STRUCTURE.md`
 - `SYSTEM_UPGRADE_PLAN.md`
+- `cloudbuild-dashboard.yaml`
 - `env.example`
 - `foundry.toml`
 - `pyproject.toml`
