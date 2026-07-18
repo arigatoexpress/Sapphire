@@ -1,12 +1,18 @@
 # Windows TradingView Webhook Runbook
 
-Last reviewed: 2026-05-06
+Last reviewed: 2026-07-17
 
 This runbook covers the Windows-side TradingView webhook receiver in
 `services/webhook/src/receiver.py`. The receiver listens on port `9090`, accepts
 TradingView-style JSON payloads, optionally asks local Ollama for a short
 quality verdict, and forwards a `TradeSignal`-shaped payload to the Mac signal
 logger and legacy Pi API gateways over Tailscale.
+
+Mac fallback: `infra/scripts/start-webhook-receiver-mac.sh` (LaunchAgent
+`com.sapphire.webhook-receiver-mac`) sets `WEBHOOK_LOG_FILE` /
+`ALERT_LOG_FILE` under `data/logs` and `data/webhook`. Platform defaults without
+env are Windows → `C:/sapphire/...`, Unix → `~/.local/share/sapphire/...`
+(never a literal `C:` dir under the repo CWD).
 
 This is a trading-adjacent ingress path. The receiver must remain paper-first,
 locally scoped, and operator-reviewed before any internet exposure or live
@@ -21,7 +27,8 @@ execution dependency.
 | Default port | `9090` |
 | Health route | `/webhook/health` |
 | Main route | `/webhook/tradingview` |
-| Default log file | `C:/sapphire/webhook.log` |
+| Default log file (Windows) | `C:/sapphire/webhook.log` (override with `WEBHOOK_LOG_FILE`) |
+| Default log file (macOS/Linux) | `~/.local/share/sapphire/webhook.log` |
 | Primary forward target | `SIGNAL_LOGGER_MAC` -> `http://100.x.x.w:18081` |
 
 ## Current Safety Posture

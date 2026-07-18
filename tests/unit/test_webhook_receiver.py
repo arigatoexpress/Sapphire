@@ -72,6 +72,26 @@ def test_map_signal_covers_every_documented_action(receiver, action, expected):
     assert receiver.map_signal(action) == expected
 
 
+# --- default_webhook_log_paths ---------------------------------------------
+
+
+def test_default_webhook_log_paths_windows_keeps_historical_layout(receiver):
+    log_file, alert_file = receiver.default_webhook_log_paths(system="Windows")
+    assert log_file == "C:/sapphire/webhook.log"
+    assert alert_file == "C:/sapphire/webhook/alerts.jsonl"
+
+
+def test_default_webhook_log_paths_unix_avoids_literal_c_drive(receiver, tmp_path):
+    """Bare Mac/Linux import must not materialize a C: directory under CWD."""
+    log_file, alert_file = receiver.default_webhook_log_paths(system="Darwin", home=tmp_path)
+    assert "C:" not in log_file
+    assert "C:" not in alert_file
+    assert log_file == str(tmp_path / ".local" / "share" / "sapphire" / "webhook.log")
+    assert alert_file == str(
+        tmp_path / ".local" / "share" / "sapphire" / "webhook" / "alerts.jsonl"
+    )
+
+
 # --- validate_payload ------------------------------------------------------
 
 
