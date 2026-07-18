@@ -55,8 +55,9 @@ class TestUploadFile:
 
         assert result.root_hash == "0xabc"
         assert result.tx_hash == "0xdeadbeef"
-        # subprocess invoked with absolute path
-        assert str(target.resolve()) in captured["args"][3]
+        # subprocess payload carries the absolute path (after JSON decoding)
+        payload = json.loads(captured["args"][3])
+        assert payload["path"] == str(target.resolve())
         # env carries the network endpoints
         assert captured["env"]["OG_RPC_URL"] == "https://evmrpc-testnet.0g.ai"
         assert captured["env"]["OG_INDEXER_URL"] == "https://indexer-storage-testnet-turbo.0g.ai"
