@@ -279,3 +279,45 @@ def test_daily_loss_limit_blocks_execution(tmp_dirs, config, fake_signal_record,
     assert len(audit) == 1
     assert audit[0]["verdict"] == "BLOCKED"
     assert any("daily_loss_limit_reached" in b for b in audit[0]["blockers"])
+
+
+# ─── Duplicate-fill regression (the "913x" bug class) ────────────────────────
+# An approved signal must execute exactly once no matter how many executor
+# passes see it. The audit log is the durable consume ledger; if that dedup
+# ever regresses, repeated run_once passes re-fill the same approval
+# (observed 2026-07: 913 duplicate paper fills from one approval).
+
+
+def test_approved_signal_executes_exactly_once_across_repeated_passes(
+    tmp_dirs, config, fake_signal_record, poll_pending
+):
+    _, return_values = poll_pending
+    return_values["A1B2C3D4"] = "approved"
+    write_signal(tmp_dirs["signals_dir"], fake_signal_record)
+
+    for _ in range(50):  # many polling passes over the same approved signal
+        ae.run_once(config)
+
+    audit = load_jsonl(config.audit_log)
+    fills = [r for r in audit if r["verdict"] == "PAPER_EXECUTED"]
+    assert len(fills) == 1, f"duplicate fills: {len(fills)} (913x bug class)"
+
+
+def test_dedup_survives_fresh_process_state(
+    tmp_dirs, config, fake_signal_record, poll_pending
+):
+    """Dedup must come from the on-disk audit ledger, not in-memory state —
+    a restarted executor (new process) must not re-fill a consumed approval."""
+    _, return_values = poll_pending
+    return_values["A1B2C3D4"] = "approved"
+    write_signal(tmp_dirs["signals_dir"], fake_signal_record)
+
+    ae.run_once(config)
+    # Simulate a process restart: re-read everything from disk only.
+    executed = ae._already_executed_ids(config.audit_log)
+    assert "abc12345" in executed
+    ae.run_once(config)
+
+    audit = load_jsonl(config.audit_log)
+    fills = [r for r in audit if r["verdict"] == "PAPER_EXECUTED"]
+    assert len(fills) == 1
