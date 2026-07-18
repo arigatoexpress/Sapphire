@@ -49,6 +49,7 @@ policy, and a rule for what must not drift into it.
 - `scripts/` — operator scripts, CI helpers, deploy wrappers, and generators.
   `scripts/archived/` is the in-git cold shelf for zero-ref operator one-offs
   (archive-over-delete; do not mass-exit to Proton until cold-tier re-verify).
+  Purge leftovers / FLAG paths: `docs/ops/monorepo-purge-leftovers.md`.
   Retention: git.
 - `services/` — deployable services and service-owned LaunchAgents. Retention:
   git for source/config; logs and state are external.
