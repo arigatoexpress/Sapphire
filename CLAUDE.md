@@ -37,6 +37,11 @@ python3 scripts/ops/tradingview_ta_capture.py pine-promote pine/generated/<file>
 SAPPHIRE_TV_MUTATION_ENABLED=1 python3 scripts/ops/tradingview_ta_capture.py --mutate sweep  # mutation-enabled
 # Scheduled: com.sapphire.tradingview-ta-capture (every 4h, read-only sweep) + com.sapphire.tradingview-pine-batch (daily 13:00 UTC, read-only Pine batch)
 
+# Prompt the Windows agent stack from the Mac terminal (over Tailscale)
+scripts/ops/agent ask "..."          # via Mac proxy :11435 (failover + sensitivity gate)
+scripts/ops/agent ask --direct "..." # straight to Windows Ollama :11434 (native /api/chat)
+scripts/ops/agent models|status|dispatch|shell|repl
+
 # Production readiness sweep
 python3 scripts/ops/production_readiness_sweep.py --json   # machine-readable PASS/WARN/FAIL rows
 
@@ -67,6 +72,7 @@ make ci            # mirror GitHub Actions CI locally
 - **Lint + format:** `ruff` only (see `[tool.ruff]` in `pyproject.toml`). Black/isort/flake8 were retired 2026-04-19. Pre-existing stylistic rules (E701, E722, E741, SIM102/105, B007, F811) are *track-only ignores* — new code is kept clean by the PostToolUse hook in `.claude/settings.json`.
 - **Pre-commit:** `ruff + ruff-format + gitleaks + bandit + stdlib hooks`. Install with `make install-hooks`.
 - **CI:** `.github/workflows/ci.yml` runs ruff + pytest (core + plugin) + `validate_tool_registry.py` + gitleaks on every push and PR. `security.yml` runs osv-scanner, trivy-fs, and bandit daily.
+- **CI runners (changed 2026-07-24):** 7 portable jobs run on the **Windows** box (`win-sapphire`) via the repo variable `SAPPHIRE_RUNNER_TESTS = ["self-hosted","Windows","X64","sapphire-win"]`. 3 host-bound jobs stay on the Mac (`ari-macbook-sapphire`): container smoke test (Docker Desktop), deploy (GCP), gitleaks (`brew install`). `runs-on` is `fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER)` — unsetting the variable silently sends everything back to the Mac. Full topology + the migration's failure modes: `docs/ops/ci-runner-topology.md`.
 - **Dependabot:** pip + github-actions weekly (`.github/dependabot.yml`). Ruff and pytest grouped.
 - **CODEOWNERS:** review-gated paths: `.github/`, `lib/security/`, `lib/core/kill_switch.py`, `contracts/`, `services/webhook/`, trading critical path.
 - **PR/issue templates:** `.github/pull_request_template.md`, `.github/ISSUE_TEMPLATE/{bug,feature}.md`.
@@ -104,7 +110,7 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `lib/content/` | library | 14-module research-to-publish pipeline. **The arrow diagram below is the intended design, not the wiring.** Verified 2026-07-24: `data_collector` has *zero* references anywhere in the repo (not even a test); `thesis_engine` and `draft_generator` are imported only by `tests/unit/test_content_thesis_drafts.py`. The first three stages have no production caller — treat them as a prototype until wired or deleted. Design: `data_collector` → `thesis_engine` → `draft_generator` → `report_generator` → `visualizations` → `quality` (7-check rubric) → `performance_policy` (blocks premature accuracy claims) → `qa_pipeline` → `formatters` → `approval` (Telegram sign-off) → `publisher`/`auto_publish` → `scheduler` (Mon brief / Wed AI intel / Fri security / daily pulse). Publishers: `substack`, `x`, `linkedin`, `typefully`. Also `outreach.py` (lead-engine integration). |
 | `lib/foundry/` | library | **Palantir Foundry integration**: `client` (bearer + OAuth), `ingestion` (local → ontology objects), `readiness` (repo-grounded audit), `sync` (15-min delta-aware + Telegram alerts). |
 | `lib/portfolio/` | library | **`robinhood.py`** — Robinhood Crypto API client (Ed25519-signed REST, accounts, holdings, best_bid_ask, order history, reconstructed cost basis). Credentials in `~/.config/sapphire-secrets/`. |
-| `lib/security/` | library | **Security platform**: `dependency_scanner` (OSV.dev CVE lookup + CycloneDX 1.5 SBOM), `model_monitor` (Ollama blob SHA-256 + Jinja2 backdoor detection), `network_mapper` (Tailscale topology + trust-zone scoring + attack-surface). |
+| `lib/security/` | library | **Security platform**: **`secret_patterns`** (canonical outbound-egress rule set — ~25 provider key shapes + homoglyph/zero-width/percent/leetspeak/base64 normalization; consumed by BOTH the plugin classifier and the inference-proxy T4 gate so they cannot diverge — fix a pattern here, every gate improves), `pii_redactor` (dashboard output), `dependency_scanner` (OSV.dev CVE lookup + CycloneDX 1.5 SBOM), `model_monitor` (Ollama blob SHA-256 + Jinja2 backdoor detection), `network_mapper` (Tailscale topology + trust-zone scoring + attack-surface). |
 | `lib/intel/` | library | `market_intelligence.py`, `lead_enricher.py`. |
 | `lib/payments/` | library | `x402_middleware.py` — HTTP 402 micropayment gate (Flask + raw-socket), EVM signature verification. |
 | `lib/agents/` | library | Paper-only autonomous harness (`base.py`, `alpha_agent.py`, `runner.py`) plus the broader OpenClaw/NemoClaw dispatch stack under `src/sapphire_agents/`. |
@@ -371,6 +377,19 @@ All in `~/.claude/scheduled-tasks/`. Run when Claude Code is open. Tasks marked 
 - pull-gcp-secrets — `[RETIRED 2026-04-27]` (one-shot fired 2026-04-02)
 
 ## Gotchas
+
+**Windows / cross-platform (learned 2026-07-24 when CI first ran on the GPU box —
+every one of these had been latent since the repo began):**
+- **Always pass `encoding="utf-8"`** to `read_text` / `write_text` / `open`. Windows defaults to cp1252 and this repo is full of `─ — ✓`, so a bare read dies with `UnicodeDecodeError: 'charmap' codec can't decode byte 0x8f`. All 384 `read_text()` sites are pinned; **~606 `write_text()` sites are not yet** — fix as you touch them. `PYTHONUTF8: "1"` in `ci.yml` covers CI only, not operators running tools by hand.
+- **Never `shutil.which("python3")` on Windows.** It resolves to the Microsoft Store App Execution Alias, a zero-byte reparse point, and `subprocess` fails with `OSError: [WinError 1920] The file cannot be accessed by the system`. Use `sys.executable`. Guarded in `test_inventory.py` and `local_ci_verify.py`; the pattern still exists in `services/control-plane/app/main.py:1355` and the hardcoded `/usr/local/bin/python3` in `services/dashboard/app.py:4191,4271`.
+- **`shell: bash` on the Windows runner resolves to WSL**, not Git Bash — Git for Windows puts `bash.exe` in `Git\bin\` but only `Git\cmd\` is on PATH. The runner service runs as LOCAL SYSTEM where WSL refuses to start. `ci.yml` names `C:\PROGRA~1\Git\bin\bash.exe` explicitly; the 8.3 short path is required because the runner splits a custom `shell:` string on the first space.
+- **`uv` is not on the Windows runner's PATH** (per-user install, invisible to a LOCAL SYSTEM service). The `ensure uv` step in `ci.yml` finds or installs it. Do not swap in `astral-sh/setup-uv` — v5 and v6 both declare Node 20, the runner force-migrates to Node 24, and the action dies with a libuv assertion *after* installing.
+
+**CI / workflow authoring:**
+- **Duplicate top-level YAML keys silently pass `yaml.safe_load`** (last wins) but make Actions reject the whole workflow — it reports `conclusion: failure` with **zero jobs** and `created_at == updated_at`. Validate with a loader that raises on duplicates before pushing a `ci.yml` edit.
+- **`concurrency.cancel-in-progress: true` + one serial Windows runner** means every push kills the in-flight run. A full sequence needs ~15 min; push more often than that and the later jobs (pytest, plugin tests) never get a turn. Batch changes and let a run finish.
+- The workflow-level `env:` block sets `AGENT_TOOLSDIRECTORY` / `RUNNER_TOOL_CACHE` to **macOS paths for every job**, including Windows ones. Harmless while everything uses `uv`; will bite the first `setup-python`.
+
 
 - `conftest.py` patches `sys.path` for legacy imports — don't remove it.
 - Dashboard requires `AUTH_PASSWORD` env var or it crashes on import.

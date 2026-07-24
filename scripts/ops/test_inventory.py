@@ -42,6 +42,14 @@ README_BADGE_RE = re.compile(
 def _resolve_collection_python() -> str:
     if env := os.environ.get("PYTHON3"):
         return env
+    # Windows: shutil.which("python3") very often resolves to the Microsoft Store
+    # App Execution Alias under %LOCALAPPDATA%\Microsoft\WindowsApps — a
+    # zero-byte reparse point that CreateProcess rejects with
+    # "OSError: [WinError 1920] The file cannot be accessed by the system".
+    # sys.executable is always the real interpreter, and under `uv run` it is
+    # already the pinned one.
+    if os.name == "nt":
+        return sys.executable
     if Path("/usr/local/bin/python3").exists():
         return "/usr/local/bin/python3"
     return shutil.which("python3") or sys.executable
