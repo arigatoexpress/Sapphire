@@ -268,6 +268,44 @@ Re-derive: the scan script is small; rebuild it by indexing every identifier in
 
 ---
 
+## 5b. ~386 file reads break on Windows (found by moving CI there)
+
+Moving CI to the Windows runner surfaced a portability bug that had been latent
+since the repo began, because nothing had ever executed there:
+
+```
+File "scripts\validate_tool_registry.py", line 74, in _compile_check
+    src = path.read_text()
+File "...Python311\Lib\encodings\cp1252.py", line 23, in decode
+UnicodeDecodeError: 'charmap' codec can't decode byte 0x8f in position 4821
+```
+
+`Path.read_text()` and `open()` without `encoding=` use the platform default:
+UTF-8 on Linux and macOS, **cp1252 on Windows**. This repo is full of box-drawing
+characters, em-dashes and check marks, so those reads fail on Windows the moment
+the file contains one.
+
+Scale, measured: **386** `read_text()` calls and **212** `open()` calls with no
+explicit encoding. Reproduced locally by forcing cp1252 —
+`plugins/claw-sapphire/tools/dev_pulse.py` fails at byte 0x9d, position 26723.
+
+Two fixes applied:
+
+- `PYTHONUTF8: "1"` at the workflow level in `ci.yml`. UTF-8 mode makes the
+  default encoding UTF-8 regardless of platform, covering all ~386 sites for CI
+  in one line, and matching the direction Python itself is moving (PEP 686).
+- Explicit `encoding="utf-8"` on the four call sites in
+  `scripts/validate_tool_registry.py`, the one CI proved broken.
+
+**Not fixed, and worth a follow-up sweep:** the other ~382 sites. The env var
+makes CI green but does not fix the code — anything invoked outside CI on a
+Windows host (an operator running a plugin tool by hand, the Windows webhook
+service) still carries the bug. New code should pass `encoding=` explicitly.
+
+The general lesson matches §3 and the runner topology doc: this was invisible
+for as long as the only machines that ran the code were the two that happened to
+default to UTF-8. Single-platform CI hides single-platform bugs.
+
 ## 6. Smaller true things
 
 - **CLAUDE.md counts had drifted on six of eight.** Tests 7,245→7,334, files
