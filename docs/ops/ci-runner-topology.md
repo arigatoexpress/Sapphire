@@ -67,8 +67,58 @@ Recommended order:
 3. Only if that is green, set the variable.
 
 `defaults.run.shell: bash` is already set repo-wide in `ci.yml`, so the job
-bodies run under Git Bash on Windows without rewriting. That was the expensive
-part and it is done.
+bodies run under Git Bash on Windows without rewriting — **provided Git Bash is
+actually on the runner service's PATH.** See the next section; it was not, and
+that is what failed on the first Windows run.
+
+## `bash` on the Windows runner resolves to WSL, not Git Bash
+
+First real Windows run (2026-07-24, run 30119251115) failed all three jobs in
+their first `run:` step, identically:
+
+```
+shell: C:\WINDOWS\System32\bash.EXE --noprofile --norc -e -o pipefail {0}
+Running WSL as local system is not supported.
+Error code: Bash/WSL_E_LOCAL_SYSTEM_NOT_SUPPORTED
+```
+
+The same log shows git resolving correctly:
+
+```
+[command]"C:\Program Files\Git\cmd\git.exe" version
+git version 2.53.0.windows.1
+```
+
+That pair is the whole diagnosis. Git for Windows installs `git.exe` under
+`Git\cmd\` and `bash.exe` under `Git\bin\`, and the installer only adds `cmd\`
+to PATH unless "Use Git and optional Unix tools from the Command Prompt" was
+selected. So `git` is found, `bash` is not, and the lookup falls through to
+`C:\Windows\System32\bash.exe` — the WSL launcher. The runner is installed as a
+service under LOCAL SYSTEM, and WSL refuses to run as LOCAL SYSTEM.
+
+Nothing in the repo can fix this well: hardcoding a Windows bash path into
+`defaults.run.shell` would break the same jobs whenever they fall back to the
+Mac, and any workaround step would itself need a working shell to run. It is a
+one-line machine fix.
+
+**Fix — put Git's `bin` ahead of System32 for the runner service, then restart
+it.** Either:
+
+- Add `C:\Program Files\Git\bin` to the *system* PATH (System Properties →
+  Environment Variables → System variables → Path), or
+- Set it for the runner only, via `<runner-dir>\.env` (the runner reads this at
+  service start):
+  ```
+  PATH=C:\Program Files\Git\bin;C:\Program Files\Git\usr\bin;%PATH%
+  ```
+  Runner dir here is `C:\Users\aribs\.github-runners\sapphire-win`.
+
+Then restart the runner service and re-run the jobs. Verify with a dispatch of
+`win-runner-smoke.yml` before trusting PR checks again.
+
+Running the service as the `aribs` user instead of LOCAL SYSTEM would also make
+the WSL bash work, but that is the worse fix — it leaves CI depending on WSL and
+on a specific user session. Prefer Git Bash on PATH.
 
 ## What stays on the Mac, and why
 
