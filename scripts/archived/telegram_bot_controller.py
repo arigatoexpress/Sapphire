@@ -54,7 +54,7 @@ def _load_env_value(key: str, files: list[Path]) -> str:
         try:
             if not env_file.exists():
                 continue
-            for line in env_file.read_text().splitlines():
+            for line in env_file.read_text(encoding="utf-8").splitlines():
                 line = line.strip()
                 if not line or line.startswith("#") or "=" not in line:
                     continue
@@ -120,7 +120,7 @@ def get_daemon_state() -> dict:
     """Get daemon state from file."""
     if DAEMON_STATE_FILE.exists():
         try:
-            return json.loads(DAEMON_STATE_FILE.read_text())
+            return json.loads(DAEMON_STATE_FILE.read_text(encoding="utf-8"))
         except Exception:
             pass
     return {"running": False, "paused": False}

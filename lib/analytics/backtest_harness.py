@@ -492,7 +492,7 @@ def cli(argv: list[str] | None = None) -> int:
     }
     if args.config_json is not None:
         try:
-            override = json.loads(args.config_json.read_text())
+            override = json.loads(args.config_json.read_text(encoding="utf-8"))
             if not isinstance(override, dict):
                 raise ValueError("--config-json must be a JSON object")
             for key, value in override.items():

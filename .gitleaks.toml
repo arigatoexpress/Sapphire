@@ -22,6 +22,14 @@ paths = [
     '''tests/legacy/test_security_fuzz\.py''',
     '''tests/unit/test_molthub_outreach\.py''',
     '''tests/unit/test_sensitivity_filter\.py''',
+    # The cloud-egress detector and its fixtures. secret_patterns.py contains
+    # provider token *prefixes* as regexes (AKIA, ghp_, xoxb-, sk_live_ ...) —
+    # they are the detection rules, not credentials. Its test assembles probe
+    # values at runtime precisely so no literal token lands in the tree; the one
+    # exception is AWS's own published example secret key, used to assert a
+    # documented detection limit.
+    '''lib/security/secret_patterns\.py''',
+    '''tests/unit/test_secret_patterns\.py''',
     '''tests/unit/test_ws_dashboard\.py''',
     # Property test intentionally generates fake token shapes and asserts redaction.
     '''tests/property/test_audit_panel_heuristics_properties\.py''',

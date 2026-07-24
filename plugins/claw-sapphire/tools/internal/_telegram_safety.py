@@ -241,7 +241,7 @@ def _parse_allowed_user_ids(raw: str, *, source: str) -> set[int]:
 def _read_allowed_user_ids_file(path_text: str) -> set[int]:
     path = Path(path_text).expanduser()
     try:
-        raw = path.read_text().strip()
+        raw = path.read_text(encoding="utf-8").strip()
     except OSError:
         logger.warning("Could not read Telegram allowlist file: %s", path)
         return set()

@@ -107,7 +107,7 @@ def test_disengage_round_trip_after_engage(isolated_paths, stub_externals):
     result = sks.engage(reason="round-trip test")
     assert sks.is_engaged() is True
 
-    flag_payload = json.loads(sks._KILL_FLAG.read_text())
+    flag_payload = json.loads(sks._KILL_FLAG.read_text(encoding="utf-8"))
     assert flag_payload["reason"] == "security_kill_switch"
     assert "engaged_at" in flag_payload
     assert isinstance(result, sks.KillSwitchResult)
@@ -126,7 +126,7 @@ def test_block_cloud_routing_writes_valid_json(isolated_paths):
     sks._block_cloud_routing(result)
 
     assert sks._KILL_FLAG.exists()
-    payload = json.loads(sks._KILL_FLAG.read_text())
+    payload = json.loads(sks._KILL_FLAG.read_text(encoding="utf-8"))
     assert payload["reason"] == "security_kill_switch"
     assert "engaged_at" in payload
     assert any("Cloud routing kill flag written" in a for a in result.actions)
@@ -159,7 +159,7 @@ def test_engage_writes_event_log(isolated_paths, stub_externals):
     assert result.reason == "suspected SIM-swap"
     # The event log must contain the engagement event.
     assert sks._EVENTS_PATH.exists()
-    lines = sks._EVENTS_PATH.read_text().splitlines()
+    lines = sks._EVENTS_PATH.read_text(encoding="utf-8").splitlines()
     payload = json.loads(lines[-1])
     assert payload["type"] == "security.kill_switch.engaged"
     assert "priority:p0" in payload["tags"]

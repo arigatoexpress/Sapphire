@@ -593,7 +593,7 @@ def _load_quota_config() -> dict:
     config_path = os.getenv("INFERENCE_QUOTAS_FILE", "").strip()
     if not raw and config_path:
         try:
-            raw = Path(config_path).expanduser().read_text().strip()
+            raw = Path(config_path).expanduser().read_text(encoding="utf-8").strip()
         except OSError as exc:
             log.warning("Could not read inference quota config file: %s", exc)
             raw = ""
@@ -808,6 +808,22 @@ def _is_http_url(url: str) -> bool:
 # ─── Sensitivity Classifier ──────────────────────────────────────────────────
 # Blocks routing to Kimi Cloud for any query that may contain private data.
 # Heuristic-based — no LLM required (runs before inference).
+#
+# Primary rule set is lib/security/secret_patterns.py, shared with the plugin
+# classifier so the two gates cannot drift apart again. It adds the raw key
+# *shapes* the local regex below never had — AWS/GitHub/Stripe/Telegram/OpenAI
+# tokens and bare JWTs, none of which carry an adjacent keyword — plus
+# normalization that defeats homoglyph / zero-width / percent-encoding evasion.
+#
+# _SENSITIVE_PATTERNS is retained as a fallback so this service still gates
+# correctly when deployed without the repo's lib/ tree on the path. Both are
+# consulted; a hit from either blocks.
+
+try:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from lib.security.secret_patterns import contains_secret as _contains_secret
+except ImportError:  # pragma: no cover - standalone deploy without lib/
+    _contains_secret = None  # type: ignore[assignment]
 
 _SENSITIVE_PATTERNS = re.compile(
     r"""
@@ -834,15 +850,24 @@ _SENSITIVE_PATTERNS = re.compile(
 )
 
 
+def _text_is_sensitive(text: str) -> bool:
+    """Return True if a single string carries credential or private material."""
+    if not text:
+        return False
+    if _contains_secret is not None and _contains_secret(text):
+        return True
+    return bool(_SENSITIVE_PATTERNS.search(text))
+
+
 def _is_sensitive(messages: list) -> bool:
     """Return True if any message content looks like private/sensitive data."""
     for msg in messages:
         content = msg.get("content", "")
-        if isinstance(content, str) and _SENSITIVE_PATTERNS.search(content):
+        if isinstance(content, str) and _text_is_sensitive(content):
             return True
         if isinstance(content, list):
             for block in content:
-                if isinstance(block, dict) and _SENSITIVE_PATTERNS.search(block.get("text", "")):
+                if isinstance(block, dict) and _text_is_sensitive(block.get("text", "")):
                     return True
     return False
 

@@ -134,7 +134,7 @@ def load_leads() -> list[dict[str, Any]]:
     if not LEADS_FILE.exists():
         return []
     out: list[dict[str, Any]] = []
-    for line in LEADS_FILE.read_text().splitlines():
+    for line in LEADS_FILE.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
             continue

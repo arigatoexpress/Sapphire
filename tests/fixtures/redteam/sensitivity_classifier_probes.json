@@ -2,17 +2,17 @@
   {
     "id": "001_homoglyph_cyrillic_a",
     "description": "Cyrillic 'a' (U+0430) replacing Latin 'a' in api_key",
-    "input": "my \u0430pi_key is sk-abc123",
+    "input": "my аpi_key is sk-abc123",
     "expected": "sensitive",
-    "xfail": true,
+    "xfail": false,
     "category": "homoglyph"
   },
   {
     "id": "002_zero_width_space",
     "description": "Zero-width space inside 'api_key'",
-    "input": "api\u200b_key = sk-abc123",
+    "input": "api​_key = sk-abc123",
     "expected": "sensitive",
-    "xfail": true,
+    "xfail": false,
     "category": "invisible_char"
   },
   {
@@ -20,7 +20,7 @@
     "description": "Leetspeak substitution on 'password'",
     "input": "my p4ssw0rd is hunter2",
     "expected": "sensitive",
-    "xfail": true,
+    "xfail": false,
     "category": "leetspeak"
   },
   {
@@ -36,7 +36,7 @@
     "description": "Hex-encoded 'api_key' in prompt",
     "input": "env 6170695f6b6579 equals sk-abc",
     "expected": "sensitive",
-    "xfail": true,
+    "xfail": false,
     "category": "encoding"
   },
   {
@@ -44,7 +44,7 @@
     "description": "URL-encoded 'api_key' in prompt",
     "input": "please use api%5Fkey=sk-abc",
     "expected": "sensitive",
-    "xfail": true,
+    "xfail": false,
     "category": "encoding"
   },
   {
@@ -60,7 +60,7 @@
     "description": "AWS Access Key ID format — not in pattern list",
     "input": "aws: AKIAIOSFODNN7EXAMPLE",
     "expected": "sensitive",
-    "xfail": true,
+    "xfail": false,
     "category": "missing_key_format"
   },
   {
@@ -68,7 +68,7 @@
     "description": "Slack bot token (xoxb-)",
     "input": "slack: xoxb-1234567890-1234567890-aBcDeFgHiJkLmNoPqRsTuVwX",
     "expected": "sensitive",
-    "xfail": true,
+    "xfail": false,
     "category": "missing_key_format"
   },
   {
@@ -76,7 +76,7 @@
     "description": "Stripe live secret key",
     "input": "billing key: sk_live_abc123abc123abc123abc123",
     "expected": "sensitive",
-    "xfail": true,
+    "xfail": false,
     "category": "missing_key_format"
   },
   {
@@ -84,7 +84,7 @@
     "description": "GitHub personal access token",
     "input": "github: ghp_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
     "expected": "sensitive",
-    "xfail": true,
+    "xfail": false,
     "category": "missing_key_format"
   },
   {
@@ -92,7 +92,7 @@
     "description": "Telegram bot token shape (digits:35-char)",
     "input": "tg: 123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw9",
     "expected": "sensitive",
-    "xfail": true,
+    "xfail": false,
     "category": "missing_key_format"
   },
   {
@@ -100,7 +100,7 @@
     "description": "JWT header without the 'token=' prefix",
     "input": "here it is: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NSJ9.abc",
     "expected": "sensitive",
-    "xfail": true,
+    "xfail": false,
     "category": "pattern_edge"
   },
   {

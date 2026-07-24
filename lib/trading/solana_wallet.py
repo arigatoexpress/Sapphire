@@ -246,7 +246,7 @@ class SolanaWallet:
         if not LEDGER_PATH.exists():
             return {"SOL": PAPER_STARTING_SOL, "USDC": PAPER_STARTING_USDC}
         try:
-            return json.loads(LEDGER_PATH.read_text())
+            return json.loads(LEDGER_PATH.read_text(encoding="utf-8"))
         except Exception as e:
             log.warning("ledger read failed: %s — resetting", e)
             return {"SOL": PAPER_STARTING_SOL, "USDC": PAPER_STARTING_USDC}

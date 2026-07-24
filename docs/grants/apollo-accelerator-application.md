@@ -66,7 +66,7 @@
 **Live execution (production-grade, not demo):**
 - **Hyperliquid live executor** (mainnet-refused until EIP-712 signing verified): $5/order, 3x lev, $25/day loss cap, file-killswitch — fail-closed by default
 - **Robinhood Crypto live capital, $50 pilot rung:** first live BTC fill 2026-04-28 04:06 UTC, $5 at $76,774.81. 14-day Sortino soak before next rung.
-- **Prediction accuracy (verified):** 61.1% overall, **BTC 83.3%** on 36 scored of 42 forecasts.
+- **Prediction accuracy (pilot-stage, not yet significant):** 22/36 scored forecasts correct (61.1%), 95% CI [44.9%, 75.2%] — the interval includes 50%, so this sample does **not** yet establish an edge. Reported here as an honest operating baseline; the claim we make is process quality (scored, timestamped, adversarially reviewed forecasts), not accuracy.
 
 **Hackathon submissions (concurrent funnel, not blocking):**
 - **0G APAC Hackathon Track 2 — `<placement TBD post-2026-05-16>`** (submission complete, PR #525)
@@ -152,7 +152,7 @@
 
 **Numbers Ari should sanity-check at submission time:**
 - "6,626 tests" — verify with `python3 scripts/ops/test_inventory.py --check-readme`
-- "BTC 83.3% on 36 scored of 42 forecasts" — verify against current `lib.analytics.prediction_accuracy` output
+- Accuracy claim — regenerate from `lib.analytics.prediction_accuracy` **and report the confidence interval, never the bare point estimate.** At n=36 the overall CI is [44.9%, 75.2%]; the per-symbol slices are n=12 each and individually meaningless. The old "verified 61.1% / BTC 83.3%" phrasing overstated a null result: BTC's nominal p=0.039 is the max of 3 symbol comparisons and fails Bonferroni correction (α=0.0167). Do not reinstate it.
 - "First Robinhood live BTC fill 2026-04-28 04:06 UTC, $5 at $76,774.81" — exact, from `data/paper_trading.jsonl` / portfolio snapshot
 - 0G mainnet contract addresses — `<TBD post-deploy>` placeholders must be replaced with live `chainscan.0g.ai/address/...` URLs
 - Apollo cohort dates + max-per-team — verify against `apollo.0g.ai` at submit time (the $2M / 10-team / 10-week parameters were 2026 cycle)

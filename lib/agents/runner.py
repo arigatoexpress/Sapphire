@@ -111,7 +111,7 @@ class AgentRunner:
 
         for path in sorted(self.heartbeat_dir.glob("*.heartbeat")):
             try:
-                heartbeat = json.loads(path.read_text())
+                heartbeat = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
                 continue
             name = path.stem

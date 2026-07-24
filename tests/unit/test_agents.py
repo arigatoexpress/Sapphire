@@ -165,7 +165,7 @@ def test_alpha_agent_scores_open_positions(tmp_path: Path) -> None:
     assert bus.events[0][1]["signal_id"] == "sig-1"
     assert bus.events[0][1]["action"] == "hold"
     assert bus.events[0][1]["score"] > 50.0
-    assert portfolio_file.read_text().count('"positions"') == 1
+    assert portfolio_file.read_text(encoding="utf-8").count('"positions"') == 1
 
 
 def test_alpha_agent_closes_on_sl_hit(tmp_path: Path) -> None:

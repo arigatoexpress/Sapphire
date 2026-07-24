@@ -41,7 +41,7 @@ def test_daily_dry_run_suppresses_telegram_and_snapshot_writes(tmp_path, monkeyp
 
     assert daily.main(["--dry-run", "--watchlist", "SPY,TSLA"]) == 0
 
-    snapshot = json.loads((output_dir / "predictions.json").read_text())
+    snapshot = json.loads((output_dir / "predictions.json").read_text(encoding="utf-8"))
     assert snapshot["dry_run"] is True
     assert snapshot["watchlist"] == ["SPY", "TSLA"]
     assert calls == [("SPY", True), ("TSLA", True)]
@@ -71,7 +71,7 @@ def test_daily_no_telegram_keeps_snapshot_enabled(tmp_path, monkeypatch):
 
     assert daily.main(["--no-telegram", "--watchlist", "SPY"]) == 0
 
-    snapshot = json.loads((output_dir / "predictions.json").read_text())
+    snapshot = json.loads((output_dir / "predictions.json").read_text(encoding="utf-8"))
     assert snapshot["dry_run"] is False
     assert calls == [("SPY", False)]
 

@@ -219,7 +219,7 @@ def test_get_snapshot_happy_path_writes_cache(isolated_cache):
     # Cache file is written
     cache_file = isolated_cache / "btc.json"
     assert cache_file.exists()
-    cached = json.loads(cache_file.read_text())
+    cached = json.loads(cache_file.read_text(encoding="utf-8"))
     assert cached["price_usd"] == 70000.0
 
 

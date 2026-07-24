@@ -280,7 +280,7 @@ class TestRunSyncDryRun:
 
         state_path = tmp_path / "data" / "foundry_sync_state.json"
         assert state_path.is_file()
-        state = json.loads(state_path.read_text())
+        state = json.loads(state_path.read_text(encoding="utf-8"))
         assert state["sync_count"] == 1
         assert state["last_status"] == "ok"
 
@@ -339,7 +339,7 @@ class TestRunSyncGracefulDegradation:
         assert result.skipped is True
 
         state_path = tmp_path / "data" / "foundry_sync_state.json"
-        state = json.loads(state_path.read_text())
+        state = json.loads(state_path.read_text(encoding="utf-8"))
         assert state["last_status"] == "not_configured"
 
     def test_foundry_preflight_config_error_exits_ok_and_skipped(self, tmp_path, monkeypatch):
@@ -368,7 +368,7 @@ class TestRunSyncGracefulDegradation:
         assert result.ok is True
         assert result.skipped is True
         state_path = tmp_path / "data" / "foundry_sync_state.json"
-        state = json.loads(state_path.read_text())
+        state = json.loads(state_path.read_text(encoding="utf-8"))
         assert state["last_status"] == "not_configured"
 
     def test_auth_failure_before_first_success_does_not_telegram(self, tmp_path, monkeypatch):
@@ -400,7 +400,7 @@ class TestRunSyncGracefulDegradation:
         assert tg.call_count == 0, "must not page on first-time auth failure"
         assert result.ok is False
         state_path = tmp_path / "data" / "foundry_sync_state.json"
-        state = json.loads(state_path.read_text())
+        state = json.loads(state_path.read_text(encoding="utf-8"))
         assert state["first_success_at"] is None
         assert state["last_auth_warning_at"] is not None
 
@@ -489,7 +489,7 @@ class TestRunSyncGracefulDegradation:
         assert result.skipped is True, "should route to not_configured path"
         assert result.ok is True
         state_path = tmp_path / "data" / "foundry_sync_state.json"
-        state = json.loads(state_path.read_text())
+        state = json.loads(state_path.read_text(encoding="utf-8"))
         assert state["last_status"] == "not_configured"
         # Confirm the INFO line fired and no ERROR for the same 404
         info_msgs = [r.getMessage() for r in caplog.records if r.levelname == "INFO"]
@@ -548,7 +548,7 @@ class TestRunSyncGracefulDegradation:
         )
         assert result.ok is False
         state_path = tmp_path / "data" / "foundry_sync_state.json"
-        state = json.loads(state_path.read_text())
+        state = json.loads(state_path.read_text(encoding="utf-8"))
         assert state["last_status"] == "error"
         # The 500 ERROR log must be present.
         error_msgs = [r.getMessage() for r in caplog.records if r.levelname == "ERROR"]
@@ -609,7 +609,7 @@ class TestRunSyncGracefulDegradation:
         assert result.ok is False, "post-success 404 must report failure, not ok=True"
         assert result.skipped is False, "must not demote to skipped/not_configured"
         assert tg.call_count == 1, "post-success 404 must Telegram (regression)"
-        state = json.loads(state_path.read_text())
+        state = json.loads(state_path.read_text(encoding="utf-8"))
         assert state["last_status"] == "error", "status must reflect the regression"
         # ERROR path, not INFO
         error_msgs = [r.getMessage() for r in caplog.records if r.levelname == "ERROR"]
@@ -699,7 +699,7 @@ class TestRunSyncGracefulDegradation:
         assert result.ok is False
         assert result.skipped is False
         state_path = tmp_path / "data" / "foundry_sync_state.json"
-        state = json.loads(state_path.read_text())
+        state = json.loads(state_path.read_text(encoding="utf-8"))
         assert state["last_status"] == "error"
 
 

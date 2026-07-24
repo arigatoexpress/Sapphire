@@ -113,7 +113,7 @@ def _read_jsonl(path: Path) -> list[dict]:
     if not path.exists():
         return []
     out: list[dict] = []
-    for line in path.read_text().splitlines():
+    for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
             continue
@@ -128,7 +128,7 @@ def _read_json(path: Path, default: Any) -> Any:
     if not path.exists():
         return default
     try:
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return default
 
@@ -252,7 +252,7 @@ def threat_intel_summary(md_path: Path | None) -> dict[str, Any]:
     """Parse the prioritized queue from the latest threat digest."""
     if md_path is None or not md_path.exists():
         return {"path": None, "items": [], "count": 0}
-    txt = md_path.read_text()
+    txt = md_path.read_text(encoding="utf-8")
     # Split into queue items by "### N." heading, take up to 5
     blocks = re.split(r"\n(?=###\s*\d+\.)", txt)
     items = []

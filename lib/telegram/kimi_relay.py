@@ -45,7 +45,7 @@ _ENV_FILE = Path.home() / ".hermes" / ".env"
 def _load_env() -> None:
     """Load .hermes/.env into os.environ if keys are missing."""
     if _ENV_FILE.exists():
-        for line in _ENV_FILE.read_text().splitlines():
+        for line in _ENV_FILE.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if not line or line.startswith("#") or "=" not in line:
                 continue

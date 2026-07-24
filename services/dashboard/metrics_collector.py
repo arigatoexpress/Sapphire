@@ -25,7 +25,7 @@ def _read_jsonl(path):
     if not path.exists():
         return []
     entries = []
-    for line in path.read_text().strip().splitlines():
+    for line in path.read_text(encoding="utf-8").strip().splitlines():
         with contextlib.suppress(json.JSONDecodeError):
             entries.append(json.loads(line))
     return entries
@@ -91,7 +91,7 @@ def _count_threats():
     ]:
         if candidate.exists():
             try:
-                d = json.loads(candidate.read_text())
+                d = json.loads(candidate.read_text(encoding="utf-8"))
                 return len(d.get("threats", []))
             except Exception:
                 pass

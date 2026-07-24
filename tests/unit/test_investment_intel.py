@@ -172,7 +172,7 @@ def test_materialization_preview_builds_rows_and_writes_ndjson(tmp_path):
     assert out["total_rows"] == sum(item["rows"] for item in out["written"])
     first = Path(out["written"][0]["path"])
     assert first.exists()
-    assert json.loads(first.read_text().splitlines()[0])["timestamp"]
+    assert json.loads(first.read_text(encoding="utf-8").splitlines()[0])["timestamp"]
 
 
 def test_public_source_clients_construct_official_urls(monkeypatch):

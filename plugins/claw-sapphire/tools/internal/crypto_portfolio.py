@@ -56,7 +56,7 @@ def action_paper() -> dict:
     if not PAPER_PORTFOLIO.exists():
         return {"error": "No paper portfolio. Run paper_trader.py first."}
 
-    pf = json.loads(PAPER_PORTFOLIO.read_text())
+    pf = json.loads(PAPER_PORTFOLIO.read_text(encoding="utf-8"))
     prices = _get_prices()
     price_map = {
         "BTCUSDT": prices.get("bitcoin", {}).get("usd"),

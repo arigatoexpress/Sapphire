@@ -2200,7 +2200,7 @@ def api_opportunities():
         if not path.exists():
             return {"opportunities": [], "timestamp": datetime.now().isoformat()}
         try:
-            lines = path.read_text().strip().splitlines()[-60:]
+            lines = path.read_text(encoding="utf-8").strip().splitlines()[-60:]
         except OSError:
             return {"opportunities": [], "timestamp": datetime.now().isoformat()}
         out: list[dict] = []
@@ -2316,7 +2316,7 @@ def api_logs():
         path = Path.home() / "Code" / "Sapphire" / "data" / "system_events.jsonl"
         if path.exists():
             try:
-                lines = path.read_text().strip().splitlines()[-500:]
+                lines = path.read_text(encoding="utf-8").strip().splitlines()[-500:]
             except OSError:
                 lines = []
             for line in reversed(lines):
@@ -2669,7 +2669,7 @@ def api_signals():
             today = _dt.now(UTC).strftime("%Y-%m-%d")
             f = signals_dir / f"{today}.jsonl"
             if f.exists():
-                for line in f.read_text().strip().splitlines()[-20:]:
+                for line in f.read_text(encoding="utf-8").strip().splitlines()[-20:]:
                     with contextlib.suppress(Exception):
                         recent.append(json.loads(line))
                 recent.reverse()
@@ -3057,7 +3057,7 @@ def api_trading_metrics():
 
         signals_today = []
         if f.exists():
-            for line in f.read_text().strip().splitlines():
+            for line in f.read_text(encoding="utf-8").strip().splitlines():
                 with contextlib.suppress(Exception):
                     signals_today.append(_json.loads(line))
 
@@ -3503,7 +3503,7 @@ def api_risk_backtest():
         if request.args.get("latest") == "1":
             for cand in (r / "data" / "backtests" / "latest.json" for r in _DASHBOARD_ROOTS):
                 if cand.exists():
-                    return jsonify(json.loads(cand.read_text()))
+                    return jsonify(json.loads(cand.read_text(encoding="utf-8")))
             return jsonify({"error": "no cached backtest"}), 404
         syms_arg = request.args.get("symbols")
         symbols = (
@@ -3750,7 +3750,7 @@ def api_soc_security():
                 Path.home() / "Code" / "Sapphire" / "services" / "inference-proxy" / "app.py"
             )
             if proxy_path.exists():
-                content = proxy_path.read_text()
+                content = proxy_path.read_text(encoding="utf-8")
                 gate_patterns = [
                     "api_key",
                     "password",
@@ -3849,7 +3849,7 @@ def api_soc_security():
                 / "threats.json"
             )
             if threat_file.exists():
-                data = json.loads(threat_file.read_text())
+                data = json.loads(threat_file.read_text(encoding="utf-8"))
                 for t in data.get("threats", [])[:8]:
                     score = t.get("score", 0) or 0
                     sev = (
@@ -4290,7 +4290,7 @@ def api_kronos_status():
         )
         data["has_todays_predictions"] = pred_file.exists()
         if pred_file.exists():
-            preds = json.loads(pred_file.read_text())
+            preds = json.loads(pred_file.read_text(encoding="utf-8"))
             data["cached_symbols"] = list(preds.get("predictions", {}).keys())
 
         return jsonify(data)
@@ -4431,7 +4431,7 @@ def api_soc_threat_timeline():
         threat_file = intel_base / date_str / "threats.json"
         if threat_file.exists():
             try:
-                data = json.loads(threat_file.read_text())
+                data = json.loads(threat_file.read_text(encoding="utf-8"))
                 for t in data.get("threats", []):
                     sev = (t.get("severity") or "low").lower()
                     if sev in counts:
@@ -4485,7 +4485,7 @@ def api_signals_performance():
         day = {"date": date_str, "signals": 0, "wins": 0, "losses": 0, "pnl": 0.0}
         if f.exists():
             try:
-                for line in f.read_text().strip().splitlines():
+                for line in f.read_text(encoding="utf-8").strip().splitlines():
                     try:
                         s = json.loads(line)
                         day["signals"] += 1
@@ -4553,7 +4553,7 @@ def _load_agent_events(limit: int = 20) -> list[dict[str, Any]]:
 
     events: list[dict[str, Any]] = []
     try:
-        lines = _AGENT_EVENTS_FILE.read_text().splitlines()
+        lines = _AGENT_EVENTS_FILE.read_text(encoding="utf-8").splitlines()
     except OSError:
         return events
 
@@ -4593,7 +4593,7 @@ def _load_agent_heartbeats() -> list[dict[str, Any]]:
 
     for path in sorted(_AGENT_HEARTBEAT_DIR.glob("*.heartbeat")):
         try:
-            payload = json.loads(path.read_text())
+            payload = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
         updated_at = _parse_agent_timestamp(payload.get("updated_at"))
@@ -7030,7 +7030,7 @@ def api_intel():
     try:
         for day_dir in sorted(intel_dir.glob("*/threats.json"), reverse=True)[:3]:
             try:
-                threats = json.loads(day_dir.read_text()).get("threats") or []
+                threats = json.loads(day_dir.read_text(encoding="utf-8")).get("threats") or []
                 for t in threats[:5]:
                     local_item_count += 1
                     stamp = t.get("published") or day_dir.parent.name
@@ -7261,7 +7261,7 @@ def api_convergence_watchlist():
         )
         if not watchlist_path.exists():
             return jsonify({"error": "watchlist not found", "tiers": {}}), 200
-        data = json.loads(watchlist_path.read_text())
+        data = json.loads(watchlist_path.read_text(encoding="utf-8"))
         data["source_file"] = str(watchlist_path.relative_to(watchlist_path.parents[4]))
         return jsonify(data)
     except Exception as e:
@@ -8034,7 +8034,7 @@ def api_lumo_latest_pack():
                 "available": True,
                 "path": str(latest),
                 "generated": latest.stem.replace("lumo_pack_", ""),
-                "content": latest.read_text(),
+                "content": latest.read_text(encoding="utf-8"),
                 "pack_count": len(packs),
             }
         )

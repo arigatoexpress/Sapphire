@@ -78,7 +78,7 @@ def collect_prediction_accuracy() -> dict:
     if not PREDICTIONS_PATH.exists():
         return {"total": 0, "accuracy": 0}
 
-    preds = [json.loads(l) for l in PREDICTIONS_PATH.read_text().strip().splitlines() if l.strip()]
+    preds = [json.loads(l) for l in PREDICTIONS_PATH.read_text(encoding="utf-8").strip().splitlines() if l.strip()]
     scored = [p for p in preds if p.get("correct") is not None]
     correct = sum(1 for p in scored if p["correct"])
 
@@ -136,7 +136,7 @@ def collect_system_health() -> dict:
 def collect_factory_health() -> dict:
     """Get factory state."""
     if QA_REPORT_PATH.exists():
-        report = json.loads(QA_REPORT_PATH.read_text())
+        report = json.loads(QA_REPORT_PATH.read_text(encoding="utf-8"))
         scores = {name: fe.get("ux_score", 0) for name, fe in report.get("frontends", {}).items()}
         return {
             "frontend_scores": scores,

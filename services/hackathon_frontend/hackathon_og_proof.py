@@ -53,7 +53,7 @@ def _load_deployments() -> dict[str, Any]:
     if path is None:
         return {}
     try:
-        loaded = json.loads(path.read_text())
+        loaded = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
     return loaded if isinstance(loaded, dict) else {}

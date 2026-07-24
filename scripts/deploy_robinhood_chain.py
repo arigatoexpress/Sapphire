@@ -54,7 +54,7 @@ def _load_private_key() -> str:
     if key:
         return key
     if SECRETS_FILE.exists():
-        key = SECRETS_FILE.read_text().strip()
+        key = SECRETS_FILE.read_text(encoding="utf-8").strip()
         if key:
             return key
     raise RuntimeError(
@@ -81,7 +81,7 @@ def _compile_contracts() -> dict[str, dict]:
 
         log.info("Compiling %s ...", name)
         result = solcx.compile_source(
-            sol_file.read_text(),
+            sol_file.read_text(encoding="utf-8"),
             output_values=["abi", "bin"],
             solc_version="0.8.20",
         )
@@ -133,7 +133,7 @@ def _save_deployments(addresses: dict[str, str], tx_hashes: dict[str, str]) -> N
     existing: dict = {}
     if DEPLOYMENTS_FILE.exists():
         try:
-            existing = json.loads(DEPLOYMENTS_FILE.read_text())
+            existing = json.loads(DEPLOYMENTS_FILE.read_text(encoding="utf-8"))
         except Exception:
             pass
 
@@ -234,7 +234,7 @@ def _preflight() -> int:
     # 5. Existing deployment?
     if DEPLOYMENTS_FILE.exists():
         try:
-            existing = json.loads(DEPLOYMENTS_FILE.read_text())
+            existing = json.loads(DEPLOYMENTS_FILE.read_text(encoding="utf-8"))
             net = existing.get("robinhood_testnet", {}).get("contracts", {})
             if net:
                 log.info("[NOTE] prior deployment on record (will be overwritten):")

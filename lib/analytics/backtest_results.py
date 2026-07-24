@@ -67,7 +67,7 @@ def load_latest_sweep() -> dict[str, Any] | None:
     if f is None:
         return None
     try:
-        raw = f.read_text()
+        raw = f.read_text(encoding="utf-8")
     except OSError:
         return None
     try:
@@ -86,7 +86,7 @@ def load_latest_best() -> dict[str, Any] | None:
     if f is None:
         return None
     try:
-        raw = f.read_text()
+        raw = f.read_text(encoding="utf-8")
     except OSError:
         return None
     try:

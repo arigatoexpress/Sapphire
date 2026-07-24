@@ -46,7 +46,7 @@ def _get_fred():
     if not FRED_KEY_PATH.exists():
         return None
     try:
-        key = FRED_KEY_PATH.read_text().strip()
+        key = FRED_KEY_PATH.read_text(encoding="utf-8").strip()
     except OSError:
         return None
     if not key:

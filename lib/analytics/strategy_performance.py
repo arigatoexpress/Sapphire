@@ -111,7 +111,7 @@ def _iter_signals_dir() -> Iterable[dict[str, Any]]:
         return
     for f in sorted(SIGNALS_DIR.glob("*.jsonl")):
         try:
-            raw = f.read_text()
+            raw = f.read_text(encoding="utf-8")
         except OSError:
             continue
         for line in raw.splitlines():
@@ -146,7 +146,7 @@ def _iter_perf_signals() -> Iterable[dict[str, Any]]:
     if not PERF_SIGNALS.exists():
         return
     try:
-        raw = PERF_SIGNALS.read_text()
+        raw = PERF_SIGNALS.read_text(encoding="utf-8")
     except OSError:
         return
     for line in raw.splitlines():
@@ -185,7 +185,7 @@ def _iter_paper_portfolio() -> Iterable[dict[str, Any]]:
     if not PAPER_PORTFOLIO.exists():
         return
     try:
-        d = json.loads(PAPER_PORTFOLIO.read_text())
+        d = json.loads(PAPER_PORTFOLIO.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return
     for h in d.get("history", []):
@@ -398,7 +398,7 @@ def _initial_capital() -> float:
     if not PAPER_PORTFOLIO.exists():
         return _DEFAULT_INITIAL_CAPITAL
     try:
-        d = json.loads(PAPER_PORTFOLIO.read_text())
+        d = json.loads(PAPER_PORTFOLIO.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return _DEFAULT_INITIAL_CAPITAL
     return float(d.get("initial_capital") or _DEFAULT_INITIAL_CAPITAL)

@@ -338,7 +338,7 @@ def _section_threats() -> dict:
             return {"status": "missing", "text": "  No threat snapshot."}
 
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as e:
         return {"status": "error", "text": f"  Threat parse error: {e}"}
 
@@ -450,7 +450,7 @@ def _section_kronos() -> dict:
     if not pred_path.exists():
         return {"status": "missing", "text": "  Kronos predictions not yet generated."}
     try:
-        data = json.loads(pred_path.read_text())
+        data = json.loads(pred_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as e:
         return {"status": "error", "text": f"  Kronos parse error: {e}"}
 
@@ -493,7 +493,7 @@ def _section_market_intel() -> dict:
             "text": "  Market intel not yet collected (run market_intelligence.py).",
         }
     try:
-        data = json.loads(snap_path.read_text())
+        data = json.loads(snap_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as e:
         return {"status": "error", "text": f"  Market intel parse error: {e}"}
 

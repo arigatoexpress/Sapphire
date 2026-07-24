@@ -19,7 +19,22 @@ Usage:
 from __future__ import annotations
 
 import re
+import sys
 from dataclasses import dataclass
+from pathlib import Path
+
+# Canonical secret-material detection lives in lib/security/secret_patterns.py so
+# that this classifier and the inference proxy's Tier-4 gate share one rule set.
+# This module is imported by tools that run from several working directories, so
+# resolve the repo root from __file__ rather than trusting sys.path.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+try:
+    from lib.security.secret_patterns import find_secret as _find_secret
+except ImportError:  # pragma: no cover - defensive; keeps the gate usable standalone
+    _find_secret = None  # type: ignore[assignment]
 
 # ─── Pattern groups ───────────────────────────────────────────────────────────
 
@@ -121,7 +136,21 @@ def classify(text: str) -> SensitivityResult:
     """Classify a single text string.
 
     Returns SENSITIVE on first match (fail-safe — err toward blocking).
+
+    Checks raw credential *material* first (AWS/GitHub/Slack/Stripe/JWT/PEM
+    shapes, and keywords hidden behind homoglyph, zero-width, percent- or
+    base64-encoding), then this module's domain groups — financial state,
+    customer PII, and Tailscale/LaunchAgent internals.
     """
+    if _find_secret is not None:
+        hit = _find_secret(text)
+        if hit:
+            return SensitivityResult(
+                safe=False,
+                reason=f"secret_material: {hit.snippet!r} ({hit})",
+                matched_group="secret_material",
+            )
+
     for group, pattern in _COMPILED:
         m = pattern.search(text)
         if m:

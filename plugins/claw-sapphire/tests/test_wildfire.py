@@ -85,7 +85,7 @@ def test_ingest_persists_valid_signal_and_emits_event(isolated_paths: Path) -> N
     assert rows[0]["signal_id"] == signal["signal_id"]
 
     assert wildfire.EVENTS_PATH.exists()
-    line = wildfire.EVENTS_PATH.read_text().strip()
+    line = wildfire.EVENTS_PATH.read_text(encoding="utf-8").strip()
     envelope = json.loads(line)
     assert envelope["type"] == "wildfire.signal.detected"
     assert envelope["tags"]["zone"] == signal["zone_id"]
@@ -285,7 +285,7 @@ def test_situation_fetches_and_emits_event(
     assert result["situation"]["level"] == "critical"
     assert wildfire.SITUATION_CACHE_PATH.exists()
 
-    envelope = json.loads(wildfire.EVENTS_PATH.read_text().strip())
+    envelope = json.loads(wildfire.EVENTS_PATH.read_text(encoding="utf-8").strip())
     assert envelope["type"] == "wildfire.situation.updated"
     assert envelope["tags"]["priority"] == "critical"
     assert envelope["summary"]["nearest_incident_km"] == 12.0
@@ -379,7 +379,7 @@ def test_fire_dept_brief_writes_draft_and_never_sends(
     assert result["ok"] is True
     brief_path = Path(result["path"])
     assert brief_path.exists()
-    text = brief_path.read_text()
+    text = brief_path.read_text(encoding="utf-8")
     assert "Wildfire Situation Brief" in text
     assert "Test Fire" in text
     assert "22.5 km" in text

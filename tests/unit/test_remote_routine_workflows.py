@@ -16,7 +16,7 @@ ROUTINE_WORKFLOWS = (
 
 
 def _workflow(name: str) -> dict:
-    return yaml.load((WORKFLOWS / name).read_text(), Loader=yaml.BaseLoader)
+    return yaml.load((WORKFLOWS / name).read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
 
 
 def test_weekly_backtest_has_manual_and_scheduled_triggers() -> None:

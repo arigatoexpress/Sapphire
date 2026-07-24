@@ -8,7 +8,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_fresh_mac_make_targets_are_present() -> None:
-    makefile = (REPO_ROOT / "Makefile").read_text()
+    makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
     expected = {
         "sapphire-on-fresh-mac": "bash scripts/ops/bootstrap_fresh_mac.sh",
         "sapphire-demo-up": "sapphire-on-fresh-mac",
@@ -21,7 +21,7 @@ def test_fresh_mac_make_targets_are_present() -> None:
 
 
 def test_fresh_mac_targets_are_phony() -> None:
-    makefile = (REPO_ROOT / "Makefile").read_text()
+    makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
     phony_line = next(line for line in makefile.splitlines() if line.startswith(".PHONY: install"))
     for target in (
         "sapphire-on-fresh-mac",

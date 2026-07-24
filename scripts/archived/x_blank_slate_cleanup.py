@@ -117,7 +117,7 @@ def _parse_cutoff(value: str) -> datetime:
 def _load_state(path: Path) -> dict[str, Any]:
     if path.exists():
         try:
-            return json.loads(path.read_text())
+            return json.loads(path.read_text(encoding="utf-8"))
         except Exception:
             pass
     return {"deleted_ids": [], "runs": []}

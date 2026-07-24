@@ -202,7 +202,7 @@ def _configured_vars(names: tuple[str, ...]) -> list[str]:
 
 def _load_json(path: Path) -> dict:
     try:
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return {}
 
@@ -540,7 +540,7 @@ def _audit_sync_history(root: Path) -> dict[str, Any]:
     latest: dict[str, Any] | None = None
 
     try:
-        for line in history_path.read_text().splitlines():
+        for line in history_path.read_text(encoding="utf-8").splitlines():
             stripped = line.strip()
             if not stripped:
                 continue

@@ -178,7 +178,7 @@ class TestTryConsumeBudget:
 
 class TestConfirmationAudit:
     def _records(self, path: Path) -> list[dict]:
-        return [json.loads(line) for line in path.read_text().splitlines()]
+        return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
 
     def test_low_risk_auto_approval_is_audited(self, tmp_path):
         audit_path = tmp_path / "audit.jsonl"
@@ -299,7 +299,7 @@ class TestConfirmationAudit:
             "token=sample-details-token bearer sample-bearer",
         )
 
-        record = json.loads(path.read_text())
+        record = json.loads(path.read_text(encoding="utf-8"))
         serialized = json.dumps(record)
         assert "sample-token" not in serialized
         assert "sample-details-token" not in serialized
@@ -314,7 +314,7 @@ class TestConfirmationAudit:
             ActionRisk.FINANCIAL,
             "paper-only unit test",
         )
-        record = json.loads(path.read_text())
+        record = json.loads(path.read_text(encoding="utf-8"))
         record["expires"] = time.time() - 1
         path.write_text(json.dumps(record))
 
@@ -364,7 +364,7 @@ class TestConfirmationAudit:
 
 class TestConfirmationReplyHandler:
     def _records(self, path: Path) -> list[dict]:
-        return [json.loads(line) for line in path.read_text().splitlines()]
+        return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
 
     def test_parse_confirmation_reply_accepts_bare_commands(self):
         assert parse_confirmation_reply("CONFIRM ab12cd34") == ("approve", "AB12CD34")
@@ -397,7 +397,7 @@ class TestConfirmationReplyHandler:
             "ok": True,
             "status": "approved",
         }
-        assert json.loads(path.read_text())["status"] == "approved"
+        assert json.loads(path.read_text(encoding="utf-8"))["status"] == "approved"
         records = self._records(audit_path)
         assert records[-1]["event_type"] == "confirmation.pending_approved"
         assert records[-1]["status"] == "approved"
@@ -421,7 +421,7 @@ class TestConfirmationReplyHandler:
             "ok": True,
             "status": "denied",
         }
-        assert json.loads(path.read_text())["status"] == "denied"
+        assert json.loads(path.read_text(encoding="utf-8"))["status"] == "denied"
         records = self._records(audit_path)
         assert records[-1]["event_type"] == "confirmation.pending_denied"
         assert records[-1]["status"] == "denied"
@@ -476,7 +476,7 @@ class TestTwoPhaseCommitCycle:
         assert path.exists()
         assert fw.approve_pending("PREPCOMM") is True
         # commit phase records "approved" — file still on disk until poll consumes it.
-        assert json.loads(path.read_text())["status"] == "approved"
+        assert json.loads(path.read_text(encoding="utf-8"))["status"] == "approved"
         assert fw_module._poll_pending("PREPCOMM") == "approved"
         assert not path.exists()
 
@@ -490,7 +490,7 @@ class TestTwoPhaseCommitCycle:
         )
 
         assert fw.deny_pending("PREPABRT") is True
-        assert json.loads(path.read_text())["status"] == "denied"
+        assert json.loads(path.read_text(encoding="utf-8"))["status"] == "denied"
         assert fw_module._poll_pending("PREPABRT") == "denied"
         assert not path.exists()
 
@@ -502,7 +502,7 @@ class TestTwoPhaseCommitCycle:
             "paper-only unit test",
         )
         path = fw_module.PENDING_DIR / "TIMEDOUT.json"
-        record = json.loads(path.read_text())
+        record = json.loads(path.read_text(encoding="utf-8"))
         record["expires"] = time.time() - 1
         path.write_text(json.dumps(record))
 
@@ -541,7 +541,7 @@ class TestTwoPhaseCommitCycle:
 
     def test_approve_pending_on_expired_record_fails_closed(self):
         path = fw_module._write_pending("EXPIRED1", "trade", ActionRisk.FINANCIAL, "")
-        record = json.loads(path.read_text())
+        record = json.loads(path.read_text(encoding="utf-8"))
         record["expires"] = time.time() - 1
         path.write_text(json.dumps(record))
 
@@ -556,7 +556,7 @@ class TestPendingCleanup:
     def test_cleanup_expired_pending_removes_only_stale(self, monkeypatch):
         live = fw_module._write_pending("LIVE1234", "trade", ActionRisk.FINANCIAL, "")
         stale = fw_module._write_pending("STAL1234", "trade", ActionRisk.FINANCIAL, "")
-        record = json.loads(stale.read_text())
+        record = json.loads(stale.read_text(encoding="utf-8"))
         record["expires"] = time.time() - 100
         stale.write_text(json.dumps(record))
 
@@ -594,7 +594,7 @@ class TestEnvOverrides:
             details="live exchange order",
         )
         assert approved is True
-        records = [json.loads(line) for line in audit.read_text().splitlines()]
+        records = [json.loads(line) for line in audit.read_text(encoding="utf-8").splitlines()]
         assert records[0]["event_type"] == "confirmation.financial_auto_approved"
 
     def test_invalid_daily_limit_env_falls_back_to_default(self, monkeypatch):
@@ -650,7 +650,7 @@ class TestRequestConfirmationFlow:
             _sleep_fn=lambda _seconds: None,
         )
         assert approved is False
-        events = [json.loads(line)["event_type"] for line in audit.read_text().splitlines()]
+        events = [json.loads(line)["event_type"] for line in audit.read_text(encoding="utf-8").splitlines()]
         assert events[-1] == "confirmation.timed_out"
 
     def test_destructive_approval_enforces_post_approval_delay(self, tmp_path, monkeypatch):
@@ -691,7 +691,7 @@ class TestRequestConfirmationFlow:
             _sleep_fn=lambda _seconds: None,
         )
         assert approved is False
-        events = [json.loads(line)["event_type"] for line in audit.read_text().splitlines()]
+        events = [json.loads(line)["event_type"] for line in audit.read_text(encoding="utf-8").splitlines()]
         assert events[-1] == "confirmation.denied"
 
     def test_self_modify_auto_approves_without_confirmation(self, tmp_path):
@@ -710,7 +710,7 @@ class TestRequestConfirmationFlow:
             _sleep_fn=lambda _seconds: None,
         )
         assert approved is True
-        events = [json.loads(line)["event_type"] for line in audit.read_text().splitlines()]
+        events = [json.loads(line)["event_type"] for line in audit.read_text(encoding="utf-8").splitlines()]
         assert events == ["confirmation.auto_approved"]
 
 

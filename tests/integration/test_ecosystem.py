@@ -34,7 +34,7 @@ def _load_tho_pin() -> str:
         / "tho_admin_pin"
     )
     if path.is_file():
-        return path.read_text().strip()
+        return path.read_text(encoding="utf-8").strip()
     return ""
 
 
@@ -179,7 +179,7 @@ def main():
 
     preds_file = SAPPHIRE_DIR / "data" / "trading_predictions.jsonl"
     if preds_file.exists():
-        preds = [json.loads(l) for l in preds_file.read_text().strip().split("\n") if l.strip()]
+        preds = [json.loads(l) for l in preds_file.read_text(encoding="utf-8").strip().split("\n") if l.strip()]
         scored = [p for p in preds if p.get("correct") is not None]
         check("Predictions scored", len(scored) > 0, f"{len(scored)}/{len(preds)} scored")
     else:
@@ -196,14 +196,14 @@ def main():
     print("\n6. GitHub Integration")
     stars_file = SAPPHIRE_DIR / "data" / "starred_repos" / "starred.json"
     if stars_file.exists():
-        stars = json.loads(stars_file.read_text())
+        stars = json.loads(stars_file.read_text(encoding="utf-8"))
         check("Starred repos synced", len(stars) >= 30, f"{len(stars)} repos")
     else:
         skip("Starred repos synced", "No data file")
 
     synergy_file = SAPPHIRE_DIR / "data" / "starred_repos" / "synergies.json"
     if synergy_file.exists():
-        synergies = json.loads(synergy_file.read_text())
+        synergies = json.loads(synergy_file.read_text(encoding="utf-8"))
         check("Synergies analyzed", len(synergies) >= 10, f"{len(synergies)} synergies")
     else:
         skip("Synergies analyzed", "No data file")

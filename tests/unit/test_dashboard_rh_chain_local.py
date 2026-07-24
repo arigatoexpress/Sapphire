@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import base64
 import importlib
+import json
 import os
 import sys
 from pathlib import Path
@@ -79,7 +80,45 @@ def test_local_feed_requires_auth(client):
     assert response.status_code == 401
 
 
-def test_local_state_summary_contract(client):
+@pytest.fixture
+def seeded_rh_state(tmp_path, monkeypatch):
+    """Point the loader at a tmp state dir seeded like the local collector.
+
+    RH_CHAIN_STATE_DIR defaults to ``~/ops-state/rh-chain``, which only exists
+    on the operator Mac after the collector has run. Reading real $HOME made
+    this contract test pass there and fail in CI, on a fresh clone, and in
+    cloud containers — the endpoint correctly reports ok=False when there is no
+    state to summarize, exactly as this module's docstring promises.
+    """
+    import lib.chain.rh_chain_local as rh_local
+
+    state_dir = tmp_path / "rh-chain"
+    state_dir.mkdir()
+    (state_dir / "rh-chain-state.json").write_text(
+        json.dumps(
+            {
+                "updated": 1_780_000_000,
+                "networks": {"mainnet": {"head_block": 1234, "gas_gwei": 0.01}},
+                "ai": {"status": "idle"},
+                "feed": {"connected": True},
+            }
+        )
+    )
+    (state_dir / "memes-state.json").write_text(
+        json.dumps({"updated": 1_780_000_100, "head_block": 1240, "tokens": [], "tape": []})
+    )
+    (state_dir / "rh-feed-state.json").write_text(json.dumps({"connected": True}))
+
+    monkeypatch.setattr(rh_local, "RH_CHAIN_STATE_DIR", state_dir)
+    # The dashboard memoizes this payload; clear it so the fixture is honoured.
+    dashboard_app._cache.pop("rh_chain_local_state", None)
+    dashboard_app._cache_time.pop("rh_chain_local_state", None)
+    yield state_dir
+    dashboard_app._cache.pop("rh_chain_local_state", None)
+    dashboard_app._cache_time.pop("rh_chain_local_state", None)
+
+
+def test_local_state_summary_contract(client, seeded_rh_state):
     response = client.get("/api/chain/robinhood/local-state", headers=_auth_header())
     assert response.status_code == 200
     body = response.get_json()

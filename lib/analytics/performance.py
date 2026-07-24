@@ -44,7 +44,7 @@ def _load_trades() -> list[dict[str, Any]]:
     trades: list[dict[str, Any]] = []
 
     if PAPER_LOG.exists():
-        for line in PAPER_LOG.read_text().splitlines():
+        for line in PAPER_LOG.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if not line:
                 continue
@@ -70,7 +70,7 @@ def _load_trades() -> list[dict[str, Any]]:
     files = sorted(SIGNALS_DIR.glob("*.jsonl")) if SIGNALS_DIR.exists() else []
     for f in files:
         try:
-            content = f.read_text()
+            content = f.read_text(encoding="utf-8")
         except OSError:
             continue
         for line in content.splitlines():
@@ -345,7 +345,7 @@ def build_performance_report(
         return compute_performance()
 
     try:
-        data = json.loads(Path(path).read_text())
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as e:
         return {"error": f"backtest unreadable: {e}"}
 

@@ -78,7 +78,7 @@ def test_write_report_emits_schema_v1_json(tmp_path: Path) -> None:
     """The JSON sidecar conforms to the documented schema_version=1 envelope."""
     results = run_mutation_testing.run_targets(live=False)
     path = run_mutation_testing.write_report(results, root=tmp_path, mode="dry_run")
-    payload = json.loads(path.read_text())
+    payload = json.loads(path.read_text(encoding="utf-8"))
     assert payload["schema_version"] == 1
     assert payload["mode"] == "dry_run"
     assert "generated_at" in payload
@@ -112,7 +112,7 @@ def test_main_dry_run_prints_markdown_and_writes_report(
     # Sidecar exists and is valid JSON.
     files = list(tmp_path.glob("mutation_report_*.json"))
     assert len(files) == 1, f"expected 1 report file, got {files}"
-    json.loads(files[0].read_text())
+    json.loads(files[0].read_text(encoding="utf-8"))
 
 
 def test_main_print_only_skips_sidecar(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

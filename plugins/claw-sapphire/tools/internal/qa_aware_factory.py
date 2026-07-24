@@ -25,7 +25,7 @@ def load_qa_report() -> dict:
     """Load the QA report."""
     if not QA_REPORT_PATH.exists():
         return {"error": "No QA report found. Run QA audit first."}
-    return json.loads(QA_REPORT_PATH.read_text())
+    return json.loads(QA_REPORT_PATH.read_text(encoding="utf-8"))
 
 
 def check_priority(priority: dict) -> dict:

@@ -180,7 +180,7 @@ def score_predictions() -> dict:
     if not PREDICTIONS_PATH.exists():
         return {"scored": 0, "message": "No predictions to score"}
 
-    lines = PREDICTIONS_PATH.read_text().strip().splitlines()
+    lines = PREDICTIONS_PATH.read_text(encoding="utf-8").strip().splitlines()
     scored = 0
     correct = 0
     updated_lines = []
@@ -251,7 +251,7 @@ def get_accuracy_history() -> dict:
     if not PREDICTIONS_PATH.exists():
         return {"total": 0, "scored": 0, "correct": 0, "accuracy": 0}
 
-    lines = PREDICTIONS_PATH.read_text().strip().splitlines()
+    lines = PREDICTIONS_PATH.read_text(encoding="utf-8").strip().splitlines()
     preds = [json.loads(l) for l in lines]
     scored = [p for p in preds if p.get("correct") is not None]
     correct = sum(1 for p in scored if p["correct"])

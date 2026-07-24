@@ -142,7 +142,7 @@ def test_showcase_metrics_are_derived_from_live_repo_contracts():
     import yaml
 
     repo_root = Path(__file__).resolve().parents[2]
-    registry = yaml.safe_load((repo_root / "infra" / "tool-registry.yaml").read_text())
+    registry = yaml.safe_load((repo_root / "infra" / "tool-registry.yaml").read_text(encoding="utf-8"))
     expected_entries = len(registry.get("tools", []))
     assert metrics["Registry Entries"]["value"] == f"{expected_entries} / 0"
     assert metrics["Readiness"]["value"].endswith(" FAIL")

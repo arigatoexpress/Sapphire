@@ -58,7 +58,7 @@ def test_record_and_load(tmp_path):
         record_decision(_fake_decision())
         record_decision(_fake_decision(symbol="ETH", decision="WAIT", direction="neutral"))
 
-    lines = decisions_file.read_text().strip().splitlines()
+    lines = decisions_file.read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 2
     first = json.loads(lines[0])
     assert first["symbol"] == "BTC"

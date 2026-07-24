@@ -249,7 +249,7 @@ def pine_ci(script_path: str) -> dict:
     """Full Pine CI pipeline: analyze → set → compile → read errors."""
     from pathlib import Path
 
-    script = Path(script_path).read_text()
+    script = Path(script_path).read_text(encoding="utf-8")
 
     # Step 1: Static analysis
     analysis = pine_analyze(script)

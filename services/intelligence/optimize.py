@@ -97,7 +97,7 @@ def _load_closed_signals(days: int) -> list[dict]:
             pass
 
         try:
-            for line in f.read_text().splitlines():
+            for line in f.read_text(encoding="utf-8").splitlines():
                 line = line.strip()
                 if not line:
                     continue
@@ -205,7 +205,7 @@ def _compute_feature_importance(signals: list[dict]) -> tuple[dict, float | None
 def _load_current_weights() -> dict:
     if WEIGHTS_FILE.exists():
         try:
-            return {**DEFAULT_WEIGHTS, **json.loads(WEIGHTS_FILE.read_text())}
+            return {**DEFAULT_WEIGHTS, **json.loads(WEIGHTS_FILE.read_text(encoding="utf-8"))}
         except (OSError, json.JSONDecodeError):
             pass
     return dict(DEFAULT_WEIGHTS)

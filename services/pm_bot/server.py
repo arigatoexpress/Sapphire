@@ -72,7 +72,7 @@ def _read_first_secret_file(paths: list[Path]) -> str:
     for path in paths:
         try:
             if path.exists():
-                contents = path.read_text().strip()
+                contents = path.read_text(encoding="utf-8").strip()
                 if contents:
                     return contents
         except OSError:
@@ -84,7 +84,7 @@ def _read_first_secret_file_with_path(paths: list[Path]) -> tuple[str, Path | No
     for path in paths:
         try:
             if path.exists():
-                contents = path.read_text().strip()
+                contents = path.read_text(encoding="utf-8").strip()
                 if contents:
                     return contents, path
         except OSError:

@@ -292,7 +292,7 @@ def isolated_predictions_file(tmp_path, monkeypatch):
 def _read_records(path: Path) -> list[dict]:
     if not path.exists():
         return []
-    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
 def test_action_predict_default_off_unchanged_record(isolated_predictions_file, monkeypatch):

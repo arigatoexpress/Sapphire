@@ -211,7 +211,7 @@ async def test_get_reserves_data_recorded_fixture_decodes_20_reserves() -> None:
     """Captured 2026-04-30 from Arbitrum One mainnet."""
     if not FIXTURE.exists():
         pytest.skip(f"fixture missing: {FIXTURE}")
-    raw_hex = FIXTURE.read_text().strip()
+    raw_hex = FIXTURE.read_text(encoding="utf-8").strip()
     client = StubClient({ADDRS.ui_pool_data_provider: raw_hex})
     aave = AaveV3Arbitrum(client, ADDRS)
     reserves = await aave.get_reserves_data()
@@ -232,7 +232,7 @@ async def test_get_reserves_data_fixture_includes_paused_and_frozen() -> None:
     """rsETH is paused, WETH/EURS/MAI are frozen at the snapshot — chain-health gate signal."""
     if not FIXTURE.exists():
         pytest.skip(f"fixture missing: {FIXTURE}")
-    raw_hex = FIXTURE.read_text().strip()
+    raw_hex = FIXTURE.read_text(encoding="utf-8").strip()
     client = StubClient({ADDRS.ui_pool_data_provider: raw_hex})
     aave = AaveV3Arbitrum(client, ADDRS)
     reserves = await aave.get_reserves_data()
@@ -247,7 +247,7 @@ async def test_get_reserves_data_fixture_weth_realistic_metrics() -> None:
     """WETH on Aave V3 Arbitrum at the snapshot."""
     if not FIXTURE.exists():
         pytest.skip(f"fixture missing: {FIXTURE}")
-    raw_hex = FIXTURE.read_text().strip()
+    raw_hex = FIXTURE.read_text(encoding="utf-8").strip()
     client = StubClient({ADDRS.ui_pool_data_provider: raw_hex})
     aave = AaveV3Arbitrum(client, ADDRS)
     reserves = await aave.get_reserves_data()

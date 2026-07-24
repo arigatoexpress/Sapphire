@@ -68,7 +68,7 @@ def _load_ledger() -> dict[str, dict[str, Any]]:
     if not LEDGER_PATH.exists():
         return {}
     try:
-        return json.loads(LEDGER_PATH.read_text())
+        return json.loads(LEDGER_PATH.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         # corrupt ledger — start fresh rather than block publishing
         logger.warning("ledger corrupt, resetting: %s", LEDGER_PATH)
@@ -142,7 +142,7 @@ def discover(
 
 def _load_content(item: DispatchItem) -> dict[str, Any]:
     """Turn a file on disk into the kwargs each client expects."""
-    text = item.path.read_text()
+    text = item.path.read_text(encoding="utf-8")
     if item.platform == "linkedin":
         return {"text": text}
     if item.platform == "substack":

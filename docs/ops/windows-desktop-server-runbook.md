@@ -89,6 +89,56 @@ matching comparator, rollback note, and runbook update. The Mac
 `com.sapphire.backtest-weekly` LaunchAgent remains the canonical weekly routine
 until remote shadow evidence proves parity.
 
+## Driving the Windows agent stack from the Mac
+
+`scripts/ops/agent` is a thin Mac-side CLI over the tailnet. It exists so the
+GPU box can be developed "from the inside out" without opening a GUI session on
+it.
+
+```bash
+agent ask "why is the funding skew inverted on SOL?"   # via the Mac proxy
+agent ask --direct "summarise this" < diff.txt         # straight to the GPU
+agent --model qwen3:14b ask "..."                      # pin a model
+agent models                                           # what's loaded on the box
+agent status                                           # tier health + failover
+agent dispatch "fix the import error in main.py"       # policy-routed task
+agent shell "nvidia-smi"                               # command over Tailscale SSH
+agent repl                                             # interactive loop
+```
+
+Prompts come from trailing arguments, or stdin when none are given — so
+`agent ask "x"`, `echo x | agent ask`, and `agent ask < file` all work. Stdin is
+only read when there are no argument prompts, so an interactive terminal never
+hangs waiting on it.
+
+**Routing.** Default goes to the Mac inference proxy on `:11435`, which gives
+4-tier failover, prompt cache, quota accounting and the outbound sensitivity
+gate. `--direct` bypasses it to Windows Ollama on `:11434` — useful when the
+proxy is down, at the cost of failover.
+
+The two endpoints do **not** speak the same protocol. The proxy is
+OpenAI-compatible (`/v1/chat/completions`); Windows Ollama's `/v1/` surface
+returns empty and must be driven through the native `/api/chat`. The CLI handles
+both response shapes; keep that asymmetry in mind if you script around it.
+
+**Overrides** (all optional):
+
+| Variable | Default |
+|---|---|
+| `SAPPHIRE_PROXY_URL` | `http://127.0.0.1:11435` |
+| `SAPPHIRE_WINDOWS_GPU_URL` | `http://100.x.x.z:11434` |
+| `SAPPHIRE_WINDOWS_SSH` | `aribs@desktop-hfck6u9` |
+| `SAPPHIRE_WINDOWS_REPO` | `E:\Sapphire\Code\Sapphire` |
+| `SAPPHIRE_AGENT_MODEL` | `auto` |
+| `SAPPHIRE_AGENT_TIMEOUT` | `120` |
+
+`agent shell` tries a POSIX shell first and falls back to
+`powershell -NoProfile -Command`, so it works both before and after setting
+OpenSSH's `DefaultShell` to Git Bash on that host.
+
+If `agent status` reports the GPU unreachable after a Windows reboot, the usual
+cause is `OLLAMA_HOST=0.0.0.0` not surviving — see the Gotchas in CLAUDE.md.
+
 ## Research Worker
 
 Repo-owned scripts are staged for a paper-only Windows Research Worker:

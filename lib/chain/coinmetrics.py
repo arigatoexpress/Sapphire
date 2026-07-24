@@ -97,7 +97,7 @@ def get_snapshot(asset: str) -> CoinMetricsSnapshot:
     cache = _cache_path(asset)
     if _cache_fresh(cache):
         try:
-            data = json.loads(cache.read_text())
+            data = json.loads(cache.read_text(encoding="utf-8"))
             return CoinMetricsSnapshot(**data)
         except Exception:
             pass

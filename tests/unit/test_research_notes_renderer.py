@@ -51,5 +51,5 @@ def test_render_note_writes_pdf_and_verifiable_envelope(tmp_path: Path):
     assert pdf.exists()
     assert pdf.read_bytes().startswith(b"%PDF")
     assert envelope.exists()
-    assert verify(json.loads(envelope.read_text()))
-    assert "sapphire-composite" in envelope.read_text()
+    assert verify(json.loads(envelope.read_text(encoding="utf-8")))
+    assert "sapphire-composite" in envelope.read_text(encoding="utf-8")

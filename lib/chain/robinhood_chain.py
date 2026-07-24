@@ -216,7 +216,7 @@ class RobinhoodChainClient:
         if not self._deployments_file.exists():
             return
         try:
-            data = json.loads(self._deployments_file.read_text())
+            data = json.loads(self._deployments_file.read_text(encoding="utf-8"))
             net = data.get("robinhood_testnet", {})
             contracts = net.get("contracts", {})
             self._addresses = {name: info["address"] for name, info in contracts.items()}

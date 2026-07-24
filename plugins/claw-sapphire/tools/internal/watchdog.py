@@ -54,7 +54,7 @@ def _load_previous_state() -> dict:
     """Load previous watchdog state to avoid duplicate alerts."""
     if STATE_FILE.exists():
         try:
-            return json.loads(STATE_FILE.read_text())
+            return json.loads(STATE_FILE.read_text(encoding="utf-8"))
         except Exception:
             pass
     return {}

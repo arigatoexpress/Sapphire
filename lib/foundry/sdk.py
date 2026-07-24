@@ -261,7 +261,7 @@ class IdempotencyLedger:
         self._entries: dict[str, dict[str, Any]] = {}
         if self.path and self.path.is_file():
             try:
-                loaded = json.loads(self.path.read_text())
+                loaded = json.loads(self.path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
                 loaded = {}
             if isinstance(loaded, dict):

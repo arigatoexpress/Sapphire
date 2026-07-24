@@ -1,0 +1,195 @@
+#!/usr/bin/env bash
+# agent — prompt the Sapphire agent stack on the Windows workhorse from the Mac.
+#
+# Everything here rides the tailnet. Nothing leaves it unless you explicitly ask
+# for a cloud tier, and the inference proxy's sensitivity gate still applies when
+# it does.
+#
+#   agent ask "why is the funding skew inverted on SOL?"     # via proxy (failover)
+#   agent ask --direct "summarise this diff" < diff.txt      # straight to the GPU
+#   agent models                                             # what's loaded on the box
+#   agent status                                             # tier health + failover
+#   agent dispatch "fix the import error in main.py"         # policy-routed task
+#   agent shell "nvidia-smi"                                 # command on Windows
+#   agent repl                                               # interactive loop
+#
+# Prompt sources, in order: trailing args, else stdin. So all of these work:
+#   agent ask "one shot"
+#   echo "from a pipe" | agent ask
+#   agent ask < prompt.txt
+#
+# Routing:
+#   default  -> Mac inference proxy :11435  (4-tier failover, cache, quota, gate)
+#   --direct -> Windows Ollama :11434       (no failover; use when the proxy is down)
+#
+# The proxy speaks OpenAI (/v1/chat/completions). Windows Ollama does NOT —
+# its /v1/ surface returns empty, so --direct uses the native /api/chat.
+# That asymmetry is a known gotcha, not a bug here.
+
+set -euo pipefail
+
+PROXY_URL="${SAPPHIRE_PROXY_URL:-http://127.0.0.1:11435}"
+GPU_URL="${SAPPHIRE_WINDOWS_GPU_URL:-${WINDOWS_GPU_URL:-http://100.x.x.z:11434}}"
+WIN_SSH="${SAPPHIRE_WINDOWS_SSH:-aribs@desktop-hfck6u9}"
+WIN_REPO="${SAPPHIRE_WINDOWS_REPO:-E:\\Sapphire\\Code\\Sapphire}"
+MODEL="${SAPPHIRE_AGENT_MODEL:-auto}"
+TIMEOUT="${SAPPHIRE_AGENT_TIMEOUT:-120}"
+DIRECT=0
+RAW=0
+
+die() { printf 'agent: %s\n' "$*" >&2; exit 1; }
+need() { command -v "$1" >/dev/null 2>&1 || die "missing required tool: $1"; }
+need curl
+need python3
+
+usage() { sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
+
+# Collect the prompt from args or stdin. Reading stdin only when no args are
+# given keeps `agent ask "x"` from hanging on an idle terminal.
+read_prompt() {
+  if [ "$#" -gt 0 ]; then
+    printf '%s' "$*"
+  elif [ ! -t 0 ]; then
+    cat
+  else
+    die "no prompt given (pass it as an argument or pipe it on stdin)"
+  fi
+}
+
+# JSON-encode via python3 so quotes, newlines and unicode in prompts survive.
+json_payload() {
+  python3 -c '
+import json, sys
+prompt, model, direct = sys.argv[1], sys.argv[2], sys.argv[3] == "1"
+msgs = [{"role": "user", "content": prompt}]
+print(json.dumps({"model": model, "messages": msgs, "stream": False}
+                 if direct else
+                 {"model": model, "messages": msgs}))
+' "$1" "$2" "$3"
+}
+
+extract_reply() {
+  python3 -c '
+import json, sys
+raw = sys.stdin.read().strip()
+if not raw:
+    sys.exit("agent: empty response — is the endpoint up? try `agent status`")
+try:
+    d = json.loads(raw)
+except json.JSONDecodeError:
+    sys.exit(f"agent: non-JSON response:\n{raw[:400]}")
+# OpenAI shape (proxy) or Ollama native shape (--direct)
+msg = ""
+if isinstance(d.get("choices"), list) and d["choices"]:
+    msg = (d["choices"][0].get("message") or {}).get("content", "")
+elif isinstance(d.get("message"), dict):
+    msg = d["message"].get("content", "")
+if not msg:
+    sys.exit(f"agent: no content in response:\n{json.dumps(d)[:400]}")
+print(msg)
+'
+}
+
+cmd_ask() {
+  local prompt payload url
+  prompt="$(read_prompt "$@")"
+  [ -n "$prompt" ] || die "empty prompt"
+  payload="$(json_payload "$prompt" "$MODEL" "$DIRECT")"
+  if [ "$DIRECT" = 1 ]; then
+    url="$GPU_URL/api/chat"
+  else
+    url="$PROXY_URL/v1/chat/completions"
+  fi
+  local out
+  if ! out=$(curl -sS --max-time "$TIMEOUT" -H 'Content-Type: application/json' \
+                  -d "$payload" "$url" 2>&1); then
+    die "request to $url failed: $out"
+  fi
+  if [ "$RAW" = 1 ]; then printf '%s\n' "$out"; else printf '%s' "$out" | extract_reply; fi
+}
+
+cmd_models() {
+  curl -sS --max-time 15 "$GPU_URL/api/tags" \
+    | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+rows = sorted(d.get("models", []), key=lambda m: -m.get("size", 0))
+if not rows:
+    sys.exit("no models reported")
+print(f"{len(rows)} models on the Windows GPU\n")
+for m in rows:
+    print(f"  {m.get('"'"'size'"'"',0)/1e9:6.1f} GB  {m.get('"'"'name'"'"','"'"'?'"'"')}")
+'
+}
+
+cmd_status() {
+  echo "── proxy ($PROXY_URL) ──"
+  curl -sS --max-time 10 "$PROXY_URL/health" | python3 -m json.tool 2>/dev/null \
+    || echo "  unreachable — is the Mac proxy running?"
+  echo
+  echo "── failover ──"
+  curl -sS --max-time 10 "$PROXY_URL/failover/status" | python3 -m json.tool 2>/dev/null \
+    || echo "  unavailable"
+  echo
+  echo "── windows gpu ($GPU_URL) ──"
+  if curl -sS --max-time 8 "$GPU_URL/api/tags" >/dev/null 2>&1; then
+    echo "  reachable"
+  else
+    echo "  UNREACHABLE — check tailscale, or that OLLAMA_HOST=0.0.0.0 survived a reboot"
+  fi
+}
+
+# Routes through the plugin's policy layer (tier classification, repo allowlist,
+# token budget) instead of hitting a model directly.
+cmd_dispatch() {
+  local task
+  task="$(read_prompt "$@")"
+  python3 -c '
+import json, sys
+print(json.dumps({"task": sys.argv[1], "repo": "Sapphire"}))
+' "$task" | python3 "$(dirname "$0")/../../plugins/claw-sapphire/tools/dispatch.py"
+}
+
+cmd_shell() {
+  [ "$#" -gt 0 ] || die "usage: agent shell \"<command>\""
+  # Git Bash if it's the SSH default shell, PowerShell otherwise. Try bash first
+  # and fall back, so this works before and after the DefaultShell change.
+  ssh -o BatchMode=yes -o ConnectTimeout=8 "$WIN_SSH" \
+    "cd '$WIN_REPO' 2>/dev/null || cd \"$WIN_REPO\"; $*" 2>/dev/null \
+  || ssh -o BatchMode=yes -o ConnectTimeout=8 "$WIN_SSH" \
+    "powershell -NoProfile -Command \"cd $WIN_REPO; $*\""
+}
+
+cmd_repl() {
+  echo "sapphire agent — model=$MODEL route=$([ "$DIRECT" = 1 ] && echo direct-gpu || echo proxy)"
+  echo "ctrl-d to exit"
+  while IFS= read -r -p '> ' line; do
+    [ -n "$line" ] || continue
+    cmd_ask "$line" || true
+    echo
+  done
+}
+
+sub=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -h|--help) usage 0 ;;
+    --direct) DIRECT=1; shift ;;
+    --json|--raw) RAW=1; shift ;;
+    --model) MODEL="${2:?--model needs a value}"; shift 2 ;;
+    --timeout) TIMEOUT="${2:?--timeout needs a value}"; shift 2 ;;
+    ask|models|status|dispatch|shell|repl) sub="$1"; shift; break ;;
+    *) die "unknown option or subcommand: $1 (try --help)" ;;
+  esac
+done
+
+case "$sub" in
+  ask)      cmd_ask "$@" ;;
+  models)   cmd_models ;;
+  status)   cmd_status ;;
+  dispatch) cmd_dispatch "$@" ;;
+  shell)    cmd_shell "$@" ;;
+  repl)     cmd_repl ;;
+  "")       usage 1 ;;
+  *)        die "unknown subcommand: $sub" ;;
+esac

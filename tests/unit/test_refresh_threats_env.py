@@ -40,12 +40,12 @@ print(json.dumps([{
 
     artifacts = [path for path in data_dir.glob("*/threats.json") if "latest" not in path.parts]
     assert len(artifacts) == 1
-    payload = json.loads(artifacts[0].read_text())
+    payload = json.loads(artifacts[0].read_text(encoding="utf-8"))
     assert payload["source_count"] == 1
     assert payload["threats"][0]["canonical_id"] == "CVE-2026-0001"
     snapshots = list(data_dir.glob("runs/*/threats.json"))
     assert len(snapshots) == 1
-    assert json.loads(snapshots[0].read_text()) == payload
+    assert json.loads(snapshots[0].read_text(encoding="utf-8")) == payload
     latest = data_dir / "latest"
     assert latest.is_symlink()
 
@@ -73,10 +73,10 @@ def test_refresh_threats_native_mode_writes_artifact(tmp_path, monkeypatch):
 
     assert refresh_threats.main() == 0
     artifact = next(path for path in data_dir.glob("*/threats.json") if "latest" not in path.parts)
-    payload = json.loads(artifact.read_text())
+    payload = json.loads(artifact.read_text(encoding="utf-8"))
     assert payload["threats"] == [{"canonical_id": "CVE-2026-0002"}]
     snapshot = next(data_dir.glob("runs/*/threats.json"))
-    assert json.loads(snapshot.read_text()) == payload
+    assert json.loads(snapshot.read_text(encoding="utf-8")) == payload
 
 
 def test_refresh_threats_reports_missing_bot(tmp_path, monkeypatch, capsys):

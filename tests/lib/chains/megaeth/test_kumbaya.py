@@ -163,7 +163,7 @@ def test_tick_to_price_negative_tick() -> None:
 
 @pytest.mark.asyncio
 async def test_get_pool_returns_address_from_factory() -> None:
-    raw_hex = (FIXT_DIR / "getpool_weth_usdm_3000.hex").read_text().strip()
+    raw_hex = (FIXT_DIR / "getpool_weth_usdm_3000.hex").read_text(encoding="utf-8").strip()
     client = StubClient({ADDRS.factory: raw_hex})
     kb = Kumbaya(client, ADDRS)
     pool = await kb.get_pool(WETH, USDM, 3000)
@@ -200,7 +200,7 @@ async def test_get_pool_invalid_fee_raises() -> None:
 
 @pytest.mark.asyncio
 async def test_quote_exact_input_single_decodes_recorded_fixture() -> None:
-    raw_hex = (FIXT_DIR / "quote_1weth_usdm_3000.hex").read_text().strip()
+    raw_hex = (FIXT_DIR / "quote_1weth_usdm_3000.hex").read_text(encoding="utf-8").strip()
     client = StubClient({ADDRS.quoter_v2: raw_hex})
     kb = Kumbaya(client, ADDRS)
     q = await kb.quote_exact_input_single(WETH, USDM, fee=3000, amount_in=10**18)
@@ -311,9 +311,9 @@ async def test_quote_exact_input_rejects_unknown_path_type() -> None:
 
 @pytest.mark.asyncio
 async def test_pool_state_decodes_recorded_fixture() -> None:
-    slot0_hex = (FIXT_DIR / "pool_weth_usdm_3000_slot0.hex").read_text().strip()
-    liq_hex = (FIXT_DIR / "pool_weth_usdm_3000_liquidity.hex").read_text().strip()
-    fee_hex = (FIXT_DIR / "pool_weth_usdm_3000_fee.hex").read_text().strip()
+    slot0_hex = (FIXT_DIR / "pool_weth_usdm_3000_slot0.hex").read_text(encoding="utf-8").strip()
+    liq_hex = (FIXT_DIR / "pool_weth_usdm_3000_liquidity.hex").read_text(encoding="utf-8").strip()
+    fee_hex = (FIXT_DIR / "pool_weth_usdm_3000_fee.hex").read_text(encoding="utf-8").strip()
     client = StubClient({POOL_WETH_USDM_3000: [slot0_hex, liq_hex, fee_hex]})
     kb = Kumbaya(client, ADDRS)
     state = await kb.pool_state(POOL_WETH_USDM_3000)

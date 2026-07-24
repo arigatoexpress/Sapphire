@@ -124,7 +124,7 @@ class TestHandleCallback:
         assert len(ready_files) == 1
         # Approval record written
         assert tmp_content["approvals"].exists()
-        record = json.loads(tmp_content["approvals"].read_text().strip())
+        record = json.loads(tmp_content["approvals"].read_text(encoding="utf-8").strip())
         assert record["status"] == "approved"
         assert record["approved_by"] == "ari"
         assert record["slug"] == "weekly-crypto-brief"
@@ -139,7 +139,7 @@ class TestHandleCallback:
         assert not pending.exists()
         rejected_files = list(tmp_content["rejected"].iterdir())
         assert len(rejected_files) == 1
-        record = json.loads(tmp_content["approvals"].read_text().strip())
+        record = json.loads(tmp_content["approvals"].read_text(encoding="utf-8").strip())
         assert record["status"] == "rejected"
 
     def test_view_sends_preview_does_not_move(self, tmp_content, monkeypatch):

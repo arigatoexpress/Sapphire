@@ -78,7 +78,7 @@ def test_write_heartbeat_persists_expected_fields(tmp_path: Path):
     )
     r._write_heartbeat(a)
     path = tmp_path / "data" / "agents" / "alpha.heartbeat"
-    payload = json.loads(path.read_text())
+    payload = json.loads(path.read_text(encoding="utf-8"))
     assert payload["agent"] == "alpha"
     assert payload["cycle_count"] == 7
     assert payload["interval_sec"] == 300
@@ -91,7 +91,7 @@ def test_write_heartbeat_handles_no_last_completed(tmp_path: Path):
     r = AgentRunner(repo_root=tmp_path)
     a = _StubAgent(name="cold")
     r._write_heartbeat(a)
-    payload = json.loads((tmp_path / "data" / "agents" / "cold.heartbeat").read_text())
+    payload = json.loads((tmp_path / "data" / "agents" / "cold.heartbeat").read_text(encoding="utf-8"))
     assert payload["last_cycle_completed_at"] is None
 
 

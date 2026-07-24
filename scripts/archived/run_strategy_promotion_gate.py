@@ -263,7 +263,7 @@ def _load_backtest_metrics(path: str | None) -> dict[str, Any]:
     p = Path(path).expanduser().resolve()
     if not p.exists():
         raise FileNotFoundError(f"backtest metrics file not found: {p}")
-    payload = json.loads(p.read_text())
+    payload = json.loads(p.read_text(encoding="utf-8"))
     metrics = payload.get("metrics", payload) if isinstance(payload, dict) else {}
     return metrics if isinstance(metrics, dict) else {}
 

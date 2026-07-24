@@ -523,7 +523,7 @@ def test_capture_sweep_populates_score_per_symbol(tmp_artifact_root: Path):
         assert score["score"] > 0.0  # +5% is bullish
 
     # Persisted manifest must include the score field too.
-    persisted = json.loads((tmp_artifact_root / "score-sweep" / "manifest.json").read_text())
+    persisted = json.loads((tmp_artifact_root / "score-sweep" / "manifest.json").read_text(encoding="utf-8"))
     assert all("score" in s for s in persisted["symbols"])
 
 

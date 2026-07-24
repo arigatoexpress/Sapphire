@@ -146,8 +146,8 @@ def test_run_strategies_days_7_still_writes_artifact(tmp_path, monkeypatch):
     assert best
     sweep_path = next(out_dir.glob("strategy_sweep_*.json"))
     best_path = next(out_dir.glob("best_per_symbol_*.json"))
-    sweep = json.loads(sweep_path.read_text())
-    best_payload = json.loads(best_path.read_text())
+    sweep = json.loads(sweep_path.read_text(encoding="utf-8"))
+    best_payload = json.loads(best_path.read_text(encoding="utf-8"))
 
     for payload in (sweep, best_payload):
         metadata = payload["metadata"]

@@ -6,8 +6,12 @@ Autonomous trading + intelligence + content ops. Telegram-first, agent-driven, e
 
 ```bash
 # Test
-pytest tests/unit/ --tb=short -q           # 6,580 collected by test_inventory.py
-pytest plugins/claw-sapphire/tests/ -q     # 604 collected by test_inventory.py
+pytest tests/unit/ --tb=short -q           # 6,701 pass, 0 fail, 10 xfail (2026-07-24)
+pytest plugins/claw-sapphire/tests/ -q     # 633 pass
+
+# Cloud / fresh container: install deps FIRST or you get ~42 phantom collection
+# errors that look like a broken repo. Runs automatically via the SessionStart hook.
+bash scripts/ops/bootstrap_cloud_session.sh
 
 # Lint
 ruff check .                          # pyproject.toml rules (E501 ignored)
@@ -32,6 +36,11 @@ python3 scripts/ops/tradingview_ta_capture.py pine-generate-screener            
 python3 scripts/ops/tradingview_ta_capture.py pine-promote pine/generated/<file>.pine --mutate  # promote validated → standalone (mutation-gated)
 SAPPHIRE_TV_MUTATION_ENABLED=1 python3 scripts/ops/tradingview_ta_capture.py --mutate sweep  # mutation-enabled
 # Scheduled: com.sapphire.tradingview-ta-capture (every 4h, read-only sweep) + com.sapphire.tradingview-pine-batch (daily 13:00 UTC, read-only Pine batch)
+
+# Prompt the Windows agent stack from the Mac terminal (over Tailscale)
+scripts/ops/agent ask "..."          # via Mac proxy :11435 (failover + sensitivity gate)
+scripts/ops/agent ask --direct "..." # straight to Windows Ollama :11434 (native /api/chat)
+scripts/ops/agent models|status|dispatch|shell|repl
 
 # Production readiness sweep
 python3 scripts/ops/production_readiness_sweep.py --json   # machine-readable PASS/WARN/FAIL rows
@@ -63,6 +72,7 @@ make ci            # mirror GitHub Actions CI locally
 - **Lint + format:** `ruff` only (see `[tool.ruff]` in `pyproject.toml`). Black/isort/flake8 were retired 2026-04-19. Pre-existing stylistic rules (E701, E722, E741, SIM102/105, B007, F811) are *track-only ignores* — new code is kept clean by the PostToolUse hook in `.claude/settings.json`.
 - **Pre-commit:** `ruff + ruff-format + gitleaks + bandit + stdlib hooks`. Install with `make install-hooks`.
 - **CI:** `.github/workflows/ci.yml` runs ruff + pytest (core + plugin) + `validate_tool_registry.py` + gitleaks on every push and PR. `security.yml` runs osv-scanner, trivy-fs, and bandit daily.
+- **CI runners (changed 2026-07-24):** 7 portable jobs run on the **Windows** box (`win-sapphire`) via the repo variable `SAPPHIRE_RUNNER_TESTS = ["self-hosted","Windows","X64","sapphire-win"]`. 3 host-bound jobs stay on the Mac (`ari-macbook-sapphire`): container smoke test (Docker Desktop), deploy (GCP), gitleaks (`brew install`). `runs-on` is `fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER)` — unsetting the variable silently sends everything back to the Mac. Full topology + the migration's failure modes: `docs/ops/ci-runner-topology.md`.
 - **Dependabot:** pip + github-actions weekly (`.github/dependabot.yml`). Ruff and pytest grouped.
 - **CODEOWNERS:** review-gated paths: `.github/`, `lib/security/`, `lib/core/kill_switch.py`, `contracts/`, `services/webhook/`, trading critical path.
 - **PR/issue templates:** `.github/pull_request_template.md`, `.github/ISSUE_TEMPLATE/{bug,feature}.md`.
@@ -88,17 +98,19 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 
 ## Module Map
 
-**Key counts (verified 2026-07-03 via `scripts/ops/test_inventory.py --check-readme`):** 7,245 collected tests (6,617 core + 628 plugin) across 439 files · 52 dashboard pages · 7 quant strategies · 29 LaunchAgent plists in `infra/launchagents/` (TV pair added in PRs #505/#506; `continuous-intelligence-daily` + `mac-to-windows-tunnel` added 2026-05-03–12; tracked definitions remain operator-controlled; see `docs/archive/2026/audits/launchagents-audit-2026-04-21.md`) plus 1 disabled template. Note: `com.sapphire.analytics-dashboard`, `com.sapphire.kronos-daily`, `com.sapphire.outcome-resolver`, and `com.sapphire.vpin-materializer` were archived on the Mac side as of 2026-05-12 — these four were installed-only LaunchAgents (no source plist was ever committed to `infra/launchagents/`) · 22 scheduled tasks · 3 smart contracts.
+**Key counts (verified 2026-07-24 by direct count; regenerate with `scripts/ops/test_inventory.py --check-readme`).** These drift every few weeks — if a number here disagrees with the tree, trust the tree and fix this line. The 2026-07-03 figures were wrong on six of eight counts.
+
+7,351 collected tests (6,714 unit + 637 plugin) across 444 files in the two CI-tracked suites — the figure `scripts/ops/test_inventory.py` enforces against README. Of the unit suite: 6,701 pass, 0 fail, 4 skip, 10 xfail. (`find tests -name 'test_*.py'` returns 459 because it also counts `tests/integration`, `tests/property` and `tests/legacy`, which no CI job runs — do not mix the two denominators.) · 46 dashboard pages (`services/dashboard/templates/pages/`) · 5 concrete quant strategies (the old "7" counted the `Strategy` ABC and the `StrategyParams` dataclass as strategies) · 33 LaunchAgent plists in `infra/launchagents/` (TV pair added in PRs #505/#506; `continuous-intelligence-daily` + `mac-to-windows-tunnel` added 2026-05-03–12; tracked definitions remain operator-controlled; see `docs/archive/2026/audits/launchagents-audit-2026-04-21.md`) plus 1 disabled template. Note: `com.sapphire.analytics-dashboard`, `com.sapphire.kronos-daily`, `com.sapphire.outcome-resolver`, and `com.sapphire.vpin-materializer` were archived on the Mac side as of 2026-05-12 — these four were installed-only LaunchAgents (no source plist was ever committed to `infra/launchagents/`) · 22 scheduled tasks · 3 smart contracts.
 
 | Path | Type | Description |
 |------|------|-------------|
 | `lib/core/` | library | Risk kernel, position sizing, **event_bus**, **heartbeat** (60s state machine), **kill_switch** (global + security), **confirmation_firewall** (2-phase commit), **decision_engine** (explainable autonomous ranking), **security_monitor**. Also `src/sapphire_core/` package (cognitive agent, executor, gateway, memory, telegram_bot). |
-| `lib/analytics/` | library | 24 modules — strategies (7: RegimeAwareRSI, FundingRateContrarian, CorrelationBreakout, MultiTFMomentum, SapphireComposite + base + params), CPCV, regime GMM, VPIN, backtest_engine, risk_engine, deflated_sharpe, liquidation, correlation, factors, forecast (Kronos+TA consensus), performance, performance_tracker, prediction_accuracy, brain_accuracy, strategy_performance, backtest_results, signal_enhancer, self_optimizer, run_strategies, sentiment, indicators. |
+| `lib/analytics/` | library | 25 modules — strategies (5 concrete: RegimeAwareRSI, FundingRateContrarian, CorrelationBreakout, MultiTFMomentum, SapphireComposite; plus the `Strategy` ABC and `StrategyParams`, which are scaffolding, not strategies), CPCV, regime GMM, VPIN, backtest_engine, risk_engine, deflated_sharpe, liquidation, correlation, factors, forecast (Kronos+TA consensus), performance, performance_tracker, prediction_accuracy, brain_accuracy, strategy_performance, backtest_results, signal_enhancer, self_optimizer, run_strategies, sentiment, indicators. |
 | `lib/chain/` | library | On-chain intelligence: regime, funding, OI, TVL, stablecoin supply, whale flow. **`coinmetrics.py`** (on-chain fundamentals), **`robinhood_chain.py`** (Arbitrum Orbit chain ID 46630 web3 client), `intelligence.py`, `sources.py`, `providers/` (CoinGlass, Dune, Whale Alert, Santiment, CoinAPI, BGGeometrics). |
-| `lib/content/` | library | 14-module research-to-publish pipeline: `data_collector` → `thesis_engine` → `draft_generator` → `report_generator` → `visualizations` → `quality` (7-check rubric) → `performance_policy` (blocks premature accuracy claims) → `qa_pipeline` → `formatters` → `approval` (Telegram sign-off) → `publisher`/`auto_publish` → `scheduler` (Mon brief / Wed AI intel / Fri security / daily pulse). Publishers: `substack`, `x`, `linkedin`, `typefully`. Also `outreach.py` (lead-engine integration). |
+| `lib/content/` | library | 14-module research-to-publish pipeline. **The arrow diagram below is the intended design, not the wiring.** Verified 2026-07-24: `data_collector` has *zero* references anywhere in the repo (not even a test); `thesis_engine` and `draft_generator` are imported only by `tests/unit/test_content_thesis_drafts.py`. The first three stages have no production caller — treat them as a prototype until wired or deleted. Design: `data_collector` → `thesis_engine` → `draft_generator` → `report_generator` → `visualizations` → `quality` (7-check rubric) → `performance_policy` (blocks premature accuracy claims) → `qa_pipeline` → `formatters` → `approval` (Telegram sign-off) → `publisher`/`auto_publish` → `scheduler` (Mon brief / Wed AI intel / Fri security / daily pulse). Publishers: `substack`, `x`, `linkedin`, `typefully`. Also `outreach.py` (lead-engine integration). |
 | `lib/foundry/` | library | **Palantir Foundry integration**: `client` (bearer + OAuth), `ingestion` (local → ontology objects), `readiness` (repo-grounded audit), `sync` (15-min delta-aware + Telegram alerts). |
 | `lib/portfolio/` | library | **`robinhood.py`** — Robinhood Crypto API client (Ed25519-signed REST, accounts, holdings, best_bid_ask, order history, reconstructed cost basis). Credentials in `~/.config/sapphire-secrets/`. |
-| `lib/security/` | library | **Security platform**: `dependency_scanner` (OSV.dev CVE lookup + CycloneDX 1.5 SBOM), `model_monitor` (Ollama blob SHA-256 + Jinja2 backdoor detection), `network_mapper` (Tailscale topology + trust-zone scoring + attack-surface). |
+| `lib/security/` | library | **Security platform**: **`secret_patterns`** (canonical outbound-egress rule set — ~25 provider key shapes + homoglyph/zero-width/percent/leetspeak/base64 normalization; consumed by BOTH the plugin classifier and the inference-proxy T4 gate so they cannot diverge — fix a pattern here, every gate improves), `pii_redactor` (dashboard output), `dependency_scanner` (OSV.dev CVE lookup + CycloneDX 1.5 SBOM), `model_monitor` (Ollama blob SHA-256 + Jinja2 backdoor detection), `network_mapper` (Tailscale topology + trust-zone scoring + attack-surface). |
 | `lib/intel/` | library | `market_intelligence.py`, `lead_enricher.py`. |
 | `lib/payments/` | library | `x402_middleware.py` — HTTP 402 micropayment gate (Flask + raw-socket), EVM signature verification. |
 | `lib/agents/` | library | Paper-only autonomous harness (`base.py`, `alpha_agent.py`, `runner.py`) plus the broader OpenClaw/NemoClaw dispatch stack under `src/sapphire_agents/`. |
@@ -120,9 +132,9 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `services/security_pipeline/` | service | Scheduled full-system security scan → SOC page. |
 | `services/pm_bot/` | service | PM bot webhook and reviewed Telegram draft queue [Mac:18082]. |
 | `services/webhook/` | service | TradingView webhook receiver [Windows:9090]. |
-| `plugins/claw-sapphire/` | plugin | 118 tool scripts on disk (64 at top level + 52 in `internal/` + 2 in `_deprecated/`), 10 libs, 604 collected tests. |
+| `plugins/claw-sapphire/` | plugin | 117 tool scripts on disk (64 top level + 52 `internal/` + 1 `_deprecated/`), 10 libs, 633 collected tests. |
 | `contracts/` | solidity | **`SapphireSignalVerifier.sol`** (on-chain signal registry with ZK proof hash field), **`SapphirePaymentGate.sol`** (micropayment gate), **`SapphireSentinelRegistry.sol`** (non-custodial agent mandate/payment receipt anchor). Deployed on Robinhood Chain testnet via `scripts/deploy_robinhood_chain.py`. |
-| `pine/` | pine | 5 TradingView strategies (standalone/: v1, v2, v3 Ultra, MultiSymbol Screener, Mac variant). |
+| `pine/` | pine | 25 `.pine` files — 5 curated standalone strategies (v1, v2, v3 Ultra, MultiSymbol Screener, Mac variant) plus generated output under `pine/generated/`. |
 | `skills/` | skills | Agent-executable capabilities. |
 | `data/content/` | data | Content engine drafts + ready/ queue. |
 | `data/chain/` | data | Deployed contract addresses (`deployments.json`), chain snapshots. |
@@ -157,7 +169,11 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 - TypeScript: strict mode, no `any`
 - Every module has a SKILL.md — read before working on that module
 - Services never import from other services — only from `lib/`
-- PnL is king. Sortino/Calmar over Sharpe. 80%+ win rate target.
+- PnL is king. Sortino/Calmar over Sharpe.
+- "80%+ win rate" is an **aspiration, not a measurement.** Nothing in this repo
+  has demonstrated it; the measured sample is n=36 with a CI spanning 50%
+  (see Trading Pipeline). Win rate alone is also the wrong target — it is
+  trivially gamed by tight take-profits and wide stops. Judge on expectancy.
 
 ## Satellite Repos (orchestrated, not absorbed)
 
@@ -257,7 +273,27 @@ Manage at https://claude.ai/code/routines.
 TradingView → webhook (Win :9090) → signal logger (Mac :18081) → Telegram
 Autonomous signal generator scans RSI/MACD/BB/MA → generates signals → paper trades
 Paper portfolio: $100K, ATR-based SL/TP (1.67:1 R:R), 10% position sizing
-Prediction accuracy: 61.1% overall, BTC 83.3% (n=36 scored of 42)
+
+**Prediction accuracy — no demonstrated edge yet (n=36).** Treat the headline
+numbers as a sample too small to act on, not as validation:
+
+| Slice | Hits | Rate | 95% CI (Wilson) | p vs coin flip |
+|---|---|---|---|---|
+| Overall | 22/36 | 61.1% | **[44.9%, 75.2%]** | 0.243 |
+| BTC | 10/12 | 83.3% | [55.2%, 95.3%] | 0.039 |
+| ETH | 6/12 | 50.0% | [25.4%, 74.6%] | 1.000 |
+| SOL | 6/12 | 50.0% | [25.4%, 74.6%] | 1.000 |
+
+The overall CI **includes 50%** — the result is not distinguishable from chance.
+BTC's p=0.039 is the best of three symbols tested; at three comparisons the
+Bonferroni threshold is 0.0167, so it does not survive correction either. ETH
+and SOL are exactly chance. Reaching ±5% precision at this hit rate needs
+roughly n≈370, i.e. ~10x more scored predictions.
+
+Do not quote "verified 61.1% / BTC 83.3%" as evidence of edge in grant
+applications, pitches, or the dashboard — cite the interval or say "n too small".
+Regenerate with `lib.analytics.prediction_accuracy`; update this table, not just
+the point estimate.
 
 **Hyperliquid live executor (`services/hyperliquid/src/hyperliquid_bot/risk.py`):**
 - Caps: `$5/order`, `3x` max leverage, `5` max open positions, `$25/day` realized-loss auto-pause.
@@ -341,6 +377,19 @@ All in `~/.claude/scheduled-tasks/`. Run when Claude Code is open. Tasks marked 
 - pull-gcp-secrets — `[RETIRED 2026-04-27]` (one-shot fired 2026-04-02)
 
 ## Gotchas
+
+**Windows / cross-platform (learned 2026-07-24 when CI first ran on the GPU box —
+every one of these had been latent since the repo began):**
+- **Always pass `encoding="utf-8"`** to `read_text` / `write_text` / `open`. Windows defaults to cp1252 and this repo is full of `─ — ✓`, so a bare read dies with `UnicodeDecodeError: 'charmap' codec can't decode byte 0x8f`. All 384 `read_text()` sites are pinned; **~606 `write_text()` sites are not yet** — fix as you touch them. `PYTHONUTF8: "1"` in `ci.yml` covers CI only, not operators running tools by hand.
+- **Never `shutil.which("python3")` on Windows.** It resolves to the Microsoft Store App Execution Alias, a zero-byte reparse point, and `subprocess` fails with `OSError: [WinError 1920] The file cannot be accessed by the system`. Use `sys.executable`. Guarded in `test_inventory.py` and `local_ci_verify.py`; the pattern still exists in `services/control-plane/app/main.py:1355` and the hardcoded `/usr/local/bin/python3` in `services/dashboard/app.py:4191,4271`.
+- **`shell: bash` on the Windows runner resolves to WSL**, not Git Bash — Git for Windows puts `bash.exe` in `Git\bin\` but only `Git\cmd\` is on PATH. The runner service runs as LOCAL SYSTEM where WSL refuses to start. `ci.yml` names `C:\PROGRA~1\Git\bin\bash.exe` explicitly; the 8.3 short path is required because the runner splits a custom `shell:` string on the first space.
+- **`uv` is not on the Windows runner's PATH** (per-user install, invisible to a LOCAL SYSTEM service). The `ensure uv` step in `ci.yml` finds or installs it. Do not swap in `astral-sh/setup-uv` — v5 and v6 both declare Node 20, the runner force-migrates to Node 24, and the action dies with a libuv assertion *after* installing.
+
+**CI / workflow authoring:**
+- **Duplicate top-level YAML keys silently pass `yaml.safe_load`** (last wins) but make Actions reject the whole workflow — it reports `conclusion: failure` with **zero jobs** and `created_at == updated_at`. Validate with a loader that raises on duplicates before pushing a `ci.yml` edit.
+- **`concurrency.cancel-in-progress: true` + one serial Windows runner** means every push kills the in-flight run. A full sequence needs ~15 min; push more often than that and the later jobs (pytest, plugin tests) never get a turn. Batch changes and let a run finish.
+- The workflow-level `env:` block sets `AGENT_TOOLSDIRECTORY` / `RUNNER_TOOL_CACHE` to **macOS paths for every job**, including Windows ones. Harmless while everything uses `uv`; will bite the first `setup-python`.
+
 
 - `conftest.py` patches `sys.path` for legacy imports — don't remove it.
 - Dashboard requires `AUTH_PASSWORD` env var or it crashes on import.

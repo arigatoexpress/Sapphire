@@ -55,7 +55,7 @@ def test_dry_run_writes_plan_json(tmp_path) -> None:
     plan_path = module.write_dry_run_plan(config)
 
     assert plan_path == tmp_path / "plan.dry-run.json"
-    payload = json.loads(plan_path.read_text())
+    payload = json.loads(plan_path.read_text(encoding="utf-8"))
     assert payload["dry_run"] is True
     assert payload["env_flag"] == module.ENV_FLAG
     assert payload["pages"], "plan must list pages"
@@ -87,7 +87,7 @@ def test_ensure_output_dir_is_idempotent(tmp_path) -> None:
     sentinel = target / "sentinel.txt"
     sentinel.write_text("hi")
     module.ensure_output_dir(config)  # second call must not destroy sentinel
-    assert sentinel.read_text() == "hi"
+    assert sentinel.read_text(encoding="utf-8") == "hi"
 
 
 def test_main_dry_run_emits_json_and_returns_zero(tmp_path, capsys) -> None:
@@ -118,7 +118,7 @@ def test_dry_run_idempotent_overwrite(tmp_path) -> None:
     module = _load_module()
     config = module.HarnessConfig(output_dir=tmp_path, dry_run=True)
     first_path = module.write_dry_run_plan(config)
-    first = json.loads(first_path.read_text())
+    first = json.loads(first_path.read_text(encoding="utf-8"))
     second_path = module.write_dry_run_plan(config)
-    second = json.loads(second_path.read_text())
+    second = json.loads(second_path.read_text(encoding="utf-8"))
     assert first == second

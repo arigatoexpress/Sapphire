@@ -138,7 +138,7 @@ def test_snapshot_writes_history_and_last_state(isolated_data, mock_sources):
     assert (isolated_data / "history.jsonl").exists()
     assert (isolated_data / "last_state.json").exists()
 
-    last = json.loads((isolated_data / "last_state.json").read_text())
+    last = json.loads((isolated_data / "last_state.json").read_text(encoding="utf-8"))
     assert last["regime"] == snap["classification"]["regime"]
 
 
@@ -189,7 +189,7 @@ def test_history_jsonl_structure_matches_correlation_engine_expectation(
 ):
     ci = ChainIntelligence()
     ci.snapshot()
-    lines = (isolated_data / "history.jsonl").read_text().strip().splitlines()
+    lines = (isolated_data / "history.jsonl").read_text(encoding="utf-8").strip().splitlines()
     assert lines
     entry = json.loads(lines[-1])
     # correlation.py regime_adjusted_matrices() requires kind, state, unix_ts

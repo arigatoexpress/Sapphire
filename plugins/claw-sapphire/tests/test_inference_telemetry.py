@@ -91,7 +91,7 @@ def test_report_action_writes_provenance_stamped_file(tmp_path: Path):
     )
     assert res["written_to"] == str(output)
     assert output.exists()
-    written = json.loads(output.read_text())
+    written = json.loads(output.read_text(encoding="utf-8"))
     # Provenance envelope is best-effort; if present, it includes a generator name.
     if "provenance" in written:
         assert "generator" in written["provenance"]

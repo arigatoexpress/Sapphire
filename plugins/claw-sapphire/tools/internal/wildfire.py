@@ -400,7 +400,7 @@ def _load_config() -> dict[str, Any]:
     cfg = json.loads(json.dumps(DEFAULT_CONFIG))  # deep copy
     if CONFIG_PATH.exists():
         try:
-            stored = json.loads(CONFIG_PATH.read_text())
+            stored = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             return cfg
         if isinstance(stored, dict):
@@ -680,7 +680,7 @@ def _action_situation(payload: dict[str, Any]) -> dict[str, Any]:
     cached: dict[str, Any] | None = None
     if SITUATION_CACHE_PATH.exists():
         try:
-            cached = json.loads(SITUATION_CACHE_PATH.read_text())
+            cached = json.loads(SITUATION_CACHE_PATH.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             cached = None
 

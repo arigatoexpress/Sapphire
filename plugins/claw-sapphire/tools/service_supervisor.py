@@ -52,7 +52,7 @@ def _parse_dt(value: Any) -> datetime | None:
 def _load_state() -> dict[str, Any]:
     try:
         if STATE_FILE.exists():
-            data = json.loads(STATE_FILE.read_text())
+            data = json.loads(STATE_FILE.read_text(encoding="utf-8"))
             if isinstance(data, dict):
                 data.setdefault("labels", {})
                 data.setdefault("restart_attempts", [])

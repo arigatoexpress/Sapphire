@@ -102,7 +102,7 @@ def test_fetch_abi_writes_cache_and_returns_meta(tmp_path: pathlib.Path) -> None
     abi_file = tmp_path / f"{addr.lower()}.json"
     meta_file = tmp_path / f"{addr.lower()}.meta.json"
     assert abi_file.exists() and meta_file.exists()
-    assert json.loads(abi_file.read_text()) == SAMPLE_ABI
+    assert json.loads(abi_file.read_text(encoding="utf-8")) == SAMPLE_ABI
 
 
 def test_fetch_abi_uses_cache_on_second_call(tmp_path: pathlib.Path) -> None:
@@ -160,7 +160,7 @@ def test_fetch_abi_to_disk_writes_target_path(tmp_path: pathlib.Path) -> None:
     fetch_abi_to_disk(addr, target, http_client=client)
     assert target.exists()
     assert target.with_suffix(".meta.json").exists()
-    assert json.loads(target.read_text()) == SAMPLE_ABI
+    assert json.loads(target.read_text(encoding="utf-8")) == SAMPLE_ABI
 
 
 def test_load_pinned_abi_finds_arbitrum_aave_v3_pool_min() -> None:

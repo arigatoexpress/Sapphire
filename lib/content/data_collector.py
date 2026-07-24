@@ -27,7 +27,7 @@ def _read_jsonl(path: Path) -> list[dict]:
     if not path.exists():
         return []
     rows = []
-    for line in path.read_text().splitlines():
+    for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if line:
             with contextlib.suppress(json.JSONDecodeError):
@@ -37,7 +37,7 @@ def _read_jsonl(path: Path) -> list[dict]:
 
 def _read_json(path: Path, default: Any = None) -> Any:
     try:
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return default
 
@@ -80,7 +80,7 @@ class ContentDataCollector:
         threats: list[str] = []
         if threat_dir.exists():
             for f in sorted(threat_dir.glob("latest_*.md"), reverse=True)[:3]:
-                threats.append(f.read_text()[:2000])
+                threats.append(f.read_text(encoding="utf-8")[:2000])
 
         return CollectedData(
             predictions=predictions,

@@ -188,7 +188,7 @@ def sync_stars() -> dict:
     # Load previous stars to detect new ones
     prev_stars = set()
     if STARS_FILE.exists():
-        prev = json.loads(STARS_FILE.read_text())
+        prev = json.loads(STARS_FILE.read_text(encoding="utf-8"))
         prev_stars = {r["full_name"] for r in prev}
 
     new_stars = [r for r in repos if r["full_name"] not in prev_stars]
@@ -229,7 +229,7 @@ def find_synergies() -> dict:
     if not STARS_FILE.exists():
         return {"error": "No starred repos data. Run sync first."}
 
-    repos = json.loads(STARS_FILE.read_text())
+    repos = json.loads(STARS_FILE.read_text(encoding="utf-8"))
     synergies = []
 
     for repo in repos:
@@ -305,8 +305,8 @@ def generate_report() -> dict:
     if not SYNERGY_FILE.exists():
         return {"error": "No synergy data. Run analyze first."}
 
-    synergies = json.loads(SYNERGY_FILE.read_text())
-    stars = json.loads(STARS_FILE.read_text()) if STARS_FILE.exists() else []
+    synergies = json.loads(SYNERGY_FILE.read_text(encoding="utf-8"))
+    stars = json.loads(STARS_FILE.read_text(encoding="utf-8")) if STARS_FILE.exists() else []
 
     lines = [
         "# Starred Repos Synergy Report",

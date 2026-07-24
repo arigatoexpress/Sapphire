@@ -317,7 +317,7 @@ def action_stats() -> dict:
     recent = []
     for f in files[:20]:
         try:
-            data = json.loads(f.read_text())
+            data = json.loads(f.read_text(encoding="utf-8"))
             total += data.get("count", 0)
             for t, n in (data.get("tiers") or {}).items():
                 tiers_agg[t] = tiers_agg.get(t, 0) + n

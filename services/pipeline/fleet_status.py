@@ -86,7 +86,7 @@ def _tradingview_cdp() -> dict:
 def _webhook_ingress() -> dict:
     local_ok, local_data = _http_get("http://localhost:9090/health", timeout=3)
     tunnel_url_file = ROOT / "data" / "webhook" / "tunnel_url.txt"
-    tunnel_url = tunnel_url_file.read_text().strip() if tunnel_url_file.exists() else None
+    tunnel_url = tunnel_url_file.read_text(encoding="utf-8").strip() if tunnel_url_file.exists() else None
     public_ok = False
     public_data = {}
     if tunnel_url:
@@ -143,7 +143,7 @@ def _tdr_pro() -> dict:
     if not latest_path.exists():
         return {"healthy": False, "error": "no sync summary"}
     try:
-        data = json.loads(latest_path.read_text())
+        data = json.loads(latest_path.read_text(encoding="utf-8"))
         episodes = data.get("episodes", [])
         return {
             "healthy": bool(episodes),
@@ -162,7 +162,7 @@ def _robinhood_chain() -> dict:
         from lib.chain.robinhood_chain import RobinhoodChainClient
 
         deploy_key_path = Path.home() / ".config" / "sapphire-secrets" / "robinhood_deploy_key"
-        deploy_key = deploy_key_path.read_text().strip() if deploy_key_path.exists() else ""
+        deploy_key = deploy_key_path.read_text(encoding="utf-8").strip() if deploy_key_path.exists() else ""
         if not deploy_key:
             return {"healthy": False, "error": "robinhood_deploy_key not found"}
 

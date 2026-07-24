@@ -94,7 +94,7 @@ class TestFiresWhenEnabled:
         # And we should have logged the skip reason for ops visibility
         events_file = tmp_path / "events.jsonl"
         assert events_file.exists()
-        assert "no_private_key" in events_file.read_text()
+        assert "no_private_key" in events_file.read_text(encoding="utf-8")
 
 
 class TestSafetyProperties:
@@ -110,7 +110,7 @@ class TestSafetyProperties:
         # Failure was recorded for the operator
         events_file = tmp_path / "events.jsonl"
         assert events_file.exists()
-        assert "spawn_error" in events_file.read_text()
+        assert "spawn_error" in events_file.read_text(encoding="utf-8")
 
     def test_missing_tool_does_not_raise(
         self, og_enabled: None, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -120,4 +120,4 @@ class TestSafetyProperties:
         with patch("subprocess.Popen") as popen:
             hooks.publish_signal_async({"symbol": "BTC"})
         assert popen.call_count == 0
-        assert "tool_missing" in (tmp_path / "events.jsonl").read_text()
+        assert "tool_missing" in (tmp_path / "events.jsonl").read_text(encoding="utf-8")

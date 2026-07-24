@@ -144,10 +144,10 @@ def test_save_writes_indented_json_and_creates_parents(runtime_policy, tmp_path,
     monkeypatch.setattr(runtime_policy, "POLICY_PATH", target)
     runtime_policy.save({"mode": "restricted", "auto_commit": True})
     assert target.exists()
-    payload = json.loads(target.read_text())
+    payload = json.loads(target.read_text(encoding="utf-8"))
     assert payload == {"mode": "restricted", "auto_commit": True}
     # Indented output → contains newlines.
-    assert "\n" in target.read_text()
+    assert "\n" in target.read_text(encoding="utf-8")
 
 
 def test_save_then_load_round_trip(runtime_policy, isolated_policy_path):
@@ -302,7 +302,7 @@ def test_save_overwrites_existing_file(runtime_policy, isolated_policy_path):
     isolated_policy_path.parent.mkdir(parents=True, exist_ok=True)
     isolated_policy_path.write_text(json.dumps({"mode": "old"}))
     runtime_policy.save({"mode": "new"})
-    assert json.loads(isolated_policy_path.read_text()) == {"mode": "new"}
+    assert json.loads(isolated_policy_path.read_text(encoding="utf-8")) == {"mode": "new"}
 
 
 # ─── docstring / contract sanity ──────────────────────────────────────────────

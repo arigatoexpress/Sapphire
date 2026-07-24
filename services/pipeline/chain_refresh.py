@@ -43,7 +43,7 @@ def _prior_regime_state() -> str | None:
     if not path.exists():
         return None
     try:
-        prior = json.loads(path.read_text())
+        prior = json.loads(path.read_text(encoding="utf-8"))
         return ((prior.get("regime") or {}).get("state")) or None
     except Exception:
         return None

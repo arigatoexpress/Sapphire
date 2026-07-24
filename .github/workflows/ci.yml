@@ -17,6 +17,20 @@ env:
   # writable local cache so no hosted minutes are needed.
   AGENT_TOOLSDIRECTORY: /Users/aribs/.github-runners/toolcache
   RUNNER_TOOL_CACHE: /Users/aribs/.github-runners/toolcache
+  # NB: the two paths above are macOS-shaped and are applied to every job,
+  # including the Windows ones — they point at /Users/aribs on a host where that
+  # does not exist. Harmless today because no job uses setup-python (everything
+  # goes through uv), but it will bite the first action that consults the tool
+  # cache. Tracked in docs/ops/ci-runner-topology.md.
+  #
+  # Windows defaults to cp1252 for text I/O, so any `path.read_text()` or
+  # `open()` without an explicit encoding fails on the box-drawing and em-dash
+  # characters throughout this repo:
+  #   UnicodeDecodeError: 'charmap' codec can't decode byte 0x8f
+  # ~386 such call sites exist; UTF-8 mode covers all of them for CI in one line
+  # and matches the default Python is moving to (PEP 686). New code should still
+  # pass encoding= explicitly — see docs/audits/portfolio-audit-2026-07-24.md.
+  PYTHONUTF8: "1"
 
 permissions:
   contents: read
@@ -31,8 +45,88 @@ jobs:
     name: lint (ruff)
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
+    # `shell: bash` on the Windows runner resolves via PATH to
+    # C:\Windows\System32\bash.exe — the WSL launcher — because Git for Windows
+    # puts bash.exe in Git\bin\ and only Git\cmd\ is on PATH. The runner service
+    # runs as LOCAL SYSTEM, where WSL refuses to start, so every `run:` step died
+    # with WSL_E_LOCAL_SYSTEM_NOT_SUPPORTED. Name Git Bash explicitly, via its 8.3
+    # short path: the runner splits a custom shell string on the first space to find
+    # the executable, so `C:\Program Files\...` fails with "Second path fragment must
+    # not be a drive or UNC name". PROGRA~1 has no space. Keyed off
+    # the same variable that selects the runner, so pointing SAPPHIRE_RUNNER_TESTS
+    # back at the macOS box transparently restores plain `bash`.
+    defaults:
+      run:
+        shell: ${{ contains(vars.SAPPHIRE_RUNNER_TESTS, 'Windows') && 'C:\PROGRA~1\Git\bin\bash.exe --noprofile --norc -e -o pipefail {0}' || 'bash' }}
     timeout-minutes: 10
     steps:
+      # uv is not on the runner service's PATH: the Windows runner runs as
+      # LOCAL SYSTEM, so a per-user install under %USERPROFILE%\.local\bin is
+      # invisible to it (`uv: command not found`, exit 127).
+      #
+      # astral-sh/setup-uv is NOT used here. Both v5 and v6 declare Node 20, the
+      # runner force-migrates them to Node 24, and the action then dies with
+      #   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), src\win\async.c:94
+      # *after* logging "Successfully installed uv" — the step fails despite
+      # succeeding. Avoiding it also keeps every action in this workflow
+      # SHA-pinned.
+      #
+      # Those same runs proved uv is already in the runner tool cache, so put it
+      # on PATH directly. No Node, no third-party action, no deprecated runtime.
+      - name: ensure uv
+        run: |
+          # `set -e -o pipefail` is active, so any lookup that may legitimately
+          # find nothing needs an explicit `|| true`.
+          if command -v uv >/dev/null 2>&1; then
+            echo "uv already on PATH: $(uv --version)"
+            exit 0
+          fi
+
+          # RUNNER_TOOL_CACHE is wrong on the Windows runner — its .env sets a
+          # macOS path copied from the Mac box — so derive locations from
+          # GITHUB_WORKSPACE instead.
+          ws=$(cygpath -u "$GITHUB_WORKSPACE" 2>/dev/null || echo "$GITHUB_WORKSPACE")
+          UV_DIR="$ws/../../_tool/sapphire-uv"
+
+          add_to_path() {
+            if command -v cygpath >/dev/null 2>&1; then
+              cygpath -w "$1" >> "$GITHUB_PATH"
+            else
+              echo "$1" >> "$GITHUB_PATH"
+            fi
+          }
+          has_uv() { [ -x "$1/uv.exe" ] || [ -x "$1/uv" ]; }
+
+          # 1. installed by a previous run of this step (persists on self-hosted)
+          if has_uv "$UV_DIR"; then
+            add_to_path "$UV_DIR"; echo "reusing uv at $UV_DIR"; exit 0
+          fi
+
+          # 2. runner tool cache, if something else populated it
+          cached=$(ls -d "$ws"/../../_tool/uv/*/* 2>/dev/null | sort -V | tail -1 || true)
+          if [ -n "$cached" ] && has_uv "$cached"; then
+            add_to_path "$cached"; echo "using tool-cache uv at $cached"; exit 0
+          fi
+
+          # 3. install to a directory we control. astral-sh/setup-uv is not used:
+          #    v5 and v6 both declare Node 20, the runner force-migrates them to
+          #    Node 24, and they die with a libuv assertion after installing.
+          mkdir -p "$UV_DIR"
+          if command -v powershell.exe >/dev/null 2>&1; then
+            target=$(cygpath -w "$UV_DIR")
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \
+              "\$env:UV_INSTALL_DIR='$target'; irm https://astral.sh/uv/install.ps1 | iex"
+          else
+            curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="$UV_DIR" sh
+          fi
+
+          if ! has_uv "$UV_DIR"; then
+            echo "::error::uv install reported success but no binary at $UV_DIR" >&2
+            ls -la "$UV_DIR" >&2 || true
+            exit 1
+          fi
+          add_to_path "$UV_DIR"
+          echo "installed uv to $UV_DIR"
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: ruff check
         run: uv run --python 3.11 --no-project --with ruff==0.7.4 ruff check --output-format=github .
@@ -45,11 +139,96 @@ jobs:
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
     needs: lint
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
-    timeout-minutes: 15
+    # `shell: bash` on the Windows runner resolves via PATH to
+    # C:\Windows\System32\bash.exe — the WSL launcher — because Git for Windows
+    # puts bash.exe in Git\bin\ and only Git\cmd\ is on PATH. The runner service
+    # runs as LOCAL SYSTEM, where WSL refuses to start, so every `run:` step died
+    # with WSL_E_LOCAL_SYSTEM_NOT_SUPPORTED. Name Git Bash explicitly, via its 8.3
+    # short path: the runner splits a custom shell string on the first space to find
+    # the executable, so `C:\Program Files\...` fails with "Second path fragment must
+    # not be a drive or UNC name". PROGRA~1 has no space. Keyed off
+    # the same variable that selects the runner, so pointing SAPPHIRE_RUNNER_TESTS
+    # back at the macOS box transparently restores plain `bash`.
+    defaults:
+      run:
+        shell: ${{ contains(vars.SAPPHIRE_RUNNER_TESTS, 'Windows') && 'C:\PROGRA~1\Git\bin\bash.exe --noprofile --norc -e -o pipefail {0}' || 'bash' }}
+    # 15 min was enough on macOS but not on Windows: the job was cancelled at
+    # 15m28s, which is this timeout firing, not a test failure. Windows pays a
+    # cold `uv` dependency resolve on top of ~6,700 tests that take ~90s on
+    # Linux with deps already present. Raised with headroom; if a run ever
+    # approaches 30 min, that is a real regression rather than a slow runner.
+    timeout-minutes: 30
     env:
       AUTH_PASSWORD: ci-placeholder
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
     steps:
+      # uv is not on the runner service's PATH: the Windows runner runs as
+      # LOCAL SYSTEM, so a per-user install under %USERPROFILE%\.local\bin is
+      # invisible to it (`uv: command not found`, exit 127).
+      #
+      # astral-sh/setup-uv is NOT used here. Both v5 and v6 declare Node 20, the
+      # runner force-migrates them to Node 24, and the action then dies with
+      #   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), src\win\async.c:94
+      # *after* logging "Successfully installed uv" — the step fails despite
+      # succeeding. Avoiding it also keeps every action in this workflow
+      # SHA-pinned.
+      #
+      # Those same runs proved uv is already in the runner tool cache, so put it
+      # on PATH directly. No Node, no third-party action, no deprecated runtime.
+      - name: ensure uv
+        run: |
+          # `set -e -o pipefail` is active, so any lookup that may legitimately
+          # find nothing needs an explicit `|| true`.
+          if command -v uv >/dev/null 2>&1; then
+            echo "uv already on PATH: $(uv --version)"
+            exit 0
+          fi
+
+          # RUNNER_TOOL_CACHE is wrong on the Windows runner — its .env sets a
+          # macOS path copied from the Mac box — so derive locations from
+          # GITHUB_WORKSPACE instead.
+          ws=$(cygpath -u "$GITHUB_WORKSPACE" 2>/dev/null || echo "$GITHUB_WORKSPACE")
+          UV_DIR="$ws/../../_tool/sapphire-uv"
+
+          add_to_path() {
+            if command -v cygpath >/dev/null 2>&1; then
+              cygpath -w "$1" >> "$GITHUB_PATH"
+            else
+              echo "$1" >> "$GITHUB_PATH"
+            fi
+          }
+          has_uv() { [ -x "$1/uv.exe" ] || [ -x "$1/uv" ]; }
+
+          # 1. installed by a previous run of this step (persists on self-hosted)
+          if has_uv "$UV_DIR"; then
+            add_to_path "$UV_DIR"; echo "reusing uv at $UV_DIR"; exit 0
+          fi
+
+          # 2. runner tool cache, if something else populated it
+          cached=$(ls -d "$ws"/../../_tool/uv/*/* 2>/dev/null | sort -V | tail -1 || true)
+          if [ -n "$cached" ] && has_uv "$cached"; then
+            add_to_path "$cached"; echo "using tool-cache uv at $cached"; exit 0
+          fi
+
+          # 3. install to a directory we control. astral-sh/setup-uv is not used:
+          #    v5 and v6 both declare Node 20, the runner force-migrates them to
+          #    Node 24, and they die with a libuv assertion after installing.
+          mkdir -p "$UV_DIR"
+          if command -v powershell.exe >/dev/null 2>&1; then
+            target=$(cygpath -w "$UV_DIR")
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \
+              "\$env:UV_INSTALL_DIR='$target'; irm https://astral.sh/uv/install.ps1 | iex"
+          else
+            curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="$UV_DIR" sh
+          fi
+
+          if ! has_uv "$UV_DIR"; then
+            echo "::error::uv install reported success but no binary at $UV_DIR" >&2
+            ls -la "$UV_DIR" >&2 || true
+            exit 1
+          fi
+          add_to_path "$UV_DIR"
+          echo "installed uv to $UV_DIR"
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: pytest (unit + coverage)
         # PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 is set at the job level to avoid
@@ -64,6 +243,9 @@ jobs:
             -p no:cacheprovider \
             -p pytest_asyncio.plugin \
             -p pytest_cov.plugin \
+            -p pytest_timeout \
+            --timeout=120 \
+            --timeout-method=thread \
             --cov=lib --cov=services --cov=plugins \
             --cov-report=xml \
             --cov-fail-under=60
@@ -79,6 +261,19 @@ jobs:
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
     needs: lint
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
+    # `shell: bash` on the Windows runner resolves via PATH to
+    # C:\Windows\System32\bash.exe — the WSL launcher — because Git for Windows
+    # puts bash.exe in Git\bin\ and only Git\cmd\ is on PATH. The runner service
+    # runs as LOCAL SYSTEM, where WSL refuses to start, so every `run:` step died
+    # with WSL_E_LOCAL_SYSTEM_NOT_SUPPORTED. Name Git Bash explicitly, via its 8.3
+    # short path: the runner splits a custom shell string on the first space to find
+    # the executable, so `C:\Program Files\...` fails with "Second path fragment must
+    # not be a drive or UNC name". PROGRA~1 has no space. Keyed off
+    # the same variable that selects the runner, so pointing SAPPHIRE_RUNNER_TESTS
+    # back at the macOS box transparently restores plain `bash`.
+    defaults:
+      run:
+        shell: ${{ contains(vars.SAPPHIRE_RUNNER_TESTS, 'Windows') && 'C:\PROGRA~1\Git\bin\bash.exe --noprofile --norc -e -o pipefail {0}' || 'bash' }}
     timeout-minutes: 15
     env:
       # The self-hosted runner's system Python has stray packages (e.g.
@@ -87,6 +282,73 @@ jobs:
       # autoload so only the explicitly requested test path runs.
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
     steps:
+      # uv is not on the runner service's PATH: the Windows runner runs as
+      # LOCAL SYSTEM, so a per-user install under %USERPROFILE%\.local\bin is
+      # invisible to it (`uv: command not found`, exit 127).
+      #
+      # astral-sh/setup-uv is NOT used here. Both v5 and v6 declare Node 20, the
+      # runner force-migrates them to Node 24, and the action then dies with
+      #   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), src\win\async.c:94
+      # *after* logging "Successfully installed uv" — the step fails despite
+      # succeeding. Avoiding it also keeps every action in this workflow
+      # SHA-pinned.
+      #
+      # Those same runs proved uv is already in the runner tool cache, so put it
+      # on PATH directly. No Node, no third-party action, no deprecated runtime.
+      - name: ensure uv
+        run: |
+          # `set -e -o pipefail` is active, so any lookup that may legitimately
+          # find nothing needs an explicit `|| true`.
+          if command -v uv >/dev/null 2>&1; then
+            echo "uv already on PATH: $(uv --version)"
+            exit 0
+          fi
+
+          # RUNNER_TOOL_CACHE is wrong on the Windows runner — its .env sets a
+          # macOS path copied from the Mac box — so derive locations from
+          # GITHUB_WORKSPACE instead.
+          ws=$(cygpath -u "$GITHUB_WORKSPACE" 2>/dev/null || echo "$GITHUB_WORKSPACE")
+          UV_DIR="$ws/../../_tool/sapphire-uv"
+
+          add_to_path() {
+            if command -v cygpath >/dev/null 2>&1; then
+              cygpath -w "$1" >> "$GITHUB_PATH"
+            else
+              echo "$1" >> "$GITHUB_PATH"
+            fi
+          }
+          has_uv() { [ -x "$1/uv.exe" ] || [ -x "$1/uv" ]; }
+
+          # 1. installed by a previous run of this step (persists on self-hosted)
+          if has_uv "$UV_DIR"; then
+            add_to_path "$UV_DIR"; echo "reusing uv at $UV_DIR"; exit 0
+          fi
+
+          # 2. runner tool cache, if something else populated it
+          cached=$(ls -d "$ws"/../../_tool/uv/*/* 2>/dev/null | sort -V | tail -1 || true)
+          if [ -n "$cached" ] && has_uv "$cached"; then
+            add_to_path "$cached"; echo "using tool-cache uv at $cached"; exit 0
+          fi
+
+          # 3. install to a directory we control. astral-sh/setup-uv is not used:
+          #    v5 and v6 both declare Node 20, the runner force-migrates them to
+          #    Node 24, and they die with a libuv assertion after installing.
+          mkdir -p "$UV_DIR"
+          if command -v powershell.exe >/dev/null 2>&1; then
+            target=$(cygpath -w "$UV_DIR")
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \
+              "\$env:UV_INSTALL_DIR='$target'; irm https://astral.sh/uv/install.ps1 | iex"
+          else
+            curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="$UV_DIR" sh
+          fi
+
+          if ! has_uv "$UV_DIR"; then
+            echo "::error::uv install reported success but no binary at $UV_DIR" >&2
+            ls -la "$UV_DIR" >&2 || true
+            exit 1
+          fi
+          add_to_path "$UV_DIR"
+          echo "installed uv to $UV_DIR"
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: pytest (claw-sapphire)
         run: uv run --python 3.11 --no-project --with-requirements requirements-test.txt pytest plugins/claw-sapphire/tests/ -q
@@ -96,8 +358,88 @@ jobs:
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
     needs: lint
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
+    # `shell: bash` on the Windows runner resolves via PATH to
+    # C:\Windows\System32\bash.exe — the WSL launcher — because Git for Windows
+    # puts bash.exe in Git\bin\ and only Git\cmd\ is on PATH. The runner service
+    # runs as LOCAL SYSTEM, where WSL refuses to start, so every `run:` step died
+    # with WSL_E_LOCAL_SYSTEM_NOT_SUPPORTED. Name Git Bash explicitly, via its 8.3
+    # short path: the runner splits a custom shell string on the first space to find
+    # the executable, so `C:\Program Files\...` fails with "Second path fragment must
+    # not be a drive or UNC name". PROGRA~1 has no space. Keyed off
+    # the same variable that selects the runner, so pointing SAPPHIRE_RUNNER_TESTS
+    # back at the macOS box transparently restores plain `bash`.
+    defaults:
+      run:
+        shell: ${{ contains(vars.SAPPHIRE_RUNNER_TESTS, 'Windows') && 'C:\PROGRA~1\Git\bin\bash.exe --noprofile --norc -e -o pipefail {0}' || 'bash' }}
     timeout-minutes: 15
     steps:
+      # uv is not on the runner service's PATH: the Windows runner runs as
+      # LOCAL SYSTEM, so a per-user install under %USERPROFILE%\.local\bin is
+      # invisible to it (`uv: command not found`, exit 127).
+      #
+      # astral-sh/setup-uv is NOT used here. Both v5 and v6 declare Node 20, the
+      # runner force-migrates them to Node 24, and the action then dies with
+      #   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), src\win\async.c:94
+      # *after* logging "Successfully installed uv" — the step fails despite
+      # succeeding. Avoiding it also keeps every action in this workflow
+      # SHA-pinned.
+      #
+      # Those same runs proved uv is already in the runner tool cache, so put it
+      # on PATH directly. No Node, no third-party action, no deprecated runtime.
+      - name: ensure uv
+        run: |
+          # `set -e -o pipefail` is active, so any lookup that may legitimately
+          # find nothing needs an explicit `|| true`.
+          if command -v uv >/dev/null 2>&1; then
+            echo "uv already on PATH: $(uv --version)"
+            exit 0
+          fi
+
+          # RUNNER_TOOL_CACHE is wrong on the Windows runner — its .env sets a
+          # macOS path copied from the Mac box — so derive locations from
+          # GITHUB_WORKSPACE instead.
+          ws=$(cygpath -u "$GITHUB_WORKSPACE" 2>/dev/null || echo "$GITHUB_WORKSPACE")
+          UV_DIR="$ws/../../_tool/sapphire-uv"
+
+          add_to_path() {
+            if command -v cygpath >/dev/null 2>&1; then
+              cygpath -w "$1" >> "$GITHUB_PATH"
+            else
+              echo "$1" >> "$GITHUB_PATH"
+            fi
+          }
+          has_uv() { [ -x "$1/uv.exe" ] || [ -x "$1/uv" ]; }
+
+          # 1. installed by a previous run of this step (persists on self-hosted)
+          if has_uv "$UV_DIR"; then
+            add_to_path "$UV_DIR"; echo "reusing uv at $UV_DIR"; exit 0
+          fi
+
+          # 2. runner tool cache, if something else populated it
+          cached=$(ls -d "$ws"/../../_tool/uv/*/* 2>/dev/null | sort -V | tail -1 || true)
+          if [ -n "$cached" ] && has_uv "$cached"; then
+            add_to_path "$cached"; echo "using tool-cache uv at $cached"; exit 0
+          fi
+
+          # 3. install to a directory we control. astral-sh/setup-uv is not used:
+          #    v5 and v6 both declare Node 20, the runner force-migrates them to
+          #    Node 24, and they die with a libuv assertion after installing.
+          mkdir -p "$UV_DIR"
+          if command -v powershell.exe >/dev/null 2>&1; then
+            target=$(cygpath -w "$UV_DIR")
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \
+              "\$env:UV_INSTALL_DIR='$target'; irm https://astral.sh/uv/install.ps1 | iex"
+          else
+            curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="$UV_DIR" sh
+          fi
+
+          if ! has_uv "$UV_DIR"; then
+            echo "::error::uv install reported success but no binary at $UV_DIR" >&2
+            ls -la "$UV_DIR" >&2 || true
+            exit 1
+          fi
+          add_to_path "$UV_DIR"
+          echo "installed uv to $UV_DIR"
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: README test inventory
         run: |
@@ -109,8 +451,88 @@ jobs:
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
     needs: lint
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
+    # `shell: bash` on the Windows runner resolves via PATH to
+    # C:\Windows\System32\bash.exe — the WSL launcher — because Git for Windows
+    # puts bash.exe in Git\bin\ and only Git\cmd\ is on PATH. The runner service
+    # runs as LOCAL SYSTEM, where WSL refuses to start, so every `run:` step died
+    # with WSL_E_LOCAL_SYSTEM_NOT_SUPPORTED. Name Git Bash explicitly, via its 8.3
+    # short path: the runner splits a custom shell string on the first space to find
+    # the executable, so `C:\Program Files\...` fails with "Second path fragment must
+    # not be a drive or UNC name". PROGRA~1 has no space. Keyed off
+    # the same variable that selects the runner, so pointing SAPPHIRE_RUNNER_TESTS
+    # back at the macOS box transparently restores plain `bash`.
+    defaults:
+      run:
+        shell: ${{ contains(vars.SAPPHIRE_RUNNER_TESTS, 'Windows') && 'C:\PROGRA~1\Git\bin\bash.exe --noprofile --norc -e -o pipefail {0}' || 'bash' }}
     timeout-minutes: 15
     steps:
+      # uv is not on the runner service's PATH: the Windows runner runs as
+      # LOCAL SYSTEM, so a per-user install under %USERPROFILE%\.local\bin is
+      # invisible to it (`uv: command not found`, exit 127).
+      #
+      # astral-sh/setup-uv is NOT used here. Both v5 and v6 declare Node 20, the
+      # runner force-migrates them to Node 24, and the action then dies with
+      #   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), src\win\async.c:94
+      # *after* logging "Successfully installed uv" — the step fails despite
+      # succeeding. Avoiding it also keeps every action in this workflow
+      # SHA-pinned.
+      #
+      # Those same runs proved uv is already in the runner tool cache, so put it
+      # on PATH directly. No Node, no third-party action, no deprecated runtime.
+      - name: ensure uv
+        run: |
+          # `set -e -o pipefail` is active, so any lookup that may legitimately
+          # find nothing needs an explicit `|| true`.
+          if command -v uv >/dev/null 2>&1; then
+            echo "uv already on PATH: $(uv --version)"
+            exit 0
+          fi
+
+          # RUNNER_TOOL_CACHE is wrong on the Windows runner — its .env sets a
+          # macOS path copied from the Mac box — so derive locations from
+          # GITHUB_WORKSPACE instead.
+          ws=$(cygpath -u "$GITHUB_WORKSPACE" 2>/dev/null || echo "$GITHUB_WORKSPACE")
+          UV_DIR="$ws/../../_tool/sapphire-uv"
+
+          add_to_path() {
+            if command -v cygpath >/dev/null 2>&1; then
+              cygpath -w "$1" >> "$GITHUB_PATH"
+            else
+              echo "$1" >> "$GITHUB_PATH"
+            fi
+          }
+          has_uv() { [ -x "$1/uv.exe" ] || [ -x "$1/uv" ]; }
+
+          # 1. installed by a previous run of this step (persists on self-hosted)
+          if has_uv "$UV_DIR"; then
+            add_to_path "$UV_DIR"; echo "reusing uv at $UV_DIR"; exit 0
+          fi
+
+          # 2. runner tool cache, if something else populated it
+          cached=$(ls -d "$ws"/../../_tool/uv/*/* 2>/dev/null | sort -V | tail -1 || true)
+          if [ -n "$cached" ] && has_uv "$cached"; then
+            add_to_path "$cached"; echo "using tool-cache uv at $cached"; exit 0
+          fi
+
+          # 3. install to a directory we control. astral-sh/setup-uv is not used:
+          #    v5 and v6 both declare Node 20, the runner force-migrates them to
+          #    Node 24, and they die with a libuv assertion after installing.
+          mkdir -p "$UV_DIR"
+          if command -v powershell.exe >/dev/null 2>&1; then
+            target=$(cygpath -w "$UV_DIR")
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \
+              "\$env:UV_INSTALL_DIR='$target'; irm https://astral.sh/uv/install.ps1 | iex"
+          else
+            curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="$UV_DIR" sh
+          fi
+
+          if ! has_uv "$UV_DIR"; then
+            echo "::error::uv install reported success but no binary at $UV_DIR" >&2
+            ls -la "$UV_DIR" >&2 || true
+            exit 1
+          fi
+          add_to_path "$UV_DIR"
+          echo "installed uv to $UV_DIR"
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: scan public routes for admin data leaks
         run: |
@@ -121,8 +543,88 @@ jobs:
     name: tool registry invariants
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
+    # `shell: bash` on the Windows runner resolves via PATH to
+    # C:\Windows\System32\bash.exe — the WSL launcher — because Git for Windows
+    # puts bash.exe in Git\bin\ and only Git\cmd\ is on PATH. The runner service
+    # runs as LOCAL SYSTEM, where WSL refuses to start, so every `run:` step died
+    # with WSL_E_LOCAL_SYSTEM_NOT_SUPPORTED. Name Git Bash explicitly, via its 8.3
+    # short path: the runner splits a custom shell string on the first space to find
+    # the executable, so `C:\Program Files\...` fails with "Second path fragment must
+    # not be a drive or UNC name". PROGRA~1 has no space. Keyed off
+    # the same variable that selects the runner, so pointing SAPPHIRE_RUNNER_TESTS
+    # back at the macOS box transparently restores plain `bash`.
+    defaults:
+      run:
+        shell: ${{ contains(vars.SAPPHIRE_RUNNER_TESTS, 'Windows') && 'C:\PROGRA~1\Git\bin\bash.exe --noprofile --norc -e -o pipefail {0}' || 'bash' }}
     timeout-minutes: 10
     steps:
+      # uv is not on the runner service's PATH: the Windows runner runs as
+      # LOCAL SYSTEM, so a per-user install under %USERPROFILE%\.local\bin is
+      # invisible to it (`uv: command not found`, exit 127).
+      #
+      # astral-sh/setup-uv is NOT used here. Both v5 and v6 declare Node 20, the
+      # runner force-migrates them to Node 24, and the action then dies with
+      #   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), src\win\async.c:94
+      # *after* logging "Successfully installed uv" — the step fails despite
+      # succeeding. Avoiding it also keeps every action in this workflow
+      # SHA-pinned.
+      #
+      # Those same runs proved uv is already in the runner tool cache, so put it
+      # on PATH directly. No Node, no third-party action, no deprecated runtime.
+      - name: ensure uv
+        run: |
+          # `set -e -o pipefail` is active, so any lookup that may legitimately
+          # find nothing needs an explicit `|| true`.
+          if command -v uv >/dev/null 2>&1; then
+            echo "uv already on PATH: $(uv --version)"
+            exit 0
+          fi
+
+          # RUNNER_TOOL_CACHE is wrong on the Windows runner — its .env sets a
+          # macOS path copied from the Mac box — so derive locations from
+          # GITHUB_WORKSPACE instead.
+          ws=$(cygpath -u "$GITHUB_WORKSPACE" 2>/dev/null || echo "$GITHUB_WORKSPACE")
+          UV_DIR="$ws/../../_tool/sapphire-uv"
+
+          add_to_path() {
+            if command -v cygpath >/dev/null 2>&1; then
+              cygpath -w "$1" >> "$GITHUB_PATH"
+            else
+              echo "$1" >> "$GITHUB_PATH"
+            fi
+          }
+          has_uv() { [ -x "$1/uv.exe" ] || [ -x "$1/uv" ]; }
+
+          # 1. installed by a previous run of this step (persists on self-hosted)
+          if has_uv "$UV_DIR"; then
+            add_to_path "$UV_DIR"; echo "reusing uv at $UV_DIR"; exit 0
+          fi
+
+          # 2. runner tool cache, if something else populated it
+          cached=$(ls -d "$ws"/../../_tool/uv/*/* 2>/dev/null | sort -V | tail -1 || true)
+          if [ -n "$cached" ] && has_uv "$cached"; then
+            add_to_path "$cached"; echo "using tool-cache uv at $cached"; exit 0
+          fi
+
+          # 3. install to a directory we control. astral-sh/setup-uv is not used:
+          #    v5 and v6 both declare Node 20, the runner force-migrates them to
+          #    Node 24, and they die with a libuv assertion after installing.
+          mkdir -p "$UV_DIR"
+          if command -v powershell.exe >/dev/null 2>&1; then
+            target=$(cygpath -w "$UV_DIR")
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \
+              "\$env:UV_INSTALL_DIR='$target'; irm https://astral.sh/uv/install.ps1 | iex"
+          else
+            curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="$UV_DIR" sh
+          fi
+
+          if ! has_uv "$UV_DIR"; then
+            echo "::error::uv install reported success but no binary at $UV_DIR" >&2
+            ls -la "$UV_DIR" >&2 || true
+            exit 1
+          fi
+          add_to_path "$UV_DIR"
+          echo "installed uv to $UV_DIR"
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - run: uv run --python 3.11 --no-project --with pyyaml python scripts/validate_tool_registry.py
 
@@ -130,8 +632,88 @@ jobs:
     name: pine static analyzer
     if: ${{ vars.SAPPHIRE_RUNNER != '' }}
     runs-on: ${{ fromJSON(vars.SAPPHIRE_RUNNER_TESTS || vars.SAPPHIRE_RUNNER) }}
+    # `shell: bash` on the Windows runner resolves via PATH to
+    # C:\Windows\System32\bash.exe — the WSL launcher — because Git for Windows
+    # puts bash.exe in Git\bin\ and only Git\cmd\ is on PATH. The runner service
+    # runs as LOCAL SYSTEM, where WSL refuses to start, so every `run:` step died
+    # with WSL_E_LOCAL_SYSTEM_NOT_SUPPORTED. Name Git Bash explicitly, via its 8.3
+    # short path: the runner splits a custom shell string on the first space to find
+    # the executable, so `C:\Program Files\...` fails with "Second path fragment must
+    # not be a drive or UNC name". PROGRA~1 has no space. Keyed off
+    # the same variable that selects the runner, so pointing SAPPHIRE_RUNNER_TESTS
+    # back at the macOS box transparently restores plain `bash`.
+    defaults:
+      run:
+        shell: ${{ contains(vars.SAPPHIRE_RUNNER_TESTS, 'Windows') && 'C:\PROGRA~1\Git\bin\bash.exe --noprofile --norc -e -o pipefail {0}' || 'bash' }}
     timeout-minutes: 10
     steps:
+      # uv is not on the runner service's PATH: the Windows runner runs as
+      # LOCAL SYSTEM, so a per-user install under %USERPROFILE%\.local\bin is
+      # invisible to it (`uv: command not found`, exit 127).
+      #
+      # astral-sh/setup-uv is NOT used here. Both v5 and v6 declare Node 20, the
+      # runner force-migrates them to Node 24, and the action then dies with
+      #   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), src\win\async.c:94
+      # *after* logging "Successfully installed uv" — the step fails despite
+      # succeeding. Avoiding it also keeps every action in this workflow
+      # SHA-pinned.
+      #
+      # Those same runs proved uv is already in the runner tool cache, so put it
+      # on PATH directly. No Node, no third-party action, no deprecated runtime.
+      - name: ensure uv
+        run: |
+          # `set -e -o pipefail` is active, so any lookup that may legitimately
+          # find nothing needs an explicit `|| true`.
+          if command -v uv >/dev/null 2>&1; then
+            echo "uv already on PATH: $(uv --version)"
+            exit 0
+          fi
+
+          # RUNNER_TOOL_CACHE is wrong on the Windows runner — its .env sets a
+          # macOS path copied from the Mac box — so derive locations from
+          # GITHUB_WORKSPACE instead.
+          ws=$(cygpath -u "$GITHUB_WORKSPACE" 2>/dev/null || echo "$GITHUB_WORKSPACE")
+          UV_DIR="$ws/../../_tool/sapphire-uv"
+
+          add_to_path() {
+            if command -v cygpath >/dev/null 2>&1; then
+              cygpath -w "$1" >> "$GITHUB_PATH"
+            else
+              echo "$1" >> "$GITHUB_PATH"
+            fi
+          }
+          has_uv() { [ -x "$1/uv.exe" ] || [ -x "$1/uv" ]; }
+
+          # 1. installed by a previous run of this step (persists on self-hosted)
+          if has_uv "$UV_DIR"; then
+            add_to_path "$UV_DIR"; echo "reusing uv at $UV_DIR"; exit 0
+          fi
+
+          # 2. runner tool cache, if something else populated it
+          cached=$(ls -d "$ws"/../../_tool/uv/*/* 2>/dev/null | sort -V | tail -1 || true)
+          if [ -n "$cached" ] && has_uv "$cached"; then
+            add_to_path "$cached"; echo "using tool-cache uv at $cached"; exit 0
+          fi
+
+          # 3. install to a directory we control. astral-sh/setup-uv is not used:
+          #    v5 and v6 both declare Node 20, the runner force-migrates them to
+          #    Node 24, and they die with a libuv assertion after installing.
+          mkdir -p "$UV_DIR"
+          if command -v powershell.exe >/dev/null 2>&1; then
+            target=$(cygpath -w "$UV_DIR")
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \
+              "\$env:UV_INSTALL_DIR='$target'; irm https://astral.sh/uv/install.ps1 | iex"
+          else
+            curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="$UV_DIR" sh
+          fi
+
+          if ! has_uv "$UV_DIR"; then
+            echo "::error::uv install reported success but no binary at $UV_DIR" >&2
+            ls -la "$UV_DIR" >&2 || true
+            exit 1
+          fi
+          add_to_path "$UV_DIR"
+          echo "installed uv to $UV_DIR"
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 2

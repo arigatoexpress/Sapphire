@@ -100,7 +100,7 @@ def _load_state(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
     try:
-        raw = json.loads(path.read_text())
+        raw = json.loads(path.read_text(encoding="utf-8"))
         return raw if isinstance(raw, dict) else {}
     except Exception:
         return {}

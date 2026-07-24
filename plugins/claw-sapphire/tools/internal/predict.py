@@ -161,7 +161,7 @@ def _read_chain_features(symbol: str) -> tuple[float | None, float | None]:
     try:
         if not CHAIN_LATEST_FILE.exists():
             return (None, None)
-        raw = CHAIN_LATEST_FILE.read_text()
+        raw = CHAIN_LATEST_FILE.read_text(encoding="utf-8")
         data = json.loads(raw)
     except (OSError, json.JSONDecodeError, ValueError):
         return (None, None)
@@ -474,7 +474,7 @@ def action_score() -> dict:
     correct_count = 0
     pending_within_window = 0
 
-    for line in PREDICTIONS_FILE.read_text().splitlines():
+    for line in PREDICTIONS_FILE.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
             continue
@@ -523,7 +523,7 @@ def action_history() -> dict:
     if not PREDICTIONS_FILE.exists():
         return {"predictions": [], "accuracy": "N/A"}
 
-    preds = [json.loads(l) for l in PREDICTIONS_FILE.read_text().strip().split("\n")]
+    preds = [json.loads(l) for l in PREDICTIONS_FILE.read_text(encoding="utf-8").strip().split("\n")]
     scored = [p for p in preds if p.get("correct") is not None]
     correct = sum(1 for p in scored if p["correct"])
 

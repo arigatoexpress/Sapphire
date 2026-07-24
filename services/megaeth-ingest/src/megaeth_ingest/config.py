@@ -185,7 +185,7 @@ def _read_yaml(path: Path) -> dict[str, Any]:
     if yaml is None or not path.exists():
         return {}
     try:
-        text = path.read_text()
+        text = path.read_text(encoding="utf-8")
     except OSError as exc:
         logger.warning("megaeth_ingest: cannot read %s: %s", path, exc)
         return {}

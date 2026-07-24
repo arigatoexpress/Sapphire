@@ -198,7 +198,7 @@ async def test_get_reserves_data_recorded_fixture_decodes_8_reserves() -> None:
     """Captured 2026-04-30 from MegaETH mainnet."""
     if not FIXTURE.exists():
         pytest.skip(f"fixture missing: {FIXTURE}")
-    raw_hex = FIXTURE.read_text().strip()
+    raw_hex = FIXTURE.read_text(encoding="utf-8").strip()
     client = StubClient({ADDRS.ui_pool_data_provider: raw_hex})
     aave = AaveV3(client, ADDRS)
     reserves = await aave.get_reserves_data()

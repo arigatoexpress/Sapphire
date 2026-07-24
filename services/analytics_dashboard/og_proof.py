@@ -49,7 +49,7 @@ def _load_deployments() -> dict[str, Any]:
     if not deployments_file.exists():
         return {}
     try:
-        loaded = json.loads(deployments_file.read_text())
+        loaded = json.loads(deployments_file.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
     return loaded if isinstance(loaded, dict) else {}

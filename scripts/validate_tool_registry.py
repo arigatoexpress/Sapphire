@@ -53,7 +53,7 @@ def _iter_tool_files() -> list[Path]:
 
 
 def _load_registry() -> dict:
-    with REGISTRY.open() as f:
+    with REGISTRY.open(encoding="utf-8") as f:
         data = yaml.safe_load(f)
     if not isinstance(data, dict) or "tools" not in data:
         raise SystemExit("registry: malformed (missing `tools` list)")
@@ -61,7 +61,7 @@ def _load_registry() -> dict:
 
 
 def _load_manifest() -> dict:
-    with MANIFEST.open() as f:
+    with MANIFEST.open(encoding="utf-8") as f:
         data = yaml.safe_load(f)
     if not isinstance(data, dict) or "tools" not in data:
         raise SystemExit("manifest: malformed (missing `tools` list)")
@@ -71,7 +71,7 @@ def _load_manifest() -> dict:
 def _compile_check(path: Path) -> str | None:
     """Compile-parse the file; return error string or None on success."""
     try:
-        src = path.read_text()
+        src = path.read_text(encoding="utf-8")
     except OSError as e:
         return f"read failed: {e}"
     try:
@@ -84,7 +84,7 @@ def _compile_check(path: Path) -> str | None:
 def _shim_has_deprecation_warning(path: Path) -> bool:
     if not path.exists():
         return False
-    src = path.read_text()
+    src = path.read_text(encoding="utf-8")
     return "warnings.warn" in src and "DeprecationWarning" in src
 
 

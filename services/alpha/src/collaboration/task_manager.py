@@ -795,7 +795,7 @@ class TaskManager:
             path = Path(self._store_path)
             if not path.exists():
                 return
-            data = json.loads(path.read_text())
+            data = json.loads(path.read_text(encoding="utf-8"))
             self._tasks = data.get("tasks", {})
             self._milestones = data.get("milestones", {})
             self._deliverables = data.get("deliverables", {})

@@ -11,6 +11,12 @@
 pytest==9.0.3
 pytest-asyncio==1.4.0
 pytest-cov==7.1.0
+# pytest-timeout: the Windows runner's first full unit run reached 68% in ~7 min
+# and then hung for 23m35s until the job timeout killed it, so no failure summary
+# was ever printed. A per-test timeout turns that hang into a named failure with
+# a traceback instead of a wall-clock wall. Load explicitly with
+# `-p pytest_timeout` — CI sets PYTEST_DISABLE_PLUGIN_AUTOLOAD=1.
+pytest-timeout>=2.3,<3
 
 # property-based + mutation testing (Tranche 6 Lane 1 — see
 # docs/products/test-rigor-0.1.0.md). Authorized for the test-rigor lane only;
@@ -31,6 +37,11 @@ fastapi==0.139.0
 # feedparser==6.0.11 here pulled sgmllib3k, an unmaintained 2009 SGML backport
 # whose setup.py also breaks on setuptools 74+ — see issue #539.
 flask==3.1.3
+# uvicorn is required to COLLECT tests/unit/test_webhook_receiver.py (57 tests
+# on the TradingView -> webhook trading critical path). It was in pyproject's
+# [dev] extra but not here, so `make test` silently un-collected the whole file
+# via tests/conftest.py::pytest_ignore_collect and still reported green.
+uvicorn>=0.30,<1.0
 httpx==0.28.1
 requests==2.34.2
 websockets>=16.1,<17

@@ -128,7 +128,7 @@ def test_signal_post_appends_jsonl(client, isolated_signals):
 
     signals_file = isolated_signals / "trading_signals.jsonl"
     assert signals_file.exists()
-    lines = signals_file.read_text().strip().splitlines()
+    lines = signals_file.read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 1
     logged = json.loads(lines[0])
     assert logged["symbol"] == "BTCUSDT"
@@ -152,7 +152,7 @@ def test_signal_post_appends_system_events(client, isolated_signals):
     )
     events_file = isolated_signals / "system_events.jsonl"
     assert events_file.exists()
-    events = [json.loads(line) for line in events_file.read_text().strip().splitlines()]
+    events = [json.loads(line) for line in events_file.read_text(encoding="utf-8").strip().splitlines()]
     assert len(events) == 1
     assert events[0]["type"] == "signal.received"
     assert "type:trading" in events[0]["tags"]

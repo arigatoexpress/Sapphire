@@ -194,7 +194,7 @@ class StateLoader:
         if not self.chain_path.exists():
             return {}
         try:
-            raw = json.loads(self.chain_path.read_text())
+            raw = json.loads(self.chain_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as e:
             log.warning("chain.json unreadable: %s", e)
             return {}
@@ -477,7 +477,7 @@ class DecisionEngine:
         try:
             if not self.state_path.exists():
                 return ""
-            return json.loads(self.state_path.read_text()).get("regime", "")
+            return json.loads(self.state_path.read_text(encoding="utf-8")).get("regime", "")
         except (OSError, json.JSONDecodeError):
             return ""
 

@@ -182,7 +182,7 @@ def test_record_task_result_write_appends_jsonl(tmp_path) -> None:
     assert response["write_enabled"] is True
     target = tmp_path / artifacts.RESULT_FILE
     assert target.exists()
-    rows = [json.loads(line) for line in target.read_text().splitlines()]
+    rows = [json.loads(line) for line in target.read_text(encoding="utf-8").splitlines()]
     assert len(rows) == 1
     assert rows[0]["task_id"] == "t-1"
     assert rows[0]["status"] == "completed"
@@ -195,7 +195,7 @@ def test_record_task_result_write_appends_jsonl(tmp_path) -> None:
         artifact_dir=tmp_path,
         write=True,
     )
-    rows = [json.loads(line) for line in target.read_text().splitlines()]
+    rows = [json.loads(line) for line in target.read_text(encoding="utf-8").splitlines()]
     assert [r["task_id"] for r in rows] == ["t-1", "t-2"]
     assert rows[1]["safety"]["operator_review_required"] is False
 
@@ -449,7 +449,7 @@ def test_lease_tasks_write_creates_jsonl(tmp_path) -> None:
 
     target = tmp_path / artifacts.LEASE_FILE
     assert target.exists()
-    rows = [json.loads(line) for line in target.read_text().splitlines()]
+    rows = [json.loads(line) for line in target.read_text(encoding="utf-8").splitlines()]
     assert rows[0]["agent_id"] == "windows-gpu"
     assert rows[0]["safety"]["execution_enabled"] is False
     assert rows[0]["safety"]["live_trading_enabled"] is False

@@ -17,4 +17,4 @@ def load_pinned_abi(rel_path: str, *, base_dir: pathlib.Path | None = None) -> l
     target = root / rel_path
     if not target.exists():
         raise AbiFetchError(f"pinned ABI missing: {target}")
-    return json.loads(target.read_text())
+    return json.loads(target.read_text(encoding="utf-8"))

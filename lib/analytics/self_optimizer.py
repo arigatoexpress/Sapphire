@@ -193,7 +193,7 @@ def load_recent_proposals(limit: int = 20, path: Path | None = None) -> list[dic
     path = path or PROPOSALS_FILE
     if not path.exists():
         return []
-    lines = path.read_text().strip().splitlines()[-limit:]
+    lines = path.read_text(encoding="utf-8").strip().splitlines()[-limit:]
     out: list[dict] = []
     for line in lines:
         with contextlib.suppress(json.JSONDecodeError):

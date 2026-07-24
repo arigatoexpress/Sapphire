@@ -443,7 +443,7 @@ def generate_pine(spec: PineSpec) -> str:
         template = env.get_template(template_name)
         rendered = template.render(**context)
     else:  # pragma: no cover - exercised when jinja2 is absent
-        rendered = _stdlib_render(template_path.read_text(), context)
+        rendered = _stdlib_render(template_path.read_text(encoding="utf-8"), context)
 
     # Final post-processing: ensure trailing newline, strip CR.
     rendered = rendered.replace("\r\n", "\n")

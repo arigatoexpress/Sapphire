@@ -26,7 +26,7 @@ def _load() -> list[dict[str, Any]]:
     if not PREDICTIONS_FILE.exists():
         return []
     try:
-        raw = PREDICTIONS_FILE.read_text()
+        raw = PREDICTIONS_FILE.read_text(encoding="utf-8")
     except OSError:
         return []
     out: list[dict[str, Any]] = []

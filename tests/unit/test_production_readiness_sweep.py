@@ -203,6 +203,13 @@ def test_scheduled_launchagent_nonzero_last_status_warns(monkeypatch) -> None:
         + [f"-\t{status}\t{label}" for label, status in scheduled]
     )
 
+    # This test exercises the macOS launchctl parsing, and patches sweep.run
+    # accordingly. probe_launchagents() branches on sys.platform, and the
+    # Windows branch calls subprocess.run directly rather than sweep.run — so on
+    # the Windows runner the patch was bypassed, a real PowerShell was spawned,
+    # and the job hung. Pin the platform so the branch under test is the branch
+    # that gets run, on every host.
+    monkeypatch.setattr(sys, "platform", "darwin")
     monkeypatch.setattr(sweep, "run", lambda _cmd: sweep.RunResult(0, stdout, "", 12))
 
     checks = {check.name: check for check in sweep.probe_launchagents()}

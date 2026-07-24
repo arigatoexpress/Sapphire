@@ -180,7 +180,7 @@ def extract_last_prompt(jsonl_path: Path) -> tuple[str, str]:
     last_prompt = ""
     branch = ""
     try:
-        for line in jsonl_path.read_text().splitlines():
+        for line in jsonl_path.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if not line:
                 continue
