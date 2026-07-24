@@ -77,6 +77,9 @@ def _missing_optional_test_deps(collection_path: Path) -> list[str]:
     return missing
 
 
+_SKIPPED_FOR_MISSING_DEPS: dict[str, list[str]] = {}
+
+
 def pytest_ignore_collect(collection_path: Path, config) -> bool:
     """Let under-provisioned local Pythons collect cleanly.
 
@@ -85,7 +88,33 @@ def pytest_ignore_collect(collection_path: Path, config) -> bool:
     in lighter environments, avoid turning optional import gaps into collection
     failures.
     """
-    return bool(_missing_optional_test_deps(Path(collection_path)))
+    missing = _missing_optional_test_deps(Path(collection_path))
+    if missing:
+        try:
+            rel = Path(collection_path).resolve().relative_to(REPO_ROOT).as_posix()
+        except ValueError:
+            rel = str(collection_path)
+        _SKIPPED_FOR_MISSING_DEPS[rel] = missing
+    return bool(missing)
+
+
+def pytest_terminal_summary(terminalreporter, exitstatus, config) -> None:
+    """Announce silently un-collected files.
+
+    Dropping a file from collection removes it from the pass count *and* from
+    the failure count, so a missing dependency reads as a smaller green suite
+    rather than as lost coverage. That hid 57 webhook-receiver tests on the
+    trading critical path behind a green run. Make the gap visible.
+    """
+    if not _SKIPPED_FOR_MISSING_DEPS:
+        return
+    terminalreporter.write_sep("=", "NOT COLLECTED — missing optional deps", yellow=True)
+    for rel, missing in sorted(_SKIPPED_FOR_MISSING_DEPS.items()):
+        terminalreporter.write_line(f"  {rel}  (needs: {', '.join(missing)})")
+    terminalreporter.write_line(
+        f"  {len(_SKIPPED_FOR_MISSING_DEPS)} file(s) skipped entirely — "
+        "these count as neither passed nor failed."
+    )
 
 
 # Redirect PerformanceTracker writes to a tmp dir during tests.

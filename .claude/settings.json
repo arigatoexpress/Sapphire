@@ -1,5 +1,10 @@
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "command": "bash -c 'cd \"${CLAUDE_PROJECT_DIR:-.}\" && [[ \"$(uname)\" == \"Linux\" ]] && bash scripts/ops/bootstrap_cloud_session.sh 2>&1 | tail -3; exit 0'"
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Edit|Write",

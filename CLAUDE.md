@@ -6,8 +6,12 @@ Autonomous trading + intelligence + content ops. Telegram-first, agent-driven, e
 
 ```bash
 # Test
-pytest tests/unit/ --tb=short -q           # 6,580 collected by test_inventory.py
-pytest plugins/claw-sapphire/tests/ -q     # 604 collected by test_inventory.py
+pytest tests/unit/ --tb=short -q           # 6,701 pass, 0 fail, 10 xfail (2026-07-24)
+pytest plugins/claw-sapphire/tests/ -q     # 633 pass
+
+# Cloud / fresh container: install deps FIRST or you get ~42 phantom collection
+# errors that look like a broken repo. Runs automatically via the SessionStart hook.
+bash scripts/ops/bootstrap_cloud_session.sh
 
 # Lint
 ruff check .                          # pyproject.toml rules (E501 ignored)
@@ -88,14 +92,16 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 
 ## Module Map
 
-**Key counts (verified 2026-07-03 via `scripts/ops/test_inventory.py --check-readme`):** 7,245 collected tests (6,617 core + 628 plugin) across 439 files · 52 dashboard pages · 7 quant strategies · 29 LaunchAgent plists in `infra/launchagents/` (TV pair added in PRs #505/#506; `continuous-intelligence-daily` + `mac-to-windows-tunnel` added 2026-05-03–12; tracked definitions remain operator-controlled; see `docs/archive/2026/audits/launchagents-audit-2026-04-21.md`) plus 1 disabled template. Note: `com.sapphire.analytics-dashboard`, `com.sapphire.kronos-daily`, `com.sapphire.outcome-resolver`, and `com.sapphire.vpin-materializer` were archived on the Mac side as of 2026-05-12 — these four were installed-only LaunchAgents (no source plist was ever committed to `infra/launchagents/`) · 22 scheduled tasks · 3 smart contracts.
+**Key counts (verified 2026-07-24 by direct count; regenerate with `scripts/ops/test_inventory.py --check-readme`).** These drift every few weeks — if a number here disagrees with the tree, trust the tree and fix this line. The 2026-07-03 figures were wrong on six of eight counts.
+
+7,334 collected tests (6,701 core + 633 plugin) across 459 files · 46 dashboard pages (`services/dashboard/templates/pages/`) · 5 concrete quant strategies (the old "7" counted the `Strategy` ABC and the `StrategyParams` dataclass as strategies) · 33 LaunchAgent plists in `infra/launchagents/` (TV pair added in PRs #505/#506; `continuous-intelligence-daily` + `mac-to-windows-tunnel` added 2026-05-03–12; tracked definitions remain operator-controlled; see `docs/archive/2026/audits/launchagents-audit-2026-04-21.md`) plus 1 disabled template. Note: `com.sapphire.analytics-dashboard`, `com.sapphire.kronos-daily`, `com.sapphire.outcome-resolver`, and `com.sapphire.vpin-materializer` were archived on the Mac side as of 2026-05-12 — these four were installed-only LaunchAgents (no source plist was ever committed to `infra/launchagents/`) · 22 scheduled tasks · 3 smart contracts.
 
 | Path | Type | Description |
 |------|------|-------------|
 | `lib/core/` | library | Risk kernel, position sizing, **event_bus**, **heartbeat** (60s state machine), **kill_switch** (global + security), **confirmation_firewall** (2-phase commit), **decision_engine** (explainable autonomous ranking), **security_monitor**. Also `src/sapphire_core/` package (cognitive agent, executor, gateway, memory, telegram_bot). |
-| `lib/analytics/` | library | 24 modules — strategies (7: RegimeAwareRSI, FundingRateContrarian, CorrelationBreakout, MultiTFMomentum, SapphireComposite + base + params), CPCV, regime GMM, VPIN, backtest_engine, risk_engine, deflated_sharpe, liquidation, correlation, factors, forecast (Kronos+TA consensus), performance, performance_tracker, prediction_accuracy, brain_accuracy, strategy_performance, backtest_results, signal_enhancer, self_optimizer, run_strategies, sentiment, indicators. |
+| `lib/analytics/` | library | 25 modules — strategies (5 concrete: RegimeAwareRSI, FundingRateContrarian, CorrelationBreakout, MultiTFMomentum, SapphireComposite; plus the `Strategy` ABC and `StrategyParams`, which are scaffolding, not strategies), CPCV, regime GMM, VPIN, backtest_engine, risk_engine, deflated_sharpe, liquidation, correlation, factors, forecast (Kronos+TA consensus), performance, performance_tracker, prediction_accuracy, brain_accuracy, strategy_performance, backtest_results, signal_enhancer, self_optimizer, run_strategies, sentiment, indicators. |
 | `lib/chain/` | library | On-chain intelligence: regime, funding, OI, TVL, stablecoin supply, whale flow. **`coinmetrics.py`** (on-chain fundamentals), **`robinhood_chain.py`** (Arbitrum Orbit chain ID 46630 web3 client), `intelligence.py`, `sources.py`, `providers/` (CoinGlass, Dune, Whale Alert, Santiment, CoinAPI, BGGeometrics). |
-| `lib/content/` | library | 14-module research-to-publish pipeline: `data_collector` → `thesis_engine` → `draft_generator` → `report_generator` → `visualizations` → `quality` (7-check rubric) → `performance_policy` (blocks premature accuracy claims) → `qa_pipeline` → `formatters` → `approval` (Telegram sign-off) → `publisher`/`auto_publish` → `scheduler` (Mon brief / Wed AI intel / Fri security / daily pulse). Publishers: `substack`, `x`, `linkedin`, `typefully`. Also `outreach.py` (lead-engine integration). |
+| `lib/content/` | library | 14-module research-to-publish pipeline. **The arrow diagram below is the intended design, not the wiring.** Verified 2026-07-24: `data_collector` has *zero* references anywhere in the repo (not even a test); `thesis_engine` and `draft_generator` are imported only by `tests/unit/test_content_thesis_drafts.py`. The first three stages have no production caller — treat them as a prototype until wired or deleted. Design: `data_collector` → `thesis_engine` → `draft_generator` → `report_generator` → `visualizations` → `quality` (7-check rubric) → `performance_policy` (blocks premature accuracy claims) → `qa_pipeline` → `formatters` → `approval` (Telegram sign-off) → `publisher`/`auto_publish` → `scheduler` (Mon brief / Wed AI intel / Fri security / daily pulse). Publishers: `substack`, `x`, `linkedin`, `typefully`. Also `outreach.py` (lead-engine integration). |
 | `lib/foundry/` | library | **Palantir Foundry integration**: `client` (bearer + OAuth), `ingestion` (local → ontology objects), `readiness` (repo-grounded audit), `sync` (15-min delta-aware + Telegram alerts). |
 | `lib/portfolio/` | library | **`robinhood.py`** — Robinhood Crypto API client (Ed25519-signed REST, accounts, holdings, best_bid_ask, order history, reconstructed cost basis). Credentials in `~/.config/sapphire-secrets/`. |
 | `lib/security/` | library | **Security platform**: `dependency_scanner` (OSV.dev CVE lookup + CycloneDX 1.5 SBOM), `model_monitor` (Ollama blob SHA-256 + Jinja2 backdoor detection), `network_mapper` (Tailscale topology + trust-zone scoring + attack-surface). |
@@ -120,9 +126,9 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 | `services/security_pipeline/` | service | Scheduled full-system security scan → SOC page. |
 | `services/pm_bot/` | service | PM bot webhook and reviewed Telegram draft queue [Mac:18082]. |
 | `services/webhook/` | service | TradingView webhook receiver [Windows:9090]. |
-| `plugins/claw-sapphire/` | plugin | 118 tool scripts on disk (64 at top level + 52 in `internal/` + 2 in `_deprecated/`), 10 libs, 604 collected tests. |
+| `plugins/claw-sapphire/` | plugin | 117 tool scripts on disk (64 top level + 52 `internal/` + 1 `_deprecated/`), 10 libs, 633 collected tests. |
 | `contracts/` | solidity | **`SapphireSignalVerifier.sol`** (on-chain signal registry with ZK proof hash field), **`SapphirePaymentGate.sol`** (micropayment gate), **`SapphireSentinelRegistry.sol`** (non-custodial agent mandate/payment receipt anchor). Deployed on Robinhood Chain testnet via `scripts/deploy_robinhood_chain.py`. |
-| `pine/` | pine | 5 TradingView strategies (standalone/: v1, v2, v3 Ultra, MultiSymbol Screener, Mac variant). |
+| `pine/` | pine | 25 `.pine` files — 5 curated standalone strategies (v1, v2, v3 Ultra, MultiSymbol Screener, Mac variant) plus generated output under `pine/generated/`. |
 | `skills/` | skills | Agent-executable capabilities. |
 | `data/content/` | data | Content engine drafts + ready/ queue. |
 | `data/chain/` | data | Deployed contract addresses (`deployments.json`), chain snapshots. |
@@ -157,7 +163,11 @@ Event bus: Redis Streams primary → JSONL file fallback (`data/events/bus.jsonl
 - TypeScript: strict mode, no `any`
 - Every module has a SKILL.md — read before working on that module
 - Services never import from other services — only from `lib/`
-- PnL is king. Sortino/Calmar over Sharpe. 80%+ win rate target.
+- PnL is king. Sortino/Calmar over Sharpe.
+- "80%+ win rate" is an **aspiration, not a measurement.** Nothing in this repo
+  has demonstrated it; the measured sample is n=36 with a CI spanning 50%
+  (see Trading Pipeline). Win rate alone is also the wrong target — it is
+  trivially gamed by tight take-profits and wide stops. Judge on expectancy.
 
 ## Satellite Repos (orchestrated, not absorbed)
 
@@ -257,7 +267,27 @@ Manage at https://claude.ai/code/routines.
 TradingView → webhook (Win :9090) → signal logger (Mac :18081) → Telegram
 Autonomous signal generator scans RSI/MACD/BB/MA → generates signals → paper trades
 Paper portfolio: $100K, ATR-based SL/TP (1.67:1 R:R), 10% position sizing
-Prediction accuracy: 61.1% overall, BTC 83.3% (n=36 scored of 42)
+
+**Prediction accuracy — no demonstrated edge yet (n=36).** Treat the headline
+numbers as a sample too small to act on, not as validation:
+
+| Slice | Hits | Rate | 95% CI (Wilson) | p vs coin flip |
+|---|---|---|---|---|
+| Overall | 22/36 | 61.1% | **[44.9%, 75.2%]** | 0.243 |
+| BTC | 10/12 | 83.3% | [55.2%, 95.3%] | 0.039 |
+| ETH | 6/12 | 50.0% | [25.4%, 74.6%] | 1.000 |
+| SOL | 6/12 | 50.0% | [25.4%, 74.6%] | 1.000 |
+
+The overall CI **includes 50%** — the result is not distinguishable from chance.
+BTC's p=0.039 is the best of three symbols tested; at three comparisons the
+Bonferroni threshold is 0.0167, so it does not survive correction either. ETH
+and SOL are exactly chance. Reaching ±5% precision at this hit rate needs
+roughly n≈370, i.e. ~10x more scored predictions.
+
+Do not quote "verified 61.1% / BTC 83.3%" as evidence of edge in grant
+applications, pitches, or the dashboard — cite the interval or say "n too small".
+Regenerate with `lib.analytics.prediction_accuracy`; update this table, not just
+the point estimate.
 
 **Hyperliquid live executor (`services/hyperliquid/src/hyperliquid_bot/risk.py`):**
 - Caps: `$5/order`, `3x` max leverage, `5` max open positions, `$25/day` realized-loss auto-pause.

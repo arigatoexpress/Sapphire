@@ -547,7 +547,12 @@ def synthesize_thesis(
         return _mock_thesis(
             signal_payload, mode_actual="dry-run-blocked-by-env", model=model, now=now
         )
-    sensitive, reason = _sensitivity(prompt)
+    # Gate the *injected* data, not the assembled prompt. build_user_prompt()
+    # wraps the signal in a static in-repo template whose rules line reads "Do
+    # not include secrets, credentials, raw private payloads" — scanning that
+    # constant makes the guardrail's own wording trip the guardrail, blocking
+    # every live call. The signal payload is the only untrusted input here.
+    sensitive, reason = _sensitivity(json.dumps(signal_payload, default=str, sort_keys=True))
     if sensitive:
         thesis = _mock_thesis(signal_payload, mode_actual="dry-run-safety", model=model, now=now)
         thesis.provenance_envelope["sensitivity"] = {"sensitive": True, "reason": reason}

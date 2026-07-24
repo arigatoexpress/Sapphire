@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 import pytest
 
 from lib.synthesis import narrative_engine as engine
+from lib.synthesis.prompts import build_user_prompt
 from lib.synthesis.rubric import score_narrative
 
 FROZEN_NOW = datetime(2026, 4, 28, 12, 0, 0, tzinfo=UTC)
@@ -236,3 +237,27 @@ def _good_live_payload() -> dict:
         "confidence": 0.81,
         "caveat_block": "Research-only dry-run narrative; no live trade execution.",
     }
+
+
+def test_static_prompt_template_does_not_trip_the_sensitivity_gate(
+    isolated_engine, monkeypatch
+) -> None:
+    """The guardrail must not block on its own wording.
+
+    build_user_prompt() embeds the rule "Do not include secrets, credentials,
+    raw private payloads". When the gate scanned the assembled prompt rather
+    than the injected signal, that constant matched the credential-keyword rule
+    and every live call silently degraded to dry-run-safety. Regression for
+    that class of self-inflicted false positive.
+    """
+    monkeypatch.setenv("SAPPHIRE_NARRATIVE_LIVE", "1")
+    prompt = build_user_prompt(_signal(), max_input_chars=6000, mode="live")
+    assert "secrets, credentials" in prompt, "template wording changed; update this test"
+
+    # A benign signal must clear the gate...
+    assert engine._sensitivity(json.dumps(_signal(), default=str, sort_keys=True))[0] is False
+    # ...while genuinely sensitive payload content still blocks.
+    # Assembled at runtime so the repo carries no real-shaped token.
+    token = "gh" + "p_" + ("abcdef0123456789" * 3)[:38]
+    tainted = {**_signal(), "note": token}
+    assert engine._sensitivity(json.dumps(tainted, default=str, sort_keys=True))[0] is True

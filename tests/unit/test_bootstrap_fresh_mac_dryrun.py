@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import os
+import platform
 import plistlib
 import subprocess
 from pathlib import Path
+
+IS_MACOS = platform.system() == "Darwin"
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BOOTSTRAP = REPO_ROOT / "scripts" / "ops" / "bootstrap_fresh_mac.sh"
@@ -41,10 +44,18 @@ def test_bootstrap_dry_run_traces_without_writing(tmp_path: Path) -> None:
 
     assert "[dry-run]" in result.stdout
     assert "git clone https://github.com/arigatoexpress/Sapphire.git" in result.stdout
-    assert "RunAtLoad=false" in result.stdout
     assert "local_ci_verify.py" in result.stdout
     assert not home.exists()
     assert not target_repo.exists()
+
+    # LaunchAgents are a macOS concept. On Linux the script announces the
+    # fallback and skips plist installation, so asserting on plist output there
+    # tests the host, not the bootstrap. Assert the correct branch either way
+    # rather than dropping the coverage.
+    if IS_MACOS:
+        assert "RunAtLoad=false" in result.stdout
+    else:
+        assert "launchagents: skipped on non-macOS" in result.stdout
 
 
 def test_demo_secrets_example_is_inert() -> None:
