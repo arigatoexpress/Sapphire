@@ -64,7 +64,14 @@ def status(label: str, *, loaded: bool = True, exit_code: int | None = 0, pid: i
 def supervisor_env(monkeypatch, tmp_path):
     state_file = tmp_path / "state.json"
     monkeypatch.setattr(service_supervisor, "STATE_FILE", state_file)
-    monkeypatch.setattr(service_supervisor.os, "getuid", lambda: 501)
+    # raising=False because os.getuid does not exist on Windows, and
+    # monkeypatch.setattr refuses to create a missing attribute by default —
+    # which errored all 11 tests in this file when CI moved to the Windows
+    # runner. The supervisor only needs the uid to build the macOS
+    # `launchctl gui/<uid>` domain string; launchctl itself is mocked, so these
+    # are platform-independent logic tests (cooldown, rate limiting, state
+    # round-trip) and are worth keeping on every runner rather than skipping.
+    monkeypatch.setattr(service_supervisor.os, "getuid", lambda: 501, raising=False)
     monkeypatch.setattr(service_supervisor, "_get_firestore_db", lambda: None)
     monkeypatch.setattr(service_supervisor, "send_alert", lambda *args, **kwargs: {"ok": True})
     return state_file

@@ -152,7 +152,12 @@ jobs:
     defaults:
       run:
         shell: ${{ contains(vars.SAPPHIRE_RUNNER_TESTS, 'Windows') && 'C:\PROGRA~1\Git\bin\bash.exe --noprofile --norc -e -o pipefail {0}' || 'bash' }}
-    timeout-minutes: 15
+    # 15 min was enough on macOS but not on Windows: the job was cancelled at
+    # 15m28s, which is this timeout firing, not a test failure. Windows pays a
+    # cold `uv` dependency resolve on top of ~6,700 tests that take ~90s on
+    # Linux with deps already present. Raised with headroom; if a run ever
+    # approaches 30 min, that is a real regression rather than a slow runner.
+    timeout-minutes: 30
     env:
       AUTH_PASSWORD: ci-placeholder
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
