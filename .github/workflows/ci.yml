@@ -46,6 +46,12 @@ jobs:
         shell: ${{ contains(vars.SAPPHIRE_RUNNER_TESTS, 'Windows') && 'C:\PROGRA~1\Git\bin\bash.exe --noprofile --norc -e -o pipefail {0}' || 'bash' }}
     timeout-minutes: 10
     steps:
+      # uv is not on the runner service's PATH: the Windows runner runs as
+      # LOCAL SYSTEM, so a per-user uv install under %USERPROFILE%\.local\bin is
+      # invisible to it (`uv: command not found`, exit 127). Provision it in the
+      # job rather than depending on machine state — this also makes the job
+      # reproducible on any runner, hosted or self-hosted.
+      - uses: astral-sh/setup-uv@v5
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: ruff check
         run: uv run --python 3.11 --no-project --with ruff==0.7.4 ruff check --output-format=github .
@@ -76,6 +82,12 @@ jobs:
       AUTH_PASSWORD: ci-placeholder
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
     steps:
+      # uv is not on the runner service's PATH: the Windows runner runs as
+      # LOCAL SYSTEM, so a per-user uv install under %USERPROFILE%\.local\bin is
+      # invisible to it (`uv: command not found`, exit 127). Provision it in the
+      # job rather than depending on machine state — this also makes the job
+      # reproducible on any runner, hosted or self-hosted.
+      - uses: astral-sh/setup-uv@v5
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: pytest (unit + coverage)
         # PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 is set at the job level to avoid
@@ -126,6 +138,12 @@ jobs:
       # autoload so only the explicitly requested test path runs.
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
     steps:
+      # uv is not on the runner service's PATH: the Windows runner runs as
+      # LOCAL SYSTEM, so a per-user uv install under %USERPROFILE%\.local\bin is
+      # invisible to it (`uv: command not found`, exit 127). Provision it in the
+      # job rather than depending on machine state — this also makes the job
+      # reproducible on any runner, hosted or self-hosted.
+      - uses: astral-sh/setup-uv@v5
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: pytest (claw-sapphire)
         run: uv run --python 3.11 --no-project --with-requirements requirements-test.txt pytest plugins/claw-sapphire/tests/ -q
@@ -150,6 +168,12 @@ jobs:
         shell: ${{ contains(vars.SAPPHIRE_RUNNER_TESTS, 'Windows') && 'C:\PROGRA~1\Git\bin\bash.exe --noprofile --norc -e -o pipefail {0}' || 'bash' }}
     timeout-minutes: 15
     steps:
+      # uv is not on the runner service's PATH: the Windows runner runs as
+      # LOCAL SYSTEM, so a per-user uv install under %USERPROFILE%\.local\bin is
+      # invisible to it (`uv: command not found`, exit 127). Provision it in the
+      # job rather than depending on machine state — this also makes the job
+      # reproducible on any runner, hosted or self-hosted.
+      - uses: astral-sh/setup-uv@v5
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: README test inventory
         run: |
@@ -176,6 +200,12 @@ jobs:
         shell: ${{ contains(vars.SAPPHIRE_RUNNER_TESTS, 'Windows') && 'C:\PROGRA~1\Git\bin\bash.exe --noprofile --norc -e -o pipefail {0}' || 'bash' }}
     timeout-minutes: 15
     steps:
+      # uv is not on the runner service's PATH: the Windows runner runs as
+      # LOCAL SYSTEM, so a per-user uv install under %USERPROFILE%\.local\bin is
+      # invisible to it (`uv: command not found`, exit 127). Provision it in the
+      # job rather than depending on machine state — this also makes the job
+      # reproducible on any runner, hosted or self-hosted.
+      - uses: astral-sh/setup-uv@v5
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: scan public routes for admin data leaks
         run: |
@@ -201,6 +231,12 @@ jobs:
         shell: ${{ contains(vars.SAPPHIRE_RUNNER_TESTS, 'Windows') && 'C:\PROGRA~1\Git\bin\bash.exe --noprofile --norc -e -o pipefail {0}' || 'bash' }}
     timeout-minutes: 10
     steps:
+      # uv is not on the runner service's PATH: the Windows runner runs as
+      # LOCAL SYSTEM, so a per-user uv install under %USERPROFILE%\.local\bin is
+      # invisible to it (`uv: command not found`, exit 127). Provision it in the
+      # job rather than depending on machine state — this also makes the job
+      # reproducible on any runner, hosted or self-hosted.
+      - uses: astral-sh/setup-uv@v5
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - run: uv run --python 3.11 --no-project --with pyyaml python scripts/validate_tool_registry.py
 
@@ -223,6 +259,12 @@ jobs:
         shell: ${{ contains(vars.SAPPHIRE_RUNNER_TESTS, 'Windows') && 'C:\PROGRA~1\Git\bin\bash.exe --noprofile --norc -e -o pipefail {0}' || 'bash' }}
     timeout-minutes: 10
     steps:
+      # uv is not on the runner service's PATH: the Windows runner runs as
+      # LOCAL SYSTEM, so a per-user uv install under %USERPROFILE%\.local\bin is
+      # invisible to it (`uv: command not found`, exit 127). Provision it in the
+      # job rather than depending on machine state — this also makes the job
+      # reproducible on any runner, hosted or self-hosted.
+      - uses: astral-sh/setup-uv@v5
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 2
