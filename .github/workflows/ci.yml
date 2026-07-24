@@ -243,6 +243,9 @@ jobs:
             -p no:cacheprovider \
             -p pytest_asyncio.plugin \
             -p pytest_cov.plugin \
+            -p pytest_timeout \
+            --timeout=120 \
+            --timeout-method=thread \
             --cov=lib --cov=services --cov=plugins \
             --cov-report=xml \
             --cov-fail-under=60
