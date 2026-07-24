@@ -31,6 +31,24 @@ Repository → Settings → Secrets and variables → Actions → Variables:
 SAPPHIRE_RUNNER_TESTS = ["self-hosted","Windows","X64","sapphire-win"]
 ```
 
+Set 2026-07-24.
+
+Three things that look like the switch but are not, all observed while doing it:
+
+- **A shell environment variable is the wrong layer.** `vars.*` is evaluated by
+  GitHub's scheduler server-side, when it decides which runner receives the job.
+  Exporting `SAPPHIRE_RUNNER_TESTS` in a container, on the Mac, or on the Windows
+  box cannot reach that decision — none of those machines are in the scheduling
+  path.
+- **A GitHub *Environment* variable is also the wrong scope.** Variables defined
+  under Settings → Environments only reach jobs that declare `environment:
+  <name>`. No job in `ci.yml` does. It must be a *repository* variable.
+- **Already-queued runs do not pick it up.** `runs-on` is resolved when the job
+  is created, so a run that was queued before the variable existed keeps
+  targeting the old runner forever. Push a commit (the `concurrency` group's
+  `cancel-in-progress` retires the stale run) or use Re-run all jobs. Waiting
+  will not help.
+
 Must be a JSON array — `fromJSON()` parses it, and the labels have to match the
 Windows runner's registration exactly (the same set `win-runner-smoke.yml`
 already targets). Leave `SAPPHIRE_RUNNER` pointing at the Mac.
